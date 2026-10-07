@@ -242,6 +242,8 @@ export interface ReservaServicio {
   telefono?: string | null;
   /** Solo existe si la migración 20260923_reservas_llegada.sql está aplicada. */
   llegada_at?: string | null;
+  /** Lo que escribió el cliente (alergias, trona, celebración…): Hoy lo enseña en la tarjeta y en la mesa. */
+  notas_cliente?: string | null;
 }
 
 export const haLlegado = (estado: string) => estado === ESTADO_LLEGADA;

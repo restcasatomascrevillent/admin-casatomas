@@ -20,7 +20,7 @@
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
-import { Maximize2, Move, ZoomIn, ZoomOut } from "lucide-react";
+import { Maximize2, MessageSquareText, Move, Star, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Mesa } from "@/hooks/useMesas";
@@ -40,6 +40,12 @@ import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
 const MARGEN_ENCUADRE = 32;
 const ZOOM_MIN = 0.2;
 const ZOOM_MAX = 5;
+/** Desde este lado (px en pantalla) la mesa lleva dentro la hora o los minutos. */
+const UMBRAL_TIEMPO_PX = 34;
+/** …y de ancho al menos esto, para que «14:30» o «45 min» quepan en una línea. */
+const ANCHO_MIN_TIEMPO_PX = 46;
+/** Desde este lado lleva encima el cartel con el nombre (la elegida y las del buscador, siempre). */
+const UMBRAL_CARTEL_PX = 28;
 
 export interface MapaSalaServicioProps {
   salaNombre: string;
@@ -119,7 +125,7 @@ export function MapaSalaServicio({
     // Antes que el controlador (mismo elemento y fase: se ejecutan por orden de alta).
     const alBajar = (e: PointerEvent) => {
       if (e.pointerType === "touch") return;
-      ratonSobreVacio.current = e.button === 0 && !(e.target as HTMLElement | null)?.closest?.("[data-mesa-id]");
+      ratonSobreVacio.current = e.button === 0 && !(e.target as HTMLElement | null)?.closest?.("[data-mesa-id],[data-halo-mesa]");
     };
     contenedor.addEventListener("pointerdown", alBajar, true);
     controlador.current = crearGestosTactiles({
@@ -250,7 +256,16 @@ export function MapaSalaServicio({
   );
 }
 
-/** Una mesa: la forma (girada) con el color del estado y, encima y DERECHOS, su número y su tiempo. */
+/**
+ * Una mesa, en TRES capas (revisión de diseño, 07/10/2026: con el halo táctil de 44 px pegado al botón,
+ * el 57 % de la mesa 7 abría la 8, que va después en el DOM):
+ *   1. HALO (z 1): el área táctil ampliada a 44 px, por DEBAJO de todas las mesas. Solo cuenta donde no
+ *      hay ninguna mesa dibujada.
+ *   2. BOTÓN (z 10+): la mesa con su forma EXACTA (girada, redonda si es redonda). Un toque dentro de una
+ *      mesa visible abre SIEMPRE esa mesa.
+ *   3. ROTULACIÓN (encima, sin eventos): número derecho, hora o minutos, icono del estado en la esquina,
+ *      estrella / nota del cliente y el cartel con el nombre.
+ */
 function MesaServicio({
   mesa,
   x,
@@ -279,89 +294,96 @@ function MesaServicio({
   onClick: (e: MouseEvent) => void;
 }) {
   const estado = resultado?.estado ?? "libre";
-  const { etiqueta, clases, badge } = CONFIG_ESTADO_MESA[estado];
+  const { etiqueta, clases, badge, Icono, icono } = CONFIG_ESTADO_MESA[estado];
   const reserva = resultado?.reserva ?? null;
   const lado = Math.min(ancho, alto);
-  // Zona sensible de 44 px REALES como mínimo, sin comerse la de la vecina (14 px por lado como mucho).
+  // Halo de 44 px REALES como mínimo alrededor de la mesa (14 px por lado como mucho).
   const relleno = Math.min(14, Math.max(4, (44 - lado) / 2));
-  const tamanoNumero = Math.max(13, Math.min(18, lado * 0.34));
+  const tamanoNumero = Math.max(14, Math.min(22, lado * 0.42));
   const tiempo = tiempoCortoMesa(estado, resultado?.minutos ?? null, reserva?.hora);
-  const conTiempo = !!tiempo && lado >= 44;
-  // Un cartel por reserva (en la primera de unas mesas juntas: dos iguales se pisarían). Con el plano
-  // alejado (mesas de menos de ~36 px) los carteles se pisarían entre sí: entonces solo salen en la mesa
-  // elegida y en las que encuentra el buscador.
-  const conCartel = !!reserva && cartel && (lado >= 36 || seleccionada || resaltada);
+  // Solo si cabe en UNA línea a 13 px («14:30», «45 min» ≈ 40 px): partida en dos no se lee.
+  const conTiempo = !!tiempo && lado >= UMBRAL_TIEMPO_PX && ancho >= ANCHO_MIN_TIEMPO_PX;
+  // Un cartel por reserva (en la primera de unas mesas juntas: dos iguales se pisarían). Con el plano muy
+  // alejado se pisarían entre sí: entonces solo salen en la mesa elegida y en las que encuentra el buscador.
+  const conCartel = !!reserva && cartel && (lado >= UMBRAL_CARTEL_PX || seleccionada || resaltada);
   const detalle = resultado ? textoMinutosMesa(estado, resultado.minutos) : null;
+  const importante = !!reserva?.importante;
+  const nota = (reserva?.notas_cliente ?? "").trim();
   const etiquetaAccesible =
     `Mesa ${mesa.nombre}, ${mesa.capacidad} plazas, ${etiqueta}` +
     (reserva
       ? `: ${reserva.nombre || "sin nombre"} a las ${String(reserva.hora).slice(0, 5)}, ${reserva.numero_comensales} comensales`
       : "") +
-    (detalle ? `, ${detalle}` : "");
+    (detalle ? `, ${detalle}` : "") +
+    (importante ? ", importante" : "") +
+    (nota ? `, nota del cliente: ${nota}` : "");
+  const z = seleccionada ? 30 : resaltada ? 20 : 10;
+  const caja = { left: x, top: y, width: ancho, height: alto };
 
   return (
-    <button
-      type="button"
-      data-mesa-id={mesa.id}
-      data-estado={estado}
-      data-atenuada={atenuada ? "true" : undefined}
-      aria-label={etiquetaAccesible}
-      aria-pressed={seleccionada}
-      onClick={onClick}
-      className="group absolute touch-manipulation outline-none"
-      style={{
-        left: x - relleno,
-        top: y - relleno,
-        width: ancho + relleno * 2,
-        height: alto + relleno * 2,
-        zIndex: seleccionada ? 30 : resaltada ? 20 : 10,
-      }}
-    >
-      <span
+    <>
+      <div
         aria-hidden="true"
+        data-halo-mesa={mesa.id}
+        onClick={onClick}
+        className="absolute touch-manipulation"
+        style={{ left: x - relleno, top: y - relleno, width: ancho + relleno * 2, height: alto + relleno * 2, zIndex: 1 }}
+      />
+      <button
+        type="button"
+        data-mesa-id={mesa.id}
+        data-estado={estado}
+        data-atenuada={atenuada ? "true" : undefined}
+        aria-label={etiquetaAccesible}
+        aria-pressed={seleccionada}
+        onClick={onClick}
         className={cn(
-          "absolute border-2 shadow-sm transition-[opacity,box-shadow]",
+          "absolute touch-manipulation shadow-sm outline-none transition-[opacity,box-shadow]",
           mesa.forma === "circular" ? "rounded-full" : "rounded-lg",
           clases,
           atenuada && "opacity-35",
           resaltada && "ring-2 ring-primary/70",
           seleccionada && "ring-4 ring-primary ring-offset-2 ring-offset-background",
-          "group-focus-visible:ring-4 group-focus-visible:ring-ring",
+          "focus-visible:ring-4 focus-visible:ring-ring",
         )}
-        style={{
-          left: relleno,
-          top: relleno,
-          width: ancho,
-          height: alto,
-          transform: `rotate(${mesa.rotacion || 0}deg)`,
-          transformOrigin: "center center",
-        }}
+        style={{ ...caja, zIndex: z, transform: `rotate(${mesa.rotacion || 0}deg)`, transformOrigin: "center center" }}
       />
-      <span
+      <div
         aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute inset-0 flex flex-col items-center justify-center leading-none text-foreground",
-          atenuada && "opacity-40",
-        )}
+        className={cn("pointer-events-none absolute", atenuada && "opacity-40")}
+        style={{ ...caja, zIndex: z + 1 }}
       >
-        <span className="font-bold tabular-nums" style={{ fontSize: tamanoNumero }}>
-          {mesa.nombre}
+        <span className="absolute inset-0 flex flex-col items-center justify-center leading-none text-foreground">
+          <span className="font-bold tabular-nums" style={{ fontSize: tamanoNumero }}>
+            {mesa.nombre}
+          </span>
+          {conTiempo && <span className="mt-0.5 whitespace-nowrap text-[13px] font-semibold tabular-nums">{tiempo}</span>}
         </span>
-        {conTiempo && <span className="mt-0.5 text-[13px] font-medium tabular-nums">{tiempo}</span>}
-      </span>
-      {conCartel && reserva && (
+        {/* El estado también con forma (icono), no solo con color. */}
         <span
-          aria-hidden="true"
-          className={cn(
-            "pointer-events-none absolute left-1/2 z-10 max-w-[9rem] -translate-x-1/2 truncate whitespace-nowrap rounded-md px-1.5 py-0.5 text-[13px] font-semibold leading-tight shadow",
-            badge,
-            atenuada && "opacity-50",
-          )}
-          style={{ bottom: `calc(100% - ${relleno}px + 3px)` }}
+          data-glifo-estado={estado}
+          className={cn("absolute -right-1.5 -top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-background shadow ring-1 ring-border", icono)}
         >
-          {nombreCartelMesa(reserva.nombre)}
+          <Icono className="h-3 w-3" />
         </span>
-      )}
-    </button>
+        {(importante || nota) && (
+          <span className="absolute -left-1.5 -top-1.5 flex items-center gap-px rounded-full bg-background px-0.5 shadow ring-1 ring-border">
+            {importante && <Star data-marca="importante" className="h-3 w-3 fill-amber-400 text-amber-600" />}
+            {nota && <MessageSquareText data-marca="nota" className="h-3 w-3 text-foreground" />}
+          </span>
+        )}
+        {conCartel && reserva && (
+          <span
+            className={cn(
+              "absolute left-1/2 max-w-[9rem] -translate-x-1/2 truncate whitespace-nowrap rounded-md px-1.5 py-0.5 text-[13px] font-semibold leading-tight shadow",
+              badge,
+            )}
+            style={{ bottom: "calc(100% + 4px)" }}
+          >
+            {nombreCartelMesa(reserva.nombre)}
+          </span>
+        )}
+      </div>
+    </>
   );
 }

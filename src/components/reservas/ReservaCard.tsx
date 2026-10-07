@@ -38,7 +38,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Clock, Users, Star, GripVertical, Phone, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen, CircleDashed } from "lucide-react";
+import { Clock, Users, Star, GripVertical, Phone, MoveRight, MoreVertical, Loader2, ShieldBan, SquarePen, CircleDashed, MessageSquareText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { etiquetaMesasReserva } from "@/components/espacios/nombresMesa";
 import type { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
@@ -427,6 +427,20 @@ export function ContenidoTarjeta({
           </Badge>
         )}
       </div>
+      {/* Nota del cliente (alergias, trona, celebración…): antes no salía en ninguna parte de Hoy. */}
+      {reserva.notas_cliente?.trim() && (
+        <p
+          data-testid="nota-cliente"
+          className="mt-1.5 flex items-start gap-1 rounded-md bg-amber-50 px-1.5 py-1 text-xs text-amber-950 dark:bg-amber-950/40 dark:text-amber-100"
+          title={reserva.notas_cliente.trim()}
+        >
+          <MessageSquareText className="mt-px h-3 w-3 shrink-0" aria-hidden="true" />
+          <span className="line-clamp-2 break-words">
+            <span className="sr-only">Nota del cliente: </span>
+            {reserva.notas_cliente.trim()}
+          </span>
+        </p>
+      )}
       {reserva.telefono &&
         (telefonoEnlace ? (
           <a

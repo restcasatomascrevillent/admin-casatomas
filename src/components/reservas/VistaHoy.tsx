@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   ChevronDown,
   Clock,
+  Lock,
   MapIcon,
   MapPin,
   MoreVertical,
@@ -19,14 +20,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
-import { hoyLocal } from "./asignacionPlano";
+import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { GestorReservasKanban } from "./GestorReservasKanban";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
-import { avisosSalasPrivadas } from "@/lib/reservas/salaPrivada";
+import { avisosSalasPrivadas, textoAvisoSalaPrivada } from "@/lib/reservas/salaPrivada";
 import {
   esModoVistaHoy,
   guardarSalaPlanoHoy,
@@ -110,7 +111,8 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
   // para toda la pestaña (kanban, aviso de salas privadas, cifras y la rejilla
   // por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
   useReservasEnVivo();
-  const hoy = useMemo(() => hoyLocal(), []);
+  // Cambia a medianoche (la tablet se queda toda la noche en «Hoy»).
+  const hoy = useHoyLocal();
   const { data: espacios } = useEspaciosReserva();
   /**
    * Reservas de hoy de Casa Tomás, para el aviso de salas privadas y las tarjetas de su desplegable
@@ -127,7 +129,11 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
    * de cada minuto (`REFRESCO_PERIODICO`). El nombre "pendientes-mesa" es herencia de la franja
    * retirada: se conserva porque otros hooks y tests la usan como clave.
    */
-  const { data: reservasHoy } = useQuery({
+  const {
+    data: reservasHoy,
+    isError: errorReservasHoy,
+    refetch: refetchReservasHoy,
+  } = useQuery({
     ...REFRESCO_PERIODICO,
     queryKey: ["reservas-hoy", "pendientes-mesa", hoy],
     queryFn: async () => {
@@ -179,43 +185,76 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
     // `reservas`.
     <ReservasEnVivoContexto.Provider value={true}>
       <div className="space-y-3 sm:space-y-4">
-        {/* Franja compacta de ocupación: los 4 datos que antes eran 4
-            tarjetas grandes, ahora en una sola línea en escritorio (2x2 en
-            móvil) para que no compitan con el kanban por la pantalla. */}
-        <div className="rounded-xl border bg-card/50 px-3 py-2.5 sm:px-2 sm:py-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5 sm:gap-x-0 sm:divide-x sm:divide-border">
-            <IndicadorHoy
-              icon={CalendarCheck}
-              iconClass="bg-primary/10 text-primary"
-              label="Reservas hoy"
-              value={resumen?.totalReservas ?? 0}
-              detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
-            />
-            <IndicadorHoy
-              icon={Users}
-              iconClass="bg-accent/10 text-accent"
-              label="Comensales"
-              value={resumen?.totalComensales ?? 0}
-            />
-            <IndicadorHoy
-              icon={MapPin}
-              iconClass="bg-secondary/10 text-secondary"
-              label="Capacidad"
-              value={resumen?.capacidadTotal ?? 0}
-            />
-            <IndicadorHoy
-              icon={TrendingUp}
-              iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
-              label="Ocupación"
-              value={`${resumen?.porcentajeTotal ?? 0}%`}
-            />
-          </div>
-        </div>
+        {/* Vista PLANO (revisión 07/10/2026): el plano necesita el alto. Las cifras van en UNA línea y el
+            aviso del Reservado dentro de ella; «Disponibilidad por cuartos de hora» no sale (está en el kanban
+            y en el Calendario). */}
+        {vista === "plano" ? (
+          <p
+            data-testid="resumen-hoy-plano"
+            className="flex min-w-0 items-center gap-x-3 overflow-hidden whitespace-nowrap rounded-xl border bg-card/50 px-3 py-2 text-sm text-muted-foreground"
+          >
+            <span>
+              <strong className="tabular-nums text-foreground">{resumen?.totalReservas ?? 0}</strong> reservas
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              <strong className="tabular-nums text-foreground">{resumen?.totalComensales ?? 0}</strong> comensales
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              <strong className="tabular-nums text-foreground">{`${resumen?.porcentajeTotal ?? 0} %`}</strong> de{" "}
+              <span className="tabular-nums">{resumen?.capacidadTotal ?? 0}</span>
+            </span>
+            {reservasHoy !== undefined &&
+              avisosPrivadas.map((aviso) => (
+                <span key={aviso.espacioId} className="flex min-w-0 items-center gap-1 text-violet-800 dark:text-violet-200">
+                  <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{textoAvisoSalaPrivada(aviso)}</span>
+                </span>
+              ))}
+          </p>
+        ) : (
+          <>
+            {/* Franja compacta de ocupación: los 4 datos que antes eran 4
+                tarjetas grandes, ahora en una sola línea en escritorio (2x2 en
+                móvil) para que no compitan con el kanban por la pantalla. */}
+            <div className="rounded-xl border bg-card/50 px-3 py-2.5 sm:px-2 sm:py-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5 sm:gap-x-0 sm:divide-x sm:divide-border">
+                <IndicadorHoy
+                  icon={CalendarCheck}
+                  iconClass="bg-primary/10 text-primary"
+                  label="Reservas hoy"
+                  value={resumen?.totalReservas ?? 0}
+                  detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
+                />
+                <IndicadorHoy
+                  icon={Users}
+                  iconClass="bg-accent/10 text-accent"
+                  label="Comensales"
+                  value={resumen?.totalComensales ?? 0}
+                />
+                <IndicadorHoy
+                  icon={MapPin}
+                  iconClass="bg-secondary/10 text-secondary"
+                  label="Capacidad"
+                  value={resumen?.capacidadTotal ?? 0}
+                />
+                <IndicadorHoy
+                  icon={TrendingUp}
+                  iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
+                  label="Ocupación"
+                  value={`${resumen?.porcentajeTotal ?? 0}%`}
+                />
+              </div>
+            </div>
 
-        {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. */}
-        <AvisoSalasPrivadas avisos={avisosPrivadas} reservas={reservasHoy} />
+            {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. Solo con
+                las reservas ya leídas: antes, mientras cargaban (o si fallaban), decía «Reservado: libre». */}
+            {reservasHoy !== undefined && <AvisoSalasPrivadas avisos={avisosPrivadas} reservas={reservasHoy} />}
 
-        <CuartosDeHoy fecha={hoy} />
+            <CuartosDeHoy fecha={hoy} />
+          </>
+        )}
 
         <BarraFiltrosHoy
           busqueda={busqueda}
@@ -234,6 +273,8 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
             salaId={salaPlano}
             onCambiarSala={cambiarSala}
             onAbrirReparto={onAbrirSala}
+            reservasError={errorReservasHoy}
+            onReintentarReservas={() => void refetchReservasHoy()}
           />
         ) : (
           <GestorReservasKanban busqueda={busqueda} filtroTurno={filtroTurno} onVerPlanoSala={verPlanoDeSala} />
@@ -242,6 +283,13 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
     </ReservasEnVivoContexto.Provider>
   );
 }
+
+/**
+ * Opción del selector «Kanban | Plano». Marcada, OSCURA (`bg-primary`), como el resto de conmutadores de
+ * vista del panel (Plano | Servicio de una sala): el dorado de `accent` sobre blanco daba 3,5:1.
+ */
+const CLASES_OPCION_VISTA =
+  "h-10 gap-1.5 whitespace-nowrap data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";
 
 /**
  * La fila de filtros de «Hoy», COMÚN a las dos vistas (antes vivía dentro del kanban, idéntica):
@@ -293,11 +341,11 @@ function BarraFiltrosHoy({
           className="shrink-0 sm:order-3"
           aria-label="Vista de Hoy"
         >
-          <ToggleGroupItem value="kanban" aria-label="Kanban" title="Kanban: una columna por sala" className="h-10 gap-1.5 whitespace-nowrap">
+          <ToggleGroupItem value="kanban" aria-label="Kanban" title="Kanban: una columna por sala" className={CLASES_OPCION_VISTA}>
             <SquareKanban className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">Kanban</span>
           </ToggleGroupItem>
-          <ToggleGroupItem value="plano" aria-label="Plano" title="Plano: las salas con sus mesas" className="h-10 gap-1.5 whitespace-nowrap">
+          <ToggleGroupItem value="plano" aria-label="Plano" title="Plano: las salas con sus mesas" className={CLASES_OPCION_VISTA}>
             <MapIcon className="h-4 w-4" aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">Plano</span>
           </ToggleGroupItem>

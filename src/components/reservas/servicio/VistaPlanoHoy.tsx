@@ -38,7 +38,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { LayoutGrid, Loader2, Lock, LogOut, RotateCcw, Users, X } from "lucide-react";
+import { AlertTriangle, LayoutGrid, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -56,11 +56,12 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { mesasPorReservaDe, useMovimientoReservaServicio } from "@/hooks/useMovimientoReservaServicio";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsBelow, useIsMobile } from "@/hooks/use-mobile";
+import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { SIN_ASIGNAR, columnaDeReserva, construirColumnas, esSinAsignar } from "@/lib/reservas/columnasServicio";
 import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
-import { TITULO_SIN_PERMISO_EDITAR } from "@/lib/reservas/accionesReserva";
+import { TITULO_SIN_PERMISO_EDITAR, accionesDisponibles } from "@/lib/reservas/accionesReserva";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import {
   ESTADOS_MESA_SERVICIO,
@@ -78,7 +79,6 @@ import {
   turnoDelPlano,
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
-import { hoyLocal } from "../asignacionPlano";
 import { BlacklistModal } from "../BlacklistModal";
 import { ConMotivo } from "../ConMotivo";
 import { EtiquetaFueraDeAforo } from "../EtiquetaFueraDeAforo";
@@ -99,7 +99,20 @@ export interface VistaPlanoHoyProps {
   onCambiarSala: (salaId: string) => void;
   /** Abre el reparto de mesas de la sala (la pantalla de siempre, `PlanoEspacio2D`). */
   onAbrirReparto?: (salaId: string) => void;
+  /** Falló la consulta de reservas de hoy (la de `VistaHoy`): se dice, con «Reintentar», en vez de «Cargando…» para siempre. */
+  reservasError?: boolean;
+  onReintentarReservas?: () => void;
 }
+
+/**
+ * Por debajo de este ancho la lista de al lado no cabe sin estrujar el plano: va en una hoja (la lista
+ * «Por sentar» y la mesa tocada). Revisión de diseño (07/10/2026): a 1024 y 1280 la lista enseñaba una
+ * tarjeta y el plano se quedaba en ~570×280 px.
+ */
+const ANCHO_PANEL_LATERAL = 1280;
+
+/** «Sentar aquí» ofrece además «Solo dar la mesa» si para la hora de la reserva falta más que esto. */
+const MINUTOS_SOLO_DAR_MESA = 30;
 
 /** Cada cuánto se recalcula «ahora» (retrasos, minutos sentados): como el modo servicio. */
 const INTERVALO_AHORA_MS = 45_000;
@@ -124,9 +137,13 @@ export function VistaPlanoHoy({
   salaId,
   onCambiarSala,
   onAbrirReparto,
+  reservasError = false,
+  onReintentarReservas,
 }: VistaPlanoHoyProps) {
-  const hoy = useMemo(() => hoyLocal(), []);
+  // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche.
+  const hoy = useHoyLocal();
   const esMovil = useIsMobile();
+  const enHojas = useIsBelow(ANCHO_PANEL_LATERAL);
   const ahora = useAhora();
   const turno = turnoDelPlano(filtroTurno, ahora);
 
@@ -140,9 +157,11 @@ export function VistaPlanoHoy({
   const sala = salas.find((s) => s.id === salaId) ?? salas[0] ?? null;
 
   // ── Datos (consultas ya existentes; ningún canal realtime nuevo) ───────────
-  const { data: asignacionesDeHoy } = useAsignacionesMesa(hoy, undefined, undefined, REFRESCO_PERIODICO);
+  const asignacionesQuery = useAsignacionesMesa(hoy, undefined, undefined, REFRESCO_PERIODICO);
+  const asignacionesDeHoy = asignacionesQuery.data;
   const mesasQuery = useMesas(sala?.id, { habilitado: !!sala });
-  const { data: plano } = usePlanoEspacio(sala?.id);
+  const planoQuery = usePlanoEspacio(sala?.id);
+  const plano = planoQuery.data;
   const { data: configReservas } = useConfiguracionReservas();
   const config = useMemo(() => configServicioSalaDesde(configReservas), [configReservas]);
 
@@ -267,20 +286,75 @@ export function VistaPlanoHoy({
 
   const tocarMesa = (mesa: Mesa) => setMesaSelId((actual) => (actual === mesa.id ? null : mesa.id));
 
-  const sentarAqui = async (reserva: ReservaServicio) => {
+  /**
+   * «Sentar aquí»: la persona está en la sala, así que se le da la mesa Y se marca «Ha llegado» (la misma
+   * acción que el kanban). Antes solo se daba la mesa: la reserva seguía «por llegar», pasaba a «Retrasada»
+   * y, a las 3 h, el cron la marcaba «No vino» y proponía la lista negra a un cliente que había venido.
+   * `conLlegada = false` («Solo dar la mesa», para reservar sitio a quien aún no ha llegado).
+   */
+  const sentarAqui = async (reserva: ReservaServicio, conLlegada: boolean) => {
     if (!mesaSel) return;
     setSentando(reserva.id);
     try {
       // Sustituye las mesas de la reserva (ninguna) por esta: el RPC valida sala, estado y solapes.
       await asignarMesas.mutateAsync({ reserva_id: reserva.id, mesa_ids: [mesaSel.id] });
     } catch {
-      // El aviso de error lo pone el propio hook (`mensajeErrorAsignacion`).
+      // El aviso de error lo pone el propio hook (`mensajeErrorAsignacion`). Sin mesa no se marca nada.
+      return;
     } finally {
       setSentando(null);
     }
+    if (
+      conLlegada &&
+      !haLlegado(reserva.estado) &&
+      accionesDisponibles(reserva, { vista: "hoy", canEdit: puedeEditar }).haLlegado.habilitada
+    ) {
+      await acciones.marcarLlegada(reserva);
+    }
+  };
+
+  /** Minutos que faltan para la hora de la reserva (negativo: ya pasó). */
+  const minutosParaLaHora = (hora: string) => {
+    const [h, m] = String(hora).split(":").map(Number);
+    return h * 60 + (m || 0) - (ahora.getHours() * 60 + ahora.getMinutes());
   };
 
   const etiquetaTurno = `${ETIQUETA_TURNO[turno]}${filtroTurno === "todo" ? " · turno en curso" : ""}`;
+
+  // ── ¿Está todo cargado? (revisión 07/10/2026) ─────────────────────────────
+  // Sin las mesas asignadas (cargando o con error) cada mesa salía «Libre» y la lista decía «Todas las
+  // reservas tienen mesa»: datos falsos en pleno servicio. Mientras falte algo, esqueleto; si falla,
+  // se dice, con «Reintentar».
+  const cargando =
+    (reservas === undefined && !reservasError) ||
+    espacios === undefined ||
+    asignacionesQuery.isLoading ||
+    (!!sala && (mesasQuery.isLoading || planoQuery.isLoading));
+  const errorDatos = reservasError || asignacionesQuery.isError;
+  const listo = !cargando && !errorDatos;
+  const reintentar = () => {
+    if (asignacionesQuery.isError) void asignacionesQuery.refetch();
+    if (reservasError) onReintentarReservas?.();
+  };
+  const avisoError = (
+    <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-sm" role="alert">
+      <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
+      <p className="font-medium">
+        {reservasError ? "No se pudieron cargar las reservas de hoy." : "No se pudieron cargar las mesas asignadas de hoy."}
+      </p>
+      <p className="text-muted-foreground">Sin eso no se sabe qué mesas están libres: no se enseña nada que pueda ser falso.</p>
+      <Button variant="outline" className="h-11" onClick={reintentar}>
+        Reintentar
+      </Button>
+    </div>
+  );
+  const esqueletoLista = (
+    <div className="space-y-2 p-3" role="status" aria-label="Cargando las reservas…">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-24 animate-pulse rounded-lg border bg-muted/50" />
+      ))}
+    </div>
+  );
 
   // ── Piezas ──────────────────────────────────────────────────────────────────
   const tarjeta = (r: ReservaServicio) => (
@@ -301,12 +375,12 @@ export function VistaPlanoHoy({
     />
   );
 
-  const leyenda = (
-    <ul aria-label="Leyenda de estados de mesa" className="flex flex-wrap gap-1.5">
+  const leyendaEn = (enFila: boolean) => (
+    <ul aria-label="Leyenda de estados de mesa" className={cn("flex gap-1.5", enFila ? "flex-nowrap" : "flex-wrap")}>
       {ESTADOS_MESA_SERVICIO.map((estado) => {
         const { etiqueta, Icono, badge } = CONFIG_ESTADO_MESA[estado];
         return (
-          <li key={estado} className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[13px] font-medium", badge)}>
+          <li key={estado} className={cn("inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[13px] font-medium", badge)}>
             <Icono className="h-3.5 w-3.5" aria-hidden="true" />
             {etiqueta}
             <span className="tabular-nums opacity-80">{recuento[estado]}</span>
@@ -315,6 +389,7 @@ export function VistaPlanoHoy({
       })}
     </ul>
   );
+  const leyenda = leyendaEn(false);
 
   const grupo = (titulo: string, reservasGrupo: ReservaServicio[], vacio: string) => (
     <section aria-label={titulo} className="space-y-2">
@@ -338,7 +413,7 @@ export function VistaPlanoHoy({
     </section>
   );
 
-  const panelPendientes = sala && (
+  const panelPendientes = sala && !listo ? (errorDatos ? avisoError : esqueletoLista) : sala && (
     <div className="space-y-4 p-3">
       {grupo(`Sin mesa en ${sala.title}`, pendientesSala, `Todas las reservas de ${sala.title} tienen mesa.`)}
       {grupo("Sin sala", sinSala, "No hay reservas sin sala.")}
@@ -352,8 +427,8 @@ export function VistaPlanoHoy({
 
   const panelMesa = mesaSel && (
     <div className="space-y-3 p-3" data-testid="detalle-mesa">
-      {/* En móvil el título y los datos van en la cabecera de la hoja. */}
-      {!esMovil && (
+      {/* En una hoja (móvil y tablet) el título y los datos van en su cabecera. */}
+      {!enHojas && (
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h3 className="text-base font-semibold">{`Mesa ${mesaSel.nombre}`}</h3>
@@ -385,6 +460,24 @@ export function VistaPlanoHoy({
 
       {reservasDeMesa.map((r) => (
         <div key={r.id} className="space-y-2">
+          {(r.importante || r.notas_cliente?.trim()) && (
+            <div className="space-y-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-[13px] text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100" data-testid="aviso-reserva-mesa">
+              {r.importante && (
+                <p className="flex items-center gap-1 font-semibold">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-600" aria-hidden="true" /> Reserva importante
+                </p>
+              )}
+              {r.notas_cliente?.trim() && (
+                <p className="flex items-start gap-1">
+                  <MessageSquareText className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="break-words">
+                    <span className="font-semibold">Nota: </span>
+                    {r.notas_cliente.trim()}
+                  </span>
+                </p>
+              )}
+            </div>
+          )}
           {/* Liberar / deshacer: lo del modo servicio (solo `salida_at`; la reserva sigue «Llegó»). Antes que
               la tarjeta: es lo que se viene a hacer a una mesa «por liberar», y en la tablet apaisada la
               tarjeta entera no cabe a la vista. */}
@@ -426,23 +519,43 @@ export function VistaPlanoHoy({
             {candidatas.map((r) => {
               const pax = Number(r.numero_comensales) || 0;
               const noCaben = pax > (mesaSel.capacidad || 0);
+              const yaLlego = haLlegado(r.estado);
+              const ofrecerSoloMesa = !yaLlego && minutosParaLaHora(r.hora) > MINUTOS_SOLO_DAR_MESA;
+              const nombre = r.nombre || "sin nombre";
+              const hora = String(r.hora).slice(0, 5);
               return (
-                <li key={r.id}>
-                  <ConMotivo className="flex" motivo={puedeEditar ? undefined : TITULO_SIN_PERMISO_EDITAR}>
+                <li key={r.id} className="space-y-1.5 rounded-lg border bg-background p-2">
+                  <p className="flex items-center justify-between gap-2 text-sm">
+                    <span className="min-w-0 truncate">
+                      <span className="tabular-nums">{hora}</span> · {r.nombre || "Sin nombre"}
+                    </span>
+                    <span className={cn("shrink-0 text-[13px] tabular-nums", noCaben ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground")}>
+                      {sentando === r.id ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Guardando" /> : `${pax} pax${noCaben ? " · no caben" : ""}`}
+                    </span>
+                  </p>
+                  <ConMotivo className="flex flex-wrap gap-1.5" motivo={puedeEditar ? undefined : TITULO_SIN_PERMISO_EDITAR}>
                     <Button
-                      variant="outline"
-                      className="h-auto min-h-11 w-full justify-between gap-2 px-3 py-2 text-left"
+                      className="h-11 flex-1"
                       disabled={!puedeEditar || sentando !== null}
-                      onClick={() => void sentarAqui(r)}
-                      aria-label={`Sentar en la mesa ${mesaSel.nombre} a ${r.nombre || "sin nombre"}, ${String(r.hora).slice(0, 5)}, ${pax} comensales`}
+                      onClick={() => void sentarAqui(r, true)}
+                      aria-label={
+                        `Sentar en la mesa ${mesaSel.nombre} a ${nombre}, ${hora}, ${pax} comensales` +
+                        (yaLlego ? "" : ": le da la mesa y marca que ha llegado")
+                      }
                     >
-                      <span className="min-w-0 truncate">
-                        <span className="tabular-nums">{String(r.hora).slice(0, 5)}</span> · {r.nombre || "Sin nombre"}
-                      </span>
-                      <span className={cn("shrink-0 text-[13px] tabular-nums", noCaben ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
-                        {sentando === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : `${pax} pax${noCaben ? " · no caben" : ""}`}
-                      </span>
+                      Sentar aquí
                     </Button>
+                    {ofrecerSoloMesa && (
+                      <Button
+                        variant="outline"
+                        className="h-11 flex-1"
+                        disabled={!puedeEditar || sentando !== null}
+                        onClick={() => void sentarAqui(r, false)}
+                        aria-label={`Solo dar la mesa ${mesaSel.nombre} a ${nombre}, ${hora}: todavía no ha llegado`}
+                      >
+                        Solo dar la mesa
+                      </Button>
+                    )}
                   </ConMotivo>
                 </li>
               );
@@ -454,7 +567,6 @@ export function VistaPlanoHoy({
   );
 
   // ── Pantalla ──────────────────────────────────────────────────────────────
-  const cargando = reservas === undefined || espacios === undefined || (!!sala && mesasQuery.isLoading);
 
   return (
     <div
@@ -478,6 +590,16 @@ export function VistaPlanoHoy({
             <TabsList aria-label="Salas" className="h-auto min-h-10 min-w-0 justify-start">
               {salas.map((s) => {
                 const cuenta = resumenPorSala.get(s.id) ?? { total: 0, sinMesa: 0 };
+                // Sin datos completos no se dan cifras (un «0» sería falso).
+                if (!listo) {
+                  return (
+                    <TabsTrigger key={s.id} value={s.id} className="gap-1.5" aria-label={s.title}>
+                      {s.privada && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
+                      <span>{s.title}</span>
+                      {s.privada && <EtiquetaFueraDeAforo className="h-5 text-xs" />}
+                    </TabsTrigger>
+                  );
+                }
                 return (
                   <TabsTrigger
                     key={s.id}
@@ -521,15 +643,21 @@ export function VistaPlanoHoy({
           {sala && (
             <TabsContent
               value={sala.id}
-              className="mt-0 grid min-h-0 flex-1 gap-3 focus-visible:ring-offset-0 md:grid-cols-[minmax(0,1fr)_15rem] lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_23rem] max-md:grid-rows-[minmax(0,1fr)_auto]"
+              className={cn(
+                "mt-0 grid min-h-0 flex-1 gap-2 focus-visible:ring-offset-0",
+                // Por debajo de 1280 px, el plano a todo lo ancho y la lista en una hoja.
+                enHojas ? "grid-cols-1 grid-rows-[minmax(0,1fr)_auto]" : "grid-cols-[minmax(0,1fr)_23rem] gap-3",
+              )}
             >
               {/* El plano: no se desplaza (se ajusta, y se acerca o se mueve con los dedos). */}
               <section
                 aria-label={`Plano de ${sala.title}`}
                 className="relative min-h-0 overflow-hidden rounded-xl border bg-card"
               >
-                {cargando ? (
-                  <div className="flex h-full items-center justify-center gap-2 text-muted-foreground" role="status">
+                {errorDatos ? (
+                  avisoError
+                ) : cargando ? (
+                  <div className="flex h-full items-center justify-center gap-2 text-muted-foreground" role="status" data-testid="plano-cargando">
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                     Cargando el plano…
                   </div>
@@ -561,25 +689,33 @@ export function VistaPlanoHoy({
                 </p>
               </section>
 
-              {esMovil ? (
-                <Button
-                  variant="outline"
-                  className="h-11 w-full justify-between"
-                  onClick={() => setPendientesAbiertos(true)}
-                  aria-label={`Por sentar: ${pendientesSala.length} sin mesa en ${sala.title} y ${sinSala.length} sin sala`}
-                >
-                  <span>Por sentar</span>
-                  <span className="text-[13px] tabular-nums text-muted-foreground">
-                    {`${pendientesSala.length} sin mesa · ${sinSala.length} sin sala`}
-                  </span>
-                </Button>
+              {enHojas ? (
+                <div className="flex min-w-0 items-center gap-2">
+                  {!esMovil && listo && <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>}
+                  <Button
+                    variant="outline"
+                    className={cn("h-11 justify-between gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
+                    disabled={!listo}
+                    onClick={() => setPendientesAbiertos(true)}
+                    aria-label={
+                      listo
+                        ? `Por sentar: ${pendientesSala.length} sin mesa en ${sala.title} y ${sinSala.length} sin sala`
+                        : "Por sentar: cargando"
+                    }
+                  >
+                    <span>Por sentar</span>
+                    <span className="text-[13px] tabular-nums text-muted-foreground">
+                      {listo ? `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala` : "…"}
+                    </span>
+                  </Button>
+                </div>
               ) : (
                 <aside
                   aria-label={mesaSel ? `Mesa ${mesaSel.nombre}` : "Reservas por sentar"}
                   className="flex min-h-0 flex-col overflow-hidden rounded-xl border bg-muted/20"
                 >
                   {/* Con una mesa tocada sobra (su estado se dice con palabras) y deja sitio a la mesa. */}
-                  {!mesaSel && <div className="shrink-0 border-b p-3">{leyenda}</div>}
+                  {!mesaSel && listo && <div className="shrink-0 border-b p-3">{leyenda}</div>}
                   {/* Lo único que se desplaza: la lista, por dentro. */}
                   <ScrollArea className="min-h-0 flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block">
                     {mesaSel ? panelMesa : panelPendientes}
@@ -591,11 +727,14 @@ export function VistaPlanoHoy({
         </Tabs>
       )}
 
-      {/* Móvil: la mesa tocada y la lista por sentar, en hojas desde abajo. */}
-      {esMovil && (
+      {/* Por debajo de 1280 px: la mesa tocada y la lista por sentar, en hojas (de lado en tablet, desde abajo en móvil). */}
+      {enHojas && (
         <>
           <Sheet open={!!mesaSel} onOpenChange={(abierta) => !abierta && setMesaSelId(null)}>
-            <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto p-0">
+            <SheetContent
+              side={esMovil ? "bottom" : "right"}
+              className={cn("overflow-y-auto p-0", esMovil ? "max-h-[85dvh]" : "w-[min(92vw,26rem)] sm:max-w-none")}
+            >
               <SheetHeader className="px-3 pt-3 text-left">
                 <SheetTitle>{mesaSel ? `Mesa ${mesaSel.nombre}` : "Mesa"}</SheetTitle>
                 <SheetDescription>{datosMesa}</SheetDescription>
@@ -604,7 +743,10 @@ export function VistaPlanoHoy({
             </SheetContent>
           </Sheet>
           <Sheet open={pendientesAbiertos} onOpenChange={setPendientesAbiertos}>
-            <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto p-0">
+            <SheetContent
+              side={esMovil ? "bottom" : "right"}
+              className={cn("overflow-y-auto p-0", esMovil ? "max-h-[85dvh]" : "w-[min(92vw,26rem)] sm:max-w-none")}
+            >
               <SheetHeader className="px-3 pt-3 text-left">
                 <SheetTitle>Por sentar</SheetTitle>
                 <SheetDescription>{etiquetaTurno}</SheetDescription>

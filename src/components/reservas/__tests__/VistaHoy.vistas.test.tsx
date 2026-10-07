@@ -11,7 +11,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const h = vi.hoisted(() => ({ reservas: [] as Record<string, unknown>[] }));
+const h = vi.hoisted(() => ({
+  reservas: [] as Record<string, unknown>[],
+  /** Cómo contesta la consulta de reservas de hoy: al momento, nunca (cargando) o con error. */
+  respuesta: "ok" as "ok" | "pendiente" | "error",
+}));
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
@@ -19,7 +23,10 @@ vi.mock("@/integrations/supabase/client", () => ({
       const b: Record<string, unknown> = {};
       for (const m of ["select", "eq", "in", "neq", "order"]) b[m] = () => b;
       b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
-        Promise.resolve({ data: h.reservas, error: null }).then(ok, ko);
+        (h.respuesta === "pendiente"
+          ? new Promise(() => {})
+          : Promise.resolve(h.respuesta === "error" ? { data: null, error: { message: "caída" } } : { data: h.reservas, error: null })
+        ).then(ok, ko);
       return b;
     },
     functions: { invoke: vi.fn() },
@@ -69,6 +76,7 @@ vi.mock("@/components/reservas/servicio/VistaPlanoHoy", () => ({
     filtroTurno: string;
     salaId: string | null;
     reservas?: unknown[];
+    reservasError?: boolean;
     onCambiarSala: (id: string) => void;
     onAbrirReparto?: (id: string) => void;
   }) => (
@@ -78,6 +86,7 @@ vi.mock("@/components/reservas/servicio/VistaPlanoHoy", () => ({
       data-turno={p.filtroTurno}
       data-sala={p.salaId ?? ""}
       data-reservas={String(p.reservas?.length ?? "")}
+      data-reservas-error={String(!!p.reservasError)}
     >
       <button type="button" onClick={() => p.onCambiarSala("reservado")}>
         Reservado
@@ -106,6 +115,7 @@ const opcion = (nombre: "Kanban" | "Plano") => within(selector()).getByRole("rad
 
 beforeEach(() => {
   window.localStorage.clear();
+  h.respuesta = "ok";
   h.reservas = [
     { id: "r1", nombre: "Ana", hora: "14:00:00", numero_comensales: 2, estado: "confirmada", espacio_id: "comedor", marca: "casa_tomas" },
     { id: "r2", nombre: "Luis", hora: "21:00:00", numero_comensales: 4, estado: "confirmada", espacio_id: null, marca: "casa_tomas" },
@@ -181,13 +191,31 @@ describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
     selector(),
   ];
 
-  it("cifras, Reservado, cuartos de hora, buscador, turno y selector están en las dos, y FUERA de la vista", async () => {
+  it("en el kanban: cifras, Reservado, cuartos de hora, buscador, turno y selector, FUERA de la vista", async () => {
     montar();
-    await screen.findByTestId("vista-kanban");
+    await screen.findByTestId("aviso-sala-privada");
     for (const pieza of bloqueDeArriba()) expect(screen.getByTestId("vista-kanban")).not.toContainElement(pieza);
+  });
 
+  it("en el plano el plano necesita el alto: cifras y Reservado en UNA línea, sin cuartos de hora; buscador, turno y selector siguen", async () => {
+    montar();
     fireEvent.click(opcion("Plano"));
-    for (const pieza of bloqueDeArriba()) expect(screen.getByTestId("vista-plano")).not.toContainElement(pieza);
+    const resumen = await screen.findByTestId("resumen-hoy-plano");
+    expect(resumen).toHaveTextContent("23 reservas");
+    expect(resumen).toHaveTextContent("89 comensales");
+    expect(resumen).toHaveTextContent("59 % de 150");
+    await waitFor(() => expect(resumen).toHaveTextContent("Reservado: libre"));
+    expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Disponibilidad por cuartos de hora/ })).toBeNull();
+    expect(screen.queryByText("Reservas hoy")).toBeNull();
+    for (const pieza of [
+      resumen,
+      screen.getByRole("textbox", { name: "Buscar reservas" }),
+      screen.getByRole("group", { name: "Filtrar por turno" }),
+      selector(),
+    ]) {
+      expect(screen.getByTestId("vista-plano")).not.toContainElement(pieza);
+    }
   });
 
   it("el buscador y «Todo el día / Comida / Cena» filtran las dos vistas y se conservan al cambiar de vista", () => {
@@ -246,5 +274,26 @@ describe("Hoy · del kanban al plano de una sala", () => {
     montar({ onAbrirSala });
     fireEvent.click(screen.getByRole("button", { name: "Reparto de mesas" }));
     expect(onAbrirSala).toHaveBeenCalledWith("comedor");
+  });
+});
+
+describe("Hoy · nada de «Reservado: libre» sin haber leído las reservas (revisión 07/10/2026)", () => {
+  it("mientras cargan las reservas de hoy no sale el aviso del Reservado (ni en el kanban ni en la línea del plano)", async () => {
+    h.respuesta = "pendiente";
+    montar();
+    await screen.findByTestId("vista-kanban");
+    expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
+    fireEvent.click(opcion("Plano"));
+    expect(screen.getByTestId("resumen-hoy-plano")).not.toHaveTextContent("Reservado");
+    h.respuesta = "ok";
+  });
+
+  it("si fallan, el plano lo sabe (para decirlo con «Reintentar») en vez de esperar para siempre", async () => {
+    h.respuesta = "error";
+    window.localStorage.setItem(CLAVE_VISTA_HOY, "plano");
+    montar();
+    await waitFor(() => expect(screen.getByTestId("vista-plano")).toHaveAttribute("data-reservas-error", "true"));
+    expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
+    h.respuesta = "ok";
   });
 });

@@ -27,13 +27,19 @@ const h = vi.hoisted(() => ({
   asignar: (() => undefined) as unknown,
   /** Lo que ha abierto el mapa de «Dar mesa» (`ElegirMesaDialog`). */
   mapa: [] as string[],
+  /** Cómo está la consulta de mesas asignadas de hoy. */
+  asignacionesEstado: "ok" as "ok" | "cargando" | "error",
+  refetchAsignaciones: (() => undefined) as unknown,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn(), rpc: vi.fn(), functions: { invoke: vi.fn() } } }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: h.espacios }) }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({
-  useAsignacionesMesa: () => ({ data: h.asignaciones }),
+  useAsignacionesMesa: () =>
+    h.asignacionesEstado === "ok"
+      ? { data: h.asignaciones, isLoading: false, isError: false, refetch: h.refetchAsignaciones }
+      : { data: undefined, isLoading: h.asignacionesEstado === "cargando", isError: h.asignacionesEstado === "error", refetch: h.refetchAsignaciones },
   useAsignarMesasReserva: () => ({ mutateAsync: h.asignar }),
 }));
 vi.mock("@/hooks/useMesas", () => ({
@@ -145,17 +151,25 @@ function Plano({
   salaInicial = null,
   onCambiarSala,
   onAbrirReparto,
+  reservas = RESERVAS,
+  reservasError,
+  onReintentarReservas,
 }: {
   busqueda?: string;
   filtroTurno?: FiltroTurnoHoy;
   salaInicial?: string | null;
   onCambiarSala?: (id: string) => void;
   onAbrirReparto?: (id: string) => void;
+  reservas?: ReservaPlanoHoy[] | null;
+  reservasError?: boolean;
+  onReintentarReservas?: () => void;
 }) {
   const [sala, setSala] = useState<string | null>(salaInicial);
   return (
     <VistaPlanoHoy
-      reservas={RESERVAS}
+      reservas={reservas ?? undefined}
+      reservasError={reservasError}
+      onReintentarReservas={onReintentarReservas}
       busqueda={busqueda}
       filtroTurno={filtroTurno}
       salaId={sala}
@@ -182,7 +196,14 @@ function montar(props: Parameters<typeof Plano>[0] = {}) {
 const mesaBoton = (nombre: string) => screen.getByRole("button", { name: new RegExp(`^Mesa ${nombre},`) });
 const estadoDe = (nombre: string) => mesaBoton(nombre).getAttribute("data-estado");
 
+const anchoOriginal = window.innerWidth;
+/** Ancho de la ventana: desde 1280 px la lista va al lado; por debajo, en hojas. */
+function anchoVentana(px: number) {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: px });
+}
+
 beforeEach(() => {
+  anchoVentana(1440);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(a(14, 30));
   h.espacios = [
@@ -221,8 +242,11 @@ beforeEach(() => {
   h.deshacer = vi.fn(async () => true);
   h.asignar = vi.fn(async () => []);
   h.mapa = [];
+  h.asignacionesEstado = "ok";
+  h.refetchAsignaciones = vi.fn();
 });
 afterEach(() => {
+  anchoVentana(anchoOriginal);
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -278,8 +302,9 @@ describe("Plano de Hoy · las mesas, con la lógica y los umbrales del modo serv
     expect(estadoDe("3")).toBe("retrasada");
     expect(estadoDe("4")).toBe("por_liberar");
     expect(estadoDe("5")).toBe("libre");
-    expect(mesaBoton("2")).toHaveAccessibleName("Mesa 2, 4 plazas, Reservada: Rosa Reservada a las 14:45, 3 comensales, dentro de 15 min");
-    expect(mesaBoton("5")).toHaveTextContent("5");
+    expect(mesaBoton("2")).toHaveAccessibleName("Mesa 2, 4 plazas, Reservada: Rosa Reservada a las 14:45, 3 comensales, en 15 min");
+    // El número va en la rotulación de encima (derecho aunque la mesa esté girada).
+    expect(mesaBoton("5").nextElementSibling).toHaveTextContent(/^5/);
 
     // Leyenda con el recuento de cada estado.
     const leyenda = screen.getByRole("list", { name: "Leyenda de estados de mesa" });
@@ -426,5 +451,179 @@ describe("Plano de Hoy · el alto de la pantalla", () => {
     montar();
     expect(screen.getByTestId("plano-hoy")).not.toHaveAttribute("data-altura-fija");
     expect(screen.getByTestId("plano-hoy").style.height).toBe("");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────
+// Revisión del 07/10/2026
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────
+
+describe("Plano de Hoy · carga y errores veraces (nunca «Libre» sin saberlo)", () => {
+  it("con las mesas asignadas aún cargando: esqueleto, ni una mesa «Libre», sin «Todas tienen mesa» y sin cifras en las salas", () => {
+    h.asignacionesEstado = "cargando";
+    montar();
+    expect(screen.getByTestId("plano-cargando")).toHaveTextContent("Cargando el plano…");
+    expect(document.querySelectorAll('[data-estado="libre"]')).toHaveLength(0);
+    expect(screen.queryByText(/tienen mesa/)).toBeNull();
+    expect(screen.getByRole("status", { name: "Cargando las reservas…" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Comedor" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /reservas?/ })).toBeNull();
+  });
+
+  it("si fallan las mesas asignadas: aviso con «Reintentar» (que vuelve a pedirlas) y ningún dato inventado", () => {
+    h.asignacionesEstado = "error";
+    montar();
+    const avisos = screen.getAllByRole("alert");
+    expect(avisos[0]).toHaveTextContent("No se pudieron cargar las mesas asignadas de hoy.");
+    expect(document.querySelectorAll("[data-mesa-id]")).toHaveLength(0);
+    expect(screen.queryByText(/tienen mesa/)).toBeNull();
+    fireEvent.click(within(avisos[0]).getByRole("button", { name: "Reintentar" }));
+    expect(h.refetchAsignaciones).toHaveBeenCalled();
+  });
+
+  it("con las reservas de hoy aún cargando: «Cargando el plano…»", () => {
+    montar({ reservas: null });
+    expect(screen.getByTestId("plano-cargando")).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-mesa-id]")).toHaveLength(0);
+  });
+
+  it("si fallan las reservas de hoy: aviso con «Reintentar», no «Cargando…» para siempre", () => {
+    const onReintentarReservas = vi.fn();
+    montar({ reservas: null, reservasError: true, onReintentarReservas });
+    expect(screen.queryByTestId("plano-cargando")).toBeNull();
+    const aviso = screen.getAllByRole("alert")[0];
+    expect(aviso).toHaveTextContent("No se pudieron cargar las reservas de hoy.");
+    fireEvent.click(within(aviso).getByRole("button", { name: "Reintentar" }));
+    expect(onReintentarReservas).toHaveBeenCalled();
+  });
+});
+
+describe("Plano de Hoy · «Sentar aquí» marca también la llegada", () => {
+  const conTardia = () => [...RESERVAS, reserva("r-hugo", "Hugo Tarde", "15:30:00", "confirmada", "comedor")];
+
+  it("da la mesa Y marca «Ha llegado» (como el kanban): no se queda «Reservada» camino de un «No vino» falso", async () => {
+    montar();
+    fireEvent.click(mesaBoton("5"));
+    const detalle = screen.getByTestId("detalle-mesa");
+    fireEvent.click(within(detalle).getByRole("button", { name: /^Sentar en la mesa 5 a Berta Sinmesa.*marca que ha llegado/ }));
+    await waitFor(() => expect(h.acciones.marcarLlegada).toHaveBeenCalledWith(expect.objectContaining({ id: "r-berta" })));
+    expect(h.asignar).toHaveBeenCalledWith({ reserva_id: "r-berta", mesa_ids: ["m5"] });
+    // Berta es a las 14:15 (ya es su hora): no se ofrece «Solo dar la mesa».
+    expect(within(detalle).queryByRole("button", { name: /^Solo dar la mesa 5 a Berta/ })).toBeNull();
+  });
+
+  it("si falta más de media hora se ofrece además «Solo dar la mesa», que NO marca la llegada", async () => {
+    montar({ reservas: conTardia() });
+    fireEvent.click(mesaBoton("5"));
+    const detalle = screen.getByTestId("detalle-mesa");
+    fireEvent.click(within(detalle).getByRole("button", { name: /^Solo dar la mesa 5 a Hugo Tarde/ }));
+    await waitFor(() => expect(h.asignar).toHaveBeenCalledWith({ reserva_id: "r-hugo", mesa_ids: ["m5"] }));
+    expect(h.acciones.marcarLlegada).not.toHaveBeenCalled();
+  });
+
+  it("si la mesa no se guarda, tampoco se marca la llegada", async () => {
+    h.asignar = vi.fn(async () => {
+      throw new Error("MESA_OCUPADA");
+    });
+    montar();
+    fireEvent.click(mesaBoton("5"));
+    fireEvent.click(within(screen.getByTestId("detalle-mesa")).getByRole("button", { name: /^Sentar en la mesa 5 a Berta/ }));
+    await waitFor(() => expect(h.asignar).toHaveBeenCalled());
+    expect(h.acciones.marcarLlegada).not.toHaveBeenCalled();
+  });
+});
+
+describe("Plano de Hoy · un toque en una mesa abre ESA mesa", () => {
+  it("el área táctil ampliada va en una capa por DEBAJO de todas las mesas, y la mesa mide su tamaño exacto", () => {
+    montar();
+    const halos = [...document.querySelectorAll<HTMLElement>("[data-halo-mesa]")];
+    const botones = [...document.querySelectorAll<HTMLElement>("button[data-mesa-id]")];
+    expect(halos).toHaveLength(5);
+    const zMinBoton = Math.min(...botones.map((b) => Number(b.style.zIndex)));
+    for (const halo of halos) {
+      expect(Number(halo.style.zIndex)).toBeLessThan(zMinBoton);
+      expect(halo.querySelector("button")).toBeNull();
+    }
+    // Sin medidas (jsdom) la escala es 1: una mesa de 80 cm a 50 px/m mide 40 px; su halo, 48.
+    expect(mesaBoton("2").style.width).toBe("40px");
+    expect(document.querySelector<HTMLElement>('[data-halo-mesa="m2"]')!.style.width).toBe("48px");
+  });
+
+  it("tocar el halo (fuera de cualquier mesa) también abre su mesa", () => {
+    montar();
+    fireEvent.click(document.querySelector('[data-halo-mesa="m2"]')!);
+    expect(screen.getByTestId("detalle-mesa")).toHaveTextContent("Mesa 2");
+  });
+});
+
+describe("Plano de Hoy · el estado no se dice solo con color", () => {
+  it("cada mesa lleva el icono de su estado en la esquina", () => {
+    montar();
+    for (const [n, estado] of [
+      ["1", "ocupada"],
+      ["2", "reservada"],
+      ["3", "retrasada"],
+      ["4", "por_liberar"],
+      ["5", "libre"],
+    ]) {
+      expect(mesaBoton(n).nextElementSibling!.querySelector(`[data-glifo-estado="${estado}"] svg`)).not.toBeNull();
+    }
+  });
+
+  it("y cada estado tiene su forma de pintar la mesa (contorno discontinuo, doble, relleno…), distinta de las demás", async () => {
+    const { CONFIG_ESTADO_MESA } = await import("@/components/reservas/servicio/estadosMesa");
+    const patron = (clases: string) =>
+      [
+        /border-dashed/.test(clases) ? "discontinuo" : /border-double/.test(clases) ? "doble" : "continuo",
+        /bg-white/.test(clases) ? "hueca" : "rellena",
+        /border-\[3px\]|border-4/.test(clases) ? "gruesa" : "fina",
+      ].join("+");
+    const patrones = Object.values(CONFIG_ESTADO_MESA).map((c) => patron(c.clases));
+    expect(new Set(patrones).size).toBe(patrones.length);
+  });
+
+  it("«en N min» solo si aún no es la hora; si ya ha pasado (dentro del margen), «N min tarde»", async () => {
+    const { textoMinutosMesa } = await import("@/components/reservas/servicio/estadosMesa");
+    expect(textoMinutosMesa("reservada", -15)).toBe("en 15 min");
+    expect(textoMinutosMesa("reservada", 0)).toBe("es su hora");
+    expect(textoMinutosMesa("reservada", 5)).toBe("5 min tarde");
+    expect(textoMinutosMesa("retrasada", 20)).toBe("retraso 20 min");
+  });
+});
+
+describe("Plano de Hoy · notas del cliente e «importante», a la vista", () => {
+  const conNota = () =>
+    RESERVAS.map((r) => (r.id === "r-rosa" ? { ...r, importante: true, notas_cliente: "Celíaca, trae tarta" } : r));
+
+  it("en la mesa (icono y nombre accesible) y en su panel, con la nota entera", () => {
+    montar({ reservas: conNota() });
+    expect(mesaBoton("2")).toHaveAccessibleName(/, importante, nota del cliente: Celíaca, trae tarta$/);
+    const rotulo = mesaBoton("2").nextElementSibling!;
+    expect(rotulo.querySelector('[data-marca="importante"]')).not.toBeNull();
+    expect(rotulo.querySelector('[data-marca="nota"]')).not.toBeNull();
+    fireEvent.click(mesaBoton("2"));
+    const detalle = screen.getByTestId("detalle-mesa");
+    const aviso = within(detalle).getByTestId("aviso-reserva-mesa");
+    expect(aviso).toHaveTextContent("Reserva importante");
+    expect(aviso).toHaveTextContent("Nota: Celíaca, trae tarta");
+    // Y en la tarjeta de siempre (la del kanban).
+    expect(within(detalle).getByTestId("nota-cliente")).toHaveTextContent("Celíaca, trae tarta");
+  });
+});
+
+describe("Plano de Hoy · por debajo de 1280 px la lista va en hojas (el plano, a todo lo ancho)", () => {
+  it("sin panel al lado: «Por sentar» abre la lista en una hoja y tocar una mesa la abre en otra", async () => {
+    anchoVentana(1024);
+    montar();
+    expect(screen.queryByRole("complementary")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /^Por sentar: 2 sin mesa en Comedor y 1 sin sala/ }));
+    const hoja = await screen.findByRole("dialog", { name: "Por sentar" });
+    expect(within(hoja).getByRole("region", { name: "Sin mesa en Comedor" })).toBeInTheDocument();
+    fireEvent.keyDown(hoja, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    fireEvent.click(mesaBoton("4"));
+    const hojaMesa = await screen.findByRole("dialog", { name: "Mesa 4" });
+    expect(within(hojaMesa).getByRole("button", { name: /Liberar mesa/ })).toBeInTheDocument();
   });
 });
