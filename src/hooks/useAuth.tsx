@@ -33,6 +33,25 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
+ * Escribe una fila de acceso en `audit_log` (login/logout). "Best effort":
+ * un fallo aquí nunca debe romper el inicio/cierre de sesión en sí, así que
+ * solo se registra en consola.
+ */
+async function registrarAccesoAuditoria(accion: "login" | "logout", userId: string, email: string | null) {
+  try {
+    const { error } = await supabase.from("audit_log").insert({
+      actor_user_id: userId,
+      actor_email: email,
+      accion,
+      user_agent: navigator.userAgent,
+    });
+    if (error) console.error(`Error registrando ${accion} en audit_log:`, error);
+  } catch (e) {
+    console.error(`Error registrando ${accion} en audit_log:`, e);
+  }
+}
+
+/**
  * Conserva la REFERENCIA del usuario previo si es la misma persona (mismo id).
  *
  * supabase-js emite SIGNED_IN / TOKEN_REFRESHED cada vez que la pestaña o la
@@ -224,6 +243,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Error registrando métrica:", e);
       }
 
+      // Rastro de auditoría para el super admin (tabla `audit_log`, ver
+      // /super-admin/auditoria). Independiente de `registrar-metrica` de
+      // arriba: esa va a la BD de métricas aparte y cuenta logins como
+      // número, esta es la fila legible ("quién entró y cuándo") que lee
+      // el super admin.
+      if (data.user) void registrarAccesoAuditoria("login", data.user.id, data.user.email ?? null);
+
       return { data, error: null };
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -236,6 +262,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Hay que leer quién es ANTES de cerrar sesión: `signOut()` invalida el
+    // token, y la política de `audit_log` exige `actor_user_id = auth.uid()`
+    // con el usuario todavía autenticado.
+    const { data: { user: saliente } } = await supabase.auth.getUser();
+    if (saliente) void registrarAccesoAuditoria("logout", saliente.id, saliente.email ?? null);
+
     const { error } = await supabase.auth.signOut();
     if (error) {
       const status = typeof error === "object" && error !== null && "status" in error

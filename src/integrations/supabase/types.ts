@@ -4095,6 +4095,42 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          accion: string
+          actor_email: string | null
+          actor_user_id: string | null
+          created_at: string
+          detalles: Json | null
+          id: string
+          registro_id: string | null
+          tabla: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          accion: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detalles?: Json | null
+          id?: string
+          registro_id?: string | null
+          tabla?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          accion?: string
+          actor_email?: string | null
+          actor_user_id?: string | null
+          created_at?: string
+          detalles?: Json | null
+          id?: string
+          registro_id?: string | null
+          tabla?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       admin_feature_toggles: {
         Row: {
           enabled: boolean

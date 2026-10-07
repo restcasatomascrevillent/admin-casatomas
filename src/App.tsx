@@ -36,6 +36,7 @@ import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminPanel from "./pages/SuperAdminPanel";
 import SuperAdminUsuarios from "./pages/SuperAdminUsuarios";
 import SuperAdminBotWeb from "./pages/SuperAdminBotWeb";
+import SuperAdminAuditoria from "./pages/SuperAdminAuditoria";
 
 const queryClient = new QueryClient();
 
@@ -111,6 +112,7 @@ const App = () => (
                   <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
                   <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />
                   <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />
+                  <Route path="/super-admin/auditoria" element={paginaSuperAdmin(<SuperAdminAuditoria />)} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </RouteErrorBoundary>
