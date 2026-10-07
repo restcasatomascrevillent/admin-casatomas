@@ -1,4 +1,4 @@
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -7,10 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollText, ChevronDown, ChevronRight, Loader2, LogIn, LogOut, Plus, Pencil, Trash2 } from "lucide-react";
+import { ScrollText, ChevronDown, ChevronRight, Loader2, LogIn, LogOut, Plus, Pencil, Trash2, UserX } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { useAuditLog, TABLAS_AUDITADAS, type AuditLogFiltros } from "@/hooks/useAuditLog";
+import {
+  useAuditLog,
+  agruparEntradas,
+  resumirCambios,
+  TABLAS_AUDITADAS,
+  TABLA_LABEL,
+  type AuditLogEntry,
+  type AuditLogFiltros,
+} from "@/hooks/useAuditLog";
 
 const ACCION_UI: Record<string, { label: string; icon: typeof LogIn; className: string }> = {
   login: { label: "Inicio de sesión", icon: LogIn, className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
@@ -22,18 +30,51 @@ const ACCION_UI: Record<string, { label: string; icon: typeof LogIn; className: 
 
 const FILTROS_VACIOS: AuditLogFiltros = {};
 
+/** Valor de un campo del diff, recortado para que una fila nunca se dispare de alto. */
+function formatearValorCampo(valor: unknown): string {
+  if (valor === null || valor === undefined) return "—";
+  const texto = typeof valor === "string" ? valor : JSON.stringify(valor);
+  return texto.length > 80 ? `${texto.slice(0, 80)}…` : texto;
+}
+
+function DetalleEntrada({ entrada }: { entrada: AuditLogEntry }) {
+  const cambios = entrada.accion === "actualizar" ? resumirCambios(entrada.detalles) : [];
+
+  if (entrada.accion === "actualizar" && cambios.length > 0) {
+    return (
+      <ul className="space-y-1 text-xs">
+        {cambios.map((c) => (
+          <li key={c.campo} className="flex flex-wrap items-center gap-1.5">
+            <span className="font-mono font-medium text-foreground">{c.campo}:</span>
+            <span className="text-muted-foreground line-through">{formatearValorCampo(c.antes)}</span>
+            <span className="text-muted-foreground">→</span>
+            <span className="text-foreground">{formatearValorCampo(c.despues)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  if (!entrada.detalles || Object.keys(entrada.detalles).length === 0) return null;
+
+  return (
+    <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(entrada.detalles, null, 2)}</pre>
+  );
+}
+
 export default function SuperAdminAuditoria() {
   const [filtrosPendientes, setFiltrosPendientes] = useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [filtros, setFiltros] = useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [pagina, setPagina] = useState(0);
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
   const { entradas, total, pageSize, loading, error } = useAuditLog(filtros, pagina);
+  const grupos = useMemo(() => agruparEntradas(entradas), [entradas]);
 
-  const alternarExpandida = (id: string) => {
+  const alternarExpandida = (key: string) => {
     setExpandidas((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -113,7 +154,7 @@ export default function SuperAdminAuditoria() {
                   <SelectItem value="todas">Todas</SelectItem>
                   {TABLAS_AUDITADAS.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {t}
+                      {TABLA_LABEL[t] ?? t}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -162,7 +203,7 @@ export default function SuperAdminAuditoria() {
               </div>
             ) : error ? (
               <p className="text-sm text-destructive py-4">Error al cargar la auditoría: {error}</p>
-            ) : entradas.length === 0 ? (
+            ) : grupos.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4">No hay registros con estos filtros.</p>
             ) : (
               <div className="overflow-x-auto">
@@ -177,17 +218,22 @@ export default function SuperAdminAuditoria() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {entradas.map((entrada) => {
-                      const ui = ACCION_UI[entrada.accion] ?? ACCION_UI.actualizar;
+                    {grupos.map((grupo) => {
+                      const ui = ACCION_UI[grupo.accion] ?? ACCION_UI.actualizar;
                       const Icon = ui.icon;
-                      const tieneDetalles = entrada.detalles && Object.keys(entrada.detalles).length > 0;
-                      const abierta = expandidas.has(entrada.id);
+                      const esGrupo = grupo.entradas.length > 1;
+                      // Un grupo de "N registros" siempre se puede desplegar (para ver
+                      // cada fila); una fila suelta solo si de verdad trae algo que ver.
+                      const tieneDetalles =
+                        esGrupo || (grupo.entradas[0].detalles && Object.keys(grupo.entradas[0].detalles).length > 0);
+                      const abierta = expandidas.has(grupo.key);
+                      const sinActor = !grupo.actor_email;
 
                       return (
-                        <Fragment key={entrada.id}>
+                        <Fragment key={grupo.key}>
                           <TableRow
                             className={tieneDetalles ? "cursor-pointer" : undefined}
-                            onClick={tieneDetalles ? () => alternarExpandida(entrada.id) : undefined}
+                            onClick={tieneDetalles ? () => alternarExpandida(grupo.key) : undefined}
                           >
                             <TableCell>
                               {tieneDetalles &&
@@ -198,23 +244,48 @@ export default function SuperAdminAuditoria() {
                                 ))}
                             </TableCell>
                             <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-                              {format(new Date(entrada.created_at), "d MMM yyyy, HH:mm:ss", { locale: es })}
+                              {format(new Date(grupo.created_at), "d MMM yyyy, HH:mm:ss", { locale: es })}
                             </TableCell>
-                            <TableCell className="text-sm">{entrada.actor_email ?? "—"}</TableCell>
+                            <TableCell className="text-sm">
+                              {sinActor ? (
+                                <span className="inline-flex items-center gap-1 text-muted-foreground">
+                                  <UserX className="h-3.5 w-3.5" />
+                                  Sin identificar
+                                </span>
+                              ) : (
+                                grupo.actor_email
+                              )}
+                            </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={`gap-1 ${ui.className}`}>
                                 <Icon className="h-3 w-3" />
                                 {ui.label}
+                                {esGrupo && <span className="ml-0.5 font-semibold">× {grupo.entradas.length}</span>}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-sm font-mono text-muted-foreground">{entrada.tabla ?? "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {grupo.tabla ? TABLA_LABEL[grupo.tabla] ?? grupo.tabla : "—"}
+                            </TableCell>
                           </TableRow>
                           {tieneDetalles && abierta && (
                             <TableRow>
                               <TableCell colSpan={5} className="border-0 p-0">
-                                <pre className="m-3 overflow-x-auto rounded-md bg-muted p-3 text-xs">
-                                  {JSON.stringify(entrada.detalles, null, 2)}
-                                </pre>
+                                <div className="m-3 space-y-2">
+                                  {esGrupo ? (
+                                    grupo.entradas.map((entrada) => (
+                                      <div key={entrada.id} className="rounded-md border border-border/60 p-2">
+                                        {entrada.registro_id && (
+                                          <p className="mb-1 font-mono text-[11px] text-muted-foreground">
+                                            {entrada.registro_id}
+                                          </p>
+                                        )}
+                                        <DetalleEntrada entrada={entrada} />
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <DetalleEntrada entrada={grupo.entradas[0]} />
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           )}

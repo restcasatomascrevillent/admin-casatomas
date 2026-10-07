@@ -64,11 +64,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Client with service role for admin operations
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
     // Get current user
     const { data: { user: currentUser }, error: userError } = await supabaseUser.auth.getUser();
     if (userError || !currentUser) {
@@ -78,6 +73,21 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Client with service role for admin operations. Lleva quién es el actor
+    // en cabeceras propias: la conexión de service role no tiene JWT, así
+    // que auth.uid() es NULL en la base de datos — fn_registrar_auditoria()
+    // (tabla audit_log) lee estas cabeceras como respaldo para no perder de
+    // vista quién creó el usuario.
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        headers: {
+          "x-audit-actor-id": currentUser.id,
+          "x-audit-actor-email": currentUser.email ?? "",
+        },
+      },
+    });
 
     console.log("Request from user:", currentUser.id);
     const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);

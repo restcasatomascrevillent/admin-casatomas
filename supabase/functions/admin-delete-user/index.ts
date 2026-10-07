@@ -42,10 +42,6 @@ Deno.serve(async (req) => {
       global: { headers: { Authorization: authHeader } },
     });
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-
     const {
       data: { user: currentUser },
       error: userError,
@@ -57,6 +53,20 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Lleva quién es el actor en cabeceras propias: la conexión de service
+    // role no tiene JWT, así que auth.uid() es NULL en la base de datos —
+    // fn_registrar_auditoria() (tabla audit_log) lee estas cabeceras como
+    // respaldo para no perder de vista quién borró el usuario.
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        headers: {
+          "x-audit-actor-id": currentUser.id,
+          "x-audit-actor-email": currentUser.email ?? "",
+        },
+      },
+    });
 
     const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
 
