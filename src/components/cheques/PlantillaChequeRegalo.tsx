@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { LOGO_CASA_TOMAS } from "@/lib/cheques/casaTomas";
 import { PLANTILLA_REGALO, CHEQUE_EJEMPLO, textoRegalo, errorCheques, type PlantillaRegalo } from "@/lib/cheques/regalo";
 import { VistaChequeRegalo } from "./VistaChequeRegalo";
+import { OpcionesRegalo } from "./OpcionesRegalo";
 
 const db = supabase as unknown as SupabaseClient;
 export function PlantillaChequeRegalo() {
@@ -20,6 +21,9 @@ export function PlantillaChequeRegalo() {
   const [cargando, setCargando] = useState(true), [guardando, setGuardando] = useState(false);
   const [cambios, setCambios] = useState(false), [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
+  const [ocultarImporte, setOcultarImporte] = useState(false);
+  const [incluirDedicatoria, setIncluirDedicatoria] = useState(true);
+  const ejemplo = { ...CHEQUE_EJEMPLO, ocultar_importe: ocultarImporte, mensaje: incluirDedicatoria ? CHEQUE_EJEMPLO.mensaje : null };
   useEffect(() => {
     let activo = true;
     setCargando(true); setError("");
@@ -71,6 +75,6 @@ export function PlantillaChequeRegalo() {
         <Button type="submit" disabled={!puedeEditar || cargando || guardando || !!error || !cambios}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar correo y PDF</Button>
       </form>
     </CardContent></Card>
-    <div className="space-y-4 xl:sticky xl:top-0"><VistaChequeRegalo cheque={CHEQUE_EJEMPLO} plantilla={plantilla} /><Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Vista previa del correo</CardTitle></CardHeader><CardContent className="space-y-4"><p className="font-medium">{textoRegalo(plantilla.email_asunto, CHEQUE_EJEMPLO)}</p><p className="text-sm whitespace-pre-wrap break-words">{textoRegalo(plantilla.email_mensaje, CHEQUE_EJEMPLO)}</p><p className="font-mono font-semibold">{CHEQUE_EJEMPLO.codigo}</p><p className="text-xs text-muted-foreground">Adjunto: Cheque-{CHEQUE_EJEMPLO.codigo}.pdf · Ejemplo de 100 €</p></CardContent></Card></div>
+    <div className="space-y-4 xl:sticky xl:top-0"><OpcionesRegalo ocultarImporte={ocultarImporte} incluirDedicatoria={incluirDedicatoria} onImporte={setOcultarImporte} onDedicatoria={setIncluirDedicatoria} /><p className="text-xs text-muted-foreground">Prueba las opciones de cada compra. Estas selecciones solo cambian el ejemplo.</p><VistaChequeRegalo cheque={ejemplo} plantilla={plantilla} /><Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Vista previa del correo</CardTitle></CardHeader><CardContent className="space-y-4"><p className="font-medium">{textoRegalo(plantilla.email_asunto, ejemplo, ocultarImporte)}</p><p className="text-sm whitespace-pre-wrap break-words">{textoRegalo(plantilla.email_mensaje, ejemplo, ocultarImporte)}</p><p className="font-mono font-semibold">{CHEQUE_EJEMPLO.codigo}</p>{!ocultarImporte && <p className="text-sm">100,00 €</p>}<p className="text-xs text-muted-foreground">Adjunto: Cheque-{CHEQUE_EJEMPLO.codigo}.pdf</p></CardContent></Card></div>
   </div>;
 }

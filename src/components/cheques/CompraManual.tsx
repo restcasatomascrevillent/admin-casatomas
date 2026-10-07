@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -9,10 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, CheckCircle2 } from "lucide-react";
-import { errorCheques, type ChequeRegalo } from "@/lib/cheques/regalo";
+import { errorCheques, PLANTILLA_REGALO, type PlantillaRegalo, type ChequeRegalo } from "@/lib/cheques/regalo";
 import { VistaChequeRegalo } from "./VistaChequeRegalo";
+import { OpcionesRegalo } from "./OpcionesRegalo";
 
-const inicial = { importe_eur: "100", comprador_nombre: "", comprador_email: "", comprador_telefono: "", destinatario_nombre: "", mensaje: "", fecha_entrega_deseada: "", pago_manual_metodo: "efectivo", ocultar_importe: false };
+const inicial = { importe_eur: "100", comprador_nombre: "", comprador_email: "", comprador_telefono: "", destinatario_nombre: "", mensaje: "", fecha_entrega_deseada: "", pago_manual_metodo: "efectivo", ocultar_importe: false, incluir_dedicatoria: true };
 
 export function CompraManual() {
   const { canAccess: puedeEditar } = useCanAccessSection("cheques", "edit");
@@ -23,6 +24,20 @@ export function CompraManual() {
   const [ocupado, setOcupado] = useState(false);
   const [emailEnviado, setEmailEnviado] = useState(false);
   const [error, setError] = useState("");
+  const [plantilla, setPlantilla] = useState<PlantillaRegalo | null>(null);
+  const [errorPlantilla, setErrorPlantilla] = useState("");
+  useEffect(() => {
+    let activo = true;
+    void (async () => {
+      const { data, error } = await (supabase as unknown as SupabaseClient).from("plantilla_cheques_regalo").select("*").eq("id", true).single();
+      if (!activo) return;
+      if (error || !data) setErrorPlantilla("No se pudo cargar la plantilla para la vista previa.");
+      else setPlantilla({ ...PLANTILLA_REGALO, ...data });
+    })().catch(() => { if (activo) setErrorPlantilla("No se pudo cargar la plantilla para la vista previa."); });
+    return () => { activo = false; };
+  }, []);
+  const ejemplo: ChequeRegalo = { ...datos, id: "ejemplo", codigo: "CT-EJEMPLO", importe_eur: Number(datos.importe_eur) || 0,
+    mensaje: datos.incluir_dedicatoria ? datos.mensaje : null, fecha_entrega_deseada: datos.fecha_entrega_deseada || null };
   function cambiar(campo: keyof typeof inicial, valor: string | boolean) { setDatos(d => ({ ...d, [campo]: valor })); }
   async function expedir(e: FormEvent) {
     e.preventDefault();
@@ -31,7 +46,7 @@ export function CompraManual() {
     setSolicitud(id); setOcupado(true); setError("");
     try {
       const { data, error } = await (supabase as unknown as SupabaseClient).rpc("crear_cheque_manual", {
-        p_solicitud_id: id, p_datos: { ...datos, importe_eur: Number(datos.importe_eur) },
+        p_solicitud_id: id, p_datos: { ...datos, importe_eur: Number(datos.importe_eur), mensaje: datos.incluir_dedicatoria ? datos.mensaje : null },
       });
       if (error || !data?.codigo) throw error || new Error("No se ha podido confirmar la expedición");
       setCheque(data as ChequeRegalo);
@@ -68,19 +83,22 @@ export function CompraManual() {
     </CardContent></Card>
     <VistaChequeRegalo cheque={cheque} />
   </div>;
-  return <Card className="max-w-3xl rounded-2xl"><CardHeader><CardTitle>Compra manual</CardTitle><p className="text-sm text-muted-foreground">Registra una compra cobrada en el restaurante o un cheque de cortesía. Se generará un código y se enviará el regalo por email con su PDF.</p></CardHeader><CardContent>
+  return <div className="grid gap-6 xl:grid-cols-2 items-start"><Card className="rounded-2xl"><CardHeader><CardTitle>Compra manual</CardTitle><p className="text-sm text-muted-foreground">Registra una compra cobrada en el restaurante o un cheque de cortesía. Se generará un código y se enviará el regalo por email con su PDF.</p></CardHeader><CardContent>
     {!puedeEditar && <p className="mb-4 text-sm text-muted-foreground">Necesitas permiso de edición de Cheques para expedir una compra.</p>}
     <form onSubmit={expedir} className="space-y-5">
       <fieldset disabled={!puedeEditar || ocupado || !!solicitud} className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="manual-importe">Importe (€)</Label><Input id="manual-importe" type="number" min="10" max="1000" step="0.01" required value={datos.importe_eur} onChange={e => cambiar("importe_eur", e.target.value)} /></div><div className="space-y-2"><Label htmlFor="manual-metodo">Método de pago</Label><select id="manual-metodo" className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={datos.pago_manual_metodo} onChange={e => { cambiar("pago_manual_metodo", e.target.value); setConfirmado(false); }}><option value="efectivo">Efectivo</option><option value="tarjeta">Tarjeta</option><option value="transferencia">Transferencia</option><option value="cortesia">Cortesía</option></select></div></div>
         <div className="grid gap-4 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="manual-nombre">Nombre del comprador</Label><Input id="manual-nombre" required maxLength={200} value={datos.comprador_nombre} onChange={e => cambiar("comprador_nombre", e.target.value)} /></div><div className="space-y-2"><Label htmlFor="manual-email">Email del comprador</Label><Input id="manual-email" type="email" required maxLength={320} value={datos.comprador_email} onChange={e => cambiar("comprador_email", e.target.value)} /></div><div className="space-y-2"><Label htmlFor="manual-telefono">Teléfono del comprador</Label><Input id="manual-telefono" type="tel" maxLength={40} value={datos.comprador_telefono} onChange={e => cambiar("comprador_telefono", e.target.value)} /></div><div className="space-y-2"><Label htmlFor="manual-destinatario">Nombre del destinatario</Label><Input id="manual-destinatario" maxLength={200} value={datos.destinatario_nombre} onChange={e => cambiar("destinatario_nombre", e.target.value)} /></div></div>
-        <div className="space-y-2"><Label htmlFor="manual-mensaje">Dedicatoria</Label><Textarea id="manual-mensaje" rows={3} maxLength={500} value={datos.mensaje} onChange={e => cambiar("mensaje", e.target.value)} /></div>
+        <OpcionesRegalo ocultarImporte={datos.ocultar_importe} incluirDedicatoria={datos.incluir_dedicatoria} onImporte={v => cambiar("ocultar_importe", v)} onDedicatoria={v => cambiar("incluir_dedicatoria", v)} disabled={!puedeEditar || ocupado || !!solicitud} />
+        {datos.incluir_dedicatoria && <div className="space-y-2"><Label htmlFor="manual-mensaje">Dedicatoria (opcional)</Label><Textarea id="manual-mensaje" rows={3} maxLength={500} value={datos.mensaje} onChange={e => cambiar("mensaje", e.target.value)} /></div>}
         <div className="space-y-2"><Label htmlFor="manual-fecha">Entrega deseada (opcional)</Label><Input id="manual-fecha" type="date" value={datos.fecha_entrega_deseada} onChange={e => cambiar("fecha_entrega_deseada", e.target.value)} className="max-w-xs" /></div>
-        <label className="flex gap-3 items-center text-sm"><Checkbox checked={datos.ocultar_importe} onCheckedChange={v => cambiar("ocultar_importe", v === true)} />Ocultar el importe en el correo y el PDF del regalo</label>
         <label className="flex gap-3 items-start rounded-xl border p-4 text-sm"><Checkbox checked={confirmado} onCheckedChange={v => setConfirmado(v === true)} className="mt-0.5" />{datos.pago_manual_metodo === "cortesia" ? "Confirmo que quiero expedir este cheque de cortesía." : "Confirmo que esta compra ya se ha cobrado por el medio indicado."}</label>
       </fieldset>
       {error && <p role="alert" className="text-destructive">{error}{solicitud && " Reintenta esta misma compra para comprobar su expedición."}</p>}
       <Button type="submit" disabled={!puedeEditar || ocupado || !confirmado}>{ocupado && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{solicitud && !ocupado ? "Reintentar expedición" : "Generar código y enviar cheque"}</Button>
     </form>
-  </CardContent></Card>;
+  </CardContent></Card><div className="space-y-3 xl:sticky xl:top-0">
+    {plantilla ? <VistaChequeRegalo cheque={ejemplo} plantilla={plantilla} /> : <p role="status" className="text-sm text-muted-foreground">{errorPlantilla || "Cargando vista previa…"}</p>}
+    <p className="text-xs text-muted-foreground">Código de ejemplo. El definitivo se genera al expedir el cheque. Las opciones elegidas se aplicarán al regalo enviado.</p>
+  </div></div>;
 }

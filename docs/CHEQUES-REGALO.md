@@ -1,5 +1,21 @@
 # Cheques regalo: expedición, compra manual, correo y PDF
 
+## Opciones de cada regalo y vista previa
+
+La compra manual y la compra web permiten mostrar u ocultar el importe en el regalo y elegir si el PDF incluye dedicatoria. Sin dedicatoria se guarda el mensaje vacío; el destinatario continúa siendo opcional. El precio cobrado y la factura conservan el importe real.
+
+Antes de confirmar se muestra una vista del PDF con código de ejemplo, usando la plantilla del restaurante. En **Correo y PDF** se pueden probar ambas casillas sin cambiar las opciones de otros cheques. El código está situado un poco más abajo dentro de su recuadro.
+
+Esta actualización no necesita una migración nueva si ya se aplicó `20261007190000_cheques_manual_plantilla.sql`. Desde `casa-tomas-story`, desplegar:
+
+```sh
+supabase functions deploy cheques-regalo-web
+supabase functions deploy cheques-regalo-admin
+supabase functions deploy stripe-webhook-cheques-regalo --no-verify-jwt
+```
+
+La función web añade `/vista-previa`, que devuelve el diseño del PDF con los datos introducidos, sin crear compras ni códigos. Las selecciones de importe se guardan antes de abrir Stripe y el webhook las respeta al enviar el regalo. GitHub/Vercel no despliegan estas funciones.
+
 ## Actualización de compra manual y plantilla (7 de octubre de 2026)
 
 - **Expedición de tickets** solo incluye cheques con código expedido. El filtro se aplica antes de contar y paginar, también en la búsqueda. Se muestran teléfono, comprador y estado; al pulsar la fila o el código se abre la ficha completa, incluidos email, dedicatoria, entrega, pago y datos de factura.

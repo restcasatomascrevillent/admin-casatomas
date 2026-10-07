@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mock = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn(), edit: true }));
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc: mock.rpc, functions: { invoke: mock.invoke } } }));
+const mock = vi.hoisted(() => ({ rpc: vi.fn(), invoke: vi.fn(), edit: true, from: vi.fn() }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: mock.from, rpc: mock.rpc, functions: { invoke: mock.invoke } } }));
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: mock.edit }) }));
-vi.mock("../VistaChequeRegalo", () => ({ VistaChequeRegalo: () => <div>Vista PDF</div> }));
+vi.mock("../VistaChequeRegalo", () => ({ VistaChequeRegalo: ({ cheque }: { cheque: { mensaje?: string | null; ocultar_importe?: boolean } }) => <div data-testid="vista-pdf" data-importe={cheque.ocultar_importe ? "oculto" : "visible"}>{cheque.mensaje || "Sin dedicatoria"}</div> }));
 import { CompraManual } from "../CompraManual";
 const cheque = { id: "1", codigo: "CT-123456", importe_eur: 100, comprador_nombre: "Ana", comprador_email: "ana@example.com" };
 function completar() {
@@ -12,7 +12,7 @@ function completar() {
   fireEvent.click(screen.getByRole("checkbox", { name: /Confirmo/ }));
 }
 describe("Compra manual", () => {
-  beforeEach(() => { mock.edit = true; mock.rpc.mockReset(); mock.invoke.mockReset(); mock.rpc.mockResolvedValue({ data: cheque, error: null }); mock.invoke.mockResolvedValue({ data: { email_enviado: true }, error: null }); });
+  beforeEach(() => { mock.edit = true; mock.from.mockReturnValue({ select: () => ({ eq: () => ({ single: async () => ({ data: {}, error: null }) }) }) }); mock.rpc.mockReset(); mock.invoke.mockReset(); mock.rpc.mockResolvedValue({ data: cheque, error: null }); mock.invoke.mockResolvedValue({ data: { email_enviado: true }, error: null }); });
   it("exige confirmar el cobro y reutiliza la referencia tras un error de conexión", async () => {
     mock.rpc.mockResolvedValueOnce({ data: null, error: new Error("Conexión interrumpida") });
     render(<CompraManual />);
@@ -33,6 +33,19 @@ describe("Compra manual", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Reintentar envío" })).toBeNull());
     expect(mock.rpc).toHaveBeenCalledTimes(1);
     expect(mock.invoke).toHaveBeenCalledTimes(2);
+  });
+  it("muestra las opciones antes de expedir y excluye la dedicatoria desmarcada", async () => {
+    render(<CompraManual />);
+    fireEvent.change(screen.getByLabelText("Dedicatoria (opcional)"), { target: { value: "Un regalo especial" } });
+    expect(await screen.findByTestId("vista-pdf")).toHaveTextContent("Un regalo especial");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Mostrar el importe en el regalo y en el PDF" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Incluir dedicatoria en el PDF" }));
+    expect(screen.getByTestId("vista-pdf")).toHaveAttribute("data-importe", "oculto");
+    expect(screen.getByTestId("vista-pdf")).toHaveTextContent("Sin dedicatoria");
+    expect(screen.queryByLabelText("Dedicatoria (opcional)")).toBeNull();
+    completar(); fireEvent.click(screen.getByRole("button", { name: "Generar código y enviar cheque" }));
+    await waitFor(() => expect(mock.rpc).toHaveBeenCalled());
+    expect(mock.rpc.mock.calls[0][1].p_datos).toMatchObject({ ocultar_importe: true, mensaje: null, destinatario_nombre: "" });
   });
   it("no permite expedir a un usuario con solo lectura", () => {
     mock.edit = false; render(<CompraManual />);

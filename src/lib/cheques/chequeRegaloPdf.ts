@@ -101,7 +101,7 @@ export async function generarVistaRegalo(cheque: ChequeRegalo, plantilla: Planti
   asegurar(100);
   rectangulo({ x: 80, y: y - 68, width: ancho - 160, height: 90, color: rgb(1,1,1), borderColor: acento, borderWidth: .5 });
   bloque("CÓDIGO DEL CHEQUE", 9, fuente, suave);
-  y -= 10; bloque(cheque.codigo, 26, negrita, acento); y -= 38;
+  y -= 20; bloque(cheque.codigo, 26, negrita, acento); y -= 28;
   if (cheque.destinatario_nombre) { bloque("Para " + cheque.destinatario_nombre, 17, serif); y -= 8; }
   if (cheque.fecha_entrega_deseada) bloque("Entrega deseada: " + cheque.fecha_entrega_deseada.split("-").reverse().join("/"), 10, fuente, suave);
   if (cheque.mensaje) { y -= 14; bloque(cheque.mensaje, 13, cursiva, suave); }

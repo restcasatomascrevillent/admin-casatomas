@@ -15,6 +15,16 @@ describe("Trazado compartido del PDF y la vista previa", () => {
     expect(vista.paginas[0]).toContain("CT-EJEMPLO");
     expect(vista.paginas[0]).toContain("100,00 €");
   });
+  it.each([false, true])("respeta importe oculto=%s con y sin dedicatoria", async ocultar_importe => {
+    for (const incluir of [false, true]) {
+      const vista = await generarVistaRegalo({ ...CHEQUE_EJEMPLO, ocultar_importe, mensaje: incluir ? CHEQUE_EJEMPLO.mensaje : null }, PLANTILLA_REGALO, LOGO_CASA_TOMAS);
+      const svg = vista.paginas.join("");
+      expect(svg.includes("100,00 €")).toBe(!ocultar_importe);
+      expect(svg.includes("¡Feliz cumpleaños!")).toBe(incluir);
+      expect(svg).toContain("CT-EJEMPLO");
+      expect((await PDFDocument.load(vista.pdf)).getPageCount()).toBe(1);
+    }
+  });
   it("escapa texto de compradores y mantiene la paginación y ocultación de importe", async () => {
     const vista = await generarVistaRegalo({ ...CHEQUE_EJEMPLO, ocultar_importe: true, destinatario_nombre: "<script>&Hola</script>", mensaje: "PalabraLarga".repeat(45) }, { ...PLANTILLA_REGALO, pdf_instrucciones: "Instrucciones de uso ".repeat(40) }, LOGO_CASA_TOMAS);
     const pdf = await PDFDocument.load(vista.pdf);
