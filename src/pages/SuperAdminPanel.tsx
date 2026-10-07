@@ -1,11 +1,19 @@
+import { useState } from "react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Loader2, ShoppingCart, Wallet, Coins, Star, Phone, Mail, Activity, MapPin, Bot } from "lucide-react";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+
+/**
+ * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
+ * abierto en el móvil) deja de encoger y vuelve el scroll de página.
+ */
+const ALTURA_MINIMA_CONTROL = 360;
 
 const MOVED_FEATURES = [
   { title: "Ecommerce", url: "/super-admin/ecommerce", icon: ShoppingCart },
@@ -21,10 +29,20 @@ const MOVED_FEATURES = [
 
 export default function SuperAdminPanel() {
   const { toggles, loading, isEnabled, setEnabled } = useAdminFeatureToggles();
+  // Alto de la pantalla (regla del dueño, 2026-10-07): el bloque mide justo lo
+  // que queda bajo la cabecera del layout y es él (con las dos tarjetas) el que
+  // hace scroll, no la página. Sin medida (jsdom, primer pintado) cae al layout
+  // de siempre.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_CONTROL);
 
   return (
     <SuperAdminLayout>
-      <div className="space-y-6">
+      <div
+        ref={setRaiz}
+        className="space-y-6 overflow-y-auto overscroll-contain"
+        style={alto ? { height: alto } : undefined}
+      >
         {/* Sin título de página (2026-09-25): la pestaña "Control del Panel"
             activa en el menú lateral ya dice dónde estás, y el subtítulo
             repetía lo que ya explica la CardDescription de justo abajo. */}

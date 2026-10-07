@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AlertCircle, Loader2, RefreshCw, Save } from "lucide-react";
@@ -20,6 +20,13 @@ import { TraduccionesBot } from "@/components/bot/TraduccionesBot";
 import { VistaPreviaBot } from "@/components/bot/VistaPreviaBot";
 import { SeccionProteccion } from "@/components/bot/SeccionProteccion";
 import type { CatalogosCarta, ConTraduccion } from "@/components/bot/traduccionBot";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+/**
+ * Suelo (px) del alto de la pestaña: por debajo (ventanas muy bajas, teclado
+ * abierto en el móvil) deja de encoger y vuelve el scroll de página.
+ */
+const ALTURA_MINIMA_BOT_WEB = 360;
 
 // Filtra por búsqueda (nombre o categoría) y agrupa por categoría. La
 // selección se hace con los nombres ESPAÑOLES; EN/FR los mapean a
@@ -58,6 +65,12 @@ export default function TabBotWeb() {
   const [saving, setSaving] = useState(false);
   const [buscarPlato, setBuscarPlato] = useState("");
   const [buscarVino, setBuscarVino] = useState("");
+  // Alto de la pantalla (regla del dueño, 2026-10-07): la pestaña mide lo que
+  // queda bajo la cabecera del layout; la barra de guardado queda fija arriba y
+  // el resto hace scroll en su región. Sin medida (jsdom, primer pintado) cae al
+  // layout de siempre, con scroll de página.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_BOT_WEB);
 
   // El borrador se carga UNA sola vez desde el servidor: los refetch
   // posteriores (p. ej. tras traducir) no pisan lo que se esté escribiendo.
@@ -185,88 +198,98 @@ export default function TabBotWeb() {
   const traduciendo = traduccion.isPending;
   const ocupado = saving || traduciendo;
 
+  // Ctrl/Cmd+S guarda en vez de abrir "Guardar página". Va en la barra y en los
+  // paneles del bot, NO en Protección (tiene su propio botón "Guardar límites"):
+  // antes los envolvía un solo div, pero la barra quedó fuera de la región con
+  // scroll y Protección dentro.
+  const atajoGuardar = (e: KeyboardEvent<HTMLDivElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      if (canEdit && dirty && !ocupado) handleSave();
+    }
+  };
+
   return (
-    <div className="space-y-4">
+    <div ref={setRaiz} className="flex flex-col gap-4" style={alto ? { height: alto } : undefined}>
+      <h2 className="sr-only">Bot web</h2>
+
+      {/* Barra de guardado + estado de traducciones. Fija arriba, fuera de
+          la región con scroll; con fondo sólido y borde: no tapa contenido ni
+          usa blur. Los márgenes negativos compensan el padding de <main>. El
+          `sticky` (bajo la cabecera del layout, h-14 / sm:h-16) solo actúa si
+          la página desplaza: sin medida o bajo el suelo. */}
       <div
-        className="space-y-4"
-        onKeyDown={(e) => {
-          // Ctrl/Cmd+S guarda en vez de abrir "Guardar página".
-          if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-            e.preventDefault();
-            if (canEdit && dirty && !ocupado) handleSave();
-          }
-        }}
+        className="sticky top-14 z-30 -mx-3 flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2 sm:top-16 sm:-mx-6 sm:px-6"
+        onKeyDown={atajoGuardar}
       >
-        <h2 className="sr-only">Bot web</h2>
+        <p className="text-sm text-muted-foreground">
+          Edita en <span className="font-medium text-foreground">español</span>; inglés y francés se traducen solos al guardar.
+        </p>
 
-        {/* Barra de guardado + estado de traducciones. Pegada bajo la
-            cabecera del layout (h-14 / sm:h-16) con fondo sólido y borde: no
-            tapa contenido ni usa blur. Los márgenes negativos compensan el
-            padding de <main>. */}
-        <div className="sticky top-14 z-30 -mx-3 flex flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2 sm:top-16 sm:-mx-6 sm:px-6">
-          <p className="text-sm text-muted-foreground">
-            Edita en <span className="font-medium text-foreground">español</span>; inglés y francés se traducen solos al guardar.
-          </p>
-
-          {canEdit && (
-            <div className="flex flex-wrap items-center gap-2" aria-live="polite">
-              <EstadoTraduccionBadges
-                configEs={configs.es}
-                configs={{ en: configs.en, fr: configs.fr }}
-                traduciendo={traduciendo}
-                errorTraduccion={errorTraduccion}
-                onReintentar={retraducir}
-                puedeReintentar={!dirty && !ocupado}
-              />
-              <EstadoGuardadoBadge dirty={dirty} saving={saving} error={saveError} />
-              <Button
-                size="sm"
-                className="h-11 px-4"
-                onClick={handleSave}
-                disabled={ocupado || !dirty}
-                aria-label="Guardar cambios y traducir a inglés y francés"
-                title="Guardar (Ctrl+S)"
-              >
-                {saving ? (
-                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Save className="mr-1.5 h-4 w-4" aria-hidden="true" />
-                )}
-                Guardar
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <BotIdiomaPanel
-          draft={draft}
-          canEdit={canEdit}
-          onChange={updateDraft}
-          onTogglePlato={(nombre) => toggleEn("platos", nombre)}
-          onToggleVino={(nombre) => toggleEn("vinos", nombre)}
-          platosPorCategoria={platosPorCategoria}
-          vinosPorCategoria={vinosPorCategoria}
-          loadingPlatos={loadingPlatos}
-          loadingVinos={loadingVinos}
-          buscarPlato={buscarPlato}
-          buscarVino={buscarVino}
-          onBuscarPlatoChange={setBuscarPlato}
-          onBuscarVinoChange={setBuscarVino}
-        />
-
-        <TraduccionesBot
-          configs={{ en: configs.en, fr: configs.fr }}
-          traduciendo={traduciendo}
-          puedeRetraducir={!dirty && !ocupado}
-          onRetraducir={retraducir}
-        />
-
-        <VistaPreviaBot borradores={borradoresPreview} />
+        {canEdit && (
+          <div className="flex flex-wrap items-center gap-2" aria-live="polite">
+            <EstadoTraduccionBadges
+              configEs={configs.es}
+              configs={{ en: configs.en, fr: configs.fr }}
+              traduciendo={traduciendo}
+              errorTraduccion={errorTraduccion}
+              onReintentar={retraducir}
+              puedeReintentar={!dirty && !ocupado}
+            />
+            <EstadoGuardadoBadge dirty={dirty} saving={saving} error={saveError} />
+            <Button
+              size="sm"
+              className="h-11 px-4"
+              onClick={handleSave}
+              disabled={ocupado || !dirty}
+              aria-label="Guardar cambios y traducir a inglés y francés"
+              title="Guardar (Ctrl+S)"
+            >
+              {saving ? (
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Save className="mr-1.5 h-4 w-4" aria-hidden="true" />
+              )}
+              Guardar
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Global (no depende del idioma): interruptor, consumo y límites. Fuera
-          del bloque con Ctrl+S — tiene su propio botón "Guardar límites". */}
-      <SeccionProteccion />
+      {/* `relative`: la región es el bloque contenedor de los `sr-only` (absolute) de
+          los paneles; sin él se escapaban del recorte y alargaban la página. */}
+      <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain">
+        <div className="space-y-4" onKeyDown={atajoGuardar}>
+          <BotIdiomaPanel
+            draft={draft}
+            canEdit={canEdit}
+            onChange={updateDraft}
+            onTogglePlato={(nombre) => toggleEn("platos", nombre)}
+            onToggleVino={(nombre) => toggleEn("vinos", nombre)}
+            platosPorCategoria={platosPorCategoria}
+            vinosPorCategoria={vinosPorCategoria}
+            loadingPlatos={loadingPlatos}
+            loadingVinos={loadingVinos}
+            buscarPlato={buscarPlato}
+            buscarVino={buscarVino}
+            onBuscarPlatoChange={setBuscarPlato}
+            onBuscarVinoChange={setBuscarVino}
+          />
+
+          <TraduccionesBot
+            configs={{ en: configs.en, fr: configs.fr }}
+            traduciendo={traduciendo}
+            puedeRetraducir={!dirty && !ocupado}
+            onRetraducir={retraducir}
+          />
+
+          <VistaPreviaBot borradores={borradoresPreview} />
+        </div>
+
+        {/* Global (no depende del idioma): interruptor, consumo y límites. Fuera
+            del bloque con Ctrl+S — tiene su propio botón "Guardar límites". */}
+        <SeccionProteccion />
+      </div>
     </div>
   );
 }

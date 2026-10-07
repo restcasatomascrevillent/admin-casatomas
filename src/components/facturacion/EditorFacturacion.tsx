@@ -17,6 +17,18 @@ import { VistaFactura } from "./VistaFactura";
 import { SelectorServicios, EditarCatalogo } from "./SelectorServicios";
 import { FacturasEmitidas } from "./FacturasEmitidas";
 import { catalogoInicial, prepararNuevaFactura, agregarProductos, ultimaFacturaCliente, recuperarServicios, siguienteNumero, normalizar } from "./catalogo";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+// Alto de pantalla (regla del dueño, 2026-10-07): el editor mide lo que queda
+// bajo la cabecera del layout (`useAlturaDisponible`); cabecera, pestañas, barra
+// de pasos y barra de acciones quedan fijas y solo hace scroll la región del
+// contenido de cada pestaña. Sin medida (jsdom, primer pintado) cae al layout de
+// siempre, con scroll de página.
+/** Suelo (px): por debajo (teclado abierto en el móvil) deja de encoger y vuelve el scroll de página. */
+const ALTURA_MINIMA_GESTOR_GASTO = 560;
+/** Pestaña que llena el alto; `data-[state=inactive]:hidden` porque Radix deja montada la inactiva con `hidden` y `flex` le gana (ver Marketing.tsx). */
+const pestanaClass = "flex min-h-0 flex-1 flex-col pt-3 data-[state=inactive]:hidden";
+const regionClass = "min-h-0 flex-1 overflow-y-auto overscroll-contain";
 
 const selectClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
 const areaClass = "min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -44,7 +56,12 @@ export function EditorFacturacion() {
   const [busy, setBusy] = useState(false);
   const [paso, setPaso] = useState(0);
   const inicioEditor = useRef<HTMLDivElement>(null);
-  const irPaso = (n: number) => { setPaso(n); inicioEditor.current?.scrollIntoView?.({block:"start",behavior:"smooth"}); };
+  const regionPaso = useRef<HTMLDivElement>(null);
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_GESTOR_GASTO);
+  // El paso nuevo empieza arriba: la región del formulario vuelve al principio y,
+  // si la página aún desplaza (móvil con teclado, bajo el suelo), la ventana también.
+  const irPaso = (n: number) => { setPaso(n); if (regionPaso.current) regionPaso.current.scrollTop = 0; inicioEditor.current?.scrollIntoView?.({block:"start",behavior:"smooth"}); };
   const [tab, setTab] = useState("nueva");
   const [confirmacion,setConfirmacion] = useState<{titulo:string;descripcion:string;accion:string;destructiva:boolean;resolver:(valor:boolean)=>void}|null>(null);
   const confirmar = (titulo:string,descripcion:string,accion:string,destructiva=true) => new Promise<boolean>(resolver=>setConfirmacion({titulo,descripcion,accion,destructiva,resolver}));
@@ -177,14 +194,14 @@ export function EditorFacturacion() {
   const ultimaCliente = ultimaFacturaCliente(q.data?.facturas ?? [],f.cliente);
   const clientes = [...(q.data?.facturas ?? [])].sort((a,b)=>b.documento.fecha.localeCompare(a.documento.fecha))
     .filter((g,i,lista)=>lista.findIndex(v=>normalizar(v.documento.cliente.nif)===normalizar(g.documento.cliente.nif))===i);
-  return <div className="space-y-5">
+  return <div ref={setRaiz} className="flex flex-col gap-5" style={alto ? {height:alto} : undefined}>
     <AlertDialog open={!!confirmacion} onOpenChange={abierto=>{if(!abierto)cerrarConfirmacion(false);}}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{confirmacion?.titulo}</AlertDialogTitle><AlertDialogDescription className="break-words">{confirmacion?.descripcion}</AlertDialogDescription></AlertDialogHeader>
         <AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction className={confirmacion?.destructiva ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined} onClick={()=>cerrarConfirmacion(true)}>{confirmacion?.accion}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
       <div><h1 className="text-2xl font-semibold">Facturación · OficiosOsIA</h1>
         <p className="mt-1 text-sm text-muted-foreground">Instalación, licencias, módulos y soporte.</p>
         <p className="mt-1 text-xs text-muted-foreground">{dirty ? "Cambios sin guardar" : actual ? facturaModificada ? "Borrador guardado · factura pendiente de actualizar" : "Factura guardada" : q.data?.config ? "Borrador guardado" : "Nuevo borrador"}</p></div>
@@ -193,29 +210,30 @@ export function EditorFacturacion() {
         <Button variant="outline" onClick={() => void recargar()} disabled={busy || q.isFetching} aria-label="Recargar facturación"><RefreshCw className="h-4 w-4" /></Button>
       </div>
     </div>
-    {q.isError && <div role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+    {q.isError && <div role="alert" className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
       <p className="font-semibold">No se ha podido cargar la facturación</p>
       <p className="mt-1 break-words">{q.error.message}</p>
       <p className="mt-1">Si esta función acaba de instalarse, comprueba que se haya aplicado la migración de facturación. Puedes reintentar con el botón de recarga.</p>
     </div>}
-    <Tabs value={tab} onValueChange={setTab}>
-      <TabsList className="grid h-auto w-full grid-cols-3">
+    <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
+      <TabsList className="grid h-auto w-full shrink-0 grid-cols-3">
         <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="emitidas">Facturas</TabsTrigger>
         <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="nueva">Nueva factura</TabsTrigger>
         <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="catalogo">Módulos y paquetes</TabsTrigger>
       </TabsList>
-      <TabsContent value="emitidas" className="space-y-4 pt-3">
+      <TabsContent value="emitidas" className={`${regionClass} space-y-4 pt-3 data-[state=inactive]:hidden`}>
         {q.isLoading ? <p role="status">Cargando facturas…</p> : q.isError ? <p className="text-sm text-muted-foreground">El historial no está disponible. Reintenta la carga.</p> :
           <FacturasEmitidas eliminar={(g,estado)=>void eliminar(g,estado)} borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={nuevo} />}
       </TabsContent>
-      <TabsContent value="nueva" className="space-y-5 pt-3">
-      {actual && <p className="text-sm font-medium">Editando factura {f.numero}</p>}
-    <div ref={inicioEditor} className="scroll-mt-4 space-y-3">
+      <TabsContent value="nueva" className={`${pestanaClass} gap-5`}>
+      {actual && <p className="shrink-0 text-sm font-medium">Editando factura {f.numero}</p>}
+    <div ref={inicioEditor} className="shrink-0 scroll-mt-4 space-y-3">
       <nav aria-label="Pasos de la factura" className="grid grid-cols-4 gap-1 rounded-lg border bg-muted/30 p-1">
         {["Cliente", "Servicios", "Ajustes", "Revisar"].map((nombre,i)=><Button key={nombre} variant={paso===i ? "default" : "ghost"} className="h-10 min-w-0 px-1 text-xs sm:text-sm" aria-current={paso===i ? "step" : undefined} onClick={()=>irPaso(i)}>{i+1}. {nombre}</Button>)}
       </nav>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="text-muted-foreground">{f.cliente.nombre || "Selecciona un cliente"} · {f.lineas.filter(l=>l.concepto.trim()).length} conceptos</span><span>Total: <strong>{euros(total.total)}</strong></span></div>
     </div>
+    <div ref={regionPaso} className={regionClass}>
     {q.isLoading ? <p role="status" className="py-10 text-center text-muted-foreground">Cargando facturación…</p> : (
       <div className="min-w-0">
         <fieldset disabled={busy} className="min-w-0 space-y-4">
@@ -289,7 +307,9 @@ export function EditorFacturacion() {
         </fieldset>
       </div>
     )}
-    <div className="sticky bottom-0 z-10 flex flex-wrap gap-2 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur sm:flex sm:flex-wrap sm:justify-end">
+    </div>
+    {/* Fuera de la región: siempre a la vista. El `sticky` solo actúa si la página desplaza (bajo el suelo). */}
+    <div className="sticky bottom-0 z-10 flex shrink-0 flex-wrap gap-2 rounded-lg border bg-background/95 p-3 shadow-sm backdrop-blur sm:flex sm:flex-wrap sm:justify-end">
       <div className="flex w-full items-center justify-between gap-2 border-b pb-2 sm:mr-auto sm:w-auto sm:border-0 sm:pb-0">
         <Button variant="outline" disabled={paso===0 || busy} onClick={()=>irPaso(paso-1)}>Anterior</Button>
         <span className="px-2 text-xs text-muted-foreground">Paso {paso+1} de 4</span>
@@ -300,9 +320,9 @@ export function EditorFacturacion() {
       <Button className={accionClass} disabled={deshabilitado} onClick={() => void guardar(true,true)}><Download className="h-4 w-4 shrink-0 sm:mr-2" />{busy ? "Procesando…" : "Descargar PDF"}</Button></>}
     </div>
       </TabsContent>
-      <TabsContent value="catalogo" className="space-y-4 pt-3">
-        <EditarCatalogo catalogo={f.catalogo ?? catalogoInicial()} cambiar={c=>cambiar({...f,catalogo:c})} busy={busy || q.isLoading} />
-        <Button disabled={deshabilitado} onClick={()=>void guardar(false,false,true)}><Save className="mr-2 h-4 w-4" />Guardar catálogo y tarifas</Button>
+      <TabsContent value="catalogo" className={`${pestanaClass} gap-4`}>
+        <div className={regionClass}><EditarCatalogo catalogo={f.catalogo ?? catalogoInicial()} cambiar={c=>cambiar({...f,catalogo:c})} busy={busy || q.isLoading} /></div>
+        <Button className="shrink-0 self-start" disabled={deshabilitado} onClick={()=>void guardar(false,false,true)}><Save className="mr-2 h-4 w-4" />Guardar catálogo y tarifas</Button>
       </TabsContent>
     </Tabs>
   </div>;

@@ -19,8 +19,13 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
           con la página), así que el sticky no llegaba a quedarse pegado
           nunca. Mismo bug y mismo arreglo que en DashboardLayout.tsx: quitar
           el overflow accidental y usar `min-w-0` (no `overflow-x-hidden`)
-          para que los hijos flex sigan sin forzar scroll horizontal. */}
-      <div className="min-h-screen flex w-full bg-background">
+          para que los hijos flex sigan sin forzar scroll horizontal.
+          `min-h-app` (index.css, 100dvh) y no `min-h-screen` (100vh), como en
+          DashboardLayout (2026-10-07, regla «el alto de la página es el de la
+          pantalla»): en iPad/Android `100vh` incluye la barra del navegador y
+          dejaba esa franja de scroll de página aunque el contenido cupiera.
+          Cada página mide su propio alto con `useAlturaDisponible`. */}
+      <div className="min-h-app flex w-full bg-background">
         <SuperAdminSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center px-3 sm:px-6 sticky top-0 z-50 w-full">

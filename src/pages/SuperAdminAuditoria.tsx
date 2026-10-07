@@ -19,6 +19,13 @@ import {
   type AuditLogEntry,
   type AuditLogFiltros,
 } from "@/hooks/useAuditLog";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+/**
+ * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
+ * abierto en el móvil) deja de encoger y vuelve el scroll de página.
+ */
+const ALTURA_MINIMA_AUDITORIA = 480;
 
 const ACCION_UI: Record<string, { label: string; icon: typeof LogIn; className: string }> = {
   login: { label: "Inicio de sesión", icon: LogIn, className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
@@ -69,6 +76,11 @@ export default function SuperAdminAuditoria() {
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
   const { entradas, total, pageSize, loading, error } = useAuditLog(filtros, pagina);
   const grupos = useMemo(() => agruparEntradas(entradas), [entradas]);
+  // Alto de la pantalla (regla del dueño, 2026-10-07): cabecera y filtros fijos
+  // arriba; la tabla de registros hace scroll dentro de su tarjeta, la página
+  // no. Sin medida (jsdom, primer pintado) cae al layout de siempre.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_AUDITORIA);
 
   const alternarExpandida = (key: string) => {
     setExpandidas((prev) => {
@@ -94,8 +106,8 @@ export default function SuperAdminAuditoria() {
 
   return (
     <SuperAdminLayout>
-      <div className="space-y-6">
-        <div className="flex items-center gap-3">
+      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
+        <div className="flex shrink-0 items-center gap-3">
           <ScrollText className="h-8 w-8 text-destructive" />
           <div>
             <h1 className="text-3xl font-bold text-foreground">Auditoría</h1>
@@ -105,7 +117,7 @@ export default function SuperAdminAuditoria() {
           </div>
         </div>
 
-        <Card>
+        <Card className="shrink-0">
           <CardHeader>
             <CardTitle>Filtros</CardTitle>
             <CardDescription>Combínalos como haga falta; se aplican todos a la vez.</CardDescription>
@@ -190,13 +202,15 @@ export default function SuperAdminAuditoria() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        {/* Nunca por debajo de 12rem: en un móvil, con los filtros apilados,
+            antes que una tabla de 0 px vuelve el scroll de página. */}
+        <Card className="flex min-h-48 flex-1 flex-col">
+          <CardHeader className="shrink-0">
             <CardTitle>
               {total} registro{total === 1 ? "" : "s"}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

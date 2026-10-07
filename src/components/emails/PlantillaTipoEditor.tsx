@@ -38,6 +38,13 @@ import { SelectorVariable } from "./SelectorVariable";
 import { HistorialVersionesPlantilla } from "./HistorialVersionesPlantilla";
 import { CampoColorMarca } from "./CampoColorMarca";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+/**
+ * Suelo (px) del alto del editor: por debajo (ventanas muy bajas, teclado
+ * abierto en el móvil) deja de encoger y vuelve el scroll de página.
+ */
+const ALTURA_MINIMA_EDITOR = 360;
 
 const CAMPOS_VACIOS: CamposEditablesPlantilla = {
   asunto: "",
@@ -141,6 +148,12 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
   // menú lateral quedan ~430 px para el formulario y ~280 para la vista): va en un
   // desplegable encima del formulario, cerrado por defecto.
   const [vistaPreviaAbierta, setVistaPreviaAbierta] = useState(false);
+  // Alto de la pantalla (regla del dueño, 2026-10-07): el editor mide lo que
+  // queda hasta el fondo del viewport; la cabecera (versión + historial) queda
+  // fija y el resto hace scroll en su región. Sin medida (jsdom, primer
+  // pintado) cae al layout de siempre.
+  const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
+  const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_EDITOR);
 
   // Se re-sincroniza SOLO cuando cambia de verdad la versión actual cargada
   // (carga inicial, guardado nuevo o restauración) — nunca en cada tecla que
@@ -189,8 +202,8 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div ref={setRaiz} className="flex flex-col gap-4" style={alto ? { height: alto } : undefined}>
+      <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">{DESCRIPCION_TIPO[tipo]}</p>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -214,20 +227,17 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
       </div>
 
       {/*
-        Corrección 2026-09-25: esta pantalla (Plantillas de Correo) cuelga de
-        SuperAdminLayout, no de DashboardLayout — ambos compartían el mismo
-        bug (overflow-x-hidden sin overflow-y explícito en <main>, que el
-        navegador traduce a overflow-y:auto implícito y rompe cualquier
-        `position: sticky` de dentro, porque <main> nunca desborda de verdad
-        y pasa a ser el "contenedor de scroll" de referencia en vez del
-        viewport). Ya está arreglado en la raíz (DashboardLayout.tsx y
-        SuperAdminLayout.tsx), así que el sticky de más abajo (columna de
-        vista previa) ya funcionaría solo contra el viewport.
-        El contenedor de abajo (max-h + overflow-y-auto) se mantiene de
-        todos modos, ahora como elección deliberada: dentro de un formulario
-        largo interesa que la vista previa quede pegada en una región propia
-        acotada en vez de perseguir todo el scroll de la página.
+        Región con scroll (2026-10-07, regla del dueño «el alto de la página es
+        el de la pantalla»). Antes era `xl:max-h-[calc(100dvh-7rem)]
+        xl:overflow-y-auto`: una constante puesta a ojo, solo desde `xl`, que
+        convivía con el scroll de la página (doble scroll). Ahora el editor
+        mide su alto (`useAlturaDisponible`, arriba) y esta región se queda con
+        lo que sobra bajo la cabecera, a cualquier ancho. La vista previa
+        desplegable de < xl va DENTRO, encima del formulario: abierta (~700 px)
+        aplastaría la región si fuera fija. El `sticky` de la columna de vista
+        previa (xl) se refiere a esta región, no a la ventana.
       */}
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain">
       <Collapsible
         open={vistaPreviaAbierta}
         onOpenChange={setVistaPreviaAbierta}
@@ -242,7 +252,6 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
         </CollapsibleContent>
       </Collapsible>
 
-      <div className="xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto">
       <div className="grid gap-6 xl:grid-cols-5 xl:items-start">
         {/* Columna izquierda: formulario — más ancha, es lo que se edita a diario */}
         <div className="space-y-4 xl:col-span-3">
