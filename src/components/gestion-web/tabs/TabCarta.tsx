@@ -195,7 +195,12 @@ export default function TabCarta() {
     <div className="space-y-4">
       <Tabs
         value={seccionActiva}
-        onValueChange={(value) => setSeccionActiva(value as Seccion)}
+        onValueChange={(value) => {
+          setSeccionActiva(value as Seccion);
+          if (value === "platos" && (filtroEstado === "activos_touza" || filtroEstado === "inactivos_touza")) {
+            setFiltroEstado("todos");
+          }
+        }}
         className="w-full space-y-4"
       >
         {/* Barra: secciones + acciones */}
@@ -274,12 +279,16 @@ export default function TabCarta() {
                 <SelectItem value="activos">Visibles</SelectItem>
                 <SelectItem value="inactivos_rest">Ocultos</SelectItem>
               </SelectGroup>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>Touza</SelectLabel>
-                <SelectItem value="activos_touza">Visibles</SelectItem>
-                <SelectItem value="inactivos_touza">Ocultos</SelectItem>
-              </SelectGroup>
+              {seccionActiva !== "platos" && (
+                <>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>Touza</SelectLabel>
+                    <SelectItem value="activos_touza">Visibles</SelectItem>
+                    <SelectItem value="inactivos_touza">Ocultos</SelectItem>
+                  </SelectGroup>
+                </>
+              )}
             </SelectContent>
           </Select>
 

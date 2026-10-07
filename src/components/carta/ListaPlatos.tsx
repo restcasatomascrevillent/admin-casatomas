@@ -37,7 +37,6 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
     toggleActivado,
     eliminarPlato,
     toggleRestaurante,
-    toggleTouza,
     actualizarPlato,
   } = usePlatos();
   const [platoAEliminar, setPlatoAEliminar] = useState<Plato | null>(null);
@@ -182,10 +181,8 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               {/* Visibilidad Web */}
               <VisibilidadToggles
                 restaurante={plato.restaurante ?? false}
-                touza={plato.touza ?? false}
                 onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: plato.id, restaurante: checked })}
-                onTouzaChange={(checked) => toggleTouza.mutate({ id: plato.id, touza: checked })}
-                isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                isPending={toggleRestaurante.isPending}
                 activado={plato.activado ?? true}
                 onActivadoChange={(checked) =>
                   toggleActivado.mutate({
@@ -253,12 +250,6 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                     </Badge>
                   ))}
                 </div>
-              )}
-
-              {plato.alergenos_notas && (
-                <p className="text-xs text-muted-foreground italic pt-1">
-                  {plato.alergenos_notas}
-                </p>
               )}
 
               {/* Botón eliminar */}

@@ -47,7 +47,6 @@ const formSchema = z.object({
   sin_gluten_disponible: z.boolean().default(false),
   ingredientes: z.string().optional(),
   unidad: z.string().optional(),
-  alergenos_notas: z.string().optional(),
 });
 
 interface PlatoFormProps {
@@ -78,7 +77,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       sin_gluten_disponible: false,
       ingredientes: "",
       unidad: "",
-      alergenos_notas: "",
     },
   });
 
@@ -152,7 +150,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         sin_gluten_disponible: values.sin_gluten_disponible,
         ingredientes: values.ingredientes,
         unidad: values.unidad,
-        alergenos_notas: values.alergenos_notas,
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
       };
       // La traducción ya no se genera aquí: crearPlato (usePlatos.ts) llama a
@@ -460,25 +457,6 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                     <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
                   </FormControl>
                   <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="alergenos_notas"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notas adicionales</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ej: Puede contener trazas de..."
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
