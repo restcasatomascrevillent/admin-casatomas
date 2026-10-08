@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { sincronizar } from "./costes.ts";
+
+const createClient = clienteConAuditoria(createClientBase, "sincronizar-costes-openai");
 
 // ============================================================================
 //  sincronizar-costes-openai · gasto REAL de OpenAI (lo que factura)
@@ -22,7 +25,7 @@ import { sincronizar } from "./costes.ts";
 //  Respuesta: { ok, filas, dias, proyectos_nuevos, proyectos_sin_proceso, tipo_cambio, avisos }
 // ============================================================================
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("sincronizar-costes-openai", createClientBase, async (req) => {
   if (req.method !== "POST") return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
   const denegado = verificarSecreto(req, Deno.env.get("OCR_TRABAJOS_SECRET"));
   if (denegado) return denegado;
@@ -44,4 +47,4 @@ serve(async (req) => {
     console.error("[sincronizar-costes-openai] error:", (e as Error)?.message ?? e);
     return jsonResponse({ ok: false, error: (e as Error)?.message ?? String(e) }, 502);
   }
-});
+}));
