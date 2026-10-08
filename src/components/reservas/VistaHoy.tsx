@@ -40,6 +40,8 @@ import {
 import { AvisoSalasPrivadas } from "./AvisoSalasPrivadas";
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 
 /**
  * Pestaña "Hoy" (rediseñada 2026-09-25, petición del dueño): antes esto era
@@ -83,6 +85,8 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
   const [busqueda, setBusqueda] = useState("");
   const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>("todo");
   const [salaPlano, setSalaPlano] = useState<string | null>(leerSalaPlanoHoy);
+  // Móvil (< 768 px): vista propia para el camarero (`movil/VistaHoyMovil.tsx`). Tablet y escritorio, igual.
+  const esMovil = useIsMobile();
   const cambiarVista = (nueva: ModoVistaHoy) => {
     setVista(nueva);
     guardarVistaHoy(nueva);
@@ -178,6 +182,29 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
   }
 
   const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
+
+  if (esMovil) {
+    return (
+      <ReservasEnVivoContexto.Provider value={true}>
+        <div className="space-y-2">
+          <BarraFiltrosHoy
+            busqueda={busqueda}
+            onBusqueda={setBusqueda}
+            filtroTurno={filtroTurno}
+            onFiltroTurno={setFiltroTurno}
+            vista={vista}
+            onVista={cambiarVista}
+            soloFiltros
+          />
+          {errorReservasHoy ? (
+            <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
+          ) : (
+            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} busqueda={busqueda} filtroTurno={filtroTurno} />
+          )}
+        </div>
+      </ReservasEnVivoContexto.Provider>
+    );
+  }
 
   return (
     // `ReservasEnVivoContexto`: lo de dentro (la rejilla por cuartos, el editor
@@ -307,7 +334,10 @@ function BarraFiltrosHoy({
   onFiltroTurno,
   vista,
   onVista,
+  soloFiltros = false,
 }: {
+  /** Móvil: solo buscador y turno (sin «Kanban | Plano» ni la ayuda). */
+  soloFiltros?: boolean;
   busqueda: string;
   onBusqueda: (texto: string) => void;
   filtroTurno: FiltroTurnoHoy;
@@ -332,6 +362,7 @@ function BarraFiltrosHoy({
             aria-label="Buscar reservas"
           />
         </div>
+        {!soloFiltros && (
         <ToggleGroup
           type="single"
           value={vista}
@@ -350,6 +381,7 @@ function BarraFiltrosHoy({
             <span className="sr-only sm:not-sr-only">Plano</span>
           </ToggleGroupItem>
         </ToggleGroup>
+        )}
       </div>
       <ToggleGroup
         type="single"
@@ -364,7 +396,7 @@ function BarraFiltrosHoy({
         <ToggleGroupItem value="comida" className="whitespace-nowrap">Comida</ToggleGroupItem>
         <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
       </ToggleGroup>
-      {vista === "plano" ? (
+      {soloFiltros ? null : vista === "plano" ? (
         // Corta a propósito: desde 1024 px cabe en la línea del buscador y no le roba alto al plano. En
         // móvil no sale (el plano necesita ese alto y tocar una mesa se explica solo).
         <p className="hidden text-xs text-muted-foreground sm:order-4 sm:block sm:basis-full lg:min-w-48 lg:flex-1 lg:text-right">

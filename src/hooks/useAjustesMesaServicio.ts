@@ -93,3 +93,30 @@ export function useVolverAPlanoBase(espacioId: string, fecha: string, turno: Tur
     onSettled: () => qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA, espacioId, fecha, turno] }),
   });
 }
+
+/** Ajustes de TODAS las salas de un día (vista móvil de «Hoy»): con su sala y su turno. */
+export function useAjustesMesaDia(fecha: string) {
+  return useQuery({
+    queryKey: [CLAVE_AJUSTES_MESA, "dia", fecha],
+    enabled: !!fecha,
+    queryFn: async (): Promise<Array<AjusteMesa & { espacioId: string; turno: string }>> => {
+      const { data, error } = await supabase
+        .from("ajustes_mesa_servicio")
+        .select("mesa_id, espacio_id, turno, piezas, picos, unida_a, plazas")
+        .eq("fecha", fecha);
+      if (error) {
+        console.warn("ajustes_mesa_servicio:", error.message);
+        return [];
+      }
+      return (data ?? []).map((a) => ({
+        mesaId: a.mesa_id,
+        espacioId: a.espacio_id,
+        turno: a.turno,
+        piezas: a.piezas,
+        picos: a.picos,
+        unidaA: a.unida_a,
+        plazas: a.plazas,
+      }));
+    },
+  });
+}
