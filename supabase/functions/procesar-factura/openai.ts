@@ -25,6 +25,7 @@ import {
 } from "./prompts.ts";
 
 const OPENAI = "https://api.openai.com/v1";
+const MODELO_EMBEDDINGS = "text-embedding-3-small";
 
 export interface UsoAcumulado {
   llamadas: number;
@@ -33,10 +34,30 @@ export interface UsoAcumulado {
   costeUsd: number;
 }
 
+/** Paso del OCR al que pertenece una llamada (va al `disparador` de ia_uso). */
+export type EtapaOcr = "lectura" | "relectura" | "pie" | "contador" | "embeddings";
+
+/** Una llamada a OpenAI ya facturada, tal cual llega a `alUsar`. */
+export interface UsoLlamada {
+  etapa: EtapaOcr;
+  operacion: "vision" | "embedding";
+  modelo: string;
+  // deno-lint-ignore no-explicit-any
+  usage: any;
+  duracionMs: number;
+}
+
 export interface DependenciasOpenAI {
   apiKey: string;
   config: ConfigModelo;
   fetch?: typeof fetch;
+  /**
+   * Se llama UNA vez por cada llamada a OpenAI que ha devuelto 200 (visión,
+   * texto y embeddings), para contabilizarla en `ia_uso` (registroUso.ts).
+   * Opcional: los tests y el banco local de Node no lo pasan. No puede
+   * romper la lectura: va envuelto en try/catch y no se espera.
+   */
+  alUsar?: (u: UsoLlamada) => void;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -46,7 +67,7 @@ export interface ClienteOpenAI {
   readonly config: ConfigModelo;
   readonly uso: UsoAcumulado;
   // deno-lint-ignore no-explicit-any
-  llamarVision(mensajes: any[], esquema?: unknown, maxTokens?: number): Promise<unknown>;
+  llamarVision(mensajes: any[], esquema?: unknown, maxTokens?: number, etapa?: EtapaOcr): Promise<unknown>;
   verificarPie(bloque: BloqueContenido): Promise<VerificacionPie | null>;
   contarFilas(bloque: BloqueContenido, texto?: string): Promise<RecuentoFilas | null>;
   embed(input: string | string[]): Promise<number[][]>;
@@ -72,8 +93,18 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
   const uso: UsoAcumulado = { llamadas: 0, tokensEntrada: 0, tokensSalida: 0, costeUsd: 0 };
   const cabeceras = { "Content-Type": "application/json", Authorization: `Bearer ${deps.apiKey}` };
 
+  const avisar = (etapa: EtapaOcr, operacion: UsoLlamada["operacion"], modelo: string, usage: unknown, t0: number) => {
+    if (!deps.alUsar) return;
+    try {
+      deps.alUsar({ etapa, operacion, modelo, usage, duracionMs: Date.now() - t0 });
+    } catch (e) {
+      console.error("[ia-uso] no se pudo anotar la llamada:", e);
+    }
+  };
+
   // deno-lint-ignore no-explicit-any
-  const anotar = (json: any) => {
+  const anotar = (json: any, etapa: EtapaOcr, t0: number) => {
+    avisar(etapa, "vision", cfg.modelo, json?.usage, t0);
     uso.llamadas++;
     uso.tokensEntrada += Number(json?.usage?.prompt_tokens ?? 0);
     uso.tokensSalida += Number(json?.usage?.completion_tokens ?? 0);
@@ -96,7 +127,8 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
   }
 
   // deno-lint-ignore no-explicit-any
-  async function llamarVision(mensajes: any[], esquema?: unknown, maxTokens?: number): Promise<unknown> {
+  async function llamarVision(mensajes: any[], esquema?: unknown, maxTokens?: number, etapa: EtapaOcr = "lectura"): Promise<unknown> {
+    const t0 = Date.now();
     const res = await postConReintento(`${OPENAI}/chat/completions`, JSON.stringify({
         model: cfg.modelo,
         // 54 filas de concepto (la factura mensual ML/101511 de Luga Sabores)
@@ -110,7 +142,7 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
     if (!res.ok) throw new Error(`Vision ${res.status}: ${await res.text()}`);
 
     const json = await res.json();
-    anotar(json);
+    anotar(json, etapa, t0);
     const choice = json?.choices?.[0];
 
     // Con Structured Outputs una negativa del modelo llega en su propio campo,
@@ -138,6 +170,7 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
    * subida que por lo demas ha ido bien.
    */
   async function verificarPie(bloque: BloqueContenido): Promise<VerificacionPie | null> {
+    const t0 = Date.now();
     try {
       const resp = await postConReintento(`${OPENAI}/chat/completions`, JSON.stringify({
         model: cfg.modelo,
@@ -153,7 +186,7 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
         return null;
       }
       const json = await resp.json();
-      anotar(json);
+      anotar(json, "pie", t0);
       const choice = json?.choices?.[0];
       if (choice?.finish_reason === "length") {
         console.warn("[verificador-pie] respuesta cortada: se sigue sin verificar.");
@@ -180,6 +213,7 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
    * null si algo falla (ver el bloque 3d de esquema.ts).
    */
   async function contarFilas(bloque: BloqueContenido, texto?: string): Promise<RecuentoFilas | null> {
+    const t0 = Date.now();
     try {
       const resp = await postConReintento(`${OPENAI}/chat/completions`, JSON.stringify({
         model: cfg.modelo,
@@ -195,7 +229,7 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
         return null;
       }
       const json = await resp.json();
-      anotar(json);
+      anotar(json, "contador", t0);
       const choice = json?.choices?.[0];
       if (choice?.finish_reason === "length") {
         console.warn("[contador-filas] respuesta cortada: se sigue sin contar.");
@@ -223,13 +257,17 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
     const salida: number[][] = [];
     for (let i = 0; i < lista.length; i += 100) {
       const lote = lista.slice(i, i + 100);
+      const t0 = Date.now();
       const res = await f(`${OPENAI}/embeddings`, {
         method: "POST",
         headers: cabeceras,
-        body: JSON.stringify({ model: "text-embedding-3-small", input: Array.isArray(input) ? lote : lote[0] }),
+        body: JSON.stringify({ model: MODELO_EMBEDDINGS, input: Array.isArray(input) ? lote : lote[0] }),
       });
       if (!res.ok) throw new Error(`OpenAI embeddings ${res.status}: ${await res.text()}`);
       const json = await res.json();
+      // No suma a `uso` (ese es el coste de la lectura que se guarda por
+      // página en ocr_trabajos), pero sí va a ia_uso.
+      avisar("embeddings", "embedding", MODELO_EMBEDDINGS, json?.usage, t0);
       // deno-lint-ignore no-explicit-any
       for (const d of json.data) salida.push((d as any).embedding);
     }

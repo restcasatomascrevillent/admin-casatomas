@@ -3,6 +3,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
 import { crearClienteOpenAI } from "./openai.ts";
+import { crearRegistroUso, type RegistroUsoOcr } from "./registroUso.ts";
 import { type ContextoGuardado, sustituirFactura } from "./guardado.ts";
 import { iniciarTrabajo, validarInicio } from "./trabajos.ts";
 import { ficheroDesdePayload, procesarSincrono } from "./unico.ts";
@@ -61,11 +62,17 @@ const envModelo = {
 const cfgModelo = configModelo(envModelo, "unico");
 const modeloPiezas = configModelo(envModelo, "piezas").modelo;
 
-function contexto(): ContextoGuardado {
+// Cada llamada a OpenAI deja su fila en ia_uso (registroUso.ts), con el
+// documento en el disparador: `trabajo:<uuid>` al sustituir, `subida:<uuid>`
+// (uno nuevo por petición) en el camino síncrono.
+function contexto(disparador = `subida:${crypto.randomUUID()}`): ContextoGuardado & { registro: RegistroUsoOcr } {
+  const supabase = createClient(cfgAuth.supabaseUrl, cfgAuth.serviceKey);
+  const registro = crearRegistroUso({ funcion: "procesar-factura", disparador, cliente: supabase });
   return {
-    supabase: createClient(cfgAuth.supabaseUrl, cfgAuth.serviceKey),
-    openai: crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config: cfgModelo }),
+    supabase,
+    openai: crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config: cfgModelo, alUsar: registro.alUsar }),
     drive,
+    registro,
   };
 }
 
@@ -105,8 +112,12 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
           ...(typeof payload.esperado.updated_at === "string" ? { updated_at: payload.esperado.updated_at } : {}),
         }
         : {};
-      const r = await sustituirFactura(contexto(), { trabajoId, facturaId, userId: authEdit.userId, esperado });
-      return jsonResponse(r);
+      const ctx = contexto(`trabajo:${trabajoId.slice(0, 36)}`);
+      try {
+        return jsonResponse(await sustituirFactura(ctx, { trabajoId, facturaId, userId: authEdit.userId, esperado }));
+      } finally {
+        await ctx.registro.esperar();
+      }
     }
 
     // ── Camino síncrono de una página (v101; el panel nuevo solo lo usa si
@@ -119,7 +130,12 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
     console.log(
       `[procesar-factura] ${archivo.nombre} (${fichero.mime}) — user ${auth.userId} — modelo ${cfgModelo.modelo}/${cfgModelo.detalle}`,
     );
-    return jsonResponse(await procesarSincrono(contexto(), fichero, auth.userId));
+    const ctx = contexto();
+    try {
+      return jsonResponse(await procesarSincrono(ctx, fichero, auth.userId));
+    } finally {
+      await ctx.registro.esperar();
+    }
   } catch (error) {
     console.error("[procesar-factura] Error:", error);
     const msg = error instanceof Error ? error.message : "Error desconocido";

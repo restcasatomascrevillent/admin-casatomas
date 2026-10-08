@@ -3,6 +3,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { configModelo } from "../procesar-factura/modelo.ts";
 import { crearClienteOpenAI } from "../procesar-factura/openai.ts";
+import { crearRegistroUso } from "../procesar-factura/registroUso.ts";
 import { procesarConsolidacion, procesarPagina } from "../procesar-factura/trabajos.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 const createClient = clienteConAuditoria(createClientBase, "ocr-trabajo");
@@ -79,7 +80,15 @@ serve(conAuditoriaDePeticion("ocr-trabajo", createClientBase, async (req) => {
     return jsonResponse({ ok: false, error: "json_invalido" }, 400);
   }
   const supabase = createClient(URL_SB, SERVICE);
-  const openai = crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config: cfgModelo });
+  // Cada llamada a OpenAI deja su fila en ia_uso (funcion 'ocr-trabajo',
+  // disparador `trabajo:<uuid>#<etapa>`). El INSERT no bloquea la lectura; se
+  // espera al final de la tarea en segundo plano.
+  const clientes = (trabajoId: string) => {
+    const registro = crearRegistroUso({ funcion: "ocr-trabajo", disparador: `trabajo:${trabajoId}`, cliente: supabase });
+    const crear = (config: typeof cfgModelo) =>
+      crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config, alUsar: registro.alUsar });
+    return { registro, openai: crear(cfgModelo), openaiUnico: crear(cfgModeloUnico) };
+  };
 
   if (body.modo === "pagina") {
     const id = Number(body.pagina_id);
@@ -88,8 +97,11 @@ serve(conAuditoriaDePeticion("ocr-trabajo", createClientBase, async (req) => {
     if (error) return jsonResponse({ ok: false, error: error.message }, 500);
     const pagina = Array.isArray(data) ? data[0] : data;
     if (!pagina?.id) return jsonResponse({ aceptada: false, motivo: "ya_reclamada_o_no_toca" });
-    const openaiUnico = crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config: cfgModeloUnico });
-    await enSegundoPlano(procesarPagina(supabase, openai, pagina, openaiUnico), `pieza ${id}`);
+    const { registro, openai, openaiUnico } = clientes(String(pagina.trabajo_id ?? ""));
+    await enSegundoPlano(
+      procesarPagina(supabase, openai, pagina, openaiUnico).finally(registro.esperar),
+      `pieza ${id}`,
+    );
     return jsonResponse({ aceptada: true }, 202);
   }
 
@@ -100,7 +112,11 @@ serve(conAuditoriaDePeticion("ocr-trabajo", createClientBase, async (req) => {
     if (error) return jsonResponse({ ok: false, error: error.message }, 500);
     const trabajo = Array.isArray(data) ? data[0] : data;
     if (!trabajo?.id) return jsonResponse({ aceptada: false, motivo: "no_lista_o_ya_reclamada" });
-    await enSegundoPlano(procesarConsolidacion({ supabase, openai, drive }, trabajo), `consolidar ${id}`);
+    const { registro, openai } = clientes(String(trabajo.id));
+    await enSegundoPlano(
+      procesarConsolidacion({ supabase, openai, drive }, trabajo).finally(registro.esperar),
+      `consolidar ${id}`,
+    );
     return jsonResponse({ aceptada: true }, 202);
   }
 

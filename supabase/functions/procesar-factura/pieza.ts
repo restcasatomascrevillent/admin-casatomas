@@ -95,7 +95,7 @@ export async function leerPieza(
   }
 
   const [crudo, recuento, verificacionPie] = await Promise.all([
-    cliente.llamarVision(mensajes, PAGINA_JSON_SCHEMA),
+    cliente.llamarVision(mensajes, PAGINA_JSON_SCHEMA, undefined, o.motivosPrevios?.length ? "relectura" : "lectura"),
     cliente.contarFilas(bloque, textoContadorPieza(d)),
     o.esUltima ? cliente.verificarPie(bloque) : Promise.resolve(null),
   ]);
@@ -108,7 +108,7 @@ export async function leerPieza(
     try {
       mensajes.push({ role: "assistant", content: JSON.stringify(resultado) });
       mensajes.push({ role: "user", content: mensajeCorrectivoPagina(motivos) });
-      const segunda = validarPaginaOLanzar(await cliente.llamarVision(mensajes, PAGINA_JSON_SCHEMA), `pieza ${d.numero} relectura`);
+      const segunda = validarPaginaOLanzar(await cliente.llamarVision(mensajes, PAGINA_JSON_SCHEMA, undefined, "relectura"), `pieza ${d.numero} relectura`);
       const motivos2 = motivosLocales(segunda, recuento, o.contexto);
       relecturas = 1;
       if (aceptarRelectura(resultado, segunda, motivos, motivos2)) {

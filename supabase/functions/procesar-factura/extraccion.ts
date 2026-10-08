@@ -198,7 +198,7 @@ export async function extraerConCuadre(
   try {
     mensajes.push({ role: "assistant", content: JSON.stringify(primera) });
     mensajes.push({ role: "user", content: mensajeCorrectivo(descuadres1) });
-    segunda = validarOLanzar(await cliente.llamarVision(mensajes), "reintento");
+    segunda = validarOLanzar(await cliente.llamarVision(mensajes, undefined, undefined, "relectura"), "reintento");
     descuadres2 = comprobarCuadre(segunda);
   } catch (e) {
     console.error("[extraccion] El reintento falló, se conserva el primer intento:", e);

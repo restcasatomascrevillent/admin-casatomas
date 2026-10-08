@@ -6,6 +6,7 @@ import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFactura
 import { TablaFacturas } from "@/components/facturas/TablaFacturas";
 import { TablaAlbaranes } from "@/components/facturas/TablaAlbaranes";
 import { TabProductos } from "@/components/facturas/productos/TabProductos";
+import { MonitorGastoIA } from "@/components/facturas/MonitorGastoIA";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, ClipboardList, MessageSquare, Upload, FolderOpen, BarChart3, Package, Zap, Tags } from "lucide-react";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
@@ -230,8 +231,11 @@ const Facturas = () => {
             </TabsContent>
 
             {/* PESTAÑA 2: ASISTENTE IA */}
-            <TabsContent value="chat" className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <div className="h-full max-h-none rounded-xl overflow-hidden shadow-md">
+            {/* Monitor de gasto (08-oct-2026): una línea fija arriba; el
+                desglose flota, así que la pestaña sigue sin scroll de página. */}
+            <TabsContent value="chat" className="h-full m-0 outline-none flex-col gap-2 data-[state=inactive]:hidden data-[state=active]:flex">
+              {activeTab === "chat" && <MonitorGastoIA modo="chat" className="shrink-0" />}
+              <div className="flex-1 min-h-0 max-h-none rounded-xl overflow-hidden shadow-md">
                 <ChatFacturas ref={chatRef} sugerencias={sugerenciasDinamicas} />
               </div>
             </TabsContent>
@@ -241,8 +245,11 @@ const Facturas = () => {
                 ocupa el alto de la pestaña y solo su lista hace scroll por dentro
                 (ver lib/facturas/alturaCargar.ts). */}
             <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <div className="mx-auto h-full max-w-4xl">
-                <SubidaFacturas />
+              <div className="mx-auto flex h-full max-w-4xl flex-col gap-2">
+                {activeTab === "cargar" && <MonitorGastoIA modo="ocr" className="shrink-0" />}
+                <div className="flex-1 min-h-0">
+                  <SubidaFacturas />
+                </div>
               </div>
             </TabsContent>
 
