@@ -1,15 +1,13 @@
-/**
- * admin-create-user/index.ts (el fichero REAL): «Puede editar» (can_edit) solo
- * lo concede un super admin al crear un usuario.
- *
- * La función escribe user_roles y user_permissions con la service role y la
- * puede llamar cualquier admin, así que la RLS de user_permissions (solo un
- * super admin escribe permisos) no la frena: la regla se comprueba en el
- * servidor. Aquí se prueba contra un Supabase FALSO en memoria; nada sale a la
- * red. index.ts importa supabase-js por URL (esm.sh), que Node no puede cargar:
- * lo sustituye vi.mock, como en emails-reserva/__tests__.
- */
+/** Prueba el handler real con clientes en memoria: solo superadmins pueden crear usuarios. */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
+
+vi.mock("../../_shared/audit-client.ts", () => ({
+  clienteConAuditoria: (factory: unknown) => factory,
+  conAuditoriaDePeticion: (_name: string, _factory: unknown, handler: unknown) => handler,
+}));
+vi.mock("../../_shared/audit-auth.ts", () => ({
+  ejecutarOperacionAuthAuditada: (_client: unknown, _actor: string, _operation: string, _subject: unknown, run: () => unknown) => run(),
+}));
 
 type Fila = Record<string, unknown>;
 type Handler = (req: Request) => Promise<Response>;
@@ -160,7 +158,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("admin-create-user · «Puede editar» solo lo concede un super admin", () => {
+describe("admin-create-user · gestión exclusiva del superadmin", () => {
   it("super admin (tabla super_admins) con can_edit: se crea y la edición se guarda tal cual", async () => {
     const r = await crear("Bearer super", CON_EDICION);
 
@@ -170,14 +168,14 @@ describe("admin-create-user · «Puede editar» solo lo concede un super admin",
       { user_id: "nuevo-1", section_key: "dashboard", can_view: true, can_edit: false },
       { user_id: "nuevo-1", section_key: "reservas", can_view: true, can_edit: true },
     ]);
-    expect(h.rpcs).toEqual(["is_admin", "is_super_admin"]);
+    expect(h.rpcs).toEqual(["is_super_admin"]);
   });
 
   it("admin que NO es super admin con can_edit: 403 con mensaje claro y no se crea nada", async () => {
     const r = await crear("Bearer admin", CON_EDICION);
 
     expect(r.status).toBe(403);
-    expect(r.cuerpo.error).toMatch(/^Solo un super admin puede conceder el permiso de edición/);
+    expect(r.cuerpo.error).toMatch(/^Solo un super admin puede crear usuarios/);
     expect(h.creados).toHaveLength(0);
     expect(h.tablas).toEqual({});
   });
@@ -192,35 +190,30 @@ describe("admin-create-user · «Puede editar» solo lo concede un super admin",
     },
   );
 
-  it("admin sin edición: igual que hoy (rol y permisos de ver tal cual) y ni se consulta si es super admin", async () => {
+  it("un admin normal tampoco puede crear usuarios sin edición", async () => {
     const r = await crear("Bearer admin", SIN_EDICION, { role: "manager" });
-
-    expect(r.status).toBe(200);
-    expect(r.cuerpo).toMatchObject({ success: true, userId: "nuevo-1" });
-    expect(h.tablas.user_roles).toEqual([{ user_id: "nuevo-1", role: "manager" }]);
-    expect(permisosDe("nuevo-1")).toEqual([
-      { user_id: "nuevo-1", section_key: "dashboard", can_view: true, can_edit: false },
-      { user_id: "nuevo-1", section_key: "reservas", can_view: true, can_edit: false },
-    ]);
-    expect(h.rpcs).toEqual(["is_admin"]);
+    expect(r.status).toBe(403);
+    expect(h.creados).toHaveLength(0);
+    expect(h.tablas).toEqual({});
+    expect(h.rpcs).toEqual(["is_super_admin"]);
   });
 
   it("can_edit null o ausente cuenta como «sin edición»", async () => {
-    const r = await crear("Bearer admin", [
+    const r = await crear("Bearer super", [
       { section_key: "dashboard", can_view: true, can_edit: null },
       { section_key: "reservas", can_view: true },
     ]);
 
     expect(r.status).toBe(200);
     expect(h.creados).toHaveLength(1);
-    expect(h.rpcs).toEqual(["is_admin"]);
+    expect(h.rpcs).toEqual(["is_super_admin"]);
   });
 
   it("sin permisos (lista vacía o ausente): igual que hoy, el usuario se queda sin permisos", async () => {
-    expect((await crear("Bearer admin", [])).status).toBe(200);
+    expect((await crear("Bearer super", [])).status).toBe(200);
     expect(permisosDe("nuevo-1")).toEqual([]);
 
-    expect((await crear("Bearer admin", undefined, { username: "otro" })).status).toBe(200);
+    expect((await crear("Bearer super", undefined, { username: "otro" })).status).toBe(200);
     expect(permisosDe("nuevo-2")).toEqual([]);
   });
 
@@ -232,16 +225,16 @@ describe("admin-create-user · «Puede editar» solo lo concede un super admin",
     expect(r.cuerpo).toEqual({ error: "Error verificando permisos" });
     expect(h.creados).toHaveLength(0);
 
-    // Sin edición no hace falta comprobarlo: se crea como hoy.
-    expect((await crear("Bearer super", SIN_EDICION)).status).toBe(200);
+    // Sin edición también debe comprobarse: no se crea nada.
+    expect((await crear("Bearer super", SIN_EDICION)).status).toBe(500);
   });
 
-  it("quien no es admin: 403 como hoy, antes de mirar los permisos", async () => {
+  it("un usuario sin privilegios recibe 403 antes de mirar los permisos", async () => {
     const r = await crear("Bearer staff", CON_EDICION);
 
     expect(r.status).toBe(403);
-    expect(r.cuerpo).toEqual({ error: "Solo administradores pueden crear usuarios" });
-    expect(h.rpcs).toEqual(["is_admin"]);
+    expect(r.cuerpo).toEqual({ error: "Solo un super admin puede crear usuarios" });
+    expect(h.rpcs).toEqual(["is_super_admin"]);
     expect(h.creados).toHaveLength(0);
   });
 
@@ -265,7 +258,7 @@ describe("super admin por SUPER_ADMIN_EMAILS (sin fila en super_admins)", () => 
 
       expect(r.status).toBe(200);
       expect(permisosDe("nuevo-1")).toContainEqual({ user_id: "nuevo-1", section_key: "reservas", can_view: true, can_edit: true });
-      expect(h.rpcs).toEqual(["is_admin"]);
+      expect(h.rpcs).toEqual(["is_super_admin"]);
     } finally {
       ENV.SUPER_ADMIN_EMAILS = "";
       h.handler = original;

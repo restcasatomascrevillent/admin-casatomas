@@ -33,6 +33,7 @@ import { Loader2, Settings, Shield, ShieldAlert, ShieldCheck, User, Trash2, Key 
 import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
+import { VisorPermisosUsuario } from "@/components/usuarios/VisorPermisosUsuario";
 import {
   cambiarEditar,
   cambiarVer,
@@ -46,9 +47,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 interface ListaUsuariosProps {
-  /** Solo en el área de Super Admin: permite gestionar el acceso de super
-   * admin de otros usuarios y actuar (contraseña) sobre usuarios admin, que
-   * en el Admin Panel normal no tienen ninguna acción disponible. */
+  /** Activa la gestión solo en el área de Super Admin y para un superadmin autenticado. */
   canManageSuperAdmins?: boolean;
 }
 
@@ -67,6 +66,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   // Solo un super admin concede o retira «Puede editar» (2026-10-01). Es la misma
   // regla que la BD: la RLS de user_permissions solo deja escribir a super admins.
   const { isSuperAdmin } = useSuperAdmin();
+  const canManageUsers = canManageSuperAdmins && isSuperAdmin;
   const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
   const [editingPermissions, setEditingPermissions] = useState<PermisoSeccion[]>([]);
@@ -111,7 +111,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   // Quien no es super admin ve el diálogo en solo lectura: la RLS de user_permissions
   // solo deja escribir a un super admin y cualquier otro guardado no haría nada.
   const handleVerChange = (sectionKey: string, value: boolean) => {
-    if (!isSuperAdmin) return;
+    if (!canManageUsers) return;
     if (selectedPresetId !== "manual") {
       setSelectedPresetId("manual");
     }
@@ -120,7 +120,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   const handleEditarChange = (sectionKey: string, value: boolean) => {
-    if (!isSuperAdmin) return;
+    if (!canManageUsers) return;
     if (selectedPresetId !== "manual") {
       setSelectedPresetId("manual");
     }
@@ -128,7 +128,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   const savePermissions = async () => {
-    if (!selectedUser || !isSuperAdmin) return;
+    if (!selectedUser || !canManageUsers) return;
     // «Puede editar» solo lo escribe un super admin. Si el guardado falla, el
     // diálogo sigue abierto con lo elegido (para reintentar) y el rol no se toca.
     const guardado = await setAllPermissions(selectedUser.id, editingPermissions, {
@@ -146,12 +146,14 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (!canManageUsers) return;
     if (confirm("¿Estás seguro de eliminar este usuario del sistema de permisos?")) {
       await deleteUser(userId);
     }
   };
 
   const handleToggleSuperAdmin = async (user: ManagedUser) => {
+    if (!canManageUsers) return;
     const makeSuperAdmin = !user.is_super_admin;
     const confirmMessage = makeSuperAdmin
       ? `¿Dar acceso de super admin a ${getUserDisplayName(user)}?`
@@ -163,6 +165,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   const openPasswordDialog = (user: ManagedUser) => {
+    if (!canManageUsers) return;
     setPasswordTargetUser(user);
     setNewPassword("");
     setConfirmPassword("");
@@ -178,7 +181,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   };
 
   const handleChangePassword = async () => {
-    if (!passwordTargetUser) return;
+    if (!passwordTargetUser || !canManageUsers) return;
 
     if (newPassword.length < 6) {
       toast.error("La contraseña debe tener al menos 6 caracteres");
@@ -284,7 +287,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
             <TableHead>Usuario</TableHead>
             <TableHead>Rol</TableHead>
             <TableHead>Accesos</TableHead>
-            <TableHead className="text-right">Acciones</TableHead>
+            <TableHead className="text-right">{canManageUsers ? "Acciones" : "Permisos"}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -336,7 +339,8 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex flex-wrap justify-end gap-2">
-                    {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
+                    {(!canManageUsers || user.is_super_admin) && <VisorPermisosUsuario user={user} nombre={getUserDisplayName(user)} />}
+                    {canManageUsers && !user.is_super_admin && (
                         <Dialog
                           open={selectedUser?.id === user.id}
                           onOpenChange={(open) => { if (!open) closePermissionsDialog(); }}
@@ -421,18 +425,19 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                           </DialogContent>
                         </Dialog>
                     )}
-                    {(user.role !== "admin" || canManageSuperAdmins) && (
+                    {canManageUsers && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-11 px-4"
+                        disabled={user.id === currentUser?.id}
                         onClick={() => openPasswordDialog(user)}
                       >
                         <Key className="h-4 w-4 mr-1" />
                         Contraseña
                       </Button>
                     )}
-                    {canManageSuperAdmins && (
+                    {canManageUsers && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -449,12 +454,12 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                         {user.is_super_admin ? "Quitar Super Admin" : "Hacer Super Admin"}
                       </Button>
                     )}
-                    {canManageSuperAdmins && user.id === currentUser?.id && (
+                    {canManageUsers && user.id === currentUser?.id && (
                       <p className="basis-full text-right text-xs text-muted-foreground">
                         No puedes quitarte a ti mismo el acceso de super admin.
                       </p>
                     )}
-                    {!user.is_super_admin && (user.role !== "admin" || canManageSuperAdmins) && (
+                    {canManageUsers && !user.is_super_admin && (
                       <Button
                         variant="ghost"
                         size="sm"

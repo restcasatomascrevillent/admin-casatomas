@@ -122,7 +122,7 @@ beforeEach(() => {
 });
 
 async function abrirPermisosDelCamarero() {
-  render(<ListaUsuarios />);
+  render(<ListaUsuarios canManageSuperAdmins />);
   fireEvent.click(await screen.findByRole("button", { name: "Permisos" }));
   return screen.findByRole("dialog");
 }
@@ -144,7 +144,7 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
 
   it("al cambiar los permisos actualiza los contadores y deja de mostrar el preset anterior", async () => {
     h.presets = [preset("p-sala", "Sala", PERMISOS_CAMARERO)];
-    render(<ListaUsuarios />);
+    render(<ListaUsuarios canManageSuperAdmins />);
     let fila = (await screen.findByText("camarero1")).closest("tr")!;
     expect(within(fila).getByText("Sala")).toBeInTheDocument();
     fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
@@ -177,7 +177,7 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
   });
 
   it("el acceso completo solo se muestra a los super admins", async () => {
-    render(<ListaUsuarios />);
+    render(<ListaUsuarios canManageSuperAdmins />);
     const fila = (await screen.findByText("Dueño")).closest("tr")!;
     expect(within(fila).getByText("Super Admin")).toBeInTheDocument();
     expect(within(fila).getByText("Acceso completo")).toBeInTheDocument();
@@ -264,30 +264,48 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
     expect(permiso("marketing")).toMatchObject({ can_view: true, can_edit: false });
   });
 
-  it("quien no es super admin ve los permisos reales en SOLO LECTURA: ni «Ver», ni «Puede editar», ni rol, ni guardar", async () => {
-    // La RLS de user_permissions solo deja escribir a un super admin: cualquier otro guardado
-    // no hace nada (2026-10-01, revisión). Antes «Ver» y «Guardar Permisos» seguían activos.
-    h.esSuperAdmin = false;
-    const dialogo = await abrirPermisosDelCamarero();
-
-    expect(interruptor(dialogo, "Puede editar Reservas")).toBeChecked();
-    expect(interruptor(dialogo, "Ver Reservas")).toBeChecked();
-    for (const s of within(dialogo).getAllByRole("switch")) expect(s).toBeDisabled();
-    expect(within(dialogo).getByRole("combobox")).toBeDisabled();
-    const guardarBtn = within(dialogo).getByRole("button", { name: "Guardar Permisos" });
-    expect(guardarBtn).toBeDisabled();
-    // El motivo, a la vista (y en el envoltorio del botón, que deshabilitado no recibe el ratón).
-    expect(within(dialogo).getByText("Solo un super admin puede cambiar permisos.")).toBeInTheDocument();
-    expect(guardarBtn.parentElement).toHaveAttribute("title", "Solo un super admin puede cambiar permisos.");
-
-    fireEvent.click(interruptor(dialogo, "Ver Facturas"));
-    fireEvent.click(guardarBtn);
-    expect(interruptor(dialogo, "Ver Facturas")).toBeChecked();
+  it.each([false, true])("el admin panel solo permite consultar, incluso si el visitante es superadmin (%s)", async (esSuperAdmin) => {
+    h.esSuperAdmin = esSuperAdmin;
+    doble.bd.tablas.user_roles.find((f) => f.user_id === CAMARERO)!.role = "admin";
+    render(<ListaUsuarios />);
+    const fila = (await screen.findByText("camarero1")).closest("tr")!;
+    expect(within(fila).getByText("Acceso por permisos")).toBeInTheDocument();
+    expect(within(fila).getByText("Gestiona usuarios")).toBeInTheDocument();
+    expect(within(fila).getByText("3 secciones")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Contraseña" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Eliminar/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Hacer Super Admin|Quitar Super Admin/ })).toBeNull();
+    fireEvent.click(within(fila).getByRole("button", { name: "Ver permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByLabelText("Ver Reservas: Sí")).toHaveTextContent("Sí");
+    expect(within(dialogo).getByLabelText("Editar Reservas: Sí")).toHaveTextContent("Sí");
+    expect(within(dialogo).getByLabelText("Editar Facturas: No")).toHaveTextContent("No");
+    expect(within(dialogo).queryByRole("switch")).toBeNull();
+    expect(within(dialogo).queryByRole("combobox")).toBeNull();
+    expect(within(dialogo).queryByRole("button", { name: /Guardar|Configurar roles/ })).toBeNull();
     expect(doble.bd.operaciones).toEqual([]);
   });
 
-  it("la fila de un super admin (también la propia) no tiene «Permisos»: nadie se quita a sí mismo la gestión", async () => {
+  it("la prop de gestión no da privilegios a quien no es superadmin", async () => {
+    h.esSuperAdmin = false;
+    render(<ListaUsuarios canManageSuperAdmins />);
+    await screen.findByText("camarero1");
+    expect(screen.queryByRole("button", { name: "Permisos" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Contraseña" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Ver permisos" })).toHaveLength(2);
+  });
+
+  it("el visor de un superadmin muestra su acceso completo", async () => {
     render(<ListaUsuarios />);
+    const fila = (await screen.findByText("Dueño")).closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: "Ver permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByLabelText("Editar Facturas: Sí")).toHaveTextContent("Sí");
+    expect(within(dialogo).getByText(/acceso completo al panel/)).toBeInTheDocument();
+  });
+
+  it("la fila de un super admin (también la propia) no tiene «Permisos»: nadie se quita a sí mismo la gestión", async () => {
+    render(<ListaUsuarios canManageSuperAdmins />);
 
     expect(await screen.findAllByRole("button", { name: "Permisos" })).toHaveLength(1);
     const filaDueno = screen.getByText("Dueño").closest("tr")!;

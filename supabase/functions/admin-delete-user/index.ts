@@ -9,8 +9,8 @@ const corsHeaders = {
 };
 
 // Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin y la autorización recae por completo en is_admin()
-// (rol en user_roles). Nunca conceder acceso por defecto — fail-closed.
+// ningún super admin por email: se comprueba la tabla super_admins.
+// El rol admin solo permite consultar usuarios, nunca gestionarlos.
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
@@ -74,12 +74,12 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
 
     const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
 
-    const { data: isAdminResult, error: adminCheckError } = await supabaseAdmin.rpc("is_admin", {
+    const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin.rpc("is_super_admin", {
       _user_id: currentUser.id,
     });
 
-    if (adminCheckError || (!isAdminResult && !currentUserIsSuperAdmin)) {
-      return new Response(JSON.stringify({ error: "Solo administradores pueden eliminar usuarios" }), {
+    if (superAdminCheckError || (!isSuperAdminResult && !currentUserIsSuperAdmin)) {
+      return new Response(JSON.stringify({ error: "Solo un super admin puede eliminar usuarios" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -102,48 +102,26 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
       });
     }
 
-    const { data: targetRoleData, error: targetRoleError } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (targetRoleError) {
-      return new Response(JSON.stringify({ error: "No se pudo validar el usuario objetivo" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // Un super admin nunca se puede eliminar directamente, ni siquiera otro
     // super admin: hay que quitarle antes el acceso de super admin (tabla
     // super_admins) con admin-set-super-admin.
-    const { data: targetSuperAdminData } = await supabaseAdmin
+    const { data: targetSuperAdminData, error: targetSuperAdminError } = await supabaseAdmin
       .from("super_admins")
       .select("id")
       .eq("user_id", userId)
       .maybeSingle();
+
+    if (targetSuperAdminError) {
+      return new Response(JSON.stringify({ error: "No se pudo validar el usuario objetivo" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     if (targetSuperAdminData) {
       return new Response(
         JSON.stringify({ error: "No se puede eliminar a un super admin: quítale antes el acceso de super admin" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-    }
-
-    if (targetRoleData?.role === "admin") {
-      // Un admin normal no puede eliminar a otro admin; un super admin sí
-      // (tabla super_admins, la misma autorización que admin-set-super-admin).
-      const { data: isSuperAdminResult } = await supabaseAdmin.rpc("is_super_admin", {
-        _user_id: currentUser.id,
-      });
-
-      if (!isSuperAdminResult && !currentUserIsSuperAdmin) {
-        return new Response(JSON.stringify({ error: "No se puede eliminar un usuario administrador" }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
     }
 
     const { error: deleteError } = await ejecutarOperacionAuthAuditada(
