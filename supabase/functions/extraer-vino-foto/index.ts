@@ -58,7 +58,27 @@ function textoONull(v: unknown, max = 300): string | null {
   return t ? t.slice(0, max) : null;
 }
 
-function buildSystem(categorias: string[]): string {
+// Ejemplos de tono: descripciones reales de la carta (las más largas), leídas
+// con el cliente del propio usuario. Si la consulta falla, se sigue sin ellos.
+async function leerEjemplosTono(cliente: ReturnType<typeof createClientBase>): Promise<string[]> {
+  try {
+    const { data, error } = await cliente
+      .from("Vinos")
+      .select("descripcion")
+      .not("descripcion", "is", null)
+      .neq("descripcion", "")
+      .limit(80);
+    if (error || !Array.isArray(data)) return [];
+    const textos = (data as Array<{ descripcion?: unknown }>)
+      .map((f) => (typeof f.descripcion === "string" ? f.descripcion.trim() : ""))
+      .filter((t) => t.length >= 40);
+    return [...new Set(textos)].sort((a, b) => b.length - a.length).slice(0, 5).map((t) => t.slice(0, 400));
+  } catch {
+    return [];
+  }
+}
+
+function buildSystem(categorias: string[], ejemplos: string[]): string {
   const listaCat = categorias.length
     ? `Categorías existentes en la carta (elige EXACTAMENTE una de ellas si encaja, si no null): ${JSON.stringify(categorias)}.`
     : "No hay categorías existentes: deja categoria en null.";
@@ -67,14 +87,25 @@ function buildSystem(categorias: string[]): string {
     "Devuelve SOLO un objeto JSON con estas claves exactas:",
     "nombre (string: nombre comercial del vino tal como aparece en la etiqueta, incluyendo la bodega si forma parte del nombre visible; incluye la añada si aparece, p.ej. 'Pazo Señorans 2022'),",
     "categoria (string o null),",
-    "descripcion (string o null: 1-2 frases breves en español para la carta, con bodega, tipo de vino y uva si se leen; sin inventar notas de cata),",
-    "ingredientes (string o null: variedad/es de uva legibles, p.ej. 'Albariño' o 'Mencía, Garnacha'),",
+    "descripcion (string: descripción de sumiller para la carta, ver REGLAS DE LA DESCRIPCIÓN),",
+    "ingredientes (string o null: variedad/es de uva, p.ej. 'Albariño' o 'Mencía, Garnacha'. Si la etiqueta no la dice pero el vino concreto o su D.O. y tipo la hacen muy probable, rellénala (p.ej. Rioja blanco → 'Viura'; Rías Baixas → 'Albariño'; Rueda → 'Verdejo'; Ribera del Duero tinto → 'Tempranillo'). Si no hay certeza razonable: null),",
     "denominacion_origen (string o null: D.O./D.O.Ca./IGP tal como figura, p.ej. 'Rías Baixas', 'Ribera del Duero'),",
     "ubicacion_region (string o null: región o comunidad, p.ej. 'Galicia', 'Castilla y León', 'Borgoña'),",
     "ubicacion_pais (string o null: país en español, p.ej. 'España', 'Francia'),",
     "contiene_sulfitos (boolean: true si la etiqueta dice 'contiene sulfitos'/'contains sulphites', si no false).",
     listaCat,
-    "Puedes deducir región y país a partir de una D.O. conocida. Cualquier otro dato que no se lea con claridad: null. No inventes. Nunca incluyas precio.",
+    "Puedes deducir región y país a partir de una D.O. conocida. Nombre, D.O. y sulfitos: solo lo que se lea con claridad, si no null. Nunca incluyas precio.",
+    "",
+    "REGLAS DE LA DESCRIPCIÓN:",
+    "- Tras leer la etiqueta, usa lo que SABES de ese vino, su bodega y su D.O. para escribir como un sumiller en la carta de un restaurante.",
+    "- Español, 2-3 frases, unos 200-300 caracteres: estilo/elaboración (joven, crianza, barrica, lías…), notas de cata (nariz y boca) y un maridaje breve.",
+    "- Tono cálido y elegante. Sin tópicos vacíos ('un vino único', 'toda una experiencia') ni superlativos exagerados.",
+    "- No empieces con una ficha literal tipo 'Vino blanco de la bodega X con denominación Y'.",
+    "- Si no conoces ese vino concreto, describe con prudencia lo típico de ese tipo + D.O. + uva.",
+    "- Nunca inventes premios, puntuaciones, añadas, meses exactos de crianza ni otros datos concretos que no conozcas con seguridad.",
+    ...(ejemplos.length
+      ? ["", "Ejemplos de descripciones de esta carta (imita su tono y longitud, no su contenido):", ...ejemplos.map((e) => `- ${e}`)]
+      : []),
   ].join("\n");
 }
 
@@ -119,6 +150,8 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
 
   if (!OPENAI_KEY) return json({ ok: false, error: "OPENAI_API_KEY no configurada" }, 500);
 
+  const ejemplos = await leerEjemplosTono(supabaseUser);
+
   const uso = new AcumuladorUso(FUNCION, MODEL, "vision");
   const inicioMs = Date.now();
   const controller = new AbortController();
@@ -130,11 +163,11 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
       body: JSON.stringify({
         model: MODEL,
-        temperature: 0.1,
-        max_tokens: 500,
+        temperature: 0.4,
+        max_tokens: 700,
         response_format: { type: "json_object" },
         messages: [
-          { role: "system", content: buildSystem(categorias) },
+          { role: "system", content: buildSystem(categorias, ejemplos) },
           {
             role: "user",
             content: [
