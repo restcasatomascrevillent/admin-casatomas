@@ -231,3 +231,21 @@ El banco de PostgreSQL usa PGlite en memoria: aplica las migraciones y comprueba
 identidad, rechazo con rollback, clasificación, claves compuestas, archivos,
 cascadas, secretos, acciones externas y tablas nuevas, sin conectar a producción.
 
+
+## Activación verificada (8 de octubre de 2026)
+
+Las funciones en producción incluyen el contexto de auditoría y las migraciones
+`audit_log_panel_completo`, `audit_accesos_dispositivos` y
+`audit_version_search_path` están aplicadas. La RPC de disponibilidad devuelve 2.
+La cobertura pasó de 13 a 102 tablas, incluidos `auth.users` y `storage.objects`.
+Los tres registros previos se conservaron y no hay registros sin identidad.
+
+Se verificaron en producción, dentro de transacciones revertidas, los intentos
+fallidos, accesos correctos, sesiones restauradas, dispositivos distintos y
+protección frente a duplicados y accesos fabricados. Con el rol real
+`authenticated`, un usuario normal no puede leer la auditoría; el superadmin
+consulta todos los registros. No quedaron entradas de prueba. El gateway
+responde y la publicación del frontend en Vercel finalizó correctamente.
+
+Recargar las pestañas abiertas para utilizar el frontend actualizado. Los
+intentos anteriores que nunca se registraron no se reconstruyen ni se inventan.
