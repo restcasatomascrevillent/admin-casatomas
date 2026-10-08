@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
@@ -70,7 +71,7 @@ function contexto(disparador = `subida:${crypto.randomUUID()}`): ContextoGuardad
   const registro = crearRegistroUso({ funcion: "procesar-factura", disparador, cliente: supabase });
   return {
     supabase,
-    openai: crearClienteOpenAI({ apiKey: Deno.env.get("OPENAI_API_KEY")!, config: cfgModelo, alUsar: registro.alUsar }),
+    openai: crearClienteOpenAI({ apiKey: claveOpenAI("ocr"), config: cfgModelo, alUsar: registro.alUsar }),
     drive,
     registro,
   };

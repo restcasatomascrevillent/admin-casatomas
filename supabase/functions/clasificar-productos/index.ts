@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { autenticar, corsHeaders, jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
@@ -63,7 +64,7 @@ serve(conAuditoriaDePeticion("clasificar-productos", createClientBase, async (re
       llamarModelo: async (mensajes, esquema) => {
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("OPENAI_API_KEY")}` },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${claveOpenAI("ocr")}` },
           body: JSON.stringify({
             model: MODELO,
             max_completion_tokens: 16000,

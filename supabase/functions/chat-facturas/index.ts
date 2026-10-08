@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import {
@@ -55,7 +56,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY")!;
+const OPENAI_KEY = claveOpenAI("chat");
 const OPENAI = "https://api.openai.com/v1";
 const MODELO = "gpt-4.1-mini";
 const MAX_HISTORIAL = 10;   // mismo valor que el contextWindowLength de n8n

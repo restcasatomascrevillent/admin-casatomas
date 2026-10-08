@@ -230,3 +230,12 @@ verify_jwt = true
 # desde service_role y limita intentos en SQL. Nunca confía en actor del body.
 [functions.panel-auth]
 verify_jwt = false
+
+# sincronizar-costes-openai: la llama SOLO el cron «sincronizar-costes-openai»
+# por pg_net (sin JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo
+# secreto y mismo valor de Vault que ocr-trabajo). No acepta datos del cuerpo:
+# con OPENAI_ADMIN_KEY trae de OpenAI el gasto real (GET /v1/organization/costs)
+# y el tipo de cambio del BCE. Ver supabase/functions/sincronizar-costes-openai/
+# y la migración 20261008150000_openai_costes_reales.sql.
+[functions.sincronizar-costes-openai]
+verify_jwt = false
