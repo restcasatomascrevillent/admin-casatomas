@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
+import { completeAuditEnabled } from "@/lib/audit-version";
+import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -33,22 +34,22 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
- * Escribe una fila de acceso en `audit_log` (login/logout). "Best effort":
- * un fallo aquí nunca debe romper el inicio/cierre de sesión en sí, así que
- * solo se registra en consola.
+ * Espera al registro mientras sigue vigente el token. Si falla, el llamador
+ * debe avisar y no presentar el acceso como registrado correctamente.
  */
-async function registrarAccesoAuditoria(accion: "login" | "logout", userId: string, email: string | null) {
-  try {
-    const { error } = await supabase.from("audit_log").insert({
-      actor_user_id: userId,
-      actor_email: email,
-      accion,
-      user_agent: navigator.userAgent,
-    });
-    if (error) console.error(`Error registrando ${accion} en audit_log:`, error);
-  } catch (e) {
-    console.error(`Error registrando ${accion} en audit_log:`, e);
+async function registrarAccesoAuditoria(accion: "acceso" | "logout") {
+  if (!await completeAuditEnabled()) {
+    if (accion === "acceso") return; // servidor anterior: todavía no registra restauraciones
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("La sesión ya no es válida");
+    const { error } = await supabase.from("audit_log").insert({ actor_user_id: user.id, actor_email: user.email, accion, user_agent: navigator.userAgent });
+    if (error) throw new Error("No se pudo registrar la salida en la auditoría");
+    return;
   }
+  const { error } = await supabase.rpc("registrar_acceso_panel", {
+    p_tipo: accion, p_ruta: window.location.pathname,
+  });
+  if (error) throw new Error(`No se pudo registrar ${accion} en la auditoría`);
 }
 
 /**
@@ -87,6 +88,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // Una entrada por sesión de página. Nunca se comparte entre dispositivos ni
+  // usa localStorage para omitir accesos; refrescar el JWT no crea otro login.
+  const accesos = useRef(new Map<string, Promise<void>>());
 
   useEffect(() => {
     let isMounted = true;
@@ -108,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const esVigente = () => isMounted && miSincronizacion === ultimaSincronizacion;
 
       if (!incomingSession) {
+        accesos.current.clear();
         if (!esVigente()) return;
         setSession(null);
         setUser(null);
@@ -127,13 +132,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (userError) {
-        // Si hay un fallo temporal de red/servicio, mantenemos la sesión local.
+        // Solo conservar una sesión que ya ha registrado su entrada en esta
+        // página; una sesión recién restaurada no puede saltarse la auditoría.
+        if (!accesos.current.has(incomingSession.user.id)) {
+          setSession(null); setUser(null); setLoading(false);
+          toast.error("No se pudo verificar y registrar el acceso. Recarga la página para reintentarlo.");
+          return;
+        }
         setSession(incomingSession);
         setUser((previo) => conservarUsuario(previo, incomingSession.user ?? null));
         setLoading(false);
         return;
       }
 
+      const userId = userData.user!.id;
+      if (!accesos.current.has(userId)) accesos.current.set(userId, registrarAccesoAuditoria("acceso"));
+      try { await accesos.current.get(userId); }
+      catch {
+        accesos.current.delete(userId);
+        if (esVigente()) {
+          setSession(null); setUser(null); setLoading(false);
+          toast.error("No se pudo registrar el acceso al panel. Recarga la página para reintentarlo.");
+        }
+        return;
+      }
+      if (!esVigente()) return;
       setSession(incomingSession);
       setUser((previo) => conservarUsuario(previo, userData.user));
       setLoading(false);
@@ -143,7 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, incomingSession) => {
-      void syncValidatedSession(incomingSession);
+      // Fuera del bloqueo de Auth: las RPC necesitan obtener el token actual.
+      setTimeout(() => { if (isMounted) void syncValidatedSession(incomingSession); }, 0);
     });
 
     // THEN check for existing session
@@ -210,21 +234,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const validatedData = signInSchema.parse({ email, password });
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: validatedData.email,
-        password: validatedData.password,
+      if (!await completeAuditEnabled()) {
+        // Compatibilidad durante la publicación: no se llama a una función
+        // aún inexistente. La pantalla de auditoría avisa de la activación pendiente.
+        const { data, error } = await supabase.auth.signInWithPassword({ email: validatedData.email, password: validatedData.password });
+        if (error) { toast.error("Email o contraseña incorrectos"); return { error }; }
+        if (!data.user) return { error: new Error("No se pudo abrir la sesión") };
+        const { error: auditError } = await supabase.from("audit_log").insert({
+          actor_user_id: data.user.id, actor_email: data.user.email, accion: "login", user_agent: navigator.userAgent,
+        });
+        if (auditError) { await supabase.auth.signOut({ scope: "local" }); return { error: new Error("No se pudo registrar el acceso en auditoría") }; }
+        toast.success("Sesión iniciada correctamente");
+        return { data, error: null };
+      }
+      const response = await supabase.functions.invoke("panel-auth", {
+        body: { email: validatedData.email, password: validatedData.password, ruta: window.location.pathname },
       });
-
-      if (error) {
-        if (error.message.includes("Invalid login credentials")) {
-          toast.error("Email o contraseña incorrectos");
-        } else {
-          toast.error("Error al iniciar sesión: " + error.message);
-        }
+      if (response.error || !response.data?.session || !response.data?.user) {
+        const context = response.error && "context" in response.error ? response.error.context : null;
+        const detail = context instanceof Response ? await context.json().catch(() => null) : null;
+        const error = new Error(detail?.error ?? response.data?.error ?? "No se pudo registrar y comprobar el acceso. Inténtalo de nuevo.");
+        toast.error(error.message);
         return { error };
       }
-
-      toast.success("Sesión iniciada correctamente");
+      // El servidor ya ha guardado este acceso. Evita que SIGNED_IN lo duplique.
+      const data = response.data;
+      accesos.current.set(data.user.id, Promise.resolve());
+      const { error: sessionError } = await supabase.auth.setSession(data.session);
+      if (sessionError) {
+        accesos.current.delete(data.user.id);
+        toast.error("El acceso se registró, pero no se pudo abrir la sesión. Inténtalo de nuevo.");
+        return { error: sessionError };
+      }
 
       // Registrar inicio de sesión en BD de métricas
       try {
@@ -243,12 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Error registrando métrica:", e);
       }
 
-      // Rastro de auditoría para el super admin (tabla `audit_log`, ver
-      // /super-admin/auditoria). Independiente de `registrar-metrica` de
-      // arriba: esa va a la BD de métricas aparte y cuenta logins como
-      // número, esta es la fila legible ("quién entró y cuándo") que lee
-      // el super admin.
-      if (data.user) void registrarAccesoAuditoria("login", data.user.id, data.user.email ?? null);
+      toast.success("Sesión iniciada correctamente");
 
       return { data, error: null };
     } catch (error) {
@@ -266,7 +302,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // token, y la política de `audit_log` exige `actor_user_id = auth.uid()`
     // con el usuario todavía autenticado.
     const { data: { user: saliente } } = await supabase.auth.getUser();
-    if (saliente) void registrarAccesoAuditoria("logout", saliente.id, saliente.email ?? null);
+    if (saliente) {
+      try { await registrarAccesoAuditoria("logout"); }
+      catch (auditError) {
+        toast.error("No se pudo registrar el cierre de sesión. Vuelve a intentarlo.");
+        return { error: auditError as Error };
+      }
+    }
 
     const { error } = await supabase.auth.signOut();
     if (error) {
@@ -284,6 +326,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       toast.error("Error al cerrar sesión: " + error.message);
       return { error };
     }
+    accesos.current.clear();
     toast.success("Sesión cerrada correctamente");
     return { error: null };
   }, []);

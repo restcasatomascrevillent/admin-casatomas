@@ -1,4 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "list-users");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,7 +18,7 @@ const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
 const isSuperAdminEmail = (email?: string | null) =>
   !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 
-Deno.serve(async (req) => {
+Deno.serve(conAuditoriaDePeticion("list-users", createClientBase, async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -100,4 +102,4 @@ Deno.serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}));

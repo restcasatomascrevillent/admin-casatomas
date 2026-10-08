@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import {
   esErrorCorregible,
@@ -10,6 +10,8 @@ import {
   systemPrompt,
   TOOLS,
 } from "./herramientas.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 
 // ============================================================================
 //  chat-facturas  ·  Asistente de gestion de compras del restaurante
@@ -201,7 +203,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx):
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
-serve(async (req) => {
+serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   const json = (body: unknown, status: number) =>
@@ -397,4 +399,4 @@ serve(async (req) => {
       cliente: supabase,
     });
   }
-});
+}));

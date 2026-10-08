@@ -1,3 +1,4 @@
+import { completeAuditEnabled } from "@/lib/audit-version";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,9 +53,17 @@ export function VapiPromptEditor({ config }: { config: any }) {
         }
 
         setIsSaving(true);
+        let evento: string | null = null;
+        let aplicado = false;
         try {
+            if (await completeAuditEnabled()) {
+                const { data, error } = await supabase.rpc("auditar_prompt_vapi");
+                if (error) throw new Error("No se pudo registrar la operación antes de ejecutarla");
+                evento = data as string;
+            }
             // Guardar url por si se ha modificado
-            await supabase.from("phone_system_config").update({ webhook_url: webhookUrl } as any).eq("restaurant_id", "default");
+            const { error: configError } = await supabase.from("phone_system_config").update({ webhook_url: webhookUrl } as any).eq("restaurant_id", "default");
+            if (configError) throw configError;
 
             const cleanUrl = webhookUrl.endsWith('/') ? webhookUrl.slice(0, -1) : webhookUrl;
             const res = await fetch(`${cleanUrl}/api/vapi-prompt`, {
@@ -67,6 +76,11 @@ export function VapiPromptEditor({ config }: { config: any }) {
             });
 
             if (res.ok) {
+                aplicado = true;
+                if (evento) {
+                    const { error } = await supabase.rpc("auditar_prompt_vapi", { p_evento: evento, p_resultado: "completada" });
+                    if (error) throw error;
+                }
                 toast.success("Instrucciones guardadas en VAPI", {
                     description: "El asistente atenderá con este texto a partir de la próxima llamada.",
                 });
@@ -76,8 +90,9 @@ export function VapiPromptEditor({ config }: { config: any }) {
             }
         } catch (e) {
             console.error(e);
-            toast.error("No se pudo guardar el prompt en VAPI", {
-                description: "El asistente sigue con las instrucciones anteriores.",
+            if (evento && !aplicado) await supabase.rpc("auditar_prompt_vapi", { p_evento: evento, p_resultado: "fallida" });
+            toast.error(aplicado ? "Las instrucciones se guardaron, pero no se pudo confirmar su auditoría" : "No se pudo confirmar el guardado en VAPI", {
+                description: "Comprueba las instrucciones actuales antes de repetir la operación.",
             });
         }
         setIsSaving(false);

@@ -28,7 +28,7 @@
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 import { crearClienteVercel } from "./vercel.ts";
 import {
@@ -38,6 +38,8 @@ import {
   type FilaDiario,
   type Repositorio,
 } from "./sync.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "sync-trafico-web");
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -101,7 +103,7 @@ function crearRepositorio(supabase: SupabaseClient): Repositorio {
   };
 }
 
-serve((req) =>
+serve(conAuditoriaDePeticion("sync-trafico-web", createClientBase, (req) =>
   procesarPeticion(req, {
     secreto: CRON_SECRET,
     token: VERCEL_TOKEN,
@@ -117,5 +119,5 @@ serve((req) =>
       status: 500,
       headers: { "Content-Type": "application/json" },
     });
-  })
+  }))
 );

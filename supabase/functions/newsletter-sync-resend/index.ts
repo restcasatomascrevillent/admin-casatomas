@@ -1,11 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { comprobarPermisoSeccion, SECCION_MARKETING, type ClientePermiso } from "../_shared/permiso-marketing.ts";
 import { canalNewsletter, limiteContactos, NOMBRE_SEGMENTO_NEWSLETTER } from "../_shared/resend-marketing/config.ts";
 import { ClienteResendMarketing } from "../_shared/resend-marketing/cliente.ts";
 import { RepositorioNewsletterResend } from "../_shared/resend-marketing/repositorio.ts";
 import { sincronizarConCerrojo } from "../_shared/resend-marketing/servicio.ts";
 import { autenticar, construirEstado, leerAccion, respuestaSincronizacion } from "./peticion.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "newsletter-sync-resend");
 
 // ============================================================================
 // newsletter-sync-resend
@@ -44,7 +46,7 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("newsletter-sync-resend", createClientBase, async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "GET" && req.method !== "POST") return json({ success: false, error: "method_not_allowed" }, 405);
 
@@ -147,4 +149,4 @@ serve(async (req) => {
     console.error("[newsletter-sync] error inesperado:", mensaje);
     return json({ success: false, error: mensaje }, 500);
   }
-});
+}));

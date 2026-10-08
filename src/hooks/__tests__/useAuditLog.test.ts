@@ -65,3 +65,17 @@ describe("identidad de auditoría", () => {
   });
 });
 
+
+describe('separación de accesos y dispositivos', () => {
+  it('nunca agrupa dos accesos aunque compartan usuario y hora', () => {
+    expect(agruparEntradas([
+      entry({ accion: 'login', actor_email: 'a@test.local', actor_user_id: 'a' }),
+      entry({ id: 'event-2', accion: 'login', actor_email: 'a@test.local', actor_user_id: 'a' }),
+    ])).toHaveLength(2);
+  });
+  it('no mezcla cambios desde dos dispositivos o peticiones distintas', () => {
+    const base = { actor_email: 'a@test.local', actor_user_id: 'a', device_id: 'phone', request_id: 'request-1' };
+    expect(agruparEntradas([entry(base), entry({ ...base, id:'event-2', device_id:'laptop' })])).toHaveLength(2);
+    expect(agruparEntradas([entry(base), entry({ ...base, id:'event-2', request_id:'request-2' })])).toHaveLength(2);
+  });
+});

@@ -44,7 +44,9 @@
 // sigue sin lanzar nunca, porque los llamadores no esperan la respuesta.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "notify-reservation-change");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -126,7 +128,7 @@ async function autenticar(
   return { ok: true, userId: user.id };
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("notify-reservation-change", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -150,10 +152,10 @@ serve(async (req) => {
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      // emails-reserva tiene verify_jwt = false explícito en config.toml
-      // (sus rutas GET de aceptar/rechazar tienen que responder sin
-      // cabeceras). Se manda igualmente por si el día de mañana cambia.
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      // Conserva el JWT ya verificado del iniciador para que los cambios
+      // y envíos de emails-reserva también se atribuyan a ese usuario.
+      // La autorización de esta ruta interna sigue exigiendo el secreto.
+      Authorization: req.headers.get("Authorization")!,
     };
     // A diferencia de checkSharedSecret en reservas-web (que fallaba
     // abierto), comprobarSecretoCompartido en emails-reserva RECHAZA la
@@ -198,4 +200,4 @@ serve(async (req) => {
     console.error("[notify-reservation-change] Error:", errorMessage);
     return json({ success: false, error: errorMessage });
   }
-});
+}));

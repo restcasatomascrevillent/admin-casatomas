@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { baseBajaWeb, urlBajaWeb } from "../newsletter-baja/enlace-web.ts";
 import {
   validarPayload,
@@ -23,6 +23,8 @@ import {
 import { ClienteResendMarketing } from "../_shared/resend-marketing/cliente.ts";
 import { RepositorioNewsletterResend } from "../_shared/resend-marketing/repositorio.ts";
 import { sincronizarConCerrojo } from "../_shared/resend-marketing/servicio.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "enviar-newsletter");
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,7 +97,7 @@ function json(body: unknown, status = 200): Response {
 
 const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("enviar-newsletter", createClientBase, async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -298,7 +300,7 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return json({ success: false, error: errorMessage }, 500);
   }
-});
+}));
 
 // ============================================================================
 // CANAL BROADCAST (Resend Marketing) — ver broadcast.ts y

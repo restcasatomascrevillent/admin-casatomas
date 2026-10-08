@@ -4252,6 +4252,10 @@ export type Database = {
           id: string
           registro_id: string | null
           tabla: string | null
+          device_id: string | null
+          ip_address: string | null
+          request_id: string | null
+          session_id: string | null
           user_agent: string | null
         }
         Insert: {
@@ -4265,6 +4269,10 @@ export type Database = {
           id?: string
           registro_id?: string | null
           tabla?: string | null
+          device_id?: string | null
+          ip_address?: string | null
+          request_id?: string | null
+          session_id?: string | null
           user_agent?: string | null
         }
         Update: {
@@ -4278,6 +4286,10 @@ export type Database = {
           id?: string
           registro_id?: string | null
           tabla?: string | null
+          device_id?: string | null
+          ip_address?: string | null
+          request_id?: string | null
+          session_id?: string | null
           user_agent?: string | null
         }
         Relationships: []
@@ -4920,6 +4932,14 @@ export type Database = {
         Args: { p_seccion: string; p_mostrar: boolean }
         Returns: undefined
       }
+      version_auditoria_panel: { Args: Record<PropertyKey, never>; Returns: number }
+      registrar_acceso_panel: { Args: { p_tipo: string; p_ruta?: string }; Returns: string }
+      auditar_prompt_vapi: { Args: { p_evento?: string; p_resultado?: string }; Returns: string }
+      listar_tablas_auditoria_panel: { Args: Record<PropertyKey, never>; Returns: { tabla: string }[] }
+      registrar_accion_auditoria_panel: { Args: { p_operacion: string; p_detalles?: Json }; Returns: string }
+      iniciar_intento_panel: { Args: { p_email: string; p_ruta?: string }; Returns: Json }
+      finalizar_intento_panel: { Args: { p_id: string; p_actor?: string; p_resultado?: string; p_session_id?: string }; Returns: undefined }
+
       append_tool_call_log: {
         Args: { p_call_id: string; p_new_tools: Json }
         Returns: undefined

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verificarWebhookResend, type CabecerasSvix } from "./firma.ts";
 import {
   mapearEventoAEstadoEntrega,
@@ -20,6 +20,8 @@ import {
   patronIlikeExacto,
   type DecisionBajaNewsletter,
 } from "./newsletter.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "resend-webhook");
 
 // ============================================================================
 // RESEND-WEBHOOK — recibe los eventos asíncronos de Resend (delivered,
@@ -116,7 +118,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 }
 
-serve(async (req: Request): Promise<Response> => {
+serve(conAuditoriaDePeticion("resend-webhook", createClientBase, async (req: Request): Promise<Response> => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -312,7 +314,7 @@ serve(async (req: Request): Promise<Response> => {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return jsonResponse({ error: "Internal server error", message: errorMessage }, 500);
   }
-});
+}));
 
 // ==============================================================================
 // ACTUAR SOBRE EL ENVÍO — enlaza el evento con su fila de envios_email_reserva

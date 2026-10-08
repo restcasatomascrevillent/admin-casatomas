@@ -107,7 +107,7 @@
 // ============================================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 import {
@@ -207,6 +207,8 @@ import {
   type AvisoAnterior,
   type DetalleAviso,
 } from "./reserva-modificada.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "emails-reserva");
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -2110,7 +2112,7 @@ const RUTAS_GET_ANTIGUAS = new Set([
   "propuesta/rechazar/ejecutar",
 ]);
 
-serve(async (req: Request) => {
+serve(conAuditoriaDePeticion("emails-reserva", createClientBase, async (req: Request) => {
   const url = new URL(req.url);
   const segments = url.pathname.split("/").filter(Boolean);
   const idx = segments.indexOf("emails-reserva");
@@ -2142,4 +2144,4 @@ serve(async (req: Request) => {
     console.error("[emails-reserva] Error no controlado:", (err as Error)?.message, (err as Error)?.stack);
     return json({ ok: false, error: "internal_error" }, 500);
   }
-});
+}));

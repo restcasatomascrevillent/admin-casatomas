@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { auditDeniedAccess } from "@/lib/audit-access";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -18,6 +19,7 @@ export default function SuperAdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  const denegado = useRef<string | null>(null);
   const checking = authLoading || (!!user && superAdminLoading);
 
   useEffect(() => {
@@ -45,7 +47,11 @@ export default function SuperAdminLogin() {
   // Si hay sesión pero no es super admin, tras la comprobación se avisa y se ofrece cambiar de cuenta.
   useEffect(() => {
     if (!checking && user && !isSuperAdmin) {
-      toast.error("Esta cuenta no tiene permisos de Super Administrador");
+      if (denegado.current !== user.id) {
+        denegado.current = user.id;
+        void auditDeniedAccess("/super-admin/login");
+        toast.error("Esta cuenta no tiene permisos de Super Administrador");
+      }
     }
   }, [checking, user, isSuperAdmin]);
 

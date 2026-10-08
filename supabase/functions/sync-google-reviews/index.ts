@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "sync-google-reviews");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +15,7 @@ const corsHeaders = {
 // propietario verificado de la ficha), que es otra integración distinta.
 const GOOGLE_MAX_REVIEWS = 5;
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -198,4 +200,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+}));

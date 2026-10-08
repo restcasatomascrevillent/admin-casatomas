@@ -1,7 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { baseBajaWeb, urlBajaWeb, quiereJson, respuestaBaja, type EstadoBaja } from "./enlace-web.ts";
 import { quitarDeResendTrasBaja } from "./resend.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "newsletter-baja");
 
 // ============================================================================
 // newsletter-baja
@@ -249,7 +251,7 @@ function renderErrorPage(): string {
 
 // ---------------------------------------------------------------------------
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("newsletter-baja", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -360,4 +362,4 @@ serve(async (req) => {
   else await quitar;
 
   return responder("baja_hecha", renderDonePage(suscriptor.email, nowIso, false), 200, suscriptor.email, nowIso);
-});
+}));

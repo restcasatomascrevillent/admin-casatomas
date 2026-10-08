@@ -221,3 +221,9 @@ verify_jwt = true
 
 [functions.notify-config-bot-change]
 verify_jwt = true
+
+
+# Login público: comprueba las credenciales en Auth, registra antes/después
+# desde service_role y limita intentos en SQL. Nunca confía en actor del body.
+[functions.panel-auth]
+verify_jwt = false

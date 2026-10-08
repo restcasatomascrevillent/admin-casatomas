@@ -32,7 +32,7 @@
 // es el mismo nivel que ya exige el panel para entrar en la página.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 // La aritmética (perímetro y área) la hacemos nosotros, no el modelo: ver la
 // justificación medida en geometria.ts.
 import {
@@ -41,6 +41,8 @@ import {
   perimetroDeParedes,
   redondear,
 } from "./geometria.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "procesar-dibujo-perimetro");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -158,7 +160,7 @@ async function autenticar(req: Request): Promise<
 }
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
-serve(async (req) => {
+serve(conAuditoriaDePeticion("procesar-dibujo-perimetro", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -346,4 +348,4 @@ Las coordenadas deben estar en metros. Intenta crear un perímetro cerrado y coh
       error: error instanceof Error ? error.message : "Error processing drawing",
     });
   }
-});
+}));

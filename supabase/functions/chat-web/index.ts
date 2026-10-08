@@ -1,6 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { firmarSessionToken, verificarSessionToken } from "./session-token.ts";
 import {
   alergenosDeFila,
@@ -10,6 +10,8 @@ import {
   SIN_INFO_ALERGENOS,
 } from "./alergenos.ts";
 import { buscarFilas, coincideCategoria, plegarTexto } from "./busqueda-carta.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "chat-web");
 
 // ============================================================================
 //  chat-web  ·  Chatbot público de la web del restaurante, SIN n8n
@@ -1284,7 +1286,7 @@ async function leerConfigChat(supabase: any): Promise<ConfigChatCache | null> {
   }
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("chat-web", createClientBase, async (req) => {
   const cors = corsPara(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") {
@@ -1608,4 +1610,4 @@ serve(async (req) => {
     console.error("[chat-web] Error:", error);
     return responder(cors, false, MENSAJES_FIJOS[idiom].generico, sessionToken);
   }
-});
+}));

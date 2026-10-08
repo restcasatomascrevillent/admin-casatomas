@@ -1,4 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "admin-update-user-password");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,7 +25,7 @@ interface UpdatePasswordRequest {
   password: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -127,7 +130,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
+    const { error: updateError } = await ejecutarOperacionAuthAuditada(
+      supabaseAdmin, currentUser.id, "actualizar", { userId },
+      () => supabaseAdmin.auth.admin.updateUserById(userId, { password }),
+    );
     if (updateError) {
       return new Response(JSON.stringify({ error: updateError.message }), {
         status: 500,
@@ -146,4 +152,4 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));

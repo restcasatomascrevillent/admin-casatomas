@@ -22,6 +22,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { buildPromptSpec, type TipoContenido } from "./prompts.ts";
 import { runBulkFill } from "./bulk.ts";
 import { buildCamposSpec, validarPayloadCampos } from "./campos.ts";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -91,7 +93,7 @@ async function callOpenAI(system: string, user: string): Promise<unknown> {
   }
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("traducir-contenido", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -169,4 +171,4 @@ serve(async (req) => {
     // romper el flujo de guardado por un fallo de OpenAI (TAREA 2).
     return json({ ok: false, tipo, error: message });
   }
-});
+}));

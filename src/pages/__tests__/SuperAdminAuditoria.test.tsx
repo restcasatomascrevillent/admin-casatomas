@@ -41,3 +41,13 @@ describe("tabla de auditoría", () => {
     expect(screen.getByText("El registro original no conservó el autor.")).toBeInTheDocument();
   });
 });
+
+it("muestra el dispositivo, la IP y la identidad no verificada de los intentos fallidos", () => {
+  state.entradas = [entry({ accion: "login_fallido", actor_label: "inventado@test.local · identidad no verificada", actor_origin: "intento", device_id: "phone-1", ip_address: "203.0.113.10", user_agent: "iPhone Safari", tabla: "accesos_panel" })];
+  render(<SuperAdminAuditoria />);
+  expect(screen.getByText("Acceso fallido")).toBeInTheDocument();
+  expect(screen.getByText("iPhone · Safari")).toBeInTheDocument();
+  expect(screen.getByText("phone-1")).toBeInTheDocument();
+  expect(screen.getByText("IP: 203.0.113.10")).toBeInTheDocument();
+  expect(screen.getByText(/identidad no verificada/)).toBeInTheDocument();
+});

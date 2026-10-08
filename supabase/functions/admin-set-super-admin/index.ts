@@ -1,4 +1,6 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "admin-set-super-admin");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +23,7 @@ interface SetSuperAdminRequest {
   makeSuperAdmin: boolean;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -176,5 +178,5 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));
 

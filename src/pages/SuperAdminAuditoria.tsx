@@ -1,3 +1,4 @@
+import { describeDevice } from "@/lib/audit-device";
 import { Fragment, useMemo, useState } from "react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ScrollText, ChevronDown, ChevronRight, Loader2, LogIn, LogOut, Plus, Pencil, Trash2 } from "lucide-react";
+import { ScrollText, ChevronDown, ChevronRight, Loader2, LogIn, LogOut, Plus, Pencil, Trash2, Activity } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -29,10 +30,15 @@ const ALTURA_MINIMA_AUDITORIA = 480;
 
 const ACCION_UI: Record<string, { label: string; icon: typeof LogIn; className: string }> = {
   login: { label: "Inicio de sesión", icon: LogIn, className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
+  intento_login: { label: "Intento pendiente", icon: LogIn, className: "bg-amber-500/10 text-amber-600" },
+  login_fallido: { label: "Acceso fallido", icon: LogIn, className: "bg-destructive/10 text-destructive" },
+  acceso: { label: "Acceso con sesión", icon: LogIn, className: "bg-emerald-500/10 text-emerald-600" },
+  acceso_denegado: { label: "Acceso denegado", icon: LogIn, className: "bg-destructive/10 text-destructive" },
   logout: { label: "Cierre de sesión", icon: LogOut, className: "bg-muted text-muted-foreground border-border" },
   crear: { label: "Creación", icon: Plus, className: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
   actualizar: { label: "Cambio", icon: Pencil, className: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
-  eliminar: { label: "Borrado", icon: Trash2, className: "bg-destructive/10 text-destructive border-destructive/20" },
+  eliminar: { label: "Eliminación", icon: Trash2, className: "bg-destructive/10 text-destructive border-destructive/20" },
+  ejecutar: { label: "Acción", icon: Activity, className: "bg-violet-500/10 text-violet-600 border-violet-500/20" },
 };
 
 const FILTROS_VACIOS: AuditLogFiltros = {};
@@ -45,6 +51,12 @@ function formatearValorCampo(valor: unknown): string {
 }
 
 function DetalleEntrada({ entrada }: { entrada: AuditLogEntry }) {
+  if (entrada.detalles?.credenciales_actualizadas) {
+    return <p className="text-sm">Credenciales actualizadas. La contraseña no se guarda en la auditoría.</p>;
+  }
+  if (entrada.detalles?.operacion && entrada.tabla === "acciones_servidor") {
+    return <p className="text-sm">{String(entrada.detalles.operacion)} · {String(entrada.detalles.resultado ?? "completada")}</p>;
+  }
   const cambios = entrada.accion === "actualizar" ? resumirCambios(entrada.detalles) : [];
 
   if (entrada.accion === "actualizar" && cambios.length > 0) {
@@ -74,7 +86,7 @@ export default function SuperAdminAuditoria() {
   const [filtros, setFiltros] = useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [pagina, setPagina] = useState(0);
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
-  const { entradas, total, pageSize, loading, error } = useAuditLog(filtros, pagina);
+  const { entradas, total, tablas = TABLAS_AUDITADAS, pageSize, loading, error, refetch, accesosActivos } = useAuditLog(filtros, pagina);
   const grupos = useMemo(() => agruparEntradas(entradas), [entradas]);
   // Alto de la pantalla (regla del dueño, 2026-10-07): cabecera y filtros fijos
   // arriba; la tabla de registros hace scroll dentro de su tarjeta, la página
@@ -112,17 +124,20 @@ export default function SuperAdminAuditoria() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Auditoría</h1>
             <p className="text-muted-foreground">
-              Quién entró al panel y qué cambió en la configuración y los permisos sensibles.
+              Accesos, intentos y acciones de todas las personas y dispositivos.
             </p>
           </div>
         </div>
 
+        {accesosActivos === false && <p role="status" className="rounded-md border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
+          Pendiente de activar el registro completo de accesos en el servidor. Todavía no se recogen todos los intentos ni las sesiones restauradas.
+        </p>}
         <Card className="shrink-0">
           <CardHeader>
             <CardTitle>Filtros</CardTitle>
             <CardDescription>Combínalos como haga falta; se aplican todos a la vez.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
             <div className="space-y-2">
               <Label htmlFor="auditoria-actor">Quién actuó / origen</Label>
               <Input
@@ -133,6 +148,12 @@ export default function SuperAdminAuditoria() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="auditoria-dispositivo">Dispositivo</Label>
+              <Input id="auditoria-dispositivo" placeholder="ID del dispositivo"
+                value={filtrosPendientes.dispositivo ?? ""}
+                onChange={(e) => setFiltrosPendientes(prev => ({ ...prev, dispositivo: e.target.value }))} />
+            </div>
             <div className="space-y-2">
               <Label>Acción</Label>
               <Select
@@ -164,7 +185,7 @@ export default function SuperAdminAuditoria() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todas</SelectItem>
-                  {TABLAS_AUDITADAS.map((t) => (
+                  {tablas.map((t) => (
                     <SelectItem key={t} value={t}>
                       {TABLA_LABEL[t] ?? t}
                     </SelectItem>
@@ -205,10 +226,11 @@ export default function SuperAdminAuditoria() {
         {/* Nunca por debajo de 12rem: en un móvil, con los filtros apilados,
             antes que una tabla de 0 px vuelve el scroll de página. */}
         <Card className="flex min-h-48 flex-1 flex-col">
-          <CardHeader className="shrink-0">
+          <CardHeader className="shrink-0 flex-row items-center justify-between">
             <CardTitle>
               {total} registro{total === 1 ? "" : "s"}
             </CardTitle>
+            <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={loading}>Actualizar</Button>
           </CardHeader>
           <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {loading ? (
@@ -229,6 +251,7 @@ export default function SuperAdminAuditoria() {
                       <TableHead>Quién</TableHead>
                       <TableHead>Acción</TableHead>
                       <TableHead>Tabla</TableHead>
+                      <TableHead>Dispositivo / conexión</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -275,10 +298,15 @@ export default function SuperAdminAuditoria() {
                             <TableCell className="text-sm text-muted-foreground">
                               {grupo.tabla ? TABLA_LABEL[grupo.tabla] ?? grupo.tabla : "—"}
                             </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              <p>{describeDevice(grupo.entradas[0].user_agent)}</p>
+                              {grupo.entradas[0].device_id && <p className="font-mono">{grupo.entradas[0].device_id}</p>}
+                              {grupo.entradas[0].ip_address && <p>IP: {grupo.entradas[0].ip_address}</p>}
+                            </TableCell>
                           </TableRow>
                           {tieneDetalles && abierta && (
                             <TableRow>
-                              <TableCell colSpan={5} className="border-0 p-0">
+                              <TableCell colSpan={6} className="border-0 p-0">
                                 <div className="m-3 space-y-2">
                                   {grupo.entradas.map((entrada) => (
                                       <div key={entrada.id} className="rounded-md border border-border/60 p-2">
@@ -295,6 +323,9 @@ export default function SuperAdminAuditoria() {
                                             {entrada.registro_id}
                                           </p>
                                         )}
+                                        {entrada.user_agent && <p className="text-xs break-all">Navegador: {entrada.user_agent}</p>}
+                                        {entrada.session_id && <p className="text-xs break-all">Sesión: {entrada.session_id}</p>}
+                                        {entrada.request_id && <p className="text-xs break-all">Petición: {entrada.request_id}</p>}
                                         <DetalleEntrada entrada={entrada} />
                                       </div>
                                     ))}

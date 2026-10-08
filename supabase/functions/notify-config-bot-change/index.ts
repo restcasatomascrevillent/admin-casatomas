@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +9,7 @@ const corsHeaders = {
 
 const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook/traducciones";
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("notify-config-bot-change", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -42,4 +44,4 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
-});
+}));

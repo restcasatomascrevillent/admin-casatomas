@@ -12,6 +12,15 @@ function clientMock(error: unknown = null) {
 }
 
 describe("auditoría de operaciones Auth", () => {
+  it("identifica el cambio de contraseña antes de llamar a GoTrue", async () => {
+    const { client, rpc } = clientMock();
+    const execute = vi.fn().mockResolvedValue({ success: true });
+    await ejecutarOperacionAuthAuditada(client, "admin-id", "actualizar", { userId: "target" }, execute);
+    expect(rpc).toHaveBeenCalledWith("preparar_contexto_auditoria_auth", {
+      p_actor_id: "admin-id", p_operacion: "actualizar", p_user_id: "target", p_email: null,
+    });
+    expect(rpc.mock.invocationCallOrder[0]).toBeLessThan(execute.mock.invocationCallOrder[0]);
+  });
   it("prepara el actor verificado antes de ejecutar Auth y elimina el contexto", async () => {
     const { client, rpc, eq } = clientMock();
     const execute = vi.fn().mockResolvedValue({ success: true });

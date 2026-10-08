@@ -1,3 +1,5 @@
+import { clienteConAuditoria } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "traducir-contenido:bulk");
 // Modo de relleno masivo (TAREA 5).
 // ---------------------------------------------------------------------------
 // Traduce los productos que YA EXISTEN en la carta y tienen las columnas
@@ -19,7 +21,7 @@
 // Empezar SIEMPRE con dryRun:true (cuenta y no escribe) antes de correrlo de
 // verdad. Usa la MISMA lógica de prompts que el modo normal (buildPromptSpec),
 // así que no hay divergencia entre "traducir al crear" y "traducir en masa".
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { buildPromptSpec, normalizarAlergenos } from "./prompts.ts";
 
 type CallOpenAI = (system: string, user: string) => Promise<unknown>;

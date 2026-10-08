@@ -16,8 +16,10 @@
 //        puro: el editor no debe romperse porque falle la IA).
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "format-novedad");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -157,7 +159,7 @@ function buildFallback(texto: string, message: string, extra?: Record<string, un
   };
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("format-novedad", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -301,4 +303,4 @@ serve(async (req) => {
       duracionMs: Date.now() - inicioMs,
     });
   }
-});
+}));

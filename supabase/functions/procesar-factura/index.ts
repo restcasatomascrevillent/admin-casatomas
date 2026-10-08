@@ -1,11 +1,13 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
 import { crearClienteOpenAI } from "./openai.ts";
 import { type ContextoGuardado, sustituirFactura } from "./guardado.ts";
 import { iniciarTrabajo, validarInicio } from "./trabajos.ts";
 import { ficheroDesdePayload, procesarSincrono } from "./unico.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "procesar-factura");
 
 // ============================================================================
 //  procesar-factura  ·  OCR de facturas/albaranes SIN n8n
@@ -67,7 +69,7 @@ function contexto(): ContextoGuardado {
   };
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   // Autenticación ANTES de tocar OpenAI, Drive o la base de datos.
@@ -124,4 +126,4 @@ serve(async (req) => {
     // HTTP 200 a propósito: el panel lee `success:false` del cuerpo.
     return jsonResponse({ success: false, error: msg });
   }
-});
+}));

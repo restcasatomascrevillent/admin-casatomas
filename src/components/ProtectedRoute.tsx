@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { auditDeniedAccess } from "@/lib/audit-access";
+import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
@@ -32,6 +33,7 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
   const navigate = useNavigate();
   const location = useLocation();
 
+  const denegado = useRef<string | null>(null);
   const loading = authLoading || roleLoading || superAdminLoading;
 
   useEffect(() => {
@@ -54,10 +56,18 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
     // lo que le marquen sus permisos, salvo la sección de usuarios (abajo).
     if (isSuperAdmin) return;
 
+    const rechazar = () => {
+      const key = `${user.id}:${location.key}`;
+      if (denegado.current !== key) {
+        denegado.current = key;
+        void auditDeniedAccess(location.pathname);
+      }
+      navigate("/dashboard");
+    };
     // La sección de usuarios es solo para admins (no configurable por
     // permisos, igual que antes).
     if (sectionKeys.includes("usuarios")) {
-      if (!isAdmin) navigate("/dashboard");
+      if (!isAdmin) rechazar();
       return;
     }
 
@@ -68,9 +78,9 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
       (key) => permissions.find((p) => p.section_key === key)?.can_view,
     );
     if (!puedeVer) {
-      navigate("/dashboard");
+      rechazar();
     }
-  }, [user, loading, isAdmin, isSuperAdmin, permissions, location.pathname, requiredSection, navigate]);
+  }, [user, loading, isAdmin, isSuperAdmin, permissions, location.pathname, location.key, requiredSection, navigate]);
 
   if (loading) {
     return (
@@ -84,5 +94,8 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
     return null;
   }
 
+  const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
+  const keys = Array.isArray(required) ? required : required ? [required] : [];
+  if (!isSuperAdmin && keys.length && (keys.includes("usuarios") ? !isAdmin : !keys.some(key => permissions.some(p => p.section_key === key && p.can_view)))) return null;
   return <>{children}</>;
 };

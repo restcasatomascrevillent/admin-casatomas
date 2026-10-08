@@ -4,7 +4,7 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 export async function ejecutarOperacionAuthAuditada<T>(
   client: SupabaseClient,
   actorId: string,
-  operacion: "crear" | "eliminar",
+  operacion: "crear" | "eliminar" | "actualizar",
   subject: { userId?: string; email?: string },
   ejecutar: () => Promise<T>,
 ): Promise<T> {

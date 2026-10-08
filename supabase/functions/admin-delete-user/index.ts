@@ -1,5 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "admin-delete-user");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -21,7 +23,7 @@ interface DeleteUserRequest {
   userId: string;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -167,5 +169,5 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}));
 

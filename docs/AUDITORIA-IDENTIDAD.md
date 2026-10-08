@@ -91,3 +91,143 @@ edición. Solo un super admin tiene «Acceso completo». El rol base admin conse
 su capacidad de gestionar usuarios, indicada por separado. Al guardar se espera
 a releer los permisos y, si procede, el nuevo rol antes de cerrar el diálogo.
 
+## Cobertura de todo el panel
+
+La migración `20261007220000_audit_log_panel_completo.sql` sustituye la lista de
+13 tablas por la instalación sobre las tablas de negocio de `public`, además
+de `auth.users` y `storage.objects`. Incluye reservas, espacios y asignaciones,
+carta, menús, novedades, reseñas, facturas, productos, proveedores, cheques,
+ecommerce, stock, newsletter, plantillas, configuración y sus documentos.
+Un event trigger instala la auditoría en las nuevas tablas de negocio de
+`public`; las particiones heredan el trigger de su tabla principal.
+
+Se excluyen el propio rastro y su contexto, copias de respaldo y registros
+derivados de historial, ocupación, límites de uso y métricas. El cambio de la
+entidad original sí queda auditado. Las escrituras públicas anónimas de la web
+no se atribuyen a un empleado; no son acciones del panel. Los 13 controles
+sensibles iniciales siguen rechazando escrituras sin identidad.
+
+Los triggers son transaccionales: si un cambio requiere un evento y no se
+puede identificar su autor, también se rechaza el cambio. Cada evento conserva
+el identificador del registro (incluidas claves compuestas), origen, operación
+SQL y estados anterior/posterior. Un guardado idéntico o solo de marcas de
+tiempo no crea eventos. Una asignación/retirada de rol, acceso o mesa es un
+cambio; la creación real del usuario o documento es una creación.
+
+Las funciones del servidor utilizan `_shared/audit-client.ts`. El UUID se
+resuelve verificando el token con Auth, nunca leyendo una cabecera de identidad
+del llamante. Un contexto aislado por petición conserva usuario y request_id
+en clientes compartidos y tareas en segundo plano. Las tareas automáticas
+llevan el nombre concreto de la función como origen. Las integraciones de
+servicio ajenas al repositorio también deben aportar `x-audit-source` y, si
+actúan en nombre de un usuario, un `x-audit-actor-id` verificado por ellas.
+Si no se puede verificar un token de usuario, se detiene la petición antes
+de ejecutar el handler; nunca se sustituye ese usuario por un proceso.
+La delegación de avisos de reservas conserva el JWT del iniciador, de modo
+que los registros de envío y las acciones de correo mantienen su identidad.
+
+Además de las mutaciones, las acciones externas iniciadas por un usuario
+(correos, sincronización, traducción, publicación, consultas del asistente...)
+tienen un evento `ejecutar`, con resultado completado/fallido. No se guarda el
+cuerpo HTTP. Si su registro falla tras un efecto externo, se devuelve error y
+se pide comprobar el resultado antes de repetir; un servicio externo y
+Postgres no comparten transacción. No se presenta una acción fallida como un
+cambio de datos exitoso.
+
+El contexto de Auth admite cambios de credenciales y se fija antes de las
+cascadas. Se registra que cambió la contraseña, sin guardar la contraseña ni
+su hash. Otros secretos, tokens, claves y binarios base64 se ocultan también
+en objetos anidados. Login/logout esperan a registrar el acceso mientras el
+token sigue disponible; un fallo se comunica, sin descartarlo en segundo plano.
+
+### Activación de cobertura y accesos por dispositivo (8 de octubre)
+
+**Publicar `main` no aplica estas migraciones ni despliega las funciones.**
+La pantalla avisa mientras el registro completo no esté activo. El login
+mantiene el comportamiento anterior hasta que `version_auditoria_panel()`
+responda 2; en esa fase todavía no se recogen intentos fallidos ni sesiones
+restauradas. No se anuncia una cobertura que el servidor no tenga.
+
+Actualizar ambos repositorios a `main` y enlazarlos al proyecto existente
+`jeamoczmbfsnwkfjxcyo`. No ejecutar de nuevo la migración de limpieza de las
+20:00 ni aplicar indiscriminadamente todo el historial de migraciones.
+
+1. Como `postgres`, ejecutar
+   `supabase/migrations/20261007213000_audit_preparar_servidor.sql`.
+   Prepara las columnas y RPC sin ampliar todavía los triggers.
+   Presupone las migraciones de identidad, limpieza y permisos ya aplicadas.
+2. Desde **adminpanelct** ejecutar `npx supabase functions deploy`, incluido
+   el nuevo gateway `panel-auth` que aún no usa el frontend. Desde
+   **casa-tomas-story**, desplegar las tres funciones compartidas de cheques:
+
+   ```sh
+   npx supabase functions deploy cheques-regalo-admin
+   npx supabase functions deploy cheques-regalo-web
+   npx supabase functions deploy stripe-webhook-cheques-regalo --no-verify-jwt
+   ```
+
+3. Ejecutar `supabase/migrations/20261007220000_audit_log_panel_completo.sql`.
+4. Ejecutar `supabase/migrations/20261008080000_audit_accesos_dispositivos.sql`.
+   Este último paso activa los accesos del nuevo frontend. Recargar el panel
+   en las pestañas abiertas. Estas migraciones no eliminan registros.
+
+Los handlers se actualizan antes de ampliar la cobertura para que ninguna
+función siga escribiendo sin origen durante la transición. Integraciones
+externas al código, como n8n, también deben enviar un `x-audit-source` concreto
+y el iniciador verificado si actúan por un usuario. No se inventa ese iniciador.
+
+Comprobaciones después de desplegar:
+
+```sql
+select public.version_auditoria_panel(); -- 2
+select count(*) as sin_identidad from public.audit_log
+where actor_label is null or btrim(actor_label)=''; -- 0
+select accion, actor_origin, count(*) from public.audit_log
+where tabla='accesos_panel' group by accion,actor_origin;
+```
+
+Desde dos navegadores/dispositivos: iniciar sesión con dos cuentas distintas,
+fallar una contraseña, intentar un email inexistente y reabrir una sesión ya
+iniciada. El super admin debe ver todos los casos, sus dispositivos y la hora.
+Después crear, editar y eliminar una entidad, cambiar permisos y subir/borrar
+un archivo. Un usuario normal no debe poder consultar `audit_log`.
+
+### Qué identifica cada acceso
+
+- El gateway `panel-auth` guarda el intento **antes** de comprobar credenciales.
+  Completa la misma fila con éxito o fallo, sin duplicar intento y resultado.
+  Si el proceso se interrumpe queda «Intento pendiente», no un éxito ficticio.
+- Un intento fallido conserva el correo introducido y «identidad no verificada».
+  Nunca se le asigna el UUID del dueño de ese correo, aunque la cuenta exista.
+  El origen `intento` solo se permite en estos eventos desde el gateway.
+- Accesos correctos y sesiones restauradas resuelven al usuario en Auth. El
+  refresco del JWT no crea otro login; otra página/dispositivo sí registra acceso.
+- Dispositivo significa instalación del navegador: UUID aleatorio en su
+  almacenamiento local, sin fingerprinting. Borrarlo o usar modo privado puede
+  crear otro ID. Navegador e IP son datos informativos de la petición, no pruebas
+  de identidad de una persona. No se pueden recuperar datos que nunca se guardaron.
+- La IP se conserva cuando la proporciona el transporte. No se guarda contraseña,
+  hash, access token ni refresh token. La sesión se enlaza con su ID, no su token.
+- El servidor limita a 30 intentos por IP/minuto; los rechazados también se ven.
+  Un fallo al guardar el resultado no entrega tokens: se intenta revocar la
+  sesión emitida y permanece el intento pendiente para investigación.
+- El cierre conserva la solicitud antes de invalidar la sesión. Una caída de red
+  o cerrar el navegador no equivale a un logout confirmado; no se inventa uno.
+- Los efectos externos (como editar el prompt VAPI) indican su resultado y
+  conservan al iniciador. VAPI marca expresamente que el resultado lo comunicó
+  el cliente. Las operaciones SQL mantienen su rastro transaccional.
+- Solo super admins leen el conjunto completo; no se filtra por el usuario o
+  dispositivo actual. Hay paginación, búsqueda por usuario/UUID, dispositivo,
+  acción y fechas (incluido el día final), y actualización cada 15 segundos.
+
+### Verificación
+
+```sh
+npm run test:auditoria:db
+npm test -- src/hooks/__tests__/audit-client.test.ts src/hooks/__tests__/audit-auth.test.ts src/hooks/__tests__/useAuth.auditoria.test.tsx src/hooks/__tests__/useAuditLog.test.ts src/hooks/__tests__/panel-auth.test.ts src/pages/__tests__/SuperAdminAuditoria.test.tsx
+```
+
+El banco de PostgreSQL usa PGlite en memoria: aplica las migraciones y comprueba
+identidad, rechazo con rollback, clasificación, claves compuestas, archivos,
+cascadas, secretos, acciones externas y tablas nuevas, sin conectar a producción.
+

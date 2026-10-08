@@ -59,7 +59,7 @@
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 // Motor de disponibilidad — MISMO modulo que usa el panel (src/hooks/useDisponibilidad.ts).
@@ -128,6 +128,8 @@ import {
   type ConsentimientosReserva,
   type EstadoDobleOptin,
 } from "./reglas.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "reservas-web");
 
 // ------------------------------------------------------------
 // CONFIGURACIÓN
@@ -1651,7 +1653,7 @@ async function handleCancelarEjecutar(req: Request): Promise<Response> {
 // ============================================================
 // ROUTER
 // ============================================================
-serve(async (req: Request) => {
+serve(conAuditoriaDePeticion("reservas-web", createClientBase, async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const pathname = new URL(req.url).pathname;
@@ -1671,4 +1673,4 @@ serve(async (req: Request) => {
     console.error("[RESERVAS-WEB] Error no controlado:", (err as Error)?.message, (err as Error)?.stack);
     return json({ ok: false, error: "internal_error" }, 500);
   }
-});
+}));

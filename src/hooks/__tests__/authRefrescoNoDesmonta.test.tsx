@@ -64,6 +64,7 @@ vi.mock("@/integrations/supabase/client", () => {
 
   return {
     supabase: {
+      rpc: vi.fn().mockResolvedValue({ data: "audit-1", error: null }),
       from: (tabla: string) => crearBuilder(tabla),
       auth: {
         // Objeto NUEVO en cada llamada, como hace GoTrue al validar el token.

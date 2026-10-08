@@ -1,4 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +9,7 @@ const corsHeaders = {
 
 const WEBHOOK_URL = "https://n8npersonal.miguelbenito.space/webhook/5eca0d6c-7077-45bc-959c-2d597180eefa";
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("traducir-carta", createClientBase, async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -106,4 +108,4 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-});
+}));

@@ -1,8 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { autenticar, corsHeaders, jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { clasificarPendientes, FUNCION, MODELO_POR_DEFECTO } from "./clasificacion.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "clasificar-productos");
 
 // ============================================================================
 //  clasificar-productos · catálogo y categoría de las líneas nuevas
@@ -37,7 +39,7 @@ const cfgAuth = {
   crearCliente: createClient,
 };
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("clasificar-productos", createClientBase, async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
 
@@ -87,4 +89,4 @@ serve(async (req) => {
   } finally {
     await registrarUso(uso, { disparador, duracionMs: Date.now() - t0, cliente: supabase });
   }
-});
+}));

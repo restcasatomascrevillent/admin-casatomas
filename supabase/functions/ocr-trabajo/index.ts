@@ -1,9 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { configModelo } from "../procesar-factura/modelo.ts";
 import { crearClienteOpenAI } from "../procesar-factura/openai.ts";
 import { procesarConsolidacion, procesarPagina } from "../procesar-factura/trabajos.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+const createClient = clienteConAuditoria(createClientBase, "ocr-trabajo");
 
 // ============================================================================
 //  ocr-trabajo  ·  OCR en segundo plano de documentos largos (04b)
@@ -65,7 +67,7 @@ async function enSegundoPlano(tarea: Promise<unknown>, etiqueta: string): Promis
   await protegida;
 }
 
-serve(async (req) => {
+serve(conAuditoriaDePeticion("ocr-trabajo", createClientBase, async (req) => {
   if (req.method !== "POST") return jsonResponse({ ok: false, error: "method_not_allowed" }, 405);
   const denegado = verificarSecreto(req, SECRETO);
   if (denegado) return denegado;
@@ -103,4 +105,4 @@ serve(async (req) => {
   }
 
   return jsonResponse({ ok: false, error: "modo_desconocido" }, 400);
-});
+}));
