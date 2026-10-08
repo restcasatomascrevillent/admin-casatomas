@@ -1,0 +1,140 @@
+/**
+ * Facturas (rediseño del 08/10/2026): pestañas Compras | IA | Cargar. El gasto
+ * de IA pasa a un texto pequeño junto a «IA» (abre el desglose); en «Cargar» se
+ * queda el monitor de siempre. Los enlaces antiguos (`?tab=productos`,
+ * `?tab=documentos`) llevan a Compras. La página mide el alto de la pantalla.
+ *
+ * Las pestañas de verdad (Compras, el chat, la subida) tienen sus propios tests;
+ * aquí se sustituyen por marcadores y se comprueba dónde se colocan.
+ */
+import { forwardRef, type ReactNode } from "react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import type { FilaGastoIa } from "@/lib/facturas/gastoIa";
+
+vi.mock("@/components/DashboardLayout", () => ({
+  DashboardLayout: ({ children }: { children: ReactNode }) => <main style={{ paddingBottom: 24 }}>{children}</main>,
+}));
+vi.mock("@/components/facturas/compras/TabCompras", () => ({
+  TabCompras: ({ modoPedido }: { modoPedido?: { modo: string } }) => (
+    <p data-testid="compras">Compras · modo pedido: {modoPedido?.modo ?? "ninguno"}</p>
+  ),
+}));
+vi.mock("@/components/facturas/ChatFacturas", () => ({
+  ChatFacturas: forwardRef(() => <p>Contenido del chat</p>),
+}));
+vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p>Contenido de la subida</p> }));
+vi.mock("@/hooks/useFacturas", () => ({
+  useFacturas: () => ({ data: [{ id: 1, proveedor: "Marta" }, { id: 2, proveedor: null }] }),
+  useAlbaranes: () => ({ data: [{ id: 3, proveedor: "Marta" }] }),
+}));
+vi.mock("@/hooks/useChatFacturas", () => ({ useChatFacturas: () => ({ conversaciones: [] }) }));
+
+const gasto: { filas: FilaGastoIa[] } = { filas: [] };
+vi.mock("@/hooks/useGastoIa", () => ({ useGastoIa: () => ({ data: gasto.filas, isLoading: false }) }));
+
+import Facturas from "@/pages/Facturas";
+
+const fila = (over: Partial<FilaGastoIa>): FilaGastoIa => ({
+  funcion: "chat-facturas", coste_usd: 0, filas: 1, llamadas: 1, unidades: 1, filas_sin_tarifa: 0, documentos_ocr: 0, ultima: null, ...over,
+});
+
+const original = { innerHeight: window.innerHeight };
+function conLayout(alto: number) {
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: alto });
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+    top: 24, bottom: 124, left: 0, right: 100, width: 100, height: 100, x: 0, y: 24, toJSON: () => ({}),
+  } as DOMRect);
+}
+function montar(ruta = "/facturas") {
+  return render(
+    <MemoryRouter initialEntries={[ruta]}>
+      <Facturas />
+    </MemoryRouter>,
+  );
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  Object.defineProperty(window, "innerHeight", { configurable: true, value: original.innerHeight });
+  gasto.filas = [];
+});
+
+describe("Facturas · pestañas", () => {
+  it("son tres: Compras · IA · Cargar (ya no hay Documentos ni Productos)", () => {
+    montar();
+    const pestanas = within(screen.getByRole("tablist")).getAllByRole("tab");
+    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Compras", "IA", "Cargar"]);
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
+    for (const p of pestanas) expect(p.className).toContain("min-h-11");
+  });
+
+  it("los enlaces antiguos llevan a Compras: ?tab=productos en el modo Productos", () => {
+    montar("/facturas?tab=productos");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: productos");
+  });
+
+  it("?tab=documentos también lleva a Compras", () => {
+    montar("/facturas?tab=documentos");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("?tab=cargar abre Cargar, con su monitor de gasto como estaba", () => {
+    montar("/facturas?tab=cargar");
+    expect(screen.getByRole("tab", { name: /^Cargar/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Contenido de la subida")).toBeInTheDocument();
+    expect(screen.getByTestId("monitor-gasto-ia-ocr")).toBeInTheDocument();
+  });
+
+  it("Compras sigue montada al ir a IA (la búsqueda y la ficha abierta no se pierden)", () => {
+    montar();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^IA/ }), { button: 0 });
+    expect(screen.getByRole("tab", { name: /^IA/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
+    expect(screen.getByTestId("compras")).toBeInTheDocument();
+  });
+});
+
+describe("Facturas · gasto de IA junto a la pestaña IA", () => {
+  it("texto pequeño con lo gastado este mes y, al tocarlo, el desglose", () => {
+    gasto.filas = [
+      fila({ funcion: "chat-facturas", coste_usd: 0.2, unidades: 20 }),
+      fila({ funcion: "clasificar-productos", coste_usd: 0.04, unidades: 2 }),
+    ];
+    montar();
+    const texto = screen.getByTestId("gasto-ia-pestana");
+    expect(texto).toHaveTextContent("0,22 € este mes");
+    expect(texto.className).toContain("min-h-11"); // objetivo táctil
+    // Está en la barra de pestañas, al lado de «IA»…
+    expect(within(screen.getByRole("tablist")).getByTestId("gasto-ia-pestana")).toBe(texto);
+    // …y la línea fija de antes ya no ocupa sitio encima del chat.
+    expect(screen.queryByTestId("monitor-gasto-ia-chat")).not.toBeInTheDocument();
+
+    fireEvent.click(texto);
+    expect(screen.getByText("Chatbot de facturas")).toBeInTheDocument();
+    expect(screen.getByText("Clasificación de productos")).toBeInTheDocument();
+    expect(screen.getByText("Lectura de facturas (OCR)")).toBeInTheDocument();
+    expect(screen.getByText(/1 USD ≈ 0,92 EUR/)).toBeInTheDocument();
+  });
+
+  it("sin datos no inventa cifras", () => {
+    montar();
+    expect(screen.getByTestId("gasto-ia-pestana")).toHaveTextContent("sin datos");
+  });
+});
+
+describe("Facturas · sin scroll de página", () => {
+  it("la página mide justo lo que queda de ventana y la pestaña reparte ese alto por dentro", () => {
+    conLayout(800);
+    montar();
+    const raiz = screen.getByRole("tablist").closest("[style*='height']") as HTMLElement;
+    // 800 − 24 (posición del bloque) − 24 (relleno inferior del <main>)
+    expect(raiz.style.height).toBe("752px");
+    expect(raiz).toHaveClass("flex", "flex-col");
+    const panel = screen.getByTestId("compras").parentElement as HTMLElement;
+    expect(panel).toHaveClass("h-full");
+  });
+});

@@ -22,7 +22,47 @@ export const EtiquetaCategoria = ({ p }: { p: ProductoFactura }) =>
     </span>
   ) : null;
 
-export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isMobile?: boolean, allDocs: Factura[] }) => {
+/**
+ * Nombre de la línea. Con `onAbrirProducto` y un producto canónico asignado es
+ * un enlace a su ficha (Compras › Productos); si no, texto plano como siempre.
+ */
+const NombreLinea = ({
+  p,
+  onAbrirProducto,
+  className = "",
+}: {
+  p: ProductoFactura;
+  onAbrirProducto?: (productoId: number) => void;
+  className?: string;
+}) =>
+  onAbrirProducto && p.producto_id != null ? (
+    <button
+      type="button"
+      onClick={() => onAbrirProducto(p.producto_id as number)}
+      className={`min-h-11 min-w-0 rounded-md text-left font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${className}`}
+      aria-label={`Ver el producto ${p.producto_canonico ?? p.producto_nombre}`}
+      title="Ver el producto: evolución del precio y dónde más aparece"
+    >
+      {p.producto_nombre}
+    </button>
+  ) : (
+    <span className={className} title={p.producto_nombre}>
+      {p.producto_nombre}
+    </span>
+  );
+
+export const FilaProducto = ({
+  p,
+  isMobile,
+  allDocs,
+  onAbrirProducto,
+}: {
+  p: ProductoFactura;
+  isMobile?: boolean;
+  allDocs: Factura[];
+  /** Si se pasa, el nombre de la línea enlaza con la ficha de su producto. */
+  onAbrirProducto?: (productoId: number) => void;
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [nombre, setNombre] = useState(p.producto_nombre);
   const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
@@ -94,7 +134,7 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
         <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-11 w-11" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
           <Pencil className="h-4 w-4 text-muted-foreground" />
         </Button>
-        <span className="font-medium text-foreground mb-1 min-h-6 pr-11">{p.producto_nombre}</span>
+        <NombreLinea p={p} onAbrirProducto={onAbrirProducto} className="font-medium text-foreground mb-1 pr-11 block" />
         {p.categoria && <span className="mb-1 -mt-0.5"><EtiquetaCategoria p={p} /></span>}
         <div className="flex justify-between text-muted-foreground items-center">
           <span>{formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}</span>
@@ -166,7 +206,7 @@ export const FilaProducto = ({ p, isMobile, allDocs }: { p: ProductoFactura, isM
           <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <span className="truncate" title={p.producto_nombre}>{p.producto_nombre}</span>
+          <NombreLinea p={p} onAbrirProducto={onAbrirProducto} className="truncate" />
           <EtiquetaCategoria p={p} />
         </div>
       </TableCell>

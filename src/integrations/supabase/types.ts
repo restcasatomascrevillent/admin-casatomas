@@ -1612,6 +1612,7 @@ export type Database = {
           drive_url: string | null
           embedding: string | null
           embedding_observaciones: string | null
+          facturado_en_id: number | null
           fecha: string
           id: number
           iva: number | null
@@ -1639,6 +1640,7 @@ export type Database = {
           drive_url?: string | null
           embedding?: string | null
           embedding_observaciones?: string | null
+          facturado_en_id?: number | null
           fecha: string
           id?: number
           iva?: number | null
@@ -1666,6 +1668,7 @@ export type Database = {
           drive_url?: string | null
           embedding?: string | null
           embedding_observaciones?: string | null
+          facturado_en_id?: number | null
           fecha?: string
           id?: number
           iva?: number | null

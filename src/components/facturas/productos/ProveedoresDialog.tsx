@@ -27,7 +27,7 @@ function resumenDocumentos(p: Proveedor): string {
   return partes.join(" · ");
 }
 
-function EditorProveedor({ p, onCerrar }: { p: Proveedor; onCerrar: () => void }) {
+export function EditorProveedor({ p, onCerrar }: { p: Proveedor; onCerrar: () => void }) {
   const [nombre, setNombre] = useState(p.nombre);
   const [comercial, setComercial] = useState(p.nombre_comercial ?? "");
   const [cif, setCif] = useState(p.cif ?? "");
@@ -147,10 +147,19 @@ function FusionProveedores({
  * proveedor una sola vez, con su CIF, sus documentos y los textos con que llega.
  * Con permiso de edición: renombrar (nombre, comercial, CIF) y fusionar duplicados.
  */
-export function ProveedoresDialog({ puedeEditar, onCerrar }: { puedeEditar: boolean; onCerrar: () => void }) {
+export function ProveedoresDialog({
+  puedeEditar,
+  onCerrar,
+  seleccionInicial,
+}: {
+  puedeEditar: boolean;
+  onCerrar: () => void;
+  /** Compras › ficha de proveedor › «Fusionar con otro»: se abre con este ya marcado. */
+  seleccionInicial?: number[];
+}) {
   const q = useProveedores();
   const [busqueda, setBusqueda] = useState("");
-  const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
+  const [seleccion, setSeleccion] = useState<Set<number>>(() => new Set(seleccionInicial ?? []));
   const [editando, setEditando] = useState<number | null>(null);
   const [fusionando, setFusionando] = useState(false);
 

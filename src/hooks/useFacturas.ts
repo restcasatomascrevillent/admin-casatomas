@@ -25,6 +25,8 @@ export interface ProductoFactura {
   categoria?: { nombre: string; ruta: string } | null;
   /** Nombre del producto canónico (productos_catalogo) si la línea lo tiene. */
   producto_canonico?: string | null;
+  /** Id del producto canónico: enlaza la línea con su ficha en Compras › Productos. */
+  producto_id?: number | null;
 }
 
 /** Una anomalia de importes detectada por `procesar-factura` al cargar el documento. */
@@ -73,6 +75,12 @@ export interface Factura {
   drive_url: string | null;
   /** Ruta del original en el bucket privado `facturas-originales` (fallback de Drive). */
   archivo_path: string | null;
+  /**
+   * Albarán ya recogido en una factura (`facturas.facturado_en_id`, migración
+   * 20261008120000): id de esa factura. null = no consta factura (o es una
+   * factura). «Albaranes sin factura» = tipo 'albaran' con esto a null.
+   */
+  facturado_en_id?: number | null;
   /** Avisos de cordura de importes. Array vacio = sin anomalias. */
   alertas: AlertaValidacion[];
   procesado_en: string | null;
@@ -82,8 +90,8 @@ export interface Factura {
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
 
-const columnasDocumento = (conBultos: boolean, conProducto: boolean) => `
-      id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,
+const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean) => `
+      id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,${conFacturado ? " facturado_en_id," : ""}
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada,
       productos_factura (
@@ -119,10 +127,10 @@ function categoriaDeLinea(
 
 const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
   // Una sola query con JOIN — se evita el N+1 de queries separadas
-  const consultar = (conBultos: boolean, conProducto: boolean) =>
+  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean) =>
     supabase
       .from('facturas')
-      .select(columnasDocumento(conBultos, conProducto))
+      .select(columnasDocumento(conBultos, conProducto, conFacturado))
       .eq('tipo', tipo)
       .order('fecha', { ascending: false })
       // Las líneas en el orden impreso: se insertan en ese orden (también las de
@@ -135,16 +143,20 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
   const categorias = await leerCategorias();
   let conProducto = categorias !== null;
   let conBultos = true;
-  let { data, error } = await consultar(conBultos, conProducto);
-  for (let i = 0; i < 2 && error; i++) {
+  // `facturado_en_id` llega con la migración 20261008120000 (ya aplicada en
+  // producción): si faltara, se repite la consulta sin ella.
+  let conFacturado = true;
+  let { data, error } = await consultar(conBultos, conProducto, conFacturado);
+  for (let i = 0; i < 3 && error; i++) {
     const msg = error.message ?? '';
     if (conProducto && /producto_id|productos_catalogo|relationship/i.test(msg)) conProducto = false;
     // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
     // mientras no esté, se repite la consulta sin esa columna en vez de dejar el
     // listado de facturas vacío.
     else if (conBultos && /bultos/i.test(msg)) conBultos = false;
+    else if (conFacturado && /facturado_en_id/i.test(msg)) conFacturado = false;
     else break;
-    ({ data, error } = await consultar(conBultos, conProducto));
+    ({ data, error } = await consultar(conBultos, conProducto, conFacturado));
   }
   const mapaCategorias = new Map((categorias ?? []).map((c) => [c.id, c]));
 
@@ -167,6 +179,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
         precio_unitario: precioUnitario,
         categoria: categoriaDeLinea(mapaCategorias, p.productos_catalogo?.categoria_id),
         producto_canonico: p.productos_catalogo?.nombre ?? null,
+        producto_id: p.producto_id ?? null,
       };
     });
 
@@ -190,6 +203,7 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       productos,
       drive_url: doc.drive_url ?? null,
       archivo_path: doc.archivo_path ?? null,
+      facturado_en_id: doc.facturado_en_id != null ? Number(doc.facturado_en_id) : null,
       alertas: Array.isArray(doc.alertas_validacion) ? doc.alertas_validacion : [],
       procesado_en: doc.procesado_en ?? null,
       created_at: doc.created_at ?? null,
