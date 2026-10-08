@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,6 +32,7 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
+import type { VinoDesdeFoto } from "./BotonVinoDesdeFoto";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -49,9 +50,11 @@ interface VinoFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categoriaInicial?: string;
+  /** Datos leídos de la foto de la botella: precargan el formulario (el usuario revisa y guarda). */
+  precarga?: VinoDesdeFoto | null;
 }
 
-export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps) {
+export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: VinoFormProps) {
   const { crearVino, actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
   const queryClient = useQueryClient();
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -81,6 +84,45 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
       alergenos_notas: "",
     },
   });
+
+  // Precarga desde la foto de la botella (BotonVinoDesdeFoto). Precio vacío
+  // a propósito: no se lee de la etiqueta.
+  const precargadoRef = useRef(false);
+  useEffect(() => {
+    if (!open) {
+      // Si se cierra sin guardar un formulario precargado, no dejar sus datos
+      // para el siguiente «Añadir vino».
+      if (precargadoRef.current) {
+        precargadoRef.current = false;
+        form.reset({ ...form.formState.defaultValues, categoria: categoriaInicial || "" });
+        setImageFile(null);
+        setImagePreview(null);
+        setAlergenosSeleccionados([]);
+        setAlergenosPersonalizados([]);
+      }
+      return;
+    }
+    if (!precarga) return;
+    precargadoRef.current = true;
+    const d = precarga.datos;
+    form.reset({
+      nombre: d.nombre ?? "",
+      categoria: d.categoria ?? categoriaInicial ?? "",
+      precio_eur: 0,
+      descripcion: d.descripcion ?? "",
+      ingredientes: d.ingredientes ?? "",
+      denominacion_origen: d.denominacion_origen ?? "",
+      ubicacion_pais: d.ubicacion_pais ?? "",
+      ubicacion_region: d.ubicacion_region ?? "",
+      alergenos_notas: "",
+    });
+    setAlergenosSeleccionados(d.contiene_sulfitos ? ["sulfitos"] : []);
+    setAlergenosPersonalizados([]);
+    setImageFile(precarga.foto);
+    const url = URL.createObjectURL(precarga.foto);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [open, precarga, form, categoriaInicial]);
 
   const toggleAlergeno = (id: string) => {
     setAlergenosSeleccionados((prev) =>
@@ -194,7 +236,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
         <DialogHeader>
           <DialogTitle>Añadir Vino</DialogTitle>
           <DialogDescription>
-            Completa los datos del nuevo vino
+            {precarga
+              ? "Datos leídos de la etiqueta: revísalos, pon el precio y guarda"
+              : "Completa los datos del nuevo vino"}
           </DialogDescription>
         </DialogHeader>
 

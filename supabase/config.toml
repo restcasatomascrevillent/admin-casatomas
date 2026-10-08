@@ -186,6 +186,9 @@ verify_jwt = true
 [functions.traducir-contenido]
 verify_jwt = true
 
+[functions.extraer-vino-foto]
+verify_jwt = true
+
 [functions.traducir-carta]
 verify_jwt = true
 

@@ -26,6 +26,7 @@ import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
 import { ListaCocteles } from "@/components/carta/ListaCocteles";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
+import { BotonVinoDesdeFoto, type VinoDesdeFoto } from "@/components/carta/BotonVinoDesdeFoto";
 
 type Seccion = "platos" | "bebidas" | "vinos" | "cocteles";
 type FiltroEstado = "todos" | "activos" | "inactivos_rest" | "activos_touza" | "inactivos_touza";
@@ -58,6 +59,7 @@ export default function TabCarta() {
   const [categoriaVinos, setCategoriaVinos] = useState<string>("");
   const [categoriaCocteles, setCategoriaCocteles] = useState<string>("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos");
+  const [precargaVino, setPrecargaVino] = useState<VinoDesdeFoto | null>(null);
   const [busqueda, setBusqueda] = useState<string>("");
 
   const [dialogPlatoOpen, setDialogPlatoOpen] = useState(false);
@@ -151,7 +153,10 @@ export default function TabCarta() {
       categorias: categoriasVinos,
       categoria: categoriaVinos,
       setCategoria: setCategoriaVinos,
-      abrirDialogo: () => setDialogVinoOpen(true),
+      abrirDialogo: () => {
+        setPrecargaVino(null);
+        setDialogVinoOpen(true);
+      },
     },
     cocteles: {
       etiqueta: "Cócteles",
@@ -219,6 +224,15 @@ export default function TabCarta() {
               <Percent className="mr-2 h-4 w-4" />
               Ajustar precios
             </Button>
+            {seccionActiva === "vinos" && (
+              <BotonVinoDesdeFoto
+                categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
+                onLeido={(resultado) => {
+                  setPrecargaVino(resultado);
+                  setDialogVinoOpen(true);
+                }}
+              />
+            )}
             <Button onClick={actual.abrirDialogo}>
               <Plus className="mr-2 h-4 w-4" />
               {actual.añadir}
@@ -351,8 +365,12 @@ export default function TabCarta() {
       />
       <VinoForm
         open={dialogVinoOpen}
-        onOpenChange={setDialogVinoOpen}
+        onOpenChange={(abierto) => {
+          setDialogVinoOpen(abierto);
+          if (!abierto) setPrecargaVino(null);
+        }}
         categoriaInicial={categoriaVinos}
+        precarga={precargaVino}
       />
       <CoctelForm
         open={dialogCoctelOpen}
