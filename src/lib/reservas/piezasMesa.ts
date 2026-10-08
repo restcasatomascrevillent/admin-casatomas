@@ -38,6 +38,11 @@ export interface MesaPiezas {
   /** Centro en metros, solo para medir cercanía. */
   x: number;
   y: number;
+  /**
+   * SITIO (Terraza): mesa cuadrada sin piezas ni pico; cada servicio puede
+   * cambiarle las plazas a mano entre `min` y `max`. Nunca da ni recibe piezas.
+   */
+  sitio?: { plazas: number; min: number; max: number };
 }
 
 /** Ajuste guardado de una mesa en un servicio. */
@@ -47,12 +52,15 @@ export interface AjusteMesa {
   picos: number;
   /** Mesa principal con la que está junta (fila unida). `null` = suelta. */
   unidaA: string | null;
+  /** Solo SITIOS: plazas de este servicio. `null`/ausente = las del plano. */
+  plazas?: number | null;
 }
 
 export interface EstadoMesa {
   piezas: number;
   picos: number;
   unidaA: string | null;
+  plazas?: number | null;
 }
 
 export type EstadoServicio = Map<string, EstadoMesa>;
@@ -89,6 +97,17 @@ export function plazasDe(e: { piezas: number; picos: number }): number {
   return e.piezas * 2 + e.picos;
 }
 
+/** Plazas de una mesa en el servicio (sitio: las puestas a mano o las del plano). */
+export function plazasMesa(mesa: MesaPiezas, e: EstadoMesa): number {
+  if (mesa.sitio) return e.piezas <= 0 ? 0 : (e.plazas ?? mesa.sitio.plazas);
+  return plazasDe(e);
+}
+
+/** Copia del estado de una mesa como fila de ajuste (conserva las plazas del sitio). */
+function comoAjuste(mesaId: string, e: EstadoMesa): AjusteMesa {
+  return { mesaId, piezas: e.piezas, picos: e.picos, unidaA: e.unidaA, plazas: e.plazas ?? null };
+}
+
 /**
  * Lo mínimo para sentar `comensales` en una fila: el menor número de piezas,
  * usando picos solo si hacen falta.
@@ -109,7 +128,12 @@ export function estadoServicio(mesas: MesaPiezas[], ajustes: AjusteMesa[]): Esta
   const estado: EstadoServicio = new Map();
   for (const m of mesas) {
     const a = porMesa.get(m.id);
-    estado.set(m.id, a ? { piezas: a.piezas, picos: a.picos, unidaA: a.unidaA } : { piezas: m.piezas, picos: m.picos, unidaA: null });
+    estado.set(
+      m.id,
+      a
+        ? { piezas: a.piezas, picos: a.picos, unidaA: a.unidaA, plazas: a.plazas ?? null }
+        : { piezas: m.piezas, picos: m.picos, unidaA: null, plazas: null },
+    );
   }
   return estado;
 }
@@ -152,6 +176,8 @@ export function piezasSobrantes(
 export function puedenPasarsePiezas(desde: MesaPiezas, hacia: MesaPiezas): boolean {
   return (
     desde.id !== hacia.id &&
+    !desde.sitio &&
+    !hacia.sitio &&
     !desde.redonda &&
     !hacia.redonda &&
     desde.grupo !== null &&
@@ -237,11 +263,11 @@ function montarPropuesta(
   if (picosFinal !== actual.picos) pasos.push({ tipo: "pico", mesa: destino.id, n: picosFinal - actual.picos });
   const recibidas = tomas.reduce((s, t) => s + t.n, 0);
   const cambios: AjusteMesa[] = [
-    { mesaId: destino.id, piezas: actual.piezas + recibidas, picos: picosFinal, unidaA: actual.unidaA },
+    { ...comoAjuste(destino.id, actual), piezas: actual.piezas + recibidas, picos: picosFinal },
     ...tomas.map((t) => {
       const e = estado.get(t.donante.mesa.id)!;
       const piezas = e.piezas - t.n;
-      return { mesaId: t.donante.mesa.id, piezas, picos: piezas === 0 ? 0 : e.picos, unidaA: e.unidaA };
+      return { ...comoAjuste(t.donante.mesa.id, e), piezas, picos: piezas === 0 ? 0 : e.picos };
     }),
   ];
   const texto = textoPasos(pasos, nombres);
@@ -324,7 +350,8 @@ export function proponerParaSentar(params: {
   const destino = mesas.find((m) => m.id === mesaId);
   if (!destino) return { propuestas: [], motivo: "Esa mesa no se gestiona por piezas." };
   const actual = estado.get(mesaId);
-  if (actual && plazasDe(actual) >= comensales) return { propuestas: [], motivo: null };
+  if (actual && plazasMesa(destino, actual) >= comensales) return { propuestas: [], motivo: null };
+  if (destino.sitio && actual) return proponerSitio(destino, actual, estado, comensales);
   const objetivo = piezasNecesarias(comensales, destino.picosMax);
   return planesPara(destino, objetivo, mesas, estado, reservas, `Para sentar ${comensales} en ${la(destino.nombre)}: `, maximo);
 }
@@ -343,31 +370,82 @@ export function proponerPiezaEnFila(params: {
   return planesPara(destino, { piezas: actual.piezas + 1, picos: actual.picos }, mesas, estado, reservas, "", 4);
 }
 
+/** SITIO: subirle las plazas (hasta su máximo) o pedir que se junte con otro. */
+function proponerSitio(
+  destino: MesaPiezas,
+  actual: EstadoMesa,
+  estado: EstadoServicio,
+  comensales: number,
+): ResultadoPropuesta {
+  const sitio = destino.sitio!;
+  const nombre = la(destino.nombre);
+  if (estaJunta(estado, destino.id)) {
+    return { propuestas: [], motivo: `${capital(nombre)} está junta con otra: ajusta las plazas de cada una o sepáralas.` };
+  }
+  if (comensales > sitio.max) {
+    return {
+      propuestas: [],
+      motivo: `En ${nombre} caben como mucho ${sitio.max}: júntala con una de al lado («Juntar con…» en la ficha de la mesa).`,
+    };
+  }
+  return {
+    propuestas: [
+      {
+        pasos: [],
+        texto: `Para sentar ${comensales} en ${nombre}: ponla para ${comensales}`,
+        cambios: [{ ...comoAjuste(destino.id, actual), plazas: comensales }],
+      },
+    ],
+    motivo: null,
+  };
+}
+
+/** SITIO: botones «− plazas» / «+ plazas». `null` si se sale del rango. */
+export function cambiarPlazas(mesa: MesaPiezas, estado: EstadoServicio, delta: 1 | -1): AjusteMesa | null {
+  const e = estado.get(mesa.id);
+  if (!e || !mesa.sitio) return null;
+  const plazas = (e.plazas ?? mesa.sitio.plazas) + delta;
+  if (plazas < mesa.sitio.min || plazas > mesa.sitio.max) return null;
+  return { ...comoAjuste(mesa.id, e), plazas };
+}
+
 /** Botones «+ Pico» / «− Pico». `null` si no cabe o no hay pico que quitar. */
 export function cambiarPico(mesa: MesaPiezas, estado: EstadoServicio, delta: 1 | -1): AjusteMesa | null {
   const e = estado.get(mesa.id);
-  if (!e || mesa.redonda || e.piezas <= 0) return null;
+  if (!e || mesa.redonda || mesa.sitio || e.piezas <= 0) return null;
   const picos = e.picos + delta;
   if (picos < 0 || picos > mesa.picosMax) return null;
-  return { mesaId: mesa.id, piezas: e.piezas, picos, unidaA: e.unidaA };
+  return { ...comoAjuste(mesa.id, e), picos };
 }
 
-/** Mesas con las que se puede juntar (misma zona, sueltas, no redondas). */
+/**
+ * Mesas con las que se puede juntar: de la misma zona, sueltas, no redondas y
+ * ADYACENTES a la mesa o a su fila unida (las que están a la distancia de la
+ * más cercana, con un 25 % de margen: en una cuadrícula, las de los lados y
+ * no las de la diagonal). Una fila ya unida puede seguir creciendo.
+ */
 export function candidatasParaJuntar(mesa: MesaPiezas, mesas: MesaPiezas[], estado: EstadoServicio): MesaPiezas[] {
-  if (mesa.redonda || estaJunta(estado, mesa.id)) return [];
-  return mesas
-    .filter((m) => puedenPasarsePiezas(m, mesa) && !estaJunta(estado, m.id) && (estado.get(m.id)?.piezas ?? 0) > 0)
-    .sort((a, b) => distancia(a, mesa) - distancia(b, mesa));
+  if (mesa.redonda || mesa.grupo === null) return [];
+  const union = mesasDeLaUnion(estado, mesa.id);
+  const miembros = mesas.filter((m) => union.includes(m.id));
+  const libres = mesas.filter(
+    (m) =>
+      !union.includes(m.id) &&
+      !m.redonda &&
+      m.grupo === mesa.grupo &&
+      !estaJunta(estado, m.id) &&
+      (estado.get(m.id)?.piezas ?? 0) > 0,
+  );
+  if (libres.length === 0) return [];
+  const cerca = (m: MesaPiezas) => Math.min(...miembros.map((u) => distancia(u, m)));
+  const minima = Math.min(...libres.map(cerca));
+  return libres.filter((m) => cerca(m) <= minima * 1.25).sort((a, b) => cerca(a) - cerca(b));
 }
 
-/** «Juntar con…»: `otra` queda unida a `principal`. Las plazas se suman. */
-export function juntar(principal: MesaPiezas, otra: MesaPiezas, estado: EstadoServicio): AjusteMesa[] {
-  const p = estado.get(principal.id)!;
-  const o = estado.get(otra.id)!;
-  return [
-    { mesaId: principal.id, piezas: p.piezas, picos: p.picos, unidaA: null },
-    { mesaId: otra.id, piezas: o.piezas, picos: o.picos, unidaA: principal.id },
-  ];
+/** «Juntar con…»: `otra` se une a la fila de `mesa`. Las plazas se suman. */
+export function juntar(mesa: MesaPiezas, otra: MesaPiezas, estado: EstadoServicio): AjusteMesa[] {
+  const principal = estado.get(mesa.id)?.unidaA ?? mesa.id;
+  return [{ ...comoAjuste(otra.id, estado.get(otra.id)!), unidaA: principal }];
 }
 
 /**
@@ -379,7 +457,7 @@ export function separar(mesa: MesaPiezas, mesas: MesaPiezas[], estado: EstadoSer
   const cambios = new Map<string, AjusteMesa>();
   const fijar = (id: string, parcial: Partial<AjusteMesa>) => {
     const e = estado.get(id)!;
-    const previo = cambios.get(id) ?? { mesaId: id, piezas: e.piezas, picos: e.picos, unidaA: e.unidaA };
+    const previo = cambios.get(id) ?? comoAjuste(id, e);
     cambios.set(id, { ...previo, ...parcial });
   };
 
@@ -401,6 +479,9 @@ export function separar(mesa: MesaPiezas, mesas: MesaPiezas[], estado: EstadoSer
       sobran -= n;
     }
   }
+  // Sitio: vuelve a las plazas del plano.
+  if (mesa.sitio && e.plazas != null) fijar(mesa.id, { plazas: null });
+
   // Si prestó piezas, no se inventan: se queda con las que tiene.
   const piezas = Math.min(e.piezas, mesa.piezas);
   const picos = piezas > 0 ? mesa.picos : 0;
@@ -411,7 +492,7 @@ export function separar(mesa: MesaPiezas, mesas: MesaPiezas[], estado: EstadoSer
 /** Aplica cambios a un estado (sin mutar el original). */
 export function aplicarCambios(estado: EstadoServicio, cambios: AjusteMesa[]): EstadoServicio {
   const nuevo: EstadoServicio = new Map(estado);
-  for (const c of cambios) nuevo.set(c.mesaId, { piezas: c.piezas, picos: c.picos, unidaA: c.unidaA });
+  for (const c of cambios) nuevo.set(c.mesaId, { piezas: c.piezas, picos: c.picos, unidaA: c.unidaA, plazas: c.plazas ?? null });
   return nuevo;
 }
 
@@ -436,13 +517,36 @@ export interface FilaMesaPiezas {
   piezas_max?: number | null;
   grupo_piezas?: string | null;
   crece_hacia?: string | null;
+  /** Sitios (Terraza): rango de plazas editable por servicio. */
+  capacidad?: number | null;
+  plazas_min?: number | null;
+  plazas_max?: number | null;
 }
 
-/** `null` si la mesa no se gestiona por piezas (`piezas` vacío). */
+/** `null` si la mesa no se gestiona por piezas (`piezas` vacío) ni es un sitio. */
 export function mesaPiezasDesde(f: FilaMesaPiezas): MesaPiezas | null {
-  if (!f.piezas || f.piezas < 1) return null;
   const ancho = (f.ancho ?? 80) / 100;
   const alto = (f.alto ?? 80) / 100;
+  if (!f.piezas && f.plazas_min && f.plazas_max) {
+    return {
+      id: f.id,
+      nombre: f.nombre,
+      piezas: 1,
+      picos: 0,
+      picosMax: 0,
+      piezasMax: 1,
+      grupo: f.forma === "circular" ? null : (f.grupo_piezas ?? null),
+      redonda: f.forma === "circular",
+      x: (f.pos_x ?? 0) + ancho / 2,
+      y: (f.pos_y ?? 0) + alto / 2,
+      sitio: {
+        plazas: Math.min(f.plazas_max, Math.max(f.plazas_min, f.capacidad ?? f.plazas_min)),
+        min: f.plazas_min,
+        max: f.plazas_max,
+      },
+    };
+  }
+  if (!f.piezas || f.piezas < 1) return null;
   return {
     id: f.id,
     nombre: f.nombre,
@@ -483,7 +587,23 @@ const OPUESTO: Record<LadoCrecimiento, LadoCrecimiento> = {
 };
 
 export function geometriaServicio(f: FilaMesaPiezas, e: EstadoMesa | undefined): GeometriaServicio | null {
-  if (!f.piezas || f.piezas < 1 || !e) return null;
+  if (!e) return null;
+  // Sitio: mismo sitio y tamaño; solo cambian las plazas.
+  const sitio = !f.piezas ? mesaPiezasDesde(f) : null;
+  if (sitio) {
+    return {
+      pos_x: f.pos_x ?? 0,
+      pos_y: f.pos_y ?? 0,
+      ancho: f.ancho ?? 80,
+      alto: f.alto ?? 80,
+      capacidad: plazasMesa(sitio, e),
+      piezas: e.piezas,
+      picos: 0,
+      ladoPico: "izquierda",
+      vertical: false,
+    };
+  }
+  if (!f.piezas || f.piezas < 1) return null;
   const lado: LadoCrecimiento =
     f.crece_hacia === "izquierda" || f.crece_hacia === "abajo" || f.crece_hacia === "arriba" ? f.crece_hacia : "derecha";
   const vertical = lado === "abajo" || lado === "arriba";

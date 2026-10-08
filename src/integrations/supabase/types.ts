@@ -125,6 +125,7 @@ export type Database = {
           mesa_id: string
           picos: number
           piezas: number
+          plazas: number | null
           turno: string
           unida_a: string | null
           updated_at: string
@@ -137,6 +138,7 @@ export type Database = {
           mesa_id: string
           picos?: number
           piezas: number
+          plazas?: number | null
           turno: string
           unida_a?: string | null
           updated_at?: string
@@ -149,6 +151,7 @@ export type Database = {
           mesa_id?: string
           picos?: number
           piezas?: number
+          plazas?: number | null
           turno?: string
           unida_a?: string | null
           updated_at?: string
@@ -2285,6 +2288,8 @@ export type Database = {
           picos_max: number
           piezas: number | null
           piezas_max: number | null
+          plazas_max: number | null
+          plazas_min: number | null
           pos_x: number | null
           pos_y: number | null
           rotacion: number | null
@@ -2309,6 +2314,8 @@ export type Database = {
           picos_max?: number
           piezas?: number | null
           piezas_max?: number | null
+          plazas_max?: number | null
+          plazas_min?: number | null
           pos_x?: number | null
           pos_y?: number | null
           rotacion?: number | null
@@ -2333,6 +2340,8 @@ export type Database = {
           picos_max?: number
           piezas?: number | null
           piezas_max?: number | null
+          plazas_max?: number | null
+          plazas_min?: number | null
           pos_x?: number | null
           pos_y?: number | null
           rotacion?: number | null

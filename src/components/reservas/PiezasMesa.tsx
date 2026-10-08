@@ -12,10 +12,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Link2, Minus, Plus, Rows3, Unlink } from "lucide-react";
 import {
   cambiarPico,
+  cambiarPlazas,
   candidatasParaJuntar,
   juntar,
   mesasDeLaUnion,
   plazasDe,
+  plazasMesa,
   proponerPiezaEnFila,
   separar,
   type AjusteMesa,
@@ -159,6 +161,95 @@ export function PanelPiezasMesa({
 
   const piezasTxt = (n: number) => (n === 1 ? "1 pieza" : `${n} piezas`);
   const resumen = `${piezasTxt(e.piezas)}${e.picos ? ` + ${e.picos === 1 ? "pico" : `${e.picos} picos`}` : ""} · ${plazasDe(e)} plazas`;
+  const otrasDeLaUnion = union.filter((id) => id !== mesa.id).map((id) => nombres.get(id)).join(", ");
+
+  const botonesJuntar = (
+    <>
+      <Button
+        variant="outline"
+        className="h-11 touch-manipulation"
+        disabled={ocupado || candidatas.length === 0}
+        onClick={() => setEligiendoJunta((v) => !v)}
+      >
+        <Link2 className="mr-1 h-4 w-4" /> Juntar con…
+      </Button>
+      <Button
+        variant="outline"
+        className="h-11 touch-manipulation"
+        disabled={ocupado || (!junta && !cambiada && e.plazas == null)}
+        onClick={() => onGuardar(separar(mesa, mesas, estado), `${mesa.nombre} vuelve a su forma`)}
+      >
+        <Unlink className="mr-1 h-4 w-4" /> Separar
+      </Button>
+    </>
+  );
+  const listaJuntar = eligiendoJunta && candidatas.length > 0 && (
+    <div className="flex flex-wrap gap-2">
+      {candidatas.map((c) => (
+        <Button
+          key={c.id}
+          variant="secondary"
+          className="h-11 min-w-11 touch-manipulation"
+          disabled={ocupado}
+          onClick={async () => {
+            await onGuardar(juntar(mesa, c, estado), `${mesa.nombre} junta con ${c.nombre}`);
+            setEligiendoJunta(false);
+          }}
+        >
+          {c.nombre}
+        </Button>
+      ))}
+    </div>
+  );
+
+  // SITIO (Terraza): sin piezas ni pico; plazas a mano entre su mínimo y su máximo.
+  if (mesa.sitio) {
+    const plazas = plazasMesa(mesa, e);
+    if (!hayServicio) {
+      return (
+        <div className="rounded-md bg-muted/60 p-2 text-xs text-muted-foreground">
+          Sitio de {mesa.sitio.min} a {mesa.sitio.max} plazas. Elige Comida o Cena para ajustarlo en ese servicio.
+        </div>
+      );
+    }
+    const menos = cambiarPlazas(mesa, estado, -1);
+    const mas = cambiarPlazas(mesa, estado, 1);
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2 rounded-md bg-muted/60 p-2">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 touch-manipulation"
+            aria-label="Una plaza menos"
+            disabled={ocupado || !menos}
+            onClick={() => menos && onGuardar([menos], `${mesa.nombre}: ${plazas - 1} plazas`)}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+          <div className="text-center">
+            <p className="text-lg font-semibold tabular-nums">{plazas} plazas</p>
+            <p className="text-xs text-muted-foreground">
+              de {mesa.sitio.min} a {mesa.sitio.max}
+              {junta && ` · junta con ${otrasDeLaUnion}`}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-11 w-11 touch-manipulation"
+            aria-label="Una plaza más"
+            disabled={ocupado || !mas}
+            onClick={() => mas && onGuardar([mas], `${mesa.nombre}: ${plazas + 1} plazas`)}
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 gap-2">{botonesJuntar}</div>
+        {listaJuntar}
+      </div>
+    );
+  }
 
   if (!hayServicio) {
     return (
@@ -176,7 +267,7 @@ export function PanelPiezasMesa({
           <p className="text-xs text-muted-foreground">
             Plano base: {piezasTxt(mesa.piezas)}
             {mesa.picos ? " + pico" : ""} · {plazasDe(mesa)} plazas
-            {junta && ` · junta con ${union.filter((id) => id !== mesa.id).map((id) => nombres.get(id)).join(", ")}`}
+            {junta && ` · junta con ${otrasDeLaUnion}`}
           </p>
         )}
       </div>
@@ -216,43 +307,11 @@ export function PanelPiezasMesa({
           >
             <Rows3 className="mr-1 h-4 w-4" /> Mesa en fila
           </Button>
-          <Button
-            variant="outline"
-            className="h-11 touch-manipulation"
-            disabled={ocupado || candidatas.length === 0}
-            onClick={() => setEligiendoJunta((v) => !v)}
-          >
-            <Link2 className="mr-1 h-4 w-4" /> Juntar con…
-          </Button>
-          <Button
-            variant="outline"
-            className="h-11 touch-manipulation"
-            disabled={ocupado || (!junta && !cambiada)}
-            onClick={() => onGuardar(separar(mesa, mesas, estado), `${mesa.nombre} vuelve a su forma`)}
-          >
-            <Unlink className="mr-1 h-4 w-4" /> Separar
-          </Button>
+          {botonesJuntar}
         </div>
       )}
 
-      {eligiendoJunta && candidatas.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {candidatas.map((c) => (
-            <Button
-              key={c.id}
-              variant="secondary"
-              className="h-11 min-w-11 touch-manipulation"
-              disabled={ocupado}
-              onClick={async () => {
-                await onGuardar(juntar(mesa, c, estado), `${mesa.nombre} junta con ${c.nombre}`);
-                setEligiendoJunta(false);
-              }}
-            >
-              {c.nombre}
-            </Button>
-          ))}
-        </div>
-      )}
+      {listaJuntar}
     </div>
   );
 }

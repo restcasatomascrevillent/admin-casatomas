@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   aplicarCambios,
+  cambiarPlazas,
   cambiarPico,
   candidatasParaJuntar,
   estadoServicio,
@@ -10,6 +11,7 @@ import {
   mesasDeLaUnion,
   piezasNecesarias,
   plazasDe,
+  plazasMesa,
   proponerParaSentar,
   proponerPiezaEnFila,
   separar,
@@ -158,7 +160,8 @@ describe("botones de la mesa", () => {
     expect(candidatasParaJuntar(diez, COMEDOR, base())[0].id).toBe("m7");
     const e = aplicarCambios(base(), juntar(diez, siete, base()));
     expect(mesasDeLaUnion(e, "m7").sort()).toEqual(["m10", "m7"]);
-    expect(candidatasParaJuntar(diez, COMEDOR, e)).toEqual([]);
+    // La fila unida puede seguir creciendo con una de al lado (la 11 o la 8), nunca en diagonal.
+    expect(candidatasParaJuntar(diez, COMEDOR, e).map((m) => m.id).sort()).toEqual(["m11", "m8"]);
     const s = aplicarCambios(e, separar(siete, COMEDOR, e));
     expect(mesasDeLaUnion(s, "m7")).toEqual(["m7"]);
     expect(mesasDeLaUnion(s, "m10")).toEqual(["m10"]);
@@ -169,7 +172,7 @@ describe("botones de la mesa", () => {
     const e = aplicarCambios(base(), r.propuestas[0].cambios);
     const tres = COMEDOR.find((x) => x.id === "m3")!;
     const s = aplicarCambios(e, separar(tres, COMEDOR, e));
-    expect(s.get("m3")).toEqual({ piezas: 2, picos: 0, unidaA: null });
+    expect(s.get("m3")).toMatchObject({ piezas: 2, picos: 0, unidaA: null });
     expect(s.get("m4")!.piezas).toBe(3);
   });
 });
@@ -214,5 +217,53 @@ describe("filas verticales (Salón)", () => {
     const g = geometriaServicio({ ...fila, crece_hacia: "arriba" }, { piezas: 3, picos: 0, unidaA: null })!;
     expect(g.pos_y).toBeCloseTo(5.45);
     expect(g.ladoPico).toBe("abajo");
+  });
+});
+
+describe("sitios de la Terraza (sin piezas, plazas 2-6)", () => {
+  // Cuadrícula 4 × 4 a 1,6 m.
+  const sitio = (n: number): MesaPiezas =>
+    mesaPiezasDesde({
+      id: `t${n}`, nombre: String(n), forma: "rectangular", ancho: 80, alto: 80,
+      pos_x: ((n - 1) % 4) * 1.6, pos_y: Math.floor((n - 1) / 4) * 1.6,
+      piezas: null, capacidad: 4, plazas_min: 2, plazas_max: 6, grupo_piezas: "terraza",
+    })!;
+  const TERRAZA = Array.from({ length: 16 }, (_, i) => sitio(i + 1));
+  const e0 = () => estadoServicio(TERRAZA, []);
+
+  it("es un sitio con 4 plazas por defecto", () => {
+    expect(TERRAZA[0].sitio).toEqual({ plazas: 4, min: 2, max: 6 });
+    expect(plazasMesa(TERRAZA[0], e0().get("t1")!)).toBe(4);
+  });
+
+  it("± plazas dentro de 2-6", () => {
+    let e = e0();
+    for (let i = 0; i < 2; i++) e = aplicarCambios(e, [cambiarPlazas(TERRAZA[0], e, 1)!]);
+    expect(plazasMesa(TERRAZA[0], e.get("t1")!)).toBe(6);
+    expect(cambiarPlazas(TERRAZA[0], e, 1)).toBeNull();
+  });
+
+  it("nunca da ni recibe piezas ni pico", () => {
+    const r = proponerPiezaEnFila({ mesas: TERRAZA, estado: e0(), reservas: [], mesaId: "t6" });
+    expect(r.propuestas).toEqual([]);
+    expect(cambiarPico(TERRAZA[5], e0(), 1)).toBeNull();
+  });
+
+  it("al sentar 6 propone ponerla para 6; con 8 pide juntar", () => {
+    const seis = proponerParaSentar({ mesas: TERRAZA, estado: e0(), reservas: [], mesaId: "t6", comensales: 6 });
+    expect(seis.propuestas[0].texto).toBe("Para sentar 6 en la 6: ponla para 6");
+    const ocho = proponerParaSentar({ mesas: TERRAZA, estado: e0(), reservas: [], mesaId: "t6", comensales: 8 });
+    expect(ocho.propuestas).toEqual([]);
+    expect(ocho.motivo).toMatch(/júntala con una de al lado/);
+  });
+
+  it("juntar solo con las de los lados, y la fila puede crecer", () => {
+    expect(candidatasParaJuntar(TERRAZA[5], TERRAZA, e0()).map((m) => m.nombre).sort()).toEqual(["10", "2", "5", "7"]);
+    const e = aplicarCambios(e0(), juntar(TERRAZA[5], TERRAZA[6], e0()));
+    expect(mesasDeLaUnion(e, "t7").sort()).toEqual(["t6", "t7"]);
+    const mas = candidatasParaJuntar(TERRAZA[6], TERRAZA, e).map((m) => m.nombre).sort();
+    expect(mas).toEqual(["10", "11", "2", "3", "5", "8"]);
+    const tres = aplicarCambios(e, juntar(TERRAZA[6], TERRAZA[7], e));
+    expect(mesasDeLaUnion(tres, "t8").sort()).toEqual(["t6", "t7", "t8"]);
   });
 });

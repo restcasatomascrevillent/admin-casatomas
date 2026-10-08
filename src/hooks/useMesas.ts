@@ -49,6 +49,9 @@ export interface Mesa {
   piezas_max?: number | null;
   grupo_piezas?: string | null;
   crece_hacia?: string | null;
+  // Sitios de la Terraza (migración 20261008200000): rango de plazas por servicio.
+  plazas_min?: number | null;
+  plazas_max?: number | null;
 }
 
 export interface MesaInput {

@@ -112,7 +112,7 @@ import {
   geometriaServicio,
   mesaPiezasDesde,
   mesasDeLaUnion,
-  plazasDe,
+  plazasMesa,
   proponerParaSentar,
   type AjusteMesa,
   type LadoCrecimiento,
@@ -1541,8 +1541,9 @@ export function PlanoEspacio2D({
               if (!(await guardarPiezas(p.cambios, null))) return;
               setPropuestaPiezas(null);
               const final = aplicarCambios(estadoPiezas, p.cambios).get(mesa.id);
+              const mp = mesasPiezas.find((m) => m.id === mesa.id);
               await guardarMesas(reserva, nuevas, {
-                plazas: final ? plazasDe(final) : undefined,
+                plazas: final && mp ? plazasMesa(mp, final) : undefined,
                 mensaje: `${reserva.nombre} → ${mesa.nombre} (${p.texto.replace(/^Para sentar [^:]+: /, "")})`,
               });
             },

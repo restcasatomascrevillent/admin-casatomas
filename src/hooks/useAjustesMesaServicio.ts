@@ -18,7 +18,7 @@ export function useAjustesMesaServicio(espacioId: string, fecha: string, turno: 
     queryFn: async (): Promise<AjusteMesa[]> => {
       const { data, error } = await supabase
         .from("ajustes_mesa_servicio")
-        .select("mesa_id, piezas, picos, unida_a")
+        .select("mesa_id, piezas, picos, unida_a, plazas")
         .eq("espacio_id", espacioId)
         .eq("fecha", fecha)
         .eq("turno", turno as string);
@@ -27,7 +27,13 @@ export function useAjustesMesaServicio(espacioId: string, fecha: string, turno: 
         console.warn("ajustes_mesa_servicio:", error.message);
         return [];
       }
-      return (data ?? []).map((a) => ({ mesaId: a.mesa_id, piezas: a.piezas, picos: a.picos, unidaA: a.unida_a }));
+      return (data ?? []).map((a) => ({
+        mesaId: a.mesa_id,
+        piezas: a.piezas,
+        picos: a.picos,
+        unidaA: a.unida_a,
+        plazas: a.plazas,
+      }));
     },
   });
 }
@@ -47,6 +53,7 @@ export function useGuardarAjustesMesa(espacioId: string, fecha: string, turno: T
         piezas: c.piezas,
         picos: c.picos,
         unida_a: c.unidaA,
+        plazas: c.plazas ?? null,
         updated_at: new Date().toISOString(),
       }));
       const { data, error } = await supabase
