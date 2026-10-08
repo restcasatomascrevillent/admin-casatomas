@@ -23,6 +23,7 @@ import { AlertCircle, CalendarDays, Edit2, Loader2, RefreshCw, Trash2, UtensilsC
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { EditorSeccionesMenu } from "@/components/gestion-web/EditorSeccionesMenu";
+import { InterruptorMenuTapas } from "@/components/gestion-web/InterruptorMenuTapas";
 import { VistaPreviaMenu } from "@/components/gestion-web/VistaPreviaMenu";
 import { indexarPlatos, usePlatosParaMenu } from "@/hooks/usePlatosParaMenu";
 import {
@@ -412,6 +413,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   // debajo de `xl` va todo apilado y desplaza la pestaña entera.
   return (
     <div className="space-y-4 xl:flex xl:h-full xl:flex-col">
+      <InterruptorMenuTapas boton={esMenu ? "menu" : "tapas"} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">{config.descripcion}</p>
         <Button variant="outline" onClick={() => cargarDatos()} disabled={isLoading}>

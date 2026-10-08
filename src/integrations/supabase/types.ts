@@ -1238,6 +1238,8 @@ export type Database = {
           id: boolean
           mostrar_fotos_platos_casa_tomas: boolean
           mostrar_fotos_platos_touza: boolean
+          mostrar_menu_dia_casa_tomas: boolean
+          mostrar_tapas_casa_tomas: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -1245,6 +1247,8 @@ export type Database = {
           id?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
+          mostrar_menu_dia_casa_tomas?: boolean
+          mostrar_tapas_casa_tomas?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -1252,6 +1256,8 @@ export type Database = {
           id?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
+          mostrar_menu_dia_casa_tomas?: boolean
+          mostrar_tapas_casa_tomas?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -4910,6 +4916,10 @@ export type Database = {
       }
     }
     Functions: {
+      configuracion_web_visibilidad_menu_tapas: {
+        Args: { p_seccion: string; p_mostrar: boolean }
+        Returns: undefined
+      }
       append_tool_call_log: {
         Args: { p_call_id: string; p_new_tools: Json }
         Returns: undefined

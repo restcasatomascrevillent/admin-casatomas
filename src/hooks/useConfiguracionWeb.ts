@@ -8,6 +8,7 @@ export type ConfiguracionWeb = Tables<"configuracion_web">;
 
 /** Webs públicas con interruptor propio de fotos de platos. */
 export type WebPublica = "casa_tomas" | "touza";
+export type BotonMenuTapas = "menu" | "tapas";
 
 export const QUERY_KEY_CONFIGURACION_WEB = ["configuracionWeb"] as const;
 
@@ -109,6 +110,35 @@ export function useConfiguracionWeb() {
 
   const config = query.data?.config ?? null;
 
+  const cambiarBotonMenuTapas = useMutation({
+    mutationFn: async ({ boton, mostrar }: { boton: BotonMenuTapas; mostrar: boolean }) => {
+      // La RPC solo cambia estos dos campos con el permiso de «Gestión web».
+      // No amplía el acceso a los ajustes de fotos de la pestaña Carta.
+      const { error } = await supabase.rpc("configuracion_web_visibilidad_menu_tapas", {
+        p_seccion: boton,
+        p_mostrar: mostrar,
+      });
+      if (error) throw error;
+    },
+    onMutate: async ({ boton, mostrar }) => {
+      await queryClient.cancelQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB });
+      const previo = queryClient.getQueryData<DatosConfiguracionWeb>(QUERY_KEY_CONFIGURACION_WEB);
+      const campo = boton === "menu" ? "mostrar_menu_dia_casa_tomas" : "mostrar_tapas_casa_tomas";
+      if (previo?.config) queryClient.setQueryData(QUERY_KEY_CONFIGURACION_WEB, {
+        ...previo, config: { ...previo.config, [campo]: mostrar },
+      });
+      return { previo };
+    },
+    onError: (error: Error, _variables, contexto) => {
+      if (contexto?.previo) queryClient.setQueryData(QUERY_KEY_CONFIGURACION_WEB, contexto.previo);
+      toast.error("No se pudo cambiar la visibilidad en la web", { description: error.message });
+    },
+    onSuccess: (_data, { boton, mostrar }) => {
+      notificarGuardadoYPublicacion(boton, `${boton === "menu" ? "Menú del día" : "Tapas"} ${mostrar ? "visible" : "oculto"} en Casa Tomás`);
+    },
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }); },
+  });
+
   return {
     config,
     /** Por defecto (sin fila o sin tabla) las fotos se ven: es lo que hacen las webs. */
@@ -120,5 +150,12 @@ export function useConfiguracionWeb() {
     isLoading: query.isLoading,
     isError: query.isError,
     cambiarFotosPlatos,
+    mostrarBotonesMenuTapas: {
+      menu: config?.mostrar_menu_dia_casa_tomas ?? true,
+      tapas: config?.mostrar_tapas_casa_tomas ?? true,
+    },
+    botonesMenuTapasDisponibles: typeof config?.mostrar_menu_dia_casa_tomas === "boolean"
+      && typeof config?.mostrar_tapas_casa_tomas === "boolean",
+    cambiarBotonMenuTapas,
   };
 }

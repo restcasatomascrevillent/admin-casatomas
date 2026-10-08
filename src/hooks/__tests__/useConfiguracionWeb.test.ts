@@ -13,7 +13,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createElement, type ReactNode } from "react";
 
-vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn() } }));
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn(), rpc: vi.fn() } }));
 vi.mock("sonner", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn(), loading: vi.fn() },
 }));
@@ -28,6 +28,8 @@ const FILA = {
   id: true,
   mostrar_fotos_platos_casa_tomas: true,
   mostrar_fotos_platos_touza: true,
+  mostrar_menu_dia_casa_tomas: true,
+  mostrar_tapas_casa_tomas: true,
   updated_at: "2026-10-01T10:00:00Z",
   updated_by: null,
 };
@@ -118,5 +120,33 @@ describe("useConfiguracionWeb", () => {
     expect(toast.error).toHaveBeenCalledTimes(1);
     expect(notificarGuardadoYPublicacion).not.toHaveBeenCalled();
     await waitFor(() => expect(result.current.mostrarFotosPlatos.touza).toBe(true));
+  });
+
+  it.each(["menu", "tapas"] as const)("guarda la visibilidad de %s de forma independiente", async (boton) => {
+    mockSupabase({ data: FILA, error: null });
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: null } as never);
+    const { result } = renderHook(() => useConfiguracionWeb(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.botonesMenuTapasDisponibles).toBe(true));
+    await act(async () => { await result.current.cambiarBotonMenuTapas.mutateAsync({ boton, mostrar: false }); });
+    expect(supabase.rpc).toHaveBeenCalledWith("configuracion_web_visibilidad_menu_tapas", { p_seccion: boton, p_mostrar: false });
+    expect(notificarGuardadoYPublicacion).toHaveBeenCalledWith(boton, expect.stringContaining("oculto en Casa Tomás"));
+  });
+
+  it("revierte el interruptor y no publica si falla el guardado", async () => {
+    mockSupabase({ data: FILA, error: null });
+    vi.mocked(supabase.rpc).mockResolvedValue({ data: null, error: new Error("Sin permiso") } as never);
+    const { result } = renderHook(() => useConfiguracionWeb(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.botonesMenuTapasDisponibles).toBe(true));
+    await act(async () => { await result.current.cambiarBotonMenuTapas.mutateAsync({ boton: "menu", mostrar: false }).catch(() => undefined); });
+    expect(toast.error).toHaveBeenCalled();
+    expect(notificarGuardadoYPublicacion).not.toHaveBeenCalled();
+    expect(result.current.mostrarBotonesMenuTapas).toEqual({ menu: true, tapas: true });
+  });
+
+  it("deshabilita los nuevos interruptores hasta aplicar la migración", async () => {
+    mockSupabase({ data: { id: true, mostrar_fotos_platos_casa_tomas: true }, error: null });
+    const { result } = renderHook(() => useConfiguracionWeb(), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.botonesMenuTapasDisponibles).toBe(false);
   });
 });
