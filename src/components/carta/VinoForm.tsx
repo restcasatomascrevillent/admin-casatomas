@@ -40,8 +40,8 @@ const formSchema = z.object({
   descripcion: z.string().optional(),
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
-  ubicacion_pais: z.string().optional(),
-  ubicacion_region: z.string().optional(),
+  ubicacion_pais: z.string().trim().min(1, "El país es obligatorio para el mapa"),
+  ubicacion_region: z.string().trim().min(1, "La región es obligatoria para el mapa"),
   alergenos_notas: z.string().optional(),
 });
 
@@ -132,7 +132,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
   };
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    // La traducción ya no se genera aquí: crearVino (usePlatos.ts) llama a
+    // La traducción ya no se genera aquí: crearVino (useVinos.ts) llama a
     // traducir-contenido internamente al guardar (ver informe, TAREA 2).
     const todosAlergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
     const vinoData: NuevoVino = {
@@ -326,7 +326,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial }: VinoFormProps
               )}
             />
 
-            <div className="grid grid-cols-3 gap-4">
+            <p className="text-sm text-muted-foreground">El país y la región sitúan el vino en el mapa de la carta.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="denominacion_origen"

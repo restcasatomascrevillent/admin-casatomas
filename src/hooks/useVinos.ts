@@ -136,6 +136,11 @@ export function useVinos() {
 
   const crearVino = useMutation({
     mutationFn: async (nuevoVino: NuevoVino) => {
+      const pais = nuevoVino.ubicacion_pais?.trim();
+      const region = nuevoVino.ubicacion_region?.trim();
+      if (!pais || !region) {
+        throw new Error("Indica el país y la región para situar el vino en el mapa");
+      }
       const alergenosArray = normalizarAlergenos(nuevoVino.alergenos_oficiales);
 
       // 1. Traducir primero (columnas ya filtradas a lo que existe en Vinos).
@@ -144,8 +149,8 @@ export function useVinos() {
         descripcion: nuevoVino.descripcion || "",
         ingredientes: nuevoVino.ingredientes || "",
         categoria: nuevoVino.categoria,
-        ubicacion_pais: nuevoVino.ubicacion_pais || "",
-        ubicacion_region: nuevoVino.ubicacion_region || "",
+        ubicacion_pais: pais,
+        ubicacion_region: region,
         alergenos_notas: nuevoVino.alergenos_notas || "",
       });
 
@@ -163,12 +168,13 @@ export function useVinos() {
             descripcion: nuevoVino.descripcion || null,
             ingredientes: nuevoVino.ingredientes || null,
             denominacion_origen: nuevoVino.denominacion_origen || null,
-            ubicacion_pais: nuevoVino.ubicacion_pais || null,
-            ubicacion_region: nuevoVino.ubicacion_region || null,
+            ubicacion_pais: pais,
+            ubicacion_region: region,
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
             orden: nuevoVino.orden ?? "0",
             activado: true,
+            restaurante: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             ...(traducciones || {}),
