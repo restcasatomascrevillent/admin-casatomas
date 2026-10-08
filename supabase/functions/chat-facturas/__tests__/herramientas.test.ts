@@ -5,7 +5,9 @@
  * `facturas/chatbot-prueba-2026-10`) y migracion 20261005100000; tercera
  * prueba (06/10/2026) y migracion 20261006100000 (deducidos, conteos, IVA);
  * compras de un producto (07/10/2026, migracion 20261007150000); gasto por
- * categoria y subidas de precio (07/10/2026, migracion 20261007170000).
+ * categoria y subidas de precio (07/10/2026, migracion 20261007170000);
+ * ronda 8 (08/10/2026, migracion 20261008120000): tipo de producto, unidades,
+ * ficha de proveedor, IVA por tipo y grafica (adjuntos).
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -20,7 +22,9 @@ import {
   necesitaRespaldoSemantico,
   prepararLlamada,
   recortar,
+  separarAdjunto,
   systemPrompt,
+  tipoDeProducto,
   TOOLS,
 } from "../herramientas.ts";
 
@@ -52,6 +56,8 @@ describe("TOOLS", () => {
       "compras_producto",
       "gasto_por_categoria",
       "variacion_precios",
+      "ficha_proveedor",
+      "grafico_precio",
       "buscar_productos",
       "buscar_facturas",
       "consulta_flexible",
@@ -76,6 +82,8 @@ describe("TOOLS", () => {
         detalle_documento: { id: 54, numero: null },
         historial_precios: { producto: "jamon" },
         compras_producto: { producto: "centollo" },
+        ficha_proveedor: { proveedor: "luga" },
+        grafico_precio: { producto: "jamon" },
         buscar_productos: { consulta: "gambas" },
         buscar_facturas: { consulta: "pescado", tipo: null },
       }[n] as Record<string, unknown> ?? {};
@@ -102,7 +110,9 @@ describe("TOOLS", () => {
     // (+1.262, ~315 tokens por ronda; strict mode obliga a declarar sus 11 parametros).
     // 8.628 con los parametros por defecto (08/10/2026: fechas y tipo null salvo que el usuario
     // los diga, +448 ~ 110 tokens por ronda; el modelo ponia "este año" y tipo=factura).
-    expect(tamano).toBeLessThan(8_700);
+    // 9.626 con la ronda 8 (08/10/2026: ficha_proveedor, grafico_precio y unidad/categoria;
+    // +998 ~ 250 tokens por ronda).
+    expect(tamano).toBeLessThan(9_700);
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -170,7 +180,7 @@ describe("systemPrompt", () => {
   });
 
   it("no hay relacion albaran-factura: no se puede saber, sin llamar herramientas (prueba 2: q19)", () => {
-    expect(p).toMatch(/No hay ninguna relacion guardada entre albaranes y facturas/);
+    expect(p).toMatch(/Albaran facturado = su factura cita su numero \(no se cuenta dos veces\)/);
     expect(p).toMatch(/SIN llamar herramientas/);
     expect(p).toMatch(/"sin_total" NO significa sin factura/);
     const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
@@ -207,7 +217,7 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/"aproximada": avisa de que no es el nombre exacto/);
     expect(p).toMatch(/sin_datos: dilo y da ultimo_dato \(fecha, cantidad, proveedor\) si viene; con sugerencias pregunta si es alguna/);
     expect(p).toMatch(/una_compra: solo hubo una, no hay evolucion/);
-    expect(p).toMatch(/incluye_albaranes: el importe es lo recibido \(facturas \+ albaranes, criterio\), no gasto facturado/);
+    expect(p).not.toMatch(/incluye_albaranes/);
     const d = TOOLS.find((t) => t.function.name === "compras_producto")!.function.description;
     expect(d).toMatch(/cuanto, a quien y a que precio/);
     expect(d).toMatch(/centollo=centolla/);
@@ -218,7 +228,7 @@ describe("systemPrompt", () => {
   it("gasto por categoria y subidas de precio: periodo, sin IVA, sin clasificar, cambio de proveedor (07/10/2026)", () => {
     expect(p).toMatch(/gasto_por_categoria: gasto en vinos, marisco, limpieza\.\.\. o reparto por categorias/);
     expect(p).toMatch(/variacion_precios: que ha subido o bajado de precio/);
-    expect(p).toMatch(/13\. gasto_por_categoria: di periodo, base SIN IVA, incluye_albaranes \(regla 12\) y sin_clasificar/);
+    expect(p).toMatch(/13\. gasto_por_categoria: di periodo, base SIN IVA y sin_clasificar/);
     expect(p).toMatch(/cambio_proveedor = otro proveedor, no subida del mismo: dilo/);
     expect(p).toMatch(/pocas_compras\/ref_antigua: comparacion debil/);
     const g = TOOLS.find((t) => t.function.name === "gasto_por_categoria")!.function;
@@ -248,7 +258,9 @@ describe("systemPrompt", () => {
     // suman 416 (~105 tokens por ronda).
     // 4.963 antes de los parametros por defecto (08/10/2026): periodo/tipo null, "que X compro
     // mas", excluir, ultimo_dato, una_compra y sin_comparar suman 385 (~100 tokens por ronda).
-    expect(p.length).toBeLessThan(5_400);
+    // 5.348 antes de la ronda 8 (08/10/2026): reparto facturas/albaranes, grafica, ficha,
+    // IVA por tipo y unidades distintas suman 384 (~95 tokens por ronda).
+    expect(p.length).toBeLessThan(5_800);
   });
 });
 
@@ -355,6 +367,8 @@ describe("prepararLlamada", () => {
         detalle_documento: { id: 1 },
         historial_precios: { producto: "jamon" },
         compras_producto: { producto: "jamon" },
+        ficha_proveedor: { proveedor: "luga" },
+        grafico_precio: { producto: "jamon" },
         buscar_productos: { consulta: "jamon" },
         buscar_facturas: { consulta: "jamon" },
       }[n] as Record<string, unknown> ?? {};
@@ -591,5 +605,80 @@ describe("marcarResultado", () => {
   it("recortar corta y marca el fragmento", () => {
     expect(recortar("x".repeat(7000))).toMatch(/FRAGMENTO/);
     expect(recortar("corto")).toBe("corto");
+  });
+});
+
+describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
+  const p = systemPrompt("2026-10-08");
+
+  it("productos y categorias: facturas + albaranes salvo que el usuario diga otra cosa (marisco 39,80 en vez de 1.353,85)", () => {
+    expect(p).not.toMatch(/Albaran = entrega, NO es gasto: nunca lo sumes/);
+    expect(p).toMatch(/Productos y categorias: cuentan facturas \+ albaranes sin factura \(tipo null\) salvo que pidan solo uno/);
+    expect(p).toMatch(/en_facturas\/en_albaranes_sin_factura, da ese reparto/);
+    // El modelo mando tipo=factura sin que el usuario lo dijera: se ignora.
+    expect(tipoDeProducto("factura", "¿cuanto hemos gastado en marisco?")).toBeNull();
+    expect(tipoDeProducto("factura", "¿y solo en facturas?")).toBe("factura");
+    expect(tipoDeProducto("albaranes", "marisco en albaranes")).toBe("albaran");
+    expect(tipoDeProducto("factura")).toBe("factura");
+    expect(prepararLlamada("gasto_por_categoria", { categoria: "marisco", tipo: "factura" }, "gasto en marisco"))
+      .toMatchObject({ params: { p_tipo: null } });
+    expect(prepararLlamada("compras_producto", { producto: "vino", tipo: "factura" }, "cuanto vino compramos"))
+      .toMatchObject({ params: { p_tipo: null } });
+    // En documentos el tipo sigue siendo del modelo.
+    expect(prepararLlamada("ranking", { criterio: "importe_documento", tipo: "factura" }, "la mas cara"))
+      .toMatchObject({ params: { p_tipo: "factura" } });
+  });
+
+  it("unidades distintas: no comparar, cada proveedor en su unidad", () => {
+    expect(p).toMatch(/unidades_mezcladas: no compares precios; cada proveedor en su unidad/);
+    expect(p).toMatch(/Osborne te vende la caja a 519,40 €; Luga el kilo a 20,50 €/);
+  });
+
+  it("unidad y categoria solo se mandan si vienen (compatibles con las RPC de antes)", () => {
+    const sin = prepararLlamada("compras_producto", { producto: "nata", unidad: null });
+    expect(sin.tipo === "rpc" && "p_unidad" in sin.params).toBe(false);
+    expect(prepararLlamada("compras_producto", { producto: "nata", unidad: "kg" })).toMatchObject({ params: { p_unidad: "kg" } });
+    expect(prepararLlamada("ranking", { criterio: "precio_unitario", unidad: "caja", categoria: "vinos" }))
+      .toMatchObject({ params: { p_unidad: "caja", p_categoria: "vinos" } });
+    const r = prepararLlamada("ranking", { criterio: "precio_unitario", unidad: null, categoria: null });
+    expect(r.tipo === "rpc" && ("p_unidad" in r.params || "p_categoria" in r.params)).toBe(false);
+  });
+
+  it("ficha_proveedor y grafico_precio", () => {
+    expect(prepararLlamada("ficha_proveedor", { proveedor: " Luga " })).toEqual({
+      tipo: "rpc", rpc: "ficha_proveedor_agente", params: { p_texto: "Luga" }, limite: null,
+    });
+    expect(() => prepararLlamada("ficha_proveedor", { proveedor: "" })).toThrow(/parametro/);
+    expect(prepararLlamada("grafico_precio", { producto: "jamon", desde: null, hasta: "2026-10-08", unidad: "kg" })).toEqual({
+      tipo: "rpc",
+      rpc: "serie_precios_agente",
+      params: { p_texto: "jamon", p_desde: null, p_hasta: "2026-10-08", p_unidad: "kg" },
+      limite: null,
+    });
+    expect(() => prepararLlamada("grafico_precio", { producto: "jamon", desde: "ayer" })).toThrow(/fecha/);
+    expect(p).toMatch(/grafico_precio: grafica del precio \(la ve el usuario\)/);
+    expect(p).toMatch(/ficha_proveedor: todo de UN proveedor/);
+    expect(p).toMatch(/IVA por tipo \(gestoria\): agrupar iva_pct/);
+    expect(AGRUPAR_FLEX).toContain("iva_pct");
+  });
+
+  it("separarAdjunto: la serie va a la UI y el modelo solo ve el resumen", () => {
+    const serie = {
+      producto: "Jamón", unidad: "kg", proveedores: ["Joselito", "Luga"],
+      puntos: [["2025-12-10", 55.8, 0], ["2025-12-31", 20.5, 1]], n: 2, min: 20.5, max: 55.8, ultimo: 20.5, variacion_pct: null,
+    };
+    const { data, adjunto } = separarAdjunto("grafico_precio", serie);
+    expect(adjunto).toEqual({ tipo: "serie_precio", datos: serie });
+    expect(data).toEqual({
+      producto: "Jamón", unidad: "kg", n: 2, min: 20.5, max: 55.8, ultimo: 20.5, variacion_pct: null,
+      proveedores: ["Joselito", "Luga"], grafico_adjunto: true,
+    });
+    expect(JSON.stringify(data)).not.toContain("puntos");
+    // Sin datos, error u otra herramienta: sin adjunto y el resultado intacto.
+    const vacio = { sin_datos: true, buscado: "caviar" };
+    expect(separarAdjunto("grafico_precio", vacio)).toEqual({ data: vacio, adjunto: null });
+    expect(separarAdjunto("grafico_precio", { error: "x" }).adjunto).toBeNull();
+    expect(separarAdjunto("historial_precios", serie)).toEqual({ data: serie, adjunto: null });
+    expect(marcarResultado("grafico_precio", { ...vacio }, null)).toMatchObject({ sin_datos: true, aviso_vacio: expect.any(String) });
   });
 });

@@ -2,11 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import {
+  type Adjunto,
   esErrorCorregible,
   marcarResultado,
   necesitaRespaldoSemantico,
   prepararLlamada,
   recortar,
+  separarAdjunto,
   systemPrompt,
   TOOLS,
 } from "./herramientas.ts";
@@ -19,7 +21,10 @@ const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 //  Bucle de function-calling de OpenAI sobre las RPC de Postgres.
 //  Mantiene el MISMO contrato que espera useChatFacturas.ts:
 //    IN : { mensaje, session_id }
-//    OUT: { success, respuesta }
+//    OUT: { success, respuesta, adjuntos? }
+//  adjuntos (20261008120000, contrato con la UI): [{ tipo: 'serie_precio',
+//  datos: <serie_precios_agente> }] cuando el modelo llama a grafico_precio;
+//  se omite si no hay. El modelo solo ve el resumen (separarAdjunto).
 //
 //  Historial: se lee de chat_facturas_conversaciones / chat_facturas_mensajes
 //  (vistas sobre `conversaciones` / `mensajes_chat`). Hasta el arreglo de
@@ -138,7 +143,7 @@ async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
   return vector;
 }
 
-interface ResultadoTool { contenido: string; fallo: boolean }
+interface ResultadoTool { contenido: string; fallo: boolean; adjunto?: Adjunto | null }
 
 /**
  * Ejecuta una herramienta. La traduccion a RPC y la validacion de argumentos
@@ -151,7 +156,7 @@ interface ResultadoTool { contenido: string; fallo: boolean }
 // deno-lint-ignore no-explicit-any
 async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx): Promise<ResultadoTool> {
   try {
-    const ll = prepararLlamada(nombre, args);
+    const ll = prepararLlamada(nombre, args, ctx.pregunta);
     let data: unknown;
 
     if (ll.tipo === "rpc") {
@@ -180,7 +185,12 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx):
       }
     }
 
-    return { fallo: false, contenido: recortar(JSON.stringify(marcarResultado(nombre, data, ll.limite, ctx.pregunta))) };
+    const { data: paraModelo, adjunto } = separarAdjunto(nombre, data);
+    return {
+      fallo: false,
+      adjunto,
+      contenido: recortar(JSON.stringify(marcarResultado(nombre, paraModelo, ll.limite, ctx.pregunta))),
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "error en herramienta";
     console.error(`[chat-facturas] tool ${nombre} fallo:`, msg);
@@ -304,6 +314,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     };
     let respuesta = "";
     let huboFalloDeHerramienta = false;
+    const adjuntos: Adjunto[] = [];
 
     for (let paso = 0; paso < MAX_PASOS; paso++) {
       // Se retiran las herramientas en el ultimo paso —o si ya no queda tiempo
@@ -340,6 +351,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* el modelo mando JSON invalido */ }
           const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
           if (r.fallo) huboFalloDeHerramienta = true;
+          if (r.adjunto) adjuntos.push(r.adjunto);
           messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
         }
         // La API exige una respuesta por cada tool_call emitida: las que se
@@ -370,7 +382,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
         : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
     }
 
-    return json({ success: true, respuesta }, 200);
+    return json({ success: true, respuesta, ...(adjuntos.length > 0 ? { adjuntos } : {}) }, 200);
   } catch (error) {
     console.error("[chat-facturas] Error:", error);
     usoChat.marcarError();
