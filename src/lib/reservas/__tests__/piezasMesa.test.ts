@@ -193,3 +193,26 @@ describe("geometría del servicio", () => {
     expect(mesaPiezasDesde({ ...fila, forma: "circular" })!.redonda).toBe(true);
   });
 });
+
+describe("filas verticales (Salón)", () => {
+  const fila = {
+    id: "s4", nombre: "4", forma: "rectangular", ancho: 70, alto: 110, pos_x: 2.26, pos_y: 6.0,
+    piezas: 2, picos_base: 0, picos_max: 1, piezas_max: 3, grupo_piezas: "salon-abajo", crece_hacia: "abajo",
+  };
+
+  it("crece hacia abajo: alto, no ancho", () => {
+    const g = geometriaServicio(fila, { piezas: 3, picos: 1, unidaA: null })!;
+    expect(g.vertical).toBe(true);
+    expect(g.ancho).toBe(70);
+    expect(g.alto).toBeCloseTo(165);
+    expect(g.pos_y).toBeCloseTo(6.0);
+    expect(g.ladoPico).toBe("arriba");
+    expect(g.capacidad).toBe(7);
+  });
+
+  it("crece hacia arriba: se desplaza pos_y", () => {
+    const g = geometriaServicio({ ...fila, crece_hacia: "arriba" }, { piezas: 3, picos: 0, unidaA: null })!;
+    expect(g.pos_y).toBeCloseTo(5.45);
+    expect(g.ladoPico).toBe("abajo");
+  });
+});

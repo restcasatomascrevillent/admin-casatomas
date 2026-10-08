@@ -115,6 +115,7 @@ import {
   plazasDe,
   proponerParaSentar,
   type AjusteMesa,
+  type LadoCrecimiento,
   type MesaPiezas,
   type ReservaEnMesas,
 } from "@/lib/reservas/piezasMesa";
@@ -509,7 +510,7 @@ function MesaPlano({
   piezasInfo,
 }: {
   /** Mesas por piezas: rayas entre piezas y marca del pico (servicio actual). */
-  piezasInfo?: { piezas: number; picos: number; ladoPico: "derecha" | "izquierda" };
+  piezasInfo?: { piezas: number; picos: number; ladoPico: LadoCrecimiento; vertical: boolean };
   /** Mesa con coordenadas y tamaño YA en píxeles de pantalla. */
   mesa: Mesa;
   /** Mesa con los datos originales (metros / capacidad) para los callbacks. */
@@ -684,15 +685,25 @@ function MesaPlano({
                   <span
                     key={i}
                     aria-hidden
-                    className="pointer-events-none absolute bottom-0 top-0 border-l border-dashed border-slate-400"
-                    style={{ left: `${((i + 1) * 100) / piezasInfo.piezas}%` }}
+                    className={cn(
+                      "pointer-events-none absolute border-dashed border-slate-400",
+                      piezasInfo.vertical ? "left-0 right-0 border-t" : "bottom-0 top-0 border-l",
+                    )}
+                    style={
+                      piezasInfo.vertical
+                        ? { top: `${((i + 1) * 100) / piezasInfo.piezas}%` }
+                        : { left: `${((i + 1) * 100) / piezasInfo.piezas}%` }
+                    }
                   />
                 ))}
               {piezasInfo && piezasInfo.picos > 0 && (
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute top-1/2 h-1/2 w-1.5 -translate-y-1/2 rounded-sm bg-amber-500"
-                  style={piezasInfo.ladoPico === "izquierda" ? { left: -8 } : { right: -8 }}
+                  className={cn(
+                    "pointer-events-none absolute rounded-sm bg-amber-500",
+                    piezasInfo.vertical ? "left-1/2 h-1.5 w-1/2 -translate-x-1/2" : "top-1/2 h-1/2 w-1.5 -translate-y-1/2",
+                  )}
+                  style={{ [piezasInfo.ladoPico === "arriba" ? "top" : piezasInfo.ladoPico === "abajo" ? "bottom" : piezasInfo.ladoPico === "izquierda" ? "left" : "right"]: -8 }}
                 />
               )}
               <span
@@ -1122,7 +1133,7 @@ export function PlanoEspacio2D({
     () =>
       localMesas.map((m) => {
         const g = geometriaServicio(m, estadoPiezas.get(m.id));
-        return g ? { ...m, pos_x: g.pos_x, ancho: g.ancho, capacidad: g.capacidad } : m;
+        return g ? { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad } : m;
       }),
     [localMesas, estadoPiezas],
   );
@@ -2707,7 +2718,7 @@ export function PlanoEspacio2D({
                         onSeleccionar={seleccionarMesa}
                         piezasInfo={(() => {
                           const g = geometriaServicio(mesa, estadoPiezas.get(mesa.id));
-                          return g ? { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico } : undefined;
+                          return g ? { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico, vertical: g.vertical } : undefined;
                         })()}
                         onAlternar={alternarMesa}
                         scale={scale}

@@ -17,7 +17,8 @@
 //     necesite otra reserva de ese servicio.
 // ============================================================================
 
-export type LadoCrecimiento = "derecha" | "izquierda";
+/** Hacia dónde se alarga la fila. Derecha/izquierda: fila horizontal; abajo/arriba: vertical. */
+export type LadoCrecimiento = "derecha" | "izquierda" | "abajo" | "arriba";
 
 /** Configuración base de una mesa por piezas (lo que dice el plano). */
 export interface MesaPiezas {
@@ -460,20 +461,45 @@ export function mesaPiezasDesde(f: FilaMesaPiezas): MesaPiezas | null {
  * Cómo se pinta la mesa en este servicio: más larga (o más corta) según sus
  * piezas, creciendo hacia `crece_hacia`, y con las plazas recalculadas.
  */
-export function geometriaServicio(
-  f: FilaMesaPiezas,
-  e: EstadoMesa | undefined,
-): { pos_x: number; ancho: number; capacidad: number; piezas: number; picos: number; ladoPico: LadoCrecimiento } | null {
+export interface GeometriaServicio {
+  pos_x: number;
+  pos_y: number;
+  ancho: number;
+  alto: number;
+  capacidad: number;
+  piezas: number;
+  picos: number;
+  /** Cabecera donde se dibuja el pico: la contraria a la que crece. */
+  ladoPico: LadoCrecimiento;
+  /** Fila vertical (las piezas se apilan en `alto`). */
+  vertical: boolean;
+}
+
+const OPUESTO: Record<LadoCrecimiento, LadoCrecimiento> = {
+  derecha: "izquierda",
+  izquierda: "derecha",
+  abajo: "arriba",
+  arriba: "abajo",
+};
+
+export function geometriaServicio(f: FilaMesaPiezas, e: EstadoMesa | undefined): GeometriaServicio | null {
   if (!f.piezas || f.piezas < 1 || !e) return null;
-  const anchoPieza = (f.ancho ?? 80) / f.piezas;
-  const extra = e.piezas - f.piezas;
-  const izquierda = f.crece_hacia === "izquierda";
+  const lado: LadoCrecimiento =
+    f.crece_hacia === "izquierda" || f.crece_hacia === "abajo" || f.crece_hacia === "arriba" ? f.crece_hacia : "derecha";
+  const vertical = lado === "abajo" || lado === "arriba";
+  const largoBase = vertical ? (f.alto ?? 80) : (f.ancho ?? 80);
+  const largoPieza = largoBase / f.piezas;
+  const largo = Math.max(0, e.piezas * largoPieza);
+  const desplazamiento = ((e.piezas - f.piezas) * largoPieza) / 100;
   return {
-    pos_x: (f.pos_x ?? 0) - (izquierda ? (extra * anchoPieza) / 100 : 0),
-    ancho: Math.max(0, e.piezas * anchoPieza),
+    pos_x: (f.pos_x ?? 0) - (lado === "izquierda" ? desplazamiento : 0),
+    pos_y: (f.pos_y ?? 0) - (lado === "arriba" ? desplazamiento : 0),
+    ancho: vertical ? (f.ancho ?? 80) : largo,
+    alto: vertical ? largo : (f.alto ?? 80),
     capacidad: plazasDe(e),
     piezas: e.piezas,
     picos: e.picos,
-    ladoPico: izquierda ? "derecha" : "izquierda",
+    ladoPico: OPUESTO[lado],
+    vertical,
   };
 }
