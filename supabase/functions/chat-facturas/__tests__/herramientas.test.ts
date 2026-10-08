@@ -171,7 +171,7 @@ describe("systemPrompt", () => {
   });
 
   it("rankings por cantidad: criterio con palabras y primero de cada unidad (prueba 2: q09)", () => {
-    expect(p).toMatch(/por cantidad total en kg/);
+    expect(p).toMatch(/Rankings: di el criterio con tus palabras/);
     expect(p).toMatch(/primero_por_unidad/);
   });
 
@@ -243,7 +243,7 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/"que X compro mas" con X categoria \(licor, vino\): sus top_productos/);
     expect(p).toMatch(/"Sin X" \(sin las cajas\): repite con excluir=X/);
     expect(p).toMatch(/Por meses: solo los meses que trae la herramienta/);
-    expect(p).toMatch(/sin_comparar: da su ultima compra \(una_compra: no hay subida ni bajada\)/);
+    expect(p).toMatch(/sin_comparar: da su ultima compra/);
     for (const nombre of ["compras_producto", "gasto_por_categoria", "variacion_precios"]) {
       const props = (TOOLS.find((t) => t.function.name === nombre)!.function.parameters as Esquema).properties;
       expect(props.desde.description, nombre).toMatch(/null salvo periodo dicho por el usuario/);
@@ -630,8 +630,8 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
   });
 
   it("unidades distintas: no comparar, cada proveedor en su unidad", () => {
-    expect(p).toMatch(/unidades_mezcladas: no compares precios; cada proveedor en su unidad/);
-    expect(p).toMatch(/Osborne te vende la caja a 519,40 €; Luga el kilo a 20,50 €/);
+    expect(p).toMatch(/lista TODOS los proveedores, cada uno con su precio en SU unidad/);
+    expect(p).toMatch(/Osborne la caja a 519,40 €; Luga el kilo a 20,50 €/);
   });
 
   it("unidad y categoria solo se mandan si vienen (compatibles con las RPC de antes)", () => {
@@ -656,7 +656,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
       limite: null,
     });
     expect(() => prepararLlamada("grafico_precio", { producto: "jamon", desde: "ayer" })).toThrow(/fecha/);
-    expect(p).toMatch(/grafico_precio: grafica del precio \(la ve el usuario\)/);
+    expect(p).toMatch(/grafico_precio: grafica, evolucion/);
     expect(p).toMatch(/ficha_proveedor: todo de UN proveedor/);
     expect(p).toMatch(/IVA por tipo \(gestoria\): agrupar iva_pct/);
     expect(AGRUPAR_FLEX).toContain("iva_pct");

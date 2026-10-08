@@ -9,6 +9,7 @@ import {
   prepararLlamada,
   recortar,
   separarAdjunto,
+  sinDuplicar,
   systemPrompt,
   TOOLS,
 } from "./herramientas.ts";
@@ -253,165 +254,181 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     return json({ success: false, respuesta: "No tienes acceso a la seccion de facturas.", error: "forbidden" }, 403);
   }
 
-  // ── Contabilidad de consumo (migracion 20260928193000) ──
-  // Se declaran ANTES del try para que el `finally` los vea. Una peticion que
-  // acaba en error tambien ha gastado tokens: OpenAI ya los facturo.
-  const usoChat = new AcumuladorUso("chat-facturas", MODELO, "chat");
-  const usoEmbed = new AcumuladorUso("chat-facturas", "text-embedding-3-small", "embedding");
-  const inicioMs = Date.now();
+  // Dos peticiones identicas pegadas (usuario+sesion+mensaje) comparten UNA
+  // ejecucion y UN registro en ia_uso (ver sinDuplicar en herramientas.ts).
+  const ejecutar = async (): Promise<Response> => {
+    // ── Contabilidad de consumo (migracion 20260928193000) ──
+    // Se declaran ANTES del try para que el `finally` los vea. Una peticion que
+    // acaba en error tambien ha gastado tokens: OpenAI ya los facturo.
+    const usoChat = new AcumuladorUso("chat-facturas", MODELO, "chat");
+    const usoEmbed = new AcumuladorUso("chat-facturas", "text-embedding-3-small", "embedding");
+    const inicioMs = Date.now();
 
-  try {
-    const { mensaje, session_id } = await req.json();
-    if (!mensaje || !String(mensaje).trim()) {
-      return json({ success: false, respuesta: "No he recibido ninguna pregunta." }, 200);
-    }
-    console.log("[chat-facturas] mensaje:", mensaje, "· session:", session_id);
+    try {
+      const { mensaje, session_id } = await req.json();
+      if (!mensaje || !String(mensaje).trim()) {
+        return json({ success: false, respuesta: "No he recibido ninguna pregunta." }, 200);
+      }
+      console.log("[chat-facturas] mensaje:", mensaje, "· session:", session_id);
 
-    // ── Historial de la conversacion ──
-    // deno-lint-ignore no-explicit-any
-    const messages: any[] = [{ role: "system", content: systemPrompt() }];
-    if (session_id) {
-      const { data: conv, error: convErr } = await supabase
-        .from("chat_facturas_conversaciones")
-        .select("id")
-        .eq("session_id", session_id)
-        .maybeSingle();
-      if (convErr) console.error("[chat-facturas] Error leyendo conversacion:", convErr.message);
+      // ── Historial de la conversacion ──
+      // deno-lint-ignore no-explicit-any
+      const messages: any[] = [{ role: "system", content: systemPrompt() }];
+      if (session_id) {
+        const { data: conv, error: convErr } = await supabase
+          .from("chat_facturas_conversaciones")
+          .select("id")
+          .eq("session_id", session_id)
+          .maybeSingle();
+        if (convErr) console.error("[chat-facturas] Error leyendo conversacion:", convErr.message);
 
-      if (conv?.id) {
-        const { data: previos, error: msgErr } = await supabase
-          .from("chat_facturas_mensajes")
-          .select("rol, contenido, created_at")
-          .eq("conversacion_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(MAX_HISTORIAL);
-        if (msgErr) console.error("[chat-facturas] Error leyendo historial:", msgErr.message);
+        if (conv?.id) {
+          const { data: previos, error: msgErr } = await supabase
+            .from("chat_facturas_mensajes")
+            .select("rol, contenido, created_at")
+            .eq("conversacion_id", conv.id)
+            .order("created_at", { ascending: false })
+            .limit(MAX_HISTORIAL);
+          if (msgErr) console.error("[chat-facturas] Error leyendo historial:", msgErr.message);
 
-        for (const m of (previos ?? []).reverse()) {
-          if (!m.contenido) continue;
-          messages.push({ role: m.rol === "user" ? "user" : "assistant", content: m.contenido });
+          for (const m of (previos ?? []).reverse()) {
+            if (!m.contenido) continue;
+            messages.push({ role: m.rol === "user" ? "user" : "assistant", content: m.contenido });
+          }
         }
       }
-    }
-    // Garantizar que el ultimo turno es el mensaje actual del usuario.
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== "user" || last.content !== mensaje) {
-      messages.push({ role: "user", content: mensaje });
-    }
-
-    // ── Bucle de function-calling ──
-    //  Acotado por tres lados: MAX_PASOS rondas, MAX_TOOL_CALLS_POR_RONDA
-    //  herramientas por ronda y un deadline global. Los dos ultimos son nuevos:
-    //  el prompt fomenta el fan-out (llamar a dos herramientas a la vez, o a
-    //  resumen_periodo dos veces) y nada impedia que un solo mensaje del usuario
-    //  encadenase ~6 chat completions mas una decena de embeddings de pago.
-    const ctx: Ctx = {
-      deadline: Date.now() + PRESUPUESTO_MS,
-      embeddings: new Map(),
-      usoChat,
-      usoEmbed,
-      pregunta: String(mensaje),
-    };
-    let respuesta = "";
-    let huboFalloDeHerramienta = false;
-    const adjuntos: Adjunto[] = [];
-
-    for (let paso = 0; paso < MAX_PASOS; paso++) {
-      // Se retiran las herramientas en el ultimo paso —o si ya no queda tiempo
-      // para ejecutar otra ronda— para forzar que el modelo redacte la respuesta
-      // con lo que ya tiene en vez de morir sin contestar.
-      const sinTiempo = ctx.deadline - Date.now() < TIMEOUT_OPENAI_MS;
-      const esUltimo = paso === MAX_PASOS - 1 || sinTiempo;
-
-      const res = await fetchConTimeout(`${OPENAI}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
-        body: JSON.stringify({
-          model: MODELO,
-          messages,
-          temperature: 0.2,
-          max_tokens: MAX_TOKENS_RESPUESTA,
-          ...(esUltimo ? {} : { tools: TOOLS }),
-        }),
-      }, msRestantes(ctx));
-
-      if (!res.ok) throw new Error(`OpenAI chat ${res.status}: ${await res.text()}`);
-      // Antes esto era `const msg = (await res.json()).choices[0].message;`. Se
-      // parte en dos para poder leer `usage`, que en la version de una linea se
-      // tiraba con el objeto temporal. El comportamiento es identico.
-      const respuestaJson = await res.json();
-      ctx.usoChat.sumar(respuestaJson.usage);
-      const msg = respuestaJson.choices[0].message;
-      messages.push(msg);
-
-      if (!esUltimo && msg.tool_calls?.length > 0) {
-        const atendidas = msg.tool_calls.slice(0, MAX_TOOL_CALLS_POR_RONDA);
-        for (const tc of atendidas) {
-          let args = {};
-          try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* el modelo mando JSON invalido */ }
-          const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
-          if (r.fallo) huboFalloDeHerramienta = true;
-          if (r.adjunto) adjuntos.push(r.adjunto);
-          messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
-        }
-        // La API exige una respuesta por cada tool_call emitida: las que se
-        // descartan por el tope tienen que contestarse igualmente.
-        for (const tc of msg.tool_calls.slice(MAX_TOOL_CALLS_POR_RONDA)) {
-          console.warn(`[chat-facturas] tool_call descartada por tope de ronda: ${tc.function?.name}`);
-          messages.push({
-            role: "tool",
-            tool_call_id: tc.id,
-            content: JSON.stringify({
-              error: `Se ha superado el tope de ${MAX_TOOL_CALLS_POR_RONDA} herramientas por ronda.`,
-              aviso: "Esta llamada NO se ha ejecutado. Si necesitas ese dato, pidelo en la " +
-                     "siguiente ronda. No inventes su resultado.",
-            }),
-          });
-        }
-        continue;
+      // Garantizar que el ultimo turno es el mensaje actual del usuario.
+      const last = messages[messages.length - 1];
+      if (!last || last.role !== "user" || last.content !== mensaje) {
+        messages.push({ role: "user", content: mensaje });
       }
 
-      respuesta = msg.content || "";
-      break;
+      // ── Bucle de function-calling ──
+      //  Acotado por tres lados: MAX_PASOS rondas, MAX_TOOL_CALLS_POR_RONDA
+      //  herramientas por ronda y un deadline global. Los dos ultimos son nuevos:
+      //  el prompt fomenta el fan-out (llamar a dos herramientas a la vez, o a
+      //  resumen_periodo dos veces) y nada impedia que un solo mensaje del usuario
+      //  encadenase ~6 chat completions mas una decena de embeddings de pago.
+      const ctx: Ctx = {
+        deadline: Date.now() + PRESUPUESTO_MS,
+        embeddings: new Map(),
+        usoChat,
+        usoEmbed,
+        pregunta: String(mensaje),
+      };
+      let respuesta = "";
+      let huboFalloDeHerramienta = false;
+      const adjuntos: Adjunto[] = [];
+
+      for (let paso = 0; paso < MAX_PASOS; paso++) {
+        // Se retiran las herramientas en el ultimo paso —o si ya no queda tiempo
+        // para ejecutar otra ronda— para forzar que el modelo redacte la respuesta
+        // con lo que ya tiene en vez de morir sin contestar.
+        const sinTiempo = ctx.deadline - Date.now() < TIMEOUT_OPENAI_MS;
+        const esUltimo = paso === MAX_PASOS - 1 || sinTiempo;
+
+        const res = await fetchConTimeout(`${OPENAI}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+          body: JSON.stringify({
+            model: MODELO,
+            messages,
+            temperature: 0.2,
+            max_tokens: MAX_TOKENS_RESPUESTA,
+            ...(esUltimo ? {} : { tools: TOOLS }),
+          }),
+        }, msRestantes(ctx));
+
+        if (!res.ok) throw new Error(`OpenAI chat ${res.status}: ${await res.text()}`);
+        // Antes esto era `const msg = (await res.json()).choices[0].message;`. Se
+        // parte en dos para poder leer `usage`, que en la version de una linea se
+        // tiraba con el objeto temporal. El comportamiento es identico.
+        const respuestaJson = await res.json();
+        ctx.usoChat.sumar(respuestaJson.usage);
+        const msg = respuestaJson.choices[0].message;
+        messages.push(msg);
+
+        if (!esUltimo && msg.tool_calls?.length > 0) {
+          const atendidas = msg.tool_calls.slice(0, MAX_TOOL_CALLS_POR_RONDA);
+          for (const tc of atendidas) {
+            let args = {};
+            try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* el modelo mando JSON invalido */ }
+            const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
+            if (r.fallo) huboFalloDeHerramienta = true;
+            if (r.adjunto) adjuntos.push(r.adjunto);
+            messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
+          }
+          // La API exige una respuesta por cada tool_call emitida: las que se
+          // descartan por el tope tienen que contestarse igualmente.
+          for (const tc of msg.tool_calls.slice(MAX_TOOL_CALLS_POR_RONDA)) {
+            console.warn(`[chat-facturas] tool_call descartada por tope de ronda: ${tc.function?.name}`);
+            messages.push({
+              role: "tool",
+              tool_call_id: tc.id,
+              content: JSON.stringify({
+                error: `Se ha superado el tope de ${MAX_TOOL_CALLS_POR_RONDA} herramientas por ronda.`,
+                aviso: "Esta llamada NO se ha ejecutado. Si necesitas ese dato, pidelo en la " +
+                       "siguiente ronda. No inventes su resultado.",
+              }),
+            });
+          }
+          continue;
+        }
+
+        respuesta = msg.content || "";
+        break;
+      }
+
+      if (!respuesta.trim()) {
+        // El modelo agoto los pasos sin redactar. Mejor decirlo que devolver vacio.
+        respuesta = huboFalloDeHerramienta
+          ? "No he podido consultar los datos de facturas en este momento. Vuelve a intentarlo en unos segundos."
+          : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
+      }
+
+      return json({ success: true, respuesta, ...(adjuntos.length > 0 ? { adjuntos } : {}) }, 200);
+    } catch (error) {
+      console.error("[chat-facturas] Error:", error);
+      usoChat.marcarError();
+      usoEmbed.marcarError();
+      const msg = error instanceof Error ? error.message : "Error desconocido";
+
+      // Mensaje util para el usuario segun el tipo de fallo, en vez de un
+      // "hubo un error" generico que no dice si reintentar o avisar a alguien.
+      let visible = "Ha habido un problema al procesar tu consulta. Intentalo de nuevo.";
+      if (msg.includes("aborted") || msg.toLowerCase().includes("timeout")) {
+        visible = "La consulta ha tardado demasiado y se ha cancelado. Prueba con una pregunta mas concreta.";
+      } else if (msg.includes("OpenAI chat 429") || msg.includes("OpenAI embeddings 429")) {
+        visible = "El servicio de IA esta saturado ahora mismo. Espera unos segundos y vuelve a intentarlo.";
+      } else if (msg.includes("OpenAI chat 401") || msg.includes("OpenAI embeddings 401")) {
+        visible = "El asistente no esta bien configurado (clave de OpenAI no valida). Avisa al administrador.";
+      } else if (msg.startsWith("OpenAI")) {
+        visible = "El servicio de IA no ha respondido. Intentalo de nuevo en un momento.";
+      }
+
+      return json({ success: false, respuesta: visible, error: msg }, 200);
+    } finally {
+      // Pasa por aqui TODO: exito, error y las salidas tempranas del try. Nunca
+      // lanza (ver _shared/registrar-uso-ia.ts), asi que no puede convertir una
+      // respuesta buena en un 500. Se reutiliza el cliente de service role que
+      // ya existe en lugar de crear otro.
+      await registrarUso([usoChat, usoEmbed], {
+        disparador: `usuario:${user.id}`,
+        duracionMs: Date.now() - inicioMs,
+        cliente: supabase,
+      });
     }
+  };
 
-    if (!respuesta.trim()) {
-      // El modelo agoto los pasos sin redactar. Mejor decirlo que devolver vacio.
-      respuesta = huboFalloDeHerramienta
-        ? "No he podido consultar los datos de facturas en este momento. Vuelve a intentarlo en unos segundos."
-        : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
-    }
-
-    return json({ success: true, respuesta, ...(adjuntos.length > 0 ? { adjuntos } : {}) }, 200);
-  } catch (error) {
-    console.error("[chat-facturas] Error:", error);
-    usoChat.marcarError();
-    usoEmbed.marcarError();
-    const msg = error instanceof Error ? error.message : "Error desconocido";
-
-    // Mensaje util para el usuario segun el tipo de fallo, en vez de un
-    // "hubo un error" generico que no dice si reintentar o avisar a alguien.
-    let visible = "Ha habido un problema al procesar tu consulta. Intentalo de nuevo.";
-    if (msg.includes("aborted") || msg.toLowerCase().includes("timeout")) {
-      visible = "La consulta ha tardado demasiado y se ha cancelado. Prueba con una pregunta mas concreta.";
-    } else if (msg.includes("OpenAI chat 429") || msg.includes("OpenAI embeddings 429")) {
-      visible = "El servicio de IA esta saturado ahora mismo. Espera unos segundos y vuelve a intentarlo.";
-    } else if (msg.includes("OpenAI chat 401") || msg.includes("OpenAI embeddings 401")) {
-      visible = "El asistente no esta bien configurado (clave de OpenAI no valida). Avisa al administrador.";
-    } else if (msg.startsWith("OpenAI")) {
-      visible = "El servicio de IA no ha respondido. Intentalo de nuevo en un momento.";
-    }
-
-    return json({ success: false, respuesta: visible, error: msg }, 200);
-  } finally {
-    // Pasa por aqui TODO: exito, error y las salidas tempranas del try. Nunca
-    // lanza (ver _shared/registrar-uso-ia.ts), asi que no puede convertir una
-    // respuesta buena en un 500. Se reutiliza el cliente de service role que
-    // ya existe en lugar de crear otro.
-    await registrarUso([usoChat, usoEmbed], {
-      disparador: `usuario:${user.id}`,
-      duracionMs: Date.now() - inicioMs,
-      cliente: supabase,
-    });
-  }
+  const peticion = await req.clone().json().catch(() => null);
+  const texto = String(peticion?.mensaje ?? "").trim();
+  if (!texto) return await ejecutar();
+  const guardada = await sinDuplicar(`${user.id}|${peticion?.session_id ?? ""}|${texto}`, async () => {
+    const r = await ejecutar();
+    return { status: r.status, cuerpo: await r.text() };
+  });
+  return new Response(guardada.cuerpo, {
+    status: guardada.status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 }));
