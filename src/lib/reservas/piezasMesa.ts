@@ -623,3 +623,68 @@ export function geometriaServicio(f: FilaMesaPiezas, e: EstadoMesa | undefined):
     vertical,
   };
 }
+
+// ─── Volver al plano base ────────────────────────────────────────────────────
+
+/** Reserva del servicio con lo necesario para avisar por su nombre. */
+export interface ReservaServicio extends ReservaEnMesas {
+  nombre: string;
+  hora: string;
+}
+
+export interface AfectadaPorBase {
+  reservaId: string;
+  nombre: string;
+  hora: string;
+  comensales: number;
+  plazasAntes: number;
+  plazasDespues: number;
+  /** Estaba sentada en una fila unida que se va a separar. */
+  porUnion: boolean;
+  /** Tras volver al plano base no caben (y antes había más sitio). */
+  sinSitio: boolean;
+}
+
+/**
+ * Qué reservas del servicio se ven afectadas si se borran TODOS los ajustes y
+ * las mesas vuelven al plano base. No se quita ninguna asignación: solo se
+ * avisa de quién se queda pasado de plazas o dependía de juntar mesas.
+ * `capacidadActual` da las plazas de hoy de cualquier mesa (también de las que
+ * no van por piezas, que no cambian).
+ */
+export function afectadasAlVolverABase(
+  mesas: MesaPiezas[],
+  estadoActual: EstadoServicio,
+  reservas: ReservaServicio[],
+  capacidadActual: (mesaId: string) => number,
+): AfectadaPorBase[] {
+  const porId = new Map(mesas.map((m) => [m.id, m]));
+  const base = estadoServicio(mesas, []);
+  const afectadas: AfectadaPorBase[] = [];
+  for (const r of reservas) {
+    if (r.mesaIds.length === 0) continue;
+    let plazasAntes = 0;
+    let plazasDespues = 0;
+    for (const id of r.mesaIds) {
+      const m = porId.get(id);
+      const actual = capacidadActual(id);
+      plazasAntes += actual;
+      plazasDespues += m ? plazasMesa(m, base.get(id)!) : actual;
+    }
+    const porUnion = r.mesaIds.some((id) => porId.has(id) && estaJunta(estadoActual, id));
+    const sinSitio = plazasDespues < r.comensales && plazasDespues < plazasAntes;
+    if (porUnion || sinSitio) {
+      afectadas.push({
+        reservaId: r.reservaId,
+        nombre: r.nombre,
+        hora: r.hora,
+        comensales: r.comensales,
+        plazasAntes,
+        plazasDespues,
+        porUnion,
+        sinSitio,
+      });
+    }
+  }
+  return afectadas.sort((a, b) => a.hora.localeCompare(b.hora));
+}

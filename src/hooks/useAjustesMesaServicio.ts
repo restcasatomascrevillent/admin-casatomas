@@ -67,3 +67,29 @@ export function useGuardarAjustesMesa(espacioId: string, fecha: string, turno: T
     onSettled: () => qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA, espacioId, fecha, turno] }),
   });
 }
+
+/**
+ * «Volver al plano base»: borra TODOS los ajustes de ese servicio y sala. No
+ * toca asignaciones. Con RLS sin permiso el DELETE no falla: devuelve 0 filas,
+ * por eso se compara con las que había.
+ */
+export function useVolverAPlanoBase(espacioId: string, fecha: string, turno: TurnoServicio | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (esperadas: number) => {
+      if (!turno) throw new Error("Elige comida o cena.");
+      const { data, error } = await supabase
+        .from("ajustes_mesa_servicio")
+        .delete()
+        .eq("espacio_id", espacioId)
+        .eq("fecha", fecha)
+        .eq("turno", turno)
+        .select("id");
+      if (error) throw error;
+      if (esperadas > 0 && (data ?? []).length === 0) throw new Error("No tienes permiso para cambiar las mesas.");
+      return (data ?? []).length;
+    },
+    onError: (e: Error) => toast.error(`No se ha podido volver al plano base: ${e.message}`),
+    onSettled: () => qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA, espacioId, fecha, turno] }),
+  });
+}

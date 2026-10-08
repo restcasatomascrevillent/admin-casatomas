@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  afectadasAlVolverABase,
   aplicarCambios,
   cambiarPlazas,
   cambiarPico,
@@ -265,5 +266,32 @@ describe("sitios de la Terraza (sin piezas, plazas 2-6)", () => {
     expect(mas).toEqual(["10", "11", "2", "3", "5", "8"]);
     const tres = aplicarCambios(e, juntar(TERRAZA[6], TERRAZA[7], e));
     expect(mesasDeLaUnion(tres, "t8").sort()).toEqual(["t6", "t7", "t8"]);
+  });
+});
+
+describe("volver al plano base", () => {
+  it("avisa de quien se queda sin sitio y de quien dependía de una unión", () => {
+    const r7 = proponerParaSentar({ mesas: COMEDOR, estado: base(), reservas: [], mesaId: "m3", comensales: 7 });
+    let e = aplicarCambios(base(), r7.propuestas[0].cambios);
+    const diez = COMEDOR.find((x) => x.id === "m10")!;
+    const siete = COMEDOR.find((x) => x.id === "m7")!;
+    e = aplicarCambios(e, juntar(diez, siete, e));
+    const porId = new Map(COMEDOR.map((m) => [m.id, m]));
+    const capacidad = (id: string) => plazasMesa(porId.get(id)!, e.get(id)!);
+
+    const afectadas = afectadasAlVolverABase(
+      COMEDOR,
+      e,
+      [
+        { reservaId: "a", nombre: "Ana", hora: "14:00", comensales: 7, mesaIds: ["m3"] },
+        { reservaId: "b", nombre: "Bea", hora: "13:30", comensales: 8, mesaIds: ["m10", "m7"] },
+        { reservaId: "c", nombre: "Carlos", hora: "15:00", comensales: 4, mesaIds: ["m4"] },
+        { reservaId: "d", nombre: "Dani", hora: "14:30", comensales: 2, mesaIds: [] },
+      ],
+      capacidad,
+    );
+    expect(afectadas.map((a) => a.nombre)).toEqual(["Bea", "Ana"]);
+    expect(afectadas[0]).toMatchObject({ porUnion: true, sinSitio: false, plazasDespues: 8 });
+    expect(afectadas[1]).toMatchObject({ porUnion: false, sinSitio: true, plazasAntes: 7, plazasDespues: 4 });
   });
 });

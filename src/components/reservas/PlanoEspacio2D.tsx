@@ -105,8 +105,14 @@ import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { useAjustesMesaServicio, useGuardarAjustesMesa, type TurnoServicio } from "@/hooks/useAjustesMesaServicio";
 import {
+  useAjustesMesaServicio,
+  useGuardarAjustesMesa,
+  useVolverAPlanoBase,
+  type TurnoServicio,
+} from "@/hooks/useAjustesMesaServicio";
+import {
+  afectadasAlVolverABase,
   aplicarCambios,
   estadoServicio,
   geometriaServicio,
@@ -171,6 +177,7 @@ import {
   useDraggable,
 } from "@dnd-kit/core";
 import {
+  RotateCcw,
   Plus,
   Trash2,
   ArrowLeft,
@@ -1166,6 +1173,12 @@ export function PlanoEspacio2D({
   );
 
   const mesasPorId = useMemo(() => new Map(mesasVista.map((m) => [m.id, m])), [mesasVista]);
+
+  // «Volver al plano base»: borra los ajustes de ESTE servicio y sala, previa
+  // confirmación nombrando las reservas afectadas. Las asignaciones no se tocan.
+  const volverABase = useVolverAPlanoBase(espacioId, fechaSel, turnoServicio);
+  const [confirmarBase, setConfirmarBase] = useState(false);
+  const numAjustes = turnoServicio ? (ajustesServicio ?? []).length : 0;
   const asignacionesPorReserva = useMemo(() => agruparPorReserva(asignacionesTurno), [asignacionesTurno]);
 
   /**
@@ -1231,6 +1244,25 @@ export function PlanoEspacio2D({
   const reservasConMesa = useMemo(
     () => reservasTurno.filter((r) => mesaIdsDe(r.id).length > 0),
     [reservasTurno, mesaIdsDe],
+  );
+
+  const afectadasBase = useMemo(
+    () =>
+      confirmarBase
+        ? afectadasAlVolverABase(
+            mesasPiezas,
+            estadoPiezas,
+            reservasTurno.map((r) => ({
+              reservaId: r.id,
+              nombre: r.nombre,
+              hora: horaCorta(r.hora),
+              comensales: r.numero_comensales,
+              mesaIds: mesaIdsDe(r.id),
+            })),
+            (id) => mesasPorId.get(id)?.capacidad ?? 0,
+          )
+        : [],
+    [confirmarBase, mesasPiezas, estadoPiezas, reservasTurno, mesaIdsDe, mesasPorId],
   );
 
   // ── Salto: abrir señalando una reserva, lista para sentar ─────────────────
@@ -2372,6 +2404,19 @@ export function PlanoEspacio2D({
               <Undo2 className="mr-2 h-4 w-4" />
               Deshacer
             </Button>
+            {turnoServicio && mesasPiezas.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 touch-manipulation"
+                onClick={() => setConfirmarBase(true)}
+                disabled={numAjustes === 0 || volverABase.isPending}
+                title={numAjustes === 0 ? "Este servicio ya está como el plano base" : undefined}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Volver al plano base
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={() => setShowAddMesa(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Mesa
@@ -3149,6 +3194,56 @@ export function PlanoEspacio2D({
 
         {/* ── Editor de la reserva elegida con el lápiz de su fila ─────────── */}
         {dialogoEdicion}
+        <AlertDialog open={confirmarBase} onOpenChange={(abierto) => !abierto && setConfirmarBase(false)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Volver al plano base?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se deshacen {numAjustes} {numAjustes === 1 ? "ajuste" : "ajustes"} (picos, piezas prestadas, uniones) de{" "}
+                {espacioNombre}, {fechaCorta(fechaSel)} {etiquetaFiltroTurno(filtroTurno).toLowerCase()}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {afectadasBase.length > 0 && (
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">
+                <p className="font-medium">Estas reservas conservan su mesa, pero:</p>
+                <ul className="space-y-1">
+                  {afectadasBase.map((a) => (
+                    <li key={a.reservaId}>
+                      <span className="font-medium">{a.nombre}</span> · {a.hora} · {a.comensales} pax —{" "}
+                      {a.sinSitio
+                        ? `quedará pasada de plazas (${a.plazasDespues} para ${a.comensales})`
+                        : "sus mesas dejan de estar juntas"}
+                      {a.sinSitio && a.porUnion && " y sus mesas dejan de estar juntas"}
+                    </li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground">No se quita ninguna asignación: revísalas después en el panel.</p>
+              </div>
+            )}
+            <AlertDialogFooter>
+              <AlertDialogCancel className="h-11" disabled={volverABase.isPending}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="h-11"
+                disabled={volverABase.isPending}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  try {
+                    await volverABase.mutateAsync(numAjustes);
+                    toast.success(`${espacioNombre} vuelve al plano base en este servicio`);
+                  } catch {
+                    // El aviso lo pone el hook.
+                  } finally {
+                    setConfirmarBase(false);
+                  }
+                }}
+              >
+                Volver al plano base
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <DialogoPropuestaPiezas
           propuesta={propuestaPiezas}
           ocupado={guardarAjustes.isPending || asignarMesas.isPending}
