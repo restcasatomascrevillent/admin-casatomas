@@ -127,10 +127,45 @@ export const useLineasProducto = (producto: number | "sin" | null) =>
     staleTime: 30_000,
   });
 
+/** Unidad del contenido de una caja/envase (productos_catalogo.contenido_unidad). */
+export type UnidadContenido = "kg" | "l" | "ud";
+
+/** Contenido por defecto de un producto del catálogo (null = sin poner). */
+export interface ContenidoProducto {
+  cantidad: number | null;
+  unidad: UnidadContenido | null;
+}
+
+/**
+ * Contenido por caja/unidad del producto (columnas productos_catalogo.contenido_*,
+ * migración 20261008140000). Sirve para comparar precios en €/kg o €/l cuando la
+ * línea de la factura no dice cuánto trae el envase.
+ */
+export const useContenidoProducto = (productoId: number | null) =>
+  useQuery({
+    queryKey: [CLAVE_PRODUCTOS, "contenido", productoId],
+    enabled: productoId !== null,
+    queryFn: async (): Promise<ContenidoProducto> => {
+      const { data, error } = await supabase
+        .from("productos_catalogo")
+        .select("contenido_cantidad, contenido_unidad")
+        .eq("id", productoId as number)
+        .maybeSingle();
+      if (error) throw error;
+      const c = data as { contenido_cantidad: number | string | null; contenido_unidad: string | null } | null;
+      return {
+        cantidad: c?.contenido_cantidad == null ? null : Number(c.contenido_cantidad),
+        unidad: (c?.contenido_unidad as UnidadContenido | null) ?? null,
+      };
+    },
+    staleTime: 30_000,
+  });
+
 export function invalidarProductos(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: [CLAVE_PRODUCTOS] });
   qc.invalidateQueries({ queryKey: ["facturas"] });
   qc.invalidateQueries({ queryKey: ["albaranes"] });
+  qc.invalidateQueries({ queryKey: ["compras"] });   // gráficas y comparaciones de Compras
 }
 
 /** Mensaje legible de un error de Supabase/PostgREST. */
@@ -152,6 +187,21 @@ function useMutacionProductos<A, R>(fn: (a: A) => Promise<R>, ok: (r: R, a: A) =
     onError: (e) => toast.error("No se ha guardado", { description: mensajeError(e) }),
   });
 }
+
+/** Guarda (o quita, con cantidad null) el contenido por defecto de un producto. */
+export const useGuardarContenidoProducto = () =>
+  useMutacionProductos(
+    async (a: { id: number; cantidad: number | null; unidad: UnidadContenido | null }) => {
+      const { error } = await rpc("productos_contenido_guardar", {
+        p_producto_id: a.id,
+        p_cantidad: a.cantidad,
+        p_unidad: a.cantidad === null ? null : a.unidad,
+      });
+      if (error) throw error;
+      return a;
+    },
+    (a) => (a.cantidad === null ? "Contenido quitado" : "Contenido guardado"),
+  );
 
 export const useRenombrarProducto = () =>
   useMutacionProductos(

@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
 import { formatCurrency, formatDateCorta, formatNumero } from "@/components/facturas/shared/formatters";
 import { DetalleProductoDialog } from "@/components/facturas/productos/DetalleProductoDialog";
+import { ContenidoProducto } from "./ContenidoProducto";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useCategoriasProducto, useLineasProducto, useResumenProductos, type LineaProducto } from "@/hooks/useProductosCatalogo";
 import { useSeriePrecioProducto } from "@/hooks/useCompras";
@@ -43,6 +44,7 @@ function agruparPorDocumento(lineas: LineaProducto[]): DocumentoDelProducto[] {
  * Compras › Productos › ficha: la evolución del precio (una línea por
  * proveedor) y los documentos en los que aparece; al tocar uno se salta a él.
  * «Editar producto» abre el diálogo de siempre (nombre, categoría, mover líneas).
+ * Debajo, el contenido por caja o unidad (para comparar precios en €/kg o €/l).
  */
 export function FichaProducto({
   productoId,
@@ -93,6 +95,8 @@ export function FichaProducto({
           <Pencil className="h-4 w-4" aria-hidden="true" /> {puedeEditar ? "Editar producto" : "Ver líneas del producto"}
         </Button>
       </header>
+
+      <ContenidoProducto productoId={productoId} puedeEditar={puedeEditar} />
 
       <section aria-label="Evolución del precio">
         {serieQ.isLoading ? (

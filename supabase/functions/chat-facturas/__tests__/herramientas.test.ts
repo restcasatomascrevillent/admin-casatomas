@@ -681,4 +681,21 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(separarAdjunto("historial_precios", serie)).toEqual({ data: serie, adjunto: null });
     expect(marcarResultado("grafico_precio", { ...vacio }, null)).toMatchObject({ sin_datos: true, aviso_vacio: expect.any(String) });
   });
+
+  it("separarAdjunto: el modelo ve de dónde viene el precio convertido (caja de 10 kg → €/kg)", () => {
+    const serie = {
+      producto: "Jamón", unidad: "kg", proveedores: ["Osborne"], puntos: [["2026-01-15", 51.94, 0]],
+      n: 1, min: 51.94, max: 51.94, ultimo: 51.94, variacion_pct: null, convertido_desde: "caja de 10 kg",
+    };
+    const { data } = separarAdjunto("grafico_precio", serie);
+    expect(data).toMatchObject({ unidad: "kg", convertido_desde: "caja de 10 kg", grafico_adjunto: true });
+  });
+
+  it("el prompt manda decir «te dejo la gráfica debajo» sin preguntar, y citar el precio convertido", () => {
+    const p = systemPrompt("2026-10-08");
+    expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
+    expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
+    expect(p.length).toBeLessThanOrEqual(5730);
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(9620);
+  });
 });

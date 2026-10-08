@@ -3379,6 +3379,8 @@ export type Database = {
       productos_catalogo: {
         Row: {
           categoria_id: number | null
+          contenido_cantidad: number | null
+          contenido_unidad: string | null
           created_at: string
           creado_por: string | null
           id: number
@@ -3390,6 +3392,8 @@ export type Database = {
         }
         Insert: {
           categoria_id?: number | null
+          contenido_cantidad?: number | null
+          contenido_unidad?: string | null
           created_at?: string
           creado_por?: string | null
           id?: never
@@ -3401,6 +3405,8 @@ export type Database = {
         }
         Update: {
           categoria_id?: number | null
+          contenido_cantidad?: number | null
+          contenido_unidad?: string | null
           created_at?: string
           creado_por?: string | null
           id?: never
@@ -3425,6 +3431,9 @@ export type Database = {
           albaran_ref: string | null
           bultos: number | null
           cantidad: number
+          contenido_cantidad: number | null
+          contenido_origen: string | null
+          contenido_unidad: string | null
           created_at: string | null
           embedding: string | null
           factura_id: number
@@ -3443,6 +3452,9 @@ export type Database = {
           albaran_ref?: string | null
           bultos?: number | null
           cantidad?: number
+          contenido_cantidad?: number | null
+          contenido_origen?: string | null
+          contenido_unidad?: string | null
           created_at?: string | null
           embedding?: string | null
           factura_id: number
@@ -3461,6 +3473,9 @@ export type Database = {
           albaran_ref?: string | null
           bultos?: number | null
           cantidad?: number
+          contenido_cantidad?: number | null
+          contenido_origen?: string | null
+          contenido_unidad?: string | null
           created_at?: string | null
           embedding?: string | null
           factura_id?: number
@@ -5413,6 +5428,10 @@ export type Database = {
         Returns: Json
       }
       productos_borrar: { Args: { p_producto_id: number }; Returns: undefined }
+      productos_contenido_guardar: {
+        Args: { p_cantidad: number | null; p_producto_id: number; p_unidad: string | null }
+        Returns: Json
+      }
       productos_fusionar: {
         Args: { p_destino_id: number; p_origen_ids: number[] }
         Returns: Json
