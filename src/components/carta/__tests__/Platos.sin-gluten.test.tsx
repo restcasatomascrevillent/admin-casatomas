@@ -24,9 +24,17 @@ describe('Marcador sin gluten al crear y editar platos', () => {
   it('incluye el marcador al crear un plato', async () => {
     render(<PlatoForm open onOpenChange={vi.fn()} categoriaInicial="SNACK" />);
     fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Croquetas' } });
+    expect(screen.queryByRole('checkbox', { name: 'Se puede hacer sin gluten' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Gluten', exact: true }));
     const checkbox = screen.getByRole('checkbox', { name: 'Se puede hacer sin gluten' });
     expect(checkbox).not.toBeChecked();
     fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: 'Gluten', exact: true }));
+    expect(screen.queryByRole('checkbox', { name: 'Se puede hacer sin gluten' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Gluten', exact: true }));
+    const checkboxRestablecido = screen.getByRole('checkbox', { name: 'Se puede hacer sin gluten' });
+    expect(checkboxRestablecido).not.toBeChecked();
+    fireEvent.click(checkboxRestablecido);
     fireEvent.click(screen.getByRole('button', { name: 'Guardar Plato' }));
     await waitFor(() => expect(mutaciones.crear).toHaveBeenCalledWith(expect.objectContaining({ nombre: 'Croquetas', sin_gluten_disponible: true })));
   });
@@ -36,6 +44,11 @@ describe('Marcador sin gluten al crear y editar platos', () => {
     const checkbox = screen.getByRole('checkbox', { name: 'Se puede hacer sin gluten' });
     await waitFor(() => expect(checkbox).toBeChecked());
     fireEvent.click(checkbox);
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole('button', { name: 'Gluten', exact: true }));
+    expect(screen.queryByRole('checkbox', { name: 'Se puede hacer sin gluten' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Gluten', exact: true }));
+    expect(screen.getByRole('checkbox', { name: 'Se puede hacer sin gluten' })).not.toBeChecked();
     fireEvent.click(screen.getByRole('button', { name: /guardar/i }));
     await waitFor(() => expect(mutaciones.actualizar).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1', sin_gluten_disponible: false, alergenos_oficiales: ['gluten'] })));
   });

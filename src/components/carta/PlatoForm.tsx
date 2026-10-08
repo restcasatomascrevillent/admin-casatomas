@@ -66,6 +66,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
   const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
   const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
   const [nuevoAlergeno, setNuevoAlergeno] = useState("");
+  const tieneGluten = alergenosSeleccionados.includes("gluten");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -81,6 +82,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
   });
 
   const toggleAlergeno = (id: string) => {
+    if (id === "gluten" && tieneGluten) {
+      form.setValue("sin_gluten_disponible", false, { shouldDirty: true });
+    }
     setAlergenosSeleccionados(prev => 
       prev.includes(id) 
         ? prev.filter(a => a !== id)
@@ -147,7 +151,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion,
-        sin_gluten_disponible: values.sin_gluten_disponible,
+        sin_gluten_disponible: todosAlergenos.includes("gluten") && values.sin_gluten_disponible,
         ingredientes: values.ingredientes,
         unidad: values.unidad,
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
@@ -448,19 +452,21 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               )}
             </div>
 
-            <FormField
-              control={form.control}
-              name="sin_gluten_disponible"
-              render={({ field }) => (
-                <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
-                  </FormControl>
-                  <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {tieneGluten && (
+              <FormField
+                control={form.control}
+                name="sin_gluten_disponible"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
+                    </FormControl>
+                    <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex justify-end gap-2">
               <Button

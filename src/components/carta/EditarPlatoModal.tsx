@@ -82,6 +82,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
   const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
   const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
   const [nuevoAlergeno, setNuevoAlergeno] = useState("");
+  const tieneGluten = alergenosSeleccionados.includes("gluten");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -109,7 +110,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
       categoria: plato.categoria ?? "",
       precio_eur: plato.precio_eur ?? 0,
       descripcion: plato.descripcion ?? "",
-      sin_gluten_disponible: plato.sin_gluten_disponible === true,
+      sin_gluten_disponible: oficiales.includes("gluten") && plato.sin_gluten_disponible === true,
       ingredientes: plato.ingredientes ?? "",
       unidad: plato.unidad ?? "",
     });
@@ -127,6 +128,9 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
   }, [open, plato, form]);
 
   const toggleAlergeno = (id: string) => {
+    if (id === "gluten" && tieneGluten) {
+      form.setValue("sin_gluten_disponible", false, { shouldDirty: true });
+    }
     setAlergenosSeleccionados((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
@@ -244,7 +248,7 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion?.trim() || null,
-        sin_gluten_disponible: values.sin_gluten_disponible,
+        sin_gluten_disponible: alergenos.includes("gluten") && values.sin_gluten_disponible,
         ingredientes: values.ingredientes?.trim() || null,
         unidad: values.unidad?.trim() || null,
         alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
@@ -504,19 +508,21 @@ export function EditarPlatoModal({ open, onOpenChange, plato }: EditarPlatoModal
               )}
             </div>
 
-            <FormField
-              control={form.control}
-              name="sin_gluten_disponible"
-              render={({ field }) => (
-                <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
-                  </FormControl>
-                  <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {tieneGluten && (
+              <FormField
+                control={form.control}
+                name="sin_gluten_disponible"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
+                    <FormControl>
+                      <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
+                    </FormControl>
+                    <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
