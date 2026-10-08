@@ -12,7 +12,7 @@ let isSuperAdmin: typeof import("@/config/permissions").isSuperAdmin;
 let SUPER_ADMIN_EMAILS: typeof import("@/config/permissions").SUPER_ADMIN_EMAILS;
 
 beforeAll(async () => {
-  vi.stubEnv("VITE_SUPER_ADMIN_EMAILS", " miguelsantiagores@gmail.com , info@casatomas.es ");
+  vi.stubEnv("VITE_SUPER_ADMIN_EMAILS", " MiguelSantiagoRes@Gmail.com , info@casatomas.es ,, ");
   vi.resetModules();
   ({ isSuperAdmin, SUPER_ADMIN_EMAILS } = await import("@/config/permissions"));
 });
@@ -31,6 +31,11 @@ describe("isSuperAdmin", () => {
   it("es case-insensitive: acepta emails en mayúsculas", () => {
     expect(isSuperAdmin("MIGUELSANTIAGORES@GMAIL.COM")).toBe(true);
     expect(isSuperAdmin("INFO@CASATOMAS.ES")).toBe(true);
+  });
+
+  it("normaliza el env con mayúsculas, espacios y entradas vacías", () => {
+    expect(SUPER_ADMIN_EMAILS).toEqual(["miguelsantiagores@gmail.com", "info@casatomas.es"]);
+    expect(isSuperAdmin("miguelsantiagores@gmail.com")).toBe(true);
   });
 
   it("devuelve false para un email desconocido", () => {
