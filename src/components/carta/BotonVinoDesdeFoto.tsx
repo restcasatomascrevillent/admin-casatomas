@@ -3,6 +3,7 @@ import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { redimensionarFoto } from "./redimensionarFoto";
 
 /** Datos que devuelve la Edge Function `extraer-vino-foto` (campos de `Vinos`). */
 export interface DatosVinoFoto {
@@ -20,24 +21,6 @@ export interface VinoDesdeFoto {
   datos: DatosVinoFoto;
   /** La foto ya redimensionada, para usarla como imagen del vino si se quiere. */
   foto: File;
-}
-
-const LADO_MAX = 1024;
-
-/** Redimensiona a ~1024px de lado mayor y la pasa a JPEG 0.8 (ahorra tokens y subida). */
-async function redimensionar(file: File): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
-  const escala = Math.min(1, LADO_MAX / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * escala);
-  canvas.height = Math.round(bitmap.height * escala);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas no disponible");
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("No se pudo comprimir la foto"))), "image/jpeg", 0.8),
-  );
 }
 
 function aDataUrl(blob: Blob): Promise<string> {
@@ -75,16 +58,33 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
     setLeyendo(true);
     setMiniatura(URL.createObjectURL(file));
     try {
-      const blob = await redimensionar(file);
-      const imagen = await aDataUrl(blob);
+      const r = await redimensionarFoto(file);
+      const imagen = await aDataUrl(r.blob);
+      // Diagnóstico desde el móvil (chrome://inspect): qué se manda realmente a la IA.
+      console.info("[extraer-vino-foto] foto", {
+        tipo: file.type || "(vacío)",
+        bytesOriginal: file.size,
+        original: `${r.original.ancho}x${r.original.alto}`,
+        final: `${r.final.ancho}x${r.final.alto}`,
+        metodo: r.metodo,
+        bytesBase64: imagen.length,
+      });
       const { data, error } = await supabase.functions.invoke("extraer-vino-foto", {
         body: { imagen, categorias: categorias.filter(Boolean) },
       });
       if (error || !data?.ok || !data?.vino) {
         throw new Error(data?.error || error?.message || "Respuesta vacía");
       }
-      const foto = new File([blob], "botella.jpg", { type: "image/jpeg" });
-      onLeido({ datos: data.vino as DatosVinoFoto, foto });
+      const datos = data.vino as DatosVinoFoto;
+      const recibidos = Object.entries(datos)
+        .filter(([, v]) => v !== null && v !== "" && v !== false)
+        .map(([k]) => k);
+      console.info("[extraer-vino-foto] campos recibidos", recibidos);
+      if (!datos.nombre) {
+        toast.warning("No se ha podido leer el nombre en la etiqueta. Revisa los datos o prueba con una foto más cerca y con luz.");
+      }
+      const foto = new File([r.blob], "botella.jpg", { type: "image/jpeg" });
+      onLeido({ datos, foto });
     } catch (e) {
       console.error("[extraer-vino-foto]", e);
       toast.error("No se pudo leer la etiqueta. Prueba con otra foto o añádelo a mano.");
