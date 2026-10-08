@@ -82,6 +82,8 @@ interface Ctx {
    */
   usoChat: AcumuladorUso;
   usoEmbed: AcumuladorUso;
+  /** Mensaje del usuario: un conteo o «la ultima factura» no lleva avisos de importe (marcarResultado). */
+  pregunta: string;
 }
 
 // ─── Utilidades ──────────────────────────────────────────────────────────────
@@ -178,7 +180,7 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx):
       }
     }
 
-    return { fallo: false, contenido: recortar(JSON.stringify(marcarResultado(nombre, data, ll.limite))) };
+    return { fallo: false, contenido: recortar(JSON.stringify(marcarResultado(nombre, data, ll.limite, ctx.pregunta))) };
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "error en herramienta";
     console.error(`[chat-facturas] tool ${nombre} fallo:`, msg);
@@ -298,6 +300,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       embeddings: new Map(),
       usoChat,
       usoEmbed,
+      pregunta: String(mensaje),
     };
     let respuesta = "";
     let huboFalloDeHerramienta = false;

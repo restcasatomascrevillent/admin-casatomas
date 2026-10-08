@@ -15,6 +15,7 @@ import {
   FILTROS_FLEX,
   LIMITES,
   marcarResultado,
+  sinAvisosDeImporte,
   METRICAS_FLEX,
   necesitaRespaldoSemantico,
   prepararLlamada,
@@ -99,7 +100,9 @@ describe("TOOLS", () => {
     // 5.997 antes de compras_producto (07/10/2026); la nueva suma ~920 (~230 tokens por ronda).
     // 6.918 antes de gasto_por_categoria + variacion_precios (07/10/2026): 8.180 con ellas
     // (+1.262, ~315 tokens por ronda; strict mode obliga a declarar sus 11 parametros).
-    expect(tamano).toBeLessThan(8_200);
+    // 8.628 con los parametros por defecto (08/10/2026: fechas y tipo null salvo que el usuario
+    // los diga, +448 ~ 110 tokens por ronda; el modelo ponia "este año" y tipo=factura).
+    expect(tamano).toBeLessThan(8_700);
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -137,7 +140,7 @@ describe("systemPrompt", () => {
   });
 
   it("conteos: solo numeros, sin importes ni avisos (prueba 3: q04, q12, q13)", () => {
-    expect(p).toMatch(/Pregunta de cuantos: solo los numeros pedidos; sin importes ni avisos de parcial/);
+    expect(p).toMatch(/Pregunta de cuantos o de UN documento \(la ultima factura\): solo lo pedido; sin avisos de parcial/);
     const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
     expect(filtrar.description).toMatch(/los demas filtros solo cuentan/);
   });
@@ -202,12 +205,14 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/compras_producto: cuanto se compro de UN producto, a quien y a que precio medio/);
     expect(p).toMatch(/12\. compras_producto: di unidad, periodo y variantes contadas \(productos_coincidentes\); nunca sumes unidades distintas/);
     expect(p).toMatch(/"aproximada": avisa de que no es el nombre exacto/);
-    expect(p).toMatch(/fuera_del_filtro di cuando si hubo; con sugerencias pregunta si es alguna/);
+    expect(p).toMatch(/sin_datos: dilo y da ultimo_dato \(fecha, cantidad, proveedor\) si viene; con sugerencias pregunta si es alguna/);
+    expect(p).toMatch(/una_compra: solo hubo una, no hay evolucion/);
     expect(p).toMatch(/incluye_albaranes: el importe es lo recibido \(facturas \+ albaranes, criterio\), no gasto facturado/);
     const d = TOOLS.find((t) => t.function.name === "compras_producto")!.function.description;
     expect(d).toMatch(/cuanto, a quien y a que precio/);
     expect(d).toMatch(/centollo=centolla/);
-    expect(d).toMatch(/este año = AAAA-01-01\.\.hoy; este trimestre = su primer dia\.\.hoy; el mes pasado = dia 1\.\.ultimo dia/);
+    expect(d).toMatch(/Sin periodo en la pregunta: desde\/hasta null = todo el historico/);
+    expect(d).not.toMatch(/este año =/);
   });
 
   it("gasto por categoria y subidas de precio: periodo, sin IVA, sin clasificar, cambio de proveedor (07/10/2026)", () => {
@@ -223,11 +228,27 @@ describe("systemPrompt", () => {
     expect((v.parameters as Esquema).properties.sentido.enum).toEqual(["subidas", "bajadas", "ambas", null]);
   });
 
+  it("parametros por defecto: periodo y tipo null salvo que el usuario los diga (prueba del 07/10)", () => {
+    expect(p).toMatch(/solo si el usuario dice un periodo; si no, desde\/hasta null = todo el historico/);
+    expect(p).toMatch(/"que X compro mas" con X categoria \(licor, vino\): sus top_productos/);
+    expect(p).toMatch(/"Sin X" \(sin las cajas\): repite con excluir=X/);
+    expect(p).toMatch(/Por meses: solo los meses que trae la herramienta/);
+    expect(p).toMatch(/sin_comparar: da su ultima compra \(una_compra: no hay subida ni bajada\)/);
+    for (const nombre of ["compras_producto", "gasto_por_categoria", "variacion_precios"]) {
+      const props = (TOOLS.find((t) => t.function.name === nombre)!.function.parameters as Esquema).properties;
+      expect(props.desde.description, nombre).toMatch(/null salvo periodo dicho por el usuario/);
+      expect(props.hasta.description, nombre).toMatch(/null salvo periodo dicho por el usuario/);
+      if (props.tipo) expect(props.tipo.description, nombre).toMatch(/null \(ambos\) salvo que diga facturas o albaranes; 'cajas' no es tipo/);
+    }
+  });
+
   it("es mas corto que el anterior (≈ 7.300 caracteres)", () => {
     // 4.045 antes de compras_producto (07/10/2026); su linea y la regla 12 suman ~500.
     // 4.547 antes de gasto_por_categoria/variacion_precios: sus dos lineas y la regla 13
     // suman 416 (~105 tokens por ronda).
-    expect(p.length).toBeLessThan(5_000);
+    // 4.963 antes de los parametros por defecto (08/10/2026): periodo/tipo null, "que X compro
+    // mas", excluir, ultimo_dato, una_compra y sin_comparar suman 385 (~100 tokens por ronda).
+    expect(p.length).toBeLessThan(5_400);
   });
 });
 
@@ -501,6 +522,41 @@ describe("marcarResultado", () => {
       albaranes: { n: 7, valor: 6413.42, si_das_importes: { sin_total: { n: 1, docs: [] } } },
     }, null) as Record<string, unknown>;
     expect(e.aviso_parcial).toBeUndefined();
+  });
+
+  it("conteo o UN documento => sin avisos de importe de otros documentos (prueba del 07/10: q04, q05)", () => {
+    expect(sinAvisosDeImporte("¿Cuántas facturas y cuántos albaranes tengo registrados?")).toBe(true);
+    expect(sinAvisosDeImporte("¿Cuál es la última factura que tengo y cuánto suma?")).toBe(true);
+    expect(sinAvisosDeImporte("¿Cuántos proveedores tengo?")).toBe(true);
+    expect(sinAvisosDeImporte("¿Cuánto he gastado cada mes?")).toBe(false);
+    expect(sinAvisosDeImporte("¿Cuántas facturas hay y cuánto suman?")).toBe(false);
+    expect(sinAvisosDeImporte("Dame las últimas facturas")).toBe(false);
+    expect(sinAvisosDeImporte(undefined)).toBe(false);
+
+    const est = {
+      facturas: { n: 12, gasto: 35342.72, si_das_importes: { sin_total: { n: 1, docs: [] } } },
+      albaranes: { n: 8, valor: 6413.42, si_das_importes: { sin_total: { n: 1, docs: [] } } },
+    };
+    const e = marcarResultado("estadisticas_globales", est, null, "¿Cuántas facturas y cuántos albaranes tengo?") as Record<string, any>;
+    expect(e.facturas).toEqual({ n: 12, gasto: 35342.72 });
+    expect(e.albaranes.si_das_importes).toBeUndefined();
+    // Con importes, se quedan.
+    const g = marcarResultado("estadisticas_globales", est, null, "¿Cuánto he gastado?") as Record<string, any>;
+    expect(g.facturas.si_das_importes).toBeDefined();
+
+    const filtrar = {
+      filas: [{ id: 52, numero: "1 - 701405", total: 15141.34 }], total_filas: 12, truncado: true,
+      sumas: { facturas: { n: 12, total: 35342.72, sin_total: 1, deducidos: 1 } },
+      documentos_sin_total: { n: 1, docs: [{ id: 39 }] },
+      documentos_deducidos: { n: 1, docs: [{ id: 54 }] },
+    };
+    const f = marcarResultado("filtrar_documentos", filtrar, null, "¿Cuál es la última factura que tengo y cuánto suma?") as Record<string, any>;
+    expect(f.aviso_parcial).toBeUndefined();
+    expect(f.documentos_sin_total).toBeUndefined();
+    expect(f.sumas).toEqual({ facturas: { n: 12 } });
+    expect(f.filas[0].total).toBe(15141.34);
+    const t = marcarResultado("filtrar_documentos", filtrar, null, "¿Cuánto suman las facturas de diciembre?") as Record<string, any>;
+    expect(t.aviso_parcial).toMatch(/1 sin total/);
   });
 
   it("compras_producto sin datos => aviso de vacio, conserva sugerencias y fuera_del_filtro", () => {
