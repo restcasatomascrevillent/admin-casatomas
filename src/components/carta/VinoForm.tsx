@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
-import type { VinoDesdeFoto } from "./BotonVinoDesdeFoto";
+import { formatoEuros, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -66,8 +66,13 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   // Precarga desde la foto de la botella (BotonVinoDesdeFoto). Precio vacío
   // a propósito: no se lee de la etiqueta.
   const precargadoRef = useRef(false);
+  // Precarga con la que se abrió (modo lote: avisar al cerrar aunque el padre ya la haya limpiado).
+  const precargaAbiertaRef = useRef<VinoDesdeFoto | null>(null);
   useEffect(() => {
     if (!open) {
+      const anterior = precargaAbiertaRef.current;
+      precargaAbiertaRef.current = null;
+      anterior?.alCerrar?.();
       // Si se cierra sin guardar un formulario precargado, no dejar sus datos
       // para el siguiente «Añadir vino».
       if (precargadoRef.current) {
@@ -80,6 +85,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     }
     if (!precarga) return;
     precargadoRef.current = true;
+    precargaAbiertaRef.current = precarga;
     const d = precarga.datos;
     form.reset({
       nombre: d.nombre ?? "",
@@ -96,6 +102,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     setImagePreview(url);
     return () => URL.revokeObjectURL(url);
   }, [open, precarga, form, categoriaInicial]);
+
+  const sugerido = precarga ? precioSugerido(precarga.datos) : null;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -132,6 +140,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     };
 
     const nuevoVino = await crearVino.mutateAsync(vinoData);
+    precarga?.alGuardar?.();
 
     // Upload image if selected
     if (imageFile && nuevoVino?.id) {
@@ -242,6 +251,25 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               denominaciones={denominaciones}
               regiones={regiones}
               paises={paises}
+              bajoPrecio={
+                sugerido !== null && (
+                  <div className="flex items-center gap-2 rounded-md bg-muted/60 px-2 py-1 text-sm">
+                    <span className="min-w-0 flex-1 text-muted-foreground">
+                      Sugerido: <span className="font-medium text-foreground">{formatoEuros(sugerido)}</span>
+                      {precarga?.datos.precio_razon ? ` — ${precarga.datos.precio_razon}` : ""}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-9 shrink-0"
+                      onClick={() => form.setValue("precio_eur", sugerido, { shouldValidate: true, shouldDirty: true })}
+                    >
+                      Usar
+                    </Button>
+                  </div>
+                )
+              }
             />
 
             <div className="flex justify-end gap-2">
