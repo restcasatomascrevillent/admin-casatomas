@@ -123,24 +123,25 @@ begin
   create temp table _piezas (
     nombre_antes text, pos_antes_x numeric, pos_antes_y numeric,
     nombre text, piezas smallint, picos smallint, picos_max smallint, piezas_max smallint,
-    grupo text, crece text, pos_x numeric, pos_y numeric
+    grupo text, crece text, pos_x numeric, pos_y numeric,
+    mesa_id uuid
   ) on commit drop;
   -- DATOS SEMILLA (fáciles de corregir): una fila por mesa.
   --   nombre_antes/pos_antes = cómo está hoy (para localizar la fila)
   --   nombre | piezas | picos (pico puesto en el plano base) | picos_max (admite pico)
   --   | piezas_max (hueco) | grupo (zona que se pasa piezas) | crece | pos nueva (m)
   insert into _piezas values
-    ('2',  3.92,  0.78, '2',  2, 0, 1, 2, null,           'derecha',   3.92,  0.78),
-    ('3',  6.88,  0.58, '3',  2, 0, 1, 3, 'comedor-3-4',  'derecha',   6.30,  0.58),
-    ('4',  6.88,  2.12, '4',  3, 1, 1, 3, 'comedor-3-4',  'derecha',   6.30,  2.12),
-    ('5',  6.88,  3.65, '5',  3, 1, 1, 3, null,           'derecha',   6.30,  3.65),
-    ('1',  2.93,  3.45, '6',  1, 0, 1, 1, null,           'derecha',   2.93,  3.45),
-    ('6',  7.58, 11.36, '7',  2, 0, 1, 3, 'comedor-7-12', 'derecha',   7.20, 11.36),
-    ('7',  7.58, 12.92, '8',  2, 0, 1, 3, 'comedor-7-12', 'derecha',   7.20, 12.92),
-    ('8',  7.58, 14.48, '9',  2, 0, 1, 3, 'comedor-7-12', 'derecha',   7.20, 14.48),
-    ('9',  5.61, 11.36, '10', 2, 0, 1, 3, 'comedor-7-12', 'izquierda', 5.70, 11.36),
-    ('10', 5.61, 12.92, '11', 2, 0, 1, 3, 'comedor-7-12', 'izquierda', 5.70, 12.92),
-    ('11', 5.61, 14.48, '12', 1, 0, 1, 3, 'comedor-7-12', 'izquierda', 6.25, 14.48);
+    ('2',  3.92,  0.78, '2',  2, 0, 1, 2, null,           'derecha',   3.92,  0.78, null),
+    ('3',  6.88,  0.58, '3',  2, 0, 1, 3, 'comedor-3-4',  'derecha',   6.30,  0.58, null),
+    ('4',  6.88,  2.12, '4',  3, 1, 1, 3, 'comedor-3-4',  'derecha',   6.30,  2.12, null),
+    ('5',  6.88,  3.65, '5',  3, 1, 1, 3, null,           'derecha',   6.30,  3.65, null),
+    ('1',  2.93,  3.45, '6',  1, 0, 1, 1, null,           'derecha',   2.93,  3.45, null),
+    ('6',  7.58, 11.36, '7',  2, 0, 1, 3, 'comedor-7-12', 'derecha',   7.20, 11.36, null),
+    ('7',  7.58, 12.92, '8',  2, 0, 1, 3, 'comedor-7-12', 'derecha',   7.20, 12.92, null),
+    ('8',  7.58, 14.48, '9',  2, 0, 1, 3, 'comedor-7-12', 'derecha',   7.20, 14.48, null),
+    ('9',  5.61, 11.36, '10', 2, 0, 1, 3, 'comedor-7-12', 'izquierda', 5.70, 11.36, null),
+    ('10', 5.61, 12.92, '11', 2, 0, 1, 3, 'comedor-7-12', 'izquierda', 5.70, 12.92, null),
+    ('11', 5.61, 14.48, '12', 1, 0, 1, 3, 'comedor-7-12', 'izquierda', 6.25, 14.48, null);
 
   -- Las mesas activas tienen que ser exactamente las del 02/10 (nombre + sitio).
   if exists (
@@ -154,6 +155,25 @@ begin
   ) then
     raise exception 'Las mesas del Comedor ya no son las del plano del 02/10. Revisar antes de aplicar.';
   end if;
+
+  -- 1) Localizar cada fila UNA vez (nombre de antes + sitio) y guardar su id.
+  update _piezas p set mesa_id = m.id
+  from public.mesas m
+  where m.espacio_id = comedor and m.nombre::text = p.nombre_antes
+    and round(m.pos_x, 2) = p.pos_antes_x and round(m.pos_y, 2) = p.pos_antes_y
+    and coalesce(m.activa, true) and not coalesce(m.is_merged, false);
+  if exists (select 1 from _piezas where mesa_id is null)
+     or (select count(distinct mesa_id) from _piezas) <> 11 then
+    raise exception 'No se han localizado las 11 mesas del Comedor. Revisar antes de aplicar.';
+  end if;
+
+  -- 2) Renumerar en DOS fases: el índice único uq_mesas_espacio_nombre_real
+  --    (espacio_id, lower(btrim(nombre))) se comprueba fila a fila y no se
+  --    puede diferir; un 1→6 directo choca con la 6 que aún no se ha movido.
+  update public.mesas m set nombre = '__tmp_' || m.id::text
+  from _piezas p where m.id = p.mesa_id;
+  get diagnostics n = row_count;
+  if n <> 11 then raise exception 'nombres temporales: % (esperaba 11)', n; end if;
 
   update public.mesas m set
     nombre = p.nombre,
@@ -171,9 +191,7 @@ begin
     pos_x = p.pos_x,
     pos_y = p.pos_y
   from _piezas p
-  where m.espacio_id = comedor and m.nombre::text = p.nombre_antes
-    and round(m.pos_x, 2) = p.pos_antes_x and round(m.pos_y, 2) = p.pos_antes_y
-    and coalesce(m.activa, true) and not coalesce(m.is_merged, false);
+  where m.id = p.mesa_id;
   get diagnostics n = row_count;
   if n <> 11 then raise exception 'mesas actualizadas: % (esperaba 11)', n; end if;
 end;
