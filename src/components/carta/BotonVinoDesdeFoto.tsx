@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -62,9 +62,18 @@ interface Props {
 export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [leyendo, setLeyendo] = useState(false);
+  // Miniatura de la foto recién hecha mientras se lee la etiqueta.
+  const [miniatura, setMiniatura] = useState<string | null>(null);
+
+  // Liberar el object URL al cambiar de miniatura o al desmontar.
+  useEffect(() => {
+    if (!miniatura) return;
+    return () => URL.revokeObjectURL(miniatura);
+  }, [miniatura]);
 
   const procesar = async (file: File) => {
     setLeyendo(true);
+    setMiniatura(URL.createObjectURL(file));
     try {
       const blob = await redimensionar(file);
       const imagen = await aDataUrl(blob);
@@ -81,6 +90,7 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
       toast.error("No se pudo leer la etiqueta. Prueba con otra foto o añádelo a mano.");
     } finally {
       setLeyendo(false);
+      setMiniatura(null);
       if (inputRef.current) inputRef.current.value = "";
     }
   };
@@ -98,6 +108,13 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
           if (file) void procesar(file);
         }}
       />
+      {leyendo && miniatura && (
+        <img
+          src={miniatura}
+          alt="Foto de la botella"
+          className="h-10 w-10 shrink-0 rounded-md border object-cover"
+        />
+      )}
       <Button variant="outline" disabled={leyendo} onClick={() => inputRef.current?.click()}>
         {leyendo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
         {leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}

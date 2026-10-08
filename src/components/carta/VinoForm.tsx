@@ -290,17 +290,29 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               />
               
               {imagePreview ? (
-                <div className="relative w-full h-48 rounded-lg overflow-hidden border">
-                  <img 
-                    src={imagePreview} 
-                    alt="Preview" 
-                    className="w-full h-full object-cover"
+                <div className="relative mx-auto h-56 w-full max-w-xs overflow-hidden rounded-lg border bg-muted">
+                  {/* object-contain: la botella se ve entera (foto vertical del móvil) */}
+                  <img
+                    src={imagePreview}
+                    alt={precarga ? "Foto de la botella" : "Vista previa"}
+                    className="h-full w-full object-contain"
                   />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="absolute bottom-2 right-2 h-11 w-11"
+                    aria-label="Cambiar imagen"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
                   <Button
                     type="button"
                     variant="destructive"
                     size="icon"
                     className="absolute top-2 right-2 h-11 w-11"
+                    aria-label="Quitar imagen"
                     onClick={clearImage}
                   >
                     <X className="h-4 w-4" />
