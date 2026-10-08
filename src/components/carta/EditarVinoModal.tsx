@@ -12,26 +12,13 @@ import {
 } from "@/components/ui/dialog";
 import {
   Form,
-  FormControl,
-  FormField,
-  FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { supabase } from "@/integrations/supabase/client";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
-import {
-  ALERGENOS_OFICIALES,
-  combinarAlergenos,
-  normalizarAlergeno,
-  separarAlergenos,
-} from "@/lib/alergenos";
+import { CamposVino } from "./CamposVino";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -42,7 +29,6 @@ const formSchema = z.object({
   denominacion_origen: z.string().optional(),
   ubicacion_pais: z.string().optional(),
   ubicacion_region: z.string().optional(),
-  alergenos_notas: z.string().optional(),
 });
 
 /**
@@ -74,10 +60,6 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
-  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
-  const [nuevoAlergeno, setNuevoAlergeno] = useState("");
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -89,16 +71,11 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       denominacion_origen: "",
       ubicacion_pais: "",
       ubicacion_region: "",
-      alergenos_notas: "",
     },
   });
 
   useEffect(() => {
     if (!open || !vino) return;
-
-    // Clasifica lo guardado en oficiales (ya en forma canónica) y
-    // personalizados de verdad (mismo criterio que EditarPlatoModal.tsx).
-    const { oficiales, personalizados } = separarAlergenos(vino.alergenos_oficiales);
 
     form.reset({
       nombre: vino.nombre ?? "",
@@ -109,12 +86,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       denominacion_origen: vino.denominacion_origen ?? "",
       ubicacion_pais: vino.ubicacion_pais ?? "",
       ubicacion_region: vino.ubicacion_region ?? "",
-      alergenos_notas: vino.alergenos_notas ?? "",
     });
-
-    setAlergenosSeleccionados(oficiales);
-    setAlergenosPersonalizados(personalizados);
-    setNuevoAlergeno("");
 
     setImageFile(null);
     setImagePreview(vino.imagen_url ?? null);
@@ -123,35 +95,6 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       fileInputRef.current.value = "";
     }
   }, [open, vino, form]);
-
-  const toggleAlergeno = (id: string) => {
-    setAlergenosSeleccionados((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const addAlergenoPersonalizado = () => {
-    const trimmed = nuevoAlergeno.trim();
-    if (!trimmed) return;
-
-    const canonico = normalizarAlergeno(trimmed);
-    if (canonico) {
-      setAlergenosSeleccionados((prev) =>
-        prev.includes(canonico) ? prev : [...prev, canonico]
-      );
-      setNuevoAlergeno("");
-      return;
-    }
-
-    if (!alergenosPersonalizados.includes(trimmed)) {
-      setAlergenosPersonalizados((prev) => [...prev, trimmed]);
-    }
-    setNuevoAlergeno("");
-  };
-
-  const removeAlergenoPersonalizado = (alergeno: string) => {
-    setAlergenosPersonalizados((prev) => prev.filter((item) => item !== alergeno));
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -181,7 +124,6 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
     setIsUploadingImage(true);
     try {
-      const alergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
       let imageUrlUpdate: string | null | undefined = undefined;
 
       if (imageFile) {
@@ -243,8 +185,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         denominacion_origen: values.denominacion_origen?.trim() || null,
         ubicacion_region: values.ubicacion_region?.trim() || null,
         ubicacion_pais: values.ubicacion_pais?.trim() || null,
-        alergenos_notas: values.alergenos_notas?.trim() || null,
-        alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
+        // Sin alergenos_oficiales/alergenos_notas a propósito: el modal ya no
+        // los muestra y así los valores guardados de cada vino no se tocan.
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
       });
 
@@ -269,42 +211,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="nombre"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Nombre del vino" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="categoria"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoría</FormLabel>
-                  <FormControl>
-                    <ComboboxCreatable
-                      value={field.value}
-                      onChange={field.onChange}
-                      options={categorias}
-                      placeholder="Selecciona o crea categoría..."
-                      emptyText="No hay categorías"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <div className="space-y-2">
-              <FormLabel>Imagen</FormLabel>
+              <FormLabel>Foto de la botella</FormLabel>
               <input
                 type="file"
                 ref={fileInputRef}
@@ -314,8 +222,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               />
 
               {imagePreview ? (
-                <div className="relative w-full h-48 rounded-lg overflow-hidden border">
-                  <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                <div className="relative mx-auto h-56 w-full max-w-xs overflow-hidden rounded-lg border bg-muted">
+                  <img src={imagePreview} alt="Foto de la botella" className="h-full w-full object-contain" />
                   <Button
                     type="button"
                     variant="destructive"
@@ -348,201 +256,12 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               </div>
             </div>
 
-            <FormField
+            <CamposVino
               control={form.control}
-              name="precio_eur"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Precio (€)</FormLabel>
-                  <FormControl>
-                    <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="descripcion"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Descripción del vino"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="ingredientes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ingredientes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ingredientes del vino"
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="denominacion_origen"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>D.O.</FormLabel>
-                    <FormControl>
-                      <ComboboxCreatable
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        options={denominaciones}
-                        placeholder="Selecciona D.O..."
-                        emptyText="No hay denominaciones"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="ubicacion_region"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Región</FormLabel>
-                    <FormControl>
-                      <ComboboxCreatable
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        options={regiones}
-                        placeholder="Selecciona región..."
-                        emptyText="No hay regiones"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="ubicacion_pais"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>País</FormLabel>
-                    <FormControl>
-                      <ComboboxCreatable
-                        value={field.value || ""}
-                        onChange={field.onChange}
-                        options={paises}
-                        placeholder="Selecciona país..."
-                        emptyText="No hay países"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Selector de Alérgenos (ver src/lib/alergenos.ts) */}
-            <div className="space-y-3">
-              <FormLabel>Alérgenos</FormLabel>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {ALERGENOS_OFICIALES.map((alergeno) => {
-                  const isSelected = alergenosSeleccionados.includes(alergeno.id);
-                  return (
-                    <button
-                      key={alergeno.id}
-                      type="button"
-                      onClick={() => toggleAlergeno(alergeno.id)}
-                      className={[
-                        "flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 border",
-                        isSelected
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted",
-                      ].join(" ")}
-                    >
-                      <span className="truncate">{alergeno.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex gap-2">
-                <Input
-                  value={nuevoAlergeno}
-                  onChange={(e) => setNuevoAlergeno(e.target.value)}
-                  placeholder="Añadir alérgeno personalizado..."
-                  className="h-11 flex-1 text-base md:text-base"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addAlergenoPersonalizado();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addAlergenoPersonalizado}
-                  disabled={!nuevoAlergeno.trim()}
-                >
-                  Añadir
-                </Button>
-              </div>
-
-              {alergenosPersonalizados.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {alergenosPersonalizados.map((alergeno) => (
-                    <Badge key={alergeno} variant="secondary" className="gap-0 py-0 pl-3 pr-0 text-sm">
-                      {alergeno}
-                      <button
-                        type="button"
-                        onClick={() => removeAlergenoPersonalizado(alergeno)}
-                        className="flex h-11 w-11 items-center justify-center hover:text-destructive"
-                        aria-label={`Quitar ${alergeno}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <FormField
-              control={form.control}
-              name="alergenos_notas"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notas adicionales</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ej: sin sulfitos añadidos, puede contener trazas de..."
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              categorias={categorias}
+              denominaciones={denominaciones}
+              regiones={regiones}
+              paises={paises}
             />
 
             <div className="flex justify-end gap-2">
