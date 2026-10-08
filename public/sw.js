@@ -34,6 +34,11 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+// El aviso de versión nueva pide activar ya el SW que esté esperando.
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -67,6 +72,8 @@ self.addEventListener("fetch", (event) => {
   // Otros orígenes (Supabase, fuentes, etc.): no se tocan.
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/functions/") || url.pathname.startsWith("/api/")) return;
+  // /version.json siempre a red: es como el panel detecta versión nueva.
+  if (url.pathname === "/version.json") return;
 
   if (req.mode === "navigate") {
     event.respondWith(

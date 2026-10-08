@@ -29,6 +29,12 @@
       ]
     },
     {
+      "source": "/version.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+      ]
+    },
+    {
       "source": "/manifest.webmanifest",
       "headers": [
         { "key": "Cache-Control", "value": "no-cache" },
@@ -71,7 +77,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!sw\\.js$|manifest\\.webmanifest$|offline\\.html$).*)",
+      "source": "/((?!sw\\.js$|version\\.json$|manifest\\.webmanifest$|offline\\.html$).*)",
       "destination": "/index.html"
     }
   ]
