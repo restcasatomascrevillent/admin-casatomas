@@ -90,7 +90,7 @@ export function usePreguntasRapidas({
   }, []);
 
   const lanzar = useCallback(
-    async (preguntaId: string, despuesDe: number) => {
+    async (preguntaId: string, despuesDe: number, parametros?: unknown) => {
       const pregunta = catalogo.find((p) => p.id === preguntaId);
       if (!pregunta?.consultar || pregunta.proximamente) return;
       const id = crypto.randomUUID();
@@ -100,7 +100,7 @@ export function usePreguntasRapidas({
         ),
       );
       try {
-        const datos = await pregunta.consultar(llamarRpc, ahora(), { umbralSubidaPrecio: leerUmbral });
+        const datos = await pregunta.consultar(llamarRpc, ahora(), { umbralSubidaPrecio: leerUmbral }, parametros);
         if (!montado.current) return;
         setResultados((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "ok", datos } : r)));
       } catch (e) {

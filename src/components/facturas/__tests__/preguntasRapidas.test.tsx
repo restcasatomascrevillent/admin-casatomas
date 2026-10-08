@@ -410,7 +410,7 @@ describe("cada botón llama a su RPC con sus argumentos", () => {
     fireEvent.click(boton(/gasto por categoría/i));
     const tarjeta = await screen.findByRole("region", { name: /gasto por categoría/i });
     expect(
-      await within(tarjeta).findByText(/disponible cuando se aplique la actualización de la base de datos/i),
+      await within(tarjeta).findByText(/pendiente de actualizar la base de datos/i),
     ).toBeInTheDocument();
     expect(within(tarjeta).queryByRole("alert")).not.toBeInTheDocument();
     const b = boton(/gasto por categoría/i);
@@ -424,11 +424,11 @@ describe("cada botón llama a su RPC con sus argumentos", () => {
     doble.rpc.mockResolvedValue({ data: null, error: { code: "42883", message: "function does not exist" } });
     montar();
     fireEvent.click(boton(/qué ha subido de precio/i));
-    expect(await screen.findByText(/disponible cuando se aplique la actualización/i)).toBeInTheDocument();
+    expect(await screen.findByText(/pendiente de actualizar la base de datos/i)).toBeInTheDocument();
   });
 
   it("el catálogo es una lista: cada entrada activa tiene consulta y pintado", () => {
-    expect(PREGUNTAS_RAPIDAS).toHaveLength(9);
+    expect(PREGUNTAS_RAPIDAS).toHaveLength(10);
     for (const p of PREGUNTAS_RAPIDAS) {
       if (p.proximamente) continue;
       expect(typeof p.consultar).toBe("function");

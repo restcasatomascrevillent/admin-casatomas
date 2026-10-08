@@ -2126,6 +2126,7 @@ export type Database = {
       }
       mensajes_chat: {
         Row: {
+          adjuntos: Json | null
           content: string
           conversacion_id: string | null
           created_at: string | null
@@ -2134,6 +2135,7 @@ export type Database = {
           session_id: string
         }
         Insert: {
+          adjuntos?: Json | null
           content: string
           conversacion_id?: string | null
           created_at?: string | null
@@ -2142,6 +2144,7 @@ export type Database = {
           session_id: string
         }
         Update: {
+          adjuntos?: Json | null
           content?: string
           conversacion_id?: string | null
           created_at?: string | null
@@ -4520,6 +4523,7 @@ export type Database = {
       }
       chat_facturas_mensajes: {
         Row: {
+          adjuntos: Json | null
           contenido: string | null
           conversacion_id: string | null
           created_at: string | null
@@ -4528,6 +4532,7 @@ export type Database = {
           session_id: string | null
         }
         Insert: {
+          adjuntos?: Json | null
           contenido?: string | null
           conversacion_id?: string | null
           created_at?: string | null
@@ -4536,6 +4541,7 @@ export type Database = {
           session_id?: string | null
         }
         Update: {
+          adjuntos?: Json | null
           contenido?: string | null
           conversacion_id?: string | null
           created_at?: string | null

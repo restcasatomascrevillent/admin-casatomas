@@ -7,10 +7,11 @@ import { cn } from "@/lib/utils";
 import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
 import { TEXTO_RPC_NO_DISPONIBLE } from "@/lib/facturas/preguntasRapidas";
 import type { PreguntaRapida } from "./catalogo";
+import { SelectorEvolucionPrecio } from "./SelectorEvolucionPrecio";
 
 interface BarraProps {
   catalogo: PreguntaRapida[];
-  onPreguntar: (preguntaId: string) => void;
+  onPreguntar: (preguntaId: string, parametros?: unknown) => void;
   cargando: (preguntaId: string) => boolean;
   /** La RPC aún no existe en la BD (migración sin aplicar). */
   noDisponible?: (preguntaId: string) => boolean;
@@ -36,11 +37,11 @@ export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDispo
         const ocupado = cargando(p.id);
         const pendiente = noDisponible(p.id);
         const deshabilitado = !!p.proximamente || !p.consultar || ocupado || pendiente;
-        return (
+        const boton = (
           <button
             key={p.id}
             type="button"
-            onClick={() => onPreguntar(p.id)}
+            onClick={p.pide ? undefined : () => onPreguntar(p.id)}
             disabled={deshabilitado}
             title={pendiente ? TEXTO_RPC_NO_DISPONIBLE : p.descripcion}
             aria-busy={ocupado || undefined}
@@ -55,6 +56,14 @@ export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDispo
             {p.proximamente && <span className="text-xs text-muted-foreground">· próximamente</span>}
             {pendiente && <span className="text-xs text-muted-foreground">· pendiente</span>}
           </button>
+        );
+        // Las preguntas con parámetros abren antes un selector (producto, unidad…).
+        return p.pide === "producto" && !deshabilitado ? (
+          <SelectorEvolucionPrecio key={p.id} onElegir={(params) => onPreguntar(p.id, params)}>
+            {boton}
+          </SelectorEvolucionPrecio>
+        ) : (
+          boton
         );
       })}
     </div>

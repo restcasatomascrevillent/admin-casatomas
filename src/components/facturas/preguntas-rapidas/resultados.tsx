@@ -8,6 +8,7 @@ import { AlertTriangle, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import type { Factura } from "@/hooks/useFacturas";
+import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
 import { EditarFacturaDialog } from "@/components/facturas/EditarFacturaDialog";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import {
@@ -655,4 +656,13 @@ export function ResultadoSubidasPrecio({ datos: { umbral, datos } }: { datos: Da
       <Avisos avisos={avisos} />
     </div>
   );
+}
+
+// ─── Evolución de precio de un producto ──────────────────────────────────────
+
+/** JSON de `serie_precios_agente` tal cual (la serie o `{sin_datos, buscado}`). */
+export type DatosEvolucionPrecio = unknown;
+
+export function ResultadoEvolucionPrecio({ datos }: { datos: DatosEvolucionPrecio }) {
+  return <GraficoSeriePrecio datos={datos} />;
 }

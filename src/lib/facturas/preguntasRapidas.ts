@@ -391,4 +391,20 @@ export class RpcNoDisponibleError extends Error {
 export const esErrorRpcInexistente = (error: { code?: string; message?: string } | null | undefined) =>
   !!error && (error.code === "PGRST202" || error.code === "42883");
 
-export const TEXTO_RPC_NO_DISPONIBLE = "Disponible cuando se aplique la actualización de la base de datos.";
+/** Lo que elige quien pulsa «Evolución de precio». */
+export interface ParametrosEvolucionPrecio {
+  /** Nombre del producto del catálogo. */
+  producto: string;
+  /** Opcional: solo compras en esa unidad (kg, l, ud…). */
+  unidad?: string | null;
+}
+
+/** Argumentos de `serie_precios_agente` (sin límite de fechas: toda la historia). */
+export const argsSeriePrecios = (p: ParametrosEvolucionPrecio) => ({
+  p_texto: p.producto.trim(),
+  p_desde: null,
+  p_hasta: null,
+  p_unidad: p.unidad?.trim() ? p.unidad.trim() : null,
+});
+
+export const TEXTO_RPC_NO_DISPONIBLE = "Pendiente de actualizar la base de datos: estará disponible en cuanto se aplique.";

@@ -14,6 +14,7 @@ import {
   CalendarRange,
   ClipboardCheck,
   FileQuestion,
+  LineChart,
   Package,
   PieChart,
   TrendingUp,
@@ -21,6 +22,7 @@ import {
   Wallet,
 } from "lucide-react";
 import {
+  argsSeriePrecios,
   comprobarErrorRpc,
   fechaIso,
   hoyMadrid,
@@ -35,11 +37,13 @@ import {
   type FilaCantidadProducto,
   type FilaGastoProveedor,
   type FiltroDocumentos,
+  type ParametrosEvolucionPrecio,
   type Ranking,
   type ResumenPeriodo,
 } from "@/lib/facturas/preguntasRapidas";
 import {
   ResultadoDocumentos,
+  ResultadoEvolucionPrecio,
   ResultadoGastoCategorias,
   ResultadoSubidasPrecio,
   type DatosGastoCategorias,
@@ -73,7 +77,12 @@ export interface PreguntaRapida<T = unknown> {
   /** RPC(s) que usa; informativo (documentación y pruebas). */
   rpc: string;
   proximamente?: boolean;
-  consultar?: (llamar: LlamarRpc, ahora: Date, contexto: ContextoConsulta) => Promise<T>;
+  /**
+   * `producto`: el botón abre antes un selector de producto (y unidad) y la
+   * consulta recibe lo elegido en `parametros`.
+   */
+  pide?: "producto";
+  consultar?: (llamar: LlamarRpc, ahora: Date, contexto: ContextoConsulta, parametros?: unknown) => Promise<T>;
   Resultado?: ComponentType<{ datos: T }>;
 }
 
@@ -249,5 +258,20 @@ export const PREGUNTAS_RAPIDAS: PreguntaRapida[] = [
       return { umbral, datos };
     },
     Resultado: ResultadoSubidasPrecio,
+  }),
+  definir<unknown>({
+    id: "evolucion-precio",
+    etiqueta: "Evolución de precio",
+    icono: LineChart,
+    descripcion: "Precio unitario de un producto en el tiempo, una línea por proveedor (sin IVA)",
+    rpc: "serie_precios_agente",
+    pide: "producto",
+    consultar: async (llamar, _ahora, _contexto, parametros) => {
+      const p = parametros as ParametrosEvolucionPrecio | undefined;
+      if (!p?.producto?.trim()) throw new Error("Elige un producto.");
+      // La RPC contesta {sin_datos:true, buscado} si no hay compras: se pinta tal cual.
+      return comprobarErrorRpc(await llamar("serie_precios_agente", argsSeriePrecios(p)));
+    },
+    Resultado: ResultadoEvolucionPrecio,
   }),
 ];

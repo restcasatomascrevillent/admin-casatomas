@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
 import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
+import { GraficoSeriePrecio } from "./GraficoSeriePrecio";
+import { esSerieSinDatos } from "@/lib/facturas/seriePrecio";
 
 export interface Sugerencia {
   icon: React.ElementType;
@@ -214,6 +216,10 @@ export function ChatArea({
             mensajes.map((msg, index) => {
               const isUser = msg.rol === "user";
               const isLastAssistant = !isUser && index === lastAssistantIndex;
+              // Gráficas de la respuesta; las «sin datos» ya las explica el texto.
+              const graficas = (msg.adjuntos ?? []).filter(
+                (a) => a.tipo === "serie_precio" && !esSerieSinDatos(a.datos),
+              );
 
               return (
                 <Fragment key={msg.id}>
@@ -246,7 +252,13 @@ export function ChatArea({
                   </div>
 
                   {/* Burbuja + acciones */}
-                  <div className={cn("flex flex-col gap-1 max-w-[88%] sm:max-w-[78%]", isUser ? "items-end" : "items-start")}>
+                  <div
+                    className={cn(
+                      "flex flex-col gap-1 max-w-[88%] sm:max-w-[78%]",
+                      isUser ? "items-end" : "items-start",
+                      graficas.length > 0 && "w-full",
+                    )}
+                  >
                     <div
                       className={cn(
                         "rounded-2xl px-4 py-2.5 shadow-sm",
@@ -292,6 +304,16 @@ export function ChatArea({
                         })}
                       </p>
                     </div>
+
+                    {/* Gráficas adjuntas (evolución de precio) */}
+                    {graficas.map((a, i) => (
+                      <div
+                        key={`${msg.id}-grafica-${i}`}
+                        className="w-full rounded-xl border border-border/60 bg-card p-3 shadow-sm"
+                      >
+                        <GraficoSeriePrecio datos={a.datos} />
+                      </div>
+                    ))}
 
                     {/* Acciones bajo el mensaje del asistente */}
                     {!isUser && (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -25,6 +26,8 @@ export interface MensajeChat {
    * perdera al recargar, en lugar de fingir que todo fue bien.
    */
   persistido?: boolean;
+  /** Gráficas que acompañan a la respuesta (columna `adjuntos` de la BD). */
+  adjuntos?: AdjuntoChat[];
 }
 
 export function useChatFacturas() {
@@ -71,6 +74,7 @@ export function useChatFacturas() {
       conversacion_id: m.conversacion_id,
       created_at: m.created_at,
       persistido: true,
+      adjuntos: normalizarAdjuntos(m.adjuntos),
     }));
 
     setMensajes(mapped);
@@ -115,18 +119,29 @@ export function useChatFacturas() {
   const guardarMensaje = useCallback(async (
     conversacion: Pick<Conversacion, "id" | "session_id">,
     contenido: string,
-    rol: "user" | "assistant"
+    rol: "user" | "assistant",
+    adjuntos: AdjuntoChat[] = []
   ) => {
-    const { data, error } = await supabase
-      .from("chat_facturas_mensajes")
-      .insert({
-        conversacion_id: conversacion.id,
-        session_id: conversacion.session_id,
-        contenido,
-        rol,
-      })
-      .select()
-      .single();
+    const fila = {
+      conversacion_id: conversacion.id,
+      session_id: conversacion.session_id,
+      contenido,
+      rol,
+    };
+    const insertar = (extra: Record<string, unknown>) =>
+      supabase
+        .from("chat_facturas_mensajes")
+        .insert({ ...fila, ...extra } as typeof fila)
+        .select()
+        .single();
+
+    let { data, error } = await insertar(adjuntos.length > 0 ? { adjuntos } : {});
+    if (error && adjuntos.length > 0) {
+      // Columna `adjuntos` aún sin crear (migración sin aplicar): se guarda el
+      // texto igualmente; la gráfica se ve ahora y se pierde al recargar.
+      console.warn("[chat-facturas] Guardado con adjuntos fallido, se reintenta sin ellos:", error);
+      ({ data, error } = await insertar({}));
+    }
 
     if (error) {
       // Fallo VISIBLE: sin persistencia no hay memoria conversacional, asi que
@@ -206,9 +221,10 @@ export function useChatFacturas() {
       if (error) throw new Error(error.message);
 
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
+      const adjuntos = normalizarAdjuntos(data?.adjuntos);
 
       // Guardar respuesta del asistente en Supabase y usar el ID real
-      const savedAssistantMsg = await guardarMensaje(conv, respuesta, "assistant");
+      const savedAssistantMsg = await guardarMensaje(conv, respuesta, "assistant", adjuntos);
 
       // Actualizar updated_at de la conversación
       await supabase
@@ -223,6 +239,7 @@ export function useChatFacturas() {
         conversacion_id: conv.id,
         created_at: savedAssistantMsg?.created_at ?? new Date().toISOString(),
         persistido: !!savedAssistantMsg,
+        adjuntos,
       };
       setMensajes((prev) => [...prev, msgAsistente]);
     } catch (error) {
@@ -297,7 +314,8 @@ export function useChatFacturas() {
       });
       if (error) throw new Error(error.message);
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
-      const savedMsg = await guardarMensaje(conversacionActiva, respuesta, "assistant");
+      const adjuntos = normalizarAdjuntos(data?.adjuntos);
+      const savedMsg = await guardarMensaje(conversacionActiva, respuesta, "assistant", adjuntos);
       // Mantener la conversacion arriba en la lista tras regenerar.
       await supabase
         .from("chat_facturas_conversaciones")
@@ -312,6 +330,7 @@ export function useChatFacturas() {
           conversacion_id: conversacionActiva.id,
           created_at: savedMsg?.created_at ?? new Date().toISOString(),
           persistido: !!savedMsg,
+          adjuntos,
         },
       ]);
     } catch {
