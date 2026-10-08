@@ -158,3 +158,148 @@ export function fmtEurIa(v: number | null | undefined): string {
   if (a >= 0.001) return `${f3.format(v)} €`;
   return `${f4.format(v)} €`;
 }
+
+// ============================================================================
+//  GASTO REAL (OpenAI) — migración 20261008150000_openai_costes_reales
+// ----------------------------------------------------------------------------
+//  `gasto_ia_real_resumen(p_dias)` da, por proceso (ocr | chat | otros |
+//  sin_asignar), lo REAL facturado por OpenAI hasta el último día cerrado
+//  (`usd_real`, `ultimo_dia_real`) y lo ESTIMADO de `ia_uso` desde el día
+//  siguiente (`usd_estimado_hoy`). `tipo_cambio_usd_eur_actual()` da el tipo
+//  del BCE (0,92 «por_defecto» si aún no hay ninguno). Todo sin IVA.
+//
+//  Si la RPC no existe (migración sin aplicar) o no hay datos reales todavía
+//  (`ultimo_dia_real` nulo), el monitor sigue con el estimado de siempre.
+// ============================================================================
+
+export type ProcesoGasto = "ocr" | "chat" | "otros" | "sin_asignar";
+
+export interface FilaGastoReal {
+  proceso: string;
+  usd_real: number;
+  /** Fecha UTC (YYYY-MM-DD) del último día cerrado con datos de OpenAI. */
+  ultimo_dia_real: string | null;
+  usd_estimado_hoy: number;
+}
+
+export interface TipoCambioIa {
+  eurPorUsd: number;
+  /** Fecha del tipo (YYYY-MM-DD); null si es el valor por defecto. */
+  fecha: string | null;
+  fuente: string;
+}
+
+export interface GastoReal {
+  filas: FilaGastoReal[];
+  tipo: TipoCambioIa;
+}
+
+export const TIPO_CAMBIO_POR_DEFECTO: TipoCambioIa = { eurPorUsd: USD_EUR, fecha: null, fuente: "por_defecto" };
+
+/** Normaliza `tipo_cambio_usd_eur_actual()` (devuelve una fila). Basura → 0,92 por defecto. */
+export function normalizarTipoCambio(datos: unknown): TipoCambioIa {
+  const f = Array.isArray(datos) ? datos[0] : datos;
+  if (!f || typeof f !== "object") return TIPO_CAMBIO_POR_DEFECTO;
+  const r = f as Record<string, unknown>;
+  const e = n(r.eur_por_usd);
+  if (!(e > 0.2 && e < 5)) return TIPO_CAMBIO_POR_DEFECTO;
+  return {
+    eurPorUsd: e,
+    fecha: typeof r.fecha === "string" ? r.fecha : null,
+    fuente: typeof r.fuente === "string" ? r.fuente : "bce",
+  };
+}
+
+/**
+ * Normaliza `gasto_ia_real_resumen`. Devuelve null si no hay DATOS REALES
+ * (sin filas o ninguna con `ultimo_dia_real`): entonces manda el estimado.
+ */
+export function normalizarGastoReal(datos: unknown, tipoDatos: unknown): GastoReal | null {
+  if (!Array.isArray(datos)) return null;
+  const filas: FilaGastoReal[] = datos
+    .filter((f) => f && typeof f === "object" && typeof (f as FilaGastoReal).proceso === "string")
+    .map((f) => {
+      const r = f as Record<string, unknown>;
+      return {
+        proceso: String(r.proceso),
+        usd_real: n(r.usd_real),
+        ultimo_dia_real: typeof r.ultimo_dia_real === "string" ? r.ultimo_dia_real : null,
+        usd_estimado_hoy: n(r.usd_estimado_hoy),
+      };
+    });
+  if (!filas.some((f) => f.ultimo_dia_real !== null)) return null;
+  return { filas, tipo: normalizarTipoCambio(tipoDatos) };
+}
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/** «2026-10-07» → «7 oct» (sin pasar por Date: nada de husos horarios). */
+export function fmtFechaCorta(iso: string | null | undefined): string {
+  const m = typeof iso === "string" ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
+  if (!m) return "—";
+  return `${Number(m[3])} ${MESES_CORTOS[Number(m[2]) - 1] ?? ""}`.trim();
+}
+
+const f3tipo = new Intl.NumberFormat("es-ES", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+/** «1 USD = 0,921 EUR, BCE 7 oct» (o «tipo por defecto» si aún no hay del BCE). */
+export function textoTipoCambioReal(t: TipoCambioIa): string {
+  const base = `1 USD = ${f3tipo.format(t.eurPorUsd)} EUR`;
+  if (t.fuente === "por_defecto" || !t.fecha) return `${base} (tipo por defecto, aún sin dato del BCE)`;
+  return `${base}, ${t.fuente.toUpperCase()} ${fmtFechaCorta(t.fecha)}`;
+}
+
+export interface LineaReal {
+  clave: ProcesoGasto;
+  etiqueta: string;
+  realEur: number;
+  hoyEur: number;
+  totalEur: number;
+}
+
+export interface ResumenGastoReal {
+  /** Último día cerrado con datos reales (YYYY-MM-DD). */
+  ultimoDia: string;
+  tipo: TipoCambioIa;
+  lineas: LineaReal[];
+  totalRealEur: number;
+  totalHoyEur: number;
+  /** Real + hoy estimado, todos los procesos (mes de la pestaña «IA»). */
+  totalEur: number;
+  /** Real + hoy estimado del proceso del monitor (chat u ocr). */
+  procesoEur: number;
+  procesoRealEur: number;
+  procesoHoyEur: number;
+}
+
+const ETIQUETA_PROCESO: Record<ProcesoGasto, string> = {
+  ocr: "Lectura de facturas",
+  chat: "Chatbot",
+  otros: "Otros (web, traducciones…)",
+  sin_asignar: "Sin asignar",
+};
+const ORDEN_PROCESO: ProcesoGasto[] = ["ocr", "chat", "otros", "sin_asignar"];
+
+export function resumirGastoReal(g: GastoReal, modo: ModoMonitor): ResumenGastoReal {
+  const k = g.tipo.eurPorUsd;
+  const lineas: LineaReal[] = ORDEN_PROCESO.map((clave) => {
+    const fs = g.filas.filter((f) => f.proceso === clave);
+    const realEur = fs.reduce((s, f) => s + f.usd_real, 0) * k;
+    const hoyEur = fs.reduce((s, f) => s + f.usd_estimado_hoy, 0) * k;
+    return { clave, etiqueta: ETIQUETA_PROCESO[clave], realEur, hoyEur, totalEur: realEur + hoyEur };
+  }).filter((l) => l.clave !== "sin_asignar" || l.totalEur > 0);
+  const propio = lineas.find((l) => l.clave === modo);
+  const totalRealEur = lineas.reduce((s, l) => s + l.realEur, 0);
+  const totalHoyEur = lineas.reduce((s, l) => s + l.hoyEur, 0);
+  return {
+    ultimoDia: g.filas.find((f) => f.ultimo_dia_real)?.ultimo_dia_real ?? "",
+    tipo: g.tipo,
+    lineas,
+    totalRealEur,
+    totalHoyEur,
+    totalEur: totalRealEur + totalHoyEur,
+    procesoEur: propio?.totalEur ?? 0,
+    procesoRealEur: propio?.realEur ?? 0,
+    procesoHoyEur: propio?.hoyEur ?? 0,
+  };
+}

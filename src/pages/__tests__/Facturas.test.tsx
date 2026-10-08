@@ -32,7 +32,10 @@ vi.mock("@/hooks/useFacturas", () => ({
 vi.mock("@/hooks/useChatFacturas", () => ({ useChatFacturas: () => ({ conversaciones: [] }) }));
 
 const gasto: { filas: FilaGastoIa[] } = { filas: [] };
-vi.mock("@/hooks/useGastoIa", () => ({ useGastoIa: () => ({ data: gasto.filas, isLoading: false }) }));
+vi.mock("@/hooks/useGastoIa", () => ({
+  useGastoIa: () => ({ data: gasto.filas, isLoading: false }),
+  useGastoIaReal: () => ({ data: null, isLoading: false }),
+}));
 
 import Facturas from "@/pages/Facturas";
 

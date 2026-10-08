@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { DIAS_GASTO_IA, FUNCIONES_GASTO_IA, type FilaGastoIa, normalizarFilas } from "@/lib/facturas/gastoIa";
+import {
+  DIAS_GASTO_IA,
+  FUNCIONES_GASTO_IA,
+  type FilaGastoIa,
+  type GastoReal,
+  normalizarFilas,
+  normalizarGastoReal,
+} from "@/lib/facturas/gastoIa";
 
 type ClienteRpc = { rpc: unknown };
 
@@ -44,5 +51,45 @@ export function useGastoIa(habilitado = true) {
     staleTime: 5 * 60 * 1000,
     retry: false,
     queryFn: () => cargarGastoIa(supabase),
+  });
+}
+
+type RespuestaRpc = { data: unknown; error: { message?: string } | null };
+type RpcFn = (this: ClienteRpc, fn: string, args?: Record<string, unknown>) => PromiseLike<RespuestaRpc>;
+
+/**
+ * Gasto REAL de OpenAI por proceso + tipo de cambio del BCE
+ * (`gasto_ia_real_resumen` y `tipo_cambio_usd_eur_actual`, migración
+ * 20261008150000). Devuelve null si la RPC no existe todavía, falla o aún no
+ * hay datos reales: entonces el monitor sigue con el estimado de `ia_uso`.
+ * Si solo falla el tipo de cambio, se usa el 0,92 por defecto.
+ * `rpc` se invoca con `.call(cliente, …)` (usa `this`; suelto se rompe).
+ */
+export async function cargarGastoIaReal(cliente: ClienteRpc): Promise<GastoReal | null> {
+  const rpc = cliente.rpc as RpcFn;
+  try {
+    const { data, error } = await rpc.call(cliente, "gasto_ia_real_resumen", { p_dias: DIAS_GASTO_IA });
+    if (error) return null;
+    let tipo: unknown = null;
+    try {
+      const t = await rpc.call(cliente, "tipo_cambio_usd_eur_actual");
+      tipo = t.error ? null : t.data;
+    } catch {
+      tipo = null;
+    }
+    return normalizarGastoReal(data, tipo);
+  } catch {
+    return null;
+  }
+}
+
+/** Gasto real de OpenAI (30 días). null = no disponible: usar el estimado. */
+export function useGastoIaReal(habilitado = true) {
+  return useQuery({
+    queryKey: ["facturas", "gasto_ia_real_resumen", DIAS_GASTO_IA],
+    enabled: habilitado,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+    queryFn: () => cargarGastoIaReal(supabase),
   });
 }

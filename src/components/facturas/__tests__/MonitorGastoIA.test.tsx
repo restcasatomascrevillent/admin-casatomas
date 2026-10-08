@@ -1,11 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
-import type { FilaGastoIa } from "@/lib/facturas/gastoIa";
+import type { FilaGastoIa, GastoReal } from "@/lib/facturas/gastoIa";
 
 let datos: FilaGastoIa[] | undefined = [];
 let cargando = false;
+let datosReal: GastoReal | null = null;
 vi.mock("@/hooks/useGastoIa", () => ({
   useGastoIa: () => ({ data: datos, isLoading: cargando }),
+  useGastoIaReal: () => ({ data: datosReal, isLoading: false }),
 }));
 
 import { MonitorGastoIA } from "../MonitorGastoIA";
@@ -19,13 +21,14 @@ describe("MonitorGastoIA", () => {
   beforeEach(() => {
     datos = [];
     cargando = false;
+    datosReal = null;
   });
 
   it("pestaña IA: una línea con total, preguntas y coste por pregunta", () => {
     datos = [fila({ funcion: "chat-facturas", coste_usd: 0.2264, unidades: 187 })];
     render(<MonitorGastoIA modo="chat" />);
     const boton = screen.getByTestId("monitor-gasto-ia-chat");
-    expect(boton).toHaveTextContent("IA este mes: 0,21 € · 187 preguntas · 0,001 € por pregunta");
+    expect(boton).toHaveTextContent("IA este mes: 0,21 € · 187 preguntas · 0,001 € por pregunta · estimado");
     expect(boton.className).toContain("min-h-11");
   });
 
@@ -55,5 +58,50 @@ describe("MonitorGastoIA", () => {
     datos = undefined;
     render(<MonitorGastoIA modo="chat" />);
     expect(screen.getByTestId("monitor-gasto-ia-chat")).toHaveTextContent("cargando…");
+  });
+
+  describe("con la RPC de gasto real", () => {
+    const real = (over: Partial<GastoReal> = {}): GastoReal => ({
+      filas: [
+        { proceso: "ocr", usd_real: 1, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0.1 },
+        { proceso: "chat", usd_real: 0.5, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0.05 },
+        { proceso: "otros", usd_real: 0.2, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+      ],
+      tipo: { eurPorUsd: 0.5, fecha: "2026-10-07", fuente: "bce" },
+      ...over,
+    });
+
+    it("existe con datos: real hasta la fecha + hoy estimado, con el tipo del BCE y sin IVA", () => {
+      datosReal = real();
+      datos = [fila({ funcion: "ocr-trabajo", coste_usd: 99, unidades: 4, documentos_ocr: 4 })];
+      render(<MonitorGastoIA modo="ocr" />);
+      const boton = screen.getByTestId("monitor-gasto-ia-ocr");
+      // (1 + 0,1) USD x 0,5 = 0,55 €; hoy 0,1 x 0,5 = 0,05 €
+      expect(boton).toHaveTextContent("Lectura de facturas este mes: 0,55 € · real hasta 7 oct + hoy est. 0,050 € · sin IVA");
+      fireEvent.click(boton);
+      expect(screen.getByText("Chatbot")).toBeInTheDocument();
+      expect(screen.getByText("Otros (web, traducciones…)")).toBeInTheDocument();
+      expect(screen.getAllByText(/Real \(OpenAI\) hasta 7 oct: 0,50 €/).length).toBeGreaterThan(0); // ocr
+      expect(screen.getByText(/1 USD = 0,500 EUR, BCE 7 oct/)).toBeInTheDocument();
+      // total: (1,7 + 0,15) x 0,5 = 0,925 €
+      expect(screen.getByText(/^0,9[23] €$/)).toBeInTheDocument();
+    });
+
+    it("chat usa el proceso chat", () => {
+      datosReal = real();
+      render(<MonitorGastoIA modo="chat" />);
+      expect(screen.getByTestId("monitor-gasto-ia-chat")).toHaveTextContent("0,28 € · real hasta 7 oct + hoy est. 0,025 €");
+    });
+
+    it("sin datos reales todavía (null): sigue el estimado, marcado «estimado»", () => {
+      datosReal = null;
+      datos = [fila({ funcion: "chat-facturas", coste_usd: 0.2264, unidades: 187 })];
+      render(<MonitorGastoIA modo="chat" />);
+      const boton = screen.getByTestId("monitor-gasto-ia-chat");
+      expect(boton).toHaveTextContent("estimado");
+      expect(boton).not.toHaveTextContent("real hasta");
+      fireEvent.click(boton);
+      expect(screen.getByText(/aún sin el gasto real de OpenAI/)).toBeInTheDocument();
+    });
   });
 });
