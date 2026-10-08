@@ -12,7 +12,12 @@
 //   structured output) o null.
 // - recorte: caja de la botella en coordenadas 0-1 sobre la imagen recibida.
 // - Modelo: env VINO_FOTO_MODELO (por defecto gpt-4.1), detail "high".
-//   Dos llamadas: visión (lectura) + texto corto (precio, solo si hay base).
+//   Tres llamadas: visión (lectura) + búsqueda web (Responses API, herramienta
+//   `web_search`, env VINO_BUSQUEDA_MODELO, por defecto gpt-4.1-mini: precio
+//   en tiendas online españolas + ficha técnica → descripción rica) + texto
+//   corto (precio de carta a partir del de mercado y de la carta).
+//   La búsqueda tiene 20 s de tope (AbortController): si falla o tarda, se
+//   sigue con la lectura básica y la descripción prudente.
 // - Lecturas de BD con el cliente del usuario (RLS); si fallan, se sigue sin
 //   ellas (categorías del body, sin ejemplos, sin precio).
 // - Auth: verify_jwt (config.toml) + permiso de ESCRITURA en `gestor_carta`
@@ -22,7 +27,8 @@
 // Body: { imagen: "<base64 JPEG, con o sin prefijo data:>", categorias?: string[] }
 // Respuesta: { ok: true, vino: {nombre, categoria, descripcion, ingredientes,
 //   denominacion_origen, ubicacion_region, ubicacion_pais, contiene_sulfitos,
-//   precio_sugerido, precio_razon, recorte} } | { ok: false, error }
+//   precio_sugerido, precio_razon, precio_mercado, precio_mercado_fuentes:
+//   {tienda,url,precio}[], recorte} } | { ok: false, error }
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
@@ -40,7 +46,15 @@ const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 const MODEL = (Deno.env.get("VINO_FOTO_MODELO") ?? "").trim() || "gpt-4.1";
+const MODELO_BUSQUEDA = (Deno.env.get("VINO_BUSQUEDA_MODELO") ?? "").trim() || "gpt-4.1-mini";
+const BUSQUEDA_MS = 20_000;
+// ia_uso solo guarda tokens; la tarifa por llamada de búsqueda (~0,01 $) se
+// registra como un "modelo" aparte con 1.000 tokens ficticios por llamada y
+// tarifa 10 $/1M en ia_precios (migración 20261008210000).
+const MODELO_LLAMADA_BUSQUEDA = "openai-web-search-call";
+const TOKENS_POR_LLAMADA_BUSQUEDA = 1000;
 // ~1024px JPEG 0.8 en base64 ronda 150-400 KB; 4 MB de margen sobra.
 const MAX_BASE64 = 4_000_000;
 const MAX_BASE_PRECIOS = 25;
@@ -304,43 +318,286 @@ async function llamarOpenAI(body: Record<string, unknown>, uso: AcumuladorUso, m
 async function sugerirPrecio(
   vino: Record<string, unknown>,
   base: VinoCarta[],
+  precioMercado: number | null,
   uso: AcumuladorUso,
 ): Promise<{ precio_sugerido: number | null; precio_razon: string | null }> {
   const nada = { precio_sugerido: null, precio_razon: null };
-  if (!base.length) return nada;
+  if (!base.length && precioMercado === null) return nada;
   const lista = base.map((v) => `- ${v.nombre} | ${v.denominacion_origen ?? "-"} | ${v.categoria ?? "-"} | ${v.precio_eur} €`);
   const ficha = [
     `Nombre: ${vino.nombre ?? "?"}`,
     `Categoría: ${vino.categoria ?? "?"}`,
     `D.O.: ${vino.denominacion_origen ?? "?"}`,
     `Uva: ${vino.ingredientes ?? "?"}`,
+    `Precio en tienda (mediana de tiendas online españolas, 75 cl): ${precioMercado !== null ? `${precioMercado} €` : "desconocido"}`,
   ].join("\n");
   try {
     const raw = await llamarOpenAI({
       temperature: 0.2,
-      max_tokens: 120,
+      max_tokens: 150,
       response_format: SCHEMA_PRECIO,
       messages: [
         {
           role: "system",
           content: [
             "Eres el sumiller de un restaurante y fijas precios de carta (precio por botella en restaurante, IVA incluido).",
-            "Sugiere un precio de carta para el vino nuevo, coherente con los precios de vinos comparables de ESTA carta y con lo que sepas de su precio de mercado (en tienda suele multiplicarse x2-x3 en restaurante).",
+            "Si se conoce el PRECIO EN TIENDA, es la base: precio de carta = precio en tienda × multiplicador.",
+            "  - El multiplicador sale de ESTA carta: compara vinos de la misma categoría/D.O. y el precio de tienda que sepas de ellos para inferir el margen típico de la casa, y mantén la coherencia con esos precios.",
+            "  - Si la carta no da base para inferirlo, usa un multiplicador de restaurante razonable (2,5-3×) y dilo en la razón.",
+            "Si NO se conoce el precio en tienda, sugiere un precio coherente con los vinos comparables de la carta y con lo que sepas de su precio de mercado.",
             "Ten en cuenta formatos: una Magnum cuesta aprox. el doble que la botella de 75 cl.",
-            "precio_razon: UNA frase corta en español (máx. 90 caracteres), p. ej. 'Similar a otros Rioja blancos de la carta (18-24 €)'.",
+            "precio_razon: UNA frase corta en español (máx. 110 caracteres), p. ej. 'Tienda ~14,90 € × 2,7, como otros Rioja blancos de la carta (35-42 €)'.",
             "Si no hay base razonable, ambos null.",
           ].join("\n"),
         },
-        { role: "user", content: `VINO NUEVO:\n${ficha}\n\nVINOS DE LA CARTA (nombre | D.O. | categoría | precio):\n${lista.join("\n")}` },
+        {
+          role: "user",
+          content: `VINO NUEVO:\n${ficha}\n\nVINOS DE LA CARTA (nombre | D.O. | categoría | precio):\n${lista.length ? lista.join("\n") : "(ninguno comparable)"}`,
+        },
       ],
     }, uso, 20000);
     if (!raw) return nada;
     const p = typeof raw.precio_sugerido === "number" && Number.isFinite(raw.precio_sugerido) ? raw.precio_sugerido : null;
     if (p === null || p <= 0 || p > 5000) return nada;
-    return { precio_sugerido: Math.round(p * 2) / 2, precio_razon: textoONull(raw.precio_razon, 160) };
+    return { precio_sugerido: Math.round(p * 2) / 2, precio_razon: textoONull(raw.precio_razon, 180) };
   } catch (e) {
     console.error(`[${FUNCION}] precio:`, e instanceof Error ? e.message : e);
     return nada;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Búsqueda web: precio de mercado + ficha técnica (una sola llamada)
+// ---------------------------------------------------------------------------
+
+interface FuentePrecio {
+  tienda: string;
+  url: string;
+  precio: number;
+}
+
+interface FichaMercado {
+  precio_mercado: number | null;
+  precio_mercado_fuentes: FuentePrecio[];
+  descripcion: string | null;
+  ingredientes: string | null;
+  denominacion_origen: string | null;
+}
+
+const EJEMPLO_DUENO =
+  "Vino elaborado en la bodega de Hervías, perteneciente a Señorío de Villarrica, en plena Rioja Alta. " +
+  "Fermenta en ovum de barro artesanal, un método ancestral, y después permanece seis meses sobre sus propias lías en el mismo ovum. " +
+  "Esa es su gran peculiaridad: el barro, por su estructura microporosa, absorbe, refresca y deja una oxigenación lenta, " +
+  "y la evaporación concentra el vino.";
+
+const SCHEMA_FICHA = {
+  type: "json_schema",
+  name: "ficha_vino_mercado",
+  strict: true,
+  schema: {
+    type: "object",
+    additionalProperties: false,
+    required: ["ficha_encontrada", "descripcion", "ingredientes", "denominacion_origen", "ofertas"],
+    properties: {
+      ficha_encontrada: { type: "boolean" },
+      descripcion: { type: ["string", "null"] },
+      ingredientes: { type: ["string", "null"] },
+      denominacion_origen: { type: ["string", "null"] },
+      ofertas: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["tienda", "url", "precio", "formato_cl"],
+          properties: {
+            tienda: { type: "string" },
+            url: { type: "string" },
+            precio: { type: "number" },
+            formato_cl: { type: ["number", "null"] },
+          },
+        },
+      },
+    },
+  },
+};
+
+function promptBusqueda(ejemplos: string[]): string {
+  return [
+    "Eres el sumiller de un restaurante gallego. Busca en internet el vino indicado (ese vino concreto, de esa bodega).",
+    "",
+    "1) PRECIO DE VENTA EN TIENDA: busca su precio de venta al público en tiendas online españolas (Vinoselección, Uvinum, Bodeboca, Lavinia, El Corte Inglés, Decántalo, Vila Viniteca, la tienda de la propia bodega…).",
+    "   - ofertas: hasta 6, cada una con tienda (nombre corto), url EXACTA de la página del producto donde viste el precio, precio en € (IVA incluido, una botella) y formato_cl (75, 150…; null si no consta).",
+    "   - Solo precios que hayas visto de verdad en una página. Prioriza la misma añada si se conoce; si no, la más parecida. Sin ofertas → lista vacía.",
+    "",
+    "2) FICHA TÉCNICA: busca la ficha técnica o nota de cata oficial (web de la bodega o fichas de tiendas) y escribe `descripcion` para la carta:",
+    "   - Español, prosa de carta, 450-700 caracteres, redactada con tus palabras (NO copies frases literales de las webs).",
+    "   - Contenido, en este orden y solo si aparece en las fuentes o en la ficha de la etiqueta: bodega y zona; elaboración (fermentación, depósito/barrica/ánfora/huevo, tiempo sobre lías o de crianza); qué lo hace peculiar; notas de cata (vista, nariz, boca); maridaje breve.",
+    "   - NO empieces repitiendo el nombre del vino. Sin tópicos vacíos ni superlativos. Nunca inventes premios, puntuaciones, meses o datos que no estén en las fuentes.",
+    "   - Si NO encuentras la ficha de ese vino concreto: ficha_encontrada = false y descripcion = null.",
+    "   Ejemplo del nivel de detalle que busca el dueño (de otro vino; imita detalle y tono, no el contenido):",
+    `   «${EJEMPLO_DUENO}»`,
+    ...(ejemplos.length ? ["   Ejemplos de tono de la carta actual:", ...ejemplos.map((e) => `   - ${e}`)] : []),
+    "",
+    "3) ingredientes (uva/s, p. ej. 'Viura, Malvasía') y denominacion_origen (con prefijo: 'D.O.Ca. Rioja', 'D.O. Rías Baixas'…): rellénalos SOLO si las fuentes los dan con claridad; si no, null.",
+    "",
+    "Responde únicamente con el JSON pedido.",
+  ].join("\n");
+}
+
+function hostDe(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return u.hostname.replace(/^www\./, "").toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function mediana(nums: number[]): number | null {
+  if (!nums.length) return null;
+  const o = [...nums].sort((a, b) => a - b);
+  const m = Math.floor(o.length / 2);
+  return o.length % 2 ? o[m] : (o[m - 1] + o[m]) / 2;
+}
+
+/** Extrae el JSON de la respuesta de la Responses API y las URLs consultadas/citadas. */
+function leerRespuestaBusqueda(data: Record<string, unknown>): { json: Record<string, unknown> | null; hosts: Set<string>; llamadas: number } {
+  const hosts = new Set<string>();
+  let llamadas = 0;
+  let texto = "";
+  const output = Array.isArray(data.output) ? (data.output as Array<Record<string, unknown>>) : [];
+  for (const item of output) {
+    if (item?.type === "web_search_call") {
+      llamadas++;
+      const fuentes = (item.action as Record<string, unknown> | undefined)?.sources;
+      if (Array.isArray(fuentes)) {
+        for (const f of fuentes) {
+          const h = typeof f?.url === "string" ? hostDe(f.url) : null;
+          if (h) hosts.add(h);
+        }
+      }
+    } else if (item?.type === "message" && Array.isArray(item.content)) {
+      for (const c of item.content as Array<Record<string, unknown>>) {
+        if (c?.type !== "output_text" || typeof c.text !== "string") continue;
+        texto += c.text;
+        if (Array.isArray(c.annotations)) {
+          for (const a of c.annotations as Array<Record<string, unknown>>) {
+            const h = typeof a?.url === "string" ? hostDe(a.url) : null;
+            if (h) hosts.add(h);
+          }
+        }
+      }
+    }
+  }
+  const limpio = texto.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+  const ini = limpio.indexOf("{");
+  const fin = limpio.lastIndexOf("}");
+  let json: Record<string, unknown> | null = null;
+  if (ini >= 0 && fin > ini) {
+    try {
+      json = JSON.parse(limpio.slice(ini, fin + 1));
+    } catch {
+      json = null;
+    }
+  }
+  return { json, hosts, llamadas };
+}
+
+function limpiarFicha(raw: Record<string, unknown>, hosts: Set<string>): FichaMercado {
+  const ofertas: FuentePrecio[] = [];
+  const vistas = new Set<string>();
+  for (const o of Array.isArray(raw.ofertas) ? (raw.ofertas as Array<Record<string, unknown>>) : []) {
+    const url = typeof o?.url === "string" ? o.url.trim() : "";
+    const host = hostDe(url);
+    let precio = typeof o?.precio === "number" && Number.isFinite(o.precio) ? o.precio : NaN;
+    const formato = typeof o?.formato_cl === "number" && o.formato_cl > 0 ? o.formato_cl : 75;
+    if (!host || !(precio > 0)) continue;
+    // Si hay fuentes, la URL tiene que ser de un sitio realmente consultado.
+    if (hosts.size && !hosts.has(host)) continue;
+    if (vistas.has(url)) continue;
+    precio = (precio * 75) / formato; // a botella de 75 cl
+    if (precio < 2 || precio > 3000) continue;
+    vistas.add(url);
+    ofertas.push({ tienda: textoONull(o.tienda, 60) ?? host, url: url.slice(0, 500), precio: Math.round(precio * 100) / 100 });
+  }
+  const med = mediana(ofertas.map((o) => o.precio));
+  // Las 3 fuentes más cercanas a la mediana.
+  const fuentes = med === null ? [] : [...ofertas].sort((a, b) => Math.abs(a.precio - med) - Math.abs(b.precio - med)).slice(0, 3);
+  const desc = raw.ficha_encontrada === true ? textoONull(raw.descripcion, 900) : null;
+  return {
+    precio_mercado: med === null ? null : Math.round(med * 100) / 100,
+    precio_mercado_fuentes: fuentes,
+    descripcion: desc && desc.length >= 200 ? desc : null,
+    ingredientes: textoONull(raw.ingredientes, 200),
+    denominacion_origen: textoONull(raw.denominacion_origen, 200),
+  };
+}
+
+async function buscarFichaMercado(
+  vino: Record<string, unknown>,
+  ejemplos: string[],
+  uso: AcumuladorUso,
+  usoLlamadas: AcumuladorUso,
+): Promise<FichaMercado | null> {
+  const ficha = [
+    `Vino (leído de la etiqueta): ${vino.nombre ?? "?"}`,
+    `D.O.: ${vino.denominacion_origen ?? "?"}`,
+    `Uva: ${vino.ingredientes ?? "?"}`,
+    `Región: ${vino.ubicacion_region ?? "?"} (${vino.ubicacion_pais ?? "?"})`,
+  ].join("\n");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), BUSQUEDA_MS);
+  const llamar = (conFormato: boolean) =>
+    fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_KEY}` },
+      body: JSON.stringify({
+        model: MODELO_BUSQUEDA,
+        temperature: 0.3,
+        max_output_tokens: 1500,
+        tools: [{ type: "web_search", search_context_size: "medium", user_location: { type: "approximate", country: "ES" } }],
+        include: ["web_search_call.action.sources"],
+        ...(conFormato ? { text: { format: SCHEMA_FICHA } } : {}),
+        input: [
+          { role: "system", content: promptBusqueda(ejemplos) },
+          {
+            role: "user",
+            content: conFormato
+              ? ficha
+              : `${ficha}\n\nDevuelve SOLO un objeto JSON con las claves ficha_encontrada, descripcion, ingredientes, denominacion_origen y ofertas [{tienda,url,precio,formato_cl}].`,
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+  try {
+    let res = await llamar(true);
+    if (res.status === 400) {
+      // Por si el modelo no admite structured output junto a web_search.
+      uso.sumar(null);
+      console.error(`[${FUNCION}] búsqueda 400 con formato: ${(await res.text()).slice(0, 300)}`);
+      res = await llamar(false);
+    }
+    if (!res.ok) {
+      uso.sumar(null);
+      console.error(`[${FUNCION}] búsqueda ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      return null;
+    }
+    const data = await res.json();
+    uso.sumar(data?.usage);
+    const { json: raw, hosts, llamadas } = leerRespuestaBusqueda(data);
+    if (llamadas > 0) {
+      usoLlamadas.sumar({ input_tokens: llamadas * TOKENS_POR_LLAMADA_BUSQUEDA, output_tokens: 0 });
+      usoLlamadas.llamadas += llamadas - 1; // sumar() ya contó una
+    }
+    if (!raw) return null;
+    return limpiarFicha(raw, hosts);
+  } catch (e) {
+    console.error(`[${FUNCION}] búsqueda:`, e instanceof Error ? e.message : e);
+    return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -391,6 +648,8 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const categorias = (categoriasBD.length ? categoriasBD : [...new Set(categoriasBody)]).slice(0, 60);
 
   const uso = new AcumuladorUso(FUNCION, MODEL, "vision");
+  const usoBusqueda = new AcumuladorUso(FUNCION, MODELO_BUSQUEDA, "chat");
+  const usoLlamadasBusqueda = new AcumuladorUso(FUNCION, MODELO_LLAMADA_BUSQUEDA, "otro");
   const inicioMs = Date.now();
 
   try {
@@ -426,9 +685,18 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     vino.categoria = categoria && categorias.includes(categoria) ? categoria : null;
     vino.contiene_sulfitos = raw.contiene_sulfitos === true;
 
+    // Búsqueda web (precio de tienda + ficha). Si falla, se sigue sin ella.
+    const mercado = await buscarFichaMercado(vino, ejemplosTono(carta), usoBusqueda, usoLlamadasBusqueda);
+    vino.precio_mercado = mercado?.precio_mercado ?? null;
+    vino.precio_mercado_fuentes = mercado?.precio_mercado_fuentes ?? [];
+    if (mercado?.descripcion) vino.descripcion = mercado.descripcion;
+    if (mercado?.ingredientes) vino.ingredientes = mercado.ingredientes;
+    if (mercado?.denominacion_origen) vino.denominacion_origen = mercado.denominacion_origen;
+
     const precio = await sugerirPrecio(
       vino,
       basePrecios(carta, vino.categoria as string | null, vino.denominacion_origen as string | null),
+      vino.precio_mercado as number | null,
       uso,
     );
     vino.precio_sugerido = precio.precio_sugerido;
@@ -442,6 +710,6 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     console.error(`[${FUNCION}]`, message);
     return json({ ok: false, error: "No se pudo leer la etiqueta" }, 500);
   } finally {
-    await registrarUso(uso, { disparador: `usuario:${permiso.userId}`, duracionMs: Date.now() - inicioMs });
+    await registrarUso([uso, usoBusqueda, usoLlamadasBusqueda], { disparador: `usuario:${permiso.userId}`, duracionMs: Date.now() - inicioMs });
   }
 }));

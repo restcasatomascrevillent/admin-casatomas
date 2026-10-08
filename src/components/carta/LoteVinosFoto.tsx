@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatoEuros, precioSugerido } from "./leerVinoFoto";
+import { formatoEuros, precioMercado, precioSugerido } from "./leerVinoFoto";
 import type { FilaLote, LoteVinos } from "./useLoteVinos";
 
 interface Props {
@@ -93,6 +93,7 @@ export function LoteVinosDialog({ open, onOpenChange, lote, onAbrirFila }: Props
           {filas.map((fila) => {
             const d = fila.resultado?.datos;
             const precio = precioSugerido(d);
+            const tienda = precioMercado(d);
             const abrible = fila.estado === "listo";
             return (
               <li key={fila.id} className="flex items-center gap-2 rounded-lg border bg-card p-2">
@@ -112,9 +113,13 @@ export function LoteVinosDialog({ open, onOpenChange, lote, onAbrirFila }: Props
                     <span className="block truncate font-medium">
                       {d?.nombre || (fila.estado === "listo" || fila.estado === "guardado" ? "Sin nombre leído" : "Botella")}
                     </span>
-                    {(d?.categoria || precio !== null) && (
+                    {(d?.categoria || precio !== null || tienda !== null) && (
                       <span className="block truncate text-xs text-muted-foreground">
-                        {[d?.categoria, precio !== null ? `sugerido ${formatoEuros(precio)}` : null]
+                        {[
+                          d?.categoria,
+                          precio !== null ? `sugerido ${formatoEuros(precio)}` : null,
+                          tienda !== null ? `tienda ~${formatoEuros(tienda)}` : null,
+                        ]
                           .filter(Boolean)
                           .join(" · ")}
                       </span>

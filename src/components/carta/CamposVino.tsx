@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 
 /** Longitud orientativa de la descripción (no es un límite de la BD). */
-export const DESCRIPCION_RECOMENDADA = 300;
+export const DESCRIPCION_RECOMENDADA = 700;
 
 /** Campos de texto comunes de un vino (alta y edición). Sin alérgenos: se conservan tal cual en BD. */
 export interface CamposVinoValores extends FieldValues {
@@ -185,8 +185,8 @@ export function CamposVino<T extends CamposVinoValores>({
               <FormControl>
                 <Textarea
                   placeholder="Notas de cata y maridaje. Ej.: Afrutado, con notas de roble; ideal con carnes rojas."
-                  className="resize-none"
-                  rows={3}
+                  className="min-h-[9rem] resize-y sm:min-h-[8rem]"
+                  rows={6}
                   {...field}
                   value={field.value ?? ""}
                 />

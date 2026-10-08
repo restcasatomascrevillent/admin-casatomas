@@ -20,7 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
-import { formatoEuros, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
+import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -104,6 +104,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   }, [open, precarga, form, categoriaInicial]);
 
   const sugerido = precarga ? precioSugerido(precarga.datos) : null;
+  const enTienda = precarga ? precioMercado(precarga.datos) : null;
+  const fuentesTienda = precarga ? fuentesMercado(precarga.datos) : [];
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -252,21 +254,41 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               regiones={regiones}
               paises={paises}
               bajoPrecio={
-                sugerido !== null && (
-                  <div className="flex items-center gap-2 rounded-md bg-muted/60 px-2 py-1 text-sm">
-                    <span className="min-w-0 flex-1 text-muted-foreground">
-                      Sugerido: <span className="font-medium text-foreground">{formatoEuros(sugerido)}</span>
-                      {precarga?.datos.precio_razon ? ` — ${precarga.datos.precio_razon}` : ""}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 shrink-0"
-                      onClick={() => form.setValue("precio_eur", sugerido, { shouldValidate: true, shouldDirty: true })}
-                    >
-                      Usar
-                    </Button>
+                (sugerido !== null || enTienda !== null) && (
+                  <div className="space-y-1 rounded-md bg-muted/60 px-2 py-1 text-sm">
+                    {sugerido !== null && (
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 text-muted-foreground">
+                        Sugerido: <span className="font-medium text-foreground">{formatoEuros(sugerido)}</span>
+                        {precarga?.datos.precio_razon ? ` — ${precarga.datos.precio_razon}` : ""}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 shrink-0"
+                        onClick={() => form.setValue("precio_eur", sugerido, { shouldValidate: true, shouldDirty: true })}
+                      >
+                        Usar
+                      </Button>
+                    </div>
+                    )}
+                  {enTienda !== null && (
+                    <p className="text-xs text-muted-foreground">
+                      En tienda: <span className="font-medium text-foreground">~{formatoEuros(enTienda)}</span>
+                      {fuentesTienda.map((f) => (
+                        <a
+                          key={f.url}
+                          href={f.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 underline underline-offset-2 hover:text-foreground"
+                        >
+                          {f.tienda} ({formatoEuros(f.precio)})
+                        </a>
+                      ))}
+                    </p>
+                  )}
                   </div>
                 )
               }
