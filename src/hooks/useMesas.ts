@@ -42,6 +42,13 @@ export interface Mesa {
   etiqueta: string | null;
   created_at: string;
   updated_at: string;
+  // Mesas por piezas (migración 20261008170000). Opcionales: antes de aplicarla no llegan.
+  piezas?: number | null;
+  picos_base?: number | null;
+  picos_max?: number | null;
+  piezas_max?: number | null;
+  grupo_piezas?: string | null;
+  crece_hacia?: string | null;
 }
 
 export interface MesaInput {

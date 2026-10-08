@@ -117,6 +117,67 @@ export type Database = {
           },
         ]
       }
+      ajustes_mesa_servicio: {
+        Row: {
+          espacio_id: string
+          fecha: string
+          id: string
+          mesa_id: string
+          picos: number
+          piezas: number
+          turno: string
+          unida_a: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          espacio_id: string
+          fecha: string
+          id?: string
+          mesa_id: string
+          picos?: number
+          piezas: number
+          turno: string
+          unida_a?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          espacio_id?: string
+          fecha?: string
+          id?: string
+          mesa_id?: string
+          picos?: number
+          piezas?: number
+          turno?: string
+          unida_a?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ajustes_mesa_servicio_espacio_id_fkey"
+            columns: ["espacio_id"]
+            isOneToOne: false
+            referencedRelation: "espacios_reserva"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ajustes_mesa_servicio_mesa_id_fkey"
+            columns: ["mesa_id"]
+            isOneToOne: false
+            referencedRelation: "mesas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ajustes_mesa_servicio_unida_a_fkey"
+            columns: ["unida_a"]
+            isOneToOne: false
+            referencedRelation: "mesas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asignaciones_mesa: {
         Row: {
           asignada_por: string | null
@@ -2211,13 +2272,19 @@ export type Database = {
           ancho: number | null
           capacidad: number
           created_at: string | null
+          crece_hacia: string
           espacio_id: string
           etiqueta: string | null
           forma: string
+          grupo_piezas: string | null
           id: string
           is_merged: boolean | null
           nombre: string
           original_mesas: Json | null
+          picos_base: number
+          picos_max: number
+          piezas: number | null
+          piezas_max: number | null
           pos_x: number | null
           pos_y: number | null
           rotacion: number | null
@@ -2229,13 +2296,19 @@ export type Database = {
           ancho?: number | null
           capacidad?: number
           created_at?: string | null
+          crece_hacia?: string
           espacio_id: string
           etiqueta?: string | null
           forma?: string
+          grupo_piezas?: string | null
           id?: string
           is_merged?: boolean | null
           nombre: string
           original_mesas?: Json | null
+          picos_base?: number
+          picos_max?: number
+          piezas?: number | null
+          piezas_max?: number | null
           pos_x?: number | null
           pos_y?: number | null
           rotacion?: number | null
@@ -2247,13 +2320,19 @@ export type Database = {
           ancho?: number | null
           capacidad?: number
           created_at?: string | null
+          crece_hacia?: string
           espacio_id?: string
           etiqueta?: string | null
           forma?: string
+          grupo_piezas?: string | null
           id?: string
           is_merged?: boolean | null
           nombre?: string
           original_mesas?: Json | null
+          picos_base?: number
+          picos_max?: number
+          piezas?: number | null
+          piezas_max?: number | null
           pos_x?: number | null
           pos_y?: number | null
           rotacion?: number | null

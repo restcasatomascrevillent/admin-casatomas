@@ -105,6 +105,20 @@ import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useAjustesMesaServicio, useGuardarAjustesMesa, type TurnoServicio } from "@/hooks/useAjustesMesaServicio";
+import {
+  aplicarCambios,
+  estadoServicio,
+  geometriaServicio,
+  mesaPiezasDesde,
+  mesasDeLaUnion,
+  plazasDe,
+  proponerParaSentar,
+  type AjusteMesa,
+  type MesaPiezas,
+  type ReservaEnMesas,
+} from "@/lib/reservas/piezasMesa";
+import { DialogoPropuestaPiezas, PanelPiezasMesa, type PropuestaAbierta } from "@/components/reservas/PiezasMesa";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
@@ -492,7 +506,10 @@ function MesaPlano({
   onSeleccionar,
   onAlternar,
   scale,
+  piezasInfo,
 }: {
+  /** Mesas por piezas: rayas entre piezas y marca del pico (servicio actual). */
+  piezasInfo?: { piezas: number; picos: number; ladoPico: "derecha" | "izquierda" };
   /** Mesa con coordenadas y tamaño YA en píxeles de pantalla. */
   mesa: Mesa;
   /** Mesa con los datos originales (metros / capacidad) para los callbacks. */
@@ -662,6 +679,22 @@ function MesaPlano({
                   : "transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease",
               }}
             >
+              {piezasInfo &&
+                Array.from({ length: Math.max(0, piezasInfo.piezas - 1) }, (_, i) => (
+                  <span
+                    key={i}
+                    aria-hidden
+                    className="pointer-events-none absolute bottom-0 top-0 border-l border-dashed border-slate-400"
+                    style={{ left: `${((i + 1) * 100) / piezasInfo.piezas}%` }}
+                  />
+                ))}
+              {piezasInfo && piezasInfo.picos > 0 && (
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute top-1/2 h-1/2 w-1.5 -translate-y-1/2 rounded-sm bg-amber-500"
+                  style={piezasInfo.ladoPico === "izquierda" ? { left: -8 } : { right: -8 }}
+                />
+              )}
               <span
                 className="pointer-events-none break-words text-center font-bold leading-tight"
                 style={{ fontSize: `${fontSize}px`, maxWidth: "100%", wordBreak: "break-word", lineHeight: 1.1 }}
@@ -1068,7 +1101,60 @@ export function PlanoEspacio2D({
     [asignacionesDia, filtroTurno],
   );
 
-  const mesasPorId = useMemo(() => new Map(localMesas.map((m) => [m.id, m])), [localMesas]);
+  // -- Mesas por piezas (Comedor, 08/10/2026) --------------------------------
+  // El plano base no se toca: cada servicio (fecha + comida/cena) tiene sus
+  // ajustes de piezas, picos y uniones. Con «Todo el día» se ve el plano base.
+  // Lógica pura y tests en `src/lib/reservas/piezasMesa.ts`.
+  const turnoServicio: TurnoServicio | null = filtroTurno === "dia" ? null : filtroTurno;
+  const { data: ajustesServicio } = useAjustesMesaServicio(espacioId, fechaSel, turnoServicio);
+  const guardarAjustes = useGuardarAjustesMesa(espacioId, fechaSel, turnoServicio);
+  const [propuestaPiezas, setPropuestaPiezas] = useState<PropuestaAbierta | null>(null);
+  const mesasPiezas = useMemo(
+    () => localMesas.map(mesaPiezasDesde).filter((m): m is MesaPiezas => m !== null),
+    [localMesas],
+  );
+  const estadoPiezas = useMemo(
+    () => estadoServicio(mesasPiezas, turnoServicio ? (ajustesServicio ?? []) : []),
+    [mesasPiezas, turnoServicio, ajustesServicio],
+  );
+  /** Las mesas tal y como están en ESTE servicio (largo y plazas recalculados). */
+  const mesasVista = useMemo(
+    () =>
+      localMesas.map((m) => {
+        const g = geometriaServicio(m, estadoPiezas.get(m.id));
+        return g ? { ...m, pos_x: g.pos_x, ancho: g.ancho, capacidad: g.capacidad } : m;
+      }),
+    [localMesas, estadoPiezas],
+  );
+  /** Reservas del servicio y sus mesas: para no quitar piezas que alguien necesita. */
+  const reservasEnMesas = useMemo<ReservaEnMesas[]>(() => {
+    const porReserva = new Map<string, ReservaEnMesas>();
+    for (const a of asignacionesTurno) {
+      const r = porReserva.get(a.reserva_id) ?? {
+        reservaId: a.reserva_id,
+        mesaIds: [],
+        comensales: a.reservas?.numero_comensales ?? 0,
+      };
+      r.mesaIds.push(a.mesa_id);
+      porReserva.set(a.reserva_id, r);
+    }
+    return [...porReserva.values()];
+  }, [asignacionesTurno]);
+
+  const guardarPiezas = useCallback(
+    async (cambios: AjusteMesa[], mensaje: string | null): Promise<boolean> => {
+      try {
+        await guardarAjustes.mutateAsync(cambios);
+      } catch {
+        return false;
+      }
+      if (mensaje) toast.success(mensaje);
+      return true;
+    },
+    [guardarAjustes],
+  );
+
+  const mesasPorId = useMemo(() => new Map(mesasVista.map((m) => [m.id, m])), [mesasVista]);
   const asignacionesPorReserva = useMemo(() => agruparPorReserva(asignacionesTurno), [asignacionesTurno]);
 
   /**
@@ -1238,7 +1324,7 @@ export function PlanoEspacio2D({
     async (
       reserva: ReservaSala,
       mesaIds: string[],
-      opciones?: { registrarDeshacer?: boolean; mensaje?: string },
+      opciones?: { registrarDeshacer?: boolean; mensaje?: string; plazas?: number },
     ) => {
       const antes = mesaIdsDe(reserva.id);
       const nombresNuevos = mesaIds.map((id) => mesasPorId.get(id)?.nombre ?? "Mesa");
@@ -1280,7 +1366,8 @@ export function PlanoEspacio2D({
 
       await refetchAsignaciones();
 
-      const plazas = plazasDeMesas(mesaIds, mesasPorId);
+      // `plazas` llega hecho cuando se acaban de ajustar piezas: `mesasPorId` aún no lo sabe.
+      const plazas = opciones?.plazas ?? plazasDeMesas(mesaIds, mesasPorId);
       const ajuste = ajusteCapacidad(reserva.numero_comensales, plazas);
 
       if (mesaIds.length === 0) {
@@ -1399,9 +1486,75 @@ export function PlanoEspacio2D({
         return;
       }
 
-      void guardarMesas(reservaActiva, [...actuales, mesa.id]);
+      // Mesa junta con otras en este servicio: se sienta en toda la fila.
+      const union = turnoServicio ? mesasDeLaUnion(estadoPiezas, mesa.id) : [mesa.id];
+      for (const id of union) {
+        const otra = mesasPorId.get(id);
+        const motivoOtra = otra && id !== mesa.id ? motivoMesaOcupada(otra, reservaActiva) : null;
+        if (motivoOtra) {
+          toast.error(`${motivoOtra}. Elige otra mesa o sepáralas primero.`);
+          return;
+        }
+      }
+      const nuevas = [...actuales, ...union.filter((id) => !actuales.includes(id))];
+
+      // No cabe en una mesa por piezas: la app PROPONE cómo agrandarla y
+      // espera a que el usuario pulse «Hacer». Nunca mueve piezas sola.
+      const reserva = reservaActiva;
+      if (
+        turnoServicio &&
+        actuales.length === 0 &&
+        union.length === 1 &&
+        plazasDeMesas(nuevas, mesasPorId) < reserva.numero_comensales &&
+        mesasPiezas.some((m) => m.id === mesa.id)
+      ) {
+        const resultado = proponerParaSentar({
+          mesas: mesasPiezas,
+          estado: estadoPiezas,
+          reservas: reservasEnMesas.filter((r) => r.reservaId !== reserva.id),
+          mesaId: mesa.id,
+          comensales: reserva.numero_comensales,
+        });
+        if (resultado.propuestas.length > 0 || resultado.motivo) {
+          setPropuestaPiezas({
+            titulo: `${reserva.nombre} · ${reserva.numero_comensales} en la ${mesa.nombre}`,
+            resultado,
+            extra: {
+              texto: "Sentar sin ajustar",
+              accion: () => {
+                setPropuestaPiezas(null);
+                void guardarMesas(reserva, nuevas);
+              },
+            },
+            hacer: async (p) => {
+              if (!(await guardarPiezas(p.cambios, null))) return;
+              setPropuestaPiezas(null);
+              const final = aplicarCambios(estadoPiezas, p.cambios).get(mesa.id);
+              await guardarMesas(reserva, nuevas, {
+                plazas: final ? plazasDe(final) : undefined,
+                mensaje: `${reserva.nombre} → ${mesa.nombre} (${p.texto.replace(/^Para sentar [^:]+: /, "")})`,
+              });
+            },
+          });
+          return;
+        }
+      }
+
+      void guardarMesas(reserva, nuevas);
     },
-    [reservaActiva, mesaIdsDe, motivoMesaOcupada, guardarMesas, pedirQuitarMesas, mesasPorId],
+    [
+      reservaActiva,
+      mesaIdsDe,
+      motivoMesaOcupada,
+      guardarMesas,
+      pedirQuitarMesas,
+      mesasPorId,
+      turnoServicio,
+      estadoPiezas,
+      mesasPiezas,
+      reservasEnMesas,
+      guardarPiezas,
+    ],
   );
 
   const seleccionarMesa = useCallback((mesa: Mesa) => setSelectedMesa(mesa), []);
@@ -2511,7 +2664,7 @@ export function PlanoEspacio2D({
                 >
                   {elementosPlano.map((elem) => renderElementoPlano(elem, { offsetX, offsetY, scale }))}
 
-                  {localMesas.map((mesa) => {
+                  {mesasVista.filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0).map((mesa) => {
                     const ocupantes = ocupantesDeMesa(mesa.id).map((asignacion) => {
                       const grupo = asignacionesPorReserva.get(asignacion.reserva_id) ?? [];
                       const esPrimeraDelGrupo = grupo[0]?.mesa_id === mesa.id;
@@ -2549,8 +2702,13 @@ export function PlanoEspacio2D({
                         comensalesActivos={reservaActiva?.numero_comensales ?? null}
                         isSelected={selectedMesa?.id === mesa.id}
                         isDragging={dragState.mesaId === mesa.id}
-                        onDragStart={handleMesaDragStart}
+                        // Recolocar mueve el PLANO BASE: se arrastra la fila original, no la del servicio.
+                        onDragStart={(e, m) => handleMesaDragStart(e, localMesas.find((l) => l.id === m.id) ?? m)}
                         onSeleccionar={seleccionarMesa}
+                        piezasInfo={(() => {
+                          const g = geometriaServicio(mesa, estadoPiezas.get(mesa.id));
+                          return g ? { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico } : undefined;
+                        })()}
                         onAlternar={alternarMesa}
                         scale={scale}
                       />
@@ -2659,13 +2817,34 @@ export function PlanoEspacio2D({
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-xs text-muted-foreground">Plazas</p>
-                      <p className="font-medium tabular-nums">{selectedMesa.capacidad}</p>
+                      <p className="font-medium tabular-nums">
+                        {mesasPorId.get(selectedMesa.id)?.capacidad ?? selectedMesa.capacidad}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Forma</p>
                       <p className="font-medium capitalize">{selectedMesa.forma}</p>
                     </div>
                   </div>
+
+                  {(() => {
+                    const mp = mesasPiezas.find((m) => m.id === selectedMesa.id);
+                    if (!mp) return null;
+                    return (
+                      <PanelPiezasMesa
+                        mesa={mp}
+                        mesas={mesasPiezas}
+                        estado={estadoPiezas}
+                        reservas={reservasEnMesas}
+                        hayServicio={!!turnoServicio}
+                        ocupado={guardarAjustes.isPending}
+                        onGuardar={async (cambios, mensaje) => {
+                          if (await guardarPiezas(cambios, mensaje)) setPropuestaPiezas(null);
+                        }}
+                        onProponer={setPropuestaPiezas}
+                      />
+                    );
+                  })()}
 
                   {(() => {
                     const ocupantes = ocupantesDeMesa(selectedMesa.id);
@@ -2958,6 +3137,11 @@ export function PlanoEspacio2D({
 
         {/* ── Editor de la reserva elegida con el lápiz de su fila ─────────── */}
         {dialogoEdicion}
+        <DialogoPropuestaPiezas
+          propuesta={propuestaPiezas}
+          ocupado={guardarAjustes.isPending || asignarMesas.isPending}
+          onCerrar={() => setPropuestaPiezas(null)}
+        />
       </div>
     </DndContext>
   );
