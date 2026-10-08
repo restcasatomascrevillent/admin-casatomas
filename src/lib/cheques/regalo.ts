@@ -35,6 +35,7 @@ export interface ChequeRegalo {
   creado_en?: string | null;
   created_at?: string | null;
   ocultar_importe?: boolean;
+  solicita_factura?: boolean;
   plantilla_cheque?: Partial<PlantillaRegalo> | null;
 }
 
@@ -58,7 +59,7 @@ export function textoRegalo(texto: string, cheque: ChequeRegalo, ocultarImporte 
 export function errorCheques(error: unknown): string {
   const e = error as { code?: string; message?: string };
   if (["PGRST202", "PGRST205", "42P01", "42883"].includes(e?.code || "")) {
-    return "Falta instalar la actualización de Cheques en Supabase. Aplica la migración de compra manual y plantilla.";
+    return "Falta instalar la actualización de Cheques en Supabase. Aplica las migraciones de Cheques, incluida la actualización de factura en compra manual.";
   }
   return e?.message || "No se pudo completar la operación. Vuelve a intentarlo.";
 }

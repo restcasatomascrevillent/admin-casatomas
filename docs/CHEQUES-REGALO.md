@@ -1,5 +1,25 @@
 # Cheques regalo: expedición, compra manual, correo y PDF
 
+## Factura en compra manual (8 de octubre de 2026)
+
+**Compra manual → Solicitar factura** muestra nombre o razón social, NIF/CIF y dirección fiscal. Se envía al email del comprador con la plantilla y el importe real, aunque el regalo oculte la cifra. Para cortesías, seleccionar un método de cobro antes de solicitar factura.
+
+Los datos se validan en la base de datos antes de expedir. La solicitud conserva el mismo código y los mismos datos al reintentar. El envío de factura usa la numeración y el PDF existentes. Si falta un envío, **Reintentar envío** continúa con el mismo cheque y factura; no vuelve a crear la compra.
+
+Activación:
+
+1. Aplicar `supabase/migrations/20261008060000_factura_compra_manual.sql` en el proyecto compartido, después de `20261007190000_cheques_manual_plantilla.sql`.
+2. Desde `casa-tomas-story`, actualizar y desplegar:
+
+   ```sh
+   git pull origin main
+   npx supabase functions deploy cheques-regalo-admin --project-ref jeamoczmbfsnwkfjxcyo
+   ```
+
+3. Comprobar los datos del emisor en **Cheques → Plantilla de factura**. Expedir una compra de prueba solicitando factura y comprobar ambos correos, el número de factura en la ficha y el reintento sin duplicados.
+
+La función `crear_cheque_manual_v2` permite detectar si falta esta migración antes de crear una compra con una solicitud de factura ignorada.
+
 ## Opciones de cada regalo y vista previa
 
 La compra manual y la compra web permiten mostrar u ocultar el importe en el regalo y elegir si el PDF incluye dedicatoria. Sin dedicatoria se guarda el mensaje vacío; el destinatario continúa siendo opcional. El precio cobrado y la factura conservan el importe real.
