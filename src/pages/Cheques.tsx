@@ -169,7 +169,7 @@ export default function Cheques() {
           <TabsTrigger value="expedicion" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg"><Ticket aria-hidden="true" className="h-4 w-4 shrink-0" />Expedición de tickets</TabsTrigger>
           <TabsTrigger value="verificar" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search aria-hidden="true" className="h-4 w-4 shrink-0" />Verificar cheque</TabsTrigger>
           <TabsTrigger value="manual" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><HandCoins aria-hidden="true" className="h-4 w-4 shrink-0" />Compra manual</TabsTrigger>
-          <TabsTrigger value="regalo" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><Palette aria-hidden="true" className="h-4 w-4 shrink-0" />Correo y PDF</TabsTrigger>
+          <TabsTrigger value="regalo" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><Palette aria-hidden="true" className="h-4 w-4 shrink-0" />Configuración</TabsTrigger>
           <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText aria-hidden="true" className="h-4 w-4 shrink-0" />Plantilla de factura</TabsTrigger>
         </TabsList>
         <TabsContent value="expedicion" className={`${CONTENIDO_PESTANA} flex flex-col`}><ListaTickets /></TabsContent>
