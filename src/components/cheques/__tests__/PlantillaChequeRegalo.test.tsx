@@ -43,4 +43,13 @@ describe("Plantilla del regalo", () => {
     expect(screen.getByRole("button", { name: "Guardar correo y PDF" })).toBeDisabled();
     expect(mock.update).not.toHaveBeenCalled();
   });
+  it("muestra un año por defecto y guarda otro plazo en meses", async () => {
+    render(<PlantillaChequeRegalo />);
+    await waitFor(() => expect(screen.queryByText("Cargando plantilla…")).toBeNull());
+    expect(screen.getByLabelText("Validez del cheque (meses)")).toHaveValue(12);
+    fireEvent.change(screen.getByLabelText("Validez del cheque (meses)"), { target: { value: "6" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar correo y PDF" }));
+    await waitFor(() => expect(mock.update).toHaveBeenCalledWith(expect.objectContaining({ caducidad_meses: 6 })));
+  });
+
 });

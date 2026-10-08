@@ -1,4 +1,7 @@
+import { fechaCaducidad } from "./caducidad";
+
 export interface PlantillaRegalo {
+  caducidad_meses: number;
   email_asunto: string;
   email_mensaje: string;
   pdf_titulo: string;
@@ -11,6 +14,7 @@ export interface PlantillaRegalo {
 }
 
 export const PLANTILLA_REGALO: PlantillaRegalo = {
+  caducidad_meses: 12,
   email_asunto: "Tu cheque regalo de Casa Tomás",
   email_mensaje: "Hola {comprador},\n\nGracias por regalar un momento en Casa Tomás. Tu cheque {codigo} ya está listo.\nAdjuntamos el PDF para imprimirlo o compartirlo.",
   pdf_titulo: "Cheque regalo",
@@ -25,6 +29,8 @@ export const PLANTILLA_REGALO: PlantillaRegalo = {
 export interface ChequeRegalo {
   id: string;
   codigo: string;
+  caduca_el?: string | null;
+  emitido_en?: string | null;
   importe_eur: number;
   comprador_nombre: string;
   comprador_email: string;
@@ -41,6 +47,7 @@ export interface ChequeRegalo {
 
 export const CHEQUE_EJEMPLO: ChequeRegalo = {
   id: "ejemplo", codigo: "CT-EJEMPLO", importe_eur: 100,
+  caduca_el: "2027-10-08",
   comprador_nombre: "Ana García", comprador_email: "ana@example.com",
   destinatario_nombre: "María", mensaje: "Para que disfrutes de un momento especial. ¡Feliz cumpleaños!",
   fecha_entrega_deseada: null,
@@ -51,9 +58,10 @@ export function textoRegalo(texto: string, cheque: ChequeRegalo, ocultarImporte 
   const valores: Record<string, string> = {
     comprador: cheque.comprador_nombre, destinatario: cheque.destinatario_nombre || "",
     codigo: cheque.codigo,
+    caducidad: fechaCaducidad(cheque.caduca_el),
     importe: ocultarImporte ? "" : Number(cheque.importe_eur).toFixed(2).replace(".", ",") + " €",
   };
-  return texto.replace(/\{(comprador|destinatario|codigo|importe)\}/g, (_, key: string) => valores[key]);
+  return texto.replace(/\{(comprador|destinatario|codigo|importe|caducidad)\}/g, (_, key: string) => valores[key]);
 }
 
 export function errorCheques(error: unknown): string {

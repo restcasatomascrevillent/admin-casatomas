@@ -22,6 +22,7 @@ describe("Trazado compartido del PDF y la vista previa", () => {
       expect(svg.includes("100,00 €")).toBe(!ocultar_importe);
       expect(svg.includes("¡Feliz cumpleaños!")).toBe(incluir);
       expect(svg).toContain("CT-EJEMPLO");
+      expect(svg).toContain("Válido hasta el 08/10/2027 (incluido)");
       expect((await PDFDocument.load(vista.pdf)).getPageCount()).toBe(1);
     }
   });
