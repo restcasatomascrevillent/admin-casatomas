@@ -10,8 +10,8 @@ const corsHeaders = {
 };
 
 // Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin y la autorización recae por completo en is_admin()
-// (rol en user_roles). Nunca conceder acceso por defecto — fail-closed.
+// ningún super admin por email: se comprueba la tabla super_admins.
+// El rol admin solo permite consultar usuarios, nunca gestionarlos.
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
@@ -65,13 +65,13 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
 
     const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
 
-    const { data: isAdminResult, error: adminCheckError } = await supabaseAdmin.rpc("is_admin", {
+    const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin.rpc("is_super_admin", {
       _user_id: currentUser.id,
     });
 
-    if (adminCheckError || (!isAdminResult && !currentUserIsSuperAdmin)) {
+    if (superAdminCheckError || (!isSuperAdminResult && !currentUserIsSuperAdmin)) {
       return new Response(
-        JSON.stringify({ error: "Solo administradores pueden actualizar contraseñas" }),
+        JSON.stringify({ error: "Solo un super admin puede actualizar contraseñas" }),
         {
           status: 403,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -105,29 +105,6 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    const { data: targetRoleData, error: targetRoleError } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .maybeSingle();
-
-    if (targetRoleError) {
-      return new Response(JSON.stringify({ error: "No se pudo validar el usuario objetivo" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (targetRoleData?.role === "admin") {
-      return new Response(
-        JSON.stringify({ error: "No se puede cambiar la contraseña de un administrador desde este panel" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
     }
 
     const { error: updateError } = await ejecutarOperacionAuthAuditada(
