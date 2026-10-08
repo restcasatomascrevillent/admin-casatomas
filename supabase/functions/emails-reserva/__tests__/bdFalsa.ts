@@ -271,6 +271,17 @@ export function crearClienteFalso(_url: string, _key: string, opciones?: { globa
   }
   return {
     from: (tabla: string) => new ConsultaFalsa(estadoPrueba().db, tabla),
-    rpc: async () => ({ data: null, error: { message: "rpc no soportada en el doble" } }),
+    // conAuditoriaDePeticion (_shared/audit-client.ts) resuelve el actor con
+    // este cliente de servicio y registra la acción con un rpc.
+    auth: {
+      getUser: async (token: string) =>
+        token === "valido" || token === "sinpermiso"
+          ? { data: { user: { id: "usuario-1", email: "personal@correo.test" } }, error: null }
+          : { data: { user: null }, error: { message: "invalid JWT" } },
+    },
+    rpc: async (fn: string) =>
+      fn === "registrar_accion_auditoria_panel"
+        ? { data: null, error: null }
+        : { data: null, error: { message: "rpc no soportada en el doble" } },
   };
 }

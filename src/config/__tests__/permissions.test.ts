@@ -4,8 +4,22 @@
  * Esta es la capa más pura del proyecto: funciones sin dependencias externas.
  * Cobertura objetivo: 100 %
  */
-import { describe, it, expect } from "vitest";
-import { isSuperAdmin, SUPER_ADMIN_EMAILS } from "@/config/permissions";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+
+// Desde 3277026 la lista sale de VITE_SUPER_ADMIN_EMAILS (ya no está en el
+// código), así que el test fija su propio valor y carga el módulo después.
+let isSuperAdmin: typeof import("@/config/permissions").isSuperAdmin;
+let SUPER_ADMIN_EMAILS: typeof import("@/config/permissions").SUPER_ADMIN_EMAILS;
+
+beforeAll(async () => {
+  vi.stubEnv("VITE_SUPER_ADMIN_EMAILS", " miguelsantiagores@gmail.com , info@casatomas.es ");
+  vi.resetModules();
+  ({ isSuperAdmin, SUPER_ADMIN_EMAILS } = await import("@/config/permissions"));
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("isSuperAdmin", () => {
   it("devuelve true para cada email de super admin registrado", () => {
