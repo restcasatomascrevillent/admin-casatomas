@@ -1,3 +1,5 @@
+import { estadoCaducidad, fechaCaducidad } from "@/lib/cheques/caducidad";
+import { useHoyCheques } from "@/hooks/useHoyCheques";
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, Ticket, HandCoins } from "lucide-react";
@@ -35,6 +37,9 @@ const CONTENIDO_PESTANA = "mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contai
 // Estas tablas/RPC se incorporan mediante la migración de Cheques.
 const db = supabase as unknown as SupabaseClient;
 interface Resultado {
+  caduca_el?: string | null;
+  caducado?: boolean;
+  dias_restantes?: number | null;
   encontrado: boolean;
   codigo?: string;
   importe_eur?: number;
@@ -66,6 +71,7 @@ function mensajeError(error: unknown, accion: string) {
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
 export default function Cheques() {
+  const hoy = useHoyCheques();
   const { canAccess: puedeEditar } = useCanAccessSection("cheques", "edit");
   const [pestana, setPestana] = useState("expedicion");
   const [codigo, setCodigo] = useState("CT-");
@@ -112,7 +118,7 @@ export default function Cheques() {
     finally { setOcupado(false); }
   }
   async function canjear() {
-    if (!resultado?.valido || !resultado.codigo || !puedeEditar || ocupado) return;
+    if (!resultado?.valido || caducado || !resultado.codigo || !puedeEditar || ocupado) return;
     setOcupado(true);
     try {
       const { data, error } = await db.rpc("canjear_cheque_regalo", { p_codigo: resultado.codigo });
@@ -152,7 +158,9 @@ export default function Cheques() {
     } catch (error) { toast.error(mensajeError(error, "guardar la plantilla")); }
     finally { setGuardando(false); }
   }
-  const estado = !resultado?.encontrado ? "Cheque no encontrado" : resultado.estado !== "pagado" ? "Cheque cancelado o sin pago confirmado" : resultado.usado ? "Este cheque ya está canjeado" : "Cheque válido para canjear";
+  const caducado = resultado?.caducado || estadoCaducidad(resultado?.caduca_el, hoy).caducado;
+  const puedeCanjear = resultado?.valido && !caducado;
+  const estado = !resultado?.encontrado ? "Cheque no encontrado" : resultado.estado !== "pagado" ? "Cheque cancelado o sin pago confirmado" : resultado.usado ? "Este cheque ya está canjeado" : caducado ? "Este cheque está caducado" : puedeCanjear ? "Cheque válido para canjear" : "Cheque no disponible para canjear";
 
   return <DashboardLayout>
     <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
@@ -175,9 +183,9 @@ export default function Cheques() {
             </form>
           </CardContent></Card>
           {errorVerificacion && <Card className="border-destructive/50 rounded-2xl"><CardContent className="pt-6"><p role="alert">{errorVerificacion}</p></CardContent></Card>}
-          {resultado && <Card className={`rounded-2xl ${resultado.valido ? "border-emerald-300 bg-emerald-50/40" : "border-destructive/30"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
-            <h2 className={`flex items-center gap-2 font-semibold ${resultado.valido ? "text-emerald-700" : "text-destructive"}`}>{resultado.valido ? <CheckCircle2 /> : <XCircle />}{estado}</h2>
-            {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{resultado.valido && puedeEditar && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}{resultado.valido && !puedeEditar && <p className="text-sm text-muted-foreground">Necesitas permiso de edición para canjearlo.</p>}</>}
+          {resultado && <Card className={`rounded-2xl ${puedeCanjear ? "border-emerald-300 bg-emerald-50/40" : "border-destructive/30"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
+            <h2 className={`flex items-center gap-2 font-semibold ${puedeCanjear ? "text-emerald-700" : "text-destructive"}`}>{puedeCanjear ? <CheckCircle2 /> : <XCircle />}{estado}</h2>
+            {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.caduca_el && <div className="text-sm"><p>Válido hasta el {fechaCaducidad(resultado.caduca_el)} (incluido).</p>{!resultado.usado && resultado.estado === "pagado" && <p className="font-semibold">{estadoCaducidad(resultado.caduca_el, hoy).texto}</p>}</div>}{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{puedeCanjear && puedeEditar && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}{puedeCanjear && !puedeEditar && <p className="text-sm text-muted-foreground">Necesitas permiso de edición para canjearlo.</p>}</>}
           </CardContent></Card>}
         </TabsContent>
         {/* La vista previa se pega arriba de la REGIÓN de la pestaña (su contenedor de scroll), ya no de la ventana. */}
@@ -208,7 +216,7 @@ export default function Cheques() {
         </TabsContent>
       </Tabs>
     </div>
-    <Dialog open={confirmar} onOpenChange={open => !ocupado && setConfirmar(open)}><DialogContent><DialogHeader><DialogTitle>Canjear cheque regalo</DialogTitle><DialogDescription>Vas a utilizar {resultado?.codigo} por {euro(Number(resultado?.importe_eur || 0))}. Después no podrá volver a canjearse.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={ocupado} onClick={() => setConfirmar(false)}>Volver</Button><Button disabled={ocupado} onClick={() => void canjear()}>{ocupado && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar canje</Button></DialogFooter></DialogContent></Dialog>
+    <Dialog open={confirmar} onOpenChange={open => !ocupado && setConfirmar(open)}><DialogContent><DialogHeader><DialogTitle>Canjear cheque regalo</DialogTitle><DialogDescription>Vas a utilizar {resultado?.codigo} por {euro(Number(resultado?.importe_eur || 0))}. Después no podrá volver a canjearse.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={ocupado} onClick={() => setConfirmar(false)}>Volver</Button><Button disabled={ocupado || !puedeCanjear} onClick={() => void canjear()}>{ocupado && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar canje</Button></DialogFooter></DialogContent></Dialog>
   </DashboardLayout>;
 }
 

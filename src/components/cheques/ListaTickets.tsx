@@ -1,3 +1,5 @@
+import { estadoCaducidad, fechaCaducidad } from "@/lib/cheques/caducidad";
+import { useHoyCheques } from "@/hooks/useHoyCheques";
 import { useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,13 +9,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DetalleCompra } from "./DetalleCompra";
 
 interface Ticket {
+  caduca_el?: string | null;
   id: string; creado_en: string | null; codigo: string | null; importe_eur: number;
   comprador_nombre: string; comprador_telefono?: string | null; destinatario_nombre: string | null; estado: string; usado: boolean;
 }
-interface Listado { total: number; expedidos: number; canjeados: number; coincidencias: number; importe_pagado: number; tickets: Ticket[] }
+interface Listado { caducados?: number; disponibles?: number; total: number; expedidos: number; canjeados: number; coincidencias: number; importe_pagado: number; tickets: Ticket[] }
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
 export function ListaTickets() {
+  const hoy = useHoyCheques();
   const [texto, setTexto] = useState("");
   const [busqueda, setBusqueda] = useState("");
   const [pagina, setPagina] = useState(0);
@@ -38,7 +42,7 @@ export function ListaTickets() {
     }
     void cargar();
     return () => { activo = false; };
-  }, [pagina, revision, busqueda]);
+  }, [pagina, revision, busqueda, hoy]);
   // Con alto medido (pestaña Expedición de Cheques.tsx) la lista llena la pestaña: título, búsqueda,
   // totales y paginación quedan fijos y solo la tabla hace scroll, con la cabecera de columnas pegada
   // (`sticky top-0`; el `bg-background` del thead tapa las filas y la fila conserva su `bg-muted/50`).
@@ -53,10 +57,10 @@ export function ListaTickets() {
       {(texto || busqueda) && <Button type="button" variant="outline" className="h-11" onClick={() => { setTexto(""); setBusqueda(""); setPagina(0); }}>Limpiar</Button>}
     </form>
     {cargando ? <p role="status">Cargando tickets…</p> : error ? <p role="alert" className="rounded-xl border border-destructive/40 p-4">{error}</p> : datos && <>
-      <div className="grid gap-3 sm:grid-cols-3">{[["Tickets expedidos", datos.expedidos], ["Tickets canjeados", datos.canjeados], ["Importe con pago confirmado", euro(Number(datos.importe_pagado))]].map(([nombre, valor]) => <Card key={nombre}><CardContent className="pt-5"><p className="text-sm text-muted-foreground">{nombre}</p><p className="text-2xl font-semibold mt-1">{valor}</p></CardContent></Card>)}</div>
-      <div className="min-h-[32rem] flex-1 overflow-auto rounded-xl border md:min-h-[12rem]"><table className="w-full text-sm"><thead className="sticky top-0 z-10 bg-background"><tr className="bg-muted/50">{["Fecha", "Código", "Comprador", "Teléfono", "Importe", "Estado"].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
-        {datos.tickets.map(t => <tr key={t.id} onClick={() => setCompraSeleccionada(t.id)} className={`border-t cursor-pointer hover:brightness-95 ${t.usado ? "bg-red-50 text-red-950 dark:bg-red-950/30 dark:text-red-100" : t.estado === "pagado" ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100" : ""}`}><td className="p-3 whitespace-nowrap">{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td><td className="p-3 font-mono whitespace-nowrap"><button type="button" aria-label={`Ver compra ${t.codigo}`} className="underline underline-offset-4 rounded focus-visible:outline focus-visible:outline-2" onClick={e => { e.stopPropagation(); setCompraSeleccionada(t.id); }}>{t.codigo}</button></td><td className="p-3">{t.comprador_nombre}</td><td className="p-3 whitespace-nowrap">{t.comprador_telefono || "—"}</td><td className="p-3 whitespace-nowrap">{euro(Number(t.importe_eur))}</td><td className="p-3 whitespace-nowrap">{t.estado === "cancelado" ? "Cancelado" : t.estado !== "pagado" ? "Pendiente de pago" : t.usado ? "Canjeado" : "Disponible"}</td></tr>)}
-        {!datos.tickets.length && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No hay tickets que coincidan con la búsqueda.</td></tr>}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[["Tickets expedidos", datos.expedidos], ["Tickets canjeados", datos.canjeados], ["Tickets caducados", datos.caducados ?? 0], ["Importe con pago confirmado", euro(Number(datos.importe_pagado))]].map(([nombre, valor]) => <Card key={nombre}><CardContent className="pt-5"><p className="text-sm text-muted-foreground">{nombre}</p><p className="text-2xl font-semibold mt-1">{valor}</p></CardContent></Card>)}</div>
+      <div className="min-h-[32rem] flex-1 overflow-auto rounded-xl border md:min-h-[12rem]"><table className="w-full text-sm"><thead className="sticky top-0 z-10 bg-background"><tr className="bg-muted/50">{["Fecha", "Código", "Comprador", "Teléfono", "Importe", "Caducidad", "Días restantes", "Estado"].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
+        {datos.tickets.map(t => <tr key={t.id} onClick={() => setCompraSeleccionada(t.id)} className={`border-t cursor-pointer hover:brightness-95 ${(t.usado || estadoCaducidad(t.caduca_el, hoy).caducado) ? "bg-red-50 text-red-950 dark:bg-red-950/30 dark:text-red-100" : t.estado === "pagado" ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100" : ""}`}><td className="p-3 whitespace-nowrap">{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td><td className="p-3 font-mono whitespace-nowrap"><button type="button" aria-label={`Ver compra ${t.codigo}`} className="underline underline-offset-4 rounded focus-visible:outline focus-visible:outline-2" onClick={e => { e.stopPropagation(); setCompraSeleccionada(t.id); }}>{t.codigo}</button></td><td className="p-3">{t.comprador_nombre}</td><td className="p-3 whitespace-nowrap">{t.comprador_telefono || "—"}</td><td className="p-3 whitespace-nowrap">{euro(Number(t.importe_eur))}</td><td className="p-3 whitespace-nowrap">{fechaCaducidad(t.caduca_el)}</td><td className="p-3 whitespace-nowrap">{t.usado || t.estado !== "pagado" ? "—" : estadoCaducidad(t.caduca_el, hoy).texto}</td><td className="p-3 whitespace-nowrap">{t.estado === "cancelado" ? "Cancelado" : t.estado !== "pagado" ? "Pendiente de pago" : t.usado ? "Canjeado" : estadoCaducidad(t.caduca_el, hoy).caducado ? "Caducado" : "Disponible"}</td></tr>)}
+        {!datos.tickets.length && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No hay tickets que coincidan con la búsqueda.</td></tr>}
       </tbody></table></div>
       <div className="flex items-center justify-between gap-3"><Button variant="outline" disabled={pagina === 0} onClick={() => setPagina(p => p - 1)}>Anterior</Button><p className="text-sm">Página {pagina + 1} de {Math.max(1, Math.ceil(datos.coincidencias / 50))}</p><Button variant="outline" disabled={(pagina + 1) * 50 >= datos.coincidencias} onClick={() => setPagina(p => p + 1)}>Siguiente</Button></div>
     </>}

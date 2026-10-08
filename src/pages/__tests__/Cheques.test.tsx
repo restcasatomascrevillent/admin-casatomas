@@ -75,4 +75,14 @@ describe("Verificación y canje", () => {
     expect(screen.getByText("Así recibirá su factura el cliente")).toBeTruthy();
   });
 
+  it("un cheque caducado nunca muestra el botón de canje", async () => {
+    mock.rpc.mockResolvedValueOnce({ data: { ...valido, caduca_el: "2020-01-01", caducado: true, valido: false }, error: null });
+    render(<Cheques />); abrirVerificador();
+    fireEvent.change(screen.getByLabelText("Código del cheque"), { target: { value: "CT-ABCDEFGH" } });
+    fireEvent.click(screen.getByRole("button", { name: "Verificar cheque" }));
+    expect(await screen.findByText("Este cheque está caducado")).toBeTruthy();
+    expect(screen.getByText(/Válido hasta el 01\/01\/2020/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Canjear cheque" })).toBeNull();
+  });
+
 });

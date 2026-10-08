@@ -99,3 +99,14 @@ Este cambio necesita el despliegue de Supabase anterior; un commit o despliegue 
 La migración `20261003180000_plantilla_casa_tomas.sql` prepara el logo original, la dirección y el contacto en plantillas vacías. Conserva datos fiscales personalizados y el NIF existente. Revisa razón social y NIF antes de emitir. El botón «Usar plantilla Casa Tomás» recupera el logo y el pie de contacto, conservando datos fiscales e IVA.
 
 Para actualizar la apariencia de las facturas enviadas, desplegar de nuevo `stripe-webhook-cheques-regalo` desde `casa-tomas-story`; incluye los módulos compartidos de marca y PDF. Las facturas existentes conservan sus datos; el cambio modifica su presentación si se vuelve a generar el PDF.
+
+
+## Caducidad de los cheques
+
+En **Cheques → Correo y PDF → Validez del cheque (meses)** se configura el plazo, de 1 a 120 meses. Por defecto son 12 meses (un año natural). Cada cheque guarda `emitido_en` y `caduca_el` al emitirse: al confirmar Stripe el pago o al registrar la compra manual. El día de caducidad está incluido y se interpreta en `Europe/Madrid`. Cambiar el plazo solo afecta a futuras emisiones.
+
+Los cheques anteriores reciben un año desde su fecha de compra. Se conserva su código, estado y diseño. No se reenvían correos automáticamente.
+
+La expedición y la ficha muestran la fecha y los días restantes; el verificador muestra «Caduca hoy» en el último día y rechaza los caducados. El canje vuelve a comprobar la fecha de forma atómica en el servidor. Un trigger también impide marcar como usado un cheque caducado y mantiene fija la fecha frente a reintentos.
+
+El correo (HTML y texto), la tarjeta PDF y las vistas previas incluyen la fecha incluso al ocultar el importe. Se admite `{caducidad}` en los textos personalizados. Las funciones `cheques-regalo-web`, `cheques-regalo-admin` y `stripe-webhook-cheques-regalo`, en `casa-tomas-story`, deben desplegarse tras aplicar la migración de caducidad.

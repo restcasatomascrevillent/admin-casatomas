@@ -1,3 +1,4 @@
+import { calcularCaducidad, fechaCaducidad } from "@/lib/cheques/caducidad";
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,6 +28,12 @@ export function CompraManual() {
   const [error, setError] = useState("");
   const [plantilla, setPlantilla] = useState<PlantillaRegalo | null>(null);
   const [errorPlantilla, setErrorPlantilla] = useState("");
+  const [revisionPlantilla, setRevisionPlantilla] = useState(0);
+  useEffect(() => {
+    const actualizar = () => setRevisionPlantilla(r => r + 1);
+    window.addEventListener("cheques-plantilla-actualizada", actualizar);
+    return () => window.removeEventListener("cheques-plantilla-actualizada", actualizar);
+  }, []);
   useEffect(() => {
     let activo = true;
     void (async () => {
@@ -36,8 +43,8 @@ export function CompraManual() {
       else setPlantilla({ ...PLANTILLA_REGALO, ...data });
     })().catch(() => { if (activo) setErrorPlantilla("No se pudo cargar la plantilla para la vista previa."); });
     return () => { activo = false; };
-  }, []);
-  const ejemplo: ChequeRegalo = { ...datos, id: "ejemplo", codigo: "CT-EJEMPLO", importe_eur: Number(datos.importe_eur) || 0,
+  }, [revisionPlantilla]);
+  const ejemplo: ChequeRegalo = { ...datos, caduca_el: calcularCaducidad(plantilla?.caducidad_meses ?? 12), id: "ejemplo", codigo: "CT-EJEMPLO", importe_eur: Number(datos.importe_eur) || 0,
     mensaje: datos.incluir_dedicatoria ? datos.mensaje : null, fecha_entrega_deseada: datos.fecha_entrega_deseada || null };
   function cambiar(campo: keyof typeof inicial, valor: string | boolean) { setDatos(d => ({ ...d, [campo]: valor })); }
   async function expedir(e: FormEvent) {
@@ -86,6 +93,7 @@ export function CompraManual() {
     <Card className="rounded-2xl"><CardHeader><CardTitle className="flex gap-2 items-center"><CheckCircle2 className="text-emerald-600" />Cheque expedido</CardTitle></CardHeader><CardContent className="space-y-4">
       <p className="text-2xl font-mono font-semibold">{cheque.codigo}</p>
       <p>{Number(cheque.importe_eur).toLocaleString("es-ES", { style: "currency", currency: "EUR" })} · {cheque.comprador_nombre}</p>
+      <p className="text-sm font-semibold">Válido hasta el {fechaCaducidad(cheque.caduca_el)} (incluido).</p>
       <p className="text-sm break-words">{emailEnviado ? `Correo y PDF enviados a ${cheque.comprador_email}.` : "El código ya se puede verificar y canjear."}</p>
       {cheque.solicita_factura && <p className="text-sm">{facturaEnviada ? "Factura enviada al email del comprador." : "Factura solicitada · envío pendiente."}</p>}
       {error && <p role="alert" className="text-destructive">{error}</p>}

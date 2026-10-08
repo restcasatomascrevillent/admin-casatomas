@@ -40,4 +40,19 @@ describe("Listado de tickets", () => {
     expect(caja).not.toContainElement(screen.getByText("Tickets expedidos"));
     expect(caja).not.toContainElement(screen.getByRole("button", { name: "Siguiente" }));
   });
+  it("separa caducados y disponibles y muestra la fecha y los días restantes", async () => {
+    const hoy = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+    const base = { creado_en: null, comprador_nombre: "Ana", importe_eur: 100, estado: "pagado", usado: false };
+    rpc.mockResolvedValueOnce({ data: { expedidos: 2, canjeados: 0, caducados: 1, coincidencias: 2, importe_pagado: 200, tickets: [
+      { ...base, id: "1", codigo: "CT-EXP", caduca_el: "2020-01-01" },
+      { ...base, id: "2", codigo: "CT-HOY", caduca_el: hoy },
+    ] }, error: null });
+    render(<ListaTickets />);
+    expect((await screen.findByText("CT-EXP")).closest("tr")).toHaveClass("bg-red-50");
+    expect(screen.getByText("CT-HOY").closest("tr")).toHaveClass("bg-emerald-50");
+    expect(screen.getByText("Caduca hoy")).toBeTruthy();
+    expect(screen.getByText("01/01/2020")).toBeTruthy();
+    expect(screen.getByText("Tickets caducados").parentElement).toHaveTextContent("1");
+  });
+
 });

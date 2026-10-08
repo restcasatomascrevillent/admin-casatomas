@@ -1,3 +1,4 @@
+import { calcularCaducidad, fechaCaducidad } from "@/lib/cheques/caducidad";
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +24,7 @@ export function PlantillaChequeRegalo() {
   const [revision, setRevision] = useState(0);
   const [ocultarImporte, setOcultarImporte] = useState(false);
   const [incluirDedicatoria, setIncluirDedicatoria] = useState(true);
-  const ejemplo = { ...CHEQUE_EJEMPLO, ocultar_importe: ocultarImporte, mensaje: incluirDedicatoria ? CHEQUE_EJEMPLO.mensaje : null };
+  const ejemplo = { ...CHEQUE_EJEMPLO, caduca_el: calcularCaducidad(plantilla.caducidad_meses), ocultar_importe: ocultarImporte, mensaje: incluirDedicatoria ? CHEQUE_EJEMPLO.mensaje : null };
   useEffect(() => {
     let activo = true;
     setCargando(true); setError("");
@@ -47,11 +48,12 @@ export function PlantillaChequeRegalo() {
     e.preventDefault();
     if (!puedeEditar || guardando || error || !cambios) return;
     if (!plantilla.email_asunto.trim() || !plantilla.email_mensaje.trim() || !plantilla.pdf_titulo.trim()) { toast.error("Completa el asunto, el mensaje y el título del cheque."); return; }
+    if (!Number.isInteger(plantilla.caducidad_meses) || plantilla.caducidad_meses < 1 || plantilla.caducidad_meses > 120) { toast.error("La validez debe ser un número entero entre 1 y 120 meses."); return; }
     setGuardando(true);
     try {
       const { data, error } = await db.from("plantilla_cheques_regalo").update({ ...plantilla, actualizado_en: new Date().toISOString() }).eq("id", true).select("id").single();
       if (error || !data) throw error || new Error("No se ha guardado la plantilla");
-      setCambios(false); toast.success("Correo y PDF del cheque guardados");
+      setCambios(false); window.dispatchEvent(new Event("cheques-plantilla-actualizada")); toast.success("Correo y PDF del cheque guardados");
     } catch (e) { toast.error(errorCheques(e)); }
     finally { setGuardando(false); }
   }
@@ -61,8 +63,9 @@ export function PlantillaChequeRegalo() {
       {error && <div className="space-y-3 mb-4"><p role="alert" className="text-destructive">{error}</p><Button variant="outline" onClick={() => setRevision(r => r + 1)}>Reintentar</Button></div>}
       <form onSubmit={guardar} className="space-y-5">
         <fieldset disabled={!puedeEditar || cargando || guardando || !!error} className="space-y-5">
+          <div className="space-y-2 rounded-xl border p-4"><Label htmlFor="regalo-caducidad">Validez del cheque (meses)</Label><Input id="regalo-caducidad" type="number" min="1" max="120" step="1" required value={plantilla.caducidad_meses} onChange={e => cambiar("caducidad_meses", Number(e.target.value))} className="max-w-40" /><p className="text-sm text-muted-foreground">Por defecto: 12 meses (1 año) desde la emisión. Válido hasta el final del día de caducidad, hora de España.</p><p className="text-xs text-muted-foreground">El nuevo plazo se aplica a los próximos cheques. Los ya expedidos conservan su fecha.</p></div>
           <div className="space-y-2"><Label htmlFor="regalo-asunto">Asunto del correo</Label><Input id="regalo-asunto" required maxLength={200} value={plantilla.email_asunto} onChange={e => cambiar("email_asunto", e.target.value)} /></div>
-          <div className="space-y-2"><Label htmlFor="regalo-mensaje">Mensaje del correo</Label><Textarea id="regalo-mensaje" rows={6} required maxLength={3000} value={plantilla.email_mensaje} onChange={e => cambiar("email_mensaje", e.target.value)} /><p className="text-xs text-muted-foreground">Puedes usar {"{comprador}"}, {"{destinatario}"}, {"{codigo}"} y {"{importe}"}. Se sustituyen por los datos de cada compra.</p></div>
+          <div className="space-y-2"><Label htmlFor="regalo-mensaje">Mensaje del correo</Label><Textarea id="regalo-mensaje" rows={6} required maxLength={3000} value={plantilla.email_mensaje} onChange={e => cambiar("email_mensaje", e.target.value)} /><p className="text-xs text-muted-foreground">Puedes usar {"{comprador}"}, {"{destinatario}"}, {"{codigo}"}, {"{importe}"} y {"{caducidad}"}. Se sustituyen por los datos de cada compra.</p></div>
           <div className="border-t pt-5 space-y-5"><h3 className="font-semibold">Diseño del PDF</h3>
             <div className="space-y-2"><Label htmlFor="regalo-titulo">Título del cheque</Label><Input id="regalo-titulo" required maxLength={80} value={plantilla.pdf_titulo} onChange={e => cambiar("pdf_titulo", e.target.value)} /></div>
             <div className="space-y-2"><Label htmlFor="regalo-subtitulo">Subtítulo</Label><Input id="regalo-subtitulo" maxLength={160} value={plantilla.pdf_subtitulo} onChange={e => cambiar("pdf_subtitulo", e.target.value)} /></div>
@@ -75,6 +78,6 @@ export function PlantillaChequeRegalo() {
         <Button type="submit" disabled={!puedeEditar || cargando || guardando || !!error || !cambios}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar correo y PDF</Button>
       </form>
     </CardContent></Card>
-    <div className="space-y-4 xl:sticky xl:top-0"><OpcionesRegalo ocultarImporte={ocultarImporte} incluirDedicatoria={incluirDedicatoria} onImporte={setOcultarImporte} onDedicatoria={setIncluirDedicatoria} /><p className="text-xs text-muted-foreground">Prueba las opciones de cada compra. Estas selecciones solo cambian el ejemplo.</p><VistaChequeRegalo cheque={ejemplo} plantilla={plantilla} /><Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Vista previa del correo</CardTitle></CardHeader><CardContent className="space-y-4"><p className="font-medium">{textoRegalo(plantilla.email_asunto, ejemplo, ocultarImporte)}</p><p className="text-sm whitespace-pre-wrap break-words">{textoRegalo(plantilla.email_mensaje, ejemplo, ocultarImporte)}</p><p className="font-mono font-semibold">{CHEQUE_EJEMPLO.codigo}</p>{!ocultarImporte && <p className="text-sm">100,00 €</p>}<p className="text-xs text-muted-foreground">Adjunto: Cheque-{CHEQUE_EJEMPLO.codigo}.pdf</p></CardContent></Card></div>
+    <div className="space-y-4 xl:sticky xl:top-0"><OpcionesRegalo ocultarImporte={ocultarImporte} incluirDedicatoria={incluirDedicatoria} onImporte={setOcultarImporte} onDedicatoria={setIncluirDedicatoria} /><p className="text-xs text-muted-foreground">Prueba las opciones de cada compra. Estas selecciones solo cambian el ejemplo.</p><VistaChequeRegalo cheque={ejemplo} plantilla={plantilla} /><Card className="rounded-2xl"><CardHeader><CardTitle className="text-base">Vista previa del correo</CardTitle></CardHeader><CardContent className="space-y-4"><p className="font-medium">{textoRegalo(plantilla.email_asunto, ejemplo, ocultarImporte)}</p><p className="text-sm whitespace-pre-wrap break-words">{textoRegalo(plantilla.email_mensaje, ejemplo, ocultarImporte)}</p><p className="font-mono font-semibold">{CHEQUE_EJEMPLO.codigo}</p>{!ocultarImporte && <p className="text-sm">100,00 €</p>}<p className="text-sm font-semibold">Válido hasta el {fechaCaducidad(ejemplo.caduca_el)} (incluido). Después de esa fecha no podrá canjearse.</p><p className="text-xs text-muted-foreground">Adjunto: Cheque-{CHEQUE_EJEMPLO.codigo}.pdf</p></CardContent></Card></div>
   </div>;
 }
