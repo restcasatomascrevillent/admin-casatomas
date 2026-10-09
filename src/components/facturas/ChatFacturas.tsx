@@ -53,36 +53,30 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
   }));
 
   return (
-    // Altura del 100% real sin max-h limitante si está en una pestaña.
-    <div className="flex flex-col h-full w-full bg-card overflow-hidden">
-      {/* Body: área a pantalla completa con las dos sub-columnas (Historial / Chat) */}
-      <div className="flex-1 flex min-h-0 bg-background border border-border/50 rounded-lg overflow-hidden shadow-sm">
+    // Plano, sin tarjeta: ni borde ni sombra alrededor del chat (estilo ChatGPT).
+    <div className="flex h-full w-full overflow-hidden">
+      {/* Columna lateral de conversaciones — solo desde 1280 px. Entre 768 y 1279 px el menú de la
+          app ya se lleva 16rem y una segunda columna dejaba muy poco al chat. */}
+      <div className="hidden w-60 shrink-0 border-r border-border/60 xl:block">
+        <ConversacionesList
+          conversaciones={conversaciones}
+          conversacionActiva={conversacionActiva}
+          onSeleccionar={seleccionar}
+          onNueva={nueva}
+          onEliminar={eliminarConversacion}
+        />
+      </div>
 
-        {/* Panel lateral conversaciones — solo desde 1280 px. Entre 768 y 1279 px el menú de la
-            app ya se lleva 16rem y un segundo panel de 16rem dejaba ~200 px al chat. */}
-        <div className="w-64 shrink-0 hidden xl:block border-r border-border/60 bg-muted/10">
-          <ConversacionesList
-            conversaciones={conversaciones}
-            conversacionActiva={conversacionActiva}
-            onSeleccionar={seleccionar}
-            onNueva={nueva}
-            onEliminar={eliminarConversacion}
-          />
-        </div>
-
-        {/* Área interactiva del chat. `min-w-0` (aquí y abajo): la botonera de
-            preguntas rápidas es una fila larga con scroll horizontal propio y,
-            sin él, su ancho mínimo ensancharía la columna en tablet. */}
-        <div className="flex-1 flex flex-col min-h-0 min-w-0">
-
-          {/* Barra superior móvil con botón de historial (Sheet drawer) */}
-          <div className="flex xl:hidden items-center gap-2 px-3 py-1 shrink-0 border-b border-border/40">
+      {/* Área del chat. `min-w-0`: que nada ensanche la columna en tablet. */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* Barra superior (< 1280 px) con botón de historial (Sheet drawer) */}
+        <div className="flex shrink-0 items-center gap-2 px-1 xl:hidden">
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1.5 text-sm text-muted-foreground hover:text-foreground h-11"
+                  className="gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                 >
                   <History className="h-4 w-4" />
                   Historial
@@ -115,8 +109,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
           </div>
 
           {/* Chat principal — ocupa el espacio restante */}
-          <div className="flex-1 flex justify-center bg-background min-h-0">
-            <div className="w-full min-w-0 max-w-4xl flex flex-col h-full bg-card/50">
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div className="flex h-full w-full min-w-0 flex-col">
               <ChatArea
                 mensajes={mensajes}
                 isLoading={isLoading}
@@ -144,7 +138,6 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
               />
             </div>
           </div>
-        </div>
       </div>
     </div>
   );

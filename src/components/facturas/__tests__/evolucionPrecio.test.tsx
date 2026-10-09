@@ -99,7 +99,13 @@ function montar() {
   return render(<ChatFacturas />, { wrapper: envoltorio });
 }
 
-const barra = () => screen.getByRole("group", { name: /al instante, sin ia/i });
+// «Al instante ▾» está plegado: se despliega la primera vez (y tras lanzar una pregunta se vuelve a plegar).
+const barra = () => {
+  if (!screen.queryByRole("group", { name: /al instante, sin ia/i })) {
+    fireEvent.click(screen.getByRole("button", { name: /^al instante/i }));
+  }
+  return screen.getByRole("group", { name: /al instante, sin ia/i });
+};
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();

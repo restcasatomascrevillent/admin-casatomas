@@ -2,7 +2,8 @@
 // Ninguna de las dos toca la IA: los botones llaman a RPC SQL y la tarjeta
 // pinta el resultado en el hilo como «mensaje del sistema» (solo en memoria;
 // ver usePreguntasRapidas.ts).
-import { Loader2, X, Zap } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, Loader2, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
 import { TEXTO_RPC_NO_DISPONIBLE } from "@/lib/facturas/preguntasRapidas";
@@ -18,54 +19,72 @@ interface BarraProps {
 }
 
 /**
- * Una sola fila con desplazamiento horizontal: no crece en alto (la pestaña IA
- * tiene altura calculada y sin scroll de página). Botones de 44 px.
+ * «Al instante ▾»: un botón discreto encima de la caja de escribir que despliega
+ * los chips de las preguntas (se envuelven en varias líneas, sin barra de scroll).
+ * Cerrado ocupa una sola línea: la pestaña IA tiene altura calculada y sin
+ * scroll de página. Al lanzar una pregunta se vuelve a plegar.
  */
 export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDisponible = () => false }: BarraProps) {
+  const [abierta, setAbierta] = useState(false);
+  const lanzar = (id: string, parametros?: unknown) => {
+    onPreguntar(id, parametros);
+    setAbierta(false);
+  };
   return (
-    <div
-      role="group"
-      aria-label="Respuestas al instante, sin IA"
-      className="flex shrink-0 items-center gap-2 overflow-x-auto border-t border-border/60 bg-background/80 px-3 py-1.5 [scrollbar-width:thin]"
-    >
-      <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground" title="Responden al momento leyendo los datos, sin usar la IA">
+    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 sm:px-4">
+      <button
+        type="button"
+        onClick={() => setAbierta((v) => !v)}
+        aria-expanded={abierta}
+        title="Responden al momento leyendo los datos, sin usar la IA"
+        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] pointer-coarse:h-11 pointer-coarse:px-3"
+      >
         <Zap className="h-3.5 w-3.5" aria-hidden />
-        <span className="hidden sm:inline">Al instante:</span>
-      </span>
-      {catalogo.map((p) => {
-        const Icono = p.icono;
-        const ocupado = cargando(p.id);
-        const pendiente = noDisponible(p.id);
-        const deshabilitado = !!p.proximamente || !p.consultar || ocupado || pendiente;
-        const boton = (
-          <button
-            key={p.id}
-            type="button"
-            onClick={p.pide ? undefined : () => onPreguntar(p.id)}
-            disabled={deshabilitado}
-            title={pendiente ? TEXTO_RPC_NO_DISPONIBLE : p.descripcion}
-            aria-busy={ocupado || undefined}
-            className={cn(
-              "inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/70 bg-card px-3.5 text-sm text-foreground transition-colors",
-              "hover:border-[hsl(38,59%,45%)] hover:text-[hsl(38,59%,35%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)]",
-              "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border/70 disabled:hover:text-foreground",
-            )}
-          >
-            {ocupado ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Icono className="h-4 w-4" aria-hidden />}
-            {p.etiqueta}
-            {p.proximamente && <span className="text-xs text-muted-foreground">· próximamente</span>}
-            {pendiente && <span className="text-xs text-muted-foreground">· pendiente</span>}
-          </button>
-        );
-        // Las preguntas con parámetros abren antes un selector (producto, unidad…).
-        return p.pide === "producto" && !deshabilitado ? (
-          <SelectorEvolucionPrecio key={p.id} onElegir={(params) => onPreguntar(p.id, params)}>
-            {boton}
-          </SelectorEvolucionPrecio>
-        ) : (
-          boton
-        );
-      })}
+        Al instante
+        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", abierta && "rotate-180")} aria-hidden />
+      </button>
+      {abierta && (
+        <div
+          role="group"
+          aria-label="Respuestas al instante, sin IA"
+          className="flex flex-wrap gap-1.5 pb-2 pt-1"
+        >
+          {catalogo.map((p) => {
+            const Icono = p.icono;
+            const ocupado = cargando(p.id);
+            const pendiente = noDisponible(p.id);
+            const deshabilitado = !!p.proximamente || !p.consultar || ocupado || pendiente;
+            const boton = (
+              <button
+                key={p.id}
+                type="button"
+                onClick={p.pide ? undefined : () => lanzar(p.id)}
+                disabled={deshabilitado}
+                title={pendiente ? TEXTO_RPC_NO_DISPONIBLE : p.descripcion}
+                aria-busy={ocupado || undefined}
+                className={cn(
+                  "inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 px-3 text-xs text-foreground transition-colors pointer-coarse:h-11 pointer-coarse:text-sm",
+                  "hover:border-[hsl(38,59%,45%)] hover:text-[hsl(38,59%,35%)] dark:hover:text-[hsl(38,59%,60%)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)]",
+                  "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-border/60 disabled:hover:text-foreground",
+                )}
+              >
+                {ocupado ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Icono className="h-3.5 w-3.5" aria-hidden />}
+                {p.etiqueta}
+                {p.proximamente && <span className="text-xs text-muted-foreground">· próximamente</span>}
+                {pendiente && <span className="text-xs text-muted-foreground">· pendiente</span>}
+              </button>
+            );
+            // Las preguntas con parámetros abren antes un selector (producto, unidad…).
+            return p.pide === "producto" && !deshabilitado ? (
+              <SelectorEvolucionPrecio key={p.id} onElegir={(params) => lanzar(p.id, params)}>
+                {boton}
+              </SelectorEvolucionPrecio>
+            ) : (
+              boton
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -82,7 +101,7 @@ export function TarjetaResultadoRapido({ resultado, pregunta, onDescartar }: Tar
   return (
     <section
       aria-label={`Respuesta al instante: ${pregunta?.etiqueta ?? resultado.preguntaId}`}
-      className="animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-dashed border-border bg-card/80 p-3 shadow-sm duration-300"
+      className="animate-in fade-in slide-in-from-bottom-2 rounded-lg border border-border/60 bg-muted/20 p-3 duration-300"
     >
       <header className="mb-2 flex items-start gap-2">
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">

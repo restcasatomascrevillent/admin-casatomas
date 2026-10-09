@@ -61,7 +61,7 @@ const Facturas = () => {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_FACTURAS);
   const topTabClass =
-    "flex min-h-11 items-center gap-1 sm:gap-2 rounded-md px-1.5 sm:px-3 transition-colors hover:bg-background/70 hover:text-foreground data-[state=active]:bg-background data-[state=active]:shadow-sm data-[state=active]:text-primary";
+    "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-[hsl(38,59%,45%)] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none";
 
   // Contadores para los badges de las pestañas
   const { data: facturas } = useFacturas();
@@ -138,9 +138,9 @@ const Facturas = () => {
           className="flex-1 flex flex-col min-h-0"
         >
           {/* Botonera de navegación superior */}
-          <div className="shrink-0 mb-2 sm:mb-4 bg-card rounded-lg border border-border/50 shadow-sm p-1 w-full sm:inline-block sm:max-w-3xl">
-            <TabsList className="flex w-full bg-muted/40 h-11 sm:h-12">
-              <TabsTrigger value="compras" className={`${topTabClass} flex-1`}>
+          <div className="mb-2 w-full shrink-0 border-b border-border/60">
+            <TabsList className="-mb-px flex h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto sm:gap-1 pointer-coarse:min-h-11">
+              <TabsTrigger value="compras" className={`${topTabClass} flex-1 sm:flex-none`}>
                 <ShoppingCart className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Compras</span>
                 {totalDocumentos > 0 && (
@@ -150,8 +150,8 @@ const Facturas = () => {
                 )}
               </TabsTrigger>
               {/* IA + lo gastado este mes (texto pequeño que abre el desglose). */}
-              <div className="flex min-w-0 flex-1 items-center">
-                <TabsTrigger value="chat" className={`${topTabClass} min-w-0 flex-1`}>
+              <div className="flex min-w-0 flex-1 items-center sm:flex-none">
+                <TabsTrigger value="chat" className={`${topTabClass} min-w-0 flex-1 sm:flex-none`}>
                   <MessageSquare className="h-4 w-4 shrink-0" />
                   <span className="font-medium text-xs sm:text-[15px] truncate">IA</span>
                   {totalConversaciones > 0 && (
@@ -162,7 +162,7 @@ const Facturas = () => {
                 </TabsTrigger>
                 <GastoIaPestana />
               </div>
-              <TabsTrigger value="cargar" className={`${topTabClass} flex-1`}>
+              <TabsTrigger value="cargar" className={`${topTabClass} flex-1 sm:flex-none`}>
                 <Upload className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Cargar</span>
                 {activosSubida > 0 && (
@@ -192,7 +192,7 @@ const Facturas = () => {
             {/* PESTAÑA IA: el gasto de IA ya no ocupa una línea aquí; va junto a la
                 pestaña (GastoIaPestana). */}
             <TabsContent value="chat" className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <div className="h-full min-h-0 max-h-none rounded-xl overflow-hidden shadow-md">
+              <div className="h-full min-h-0 overflow-hidden">
                 <ChatFacturas ref={chatRef} sugerencias={sugerenciasDinamicas} />
               </div>
             </TabsContent>

@@ -1,8 +1,6 @@
 import { Fragment, useRef, useEffect, useState, type ReactNode } from "react";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Zap, FileText, BarChart3, Package, Copy, Check, RefreshCw } from "lucide-react";
+import { ArrowUp, Bot, Zap, FileText, BarChart3, Package, Copy, Check, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
@@ -37,23 +35,23 @@ interface ChatAreaProps {
    */
   resultadosRapidos?: ResultadoRapido[];
   renderResultadoRapido?: (r: ResultadoRapido) => ReactNode;
-  /** Botonera de preguntas rápidas, encima de la caja de texto. */
+  /** Botón «Al instante» de preguntas rápidas, encima de la caja de texto. */
   barraRapida?: ReactNode;
 }
 
 function TypingDots() {
   return (
-    <div className="flex items-center gap-1 px-1 py-1">
+    <div className="flex items-center gap-1 py-2" role="status" aria-label="Escribiendo…">
       <span
-        className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+        className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce"
         style={{ animationDelay: "0ms", animationDuration: "1s" }}
       />
       <span
-        className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+        className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce"
         style={{ animationDelay: "180ms", animationDuration: "1s" }}
       />
       <span
-        className="h-2 w-2 rounded-full bg-muted-foreground/50 animate-bounce"
+        className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50 animate-bounce"
         style={{ animationDelay: "360ms", animationDuration: "1s" }}
       />
     </div>
@@ -80,17 +78,13 @@ function CopyButton({ text }: { text: string }) {
       onClick={handleCopy}
       title={copied ? "¡Copiado!" : "Copiar respuesta"}
       className={cn(
-        "flex min-h-11 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-all duration-150",
+        "flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors duration-150 pointer-coarse:min-h-11 pointer-coarse:px-3",
         copied
           ? "text-emerald-600 bg-emerald-500/10"
           : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
       )}
     >
-      {copied ? (
-        <Check className="h-4 w-4" />
-      ) : (
-        <Copy className="h-4 w-4" />
-      )}
+      {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
       {copied ? "Copiado" : "Copiar"}
     </button>
   );
@@ -153,45 +147,39 @@ export function ChatArea({
   // ─── Estado vacío (sin mensajes) ──────────────────────────────────────────
   if (mensajes.length === 0 && !isSending && resultadosRapidos.length === 0) {
     return (
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex-1 flex flex-col items-center justify-center gap-6 p-6 overflow-y-auto">
-          {/* Icono central */}
-          <div className="flex flex-col items-center gap-3 text-center">
-            <div
-              className="flex h-16 w-16 items-center justify-center rounded-2xl"
-              style={{
-                background: "linear-gradient(135deg, hsl(206 11% 22%), hsl(206 11% 30%))",
-                boxShadow: "0 8px 24px hsl(206 11% 15% / 0.25)",
-              }}
-            >
-              <Bot className="h-8 w-8 text-white" />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto px-4 py-4">
+          <div className="flex flex-col items-center gap-2 text-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-[hsl(38,59%,45%)]">
+              <Bot className="h-5 w-5" aria-hidden />
             </div>
             <div>
-              <p className="font-semibold text-foreground text-sm">¿En qué puedo ayudarte?</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-base font-semibold text-foreground">¿En qué puedo ayudarte?</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 Pregunta sobre tus facturas, albaranes o proveedores
               </p>
             </div>
           </div>
 
-          {/* Sugerencias (dinámicas o por defecto) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-xl">
+          {/* Sugerencias (dinámicas o por defecto): lista ligera, sin tarjetas */}
+          <ul className="w-full max-w-md space-y-0.5">
             {listaSugerencias.map(({ icon: Icon, texto }) => (
-              <button
-                key={texto}
-                onClick={() => handleSugerencia(texto)}
-                disabled={isSending}
-                className="flex min-h-11 items-start gap-2.5 rounded-xl border border-border/60 bg-card p-3 text-left text-sm text-muted-foreground hover:border-[hsl(38,59%,45%)] hover:text-foreground hover:shadow-sm transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed group"
-              >
-                <Icon className="h-4 w-4 shrink-0 mt-0.5 group-hover:text-[hsl(38,59%,45%)] transition-colors" />
-                <span className="leading-snug">{texto}</span>
-              </button>
+              <li key={texto}>
+                <button
+                  type="button"
+                  onClick={() => handleSugerencia(texto)}
+                  disabled={isSending}
+                  className="group flex min-h-9 w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
+                >
+                  <Icon className="h-4 w-4 shrink-0 transition-colors group-hover:text-[hsl(38,59%,45%)]" aria-hidden />
+                  <span className="leading-snug">{texto}</span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
 
         {barraRapida}
-        {/* Input inferior */}
         <InputBar
           input={input}
           setInput={setInput}
@@ -205,9 +193,9 @@ export function ChatArea({
 
   // ─── Chat con mensajes ──────────────────────────────────────────────────────
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <ScrollArea className="flex-1 px-4 py-4">
-        <div className="space-y-5">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="mx-auto w-full max-w-3xl space-y-4 px-3 py-3 sm:px-4">
           {isLoading && mensajes.length === 0 ? (
             <div className="flex justify-center py-12">
               <TypingDots />
@@ -220,104 +208,53 @@ export function ChatArea({
               const graficas = (msg.adjuntos ?? []).filter(
                 (a) => a.tipo === "serie_precio" && !esSerieSinDatos(a.datos),
               );
+              const hora = new Date(msg.created_at).toLocaleTimeString("es-ES", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              // `persistido === false` = se pintó pero no se guardó en BD.
+              // Se avisa aquí para que no parezca que el hilo quedó grabado.
+              const sinGuardar = msg.persistido === false && (
+                <span className="mr-1.5 font-medium text-destructive">
+                  sin guardar (no se pudo guardar en el historial: se perderá al recargar) ·
+                </span>
+              );
 
               return (
                 <Fragment key={msg.id}>
-                {rapidosEn(index)}
-                <div
-                  className={cn(
-                    "flex gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300",
-                    isUser ? "flex-row-reverse" : "flex-row"
-                  )}
-                >
-                  {/* Avatar */}
-                  <div
-                    className={cn(
-                      "flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-2",
-                      isUser
-                        ? "ring-[hsl(38,59%,45%)/0.3]"
-                        : "ring-border/60"
-                    )}
-                    style={
-                      isUser
-                        ? { background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))" }
-                        : { background: "linear-gradient(135deg, hsl(206 11% 28%), hsl(206 11% 22%))" }
-                    }
-                  >
-                    {isUser ? (
-                      <User className="h-3.5 w-3.5 text-white" />
-                    ) : (
-                      <Bot className="h-3.5 w-3.5 text-white" />
-                    )}
-                  </div>
-
-                  {/* Burbuja + acciones */}
-                  <div
-                    className={cn(
-                      "flex flex-col gap-1 max-w-[88%] sm:max-w-[78%]",
-                      isUser ? "items-end" : "items-start",
-                      graficas.length > 0 && "w-full",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "rounded-2xl px-4 py-2.5 shadow-sm",
-                        isUser
-                          ? "rounded-tr-sm text-white"
-                          : "rounded-tl-sm bg-muted/60 text-foreground border border-border/40"
-                      )}
-                      style={
-                        isUser
-                          ? { background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 38%))" }
-                          : undefined
-                      }
-                    >
-                      <div
-                        className={cn(
-                          "prose prose-sm max-w-none",
-                          isUser ? "prose-invert" : "dark:prose-invert"
-                        )}
-                      >
-                        <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                  {rapidosEn(index)}
+                  {isUser ? (
+                    <div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-end gap-0.5 duration-300">
+                      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[hsl(38,59%,45%)] px-3.5 py-2 text-white sm:max-w-[75%]">
+                        <div className="prose prose-sm prose-invert max-w-none prose-p:my-0">
+                          <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                        </div>
                       </div>
-                      <p
-                        className={cn(
-                          "text-xs mt-1.5 text-right",
-                          isUser ? "text-white/60" : "text-muted-foreground/60"
-                        )}
-                      >
-                        {/* `persistido === false` = se pinto pero no se guardo en BD.
-                            Se avisa aqui para que no parezca que el hilo quedo grabado. */}
-                        {msg.persistido === false && (
-                          <span
-                            className={cn(
-                              "mr-1.5 font-medium",
-                              isUser ? "text-white/90" : "text-destructive"
-                            )}
-                          >
-                            sin guardar (no se pudo guardar en el historial: se perderá al recargar) ·
-                          </span>
-                        )}
-                        {new Date(msg.created_at).toLocaleTimeString("es-ES", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                      <p className="px-1 text-[11px] text-muted-foreground/70">
+                        {sinGuardar}
+                        {hora}
                       </p>
                     </div>
-
-                    {/* Gráficas adjuntas (evolución de precio) */}
-                    {graficas.map((a, i) => (
-                      <div
-                        key={`${msg.id}-grafica-${i}`}
-                        className="w-full rounded-xl border border-border/60 bg-card p-3 shadow-sm"
-                      >
-                        <GraficoSeriePrecio datos={a.datos} />
+                  ) : (
+                    <div
+                      className={cn(
+                        "flex animate-in fade-in slide-in-from-bottom-2 flex-col gap-1 duration-300",
+                        graficas.length === 0 && "max-w-[44rem]",
+                      )}
+                    >
+                      <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
+                        <ReactMarkdown>{msg.contenido}</ReactMarkdown>
                       </div>
-                    ))}
 
-                    {/* Acciones bajo el mensaje del asistente */}
-                    {!isUser && (
-                      <div className="flex items-center gap-1 pl-1">
+                      {/* Gráficas adjuntas (evolución de precio) */}
+                      {graficas.map((a, i) => (
+                        <div key={`${msg.id}-grafica-${i}`} className="w-full pt-1">
+                          <GraficoSeriePrecio datos={a.datos} />
+                        </div>
+                      ))}
+
+                      {/* Acciones y hora bajo la respuesta */}
+                      <div className="-ml-2 flex flex-wrap items-center gap-x-1 text-[11px] text-muted-foreground/70">
                         <CopyButton text={msg.contenido} />
 
                         {/* Botón regenerar solo en el último mensaje del asistente */}
@@ -326,16 +263,19 @@ export function ChatArea({
                             type="button"
                             onClick={onRegenerar}
                             title="Regenerar respuesta"
-                            className="flex min-h-11 items-center gap-1.5 rounded-md px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-150"
+                            className="flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors duration-150 hover:bg-muted/60 hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:px-3"
                           >
-                            <RefreshCw className="h-4 w-4" />
+                            <RefreshCw className="h-3.5 w-3.5" />
                             Regenerar
                           </button>
                         )}
+                        <span className="px-1">
+                          {sinGuardar}
+                          {hora}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                </div>
+                    </div>
+                  )}
                 </Fragment>
               );
             })
@@ -343,24 +283,12 @@ export function ChatArea({
 
           {rapidosEn(mensajes.length)}
 
-          {/* Typing indicator */}
-          {isSending && (
-            <div className="flex gap-2.5 flex-row">
-              <div
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
-                style={{ background: "linear-gradient(135deg, hsl(206 11% 28%), hsl(206 11% 22%))" }}
-              >
-                <Bot className="h-3.5 w-3.5 text-white" />
-              </div>
-              <div className="rounded-2xl rounded-tl-sm px-4 py-2.5 bg-muted/60 border border-border/40 shadow-sm">
-                <TypingDots />
-              </div>
-            </div>
-          )}
+          {/* Indicador de «escribiendo» */}
+          {isSending && <TypingDots />}
 
           <div ref={scrollRef} />
         </div>
-      </ScrollArea>
+      </div>
 
       {barraRapida}
       <InputBar
@@ -384,33 +312,39 @@ interface InputBarProps {
 }
 
 function InputBar({ input, setInput, isSending, onSend, onKeyDown }: InputBarProps) {
+  const hayTexto = input.trim().length > 0;
   return (
-    <div className="flex gap-2 p-4 border-t border-border/60 bg-background/80 backdrop-blur-sm">
-      <Textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="Escribe tu pregunta…"
-        enterKeyHint="send"
-        aria-label="Pregunta para el asistente"
-        disabled={isSending}
-        className="min-h-[52px] max-h-32 resize-none text-base md:text-base rounded-xl border-border/60 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-1 focus-visible:border-[hsl(38,59%,45%)]"
-        rows={2}
-      />
-      <Button
-        onClick={onSend}
-        disabled={isSending || !input.trim()}
-        size="icon"
-        aria-label="Enviar pregunta"
-        className="h-auto min-h-11 w-12 shrink-0 rounded-xl transition-all duration-150 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100"
-        style={{
-          background: "linear-gradient(135deg, hsl(38 59% 45%), hsl(38 59% 36%))",
-          border: "none",
-          color: "white",
-        }}
-      >
-        <Send className="h-4 w-4" />
-      </Button>
+    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 pt-1 sm:px-4">
+      {/* Una sola caja redondeada; el botón de enviar va dentro, a la derecha. */}
+      <div className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-[hsl(38,59%,45%)]">
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Escribe tu pregunta…"
+          enterKeyHint="send"
+          aria-label="Pregunta para el asistente"
+          disabled={isSending}
+          className="max-h-40 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base"
+          rows={1}
+        />
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={isSending || !hayTexto}
+          aria-label="Enviar pregunta"
+          className={cn(
+            "absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full transition-colors pointer-coarse:bottom-1 pointer-coarse:right-1 pointer-coarse:h-11 pointer-coarse:w-11",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+            "disabled:cursor-not-allowed",
+            hayTexto && !isSending
+              ? "bg-[hsl(38,59%,45%)] text-white hover:bg-[hsl(38,59%,38%)]"
+              : "bg-muted text-muted-foreground",
+          )}
+        >
+          <ArrowUp className="h-4 w-4" aria-hidden />
+        </button>
+      </div>
     </div>
   );
 }
