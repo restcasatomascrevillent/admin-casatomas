@@ -147,3 +147,17 @@ describe("organizarServicio", () => {
     expect(deLaSala("Salón")).toBe("del Salón");
   });
 });
+
+describe("organizarServicio · mesas liberadas", () => {
+  it("una sentada que ya se fue no ocupa su mesa", () => {
+    const mesas = [pieza("C", "1", 2)];
+    const r = organizarServicio(
+      entrada(mesas, [
+        res("Ida", 4, "13:00:00", ["C1"], { estado: "completada", salidaAt: "2026-10-09T12:30:00Z" }),
+        res("Nueva", 4, "15:00:00"),
+      ]),
+    );
+    expect(r.movimientos.map((m) => m.reservaId)).toEqual(["Nueva"]);
+    expect(r.sinSitio).toEqual([]);
+  });
+});

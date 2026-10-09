@@ -22,6 +22,18 @@ export interface FilaMesaSala extends FilaMesaPiezas {
 
 export type AsignacionDia = AsignacionConReserva;
 
+/**
+ * ¿Esta asignación sigue ocupando su mesa para sentar a alguien más? No, si la
+ * reserva ya se fue («Liberar mesa»: `salida_at`) o no vino. (La base de datos
+ * lo admite con la migración 20261009150000.)
+ */
+export function asignacionOcupa(a: AsignacionConReserva): boolean {
+  const r = a.reservas as { estado?: string | null; salida_at?: string | null } | null | undefined;
+  if (!r) return true;
+  if (r.estado === "no_show" || r.estado === "cancelada") return false;
+  return !r.salida_at;
+}
+
 export interface AjusteDia extends AjusteMesa {
   espacioId: string;
   turno: string;
@@ -53,7 +65,8 @@ export function opcionesParaSentar(params: {
   /** `id` vacío para quien aún no tiene reserva (walk-in). */
   reserva: { id: string; hora: string; comensales: number; espacioId: string | null };
 }): OpcionesSentar {
-  const { salas, mesas, ajustesDia, asignaciones, excluidas, configOcupacion, reserva } = params;
+  const { salas, mesas, ajustesDia, excluidas, configOcupacion, reserva } = params;
+  const asignaciones = params.asignaciones.filter(asignacionOcupa);
   const turno = turnoDeHora(reserva.hora);
   const opciones: MesaOpcion[] = [];
   const porSala = new Map<string, { piezas: MesaPiezas[]; estado: ReturnType<typeof estadoServicio> }>();

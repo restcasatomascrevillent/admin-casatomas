@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  asignacionOcupa,
   esErrorCanal,
   filaSinReserva,
   horaActual,
@@ -60,5 +61,21 @@ describe("sin reserva (walk-in)", () => {
     expect(r.caben).toEqual([]);
     expect(r.propuesta?.mesa.nombre).toBe("3");
     expect(r.propuesta?.propuesta.texto).toBe("Para sentar 6 en la 3: pasa una pieza de la 4 a la 3");
+  });
+});
+
+describe("mesa liberada", () => {
+  it("una liberada o de «No vino» no ocupa; se puede volver a dar", () => {
+    const base = { mesa_id: "m", reserva_id: "r" };
+    expect(asignacionOcupa({ ...base, reservas: { hora: "21:00", estado: "completada", salida_at: null } as never })).toBe(true);
+    expect(asignacionOcupa({ ...base, reservas: { hora: "21:00", estado: "completada", salida_at: "2026-10-09T20:00:00Z" } as never })).toBe(false);
+    expect(asignacionOcupa({ ...base, reservas: { hora: "21:00", estado: "no_show" } as never })).toBe(false);
+    const mesas = [mesa("a", "4", "c")];
+    const r = opcionesParaSentar({
+      salas: SALAS, mesas, excluidas: new Set(), ajustesDia: [],
+      asignaciones: [{ ...base, mesa_id: "a", reservas: { hora: "21:00:00", estado: "completada", salida_at: "2026-10-09T19:30:00Z" } as never }],
+      reserva: { id: "", hora: "21:40:00", comensales: 2, espacioId: null },
+    });
+    expect(r.caben.map((m) => m.nombre)).toEqual(["4"]);
   });
 });

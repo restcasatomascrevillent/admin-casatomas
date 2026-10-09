@@ -65,6 +65,7 @@ interface FilaReserva {
   importante?: boolean | null;
   espacio_id: string | null;
   marca?: string | null;
+  salida_at?: string | null;
 }
 
 function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: TurnoServicio; onCerrar: () => void }) {
@@ -119,6 +120,7 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
         importante: !!r.importante,
         espacioId: r.espacio_id,
         mesaIds: mesasDe.get(r.id) ?? [],
+        salidaAt: r.salida_at ?? null,
       }));
     const ahora = new Date();
     const empezado = fecha === hoyLocal() && turnoDeHora(ahora.toTimeString().slice(0, 8)) === turno;

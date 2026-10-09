@@ -70,6 +70,8 @@ export interface ReservaOrg {
   espacioId: string | null;
   /** Mesas que tiene asignadas ahora en este servicio. */
   mesaIds: string[];
+  /** «Liberar mesa»: ya se fue; su mesa no cuenta como ocupada. */
+  salidaAt?: string | null;
 }
 
 export interface DestinoOrg {
@@ -478,7 +480,11 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
   const empezado = entrada.minutoAhora != null;
   const salaOk = new Set(ctx.salasActivas.map((s) => s.id));
 
-  const relevantes = entrada.reservas.filter((r) => ESTADOS_A_COLOCAR.has(r.estado) || ESTADOS_FIJOS.has(r.estado));
+  // Las que ya se fueron («Liberar mesa») y las de «No vino» no se tocan, pero tampoco ocupan:
+  // su mesa vuelve a estar libre (la BD lo admite con la migración 20261009150000).
+  const relevantes = entrada.reservas.filter(
+    (r) => (ESTADOS_A_COLOCAR.has(r.estado) || ESTADOS_FIJOS.has(r.estado)) && !r.salidaAt && r.estado !== "no_show",
+  );
   const inamovible = (r: ReservaOrg) => {
     if (ESTADOS_FIJOS.has(r.estado)) return true;
     if (!empezado || r.mesaIds.length === 0) return false;

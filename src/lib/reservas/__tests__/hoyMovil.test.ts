@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agruparHoyMovil, mesasQueCaben, textoMesas, type ReservaHoyMovil } from "../hoyMovil";
+import { agruparHoyMovil, estadoMesasHoy, lleganAhora, mesasQueCaben, textoMesas, type ReservaHoyMovil } from "../hoyMovil";
 
 const r = (id: string, hora: string, estado: string, espacio: string | null, pax = 2, nombre = id): ReservaHoyMovil => ({
   id,
@@ -83,5 +83,53 @@ describe("mesasQueCaben", () => {
     expect(textoMesas([])).toBe("Sin mesa");
     expect(textoMesas(["3"])).toBe("Mesa 3");
     expect(textoMesas(["4", "5"])).toBe("Mesas 4 + 5");
+  });
+});
+
+describe("lleganAhora", () => {
+  const reservas = [
+    r("tarde", "20:35:00", "confirmada", "c"),
+    r("muyTarde", "20:20:00", "confirmada", "c"),
+    r("ya", "21:00:00", "confirmada", "c"),
+    r("pronto", "21:10:00", "verificada", "s"),
+    r("luego", "21:30:00", "confirmada", "s"),
+    r("llego", "21:00:00", "completada", "s"),
+  ];
+  it("próximos 15 min y hasta 30 tarde, sin las que ya llegaron", () => {
+    const filas = lleganAhora(reservas, () => [], 21 * 60, { busqueda: "", filtroTurno: "todo" });
+    expect(filas.map((f) => [f.reserva.id, f.tarde])).toEqual([
+      ["tarde", true],
+      ["ya", false],
+      ["pronto", false],
+    ]);
+  });
+});
+
+describe("estadoMesasHoy", () => {
+  const turnoDe = (h: string) => (h < "17:00" ? "comida" : "cena") as "comida" | "cena";
+  const reservas = [
+    { id: "a", nombre: "Ana", hora: "21:00:00", numero_comensales: 4, estado: "completada", salida_at: null },
+    { id: "b", nombre: "Bea", hora: "22:00:00", numero_comensales: 2, estado: "confirmada" },
+    { id: "c", nombre: "Ciro", hora: "21:30:00", numero_comensales: 2, estado: "confirmada" },
+    { id: "d", nombre: "Dani", hora: "20:00:00", numero_comensales: 2, estado: "completada", salida_at: "2026-10-09T19:00:00Z" },
+    { id: "e", nombre: "Eva", hora: "14:00:00", numero_comensales: 2, estado: "confirmada" },
+    { id: "f", nombre: "Fran", hora: "21:00:00", numero_comensales: 2, estado: "no_show" },
+  ];
+  const asig = [
+    { mesa_id: "1", reserva_id: "a" },
+    { mesa_id: "1", reserva_id: "b" },
+    { mesa_id: "2", reserva_id: "b" },
+    { mesa_id: "2", reserva_id: "c" },
+    { mesa_id: "3", reserva_id: "d" },
+    { mesa_id: "4", reserva_id: "e" },
+    { mesa_id: "5", reserva_id: "f" },
+  ];
+  it("sentada manda; si no, la próxima; liberadas, de otro turno y «No vino» = libre", () => {
+    const e = estadoMesasHoy(asig, reservas, "cena", turnoDe);
+    expect(e.get("1")).toMatchObject({ tipo: "sentada", nombre: "Ana" });
+    expect(e.get("2")).toMatchObject({ tipo: "reservada", nombre: "Ciro", hora: "21:30:00" });
+    expect(e.get("3")).toBeUndefined();
+    expect(e.get("4")).toBeUndefined();
+    expect(e.get("5")).toBeUndefined();
   });
 });

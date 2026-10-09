@@ -56,6 +56,8 @@ export interface AsignacionConDetalles extends AsignacionMesa {
     estado: string;
     /** Viene en el select; declarada opcional para no romper a quien construya el objeto. */
     fecha?: string;
+    /** «Liberar mesa»: la reserva ya se fue (la mesa queda libre desde esa hora). */
+    salida_at?: string | null;
   };
   mesas: {
     id: string;
@@ -108,7 +110,8 @@ export function useAsignacionesMesa(
             hora,
             numero_comensales,
             estado,
-            fecha
+            fecha,
+            salida_at
           ),
           mesas!inner (
             id,

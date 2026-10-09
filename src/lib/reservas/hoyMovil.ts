@@ -144,3 +144,84 @@ export function mesasQueCaben(
         a.nombre.localeCompare(b.nombre, "es"),
     );
 }
+
+// ─── «Llegan ahora» ──────────────────────────────────────────────────────────
+
+const ESTADOS_POR_LLEGAR = new Set(["pendiente", "verificada", "confirmada"]);
+
+function minutos(hora: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})/.exec(hora ?? "");
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+export interface FilaLlegada<R extends ReservaHoyMovil = ReservaHoyMovil> extends FilaHoyMovil<R> {
+  /** Ya debería estar aquí (hasta 30 min tarde). */
+  tarde: boolean;
+}
+
+/**
+ * Las que aún no han llegado y llegan en los próximos 15 min, más las que van
+ * hasta 30 min tarde (marcadas). Por hora. Mismos filtros que la lista.
+ */
+export function lleganAhora<R extends ReservaHoyMovil>(
+  reservas: readonly R[],
+  mesasDe: (reservaId: string) => string[],
+  minutoAhora: number,
+  filtros: { busqueda: string; filtroTurno: FiltroTurnoHoy },
+): FilaLlegada<R>[] {
+  return reservas
+    .filter((r) => ESTADOS_POR_LLEGAR.has(r.estado) && coincideFiltroHoy(r, filtros))
+    .map((r) => ({ r, m: minutos(r.hora) }))
+    .filter(({ m }) => m != null && m >= minutoAhora - 30 && m <= minutoAhora + 15)
+    .sort((a, b) => (a.m as number) - (b.m as number) || (a.r.nombre ?? "").localeCompare(b.r.nombre ?? "", "es"))
+    .map(({ r, m }) => ({ reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: (m as number) < minutoAhora }));
+}
+
+// ─── Estado de cada mesa («Mesas») ───────────────────────────────────────────
+
+export type EstadoMesaHoy =
+  | { tipo: "libre" }
+  | { tipo: "sentada"; reservaId: string; nombre: string; comensales: number }
+  | { tipo: "reservada"; reservaId: string; nombre: string; comensales: number; hora: string };
+
+export interface ReservaParaMesa {
+  id: string;
+  nombre: string | null;
+  hora: string;
+  numero_comensales: number;
+  estado: string;
+  salida_at?: string | null;
+}
+
+/**
+ * Cómo está cada mesa en el turno: SENTADA (alguien con «Llegó» que no se ha
+ * ido), RESERVADA (la próxima reserva por llegar, con su hora) o LIBRE. Una
+ * mesa liberada (`salida_at`) o de un «No vino» cuenta como libre.
+ */
+export function estadoMesasHoy(
+  asignaciones: ReadonlyArray<{ mesa_id: string; reserva_id: string }>,
+  reservas: readonly ReservaParaMesa[],
+  turno: "comida" | "cena",
+  turnoDe: (hora: string) => "comida" | "cena",
+): Map<string, EstadoMesaHoy> {
+  const porId = new Map(reservas.map((r) => [r.id, r]));
+  const sentadas = new Map<string, ReservaParaMesa>();
+  const proximas = new Map<string, ReservaParaMesa>();
+  for (const a of asignaciones) {
+    const r = porId.get(a.reserva_id);
+    if (!r || turnoDe(r.hora) !== turno) continue;
+    if (r.estado === ESTADO_LLEGADA && !r.salida_at) sentadas.set(a.mesa_id, r);
+    else if (ESTADOS_POR_LLEGAR.has(r.estado)) {
+      const actual = proximas.get(a.mesa_id);
+      if (!actual || r.hora < actual.hora) proximas.set(a.mesa_id, r);
+    }
+  }
+  const estado = new Map<string, EstadoMesaHoy>();
+  for (const [mesaId, r] of proximas) {
+    estado.set(mesaId, { tipo: "reservada", reservaId: r.id, nombre: r.nombre ?? "", comensales: r.numero_comensales, hora: r.hora });
+  }
+  for (const [mesaId, r] of sentadas) {
+    estado.set(mesaId, { tipo: "sentada", reservaId: r.id, nombre: r.nombre ?? "", comensales: r.numero_comensales });
+  }
+  return estado;
+}
