@@ -127,6 +127,7 @@ import {
 } from "@/lib/reservas/piezasMesa";
 import { DialogoPropuestaPiezas, PanelPiezasMesa, type PropuestaAbierta } from "@/components/reservas/PiezasMesa";
 import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
+import { BotonOrganizarServicio } from "@/components/reservas/OrganizarServicio";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
@@ -2423,9 +2424,9 @@ export function PlanoEspacio2D({
               <Plus className="mr-2 h-4 w-4" />
               Mesa
             </Button>
-            {/* "Repartir", no "Auto-asignar con IA": ya no llama a ninguna IA,
-                reparte aquí mismo con una regla explicable (los grupos grandes
-                primero, la mesa más justa que valga). */}
+            {/* «Organizar» (09/10/2026): decide sala y mesa de TODAS las reservas del servicio y propone
+                antes de tocar nada. «Repartir» sigue al lado: solo da mesa en esta sala a las pendientes. */}
+            {turnoServicio && <BotonOrganizarServicio fecha={fechaSel} turno={turnoServicio} />}
             <Button
               variant="outline"
               size="sm"
