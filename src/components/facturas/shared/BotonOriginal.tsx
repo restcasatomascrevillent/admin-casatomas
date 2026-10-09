@@ -11,8 +11,12 @@ const SEGUNDOS_FIRMA = 120;
 interface BotonOriginalProps {
   driveUrl: string | null;
   archivoPath: string | null;
-  variant: "mobile" | "desktop";
-  /** Texto del boton en movil ("Escaneo" en facturas, "Doc" en albaranes). */
+  variant: "mobile" | "desktop" | "ficha";
+  /**
+   * Texto del boton en movil ("Escaneo" en facturas, "Doc" en albaranes). En la
+   * variante `ficha` es el nombre accesible ("Ver original") y el texto visible
+   * es la palabra corta que queda tras quitar el "Ver ".
+   */
   label?: string;
 }
 
@@ -32,9 +36,15 @@ interface BotonOriginalProps {
  */
 export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo" }: BotonOriginalProps) {
   const [cargando, setCargando] = useState(false);
+  // `ficha`: solo icono en estrecho, icono + palabra corta desde `sm`, con el nombre accesible siempre puesto.
+  const corto = label.replace(/^Ver /i, "").replace(/^./, (c) => c.toUpperCase());
+  const texto =
+    variant === "mobile" ? label : variant === "ficha" ? <span className="hidden xl:inline">{corto}</span> : null;
 
   const clases =
-    variant === "mobile"
+    variant === "ficha"
+      ? "inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+      : variant === "mobile"
       ? "inline-flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-50 px-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40"
       : "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40";
 
@@ -47,8 +57,8 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
         title="No se guardó el documento original de este registro"
         aria-label="Ver original: no se guardó el documento original de este registro"
       >
-        <ExternalLink className={variant === "mobile" ? "h-4 w-4" : "h-4 w-4"} />
-        {variant === "mobile" && label}
+        <ExternalLink className="h-4 w-4" />
+        {texto}
       </button>
     );
   }
@@ -69,10 +79,10 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
         onClick={(e) => e.stopPropagation()}
         className={clases}
         title="Ver documento original (Google Drive)"
-        aria-label={variant === "mobile" ? undefined : "Ver documento original (Google Drive)"}
+        aria-label={variant === "mobile" ? undefined : variant === "ficha" ? label : "Ver documento original (Google Drive)"}
       >
         {icono}
-        {variant === "mobile" && label}
+        {texto}
       </a>
     );
   }
@@ -101,10 +111,10 @@ export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo
       disabled={cargando}
       className={clases}
       title="Ver documento original (archivo guardado)"
-      aria-label={variant === "mobile" ? undefined : "Ver documento original (archivo guardado)"}
+      aria-label={variant === "mobile" ? undefined : variant === "ficha" ? label : "Ver documento original (archivo guardado)"}
     >
       {icono}
-      {variant === "mobile" && label}
+      {texto}
     </button>
   );
 }

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Search, Truck, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function TabCompras({
 }: {
   onPreguntarIA?: (doc: Factura, tipo: "factura" | "albarán") => void;
   /** Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos. */
-  modoPedido?: { modo: ModoCompras; clave: string };
+  modoPedido?: { modo: ModoCompras; clave: string; doc?: number };
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   const [texto, setTexto] = useState("");
@@ -86,6 +86,10 @@ export function TabCompras({
   const [origen, setOrigen] = useState<Origen | null>(null);
   const [editando, setEditando] = useState<Factura | null>(null);
   const [gestionando, setGestionando] = useState(false);
+  // La selección cambió desde fuera de la lista (enlace profundo, salto desde una
+  // ficha): hay que dejar a la vista su fila. Un clic en la propia lista no lo pide.
+  const [pedidoDesplazar, setPedidoDesplazar] = useState(0);
+  const listaRef = useRef<HTMLElement>(null);
 
   // ── Datos (react-query comparte la caché con las demás pantallas) ─────────
   const facturasQ = useFacturas();
@@ -154,6 +158,7 @@ export function TabCompras({
     setOrigen(desde && !(desde.modo === destino && desde.id === id) ? desde : null);
     setModo(destino);
     setSeleccion((s) => ({ ...s, [destino]: id }));
+    setPedidoDesplazar((n) => n + 1);
     parche?.();
   };
 
@@ -164,6 +169,15 @@ export function TabCompras({
       // Si el texto buscado no encuentra ese documento, se quita para verlo en la lista.
       if (doc && !coincideDocumento(doc, palabrasBusqueda(texto))) setTexto("");
     });
+  };
+  /** Enlace profundo (`?doc=`): abre ese documento sin «Volver», vaciando lo que lo esconda. */
+  const abrirDocumentoPedido = (doc: Factura) => {
+    setOrigen(null);
+    setModo("documentos");
+    setFiltroDocs("todo");
+    setSeleccion((s) => ({ ...s, documentos: doc.id }));
+    setPedidoDesplazar((n) => n + 1);
+    if (!coincideDocumento(doc, palabrasBusqueda(texto))) setTexto("");
   };
   const abrirProducto = (id: number) => {
     const p = productos.find((x) => x.producto_id === id);
@@ -203,6 +217,44 @@ export function TabCompras({
     // Cada modo empieza sin ficha abierta (en pantallas estrechas la ficha tapa la lista).
     setSeleccion((s) => ({ ...s, [m]: null }));
   };
+
+  // Enlace profundo a un documento: se espera a que haya datos; si no está en la
+  // caché (recién subido) se refresca una vez y, si sigue sin estar, se abandona.
+  const [docPendiente, setDocPendiente] = useState<number | null>(modoPedido?.doc ?? null);
+  const refrescado = useRef(false);
+  useEffect(() => {
+    if (modoPedido?.doc) {
+      refrescado.current = false;
+      setDocPendiente(modoPedido.doc);
+    }
+  }, [modoPedido?.clave, modoPedido?.doc]);
+  useEffect(() => {
+    if (docPendiente === null) return;
+    const doc = documentos.find((d) => d.id === docPendiente);
+    if (doc) {
+      abrirDocumentoPedido(doc);
+      setDocPendiente(null);
+    } else if (!facturasQ.isFetching && !albaranesQ.isFetching) {
+      if (refrescado.current) setDocPendiente(null);
+      else {
+        refrescado.current = true;
+        void facturasQ.refetch();
+        void albaranesQ.refetch();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docPendiente, documentos, facturasQ.isFetching, albaranesQ.isFetching]);
+
+  // Deja a la vista la fila abierta (la de `aria-current`) de la lista del modo actual.
+  useEffect(() => {
+    if (pedidoDesplazar === 0) return;
+    const marco = requestAnimationFrame(() => {
+      const fila = listaRef.current?.querySelector('[aria-current="true"]');
+      const sinMovimiento = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      fila?.scrollIntoView?.({ block: "nearest", behavior: sinMovimiento ? "auto" : "smooth" });
+    });
+    return () => cancelAnimationFrame(marco);
+  }, [pedidoDesplazar]);
 
   // ── Ficha de la derecha ───────────────────────────────────────────────────
   let ficha: ReactNode = null;
@@ -306,6 +358,7 @@ export function TabCompras({
       <div className="relative min-h-0 flex-1 md:grid md:grid-cols-[minmax(16rem,19rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-3 lg:grid-cols-[minmax(21rem,26rem)_minmax(0,1fr)]">
         {/* Lista compacta (izquierda) */}
         <section
+          ref={listaRef}
           aria-label={`Lista de ${modo}`}
           className="flex h-full min-h-0 flex-col gap-1 overflow-hidden rounded-xl border border-border/50 bg-card px-2 pt-1 shadow-sm"
         >

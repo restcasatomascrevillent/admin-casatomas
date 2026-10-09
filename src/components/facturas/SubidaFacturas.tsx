@@ -26,6 +26,8 @@ import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
 
 /** Dónde se ve el documento ya guardado (la pestaña Compras, en Documentos). */
 const RUTA_COMPRAS = "/facturas?tab=compras";
+/** «Ver»: abre ESE documento en Compras › Documentos (sin id, solo Compras). */
+const rutaDocumento = (id: number | undefined) => (id ? `${RUTA_COMPRAS}&modo=documentos&doc=${id}` : RUTA_COMPRAS);
 
 /** Dorado de marca: solo para la acción principal de la pantalla. */
 const DORADO = "bg-[hsl(38,59%,45%)] text-white hover:bg-[hsl(38,59%,38%)] focus-visible:ring-[hsl(38,59%,45%)]";
@@ -382,7 +384,7 @@ function FilaEnviado({ e, onReintentar }: { e: ElementoCola; onReintentar: () =>
       )}
       {r?.success && (
         <Link
-          to={RUTA_COMPRAS}
+          to={rutaDocumento(r.facturaId)}
           aria-label={`Ver ${e.nombre}`}
           className="inline-flex h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >

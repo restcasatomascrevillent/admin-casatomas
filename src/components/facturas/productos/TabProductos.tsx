@@ -492,6 +492,52 @@ function FilaResumen({
   const nombresProv = nombresProveedores(p, resolver);
   // `lg:` solo en la lista ancha de siempre; en Compras la lista es una columna estrecha.
   const lg = (clases: string) => (compacta ? "" : clases);
+  if (compacta) {
+    // Compras: dos líneas como mucho. Nombre (truncado, con tooltip) + importe
+    // arriba; «Categoría · Proveedor · N compras · kg · últ. €» truncado debajo.
+    const detalle = [
+      ruta ?? "Sin categoría",
+      nombresProv.length > 0 ? nombresProv.join(", ") : null,
+      `${p.compras} compra(s)`,
+      formatCantidades(p.cantidades),
+      p.ultimo_precio !== null ? `últ. ${formatCurrency(p.ultimo_precio)}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    return (
+      <li
+        className={`flex items-center gap-1 px-2 py-1 ${abierto ? "bg-muted/70" : seleccionado ? "bg-primary/5" : ""}`}
+        aria-current={abierto ? "true" : undefined}
+      >
+        {conCasilla && (
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+            <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+          </div>
+        )}
+        <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 flex-1 rounded-md px-1 py-0.5 text-left hover:bg-muted/40">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate text-sm font-medium" title={p.nombre}>
+              {p.nombre}
+            </span>
+            {subio && (
+              <TrendingUp className="h-3.5 w-3.5 shrink-0 text-red-600" role="img" aria-label="Ha subido de precio">
+                <title>Su última compra es más cara que el precio de referencia</title>
+              </TrendingUp>
+            )}
+            {p.origen === "ia" && (
+              <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-600" role="img" aria-label="Clasificado por la IA, sin revisar">
+                <title>Clasificado por la IA; nadie lo ha corregido todavía</title>
+              </Sparkles>
+            )}
+            <span className="ml-auto shrink-0 pl-2 text-sm font-semibold tabular-nums">{formatCurrency(p.gasto)}</span>
+          </span>
+          <span className="block truncate text-xs text-muted-foreground" title={detalle}>
+            {detalle}
+          </span>
+        </button>
+      </li>
+    );
+  }
   return (
     <li
       className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-0.5 px-2 py-1.5 ${lg(COLUMNAS)} ${
