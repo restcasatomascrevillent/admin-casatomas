@@ -232,6 +232,22 @@ describe("Compras · enlace profundo a un documento (?doc=)", () => {
     expect(within(listaDocs()).getByText("F-101").closest("button")).toHaveAttribute("aria-current", "true");
   });
 
+  it("deja a la vista la fila abierta (nearest) solo al llegar por el enlace o por un salto, no al hacer clic en la lista", async () => {
+    const desplazar = vi.fn();
+    Element.prototype.scrollIntoView = desplazar;
+    montar(vi.fn(), { modo: "documentos", clave: "k3", doc: 2 });
+    await screen.findByRole("heading", { name: "F-101" });
+    await waitFor(() => expect(desplazar).toHaveBeenCalledTimes(1));
+    expect(desplazar).toHaveBeenCalledWith(expect.objectContaining({ block: "nearest" }));
+    expect(desplazar.mock.contexts[0]).toBe(within(listaDocs()).getByText("F-101").closest("button"));
+
+    desplazar.mockClear();
+    fireEvent.click(within(listaDocs()).getByText("F-100"));
+    await screen.findByRole("heading", { name: "F-100" });
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(desplazar).not.toHaveBeenCalled();
+  });
+
   it("un documento que no existe no rompe nada", async () => {
     montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
     expect(await screen.findByText("F-100")).toBeInTheDocument();

@@ -86,6 +86,10 @@ export function TabCompras({
   const [origen, setOrigen] = useState<Origen | null>(null);
   const [editando, setEditando] = useState<Factura | null>(null);
   const [gestionando, setGestionando] = useState(false);
+  // La selección cambió desde fuera de la lista (enlace profundo, salto desde una
+  // ficha): hay que dejar a la vista su fila. Un clic en la propia lista no lo pide.
+  const [pedidoDesplazar, setPedidoDesplazar] = useState(0);
+  const listaRef = useRef<HTMLElement>(null);
 
   // ── Datos (react-query comparte la caché con las demás pantallas) ─────────
   const facturasQ = useFacturas();
@@ -154,6 +158,7 @@ export function TabCompras({
     setOrigen(desde && !(desde.modo === destino && desde.id === id) ? desde : null);
     setModo(destino);
     setSeleccion((s) => ({ ...s, [destino]: id }));
+    setPedidoDesplazar((n) => n + 1);
     parche?.();
   };
 
@@ -171,6 +176,7 @@ export function TabCompras({
     setModo("documentos");
     setFiltroDocs("todo");
     setSeleccion((s) => ({ ...s, documentos: doc.id }));
+    setPedidoDesplazar((n) => n + 1);
     if (!coincideDocumento(doc, palabrasBusqueda(texto))) setTexto("");
   };
   const abrirProducto = (id: number) => {
@@ -238,6 +244,17 @@ export function TabCompras({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docPendiente, documentos, facturasQ.isFetching, albaranesQ.isFetching]);
+
+  // Deja a la vista la fila abierta (la de `aria-current`) de la lista del modo actual.
+  useEffect(() => {
+    if (pedidoDesplazar === 0) return;
+    const marco = requestAnimationFrame(() => {
+      const fila = listaRef.current?.querySelector('[aria-current="true"]');
+      const sinMovimiento = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      fila?.scrollIntoView?.({ block: "nearest", behavior: sinMovimiento ? "auto" : "smooth" });
+    });
+    return () => cancelAnimationFrame(marco);
+  }, [pedidoDesplazar]);
 
   // ── Ficha de la derecha ───────────────────────────────────────────────────
   let ficha: ReactNode = null;
@@ -341,6 +358,7 @@ export function TabCompras({
       <div className="relative min-h-0 flex-1 md:grid md:grid-cols-[minmax(16rem,19rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-3 lg:grid-cols-[minmax(21rem,26rem)_minmax(0,1fr)]">
         {/* Lista compacta (izquierda) */}
         <section
+          ref={listaRef}
           aria-label={`Lista de ${modo}`}
           className="flex h-full min-h-0 flex-col gap-1 overflow-hidden rounded-xl border border-border/50 bg-card px-2 pt-1 shadow-sm"
         >
