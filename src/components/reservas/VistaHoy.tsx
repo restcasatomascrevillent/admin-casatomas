@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import {
@@ -42,6 +42,7 @@ import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
+import { BotonSentarSinReserva } from "./SentarSinReserva";
 
 /**
  * Pestaña "Hoy" (rediseñada 2026-09-25, petición del dueño): antes esto era
@@ -195,6 +196,7 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
             vista={vista}
             onVista={cambiarVista}
             soloFiltros
+            accion={<BotonSentarSinReserva className="shrink-0" />}
           />
           {errorReservasHoy ? (
             <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
@@ -290,6 +292,7 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
           onFiltroTurno={setFiltroTurno}
           vista={vista}
           onVista={cambiarVista}
+          accion={<BotonSentarSinReserva className="shrink-0 sm:order-2" />}
         />
 
         {vista === "plano" ? (
@@ -335,7 +338,10 @@ function BarraFiltrosHoy({
   vista,
   onVista,
   soloFiltros = false,
+  accion,
 }: {
+  /** Botón de acción junto al turno («Sin reserva»). */
+  accion?: ReactNode;
   /** Móvil: solo buscador y turno (sin «Kanban | Plano» ni la ayuda). */
   soloFiltros?: boolean;
   busqueda: string;
@@ -396,6 +402,7 @@ function BarraFiltrosHoy({
         <ToggleGroupItem value="comida" className="whitespace-nowrap">Comida</ToggleGroupItem>
         <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
       </ToggleGroup>
+      {accion}
       {soloFiltros ? null : vista === "plano" ? (
         // Corta a propósito: desde 1024 px cabe en la línea del buscador y no le roba alto al plano. En
         // móvil no sale (el plano necesita ese alto y tocar una mesa se explica solo).

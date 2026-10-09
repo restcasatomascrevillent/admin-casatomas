@@ -34,27 +34,12 @@ import {
 } from "@/hooks/useAjustesMesaServicio";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde, type ReservaServicio } from "@/lib/reservas/servicioSala";
-import { conflictoDeMesa } from "@/lib/reservas/ocupacionMesa";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 import type { FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
-import {
-  agruparHoyMovil,
-  estaTerminada,
-  mesasQueCaben,
-  textoMesas,
-  type MesaOpcion,
-} from "@/lib/reservas/hoyMovil";
-import {
-  estadoServicio,
-  geometriaServicio,
-  mesaPiezasDesde,
-  proponerParaSentar,
-  type AjusteMesa,
-  type MesaPiezas,
-  type Propuesta,
-  type ReservaEnMesas,
-} from "@/lib/reservas/piezasMesa";
+import { agruparHoyMovil, estaTerminada, textoMesas, type MesaOpcion } from "@/lib/reservas/hoyMovil";
+import type { AjusteMesa } from "@/lib/reservas/piezasMesa";
+import { opcionesParaSentar, type AjusteDia } from "@/lib/reservas/sentarAhora";
 import { cn } from "@/lib/utils";
 
 type ReservaMovil = ReservaServicio;
@@ -207,7 +192,7 @@ function PanelReservaMovil({
   salas: Array<{ id: string; nombre: string }>;
   mesas: Mesa[];
   asignaciones: AsignacionConDetalles[];
-  ajustesDia: Array<AjusteMesa & { espacioId: string; turno: string }>;
+  ajustesDia: AjusteDia[];
   mesasExcluidas: readonly string[];
   configOcupacion: ReturnType<typeof configServicioSalaDesde>;
   nombresMesa: string[];
@@ -225,66 +210,20 @@ function PanelReservaMovil({
   const terminada = estaTerminada(reserva.estado);
   const excluidas = useMemo(() => new Set(mesasExcluidas), [mesasExcluidas]);
 
-  // Mesas de cada sala tal y como están en ESTE servicio (piezas, picos, plazas de la Terraza).
-  const { opciones, piezasSala, estadoSala } = useMemo(() => {
-    const opciones: MesaOpcion[] = [];
-    let piezasSala: MesaPiezas[] = [];
-    let estadoSala = estadoServicio([], []);
-    for (const sala of salas) {
-      const deSala = mesas.filter((m) => m.espacio_id === sala.id);
-      const piezas = deSala.map(mesaPiezasDesde).filter((m): m is MesaPiezas => m !== null);
-      const estado = estadoServicio(
-        piezas,
-        ajustesDia.filter((a) => a.espacioId === sala.id && a.turno === turno),
-      );
-      if (sala.id === reserva.espacio_id) {
-        piezasSala = piezas;
-        estadoSala = estado;
-      }
-      for (const m of deSala) {
-        const e = estado.get(m.id);
-        if (e && e.piezas <= 0) continue;
-        const g = geometriaServicio(m, e);
-        opciones.push({ id: m.id, nombre: m.nombre, espacioId: sala.id, salaNombre: sala.nombre, plazas: g?.capacidad ?? m.capacidad });
-      }
-    }
-    return { opciones, piezasSala, estadoSala };
-  }, [salas, mesas, ajustesDia, turno, reserva.espacio_id]);
-
-  const libre = (mesaId: string) =>
-    !excluidas.has(mesaId) && !conflictoDeMesa(asignaciones, mesaId, reserva, configOcupacion);
-  const caben = mesasQueCaben(opciones, reserva.numero_comensales, reserva.espacio_id, libre);
-  const cabeEnSuSala = caben.some((m) => m.espacioId === reserva.espacio_id);
-
-  // Si en su sala no cabe en ninguna mesa libre: la propuesta de piezas de la primera que la admita.
-  const propuesta = useMemo((): { mesa: MesaOpcion; propuesta: Propuesta } | null => {
-    if (cabeEnSuSala || !reserva.espacio_id) return null;
-    const reservasSala: ReservaEnMesas[] = [];
-    const porReserva = new Map<string, ReservaEnMesas>();
-    for (const a of asignaciones) {
-      if (a.reserva_id === reserva.id || turnoDeHora(a.reservas?.hora ?? "") !== turno) continue;
-      if (!piezasSala.some((m) => m.id === a.mesa_id)) continue;
-      const r = porReserva.get(a.reserva_id) ?? { reservaId: a.reserva_id, mesaIds: [], comensales: a.reservas?.numero_comensales ?? 0 };
-      r.mesaIds.push(a.mesa_id);
-      porReserva.set(a.reserva_id, r);
-    }
-    reservasSala.push(...porReserva.values());
-    for (const m of piezasSala) {
-      if (!libre(m.id)) continue;
-      const r = proponerParaSentar({
-        mesas: piezasSala,
-        estado: estadoSala,
-        reservas: reservasSala,
-        mesaId: m.id,
-        comensales: reserva.numero_comensales,
-      });
-      const opcion = opciones.find((o) => o.id === m.id);
-      if (r.propuestas[0] && opcion) return { mesa: opcion, propuesta: r.propuestas[0] };
-    }
-    return null;
-    // `libre` depende de lo mismo que el resto de dependencias.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cabeEnSuSala, piezasSala, estadoSala, asignaciones, reserva, turno, opciones]);
+  // Mesas libres donde cabe (con las plazas de ESTE servicio) y, si no cabe, la propuesta de piezas.
+  const { caben, propuesta } = useMemo(
+    () =>
+      opcionesParaSentar({
+        salas,
+        mesas,
+        ajustesDia,
+        asignaciones,
+        excluidas,
+        configOcupacion,
+        reserva: { id: reserva.id, hora: reserva.hora, comensales: reserva.numero_comensales, espacioId: reserva.espacio_id },
+      }),
+    [salas, mesas, ajustesDia, asignaciones, excluidas, configOcupacion, reserva],
+  );
 
   const ejecutar = async (trabajo: () => Promise<unknown>) => {
     setOcupado(true);

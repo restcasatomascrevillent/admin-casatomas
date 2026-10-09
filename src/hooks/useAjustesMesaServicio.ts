@@ -120,3 +120,30 @@ export function useAjustesMesaDia(fecha: string) {
     },
   });
 }
+
+/** Guardar ajustes sin hook (cuando la sala no se conoce al montar: «Sin reserva», vista móvil). */
+export async function guardarAjustesServicio(
+  espacioId: string,
+  fecha: string,
+  turno: TurnoServicio,
+  cambios: AjusteMesa[],
+): Promise<void> {
+  if (cambios.length === 0) return;
+  const filas = cambios.map((c) => ({
+    mesa_id: c.mesaId,
+    espacio_id: espacioId,
+    fecha,
+    turno,
+    piezas: c.piezas,
+    picos: c.picos,
+    unida_a: c.unidaA,
+    plazas: c.plazas ?? null,
+    updated_at: new Date().toISOString(),
+  }));
+  const { data, error } = await supabase
+    .from("ajustes_mesa_servicio")
+    .upsert(filas, { onConflict: "mesa_id,fecha,turno" })
+    .select("id");
+  if (error) throw error;
+  if ((data ?? []).length !== filas.length) throw new Error("No se han podido guardar todos los cambios (permisos).");
+}
