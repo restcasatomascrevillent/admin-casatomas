@@ -65,6 +65,17 @@ export interface ResultadoProcesamiento {
   piezas?: number;
 }
 
+export type TipoDocumento = "factura" | "albaran";
+
+/** «Albarán», «ALBARAN », «albaran» → "albaran"; «Factura» → "factura"; otra cosa → null. */
+export function normalizarTipo(v: unknown): TipoDocumento | null {
+  if (typeof v !== "string") return null;
+  const t = v.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+  if (t.startsWith("albaran")) return "albaran";
+  if (t.startsWith("factura")) return "factura";
+  return null;
+}
+
 /** Respuesta de procesar-factura (síncrona) o resultado de un trabajo → fila. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cuerpo JSON de la función, se valida campo a campo
 export function aResultado(nombre: string, data: any, piezas?: number): ResultadoProcesamiento {
@@ -75,7 +86,8 @@ export function aResultado(nombre: string, data: any, piezas?: number): Resultad
     nombre,
     success: true,
     respuesta: data.webhookResponse,
-    tipo: data.webhookResponse?.tipo || data.tipo,
+    // Normalizado («Albarán» / «albaran» → "albaran"); si no se reconoce, tal cual.
+    tipo: normalizarTipo(data.webhookResponse?.tipo) ?? normalizarTipo(data.tipo) ?? (data.webhookResponse?.tipo || data.tipo),
     alertas: Array.isArray(data.alertas) ? data.alertas : [],
     archivoGuardado: data.duplicado === true ? undefined : data.archivo_guardado !== false,
     duplicado: data.duplicado === true,

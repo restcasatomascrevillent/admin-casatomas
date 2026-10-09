@@ -201,8 +201,8 @@ const Facturas = () => {
                 ocupa el alto de la pestaña y solo su lista hace scroll por dentro
                 (ver lib/facturas/alturaCargar.ts). */}
             <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <div className="mx-auto flex h-full max-w-4xl flex-col gap-2">
-                {activeTab === "cargar" && <MonitorGastoIA modo="ocr" className="shrink-0" />}
+              <div className="mx-auto flex h-full max-w-3xl flex-col gap-1">
+                {activeTab === "cargar" && <MonitorGastoIA modo="ocr" className="shrink-0 self-end" />}
                 <div className="flex-1 min-h-0">
                   <SubidaFacturas />
                 </div>
