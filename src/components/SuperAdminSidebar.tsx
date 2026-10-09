@@ -13,6 +13,7 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -51,17 +52,23 @@ export function SuperAdminSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border p-4">
-        {!isCollapsed && (
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6 text-destructive" />
-            <div className="flex flex-col">
-              <h2 className="text-lg font-semibold text-sidebar-foreground">Super Admin</h2>
-              <span className="text-xs text-sidebar-foreground/70">Control total del sistema</span>
+      {/* El plegador vive aquí desde que SuperAdminLayout quitó su cabecera
+          de escritorio (2026-10-09); mismo patrón que AppSidebar. */}
+      <SidebarHeader
+        className={`border-b border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
+      >
+        <div className={`flex items-center gap-2 ${isCollapsed ? "flex-col justify-center" : ""}`}>
+          <ShieldAlert className="h-6 w-6 text-destructive shrink-0" />
+          {!isCollapsed && (
+            <div className="flex flex-col min-w-0">
+              <h2 className="text-lg font-semibold text-sidebar-foreground truncate">Super Admin</h2>
+              <span className="text-xs text-sidebar-foreground/70 truncate">Control total del sistema</span>
             </div>
-          </div>
-        )}
-        {isCollapsed && <ShieldAlert className="h-6 w-6 text-destructive mx-auto" />}
+          )}
+          <SidebarTrigger
+            className={`text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent shrink-0 ${!isCollapsed ? "ml-auto" : ""}`}
+          />
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
