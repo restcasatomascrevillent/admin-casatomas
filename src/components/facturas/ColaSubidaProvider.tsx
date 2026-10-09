@@ -20,6 +20,7 @@ import {
   textoResumenTanda,
 } from "@/lib/facturas/colaSubida";
 import { sustituirExistente, type Sustituible } from "@/lib/facturas/documentoLargo";
+import { ETIQUETA_TIPO, tipoDocumento } from "@/lib/facturas/resultadosCarga";
 import {
   fusionarPendientes,
   guardarDescartados,
@@ -66,18 +67,21 @@ export function ColaSubidaProvider({ children, deps }: Props) {
     const alTerminar = (e: ElementoCola) => {
       const r = e.resultado;
       const clase = clasificarResultado(r);
-      const doc = r?.tipo === "albaran" ? "Albarán" : "Factura";
+      // Tipo real del resultado; sin tipo reconocible, «Documento» (no se inventa «Factura»).
+      const tipo = tipoDocumento(r);
+      const doc = tipo ? ETIQUETA_TIPO[tipo] : "Documento";
+      const guardado = tipo === "factura" ? "guardada" : "guardado";
       if (r?.success && !r.duplicado) {
         queryClient.invalidateQueries({ queryKey: ["facturas"] });
         queryClient.invalidateQueries({ queryKey: ["albaranes"] });
       }
       switch (clase) {
         case "guardada":
-          toast.success(`${doc} guardada`, { description: e.nombre, action: ver });
+          toast.success(`${doc} ${guardado}`, { description: e.nombre, action: ver });
           break;
         case "avisos": {
           const n = r?.alertas?.length ?? 0;
-          toast.warning(`${doc} guardada con ${n} aviso${n === 1 ? "" : "s"}`, {
+          toast.warning(`${doc} ${guardado} con ${n} aviso${n === 1 ? "" : "s"}`, {
             description: `${e.nombre}: conviene revisar los importes.`,
             action: ver,
           });
