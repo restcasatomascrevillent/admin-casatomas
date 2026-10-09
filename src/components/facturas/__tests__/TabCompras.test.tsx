@@ -226,7 +226,7 @@ describe("Compras · buscador único y selector con contadores", () => {
 describe("Compras · enlace profundo a un documento (?doc=)", () => {
   it("abre la ficha del documento pedido, sin «Volver», aunque haya filtros que lo escondan", async () => {
     montar(vi.fn(), { modo: "documentos", clave: "k1", doc: 2 });
-    expect(await screen.findByRole("heading", { name: "F-101" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
     expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true");
     expect(screen.queryByRole("button", { name: /^Volver a/ })).not.toBeInTheDocument();
     expect(within(listaDocs()).getByText("F-101").closest("button")).toHaveAttribute("aria-current", "true");
@@ -236,14 +236,14 @@ describe("Compras · enlace profundo a un documento (?doc=)", () => {
     const desplazar = vi.fn();
     Element.prototype.scrollIntoView = desplazar;
     montar(vi.fn(), { modo: "documentos", clave: "k3", doc: 2 });
-    await screen.findByRole("heading", { name: "F-101" });
+    await screen.findByRole("heading", { name: "Factura F-101" });
     await waitFor(() => expect(desplazar).toHaveBeenCalledTimes(1));
     expect(desplazar).toHaveBeenCalledWith(expect.objectContaining({ block: "nearest" }));
     expect(desplazar.mock.contexts[0]).toBe(within(listaDocs()).getByText("F-101").closest("button"));
 
     desplazar.mockClear();
     fireEvent.click(within(listaDocs()).getByText("F-100"));
-    await screen.findByRole("heading", { name: "F-100" });
+    await screen.findByRole("heading", { name: "Factura F-100" });
     await new Promise((r) => requestAnimationFrame(() => r(null)));
     expect(desplazar).not.toHaveBeenCalled();
   });
@@ -251,7 +251,7 @@ describe("Compras · enlace profundo a un documento (?doc=)", () => {
   it("un documento que no existe no rompe nada", async () => {
     montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
     expect(await screen.findByText("F-100")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "F-100" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Factura F-100" })).not.toBeInTheDocument();
   });
 });
 
@@ -377,7 +377,7 @@ describe("Compras · fichas", () => {
     const onIA = montar();
     fireEvent.click(await screen.findByText("F-100"));
     const ficha = await screen.findByTestId("ficha-compras");
-    expect(within(ficha).getByRole("heading", { name: "F-100" })).toBeInTheDocument();
+    expect(within(ficha).getByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
     expect(within(ficha).getByRole("button", { name: "Editar" })).toBeInTheDocument();
     expect(within(ficha).getByRole("button", { name: /Ver original|original/ })).toBeDisabled(); // sin escaneo guardado
     expect(within(ficha).getByRole("button", { name: /Sin revisar/ })).toBeInTheDocument();
@@ -396,7 +396,7 @@ describe("Compras · fichas", () => {
     fireEvent.click(screen.getByText("A-2"));
     const enlace = await screen.findByRole("button", { name: /Recogido en la factura F-101/ });
     fireEvent.click(enlace);
-    expect(await screen.findByRole("heading", { name: "F-101" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
   });
 
   it("producto → gráfica de precio y documentos donde aparece; al tocar uno salta y se puede volver", async () => {
@@ -412,7 +412,7 @@ describe("Compras · fichas", () => {
     expect(within(ficha).getByRole("button", { name: /Editar producto/ })).toBeInTheDocument();
 
     fireEvent.click(await within(ficha).findByRole("button", { name: "Abrir la factura F-100" }));
-    expect(await screen.findByRole("heading", { name: "F-100" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
     expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(screen.getByRole("button", { name: /Volver a «Merluza de pincho»/ }));
@@ -453,6 +453,6 @@ describe("Compras · fichas", () => {
     expect(await screen.findByRole("heading", { name: /Pescados Marta S\.L\./ })).toBeInTheDocument();
     expect(modo(/^Proveedores/)).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(within(screen.getByTestId("ficha-compras")).getByRole("button", { name: "Abrir la factura F-100" }));
-    expect(await screen.findByRole("heading", { name: "F-100" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
   });
 });
