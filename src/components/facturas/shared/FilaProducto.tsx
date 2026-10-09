@@ -30,16 +30,19 @@ const NombreLinea = ({
   p,
   onAbrirProducto,
   className = "",
+  compacto = false,
 }: {
   p: ProductoFactura;
   onAbrirProducto?: (productoId: number) => void;
   className?: string;
+  /** Fila plana de dos líneas: el botón no fuerza 44 px de alto, la zona táctil se amplía con un ::before. */
+  compacto?: boolean;
 }) =>
   onAbrirProducto && p.producto_id != null ? (
     <button
       type="button"
       onClick={() => onAbrirProducto(p.producto_id as number)}
-      className={`min-h-11 min-w-0 rounded-md text-left font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${className}`}
+      className={`${compacto ? "relative before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']" : "min-h-11"} min-w-0 rounded-md text-left font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${className}`}
       aria-label={`Ver el producto ${p.producto_canonico ?? p.producto_nombre}`}
       title="Ver el producto: evolución del precio y dónde más aparece"
     >
@@ -129,20 +132,37 @@ export const FilaProducto = ({
     }
 
     return (
-      <div className="flex flex-col text-xs bg-white p-2 rounded-md border border-border/40 shadow-sm relative group/prod hover:border-[hsl(38,59%,45%)/0.3] transition-colors">
-        {/* Siempre visible: antes solo aparecía al pasar el ratón y con el dedo no había forma de editar. */}
-        <Button variant="ghost" size="icon" className="absolute top-0 right-0 h-11 w-11" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
-          <Pencil className="h-4 w-4 text-muted-foreground" />
-        </Button>
-        <NombreLinea p={p} onAbrirProducto={onAbrirProducto} className="font-medium text-foreground mb-1 pr-11 block" />
-        {p.categoria && <span className="mb-1 -mt-0.5"><EtiquetaCategoria p={p} /></span>}
-        <div className="flex justify-between text-muted-foreground items-center">
-          <span>{formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}</span>
-          <div className="flex items-center gap-1.5">
-            {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
-            <span className="font-semibold text-foreground">{formatCurrency(p.precio)}</span>
+      // Fila plana con separador fino, dos líneas: nombre + importe, y debajo en gris
+      // «cantidad × precio · categoría». El lápiz va a la derecha: con puntero solo
+      // aparece al pasar por encima (o con el foco); en táctil se ve siempre.
+      <div className="group/prod flex items-start gap-1 border-b border-border/50 py-1.5 text-xs last:border-b-0">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline justify-between gap-2">
+            <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
+            <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
+              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
+              {formatCurrency(p.precio)}
+            </span>
           </div>
+          <p className="text-muted-foreground">
+            {formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}
+            {p.categoria && (
+              <>
+                {" · "}
+                <span title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}>{p.categoria.nombre}</span>
+              </>
+            )}
+          </p>
         </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-my-1.5 h-11 w-11 shrink-0 text-muted-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prod:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
+          onClick={() => setIsEditing(true)}
+          aria-label={`Editar ${p.producto_nombre}`}
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
       </div>
     );
   }

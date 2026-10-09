@@ -99,17 +99,20 @@ export function FichaDocumento({
                 title="Ver la ficha del proveedor"
               >
                 <Truck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                <span className="break-words">{doc.proveedor}</span>
+                <span className="break-words">
+                  {doc.proveedor}
+                  <span aria-hidden="true" className="no-underline"> ·</span>
+                </span>
               </button>
             ) : (
-              <span>Sin proveedor</span>
+              <span className="whitespace-nowrap">Sin proveedor ·</span>
             )}
-            <span className="whitespace-nowrap"><span aria-hidden="true">· </span>{formatDate(doc.fecha)}</span>
-            {doc.cif && (
-              <span className="whitespace-nowrap">
-                <span aria-hidden="true">· </span>CIF {doc.cif}
-              </span>
-            )}
+            {/* El separador va pegado al FINAL de cada dato (nunca al principio): si la línea se parte, no empieza por «·». */}
+            <span className="whitespace-nowrap">
+              {formatDate(doc.fecha)}
+              {doc.cif && <span aria-hidden="true"> ·</span>}
+            </span>
+            {doc.cif && <span className="whitespace-nowrap">CIF {doc.cif}</span>}
           </p>
         </div>
 
@@ -213,7 +216,7 @@ export function FichaDocumento({
         {doc.productos.length === 0 ? (
           <p className="text-sm text-muted-foreground">Este documento no tiene líneas.</p>
         ) : (
-          <div className="space-y-1.5">
+          <div>
             {doc.productos.map((p) => (
               <FilaProducto key={p.id} p={p} isMobile allDocs={mismoTipo} onAbrirProducto={onAbrirProducto} />
             ))}
