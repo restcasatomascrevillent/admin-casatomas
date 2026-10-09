@@ -25,7 +25,7 @@ const CLAVE = ["productos", "configuracion-avisos"];
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const tabla = () => (supabase.from as any)("configuracion_facturas");
 
-export function AvisosPrecio({ puedeEditar }: { puedeEditar: boolean }) {
+export function AvisosPrecio({ puedeEditar, soloIcono = false }: { puedeEditar: boolean; soloIcono?: boolean }) {
   const qc = useQueryClient();
   const config = useQuery({
     queryKey: CLAVE,
@@ -71,12 +71,28 @@ export function AvisosPrecio({ puedeEditar }: { puedeEditar: boolean }) {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" aria-label="Avisos de subida de precio">
-          <BellRing className="mr-1 h-4 w-4" aria-hidden="true" />
-          {config.data.avisos_subida_precio
-            ? `Avisos > ${String(config.data.umbral_subida_precio_pct).replace(".", ",")} %`
-            : "Avisos de precio: no"}
-        </Button>
+        {soloIcono ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 shrink-0"
+            aria-label="Avisos de subida de precio"
+            title={
+              config.data.avisos_subida_precio
+                ? `Avisos de precio: más de ${String(config.data.umbral_subida_precio_pct).replace(".", ",")} %`
+                : "Avisos de precio: desactivados"
+            }
+          >
+            <BellRing className={`h-4 w-4 ${config.data.avisos_subida_precio ? "" : "text-muted-foreground"}`} aria-hidden="true" />
+          </Button>
+        ) : (
+          <Button variant="outline" aria-label="Avisos de subida de precio">
+            <BellRing className="mr-1 h-4 w-4" aria-hidden="true" />
+            {config.data.avisos_subida_precio
+              ? `Avisos > ${String(config.data.umbral_subida_precio_pct).replace(".", ",")} %`
+              : "Avisos de precio: no"}
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent className="w-72 space-y-3" align="end">
         <p className="text-sm">

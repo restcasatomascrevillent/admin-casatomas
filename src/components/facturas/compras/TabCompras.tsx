@@ -50,8 +50,11 @@ interface Origen {
   etiqueta: string;
 }
 
+// Chip de filtro: 32 px a la vista, 44 de zona táctil (el contenedor mide 44 y el
+// `before:` amplía el toque, ver `barraChips`).
 const chipClase =
-  "inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted/50 aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-foreground";
+  "relative inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-muted-foreground transition-colors before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:bg-muted/50 hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground";
+const barraChips = "flex h-11 shrink-0 items-center gap-1 overflow-x-auto no-scrollbar";
 
 /**
  * Facturas › Compras (rediseño del 08/10/2026): UN buscador, tres formas de
@@ -233,6 +236,12 @@ export function TabCompras({
     );
   }
   const hayFicha = ficha !== null;
+  const tituloFicha =
+    modo === "documentos"
+      ? (docSeleccionado?.numero_documento ?? "")
+      : modo === "productos"
+        ? (productoSeleccionado?.nombre ?? "")
+        : (provSeleccionado?.nombre ?? "");
   const vacioFicha: Record<ModoCompras, string> = {
     documentos: "Elige una factura o un albarán para ver sus líneas.",
     productos: "Elige un producto para ver cómo ha cambiado su precio y en qué documentos aparece.",
@@ -252,7 +261,7 @@ export function TabCompras({
   return (
     <div className="flex h-full min-h-0 flex-col gap-2" data-testid="tab-compras">
       {/* UN buscador + qué mirar (con el nº de resultados de cada modo) */}
-      <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center">
+      <div className="flex shrink-0 flex-col gap-2 md:flex-row md:items-center">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
@@ -294,23 +303,23 @@ export function TabCompras({
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1 lg:grid lg:grid-cols-[minmax(21rem,26rem)_minmax(0,1fr)] lg:grid-rows-[minmax(0,1fr)] lg:gap-3">
+      <div className="relative min-h-0 flex-1 md:grid md:grid-cols-[minmax(16rem,19rem)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:gap-3 lg:grid-cols-[minmax(21rem,26rem)_minmax(0,1fr)]">
         {/* Lista compacta (izquierda) */}
         <section
           aria-label={`Lista de ${modo}`}
-          className="flex h-full min-h-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-2 shadow-sm"
+          className="flex h-full min-h-0 flex-col gap-1 overflow-hidden rounded-xl border border-border/50 bg-card px-2 pt-1 shadow-sm"
         >
           {modo === "documentos" && (
             <>
-              <div className="flex shrink-0 gap-2 overflow-x-auto pb-1 no-scrollbar" role="toolbar" aria-label="Filtrar documentos">
+              <div className={barraChips} role="toolbar" aria-label="Filtrar documentos">
                 {FILTROS_DOCUMENTOS.map((f) => (
                   <button key={f.valor} type="button" className={chipClase} aria-pressed={filtroDocs === f.valor} onClick={() => setFiltroDocs(f.valor)}>
                     {f.etiqueta}
-                    <span className="text-xs tabular-nums text-muted-foreground">{cuentaFiltrosDocs[f.valor]}</span>
+                    <span className="text-xs font-normal tabular-nums text-muted-foreground">{cuentaFiltrosDocs[f.valor]}</span>
                   </button>
                 ))}
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border" data-testid="lista-documentos">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-border/50" data-testid="lista-documentos">
                 {errorDocs ? (
                   <p className="p-4 text-sm text-destructive">Error al cargar los documentos: {(errorDocs as { message?: string }).message}</p>
                 ) : (
@@ -327,7 +336,7 @@ export function TabCompras({
                   />
                 )}
               </div>
-              <p className="shrink-0 text-xs text-muted-foreground">{docsVisibles.length} documento(s)</p>
+              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{docsVisibles.length} documento(s)</p>
             </>
           )}
 
@@ -347,20 +356,27 @@ export function TabCompras({
 
           {modo === "proveedores" && (
             <>
-              <div className="flex shrink-0 gap-2 overflow-x-auto pb-1 no-scrollbar" role="toolbar" aria-label="Filtrar proveedores">
+              <div className={barraChips} role="toolbar" aria-label="Filtrar proveedores">
                 {FILTROS_PROVEEDORES.map((f) => (
                   <button key={f.valor} type="button" className={chipClase} aria-pressed={filtroProv === f.valor} onClick={() => setFiltroProv(f.valor)}>
                     {f.etiqueta}
-                    <span className="text-xs tabular-nums text-muted-foreground">
+                    <span className="text-xs font-normal tabular-nums text-muted-foreground">
                       {f.valor === "todos" ? contadores.proveedores : conAlbaranesSinFactura}
                     </span>
                   </button>
                 ))}
-                <Button variant="outline" className="h-11 shrink-0 gap-1.5" onClick={() => setGestionando(true)}>
-                  <Truck className="h-4 w-4" aria-hidden="true" /> Gestionar
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="ml-auto h-11 w-11 shrink-0"
+                  onClick={() => setGestionando(true)}
+                  aria-label="Gestionar proveedores"
+                  title="Gestionar proveedores"
+                >
+                  <Truck className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-lg border" data-testid="lista-proveedores">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain border-t border-border/50" data-testid="lista-proveedores">
                 <ListaProveedores
                   proveedores={provVisibles}
                   sinFacturaPorClave={sinFacturaPorClave}
@@ -374,7 +390,7 @@ export function TabCompras({
                   }}
                 />
               </div>
-              <p className="shrink-0 text-xs text-muted-foreground">{provVisibles.length} proveedor(es)</p>
+              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{provVisibles.length} proveedor(es)</p>
             </>
           )}
         </section>
@@ -382,23 +398,27 @@ export function TabCompras({
         {/* Ficha (derecha; en pantallas estrechas, un panel encima de la lista) */}
         <aside
           aria-label="Ficha"
-          className={`min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm max-lg:absolute max-lg:inset-0 max-lg:z-20 ${
-            hayFicha ? "flex" : "hidden lg:flex"
+          className={`min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm max-md:absolute max-md:inset-0 max-md:z-20 ${
+            hayFicha ? "flex" : "hidden md:flex"
           }`}
         >
           {hayFicha ? (
             <>
-              <div className="flex shrink-0 items-center gap-1 border-b border-border/40 px-2 py-1">
-                <Button variant="ghost" className="h-11 gap-1.5 px-2 lg:hidden" onClick={cerrarFicha}>
+              {/* Cabecera fija: «← Lista» y el nombre del elemento (en estrecho); «Volver a …» si se saltó desde otra ficha. */}
+              <div className="flex shrink-0 items-center gap-1 border-b border-border/40 px-1 md:hidden" data-testid="cabecera-ficha">
+                <Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-2" onClick={cerrarFicha}>
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Lista
                 </Button>
-                {origen && (
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{tituloFicha}</span>
+              </div>
+              {origen && (
+                <div className="flex shrink-0 items-center border-b border-border/40 px-1">
                   <Button variant="ghost" className="h-11 min-w-0 gap-1.5 px-2" onClick={volver}>
                     <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span className="truncate">Volver a «{origen.etiqueta}»</span>
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" data-testid="ficha-compras">
                 {ficha}
               </div>

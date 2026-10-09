@@ -28,6 +28,20 @@ describe("GraficoSeriePrecio", () => {
     expect(screen.getByTestId("grafico-serie-precio")).toBeInTheDocument();
   });
 
+  it("las cifras van en una fila de texto, sin recuadros", () => {
+    render(<GraficoSeriePrecio datos={SERIE} />);
+    const fila = screen.getByTestId("cifras-serie-precio");
+    expect(fila).toHaveTextContent(/Último\s*12,90 €\/kg.*Mín\s*10,50 €\/kg.*Máx\s*12,90 €\/kg.*Variación\s*\+22,9 %/);
+    expect(fila.querySelector('[class*="border"]')).toBeNull();
+  });
+
+  it("compacto (ficha de producto): sin el título repetido y con la gráfica más baja", () => {
+    render(<GraficoSeriePrecio datos={SERIE} compacto />);
+    expect(screen.queryByText(/evolución del precio · merluza/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("figure", { name: /evolución del precio de merluza/i })).toBeInTheDocument();
+    expect((screen.getByTestId("grafico-serie-precio") as HTMLElement).style.height).toBe("168px");
+  });
+
   it("una leyenda por proveedor, de 44 px, que oculta y muestra su línea", () => {
     render(<GraficoSeriePrecio datos={SERIE} />);
     const grupo = screen.getByRole("group", { name: /proveedores en la gráfica/i });

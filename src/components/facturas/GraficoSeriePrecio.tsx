@@ -31,19 +31,21 @@ const COLORES_SERIE = [
 
 const DIA_MS = 86_400_000;
 const ALTO_GRAFICO = 220;
+/** Alto de la gráfica dentro de la ficha de producto (para que se vea sin scroll en 1280×711). */
+const ALTO_GRAFICO_COMPACTO = 168;
 
 const fechaCorta = (t: number) => {
   const d = new Date(t);
   return `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}/${String(d.getUTCFullYear()).slice(2)}`;
 };
 
-function Dato({ etiqueta, valor, nota }: { etiqueta: string; valor: string; nota?: string }) {
+/** Una cifra del resumen: etiqueta gris + valor, sin recuadro (van en una sola fila de texto). */
+function Cifra({ etiqueta, valor, className }: { etiqueta: string; valor: string; className?: string }) {
   return (
-    <div className="min-w-0 rounded-lg border border-border/60 bg-background px-2.5 py-1.5">
-      <p className="text-[11px] font-medium text-muted-foreground">{etiqueta}</p>
-      <p className="truncate text-sm font-semibold tabular-nums text-foreground">{valor}</p>
-      {nota && <p className="text-[11px] text-muted-foreground">{nota}</p>}
-    </div>
+    <span className={cn("whitespace-nowrap", className)}>
+      <span className="text-muted-foreground">{etiqueta} </span>
+      <span className="font-semibold tabular-nums">{valor}</span>
+    </span>
   );
 }
 
@@ -72,7 +74,7 @@ function TooltipSerie({ active, payload, unidad }: TooltipProps) {
   );
 }
 
-function Grafico({ serie }: { serie: SeriePrecio }) {
+function Grafico({ serie, alto }: { serie: SeriePrecio; alto: number }) {
   const filas = useMemo(() => filasGrafico(serie), [serie]);
   const usados = useMemo(() => proveedoresUsados(serie), [serie]);
   const [ocultos, setOcultos] = useState<ReadonlySet<number>>(new Set());
@@ -111,7 +113,7 @@ function Grafico({ serie }: { serie: SeriePrecio }) {
         })}
       </div>
 
-      <div style={{ height: ALTO_GRAFICO }} className="w-full" data-testid="grafico-serie-precio">
+      <div style={{ height: alto }} className="w-full" data-testid="grafico-serie-precio">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filas} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
@@ -170,7 +172,16 @@ function Grafico({ serie }: { serie: SeriePrecio }) {
  * Recibe el JSON de `serie_precios_agente` tal cual (o el adjunto del chat) y
  * lo pinta; si no es válido muestra un aviso en vez de romper el hilo.
  */
-export function GraficoSeriePrecio({ datos, className }: { datos: unknown; className?: string }) {
+export function GraficoSeriePrecio({
+  datos,
+  className,
+  compacto = false,
+}: {
+  datos: unknown;
+  className?: string;
+  /** En la ficha de producto: sin título repetido y gráfica más baja. */
+  compacto?: boolean;
+}) {
   const serie = useMemo(() => normalizarSerie(datos), [datos]);
 
   if (!serie) {
@@ -195,35 +206,42 @@ export function GraficoSeriePrecio({ datos, className }: { datos: unknown; class
 
   return (
     <figure
-      className={cn("w-full space-y-2", className)}
+      className={cn("w-full space-y-1.5", className)}
       aria-label={`Evolución del precio de ${serie.producto}`}
     >
-      <figcaption className="text-sm font-semibold leading-tight text-foreground">
-        Evolución del precio · {serie.producto}
-        <span className="block text-xs font-normal text-muted-foreground">
-          Precio unitario sin IVA{serie.unidad ? `, en €/${serie.unidad}` : ""} · {serie.n} {serie.n === 1 ? "compra" : "compras"}
-        </span>
+      <figcaption className={cn("text-sm leading-tight text-foreground", !compacto && "font-semibold")}>
+        {compacto ? (
+          <span className="text-xs text-muted-foreground">
+            Evolución del precio · sin IVA{serie.unidad ? `, en €/${serie.unidad}` : ""} · {serie.n} {serie.n === 1 ? "compra" : "compras"}
+          </span>
+        ) : (
+          <>
+            Evolución del precio · {serie.producto}
+            <span className="block text-xs font-normal text-muted-foreground">
+              Precio unitario sin IVA{serie.unidad ? `, en €/${serie.unidad}` : ""} · {serie.n} {serie.n === 1 ? "compra" : "compras"}
+            </span>
+          </>
+        )}
       </figcaption>
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Dato etiqueta="Último" valor={formatPrecioUnidad(serie.ultimo, serie.unidad)} />
-        <Dato etiqueta="Mínimo" valor={formatPrecioUnidad(serie.min, serie.unidad)} />
-        <Dato etiqueta="Máximo" valor={formatPrecioUnidad(serie.max, serie.unidad)} />
+      {/* Cifras en una fila de texto, sin recuadros. */}
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm" data-testid="cifras-serie-precio">
+        <Cifra etiqueta="Último" valor={formatPrecioUnidad(serie.ultimo, serie.unidad)} />
+        <span className="text-muted-foreground/60" aria-hidden="true">·</span>
+        <Cifra etiqueta="Mín" valor={formatPrecioUnidad(serie.min, serie.unidad)} />
+        <span className="text-muted-foreground/60" aria-hidden="true">·</span>
+        <Cifra etiqueta="Máx" valor={formatPrecioUnidad(serie.max, serie.unidad)} />
+        <span className="text-muted-foreground/60" aria-hidden="true">·</span>
         {unaSola || serie.variacion_pct === null ? (
-          <Dato etiqueta="Variación" valor="—" />
+          <Cifra etiqueta="Variación" valor="—" />
         ) : (
-          <div
-            className={cn(
-              "min-w-0 rounded-lg border border-border/60 bg-background px-2.5 py-1.5",
-              sube && "text-red-700 dark:text-red-400",
-              baja && "text-emerald-700 dark:text-emerald-400",
-            )}
-          >
-            <p className="text-[11px] font-medium text-muted-foreground">Variación</p>
-            <p className="truncate text-sm font-semibold tabular-nums">{formatPorcentaje(serie.variacion_pct)}</p>
-          </div>
+          <Cifra
+            etiqueta="Variación"
+            valor={formatPorcentaje(serie.variacion_pct)}
+            className={cn(sube && "text-red-700 dark:text-red-400", baja && "text-emerald-700 dark:text-emerald-400")}
+          />
         )}
-      </div>
+      </p>
 
       {unaSola && (
         <p className="text-sm text-muted-foreground" role="status">
@@ -231,7 +249,7 @@ export function GraficoSeriePrecio({ datos, className }: { datos: unknown; class
         </p>
       )}
 
-      <Grafico serie={serie} />
+      <Grafico serie={serie} alto={compacto ? ALTO_GRAFICO_COMPACTO : ALTO_GRAFICO} />
     </figure>
   );
 }
