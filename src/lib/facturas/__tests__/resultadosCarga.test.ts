@@ -43,6 +43,14 @@ describe("tipoDocumento: Factura o Albarán según el resultado real", () => {
     expect(normalizarTipo(42)).toBeNull();
   });
 
+  it("aResultado guarda el id del documento: el nuevo, el ya existente (duplicado) o el del trabajo", () => {
+    expect(aResultado("a.pdf", { success: true, webhookResponse: { tipo: "factura", factura_id: 42 } }).facturaId).toBe(42);
+    expect(aResultado("b.pdf", { success: true, duplicado: true, webhookResponse: { factura_existente_id: 7 } }).facturaId).toBe(7);
+    expect(aResultado("c.pdf", { success: true, duplicado: true, sustituible: { existente: { id: 9 } } }).facturaId).toBe(9);
+    expect(aResultado("d.pdf", { success: true }, 3, 15).facturaId).toBe(15);
+    expect(aResultado("e.pdf", { success: true }).facturaId).toBeUndefined();
+  });
+
   it("aResultado normaliza el tipo que llega del servidor, también el del albarán con tilde", () => {
     const r = aResultado("a.pdf", { success: true, tipo: "albarán", webhookResponse: { tipo: "albarán" }, alertas: [] });
     expect(r.tipo).toBe("albaran");

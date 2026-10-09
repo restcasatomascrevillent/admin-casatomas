@@ -6,7 +6,7 @@ import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFactura
 import { TabCompras } from "@/components/facturas/compras/TabCompras";
 import { GastoIaPestana } from "@/components/facturas/GastoIaPestana";
 import { MonitorGastoIA } from "@/components/facturas/MonitorGastoIA";
-import type { ModoCompras } from "@/lib/facturas/compras";
+import { MODOS_COMPRAS, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, MessageSquare, Upload, BarChart3, Package, Zap, ShoppingCart } from "lucide-react";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
@@ -34,10 +34,14 @@ const Facturas = () => {
   const tabUrl = pestanaDeUrl(searchParams.get("tab"));
   const [activeTab, setActiveTab] = useState<string>(tabUrl ?? "compras");
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
-  const modoPedido = useMemo(
-    () => (searchParams.get("tab") === "productos" ? { modo: "productos" as ModoCompras, clave: claveNavegacion } : undefined),
-    [searchParams, claveNavegacion],
-  );
+  // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
+  const modoPedido = useMemo(() => {
+    const modoUrl = MODOS_COMPRAS.find((m) => m.valor === searchParams.get("modo"))?.valor;
+    const docNum = Number(searchParams.get("doc"));
+    const doc = Number.isInteger(docNum) && docNum > 0 ? docNum : undefined;
+    const modo: ModoCompras | undefined = searchParams.get("tab") === "productos" ? "productos" : (modoUrl ?? (doc ? "documentos" : undefined));
+    return modo ? { modo, clave: claveNavegacion, doc: modo === "documentos" ? doc : undefined } : undefined;
+  }, [searchParams, claveNavegacion]);
   useEffect(() => {
     if (tabUrl) setActiveTab(tabUrl);
     // `claveNavegacion`: volver a tocar el indicador estando ya en esta URL
@@ -50,6 +54,9 @@ const Facturas = () => {
     setSearchParams((prev) => {
       const p = new URLSearchParams(prev);
       p.set("tab", v);
+      // El enlace profundo ya se aplicó: que no vuelva a abrir el documento al volver a Compras.
+      p.delete("modo");
+      p.delete("doc");
       return p;
     }, { replace: true });
   };

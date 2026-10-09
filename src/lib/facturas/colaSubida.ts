@@ -63,6 +63,8 @@ export interface ResultadoProcesamiento {
   sustituida?: boolean;
   /** Documento largo leído por trozos (páginas o franjas). */
   piezas?: number;
+  /** Id del documento guardado (o del ya existente si es un duplicado): el «Ver» abre ESE en Compras. */
+  facturaId?: number;
 }
 
 export type TipoDocumento = "factura" | "albaran";
@@ -78,7 +80,7 @@ export function normalizarTipo(v: unknown): TipoDocumento | null {
 
 /** Respuesta de procesar-factura (síncrona) o resultado de un trabajo → fila. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cuerpo JSON de la función, se valida campo a campo
-export function aResultado(nombre: string, data: any, piezas?: number): ResultadoProcesamiento {
+export function aResultado(nombre: string, data: any, piezas?: number, facturaIdTrabajo?: number | null): ResultadoProcesamiento {
   if (!data?.success) {
     return { nombre, success: false, error: data?.error || "Error desconocido", piezas };
   }
@@ -93,7 +95,21 @@ export function aResultado(nombre: string, data: any, piezas?: number): Resultad
     duplicado: data.duplicado === true,
     sustituible: data.sustituible ?? null,
     piezas,
+    facturaId: idDocumento(data, facturaIdTrabajo),
   };
+}
+
+/** Id del documento que dejó el procesado: el nuevo, el ya existente (duplicado) o el del trabajo. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- cuerpo JSON de la función
+function idDocumento(data: any, facturaIdTrabajo?: number | null): number | undefined {
+  const candidatos = [
+    data?.webhookResponse?.factura_id,
+    data?.webhookResponse?.factura_existente_id,
+    data?.sustituible?.existente?.id,
+    facturaIdTrabajo,
+  ];
+  const id = candidatos.find((c) => typeof c === "number" && Number.isInteger(c) && c > 0);
+  return id as number | undefined;
 }
 
 export type ClaseResultado = "guardada" | "avisos" | "sin_original" | "duplicada" | "pendiente" | "sustituida" | "fallida";
@@ -270,7 +286,7 @@ export function crearColaSubida(deps: DepsCola) {
     if (fin.estado === "fallido" || fin.estado === "cancelado") {
       return { nombre, success: false, error: fin.error || "No se pudo leer el documento", piezas: n };
     }
-    return aResultado(nombre, fin.resultado, n);
+    return aResultado(nombre, fin.resultado, n, fin.factura_id);
   };
 
   const procesar = async (id: string, liberarHueco: () => void) => {

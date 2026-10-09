@@ -28,7 +28,8 @@ const resultadoPorNombre = async (_f: File, nombre: string): Promise<ResultadoPr
   }
   if (nombre.startsWith("duplicado")) return { nombre, success: true, tipo: "factura", ...base, duplicado: true, archivoGuardado: undefined };
   if (nombre.startsWith("albaran")) return { nombre, success: true, tipo: "albaran", ...base };
-  return { nombre, success: true, tipo: "factura", ...base };
+  if (nombre.startsWith("sinid")) return { nombre, success: true, tipo: "factura", ...base };
+  return { nombre, success: true, tipo: "factura", ...base, facturaId: 4321 };
 };
 
 const elegir = (nombres: string[], tipo = "application/pdf") =>
@@ -94,6 +95,11 @@ describe("Cargar · diseño plano", () => {
     // El fallido no tiene tipo; los guardados tienen «Ver»; el fallido, «Reintentar».
     expect(within(filas[0]).queryByText("Factura")).toBeNull();
     expect(within(factura).getByRole("link", { name: "Ver factura-ok.pdf" })).toBeTruthy();
+    // «Ver» abre ESE documento en Compras (modo Documentos, ficha abierta).
+    expect(within(factura).getByRole("link", { name: "Ver factura-ok.pdf" })).toHaveAttribute(
+      "href",
+      "/facturas?tab=compras&modo=documentos&doc=4321",
+    );
     expect(within(filas[0]).getByRole("button", { name: "Reintentar fallido.pdf" })).toBeTruthy();
 
     // Botones ligeros de la tanda.

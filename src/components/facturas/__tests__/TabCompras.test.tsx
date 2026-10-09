@@ -150,12 +150,12 @@ function prepararBase() {
   });
 }
 
-function montar(onPreguntarIA = vi.fn()) {
+function montar(onPreguntarIA = vi.fn(), modoPedido?: { modo: "documentos" | "productos" | "proveedores"; clave: string; doc?: number }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
       <div style={{ height: 800 }}>
-        <TabCompras onPreguntarIA={onPreguntarIA} />
+        <TabCompras onPreguntarIA={onPreguntarIA} modoPedido={modoPedido} />
       </div>
     </QueryClientProvider>,
   );
@@ -220,6 +220,22 @@ describe("Compras · buscador único y selector con contadores", () => {
     fireEvent.click(screen.getByRole("button", { name: "Borrar la búsqueda" }));
     expect(await screen.findByText("F-100")).toBeInTheDocument();
     expect(buscador()).toHaveValue("");
+  });
+});
+
+describe("Compras · enlace profundo a un documento (?doc=)", () => {
+  it("abre la ficha del documento pedido, sin «Volver», aunque haya filtros que lo escondan", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k1", doc: 2 });
+    expect(await screen.findByRole("heading", { name: "F-101" })).toBeInTheDocument();
+    expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByRole("button", { name: /^Volver a/ })).not.toBeInTheDocument();
+    expect(within(listaDocs()).getByText("F-101").closest("button")).toHaveAttribute("aria-current", "true");
+  });
+
+  it("un documento que no existe no rompe nada", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
+    expect(await screen.findByText("F-100")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "F-100" })).not.toBeInTheDocument();
   });
 });
 

@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, Search, Truck, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function TabCompras({
 }: {
   onPreguntarIA?: (doc: Factura, tipo: "factura" | "albarán") => void;
   /** Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos. */
-  modoPedido?: { modo: ModoCompras; clave: string };
+  modoPedido?: { modo: ModoCompras; clave: string; doc?: number };
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   const [texto, setTexto] = useState("");
@@ -165,6 +165,14 @@ export function TabCompras({
       if (doc && !coincideDocumento(doc, palabrasBusqueda(texto))) setTexto("");
     });
   };
+  /** Enlace profundo (`?doc=`): abre ese documento sin «Volver», vaciando lo que lo esconda. */
+  const abrirDocumentoPedido = (doc: Factura) => {
+    setOrigen(null);
+    setModo("documentos");
+    setFiltroDocs("todo");
+    setSeleccion((s) => ({ ...s, documentos: doc.id }));
+    if (!coincideDocumento(doc, palabrasBusqueda(texto))) setTexto("");
+  };
   const abrirProducto = (id: number) => {
     const p = productos.find((x) => x.producto_id === id);
     saltar("productos", id, () => {
@@ -203,6 +211,33 @@ export function TabCompras({
     // Cada modo empieza sin ficha abierta (en pantallas estrechas la ficha tapa la lista).
     setSeleccion((s) => ({ ...s, [m]: null }));
   };
+
+  // Enlace profundo a un documento: se espera a que haya datos; si no está en la
+  // caché (recién subido) se refresca una vez y, si sigue sin estar, se abandona.
+  const [docPendiente, setDocPendiente] = useState<number | null>(modoPedido?.doc ?? null);
+  const refrescado = useRef(false);
+  useEffect(() => {
+    if (modoPedido?.doc) {
+      refrescado.current = false;
+      setDocPendiente(modoPedido.doc);
+    }
+  }, [modoPedido?.clave, modoPedido?.doc]);
+  useEffect(() => {
+    if (docPendiente === null) return;
+    const doc = documentos.find((d) => d.id === docPendiente);
+    if (doc) {
+      abrirDocumentoPedido(doc);
+      setDocPendiente(null);
+    } else if (!facturasQ.isFetching && !albaranesQ.isFetching) {
+      if (refrescado.current) setDocPendiente(null);
+      else {
+        refrescado.current = true;
+        void facturasQ.refetch();
+        void albaranesQ.refetch();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docPendiente, documentos, facturasQ.isFetching, albaranesQ.isFetching]);
 
   // ── Ficha de la derecha ───────────────────────────────────────────────────
   let ficha: ReactNode = null;

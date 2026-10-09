@@ -17,8 +17,11 @@ vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <main style={{ paddingBottom: 24 }}>{children}</main>,
 }));
 vi.mock("@/components/facturas/compras/TabCompras", () => ({
-  TabCompras: ({ modoPedido }: { modoPedido?: { modo: string } }) => (
-    <p data-testid="compras">Compras · modo pedido: {modoPedido?.modo ?? "ninguno"}</p>
+  TabCompras: ({ modoPedido }: { modoPedido?: { modo: string; doc?: number } }) => (
+    <p data-testid="compras">
+      Compras · modo pedido: {modoPedido?.modo ?? "ninguno"}
+      {modoPedido?.doc ? ` · doc ${modoPedido.doc}` : ""}
+    </p>
   ),
 }));
 vi.mock("@/components/facturas/ChatFacturas", () => ({
@@ -79,6 +82,17 @@ describe("Facturas · pestañas", () => {
     montar("/facturas?tab=productos");
     expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: productos");
+  });
+
+  it("enlace profundo del «Ver» de Cargar: ?tab=compras&modo=documentos&doc=7 abre ese documento", () => {
+    montar("/facturas?tab=compras&modo=documentos&doc=7");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: documentos · doc 7");
+  });
+
+  it("un doc= que no es un número válido se ignora", () => {
+    montar("/facturas?tab=compras&doc=abc");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
   });
 
   it("?tab=documentos también lleva a Compras", () => {

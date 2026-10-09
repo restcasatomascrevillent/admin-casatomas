@@ -8,12 +8,14 @@ import { EditorProveedor, ProveedoresDialog } from "@/components/facturas/produc
 import { esAlbaranSinFactura, textoFrecuencia } from "@/lib/facturas/compras";
 import type { Proveedor } from "@/lib/facturas/proveedores";
 
-/** Una cifra de la fila de resumen: etiqueta gris encima, valor debajo, sin marco. */
-const dato = (etiqueta: string, valor: string | null) =>
+/** Una cifra de la fila de resumen: etiqueta gris encima (corta; `titulo` trae la larga), valor debajo, sin marco. */
+const dato = (etiqueta: string, valor: string | null, titulo?: string) =>
   valor ? (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-muted-foreground">{etiqueta}</dt>
-      <dd className="truncate text-sm font-semibold tabular-nums" title={valor}>
+      <dt className="truncate text-[11px] font-medium text-muted-foreground" title={titulo ?? etiqueta}>
+        {etiqueta}
+      </dt>
+      <dd className="truncate text-[13px] font-semibold tabular-nums" title={valor}>
         {valor}
       </dd>
     </div>
@@ -91,12 +93,12 @@ export function FichaProveedor({
             No hay compras registradas de este proveedor todavía.
           </p>
         )}
-        <dl className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Cifras del proveedor">
+        <dl className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Cifras del proveedor">
           {dato("Documentos", `${proveedor.facturas} fact. · ${proveedor.albaranes} alb.`)}
-          {dato("Gasto (con IVA)", formatCurrency(ficha?.gasto ?? proveedor.total_facturas + proveedor.total_albaranes))}
+          {dato("Gasto", formatCurrency(ficha?.gasto ?? proveedor.total_facturas + proveedor.total_albaranes), "Gasto (con IVA)")}
           {dato("Último pedido", ficha?.ultima ? formatDate(ficha.ultima) : proveedor.ultima_fecha ? formatDate(proveedor.ultima_fecha) : null)}
           {dato("Cada cuánto", frecuencia ? `Pide ${frecuencia}` : null)}
-          {dato("Albaranes sin factura", String(sinFactura.length))}
+          {dato("Sin factura", String(sinFactura.length), "Albaranes sin factura")}
         </dl>
         {ficha?.reparto && (
           <p className="text-xs text-muted-foreground">
