@@ -205,12 +205,13 @@ export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; cl
             "estimado",
           ].join(" · ");
 
+  // Texto gris compacto, sin tarjeta ni borde; solo el tope lo tiñe de ámbar o rojo.
   const tinte =
     estadoTope.nivel === "superado"
-      ? "border-destructive/60 bg-destructive/10 text-destructive hover:bg-destructive/15"
+      ? "text-destructive hover:bg-destructive/10"
       : estadoTope.nivel === "aviso"
-        ? "border-amber-500/60 bg-amber-500/10 text-amber-900 hover:bg-amber-500/15 dark:text-amber-200"
-        : "border-border/50 bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground";
+        ? "text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
+        : "text-muted-foreground hover:text-foreground";
   const Icono = estadoTope.nivel === "ok" ? Coins : AlertTriangle;
   const avisoTexto = textoAvisoTope(estadoTope, topeEur);
 
@@ -221,15 +222,15 @@ export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; cl
           type="button"
           data-testid={`monitor-gasto-ia-${modo}`}
           data-nivel-tope={estadoTope.nivel}
-          className={`flex min-h-11 w-full items-center gap-2 rounded-md border px-3 text-left text-xs sm:text-sm shadow-sm transition-colors ${tinte} ${className}`}
+          className={`flex min-h-11 w-fit max-w-full items-center gap-1.5 rounded-md px-2 text-left text-xs transition-colors ${tinte} ${className}`}
           aria-label={`${TITULO[modo]}: ${resumen}.${avisoTexto ? ` ${avisoTexto}` : ""} Ver desglose`}
         >
-          <Icono className={`h-4 w-4 shrink-0 ${estadoTope.nivel === "ok" ? "text-primary" : ""}`} aria-hidden="true" />
+          <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate">
-            <span className={`font-medium ${estadoTope.nivel === "ok" ? "text-foreground" : ""}`}>{TITULO[modo]}:</span>{" "}
+            <span>{TITULO[modo]}:</span>{" "}
             <span className="tabular-nums">{resumen}</span>
           </span>
-          <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-3 text-sm">

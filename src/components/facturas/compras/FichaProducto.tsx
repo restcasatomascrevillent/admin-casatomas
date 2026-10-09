@@ -44,7 +44,8 @@ function agruparPorDocumento(lineas: LineaProducto[]): DocumentoDelProducto[] {
  * Compras › Productos › ficha: la evolución del precio (una línea por
  * proveedor) y los documentos en los que aparece; al tocar uno se salta a él.
  * «Editar producto» abre el diálogo de siempre (nombre, categoría, mover líneas).
- * Debajo, el contenido por caja o unidad (para comparar precios en €/kg o €/l).
+ * La gráfica va arriba; el contenido por caja o unidad (para comparar precios
+ * en €/kg o €/l) es una sola línea editable.
  */
 export function FichaProducto({
   productoId,
@@ -75,29 +76,33 @@ export function FichaProducto({
   }
 
   return (
-    <div className="space-y-4 p-3 sm:p-4">
-      <header className="space-y-1">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Producto</p>
-        <h2 className="flex flex-wrap items-center gap-2 break-words text-lg font-semibold leading-tight">
-          {producto.nombre}
-          {producto.origen === "ia" && (
-            <Badge variant="secondary" className="gap-1" title="Lo clasificó la IA y nadie lo ha corregido todavía">
-              <Sparkles className="h-3 w-3" aria-hidden="true" /> IA
-            </Badge>
-          )}
-        </h2>
+    <div className="space-y-2 p-3 sm:p-4">
+      <header className="space-y-0.5">
+        <div className="flex items-start gap-2">
+          <h2 className="flex min-w-0 flex-1 flex-wrap items-center gap-2 break-words text-lg font-semibold leading-tight">
+            {producto.nombre}
+            {producto.origen === "ia" && (
+              <Badge variant="secondary" className="gap-1" title="Lo clasificó la IA y nadie lo ha corregido todavía">
+                <Sparkles className="h-3 w-3" aria-hidden="true" /> IA
+              </Badge>
+            )}
+          </h2>
+          <Button
+            variant="ghost"
+            className="-mr-2 -mt-1.5 h-11 shrink-0 gap-1.5 px-3"
+            onClick={() => setEditando(true)}
+            aria-label={puedeEditar ? "Editar producto" : "Ver líneas del producto"}
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" /> {puedeEditar ? "Editar" : "Líneas"}
+          </Button>
+        </div>
         <p className="text-sm text-muted-foreground">
           {rutaCategoria(mapa, producto.categoria_id) ?? "Sin categoría"} · {producto.compras} compra(s) ·{" "}
           {formatCantidades(producto.cantidades)} · {formatCurrency(producto.gasto)} (base sin IVA)
-          {producto.ultimo_precio !== null && ` · último precio ${formatCurrency(producto.ultimo_precio)}`}
         </p>
-        <Button variant="outline" className="h-11 gap-1.5" onClick={() => setEditando(true)}>
-          <Pencil className="h-4 w-4" aria-hidden="true" /> {puedeEditar ? "Editar producto" : "Ver líneas del producto"}
-        </Button>
       </header>
 
-      <ContenidoProducto productoId={productoId} puedeEditar={puedeEditar} />
-
+      {/* La gráfica va arriba: es lo primero que se quiere ver de un producto. */}
       <section aria-label="Evolución del precio">
         {serieQ.isLoading ? (
           <p className="text-sm text-muted-foreground" role="status">
@@ -108,16 +113,20 @@ export function FichaProducto({
             No se ha podido leer la evolución del precio: {(serieQ.error as { message?: string })?.message ?? "error desconocido"}.
           </p>
         ) : (
-          <GraficoSeriePrecio datos={serieQ.data} />
+          <GraficoSeriePrecio datos={serieQ.data} compacto />
         )}
       </section>
 
-      <section aria-label="Documentos en los que aparece" className="space-y-1">
+      <div className="border-y border-border/50">
+        <ContenidoProducto productoId={productoId} puedeEditar={puedeEditar} />
+      </div>
+
+      <section aria-label="Documentos en los que aparece" className="space-y-1 pt-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Aparece en {lineasQ.isLoading ? "…" : `${documentos.length} ${documentos.length === 1 ? "documento" : "documentos"}`}
         </h3>
         {!lineasQ.isLoading && documentos.length === 0 && <p className="text-sm text-muted-foreground">Ningún documento todavía.</p>}
-        <ul className="divide-y rounded-lg border">
+        <ul className="divide-y border-y border-border/50">
           {documentos.map((d) => {
             const resumen = d.lineas
               .map((l) => {
@@ -132,7 +141,7 @@ export function FichaProducto({
                 <button
                   type="button"
                   onClick={() => onAbrirDocumento(d.id)}
-                  className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40"
+                  className="flex min-h-12 w-full items-center gap-3 px-1 py-1.5 text-left hover:bg-muted/40"
                   aria-label={`Abrir ${d.tipo === "albaran" ? "el albarán" : "la factura"} ${d.numero ?? d.id}`}
                 >
                   <span className="min-w-0 flex-1">

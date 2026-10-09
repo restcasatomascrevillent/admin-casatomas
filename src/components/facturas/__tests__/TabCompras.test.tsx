@@ -170,7 +170,7 @@ const listaDocs = () => screen.getByRole("list", { name: "Documentos" });
 const numerosVisibles = () =>
   within(listaDocs())
     .getAllByRole("button")
-    .map((b) => b.querySelector("span span span")?.textContent);
+    .map((b) => b.querySelector("[data-numero]")?.textContent);
 
 beforeEach(() => {
   prepararBase();
@@ -233,7 +233,12 @@ describe("Compras · chips por modo", () => {
     expect(within(barra).getAllByRole("button").map((b) => b.textContent?.replace(/\d+$/, "").trim())).toEqual([
       "Todo", "Facturas", "Albaranes", "Albaranes sin factura", "Con avisos", "Sin revisar",
     ]);
-    for (const b of within(barra).getAllByRole("button")) expect(b.className).toContain("min-h-11");
+    // Chips compactos (32 px) con zona táctil de 44: contenedor h-11 y toque ampliado.
+    expect(barra.className).toContain("h-11");
+    for (const b of within(barra).getAllByRole("button")) {
+      expect(b.className).toContain("h-8");
+      expect(b.className).toContain("before:-inset-y-1.5");
+    }
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Albaranes sin factura/ }));
     expect(within(listaDocs()).getAllByRole("button")).toHaveLength(1);
@@ -267,7 +272,8 @@ describe("Compras · chips por modo", () => {
     const lista = await screen.findByTestId("lista-productos");
     await within(lista).findByText("Merluza de pincho");
     const subieron = await screen.findByRole("button", { name: /Subieron de precio/ });
-    expect(subieron.className).toContain("min-h-11");
+    expect(subieron.className).toContain("before:-inset-y-1.5"); // zona táctil de 44 px
+    expect(subieron.className).toContain("h-8"); // una sola línea
     expect(subieron.textContent).toMatch(/1 producto/);
     fireEvent.click(subieron);
     await waitFor(() => expect(within(lista).queryByText("Vino tinto crianza")).not.toBeInTheDocument());
@@ -306,6 +312,34 @@ describe("Compras · chips por modo", () => {
   });
 });
 
+describe("Compras · filas planas", () => {
+  it("cada documento muestra una sola insignia (avisos > sin revisar > sin factura); el resto, en el tooltip", async () => {
+    montar();
+    await screen.findByText("F-100");
+    const fila = (num: string) => within(listaDocs()).getByText(num).closest("button") as HTMLElement;
+    // F-101: con avisos (y revisada) → solo «1 aviso».
+    expect(fila("F-101")).toHaveTextContent("1 aviso");
+    expect(fila("F-101")).not.toHaveTextContent("Sin revisar");
+    // A-1: sin revisar y sin factura → solo «Sin revisar +1», con las dos en el tooltip.
+    expect(fila("A-1")).toHaveTextContent("Sin revisar");
+    expect(fila("A-1")).toHaveTextContent("+1");
+    expect(fila("A-1")).not.toHaveTextContent("Sin factura");
+    expect(fila("A-1")).toHaveAttribute("title", "Sin revisar · Sin factura");
+    // El tipo va junto al número.
+    expect(fila("F-100")).toHaveTextContent("F-100 · Factura");
+  });
+
+  it("la ficha tiene cabecera fija con «← Lista» y el nombre del elemento", async () => {
+    montar();
+    fireEvent.click(await screen.findByText("F-100"));
+    const cabecera = await screen.findByTestId("cabecera-ficha");
+    expect(within(cabecera).getByRole("button", { name: /Lista/ })).toBeInTheDocument();
+    expect(cabecera).toHaveTextContent("F-100");
+    fireEvent.click(within(cabecera).getByRole("button", { name: /Lista/ }));
+    await waitFor(() => expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument());
+  });
+});
+
 describe("Compras · fichas", () => {
   it("documento: sus datos, los botones de siempre y sus líneas con enlace al producto", async () => {
     const onIA = montar();
@@ -341,7 +375,7 @@ describe("Compras · fichas", () => {
 
     const ficha = await screen.findByTestId("ficha-compras");
     expect(await within(ficha).findByRole("heading", { name: /Merluza de pincho/ })).toBeInTheDocument();
-    expect(await within(ficha).findByText(/evolución del precio · merluza de pincho/i)).toBeInTheDocument();
+    expect(await within(ficha).findByRole("figure", { name: /evolución del precio de merluza de pincho/i })).toBeInTheDocument();
     expect(base.rpc).toHaveBeenCalledWith("serie_precios_agente", expect.objectContaining({ p_texto: "Merluza de pincho" }));
     expect(within(ficha).getByRole("button", { name: /Editar producto/ })).toBeInTheDocument();
 
@@ -358,7 +392,7 @@ describe("Compras · fichas", () => {
     montar();
     fireEvent.click(await screen.findByText("F-100"));
     fireEvent.click(await screen.findByRole("button", { name: "Ver el producto Merluza de pincho" }));
-    expect(await screen.findByText(/evolución del precio · merluza de pincho/i)).toBeInTheDocument();
+    expect(await screen.findByRole("figure", { name: /evolución del precio de merluza de pincho/i })).toBeInTheDocument();
     expect(modo(/^Productos/)).toHaveAttribute("aria-pressed", "true");
   });
 

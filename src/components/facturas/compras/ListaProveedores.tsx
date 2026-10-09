@@ -33,7 +33,7 @@ export function ListaProveedores({
     );
   }
   return (
-    <ul className="divide-y" aria-label="Proveedores" data-testid="lista-proveedores-compras">
+    <ul className="divide-y divide-border/50" aria-label="Proveedores" data-testid="lista-proveedores-compras">
       {proveedores.map((p) => {
         const sinFactura = sinFacturaPorClave.get(`#${p.id}`) ?? 0;
         const abierto = seleccionadoId === p.id;
@@ -43,21 +43,22 @@ export function ListaProveedores({
               type="button"
               onClick={() => onAbrir(p.id)}
               aria-current={abierto ? "true" : undefined}
-              className={`flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-muted/40 ${abierto ? "bg-muted/70" : ""}`}
+              className={`flex min-h-12 w-full items-center gap-3 px-2 py-1.5 text-left transition-colors hover:bg-muted/40 ${abierto ? "bg-muted/70" : ""}`}
             >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold">{p.nombre}</span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {p.cif ? `CIF ${p.cif} · ` : ""}
-                  {p.documentos} documento(s)
-                  {p.ultima_fecha ? ` · último ${formatDateCorta(p.ultima_fecha)}` : ""}
-                </span>
-                {sinFactura > 0 && (
-                  <span className="mt-0.5 inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-1.5 text-[11px] leading-5 text-amber-800">
-                    <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {sinFactura}{" "}
-                    {sinFactura === 1 ? "albarán sin factura" : "albaranes sin factura"}
+                <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                  <span className="min-w-0 truncate" title={p.ultima_fecha ? `Último documento: ${formatDateCorta(p.ultima_fecha)}` : undefined}>
+                    {p.documentos} doc.
+                    {p.ultima_fecha ? ` · ${formatDateCorta(p.ultima_fecha)}` : ""}
                   </span>
-                )}
+                  {sinFactura > 0 && (
+                    <span className="inline-flex shrink-0 items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
+                      <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {sinFactura}{" "}
+                      {sinFactura === 1 ? "albarán sin factura" : "albaranes sin factura"}
+                    </span>
+                  )}
+                </span>
               </span>
               <span className="shrink-0 text-sm font-semibold tabular-nums">{formatCurrency(p.total_facturas + p.total_albaranes)}</span>
             </button>

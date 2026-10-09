@@ -225,12 +225,12 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
     <div
       className={
         compacto
-          ? "flex h-full min-h-0 flex-col gap-2"
+          ? "flex h-full min-h-0 flex-col gap-0.5"
           : "flex h-full min-h-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-2 shadow-sm sm:p-3"
       }
     >
-      {/* Filtros */}
-      <div className={`flex shrink-0 items-center gap-2 ${compacto ? "overflow-x-auto no-scrollbar" : "flex-wrap"}`}>
+      {/* Herramientas: en Compras, botones de icono con etiqueta accesible (nada se corta a 1280). */}
+      <div className={`flex shrink-0 items-center ${compacto ? "gap-0.5" : "flex-wrap gap-2"}`}>
         {busquedaExterna === undefined && (
           <div className="relative min-w-[12rem] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -246,10 +246,11 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         {compacto ? (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="h-11 shrink-0">
-                <SlidersHorizontal className="mr-1 h-4 w-4" aria-hidden="true" /> Filtros
+              <Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-3" aria-label="Filtros" title="Filtrar y ordenar">
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                <span>Filtros</span>
                 {filtrosActivos > 0 && (
-                  <span className="ml-1.5 rounded-full bg-primary px-1.5 text-[11px] font-semibold leading-5 text-primary-foreground tabular-nums">
+                  <span className="rounded-full bg-muted px-1.5 text-[11px] font-semibold leading-5 text-foreground tabular-nums">
                     {filtrosActivos}
                   </span>
                 )}
@@ -269,28 +270,46 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
             <Truck className="mr-1 h-4 w-4" aria-hidden="true" /> Proveedores
           </Button>
         )}
-        {puedeEditar && (
-          <Button variant="outline" className={compacto ? "h-11 shrink-0" : undefined} onClick={() => setEditandoCategorias(true)}>
-            <FolderTree className="mr-1 h-4 w-4" aria-hidden="true" /> Categorías
-          </Button>
-        )}
-        <AvisosPrecio puedeEditar={puedeEditar} />
-        {puedeEditar && pendientes > 0 && (
-          <Button variant="outline" className={compacto ? "h-11 shrink-0" : undefined} disabled={clasificar.isPending} onClick={() => clasificar.mutate()}>
-            <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
-            {clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
-          </Button>
-        )}
+        {puedeEditar &&
+          (compacto ? (
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" aria-label="Categorías" title="Categorías" onClick={() => setEditandoCategorias(true)}>
+              <FolderTree className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button variant="outline" onClick={() => setEditandoCategorias(true)}>
+              <FolderTree className="mr-1 h-4 w-4" aria-hidden="true" /> Categorías
+            </Button>
+          ))}
+        <AvisosPrecio puedeEditar={puedeEditar} soloIcono={compacto} />
+        {puedeEditar &&
+          pendientes > 0 &&
+          (compacto ? (
+            <Button
+              variant="ghost"
+              className="h-11 shrink-0 gap-1.5 px-3 text-primary"
+              disabled={clasificar.isPending}
+              onClick={() => clasificar.mutate()}
+              aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
+              title={`Clasificar ${pendientes} línea(s) con IA`}
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              <span className="tabular-nums">{pendientes}</span>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled={clasificar.isPending} onClick={() => clasificar.mutate()}>
+              <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
+              {clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
+            </Button>
+          ))}
       </div>
 
-      {/* Gasto por categoría (clic = filtrar) */}
-      <div className="flex shrink-0 gap-2 overflow-x-auto pb-1 no-scrollbar" role="toolbar" aria-label="Gasto por categoría">
-        <button
-          type="button"
-          onClick={() => elegirChip("todas")}
-          aria-pressed={chipActivo("todas")}
-          className="flex min-h-11 shrink-0 flex-col justify-center rounded-lg border px-3 py-1 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10"
-        >
+      {/* Gasto por categoría (clic = filtrar): una sola fila de chips, con scroll horizontal sin barra */}
+      <div
+        className={`flex shrink-0 overflow-x-auto no-scrollbar ${compacto ? "h-11 items-center gap-1" : "gap-2 pb-1"}`}
+        role="toolbar"
+        aria-label="Gasto por categoría"
+      >
+        <button type="button" onClick={() => elegirChip("todas")} aria-pressed={chipActivo("todas")} className={chipCategoria(compacto, "")}>
           <span className="font-semibold">Todas</span>
           <span className="tabular-nums text-muted-foreground">{formatCurrency(gastoTotal)}</span>
         </button>
@@ -300,9 +319,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
             type="button"
             onClick={() => elegirChip(t.clave)}
             aria-pressed={chipActivo(t.clave)}
-            className={`flex min-h-11 shrink-0 flex-col justify-center rounded-lg border px-3 py-1 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10 ${
-              t.clave === "pendiente" ? "border-amber-400/70 bg-amber-50 dark:bg-amber-950/30" : ""
-            }`}
+            className={chipCategoria(compacto, t.clave === "pendiente" ? "!border-amber-400/70 bg-amber-50 dark:bg-amber-950/30" : "")}
           >
             <span className="whitespace-nowrap font-semibold">{t.nombre}</span>
             <span className="whitespace-nowrap tabular-nums text-muted-foreground">
@@ -319,14 +336,12 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
               setSoloSubidas((v) => !v);
             }}
             aria-pressed={soloSubidas}
-            className="flex min-h-11 shrink-0 flex-col justify-center rounded-lg border border-red-200 px-3 py-1 text-left text-xs aria-pressed:border-red-500 aria-pressed:bg-red-50 dark:border-red-900 dark:aria-pressed:bg-red-950/30"
+            className={chipCategoria(compacto, "!border-red-200 aria-pressed:!border-red-500 aria-pressed:bg-red-50 dark:!border-red-900 dark:aria-pressed:bg-red-950/30")}
           >
             <span className="flex items-center gap-1 whitespace-nowrap font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-red-600" aria-hidden="true" /> Subieron de precio
             </span>
-            <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-              {nombresSubida.size} producto(s)
-            </span>
+            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{nombresSubida.size} producto(s)</span>
           </button>
         )}
       </div>
@@ -364,7 +379,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
       )}
 
       {/* Lista (scroll por dentro) */}
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border" data-testid="lista-productos">
+      <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${compacto ? "border-t border-border/50" : "rounded-lg border"}`} data-testid="lista-productos">
         {vista === "pendientes" ? (
           <LineasSinClasificar catalogo={productos} categorias={categorias} puedeEditar={puedeEditar} />
         ) : resumenQ.isLoading ? (
@@ -385,7 +400,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
                 <span className="text-right">Último precio</span>
               </div>
             )}
-            <ul className="divide-y">
+            <ul className="divide-y divide-border/50">
               {visibles.map((p) => (
                 <FilaResumen
                   key={p.producto_id}
@@ -437,6 +452,16 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
     </div>
   );
 }
+
+/**
+ * Chip de categoría. En Compras es de una sola línea (nombre + importe en gris),
+ * visualmente de 32 px pero con zona táctil de 44 (el contenedor mide 44 y el
+ * `before:` amplía el toque); fuera de Compras, la tarjeta de dos líneas de siempre.
+ */
+const chipCategoria = (compacto: boolean, extra: string) =>
+  compacto
+    ? `relative flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3 text-xs before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] aria-pressed:bg-muted aria-pressed:text-foreground hover:bg-muted/50 ${extra}`
+    : `flex min-h-11 shrink-0 flex-col justify-center rounded-lg border px-3 py-1 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10 ${extra}`;
 
 function FilaResumen({
   p,

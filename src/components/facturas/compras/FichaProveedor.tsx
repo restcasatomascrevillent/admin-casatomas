@@ -8,13 +8,14 @@ import { EditorProveedor, ProveedoresDialog } from "@/components/facturas/produc
 import { esAlbaranSinFactura, textoFrecuencia } from "@/lib/facturas/compras";
 import type { Proveedor } from "@/lib/facturas/proveedores";
 
+/** Una cifra de la fila de resumen: etiqueta gris encima, valor debajo, sin marco. */
 const dato = (etiqueta: string, valor: string | null) =>
   valor ? (
-    <div className="min-w-0 rounded-lg border border-border/60 bg-background px-2.5 py-1.5">
-      <p className="text-[11px] font-medium text-muted-foreground">{etiqueta}</p>
-      <p className="truncate text-sm font-semibold tabular-nums" title={valor}>
+    <div className="min-w-0">
+      <dt className="text-[11px] font-medium text-muted-foreground">{etiqueta}</dt>
+      <dd className="truncate text-sm font-semibold tabular-nums" title={valor}>
         {valor}
-      </p>
+      </dd>
     </div>
   ) : null;
 
@@ -47,7 +48,7 @@ export function FichaProveedor({
   const frecuencia = textoFrecuencia(ficha?.intervalo_medio_dias ?? null);
 
   return (
-    <div className="space-y-4 p-3 sm:p-4">
+    <div className="space-y-3 p-3 sm:p-4">
       <header className="space-y-1">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Proveedor</p>
         <h2 className="break-words text-lg font-semibold leading-tight">
@@ -90,13 +91,13 @@ export function FichaProveedor({
             No hay compras registradas de este proveedor todavía.
           </p>
         )}
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <dl className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Cifras del proveedor">
           {dato("Documentos", `${proveedor.facturas} fact. · ${proveedor.albaranes} alb.`)}
           {dato("Gasto (con IVA)", formatCurrency(ficha?.gasto ?? proveedor.total_facturas + proveedor.total_albaranes))}
           {dato("Último pedido", ficha?.ultima ? formatDate(ficha.ultima) : proveedor.ultima_fecha ? formatDate(proveedor.ultima_fecha) : null)}
           {dato("Cada cuánto", frecuencia ? `Pide ${frecuencia}` : null)}
           {dato("Albaranes sin factura", String(sinFactura.length))}
-        </div>
+        </dl>
         {ficha?.reparto && (
           <p className="text-xs text-muted-foreground">
             En facturas {formatCurrency(ficha.reparto.en_facturas)} · en albaranes sin factura {formatCurrency(ficha.reparto.en_albaranes_sin_factura)}
@@ -110,13 +111,13 @@ export function FichaProveedor({
       {ficha && ficha.top_productos.length > 0 && (
         <section aria-label="Qué le compras" className="space-y-1">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Qué le compras</h3>
-          <ul className="divide-y rounded-lg border">
+          <ul className="divide-y divide-border/50 border-y border-border/50">
             {ficha.top_productos.map((t) => (
               <li key={`${t.producto}|${t.unidad ?? ""}`}>
                 <button
                   type="button"
                   onClick={() => onAbrirProducto(t.producto)}
-                  className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40"
+                  className="flex min-h-11 w-full items-center gap-3 px-1 py-1.5 text-left hover:bg-muted/40"
                   aria-label={`Ver el producto ${t.producto}`}
                 >
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.producto}</span>
@@ -136,13 +137,13 @@ export function FichaProveedor({
         {documentos.length === 0 ? (
           <p className="text-sm text-muted-foreground">Ningún documento cargado.</p>
         ) : (
-          <ul className="divide-y rounded-lg border">
+          <ul className="divide-y divide-border/50 border-y border-border/50">
             {documentos.map((d) => (
               <li key={d.id}>
                 <button
                   type="button"
                   onClick={() => onAbrirDocumento(d.id)}
-                  className="flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left hover:bg-muted/40"
+                  className="flex min-h-11 w-full items-center gap-3 px-1 py-1.5 text-left hover:bg-muted/40"
                   aria-label={`Abrir ${d.tipo === "albaran" ? "el albarán" : "la factura"} ${d.numero_documento}`}
                 >
                   <span className="min-w-0 flex-1">

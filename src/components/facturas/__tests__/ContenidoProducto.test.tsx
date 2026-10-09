@@ -4,7 +4,7 @@
  * productos_contenido_guardar.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const base = vi.hoisted(() => {
@@ -43,6 +43,11 @@ function montar(puedeEditar = true) {
 }
 
 const campo = () => screen.getByRole("textbox", { name: "Contenido por caja o unidad" });
+/** Abre el editor (popover) desde la línea «Caja de … · Editar» / «Sin contenido · Añadir». */
+const abrir = async (nombre: "Editar contenido por caja" | "Añadir contenido por caja" = "Añadir contenido por caja") => {
+  fireEvent.click(await screen.findByRole("button", { name: nombre }));
+  await waitFor(() => expect(campo()).not.toBeDisabled());
+};
 
 beforeEach(() => {
   base.estado.fila = { contenido_cantidad: null, contenido_unidad: null };
@@ -61,7 +66,7 @@ describe("leerContenido", () => {
 describe("ContenidoProducto", () => {
   it("guarda «10 kg» por la RPC y los controles son táctiles (44 px)", async () => {
     montar();
-    await waitFor(() => expect(campo()).not.toBeDisabled());
+    await abrir();
     expect(campo().className).toContain("h-11");
     const guardar = screen.getByRole("button", { name: "Guardar" });
     expect(guardar.className).toContain("h-11");
@@ -75,7 +80,7 @@ describe("ContenidoProducto", () => {
 
   it("cambia la unidad a litros y guarda 0,75", async () => {
     montar();
-    await waitFor(() => expect(campo()).not.toBeDisabled());
+    await abrir();
     fireEvent.change(campo(), { target: { value: "0,75" } });
     const litros = screen.getByRole("button", { name: "litros" });
     fireEvent.click(litros);
@@ -88,6 +93,9 @@ describe("ContenidoProducto", () => {
   it("muestra lo guardado y «Quitar» lo borra (cantidad null)", async () => {
     base.estado.fila = { contenido_cantidad: 7.5, contenido_unidad: "kg" };
     montar();
+    // La línea de resumen dice lo guardado sin abrir nada.
+    expect(await screen.findByText("Caja de 7,5 kg")).toBeInTheDocument();
+    await abrir("Editar contenido por caja");
     await waitFor(() => expect(campo()).toHaveValue("7,5"));
     expect(screen.getByRole("button", { name: "kg" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled(); // sin cambios
@@ -98,17 +106,26 @@ describe("ContenidoProducto", () => {
 
   it("un valor no válido avisa y no deja guardar", async () => {
     montar();
-    await waitFor(() => expect(campo()).not.toBeDisabled());
+    await abrir();
     fireEvent.change(campo(), { target: { value: "0" } });
     expect(screen.getByRole("alert")).toHaveTextContent("mayor que 0");
     expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
   });
 
-  it("sin permiso de edición: todo desactivado y con su explicación", async () => {
+  it("es una sola línea: «Sin contenido por caja · Añadir» y, guardado, «Caja de 7,5 kg · Editar»", async () => {
+    montar();
+    const linea = screen.getByRole("region", { name: "Contenido por caja o unidad" });
+    expect(within(linea).getByText("Sin contenido por caja")).toBeInTheDocument();
+    expect(within(linea).getByRole("button", { name: "Añadir contenido por caja" })).toHaveTextContent("Añadir");
+    // Hasta que no se pide, no hay editor en pantalla.
+    expect(screen.queryByRole("textbox", { name: "Contenido por caja o unidad" })).not.toBeInTheDocument();
+  });
+
+  it("sin permiso de edición: solo la línea de resumen, sin botón para cambiarlo", async () => {
+    base.estado.fila = { contenido_cantidad: 10, contenido_unidad: "kg" };
     montar(false);
-    expect(campo()).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "kg" })).toBeDisabled();
-    expect(screen.getByText(/Solo quien edita Facturas/)).toBeInTheDocument();
+    expect(await screen.findByText("Caja de 10 kg")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /contenido por caja/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 });
