@@ -1,28 +1,31 @@
+import { AlertTriangle } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useGastoIa, useGastoIaReal } from "@/hooks/useGastoIa";
-import { fmtEurIa, resumirGastoIa, resumirGastoReal } from "@/lib/facturas/gastoIa";
-import { DesgloseGastoIa } from "./MonitorGastoIA";
+import { fmtEurIa } from "@/lib/facturas/gastoIa";
+import { DesgloseGastoIa, textoAvisoTope, useMonitorGastoIa } from "./MonitorGastoIA";
 
 /**
- * Lo gastado en IA en Facturas, como un texto pequeño junto a la pestaña «IA»
- * («0,22 € este mes»). Al tocarlo se abre el desglose por proceso. Los datos y
- * las cuentas son los del monitor de siempre (`useGastoIa` + `resumirGastoIa`);
- * solo cambia dónde se coloca: ya no ocupa una línea fija encima del chat.
+ * Lo que cuesta el chatbot de Facturas este mes, como un texto pequeño junto a
+ * la pestaña «IA» («0,22 € este mes»). Al tocarlo se abre el desglose. Solo el
+ * chatbot: el resto del gasto de IA está en Super Admin › Costes. Si el mes
+ * se acerca o supera el tope de gasto de IA, el texto se tiñe de ámbar o rojo.
  */
 export function GastoIaPestana({ className = "" }: { className?: string }) {
-  const { data, isLoading } = useGastoIa();
-  const { data: dataReal, isLoading: cargandoReal } = useGastoIaReal();
-  const r = resumirGastoIa(data ?? [], "chat");
-  const real = dataReal ? resumirGastoReal(dataReal, "chat") : null;
+  const { r, real, cargando, topeEur, estadoTope } = useMonitorGastoIa("chat");
   // Real (OpenAI) + estimado de hoy; sin datos reales, el estimado de `ia_uso`.
-  const corto =
-    isLoading || cargandoReal
-      ? "cargando…"
-      : real
-        ? `${fmtEurIa(real.totalEur)} este mes`
-        : r.totalFacturasEur === null
-          ? "sin datos"
-          : `${fmtEurIa(r.totalFacturasEur)} este mes (est.)`;
+  const corto = cargando
+    ? "cargando…"
+    : real
+      ? `${fmtEurIa(real.procesoEur)} este mes`
+      : r.eur === null
+        ? "sin datos"
+        : `${fmtEurIa(r.eur)} este mes (est.)`;
+  const avisoTexto = textoAvisoTope(estadoTope, topeEur);
+  const color =
+    estadoTope.nivel === "superado"
+      ? "font-medium text-destructive"
+      : estadoTope.nivel === "aviso"
+        ? "font-medium text-amber-700 dark:text-amber-400"
+        : "text-muted-foreground hover:text-foreground";
 
   return (
     <Popover>
@@ -30,14 +33,16 @@ export function GastoIaPestana({ className = "" }: { className?: string }) {
         <button
           type="button"
           data-testid="gasto-ia-pestana"
-          aria-label={`Gasto de IA este mes${real ? " (real, sin IVA)" : " (estimado)"}: ${corto}. Ver desglose por proceso`}
-          className={`flex min-h-11 shrink-0 items-center rounded-md px-1.5 text-[11px] leading-tight text-muted-foreground tabular-nums underline-offset-2 transition-colors hover:text-foreground hover:underline sm:text-xs ${className}`}
+          data-nivel-tope={estadoTope.nivel}
+          aria-label={`Gasto del chatbot este mes${real ? " (real, sin IVA)" : " (estimado)"}: ${corto}.${avisoTexto ? ` ${avisoTexto}` : ""} Ver desglose`}
+          className={`flex min-h-11 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] leading-tight tabular-nums underline-offset-2 transition-colors hover:underline sm:text-xs ${color} ${className}`}
         >
+          {estadoTope.nivel !== "ok" && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
           <span className="max-w-[5.5rem] truncate sm:max-w-none">{corto}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[min(22rem,calc(100vw-2rem))] p-3 text-sm">
-        <DesgloseGastoIa r={r} real={real} />
+        <DesgloseGastoIa r={r} real={real} modo="chat" estadoTope={estadoTope} topeEur={topeEur} />
       </PopoverContent>
     </Popover>
   );

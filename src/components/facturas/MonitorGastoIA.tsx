@@ -1,8 +1,9 @@
-import { ChevronDown, Coins } from "lucide-react";
+import { AlertTriangle, ChevronDown, Coins } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useGastoIa, useGastoIaReal } from "@/hooks/useGastoIa";
+import { useGastoIa, useGastoIaRealMes, useTopeIaMes } from "@/hooks/useGastoIa";
 import {
-  DIAS_GASTO_IA,
+  type EstadoTope,
+  evaluarTope,
   fmtEurIa,
   fmtFechaCorta,
   type ModoMonitor,
@@ -10,60 +11,71 @@ import {
   type ResumenGastoReal,
   resumirGastoIa,
   resumirGastoReal,
+  TOPE_IA_POR_DEFECTO,
   textoTipoCambioReal,
 } from "@/lib/facturas/gastoIa";
 import { TEXTO_TIPO_CAMBIO } from "@/components/costes/formato";
 
 const fmtEntero = new Intl.NumberFormat("es-ES");
+const fmtPct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
 
 const TITULO: Record<ModoMonitor, string> = {
   chat: "IA este mes",
   ocr: "Lectura de facturas este mes",
 };
 
-/** Desglose con el gasto REAL de OpenAI + lo estimado de hoy, por proceso. */
-function DesgloseGastoReal({ g }: { g: ResumenGastoReal }) {
+/** Texto del aviso del tope; null si todo va bien. Sin euros de otros procesos: solo el porcentaje. */
+export function textoAvisoTope(e: EstadoTope, topeEur: number): string | null {
+  if (e.nivel === "ok") return null;
+  const tope = fmtEurIa(topeEur);
+  return e.nivel === "superado"
+    ? `El gasto de IA del restaurante este mes ha superado el tope (${tope}).`
+    : `El gasto de IA del restaurante este mes lleva el ${fmtPct.format(e.pct)} % del tope (${tope}).`;
+}
+
+/** Aviso visual del tope (ámbar al 80 %, rojo al pasarlo). No pinta nada si va bien. */
+export function AvisoTopeIa({ estado, topeEur, className = "" }: { estado: EstadoTope; topeEur: number; className?: string }) {
+  const texto = textoAvisoTope(estado, topeEur);
+  if (!texto) return null;
+  const rojo = estado.nivel === "superado";
+  return (
+    <p
+      role="alert"
+      data-testid="aviso-tope-ia"
+      data-nivel={estado.nivel}
+      className={`flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-xs ${
+        rojo
+          ? "border-destructive/50 bg-destructive/10 text-destructive"
+          : "border-amber-500/50 bg-amber-500/10 text-amber-800 dark:text-amber-300"
+      } ${className}`}
+    >
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>{texto}</span>
+    </p>
+  );
+}
+
+/** Desglose con el gasto REAL del proceso de la pestaña (mes en curso) + lo estimado de hoy. */
+function DesgloseGastoReal({ g, modo }: { g: ResumenGastoReal; modo: ModoMonitor }) {
   const hasta = fmtFechaCorta(g.ultimoDia);
+  const linea = g.lineas.find((l) => l.clave === modo);
   return (
     <>
-      <p className="mb-2 font-medium">Gasto de IA (OpenAI) · últimos {DIAS_GASTO_IA} días · sin IVA</p>
-      <ul className="space-y-2" aria-label="Desglose por proceso">
-        {g.lineas.map((l) => (
-          <li key={l.clave}>
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="min-w-0">
-                {l.etiqueta}
-                <span className="block text-xs text-muted-foreground tabular-nums">
-                  Real (OpenAI) hasta {hasta}: {fmtEurIa(l.realEur)}
-                </span>
-                <span className="block text-xs text-muted-foreground tabular-nums">
-                  hoy, estimado: {fmtEurIa(l.hoyEur)}
-                </span>
-              </span>
-              <span className="shrink-0 tabular-nums">{fmtEurIa(l.totalEur)}</span>
-            </div>
-            {l.sub.length > 0 && (
-              <ul className="mt-1 space-y-0.5 border-l pl-3" aria-label={`Desglose estimado de ${l.etiqueta}`}>
-                {l.sub.map((sl) => (
-                  <li key={sl.clave} className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
-                    <span>{sl.etiqueta} (estimado)</span>
-                    <span className="shrink-0 tabular-nums">{fmtEurIa(sl.totalEur)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
-      </ul>
-      <div className="mt-2 border-t pt-2 font-medium">
-        <div className="flex items-baseline justify-between">
-          <span>Total</span>
-          <span className="tabular-nums">{fmtEurIa(g.totalEur)}</span>
+      <p className="mb-2 font-medium">Gasto de IA (OpenAI) · mes en curso · sin IVA</p>
+      {linea && (
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0">
+            {linea.etiqueta}
+            <span className="block text-xs text-muted-foreground tabular-nums">
+              Real (OpenAI) hasta {hasta}: {fmtEurIa(linea.realEur)}
+            </span>
+            <span className="block text-xs text-muted-foreground tabular-nums">
+              hoy, estimado: {fmtEurIa(linea.hoyEur)}
+            </span>
+          </span>
+          <span className="shrink-0 font-medium tabular-nums">{fmtEurIa(linea.totalEur)}</span>
         </div>
-        <div className="mt-0.5 text-xs font-normal text-muted-foreground tabular-nums">
-          Real (OpenAI) hasta {hasta}: {fmtEurIa(g.totalRealEur)} · hoy, estimado: {fmtEurIa(g.totalHoyEur)}
-        </div>
-      </div>
+      )}
       <p className="mt-2 text-xs text-muted-foreground">
         {g.repartoTexto}. Sin IVA. {textoTipoCambioReal(g.tipo)}.
       </p>
@@ -72,19 +84,40 @@ function DesgloseGastoReal({ g }: { g: ResumenGastoReal }) {
 }
 
 /**
- * Cuerpo del desglose por proceso (lista, total, aviso de modelos sin tarifa y
- * nota de cálculo). Lo comparten el monitor de «Cargar» y el texto de la
+ * Cuerpo del desglose del proceso de la pestaña (OCR en «Cargar», chatbot en
+ * «IA»): solo lo que cuesta ese proceso; el resto del gasto de IA se ve en
+ * Super Admin › Costes. Lo comparten el monitor de «Cargar» y el texto de la
  * pestaña «IA» (`GastoIaPestana`): un solo sitio donde cambiarlo.
  */
-export function DesgloseGastoIa({ r, real }: { r: ResumenGastoIa; real?: ResumenGastoReal | null }) {
-  if (real) return <DesgloseGastoReal g={real} />;
+export function DesgloseGastoIa({
+  r,
+  real,
+  modo,
+  estadoTope,
+  topeEur = TOPE_IA_POR_DEFECTO,
+}: {
+  r: ResumenGastoIa;
+  real?: ResumenGastoReal | null;
+  modo: ModoMonitor;
+  estadoTope?: EstadoTope;
+  topeEur?: number;
+}) {
+  const aviso = estadoTope ? <AvisoTopeIa estado={estadoTope} topeEur={topeEur} className="mb-2" /> : null;
+  if (real) {
+    return (
+      <>
+        {aviso}
+        <DesgloseGastoReal g={real} modo={modo} />
+      </>
+    );
+  }
+  const lineas = r.desglose.filter((l) => (modo === "chat" ? l.clave === "chat" : l.clave !== "chat"));
   return (
     <>
-      <p className="mb-2 font-medium">
-        Gasto de IA en Facturas · últimos {DIAS_GASTO_IA} días · estimado
-      </p>
+      {aviso}
+      <p className="mb-2 font-medium">Gasto de IA · mes en curso · estimado</p>
       <ul className="space-y-1.5" aria-label="Desglose por proceso">
-        {r.desglose.map((l) => (
+        {lineas.map((l) => (
           <li key={l.clave} className="flex items-baseline justify-between gap-3">
             <span className="min-w-0">
               {l.etiqueta}
@@ -101,7 +134,7 @@ export function DesgloseGastoIa({ r, real }: { r: ResumenGastoIa; real?: Resumen
       </ul>
       <div className="mt-2 flex items-baseline justify-between border-t pt-2 font-medium">
         <span>Total</span>
-        <span className="tabular-nums">{r.totalFacturasEur === null ? "sin datos todavía" : fmtEurIa(r.totalFacturasEur)}</span>
+        <span className="tabular-nums">{r.eur === null ? "sin datos todavía" : fmtEurIa(r.eur)}</span>
       </div>
       {r.filasSinTarifa > 0 && (
         <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
@@ -117,41 +150,69 @@ export function DesgloseGastoIa({ r, real }: { r: ResumenGastoIa; real?: Resumen
 }
 
 /**
- * Monitor compacto de lo gastado en IA en Facturas (últimos 30 días, en €).
- * Una sola línea de 44 px (táctil); el desglose por proceso se abre en un
- * desplegable flotante, así que no añade alto a la página (regla del dueño:
- * sin scroll vertical de página).
+ * Datos del monitor compartidos por «Cargar» y la pestaña «IA»: estimado,
+ * real del mes en curso y estado del tope. El tope se mide contra el gasto de
+ * IA de todo el restaurante (real si lo hay, si no el estimado de Facturas).
+ */
+export function useMonitorGastoIa(modo: ModoMonitor) {
+  const { data, isLoading } = useGastoIa();
+  const { data: dataReal, isLoading: cargandoReal } = useGastoIaRealMes();
+  const { data: tope } = useTopeIaMes();
+  const topeEur = tope ?? TOPE_IA_POR_DEFECTO;
+  const r = resumirGastoIa(data ?? [], modo);
+  const real = dataReal ? resumirGastoReal(dataReal.actual, modo) : null;
+  const gastoTotalEur = real ? real.totalEur : r.totalFacturasEur;
+  return {
+    r,
+    real,
+    cargando: isLoading || cargandoReal,
+    topeEur,
+    estadoTope: evaluarTope(gastoTotalEur, topeEur),
+  };
+}
+
+/**
+ * Monitor compacto de lo gastado en IA en Facturas (mes en curso, en €).
+ * Una sola línea de 44 px (táctil); el desglose se abre en un desplegable
+ * flotante, así que no añade alto a la página (regla del dueño: sin scroll
+ * vertical de página). Si el mes se acerca o supera el tope, la línea se
+ * tiñe de ámbar o rojo.
  *
  *   modo="chat"  → «IA este mes: 0,21 € · 187 preguntas · 0,001 € por pregunta»
  *   modo="ocr"   → «Lectura de facturas este mes: X € · N documentos · Y € por documento»
  *                  (OCR + clasificación de productos)
  */
 export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; className?: string }) {
-  const { data, isLoading } = useGastoIa();
-  const { data: dataReal, isLoading: cargandoReal } = useGastoIaReal();
-  const r = resumirGastoIa(data ?? [], modo);
-  const real = dataReal ? resumirGastoReal(dataReal, modo) : null;
+  const { r, real, cargando, topeEur, estadoTope } = useMonitorGastoIa(modo);
   const singular = modo === "chat" ? "pregunta" : "documento";
 
   // Con gasto real de OpenAI manda lo real (+ el estimado de hoy); si la RPC no
   // existe o aún no hay datos reales, el estimado de siempre, marcado «estimado».
-  const resumen =
-    isLoading || cargandoReal
-      ? "cargando…"
-      : real
-        ? [
-            fmtEurIa(real.procesoEur),
-            `real hasta ${fmtFechaCorta(real.ultimoDia)} + hoy est. ${fmtEurIa(real.procesoHoyEur)}`,
-            "sin IVA",
-          ].join(" · ")
-        : r.eur === null
-          ? "sin datos todavía"
-          : [
-              fmtEurIa(r.eur),
-              `${fmtEntero.format(r.unidades)} ${r.unidadTexto}`,
-              ...(r.porUnidadEur !== null ? [`${fmtEurIa(r.porUnidadEur)} por ${singular}`] : []),
-              "estimado",
-            ].join(" · ");
+  const resumen = cargando
+    ? "cargando…"
+    : real
+      ? [
+          fmtEurIa(real.procesoEur),
+          `real hasta ${fmtFechaCorta(real.ultimoDia)} + hoy est. ${fmtEurIa(real.procesoHoyEur)}`,
+          "sin IVA",
+        ].join(" · ")
+      : r.eur === null
+        ? "sin datos todavía"
+        : [
+            fmtEurIa(r.eur),
+            `${fmtEntero.format(r.unidades)} ${r.unidadTexto}`,
+            ...(r.porUnidadEur !== null ? [`${fmtEurIa(r.porUnidadEur)} por ${singular}`] : []),
+            "estimado",
+          ].join(" · ");
+
+  const tinte =
+    estadoTope.nivel === "superado"
+      ? "border-destructive/60 bg-destructive/10 text-destructive hover:bg-destructive/15"
+      : estadoTope.nivel === "aviso"
+        ? "border-amber-500/60 bg-amber-500/10 text-amber-900 hover:bg-amber-500/15 dark:text-amber-200"
+        : "border-border/50 bg-card text-muted-foreground hover:bg-muted/40 hover:text-foreground";
+  const Icono = estadoTope.nivel === "ok" ? Coins : AlertTriangle;
+  const avisoTexto = textoAvisoTope(estadoTope, topeEur);
 
   return (
     <Popover>
@@ -159,19 +220,20 @@ export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; cl
         <button
           type="button"
           data-testid={`monitor-gasto-ia-${modo}`}
-          className={`flex min-h-11 w-full items-center gap-2 rounded-md border border-border/50 bg-card px-3 text-left text-xs sm:text-sm text-muted-foreground shadow-sm transition-colors hover:bg-muted/40 hover:text-foreground ${className}`}
-          aria-label={`${TITULO[modo]}: ${resumen}. Ver desglose por proceso`}
+          data-nivel-tope={estadoTope.nivel}
+          className={`flex min-h-11 w-full items-center gap-2 rounded-md border px-3 text-left text-xs sm:text-sm shadow-sm transition-colors ${tinte} ${className}`}
+          aria-label={`${TITULO[modo]}: ${resumen}.${avisoTexto ? ` ${avisoTexto}` : ""} Ver desglose`}
         >
-          <Coins className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <Icono className={`h-4 w-4 shrink-0 ${estadoTope.nivel === "ok" ? "text-primary" : ""}`} aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate">
-            <span className="font-medium text-foreground">{TITULO[modo]}:</span>{" "}
+            <span className={`font-medium ${estadoTope.nivel === "ok" ? "text-foreground" : ""}`}>{TITULO[modo]}:</span>{" "}
             <span className="tabular-nums">{resumen}</span>
           </span>
           <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-3 text-sm">
-        <DesgloseGastoIa r={r} real={real} />
+        <DesgloseGastoIa r={r} real={real} modo={modo} estadoTope={estadoTope} topeEur={topeEur} />
       </PopoverContent>
     </Popover>
   );

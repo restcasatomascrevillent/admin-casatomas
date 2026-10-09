@@ -376,3 +376,90 @@ export function resumirGastoReal(g: GastoReal, modo: ModoMonitor): ResumenGastoR
     sinAsignarEur: lineas.find((l) => l.clave === "sin_asignar")?.totalEur ?? 0,
   };
 }
+
+// ============================================================================
+//  MES EN CURSO Y TOPE (encargo del dueño, 09/10/2026)
+// ----------------------------------------------------------------------------
+//  El monitor de Facturas y Super Admin › Costes miran el MES EN CURSO, no una
+//  ventana de 30 días. `gasto_ia_real_resumen(p_dias)` mide la ventana hacia
+//  atrás desde el último día cerrado con datos (`ultimo_dia_real`), así que el
+//  mes se pide con `p_dias` = día del mes de ese último día cerrado. El mes
+//  anterior sale de restar dos ventanas (aproximado: el reparto por proceso se
+//  calcula dentro de cada ventana).
+// ============================================================================
+
+/** Tope mensual por defecto (€) si no se puede leer `configuracion_facturas.tope_ia_mes_eur`. */
+export const TOPE_IA_POR_DEFECTO = 5;
+
+/** Fracción del tope a partir de la cual el aviso pasa a ámbar. */
+export const UMBRAL_AVISO_TOPE = 0.8;
+
+export type NivelTope = "ok" | "aviso" | "superado";
+
+export interface EstadoTope {
+  /** Gasto / tope, en % (sin tope, 0). Puede pasar de 100. */
+  pct: number;
+  nivel: NivelTope;
+}
+
+/** ok < 80 % ≤ aviso (ámbar) < 100 % ≤ superado (rojo). */
+export function evaluarTope(gastoEur: number | null | undefined, topeEur: number | null | undefined): EstadoTope {
+  const g = Number(gastoEur);
+  const t = Number(topeEur);
+  if (!Number.isFinite(g) || !Number.isFinite(t) || t <= 0 || g <= 0) return { pct: 0, nivel: "ok" };
+  const pct = (g / t) * 100;
+  return { pct, nivel: pct >= 100 ? "superado" : pct >= UMBRAL_AVISO_TOPE * 100 ? "aviso" : "ok" };
+}
+
+/** Día del mes de `hoy` (1 el día 1): ventana del estimado de `gasto_ia_resumen`. */
+export const diaDelMes = (hoy: Date): number => hoy.getDate();
+
+/** Días que tiene el mes de `hoy`. */
+export const diasDelMes = (hoy: Date): number => new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+
+const pad2 = (v: number) => String(v).padStart(2, "0");
+
+/** «2026-10-01» del mes de `hoy` (calendario local). */
+export const primerDiaMesIso = (hoy: Date): string => `${hoy.getFullYear()}-${pad2(hoy.getMonth() + 1)}-01`;
+
+/** «2026-09-01» del mes anterior al de `hoy`. */
+export const primerDiaMesAnteriorIso = (hoy: Date): string => {
+  const d = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`;
+};
+
+/** «2026-10-09» de `hoy` (calendario local): parte de las claves de caché. */
+export const hoyIso = (hoy: Date): string => `${primerDiaMesIso(hoy).slice(0, 8)}${pad2(hoy.getDate())}`;
+
+const aUtc = (iso: string): number => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : NaN;
+};
+
+/** Días entre dos fechas ISO, ambas incluidas (desde ≤ hasta); 0 si hasta < desde. */
+export function diasEntre(desdeIso: string, hastaIso: string): number {
+  const d = Math.round((aUtc(hastaIso) - aUtc(desdeIso)) / 86_400_000) + 1;
+  return Number.isFinite(d) && d > 0 ? d : 0;
+}
+
+/** Último día cerrado con datos reales (YYYY-MM-DD) de unas filas de la RPC, o null. */
+export const ultimoDiaDe = (g: GastoReal): string | null => g.filas.find((f) => f.ultimo_dia_real)?.ultimo_dia_real ?? null;
+
+/** Misma ventana pero con el real a 0 (queda el estimado de hoy): mes sin ningún día cerrado todavía. */
+export function sinRealCerrado(g: GastoReal): GastoReal {
+  const cero = (f: FilaGastoReal): FilaGastoReal => ({ ...f, usd_real: 0 });
+  return { ...g, filas: g.filas.map(cero), subs: g.subs?.map(cero) };
+}
+
+/**
+ * `a − b` en USD por proceso (ventana grande menos ventana corta = mes
+ * anterior). Nunca negativo y sin estimado de hoy: es un mes cerrado.
+ */
+export function restarGastoReal(a: GastoReal, b: GastoReal): GastoReal {
+  const resta = (fa: FilaGastoReal[], fb: FilaGastoReal[] | undefined): FilaGastoReal[] =>
+    fa.map((f) => {
+      const o = (fb ?? []).filter((x) => x.proceso === f.proceso).reduce((s, x) => s + x.usd_real, 0);
+      return { ...f, usd_real: Math.max(0, f.usd_real - o), usd_estimado_hoy: 0 };
+    });
+  return { ...a, filas: resta(a.filas, b.filas), subs: a.subs ? resta(a.subs, b.subs) : a.subs };
+}

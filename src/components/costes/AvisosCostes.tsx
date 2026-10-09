@@ -44,8 +44,8 @@ export function AvisosCostes({ sinRegistro, modelos, fijos, fijosSinVerificarRpc
               ))}
             </ul>
             <p className="mt-1 text-xs opacity-80">
-              Lo que ves aquí NO incluye su coste real, solo la estimación medida a mano de más abajo. El coste
-              verdadero del sistema es mayor que el de estas cifras.
+              Lo que ves aquí NO incluye su coste por función registrado en la app (el gasto real de OpenAI sí lo
+              recoge entero). Si no hay gasto real, el coste verdadero es mayor que el de estas cifras.
             </p>
           </AlertDescription>
         </Alert>
