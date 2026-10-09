@@ -7,18 +7,27 @@
 //
 //    'ocr'   → OPENAI_API_KEY_OCR   (procesar-factura, ocr-trabajo, clasificar-productos)
 //    'chat'  → OPENAI_API_KEY_CHAT  (chat-facturas)
-//    'otros' → OPENAI_API_KEY       (chat-web, traducir-contenido, format-novedad…)
+//    'chatweb' → OPENAI_API_KEY_CHATWEB (chat-web: el chat de la web pública)
+//    'vinos' → OPENAI_API_KEY_VINOS (extraer-vino-foto: «Vinos desde foto»)
+//    'carta' → OPENAI_API_KEY_CARTA (heredado del plan de un proyecto por proceso; sin esa clave cae a la general)
+//    'otros' → OPENAI_API_KEY       (clave general: traducir-contenido, format-novedad, procesar-dibujo-perimetro…)
+//
+//  Ninguna Edge Function lee OPENAI_API_KEY directamente: todas pasan por aquí.
+//  El mapeo función → proceso del ESTIMADO está en SQL: ia_proceso_de_funcion().
 //
 //  Si la clave específica NO existe (o está vacía), se usa OPENAI_API_KEY: el
 //  comportamiento anterior queda intacto hasta que el dueño cree las claves.
 //  No lee el entorno al cargarse: `env` se inyecta (los tests no tienen Deno).
 // ============================================================================
 
-export type ProcesoOpenAI = "ocr" | "chat" | "otros";
+export type ProcesoOpenAI = "ocr" | "chat" | "chatweb" | "vinos" | "carta" | "otros";
 
 const SECRETO_POR_PROCESO: Record<ProcesoOpenAI, string | null> = {
   ocr: "OPENAI_API_KEY_OCR",
   chat: "OPENAI_API_KEY_CHAT",
+  chatweb: "OPENAI_API_KEY_CHATWEB",
+  vinos: "OPENAI_API_KEY_VINOS",
+  carta: "OPENAI_API_KEY_CARTA",
   otros: null,
 };
 

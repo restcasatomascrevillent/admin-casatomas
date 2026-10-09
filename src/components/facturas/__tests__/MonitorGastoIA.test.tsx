@@ -80,11 +80,37 @@ describe("MonitorGastoIA", () => {
       expect(boton).toHaveTextContent("Lectura de facturas este mes: 0,55 € · real hasta 7 oct + hoy est. 0,050 € · sin IVA");
       fireEvent.click(boton);
       expect(screen.getByText("Chatbot")).toBeInTheDocument();
-      expect(screen.getByText("Otros (web, traducciones…)")).toBeInTheDocument();
+      expect(screen.getByText("Otros (traducciones, novedades…)")).toBeInTheDocument();
       expect(screen.getAllByText(/Real \(OpenAI\) hasta 7 oct: 0,50 €/).length).toBeGreaterThan(0); // ocr
       expect(screen.getByText(/1 USD = 0,500 EUR, BCE 7 oct/)).toBeInTheDocument();
       // total: (1,7 + 0,15) x 0,5 = 0,925 €
       expect(screen.getByText(/^0,9[23] €$/)).toBeInTheDocument();
+    });
+
+    it("con la RPC por clave: Chat de la web, Vinos desde foto, sub-líneas de Otros, «repartido por clave» y «sin IVA»", () => {
+      datosReal = real({
+        filas: [
+          { proceso: "ocr", usd_real: 1, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+          { proceso: "chat", usd_real: 0.5, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+          { proceso: "chatweb", usd_real: 0.4, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+          { proceso: "vinos", usd_real: 0.2, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+          { proceso: "otros", usd_real: 0.1, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+        ],
+        subs: [
+          { proceso: "traducciones", usd_real: 0.06, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+          { proceso: "novedades", usd_real: 0.04, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 },
+        ],
+        reparto: "clave_tarifa",
+      });
+      render(<MonitorGastoIA modo="chat" />);
+      fireEvent.click(screen.getByTestId("monitor-gasto-ia-chat"));
+      expect(screen.getByText("Chat de la web")).toBeInTheDocument();
+      expect(screen.getByText("Vinos desde foto")).toBeInTheDocument();
+      expect(screen.getByText("Traducciones (estimado)")).toBeInTheDocument();
+      expect(screen.getByText("Novedades (formato) (estimado)")).toBeInTheDocument();
+      expect(screen.getByText(/Real repartido por clave \(tokens × tarifa\)\. Sin IVA\./)).toBeInTheDocument();
+      // total: (1 + 0,5 + 0,4 + 0,2 + 0,1) x 0,5 = 1,10 €
+      expect(screen.getByText(/^1,10 €$/)).toBeInTheDocument();
     });
 
     it("chat usa el proceso chat", () => {

@@ -10,6 +10,19 @@ describe("claveOpenAI", () => {
     expect(claveOpenAI("chat", env)).toBe("k-chat");
   });
 
+  it("'carta' usa OPENAI_API_KEY_CARTA y, si falta, OPENAI_API_KEY", () => {
+    expect(claveOpenAI("carta", entorno({ OPENAI_API_KEY: "general", OPENAI_API_KEY_CARTA: "k-carta" }))).toBe("k-carta");
+    expect(claveOpenAI("carta", entorno({ OPENAI_API_KEY: "general" }))).toBe("general");
+  });
+
+  it("'chatweb' y 'vinos' usan su clave y, si falta, OPENAI_API_KEY", () => {
+    const env = entorno({ OPENAI_API_KEY: "general", OPENAI_API_KEY_CHATWEB: "k-web", OPENAI_API_KEY_VINOS: "k-vinos" });
+    expect(claveOpenAI("chatweb", env)).toBe("k-web");
+    expect(claveOpenAI("vinos", env)).toBe("k-vinos");
+    expect(claveOpenAI("chatweb", entorno({ OPENAI_API_KEY: "general" }))).toBe("general");
+    expect(claveOpenAI("vinos", entorno({ OPENAI_API_KEY: "general", OPENAI_API_KEY_VINOS: " " }))).toBe("general");
+  });
+
   it("'otros' usa siempre OPENAI_API_KEY, aunque existan las específicas", () => {
     const env = entorno({ OPENAI_API_KEY: "general", OPENAI_API_KEY_OCR: "k-ocr", OPENAI_API_KEY_CHAT: "k-chat" });
     expect(claveOpenAI("otros", env)).toBe("general");

@@ -3,6 +3,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { sincronizar } from "./costes.ts";
+import { sincronizarUso } from "./uso.ts";
 
 const createClient = clienteConAuditoria(createClientBase, "sincronizar-costes-openai");
 
@@ -20,9 +21,13 @@ const createClient = clienteConAuditoria(createClientBase, "sincronizar-costes-o
 //  proyecto y concepto y los guarda en `openai_costes_diarios`; da de alta los
 //  proyectos nuevos en `openai_proyectos` (proceso null: lo asigna el dueño) y
 //  actualiza el tipo de cambio USD→EUR del BCE en `tipo_cambio_usd_eur`.
+//  Además trae el uso (tokens) por clave y modelo de /usage/completions y
+//  /usage/embeddings a `openai_uso_diario` y da de alta las claves en
+//  `openai_claves` (ver uso.ts): con ello la RPC reparte el total real entre
+//  procesos (ocr / chat / otros) dentro de UN solo proyecto.
 //
 //  Secretos: OPENAI_ADMIN_KEY, OCR_TRABAJOS_SECRET (ya existe).
-//  Respuesta: { ok, filas, dias, proyectos_nuevos, proyectos_sin_proceso, tipo_cambio, avisos }
+//  Respuesta: { ok, filas, dias, proyectos_nuevos, proyectos_sin_proceso, tipo_cambio, avisos, uso }
 // ============================================================================
 
 serve(conAuditoriaDePeticion("sincronizar-costes-openai", createClientBase, async (req) => {
@@ -41,8 +46,17 @@ serve(conAuditoriaDePeticion("sincronizar-costes-openai", createClientBase, asyn
   });
   try {
     const r = await sincronizar({ supabase, adminKey });
-    console.log(`[sincronizar-costes-openai] ${JSON.stringify({ ...r, tipo_cambio: r.tipo_cambio?.eur_por_usd ?? null })}`);
-    return jsonResponse({ ok: true, ...r });
+    // Uso por clave (para repartir el total real entre procesos). Si falla, los
+    // costes ya guardados son válidos: se avisa pero no se tumba la sincronización.
+    let uso: Awaited<ReturnType<typeof sincronizarUso>> | null = null;
+    try {
+      uso = await sincronizarUso({ supabase, adminKey });
+      r.avisos.push(...uso.avisos);
+    } catch (e) {
+      r.avisos.push(`Sin uso por clave: ${(e as Error)?.message ?? e}`);
+    }
+    console.log(`[sincronizar-costes-openai] ${JSON.stringify({ ...r, uso, tipo_cambio: r.tipo_cambio?.eur_por_usd ?? null })}`);
+    return jsonResponse({ ok: true, ...r, uso });
   } catch (e) {
     console.error("[sincronizar-costes-openai] error:", (e as Error)?.message ?? e);
     return jsonResponse({ ok: false, error: (e as Error)?.message ?? String(e) }, 502);

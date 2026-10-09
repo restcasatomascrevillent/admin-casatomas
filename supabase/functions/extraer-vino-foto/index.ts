@@ -22,7 +22,7 @@
 //   ellas (categorías del body, sin ejemplos, sin precio).
 // - Auth: verify_jwt (config.toml) + permiso de ESCRITURA en `gestor_carta`
 //   (misma función que la RLS de la carta, resuelta con el JWT del usuario).
-// - Mismo secreto que traducir-contenido: OPENAI_API_KEY.
+// - Clave del proceso «vinos»: OPENAI_API_KEY_VINOS (si falta, OPENAI_API_KEY).
 //
 // Body: { imagen: "<base64 JPEG, con o sin prefijo data:>", categorias?: string[] }
 // Respuesta: { ok: true, vino: {nombre, categoria, descripcion, ingredientes,
@@ -31,6 +31,7 @@
 //   {tienda,url,precio}[], recorte} } | { ok: false, error }
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso-marketing.ts";
@@ -42,7 +43,7 @@ const corsHeaders = {
 };
 
 const FUNCION = "extraer-vino-foto";
-const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY");
+const OPENAI_KEY = claveOpenAI("vinos"); // OPENAI_API_KEY_VINOS o, si falta, OPENAI_API_KEY
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";

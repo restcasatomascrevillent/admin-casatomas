@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { firmarSessionToken, verificarSessionToken } from "./session-token.ts";
 import {
@@ -129,7 +130,7 @@ function corsPara(req: Request): Cors {
   return { ...base, "Access-Control-Allow-Origin": permitido, Vary: "Origin" };
 }
 
-const OPENAI_KEY = Deno.env.get("OPENAI_API_KEY")!;
+const OPENAI_KEY = claveOpenAI("chatweb"); // OPENAI_API_KEY_CHATWEB o, si falta, OPENAI_API_KEY
 const OPENAI = "https://api.openai.com/v1";
 
 // ── Modelo ───────────────────────────────────────────────────────────────

@@ -160,19 +160,25 @@ export function fmtEurIa(v: number | null | undefined): string {
 }
 
 // ============================================================================
-//  GASTO REAL (OpenAI) — migración 20261008150000_openai_costes_reales
+//  GASTO REAL (OpenAI) — migraciones 20261008150000_openai_costes_reales y
+//  20261009100000_openai_gasto_por_clave
 // ----------------------------------------------------------------------------
-//  `gasto_ia_real_resumen(p_dias)` da, por proceso (ocr | chat | otros |
-//  sin_asignar), lo REAL facturado por OpenAI hasta el último día cerrado
-//  (`usd_real`, `ultimo_dia_real`) y lo ESTIMADO de `ia_uso` desde el día
-//  siguiente (`usd_estimado_hoy`). `tipo_cambio_usd_eur_actual()` da el tipo
-//  del BCE (0,92 «por_defecto» si aún no hay ninguno). Todo sin IVA.
+//  `gasto_ia_real_resumen(p_dias)` da, por proceso (ocr | chat | chatweb |
+//  vinos | otros | sin_asignar), lo REAL facturado por OpenAI hasta el último
+//  día cerrado (`usd_real`, `ultimo_dia_real`) y lo ESTIMADO de `ia_uso` desde
+//  el día siguiente (`usd_estimado_hoy`). Hay UN proyecto de OpenAI para todo
+//  el restaurante: el total real es exacto y se REPARTE por proceso según el
+//  coste de cada clave (`reparto`). Las filas `otros:traducciones`, `otros:
+//  novedades` y `otros:resto` son un desglose ESTIMADO de «otros» escalado a su
+//  real. `sin_asignar` = proyectos sin marcar: informativo, NO suma al total.
+//  `tipo_cambio_usd_eur_actual()` da el tipo del BCE (0,92 «por_defecto» si aún
+//  no hay ninguno). Todo sin IVA.
 //
 //  Si la RPC no existe (migración sin aplicar) o no hay datos reales todavía
 //  (`ultimo_dia_real` nulo), el monitor sigue con el estimado de siempre.
 // ============================================================================
 
-export type ProcesoGasto = "ocr" | "chat" | "otros" | "sin_asignar";
+export type ProcesoGasto = "ocr" | "chat" | "chatweb" | "vinos" | "otros" | "sin_asignar";
 
 export interface FilaGastoReal {
   proceso: string;
@@ -190,7 +196,12 @@ export interface TipoCambioIa {
 }
 
 export interface GastoReal {
+  /** Una fila por proceso. */
   filas: FilaGastoReal[];
+  /** Desglose estimado de «otros» (`otros:xxx`), ya sin el prefijo en `proceso`. */
+  subs?: FilaGastoReal[];
+  /** Cómo se ha repartido el real: clave_tarifa | clave_peticiones | proyecto | sin_datos (RPC nueva). */
+  reparto?: string | null;
   tipo: TipoCambioIa;
 }
 
@@ -210,13 +221,15 @@ export function normalizarTipoCambio(datos: unknown): TipoCambioIa {
   };
 }
 
+const PREFIJO_SUB = "otros:";
+
 /**
  * Normaliza `gasto_ia_real_resumen`. Devuelve null si no hay DATOS REALES
  * (sin filas o ninguna con `ultimo_dia_real`): entonces manda el estimado.
  */
 export function normalizarGastoReal(datos: unknown, tipoDatos: unknown): GastoReal | null {
   if (!Array.isArray(datos)) return null;
-  const filas: FilaGastoReal[] = datos
+  const todas: FilaGastoReal[] = datos
     .filter((f) => f && typeof f === "object" && typeof (f as FilaGastoReal).proceso === "string")
     .map((f) => {
       const r = f as Record<string, unknown>;
@@ -227,8 +240,14 @@ export function normalizarGastoReal(datos: unknown, tipoDatos: unknown): GastoRe
         usd_estimado_hoy: n(r.usd_estimado_hoy),
       };
     });
-  if (!filas.some((f) => f.ultimo_dia_real !== null)) return null;
-  return { filas, tipo: normalizarTipoCambio(tipoDatos) };
+  if (!todas.some((f) => f.ultimo_dia_real !== null)) return null;
+  const filas = todas.filter((f) => !f.proceso.startsWith(PREFIJO_SUB));
+  const subs = todas
+    .filter((f) => f.proceso.startsWith(PREFIJO_SUB))
+    .map((f) => ({ ...f, proceso: f.proceso.slice(PREFIJO_SUB.length) }));
+  const rep = (datos.find((f) => f && typeof f === "object" && typeof (f as Record<string, unknown>).reparto === "string") ??
+    null) as Record<string, unknown> | null;
+  return { filas, subs, reparto: rep ? String(rep.reparto) : null, tipo: normalizarTipoCambio(tipoDatos) };
 }
 
 const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -249,36 +268,74 @@ export function textoTipoCambioReal(t: TipoCambioIa): string {
   return `${base}, ${t.fuente.toUpperCase()} ${fmtFechaCorta(t.fecha)}`;
 }
 
-export interface LineaReal {
-  clave: ProcesoGasto;
+export interface LineaSub {
+  clave: string;
   etiqueta: string;
   realEur: number;
   hoyEur: number;
   totalEur: number;
 }
 
+export interface LineaReal {
+  clave: ProcesoGasto;
+  etiqueta: string;
+  realEur: number;
+  hoyEur: number;
+  totalEur: number;
+  /** Solo en «otros»: desglose estimado por función (Traducciones, Novedades…). */
+  sub: LineaSub[];
+}
+
 export interface ResumenGastoReal {
   /** Último día cerrado con datos reales (YYYY-MM-DD). */
   ultimoDia: string;
   tipo: TipoCambioIa;
+  /** Texto de cómo se ha repartido el real («real repartido por clave»). */
+  repartoTexto: string;
   lineas: LineaReal[];
   totalRealEur: number;
   totalHoyEur: number;
-  /** Real + hoy estimado, todos los procesos (mes de la pestaña «IA»). */
+  /** Real + hoy estimado, todos los procesos del restaurante (mes de la pestaña «IA»). */
   totalEur: number;
   /** Real + hoy estimado del proceso del monitor (chat u ocr). */
   procesoEur: number;
   procesoRealEur: number;
   procesoHoyEur: number;
+  /** Proyectos de OpenAI sin marcar: informativo, no suma a ningún total. */
+  sinAsignarEur: number;
 }
 
 const ETIQUETA_PROCESO: Record<ProcesoGasto, string> = {
   ocr: "Lectura de facturas",
   chat: "Chatbot",
-  otros: "Otros (web, traducciones…)",
-  sin_asignar: "Sin asignar",
+  chatweb: "Chat de la web",
+  vinos: "Vinos desde foto",
+  otros: "Otros (traducciones, novedades…)",
+  sin_asignar: "Proyectos sin marcar (no suman)",
 };
-const ORDEN_PROCESO: ProcesoGasto[] = ["ocr", "chat", "otros", "sin_asignar"];
+const ORDEN_PROCESO: ProcesoGasto[] = ["ocr", "chat", "chatweb", "vinos", "otros", "sin_asignar"];
+/** Procesos que solo se pintan con importe (no existen sin la migración 20261009100000 o no tienen gasto). */
+const SOLO_CON_IMPORTE: ProcesoGasto[] = ["chatweb", "vinos", "sin_asignar"];
+
+const ETIQUETA_SUB: Record<string, string> = {
+  traducciones: "Traducciones",
+  novedades: "Novedades (formato)",
+  resto: "Resto",
+};
+const ORDEN_SUB = ["traducciones", "novedades", "resto"];
+
+export function textoReparto(reparto: string | null | undefined): string {
+  switch (reparto) {
+    case "clave_tarifa":
+      return "Real repartido por clave (tokens × tarifa)";
+    case "clave_peticiones":
+      return "Real repartido por clave (por peticiones: falta alguna tarifa)";
+    case "proyecto":
+      return "Real por proyecto (aún sin uso por clave)";
+    default:
+      return "Real repartido por clave";
+  }
+}
 
 export function resumirGastoReal(g: GastoReal, modo: ModoMonitor): ResumenGastoReal {
   const k = g.tipo.eurPorUsd;
@@ -286,14 +343,29 @@ export function resumirGastoReal(g: GastoReal, modo: ModoMonitor): ResumenGastoR
     const fs = g.filas.filter((f) => f.proceso === clave);
     const realEur = fs.reduce((s, f) => s + f.usd_real, 0) * k;
     const hoyEur = fs.reduce((s, f) => s + f.usd_estimado_hoy, 0) * k;
-    return { clave, etiqueta: ETIQUETA_PROCESO[clave], realEur, hoyEur, totalEur: realEur + hoyEur };
-  }).filter((l) => l.clave !== "sin_asignar" || l.totalEur > 0);
+    const sub: LineaSub[] =
+      clave === "otros"
+        ? (g.subs ?? [])
+            .map((f) => ({
+              clave: f.proceso,
+              etiqueta: ETIQUETA_SUB[f.proceso] ?? f.proceso,
+              realEur: f.usd_real * k,
+              hoyEur: f.usd_estimado_hoy * k,
+              totalEur: (f.usd_real + f.usd_estimado_hoy) * k,
+            }))
+            .filter((l) => l.totalEur > 0)
+            .sort((a, b) => ORDEN_SUB.indexOf(a.clave) - ORDEN_SUB.indexOf(b.clave))
+        : [];
+    return { clave, etiqueta: ETIQUETA_PROCESO[clave], realEur, hoyEur, totalEur: realEur + hoyEur, sub };
+  }).filter((l) => !SOLO_CON_IMPORTE.includes(l.clave) || l.totalEur > 0);
   const propio = lineas.find((l) => l.clave === modo);
-  const totalRealEur = lineas.reduce((s, l) => s + l.realEur, 0);
-  const totalHoyEur = lineas.reduce((s, l) => s + l.hoyEur, 0);
+  const delRestaurante = lineas.filter((l) => l.clave !== "sin_asignar");
+  const totalRealEur = delRestaurante.reduce((s, l) => s + l.realEur, 0);
+  const totalHoyEur = delRestaurante.reduce((s, l) => s + l.hoyEur, 0);
   return {
     ultimoDia: g.filas.find((f) => f.ultimo_dia_real)?.ultimo_dia_real ?? "",
     tipo: g.tipo,
+    repartoTexto: textoReparto(g.reparto),
     lineas,
     totalRealEur,
     totalHoyEur,
@@ -301,5 +373,6 @@ export function resumirGastoReal(g: GastoReal, modo: ModoMonitor): ResumenGastoR
     procesoEur: propio?.totalEur ?? 0,
     procesoRealEur: propio?.realEur ?? 0,
     procesoHoyEur: propio?.hoyEur ?? 0,
+    sinAsignarEur: lineas.find((l) => l.clave === "sin_asignar")?.totalEur ?? 0,
   };
 }

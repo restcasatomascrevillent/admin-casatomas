@@ -8,6 +8,7 @@ import {
   resumirGastoIa,
   resumirGastoReal,
   textoTipoCambioReal,
+  textoReparto,
   USD_EUR,
   usdAEur,
 } from "../gastoIa";
@@ -98,6 +99,35 @@ describe("gasto real de OpenAI", () => {
   it("sin_asignar solo aparece si tiene importe", () => {
     const g = normalizarGastoReal([...filas, { proceso: "sin_asignar", usd_real: 1, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 }], tipo)!;
     expect(resumirGastoReal(g, "chat").lineas.map((l) => l.clave)).toContain("sin_asignar");
+  });
+
+  it("reparto por clave: chatweb, vinos y sub-líneas de otros; sin_asignar no suma al total", () => {
+    const f = (proceso: string, usd_real: number, hoy = 0) => ({ proceso, usd_real, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: hoy, reparto: "clave_tarifa" });
+    const g = normalizarGastoReal(
+      [f("ocr", 4), f("chat", 2), f("chatweb", 1), f("vinos", 1), f("otros", 2), f("otros:traducciones", 1.5), f("otros:novedades", 0.5), f("otros:resto", 0), f("sin_asignar", 10)],
+      [{ eur_por_usd: 0.5, fecha: "2026-10-07", fuente: "bce" }],
+    )!;
+    expect(g.subs?.map((s) => s.proceso)).toEqual(["traducciones", "novedades", "resto"]);
+    expect(g.filas.map((x) => x.proceso)).not.toContain("otros:traducciones");
+    const r = resumirGastoReal(g, "chat");
+    expect(r.lineas.map((l) => l.clave)).toEqual(["ocr", "chat", "chatweb", "vinos", "otros", "sin_asignar"]);
+    expect(r.totalRealEur).toBeCloseTo(5); // (4+2+1+1+2) x 0,5; sin_asignar fuera
+    expect(r.sinAsignarEur).toBeCloseTo(5);
+    expect(r.lineas.find((l) => l.clave === "otros")!.sub.map((s) => [s.clave, s.etiqueta, s.totalEur])).toEqual([
+      ["traducciones", "Traducciones", 0.75],
+      ["novedades", "Novedades (formato)", 0.25],
+    ]); // «resto» a 0 no se pinta
+    expect(r.lineas.find((l) => l.clave === "chatweb")!.etiqueta).toBe("Chat de la web");
+    expect(r.lineas.find((l) => l.clave === "vinos")!.etiqueta).toBe("Vinos desde foto");
+    expect(r.repartoTexto).toBe("Real repartido por clave (tokens × tarifa)");
+    expect(textoReparto("proyecto")).toContain("por proyecto");
+    expect(textoReparto(null)).toBe("Real repartido por clave");
+  });
+
+  it("con la RPC antigua (sin chatweb/vinos/reparto) el modo real sigue igual", () => {
+    const r = resumirGastoReal(normalizarGastoReal(filas, tipo)!, "chat");
+    expect(r.lineas.every((l) => l.sub.length === 0)).toBe(true);
+    expect(r.sinAsignarEur).toBe(0);
   });
 
   it("sin ultimo_dia_real, vacía o basura: null (manda el estimado)", () => {

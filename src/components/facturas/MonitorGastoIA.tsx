@@ -29,17 +29,29 @@ function DesgloseGastoReal({ g }: { g: ResumenGastoReal }) {
       <p className="mb-2 font-medium">Gasto de IA (OpenAI) · últimos {DIAS_GASTO_IA} días · sin IVA</p>
       <ul className="space-y-2" aria-label="Desglose por proceso">
         {g.lineas.map((l) => (
-          <li key={l.clave} className="flex items-baseline justify-between gap-3">
-            <span className="min-w-0">
-              {l.etiqueta}
-              <span className="block text-xs text-muted-foreground tabular-nums">
-                Real (OpenAI) hasta {hasta}: {fmtEurIa(l.realEur)}
+          <li key={l.clave}>
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0">
+                {l.etiqueta}
+                <span className="block text-xs text-muted-foreground tabular-nums">
+                  Real (OpenAI) hasta {hasta}: {fmtEurIa(l.realEur)}
+                </span>
+                <span className="block text-xs text-muted-foreground tabular-nums">
+                  hoy, estimado: {fmtEurIa(l.hoyEur)}
+                </span>
               </span>
-              <span className="block text-xs text-muted-foreground tabular-nums">
-                hoy, estimado: {fmtEurIa(l.hoyEur)}
-              </span>
-            </span>
-            <span className="shrink-0 tabular-nums">{fmtEurIa(l.totalEur)}</span>
+              <span className="shrink-0 tabular-nums">{fmtEurIa(l.totalEur)}</span>
+            </div>
+            {l.sub.length > 0 && (
+              <ul className="mt-1 space-y-0.5 border-l pl-3" aria-label={`Desglose estimado de ${l.etiqueta}`}>
+                {l.sub.map((sl) => (
+                  <li key={sl.clave} className="flex items-baseline justify-between gap-3 text-xs text-muted-foreground">
+                    <span>{sl.etiqueta} (estimado)</span>
+                    <span className="shrink-0 tabular-nums">{fmtEurIa(sl.totalEur)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>
@@ -52,7 +64,9 @@ function DesgloseGastoReal({ g }: { g: ResumenGastoReal }) {
           Real (OpenAI) hasta {hasta}: {fmtEurIa(g.totalRealEur)} · hoy, estimado: {fmtEurIa(g.totalHoyEur)}
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">Sin IVA. {textoTipoCambioReal(g.tipo)}.</p>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {g.repartoTexto}. Sin IVA. {textoTipoCambioReal(g.tipo)}.
+      </p>
     </>
   );
 }
