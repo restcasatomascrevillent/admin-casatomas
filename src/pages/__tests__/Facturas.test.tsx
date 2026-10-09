@@ -102,7 +102,7 @@ describe("Facturas · pestañas", () => {
   });
 });
 
-describe("Facturas · gasto de IA junto a la pestaña IA", () => {
+describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => {
   it("texto pequeño con lo gastado este mes y, al tocarlo, el desglose", () => {
     gasto.filas = [
       fila({ funcion: "chat-facturas", coste_usd: 0.2, unidades: 20 }),
@@ -113,8 +113,11 @@ describe("Facturas · gasto de IA junto a la pestaña IA", () => {
     // Solo lo que cuesta el chatbot (0,2 USD x 0,92); la clasificación es del OCR.
     expect(texto).toHaveTextContent("0,18 € este mes (est.)");
     expect(texto.className).toContain("min-h-11"); // objetivo táctil
-    // Está en la barra de pestañas, al lado de «IA»…
-    expect(within(screen.getByRole("tablist")).getByTestId("gasto-ia-pestana")).toBe(texto);
+    // Está en la barra de pestañas, al extremo derecho y fuera del tablist
+    // (no es una pestaña más)…
+    expect(within(screen.getByRole("tablist")).queryByTestId("gasto-ia-pestana")).not.toBeInTheDocument();
+    expect(texto.className).toContain("ml-auto");
+    expect(texto.parentElement).toBe(screen.getByRole("tablist").parentElement);
     // …y la línea fija de antes ya no ocupa sitio encima del chat.
     expect(screen.queryByTestId("monitor-gasto-ia-chat")).not.toBeInTheDocument();
 

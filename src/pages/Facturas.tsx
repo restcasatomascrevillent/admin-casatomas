@@ -138,8 +138,8 @@ const Facturas = () => {
           className="flex-1 flex flex-col min-h-0"
         >
           {/* Botonera de navegación superior */}
-          <div className="mb-2 w-full shrink-0 border-b border-border/60">
-            <TabsList className="-mb-px flex h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto sm:gap-1 pointer-coarse:min-h-11">
+          <div className="mb-2 flex w-full shrink-0 items-center border-b border-border/60">
+            <TabsList className="-mb-px flex h-auto min-w-0 flex-1 justify-start gap-0 rounded-none bg-transparent p-0 sm:flex-none sm:gap-1 pointer-coarse:min-h-11">
               <TabsTrigger value="compras" className={`${topTabClass} flex-1 sm:flex-none`}>
                 <ShoppingCart className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Compras</span>
@@ -149,19 +149,15 @@ const Facturas = () => {
                   </span>
                 )}
               </TabsTrigger>
-              {/* IA + lo gastado este mes (texto pequeño que abre el desglose). */}
-              <div className="flex min-w-0 flex-1 items-center sm:flex-none">
-                <TabsTrigger value="chat" className={`${topTabClass} min-w-0 flex-1 sm:flex-none`}>
-                  <MessageSquare className="h-4 w-4 shrink-0" />
-                  <span className="font-medium text-xs sm:text-[15px] truncate">IA</span>
-                  {totalConversaciones > 0 && (
-                    <span className="hidden sm:inline ml-1 rounded-full bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,45%)] text-[11px] font-semibold px-1.5 py-0.5 leading-none">
-                      {totalConversaciones}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <GastoIaPestana />
-              </div>
+              <TabsTrigger value="chat" className={`${topTabClass} flex-1 sm:flex-none`}>
+                <MessageSquare className="h-4 w-4 shrink-0" />
+                <span className="font-medium text-xs sm:text-[15px] truncate">IA</span>
+                {totalConversaciones > 0 && (
+                  <span className="hidden sm:inline ml-1 rounded-full bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,45%)] text-[11px] font-semibold px-1.5 py-0.5 leading-none">
+                    {totalConversaciones}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="cargar" className={`${topTabClass} flex-1 sm:flex-none`}>
                 <Upload className="h-4 w-4 shrink-0" />
                 <span className="font-medium text-xs sm:text-[15px] truncate">Cargar</span>
@@ -175,6 +171,9 @@ const Facturas = () => {
                 )}
               </TabsTrigger>
             </TabsList>
+            {/* Gasto del chatbot este mes: aparte de las pestañas, a la derecha,
+                para que no parezca una pestaña más. Abre su desglose al tocarlo. */}
+            <GastoIaPestana className="ml-auto" />
           </div>
 
           {/* Área de Visualización */}
