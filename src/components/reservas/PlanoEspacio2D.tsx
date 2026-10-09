@@ -126,6 +126,7 @@ import {
   type ReservaEnMesas,
 } from "@/lib/reservas/piezasMesa";
 import { DialogoPropuestaPiezas, PanelPiezasMesa, type PropuestaAbierta } from "@/components/reservas/PiezasMesa";
+import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
@@ -2404,6 +2405,7 @@ export function PlanoEspacio2D({
               <Undo2 className="mr-2 h-4 w-4" />
               Deshacer
             </Button>
+            <BotonSentarSinReserva salaPreferida={espacioId} />
             {turnoServicio && mesasPiezas.length > 0 && (
               <Button
                 variant="outline"
