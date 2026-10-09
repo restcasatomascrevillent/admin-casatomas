@@ -34,7 +34,8 @@ vi.mock("@/hooks/useChatFacturas", () => ({ useChatFacturas: () => ({ conversaci
 const gasto: { filas: FilaGastoIa[] } = { filas: [] };
 vi.mock("@/hooks/useGastoIa", () => ({
   useGastoIa: () => ({ data: gasto.filas, isLoading: false }),
-  useGastoIaReal: () => ({ data: null, isLoading: false }),
+  useGastoIaRealMes: () => ({ data: null, isLoading: false }),
+  useTopeIaMes: () => ({ data: 5 }),
 }));
 
 import Facturas from "@/pages/Facturas";
@@ -109,7 +110,8 @@ describe("Facturas · gasto de IA junto a la pestaña IA", () => {
     ];
     montar();
     const texto = screen.getByTestId("gasto-ia-pestana");
-    expect(texto).toHaveTextContent("0,22 € este mes");
+    // Solo lo que cuesta el chatbot (0,2 USD x 0,92); la clasificación es del OCR.
+    expect(texto).toHaveTextContent("0,18 € este mes (est.)");
     expect(texto.className).toContain("min-h-11"); // objetivo táctil
     // Está en la barra de pestañas, al lado de «IA»…
     expect(within(screen.getByRole("tablist")).getByTestId("gasto-ia-pestana")).toBe(texto);
@@ -117,9 +119,10 @@ describe("Facturas · gasto de IA junto a la pestaña IA", () => {
     expect(screen.queryByTestId("monitor-gasto-ia-chat")).not.toBeInTheDocument();
 
     fireEvent.click(texto);
+    // El desglose de la pestaña IA es solo el del chatbot.
     expect(screen.getByText("Chatbot de facturas")).toBeInTheDocument();
-    expect(screen.getByText("Clasificación de productos")).toBeInTheDocument();
-    expect(screen.getByText("Lectura de facturas (OCR)")).toBeInTheDocument();
+    expect(screen.queryByText("Clasificación de productos")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lectura de facturas (OCR)")).not.toBeInTheDocument();
     expect(screen.getByText(/1 USD ≈ 0,92 EUR/)).toBeInTheDocument();
   });
 
