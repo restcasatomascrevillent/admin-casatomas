@@ -90,17 +90,18 @@ export const GraficoSerieVisitas = memo(function GraficoSerieVisitas({ serie, te
   const fiable = tendencia?.fiable === true;
 
   return (
-    <Card>
-      <CardHeader className="pb-2 sm:pb-4">
+    <Card variante="plana">
+      <CardHeader className="px-0 pb-2 sm:pb-4">
         <CardTitle className="text-sm font-medium sm:text-base">Visitas diarias</CardTitle>
         <CardDescription className="text-xs">
-          Bandas: media ±1σ y ±2σ de los 8 mismos días de la semana anteriores. Un punto rojo es una anomalía (fuera de
-          ±2σ). Línea discontinua: proyección lineal a 30 días{fiable ? "" : " (poco fiable: menos de 14 días de datos)"}.
-          Los días sin sincronizar quedan en blanco, no a cero.
+          Bandas ±1σ y ±2σ de los 8 mismos días de la semana anteriores; punto rojo = anomalía; discontinua = proyección
+          a 30 días{fiable ? "" : " (poco fiable: menos de 14 días de datos)"}. Los días sin sincronizar quedan en blanco.
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-2 sm:px-6">
-        <ResponsiveContainer width="100%" height={340}>
+      <CardContent className="px-0">
+        {/* Alto adaptado a la ventana: la gráfica entera cabe a 1280×711 sin scroll de la región (de 220 a 340 px). */}
+        <div style={{ height: "clamp(220px, calc(100dvh - 430px), 340px)" }} data-testid="grafico-visitas">
+        <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={puntos} margin={{ left: -10, right: 8, top: 8 }}>
             <CartesianGrid vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.6} />
             <XAxis
@@ -178,6 +179,7 @@ export const GraficoSerieVisitas = memo(function GraficoSerieVisitas({ serie, te
             />
           </ComposedChart>
         </ResponsiveContainer>
+        </div>
       </CardContent>
     </Card>
   );

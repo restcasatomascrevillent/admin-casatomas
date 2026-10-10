@@ -29,8 +29,8 @@ export function TopPaginas({ proyecto, desde, hasta }: TopPaginasProps) {
   if (isError) return <EstadoErrorCarga titulo="las páginas más vistas" error={error} onReintentar={() => refetch()} />;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card variante="plana">
+      <CardHeader className="px-0 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-sm font-medium sm:text-base">
             <FileText className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -51,7 +51,7 @@ export function TopPaginas({ proyecto, desde, hasta }: TopPaginasProps) {
           Transferencia = ESTIMACIÓN (visitas × peso de la página, o el peso medio de la web si no tiene uno propio).
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-2 sm:px-6">
+      <CardContent className="px-0">
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 5 }, (_, i) => (

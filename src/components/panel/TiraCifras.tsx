@@ -16,7 +16,7 @@ export interface CifraTira {
   etiqueta: string;
   valor: ReactNode;
   /** Texto pequeño pegado a la cifra («de 150», «pax»). */
-  detalle?: string;
+  detalle?: ReactNode;
   tono?: "ambar" | "rojo";
   /** Si se da, la cifra es un botón (44 px con dedo). */
   onClick?: () => void;

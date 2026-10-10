@@ -204,8 +204,11 @@ export function PlantillaTipoEditor({ tipo, puedeEditar, emailUsuario }: Plantil
   return (
     <div ref={setRaiz} className="flex flex-col gap-4" style={alto ? { height: alto } : undefined}>
       <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">{DESCRIPCION_TIPO[tipo]}</p>
+        <div className="min-w-0 space-y-1">
+          {/* Ayuda de UNA línea (el texto completo, en el tooltip y en el nombre accesible). */}
+          <p className="max-w-3xl truncate text-sm text-muted-foreground" title={DESCRIPCION_TIPO[tipo]}>
+            {DESCRIPCION_TIPO[tipo]}
+          </p>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {versionActual ? (
               <>

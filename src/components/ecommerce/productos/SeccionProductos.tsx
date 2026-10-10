@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -29,7 +30,7 @@ const CATEGORIAS_COMIDA = [
 ];
 
 /** La rejilla de Bebidas/Comida: se queda con el alto que dejan los filtros y desplaza por dentro. */
-const CONTENIDO_PRODUCTOS = "mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+const CONTENIDO_PRODUCTOS = "mt-2 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 export function SeccionProductos() {
   const [activeTab, setActiveTab] = useState("bebidas");
@@ -86,17 +87,13 @@ export function SeccionProductos() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <Tabs value={activeTab} onValueChange={handleTabChange} className="flex min-h-0 flex-1 flex-col">
-        <div className="flex shrink-0 flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <TabsList>
-            <TabsTrigger value="bebidas" className="min-h-11 gap-2 px-4">
-              <Wine className="h-4 w-4" />
-              Bebidas
-            </TabsTrigger>
-            <TabsTrigger value="comida" className="min-h-11 gap-2 px-4">
-              <Beef className="h-4 w-4" />
-              Comida
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex shrink-0 flex-col items-start justify-between gap-2 sm:flex-row sm:items-center">
+          <ChipsSubnivel
+            chips={[
+              { valor: "bebidas", etiqueta: "Bebidas", icono: <Wine /> },
+              { valor: "comida", etiqueta: "Comida", icono: <Beef /> },
+            ]}
+          />
 
           <Dialog open={dialogOpen} onOpenChange={(open) => { if (!open) handleDialogClose(); else handleAddNew(); }}>
             <DialogTrigger asChild>
@@ -121,18 +118,18 @@ export function SeccionProductos() {
           </Dialog>
         </div>
 
-        <div className="flex shrink-0 flex-col sm:flex-row gap-2 mt-4">
+        <div className="mt-3 flex shrink-0 flex-col gap-2 sm:flex-row">
           <div className="relative flex-1 sm:max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Buscar productos..."
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              className="pl-9"
+              className="h-11 pl-9"
             />
           </div>
           <Select value={categoriaFiltro || "all"} onValueChange={(v) => setCategoriaFiltro(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="h-11 w-full sm:w-48">
               <SelectValue placeholder="Todas las categorías" />
             </SelectTrigger>
             <SelectContent>

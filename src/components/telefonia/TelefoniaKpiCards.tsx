@@ -1,12 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { TiraCifras } from "@/components/panel/TiraCifras";
 import {
-    Phone,
-    CheckCircle2,
-    Clock,
-    Euro,
-    CalendarCheck,
-    UserRoundCog,
     TrendingUp,
     TrendingDown,
     Minus,
@@ -79,7 +72,6 @@ function Delta({
 interface KpiItem {
     title: string;
     value: string;
-    icon: React.ElementType;
     delta?: React.ReactNode;
     hint?: string;
 }
@@ -87,19 +79,10 @@ interface KpiItem {
 export function TelefoniaKpiCards({ analytics, isLoading }: Props) {
     if (isLoading || !analytics) {
         return (
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                    <Card key={i}>
-                        <CardHeader className="pb-2">
-                            <Skeleton className="h-4 w-24" />
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <Skeleton className="h-7 w-16" />
-                            <Skeleton className="h-3 w-20" />
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+            <TiraCifras
+                data-testid="telefonia-cifras"
+                cifras={["Total llamadas", "% éxito", "Duración media", "Coste total", "Reservas creadas", "Transferidas"].map((etiqueta) => ({ etiqueta, valor: "—" }))}
+            />
         );
     }
 
@@ -109,21 +92,18 @@ export function TelefoniaKpiCards({ analytics, isLoading }: Props) {
         {
             title: "Total llamadas",
             value: analytics.totalCalls.toLocaleString("es-ES"),
-            icon: Phone,
             delta: <Delta current={analytics.totalCalls} previous={prev?.totalCalls} format="pct" />,
             hint: "en el periodo",
         },
         {
             title: "% éxito",
             value: formatPct(analytics.successRate),
-            icon: CheckCircle2,
             delta: <Delta current={analytics.successRate} previous={prev?.successRate} format="pct" />,
             hint: "llamadas resueltas",
         },
         {
             title: "Duración media",
             value: formatDuration(analytics.avgDurationSec),
-            icon: Clock,
             delta: (
                 <Delta
                     current={analytics.avgDurationSec}
@@ -137,7 +117,6 @@ export function TelefoniaKpiCards({ analytics, isLoading }: Props) {
         {
             title: "Coste total",
             value: formatEur(analytics.totalCostEur),
-            icon: Euro,
             delta: (
                 <Delta
                     current={analytics.totalCostEur}
@@ -151,7 +130,6 @@ export function TelefoniaKpiCards({ analytics, isLoading }: Props) {
         {
             title: "Reservas creadas",
             value: formatPct(analytics.reservasCreadasRate),
-            icon: CalendarCheck,
             delta: (
                 <Delta
                     current={analytics.reservasCreadasRate}
@@ -164,7 +142,6 @@ export function TelefoniaKpiCards({ analytics, isLoading }: Props) {
         {
             title: "Transferidas",
             value: formatPct(analytics.transferredRate),
-            icon: UserRoundCog,
             delta: (
                 <Delta
                     current={analytics.transferredRate}
@@ -178,33 +155,13 @@ export function TelefoniaKpiCards({ analytics, isLoading }: Props) {
     ];
 
     return (
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
-            {items.map((item) => {
-                const Icon = item.icon;
-                return (
-                    <Card key={item.title}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
-                                {item.title}
-                            </CardTitle>
-                            <Icon className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold tracking-tight">{item.value}</div>
-                            <div className="flex items-center justify-between mt-1 gap-2 flex-wrap">
-                                {item.delta}
-                                {item.hint && (
-                                    <span className="text-[11px] text-muted-foreground truncate">
-                                        {item.hint}
-                                    </span>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                );
-            })}
-        </div>
+        <TiraCifras
+            data-testid="telefonia-cifras"
+            cifras={items.map((item) => ({
+                etiqueta: item.title,
+                valor: item.value,
+                detalle: item.delta,
+            }))}
+        />
     );
 }
-
-export default TelefoniaKpiCards;

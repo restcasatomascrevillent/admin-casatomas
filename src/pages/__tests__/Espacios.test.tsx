@@ -8,7 +8,7 @@
  * también son la barrera para que una sala de Touza no se edite (ni se pase a Casa Tomás) desde aquí.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { ReactNode } from "react";
 
@@ -106,19 +106,26 @@ describe("Espacios · solo las salas de Casa Tomás", () => {
   });
 });
 
-describe("Espacios · táctil", () => {
-  it("cada sala tiene botones de editar y eliminar con nombre accesible y tamaño de dedo (≥ 44 px)", () => {
+describe("Espacios · lista plana con menú «⋯»", () => {
+  it("cada sala es una fila con su menú «⋯» (nombre accesible y tamaño de dedo ≥ 44 px) y estado con punto", () => {
     montar();
+    expect(screen.getByRole("list", { name: "Salas" })).toBeInTheDocument();
     for (const nombre of ["Comedor", "Salón", "Terraza", "Reservado", "Bodega"]) {
-      for (const verbo of ["Editar", "Eliminar"]) {
-        const boton = screen.getByRole("button", { name: `${verbo} ${nombre}` });
-        expect(boton.className, `${verbo} ${nombre}`).toMatch(/\bh-11\b/);
-        expect(boton.className, `${verbo} ${nombre}`).toMatch(/\bw-11\b/);
-      }
+      const menu = screen.getByRole("button", { name: `Más acciones de ${nombre}` });
+      expect(menu.className, nombre).toMatch(/pointer-coarse:h-11/);
+      expect(menu.className, nombre).toMatch(/pointer-coarse:w-11/);
     }
-    expect(screen.getByRole("button", { name: /Nuevo Espacio/ }).className).toMatch(/\bh-11\b/);
-    for (const boton of screen.getAllByRole("button", { name: /Configurar Plano y Mesas/ })) {
-      expect(boton.className).toMatch(/\bh-11\b/);
-    }
+    expect(screen.getAllByText("Activo")).toHaveLength(4);
+    expect(screen.getByText("Inactivo")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Nuevo Espacio/ }).className).toMatch(/(^| )h-11( |$)/);
+  });
+
+  it("el menú ofrece Configurar plano y mesas, Editar espacio y Eliminar; «Configurar» abre el editor", async () => {
+    montar();
+    fireEvent.pointerDown(screen.getByRole("button", { name: "Más acciones de Comedor" }), { button: 0, ctrlKey: false });
+    expect(await screen.findByRole("menuitem", { name: "Editar espacio" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Eliminar" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Configurar plano y mesas" }));
+    expect(await screen.findByTestId("editor-plano")).toHaveTextContent("ct-comedor|Comedor");
   });
 });

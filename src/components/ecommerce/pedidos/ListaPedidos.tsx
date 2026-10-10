@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, Search, Truck, CheckCircle, XCircle, Clock, Package, RotateCcw, Store, Globe } from "lucide-react";
+import { Eye, Search, Store, Globe } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { DetallePedido } from "./DetallePedido";
@@ -19,16 +19,6 @@ const ESTADO_COLORES: Record<string, string> = {
   entregado: "bg-green-500",
   cancelado: "bg-red-500",
   devuelto: "bg-gray-500",
-};
-
-const ESTADO_ICONOS: Record<string, React.ReactNode> = {
-  pendiente: <Clock className="h-3 w-3" />,
-  confirmado: <CheckCircle className="h-3 w-3" />,
-  preparando: <Package className="h-3 w-3" />,
-  enviado: <Truck className="h-3 w-3" />,
-  entregado: <CheckCircle className="h-3 w-3" />,
-  cancelado: <XCircle className="h-3 w-3" />,
-  devuelto: <RotateCcw className="h-3 w-3" />,
 };
 
 export function ListaPedidos() {
@@ -167,16 +157,16 @@ export function ListaPedidos() {
                       }}
                     >
                       <SelectTrigger className="h-11 w-44">
-                        <Badge className={`${ESTADO_COLORES[pedido.estado || 'pendiente']} text-white flex items-center gap-1`}>
-                          {ESTADO_ICONOS[pedido.estado || 'pendiente']}
-                          <span className="capitalize">{pedido.estado}</span>
-                        </Badge>
+                        <span className="flex items-center gap-2 text-sm">
+                          <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${ESTADO_COLORES[pedido.estado || 'pendiente']}`} />
+                          <span className="capitalize">{pedido.estado || 'pendiente'}</span>
+                        </span>
                       </SelectTrigger>
                       <SelectContent>
                         {ESTADOS_PEDIDO.map((estado) => (
                           <SelectItem key={estado} value={estado} className="capitalize">
                             <div className="flex items-center gap-2">
-                              {ESTADO_ICONOS[estado]}
+                              <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${ESTADO_COLORES[estado]}`} />
                               {estado}
                             </div>
                           </SelectItem>

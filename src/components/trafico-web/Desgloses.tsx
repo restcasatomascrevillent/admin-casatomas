@@ -50,14 +50,14 @@ function Desglose({ proyecto, dimension, titulo, icono: Icono, desde, hasta }: D
   if (isError) return <EstadoErrorCarga titulo={`el desglose por ${titulo.toLowerCase()}`} error={error} onReintentar={() => refetch()} />;
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card variante="plana">
+      <CardHeader className="px-0 pb-2">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Icono className="h-4 w-4 text-muted-foreground" aria-hidden />
           {titulo}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-0">
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }, (_, i) => (

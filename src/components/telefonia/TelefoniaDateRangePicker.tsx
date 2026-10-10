@@ -6,6 +6,7 @@ import {
     PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { SelectorSubrayado } from "@/components/panel/SelectorSubrayado";
 import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -56,26 +57,25 @@ export function TelefoniaDateRangePicker({ value, preset = "7d", onChange }: Pro
 
     return (
         <div className="flex items-center gap-1 flex-wrap">
-            <div className="inline-flex rounded-md border bg-card p-0.5">
-                {presets.map((p) => (
-                    <Button
-                        key={p.key}
-                        variant={preset === p.key ? "default" : "ghost"}
-                        size="sm"
-                        className="h-11 px-4 text-sm"
-                        onClick={() => onChange(presetRange(p.key), p.key)}
-                    >
-                        {p.label}
-                    </Button>
-                ))}
-            </div>
+            <SelectorSubrayado
+                aria-label="Intervalo"
+                valor={preset === "custom" ? "" : preset}
+                onCambio={(v) => {
+                    const p = v as Exclude<PresetRange, "custom">;
+                    onChange(presetRange(p), p);
+                }}
+                opciones={presets.map((p) => ({ valor: p.key, etiqueta: p.label }))}
+            />
 
             <Popover open={customOpen} onOpenChange={setCustomOpen}>
                 <PopoverTrigger asChild>
                     <Button
-                        variant={preset === "custom" ? "default" : "outline"}
+                        variant="ghost"
                         size="sm"
-                        className={cn("h-11 gap-2 px-4 text-sm")}
+                        className={cn(
+                            "h-10 gap-2 rounded-none border-b-2 border-transparent px-3 text-sm text-muted-foreground hover:bg-transparent hover:text-foreground pointer-coarse:h-11",
+                            preset === "custom" && "border-foreground text-foreground",
+                        )}
                     >
                         <CalendarIcon className="h-4 w-4" />
                         {preset === "custom"

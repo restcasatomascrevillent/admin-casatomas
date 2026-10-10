@@ -1,8 +1,15 @@
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { AlertCircle, Loader2, RefreshCw } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { AlertCircle, Loader2, MoreHorizontal, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import type { ConfigBotWeb } from "@/hooks/useConfigBotWeb";
 import { IDIOMAS_TRADUCIDOS, estadoTraduccion, type IdiomaTraducido } from "./traduccionBot";
@@ -22,10 +29,11 @@ function haceCuanto(iso: string): string {
   return Number.isNaN(fecha.getTime()) ? "" : formatDistanceToNow(fecha, { addSuffix: true, locale: es });
 }
 
-// Estado compacto de EN/FR junto al botón Guardar. Se deriva de updated_at
-// (lo pone el trigger de configBotWeb), así que sobrevive a recargas: si ES
-// se guardó y la traducción no llegó a escribirse, EN/FR salen como
-// "Desactualizado" aunque ya no esté el error de la sesión.
+// Estado de EN/FR junto al botón Guardar: texto solo si hay algo que avisar
+// (traduciendo / pendiente) y el detalle de cada idioma + «Reintentar» recogidos
+// en un menú «⋯». Se deriva de updated_at (lo pone el trigger de configBotWeb),
+// así que sobrevive a recargas: si ES se guardó y la traducción no llegó a
+// escribirse, EN/FR salen como "Desactualizado" aunque ya no esté el error de la sesión.
 export function EstadoTraduccionBadges({
   configEs,
   configs,
@@ -38,61 +46,58 @@ export function EstadoTraduccionBadges({
     const config = configs[idioma];
     const estado = estadoTraduccion(configEs, config);
     if (traduciendo) {
-      return { idioma, texto: "Traduciendo…", clase: "text-muted-foreground", pendiente: false };
+      return { idioma, texto: "Traduciendo…", pendiente: false };
     }
     if (estado === "sin_traducir") {
-      return { idioma, texto: "Sin traducir", clase: "border-amber-400 text-amber-700 dark:text-amber-400", pendiente: true };
+      return { idioma, texto: "Sin traducir", pendiente: true };
     }
     if (estado === "desactualizado") {
-      return { idioma, texto: "Desactualizado", clase: "border-amber-400 text-amber-700 dark:text-amber-400", pendiente: true };
+      return { idioma, texto: "Desactualizado", pendiente: true };
     }
-    return {
-      idioma,
-      texto: `Traducido · ${config ? haceCuanto(config.updated_at) : ""}`,
-      clase: "text-muted-foreground",
-      pendiente: false,
-    };
+    return { idioma, texto: `Traducido · ${config ? haceCuanto(config.updated_at) : ""}`, pendiente: false };
   });
 
   const hayPendiente = !traduciendo && (errorTraduccion !== null || estados.some((e) => e.pendiente));
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {errorTraduccion && !traduciendo && (
-        <Badge variant="destructive" className="max-w-full items-start gap-1 whitespace-normal text-left font-normal">
-          <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-          <span>
-            Traducción pendiente: {errorTraduccion}
-          </span>
-        </Badge>
+    <div className="flex items-center gap-1">
+      {traduciendo && (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+          Traduciendo…
+        </span>
       )}
-      {estados.map((e) => (
-        <Badge
-          key={e.idioma}
-          variant="outline"
-          className={cn("gap-1 whitespace-nowrap font-normal", e.clase)}
-          title={`${e.idioma.toUpperCase()}: ${e.texto}`}
-        >
-          {traduciendo && <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />}
-          <span className="font-semibold uppercase">{e.idioma}</span>
-          <span className="hidden md:inline">{e.texto}</span>
-          <span className="sr-only md:hidden">{e.texto}</span>
-        </Badge>
-      ))}
       {hayPendiente && (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="h-11 px-3 text-sm"
-          onClick={onReintentar}
-          disabled={!puedeReintentar}
-          title={puedeReintentar ? "Traducir de nuevo lo último guardado en español" : "Guarda primero los cambios en español"}
-        >
-          <RefreshCw className="mr-1 h-3 w-3" aria-hidden="true" />
-          Reintentar traducción
-        </Button>
+        <span className="inline-flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-400">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {errorTraduccion ? `Traducción pendiente: ${errorTraduccion}` : "Traducciones pendientes"}
+        </span>
       )}
+      {/* EN / FR / Reintentar, en un menú «⋯» (antes dos insignias y un botón sueltos en la barra). */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" variant="ghost" size="icon" className="text-muted-foreground" aria-label="Traducciones EN y FR">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel>Traducciones automáticas</DropdownMenuLabel>
+          {estados.map((e) => (
+            <div key={e.idioma} className="flex items-center gap-2 px-2 py-1.5 text-sm" title={`${e.idioma.toUpperCase()}: ${e.texto}`}>
+              <span className="w-6 font-semibold uppercase">{e.idioma}</span>
+              <span className={cn("min-w-0 flex-1 truncate text-xs", e.pendiente ? "text-amber-700 dark:text-amber-400" : "text-muted-foreground")}>
+                {e.texto}
+              </span>
+            </div>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem disabled={!puedeReintentar || traduciendo} onSelect={onReintentar}>
+            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+            {hayPendiente ? "Reintentar traducción" : "Traducir de nuevo"}
+          </DropdownMenuItem>
+          {!puedeReintentar && <p className="px-2 pb-1.5 text-xs text-muted-foreground">Guarda primero los cambios en español.</p>}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

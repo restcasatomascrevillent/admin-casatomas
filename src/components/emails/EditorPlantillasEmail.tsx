@@ -12,7 +12,8 @@
 // de prueba. Se calculan una sola vez aquí y se pasan hacia abajo, en vez de
 // que cada pestaña vuelva a pedir permisos al cambiar de tipo.
 // ============================================================================
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Lock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,15 +47,9 @@ export function EditorPlantillasEmail() {
       )}
 
       <Tabs defaultValue={TIPOS_PLANTILLA[0]}>
-        <TabsList className="h-auto flex-wrap justify-start gap-1">
-          {TIPOS_PLANTILLA.map((tipo) => (
-            <TabsTrigger key={tipo} value={tipo} className="min-h-11 px-4">
-              {ETIQUETA_TIPO[tipo]}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <PestanasPagina pestanas={TIPOS_PLANTILLA.map((tipo) => ({ valor: tipo, etiqueta: ETIQUETA_TIPO[tipo] }))} />
         {TIPOS_PLANTILLA.map((tipo) => (
-          <TabsContent key={tipo} value={tipo} className="mt-4">
+          <TabsContent key={tipo} value={tipo} className="mt-3">
             <PlantillaTipoEditor tipo={tipo} puedeEditar={puedeEditar} emailUsuario={user?.email ?? ""} />
           </TabsContent>
         ))}

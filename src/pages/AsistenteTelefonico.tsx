@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import {
     Loader2,
     Phone,
@@ -62,10 +63,10 @@ const ALTURA_MINIMA_ASISTENTE = 360;
  * imprescindible (como en Marketing/Facturas): Radix deja montado el contenedor de las
  * pestañas inactivas con el atributo `hidden`, y una clase que fije `display` le gana.
  */
-const PESTANA_CON_SCROLL = "mt-6 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+const PESTANA_CON_SCROLL = "mt-3 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 /** Pestaña con una parte fija arriba (filtros, KPIs) y una región con scroll debajo (Resumen, Llamadas). */
-const PESTANA_EN_COLUMNA = "mt-6 min-h-0 flex-1 flex-col data-[state=active]:flex data-[state=inactive]:hidden";
+const PESTANA_EN_COLUMNA = "mt-3 min-h-0 flex-1 flex-col data-[state=active]:flex data-[state=inactive]:hidden";
 
 /**
  * Región con scroll bajo una parte fija. `min-h-48` es su suelo: si lo fijo no deja sitio
@@ -374,7 +375,7 @@ export default function AsistenteTelefonico() {
         if (isLoadingConfig) return null;
         const mode = (config as any)?.mode;
         return (
-            <div className="flex min-h-11 items-center gap-3 rounded-md border bg-card px-3 py-1.5">
+            <div className="flex min-h-11 items-center gap-3 px-1">
                 <Switch
                     id="mode-switch-header"
                     checked={mode === "bot"}
@@ -391,45 +392,36 @@ export default function AsistenteTelefonico() {
 
     return (
         <SuperAdminLayout>
-            <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
+            <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
                 {/* Sin título de página (2026-09-25): la pestaña "Asistente
                     Tel." activa en el menú lateral ya dice dónde estás. Se
                     conserva el interruptor de modo (Bot IA / Humano), que es
                     una acción real. */}
-                <div className="flex justify-end">
-                    {modeBadge}
-                </div>
-
                 <Tabs defaultValue="resumen" className="flex min-h-0 w-full flex-1 flex-col">
-                    {/* `self-start`: en columna flex la barra se estiraría a todo el ancho. */}
-                    <TabsList className="w-full shrink-0 self-start sm:w-auto bg-muted/80 p-1.5 h-auto gap-1 flex-wrap">
-                        <TabsTrigger value="resumen" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
-                            <BarChart3 className="h-4 w-4" /> Resumen
-                        </TabsTrigger>
-                        <TabsTrigger value="llamadas" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
-                            <PhoneCall className="h-4 w-4" /> Llamadas
-                        </TabsTrigger>
-                        <TabsTrigger value="alertas" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
-                            <BellRing className="h-4 w-4" /> Alertas
-                        </TabsTrigger>
-                        <TabsTrigger value="configuracion" className="flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md rounded-md transition-all">
-                            <Settings className="h-4 w-4" /> Configuración
-                        </TabsTrigger>
-                    </TabsList>
+                    {/* Un solo nivel de pestañas (PestanasPagina); el interruptor de modo (Bot IA / Humano), que es una
+                        acción real, va a la derecha de la barra. */}
+                    <PestanasPagina
+                        pestanas={[
+                            { valor: "resumen", etiqueta: "Resumen", icono: <BarChart3 /> },
+                            { valor: "llamadas", etiqueta: "Llamadas", icono: <PhoneCall /> },
+                            { valor: "alertas", etiqueta: "Alertas", icono: <BellRing /> },
+                            { valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> },
+                        ]}
+                        acciones={modeBadge}
+                    />
 
                     {/* ═══════════ RESUMEN ═══════════ */}
                     {/* Solución provisional (cuadro de mando, clase C de la auditoría de
                         scroll): periodo y KPIs fijos; las gráficas hacen scroll por dentro. */}
-                    <TabsContent value="resumen" className={`${PESTANA_EN_COLUMNA} gap-6`}>
-                        <div className="flex justify-end">
+                    <TabsContent value="resumen" className={`${PESTANA_EN_COLUMNA} gap-3`}>
+                        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                            <TelefoniaKpiCards analytics={analytics} isLoading={isLoadingAnalytics} />
                             <TelefoniaDateRangePicker
                                 value={range}
                                 preset={preset}
                                 onChange={(r, p) => { setRange(r); setPreset(p); }}
                             />
                         </div>
-
-                        <TelefoniaKpiCards analytics={analytics} isLoading={isLoadingAnalytics} />
 
                         <div className={`${REGION_CON_SCROLL} space-y-6`}>
                             <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">

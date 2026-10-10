@@ -8,8 +8,8 @@ export function TablaAnomalias({ serie }: { serie: FilaSerie[] }) {
   const anomalias = serie.filter((f) => f.es_anomalia === true).reverse();
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card variante="plana">
+      <CardHeader className="px-0 pb-2">
         <CardTitle className="flex items-center gap-2 text-sm font-medium sm:text-base">
           <AlertTriangle className="h-4 w-4 text-destructive" aria-hidden />
           Anomalías del periodo
@@ -18,7 +18,7 @@ export function TablaAnomalias({ serie }: { serie: FilaSerie[] }) {
           Días cuyo tráfico se aleja más de 2 desviaciones de la media de los 8 mismos días de la semana anteriores.
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-2 sm:px-6">
+      <CardContent className="px-0">
         {anomalias.length === 0 ? (
           <p className="py-4 text-center text-sm text-muted-foreground">Ninguna anomalía en este periodo.</p>
         ) : (

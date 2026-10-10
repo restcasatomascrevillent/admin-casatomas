@@ -91,7 +91,7 @@ export function EditorPesoPaginas() {
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="h-11 gap-2 px-4">
+        <Button variant="ghost" size="sm" className="h-11 gap-2 px-3 text-muted-foreground hover:text-foreground">
           <Scale className="h-4 w-4" aria-hidden />
           Pesos por página
         </Button>

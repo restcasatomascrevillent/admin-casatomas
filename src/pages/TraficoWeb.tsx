@@ -101,20 +101,17 @@ export default function TraficoWeb() {
 
   return (
     <SuperAdminLayout>
-      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
-        {/* Sin título "Tráfico web" (2026-09-25): ya lo dice la pestaña activa
-            del menú lateral. Se conserva el subtítulo — no es relleno: dice de
-            dónde salen los datos (Vercel Web Analytics) y que incluye una
-            estimación de transferencia, algo que nadie esperaría solo por el
-            nombre — y el editor de peso de páginas, que es una acción. */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <p className="text-muted-foreground">
-            Visitas de Casa Tomás y Touza (Vercel Web Analytics) y estimación de la transferencia de datos.
-          </p>
-          <EditorPesoPaginas />
+      <div ref={setRaiz} className="flex flex-col gap-3" style={alto ? { height: alto } : undefined}>
+        {/* Sin título "Tráfico web" (2026-09-25): ya lo dice la pestaña activa del menú lateral. Filtros y «Pesos por
+            página» (una acción) en una sola fila; el origen de los datos (Vercel Web Analytics, con estimación de la
+            transferencia) va como nota discreta a la derecha. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
+          <div className="flex items-center gap-3">
+            <p className="hidden text-xs text-muted-foreground xl:block">Vercel Web Analytics · la transferencia es una estimación</p>
+            <EditorPesoPaginas />
+          </div>
         </div>
-
-        <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
 
         {/* KPIs fijos bajo los filtros. Mientras cargan, su esqueleto va en la región (CargandoPagina). */}
         {kpisListos && <KpisTrafico actual={actual} anterior={anterior} tendencia={tendenciaQ.data} dias={dias} />}
@@ -122,7 +119,7 @@ export default function TraficoWeb() {
         {/* Región con scroll. Los avisos van aquí (y no fijos arriba) porque pueden
             ser varios y dejarían sin sitio al resto. `min-h-48`: suelo de la región;
             si lo fijo no deja sitio (móvil) vuelve el scroll de página. */}
-        <div className="min-h-48 flex-1 space-y-6 overflow-y-auto overscroll-contain">
+        <div className="min-h-48 flex-1 space-y-5 overflow-y-auto overscroll-contain">
           {serieQ.isError ? (
             <EstadoErrorCarga titulo="las visitas" error={serieQ.error} onReintentar={() => serieQ.refetch()} />
           ) : serieQ.isLoading ? (
@@ -142,7 +139,7 @@ export default function TraficoWeb() {
 
               <GraficoSerieVisitas serie={serieActual} tendencia={tendenciaQ.data} hoy={hoy} />
 
-              <div className="grid gap-6 xl:grid-cols-2">
+              <div className="grid gap-5 xl:grid-cols-2">
                 {fdtQ.isError ? (
                   <EstadoErrorCarga titulo="la estimación de transferencia" error={fdtQ.error} onReintentar={() => fdtQ.refetch()} />
                 ) : fdtQ.isLoading ? (

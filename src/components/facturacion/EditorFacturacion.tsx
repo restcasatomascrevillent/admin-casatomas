@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { useFacturacionOficiososia, type BorradorGuardado, type FacturaGuardada } from "@/hooks/useFacturacionOficiososia";
@@ -194,7 +195,7 @@ export function EditorFacturacion() {
   const ultimaCliente = ultimaFacturaCliente(q.data?.facturas ?? [],f.cliente);
   const clientes = [...(q.data?.facturas ?? [])].sort((a,b)=>b.documento.fecha.localeCompare(a.documento.fecha))
     .filter((g,i,lista)=>lista.findIndex(v=>normalizar(v.documento.cliente.nif)===normalizar(g.documento.cliente.nif))===i);
-  return <div ref={setRaiz} className="flex flex-col gap-5" style={alto ? {height:alto} : undefined}>
+  return <div ref={setRaiz} className="flex flex-col gap-3" style={alto ? {height:alto} : undefined}>
     <AlertDialog open={!!confirmacion} onOpenChange={abierto=>{if(!abierto)cerrarConfirmacion(false);}}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{confirmacion?.titulo}</AlertDialogTitle><AlertDialogDescription className="break-words">{confirmacion?.descripcion}</AlertDialogDescription></AlertDialogHeader>
@@ -202,9 +203,8 @@ export function EditorFacturacion() {
       </AlertDialogContent>
     </AlertDialog>
     <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
-      <div><h1 className="text-2xl font-semibold">Facturación · OficiosOsIA</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Instalación, licencias, módulos y soporte.</p>
-        <p className="mt-1 text-xs text-muted-foreground">{dirty ? "Cambios sin guardar" : actual ? facturaModificada ? "Borrador guardado · factura pendiente de actualizar" : "Factura guardada" : q.data?.config ? "Borrador guardado" : "Nuevo borrador"}</p></div>
+      <div><h1 className="text-base font-semibold leading-tight">Facturación · OficiosOsIA</h1>
+        <p className="mt-0.5 text-xs text-muted-foreground">Instalación, licencias, módulos y soporte · {dirty ? "Cambios sin guardar" : actual ? facturaModificada ? "Borrador guardado · factura pendiente de actualizar" : "Factura guardada" : q.data?.config ? "Borrador guardado" : "Nuevo borrador"}</p></div>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" onClick={nuevo} disabled={busy || q.isLoading}><FilePlus2 className="mr-2 h-4 w-4" />Nueva factura</Button>
         <Button variant="outline" onClick={() => void recargar()} disabled={busy || q.isFetching} aria-label="Recargar facturación"><RefreshCw className="h-4 w-4" /></Button>
@@ -216,11 +216,13 @@ export function EditorFacturacion() {
       <p className="mt-1">Si esta función acaba de instalarse, comprueba que se haya aplicado la migración de facturación. Puedes reintentar con el botón de recarga.</p>
     </div>}
     <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col">
-      <TabsList className="grid h-auto w-full shrink-0 grid-cols-3">
-        <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="emitidas">Facturas</TabsTrigger>
-        <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="nueva">Nueva factura</TabsTrigger>
-        <TabsTrigger className="min-h-12 min-w-0 whitespace-normal px-2 text-xs sm:text-sm" value="catalogo">Módulos y paquetes</TabsTrigger>
-      </TabsList>
+      <PestanasPagina
+        pestanas={[
+          { valor: "emitidas", etiqueta: "Facturas" },
+          { valor: "nueva", etiqueta: "Nueva factura" },
+          { valor: "catalogo", etiqueta: "Módulos y paquetes" },
+        ]}
+      />
       <TabsContent value="emitidas" className={`${regionClass} space-y-4 pt-3 data-[state=inactive]:hidden`}>
         {q.isLoading ? <p role="status">Cargando facturas…</p> : q.isError ? <p className="text-sm text-muted-foreground">El historial no está disponible. Reintenta la carga.</p> :
           <FacturasEmitidas eliminar={(g,estado)=>void eliminar(g,estado)} borradores={q.data?.borradores ?? []} editarBorrador={abrirBorrador} facturas={q.data?.facturas ?? []} busy={busy} editar={abrir} duplicar={duplicar} descargar={g=>void descargarEmitida(g)} nueva={nuevo} />}
@@ -228,8 +230,8 @@ export function EditorFacturacion() {
       <TabsContent value="nueva" className={`${pestanaClass} gap-5`}>
       {actual && <p className="shrink-0 text-sm font-medium">Editando factura {f.numero}</p>}
     <div ref={inicioEditor} className="shrink-0 scroll-mt-4 space-y-3">
-      <nav aria-label="Pasos de la factura" className="grid grid-cols-4 gap-1 rounded-lg border bg-muted/30 p-1">
-        {["Cliente", "Servicios", "Ajustes", "Revisar"].map((nombre,i)=><Button key={nombre} variant={paso===i ? "default" : "ghost"} className="h-10 min-w-0 px-1 text-xs sm:text-sm" aria-current={paso===i ? "step" : undefined} onClick={()=>irPaso(i)}>{i+1}. {nombre}</Button>)}
+      <nav aria-label="Pasos de la factura" className="flex gap-1 border-b border-border/60">
+        {["Cliente", "Servicios", "Ajustes", "Revisar"].map((nombre,i)=><Button key={nombre} variant="ghost" className={"-mb-px h-10 min-w-0 flex-1 rounded-none border-b-2 px-1 text-xs shadow-none hover:bg-transparent sm:flex-none sm:px-4 sm:text-sm pointer-coarse:h-11 "+(paso===i ? "border-foreground text-foreground" : "border-transparent text-muted-foreground")} aria-current={paso===i ? "step" : undefined} onClick={()=>irPaso(i)}>{i+1}. {nombre}</Button>)}
       </nav>
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm"><span className="text-muted-foreground">{f.cliente.nombre || "Selecciona un cliente"} · {f.lineas.filter(l=>l.concepto.trim()).length} conceptos</span><span>Total: <strong>{euros(total.total)}</strong></span></div>
     </div>

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListaPlana, FilaPlana } from "@/components/panel/ListaPlana";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Users, Settings2 } from "lucide-react";
+import { Plus, Edit, Trash2, Settings2 } from "lucide-react";
 import {
   useEspaciosReserva,
   useEliminarEspacio,
@@ -89,7 +88,7 @@ export default function Espacios() {
 
   return (
     <SuperAdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-3">
         {/* Sin título de página (2026-09-25): la pestaña "Espacios" activa en
             el menú lateral ya dice dónde estás. Se conserva el botón, que sí
             es una acción. */}
@@ -107,7 +106,7 @@ export default function Espacios() {
         ) : espacios.length === 0 ? (
           <p className="text-sm text-muted-foreground">No hay espacios creados</p>
         ) : (
-          <section aria-label="Espacios del restaurante" className="space-y-3">
+          <section aria-label="Espacios del restaurante" className="space-y-1">
             <p className="text-sm text-muted-foreground">
               Aforo por turno:{" "}
               <span className="font-medium text-foreground tabular-nums">
@@ -118,88 +117,42 @@ export default function Espacios() {
                 <span> (sin las salas privadas: están fuera de aforo)</span>
               )}
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {espacios.map((espacio: any) => {
-                const mesasCount = getMesasCount(espacio.id);
-
-                return (
-                  <Card key={espacio.id} className="group">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="flex flex-wrap items-center gap-2">
-                            {espacio.nombre}
-                            {espacio.activa ? (
-                              <Badge variant="default">Activo</Badge>
-                            ) : (
-                              <Badge variant="secondary">Inactivo</Badge>
-                            )}
-                            {esSalaPrivada(espacio) && <EtiquetaFueraDeAforo />}
-                          </CardTitle>
-                          <CardDescription className="mt-2">
-                            {espacio.descripcion || "Sin descripción"}
-                          </CardDescription>
-                        </div>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-11 w-11 touch-manipulation"
-                            aria-label={`Editar ${espacio.nombre}`}
-                            onClick={() => {
-                              setEspacioEditando(espacio);
-                              setShowForm(true);
-                            }}
-                          >
-                            <Edit className="h-5 w-5" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-11 w-11 touch-manipulation"
-                            aria-label={`Eliminar ${espacio.nombre}`}
-                            onClick={() => setEspacioAEliminar(espacio.id)}
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-center gap-4 text-sm">
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Capacidad:</span>
-                            <span className="font-medium">{espacio.capacidad_maxima}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted-foreground">Mesas:</span>
-                            <Badge variant="outline">{mesasCount}</Badge>
-                          </div>
-                        </div>
-
-                        {/* Botón de configurar plano */}
-                        <Button
-                          variant="outline"
-                          className="w-full h-11 touch-manipulation"
-                          onClick={() => {
-                            console.log("[Espacios] abrir editor plano", {
-                              espacioId: espacio.id,
-                              espacioNombre: espacio.nombre,
-                            });
-                            setEspacioConfigurando({ id: espacio.id, nombre: espacio.nombre });
-                          }}
-                        >
-                          <Settings2 className="h-4 w-4 mr-2" />
-                          Configurar Plano y Mesas
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+            <ListaPlana aria-label="Salas">
+              {espacios.map((espacio: any) => (
+                <FilaPlana
+                  key={espacio.id}
+                  titulo={
+                    <span className="inline-flex items-center gap-2">
+                      {espacio.nombre}
+                      {esSalaPrivada(espacio) && <EtiquetaFueraDeAforo />}
+                    </span>
+                  }
+                  subtitulo={[
+                    espacio.descripcion || "Sin descripción",
+                    `Capacidad ${espacio.capacidad_maxima}`,
+                    `${getMesasCount(espacio.id)} ${getMesasCount(espacio.id) === 1 ? "mesa" : "mesas"}`,
+                  ]}
+                  estado={{ texto: espacio.activa ? "Activo" : "Inactivo", tono: espacio.activa ? "verde" : "gris" }}
+                  etiquetaMenu={`Más acciones de ${espacio.nombre}`}
+                  menu={[
+                    {
+                      etiqueta: "Configurar plano y mesas",
+                      icono: Settings2,
+                      onClick: () => setEspacioConfigurando({ id: espacio.id, nombre: espacio.nombre }),
+                    },
+                    {
+                      etiqueta: "Editar espacio",
+                      icono: Edit,
+                      onClick: () => {
+                        setEspacioEditando(espacio);
+                        setShowForm(true);
+                      },
+                    },
+                    { etiqueta: "Eliminar", icono: Trash2, destructiva: true, separadorAntes: true, onClick: () => setEspacioAEliminar(espacio.id) },
+                  ]}
+                />
+              ))}
+            </ListaPlana>
           </section>
         )}
 

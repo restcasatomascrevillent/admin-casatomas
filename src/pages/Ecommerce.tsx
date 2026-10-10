@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { Package, ShoppingCart, Boxes, Users, BarChart3, Receipt } from "lucide-react";
 import { TPVContainer } from "@/components/ecommerce/tpv/TPVContainer";
 import { SeccionProductos } from "@/components/ecommerce/productos/SeccionProductos";
@@ -25,13 +27,13 @@ const ALTURA_MINIMA_ECOMMERCE = 420;
  * con el atributo `hidden`, y un `flex` le gana a ese atributo — la pestaña
  * oculta seguiría ocupando sitio.
  */
-const CONTENIDO_PESTANA = "mt-6 min-h-0 flex-1 data-[state=inactive]:hidden";
+const CONTENIDO_PESTANA = "mt-3 min-h-0 flex-1 data-[state=inactive]:hidden";
 /** TPV, Productos, Pedidos y Stock reparten el alto por dentro: filtros fijos arriba y la tabla o la rejilla con su propio scroll. */
 const PESTANA_REPARTIDA = `${CONTENIDO_PESTANA} flex flex-col`;
 /** Clientes y Analíticas: la pestaña entera desplaza por dentro; la barra de pestañas se queda fija. */
 const PESTANA_CON_SCROLL = `${CONTENIDO_PESTANA} overflow-y-auto overscroll-contain`;
 /** Inventario e Historial (dentro de Stock): igual, bajo su propia fila de pestañas. */
-const SUBPESTANA_STOCK = "mt-4 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden";
+const SUBPESTANA_STOCK = "mt-3 flex min-h-0 flex-1 flex-col data-[state=inactive]:hidden";
 
 export default function Ecommerce() {
   const [seccionActiva, setSeccionActiva] = useState("productos");
@@ -67,32 +69,18 @@ export default function Ecommerce() {
           onValueChange={setSeccionActiva}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <TabsList className="grid w-full shrink-0 grid-cols-3 lg:grid-cols-6 h-auto">
-            <TabsTrigger value="tpv" className="min-h-11 gap-2 py-2">
-              <Receipt className="h-4 w-4" />
-              <span className="hidden sm:inline">TPV</span>
-            </TabsTrigger>
-            <TabsTrigger value="productos" className="min-h-11 gap-2 py-2">
-              <Package className="h-4 w-4" />
-              <span className="hidden sm:inline">Productos</span>
-            </TabsTrigger>
-            <TabsTrigger value="pedidos" className="min-h-11 gap-2 py-2">
-              <ShoppingCart className="h-4 w-4" />
-              <span className="hidden sm:inline">Pedidos</span>
-            </TabsTrigger>
-            <TabsTrigger value="stock" className="min-h-11 gap-2 py-2">
-              <Boxes className="h-4 w-4" />
-              <span className="hidden sm:inline">Stock</span>
-            </TabsTrigger>
-            <TabsTrigger value="clientes" className="min-h-11 gap-2 py-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Clientes</span>
-            </TabsTrigger>
-            <TabsTrigger value="analiticas" className="min-h-11 gap-2 py-2">
-              <BarChart3 className="h-4 w-4" />
-              <span className="hidden sm:inline">Analíticas</span>
-            </TabsTrigger>
-          </TabsList>
+          {/* Un solo nivel de pestañas (PestanasPagina, como Facturas); Inventario/Historial y Bebidas/Comida son
+              chips dentro de su pestaña. */}
+          <PestanasPagina
+            pestanas={[
+              { valor: "tpv", etiqueta: "TPV", icono: <Receipt /> },
+              { valor: "productos", etiqueta: "Productos", icono: <Package /> },
+              { valor: "pedidos", etiqueta: "Pedidos", icono: <ShoppingCart /> },
+              { valor: "stock", etiqueta: "Stock", icono: <Boxes /> },
+              { valor: "clientes", etiqueta: "Clientes", icono: <Users /> },
+              { valor: "analiticas", etiqueta: "Analíticas", icono: <BarChart3 /> },
+            ]}
+          />
 
           <TabsContent value="tpv" className={`${PESTANA_REPARTIDA} overflow-hidden`}>
             <TPVContainer />
@@ -112,11 +100,12 @@ export default function Ecommerce() {
               onValueChange={setSubSeccionStock}
               className="flex min-h-0 flex-1 flex-col"
             >
-              {/* `self-start`: en columna flex la fila de pestañas se estiraría a todo el ancho. */}
-              <TabsList className="shrink-0 self-start">
-                <TabsTrigger value="inventario" className="min-h-11 px-4">Inventario</TabsTrigger>
-                <TabsTrigger value="movimientos" className="min-h-11 px-4">Historial</TabsTrigger>
-              </TabsList>
+              <ChipsSubnivel
+                chips={[
+                  { valor: "inventario", etiqueta: "Inventario" },
+                  { valor: "movimientos", etiqueta: "Historial" },
+                ]}
+              />
               <TabsContent value="inventario" className={SUBPESTANA_STOCK}>
                 <TablaStock />
               </TabsContent>

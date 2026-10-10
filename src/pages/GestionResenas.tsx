@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TiraCifras } from "@/components/panel/TiraCifras";
+import { ListaPlana } from "@/components/panel/ListaPlana";
+import { Plegable } from "@/components/panel/Plegable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Star, RefreshCw, Settings, ExternalLink, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Star, RefreshCw, Settings, ExternalLink, AlertCircle } from "lucide-react";
 import { useResenas, useConfigGooglePlaces } from "@/hooks/useResenas";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -21,9 +22,9 @@ export default function GestionResenas() {
     const { data: resenas, isLoading: resenasLoading } = useResenas();
     const { data: config, isLoading: configLoading } = useConfigGooglePlaces();
     // Alto de la pantalla (regla del dueño, 2026-10-07: sin scroll de página).
-    // Solución provisional de la auditoría (clase C): botón, aviso y cifras fijos
-    // arriba; la configuración y la lista de reseñas en una región con scroll
-    // propio. Sin medida (jsdom, primer pintado) cae al layout de siempre.
+    // Cifras y botón fijos arriba; la configuración va plegada (acordeón) y la
+    // lista de reseñas ocupa el resto con su propio scroll. Sin medida (jsdom,
+    // primer pintado) cae al layout de siempre.
     const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
     const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_RESENAS);
     const [syncing, setSyncing] = useState(false);
@@ -74,7 +75,7 @@ export default function GestionResenas() {
     };
 
     const renderEstrellas = (valoracion: number) => (
-        <div className="flex gap-0.5">
+        <div className="flex gap-0.5" role="img" aria-label={`${valoracion} de 5 estrellas`}>
             {[1, 2, 3, 4, 5].map((star) => (
                 <Star
                     key={star}
@@ -86,262 +87,188 @@ export default function GestionResenas() {
 
     const googleRating = config?.rating_promedio ? Number(config.rating_promedio) : 0;
     const isPlaceholderPlaceId = config?.place_id?.includes("_casa_") || !config?.place_id?.startsWith("ChIJ");
+    const ultimaSync = config?.ultima_sincronizacion ? new Date(config.ultima_sincronizacion) : null;
 
     return (
         <SuperAdminLayout>
-            <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
-                {/* Sin título de página (2026-09-25): la pestaña "Reseñas
-                    Google" activa en el menú lateral ya dice dónde estás; el
-                    subtítulo era relleno. Se conserva el botón, que sí es una
-                    acción. */}
-                <div className="flex justify-end">
-                    <Button onClick={handleSync} disabled={syncing} className="h-11 gap-2 self-start px-5 sm:self-auto">
+            <div ref={setRaiz} className="flex flex-col gap-3 overflow-y-auto overscroll-contain" style={alto ? { height: alto } : undefined}>
+                {/* Sin título de página (2026-09-25): la pestaña "Reseñas Google" activa en el menú lateral ya dice
+                    dónde estás. Cifras en una tira y la única acción («Sincronizar ahora») a la derecha. */}
+                <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-6 gap-y-2">
+                    <TiraCifras
+                        data-testid="resenas-cifras"
+                        cifras={[
+                            {
+                                etiqueta: "Rating Google",
+                                valor: configLoading ? "—" : (
+                                    <span className="inline-flex items-center gap-2">
+                                        {googleRating.toFixed(1)}
+                                        {renderEstrellas(Math.round(googleRating))}
+                                    </span>
+                                ),
+                                detalle: `de ${config?.total_resenas ?? 0} reseñas`,
+                            },
+                            {
+                                etiqueta: "Última sincronización",
+                                valor: ultimaSync ? formatDistanceToNow(ultimaSync, { addSuffix: true, locale: es }) : "Nunca",
+                                detalle: ultimaSync ? format(ultimaSync, "dd MMM HH:mm", { locale: es }) : undefined,
+                            },
+                            { etiqueta: "En base de datos", valor: resenasLoading ? "—" : resenas?.length ?? 0, detalle: "reseñas" },
+                        ]}
+                    />
+                    <Button onClick={handleSync} disabled={syncing} className="h-11 gap-2 px-5">
                         <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
                         {syncing ? "Sincronizando..." : "Sincronizar ahora"}
                     </Button>
                 </div>
 
-                {/* Aviso si el Place ID es placeholder */}
+                {/* Aviso si el Place ID es placeholder: una línea ámbar, sin tarjeta. */}
                 {!configLoading && isPlaceholderPlaceId && (
-                    <Card className="border-yellow-500/50 bg-yellow-500/5">
-                        <CardContent className="flex items-start gap-3 pt-4">
-                            <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                                <p className="font-medium text-sm text-yellow-600 dark:text-yellow-400">
-                                    Place ID de Google no configurado
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                    El Place ID actual es un valor de ejemplo. Para sincronizar reseñas reales necesitas el Place ID de Google Maps del restaurante.
-                                    Puedes encontrarlo en{" "}
-                                    <a
-                                        href="https://developers.google.com/maps/documentation/places/web-service/place-id#find-id"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="underline text-yellow-600 dark:text-yellow-400 hover:no-underline"
-                                    >
-                                        Place ID Finder
-                                    </a>.
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div role="alert" className="flex shrink-0 items-start gap-2 text-sm">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                        <p className="text-muted-foreground">
+                            <span className="font-medium text-amber-600 dark:text-amber-400">Place ID de Google no configurado.</span>{" "}
+                            El actual es un valor de ejemplo: para sincronizar reseñas reales hace falta el Place ID de Google Maps del
+                            restaurante (
+                            <a
+                                href="https://developers.google.com/maps/documentation/places/web-service/place-id#find-id"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="underline hover:no-underline"
+                            >
+                                Place ID Finder
+                            </a>
+                            ).
+                        </p>
+                    </div>
                 )}
 
-                {/* Stats + Configuración */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Rating promedio */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Rating Google</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-end gap-2">
-                                <span className="text-4xl font-bold">
-                                    {configLoading ? "—" : googleRating.toFixed(1)}
-                                </span>
-                                <div className="mb-1">
-                                    {renderEstrellas(Math.round(googleRating))}
-                                </div>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                Basado en {config?.total_resenas ?? 0} reseñas
-                            </p>
-                        </CardContent>
-                    </Card>
-
-                    {/* Última sync */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Última Sincronización</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {config?.ultima_sincronizacion ? (
-                                <>
-                                    <div className="flex items-center gap-2">
-                                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                        <span className="font-semibold text-sm">
-                                            {formatDistanceToNow(new Date(config.ultima_sincronizacion), { addSuffix: true, locale: es })}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                        {format(new Date(config.ultima_sincronizacion), "dd MMM yyyy HH:mm", { locale: es })}
-                                    </p>
-                                </>
-                            ) : (
-                                <div className="flex items-center gap-2 text-muted-foreground">
-                                    <Clock className="h-5 w-5" />
-                                    <span className="text-sm">Nunca sincronizado</span>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Reseñas totales en BD */}
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">En Base de Datos</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <span className="text-4xl font-bold">{resenasLoading ? "—" : resenas?.length ?? 0}</span>
-                            <p className="text-xs text-muted-foreground mt-1">reseñas almacenadas</p>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Región con scroll: configuración y lista de reseñas. La configuración
-                    va aquí (y no fija arriba) porque mide casi una pantalla: fija dejaría
-                    a la lista sin sitio. `min-h-48`: suelo de la región; si lo fijo no
-                    deja sitio (móvil) vuelve el scroll de página. */}
-                <div className="min-h-48 flex-1 space-y-6 overflow-y-auto overscroll-contain">
-                    {/* Configuración Google Places */}
-                    <Card>
-                        <CardHeader>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Settings className="h-4 w-4" />
-                                        Configuración Google Places
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Ajusta el Place ID y la API Key para la sincronización
-                                    </CardDescription>
-                                </div>
-                                <a
-                                    href={`https://www.google.com/maps/place/?q=place_id:${config?.place_id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    <Button variant="ghost" size="sm" className="h-11 gap-1.5 px-4">
-                                        <ExternalLink className="h-4 w-4" />
-                                        Ver en Maps
-                                    </Button>
-                                </a>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Configuración Google Places: plegada, se usa una vez. */}
+                <Plegable
+                    titulo="Configuración Google Places"
+                    icono={<Settings />}
+                    resumen={config?.place_name ?? undefined}
+                    forzarMontaje
+                    data-testid="resenas-configuracion"
+                >
+                    <div className="space-y-4">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <Label>Nombre del lugar</Label>
                                     <p className="text-sm font-medium">{config?.place_name ?? "—"}</p>
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Place ID actual</Label>
-                                    <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-                                        {config?.place_id ?? "—"}
-                                    </code>
+                                    <code className="block break-all rounded bg-muted px-2 py-1 text-xs">{config?.place_id ?? "—"}</code>
                                 </div>
                             </div>
+                            <Button asChild variant="ghost" size="sm" className="h-11 gap-1.5 px-4">
+                                <a href={`https://www.google.com/maps/place/?q=place_id:${config?.place_id}`} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="h-4 w-4" />
+                                    Ver en Maps
+                                </a>
+                            </Button>
+                        </div>
 
-                            {/* Editar Place ID */}
-                            {editingPlaceId ? (
-                                <div className="space-y-2 p-4 border border-border rounded-lg bg-muted/30">
-                                    <Label htmlFor="new-place-id">Nuevo Place ID de Google Maps</Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Busca el restaurante en{" "}
-                                        <a
-                                            href="https://developers.google.com/maps/documentation/places/web-service/place-id#find-id"
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="underline"
-                                        >
-                                            Place ID Finder
-                                        </a>{" "}
-                                        y copia el ID que empieza por ChIJ...
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Input
-                                            id="new-place-id"
-                                            placeholder="ChIJxxxxxxxxxxxxxxxxx"
-                                            value={newPlaceId}
-                                            onChange={(e) => setNewPlaceId(e.target.value)}
-                                            autoCapitalize="none"
-                                            autoCorrect="off"
-                                            spellCheck={false}
-                                            className="h-11 min-w-[14rem] flex-1 text-base md:text-base"
-                                        />
-                                        <Button className="h-11 px-5" onClick={handleSavePlaceId} disabled={savingPlaceId || !newPlaceId.trim()}>
-                                            Guardar
-                                        </Button>
-                                        <Button variant="ghost" className="h-11 px-5" onClick={() => { setEditingPlaceId(false); setNewPlaceId(""); }}>
-                                            Cancelar
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <Button variant="outline" size="sm" className="h-11 px-4" onClick={() => { setEditingPlaceId(true); setNewPlaceId(config?.place_id ?? ""); }}>
-                                    Cambiar Place ID
-                                </Button>
-                            )}
-
-                            {/* Instrucciones API Key */}
-                            <div className="p-4 border border-border rounded-lg bg-muted/20 space-y-2">
-                                <p className="text-sm font-medium">🔑 Google Places API Key</p>
-                                <p className="text-sm text-muted-foreground">
-                                    La API Key se gestiona como secreto seguro en Supabase. Para añadirla o cambiarla:
+                        {editingPlaceId ? (
+                            <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+                                <Label htmlFor="new-place-id">Nuevo Place ID de Google Maps</Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Busca el restaurante en{" "}
+                                    <a
+                                        href="https://developers.google.com/maps/documentation/places/web-service/place-id#find-id"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="underline"
+                                    >
+                                        Place ID Finder
+                                    </a>{" "}
+                                    y copia el ID que empieza por ChIJ...
                                 </p>
-                                <ol className="text-sm text-muted-foreground space-y-1 ml-4 list-decimal">
-                                    <li>Ve a <strong>Supabase Dashboard → Edge Functions → Secrets</strong></li>
-                                    <li>Añade el secreto con nombre: <code className="bg-muted px-1 rounded">GOOGLE_PLACES_API_KEY</code></li>
-                                    <li>Valor: tu API Key de Google Cloud con permiso de <em>Places API (New)</em></li>
-                                    <li>Guarda y pulsa <strong>"Sincronizar ahora"</strong> arriba</li>
-                                </ol>
+                                <div className="flex flex-wrap gap-2">
+                                    <Input
+                                        id="new-place-id"
+                                        placeholder="ChIJxxxxxxxxxxxxxxxxx"
+                                        value={newPlaceId}
+                                        onChange={(e) => setNewPlaceId(e.target.value)}
+                                        autoCapitalize="none"
+                                        autoCorrect="off"
+                                        spellCheck={false}
+                                        className="h-11 min-w-[14rem] flex-1 text-base md:text-base"
+                                    />
+                                    <Button className="h-11 px-5" onClick={handleSavePlaceId} disabled={savingPlaceId || !newPlaceId.trim()}>
+                                        Guardar
+                                    </Button>
+                                    <Button variant="ghost" className="h-11 px-5" onClick={() => { setEditingPlaceId(false); setNewPlaceId(""); }}>
+                                        Cancelar
+                                    </Button>
+                                </div>
                             </div>
-                        </CardContent>
-                    </Card>
+                        ) : (
+                            <Button variant="outline" size="sm" className="h-11 px-4" onClick={() => { setEditingPlaceId(true); setNewPlaceId(config?.place_id ?? ""); }}>
+                                Cambiar Place ID
+                            </Button>
+                        )}
 
-                    {/* Lista de reseñas */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Todas las Reseñas</CardTitle>
-                            <CardDescription>
-                                Se actualizan automáticamente en tiempo real tras cada sincronización
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            {resenasLoading ? (
-                                <div className="space-y-3">
-                                    {[1, 2, 3].map((i) => (
-                                        <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
-                                    ))}
+                        {/* Instrucciones de la API Key, dentro del mismo bloque plegado. */}
+                        <div className="space-y-2 border-t border-border/60 pt-3">
+                            <p className="text-sm font-medium">Google Places API Key</p>
+                            <p className="text-sm text-muted-foreground">
+                                La API Key se gestiona como secreto seguro en Supabase. Para añadirla o cambiarla:
+                            </p>
+                            <ol className="ml-4 list-decimal space-y-1 text-sm text-muted-foreground">
+                                <li>Ve a <strong>Supabase Dashboard → Edge Functions → Secrets</strong></li>
+                                <li>Añade el secreto con nombre: <code className="rounded bg-muted px-1">GOOGLE_PLACES_API_KEY</code></li>
+                                <li>Valor: tu API Key de Google Cloud con permiso de <em>Places API (New)</em></li>
+                                <li>Guarda y pulsa <strong>"Sincronizar ahora"</strong> arriba</li>
+                            </ol>
+                        </div>
+                    </div>
+                </Plegable>
+
+                {/* Lista de reseñas: ocupa el resto y es lo único que hace scroll. */}
+                <h2 className="shrink-0 text-base font-semibold leading-tight">
+                    Todas las reseñas
+                    <span className="ml-2 text-xs font-normal text-muted-foreground">se actualizan en tiempo real tras cada sincronización</span>
+                </h2>
+                {resenasLoading ? (
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                            <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+                        ))}
+                    </div>
+                ) : (
+                    <ListaPlana
+                        scroll
+                        aria-label="Reseñas"
+                        data-testid="lista-resenas"
+                        className="min-h-48"
+                        vacio={
+                            <div className="py-12 text-center text-muted-foreground">
+                                <Star className="mx-auto mb-3 h-10 w-10 opacity-20" />
+                                <p>No hay reseñas todavía.</p>
+                                <p className="mt-1 text-sm">Pulsa "Sincronizar ahora" para obtener las reseñas de Google.</p>
+                            </div>
+                        }
+                    >
+                        {(resenas ?? []).map((resena: any) => (
+                            <li key={resena.id} className="space-y-1 px-2 py-2.5">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                                        <span className="text-sm font-semibold">{resena.nombre_cliente}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {resena.fuente === "google" ? "Google" : resena.fuente} · {resena.estado} ·{" "}
+                                            {format(new Date(resena.fecha), "dd MMMM yyyy", { locale: es })}
+                                        </span>
+                                    </div>
+                                    {renderEstrellas(resena.valoracion)}
                                 </div>
-                            ) : resenas && resenas.length > 0 ? (
-                                <div className="space-y-3">
-                                    {resenas.map((resena: any) => (
-                                        <div key={resena.id} className="p-4 border border-border rounded-lg space-y-2 hover:bg-muted/30 transition-colors">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="font-semibold text-sm">{resena.nombre_cliente}</span>
-                                                    <Badge variant={resena.fuente === "google" ? "default" : "secondary"} className="text-xs">
-                                                        {resena.fuente === "google" ? "🔍 Google" : resena.fuente}
-                                                    </Badge>
-                                                    <Badge
-                                                        variant={resena.estado === "publicada" ? "outline" : "secondary"}
-                                                        className="text-xs"
-                                                    >
-                                                        {resena.estado}
-                                                    </Badge>
-                                                </div>
-                                                {renderEstrellas(resena.valoracion)}
-                                            </div>
-                                            {resena.comentario && (
-                                                <p className="text-sm text-muted-foreground line-clamp-3">{resena.comentario}</p>
-                                            )}
-                                            <p className="text-xs text-muted-foreground">
-                                                {format(new Date(resena.fecha), "dd MMMM yyyy", { locale: es })}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="text-center py-12 text-muted-foreground">
-                                    <Star className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                                    <p>No hay reseñas todavía.</p>
-                                    <p className="text-sm mt-1">Pulsa "Sincronizar ahora" para obtener las reseñas de Google.</p>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
+                                {resena.comentario && <p className="line-clamp-3 text-sm text-muted-foreground">{resena.comentario}</p>}
+                            </li>
+                        ))}
+                    </ListaPlana>
+                )}
             </div>
         </SuperAdminLayout>
     );

@@ -70,8 +70,8 @@ export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
   const mes = format(new Date(), "MMMM yyyy", { locale: es });
 
   return (
-    <Card>
-      <CardHeader className="pb-2">
+    <Card variante="plana">
+      <CardHeader className="px-0 pb-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2 text-sm font-medium sm:text-base">
             <HardDrive className="h-4 w-4 text-muted-foreground" aria-hidden />
@@ -94,7 +94,7 @@ export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
           </a>
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 px-0">
         {total?.alerta_80 && (
           <div className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />

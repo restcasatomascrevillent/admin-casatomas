@@ -71,7 +71,8 @@ describe("Ecommerce · ocupa el alto de la pantalla, sin scroll de página", () 
     conLayout(800);
     render(<Ecommerce />);
 
-    expect(screen.getAllByRole("tablist")[0]).toHaveClass("shrink-0");
+    // Un solo nivel de pestañas (PestanasPagina): la barra va fija arriba, sin encoger.
+    expect(screen.getByTestId("pestanas-pagina")).toHaveClass("shrink-0");
     const paneles = document.querySelectorAll('[role="tabpanel"]');
     expect(paneles.length).toBe(6);
     paneles.forEach((panel) => {

@@ -228,14 +228,6 @@ export default function TabBotWeb() {
 
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2" aria-live="polite">
-            <EstadoTraduccionBadges
-              configEs={configs.es}
-              configs={{ en: configs.en, fr: configs.fr }}
-              traduciendo={traduciendo}
-              errorTraduccion={errorTraduccion}
-              onReintentar={retraducir}
-              puedeReintentar={!dirty && !ocupado}
-            />
             <EstadoGuardadoBadge dirty={dirty} saving={saving} error={saveError} />
             <Button
               size="sm"
@@ -252,6 +244,14 @@ export default function TabBotWeb() {
               )}
               Guardar
             </Button>
+            <EstadoTraduccionBadges
+              configEs={configs.es}
+              configs={{ en: configs.en, fr: configs.fr }}
+              traduciendo={traduciendo}
+              errorTraduccion={errorTraduccion}
+              onReintentar={retraducir}
+              puedeReintentar={!dirty && !ocupado}
+            />
           </div>
         )}
       </div>

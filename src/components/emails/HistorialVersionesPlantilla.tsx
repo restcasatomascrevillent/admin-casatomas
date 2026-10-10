@@ -45,9 +45,9 @@ export function HistorialVersionesPlantilla({ tipo, versiones, puedeRestaurar }:
   return (
     <Dialog open={abierto} onOpenChange={setAbierto}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="h-11 gap-1.5 px-4">
+        <Button type="button" variant="link" size="sm" className="h-11 gap-1.5 px-2 text-muted-foreground hover:text-foreground">
           <History className="h-4 w-4" />
-          Historial de versiones{versiones.length > 0 ? ` (${versiones.length})` : ""}
+          Historial{versiones.length > 0 ? ` (${versiones.length})` : ""}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[80dvh] max-w-lg overflow-y-auto">
