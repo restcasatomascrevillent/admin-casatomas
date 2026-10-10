@@ -34,6 +34,7 @@ describe("OriginalIncrustado", () => {
     expect(base.firmar).toHaveBeenCalledWith("facturas-originales", "facturas/1.jpeg", expect.any(Number));
     expect(img).toHaveAttribute("src", "https://x.test/firmada");
     expect(img).toHaveAttribute("loading", "lazy");
+    expect(screen.getByText(/ctrl \+ rueda o pellizca para ampliar/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /pantalla completa/i }));
     expect(await screen.findByTestId("visor-original")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /ver al 100/i }));
