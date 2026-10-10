@@ -31,8 +31,14 @@ set client_encoding = 'UTF8';
 --          ESTIMADO de ESE día (ia_uso + chat_web_uso para chatweb) por función
 --          → proceso (ia_proceso_gasto: procesar-factura / ocr-trabajo /
 --          clasificar-productos → ocr, chat-facturas → chat, chat-web →
---          chatweb, extraer-vino-foto → vinos, resto → otros). Si ese día no
---          hay ia_uso, todo a 'otros'.
+--          chatweb, extraer-vino-foto → vinos, resto → otros). Para cada día,
+--          R = real de la clave y E_p = estimado de cada proceso (E = Σ E_p):
+--          cada proceso recibe E_p × min(R/E, 1,3) (el 1,3 deja margen para
+--          tarifas desajustadas). Lo que sobra (R − Σ) no tiene rastro en
+--          ia_uso (pruebas o scripts locales con la clave, p. ej. la comparación
+--          de modelos OCR del 05/10) y va a 'otros' en una sub-línea nueva
+--          `otros:sin_identificar` («Sin identificar (pruebas o scripts)»).
+--          Si E = 0, todo es sin_identificar.
 --       4. Total del restaurante = suma de lo no ajeno (exacta: el redondeo
 --          de micro-dólares se lo lleva 'otros'). El proyecto con proceso NULL
 --          sigue saliendo aparte como 'sin_asignar' sin sumar.
@@ -310,19 +316,31 @@ begin
     select a.fecha, sum(a.usd) as usd from asig a where a.cls = 'mixto' group by a.fecha
   ),
   mixto_rep as (
-    -- Las claves mixtas, entre procesos según el estimado de ese día; sin ia_uso, a 'otros'.
-    select m.fecha,
-           case when et.tot is null then 'otros' else e.proc end as proc,
-           case when et.tot is null then m.usd else m.usd * e.c / et.tot end as usd
+    -- Las claves mixtas, entre procesos según el estimado de ese día. R = real de
+    -- la clave ese día, E_p = estimado de cada proceso, E = suma. Cada proceso
+    -- recibe E_p × min(R/E, 1,3) (el 1,3 deja margen para tarifas desajustadas).
+    -- Lo que sobra (R − Σ) no tiene rastro en ia_uso (pruebas o scripts locales
+    -- con la clave): va a «otros» como sin_identificar. Sin estimado ese día
+    -- (E = 0), todo es sin_identificar.
+    select m.fecha, e.proc, e.c * least(m.usd / et.tot, 1.3) as usd, false as sin_id
+      from mixto_dia m
+      join est_tot et on et.fecha = m.fecha
+      join est_dia e on e.fecha = m.fecha
+    union all
+    select m.fecha, 'otros',
+           m.usd - coalesce(et.tot * least(m.usd / et.tot, 1.3), 0),
+           true
       from mixto_dia m
       left join est_tot et on et.fecha = m.fecha
-      left join est_dia e on e.fecha = m.fecha and et.tot is not null
   ),
   directo as (
     select a.cls as proc, sum(a.usd) as usd
       from asig a where a.cls not in ('mixto', 'ajeno') group by a.cls
     union all
     select mr.proc, sum(mr.usd) from mixto_rep mr group by mr.proc
+  ),
+  sin_ident as (
+    select round(coalesce(sum(mr.usd) filter (where mr.sin_id), 0), 6) as s from mixto_rep mr
   ),
   por_proc as (
     select d.proc, sum(d.usd) as usd from directo d group by d.proc
@@ -364,7 +382,10 @@ begin
       from est e where e.proc = 'otros' group by e.grp
   ),
   suma as (select coalesce(sum(g.ventana), 0) as total from grupos g),
-  otros_real as (select re.r from reales re where re.proc = 'otros'),
+  otros_real as (
+    -- Real de «otros» SIN la parte sin identificar (esa va en su propia sub-línea).
+    select greatest(re.r - (select si.s from sin_ident si), 0) as r from reales re where re.proc = 'otros'
+  ),
   filas as (
     select array_position(array['ocr', 'chat', 'chatweb', 'vinos', 'otros'], re.proc) as ord,
            re.proc as nombre, re.r as real_usd,
@@ -385,6 +406,8 @@ begin
       from suma s
      where s.total = 0 and (select o.r from otros_real o) > 0
        and not exists (select 1 from grupos g where g.grp = 'resto' and (g.ventana > 0 or g.hoy > 0))
+    union all
+    select 7, 'otros:sin_identificar', si.s, 0::numeric from sin_ident si where si.s > 0
   )
   select f.nombre, f.real_usd::numeric, v_corte, f.hoy_usd::numeric, (select m.m from modo m)
     from filas f
@@ -397,9 +420,10 @@ comment on function public.gasto_ia_real_resumen(integer) is
   'repartido en ocr / chat / chatweb / vinos / otros. Para cada proyecto y día, su coste se reparte entre las claves con '
   'uso (openai_uso_diario × ia_precios; reparto = clave_tarifa | clave_peticiones | proyecto): las claves ajeno '
   '(openai_claves.proceso) se excluyen, también en proyectos ajeno (Default); las mixto se reparten entre procesos según '
-  'el coste estimado de ia_uso + chat_web_uso de ESE día (sin ia_uso, a otros); un proyecto del restaurante sin uso ese día '
+  'el coste estimado de ia_uso + chat_web_uso de ESE día (cada proceso E_p × min(R/E, 1,3); el resto, R − suma, va a '
+  'otros:sin_identificar: pruebas o scripts sin rastro en ia_uso); un proyecto del restaurante sin uso ese día '
   'se queda con su proceso y uno ajeno se excluye. La suma es el total real no ajeno exacto. Filas otros:traducciones / '
-  'novedades / resto = desglose ESTIMADO de «otros» (ia_uso) escalado a su real. sin_asignar = proyectos sin marcar '
+  'novedades / resto = desglose ESTIMADO de «otros» (ia_uso) escalado a su real sin la parte sin_identificar. sin_asignar = proyectos sin marcar '
   '(no suma al total). usd_estimado_hoy = ia_uso + chat_web_uso desde el día siguiente, lo que OpenAI aún no ha '
   'publicado. Sin gasto real del restaurante ultimo_dia_real es NULL y todo es estimado. Exige poder ver Facturas.';
 
