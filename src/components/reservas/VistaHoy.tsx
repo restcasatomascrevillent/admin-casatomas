@@ -1,21 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
-import {
-  CalendarCheck,
-  ChevronDown,
-  Clock,
-  Lock,
-  MapIcon,
-  MapPin,
-  MoreVertical,
-  Search,
-  SquareKanban,
-  TrendingUp,
-  Users,
-  Wand2,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronDown, Clock, Info, Lock, MapIcon, Search, SquareKanban, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -234,74 +220,13 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     // del kanban) ya lo refresca `useReservasEnVivo` y no abre su propio canal a
     // `reservas`.
     <ReservasEnVivoContexto.Provider value={true}>
-      <div className="space-y-3 sm:space-y-4">
-        {/* Vista PLANO (revisión 07/10/2026): el plano necesita el alto. Las cifras van en UNA línea y el
-            aviso del Reservado dentro de ella; «Disponibilidad por cuartos de hora» no sale (está en el kanban
-            y en el Calendario). */}
-        {vista === "plano" ? (
-          <p
-            data-testid="resumen-hoy-plano"
-            className="flex min-w-0 items-center gap-x-3 overflow-hidden whitespace-nowrap rounded-xl border bg-card/50 px-3 py-2 text-sm text-muted-foreground"
-          >
-            <span>
-              <strong className="tabular-nums text-foreground">{resumen?.totalReservas ?? 0}</strong> reservas
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>
-              <strong className="tabular-nums text-foreground">{resumen?.totalComensales ?? 0}</strong> comensales
-            </span>
-            <span aria-hidden="true">·</span>
-            <span>
-              <strong className="tabular-nums text-foreground">{`${resumen?.porcentajeTotal ?? 0} %`}</strong> de{" "}
-              <span className="tabular-nums">{resumen?.capacidadTotal ?? 0}</span>
-            </span>
-            {reservasHoy !== undefined &&
-              avisosPrivadas.map((aviso) => (
-                <span key={aviso.espacioId} className="flex min-w-0 items-center gap-1 text-violet-800 dark:text-violet-200">
-                  <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{textoAvisoSalaPrivada(aviso)}</span>
-                </span>
-              ))}
-          </p>
-        ) : (
+      <div className="space-y-2">
+        {/* Revisión 10/10/2026 (tablet): las cifras ya no ocupan su propia franja; van en chips pequeños en
+            la fila de filtros (`cifras`). En el kanban siguen el aviso del Reservado y los cuartos de hora,
+            plegados; el plano empieza justo debajo de la fila de filtros. */}
+        {vista !== "plano" && (
           <>
-            {/* Franja compacta de ocupación: los 4 datos que antes eran 4
-                tarjetas grandes, ahora en una sola línea en escritorio (2x2 en
-                móvil) para que no compitan con el kanban por la pantalla. */}
-            <div className="rounded-xl border bg-card/50 px-3 py-2.5 sm:px-2 sm:py-3">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-2.5 sm:gap-x-0 sm:divide-x sm:divide-border">
-                <IndicadorHoy
-                  icon={CalendarCheck}
-                  iconClass="bg-primary/10 text-primary"
-                  label="Reservas hoy"
-                  value={resumen?.totalReservas ?? 0}
-                  detalle={reservasCanceladas > 0 ? `· ${reservasCanceladas} canc.` : undefined}
-                />
-                <IndicadorHoy
-                  icon={Users}
-                  iconClass="bg-accent/10 text-accent"
-                  label="Comensales"
-                  value={resumen?.totalComensales ?? 0}
-                />
-                <IndicadorHoy
-                  icon={MapPin}
-                  iconClass="bg-secondary/10 text-secondary"
-                  label="Capacidad"
-                  value={resumen?.capacidadTotal ?? 0}
-                />
-                <IndicadorHoy
-                  icon={TrendingUp}
-                  iconClass="bg-green-500/10 text-green-600 dark:text-green-500"
-                  label="Ocupación"
-                  value={`${resumen?.porcentajeTotal ?? 0}%`}
-                />
-              </div>
-            </div>
-
-            {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. Solo con
-                las reservas ya leídas: antes, mientras cargaban (o si fallaban), decía «Reservado: libre». */}
             {reservasHoy !== undefined && <AvisoSalasPrivadas avisos={avisosPrivadas} reservas={reservasHoy} />}
-
             <CuartosDeHoy fecha={hoy} />
           </>
         )}
@@ -316,13 +241,41 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             cambiarVista(v);
             if (v !== "plano") setOrganizando(null);
           }}
+          cifras={
+            <p
+              data-testid="cifras-hoy"
+              className="flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-xs text-muted-foreground"
+            >
+              <span>
+                <strong className="tabular-nums text-foreground">{resumen?.totalReservas ?? 0}</strong> reservas
+                {reservasCanceladas > 0 && ` (${reservasCanceladas} canc.)`}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                <strong className="tabular-nums text-foreground">{resumen?.totalComensales ?? 0}</strong> comensales
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                <strong className="tabular-nums text-foreground">{`${resumen?.porcentajeTotal ?? 0} %`}</strong> de{" "}
+                <span className="tabular-nums">{resumen?.capacidadTotal ?? 0}</span>
+              </span>
+              {vista === "plano" &&
+                reservasHoy !== undefined &&
+                avisosPrivadas.map((aviso) => (
+                  <span key={aviso.espacioId} className="flex min-w-0 items-center gap-1 text-violet-800 dark:text-violet-200">
+                    <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{textoAvisoSalaPrivada(aviso)}</span>
+                  </span>
+                ))}
+            </p>
+          }
           accion={
             <div className="flex shrink-0 gap-2 sm:order-2">
-              <Button className="h-11 gap-1.5 px-4 text-base" onClick={pulsarOrganizar} disabled={!!organizando}>
+              <Button className="touch-hit h-9 gap-1.5 px-4 pointer-coarse:h-9" onClick={pulsarOrganizar} disabled={!!organizando}>
                 <Wand2 className="h-4 w-4" aria-hidden="true" />
                 Organizar
               </Button>
-              <BotonSentarSinReserva className="shrink-0" />
+              <BotonSentarSinReserva className="touch-hit h-9 shrink-0 pointer-coarse:h-9" />
             </div>
           }
         />
@@ -375,7 +328,7 @@ function turnoSiguiente(): "comida" | "cena" {
  * vista del panel (Plano | Servicio de una sala): el dorado de `accent` sobre blanco daba 3,5:1.
  */
 const CLASES_OPCION_VISTA =
-  "h-10 gap-1.5 whitespace-nowrap data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";
+  "touch-hit h-9 pointer-coarse:h-9 gap-1.5 whitespace-nowrap data-[state=on]:bg-primary data-[state=on]:text-primary-foreground";
 
 /**
  * La fila de filtros de «Hoy», COMÚN a las dos vistas (antes vivía dentro del kanban, idéntica):
@@ -395,7 +348,10 @@ function BarraFiltrosHoy({
   onVista,
   soloFiltros = false,
   accion,
+  cifras,
 }: {
+  /** Cifras del día en pequeño, al final de la fila (tablet y escritorio). */
+  cifras?: ReactNode;
   /** Botón de acción junto al turno («Sin reserva»). */
   accion?: ReactNode;
   /** Móvil: solo buscador y turno (sin «Kanban | Plano» ni la ayuda). */
@@ -410,7 +366,7 @@ function BarraFiltrosHoy({
   return (
     // `flex-wrap`: por debajo de ~1100px el texto de ayuda se baja a su propia línea en vez de
     // estrujar el filtro de turno hasta partir "Todo el día" en dos renglones.
-    <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-3">
+    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1">
       {/* Móvil: buscador y selector en una fila. Desde `sm`, `contents` los deja sueltos en la fila de
           siempre y `order` pone el selector detrás del turno. */}
       <div className="flex min-w-0 items-center gap-2 sm:contents">
@@ -420,7 +376,7 @@ function BarraFiltrosHoy({
             placeholder="Buscar por nombre, email o teléfono…"
             value={busqueda}
             onChange={(e) => onBusqueda(e.target.value)}
-            className="pl-9"
+            className="h-9 pl-9 pointer-coarse:h-10"
             aria-label="Buscar reservas"
           />
         </div>
@@ -454,22 +410,31 @@ function BarraFiltrosHoy({
         className="shrink-0 sm:order-2"
         aria-label="Filtrar por turno"
       >
-        <ToggleGroupItem value="todo" className="whitespace-nowrap">Todo el día</ToggleGroupItem>
-        <ToggleGroupItem value="comida" className="whitespace-nowrap">Comida</ToggleGroupItem>
-        <ToggleGroupItem value="cena" className="whitespace-nowrap">Cena</ToggleGroupItem>
+        <ToggleGroupItem value="todo" className="touch-hit whitespace-nowrap pointer-coarse:h-9">Todo el día</ToggleGroupItem>
+        <ToggleGroupItem value="comida" className="touch-hit whitespace-nowrap pointer-coarse:h-9">Comida</ToggleGroupItem>
+        <ToggleGroupItem value="cena" className="touch-hit whitespace-nowrap pointer-coarse:h-9">Cena</ToggleGroupItem>
       </ToggleGroup>
       {accion}
-      {soloFiltros ? null : vista === "plano" ? (
-        // Corta a propósito: desde 1024 px cabe en la línea del buscador y no le roba alto al plano. En
-        // móvil no sale (el plano necesita ese alto y tocar una mesa se explica solo).
-        <p className="hidden text-xs text-muted-foreground sm:order-4 sm:block sm:basis-full lg:min-w-48 lg:flex-1 lg:text-right">
-          Toca una mesa para ver su reserva y sus acciones.
-        </p>
-      ) : (
-        <p className="text-xs text-muted-foreground sm:order-4 sm:basis-full lg:min-w-64 lg:flex-1 lg:text-right">
-          Toca una tarjeta para ver sus acciones (<MoreVertical className="inline h-3 w-3" aria-hidden="true" />), o mantenla pulsada y arrástrala a otro espacio.
-        </p>
+      {!soloFiltros && (
+        // La ayuda, como un ⓘ (10/10/2026): el texto entero en el título y para el lector de pantalla.
+        <span
+          role="note"
+          className="hidden shrink-0 text-muted-foreground sm:order-4 sm:inline-flex"
+          aria-label={
+            vista === "plano"
+              ? "Toca una mesa para ver su reserva y sus acciones."
+              : "Toca una tarjeta para ver sus acciones, o mantenla pulsada y arrástrala a otro espacio."
+          }
+          title={
+            vista === "plano"
+              ? "Toca una mesa para ver su reserva y sus acciones."
+              : "Toca una tarjeta para ver sus acciones, o mantenla pulsada y arrástrala a otro espacio."
+          }
+        >
+          <Info className="h-4 w-4" aria-hidden="true" />
+        </span>
       )}
+      {!soloFiltros && cifras && <div className="min-w-0 sm:order-5 sm:ml-auto">{cifras}</div>}
     </div>
   );
 }
@@ -497,35 +462,5 @@ function CuartosDeHoy({ fecha }: { fecha: string }) {
         <DisponibilidadCuartos fecha={fecha} compacto ocultarTitulo />
       </CollapsibleContent>
     </Collapsible>
-  );
-}
-
-/** Un dato de la franja compacta: icono + número. */
-function IndicadorHoy({
-  icon: Icon,
-  iconClass,
-  label,
-  value,
-  detalle,
-}: {
-  icon: LucideIcon;
-  iconClass: string;
-  label: string;
-  value: string | number;
-  detalle?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 min-w-0 sm:px-3 sm:first:pl-1">
-      <div className={cn("p-1.5 rounded-lg shrink-0", iconClass)}>
-        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" aria-hidden="true" />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground leading-none truncate">{label}</p>
-        <p className="text-base sm:text-lg font-bold leading-tight tabular-nums">
-          {value}
-          {detalle && <span className="ml-1 text-[10px] font-normal text-muted-foreground">{detalle}</span>}
-        </p>
-      </div>
-    </div>
   );
 }

@@ -7,8 +7,8 @@
  * líneas de un producto por `producto_id`) y 3 proveedores, 5 documentos y
  * 3 productos sacados de la misma compra de merluza.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const base = vi.hoisted(() => {
@@ -166,14 +166,21 @@ const buscador = () => screen.getByLabelText("Buscar en compras");
 const selector = () => screen.getByRole("group", { name: "Qué mirar" });
 const modo = (nombre: RegExp) => within(selector()).getByRole("button", { name: nombre });
 const cuenta = (nombre: RegExp) => modo(nombre).querySelector("span")?.textContent;
-const listaDocs = () => screen.getByRole("list", { name: "Documentos" });
-const numerosVisibles = () =>
-  within(listaDocs())
-    .getAllByRole("button")
-    .map((b) => b.querySelector("[data-numero]")?.textContent);
+// La lista de Documentos va agrupada por mes y proveedor: las filas son los botones dentro de los <li>.
+const listaDocs = () => screen.getByTestId("documentos-agrupados");
+const filasDocs = () => within(listaDocs()).getAllByRole("listitem").map((li) => li.querySelector("button") as HTMLElement);
+const numerosVisibles = () => filasDocs().map((b) => b.querySelector("[data-numero]")?.textContent);
 
 beforeEach(() => {
   prepararBase();
+  // Qué meses salen desplegados depende de «hoy»: se fija para que el dato de prueba no caduque.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 9, 10, 12, 0, 0));
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe("Compras · buscador único y selector con contadores", () => {
@@ -195,7 +202,7 @@ describe("Compras · buscador único y selector con contadores", () => {
     montar();
     await screen.findByText("F-100");
     fireEvent.change(buscador(), { target: { value: "merluza" } });
-    await waitFor(() => expect(within(listaDocs()).getAllByRole("button")).toHaveLength(3));
+    await waitFor(() => expect(filasDocs()).toHaveLength(3));
     expect(within(listaDocs()).queryByText("F-101")).not.toBeInTheDocument();
 
     fireEvent.click(modo(/^Productos/));
@@ -248,6 +255,22 @@ describe("Compras · enlace profundo a un documento (?doc=)", () => {
     expect(desplazar).not.toHaveBeenCalled();
   });
 
+  it("si el documento está en un mes plegado (agosto), lo despliega y deja a la vista su fila", async () => {
+    const desplazar = vi.fn();
+    Element.prototype.scrollIntoView = desplazar;
+    montar();
+    await screen.findByText("F-100");
+    expect(screen.queryByText("A-3")).not.toBeInTheDocument(); // agosto, plegado por defecto
+    cleanup();
+    montar(vi.fn(), { modo: "documentos", clave: "k-ago", doc: 5 });
+    expect(await screen.findByRole("heading", { name: "Albarán A-3" })).toBeInTheDocument();
+    const fila = within(listaDocs()).getByText("A-3").closest("button");
+    expect(fila).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(desplazar).toHaveBeenCalled());
+    expect(desplazar.mock.contexts.at(-1)).toBe(fila);
+  });
+
   it("un documento que no existe no rompe nada", async () => {
     montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
     expect(await screen.findByText("F-100")).toBeInTheDocument();
@@ -273,11 +296,11 @@ describe("Compras · chips por modo", () => {
     }
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Albaranes sin factura/ }));
-    expect(within(listaDocs()).getAllByRole("button")).toHaveLength(1);
+    expect(filasDocs()).toHaveLength(1);
     expect(within(listaDocs()).getByText("A-1")).toBeInTheDocument(); // A-2 y A-3 ya están facturados
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Con avisos/ }));
-    expect(within(listaDocs()).getAllByRole("button")).toHaveLength(1);
+    expect(filasDocs()).toHaveLength(1);
     expect(within(listaDocs()).getByText("F-101")).toBeInTheDocument();
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Sin revisar/ }));
@@ -285,7 +308,7 @@ describe("Compras · chips por modo", () => {
     expect(within(listaDocs()).getByText("F-100")).toBeInTheDocument();
 
     fireEvent.click(within(barra).getByRole("button", { name: /^Facturas/ }));
-    expect(within(listaDocs()).getAllByRole("button")).toHaveLength(2);
+    expect(filasDocs()).toHaveLength(2);
     expect(numerosVisibles()).toEqual(["F-101", "F-100"]);
   });
 
