@@ -1613,6 +1613,7 @@ export type Database = {
           embedding: string | null
           embedding_observaciones: string | null
           facturado_en_id: number | null
+          facturado_origen: string | null
           fecha: string
           id: number
           iva: number | null
@@ -1641,6 +1642,7 @@ export type Database = {
           embedding?: string | null
           embedding_observaciones?: string | null
           facturado_en_id?: number | null
+          facturado_origen?: string | null
           fecha: string
           id?: number
           iva?: number | null
@@ -1669,6 +1671,7 @@ export type Database = {
           embedding?: string | null
           embedding_observaciones?: string | null
           facturado_en_id?: number | null
+          facturado_origen?: string | null
           fecha?: string
           id?: number
           iva?: number | null
@@ -5051,6 +5054,45 @@ export type Database = {
       registrar_accion_auditoria_panel: { Args: { p_operacion: string; p_detalles?: Json }; Returns: string }
       iniciar_intento_panel: { Args: { p_email: string; p_ruta?: string }; Returns: Json }
       finalizar_intento_panel: { Args: { p_id: string; p_actor?: string; p_resultado?: string; p_session_id?: string }; Returns: undefined }
+
+      // Albarán ↔ factura y cotejo (migración 20261010110000_albaranes_factura_cotejo).
+      vincular_albaran_factura: {
+        Args: { p_albaran_id: number; p_factura_id: number; p_forzar?: boolean }
+        Returns: Json
+      }
+      desvincular_albaran: { Args: { p_albaran_id: number }; Returns: Json }
+      albaranes_candidatos: {
+        Args: { p_factura_id: number; p_texto?: string | null }
+        Returns: {
+          id: number
+          numero_documento: string
+          fecha: string | null
+          proveedor: string | null
+          total: number | null
+          base: number | null
+          lineas: number
+          citado_en_factura: boolean
+          mismo_proveedor: boolean
+          dias: number | null
+        }[]
+      }
+      facturas_candidatas: {
+        Args: { p_albaran_id: number }
+        Returns: {
+          id: number
+          numero_documento: string
+          fecha: string | null
+          total: number | null
+          base: number | null
+          lineas: number
+          cita_albaran: boolean
+          dias: number | null
+        }[]
+      }
+      cotejo_factura_albaranes: {
+        Args: { p_factura_id: number; p_albaran_id?: number | null }
+        Returns: Json
+      }
 
       append_tool_call_log: {
         Args: { p_call_id: string; p_new_tools: Json }

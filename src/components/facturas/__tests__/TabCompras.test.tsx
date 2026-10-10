@@ -394,7 +394,8 @@ describe("Compras · fichas", () => {
     fireEvent.click(await screen.findByText("A-1"));
     expect(await screen.findByText("Sin factura todavía")).toBeInTheDocument();
     fireEvent.click(screen.getByText("A-2"));
-    const enlace = await screen.findByRole("button", { name: /Recogido en la factura F-101/ });
+    expect(await screen.findByText(/Facturado en/)).toBeInTheDocument();
+    const enlace = await screen.findByRole("link", { name: "Ver la factura F-101" });
     fireEvent.click(enlace);
     expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
   });

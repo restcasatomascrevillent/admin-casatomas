@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link2, Package, Pencil, Sparkles, Truck } from "lucide-react";
+import { Package, Pencil, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura } from "@/hooks/useFacturas";
 import { formatCurrency, formatDate, formatDateTime } from "@/components/facturas/shared/formatters";
@@ -8,6 +8,8 @@ import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrust
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
 import { FilaProducto } from "@/components/facturas/shared/FilaProducto";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
+import { AlbaranesDeFactura } from "./AlbaranesDeFactura";
+import { FacturaDelAlbaran } from "./FacturaDelAlbaran";
 
 /** Observaciones: dos líneas como mucho; el resto, tras «ver más». */
 function Observaciones({ texto }: { texto: string }) {
@@ -178,34 +180,11 @@ export function FichaDocumento({
         </p>
       )}
 
-      {esAlbaran && facturaDelAlbaran && (
-        <button
-          type="button"
-          onClick={() => onAbrirDocumento(facturaDelAlbaran.id)}
-          className="flex min-h-11 w-full items-center gap-2 rounded-md border px-3 text-left text-sm hover:bg-muted/40"
-        >
-          <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-          <span className="min-w-0 flex-1 truncate">Recogido en la factura {facturaDelAlbaran.numero_documento}</span>
-        </button>
-      )}
-      {!esAlbaran && albaranesDeLaFactura.length > 0 && (
-        <div className="space-y-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Recoge {albaranesDeLaFactura.length} {albaranesDeLaFactura.length === 1 ? "albarán" : "albaranes"}
-          </p>
-          {albaranesDeLaFactura.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onAbrirDocumento(a.id)}
-              className="flex min-h-11 w-full items-center gap-2 rounded-md border px-3 text-left text-sm hover:bg-muted/40"
-            >
-              <Link2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">Albarán {a.numero_documento}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{formatDate(a.fecha)}</span>
-            </button>
-          ))}
-        </div>
+      {/* Albarán ↔ factura: vínculo, candidatos y cotejo (migración 20261010110000). */}
+      {esAlbaran ? (
+        <FacturaDelAlbaran albaran={doc} factura={facturaDelAlbaran} onAbrirDocumento={onAbrirDocumento} />
+      ) : (
+        <AlbaranesDeFactura factura={doc} albaranesCargados={albaranesDeLaFactura} onAbrirDocumento={onAbrirDocumento} />
       )}
 
       {doc.observaciones && <Observaciones texto={doc.observaciones} />}
