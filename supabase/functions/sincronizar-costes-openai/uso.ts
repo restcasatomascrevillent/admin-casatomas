@@ -52,7 +52,8 @@ export interface ClaveOpenAI {
   nombre: string | null;
 }
 
-export type ProcesoClave = "ocr" | "chat" | "chatweb" | "vinos" | "otros";
+// `ajeno` solo lo asigna esta función a claves nuevas de un proyecto marcado `ajeno` (p. ej. Default); `mixto` lo pone el dueño a mano.
+export type ProcesoClave = "ocr" | "chat" | "chatweb" | "vinos" | "otros" | "ajeno";
 
 /**
  * Proceso que se deduce del NOMBRE de una clave nueva: OPENAI_API_KEY_OCR → ocr,
@@ -225,10 +226,13 @@ async function upsertPorLotes(
 }
 
 /**
- * Trae el uso por clave de los últimos 35 días, da de alta las claves de los
- * proyectos del restaurante (todos menos los marcados 'ajeno') en
- * `openai_claves` y guarda el uso en `openai_uso_diario`. Se llama DESPUÉS de
- * `sincronizar` (que ya ha dado de alta los proyectos).
+ * Trae el uso por clave de los últimos 35 días, da de alta las claves de TODOS
+ * los proyectos en `openai_claves` y guarda el uso en `openai_uso_diario`. Desde
+ * 20261010100000 también los de los proyectos marcados 'ajeno' (Default): el
+ * proceso se decide por CLAVE (openai_claves.proceso) y la RPC necesita el uso
+ * de sus claves para repartir el coste real del proyecto. Las claves NUEVAS de un
+ * proyecto 'ajeno' entran como 'ajeno' (el dueño marca a mano las que sí cuentan).
+ * Se llama DESPUÉS de `sincronizar` (que ya ha dado de alta los proyectos).
  */
 export async function sincronizarUso(opts: {
   supabase: Supabase;
@@ -246,16 +250,14 @@ export async function sincronizarUso(opts: {
   const ajenos = new Set(
     (proyectos ?? []).filter((p: { proceso: string | null }) => p.proceso === "ajeno").map((p: { project_id: string }) => p.project_id),
   );
-  const delRestaurante = (proyectos ?? [])
-    .map((p: { project_id: string }) => p.project_id)
-    .filter((id: string) => !ajenos.has(id));
+  const todosProyectos = (proyectos ?? []).map((p: { project_id: string }) => p.project_id);
 
   const todoUso = await obtenerUso({ adminKey: opts.adminKey, desdeUnix: inicioVentana(ahora, DIAS_SINCRONIZADOS), fetch: fetchFn });
-  const uso = todoUso.filter((u) => !ajenos.has(u.project_id));
+  const uso = todoUso;
 
-  // Claves de cada proyecto del restaurante (los ajenos no se tocan).
+  // Claves de cada proyecto (también los 'ajeno': su proceso se decide por clave).
   const listadas = new Map<string, ClaveOpenAI>();
-  for (const projectId of delRestaurante) {
+  for (const projectId of todosProyectos) {
     try {
       for (const c of await listarClavesProyecto({ adminKey: opts.adminKey, projectId, fetch: fetchFn })) listadas.set(c.api_key_id, c);
     } catch (e) {
@@ -274,19 +276,19 @@ export async function sincronizarUso(opts: {
   // Nuevas: con el proceso deducido del nombre. Cambiadas: solo nombre/proyecto (nunca el proceso).
   const nuevas = [...listadas.values()]
     .filter((c) => !yaEstan.has(c.api_key_id))
-    .map((c) => ({ ...c, proceso: procesoPorNombreClave(c.nombre) }));
+    .map((c) => ({ ...c, proceso: ajenos.has(c.project_id) ? ("ajeno" as ProcesoClave) : procesoPorNombreClave(c.nombre) }));
   const cambiadas = [...listadas.values()].filter((c) => {
     const previa = yaEstan.get(c.api_key_id);
     return previa && (previa.project_id !== c.project_id || (previa.nombre ?? null) !== c.nombre);
   });
-  // Claves que solo aparecen en el uso (borradas o no listables): alta sin nombre, proceso otros.
+  // Claves que solo aparecen en el uso (borradas o no listables): alta sin nombre, proceso otros (ajeno si el proyecto lo es).
   const vistas = new Set<string>();
   const soloEnUso: Array<ClaveOpenAI & { proceso: ProcesoClave }> = [];
   for (const u of uso) {
     if (!u.api_key_id || vistas.has(u.api_key_id)) continue;
     vistas.add(u.api_key_id);
     if (yaEstan.has(u.api_key_id) || listadas.has(u.api_key_id)) continue;
-    soloEnUso.push({ api_key_id: u.api_key_id, project_id: u.project_id, nombre: null, proceso: "otros" });
+    soloEnUso.push({ api_key_id: u.api_key_id, project_id: u.project_id, nombre: null, proceso: ajenos.has(u.project_id) ? "ajeno" : "otros" });
   }
 
   if (nuevas.length) await upsertPorLotes(opts.supabase, "openai_claves", nuevas, { onConflict: "api_key_id" });

@@ -183,6 +183,13 @@ describe("sincronizarUso", () => {
         next_page: null,
       }),
     [EMB]: () => resp({ object: "page", data: [], has_more: false, next_page: null }),
+    [KEYS("proj_default")]: () =>
+      resp({
+        object: "list",
+        data: [{ id: "key_ajena", name: "n8n" }, { id: "key_rest", name: "restaurante" }],
+        last_id: "key_rest",
+        has_more: false,
+      }),
     [KEYS("proj_casa")]: () =>
       resp({
         object: "list",
@@ -201,7 +208,7 @@ describe("sincronizarUso", () => {
     { project_id: "proj_default", proceso: "ajeno" },
   ];
 
-  it("da de alta claves nuevas con su proceso, no toca las ajenas ni pisa el proceso de las existentes", async () => {
+  it("da de alta claves nuevas con su proceso (ajeno en proyectos ajenos) y no pisa el proceso de las existentes", async () => {
     const { fn, llamadas } = fetchSimulado(rutas);
     const { supabase, upserts } = supabaseSimulado({
       proyectos,
@@ -209,8 +216,8 @@ describe("sincronizarUso", () => {
     });
     const r = await sincronizarUso({ supabase, adminKey: "k", fetch: fn, ahoraMs: ahora });
 
-    // Las claves del proyecto ajeno no se listan.
-    expect(llamadas.some((l) => l.url.pathname.includes("proj_default"))).toBe(false);
+    // Las claves del proyecto ajeno también se listan (su proceso se decide por clave).
+    expect(llamadas.some((l) => l.url.pathname.includes("proj_default"))).toBe(true);
 
     const claves = upserts.filter((u) => u.tabla === "openai_claves");
     expect(claves[0].opciones).toEqual({ onConflict: "api_key_id" });
@@ -218,6 +225,9 @@ describe("sincronizarUso", () => {
       { api_key_id: "key_ocr", project_id: "proj_casa", nombre: "OPENAI_API_KEY_OCR", proceso: "ocr" },
       { api_key_id: "key_chat", project_id: "proj_casa", nombre: "OPENAI_API_KEY_CHAT", proceso: "chat" },
       { api_key_id: "key_gen", project_id: "proj_casa", nombre: "OPENAI_API_KEY", proceso: "otros" },
+      // Claves nuevas de un proyecto ajeno entran como ajeno, sea cual sea el nombre.
+      { api_key_id: "key_ajena", project_id: "proj_default", nombre: "n8n", proceso: "ajeno" },
+      { api_key_id: "key_rest", project_id: "proj_default", nombre: "restaurante", proceso: "ajeno" },
     ]);
     // Cambio de nombre: solo nombre/proyecto, sin 'proceso' (no pisa lo puesto a mano).
     expect(claves[1].filas).toEqual([{ api_key_id: "key_vieja", project_id: "proj_casa", nombre: "nombre nuevo" }]);
@@ -227,10 +237,10 @@ describe("sincronizarUso", () => {
 
     const uso = upserts.find((u) => u.tabla === "openai_uso_diario")!;
     expect(uso.opciones).toEqual({ onConflict: "fecha,project_id,api_key_id,modelo" });
-    expect(uso.filas).toHaveLength(2); // el uso del proyecto ajeno no se guarda
-    expect(uso.filas.every((f) => f.project_id === "proj_casa" && f.actualizado_en === new Date(ahora).toISOString())).toBe(true);
+    expect(uso.filas).toHaveLength(3); // también el uso del proyecto ajeno: el reparto por clave lo necesita
+    expect(uso.filas.every((f) => f.actualizado_en === new Date(ahora).toISOString())).toBe(true);
 
-    expect(r).toMatchObject({ uso_filas: 2, claves_nuevas: 4, claves_sin_nombre: 1, avisos: [] });
+    expect(r).toMatchObject({ uso_filas: 3, claves_nuevas: 6, claves_sin_nombre: 1, avisos: [] });
   });
 
   it("si no se pueden listar las claves avisa y sigue guardando el uso", async () => {
