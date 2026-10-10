@@ -100,6 +100,17 @@ export function MapaSalaServicio({
   }, [tamano, limites.width, limites.height]);
   const escala = zoomManual ?? escalaAuto;
 
+  // Encuadre de nuevo cuando cambia el hueco o lo que hay que enseñar (10/10/2026, tablet Android
+  // en horizontal): si el zoom o el desplazamiento se fijaron mientras el hueco aún se estaba
+  // midiendo (la hoja o el panel de al lado abriéndose, la barra de Organizar…), el plano se quedaba
+  // casi vacío y con las mesas cortadas en un borde. Así, al abrir la sala o cambiar el tamaño, se
+  // ve entera y centrada (como pulsar «Ajustar»).
+  const claveEncuadre = `${tamano?.ancho ?? 0}x${tamano?.alto ?? 0}|${Math.round(limites.minX)},${Math.round(limites.minY)},${Math.round(limites.width)},${Math.round(limites.height)}`;
+  useEffect(() => {
+    setZoomManual(null);
+    setPan({ x: 0, y: 0 });
+  }, [claveEncuadre]);
+
   // ── Gestos (mismo controlador que el plano de reparto) ─────────────────────
   // Los valores vivos van en refs para no volver a montar los listeners en cada render.
   const escalaViva = useRef(escala);
