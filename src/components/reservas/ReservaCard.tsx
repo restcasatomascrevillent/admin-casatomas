@@ -75,6 +75,7 @@ export function ReservaCard({
   sinArrastre,
   telefonoEnlace,
   compacta = false,
+  textoDarMesa = "Dar mesa",
   anchoColumna,
 }: {
   reserva: ReservaServicio;
@@ -119,6 +120,8 @@ export function ReservaCard({
    * «Ha llegado» en icono y «⋮» (zona táctil de 44 px). Tocar la fila abre el menú.
    */
   compacta?: boolean;
+  /** Texto del «Dar mesa» del menú (en el Plano de Hoy: «Elegir mesa en el plano»). */
+  textoDarMesa?: string;
   /**
    * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
    * texto o solo iconos. Va por ancho de COLUMNA y no de ventana a propósito:
@@ -243,7 +246,7 @@ export function ReservaCard({
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => onDarMesa(reserva)}>
                 <CircleDashed className="h-3.5 w-3.5 mr-2" />
-                Dar mesa
+                {textoDarMesa}
               </DropdownMenuItem>
             </>
           )}

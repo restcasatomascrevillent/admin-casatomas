@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   asignacionOcupa,
+  decidirSoltar,
   esErrorCanal,
   filaSinReserva,
   horaActual,
@@ -9,6 +10,7 @@ import {
   ordenarParaSinReserva,
   type FilaMesaSala,
 } from "../sentarAhora";
+import { estadoServicio, mesaPiezasDesde } from "../piezasMesa";
 
 const SALAS = [
   { id: "c", nombre: "Comedor" },
@@ -77,5 +79,44 @@ describe("mesa liberada", () => {
       reserva: { id: "", hora: "21:40:00", comensales: 2, espacioId: null },
     });
     expect(r.caben.map((m) => m.nombre)).toEqual(["4"]);
+  });
+});
+
+describe("decidirSoltar (arrastrar una reserva a una mesa)", () => {
+  const reserva = { id: "r", hora: "21:00:00", numero_comensales: 4, espacio_id: "c" };
+  const mesa4 = { id: "m4", nombre: "4", espacio_id: "c", plazas: 4 };
+
+  it("mesa válida de su sala: asignar", () => {
+    expect(decidirSoltar({ reserva, mesa: mesa4, asignaciones: [] })).toEqual({ tipo: "asignar", cambiarSala: false });
+  });
+
+  it("de otra sala (o sin sala): asignar cambiando la sala", () => {
+    expect(decidirSoltar({ reserva: { ...reserva, espacio_id: null }, mesa: mesa4, asignaciones: [] })).toEqual({
+      tipo: "asignar",
+      cambiarSala: true,
+    });
+  });
+
+  it("ocupada a esa hora: no se da", () => {
+    const r = decidirSoltar({
+      reserva,
+      mesa: mesa4,
+      asignaciones: [{ mesa_id: "m4", reserva_id: "otra", reservas: { hora: "20:30:00", nombre: "Ana" } }],
+    });
+    expect(r).toEqual({ tipo: "ocupada", motivo: "La mesa 4 está ocupada a esa hora por Ana" });
+  });
+
+  it("no cabe: propuesta de piezas", () => {
+    const piezas3 = mesaPiezasDesde({ id: "m3", nombre: "3", forma: "rectangular", ancho: 110, alto: 70, pos_x: 0, pos_y: 0, piezas: 2, picos_max: 1, piezas_max: 3, grupo_piezas: "g" })!;
+    const piezas4 = mesaPiezasDesde({ id: "m4", nombre: "4", forma: "rectangular", ancho: 165, alto: 70, pos_x: 0, pos_y: 1.5, piezas: 3, picos_base: 1, picos_max: 1, piezas_max: 3, grupo_piezas: "g" })!;
+    const mesas = [piezas3, piezas4];
+    const r = decidirSoltar({
+      reserva: { ...reserva, numero_comensales: 7 },
+      mesa: { id: "m3", nombre: "3", espacio_id: "c", plazas: 4 },
+      asignaciones: [],
+      piezas: { mesas, estado: estadoServicio(mesas, []), reservas: [] },
+    });
+    expect(r.tipo).toBe("noCabe");
+    expect(r.tipo === "noCabe" && r.propuesta?.propuestas[0].texto).toBe("Para sentar 7 en la 3: pasa una pieza de la 4 a la 3 y pon pico");
   });
 });

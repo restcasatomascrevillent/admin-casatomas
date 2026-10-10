@@ -20,6 +20,7 @@
 // ============================================================================
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { Maximize2, MessageSquareText, Move, Star, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -100,16 +101,6 @@ export function MapaSalaServicio({
   }, [tamano, limites.width, limites.height]);
   const escala = zoomManual ?? escalaAuto;
 
-  // Encuadre de nuevo cuando cambia el hueco o lo que hay que enseñar (10/10/2026, tablet Android
-  // en horizontal): si el zoom o el desplazamiento se fijaron mientras el hueco aún se estaba
-  // midiendo (la hoja o el panel de al lado abriéndose, la barra de Organizar…), el plano se quedaba
-  // casi vacío y con las mesas cortadas en un borde. Así, al abrir la sala o cambiar el tamaño, se
-  // ve entera y centrada (como pulsar «Ajustar»).
-  const claveEncuadre = `${tamano?.ancho ?? 0}x${tamano?.alto ?? 0}|${Math.round(limites.minX)},${Math.round(limites.minY)},${Math.round(limites.width)},${Math.round(limites.height)}`;
-  useEffect(() => {
-    setZoomManual(null);
-    setPan({ x: 0, y: 0 });
-  }, [claveEncuadre]);
 
   // ── Gestos (mismo controlador que el plano de reparto) ─────────────────────
   // Los valores vivos van en refs para no volver a montar los listeners en cada render.
@@ -328,7 +319,9 @@ function MesaServicio({
     (detalle ? `, ${detalle}` : "") +
     (importante ? ", importante" : "") +
     (nota ? `, nota del cliente: ${nota}` : "");
-  const z = seleccionada ? 30 : resaltada ? 20 : 10;
+  // Se puede SOLTAR una reserva encima (Plano de Hoy, 10/10/2026). Sin `DndContext` alrededor no hace nada.
+  const { setNodeRef, isOver } = useDroppable({ id: `mesa-${mesa.id}`, data: { mesaId: mesa.id } });
+  const z = isOver ? 40 : seleccionada ? 30 : resaltada ? 20 : 10;
   const caja = { left: x, top: y, width: ancho, height: alto };
 
   return (
@@ -341,8 +334,10 @@ function MesaServicio({
         style={{ left: x - relleno, top: y - relleno, width: ancho + relleno * 2, height: alto + relleno * 2, zIndex: 1 }}
       />
       <button
+        ref={setNodeRef}
         type="button"
         data-mesa-id={mesa.id}
+        data-sobre={isOver ? "true" : undefined}
         data-estado={estado}
         data-atenuada={atenuada ? "true" : undefined}
         aria-label={etiquetaAccesible}
@@ -355,6 +350,7 @@ function MesaServicio({
           atenuada && "opacity-35",
           resaltada && "ring-2 ring-primary/70",
           seleccionada && "ring-4 ring-primary ring-offset-2 ring-offset-background",
+          isOver && "ring-4 ring-emerald-500 ring-offset-2 ring-offset-background",
           "focus-visible:ring-4 focus-visible:ring-ring",
         )}
         style={{ ...caja, zIndex: z, transform: `rotate(${mesa.rotacion || 0}deg)`, transformOrigin: "center center" }}

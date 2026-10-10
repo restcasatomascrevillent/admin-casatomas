@@ -9,7 +9,15 @@
 //     tiene), la propuesta de piezas de la primera mesa que la admita.
 // ============================================================================
 
-import type { AjusteMesa, Propuesta, ReservaEnMesas, MesaPiezas, FilaMesaPiezas } from "./piezasMesa";
+import type {
+  AjusteMesa,
+  EstadoServicio,
+  FilaMesaPiezas,
+  MesaPiezas,
+  Propuesta,
+  ReservaEnMesas,
+  ResultadoPropuesta,
+} from "./piezasMesa";
 import { estadoServicio, geometriaServicio, mesaPiezasDesde, proponerParaSentar } from "./piezasMesa";
 import { mesasQueCaben, type MesaOpcion } from "./hoyMovil";
 import { conflictoDeMesa, type AsignacionConReserva, type ConfigOcupacionMesa } from "./ocupacionMesa";
@@ -185,4 +193,53 @@ export function filaSinReserva(p: {
 /** ¿El error es el CHECK de canal (falta la migración de 'presencial')? */
 export function esErrorCanal(error: { code?: string; message?: string } | null | undefined): boolean {
   return !!error && (error.code === "23514" || /check/i.test(error.message ?? "")) && /canal/i.test(error.message ?? "");
+}
+
+// ─── Soltar una reserva en una mesa del plano (arrastrar o «Elegir mesa») ────
+
+export type ResultadoSoltar =
+  /** Cabe y está libre: se le da la mesa (y antes la sala, si era de otra). */
+  | { tipo: "asignar"; cambiarSala: boolean }
+  /** La mesa no está libre a la hora de la reserva. */
+  | { tipo: "ocupada"; motivo: string }
+  /** No cabe: la propuesta de piezas (puede venir vacía, con su motivo). */
+  | { tipo: "noCabe"; cambiarSala: boolean; propuesta: ResultadoPropuesta | null };
+
+/**
+ * Qué pasa al soltar `reserva` en `mesa` (del plano de una sala, con sus plazas de ESTE servicio).
+ * Lógica pura: la pantalla solo ejecuta lo que dice.
+ */
+export function decidirSoltar(p: {
+  reserva: { id: string; hora: string; numero_comensales: number; espacio_id: string | null };
+  mesa: { id: string; nombre: string; espacio_id: string; plazas: number };
+  asignaciones: readonly AsignacionConReserva[];
+  configOcupacion?: ConfigOcupacionMesa;
+  /** Para la propuesta de piezas (mesas por piezas de la sala, su estado y quién las usa). */
+  piezas?: {
+    mesas: MesaPiezas[];
+    estado: EstadoServicio;
+    reservas: ReservaEnMesas[];
+  };
+}): ResultadoSoltar {
+  const { reserva, mesa } = p;
+  const cambiarSala = reserva.espacio_id !== mesa.espacio_id;
+  const vivas = p.asignaciones.filter(asignacionOcupa);
+  const choque = conflictoDeMesa(vivas, mesa.id, { id: reserva.id, hora: reserva.hora }, p.configOcupacion);
+  if (choque) {
+    const quien = choque.asignacion.reservas?.nombre?.trim() || "otra reserva";
+    return { tipo: "ocupada", motivo: `La mesa ${mesa.nombre} está ocupada a esa hora por ${quien}` };
+  }
+  if (mesa.plazas >= reserva.numero_comensales) return { tipo: "asignar", cambiarSala };
+  const enPiezas = p.piezas?.mesas.some((m) => m.id === mesa.id);
+  const propuesta =
+    p.piezas && enPiezas
+      ? proponerParaSentar({
+          mesas: p.piezas.mesas,
+          estado: p.piezas.estado,
+          reservas: p.piezas.reservas.filter((r) => r.reservaId !== reserva.id),
+          mesaId: mesa.id,
+          comensales: reserva.numero_comensales,
+        })
+      : null;
+  return { tipo: "noCabe", cambiarSala, propuesta };
 }

@@ -78,10 +78,10 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
     const etiqueta = etiquetaEstadoReserva(reserva.estado);
     const etiquetaLlegada = hora ? `${etiqueta} ${hora}` : etiqueta;
     return (
-      <div className={cn("flex items-center gap-1", soloIcono && "flex-wrap gap-y-1", className)} {...detener}>
+      <div className={cn("flex min-w-0 max-w-full flex-wrap items-center gap-1", soloIcono && "gap-y-1", className)} {...detener}>
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium",
+            "inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium",
             compacto ? "text-[11px] px-1.5 py-0.5" : "text-xs px-2 py-1",
           )}
           // En modo icono la etiqueta se reduce a la hora ("14:23"), que es el
@@ -91,7 +91,7 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
           aria-label={etiquetaLlegada}
         >
           <Check className="h-3 w-3" aria-hidden="true" />
-          {soloIcono ? hora && <span aria-hidden="true">{hora}</span> : <span aria-hidden="true">{etiquetaLlegada}</span>}
+          {soloIcono ? hora && <span aria-hidden="true">{hora}</span> : <span aria-hidden="true" className="truncate">{etiquetaLlegada}</span>}
         </span>
         <ConMotivo motivo={motivoSiNoSePuede(deshacer)}>
           <Button
@@ -115,17 +115,17 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
     // `No vino`: la única otra reserva con «Deshacer» (ver `accionesDisponibles`).
     const etiqueta = etiquetaEstadoReserva(reserva.estado);
     return (
-      <div className={cn("flex items-center gap-1", soloIcono && "flex-wrap gap-y-1", className)} {...detener}>
+      <div className={cn("flex min-w-0 max-w-full flex-wrap items-center gap-1", soloIcono && "gap-y-1", className)} {...detener}>
         <span
           className={cn(
-            "inline-flex items-center gap-1 rounded-md bg-muted text-muted-foreground font-medium",
+            "inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap rounded-md bg-muted text-muted-foreground font-medium",
             compacto ? "text-[11px] px-1.5 py-0.5" : "text-xs px-2 py-1",
           )}
           title={etiqueta}
           aria-label={etiqueta}
         >
           <UserX className="h-3 w-3" aria-hidden="true" />
-          {!soloIcono && <span aria-hidden="true">{etiqueta}</span>}
+          {!soloIcono && <span aria-hidden="true" className="truncate">{etiqueta}</span>}
         </span>
         <ConMotivo motivo={motivoSiNoSePuede(deshacer)}>
           <Button
@@ -148,7 +148,7 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
   if (!llegada.visible) return null;
 
   return (
-    <div className={cn("flex items-center gap-1", soloIcono && "flex-wrap gap-y-1", className)} {...detener}>
+    <div className={cn("flex min-w-0 max-w-full flex-wrap items-center gap-1", soloIcono && "gap-y-1", className)} {...detener}>
       <ConMotivo motivo={motivoSiNoSePuede(llegada)}>
         <Button
           type="button"
@@ -157,7 +157,7 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
           size={soloIcono ? "icon" : "sm"}
           variant="outline"
           className={cn(
-            "gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40",
+            "min-w-0 max-w-full gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40",
             compacto ? "h-6 text-[11px]" : "h-7 text-xs",
             "pointer-coarse:text-sm",
             // Sin texto queda cuadrado (24px de lado en compacto): es la mitad

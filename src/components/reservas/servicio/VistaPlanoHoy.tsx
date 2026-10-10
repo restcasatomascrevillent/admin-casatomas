@@ -41,7 +41,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DndContext,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from "@dnd-kit/core";
+import { decidirSoltar } from "@/lib/reservas/sentarAhora";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -381,7 +391,26 @@ export function VistaPlanoHoy({
     [mesaSel, estadoSel, pendientesSala, turno],
   );
 
-  const tocarMesa = (mesa: Mesa) => setMesaSelId((actual) => (actual === mesa.id ? null : mesa.id));
+  // ── Dar mesa arrastrando (pulsación larga) o con «Elegir mesa en el plano» (10/10/2026) ─
+  /** La reserva que se está arrastrando, o para la que se elige mesa tocando el plano. */
+  const [arrastrando, setArrastrando] = useState<ReservaServicio | null>(null);
+  const [eligiendoPara, setEligiendoPara] = useState<ReservaServicio | null>(null);
+  useEffect(() => setEligiendoPara(null), [sala?.id, proponiendo]);
+  const sensores = useSensors(
+    // Ratón: a los 6 px. Dedo: pulsación larga (250 ms, 8 px de margen); deslizar sigue siendo scroll.
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  );
+
+  const tocarMesa = (mesa: Mesa) => {
+    if (eligiendoPara) {
+      const r = eligiendoPara;
+      setEligiendoPara(null);
+      void soltar(r, mesa);
+      return;
+    }
+    setMesaSelId((actual) => (actual === mesa.id ? null : mesa.id));
+  };
 
   // ── Piezas desde la ficha de mesa (lo que antes solo estaba en «Reparto de mesas») ─
   const [propuestaPiezas, setPropuestaPiezas] = useState<PropuestaAbierta | null>(null);
@@ -412,6 +441,86 @@ export function VistaPlanoHoy({
       void qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA] });
     }
   };
+  /** Qué pasa al soltar `reserva` en `mesa` (lógica pura en `decidirSoltar`). */
+  const decidir = (reserva: ReservaServicio, mesa: Mesa) =>
+    decidirSoltar({
+      reserva,
+      mesa: { id: mesa.id, nombre: mesa.nombre, espacio_id: sala?.id ?? mesa.espacio_id, plazas: mesa.capacidad },
+      asignaciones: asignacionesDeHoy ?? [],
+      configOcupacion: config,
+      piezas: { mesas: mesasPiezas, estado: estadoPiezas, reservas: reservasEnMesas },
+    });
+  /** Solo DA la mesa (no marca «Llegó»); cambia antes la sala si era de otra. Con «Deshacer». */
+  const darMesaA = async (reserva: ReservaServicio, mesa: Mesa, cambiarSala: boolean) => {
+    if (!sala) return;
+    if (cambiarSala && !(await acciones.moverEspacio(reserva, sala.id, sala.title))) return;
+    try {
+      await asignarMesas.mutateAsync({ reserva_id: reserva.id, mesa_ids: [mesa.id], silencioso: true });
+    } catch {
+      return; // El aviso lo pone el hook.
+    }
+    toast.success(`${reserva.nombre || "Reserva"} → mesa ${mesa.nombre}`, {
+      action: {
+        label: "Deshacer",
+        onClick: () => asignarMesas.mutate({ reserva_id: reserva.id, mesa_ids: [], silencioso: true }),
+      },
+    });
+  };
+  const soltar = async (reserva: ReservaServicio, mesa: Mesa) => {
+    const r = decidir(reserva, mesa);
+    if (r.tipo === "ocupada") {
+      toast.error(r.motivo);
+      return;
+    }
+    if (r.tipo === "asignar") {
+      await darMesaA(reserva, mesa, r.cambiarSala);
+      return;
+    }
+    setPropuestaPiezas({
+      titulo: `${reserva.nombre || "Reserva"} · ${reserva.numero_comensales} en la ${mesa.nombre}`,
+      resultado: r.propuesta ?? { propuestas: [], motivo: `En la ${mesa.nombre} caben ${mesa.capacidad}.` },
+      extra: {
+        texto: "Darle la mesa igual",
+        accion: () => {
+          setPropuestaPiezas(null);
+          void darMesaA(reserva, mesa, r.cambiarSala);
+        },
+      },
+      hacer: async (prop) => {
+        if (!sala) return;
+        try {
+          await guardarAjustesServicio(sala.id, hoy, turno, prop.cambios);
+        } catch (e) {
+          toast.error(`No se ha podido ajustar la mesa: ${e instanceof Error ? e.message : "error"}`);
+          return;
+        }
+        void qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA] });
+        setPropuestaPiezas(null);
+        await darMesaA(reserva, mesa, r.cambiarSala);
+      },
+    });
+  };
+  /** Mientras se arrastra o se elige: las mesas donde cabe y están libres, en verde; el resto, atenuadas. */
+  const objetivo = arrastrando ?? eligiendoPara;
+  const mesasValidas = useMemo(
+    () => (objetivo ? new Set(mesas.filter((m) => decidir(objetivo, m).tipo === "asignar").map((m) => m.id)) : null),
+    // `decidir` depende de lo mismo que las mesas y las asignaciones.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [objetivo, mesas, asignacionesDeHoy, estadoPiezas, reservasEnMesas],
+  );
+  const coincidentesMapa = mesasValidas ?? coincidentes;
+  const alEmpezarArrastre = (e: DragStartEvent) => {
+    setArrastrando((e.active.data.current as ReservaServicio | undefined) ?? null);
+    setEligiendoPara(null);
+  };
+  const alSoltar = (e: DragEndEvent) => {
+    const reserva = arrastrando;
+    setArrastrando(null);
+    const mesaId = (e.over?.data.current as { mesaId?: string } | undefined)?.mesaId;
+    const mesa = mesas.find((m) => m.id === mesaId);
+    if (reserva && mesa) void soltar(reserva, mesa);
+  };
+
   const volverABase = useVolverAPlanoBase(sala?.id ?? "", hoy, turno);
   const [confirmarBase, setConfirmarBase] = useState(false);
   const numAjustes = (ajustesQuery.data ?? []).length;
@@ -498,11 +607,20 @@ export function VistaPlanoHoy({
       onToggleImportante={(x) => void acciones.alternarImportante(x)}
       onBlacklist={setBlacklist}
       onEditar={(x) => editarReserva(x.id)}
-      onDarMesa={darMesa}
-      sinMesa={estaSinMesa(r)}
+      onDarMesa={
+        proponiendo
+          ? undefined
+          : (x) => {
+              setEligiendoPara(x);
+              setMesaSelId(null);
+              setPendientesAbiertos(false);
+            }
+      }
+      textoDarMesa="Elegir mesa en el plano"
+      sinMesa={estaSinMesa(r) || (listo && ocupaEspacio(r.estado) && !mesasPorReserva.has(r.id))}
       mesas={mesasPorReserva.get(r.id)}
       puedeEditar={puedeEditar}
-      sinArrastre
+      sinArrastre={proponiendo}
       telefonoEnlace
       compacta
     />
@@ -743,6 +861,7 @@ export function VistaPlanoHoy({
       className={cn("flex min-w-0 flex-col gap-2", medida ? "flex-none" : "h-[65dvh] min-h-[420px]")}
       style={medida ? { height: alto } : undefined}
     >
+      <DndContext sensors={sensores} onDragStart={alEmpezarArrastre} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
       {salas.length === 0 ? (
         <div className="flex flex-1 items-center justify-center rounded-xl border text-sm text-muted-foreground" role="status">
           {espacios === undefined ? "Cargando salas…" : "No hay salas de Casa Tomás activas. Se crean en Espacios."}
@@ -921,9 +1040,19 @@ export function VistaPlanoHoy({
                     estados={estados}
                     conCartel={conCartel}
                     seleccionada={mesaSelId}
-                    coincidentes={coincidentes}
+                    coincidentes={coincidentesMapa}
                     onTocarMesa={tocarMesa}
                   />
+                )}
+                {eligiendoPara && (
+                  <div className="absolute inset-x-2 top-2 z-50 flex items-center justify-between gap-2 rounded-lg bg-primary px-3 py-2 text-primary-foreground shadow-lg">
+                    <span className="min-w-0 truncate text-sm font-medium">
+                      Toca una mesa para {eligiendoPara.nombre || "la reserva"} ({eligiendoPara.numero_comensales} p.)
+                    </span>
+                    <Button variant="secondary" className="h-10 shrink-0" onClick={() => setEligiendoPara(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
                 )}
                 <p className="pointer-events-none absolute left-2 top-2 rounded-md border bg-background/90 px-2 py-1 text-[13px] font-medium shadow-sm backdrop-blur-sm">
                   {etiquetaTurno}
@@ -958,9 +1087,11 @@ export function VistaPlanoHoy({
                   {/* Con una mesa tocada sobra (su estado se dice con palabras) y deja sitio a la mesa. */}
                   {!mesaSel && listo && <div className="shrink-0 border-b p-3">{leyenda}</div>}
                   {/* Lo único que se desplaza: la lista, por dentro. */}
-                  <ScrollArea className="min-h-0 flex-1 [&>[data-radix-scroll-area-viewport]>div]:!block">
+                  {/* Scroll con el dedo (10/10/2026): div nativo de alto acotado, `pan-y`, sin encadenar el gesto a
+                      la página. Las tarjetas solo se arrastran con pulsación larga. */}
+                  <div data-lista-desplazable className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain">
                     {mesaSel ? panelMesa : panelPendientes}
-                  </ScrollArea>
+                  </div>
                 </aside>
               )}
             </TabsContent>
@@ -975,7 +1106,7 @@ export function VistaPlanoHoy({
           <Sheet open={!!mesaSel} onOpenChange={(abierta) => !abierta && setMesaSelId(null)}>
             <SheetContent
               side={esMovil ? "bottom" : "right"}
-              className={cn("overflow-y-auto p-0", esMovil ? "max-h-[85dvh]" : "w-[min(92vw,26rem)] sm:max-w-none")}
+              className={cn("touch-pan-y overflow-y-auto overscroll-contain p-0", esMovil ? "max-h-[85dvh]" : "w-[min(92vw,26rem)] sm:max-w-none")}
             >
               <SheetHeader className="px-3 pt-3 text-left">
                 <SheetTitle>{mesaSel ? `Mesa ${mesaSel.nombre}` : "Mesa"}</SheetTitle>
@@ -987,7 +1118,7 @@ export function VistaPlanoHoy({
           <Sheet open={pendientesAbiertos} onOpenChange={setPendientesAbiertos}>
             <SheetContent
               side={esMovil ? "bottom" : "right"}
-              className={cn("overflow-y-auto p-0", esMovil ? "max-h-[85dvh]" : "w-[min(92vw,26rem)] sm:max-w-none")}
+              className={cn("touch-pan-y overflow-y-auto overscroll-contain p-0", esMovil ? "max-h-[85dvh]" : "w-[min(92vw,26rem)] sm:max-w-none")}
             >
               <SheetHeader className="px-3 pt-3 text-left">
                 <SheetTitle>Por sentar</SheetTitle>
@@ -1009,6 +1140,15 @@ export function VistaPlanoHoy({
           if (!abierto) setBlacklist(null);
         }}
       />
+      {/* La «ficha» que sigue al dedo: nombre y personas. */}
+        <DragOverlay dropAnimation={null}>
+          {arrastrando && (
+            <div className="pointer-events-none rounded-lg border-2 border-primary bg-background px-3 py-2 text-sm font-semibold shadow-xl">
+              {arrastrando.nombre || "Reserva"} · {arrastrando.numero_comensales} p.
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
       {dialogoEdicion}
       <DialogoPropuestaPiezas propuesta={propuestaPiezas} ocupado={guardandoPiezas} onCerrar={() => setPropuestaPiezas(null)} />
       <AlertDialog open={confirmarBase} onOpenChange={(abierto) => !abierto && setConfirmarBase(false)}>

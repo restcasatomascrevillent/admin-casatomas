@@ -365,12 +365,17 @@ describe("Plano de Hoy · las reservas por sentar", () => {
     expect(within(sinSala).getByRole("button", { name: /^Carlos Sinsala,/ })).toBeInTheDocument();
   });
 
-  it("«Dar mesa» abre el mapa de siempre para elegirle la mesa en su sala", async () => {
+  it("«Elegir mesa en el plano» resalta las mesas donde cabe y tocar una se la da (sin marcar «Llegó»)", async () => {
     montar();
     const sinMesa = screen.getByRole("region", { name: "Sin mesa en Comedor" });
     fireEvent.keyDown(within(sinMesa).getByRole("button", { name: "Acciones de la reserva de Berta Sinmesa" }), { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Dar mesa" }));
-    expect(await screen.findByTestId("elegir-mesa")).toHaveTextContent("Elige la mesa de Berta Sinmesa en Comedor");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Elegir mesa en el plano" }));
+    expect(await screen.findByText(/Toca una mesa para Berta Sinmesa/)).toBeInTheDocument();
+    // La 5 está libre: se resalta; las ocupadas se atenúan.
+    expect(mesaBoton("5")).not.toHaveAttribute("data-atenuada");
+    expect(mesaBoton("1")).toHaveAttribute("data-atenuada", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByText(/Toca una mesa para Berta Sinmesa/)).toBeNull();
   });
 });
 
@@ -441,8 +446,10 @@ describe("Plano de Hoy · el alto de la pantalla", () => {
     const plano = screen.getByRole("region", { name: "Plano de Comedor" });
     expect(plano).toHaveClass("overflow-hidden", "min-h-0");
     expect(screen.getByTestId("mapa-sala")).toHaveClass("overflow-hidden");
-    const desplazables = bloque.querySelectorAll("[data-radix-scroll-area-viewport]");
+    // Desde el 10/10/2026, un div nativo (scroll con el dedo en la tablet: `pan-y`, sin encadenar).
+    const desplazables = bloque.querySelectorAll("[data-lista-desplazable]");
     expect(desplazables).toHaveLength(1);
+    expect(desplazables[0]).toHaveClass("overflow-y-auto", "touch-pan-y", "overscroll-contain");
     expect(screen.getByRole("complementary", { name: "Reservas por sentar" })).toContainElement(desplazables[0] as HTMLElement);
   });
 

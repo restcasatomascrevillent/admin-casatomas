@@ -754,14 +754,15 @@ function PanelReservaMovil({
         {!terminada && (
           <Button
             variant="outline"
-            className="h-12 text-destructive"
+            className="h-12 min-w-0 text-destructive"
             disabled={ocupado}
             onClick={() => ejecutar(() => marcarNoShow(reserva))}
           >
-            <UserX className="mr-2 h-4 w-4" /> No vino
+            <UserX className="h-4 w-4" />
+            <span className="truncate">No vino</span>
           </Button>
         )}
-        <Button variant="ghost" className={cn("h-12", terminada && "col-span-2")} onClick={onCerrar}>
+        <Button variant="ghost" className={cn("h-12 min-w-0", terminada && "col-span-2")} onClick={onCerrar}>
           Cerrar
         </Button>
       </div>
