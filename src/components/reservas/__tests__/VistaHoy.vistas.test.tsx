@@ -268,12 +268,13 @@ describe("Hoy · del kanban al plano de una sala", () => {
     expect(window.localStorage.getItem(CLAVE_SALA_PLANO_HOY)).toBe("reservado");
   });
 
-  it("«Reparto de mesas» del plano abre la sala a pantalla completa (lo de `Reservas.tsx`)", () => {
+  it("Hoy ya no ofrece «Reparto de mesas» (10/10/2026): lo esencial está en el Plano", () => {
     window.localStorage.setItem(CLAVE_VISTA_HOY, "plano");
     const onAbrirSala = vi.fn();
     montar({ onAbrirSala });
+    // El plano (simulado) ya no recibe el salto: tocar su botón no abre nada.
     fireEvent.click(screen.getByRole("button", { name: "Reparto de mesas" }));
-    expect(onAbrirSala).toHaveBeenCalledWith("comedor");
+    expect(onAbrirSala).not.toHaveBeenCalled();
   });
 });
 

@@ -584,3 +584,42 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
     plan: usarCompleto ? "completo" : "conservador",
   };
 }
+
+// ─── Vista previa en los planos ──────────────────────────────────────────────
+
+/**
+ * Cómo QUEDARÍAN las mesas si se aplica todo: mesa → reserva. Parte de lo que
+ * hay ahora (`mesasActuales`: reserva → mesas) y aplica los movimientos.
+ */
+export function disposicionPropuesta(
+  mesasActuales: ReadonlyMap<string, readonly string[]>,
+  movimientos: readonly MovimientoOrg[],
+): Map<string, string> {
+  const porReserva = new Map<string, readonly string[]>(mesasActuales);
+  for (const m of movimientos) porReserva.set(m.reservaId, m.hacia.mesaIds);
+  const porMesa = new Map<string, string>();
+  for (const [reservaId, mesaIds] of porReserva) for (const id of mesaIds) porMesa.set(id, reservaId);
+  return porMesa;
+}
+
+/** Los ajustes del servicio tras la propuesta (por mesa, el último manda). */
+export function ajustesPropuestos<A extends AjusteMesa & { espacioId: string }>(
+  ajustes: readonly A[],
+  movimientos: readonly MovimientoOrg[],
+): Array<AjusteMesa & { espacioId: string }> {
+  const porMesa = new Map<string, AjusteMesa & { espacioId: string }>(ajustes.map((a) => [a.mesaId, a]));
+  for (const m of movimientos) {
+    for (const g of m.ajustes) for (const c of g.cambios) porMesa.set(c.mesaId, { ...c, espacioId: g.salaId });
+  }
+  return [...porMesa.values()];
+}
+
+/** Mesas que cambian con la propuesta (destino de un movimiento o con piezas/plazas/uniones nuevas). */
+export function mesasQueCambian(movimientos: readonly MovimientoOrg[]): Map<string, MovimientoOrg> {
+  const mapa = new Map<string, MovimientoOrg>();
+  for (const m of movimientos) {
+    for (const g of m.ajustes) for (const c of g.cambios) if (!mapa.has(c.mesaId)) mapa.set(c.mesaId, m);
+    for (const id of m.hacia.mesaIds) mapa.set(id, m);
+  }
+  return mapa;
+}

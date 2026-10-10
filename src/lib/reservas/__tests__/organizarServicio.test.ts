@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { deLaSala, organizarServicio, type EntradaOrg, type ReservaOrg, type SalaOrg } from "../organizarServicio";
+import {
+  ajustesPropuestos,
+  deLaSala,
+  disposicionPropuesta,
+  mesasQueCambian,
+  organizarServicio,
+  type EntradaOrg,
+  type ReservaOrg,
+  type SalaOrg,
+} from "../organizarServicio";
 import type { FilaMesaSala } from "../sentarAhora";
 
 const SALAS: SalaOrg[] = [
@@ -159,5 +168,21 @@ describe("organizarServicio · mesas liberadas", () => {
     );
     expect(r.movimientos.map((m) => m.reservaId)).toEqual(["Nueva"]);
     expect(r.sinSitio).toEqual([]);
+  });
+});
+
+describe("vista previa de la propuesta", () => {
+  it("disposición final, ajustes y mesas que cambian", () => {
+    const mesas = [pieza("C", "4", 3, { picos_base: 1 }), pieza("S", "5", 2)];
+    const r = organizarServicio(entrada(mesas, [res("Pepito", 4, "21:00:00", ["C4"]), res("Grupo", 7, "21:00:00")]));
+    const actual = new Map([["Pepito", ["C4"]]]);
+    const disp = disposicionPropuesta(actual, r.movimientos);
+    expect(disp.get("C4")).toBe("Grupo");
+    expect(disp.get("S5")).toBe("Pepito");
+    expect([...mesasQueCambian(r.movimientos).keys()].sort()).toEqual(["C4", "S5"]);
+    const ajustes = ajustesPropuestos([{ mesaId: "C4", piezas: 3, picos: 1, unidaA: null, espacioId: "C" }], [
+      { ...r.movimientos[0], ajustes: [{ salaId: "S", cambios: [{ mesaId: "S5", piezas: 2, picos: 1, unidaA: null }] }] },
+    ]);
+    expect(ajustes.find((a) => a.mesaId === "S5")).toMatchObject({ picos: 1, espacioId: "S" });
   });
 });
