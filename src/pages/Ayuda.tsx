@@ -9,7 +9,7 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useUserRole, type SectionKey } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
-import { FICHAS_AYUDA, type FichaAyuda } from "@/lib/ayuda/centroAyuda";
+import { FICHAS_AYUDA, esArchivoVideo, type FichaAyuda } from "@/lib/ayuda/centroAyuda";
 import type { EstadoLanzarTour, SeccionAyuda } from "@/lib/ayuda/tours";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +59,16 @@ function Ficha({ ficha, puedeEntrar }: { ficha: FichaAyuda; puedeEntrar: boolean
 
       {ficha.videoUrl && (
         <div className="aspect-video overflow-hidden rounded-xl border bg-muted">
+          {esArchivoVideo(ficha.videoUrl) ? (
+            <video
+              src={ficha.videoUrl}
+              controls
+              preload="metadata"
+              playsInline
+              aria-label={`Vídeo: cómo usar ${ficha.titulo}`}
+              className="h-full w-full bg-black object-contain"
+            />
+          ) : (
           <iframe
             src={ficha.videoUrl}
             title={`Vídeo: cómo usar ${ficha.titulo}`}
@@ -67,6 +77,7 @@ function Ficha({ ficha, puedeEntrar }: { ficha: FichaAyuda; puedeEntrar: boolean
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
           />
+          )}
         </div>
       )}
 

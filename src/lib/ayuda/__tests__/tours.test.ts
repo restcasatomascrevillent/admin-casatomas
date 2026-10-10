@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { TOURS, TOUR_BOTON_AYUDA, claveTourVisto, esEstadoLanzarTour, resolverPasos, type PasoTour } from "../tours";
-import { FICHAS_AYUDA } from "../centroAyuda";
+import { describe, expect, it, vi } from "vitest";
+import { TOURS, TOUR_BOTON_AYUDA, claveTourVisto, esEstadoLanzarTour, esperarA, pestanasDelTour } from "../tours";
+import { FICHAS_AYUDA, esArchivoVideo } from "../centroAyuda";
 
 describe("tours de ayuda", () => {
   it("cada sección tiene pasos con título y texto, y acaba en el botón «?»", () => {
@@ -14,9 +14,9 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("no repite elementos dentro de un tour", () => {
+  it("no repite el mismo elemento en la misma pestaña", () => {
     for (const pasos of Object.values(TOURS)) {
-      const ids = pasos.map((p) => p.elemento).filter(Boolean);
+      const ids = pasos.filter((p) => p.elemento).map((p) => `${p.pestana ?? ""}|${p.elemento}`);
       expect(new Set(ids).size).toBe(ids.length);
     }
   });
@@ -25,19 +25,56 @@ describe("tours de ayuda", () => {
     expect(TOURS.facturas.some((p) => p.texto.includes("se marcan solas"))).toBe(true);
   });
 
-  it("resolverPasos: salta los opcionales sin elemento y centra los obligatorios", () => {
-    const pasos: PasoTour[] = [
-      { titulo: "Intro", texto: "a" },
-      { elemento: "visible", titulo: "Visible", texto: "b" },
-      { elemento: "falta", titulo: "Opcional", texto: "c", opcional: true },
-      { elemento: "falta", titulo: "Obligatorio", texto: "d" },
-    ];
-    const r = resolverPasos(pasos, (id) => (id === "visible" ? "EL" : null));
-    expect(r.map((x) => [x.paso.titulo, x.elemento])).toEqual([
-      ["Intro", null],
-      ["Visible", "EL"],
-      ["Obligatorio", null],
+  it("recorre las pestañas en orden: Facturas Cargar → Compras → IA; Gestor Web Carta → Novedades → Menús → Tapas", () => {
+    expect(pestanasDelTour(TOURS.facturas)).toEqual([
+      "facturas-pestana-cargar",
+      "facturas-pestana-compras",
+      "facturas-pestana-ia",
     ]);
+    expect(pestanasDelTour(TOURS["gestor-web"])).toEqual([
+      "gw-pestana-carta",
+      "gw-pestana-novedades",
+      "gw-pestana-menus",
+      "gw-pestana-tapas",
+    ]);
+  });
+
+  it("los pasos de una pestaña van juntos (no se salta de una a otra y vuelve)", () => {
+    for (const pasos of Object.values(TOURS)) {
+      const secuencia = pasos.map((p) => p.pestana).filter(Boolean);
+      const bloques = secuencia.filter((p, i) => p !== secuencia[i - 1]);
+      expect(new Set(bloques).size).toBe(bloques.length);
+    }
+  });
+
+  it("la IA de Facturas se explica por partes: historial, ejemplos, «Al instante» y caja de pregunta", () => {
+    const ia = TOURS.facturas.filter((p) => p.pestana === "facturas-pestana-ia").map((p) => p.elemento);
+    expect(ia).toEqual([
+      "facturas-pestana-ia",
+      "facturas-ia-historial",
+      "facturas-ia-sugerencias",
+      "facturas-ia-al-instante",
+      "facturas-ia-pregunta",
+    ]);
+    expect(TOURS.facturas.find((p) => p.elemento === "facturas-ia-al-instante")?.abrir).toBe("facturas-ia-al-instante-abrir");
+  });
+
+  it("esperarA: devuelve el elemento en cuanto aparece y null si no llega a tiempo", async () => {
+    vi.useFakeTimers();
+    try {
+      let el: string | null = null;
+      const encontrado = esperarA(() => el, 2000);
+      await vi.advanceTimersByTimeAsync(300);
+      el = "EL";
+      await vi.advanceTimersByTimeAsync(100);
+      await expect(encontrado).resolves.toBe("EL");
+
+      const nunca = esperarA(() => null, 2000);
+      await vi.advanceTimersByTimeAsync(2100);
+      await expect(nunca).resolves.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("la clave de «ya visto» distingue sección y usuario", () => {
@@ -58,5 +95,14 @@ describe("tours de ayuda", () => {
       expect(f.preguntas.length).toBeGreaterThan(0);
       expect(f.ruta.startsWith("/")).toBe(true);
     }
+  });
+});
+
+describe("esArchivoVideo", () => {
+  it("distingue archivos de vídeo propios de enlaces de inserción", () => {
+    expect(esArchivoVideo("/ayuda/videos/facturas.webm")).toBe(true);
+    expect(esArchivoVideo("/ayuda/videos/gestor-web.mp4?v=2")).toBe(true);
+    expect(esArchivoVideo("https://www.youtube.com/embed/abc123")).toBe(false);
+    expect(esArchivoVideo("https://player.vimeo.com/video/123")).toBe(false);
   });
 });

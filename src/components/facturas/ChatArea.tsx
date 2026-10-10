@@ -162,7 +162,7 @@ export function ChatArea({
           </div>
 
           {/* Sugerencias (dinámicas o por defecto): lista ligera, sin tarjetas */}
-          <ul className="w-full max-w-md space-y-0.5">
+          <ul className="w-full max-w-md space-y-0.5" data-tour="facturas-ia-sugerencias">
             {listaSugerencias.map(({ icon: Icon, texto }) => (
               <li key={texto}>
                 <button
@@ -316,7 +316,7 @@ function InputBar({ input, setInput, isSending, onSend, onKeyDown }: InputBarPro
   return (
     <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 pt-1 sm:px-4">
       {/* Una sola caja redondeada; el botón de enviar va dentro, a la derecha. */}
-      <div className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-[hsl(38,59%,45%)]">
+      <div className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-[hsl(38,59%,45%)]" data-tour="facturas-ia-pregunta">
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}

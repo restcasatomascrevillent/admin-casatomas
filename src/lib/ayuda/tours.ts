@@ -2,10 +2,13 @@
 // Tours guiados del panel (driver.js), uno por sección.
 //
 // Cada paso apunta a un elemento marcado con `data-tour="<id>"` en la pantalla
-// real. Si el elemento no está en pantalla al lanzar el tour (otra pestaña,
-// pantalla estrecha, sin permiso):
+// real. Si el paso dice `pestana` (el `data-tour` del botón de una pestaña),
+// el tour abre esa pestaña antes de enseñarlo (solo cambia de pestaña: nunca
+// rellena ni guarda nada) y espera a que el elemento aparezca. Si aun así no
+// está a la vista (pantalla estrecha, sin permiso, sin datos):
 //   · paso `opcional`: se salta;
 //   · paso normal: se enseña igual, centrado y sin resaltar nada.
+// Al terminar o cerrar el tour se vuelve a la pestaña en la que estabas.
 //
 // Para añadir una sección: un id en `SeccionAyuda`, sus pasos en `TOURS`, los
 // `data-tour` en sus componentes y un <BotonAyuda seccion="..." /> en su
@@ -20,6 +23,13 @@ export type LadoPaso = "top" | "right" | "bottom" | "left";
 export interface PasoTour {
   /** Valor de `data-tour` del elemento a resaltar. Sin él, el paso sale centrado. */
   elemento?: string;
+  /** `data-tour` del botón de la pestaña que hay que abrir antes de este paso. */
+  pestana?: string;
+  /**
+   * `data-tour` de un botón desplegable (con `aria-expanded`) que hay que
+   * desplegar para que el elemento se vea. Solo despliega: nunca envía nada.
+   */
+  abrir?: string;
   titulo: string;
   texto: string;
   /** Si el elemento no está a la vista, el paso se salta en vez de salir centrado. */
@@ -38,22 +48,43 @@ const PASO_FINAL: PasoTour = {
   lado: "bottom",
 };
 
+const F_CARGAR = "facturas-pestana-cargar";
+const F_COMPRAS = "facturas-pestana-compras";
+const F_IA = "facturas-pestana-ia";
+const GW_CARTA = "gw-pestana-carta";
+const GW_NOVEDADES = "gw-pestana-novedades";
+const GW_MENUS = "gw-pestana-menus";
+const GW_TAPAS = "gw-pestana-tapas";
+
 export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
   facturas: [
     {
       titulo: "Facturas y albaranes",
       texto:
-        "Aquí guardas todas las facturas y albaranes de los proveedores. Les haces una foto, la aplicación los lee sola y luego puedes buscar qué compraste, a quién y a qué precio. Te enseñamos lo importante en un minuto.",
+        "Aquí guardas todas las facturas y albaranes de los proveedores. Les haces una foto, la aplicación los lee sola y luego puedes buscar qué compraste, a quién y a qué precio. Te enseñamos lo importante en un minuto: el recorrido va abriendo cada pestaña solo.",
     },
+    // --- Cargar ---
     {
-      elemento: "facturas-pestana-cargar",
+      elemento: F_CARGAR,
+      pestana: F_CARGAR,
       titulo: "1. Subir una factura",
       texto:
-        "En «Cargar» haces una foto con la tablet o eliges un PDF o una imagen. Puedes subir varias a la vez. La aplicación lee sola el proveedor, la fecha, los productos, los precios y el IVA. Tarda unos segundos y puedes seguir trabajando mientras: te avisa al terminar.",
+        "En «Cargar» subes las facturas y los albaranes. La aplicación lee sola el proveedor, la fecha, los productos, los precios y el IVA. Tarda unos segundos y puedes seguir trabajando mientras: te avisa al terminar.",
       lado: "bottom",
     },
     {
-      elemento: "facturas-pestana-compras",
+      elemento: "facturas-cargar-botones",
+      pestana: F_CARGAR,
+      titulo: "Foto o archivo",
+      texto:
+        "«Hacer foto» abre la cámara de la tablet; «Elegir archivos» te deja escoger un PDF o una imagen. Puedes subir varios a la vez.",
+      opcional: true,
+      lado: "bottom",
+    },
+    // --- Compras ---
+    {
+      elemento: F_COMPRAS,
+      pestana: F_COMPRAS,
       titulo: "2. Ver lo que has comprado",
       texto:
         "En «Compras» está todo lo que se ha leído: facturas, albaranes, productos y proveedores. Es la pestaña que más vas a usar.",
@@ -61,6 +92,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "facturas-buscar",
+      pestana: F_COMPRAS,
       titulo: "Buscar",
       texto:
         "Escribe lo que buscas: un producto («aceite»), un proveedor o un número de factura. Busca en todo a la vez.",
@@ -69,6 +101,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "facturas-modos",
+      pestana: F_COMPRAS,
       titulo: "Tres formas de mirar",
       texto:
         "«Documentos» enseña las facturas y albaranes; «Productos», lo que compras y cómo cambia su precio; «Proveedores», cuánto le compras a cada uno. El número indica cuántos resultados hay.",
@@ -77,6 +110,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "facturas-filtros",
+      pestana: F_COMPRAS,
       titulo: "Filtros rápidos",
       texto:
         "Toca un filtro para ver solo una parte: solo facturas, solo albaranes, los albaranes que aún no tienen factura, los que tienen avisos o los que nadie ha revisado todavía.",
@@ -85,6 +119,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "facturas-lista",
+      pestana: F_COMPRAS,
       titulo: "La lista y sus avisos",
       texto:
         "Los documentos van por meses y, dentro, por proveedor. Si algo no cuadra sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «Precio extremo», «Sin total»… Las facturas que cuadran se marcan solas («Revisada auto»); solo tienes que mirar las que salen en rojo y las que pone «Sin revisar».",
@@ -93,18 +128,58 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "facturas-ficha",
+      pestana: F_COMPRAS,
       titulo: "La ficha del documento",
       texto:
         "Toca un documento para abrir su ficha. Con «Ver original» ves la foto o el PDF tal cual se subió. Con «Editar» corriges lo que se haya leído mal y, si está bien, activas «Marcar como verificada» para que pase a «Revisada». En los albaranes ves también a qué factura pertenecen.",
       opcional: true,
       lado: "left",
     },
+    // --- IA (solo se señala: el tour nunca envía preguntas, cuestan dinero) ---
     {
-      elemento: "facturas-pestana-ia",
+      elemento: F_IA,
+      pestana: F_IA,
       titulo: "3. Preguntar a la IA",
       texto:
-        "En «IA» le preguntas con tus palabras, como a una persona: «¿Cuánto gastamos en carne en septiembre?» o «¿Qué proveedor nos vende más caro el aceite?». Responde con los datos de tus facturas.",
+        "En «IA» le preguntas a la aplicación por tus compras, con tus palabras, como a una persona. Responde con los datos de tus facturas y albaranes. Te enseñamos sus partes.",
       lado: "bottom",
+    },
+    {
+      elemento: "facturas-ia-historial",
+      pestana: F_IA,
+      titulo: "Tus conversaciones",
+      texto:
+        "Aquí se guardan las preguntas que ya has hecho, con su fecha. Toca una para volver a ella y seguir donde lo dejaste. «Nueva conversación» empieza de cero.",
+      opcional: true,
+      lado: "right",
+    },
+    {
+      elemento: "facturas-ia-sugerencias",
+      pestana: F_IA,
+      titulo: "Preguntas de ejemplo",
+      texto:
+        "Si no sabes por dónde empezar, toca una de estas: «¿Cuánto hemos gastado en octubre?», las facturas de un proveedor, sus albaranes de esta semana o lo que más compráis. Se pregunta sola al tocarla.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "facturas-ia-al-instante",
+      pestana: F_IA,
+      abrir: "facturas-ia-al-instante-abrir",
+      titulo: "Al instante",
+      texto:
+        "Son las respuestas rápidas: salen al momento, sin escribir y sin gastar IA. Gasto de este mes, gasto por mes, mejores proveedores, productos más comprados, documentos por revisar, con avisos o sin total, gasto por categoría, qué ha subido de precio y la evolución del precio de un producto.",
+      opcional: true,
+      lado: "top",
+    },
+    {
+      elemento: "facturas-ia-pregunta",
+      pestana: F_IA,
+      titulo: "Escribe tu pregunta",
+      texto:
+        "Para todo lo demás, escríbela aquí con tus palabras y pulsa la flecha para enviarla. Por ejemplo: «¿Cuánto gastamos en carne en septiembre?» o «¿Qué proveedor nos vende más caro el aceite?».",
+      opcional: true,
+      lado: "top",
     },
     PASO_FINAL,
   ],
@@ -114,40 +189,21 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       elemento: "gw-intro",
       titulo: "Gestor Web",
       texto:
-        "Desde aquí cambias lo que se ve en las webs de Casa Tomás y Touza: la carta, las novedades, el menú del día y las tapas. Lo que guardas aquí es lo que ven los clientes.",
+        "Desde aquí cambias lo que se ve en las webs de Casa Tomás y Touza: la carta, las novedades, el menú del día y las tapas. Lo que guardas aquí es lo que ven los clientes. El recorrido va abriendo cada pestaña solo.",
       lado: "bottom",
     },
+    // --- Carta ---
     {
-      elemento: "gw-pestana-carta",
+      elemento: GW_CARTA,
+      pestana: GW_CARTA,
       titulo: "Carta",
       texto: "Platos, bebidas, vinos y cócteles: precios, descripciones, alérgenos, fotos y en qué web se ven.",
       opcional: true,
       lado: "bottom",
     },
     {
-      elemento: "gw-pestana-novedades",
-      titulo: "Novedades",
-      texto: "Las tarjetas de «Novedades» de la web de Casa Tomás: un plato nuevo, un evento, una oferta…",
-      opcional: true,
-      lado: "bottom",
-    },
-    {
-      elemento: "gw-pestana-menus",
-      titulo: "Menús diarios",
-      texto: "El menú del día: primero, segundo y postre para cada fecha.",
-      opcional: true,
-      lado: "bottom",
-    },
-    {
-      elemento: "gw-pestana-tapas",
-      titulo: "Tapas",
-      texto: "Las tapas del día, una por línea, para cada fecha.",
-      opcional: true,
-      lado: "bottom",
-    },
-    // --- Carta (solo si estás en esa pestaña) ---
-    {
       elemento: "gw-carta-secciones",
+      pestana: GW_CARTA,
       titulo: "Secciones de la carta",
       texto: "Elige qué quieres tocar: platos, bebidas, vinos o cócteles. El número es cuántos hay.",
       opcional: true,
@@ -155,6 +211,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "gw-carta-acciones",
+      pestana: GW_CARTA,
       titulo: "Añadir y subir precios",
       texto:
         "«Añadir» crea uno nuevo; se escribe en español y se traduce solo al inglés y al francés. «Ajustar precios» sube o baja de golpe los precios de una categoría entera.",
@@ -163,6 +220,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "gw-carta-filtros",
+      pestana: GW_CARTA,
       titulo: "Buscar y filtrar",
       texto:
         "Busca por nombre o filtra por categoría y por lo que se ve u oculta en cada web. En cada plato tienes interruptores para mostrarlo u ocultarlo en Casa Tomás o en Touza, y los botones «Editar» y «Eliminar».",
@@ -171,31 +229,34 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     // --- Novedades ---
     {
-      elemento: "gw-novedades-nueva",
-      titulo: "Nueva novedad",
-      texto:
-        "Pulsa aquí para crear una. Escribe un título y unas ideas, y si quieres pulsa «Redactar con IA» para que te deje el texto bonito. Puedes añadir una foto.",
+      elemento: GW_NOVEDADES,
+      pestana: GW_NOVEDADES,
+      titulo: "Novedades",
+      texto: "Las tarjetas de «Novedades» de la web de Casa Tomás: un plato nuevo, un evento, una oferta…",
       opcional: true,
       lado: "bottom",
     },
     {
-      elemento: "gw-novedades-publicacion",
-      titulo: "Cuándo se ve",
+      elemento: "gw-novedades-nueva",
+      pestana: GW_NOVEDADES,
+      titulo: "Nueva novedad",
       texto:
-        "Decide si se ve en la web, si sale la primera (destacada) y entre qué fechas. Al quitar «Visible en la web» se guarda sin enseñarse.",
+        "Pulsa aquí para crear una. Escribe un título y unas ideas y, si quieres, pulsa «Redactar con IA» para que te deje el texto bonito. Puedes añadir una foto, decidir si sale la primera y entre qué fechas se ve, y a la derecha ves cómo quedará en el móvil antes de guardarla.",
       opcional: true,
-      lado: "top",
+      lado: "bottom",
     },
+    // --- Menús diarios ---
     {
-      elemento: "gw-novedades-vista",
-      titulo: "Así queda en el móvil",
-      texto: "Aquí ves cómo quedará la tarjeta en el móvil de un cliente antes de guardarla.",
+      elemento: GW_MENUS,
+      pestana: GW_MENUS,
+      titulo: "Menús diarios",
+      texto: "El menú del día: primero, segundo y postre para cada fecha.",
       opcional: true,
-      lado: "left",
+      lado: "bottom",
     },
-    // --- Menús diarios y tapas ---
     {
       elemento: "gw-menu-interruptor",
+      pestana: GW_MENUS,
       titulo: "Mostrar u ocultar en la web",
       texto:
         "Con este interruptor enseñas u ocultas el botón en la web de Casa Tomás (por ejemplo, en vacaciones). Lo guardado no se borra.",
@@ -204,9 +265,27 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "gw-menu-formulario",
+      pestana: GW_MENUS,
       titulo: "Escribir el del día",
       texto:
         "Elige la fecha, escribe en español y guarda: se traduce solo al inglés y al francés. Para cambiar uno ya guardado, tócalo en la lista de arriba.",
+      opcional: true,
+      lado: "top",
+    },
+    // --- Tapas ---
+    {
+      elemento: GW_TAPAS,
+      pestana: GW_TAPAS,
+      titulo: "Tapas",
+      texto: "Las tapas del día para cada fecha. Funciona igual que el menú: con su propio interruptor para la web.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "gw-menu-formulario",
+      pestana: GW_TAPAS,
+      titulo: "Escribir las tapas",
+      texto: "Elige la fecha y escribe una tapa por línea. Al guardar se traducen solas al inglés y al francés.",
       opcional: true,
       lado: "top",
     },
@@ -216,22 +295,25 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
 
 export const selectorTour = (id: string): string => `[data-tour="${id}"]`;
 
+/** Botones de pestaña distintos que usa un tour, en orden. */
+export const pestanasDelTour = (pasos: PasoTour[]): string[] =>
+  Array.from(new Set(pasos.map((p) => p.pestana).filter((p): p is string => Boolean(p))));
+
 /**
- * Pasos que se enseñan, con el elemento ya resuelto. `buscar` devuelve el
- * elemento visible para un id (o null). Un paso opcional sin elemento se
- * salta; uno normal sin elemento se enseña centrado.
+ * Espera (sondeando) a que `buscar()` devuelva algo, como mucho `maxMs`.
+ * Devuelve lo encontrado o null si no aparece a tiempo.
  */
-export function resolverPasos<E>(
-  pasos: PasoTour[],
-  buscar: (id: string) => E | null,
-): { paso: PasoTour; elemento: E | null }[] {
-  const resultado: { paso: PasoTour; elemento: E | null }[] = [];
-  for (const paso of pasos) {
-    const elemento = paso.elemento ? buscar(paso.elemento) : null;
-    if (paso.elemento && !elemento && paso.opcional) continue;
-    resultado.push({ paso, elemento });
-  }
-  return resultado;
+export function esperarA<E>(buscar: () => E | null, maxMs: number, cadaMs = 50): Promise<E | null> {
+  return new Promise((resolver) => {
+    const inicio = Date.now();
+    const mirar = () => {
+      const encontrado = buscar();
+      if (encontrado) return resolver(encontrado);
+      if (Date.now() - inicio >= maxMs) return resolver(null);
+      window.setTimeout(mirar, cadaMs);
+    };
+    mirar();
+  });
 }
 
 /** Clave de localStorage: «ya ha visto el tour» por sección y usuario. */

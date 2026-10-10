@@ -8,13 +8,19 @@ import {
   TOURS,
   claveTourVisto,
   esEstadoLanzarTour,
-  resolverPasos,
+  esperarA,
+  pestanasDelTour,
   selectorTour,
+  type PasoTour,
   type SeccionAyuda,
 } from "@/lib/ayuda/tours";
 
 /** Margen para que la pantalla termine de pintarse (datos, pestañas lazy) antes de resaltar nada. */
 const ESPERA_LANZAR_MS = 700;
+/** Lo que se espera a que aparezca el elemento de un paso tras cambiar de pestaña (luego se salta). */
+const ESPERA_TRAS_PESTANA_MS = 2000;
+/** Lo mismo sin cambio de pestaña (datos que aún cargan). */
+const ESPERA_SIN_CAMBIO_MS = 400;
 
 /** Primer elemento con ese `data-tour` que de verdad se ve (las pestañas ocultas siguen en el DOM). */
 function elementoVisible(id: string): Element | null {
@@ -23,6 +29,22 @@ function elementoVisible(id: string): Element | null {
     if (el.getClientRects().length > 0) return el;
   }
   return null;
+}
+
+/** ¿Está abierta la pestaña cuyo botón lleva ese `data-tour`? */
+function pestanaAbierta(id: string): boolean {
+  return document.querySelector(selectorTour(id))?.getAttribute("aria-selected") === "true";
+}
+
+/**
+ * Abre una pestaña (Radix) pulsando su botón por programa: Radix cambia de
+ * pestaña con `mousedown`, no con `click`. Devuelve si ha habido cambio.
+ */
+function abrirPestana(id: string): boolean {
+  const boton = document.querySelector<HTMLElement>(selectorTour(id));
+  if (!boton || pestanaAbierta(id)) return false;
+  boton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+  return true;
 }
 
 function leerVisto(clave: string): boolean {
@@ -65,20 +87,93 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
   const navigate = useNavigate();
   const driverRef = useRef<Driver | null>(null);
 
+  // Pestaña en la que estaba el usuario al lanzar el tour (para devolverle a ella).
+  const pestanaInicialRef = useRef<string | null>(null);
+
   const lanzar = useCallback(() => {
+    const habiaTour = driverRef.current !== null;
     driverRef.current?.destroy();
     guardarVisto(claveTourVisto(seccion, usuarioId));
 
-    const pasos = resolverPasos(TOURS[seccion], elementoVisible);
-    const steps: DriveStep[] = pasos.map(({ paso, elemento }) => ({
-      element: elemento ?? undefined,
-      popover: {
-        title: paso.titulo,
-        description: paso.texto,
-        side: elemento ? paso.lado : undefined,
-        align: "start",
-      },
+    // Relanzado a mitad de tour: la pestaña «de vuelta» sigue siendo la de antes.
+    // Si no, se apunta justo antes del primer cambio de pestaña (al lanzarse solo,
+    // la barra de pestañas puede no haberse pintado aún).
+    const pasos: PasoTour[] = [...TOURS[seccion]];
+    const pestanasTour = pestanasDelTour(pasos);
+    if (!habiaTour) pestanaInicialRef.current = null;
+    const apuntarPestanaInicial = () => {
+      if (!pestanaInicialRef.current) pestanaInicialRef.current = pestanasTour.find(pestanaAbierta) ?? null;
+    };
+
+    // Los elementos se resuelven al llegar a cada paso (tras abrir su pestaña);
+    // driver.js lee este mismo array, así que quitar un paso saltado actualiza
+    // también el «3 de 12».
+    const steps: DriveStep[] = pasos.map((paso) => ({
+      popover: { title: paso.titulo, description: paso.texto, align: "start" },
     }));
+
+    let ocupado = false;
+    let terminado = false;
+    const terminar = () => {
+      if (terminado) return;
+      terminado = true;
+      if (driverRef.current === d) driverRef.current = null;
+      if (pestanaInicialRef.current) abrirPestana(pestanaInicialRef.current);
+    };
+    const vigente = () => !terminado && driverRef.current === d;
+
+    /** Prepara y enseña el paso `i`; si es opcional y no aparece, sigue en la dirección `dir`. */
+    const mostrar = async (i: number, dir: 1 | -1) => {
+      if (ocupado) return;
+      ocupado = true;
+      try {
+        while (i >= 0 && i < pasos.length) {
+          const paso = pasos[i];
+          if (paso.pestana) apuntarPestanaInicial();
+          let cambio = paso.pestana ? abrirPestana(paso.pestana) : false;
+          if (paso.abrir) {
+            // Tras abrir la pestaña, el desplegable puede tardar en montarse.
+            const abrir = paso.abrir;
+            const boton = await esperarA(() => elementoVisible(abrir), cambio ? ESPERA_TRAS_PESTANA_MS : ESPERA_SIN_CAMBIO_MS);
+            if (!vigente()) return;
+            if (boton instanceof HTMLElement && boton.getAttribute("aria-expanded") !== "true") {
+              boton.click();
+              cambio = true;
+            }
+          }
+          const id = paso.elemento;
+          const elemento = id
+            ? await esperarA(() => elementoVisible(id), cambio ? ESPERA_TRAS_PESTANA_MS : ESPERA_SIN_CAMBIO_MS)
+            : null;
+          if (!vigente()) return;
+          if (id && !elemento && paso.opcional) {
+            pasos.splice(i, 1);
+            steps.splice(i, 1);
+            if (dir < 0) i -= 1;
+            continue;
+          }
+          // En el móvil la barra de pestañas se desliza de lado: que el botón quede a la vista.
+          elemento?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+          steps[i].element = elemento ?? undefined;
+          steps[i].popover = { ...steps[i].popover, side: elemento ? paso.lado : undefined };
+          // driver.js quita el resaltado del paso anterior al terminar su animación;
+          // si se avanza antes (o el navegador frena las animaciones), se queda
+          // pegado. Se limpia aquí: el paso nuevo lo vuelve a poner.
+          document.querySelectorAll(".driver-active-element").forEach((el) =>
+            el.classList.remove("driver-active-element", "driver-no-interaction"),
+          );
+          if (d.isActive()) d.moveTo(i);
+          else d.drive(i);
+          return;
+        }
+        if (i >= pasos.length) {
+          d.destroy();
+          terminar();
+        }
+      } finally {
+        ocupado = false;
+      }
+    };
 
     const d = driver({
       steps,
@@ -95,12 +190,17 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
       smoothScroll: true,
       // Durante el tour se mira, no se toca: así un toque no abre diálogos a medias.
       disableActiveInteraction: true,
-      onDestroyed: () => {
-        if (driverRef.current === d) driverRef.current = null;
+      onNextClick: () => void mostrar((d.getActiveIndex() ?? -1) + 1, 1),
+      onPrevClick: () => void mostrar((d.getActiveIndex() ?? 1) - 1, -1),
+      // Cierre por el usuario («×», Esc, clic fuera). Se usa este aviso y no
+      // `onDestroyed`: ese solo llega si la animación del paso terminó.
+      onDestroyStarted: () => {
+        d.destroy();
+        terminar();
       },
     });
     driverRef.current = d;
-    d.drive();
+    void mostrar(0, 1);
   }, [seccion, usuarioId]);
 
   // Un solo temporizador para las dos formas de lanzarlo solo; no depende de
@@ -135,7 +235,10 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
   useEffect(
     () => () => {
       window.clearTimeout(temporizador.current);
-      driverRef.current?.destroy();
+      // Primero se suelta: un tour a medio preparar ya no debe arrancar.
+      const d = driverRef.current;
+      driverRef.current = null;
+      d?.destroy();
     },
     [],
   );

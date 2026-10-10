@@ -31,10 +31,11 @@ export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDispo
     setAbierta(false);
   };
   return (
-    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 sm:px-4">
+    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 sm:px-4" data-tour="facturas-ia-al-instante">
       <button
         type="button"
         onClick={() => setAbierta((v) => !v)}
+        data-tour="facturas-ia-al-instante-abrir"
         aria-expanded={abierta}
         title="Responden al momento leyendo los datos, sin usar la IA"
         className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] pointer-coarse:h-11 pointer-coarse:px-3"

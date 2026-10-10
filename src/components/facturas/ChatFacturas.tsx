@@ -77,6 +77,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
                   variant="ghost"
                   size="sm"
                   className="gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                  data-tour="facturas-ia-historial"
                 >
                   <History className="h-4 w-4" />
                   Historial

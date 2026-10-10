@@ -126,7 +126,7 @@ export function SubidaFacturas() {
           <p className="min-w-0 flex-1 basis-40 text-sm text-muted-foreground">
             {isDragging ? "Suelta aquí para añadir" : "Añade más: foto, archivos o arrastrándolos aquí (PDF o imagen, máx. 10MB)."}
           </p>
-          <div className="flex flex-wrap gap-2">{botonesSubida}</div>
+          <div className="flex flex-wrap gap-2" data-tour="facturas-cargar-botones">{botonesSubida}</div>
         </div>
       ) : (
         // Cola vacía: la zona de soltar es la propia superficie, centrada y de tamaño razonable.
@@ -151,7 +151,7 @@ export function SubidaFacturas() {
             {/* Dos botones grandes en vez de una zona entera "clicable": en la tablet
                 se toca, no se arrastra. El de la cámara usa `capture` para abrir la
                 cámara trasera directamente; el otro admite PDF y varias imágenes. */}
-            <div className="flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <div className="flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center sm:gap-3" data-tour="facturas-cargar-botones">
               {botonesSubida}
             </div>
             <p className="mt-6 text-xs text-muted-foreground">

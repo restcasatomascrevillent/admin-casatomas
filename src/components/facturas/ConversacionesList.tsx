@@ -43,7 +43,7 @@ export function ConversacionesList({
   const [aEliminar, setAEliminar] = useState<Conversacion | null>(null);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col" data-tour="facturas-ia-historial">
       <div className="px-2 pb-1 pt-2">
         <Button
           onClick={onNueva}

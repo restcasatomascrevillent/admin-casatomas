@@ -32,3 +32,6 @@ dist-ssr
 # Estado local de la CLI de Supabase (project-ref, pooler-url, versiones)
 # No debe versionarse: es cache de la maquina, no del proyecto
 supabase/.temp/
+
+# Sesión guardada para grabar los vídeos de ayuda (scripts/videos-ayuda): credenciales, nunca a git
+scripts/videos-ayuda/.sesion.json

@@ -3,8 +3,10 @@ import type { SeccionAyuda } from "./tours";
 // ---------------------------------------------------------------------------
 // Contenido del Centro de Ayuda (/ayuda): una ficha por sección del panel.
 // Para el dueño y el personal: llano, de tú, sin palabras técnicas.
-// `videoUrl` (opcional): enlace de inserción (YouTube «embed», Vimeo, Loom…)
-// de un vídeo corto de la sección. Si no hay, no se enseña nada.
+// `videoUrl` (opcional): vídeo corto de la sección. Puede ser un archivo propio
+// (`/ayuda/videos/facturas.webm`, en `public/`; se generan con
+// `scripts/videos-ayuda/`) o un enlace de inserción (YouTube «embed», Vimeo,
+// Loom…). Si no hay, no se enseña nada.
 // ---------------------------------------------------------------------------
 
 export interface PreguntaFrecuente {
@@ -39,7 +41,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       "Fíjate en las etiquetas. Las facturas que cuadran se marcan solas como «Revisada auto»: no tienes que hacer nada con ellas. Solo tienes que mirar las que salen en rojo o naranja (por ejemplo «IVA no cuadra» o «Precio extremo») y las que pone «Sin revisar».",
       "Para revisar una, ábrela y pulsa «Ver original» para comparar con el papel. Si algo está mal leído, pulsa «Editar», corrígelo y activa «Marcar como verificada»: pasará a «Revisada».",
       "Para buscar, escribe en el buscador de arriba (un producto, un proveedor o un número) y elige si quieres ver Documentos, Productos o Proveedores. Los filtros («Con avisos», «Sin revisar», «Albaranes sin factura»…) te dejan ver solo una parte.",
-      "Para preguntas como «¿cuánto gastamos en carne este mes?», ve a «IA» y escríbela con tus palabras.",
+      "Para preguntas como «¿cuánto gastamos en carne este mes?», ve a «IA». Puedes tocar una pregunta de ejemplo, usar los botones de «Al instante» (responden al momento, sin escribir) o escribirla con tus palabras. A la izquierda (en la tablet, en «Historial») quedan tus conversaciones anteriores.",
     ],
     preguntas: [
       {
@@ -72,9 +74,9 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         respuesta: "Abre el documento y pulsa «Ver original» (en los albaranes, «Ver albarán»).",
       },
       {
-        pregunta: "¿Qué le puedo preguntar a la IA?",
+        pregunta: "¿Qué le puedo preguntar al chatbot?",
         respuesta:
-          "Cosas sobre tus compras: cuánto has gastado en un mes, qué le compras a un proveedor, cómo ha cambiado el precio de un producto o qué facturas hay de una fecha. Responde con los datos de tus facturas. Arriba a la derecha ves cuánto ha costado este mes usar la IA.",
+          "Cualquier cosa sobre tus compras, con tus palabras. Por ejemplo: «¿Cuánto hemos gastado en octubre?», «Muéstrame todas las facturas de» y el nombre del proveedor, «¿Qué albaranes de ese proveedor hay esta semana?», «¿Qué productos hemos comprado más veces este mes?», «¿Cuánto gastamos en carne en septiembre?» o «¿Qué proveedor nos vende más caro el aceite?». Responde con los datos de tus facturas y albaranes. Para lo más habitual (gasto del mes, mejores proveedores, documentos por revisar, qué ha subido de precio…) usa los botones de «Al instante»: salen al momento y no gastan IA. Arriba a la derecha ves cuánto ha costado este mes usar la IA.",
       },
     ],
   },
@@ -125,3 +127,6 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
     ],
   },
 ];
+
+/** ¿Es un archivo de vídeo (se enseña con <video>) y no un enlace de inserción (<iframe>)? */
+export const esArchivoVideo = (url: string): boolean => /\.(webm|mp4|m4v|ogv|mov)(\?.*)?$/i.test(url);
