@@ -82,7 +82,7 @@ export function FichaDocumento({
             <h2 className="break-words text-lg font-semibold leading-tight">
               {esAlbaran ? "Albarán" : "Factura"} {doc.numero_documento}
             </h2>
-            <EstadoDocumento alertas={avisos} verificada={doc.verificada} onRevisar={() => onEditar(doc)} compacto={false} />
+            <EstadoDocumento alertas={avisos} verificada={doc.verificada} origen={doc.verificacion_origen} onRevisar={() => onEditar(doc)} compacto={false} />
             {esAlbaran &&
               (esAlbaranSinFactura(doc) ? (
                 <span className="inline-flex h-7 items-center rounded-md border border-amber-300 bg-amber-50 px-2 text-xs font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">

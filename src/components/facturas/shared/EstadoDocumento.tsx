@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, EyeOff } from "lucide-react";
+import { AlertTriangle, CheckCircle2, EyeOff, Sparkles } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { INSIGNIA } from "./tabla";
@@ -49,6 +49,12 @@ export const etiquetaAlerta = (codigo: string): string =>
 interface EstadoDocumentoProps {
   alertas: AlertaValidacion[];
   verificada: boolean;
+  /**
+   * Quien la dio por revisada. 'auto' = la regla de la base (sin avisos,
+   * total y base presentes, no duplicado, proveedor ya conocido); no la ha
+   * mirado nadie. Se pinta distinta de la revision humana.
+   */
+  origen?: "auto" | "manual" | null;
   /** Abre el dialogo de edicion, que es donde se marca como verificada. */
   onRevisar: () => void;
   /** En las tarjetas hay sitio de sobra: se pintan todas las alertas. */
@@ -61,7 +67,7 @@ interface EstadoDocumentoProps {
  */
 const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']`;
 
-export function EstadoDocumento({ alertas, verificada, onRevisar, compacto = true }: EstadoDocumentoProps) {
+export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar, compacto = true }: EstadoDocumentoProps) {
   const lista = alertas ?? [];
   const graves = lista.filter((a) => a.severidad === "alta");
   // En la tabla solo cabe una insignia de aviso; el resto se resume en "+N".
@@ -113,7 +119,25 @@ export function EstadoDocumento({ alertas, verificada, onRevisar, compacto = tru
         );
       })}
 
-      {verificada ? (
+      {verificada && origen === "auto" ? (
+        // Popover y no title: en la tablet no hay hover.
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Revisada automáticamente: cuadra todo y el proveedor es conocido; no la ha mirado nadie"
+              className={`${INSIGNIA_TACTIL} border-emerald-100 bg-transparent text-emerald-600/80`}
+            >
+              <Sparkles className="h-3 w-3 shrink-0" />
+              Revisada auto
+            </button>
+          </PopoverTrigger>
+          <PopoverContent collisionPadding={12} onClick={(e) => e.stopPropagation()} className="w-[min(18rem,calc(100vw-1.5rem))] text-sm">
+            Cuadra todo y el proveedor es conocido; no la ha mirado nadie.
+          </PopoverContent>
+        </Popover>
+      ) : verificada ? (
         <span className={`${INSIGNIA} h-7 text-xs border-emerald-200 bg-emerald-50 text-emerald-700`}>
           <CheckCircle2 className="h-3 w-3 shrink-0" />
           Revisada

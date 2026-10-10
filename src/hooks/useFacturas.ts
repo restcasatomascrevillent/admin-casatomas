@@ -86,6 +86,12 @@ export interface Factura {
   procesado_en: string | null;
   created_at: string | null;
   verificada: boolean;
+  /**
+   * Quién la dio por revisada (migración 20261010130000): 'auto' = cuadra todo
+   * y el proveedor es conocido, no la ha mirado nadie; 'manual' = una persona.
+   * null = sin revisar.
+   */
+  verificacion_origen?: "auto" | "manual" | null;
 }
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
@@ -93,7 +99,7 @@ const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de
 const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean) => `
       id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,${conFacturado ? " facturado_en_id," : ""}
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
-      alertas_validacion, procesado_en, created_at, verificada,
+      alertas_validacion, procesado_en, created_at, verificada, verificacion_origen,
       productos_factura (
         id, nombre, precio_unitario, cantidad, unidad, total${conBultos ? ", bultos" : ""}${
           conProducto ? ", producto_id, productos_catalogo ( nombre, categoria_id )" : ""
@@ -208,6 +214,8 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
       procesado_en: doc.procesado_en ?? null,
       created_at: doc.created_at ?? null,
       verificada: doc.verificada ?? false,
+      verificacion_origen:
+        doc.verificacion_origen === "auto" || doc.verificacion_origen === "manual" ? doc.verificacion_origen : null,
     };
   });
 };

@@ -236,6 +236,12 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                                 <DialogDescription>
                                     Indica que los importes y datos de esta factura han sido revisados y son correctos.
                                 </DialogDescription>
+                                {factura?.verificacion_origen === "auto" && (
+                                    <p className="text-xs text-muted-foreground">
+                                        Ahora está revisada automáticamente: cuadra todo y el proveedor es conocido, pero no la ha mirado nadie.
+                                        Si cambias importes y dejan de cuadrar, volverá a «Sin revisar».
+                                    </p>
+                                )}
                             </div>
                             <FormField
                                 control={form.control}

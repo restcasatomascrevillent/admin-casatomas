@@ -1632,6 +1632,7 @@ export type Database = {
           total_origen: string | null
           updated_at: string | null
           verificada: boolean | null
+          verificacion_origen: string | null
         }
         Insert: {
           alertas_validacion?: Json | null
@@ -1661,6 +1662,7 @@ export type Database = {
           total_origen?: string | null
           updated_at?: string | null
           verificada?: boolean | null
+          verificacion_origen?: string | null
         }
         Update: {
           alertas_validacion?: Json | null
@@ -1690,6 +1692,7 @@ export type Database = {
           total_origen?: string | null
           updated_at?: string | null
           verificada?: boolean | null
+          verificacion_origen?: string | null
         }
         Relationships: [
           {
