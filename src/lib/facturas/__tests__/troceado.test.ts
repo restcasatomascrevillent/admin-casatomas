@@ -5,7 +5,7 @@ import { debeTrocear, planificarFranjas, UMBRAL_RELACION } from "../troceado";
 const BANCO: [string, number, number, boolean][] = [
   ["21 Osborne", 2040, 1148, false], ["22", 1600, 900, false], ["23 Guillén", 1152, 2048, false],
   ["24 Candela", 2040, 1148, false], ["25 Joselito", 1148, 2040, false], ["26 Garre", 2040, 1148, false],
-  ["27 Osborne", 1600, 900, false], ["28 Joselito", 2040, 1148, false], ["29 Angelmar", 738, 1600, true],
+  ["27 Osborne", 1600, 900, false], ["28 Joselito", 2040, 1148, false], ["29 Angelmar", 738, 1600, false],
   ["30 Campoluz", 899, 1599, false], ["31 Luga", 945, 2048, true], ["32 Enchenta", 1192, 2048, false],
   ["33 Campoluz", 899, 1599, false], ["34 Santacruz", 1290, 1867, false], ["35 33/35", 900, 1600, false],
   ["36 Equipalia", 945, 2048, true], ["37 Flope", 1290, 1971, false], ["38 Ínsula", 1148, 2040, false],
@@ -19,6 +19,7 @@ describe("umbral de troceado (fijado con el banco de 19 documentos)", () => {
   it("solo las capturas de móvil de un PDF (relación ≥ 1,9) se trocean; una hoja A4 en foto no", () => {
     expect(UMBRAL_RELACION).toBeGreaterThan(297 / 210);
     expect(debeTrocear(1240, 1754)).toBe(false); // A4 a 150 DPI
+    expect(debeTrocear(736, 1600)).toBe(false); // captura de WhatsApp (factura 374): 1 llamada, no 5 franjas
     expect(debeTrocear(400, 1200)).toBe(false); // ticket pequeño: no compensa
     expect(debeTrocear(0, 0)).toBe(false);
   });

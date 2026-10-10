@@ -31,6 +31,15 @@ import {
 import { type BloqueContenido, bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import { diagnosticoResolucion } from "./imagen.ts";
 import { CIF_CLIENTE, TEXTO_EXTRACCION, VISION_SYSTEM_PROMPT } from "./prompts.ts";
+import {
+  avisoClienteAjeno,
+  type AvisoCalidad,
+  cifControlValido,
+  cifLimpio,
+  depurarLineas,
+  limpiarObservaciones,
+  numeroProvisional,
+} from "./calidad.ts";
 
 /** Peso de un conjunto de descuadres, para poder comparar dos intentos.
  *  Una alerta 'alta' (precio o total inverosímil) pesa más que diez 'media'. */
@@ -70,7 +79,7 @@ export function esNombreCliente(nombre: string | null | undefined): boolean {
 // deno-lint-ignore no-explicit-any
 export function normalizarDatos(data: any) {
   if (!data || typeof data !== "object") throw new Error("Los datos extraídos no son un objeto válido");
-  if (!data.numero_documento) throw new Error("Falta el campo obligatorio: numero_documento");
+  const avisosCalidad: AvisoCalidad[] = [];
 
   // tipo
   let tipo = (data.tipo || "factura").toLowerCase().trim();
@@ -92,11 +101,36 @@ export function normalizarDatos(data: any) {
   // El CIF del cliente NUNCA es el del proveedor: si llega, se descarta (null
   // antes que un dato falso). Y si el «proveedor» es el propio restaurante, se
   // deja a null por la misma razón. Red de seguridad del prompt (sección 1b).
-  const cif = data.cif && !esCifCliente(data.cif) ? data.cif : null;
+  // Se guarda normalizado («46914230-A» → 46914230A, «F-54650895» →
+  // F54650895). Si no supera el dígito de control se guarda igual (es lo que
+  // pone el papel) y SQL decide: lo corrige contra la ficha del proveedor si
+  // está a ≤ 2 caracteres, y no crea ficha nueva con él (20261010160000).
+  const cif = data.cif && !esCifCliente(data.cif) ? (cifLimpio(data.cif) || null) : null;
+  if (cif && !cifControlValido(cif)) {
+    console.warn(`[calidad] CIF leído ${cif} no supera el dígito de control.`);
+  }
   const proveedor = data.proveedor && !esNombreCliente(data.proveedor) ? data.proveedor : null;
 
+  // Documento sin número impreso (nota de entrega de Narejos, Aceites
+  // Crevillente): antes se perdía por «obligatorio». Número provisional + aviso.
+  let numero = typeof data.numero_documento === "string" ? data.numero_documento.trim() : "";
+  if (!numero) {
+    numero = numeroProvisional(proveedor, data.fecha);
+    avisosCalidad.push({
+      codigo: "numero_ausente",
+      severidad: "media",
+      mensaje: `Sin número en el papel: se guarda con el provisional «${numero}». Cámbialo si el proveedor lo da.`,
+      detalle: { numero_provisional: numero },
+    });
+  }
+  const clienteAjeno = avisoClienteAjeno(data.cliente);
+  if (clienteAjeno) avisosCalidad.push(clienteAjeno);
+
+  const cantidadLeida: (number | null)[] = Array.isArray(data.productos)
+    ? data.productos.map((p: { cantidad?: unknown } | null) => toNumber(p?.cantidad, true))
+    : [];
   // deno-lint-ignore no-explicit-any
-  const productos = Array.isArray(data.productos)
+  const productosLeidos = Array.isArray(data.productos)
     ? data.productos.map((p: any, i: number) => {
       const precio_unitario = toNumber(p.precio_unitario, true);
       const total = toNumber(p.total, true);
@@ -138,11 +172,15 @@ export function normalizarDatos(data: any) {
       };
     })
     : [];
+  // Rótulos sin cantidad, mercancía pendiente, kg al peso y precio neto.
+  const depuradas = depurarLineas(productosLeidos, cantidadLeida, data.sin_importes === true);
+  const productos: typeof productosLeidos = depuradas.lineas;
+  avisosCalidad.push(...depuradas.avisos);
   const cambiadasAPeso = productos.filter((p: { regla_magnitud: string }) =>
     p.regla_magnitud === "peso_cuadra" || p.regla_magnitud === "peso_con_descuento"
   ).length;
   if (cambiadasAPeso > 0) {
-    console.log(`[magnitudes] ${data.numero_documento}: ${cambiadasAPeso} línea(s) guardadas por peso (precio por kilo/litro).`);
+    console.log(`[magnitudes] ${numero}: ${cambiadasAPeso} línea(s) guardadas por peso (precio por kilo/litro).`);
   }
   const avisoMagnitud = avisoMagnitudes(productos.map((p: {
     nombre: string; cantidad: number; unidad: string; precio_unitario: number | null; total: number | null;
@@ -153,18 +191,30 @@ export function normalizarDatos(data: any) {
     tipo,
     proveedor,
     cif,
-    numero_documento: String(data.numero_documento),
+    numero_documento: numero,
+    /** Paginación impresa («PÁGINA Nº 1/2»); null si el papel no la trae. */
+    pagina: paginaImpresa(data.pagina),
     fecha,
     subtotal: toNumber(data.subtotal, true),
     iva: toNumber(data.iva, true),
     total: toNumber(data.total, true),
-    observaciones: data.observaciones || null,
+    observaciones: limpiarObservaciones(data.observaciones),
     resumen: data.resumen || null,
     productos,
     /** Avisos de la normalización de cantidades (no van a ninguna columna:
      *  los llamantes los añaden a alertasPrevias). */
-    avisos: avisoMagnitud ? [avisoMagnitud] : [],
+    avisos: [...(avisoMagnitud ? [avisoMagnitud] : []), ...avisosCalidad],
   };
+}
+
+/** {actual, total} con enteros positivos; null si no hay ninguno. */
+export function paginaImpresa(v: unknown): { actual: number | null; total: number | null } | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const ent = (x: unknown) => (typeof x === "number" && Number.isInteger(x) && x > 0 && x < 1000 ? x : null);
+  const actual = ent(o.actual), total = ent(o.total);
+  if (actual === null && total === null) return null;
+  return { actual, total: total !== null && actual !== null && total < actual ? null : total };
 }
 
 export type DatosNormalizados = ReturnType<typeof normalizarDatos>;

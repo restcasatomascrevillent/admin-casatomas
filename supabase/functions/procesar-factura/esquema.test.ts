@@ -150,8 +150,9 @@ describe("DOCUMENTO_JSON_SCHEMA — reglas de Structured Outputs estricto", () =
     for (const campo of ["proveedor", "cif", "subtotal", "iva", "total", "observaciones"]) {
       expect(props[campo].type, campo).toContain("null");
     }
-    // Los que NO pueden faltar siguen siendo escalares obligatorios.
-    expect(props.numero_documento.type).toBe("string");
+    // numero_documento puede faltar desde el 10/10/2026 (notas de entrega sin
+    // número): se guarda con un provisional. tipo sigue siendo obligatorio.
+    expect(props.numero_documento.type).toContain("null");
     expect(props.tipo.type).toBe("string");
   });
 
@@ -220,9 +221,10 @@ describe("validarEstructura — formas que hoy se cuelan", () => {
     expect(d.map((x) => x.codigo)).toEqual(["fecha_ausente"]);
   });
 
-  it("rechaza numero_documento vacio o ausente", () => {
-    expect(validarEstructura(doc({ numero_documento: "" })).ok).toBe(false);
-    expect(validarEstructura(doc({ numero_documento: undefined as unknown as string })).ok).toBe(false);
+  it("acepta numero_documento vacio o null (nota sin numero), pero no otro tipo", () => {
+    expect(validarEstructura(doc({ numero_documento: "" })).ok).toBe(true);
+    expect(validarEstructura(doc({ numero_documento: null })).ok).toBe(true);
+    expect(validarEstructura(doc({ numero_documento: 76 as unknown as string })).ok).toBe(false);
   });
 
   it("rechaza un tipo que no es factura ni albaran", () => {
@@ -941,9 +943,18 @@ describe("toleranciaCabecera — suelo, porcentaje y TECHO", () => {
     expect(12513.5 * 0.02).toBeGreaterThan(200); // lo que toleraba antes
   });
 
-  it("nunca baja del suelo, ni en documentos de dos euros", () => {
-    expect(toleranciaCabecera(1)).toBe(2);
-    expect(toleranciaCabecera(0)).toBe(2);
+  it("nunca baja del suelo (0,50 EUR desde el 10/10/2026), ni en documentos de dos euros", () => {
+    expect(toleranciaCabecera(1)).toBe(0.5);
+    expect(toleranciaCabecera(0)).toBe(0.5);
+  });
+
+  it("los cargos fijos del pie (embalaje 1,82, portes 1,60, RGA 1,97) ya no caben en la tolerancia", () => {
+    // 385 N. y Valero: lineas 316,23 frente a base 318,05; 366 Altamira 199,57/201,17; 341 Luga 317,51/319,48.
+    for (const [suma, base] of [[316.23, 318.05], [199.57, 201.17], [317.51, 319.48], [87.0, 88.82], [214.34, 216.16]]) {
+      expect(Math.abs(base - suma)).toBeGreaterThan(toleranciaCabecera(base));
+    }
+    // El canon de Campoluz 0009780 (0,72 sobre ~263) sigue dentro.
+    expect(0.72).toBeLessThan(toleranciaCabecera(262.78));
   });
 
   it("es monotona: mas documento, nunca menos tolerancia", () => {

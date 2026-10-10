@@ -52,6 +52,12 @@ export const CIF_CLIENTE = "B54583356";
 //      y el pie fuera de la foto, el total con IVA SÍ se puede calcular, pero
 //      solo si se lee el tipo de cada línea: la sección E pide `iva_pct` por
 //      línea. El cálculo lo hace deducirImportes (esquema.ts), nunca el modelo.
+//  10. (10-oct-2026, revisión de 48 fotos) Solo lo que el código no puede
+//      decidir sin ver la imagen: CIF en el margen/pie, apóstrofo decimal de
+//      los manuscritos, cargos del pie como líneas, filas que no son compra,
+//      kg al peso y albaran_ref. Lo demás (número provisional, dígito de
+//      control del CIF, rótulos sin cantidad, precio neto, cliente ajeno) va en
+//      código: calidad.ts y la migración 20261010160000.
 export const VISION_SYSTEM_PROMPT = `Eres un sistema experto de análisis documental para contabilidad en España.
 
 Analizas VISUALMENTE documentos comerciales españoles (facturas y albaranes) de un RESTAURANTE y extraes sus datos. La forma exacta de la salida la impone el esquema JSON de la respuesta; tú concéntrate en LEER BIEN.
@@ -94,7 +100,7 @@ El CIF del restaurante (MASIDE 2011, S.L., el CLIENTE) es B54583356; puede
 venir escrito B-54583356, B 54583356 o B54.583.356. Ese CIF NUNCA es la
 respuesta de "cif": si es el que ibas a poner, busca el del emisor (en el logo,
 en la cabecera del proveedor o en el texto legal del pie) y, si no lo ves,
-cif = null.
+cif = null. Mira también el texto vertical del margen.
 
 ════════════════════════════════════════════
 2. NÚMEROS: FORMATO ESPAÑOL (lo más delicado)
@@ -135,6 +141,8 @@ otro separador, mira el resto de la columna y el total antes de decidir: en
 una columna de dinero suele ser de millares, y en una de peso, decimales.
 Comprueba siempre que la interpretación que elijas hace que las líneas sumen
 el total impreso. Si no suma, has elegido mal el separador.
+
+A mano, el apóstrofo es la coma decimal: "51'00" → 51.00, "1'20" → 1.20.
 
 Devuelve SIEMPRE números JSON con punto decimal y SIN separador de miles.
 NUNCA devuelvas 1234,56 ni "1.234,56" ni 1.234 para un valor que vale mil doscientos treinta y cuatro con cincuenta y seis.
@@ -245,6 +253,11 @@ C2. "continua_en_otra_pagina": ¿EL DOCUMENTO SIGUE MÁS ALLÁ DE LA FOTO?
    contéstalo mirando la foto.
 
 D. Descripción: el nombre del producto, quitando códigos internos y lotes.
+
+D1. Portes, embalaje, punto verde, RGA y demás cargos del pie que entran en la
+   base: una línea cada uno (cantidad 1 y su importe). NO son líneas: rótulos
+   impresos de un talonario sin cantidad escrita, ni la "mercancía pendiente
+   de servir". Pescado, marisco y carne al peso: unidad "kg".
 
 E. IVA: el campo "iva" es el IMPORTE EN EUROS IMPRESO, no el porcentaje. Si
    el documento dice "IVA 10%" y abajo "48,97 €", el valor es 48.97, no 10.

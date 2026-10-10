@@ -330,9 +330,11 @@ describe("consolidar · fronteras entre páginas", () => {
     expect(mal.alertas.map((a) => a.codigo)).toContain("recuento_filas_discordante");
   });
 
-  it("sin número de documento en ninguna página → error claro al preparar", () => {
+  it("sin número de documento en ninguna página → número provisional con aviso (10/10/2026)", () => {
     const c = consolidar([pieza(1, resultado([A])), pieza(2, resultado([B]))]);
-    expect(() => prepararDocumentoConsolidado(c)).toThrow(/número de factura/);
+    const listo = prepararDocumentoConsolidado(c);
+    expect(listo.datos.numero_documento).toMatch(/^SN-[A-Z0-9]+-\d{8}$/);
+    expect(listo.alertasPrevias.map((a) => a.codigo)).toContain("numero_ausente");
   });
 });
 
@@ -440,7 +442,8 @@ describe("cliente ≠ proveedor (caso Salazones Garre F/25011959, factura 39)", 
       const d = normalizarDatos({ numero_documento: "F / 25011959", tipo: "factura", cif, proveedor: "SALAZONES GARRE", productos: [] });
       expect(d.cif).toBeNull();
     }
-    expect(normalizarDatos({ numero_documento: "X", cif: "B-73028474", productos: [] }).cif).toBe("B-73028474");
+    // Se guarda normalizado (sin guion), 10/10/2026.
+    expect(normalizarDatos({ numero_documento: "X", cif: "B-73028474", productos: [] }).cif).toBe("B73028474");
   });
   it("normalizarDatos no acepta al restaurante como proveedor", () => {
     expect(normalizarDatos({ numero_documento: "X", proveedor: "MASIDE 2011, S.L.U", productos: [] }).proveedor).toBeNull();

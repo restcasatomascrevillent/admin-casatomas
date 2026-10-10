@@ -803,15 +803,11 @@ export interface DocumentoConsolidadoListo {
  * importes del pie que no se citan, deducir el total y normalizar. El
  * recuento ya viene aplicado por la consolidación (alerta por pieza), así que
  * aquí NO se llama a aplicarRecuentoVerificado con un recuento global.
- * Lanza si ninguna pieza trae número de documento (como normalizarDatos).
+ * Sin número en ninguna pieza: número provisional (normalizarDatos).
  */
 export function prepararDocumentoConsolidado(c: ResultadoConsolidacion): DocumentoConsolidadoListo {
-  if (!c.documento.numero_documento) {
-    throw new Error(
-      "Ninguna página del documento trae un número de factura o albarán legible: no se puede guardar. " +
-        "Sube la página de la cabecera o una foto mejor.",
-    );
-  }
+  // Sin número en ninguna pieza ya no se lanza (10/10/2026): normalizarDatos
+  // le pone uno provisional «SN-<proveedor>-<AAAAMMDD>» con su aviso.
   // Descuadres del documento consolidado (mismo validador que el camino de
   // una página). Los de recuento ya los ha puesto la consolidación por pieza.
   const yaPuestos = new Set(c.alertas.map((a) => a.codigo));

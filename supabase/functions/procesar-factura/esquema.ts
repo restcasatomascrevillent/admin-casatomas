@@ -75,7 +75,7 @@ export const DOCUMENTO_JSON_SCHEMA = {
     additionalProperties: false,
     required: [
       "total_literal", "subtotal_literal", "iva_literal",
-      "tipo", "proveedor", "cif", "numero_documento", "fecha", "sin_importes",
+      "tipo", "proveedor", "cif", "cliente", "numero_documento", "pagina", "fecha", "sin_importes",
       "continua_en_otra_pagina", "filas_tabla", "productos",
       "subtotal", "iva", "total", "observaciones", "resumen",
     ],
@@ -126,11 +126,27 @@ export const DOCUMENTO_JSON_SCHEMA = {
       },
       cif: {
         type: ["string", "null"],
-        description: "CIF/NIF del proveedor emisor. null si no aparece.",
+        description: "CIF/NIF del proveedor emisor (miralo tambien en el margen vertical y en el pie). null si no aparece.",
+      },
+      cliente: {
+        type: ["string", "null"],
+        description: "Destinatario/cliente tal como aparece (nombre y CIF). null si no consta.",
       },
       numero_documento: {
-        type: "string",
-        description: "Numero de factura o albaran, tal cual aparece impreso, con sus ceros y prefijos.",
+        type: ["string", "null"],
+        description:
+          "Numero de factura o albaran tal cual, con sus ceros y prefijos. null si la casilla esta en blanco: " +
+          "NUNCA lo saques de un telefono, CIF, fecha, ano, lote o codigo de cliente.",
+      },
+      pagina: {
+        type: "object",
+        additionalProperties: false,
+        required: ["actual", "total"],
+        description: "Paginacion impresa ('PAGINA N. 1/2', 'Pag. 2 de 2', 'Hoja 1/2'). null en los dos si no la pone.",
+        properties: {
+          actual: { type: ["integer", "null"] },
+          total: { type: ["integer", "null"] },
+        },
       },
       fecha: {
         type: ["string", "null"],
@@ -176,6 +192,7 @@ export const DOCUMENTO_JSON_SCHEMA = {
           additionalProperties: false,
           required: [
             "nombre", "cantidad", "unidad", "peso_kg", "base_precio", "precio_unitario", "total", "iva_pct", "bonificada",
+            "albaran_ref",
           ],
           properties: {
             nombre: {
@@ -239,6 +256,10 @@ export const DOCUMENTO_JSON_SCHEMA = {
               description:
                 "true si la linea es regalo / bonificacion / descuento del 100% (cantidad > 0 con importe 0). No elimines esas lineas.",
             },
+            albaran_ref: {
+              type: ["string", "null"],
+              description: "Nº del albaran al que pertenece la fila (cabecera 'Albaran X' encima, columna o cita). null si no consta.",
+            },
           },
         },
       },
@@ -293,13 +314,20 @@ export interface LineaExtraida {
    *  antiguos y piezas guardadas antes del 06/10/2026 no lo traen. */
   iva_pct?: number | null;
   bonificada: boolean;
+  /** Albaran al que pertenece la fila (facturas que agrupan albaranes). */
+  albaran_ref?: string | null;
 }
 
 export interface DocumentoExtraido {
   tipo: "factura" | "albaran";
   proveedor: string | null;
   cif: string | null;
-  numero_documento: string;
+  /** Destinatario impreso (nombre y CIF). Opcional: payloads antiguos no lo traen. */
+  cliente?: string | null;
+  /** null si el papel no trae numero: se guarda con uno provisional (calidad.ts). */
+  numero_documento: string | null;
+  /** Paginacion impresa («PÁGINA Nº 1/2»). Opcional como los de abajo. */
+  pagina?: { actual: number | null; total: number | null } | null;
   fecha: string | null;
   /** El documento no lleva ningun importe en euros (albaran de entrega). */
   sin_importes: boolean;
@@ -382,10 +410,16 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
   if (d.tipo !== "factura" && d.tipo !== "albaran") {
     push("tipo", `debe ser "factura" o "albaran", llego ${JSON.stringify(d.tipo)}`);
   }
-  // `numero_documento` es la clave real del documento (unique con proveedor) y
-  // ademas la usa `verificar_duplicado_factura`: sin el, no hay nada que hacer.
-  if (typeof d.numero_documento !== "string" || d.numero_documento.trim() === "") {
-    push("numero_documento", "obligatorio y no puede venir vacio");
+  // `numero_documento` puede faltar (10/10/2026): una nota de entrega sin
+  // numero (Narejos, Aceites Crevillente) se perdia entera por «obligatorio».
+  // Ahora se guarda con un numero provisional y su aviso (calidad.ts). Lo que
+  // no vale es otro tipo.
+  if (d.numero_documento !== null && d.numero_documento !== undefined && typeof d.numero_documento !== "string") {
+    push("numero_documento", `debe ser texto o null, llego ${JSON.stringify(d.numero_documento)}`);
+  }
+  if (d.cliente !== undefined && !esStringONull(d.cliente)) push("cliente", "debe ser texto o null");
+  if (d.pagina !== undefined && d.pagina !== null && (typeof d.pagina !== "object" || Array.isArray(d.pagina))) {
+    push("pagina", `debe ser un objeto {actual, total} o null, llego ${JSON.stringify(d.pagina)}`);
   }
   // `fecha` puede ser null a proposito. Hay documentos reales sin ninguna
   // fecha impresa (la factura 1-701405 de Insula Roma es uno), y exigir un
@@ -553,8 +587,16 @@ const ABS_LINEA_MIN = 0.05;     // por debajo de 5 centimos de diferencia, da ig
 //
 // Con estos tres valores NINGUNO de los 19 documentos da aviso falso y el
 // agujero de Campoluz salta.
+//
+// SUELO BAJADO A 0,50 EUR (10/10/2026, revision de 48 fotos de octubre). Con
+// 2 EUR pasaban sin aviso los cargos fijos del pie que no se extraian como
+// linea: embalaje 1,82 (Nicolas y Valero, x5), portes 1,60 (Altamira), RGA
+// 1,97 (Luga). Ahora el prompt pide esos cargos como lineas (y entonces cuadra
+// exacto) y, si no salen, el aviso salta. El 0,72 de Campoluz 0009780 sigue
+// dentro (0,5 % de ~263 = 1,31). Mismo cambio en validar_cordura_factura
+// (migracion 20261010160000).
 const TOL_CABECERA_REL = 0.005;  // 0,5 % ...
-const TOL_CABECERA_ABS = 2.00;   // ... con suelo de 2 EUR ...
+const TOL_CABECERA_ABS = 0.50;   // ... con suelo de 0,50 EUR ...
 const TOL_CABECERA_MAX = 15.00;  // ... y TECHO de 15 EUR, para que no crezca
 const PRECIO_UNITARIO_EXTREMO = 1000;
 const TOTAL_DOCUMENTO_EXTREMO = 25000;
@@ -1049,7 +1091,7 @@ export function leerImporteLiteral(texto: string): number | null {
     if (partes.some((p) => p === null)) return null;
     return redondear2((partes as number[]).reduce((a, b) => a + b, 0));
   }
-  const limpio = texto.replace(/[^0-9.,-]/g, "");
+  const limpio = apostrofoDecimal(texto).replace(/[^0-9.,-]/g, "");
   if (!/[0-9]/.test(limpio)) return null;
   const ultimaComa = limpio.lastIndexOf(",");
   const ultimoPunto = limpio.lastIndexOf(".");
@@ -1064,6 +1106,14 @@ export function leerImporteLiteral(texto: string): number | null {
   }
   const n = Number(normal);
   return Number.isFinite(n) ? n : null;
+}
+
+/** Manuscritos y talonarios escriben la coma decimal como apostrofo: «51'00»,
+ *  «134'97», «1'20». Antes se quitaba y salia 5100 / 13497 (5 avisos falsos
+ *  del verificador en las facturas 354 y 384). Seguido de 1-2 cifras es coma
+ *  decimal; seguido de 3 («1'234,56», estilo suizo) es de miles y se quita. */
+export function apostrofoDecimal(texto: string): string {
+  return texto.replace(/['’‘´`](\d{1,2})(?!\d)/g, ",$1").replace(/['’‘´`]/g, "");
 }
 
 /** Diferencia maxima entre el numero y su cita antes de avisar. Un centimo. */
