@@ -378,6 +378,8 @@ export function TabCompras({
                 ) : (
                   <ListaDocumentos
                     documentos={docsVisibles}
+                    facturas={facturas}
+                    resolver={resolver}
                     avisosPorId={avisosPorId}
                     seleccionadoId={seleccion.documentos}
                     cargando={facturasQ.isLoading || albaranesQ.isLoading}
