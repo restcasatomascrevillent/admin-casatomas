@@ -99,6 +99,39 @@ function textoONull(v: unknown, max = 300): string | null {
   return t ? t.slice(0, max) : null;
 }
 
+// Límite de la descripción del vino: la web la pinta en una tarjeta pequeña
+// (sin límite en BD, columna `text`). Objetivo 300, tope duro 320.
+const DESCRIPCION_MAX = 320;
+const SEP_DESCRIPCION = " · ";
+
+// Recorta en el último final de frase (o separador « · ») antes del límite;
+// si no hay ninguno, en el último espacio. Nunca a mitad de palabra.
+function recortarDescripcion(v: unknown, max = DESCRIPCION_MAX): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.replace(/\s*\n+\s*/g, SEP_DESCRIPCION).replace(/\s{2,}/g, " ").trim();
+  if (!t) return null;
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max + 1);
+  let fin = -1;
+  for (const m of corte.matchAll(/[.!?…](?=\s|$)/g)) {
+    if (m.index !== undefined && m.index < max) fin = m.index + 1;
+  }
+  if (fin < 0) {
+    const sep = corte.lastIndexOf(SEP_DESCRIPCION.trim());
+    if (sep > 0) fin = sep;
+  }
+  if (fin < 0) fin = corte.lastIndexOf(" ");
+  const res = (fin > 0 ? t.slice(0, fin) : t.slice(0, max)).replace(/[\s·,;:]+$/, "").trim();
+  return res || null;
+}
+
+const FORMATO_DESCRIPCION = [
+  "   Formato FIJO, tres partes en este orden, cada una UNA frase breve, unidas con « · » (sin saltos de línea):",
+  "   «Elaboración: <lo distintivo de su elaboración>. · Cata: <nariz y boca en pocas palabras>. · Maridaje: <2-3 platos>.»",
+  `   - Máximo ${DESCRIPCION_MAX - 20} caracteres en total (contando todo). Breve y concreto.`,
+  "   - NO repitas el nombre del vino, la bodega ni la D.O. (ya aparecen en otros campos).",
+];
+
 // "D.O.Ca. Rioja" / "D.O. Rías Baixas (estimado)" → "rioja" / "rias baixas"
 function normalizarDO(v: string | null | undefined): string {
   if (!v) return "";
@@ -180,13 +213,13 @@ function buildSystem(categorias: string[], resumenCat: string[], nombres: string
     "",
     "REGLAS DE LA DESCRIPCIÓN:",
     "- Tras leer la etiqueta, usa lo que SABES de ese vino, su bodega y su D.O. para escribir como un sumiller en la carta de un restaurante.",
-    "- Español, 2-3 frases, unos 200-300 caracteres: estilo/elaboración (joven, crianza, barrica, lías…), notas de cata (nariz y boca) y un maridaje breve.",
-    "- NO repitas el nombre del vino ni la ficha literal ('Vino blanco de la bodega X con D.O. Y'): el nombre ya aparece encima en la carta.",
+    "- Español.",
+    ...FORMATO_DESCRIPCION.map((l) => l.trim()),
     "- Tono cálido y elegante. Sin tópicos vacíos ('un vino único', 'toda una experiencia') ni superlativos exagerados.",
     "- Si no conoces ese vino concreto, describe con prudencia lo típico de ese tipo + D.O. + uva.",
     "- Nunca inventes premios, puntuaciones, añadas, meses exactos de crianza ni otros datos concretos que no conozcas con seguridad.",
     ...(ejemplos.length
-      ? ["", "Ejemplos de descripciones de esta carta (imita su tono y longitud, no su contenido):", ...ejemplos.map((e) => `- ${e}`)]
+      ? ["", "Ejemplos de descripciones de esta carta (imita solo su tono, no su longitud ni su contenido):", ...ejemplos.map((e) => `- ${e}`)]
       : []),
   ].join("\n");
 }
@@ -386,10 +419,9 @@ interface FichaMercado {
 }
 
 const EJEMPLO_DUENO =
-  "Vino elaborado en la bodega de Hervías, perteneciente a Señorío de Villarrica, en plena Rioja Alta. " +
-  "Fermenta en ovum de barro artesanal, un método ancestral, y después permanece seis meses sobre sus propias lías en el mismo ovum. " +
-  "Esa es su gran peculiaridad: el barro, por su estructura microporosa, absorbe, refresca y deja una oxigenación lenta, " +
-  "y la evaporación concentra el vino.";
+  "Elaboración: fermentado y criado 6 meses sobre lías en ovum de barro, que le da una oxigenación lenta. · " +
+  "Cata: nariz de fruta blanca y flores; boca fresca, untuosa y mineral. · " +
+  "Maridaje: pescados a la plancha, arroces y quesos semicurados.";
 
 const SCHEMA_FICHA = {
   type: "json_schema",
@@ -431,13 +463,14 @@ function promptBusqueda(ejemplos: string[]): string {
     "   - Solo precios que hayas visto de verdad en una página. Prioriza la misma añada si se conoce; si no, la más parecida. Sin ofertas → lista vacía.",
     "",
     "2) FICHA TÉCNICA: busca la ficha técnica o nota de cata oficial (web de la bodega o fichas de tiendas) y escribe `descripcion` para la carta:",
-    "   - Español, prosa de carta, 450-700 caracteres, redactada con tus palabras (NO copies frases literales de las webs).",
-    "   - Contenido, en este orden y solo si aparece en las fuentes o en la ficha de la etiqueta: bodega y zona; elaboración (fermentación, depósito/barrica/ánfora/huevo, tiempo sobre lías o de crianza); qué lo hace peculiar; notas de cata (vista, nariz, boca); maridaje breve.",
-    "   - NO empieces repitiendo el nombre del vino. Sin tópicos vacíos ni superlativos. Nunca inventes premios, puntuaciones, meses o datos que no estén en las fuentes.",
+    "   - Español, redactada con tus palabras (NO copies frases literales de las webs).",
+    ...FORMATO_DESCRIPCION,
+    "   - Solo datos de las fuentes o de la etiqueta: elaboración (fermentación, depósito/barrica/ánfora/huevo, tiempo sobre lías o de crianza), nariz y boca, maridaje.",
+    "   - Sin tópicos vacíos ni superlativos. Nunca inventes premios, puntuaciones, meses o datos que no estén en las fuentes.",
     "   - Si NO encuentras la ficha de ese vino concreto: ficha_encontrada = false y descripcion = null.",
-    "   Ejemplo del nivel de detalle que busca el dueño (de otro vino; imita detalle y tono, no el contenido):",
+    "   Ejemplo del formato y tono que quiere el dueño (de otro vino, un blanco de Rioja; imita formato y longitud, no el contenido):",
     `   «${EJEMPLO_DUENO}»`,
-    ...(ejemplos.length ? ["   Ejemplos de tono de la carta actual:", ...ejemplos.map((e) => `   - ${e}`)] : []),
+    ...(ejemplos.length ? ["   Ejemplos de tono de la carta actual (solo tono; su longitud y formato NO valen):", ...ejemplos.map((e) => `   - ${e}`)] : []),
     "",
     "3) ingredientes (uva/s, p. ej. 'Viura, Malvasía') y denominacion_origen (con prefijo: 'D.O.Ca. Rioja', 'D.O. Rías Baixas'…): rellénalos SOLO si las fuentes los dan con claridad; si no, null.",
     "",
@@ -525,11 +558,11 @@ function limpiarFicha(raw: Record<string, unknown>, hosts: Set<string>): FichaMe
   const med = mediana(ofertas.map((o) => o.precio));
   // Las 3 fuentes más cercanas a la mediana.
   const fuentes = med === null ? [] : [...ofertas].sort((a, b) => Math.abs(a.precio - med) - Math.abs(b.precio - med)).slice(0, 3);
-  const desc = raw.ficha_encontrada === true ? textoONull(raw.descripcion, 900) : null;
+  const desc = raw.ficha_encontrada === true ? recortarDescripcion(raw.descripcion) : null;
   return {
     precio_mercado: med === null ? null : Math.round(med * 100) / 100,
     precio_mercado_fuentes: fuentes,
-    descripcion: desc && desc.length >= 200 ? desc : null,
+    descripcion: desc && desc.length >= 80 ? desc : null,
     ingredientes: textoONull(raw.ingredientes, 200),
     denominacion_origen: textoONull(raw.denominacion_origen, 200),
   };
@@ -680,7 +713,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
 
     const vino: Record<string, unknown> = {};
     for (const campo of CAMPOS_TEXTO) {
-      vino[campo] = textoONull(raw[campo], campo === "descripcion" ? 600 : 200);
+      vino[campo] = campo === "descripcion" ? recortarDescripcion(raw[campo]) : textoONull(raw[campo], 200);
     }
     const categoria = textoONull(raw.categoria, 100);
     vino.categoria = categoria && categorias.includes(categoria) ? categoria : null;
