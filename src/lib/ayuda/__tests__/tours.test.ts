@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { TOURS, TOUR_BOTON_AYUDA, claveTourVisto, esEstadoLanzarTour, esperarA, pestanasDelTour, cadenaPestanas } from "../tours";
-import { FICHAS_AYUDA, esArchivoVideo } from "../centroAyuda";
+import { FICHAS_AYUDA, esArchivoVideo, pasosDeFicha } from "../centroAyuda";
 
 describe("tours de ayuda", () => {
   it("cada sección tiene pasos con título y texto, y acaba en el botón «?»", () => {
@@ -23,6 +23,20 @@ describe("tours de ayuda", () => {
 
   it("el tour de Facturas avisa de que las que cuadran se revisan solas", () => {
     expect(TOURS.facturas.some((p) => p.texto.includes("se marcan solas"))).toBe(true);
+  });
+
+  it("el tour de Facturas enseña la lista por meses, el vínculo albarán-factura y el zoom del original", () => {
+    const compras = TOURS.facturas.filter((p) => p.pestana === "facturas-pestana-compras").map((p) => p.elemento);
+    expect(compras).toEqual(expect.arrayContaining(["facturas-lista", "facturas-ficha-vinculo", "facturas-original"]));
+    expect(TOURS.facturas.find((p) => p.elemento === "facturas-original")?.texto).toMatch(/zoom|Amplía/i);
+  });
+
+  it("los textos de ayuda hablan de tú y en español: nada de «usted»", () => {
+    const textos = [
+      ...Object.values(TOURS).flat().map((p) => p.texto),
+      ...FICHAS_AYUDA.flatMap((f) => [f.queEs, ...pasosDeFicha(f), ...f.preguntas.map((q) => q.respuesta)]),
+    ];
+    for (const t of textos) expect(t).not.toMatch(/\busted\b/i);
   });
 
   it("recorre las pestañas en orden: Facturas Cargar → Compras → IA; Gestor Web Carta (› Vinos) → Novedades → Menús → Tapas", () => {
@@ -57,6 +71,7 @@ describe("tours de ayuda", () => {
     const ia = TOURS.facturas.filter((p) => p.pestana === "facturas-pestana-ia").map((p) => p.elemento);
     expect(ia).toEqual([
       "facturas-pestana-ia",
+      "facturas-gasto-ia",
       "facturas-ia-historial",
       "facturas-ia-sugerencias",
       "facturas-ia-al-instante",
@@ -97,7 +112,11 @@ describe("tours de ayuda", () => {
   it("hay una ficha del Centro de Ayuda por cada tour, con pasos y preguntas", () => {
     expect(FICHAS_AYUDA.map((f) => f.seccion).sort()).toEqual(Object.keys(TOURS).sort());
     for (const f of FICHAS_AYUDA) {
-      expect(f.pasos.length).toBeGreaterThan(0);
+      expect(pasosDeFicha(f).length).toBeGreaterThan(0);
+      for (const g of f.grupos) {
+        expect(g.titulo.trim()).not.toBe("");
+        expect(g.pasos.length).toBeGreaterThan(0);
+      }
       expect(f.preguntas.length).toBeGreaterThan(0);
       expect(f.ruta.startsWith("/")).toBe(true);
     }

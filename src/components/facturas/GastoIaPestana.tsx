@@ -34,6 +34,7 @@ export function GastoIaPestana({ className = "" }: { className?: string }) {
     <Popover>
       <PopoverTrigger asChild>
         <button
+          data-tour="facturas-gasto-ia"
           type="button"
           data-testid="gasto-ia-pestana"
           data-nivel-tope={estadoTope.nivel}

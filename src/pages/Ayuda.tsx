@@ -85,19 +85,30 @@ function Ficha({ ficha, puedeEntrar }: { ficha: FichaAyuda; puedeEntrar: boolean
         <h3 id={`como-${ficha.seccion}`} className="text-base font-semibold">
           Cómo se usa, paso a paso
         </h3>
-        <ol className="space-y-3">
-          {ficha.pasos.map((paso, i) => (
-            <li key={i} className="flex gap-3">
-              <span
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold tabular-nums text-primary"
-                aria-hidden="true"
-              >
-                {i + 1}
-              </span>
-              <p className="pt-0.5 text-base leading-relaxed">{paso}</p>
-            </li>
-          ))}
-        </ol>
+        {/* Bloques con título; la numeración sigue de un bloque al siguiente. */}
+        <div className="space-y-5">
+          {ficha.grupos.map((grupo, g) => {
+            const inicio = ficha.grupos.slice(0, g).reduce((n, x) => n + x.pasos.length, 0);
+            return (
+              <div key={grupo.titulo} className="space-y-3">
+                <h4 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{grupo.titulo}</h4>
+                <ol className="space-y-3" start={inicio + 1}>
+                  {grupo.pasos.map((paso, i) => (
+                    <li key={i} className="flex gap-3">
+                      <span
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold tabular-nums text-primary"
+                        aria-hidden="true"
+                      >
+                        {inicio + i + 1}
+                      </span>
+                      <p className="pt-0.5 text-base leading-relaxed">{paso}</p>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section aria-labelledby={`faq-${ficha.seccion}`} className="space-y-3">

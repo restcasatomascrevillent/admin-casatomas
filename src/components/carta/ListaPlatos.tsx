@@ -106,9 +106,10 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {platos.map((plato) => (
+        {platos.map((plato, i) => (
           <Card 
             key={plato.id} 
+            data-tour={i === 0 ? "gw-carta-plato" : undefined}
             className={cn(
               "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
               !plato.activado && "opacity-60"

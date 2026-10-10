@@ -186,7 +186,11 @@ const Facturas = () => {
                 (ver lib/facturas/alturaCargar.ts). */}
             <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="mx-auto flex h-full max-w-3xl flex-col gap-1">
-                {activeTab === "cargar" && <MonitorGastoIA modo="ocr" className="shrink-0 self-end" />}
+                {activeTab === "cargar" && (
+                  <div className="shrink-0 self-end" data-tour="facturas-coste-lectura">
+                    <MonitorGastoIA modo="ocr" />
+                  </div>
+                )}
                 <div className="flex-1 min-h-0">
                   <SubidaFacturas />
                 </div>

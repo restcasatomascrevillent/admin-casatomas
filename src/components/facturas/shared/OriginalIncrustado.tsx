@@ -150,7 +150,7 @@ function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titul
   }
 
   return (
-    <section aria-label="Documento original" className="space-y-2">
+    <section aria-label="Documento original" className="space-y-2" data-tour="facturas-original">
       {cabecera}
       {cuerpo}
       {url && !pdf && <VisorPantallaCompleta url={url} abierto={visor} onCerrar={() => setVisor(false)} titulo={titulo} />}

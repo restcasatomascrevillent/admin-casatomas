@@ -845,7 +845,7 @@ export function EditorNovedadesWeb() {
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)] xl:flex-1 xl:min-h-0 gap-4 items-start">
         <div className="space-y-4 min-w-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain">
           {/* ------------------------------------------------ Lista */}
-          <Card>
+          <Card data-tour="gw-novedades-lista">
             <CardHeader className="p-4 pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 Publicadas y guardadas

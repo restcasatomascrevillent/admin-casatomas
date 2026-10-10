@@ -121,7 +121,7 @@ export function FichaDocumento({
         </div>
 
         {/* Acciones compactas: icono + palabra corta; en estrecho, solo icono con su nombre accesible. */}
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className="flex shrink-0 items-center gap-0.5" data-tour="facturas-ficha-acciones">
           <BotonOriginal
             driveUrl={doc.drive_url}
             archivoPath={doc.archivo_path}
@@ -182,11 +182,13 @@ export function FichaDocumento({
       )}
 
       {/* Albarán ↔ factura: vínculo, candidatos y cotejo (migración 20261010110000). */}
-      {esAlbaran ? (
-        <FacturaDelAlbaran albaran={doc} factura={facturaDelAlbaran} onAbrirDocumento={onAbrirDocumento} />
-      ) : (
-        <AlbaranesDeFactura factura={doc} albaranesCargados={albaranesDeLaFactura} onAbrirDocumento={onAbrirDocumento} />
-      )}
+      <div className="empty:hidden" data-tour="facturas-ficha-vinculo">
+        {esAlbaran ? (
+          <FacturaDelAlbaran albaran={doc} factura={facturaDelAlbaran} onAbrirDocumento={onAbrirDocumento} />
+        ) : (
+          <AlbaranesDeFactura factura={doc} albaranesCargados={albaranesDeLaFactura} onAbrirDocumento={onAbrirDocumento} />
+        )}
+      </div>
 
       {doc.observaciones && <Observaciones texto={doc.observaciones} />}
 
