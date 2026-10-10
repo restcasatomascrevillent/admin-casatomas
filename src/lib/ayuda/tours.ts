@@ -52,6 +52,7 @@ const F_CARGAR = "facturas-pestana-cargar";
 const F_COMPRAS = "facturas-pestana-compras";
 const F_IA = "facturas-pestana-ia";
 const GW_CARTA = "gw-pestana-carta";
+const GW_CARTA_VINOS = "gw-carta-vinos";
 const GW_NOVEDADES = "gw-pestana-novedades";
 const GW_MENUS = "gw-pestana-menus";
 const GW_TAPAS = "gw-pestana-tapas";
@@ -224,6 +225,25 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       titulo: "Buscar y filtrar",
       texto:
         "Busca por nombre o filtra por categoría y por lo que se ve u oculta en cada web. En cada plato tienes interruptores para mostrarlo u ocultarlo en Casa Tomás o en Touza, y los botones «Editar» y «Eliminar».",
+      opcional: true,
+      lado: "bottom",
+    },
+    // --- Carta › Vinos (solo se señala: el tour nunca abre la cámara ni sube fotos) ---
+    {
+      elemento: GW_CARTA_VINOS,
+      pestana: GW_CARTA_VINOS,
+      titulo: "Vinos con una foto",
+      texto:
+        "En «Vinos» puedes dar de alta una botella sin escribir: le haces una foto a la etiqueta y la ficha se rellena sola.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "gw-carta-vinos-foto",
+      pestana: GW_CARTA_VINOS,
+      titulo: "Añadir botella con foto",
+      texto:
+        "«Añadir botella con foto» abre la cámara: foto a la etiqueta de delante, de cerca y con luz. Se rellenan el nombre, la categoría, la D.O., la uva, la región y una descripción, y te sugiere un precio. Lo revisas y guardas tú. «Varias botellas» sirve para hacer una foto tras otra y revisarlas después. Cada foto usa la IA.",
       opcional: true,
       lado: "bottom",
     },

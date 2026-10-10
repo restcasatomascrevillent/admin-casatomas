@@ -212,7 +212,12 @@ export default function TabCarta() {
           <div className="max-w-full overflow-x-auto" data-tour="gw-carta-secciones">
             <TabsList className="h-auto w-auto">
               {(Object.keys(secciones) as Seccion[]).map((seccion) => (
-                <TabsTrigger key={seccion} value={seccion} className="min-h-11 gap-1.5 px-4">
+                <TabsTrigger
+                  key={seccion}
+                  value={seccion}
+                  className="min-h-11 gap-1.5 px-4"
+                  data-tour={seccion === "vinos" ? "gw-carta-vinos" : undefined}
+                >
                   {secciones[seccion].etiqueta}
                   <span className="text-xs text-muted-foreground tabular-nums">{secciones[seccion].total}</span>
                 </TabsTrigger>
@@ -225,13 +230,15 @@ export default function TabCarta() {
               Ajustar precios
             </Button>
             {seccionActiva === "vinos" && (
-              <BotonVinoDesdeFoto
-                categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
-                onLeido={(resultado) => {
-                  setPrecargaVino(resultado);
-                  setDialogVinoOpen(true);
-                }}
-              />
+              <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-vinos-foto">
+                <BotonVinoDesdeFoto
+                  categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
+                  onLeido={(resultado) => {
+                    setPrecargaVino(resultado);
+                    setDialogVinoOpen(true);
+                  }}
+                />
+              </div>
             )}
             <Button onClick={actual.abrirDialogo}>
               <Plus className="mr-2 h-4 w-4" />

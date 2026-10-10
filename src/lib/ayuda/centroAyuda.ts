@@ -93,6 +93,9 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       "En «Carta», elige si quieres tocar platos, bebidas, vinos o cócteles. Pulsa «Añadir» para crear uno o «Editar» en uno que ya existe para cambiar su precio, descripción, alérgenos o foto.",
       "En cada plato tienes interruptores para mostrarlo u ocultarlo en la web de Casa Tomás o en la de Touza. Ocultar no borra nada: lo puedes volver a enseñar cuando quieras.",
       "Para subir o bajar los precios de toda una categoría de golpe, usa «Ajustar precios».",
+      "Meter vinos con una foto: en «Carta», entra en «Vinos» y pulsa «Añadir botella con foto». Hazle la foto a la etiqueta de delante de la botella, de cerca y con luz. En unos segundos se abre la ficha ya rellena: nombre (con la añada si se lee), categoría, D.O., uva, región, país y una descripción. La foto se recorta sola y queda como foto del vino.",
+      "El precio no se rellena solo: debajo te sale un precio «Sugerido» (calculado con los precios de tu carta), que puedes poner con «Usar», y lo que cuesta más o menos en tiendas. Revisa todo, corrige lo que haga falta y pulsa guardar. Hasta que no guardas, no se añade nada a la carta.",
+      "Si tienes varias botellas, pulsa «Varias botellas» y ve haciendo una foto por botella («Hacer foto» y luego «Otra foto»), o elígelas de la galería. Se leen solas mientras sigues; cuando una pone «Listo · toca para revisar», tócala, revísala y guárdala. Las que ya están pasan a «Guardado».",
       "En «Novedades», pulsa «Nueva novedad», escribe el título y la descripción (o unas ideas y «Redactar con IA»), añade una foto si quieres y elige si se ve en la web y entre qué fechas. A la derecha ves cómo queda en el móvil.",
       "En «Menús diarios» y «Tapas», elige la fecha, escribe el menú o las tapas (una por línea) y guarda.",
       "Escribe siempre en español: al guardar se traduce solo al inglés y al francés.",
@@ -121,6 +124,16 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         pregunta: "Me he equivocado en una novedad ya publicada, ¿qué hago?",
         respuesta:
           "Tócala en la lista para editarla, corrige y guarda. Si prefieres quitarla un tiempo, desactiva «Visible en la web».",
+      },
+      {
+        pregunta: "Vinos con foto: ¿qué foto le hago?",
+        respuesta:
+          "A la etiqueta de delante de una sola botella: de cerca, recta, con buena luz y sin reflejos. No sirve una foto de la carta de vinos ni de varias botellas juntas; para eso usa «Varias botellas» y haz una foto a cada una. Cada foto usa la IA (y busca el precio en tiendas), así que cuesta unos céntimos: no hagas fotos de prueba de más.",
+      },
+      {
+        pregunta: "Vinos con foto: ¿y si lee algo mal?",
+        respuesta:
+          "No pasa nada: nada se guarda hasta que tú pulsas guardar. Corrige en la ficha lo que esté mal y luego guarda. Si no ha leído casi nada (te avisa si no encuentra el nombre), cierra y repite la foto más cerca y con más luz, o añádelo a mano con «Añadir». En «Varias botellas», si una sale «No se pudo leer», pulsa el botón de reintentar o quítala con la X.",
       },
       {
         pregunta: "No veo alguna pestaña, ¿por qué?",

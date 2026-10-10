@@ -25,7 +25,7 @@ describe("tours de ayuda", () => {
     expect(TOURS.facturas.some((p) => p.texto.includes("se marcan solas"))).toBe(true);
   });
 
-  it("recorre las pestañas en orden: Facturas Cargar → Compras → IA; Gestor Web Carta → Novedades → Menús → Tapas", () => {
+  it("recorre las pestañas en orden: Facturas Cargar → Compras → IA; Gestor Web Carta (› Vinos) → Novedades → Menús → Tapas", () => {
     expect(pestanasDelTour(TOURS.facturas)).toEqual([
       "facturas-pestana-cargar",
       "facturas-pestana-compras",
@@ -33,6 +33,7 @@ describe("tours de ayuda", () => {
     ]);
     expect(pestanasDelTour(TOURS["gestor-web"])).toEqual([
       "gw-pestana-carta",
+      "gw-carta-vinos",
       "gw-pestana-novedades",
       "gw-pestana-menus",
       "gw-pestana-tapas",

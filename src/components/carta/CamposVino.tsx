@@ -5,8 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 
-/** Longitud orientativa de la descripción (no es un límite de la BD). */
-export const DESCRIPCION_RECOMENDADA = 700;
+/**
+ * Longitud máxima recomendada de la descripción (la BD es `text`, sin límite;
+ * la web la pinta en una tarjeta pequeña). Igual que el recorte de la
+ * función `extraer-vino-foto` (DESCRIPCION_MAX).
+ */
+export const DESCRIPCION_RECOMENDADA = 320;
 
 /** Campos de texto comunes de un vino (alta y edición). Sin alérgenos: se conservan tal cual en BD. */
 export interface CamposVinoValores extends FieldValues {
