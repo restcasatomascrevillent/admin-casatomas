@@ -7,6 +7,7 @@ import { useUserRole } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
+import { esCambioDePestanaDelTour } from "@/lib/ayuda/tours";
 import {
   PESTANAS_GESTOR_WEB,
   esPestanaGestorWeb,
@@ -104,7 +105,8 @@ export default function GestorWeb() {
     if (!esPestanaGestorWeb(value)) return;
     const next = new URLSearchParams(searchParams);
     next.set("tab", value);
-    setSearchParams(next);
+    // Los saltos del tour guiado no apilan historial (si no, «Atrás» repite el tour).
+    setSearchParams(next, { replace: esCambioDePestanaDelTour() });
   };
 
   // Alto de la pantalla, calculado solo (regla del dueño, 2026-10-07: la página

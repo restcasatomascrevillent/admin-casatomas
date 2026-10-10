@@ -6,6 +6,7 @@ import "@/components/ayuda/tour.css";
 import { useAuth } from "@/hooks/useAuth";
 import {
   TOURS,
+  cambiarPestanaComoTour,
   claveTourVisto,
   esEstadoLanzarTour,
   esperarA,
@@ -43,7 +44,10 @@ function pestanaAbierta(id: string): boolean {
 function abrirPestana(id: string): boolean {
   const boton = document.querySelector<HTMLElement>(selectorTour(id));
   if (!boton || pestanaAbierta(id)) return false;
-  boton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 }));
+  // Marcado como cambio del tour: la pantalla lo pone en la URL sin apilar historial.
+  cambiarPestanaComoTour(() =>
+    boton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, button: 0 })),
+  );
   return true;
 }
 
@@ -112,12 +116,18 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
       popover: { title: paso.titulo, description: paso.texto, align: "start" },
     }));
 
+    // Desplegables que abrió el tour (estaban plegados): al acabar se vuelven a plegar.
+    const desplegados: HTMLElement[] = [];
+
     let ocupado = false;
     let terminado = false;
     const terminar = () => {
       if (terminado) return;
       terminado = true;
       if (driverRef.current === d) driverRef.current = null;
+      for (const boton of desplegados) {
+        if (boton.isConnected && boton.getAttribute("aria-expanded") === "true") boton.click();
+      }
       if (pestanaInicialRef.current) abrirPestana(pestanaInicialRef.current);
     };
     const vigente = () => !terminado && driverRef.current === d;
@@ -138,6 +148,7 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
             if (!vigente()) return;
             if (boton instanceof HTMLElement && boton.getAttribute("aria-expanded") !== "true") {
               boton.click();
+              if (!desplegados.includes(boton)) desplegados.push(boton);
               cambio = true;
             }
           }

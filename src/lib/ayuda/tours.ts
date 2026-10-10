@@ -330,3 +330,21 @@ export const esEstadoLanzarTour = (estado: unknown): estado is EstadoLanzarTour 
   estado !== null &&
   typeof (estado as { lanzarTour?: unknown }).lanzarTour === "string" &&
   (estado as { lanzarTour: string }).lanzarTour in TOURS;
+
+// Cambio de pestaña hecho por el tour (no por el usuario). Las pantallas que
+// guardan la pestaña en la URL lo miran para no apilar historial: si no, al
+// acabar el tour «Atrás» recorre todas las pestañas que enseñó.
+let pestanaPorTour = false;
+
+/** Ejecuta `cambiar` marcándolo como cambio de pestaña del tour (Radix avisa en el mismo `mousedown`). */
+export function cambiarPestanaComoTour(cambiar: () => void): void {
+  pestanaPorTour = true;
+  try {
+    cambiar();
+  } finally {
+    pestanaPorTour = false;
+  }
+}
+
+/** ¿El cambio de pestaña en curso lo está haciendo el tour? */
+export const esCambioDePestanaDelTour = (): boolean => pestanaPorTour;
