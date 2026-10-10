@@ -194,7 +194,7 @@ describe("VistaHoy — lo que ya NO hay (retirado el 04/10/2026 a petición del 
     const { queryClient } = montar();
     await esperarCarga(queryClient);
 
-    expect(screen.getByText("Reservas hoy")).toBeInTheDocument();
+    expect(screen.getByTestId("cifras-hoy")).toHaveTextContent("reservas");
   });
 });
 
@@ -307,7 +307,7 @@ describe("VistaHoy — el Reservado (sala privada) está fuera de aforo pero a l
     expect(aviso).toHaveTextContent("Reservado: ocupado — García, 8 pax (comida); libre en la cena");
     expect(aviso).toHaveTextContent("Fuera de aforo");
     // Las cifras de la franja son las del resumen (que ya las calcula sin el Reservado): no se tocan aquí.
-    expect(screen.getByText("Comensales")).toBeInTheDocument();
+    expect(screen.getByTestId("cifras-hoy")).toHaveTextContent("comensales");
   });
 
   // 04/10/2026 (dueño): el Reservado ya no tiene columna en el kanban; "al darle al desplegable veo quién es".

@@ -288,9 +288,9 @@ export default function Reservas() {
 
             {/* Tablet/desktop: pestañas */}
             <div className="hidden sm:block scroll-x-touch no-scrollbar">
-              <TabsList className="w-max min-w-max justify-start gap-1 p-1">
-                <TabsTrigger value="hoy" className="flex-shrink-0 text-sm lg:text-base">Hoy</TabsTrigger>
-                <TabsTrigger value="reservas" className="flex-shrink-0 text-sm lg:text-base gap-1">
+              <TabsList className="h-9 w-max min-w-max justify-start gap-1 p-0.5 pointer-coarse:h-10 pointer-coarse:min-h-0">
+                <TabsTrigger value="hoy" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Hoy</TabsTrigger>
+                <TabsTrigger value="reservas" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base gap-1">
                   Lista
                   {countPendientes > 0 && (
                     <span
@@ -302,11 +302,11 @@ export default function Reservas() {
                     </span>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="calendario" className="flex-shrink-0 text-sm lg:text-base">Calendario</TabsTrigger>
-                <TabsTrigger value="asignacion" className="flex-shrink-0 text-sm lg:text-base">Próximas reservas</TabsTrigger>
-                <TabsTrigger value="blacklist" className="flex-shrink-0 text-sm lg:text-base">Blacklist</TabsTrigger>
+                <TabsTrigger value="calendario" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Calendario</TabsTrigger>
+                <TabsTrigger value="asignacion" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Próximas reservas</TabsTrigger>
+                <TabsTrigger value="blacklist" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Blacklist</TabsTrigger>
                 {isAdmin && (
-                  <TabsTrigger value="configuracion" className="gap-1 flex-shrink-0 text-sm lg:text-base">
+                  <TabsTrigger value="configuracion" className="touch-hit pointer-coarse:min-h-9 gap-1 flex-shrink-0 text-sm lg:text-base">
                     <Settings className="h-4 w-4" />
                     <span className="hidden sm:inline">Configuración</span>
                     <span className="sm:hidden">Config</span>
@@ -323,7 +323,7 @@ export default function Reservas() {
           <Dialog open={openDialog} onOpenChange={setOpenDialog}>
             <ConMotivo motivo={puedeEditarReservas ? undefined : MOTIVO_SIN_PERMISO_ALTA} className="shrink-0">
               <DialogTrigger asChild>
-                <Button className="shrink-0" disabled={!puedeEditarReservas}>
+                <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9" disabled={!puedeEditarReservas}>
                   <Plus className="mr-2 h-4 w-4" />
                   Nueva Reserva
                 </Button>
@@ -350,7 +350,7 @@ export default function Reservas() {
             mesas» abre la sala aquí, a pantalla completa (el mismo salto que el
             Calendario: reparto `PlanoEspacio2D` ↔ modo servicio), y «Volver»
             regresa a Hoy en la vista en que se estaba. */}
-        <TabsContent value="hoy" className="mt-6">
+        <TabsContent value="hoy" className="mt-2">
           <VistaHoy onAbrirSala={handleEspacioClick} />
         </TabsContent>
 

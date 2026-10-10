@@ -197,7 +197,7 @@ describe("Hoy · el kanban mide el alto de la pantalla", () => {
     await montar();
 
     const fijos = [
-      screen.getByText("Reservas hoy"),
+      screen.getByTestId("cifras-hoy"),
       screen.getByTestId("aviso-sala-privada"),
       screen.getByRole("button", { name: /Disponibilidad por cuartos de hora/ }),
       screen.getByRole("textbox", { name: "Buscar reservas" }),

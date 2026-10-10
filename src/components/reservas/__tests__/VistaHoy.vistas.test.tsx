@@ -183,7 +183,7 @@ describe("Hoy · el selector «Kanban | Plano»", () => {
 
 describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
   const bloqueDeArriba = () => [
-    screen.getByText("Reservas hoy"),
+    screen.getByTestId("cifras-hoy"),
     screen.getByTestId("aviso-sala-privada"),
     screen.getByRole("button", { name: /Disponibilidad por cuartos de hora/ }),
     screen.getByRole("textbox", { name: "Buscar reservas" }),
@@ -200,7 +200,8 @@ describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
   it("en el plano el plano necesita el alto: cifras y Reservado en UNA línea, sin cuartos de hora; buscador, turno y selector siguen", async () => {
     montar();
     fireEvent.click(opcion("Plano"));
-    const resumen = await screen.findByTestId("resumen-hoy-plano");
+    // 10/10/2026: las cifras van en chips pequeños dentro de la fila de filtros (las dos vistas).
+    const resumen = await screen.findByTestId("cifras-hoy");
     expect(resumen).toHaveTextContent("23 reservas");
     expect(resumen).toHaveTextContent("89 comensales");
     expect(resumen).toHaveTextContent("59 % de 150");
@@ -239,10 +240,11 @@ describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
 
   it("la ayuda de la fila es la de cada vista", () => {
     montar();
-    expect(screen.getByText(/Toca una tarjeta para ver sus acciones/)).toBeInTheDocument();
+    // 10/10/2026: la ayuda es un ⓘ (nota con el texto como nombre accesible y título).
+    expect(screen.getByRole("note", { name: /Toca una tarjeta para ver sus acciones/ })).toBeInTheDocument();
     fireEvent.click(opcion("Plano"));
-    expect(screen.getByText(/Toca una mesa para ver su reserva/)).toBeInTheDocument();
-    expect(screen.queryByText(/Toca una tarjeta para ver sus acciones/)).not.toBeInTheDocument();
+    expect(screen.getByRole("note", { name: /Toca una mesa para ver su reserva/ })).toBeInTheDocument();
+    expect(screen.queryByRole("note", { name: /Toca una tarjeta para ver sus acciones/ })).not.toBeInTheDocument();
   });
 });
 
@@ -285,7 +287,7 @@ describe("Hoy · nada de «Reservado: libre» sin haber leído las reservas (rev
     await screen.findByTestId("vista-kanban");
     expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
     fireEvent.click(opcion("Plano"));
-    expect(screen.getByTestId("resumen-hoy-plano")).not.toHaveTextContent("Reservado");
+    expect(screen.getByTestId("cifras-hoy")).not.toHaveTextContent("Reservado");
     h.respuesta = "ok";
   });
 
