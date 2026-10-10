@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Megaphone, UtensilsCrossed, PartyPopper } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +15,7 @@ interface TipoOption {
 const tiposNewsletter: TipoOption[] = [
   {
     tipo: 'anuncio',
-    icono: <Megaphone className="h-8 w-8" />,
+    icono: <Megaphone className="h-4 w-4" />,
     nombre: 'Anuncio General',
     descripcion: 'Comunica novedades a tus clientes',
     tituloDefault: 'Novedades de Casa Tomás',
@@ -24,7 +23,7 @@ const tiposNewsletter: TipoOption[] = [
   },
   {
     tipo: 'nuevo_menu',
-    icono: <UtensilsCrossed className="h-8 w-8" />,
+    icono: <UtensilsCrossed className="h-4 w-4" />,
     nombre: 'Nuevo Menú',
     descripcion: 'Presenta nuevos platos de la carta',
     tituloDefault: 'Nuevos platos en nuestra carta',
@@ -32,7 +31,7 @@ const tiposNewsletter: TipoOption[] = [
   },
   {
     tipo: 'oferta',
-    icono: <PartyPopper className="h-8 w-8" />,
+    icono: <PartyPopper className="h-4 w-4" />,
     nombre: 'Oferta Especial',
     descripcion: 'Promociones y descuentos exclusivos',
     tituloDefault: '¡Oferta exclusiva para ti!',
@@ -46,29 +45,31 @@ interface SelectorTipoNewsletterProps {
 }
 
 export function SelectorTipoNewsletter({ tipoSeleccionado, onSeleccionar }: SelectorTipoNewsletterProps) {
+  // Una fila de tres botones (icono + nombre, 44 px): la descripción de cada tipo va en el tooltip y en el nombre
+  // accesible, no ocupa alto. Es un grupo de opciones: se mueve con Tab y se elige con Intro o Espacio.
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      {tiposNewsletter.map((opcion) => (
-        <Card
-          key={opcion.tipo}
-          className={cn(
-            "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
-            tipoSeleccionado === opcion.tipo && "border-primary ring-2 ring-primary/20"
-          )}
-          onClick={() => onSeleccionar(opcion.tipo, opcion.tituloDefault, opcion.mensajeDefault)}
-        >
-          <CardContent className="p-4 text-center">
-            <div className={cn(
-              "mx-auto mb-2 w-fit p-2 rounded-full",
-              tipoSeleccionado === opcion.tipo ? "bg-primary text-primary-foreground" : "bg-muted"
-            )}>
-              {opcion.icono}
-            </div>
-            <h3 className="font-semibold text-sm">{opcion.nombre}</h3>
-            <p className="text-xs text-muted-foreground mt-1">{opcion.descripcion}</p>
-          </CardContent>
-        </Card>
-      ))}
+    <div role="radiogroup" aria-label="Tipo de comunicación" className="grid grid-cols-3 gap-2">
+      {tiposNewsletter.map((opcion) => {
+        const activo = tipoSeleccionado === opcion.tipo;
+        return (
+          <button
+            key={opcion.tipo}
+            type="button"
+            role="radio"
+            aria-checked={activo}
+            aria-label={`${opcion.nombre}: ${opcion.descripcion}`}
+            title={opcion.descripcion}
+            onClick={() => onSeleccionar(opcion.tipo, opcion.tituloDefault, opcion.mensajeDefault)}
+            className={cn(
+              "flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-md border px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              activo ? "border-primary bg-primary text-primary-foreground" : "border-input bg-background hover:bg-muted/60",
+            )}
+          >
+            <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">{opcion.icono}</span>
+            <span className="text-center leading-tight">{opcion.nombre}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

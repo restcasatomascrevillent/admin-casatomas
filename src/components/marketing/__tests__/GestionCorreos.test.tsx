@@ -4,7 +4,7 @@
  * pestaña empieza directamente por los contadores y la lista. Supabase mockeado: nunca se llama a nada real.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 const mock = vi.hoisted(() => ({ invoke: vi.fn(), filas: [] as Record<string, unknown>[] }));
@@ -103,9 +103,13 @@ describe("GestionCorreos (pestaña Suscriptores)", () => {
     // no se debe a que todavía no se hubiera pintado nada).
     expect(await screen.findByRole("tab", { name: "Activos (2)" })).toBeInTheDocument();
     expect(await screen.findByText("Lista de envío")).toBeInTheDocument();
-    expect(screen.getByText("Suscriptores activos")).toBeInTheDocument();
-    expect(screen.getByText("Lista de suscriptores")).toBeInTheDocument();
-    expect(screen.getByText(/dados de baja \(no reciben nada\)/)).toBeInTheDocument();
+    // Las cifras, en una tira (sin tarjetas): activos y dados de baja con su explicación corta.
+    const tira = screen.getByTestId("cifras-suscriptores");
+    expect(within(tira).getByText("Suscriptores activos")).toBeInTheDocument();
+    expect(within(tira).getByText("Dados de baja")).toBeInTheDocument();
+    expect(within(tira).getByText("no reciben nada")).toBeInTheDocument();
+    // «Lista de envío» en una sola línea compacta.
+    expect(screen.getByTestId("lista-envio-compacta")).toBeInTheDocument();
 
     const texto = document.body.textContent ?? "";
     for (const quitado of TEXTOS_QUITADOS) expect(texto).not.toContain(quitado);
@@ -125,24 +129,23 @@ describe("GestionCorreos (pestaña Suscriptores)", () => {
 
     const tarjeta = screen.getByTestId("tarjeta-lista-suscriptores");
     const comprobarLista = () => {
-      // Dentro de la tarjeta de la lista no queda ningún alto fijo (el antiguo `h-[300px]`, `h-[20rem]`…).
+      // Dentro de la zona de la lista no queda ningún alto fijo (el antiguo `h-[300px]`, `h-[20rem]`…).
       const fijos = [tarjeta, ...Array.from(tarjeta.querySelectorAll("*"))].filter((el) =>
         /(^|\s)h-\[[\d.]+(px|rem)\]/.test(el.getAttribute("class") ?? ""),
       );
       expect(fijos).toEqual([]);
 
-      // La zona con scroll es la de la propia lista…
-      const visor = tarjeta.querySelector("[data-radix-scroll-area-viewport]");
-      expect(visor).not.toBeNull();
-      const zonaConScroll = (visor as HTMLElement).parentElement as HTMLElement;
-      // …y ella y cada contenedor hasta la tarjeta pueden crecer y encoger (flex-1 + min-h-0): si falla uno,
+      // La zona con scroll es la propia lista plana (`ul`)…
+      const lista = tarjeta.querySelector("ul[aria-label^='Suscriptores']") as HTMLElement;
+      expect(lista).not.toBeNull();
+      expect(lista.className).toMatch(/overflow-y-auto/);
+      // …y ella y cada contenedor hasta la zona pueden crecer y encoger (flex-1 + min-h-0): si falla uno,
       // la lista empuja al resto y la pestaña vuelve a hacer scroll.
-      const cadena: HTMLElement[] = [zonaConScroll];
-      for (let el = zonaConScroll.parentElement; el && el !== tarjeta; el = el.parentElement) cadena.push(el);
-      expect(cadena.length).toBeGreaterThanOrEqual(3);
-      for (const el of cadena) {
+      const cadena: HTMLElement[] = [lista];
+      for (let el = lista.parentElement; el && el !== tarjeta; el = el.parentElement) cadena.push(el);
+      for (const el of [...cadena, tarjeta]) {
         expect(el.className).toMatch(/(^|\s)flex-1(\s|$)/);
-        expect(el.className).toMatch(/(^|\s)min-h-0(\s|$)/);
+        expect(el.className).toMatch(/(^|\s)min-h-(0|\[16rem\])(\s|$)/);
       }
     };
 

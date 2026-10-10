@@ -3,8 +3,9 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { useEstadisticasCorreos } from "@/hooks/useEmailEventos";
+import { TiraCifras } from "@/components/panel/TiraCifras";
 import { cn } from "@/lib/utils";
-import { Send, CheckCircle, Mail, MousePointerClick, AlertTriangle, RefreshCw, TrendingUp } from "lucide-react";
+import { AlertTriangle, RefreshCw, TrendingUp } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -17,10 +18,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 //
 // TODO A LA VISTA, SIN SCROLL (petición del dueño, 2026-10-06): la pestaña
 // cabe en el alto que le da Marketing (`useAlturaDisponible`) desde 768 px de
-// ancho. Cabecera en una fila (la explicación larga va en la ayuda «i»),
-// tarjetas bajas en una fila y la gráfica ocupa el resto del alto. Desde `lg`
-// el desglose y el historial van a la derecha de la gráfica; entre `md` y `lg`
-// (tablet vertical), debajo. Si el historial es largo, solo su lista hace
+// ancho. Cabecera en una fila (la explicación larga va en la ayuda «i»), UN
+// solo bloque de cifras (TiraCifras: enviados, entregados, abiertos, con clic,
+// no entregados y spam; antes eran 4 tarjetas y un «Desglose» de chips de
+// colores con los mismos números) y la gráfica ocupa el resto del alto. Desde
+// `lg` el historial va a la derecha de la gráfica; entre `md` y `lg` (tablet
+// vertical), debajo. Si el historial es largo, solo su lista hace
 // scroll. En móvil (< md) todo va en columna y desplaza la pestaña entera.
 
 const ESTILO_TOOLTIP = {
@@ -39,36 +42,6 @@ const SERIES = [
 
 const TEXTO_AYUDA =
   "Cuenta todos los correos que envía el restaurante: los de las reservas y los de la newsletter. Cada correo cuenta una sola vez y los porcentajes son sobre los enviados. Se actualizan solas cada minuto.";
-
-interface TarjetaCifraProps {
-  titulo: string;
-  icono: ReactNode;
-  cifra: ReactNode;
-  detalle: string;
-  claseCifra?: string;
-}
-
-/**
- * Tarjeta baja: etiqueta e icono arriba y, debajo, la cifra con su «n de N correos». Desde `lg` los dos
- * van en la misma línea; por debajo (tarjetas estrechas) el detalle va debajo en las cuatro por igual.
- */
-function TarjetaCifra({ titulo, icono, cifra, detalle, claseCifra }: TarjetaCifraProps) {
-  const idTitulo = useId();
-  return (
-    <Card role="group" aria-labelledby={idTitulo} className="p-3">
-      <div className="flex items-center justify-between gap-2">
-        <CardTitle id={idTitulo} className="truncate text-sm font-medium">
-          {titulo}
-        </CardTitle>
-        {icono}
-      </div>
-      <div className="mt-1 flex flex-col lg:flex-row lg:flex-wrap lg:items-baseline lg:gap-x-2">
-        <span className={cn("text-2xl font-bold leading-8", claseCifra)}>{cifra}</span>
-        <span className="text-xs text-muted-foreground">{detalle}</span>
-      </div>
-    </Card>
-  );
-}
 
 interface EstadisticasNewsletterProps {
   /** Lo que va junto al desglose: en Marketing, el historial de envíos (se le da el alto que queda). */
@@ -111,7 +84,7 @@ export function EstadisticasNewsletter({ historial }: EstadisticasNewsletterProp
   }
 
   const { cifras, tasas, porDia, truncado } = data;
-  const deEnviados = (n: number) => `${n} de ${cifras.enviados} correos`;
+  const deEnviados = (n: number) => `${n} de ${cifras.enviados}`;
   const hayTendencia = porDia.some((d) => d.enviados || d.entregados || d.abiertos || d.clics);
 
   return (
@@ -134,38 +107,23 @@ export function EstadisticasNewsletter({ historial }: EstadisticasNewsletterProp
         )}
       </div>
 
-      <div data-testid="tarjetas-correos" className="grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
-        <TarjetaCifra
-          titulo="Enviados"
-          icono={<Send className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
-          cifra={cifras.enviados}
-          detalle="correos enviados"
-        />
-        <TarjetaCifra
-          titulo="Entregados"
-          icono={<CheckCircle className="h-4 w-4 shrink-0 text-green-500" aria-hidden="true" />}
-          cifra={`${tasas.entrega}%`}
-          detalle={deEnviados(cifras.entregados)}
-          claseCifra="text-green-600"
-        />
-        <TarjetaCifra
-          titulo="Abiertos"
-          icono={<Mail className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />}
-          cifra={`${tasas.apertura}%`}
-          detalle={deEnviados(cifras.abiertos)}
-          claseCifra="text-blue-600"
-        />
-        <TarjetaCifra
-          titulo="Con clic"
-          icono={<MousePointerClick className="h-4 w-4 shrink-0 text-purple-500" aria-hidden="true" />}
-          cifra={`${tasas.clics}%`}
-          detalle={deEnviados(cifras.clics)}
-          claseCifra="text-purple-600"
-        />
-      </div>
+      {/* Un solo bloque de cifras. Los tres porcentajes son sobre los enviados (cifra grande) y debajo, «n de N»;
+          no entregados y spam solo se colorean si hay alguno. */}
+      <TiraCifras
+        data-testid="tarjetas-correos"
+        className="shrink-0"
+        cifras={[
+          { etiqueta: "Enviados", valor: cifras.enviados },
+          { etiqueta: "Entregados", valor: `${tasas.entrega}%`, detalle: deEnviados(cifras.entregados) },
+          { etiqueta: "Abiertos", valor: `${tasas.apertura}%`, detalle: deEnviados(cifras.abiertos) },
+          { etiqueta: "Con clic", valor: `${tasas.clics}%`, detalle: deEnviados(cifras.clics) },
+          { etiqueta: "No entregados", valor: cifras.noEntregados, tono: cifras.noEntregados > 0 ? "ambar" : undefined },
+          { etiqueta: "Marcados como spam", valor: cifras.spam, tono: cifras.spam > 0 ? "rojo" : undefined },
+        ]}
+      />
 
-      {/* Gráfica (el resto del alto) y, a su lado desde `lg` o debajo, desglose + historial. Entre `md`
-          y `lg` la fila de la gráfica mide al menos 15rem (lienzo de ~185 px) y el desglose y el
+      {/* Gráfica (el resto del alto) y, a su lado desde `lg` o debajo, el historial. Entre `md`
+          y `lg` la fila de la gráfica mide al menos 15rem (lienzo de ~185 px) y el
           historial se quedan lo suyo; si el historial no cabe, solo su lista hace scroll. El suelo del
           bloque (32rem / 20rem) hace que, en ventanas más bajas, desplace la pestaña antes que aplastarlo. */}
       <div
@@ -246,35 +204,6 @@ export function EstadisticasNewsletter({ historial }: EstadisticasNewsletterProp
         )}
 
         <div className="flex min-h-0 flex-col gap-3">
-          <Card className="shrink-0 p-3">
-            <CardTitle className="mb-2 text-sm font-medium">Desglose</CardTitle>
-            <div className={cn("grid grid-cols-3 gap-2 sm:grid-cols-6", hayTendencia && "lg:grid-cols-3")}>
-              <div className="text-center px-2 py-1.5 rounded-md bg-muted/50">
-                <div className="text-lg font-bold leading-6">{cifras.enviados}</div>
-                <div className="text-xs text-muted-foreground">Enviados</div>
-              </div>
-              <div className="text-center px-2 py-1.5 rounded-md bg-green-50 dark:bg-green-950">
-                <div className="text-lg font-bold leading-6 text-green-600">{cifras.entregados}</div>
-                <div className="text-xs text-muted-foreground">Entregados</div>
-              </div>
-              <div className="text-center px-2 py-1.5 rounded-md bg-blue-50 dark:bg-blue-950">
-                <div className="text-lg font-bold leading-6 text-blue-600">{cifras.abiertos}</div>
-                <div className="text-xs text-muted-foreground">Abiertos</div>
-              </div>
-              <div className="text-center px-2 py-1.5 rounded-md bg-purple-50 dark:bg-purple-950">
-                <div className="text-lg font-bold leading-6 text-purple-600">{cifras.clics}</div>
-                <div className="text-xs text-muted-foreground">Con clic</div>
-              </div>
-              <div className="text-center px-2 py-1.5 rounded-md bg-orange-50 dark:bg-orange-950">
-                <div className="text-lg font-bold leading-6 text-orange-600">{cifras.noEntregados}</div>
-                <div className="text-xs text-muted-foreground">No entregados</div>
-              </div>
-              <div className="text-center px-2 py-1.5 rounded-md bg-red-50 dark:bg-red-950">
-                <div className="text-lg font-bold leading-6 text-red-600">{cifras.spam}</div>
-                <div className="text-xs text-muted-foreground">Marcados como spam</div>
-              </div>
-            </div>
-          </Card>
           {historial && <div className="flex min-h-0 flex-1 flex-col">{historial}</div>}
         </div>
       </div>

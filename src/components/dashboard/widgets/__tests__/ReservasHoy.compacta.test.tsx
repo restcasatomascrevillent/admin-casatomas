@@ -139,47 +139,36 @@ describe("ReservasHoy compacta · mismos datos en menos alto", () => {
     expect(franja).not.toHaveClass("flex-col");
   });
 
-  it("Comida y Cena: cada una en UNA fila, con las reservas y los comensales en la misma línea", async () => {
+  it("una sola tira de cifras sin fondos de color: Activas · Confirmadas · Pendientes · Próxima · Comida · Cena", async () => {
     await montar();
-    const comida = screen.getByTestId("turno-comida");
-    const cena = screen.getByTestId("turno-cena");
-
-    for (const [turno, reservas, comensales] of [
-      [comida, "12", "46 comensales"],
-      [cena, "11", "43 comensales"],
-    ] as const) {
-      expect(turno).toHaveClass("flex", "items-center");
-      expect(turno).not.toHaveClass("flex-col");
-      const cifra = within(turno).getByText(reservas);
-      // Reservas y comensales juntos, en el mismo bloque de la fila (antes, cada cosa en su línea).
-      expect(within(turno).getByText(comensales).parentElement).toBe(cifra.parentElement);
-      expect(cifra.parentElement?.parentElement).toBe(turno);
-    }
-    // A las 20:40 el turno en curso es la cena.
-    expect(within(cena).getByText("Ahora")).toBeInTheDocument();
-    expect(within(comida).queryByText("Ahora")).not.toBeInTheDocument();
-  });
-
-  it("los cuatro mosaicos siguen con sus datos (23 · 22 · 0 · 21:00), más bajos: cifra y nombre en una fila desde sm", async () => {
-    await montar();
-    const mosaicos = screen.getByTestId("mosaicos-estado");
-
+    const tira = screen.getByTestId("cifras-hoy");
+    const items = within(tira).getAllByRole("listitem");
+    expect(items).toHaveLength(6);
     const esperado = [
       ["Activas", "23"],
       ["Confirmadas", "22"],
       ["Pendientes", "0"],
       ["Próxima", "21:00"],
+      ["Comida", "12"],
+      ["Cena · ahora", "11"], // a las 20:40 el turno en curso es la cena
     ] as const;
-    expect([...mosaicos.children]).toHaveLength(4);
     esperado.forEach(([nombre, cifra], i) => {
-      const mosaico = mosaicos.children[i] as HTMLElement;
-      expect(within(mosaico).getByText(nombre)).toBeInTheDocument();
-      expect(within(mosaico).getByText(cifra)).toBeInTheDocument();
-      expect(mosaico).toHaveClass("flex-col", "sm:flex-row");
+      expect(within(items[i]).getByText(nombre)).toBeInTheDocument();
+      expect(within(items[i]).getByText(cifra)).toBeInTheDocument();
     });
+    expect(within(items[4]).getByText("res. · 46 pax")).toBeInTheDocument();
+    expect(within(items[5]).getByText("res. · 43 pax")).toBeInTheDocument();
+    // Ni la tira ni sus cifras llevan fondo de color (ni tarjetas de turno con borde).
+    expect(tira.innerHTML).not.toMatch(/(^|[\s"])bg-(green|amber|red|primary|muted)/);
+    expect(screen.queryByTestId("turno-comida")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("mosaicos-estado")).not.toBeInTheDocument();
+    // La franja de ocupación tampoco lleva fondo.
+    expect(screen.getByTestId("franja-ocupacion").className).not.toMatch(/(^|\s)bg-/);
+  });
 
-    // «Pendientes» sigue llevando a la lista filtrada.
-    fireEvent.click(within(mosaicos).getByRole("link"));
+  it("«Pendientes» sigue llevando a la lista filtrada", async () => {
+    await montar();
+    fireEvent.click(within(screen.getByTestId("cifras-hoy")).getByRole("button", { name: /Pendientes/ }));
     expect(screen.getByTestId("destino")).toHaveTextContent("/reservas?tab=reservas&status=pendiente&date=today");
   });
 
@@ -187,13 +176,10 @@ describe("ReservasHoy compacta · mismos datos en menos alto", () => {
     await montar();
 
     expect(screen.getByText("59%")).toHaveClass("text-2xl");
-    for (const cifra of ["23", "22", "0", "21:00"]) {
-      expect(within(screen.getByTestId("mosaicos-estado")).getByText(cifra)).toHaveClass("text-xl", "sm:text-2xl");
+    for (const cifra of ["23", "22", "0", "21:00", "12", "11"]) {
+      expect(within(screen.getByTestId("cifras-hoy")).getByText(cifra)).toHaveClass("text-xl");
     }
-    for (const [turno, cifra] of [["turno-comida", "12"], ["turno-cena", "11"]]) {
-      expect(within(screen.getByTestId(turno)).getByText(cifra)).toHaveClass("text-xl");
-    }
-    for (const nombre of ["Activas", "Confirmadas", "Pendientes", "Próxima", "46 comensales", "89/150 pax · 23 res."]) {
+    for (const nombre of ["Activas", "Confirmadas", "Pendientes", "Próxima", "res. · 46 pax", "89/150 pax · 23 res."]) {
       expect(screen.getByText(nombre)).toHaveClass("text-xs");
     }
   });

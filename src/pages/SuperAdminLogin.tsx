@@ -79,7 +79,7 @@ export default function SuperAdminLogin() {
         {user && !isSuperAdmin ? (
           <Card>
             <CardHeader>
-              <CardTitle>Acceso denegado</CardTitle>
+              <CardTitle className="text-2xl">Acceso denegado</CardTitle>
               <CardDescription>
                 La cuenta <span className="font-medium">{user.email}</span> no tiene permisos de Super
                 Administrador. Cierra sesión para intentarlo con otra cuenta.
@@ -100,7 +100,7 @@ export default function SuperAdminLogin() {
         ) : (
           <Card>
             <CardHeader>
-              <CardTitle>Inicio de sesión seguro</CardTitle>
+              <CardTitle className="text-2xl">Inicio de sesión seguro</CardTitle>
               <CardDescription>
                 Introduce las credenciales de tu cuenta de Super Administrador
               </CardDescription>

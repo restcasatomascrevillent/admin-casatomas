@@ -71,17 +71,20 @@ function pintar(historial?: ReactNode) {
   );
 }
 
-/** Tarjeta superior por su título: su porcentaje y su línea «n de N correos». */
-function tarjeta(titulo: string) {
-  const el = screen.getAllByText(titulo)[0].closest(".rounded-lg") as HTMLElement;
-  return within(el);
+/** Cifra de la tira por su etiqueta: devuelve sus consultas (porcentaje o número y «n de N»). */
+function tarjeta(etiqueta: string) {
+  const li = within(screen.getByTestId("tarjetas-correos"))
+    .getAllByRole("listitem")
+    .find((el) => el.firstElementChild?.textContent === etiqueta) as HTMLElement;
+  return within(li);
 }
 
-/** Casilla del desglose por su etiqueta: la cifra grande de encima. */
-function desglose(etiqueta: string) {
-  const seccion = screen.getByText("Desglose").closest(".rounded-lg") as HTMLElement;
-  const casilla = within(seccion).getByText(etiqueta).parentElement as HTMLElement;
-  return casilla.firstElementChild?.textContent;
+/** La cifra grande de una etiqueta de la tira. */
+function cifra(etiqueta: string) {
+  const li = within(screen.getByTestId("tarjetas-correos"))
+    .getAllByRole("listitem")
+    .find((el) => el.firstElementChild?.textContent === etiqueta) as HTMLElement;
+  return li.querySelector(".text-xl")?.textContent;
 }
 
 const TEXTO_LARGO = /todos los correos que envía el restaurante: los de las reservas y los de la newsletter/i;
@@ -92,7 +95,7 @@ beforeEach(() => {
 });
 
 describe("EstadisticasNewsletter", () => {
-  it("el caso del dueño (30 enviados, 30 entregados, 5 abiertos, 4 con clic) cuadra en tarjetas y desglose", async () => {
+  it("el caso del dueño (30 enviados, 30 entregados, 5 abiertos, 4 con clic) cuadra en un solo bloque de cifras", async () => {
     const filas = [];
     for (let i = 0; i < 30; i++) {
       filas.push(fila(`m${i}`, "sent"), fila(`m${i}`, "delivered"));
@@ -103,23 +106,22 @@ describe("EstadisticasNewsletter", () => {
     doble.tablas.email_eventos = filas;
 
     pintar();
-    await screen.findByText("Desglose");
+    await screen.findByTestId("tarjetas-correos");
 
     // Antes: «39 entregados» y «9 abiertos» en las tarjetas.
     expect(screen.queryByText(/39 entregados/)).toBeNull();
     expect(screen.queryByText(/9 abiertos/)).toBeNull();
 
     expect(tarjeta("Entregados").getByText("100%")).toBeInTheDocument();
-    expect(tarjeta("Entregados").getByText("30 de 30 correos")).toBeInTheDocument();
+    expect(tarjeta("Entregados").getByText("30 de 30")).toBeInTheDocument();
     expect(tarjeta("Abiertos").getByText("17%")).toBeInTheDocument();
-    expect(tarjeta("Abiertos").getByText("5 de 30 correos")).toBeInTheDocument();
+    expect(tarjeta("Abiertos").getByText("5 de 30")).toBeInTheDocument();
     expect(tarjeta("Con clic").getByText("13%")).toBeInTheDocument();
-    expect(tarjeta("Con clic").getByText("4 de 30 correos")).toBeInTheDocument();
+    expect(tarjeta("Con clic").getByText("4 de 30")).toBeInTheDocument();
 
-    expect(desglose("Enviados")).toBe("30");
-    expect(desglose("Entregados")).toBe("30");
-    expect(desglose("Abiertos")).toBe("5");
-    expect(desglose("Con clic")).toBe("4");
+    expect(cifra("Enviados")).toBe("30");
+    // Un solo bloque: ya no hay un «Desglose» aparte repitiendo los mismos números en chips de colores.
+    expect(screen.queryByText("Desglose")).toBeNull();
 
     // La explicación en llano de qué correos cuenta sigue ahí: en la ayuda «i» de la cabecera.
     fireEvent.click(screen.getByRole("button", { name: "Qué cuentan estas estadísticas" }));
@@ -132,16 +134,16 @@ describe("EstadisticasNewsletter", () => {
     doble.tablas.email_eventos = filas;
 
     pintar();
-    await screen.findByText("Desglose");
-    expect(desglose("Enviados")).toBe("400");
-    expect(desglose("Abiertos")).toBe("400");
+    await screen.findByTestId("tarjetas-correos");
+    expect(cifra("Enviados")).toBe("400");
+    expect(tarjeta("Abiertos").getByText("400 de 400")).toBeInTheDocument();
     expect(tarjeta("Abiertos").getByText("100%")).toBeInTheDocument();
   });
 
   it("ya no muestra los últimos movimientos ni el aviso del webhook", async () => {
     doble.tablas.email_eventos = [fila("a", "sent"), fila("a", "delivered")];
     pintar();
-    await screen.findByText("Desglose");
+    await screen.findByTestId("tarjetas-correos");
     expect(screen.queryByText(/Últimos movimientos/i)).toBeNull();
     expect(screen.queryByText(/Detalle técnico/i)).toBeNull();
     expect(screen.queryByText(/webhook/i)).toBeNull();
@@ -185,36 +187,46 @@ describe("EstadisticasNewsletter · todo cabe sin scroll (2026-10-06)", () => {
     await waitFor(() => expect(lecturas()).toBeGreaterThan(antes));
   });
 
-  it("las 4 tarjetas van en UNA fila, bajas, cada una con su nombre accesible, su cifra y su «n de N correos»", async () => {
+  it("un solo bloque de cifras en UNA línea: enviados, entregados, abiertos, con clic, no entregados y spam, sin tarjetas ni fondos", async () => {
     doble.tablas.email_eventos = [...correosDeHoy(3), fila("hoy-0", "opened", new Date().toISOString())];
     pintar();
-    await screen.findByText("Desglose");
+    await screen.findByTestId("tarjetas-correos");
 
-    const filaTarjetas = screen.getByTestId("tarjetas-correos");
-    expect(filaTarjetas).toHaveClass("grid", "sm:grid-cols-4");
-    const tarjetas = within(filaTarjetas).getAllByRole("group");
-    expect(tarjetas.map((t) => t.getAttribute("aria-labelledby") && document.getElementById(t.getAttribute("aria-labelledby")!)?.textContent)).toEqual([
+    const tira = screen.getByTestId("tarjetas-correos");
+    expect(tira).toHaveClass("shrink-0");
+    const items = within(tira).getAllByRole("listitem");
+    expect(items.map((li) => li.firstElementChild?.textContent)).toEqual([
       "Enviados",
       "Entregados",
       "Abiertos",
       "Con clic",
+      "No entregados",
+      "Marcados como spam",
     ]);
+    expect(within(tira).queryAllByRole("group")).toHaveLength(0);
+    expect(tira.innerHTML).not.toMatch(/(^|[\s"])bg-(green|blue|purple|orange|red|muted)/);
 
-    const datos: Array<[string, string, string]> = [
-      ["Enviados", "3", "correos enviados"],
-      ["Entregados", "100%", "3 de 3 correos"],
-      ["Abiertos", "33%", "1 de 3 correos"],
-      ["Con clic", "0%", "0 de 3 correos"],
+    const datos: Array<[string, string, string | null]> = [
+      ["Enviados", "3", null],
+      ["Entregados", "100%", "3 de 3"],
+      ["Abiertos", "33%", "1 de 3"],
+      ["Con clic", "0%", "0 de 3"],
+      ["No entregados", "0", null],
+      ["Marcados como spam", "0", null],
     ];
-    for (const [nombre, cifra, detalle] of datos) {
-      const t = screen.getByRole("group", { name: nombre });
-      // Menos relleno que la tarjeta de siempre (CardHeader + CardContent, 24 px por lado).
-      expect(t).toHaveClass("p-3");
-      expect(t.querySelector('[class*="p-6"]')).toBeNull();
-      // La cifra sigue grande (24 px) y el detalle legible (12 px), en la misma tarjeta.
-      expect(within(t).getByText(cifra)).toHaveClass("text-2xl", "font-bold");
-      expect(within(t).getByText(detalle)).toHaveClass("text-xs");
+    for (const [nombre, valor, detalle] of datos) {
+      expect(cifra(nombre)).toBe(valor);
+      if (detalle) expect(tarjeta(nombre).getByText(detalle)).toHaveClass("text-xs");
     }
+  });
+
+  it("no entregados y spam solo se colorean cuando hay alguno", async () => {
+    doble.tablas.email_eventos = [fila("a", "sent"), fila("a", "bounced"), fila("b", "sent"), fila("b", "complained")];
+    pintar();
+    await screen.findByTestId("tarjetas-correos");
+    expect(tarjeta("No entregados").getByText("1")).toHaveClass("text-amber-600");
+    expect(tarjeta("Marcados como spam").getByText("1")).toHaveClass("text-red-600");
+    expect(tarjeta("Enviados").getByText("2").className).not.toMatch(/text-(amber|red)/);
   });
 
   it("la gráfica llena el hueco que queda: contenedor flexible con ResponsiveContainer al 100 %, leyenda en la fila del título y tabla para el lector de pantalla", async () => {
@@ -264,16 +276,15 @@ describe("EstadisticasNewsletter · todo cabe sin scroll (2026-10-06)", () => {
     const raiz = screen.getByTestId("estadisticas-correos");
     expect(raiz).toHaveClass("flex", "flex-col", "md:h-full");
     expect(raiz.className).not.toMatch(/space-y-6/);
-    // Ningún contenedor con scroll propio en las estadísticas (cabecera, tarjetas, gráfica, desglose).
+    // Ningún contenedor con scroll propio en las estadísticas (cabecera, cifras, gráfica).
     expect(raiz.querySelectorAll('[class*="overflow-y-auto"], [class*="overflow-auto"], [class*="overflow-scroll"]')).toHaveLength(0);
     // Cabecera y tarjetas no encogen; la zona de la gráfica sí se reparte el resto.
     expect(screen.getByTestId("tarjetas-correos")).toHaveClass("shrink-0");
 
-    // El historial va en la columna del desglose, con el alto que quede (flex-1) y sin forzar más.
+    // El historial va en su columna, con el alto que quede (flex-1) y sin forzar más.
     const historial = screen.getByText("Historial de prueba");
     expect(historial.parentElement).toHaveClass("flex-1", "min-h-0");
-    const columna = (screen.getByText("Desglose").closest(".rounded-lg") as HTMLElement).parentElement as HTMLElement;
-    expect(columna).toContainElement(historial);
+    expect(screen.getByTestId("zona-grafica")).toContainElement(historial);
   });
 
   it("estado de carga intacto: indicador con nombre accesible y el historial sigue a la vista", async () => {
@@ -281,29 +292,25 @@ describe("EstadisticasNewsletter · todo cabe sin scroll (2026-10-06)", () => {
     pintar(<p>Historial de prueba</p>);
     expect(await screen.findByRole("status", { name: "Cargando las estadísticas" })).toBeInTheDocument();
     expect(screen.getByText("Historial de prueba")).toBeInTheDocument();
-    expect(screen.queryByText("Desglose")).toBeNull();
+    expect(screen.queryByTestId("tarjetas-correos")).toBeNull();
   });
 
-  it("estado vacío intacto: sin correos, todo a cero, sin gráfica y el desglose y el historial a todo el ancho", async () => {
+  it("estado vacío intacto: sin correos, todo a cero, sin gráfica y el historial a todo el ancho", async () => {
     doble.tablas.email_eventos = [];
     pintar(<p>Historial de prueba</p>);
-    await screen.findByText("Desglose");
+    await screen.findByTestId("tarjetas-correos");
 
-    expect(within(screen.getByRole("group", { name: "Enviados" })).getByText("0")).toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: "Enviados" })).getByText("correos enviados")).toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: "Entregados" })).getByText("0%")).toBeInTheDocument();
-    expect(within(screen.getByRole("group", { name: "Entregados" })).getByText("0 de 0 correos")).toBeInTheDocument();
+    expect(cifra("Enviados")).toBe("0");
+    expect(cifra("Entregados")).toBe("0%");
+    expect(tarjeta("Entregados").getByText("0 de 0")).toBeInTheDocument();
+    expect(cifra("No entregados")).toBe("0");
+    expect(cifra("Marcados como spam")).toBe("0");
     expect(screen.queryByRole("figure")).toBeNull();
     expect(screen.queryByTestId("contenedor-recharts")).toBeNull();
-    expect(desglose("No entregados")).toBe("0");
-    expect(desglose("Marcados como spam")).toBe("0");
 
-    // Sin gráfica no hay dos columnas: desglose (6 en fila) e historial ocupan todo el ancho.
+    // Sin gráfica no hay dos columnas: el historial ocupa todo el ancho.
     const zona = screen.getByTestId("zona-grafica");
     expect(zona.className).not.toContain("lg:grid-cols-");
-    const rejillaDesglose = (screen.getByText("Desglose").closest(".rounded-lg") as HTMLElement).querySelector(".grid") as HTMLElement;
-    expect(rejillaDesglose).toHaveClass("sm:grid-cols-6");
-    expect(rejillaDesglose.className).not.toContain("lg:grid-cols-3");
     expect(screen.getByText("Historial de prueba")).toBeInTheDocument();
   });
 

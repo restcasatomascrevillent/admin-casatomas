@@ -53,7 +53,7 @@ export default function Auth() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Acceso al Sistema</CardTitle>
+            <CardTitle className="text-2xl">Acceso al Sistema</CardTitle>
             <CardDescription>
               Inicia sesión para acceder al panel
             </CardDescription>

@@ -2,8 +2,25 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)} {...props} />
+/**
+ * `variante="plana"`: sin borde, sombra ni redondeo, solo una raya fina debajo (para bloques que se apilan en una
+ * página sin parecer tarjetas; mismo estilo que las listas planas de Facturas). Por defecto, la tarjeta de siempre.
+ */
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  variante?: "tarjeta" | "plana";
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(({ className, variante = "tarjeta", ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn(
+      variante === "plana"
+        ? "border-b border-border/60 bg-transparent text-card-foreground"
+        : "rounded-lg border bg-card text-card-foreground shadow-sm",
+      className,
+    )}
+    {...props}
+  />
 ));
 Card.displayName = "Card";
 
@@ -16,7 +33,7 @@ CardHeader.displayName = "CardHeader";
 
 const CardTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn("text-2xl font-semibold leading-none tracking-tight", className)} {...props} />
+    <h3 ref={ref} className={cn("text-base font-semibold leading-none tracking-tight", className)} {...props} />
   ),
 );
 CardTitle.displayName = "CardTitle";
