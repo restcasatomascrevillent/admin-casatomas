@@ -29,6 +29,9 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
  * pliega o despliega se recuerda (localStorage). Con búsqueda o chip activos
  * se despliega todo, para no esconder resultados. Cada fila: número · tipo y
  * total en la primera línea, fecha · líneas en la segunda, y una sola insignia.
+ * Cada nivel se tabula: mes a ras, proveedor con sangría de 16 px y documentos de
+ * 32 px con una guía vertical fina que los une a su proveedor (8/16 px en <640 px).
+ * Los importes quedan alineados a la derecha en los tres niveles.
  */
 export function ListaDocumentos({
   documentos,
@@ -108,7 +111,7 @@ export function ListaDocumentos({
         return (
           <section key={mes.clave} aria-label={mes.etiqueta} data-mes={mes.clave}>
             {/* Cabecera del mes: fija dentro del scroll de la lista. */}
-            <h3 className="sticky top-0 z-10 m-0 border-b border-border/60 bg-card text-sm">
+            <h3 className="sticky top-0 z-10 m-0 border-b border-border/60 bg-card text-[15px]">
               <button
                 type="button"
                 aria-expanded={abierto}
@@ -130,7 +133,8 @@ export function ListaDocumentos({
                 const ChevronProv = provAbierto ? ChevronDown : ChevronRight;
                 return (
                   <div key={prov.clave || "sin-proveedor"} data-proveedor={prov.clave}>
-                    <h4 className="m-0 bg-muted/30 text-[13px]">
+                    {/* Nivel 2: sangría 16 px (8 en estrecho); el chevron queda sobre la guía de los documentos. */}
+                    <h4 className="m-0 ml-2 bg-muted/30 text-[13px] sm:ml-4" data-nivel="proveedor">
                       <button
                         type="button"
                         aria-expanded={provAbierto}
@@ -146,7 +150,11 @@ export function ListaDocumentos({
                       </button>
                     </h4>
                     {provAbierto && (
-                      <ul className="divide-y divide-border/50" aria-label={`${prov.nombre}, ${mes.etiqueta}`}>
+                      <ul
+                        className="ml-4 divide-y divide-border/50 border-l border-border sm:ml-8"
+                        data-nivel="documentos"
+                        aria-label={`${prov.nombre}, ${mes.etiqueta}`}
+                      >
                         {prov.documentos.map((d) => (
                           <FilaDocumento
                             key={d.id}
