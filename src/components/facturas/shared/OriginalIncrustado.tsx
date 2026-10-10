@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, FileText, ImageOff, Loader2, Maximize2, RefreshCw } from "lucide-react";
+import { ExternalLink, FileText, ImageOff, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ImagenZoom } from "./ImagenZoom";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const BUCKET = "facturas-originales";
@@ -31,59 +32,21 @@ function useUrlOriginal(archivoPath: string | null) {
 const ENLACE =
   "inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-blue-600 hover:bg-blue-50 hover:text-blue-800 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300";
 
-/** Visor a pantalla completa: «Ajustar» (cabe entera) o «100 %» (tamaño real; se arrastra o se desplaza). */
+/** Visor a pantalla completa: la misma imagen con zoom (rueda, pellizco, arrastre, giro) a todo el alto del diálogo. */
 function VisorPantallaCompleta({ url, abierto, onCerrar, titulo }: { url: string; abierto: boolean; onCerrar: () => void; titulo: string }) {
-  const [real, setReal] = useState(false);
-  const marco = useRef<HTMLDivElement>(null);
-  const arrastre = useRef<{ x: number; y: number; sl: number; st: number } | null>(null);
-
   return (
     <Dialog open={abierto} onOpenChange={(o) => !o && onCerrar()}>
       <DialogContent className="h-[94dvh] w-[96vw] max-w-[96vw] gap-0 p-0 sm:rounded-lg pointer-coarse:max-h-[94dvh]">
         <DialogTitle className="sr-only">{titulo}</DialogTitle>
         <DialogDescription className="sr-only">Documento original a pantalla completa</DialogDescription>
         <div className="flex shrink-0 items-center gap-1 border-b px-2 py-1 pr-14">
-          <button
-            type="button"
-            onClick={() => setReal((v) => !v)}
-            aria-pressed={real}
-            className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium hover:bg-muted"
-          >
-            {real ? "Ajustar a la pantalla" : "Ver al 100 %"}
-          </button>
           <a href={url} target="_blank" rel="noopener noreferrer" className={ENLACE}>
             <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir en pestaña nueva
           </a>
+          <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">Rueda o pellizco para ampliar · arrastra para moverte · doble clic para acercar</span>
         </div>
-        <div
-          ref={marco}
-          data-testid="visor-original"
-          className={`min-h-0 flex-1 overflow-auto overscroll-contain bg-muted/40 ${real ? "cursor-grab active:cursor-grabbing" : "flex items-center justify-center"}`}
-          style={{ touchAction: real ? "pan-x pan-y pinch-zoom" : "auto" }}
-          onPointerDown={(e) => {
-            if (!real || e.pointerType !== "mouse" || !marco.current) return;
-            arrastre.current = { x: e.clientX, y: e.clientY, sl: marco.current.scrollLeft, st: marco.current.scrollTop };
-            marco.current.setPointerCapture?.(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            const a = arrastre.current;
-            if (!a || !marco.current) return;
-            marco.current.scrollLeft = a.sl - (e.clientX - a.x);
-            marco.current.scrollTop = a.st - (e.clientY - a.y);
-          }}
-          onPointerUp={() => {
-            arrastre.current = null;
-          }}
-          onPointerCancel={() => {
-            arrastre.current = null;
-          }}
-        >
-          <img
-            src={url}
-            alt={titulo}
-            draggable={false}
-            className={real ? "max-w-none select-none" : "max-h-full max-w-full select-none object-contain"}
-          />
+        <div data-testid="visor-original" className="flex min-h-0 flex-1 flex-col">
+          <ImagenZoom src={url} alt={titulo} className="min-h-0 flex-1 rounded-none border-0" />
         </div>
       </DialogContent>
     </Dialog>
@@ -92,7 +55,7 @@ function VisorPantallaCompleta({ url, abierto, onCerrar, titulo }: { url: string
 
 /**
  * Original del documento incrustado al final de la ficha (Compras › Documentos).
- *   - `archivo_path` imagen -> foto a todo el ancho; al tocarla, pantalla completa con zoom.
+ *   - `archivo_path` imagen -> foto en un recuadro con zoom/arrastre/giro; botón de pantalla completa.
  *   - `archivo_path` PDF    -> primera vista con <object> + enlace «Abrir PDF».
  *   - solo `drive_url`      -> una línea con el enlace (Drive no se incrusta: pide permisos).
  *   - nada                  -> no pinta nada.
@@ -165,26 +128,24 @@ function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titul
     );
   } else {
     cuerpo = (
-      <button
-        type="button"
-        onClick={() => setVisor(true)}
-        aria-label="Ver el original a pantalla completa"
-        className="group relative block w-full overflow-hidden rounded-md border bg-muted/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        {/* Nada de `display:none` mientras carga: una imagen `lazy` oculta no se pide nunca. */}
-        {!cargada && <span className="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />}
-        <img
-          src={url}
-          alt={titulo}
-          loading="lazy"
-          onLoad={() => setCargada(true)}
-          onError={() => setFalloImagen(true)}
-          className={`relative block w-full ${cargada ? "" : "min-h-64 opacity-0"}`}
-        />
-        <span className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-md bg-background/80 text-foreground opacity-80 shadow-sm group-hover:opacity-100">
-          <Maximize2 className="h-4 w-4" aria-hidden="true" />
-        </span>
-      </button>
+      <div className="space-y-1">
+        <div className="relative">
+          {/* Nada de `display:none` mientras carga: una imagen `lazy` oculta no se pide nunca. */}
+          {!cargada && <span className="absolute inset-0 z-10 animate-pulse rounded-md bg-muted" aria-hidden="true" />}
+          <ImagenZoom
+            src={url}
+            alt={titulo}
+            lazy
+            requiereCtrl
+            oculta={!cargada}
+            onLoad={() => setCargada(true)}
+            onError={() => setFalloImagen(true)}
+            onPantallaCompleta={() => setVisor(true)}
+            className="h-[65dvh] max-h-[44rem] min-h-72"
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">Ctrl + rueda o pellizca para ampliar · arrastra para moverte · doble clic para acercar</p>
+      </div>
     );
   }
 
