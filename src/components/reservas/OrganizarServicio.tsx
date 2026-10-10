@@ -30,7 +30,7 @@ import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { mensajeErrorAsignacion, turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { hoyLocal } from "@/components/reservas/asignacionPlano";
 import { minutosDeHora } from "@/lib/reservas/ocupacionMesa";
-import { organizarServicio, type MovimientoOrg, type ReservaOrg } from "@/lib/reservas/organizarServicio";
+import { organizarServicio, type MovimientoOrg, type ReservaOrg, type ResultadoOrg } from "@/lib/reservas/organizarServicio";
 import type { AjusteMesa } from "@/lib/reservas/piezasMesa";
 
 export function BotonOrganizarServicio({ fecha, turno }: { fecha: string; turno: TurnoServicio }) {
@@ -68,7 +68,11 @@ interface FilaReserva {
   salida_at?: string | null;
 }
 
-function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: TurnoServicio; onCerrar: () => void }) {
+/**
+ * Todo lo de «Organizar» menos la pantalla: datos, cálculo (`organizarServicio`), «Terraza cerrada» y
+ * aplicar. Lo usan el diálogo de la lista y la vista previa en los planos de Hoy (`VistaPlanoHoy`).
+ */
+export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activo = true) {
   const qc = useQueryClient();
   const { data: espacios } = useEspaciosReserva();
   const { data: mesas } = useMesas();
@@ -76,6 +80,7 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
   const { data: ajustesDia } = useAjustesMesaDia(fecha);
   const { data: config } = useConfiguracionReservas();
   const { data: reservas } = useQuery({
+    enabled: activo,
     queryKey: ["reservas-servicio-dia", fecha, "organizar"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -101,14 +106,19 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
 
   const cargando = !espacios || !mesas || !asignaciones || !reservas;
 
-  const resultado = useMemo(() => {
-    if (cargando) return null;
-    const salaIds = new Set(salas.map((s) => s.id));
-    const mesasDe = new Map<string, string[]>();
+  /** Mesas de cada reserva en este turno (lo que hay ahora). */
+  const mesasDe = useMemo(() => {
+    const mapa = new Map<string, string[]>();
     for (const a of asignaciones ?? []) {
       if (turnoDeHora(a.reservas?.hora ?? "") !== turno) continue;
-      mesasDe.set(a.reserva_id, [...(mesasDe.get(a.reserva_id) ?? []), a.mesa_id]);
+      mapa.set(a.reserva_id, [...(mapa.get(a.reserva_id) ?? []), a.mesa_id]);
     }
+    return mapa;
+  }, [asignaciones, turno]);
+
+  const resultado = useMemo(() => {
+    if (cargando || !activo) return null;
+    const salaIds = new Set(salas.map((s) => s.id));
     const lista: ReservaOrg[] = (reservas ?? [])
       .filter((r) => turnoDeHora(r.hora) === turno && (!r.espacio_id || salaIds.has(r.espacio_id)))
       .map((r) => ({
@@ -133,7 +143,7 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
       minutoAhora: empezado ? minutosDeHora(ahora.toTimeString().slice(0, 5)) : null,
       excluidas: new Set(configAsignacionDesde(config).mesasExcluidas),
     });
-  }, [cargando, salas, asignaciones, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config]);
+  }, [cargando, activo, salas, mesasDe, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config]);
 
   const refrescar = () => {
     for (const clave of CLAVES_POR_CAMBIO.ocupacion) void qc.invalidateQueries({ queryKey: [clave] });
@@ -200,6 +210,11 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
     }
   };
 
+  return { resultado, aplicar, aplicando, terraza, cierre, cargando, mesasDe, reservas, ajustesDia, salas };
+}
+
+function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: TurnoServicio; onCerrar: () => void }) {
+  const { resultado, aplicar, aplicando, terraza, cierre } = usePropuestaOrganizar(fecha, turno);
   return (
     <>
       <DialogHeader className="text-left">
@@ -221,30 +236,8 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
         </div>
       )}
 
-      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
-        {resultado?.movimientos.map((m) => (
-          <div key={m.reservaId} className="flex items-center gap-2 rounded-md border p-2">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">{m.importante ? "★ " : ""}{m.texto}</p>
-              {m.detalle && m.desde && <p className="text-xs text-muted-foreground">{m.detalle}</p>}
-            </div>
-            <Button variant="outline" className="h-11 shrink-0" disabled={aplicando} onClick={() => void aplicar([m])}>
-              Aplicar
-            </Button>
-          </div>
-        ))}
-        {resultado && resultado.sinSitio.length > 0 && (
-          <div className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">
-            <p className="font-medium">Sin sitio ({resultado.sinSitio.length})</p>
-            <ul className="mt-1 space-y-0.5">
-              {resultado.sinSitio.map((s) => (
-                <li key={s.reservaId}>
-                  {s.nombre} ({s.comensales} p., {s.hora.slice(0, 5)}): {s.motivo}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {resultado && <ListaPropuesta resultado={resultado} aplicando={aplicando} onAplicar={(m) => void aplicar([m])} />}
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -260,5 +253,44 @@ function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: 
         </Button>
       </div>
     </>
+  );
+}
+
+/** Las frases de la propuesta (cada una con «Aplicar») y las que no caben. */
+export function ListaPropuesta({
+  resultado,
+  aplicando,
+  onAplicar,
+}: {
+  resultado: ResultadoOrg;
+  aplicando: boolean;
+  onAplicar: (m: MovimientoOrg) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      {resultado.movimientos.map((m) => (
+        <div key={m.reservaId} className="flex items-center gap-2 rounded-md border p-2">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">{m.importante ? "★ " : ""}{m.texto}</p>
+            {m.detalle && m.desde && <p className="text-xs text-muted-foreground">{m.detalle}</p>}
+          </div>
+          <Button variant="outline" className="h-11 shrink-0" disabled={aplicando} onClick={() => onAplicar(m)}>
+            Aplicar
+          </Button>
+        </div>
+      ))}
+      {resultado.sinSitio.length > 0 && (
+        <div className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">
+          <p className="font-medium">Sin sitio ({resultado.sinSitio.length})</p>
+          <ul className="mt-1 space-y-0.5">
+            {resultado.sinSitio.map((s) => (
+              <li key={s.reservaId}>
+                {s.nombre} ({s.comensales} p., {s.hora.slice(0, 5)}): {s.motivo}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }

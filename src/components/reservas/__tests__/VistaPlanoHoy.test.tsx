@@ -286,11 +286,10 @@ describe("Plano de Hoy · las salas", () => {
     expect(mesaBoton("R")).toHaveAccessibleName(/Elena Reservado/);
   });
 
-  it("«Reparto de mesas» abre el reparto de ESA sala (la pantalla de siempre)", () => {
+  it("ya no ofrece «Reparto de mesas» (10/10/2026), aunque se le pase `onAbrirReparto`", () => {
     const onAbrirReparto = vi.fn();
     montar({ onAbrirReparto, salaInicial: "salon" });
-    fireEvent.click(screen.getByRole("button", { name: "Abrir el reparto de mesas de Salón" }));
-    expect(onAbrirReparto).toHaveBeenCalledWith("salon");
+    expect(screen.queryByRole("button", { name: /reparto de mesas/i })).toBeNull();
   });
 });
 

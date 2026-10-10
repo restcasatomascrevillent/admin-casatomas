@@ -13,6 +13,7 @@ import {
   SquareKanban,
   TrendingUp,
   Users,
+  Wand2,
   type LucideIcon,
 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
@@ -43,6 +44,8 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * Pestaña "Hoy" (rediseñada 2026-09-25, petición del dueño): antes esto era
@@ -77,10 +80,14 @@ import { BotonSentarSinReserva } from "./SentarSinReserva";
  * dentro del kanban) y filtran igual el kanban y el plano (`coincideFiltroHoy`). El plano está en
  * `servicio/VistaPlanoHoy.tsx`. Tocar el nombre de una sala en el kanban abre su plano.
  *
- * `onAbrirSala`: abre el reparto de mesas de una sala a pantalla completa (`Reservas.tsx`, el
+ * ORGANIZAR (10/10/2026): botón en la fila de filtros (tablet y escritorio). Con «Todo el día» pregunta
+ * «¿Comida o Cena?»; después la vista pasa a Plano en MODO PROPUESTA (`VistaPlanoHoy`, prop `organizar`).
+ * «Reparto de mesas» (`PlanoEspacio2D`) ya no se ofrece desde Hoy: lo esencial está en el Plano.
+ *
+ * `onAbrirSala` (sin uso desde el 10/10/2026): abría el reparto de mesas de una sala (`Reservas.tsx`, el
  * mismo salto que el Calendario: `PlanoEspacio2D`, con su conmutador al modo servicio).
  */
-export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) => void } = {}) {
+export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } = {}) {
   // Lo que comparten las dos vistas: el buscador y el turno de la fila de filtros, y la vista elegida.
   const [vista, setVista] = useState<ModoVistaHoy>(leerVistaHoy);
   const [busqueda, setBusqueda] = useState("");
@@ -88,6 +95,20 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
   const [salaPlano, setSalaPlano] = useState<string | null>(leerSalaPlanoHoy);
   // Móvil (< 768 px): vista propia para el camarero (`movil/VistaHoyMovil.tsx`). Tablet y escritorio, igual.
   const esMovil = useIsMobile();
+  // «Organizar»: turno de la propuesta en curso (o `null`) y la pregunta «¿Comida o Cena?».
+  const [organizando, setOrganizando] = useState<"comida" | "cena" | null>(null);
+  const [preguntarTurno, setPreguntarTurno] = useState(false);
+  const empezarOrganizar = (turno: "comida" | "cena") => {
+    setPreguntarTurno(false);
+    setFiltroTurno(turno);
+    cambiarVista("plano");
+    setOrganizando(turno);
+  };
+  const pulsarOrganizar = () => (filtroTurno === "todo" ? setPreguntarTurno(true) : empezarOrganizar(filtroTurno));
+  const cambiarTurno = (t: FiltroTurnoHoy) => {
+    setFiltroTurno(t);
+    if (t !== organizando) setOrganizando(null);
+  };
   const cambiarVista = (nueva: ModoVistaHoy) => {
     setVista(nueva);
     guardarVistaHoy(nueva);
@@ -289,10 +310,21 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
           busqueda={busqueda}
           onBusqueda={setBusqueda}
           filtroTurno={filtroTurno}
-          onFiltroTurno={setFiltroTurno}
+          onFiltroTurno={cambiarTurno}
           vista={vista}
-          onVista={cambiarVista}
-          accion={<BotonSentarSinReserva className="shrink-0 sm:order-2" />}
+          onVista={(v) => {
+            cambiarVista(v);
+            if (v !== "plano") setOrganizando(null);
+          }}
+          accion={
+            <div className="flex shrink-0 gap-2 sm:order-2">
+              <Button className="h-11 gap-1.5 px-4 text-base" onClick={pulsarOrganizar} disabled={!!organizando}>
+                <Wand2 className="h-4 w-4" aria-hidden="true" />
+                Organizar
+              </Button>
+              <BotonSentarSinReserva className="shrink-0" />
+            </div>
+          }
         />
 
         {vista === "plano" ? (
@@ -302,7 +334,7 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
             filtroTurno={filtroTurno}
             salaId={salaPlano}
             onCambiarSala={cambiarSala}
-            onAbrirReparto={onAbrirSala}
+            organizar={organizando ? { turno: organizando, onSalir: () => setOrganizando(null) } : null}
             reservasError={errorReservasHoy}
             onReintentarReservas={() => void refetchReservasHoy()}
           />
@@ -310,8 +342,32 @@ export function VistaHoy({ onAbrirSala }: { onAbrirSala?: (espacioId: string) =>
           <GestorReservasKanban busqueda={busqueda} filtroTurno={filtroTurno} onVerPlanoSala={verPlanoDeSala} />
         )}
       </div>
+      <Dialog open={preguntarTurno} onOpenChange={setPreguntarTurno}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>¿Qué servicio organizo?</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            {(["comida", "cena"] as const).map((t) => (
+              <Button
+                key={t}
+                variant={t === turnoSiguiente() ? "default" : "outline"}
+                className="h-16 text-lg"
+                onClick={() => empezarOrganizar(t)}
+              >
+                {t === "comida" ? "Comida" : "Cena"}
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </ReservasEnVivoContexto.Provider>
   );
+}
+
+/** El turno en curso o el siguiente: comida hasta las 16:00, después cena. */
+function turnoSiguiente(): "comida" | "cena" {
+  return new Date().getHours() < 16 ? "comida" : "cena";
 }
 
 /**

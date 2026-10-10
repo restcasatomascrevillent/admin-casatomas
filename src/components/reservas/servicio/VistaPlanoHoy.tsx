@@ -38,12 +38,50 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, LayoutGrid, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
+import { AlertTriangle, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  CLAVE_AJUSTES_MESA,
+  guardarAjustesServicio,
+  useAjustesMesaServicio,
+  useVolverAPlanoBase,
+  type TurnoServicio,
+} from "@/hooks/useAjustesMesaServicio";
+import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import {
+  estadoServicio,
+  geometriaServicio,
+  mesaPiezasDesde,
+  type AjusteMesa,
+  type MesaPiezas,
+  type ReservaEnMesas,
+} from "@/lib/reservas/piezasMesa";
+import {
+  ajustesPropuestos,
+  disposicionPropuesta,
+  mesasQueCambian,
+  type MovimientoOrg,
+} from "@/lib/reservas/organizarServicio";
+import { DialogoPropuestaPiezas, PanelPiezasMesa, type PropuestaAbierta } from "../PiezasMesa";
+import { ListaPropuesta, usePropuestaOrganizar } from "../OrganizarServicio";
 import { cn } from "@/lib/utils";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useAsignacionesMesa, useAsignarMesasReserva } from "@/hooks/useAsignacionesMesa";
@@ -69,6 +107,7 @@ import {
   estadoMesaServicio,
   haLlegado,
   type EstadoMesaServicio,
+  type ResultadoEstadoMesa,
   type ReservaMesaServicio,
   type ReservaServicio,
 } from "@/lib/reservas/servicioSala";
@@ -97,8 +136,13 @@ export interface VistaPlanoHoyProps {
   /** Sala elegida (id de `espacios_reserva`); `null` o una que ya no existe = la primera. */
   salaId: string | null;
   onCambiarSala: (salaId: string) => void;
-  /** Abre el reparto de mesas de la sala (la pantalla de siempre, `PlanoEspacio2D`). */
+  /** Abre el reparto de mesas de la sala (`PlanoEspacio2D`). Desde el 10/10/2026 Hoy ya no lo ofrece. */
   onAbrirReparto?: (salaId: string) => void;
+  /**
+   * «Organizar» (10/10/2026): el plano pasa a MODO PROPUESTA de ese turno. Cada sala enseña cómo
+   * quedarían las mesas; nada se guarda hasta «Aplicar». `onSalir` vuelve al plano normal.
+   */
+  organizar?: { turno: TurnoServicio; onSalir: () => void } | null;
   /** Falló la consulta de reservas de hoy (la de `VistaHoy`): se dice, con «Reintentar», en vez de «Cargando…» para siempre. */
   reservasError?: boolean;
   onReintentarReservas?: () => void;
@@ -137,6 +181,7 @@ export function VistaPlanoHoy({
   salaId,
   onCambiarSala,
   onAbrirReparto,
+  organizar = null,
   reservasError = false,
   onReintentarReservas,
 }: VistaPlanoHoyProps) {
@@ -145,7 +190,8 @@ export function VistaPlanoHoy({
   const esMovil = useIsMobile();
   const enHojas = useIsBelow(ANCHO_PANEL_LATERAL);
   const ahora = useAhora();
-  const turno = turnoDelPlano(filtroTurno, ahora);
+  const turno: TurnoServicio = organizar?.turno ?? turnoDelPlano(filtroTurno, ahora);
+  const proponiendo = !!organizar;
 
   // ── Salas: las de Casa Tomás, el Reservado (privada) la última ─────────────
   const { data: espacios } = useEspaciosReserva();
@@ -222,10 +268,39 @@ export function VistaPlanoHoy({
     [visibles, columnas],
   );
 
-  // ── Mesas de la sala y su estado en el turno que se pinta ───────────────────
-  const mesas = useMemo(
+  // ── «Organizar»: la propuesta de todo el servicio (solo en modo propuesta) ─
+  const org = usePropuestaOrganizar(hoy, turno, proponiendo);
+  const movimientos = useMemo<MovimientoOrg[]>(() => org.resultado?.movimientos ?? [], [org.resultado]);
+  const cambian = useMemo(() => mesasQueCambian(movimientos), [movimientos]);
+  const [verSinSitio, setVerSinSitio] = useState(false);
+
+  // ── Piezas, picos y uniones del servicio (los de verdad, o los propuestos) ─
+  const qc = useQueryClient();
+  const ajustesQuery = useAjustesMesaServicio(sala?.id ?? "", hoy, turno);
+  const ajustesSala = useMemo(() => {
+    if (!proponiendo) return ajustesQuery.data ?? [];
+    const delTurno = (org.ajustesDia ?? []).filter((a) => a.turno === turno);
+    return ajustesPropuestos(delTurno, movimientos).filter((a) => a.espacioId === sala?.id);
+  }, [proponiendo, ajustesQuery.data, org.ajustesDia, turno, movimientos, sala?.id]);
+  const mesasBase = useMemo(
     () => [...(mesasQuery.data ?? [])].sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true })),
     [mesasQuery.data],
+  );
+  const mesasPiezas = useMemo(
+    () => mesasBase.map(mesaPiezasDesde).filter((m): m is MesaPiezas => m !== null),
+    [mesasBase],
+  );
+  const estadoPiezas = useMemo(() => estadoServicio(mesasPiezas, ajustesSala), [mesasPiezas, ajustesSala]);
+  /** Las mesas como están (o quedarían) en este servicio: largo y plazas recalculados; sin piezas, fuera. */
+  const mesas = useMemo(
+    () =>
+      mesasBase
+        .filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0)
+        .map((m) => {
+          const g = geometriaServicio(m, estadoPiezas.get(m.id));
+          return g ? { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad } : m;
+        }),
+    [mesasBase, estadoPiezas],
   );
   const asignacionesSala = useMemo(() => {
     const ids = new Set(mesas.map((m) => m.id));
@@ -233,10 +308,30 @@ export function VistaPlanoHoy({
       .filter((a) => ids.has(a.mesa_id))
       .map((a) => ({ mesa_id: a.mesa_id, reserva_id: a.reserva_id }));
   }, [mesas, asignacionesDeHoy]);
-  const estados = useMemo(
+  const estadosReales = useMemo(
     () => new Map(mesas.map((m) => [m.id, estadoMesaServicio(m.id, asignacionesSala, lista, turno, ahora, config)])),
     [mesas, asignacionesSala, lista, turno, ahora, config],
   );
+  /** En la propuesta: cada mesa con la reserva que tendría (nombre y personas en el cartel). */
+  const estados = useMemo(() => {
+    if (!proponiendo) return estadosReales;
+    const disposicion = disposicionPropuesta(org.mesasDe, movimientos);
+    const porId = new Map(lista.map((r) => [r.id, r]));
+    return new Map<string, ResultadoEstadoMesa>(
+      mesas.map((m): [string, ResultadoEstadoMesa] => {
+        const r = porId.get(disposicion.get(m.id) ?? "");
+        if (!r || r.salida_at || r.estado === "no_show") return [m.id, { estado: "libre", reserva: null, minutos: null }];
+        return [
+          m.id,
+          {
+            estado: haLlegado(r.estado) ? "ocupada" : "reservada",
+            reserva: { ...r, nombre: `${r.nombre || "Reserva"} · ${r.numero_comensales}` },
+            minutos: null,
+          },
+        ];
+      }),
+    );
+  }, [proponiendo, estadosReales, org.mesasDe, movimientos, lista, mesas]);
   /** El cartel con el nombre va en UNA de las mesas de cada reserva (la de número más bajo). */
   const conCartel = useMemo(() => {
     const yaPuestas = new Set<string>();
@@ -251,6 +346,8 @@ export function VistaPlanoHoy({
     return mesasConCartel;
   }, [mesas, estados]);
   const coincidentes = useMemo(() => {
+    // En la propuesta se resaltan las mesas que cambian (y se atenúan las demás).
+    if (proponiendo) return cambian.size > 0 ? new Set(mesas.filter((m) => cambian.has(m.id)).map((m) => m.id)) : null;
     if (!busqueda.trim()) return null;
     const encontradas = new Set<string>();
     for (const m of mesas) {
@@ -258,7 +355,7 @@ export function VistaPlanoHoy({
       if (r && coincideFiltroHoy(r, { busqueda, filtroTurno: "todo" })) encontradas.add(m.id);
     }
     return encontradas;
-  }, [busqueda, mesas, estados]);
+  }, [proponiendo, cambian, busqueda, mesas, estados]);
   const recuento = useMemo(() => {
     const acc: Record<EstadoMesaServicio, number> = { libre: 0, reservada: 0, retrasada: 0, ocupada: 0, por_liberar: 0 };
     for (const m of mesas) acc[estados.get(m.id)?.estado ?? "libre"] += 1;
@@ -285,6 +382,41 @@ export function VistaPlanoHoy({
   );
 
   const tocarMesa = (mesa: Mesa) => setMesaSelId((actual) => (actual === mesa.id ? null : mesa.id));
+
+  // ── Piezas desde la ficha de mesa (lo que antes solo estaba en «Reparto de mesas») ─
+  const [propuestaPiezas, setPropuestaPiezas] = useState<PropuestaAbierta | null>(null);
+  const [guardandoPiezas, setGuardandoPiezas] = useState(false);
+  const reservasEnMesas = useMemo<ReservaEnMesas[]>(() => {
+    const porReserva = new Map<string, ReservaEnMesas>();
+    const porId = new Map(lista.map((r) => [r.id, r]));
+    for (const a of asignacionesSala) {
+      const r = porId.get(a.reserva_id);
+      if (!r || turnoDeHora(r.hora) !== turno || !ocupaEspacio(r.estado) || r.salida_at) continue;
+      const fila = porReserva.get(r.id) ?? { reservaId: r.id, mesaIds: [], comensales: r.numero_comensales };
+      fila.mesaIds.push(a.mesa_id);
+      porReserva.set(r.id, fila);
+    }
+    return [...porReserva.values()];
+  }, [asignacionesSala, lista, turno]);
+  const guardarPiezas = async (cambios: AjusteMesa[], mensaje: string) => {
+    if (!sala) return;
+    setGuardandoPiezas(true);
+    try {
+      await guardarAjustesServicio(sala.id, hoy, turno, cambios);
+      toast.success(mensaje);
+      setPropuestaPiezas(null);
+    } catch (e) {
+      toast.error(`No se ha podido ajustar la mesa: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setGuardandoPiezas(false);
+      void qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA] });
+    }
+  };
+  const volverABase = useVolverAPlanoBase(sala?.id ?? "", hoy, turno);
+  const [confirmarBase, setConfirmarBase] = useState(false);
+  const numAjustes = (ajustesQuery.data ?? []).length;
+  const esTerraza = !!sala && /terraza/i.test(sala.title);
+  const cierreSala = useSalaCerradaServicio(esTerraza ? (sala?.id ?? null) : null, hoy, turno);
 
   /**
    * «Sentar aquí»: la persona está en la sala, así que se le da la mesa Y se marca «Ha llegado» (la misma
@@ -425,7 +557,28 @@ export function VistaPlanoHoy({
 
   const datosMesa = mesaSel ? `${mesaSel.capacidad} plazas · ${sala?.title ?? ""} · ${ETIQUETA_TURNO[turno]}` : "";
 
-  const panelMesa = mesaSel && (
+  const movimientoSel = mesaSel ? (cambian.get(mesaSel.id) ?? null) : null;
+  const mesaPiezasSel = mesaSel ? (mesasPiezas.find((m) => m.id === mesaSel.id) ?? null) : null;
+  const panelPropuestaMesa = mesaSel && (
+    <div className="space-y-3 p-3" data-testid="detalle-mesa-propuesta">
+      {!enHojas && <h3 className="text-base font-semibold">{`Mesa ${mesaSel.nombre}`}</h3>}
+      {movimientoSel ? (
+        <>
+          <p className="text-sm font-medium">{movimientoSel.texto}</p>
+          {movimientoSel.detalle && movimientoSel.desde && <p className="text-[13px] text-muted-foreground">{movimientoSel.detalle}</p>}
+          <Button className="h-12 w-full" disabled={org.aplicando} onClick={() => void org.aplicar([movimientoSel])}>
+            Aplicar solo este
+          </Button>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          {estados.get(mesaSel.id)?.reserva ? "Sin cambios en esta mesa." : "Libre en la propuesta."}
+        </p>
+      )}
+    </div>
+  );
+
+  const panelMesa = proponiendo ? panelPropuestaMesa : mesaSel && (
     <div className="space-y-3 p-3" data-testid="detalle-mesa">
       {/* En una hoja (móvil y tablet) el título y los datos van en su cabecera. */}
       {!enHojas && (
@@ -508,6 +661,19 @@ export function VistaPlanoHoy({
         </div>
       ))}
 
+      {mesaPiezasSel && (
+        <PanelPiezasMesa
+          mesa={mesaPiezasSel}
+          mesas={mesasPiezas}
+          estado={estadoPiezas}
+          reservas={reservasEnMesas}
+          hayServicio
+          ocupado={guardandoPiezas || !puedeEditar}
+          onGuardar={(cambios, mensaje) => guardarPiezas(cambios, mensaje)}
+          onProponer={setPropuestaPiezas}
+        />
+      )}
+
       {estadoSel?.estado === "libre" && (
         <section aria-label="Sentar aquí" className="space-y-2">
           <p className="text-[13px] text-muted-foreground">
@@ -581,6 +747,71 @@ export function VistaPlanoHoy({
           {espacios === undefined ? "Cargando salas…" : "No hay salas de Casa Tomás activas. Se crean en Espacios."}
         </div>
       ) : (
+        <>
+        {proponiendo && (
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-xl border-2 border-primary bg-primary/5 px-3 py-2"
+            data-testid="barra-propuesta"
+            role="region"
+            aria-label="Propuesta de Organizar"
+          >
+            <p className="text-xl font-bold">
+              {!org.resultado ? "Calculando…" : org.resultado.resumen}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">{ETIQUETA_TURNO[turno]}</span>
+            </p>
+            {org.resultado && org.resultado.sinSitio.length > 0 && (
+              <Popover open={verSinSitio} onOpenChange={setVerSinSitio}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-11 border-amber-400 text-amber-800 dark:text-amber-300">
+                    {org.resultado.sinSitio.length} sin sitio
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 text-sm">
+                  <ul className="space-y-1">
+                    {org.resultado.sinSitio.map((x) => (
+                      <li key={x.reservaId}>
+                        <span className="font-medium">{x.nombre}</span> ({x.comensales} p., {x.hora.slice(0, 5)}): {x.motivo}
+                      </li>
+                    ))}
+                  </ul>
+                </PopoverContent>
+              </Popover>
+            )}
+            {org.terraza && (
+              <label className="flex h-11 items-center gap-2 rounded-md border bg-background px-2 text-sm">
+                <Switch checked={org.cierre.cerrada} onCheckedChange={(v) => void org.cierre.cambiar(v)} />
+                {org.terraza.nombre} cerrada
+              </label>
+            )}
+            {org.resultado && org.resultado.movimientos.length > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="h-11 gap-1.5">
+                    <ListChecks className="h-4 w-4" aria-hidden="true" /> Ver lista
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="max-h-[60dvh] w-[min(92vw,28rem)] overflow-y-auto">
+                  <ListaPropuesta resultado={org.resultado} aplicando={org.aplicando} onAplicar={(m) => void org.aplicar([m])} />
+                </PopoverContent>
+              </Popover>
+            )}
+            <div className="ml-auto flex gap-2">
+              <Button variant="outline" className="h-12 px-5" onClick={organizar?.onSalir}>
+                Descartar
+              </Button>
+              <Button
+                className="h-12 px-6 text-base"
+                disabled={!org.resultado || org.resultado.movimientos.length === 0 || org.aplicando}
+                onClick={async () => {
+                  await org.aplicar(org.resultado?.movimientos ?? []);
+                  organizar?.onSalir();
+                }}
+              >
+                {org.aplicando ? "Aplicando…" : "Aplicar todo"}
+              </Button>
+            </div>
+          </div>
+        )}
         <Tabs
           value={sala?.id ?? ""}
           onValueChange={(valor) => valor && onCambiarSala(valor)}
@@ -625,18 +856,27 @@ export function VistaPlanoHoy({
                 );
               })}
             </TabsList>
-            {onAbrirReparto && sala && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-auto h-10 shrink-0 gap-1.5"
-                onClick={() => onAbrirReparto(sala.id)}
-                aria-label={`Abrir el reparto de mesas de ${sala.title}`}
-                title="Repartir mesas, juntar, PDF del servicio…"
-              >
-                <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden lg:inline">Reparto de mesas</span>
-              </Button>
+            {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
+            {!proponiendo && sala && (
+              <div className="ml-auto flex shrink-0 items-center gap-2">
+                {esTerraza && (
+                  <label className="flex h-10 items-center gap-2 rounded-md border px-2 text-[13px]">
+                    <Switch checked={cierreSala.cerrada} onCheckedChange={(v) => void cierreSala.cambiar(v)} aria-label={`${sala.title} cerrada en este servicio`} />
+                    Cerrada
+                  </label>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 gap-1.5"
+                  disabled={numAjustes === 0 || !puedeEditar}
+                  onClick={() => setConfirmarBase(true)}
+                  title={numAjustes === 0 ? "Este servicio ya está como el plano base" : "Deshacer picos, piezas prestadas y uniones de este servicio"}
+                >
+                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  <span className="hidden lg:inline">Plano base</span>
+                </Button>
+              </div>
             )}
           </div>
 
@@ -725,6 +965,7 @@ export function VistaPlanoHoy({
             </TabsContent>
           )}
         </Tabs>
+        </>
       )}
 
       {/* Por debajo de 1280 px: la mesa tocada y la lista por sentar, en hojas (de lado en tablet, desde abajo en móvil). */}
@@ -768,6 +1009,37 @@ export function VistaPlanoHoy({
         }}
       />
       {dialogoEdicion}
+      <DialogoPropuestaPiezas propuesta={propuestaPiezas} ocupado={guardandoPiezas} onCerrar={() => setPropuestaPiezas(null)} />
+      <AlertDialog open={confirmarBase} onOpenChange={(abierto) => !abierto && setConfirmarBase(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Volver al plano base?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se deshacen {numAjustes} {numAjustes === 1 ? "ajuste" : "ajustes"} (picos, piezas prestadas, uniones) de{" "}
+              {sala?.title}, {ETIQUETA_TURNO[turno].toLowerCase()} de hoy. Las reservas conservan su mesa.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-11">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="h-11"
+              onClick={async (e) => {
+                e.preventDefault();
+                try {
+                  await volverABase.mutateAsync(numAjustes);
+                  toast.success(`${sala?.title ?? "La sala"} vuelve al plano base`);
+                } catch {
+                  // El aviso lo pone el hook.
+                } finally {
+                  setConfirmarBase(false);
+                }
+              }}
+            >
+              Volver al plano base
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
