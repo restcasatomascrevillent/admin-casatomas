@@ -27,9 +27,9 @@ import {
   type DocumentoPendiente,
   guardarDocumento,
   guardarOriginalPendiente,
+  ofertasDuplicado,
   type RespuestaProcesado,
   type ResultadoGuardado,
-  resumenNuevo,
 } from "./guardado.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -54,12 +54,21 @@ export function guardarLecturaUnica(
   });
 }
 
-/** Documento pendiente de «Sustituir la existente» de una lectura de una página. */
+/**
+ * Documento pendiente de decidir de una lectura de una página: «Sustituir la
+ * existente» (si es seguro), «Añadir como página x» (si es otra página del
+ * mismo documento) o nada (duplicado sin más).
+ */
 export function pendienteUnico(
   listo: Pick<DocumentoListo, "datos" | "alertasPrevias" | "totalOrigen">,
   existente: DocumentoPendiente["existente"],
   trabajoId: string,
-): { pendiente: DocumentoPendiente; sustituible: NonNullable<RespuestaProcesado["sustituible"]> } {
+): {
+  pendiente: DocumentoPendiente;
+  sustituible: RespuestaProcesado["sustituible"];
+  anadible: RespuestaProcesado["anadible"];
+  motivo: string | null;
+} {
   const pendiente: DocumentoPendiente = {
     datos: listo.datos,
     alertasPrevias: listo.alertasPrevias,
@@ -67,8 +76,12 @@ export function pendienteUnico(
     paginas: 1,
     existente,
   };
-  return { pendiente, sustituible: { trabajo_id: trabajoId, existente, nuevo: resumenNuevo(pendiente) } };
+  const o = ofertasDuplicado(pendiente, trabajoId);
+  return { pendiente, sustituible: o.sustituible, anadible: o.anadible, motivo: o.motivo };
 }
+
+/** Lo que el panel necesita de un duplicado: qué se le ofrece. */
+export type OfertasPendiente = Pick<RespuestaProcesado, "sustituible" | "anadible" | "motivo_no_sustituible">;
 
 /**
  * El camino de una página ha detectado un duplicado: se guarda el documento ya
@@ -93,8 +106,9 @@ export async function registrarDuplicadoSincrono(
     costeUsd?: number;
     llamadas?: number | null;
   },
-): Promise<RespuestaProcesado["sustituible"]> {
-  const { pendiente, sustituible } = pendienteUnico(a, a.existente, a.trabajoId);
+): Promise<OfertasPendiente | null> {
+  const { pendiente, sustituible, anadible, motivo } = pendienteUnico(a, a.existente, a.trabajoId);
+  const ofertas: OfertasPendiente = { sustituible, anadible, motivo_no_sustituible: motivo };
   const { error } = await supabase.from("ocr_trabajos").insert({
     id: a.trabajoId,
     creado_por: a.userId,
@@ -107,7 +121,7 @@ export async function registrarDuplicadoSincrono(
     modelo: a.modelo,
     ...(a.costeUsd ? { coste_usd: a.costeUsd } : {}),
     documento_pendiente: pendiente,
-    resultado: { success: true, duplicado: true, sustituible },
+    resultado: { success: true, duplicado: true, ...ofertas },
     terminado_at: new Date().toISOString(),
   });
   if (error) {
@@ -120,7 +134,7 @@ export async function registrarDuplicadoSincrono(
     const { error: eLl } = await supabase.from("ocr_trabajos").update({ llamadas: a.llamadas }).eq("id", a.trabajoId);
     if (eLl) console.warn("[coste-lectura] no se pudo anotar las llamadas del duplicado:", eLl.message);
   }
-  return sustituible;
+  return ofertas;
 }
 
 /** Cuerpo `archivo` del camino síncrono → fichero (quita la cabecera data:). */
@@ -151,7 +165,7 @@ export async function procesarSincrono(
     // Primero el registro (si la migración no está aplicada, no se sube nada
     // a pendientes/); después el original, que es el que se archivará.
     const trabajoId = generarId();
-    const sustituible = await registrarDuplicadoSincrono(ctx.supabase, {
+    const ofertas = await registrarDuplicadoSincrono(ctx.supabase, {
       userId,
       trabajoId,
       nombre: f.nombre,
@@ -165,13 +179,19 @@ export async function procesarSincrono(
       costeUsd: lectura.usd,
       llamadas: lectura.llamadas,
     });
-    if (sustituible) {
+    if (ofertas?.sustituible || ofertas?.anadible) {
       const originalPath = await guardarOriginalPendiente(ctx.supabase, userId, trabajoId, f.b64, f.mime);
       if (originalPath) {
         await ctx.supabase.from("ocr_trabajos").update({ original_path: originalPath }).eq("id", trabajoId);
       }
     }
-    return { ...g.respuesta, sustituible, coste_usd: lectura.usd };
+    return {
+      ...g.respuesta,
+      sustituible: ofertas?.sustituible ?? null,
+      ...(ofertas?.anadible ? { anadible: ofertas.anadible } : {}),
+      ...(ofertas?.motivo_no_sustituible ? { motivo_no_sustituible: ofertas.motivo_no_sustituible } : {}),
+      coste_usd: lectura.usd,
+    };
   }
   if (g.estado === "guardado") await guardarCosteLectura(ctx.supabase, g.facturaId, lectura);
   return { ...g.respuesta, coste_usd: lectura.usd } as unknown as Record<string, unknown>;

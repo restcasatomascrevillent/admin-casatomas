@@ -28,7 +28,7 @@ export const ESTADOS_TERMINALES = ["completado", "duplicado", "fallido", "cancel
 
 export interface PiezaPreparada {
   blob: Blob;
-  mime: "application/pdf" | "image/jpeg";
+  mime: "application/pdf" | "image/jpeg" | "image/png" | "image/webp";
   pieza: "pagina" | "franja";
   pagina_doc: number;
   franja: number | null;
@@ -37,7 +37,14 @@ export interface PiezaPreparada {
 
 export type PlanDocumento =
   | { camino: "unico" }
-  | { camino: "largo"; origen: "pdf" | "imagen"; piezas: PiezaPreparada[]; paginasDocumento: number };
+  | {
+    camino: "largo";
+    origen: "pdf" | "imagen";
+    piezas: PiezaPreparada[];
+    paginasDocumento: number;
+    /** Original que se archiva. Sin el campo: el fichero subido; `null`: ninguno (fotos unidas sin PDF). */
+    original?: File | null;
+  };
 
 /** Decide el camino de un fichero y, si es largo, lo trocea. */
 export async function planificarDocumento(file: File): Promise<PlanDocumento> {
@@ -120,9 +127,17 @@ export async function iniciarDocumentoLargo(
     onProgreso?.(++subidas, total);
   };
 
-  const mimeOriginal = file.type || "application/octet-stream";
-  const original = { path: `${base}/original.${extension(mimeOriginal)}`, mime: mimeOriginal, bytes: file.size };
-  await subir(original.path, file, mimeOriginal);
+  // Fotos unidas como un documento: el original es un PDF hecho con ellas
+  // (o ninguno si no se pudo hacer: se archiva la primera pieza).
+  const ficheroOriginal = plan.original === undefined ? file : plan.original;
+  let original: { path: string; mime: string; bytes: number } | null = null;
+  if (ficheroOriginal) {
+    const mimeOriginal = ficheroOriginal.type || "application/octet-stream";
+    original = { path: `${base}/original.${extension(mimeOriginal)}`, mime: mimeOriginal, bytes: ficheroOriginal.size };
+    await subir(original.path, ficheroOriginal, mimeOriginal);
+  } else {
+    onProgreso?.(++subidas, total);
+  }
   const piezas = [];
   for (const [i, p] of plan.piezas.entries()) {
     const path = `${base}/${String(i + 1).padStart(2, "0")}.${extension(p.mime)}`;
@@ -286,41 +301,175 @@ export async function esperarTrabajo(
   }
 }
 
-/** Resumen de la factura existente que enseña el diálogo de sustitución. */
-export interface Sustituible {
-  trabajo_id: string;
-  existente: {
-    id: number;
-    numero_documento: string;
-    proveedor: string | null;
-    fecha: string | null;
-    total: number | null;
-    total_origen: string | null;
-    lineas: number;
-    alertas: number;
-    alertas_graves: number;
-    updated_at?: string | null;
-  };
-  nuevo: {
-    total: number | null;
-    total_origen: string | null;
-    lineas: number;
-    alertas: number;
-    proveedor: string | null;
-    fecha: string;
-  };
+
+// ── Fotos unidas como UN documento (revisión del 10/10/2026) ────────────────
+
+/** Imágenes que se pueden unir como páginas de un documento. */
+export const MIMES_UNIBLES = ["image/jpeg", "image/png", "image/webp"];
+/** Como mucho, páginas por documento (lo que acepta el servidor). */
+export const MAX_PAGINAS_UNIDAS = 20;
+
+/**
+ * Varias fotos = UN documento de varias páginas (cada foto, su página; las
+ * muy altas, en franjas). Va por el camino de documento largo con
+ * `paginas_documento` = nº de fotos. El original que se archiva es un PDF con
+ * todas las fotos (si se puede hacer y pesa menos de 10 MB).
+ */
+export async function planificarGrupo(
+  fotos: File[],
+  opciones: { hacerPdf?: (fotos: File[]) => Promise<File | null> } = {},
+): Promise<Extract<PlanDocumento, { camino: "largo" }>> {
+  if (fotos.length < 2) throw new Error("Para unir hacen falta al menos dos fotos");
+  if (fotos.length > MAX_PAGINAS_UNIDAS) throw new Error(`Como mucho ${MAX_PAGINAS_UNIDAS} páginas por documento`);
+  const piezas: PiezaPreparada[] = [];
+  for (const [i, f] of fotos.entries()) {
+    if (!MIMES_UNIBLES.includes(f.type)) throw new Error(`${f.name} no es una foto (solo se unen imágenes)`);
+    let franjas: { blob: Blob }[] = [];
+    try {
+      const { ancho, alto } = await dimensionesImagen(f);
+      if (debeTrocear(ancho, alto)) franjas = (await trocearImagen(f)).franjas;
+    } catch {
+      // Sin canvas (o imagen rara): la foto va entera.
+    }
+    if (franjas.length >= 2) {
+      franjas.forEach((fr, k) =>
+        piezas.push({
+          blob: fr.blob, mime: "image/jpeg", pieza: "franja", pagina_doc: i + 1, franja: k + 1, franjas_pagina: franjas.length,
+        }),
+      );
+    } else {
+      piezas.push({
+        blob: f, mime: f.type as PiezaPreparada["mime"], pieza: "pagina", pagina_doc: i + 1, franja: null, franjas_pagina: null,
+      });
+    }
+  }
+  let original: File | null = null;
+  try {
+    original = await (opciones.hacerPdf ?? pdfDeFotos)(fotos);
+  } catch (err) {
+    console.warn("[unir-fotos] no se pudo hacer el PDF del original:", err);
+  }
+  if (original && original.size > 10 * 1024 * 1024) original = null;
+  return { camino: "largo", origen: "imagen", piezas, paginasDocumento: fotos.length, original };
 }
 
-/** Sustituye EN SITIO la factura existente por el documento nuevo. */
-export async function sustituirExistente(s: Sustituible): Promise<{ message: string; alertas: unknown[] }> {
-  const { data, error } = await supabase.functions.invoke("procesar-factura", {
-    body: {
-      modo: "sustituir",
-      factura_id: s.existente.id,
-      trabajo_id: s.trabajo_id,
-      esperado: { lineas: s.existente.lineas, updated_at: s.existente.updated_at ?? null },
-    },
-  });
+/** PDF con una foto por página (reducidas a 1.800 px y JPEG 0,8 para no pasar de 10 MB). */
+export async function pdfDeFotos(fotos: File[]): Promise<File | null> {
+  if (typeof document === "undefined" || typeof createImageBitmap !== "function") return null;
+  const { PDFDocument } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  for (const f of fotos) {
+    const bmp = await createImageBitmap(f, { imageOrientation: "from-image" });
+    try {
+      const escala = Math.min(1, 1800 / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bmp.width * escala);
+      canvas.height = Math.round(bmp.height * escala);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob>((ok, ko) =>
+        canvas.toBlob((b) => (b ? ok(b) : ko(new Error("No se pudo codificar la foto"))), "image/jpeg", 0.8),
+      );
+      const img = await pdf.embedJpg(new Uint8Array(await blob.arrayBuffer()));
+      const pag = pdf.addPage([img.width, img.height]);
+      pag.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+    } finally {
+      bmp.close();
+    }
+  }
+  const bytes = await pdf.save();
+  const base = fotos[0].name.replace(/\.[^.]+$/, "");
+  return new File([bytes], `${base}-${fotos.length}pag.pdf`, { type: "application/pdf" });
+}
+
+// ── Duplicados: sustituir o añadir como página ──────────────────────────────
+
+/** Resumen de la factura existente que enseñan los diálogos. */
+export interface ResumenExistente {
+  id: number;
+  numero_documento: string;
+  proveedor: string | null;
+  fecha: string | null;
+  total: number | null;
+  total_origen: string | null;
+  lineas: number;
+  alertas: number;
+  alertas_graves: number;
+  updated_at?: string | null;
+  paginas?: number | null;
+  paginas_lineas?: number[] | null;
+  trabajo_pendiente?: boolean | null;
+}
+
+export interface ResumenNuevo {
+  total: number | null;
+  total_origen: string | null;
+  lineas: number;
+  alertas: number;
+  proveedor: string | null;
+  fecha: string;
+}
+
+/** Duplicado que se puede SUSTITUIR por el documento nuevo. */
+export interface Sustituible {
+  trabajo_id: string;
+  existente: ResumenExistente;
+  nuevo: ResumenNuevo;
+}
+
+/** Otra página de un documento que ya existe: se ofrece AÑADIRLA (nunca sustituir). */
+export interface Anadible {
+  trabajo_id: string;
+  existente: ResumenExistente;
+  pagina: { actual: number; total: number };
+  nuevo: ResumenNuevo;
+}
+
+/** Lo que el usuario ve y confirma: el estado de la existente en ese momento. */
+export interface Esperado {
+  lineas: number;
+  updated_at: string | null;
+}
+
+/**
+ * Relee la factura existente al abrir el aviso (no la «foto vieja» de cuando
+ * se detectó el duplicado). `null` si el servidor aún no tiene la RPC.
+ */
+export async function leerResumenFactura(id: number): Promise<ResumenExistente | null> {
+  const { data, error } = await supabase.rpc("ocr_resumen_factura" as never, { p_factura_id: id } as never);
+  if (error) {
+    console.warn("[duplicados] ocr_resumen_factura (¿migración sin aplicar?):", error.message);
+    return null;
+  }
+  const r = data as unknown as (ResumenExistente & { total: number | string | null }) | null;
+  if (!r || typeof r.id !== "number") return null;
+  return { ...r, total: r.total === null || r.total === undefined ? null : Number(r.total) };
+}
+
+/** ¿Se puede sustituir/añadir ahora? El motivo si no. */
+export function motivoBloqueo(
+  e: Pick<ResumenExistente, "lineas" | "trabajo_pendiente">,
+  operacion: "sustituir" | "anadir",
+): string | null {
+  if (e.trabajo_pendiente) return "La factura que ya existe aún se está guardando. Espera a que termine y vuelve a abrir este aviso.";
+  if (operacion === "sustituir" && !(e.lineas > 0)) {
+    return "La factura que ya existe no tiene líneas todavía (puede que aún se esté guardando): no se ofrece sustituirla.";
+  }
+  return null;
+}
+
+/** El servidor abortó porque la factura cambió (o seguía guardándose). */
+export class FacturaCambiada extends Error {}
+
+export const MENSAJE_FACTURA_CAMBIADA = "La factura ha cambiado: revisa los datos y confirma de nuevo.";
+
+const RE_CAMBIO = /ha cambiado desde que la viste|se ha modificado|tiene ahora|no tiene l[ií]neas|a[uú]n se est[aá] (leyendo|guardando)/i;
+
+async function invocarDecision(body: Record<string, unknown>, porDefecto: string) {
+  const { data, error } = await supabase.functions.invoke("procesar-factura", { body });
   if (error) {
     // 403 sin permiso de edición: el cuerpo trae el motivo.
     let motivo = error.message;
@@ -330,8 +479,38 @@ export async function sustituirExistente(s: Sustituible): Promise<{ message: str
     } catch {
       // se queda el mensaje genérico
     }
-    throw new Error(motivo || "No se pudo sustituir la factura");
+    throw new Error(motivo || porDefecto);
   }
-  if (!data?.success) throw new Error(data?.error || "No se pudo sustituir la factura");
-  return { message: data.message, alertas: Array.isArray(data.alertas) ? data.alertas : [] };
+  if (!data?.success) {
+    const motivo = String(data?.error || porDefecto);
+    if (RE_CAMBIO.test(motivo)) throw new FacturaCambiada(`${MENSAJE_FACTURA_CAMBIADA} (${motivo.replace(/^No se ha (sustituido|añadido) nada: /, "")})`);
+    throw new Error(motivo);
+  }
+  return { message: String(data.message ?? ""), alertas: Array.isArray(data.alertas) ? data.alertas : [] };
+}
+
+/** Sustituye EN SITIO la factura existente por el documento nuevo. `esperado`: lo que el usuario acaba de ver. */
+export async function sustituirExistente(s: Sustituible, esperado?: Esperado): Promise<{ message: string; alertas: unknown[] }> {
+  return invocarDecision(
+    {
+      modo: "sustituir",
+      factura_id: s.existente.id,
+      trabajo_id: s.trabajo_id,
+      esperado: esperado ?? { lineas: s.existente.lineas, updated_at: s.existente.updated_at ?? null },
+    },
+    "No se pudo sustituir la factura",
+  );
+}
+
+/** Añade el documento nuevo como página x de la factura existente (sin borrar nada). */
+export async function anadirComoPagina(a: Anadible, esperado?: Esperado): Promise<{ message: string; alertas: unknown[] }> {
+  return invocarDecision(
+    {
+      modo: "anadir_pagina",
+      factura_id: a.existente.id,
+      trabajo_id: a.trabajo_id,
+      esperado: esperado ?? { lineas: a.existente.lineas, updated_at: a.existente.updated_at ?? null },
+    },
+    "No se pudo añadir la página",
+  );
 }

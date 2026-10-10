@@ -93,9 +93,13 @@ export function lineaEstado(e: ElementoCola): LineaEstado {
   if (nivel === "duplicado") {
     return {
       nivel,
-      texto: r?.sustituible
-        ? "Ya existía: está arriba, en «Pendientes de decidir»."
-        : "Ya existía un documento con el mismo número, proveedor, fecha y total: no se ha creado uno nuevo.",
+      texto: r?.anadible
+        ? `Es la página ${r.anadible.pagina.actual} de ${r.anadible.pagina.total} de la factura ${r.anadible.existente.numero_documento}: ` +
+          "puedes añadirla arriba, en «Pendientes de decidir»."
+        : r?.sustituible
+          ? "Ya existía: está arriba, en «Pendientes de decidir»."
+          : "Ya existía un documento con el mismo número y proveedor: no se ha creado uno nuevo." +
+            (r?.motivoNoSustituible ? ` No se ofrece sustituirlo: ${r.motivoNoSustituible}.` : ""),
     };
   }
   const partes: string[] = [];
@@ -104,7 +108,13 @@ export function lineaEstado(e: ElementoCola): LineaEstado {
     if (n > 0) partes.push(`${n} aviso${n > 1 ? "s" : ""}: ${r!.alertas!.map((a) => a.mensaje).join(" · ")}`);
     if (r?.archivoGuardado === false) partes.push("Guardado, pero el fichero original no se ha podido archivar.");
   } else {
-    partes.push(r?.sustituida ? "Factura existente sustituida por este documento." : "Guardado");
+    partes.push(
+      r?.paginaAnadida
+        ? "Añadido como página a la factura que ya existía."
+        : r?.sustituida
+          ? "Factura existente sustituida por este documento."
+          : "Guardado",
+    );
   }
   if (piezas > 1) partes.push(`Leído en ${piezas} trozos y unido.`);
   return { nivel, texto: partes.join(" · ") };

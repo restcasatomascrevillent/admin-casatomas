@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,41 +10,96 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
-import type { Sustituible } from "@/lib/facturas/documentoLargo";
+import {
+  type Anadible,
+  type Esperado,
+  FacturaCambiada,
+  leerResumenFactura,
+  motivoBloqueo,
+  type ResumenExistente,
+  type Sustituible,
+} from "@/lib/facturas/documentoLargo";
 
 const eur = (n: number | null | undefined) =>
   n === null || n === undefined ? "sin total" : `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
+/** Qué se va a hacer con el documento nuevo. */
+export type DecisionDuplicado = { tipo: "sustituir"; s: Sustituible } | { tipo: "anadir"; a: Anadible };
+
 interface Props {
-  sustituible: Sustituible | null;
+  /** Compatibilidad: solo «Sustituir». */
+  sustituible?: Sustituible | null;
+  decision?: DecisionDuplicado | null;
   onCancelar: () => void;
-  onConfirmar: (s: Sustituible) => Promise<void>;
+  /** Confirmado con lo que el usuario ve AHORA (`esperado`). Lanza FacturaCambiada si la factura cambió. */
+  onConfirmar: (esperado: Esperado) => Promise<void>;
+  /** Relectura de la existente (tests). */
+  leerResumen?: (id: number) => Promise<ResumenExistente | null>;
 }
 
 /**
- * Confirmación de «Sustituir la existente» (decisión del dueño, 05-oct-2026):
- * enseña la fila que hay ahora (total, nº de líneas, avisos) frente a la
- * nueva antes de reemplazarla EN SITIO (mismo id; copia de auditoría en
- * facturas_sustituciones).
+ * Confirmación de «Sustituir la existente» (decisión del dueño, 05-oct-2026)
+ * y de «Añadir como página x» (revisión del 10/10/2026). Al abrirse RELEE la
+ * factura existente (líneas, avisos, updated_at) en vez de enseñar la foto de
+ * cuando se detectó el duplicado, y confirma con eso. No deja sustituir si la
+ * existente aún se está guardando o no tiene líneas; si el servidor aborta
+ * porque la factura cambió, lo dice, la vuelve a leer y deja confirmar de nuevo.
  */
-export function SustituirFacturaDialog({ sustituible, onCancelar, onConfirmar }: Props) {
+export function SustituirFacturaDialog({ sustituible, decision: decisionProp, onCancelar, onConfirmar, leerResumen = leerResumenFactura }: Props) {
+  const decision: DecisionDuplicado | null = decisionProp ?? (sustituible ? { tipo: "sustituir", s: sustituible } : null);
+  const oferta = decision ? (decision.tipo === "sustituir" ? decision.s : decision.a) : null;
   const [enviando, setEnviando] = useState(false);
-  const e = sustituible?.existente;
-  const n = sustituible?.nuevo;
+  const [actual, setActual] = useState<ResumenExistente | null>(null);
+  const [cargando, setCargando] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const idExistente = oferta?.existente.id ?? null;
+  const trabajo = oferta?.trabajo_id ?? null;
+
+  const releer = useCallback(async () => {
+    if (idExistente === null) return;
+    setCargando(true);
+    try {
+      setActual(await leerResumen(idExistente));
+    } catch {
+      setActual(null);
+    } finally {
+      setCargando(false);
+    }
+  }, [idExistente, leerResumen]);
+
+  useEffect(() => {
+    setAviso(null);
+    setActual(null);
+    if (idExistente !== null) void releer();
+  }, [idExistente, trabajo, releer]);
+
+  // Sin la RPC (migración sin aplicar) se enseña lo que se vio al detectarlo.
+  const e = actual ?? oferta?.existente;
+  const n = oferta?.nuevo;
+  const operacion = decision?.tipo ?? "sustituir";
+  const bloqueo = e ? motivoBloqueo(e, operacion) : null;
+  const pagina = decision?.tipo === "anadir" ? decision.a.pagina : null;
 
   return (
-    <AlertDialog open={!!sustituible} onOpenChange={(abierto) => { if (!abierto && !enviando) onCancelar(); }}>
+    <AlertDialog open={!!decision} onOpenChange={(abierto) => { if (!abierto && !enviando) onCancelar(); }}>
       <AlertDialogContent className="max-h-[90dvh] overflow-y-auto">
         <AlertDialogHeader>
-          <AlertDialogTitle>¿Sustituir la factura {e?.numero_documento}?</AlertDialogTitle>
+          <AlertDialogTitle>
+            {pagina
+              ? `¿Añadir como página ${pagina.actual} de ${pagina.total} a la factura ${e?.numero_documento}?`
+              : `¿Sustituir la factura ${e?.numero_documento}?`}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            Se reemplazan la cabecera y todas las líneas de la factura que ya existe por las del documento que acabas
-            de subir. Se conserva el mismo número interno y se guarda una copia de la versión actual.
+            {pagina
+              ? "Se añaden las líneas del documento que acabas de subir a la factura que ya existe, sin borrar las suyas, " +
+                "y se recalculan los importes. Se guarda una copia de la versión actual."
+              : "Se reemplazan la cabecera y todas las líneas de la factura que ya existe por las del documento que acabas " +
+                "de subir. Se conserva el mismo número interno y se guarda una copia de la versión actual."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {e && n && (
           <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <div className="rounded-md border p-3">
+            <div className="rounded-md border p-3" aria-busy={cargando}>
               <p className="mb-1 font-medium">Ahora (factura {e.id})</p>
               <p>{e.proveedor ?? "Proveedor sin leer"} · {e.fecha ?? "sin fecha"}</p>
               <p>Total: <strong>{eur(e.total)}</strong>{e.total_origen === "deducido" ? " (calculado)" : ""}</p>
@@ -55,7 +110,7 @@ export function SustituirFacturaDialog({ sustituible, onCancelar, onConfirmar }:
               </p>
             </div>
             <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
-              <p className="mb-1 font-medium">Documento nuevo</p>
+              <p className="mb-1 font-medium">{pagina ? `Página ${pagina.actual} nueva` : "Documento nuevo"}</p>
               <p>{n.proveedor ?? "Proveedor sin leer"} · {n.fecha}</p>
               <p>Total: <strong>{eur(n.total)}</strong>{n.total_origen === "deducido" ? " (calculado)" : ""}</p>
               <p>Líneas: <strong>{n.lineas}</strong></p>
@@ -63,26 +118,36 @@ export function SustituirFacturaDialog({ sustituible, onCancelar, onConfirmar }:
             </div>
           </div>
         )}
+        {(aviso || bloqueo) && (
+          <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            {aviso ?? bloqueo}
+          </p>
+        )}
         <AlertDialogFooter className="gap-2">
           <AlertDialogCancel className="h-11 pointer-coarse:h-12" disabled={enviando}>
             No, dejar la que hay
           </AlertDialogCancel>
           <AlertDialogAction
             className="h-11 pointer-coarse:h-12"
-            disabled={enviando}
+            disabled={enviando || cargando || !!bloqueo || !e}
             onClick={async (ev) => {
               ev.preventDefault();
-              if (!sustituible) return;
+              if (!decision || !e) return;
               setEnviando(true);
+              setAviso(null);
               try {
-                await onConfirmar(sustituible);
+                await onConfirmar({ lineas: e.lineas, updated_at: e.updated_at ?? null });
+              } catch (err) {
+                // Se queda abierto con el motivo; si la factura cambió, se relee para confirmar de nuevo.
+                setAviso(err instanceof Error ? err.message : String(err));
+                if (err instanceof FacturaCambiada) await releer();
               } finally {
                 setEnviando(false);
               }
             }}
           >
             {enviando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-            Sí, sustituir
+            {pagina ? "Sí, añadir la página" : "Sí, sustituir"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

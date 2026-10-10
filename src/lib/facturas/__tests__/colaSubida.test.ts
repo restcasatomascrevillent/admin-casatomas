@@ -377,3 +377,76 @@ describe("textos", () => {
     expect(debeAvisarEnCampana("/reservas", "", false)).toBe(true);
   });
 });
+
+describe("unir fotos como UN documento (páginas)", () => {
+  const preparar = () => {
+    const cola = crearColaSubida(deps());
+    cola.añadirArchivos([jpg("p1.jpg"), jpg("p2.jpg"), pdf("suelto.pdf"), jpg("p3.jpg")]);
+    const ids = cola.getEstado().elementos.map((e) => e.id);
+    return { cola, ids };
+  };
+
+  it("une, reordena y separa sin perder fotos; no une PDF", () => {
+    const { cola, ids } = preparar();
+    expect(cola.unir([ids[0], ids[2]])).toEqual({ error: expect.stringMatching(/no PDF/) });
+    const r = cola.unir([ids[0], ids[1], ids[3]]);
+    expect("id" in r).toBe(true);
+    let els = cola.getEstado().elementos;
+    expect(els).toHaveLength(2);
+    const grupo = els.find((e) => e.fotos)!;
+    expect(grupo.nombre).toBe("p1 (3 páginas)");
+    expect(grupo.fotos!.map((f) => f.name)).toEqual(["p1.jpg", "p2.jpg", "p3.jpg"]);
+    cola.moverPagina(grupo.id, 2, 0);
+    expect(cola.getEstado().elementos.find((e) => e.fotos)!.fotos!.map((f) => f.name)).toEqual(["p3.jpg", "p1.jpg", "p2.jpg"]);
+    cola.separar(grupo.id);
+    els = cola.getEstado().elementos;
+    expect(els.map((e) => e.nombre)).toEqual(["p3.jpg", "p1.jpg", "p2.jpg", "suelto.pdf"]);
+    expect(els.every((e) => !e.fotos)).toBe(true);
+  });
+
+  it("se envía por el camino de documento largo con una página por foto, en el orden elegido", async () => {
+    const planificarGrupo = vi.fn(async (fotos: File[]) => ({
+      camino: "largo" as const, origen: "imagen" as const, paginasDocumento: fotos.length, original: null,
+      piezas: fotos.map((f, i) => ({ blob: f, mime: "image/jpeg" as const, pieza: "pagina" as const, pagina_doc: i + 1, franja: null, franjas_pagina: null })),
+    }));
+    const iniciarLargo = vi.fn(async () => ({ trabajoId: "tg", numPiezas: 2 }));
+    const procesarUnico = vi.fn(async (_f: File, n: string) => ok(n));
+    const cola = crearColaSubida(deps({ planificarGrupo, iniciarLargo, procesarUnico, esperar: async () => trabajo("completado", { id: "tg", num_paginas: 2 }) }));
+    cola.añadirArchivos([jpg("a.jpg"), jpg("b.jpg")]);
+    const [x, y] = cola.getEstado().elementos.map((e) => e.id);
+    cola.unir([y, x]);
+    cola.enviar();
+    for (let i = 0; i < 6; i++) await vuelta();
+    expect(planificarGrupo.mock.calls[0][0].map((f: File) => f.name)).toEqual(["b.jpg", "a.jpg"]);
+    expect(iniciarLargo).toHaveBeenCalledTimes(1);
+    expect(procesarUnico).not.toHaveBeenCalled();
+    const e = cola.getEstado().elementos[0];
+    expect(e.fase).toBe("terminado");
+    expect(e.resultado?.success).toBe(true);
+  });
+
+  it("servidor antiguo: error claro, sin caer al camino de una página", async () => {
+    const cola = crearColaSubida(deps({
+      planificarGrupo: async (fotos) => ({ camino: "largo", origen: "imagen", paginasDocumento: fotos.length, piezas: [], original: null }),
+      iniciarLargo: async () => { throw new SinDocumentosLargos("403"); },
+    }));
+    cola.añadirArchivos([jpg("a.jpg"), jpg("b.jpg")]);
+    cola.unir(cola.getEstado().elementos.map((e) => e.id));
+    cola.enviar();
+    for (let i = 0; i < 6; i++) await vuelta();
+    expect(cola.getEstado().elementos[0].resultado?.error).toMatch(/aún no admite documentos de varias fotos/);
+  });
+});
+
+describe("otra página de una factura existente", () => {
+  it("cuenta como «por decidir» y, al añadirla, como guardada", () => {
+    const anadible = {
+      trabajo_id: "t9", pagina: { actual: 2, total: 2 },
+      existente: { id: 352, numero_documento: "P26/24306", proveedor: null, fecha: null, total: null, total_origen: null, lineas: 2, alertas: 0, alertas_graves: 0 },
+      nuevo: { total: null, total_origen: null, lineas: 1, alertas: 0, proveedor: null, fecha: "2026-10-09" },
+    };
+    expect(clasificarResultado(ok("x", { duplicado: true, anadible }))).toBe("pendiente");
+    expect(clasificarResultado(ok("x", { duplicado: true }))).toBe("duplicada");
+    expect(clasificarResultado(ok("x", { paginaAnadida: true }))).toBe("sustituida");
+  });
+});

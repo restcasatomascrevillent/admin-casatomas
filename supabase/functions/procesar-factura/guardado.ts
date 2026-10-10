@@ -13,6 +13,7 @@ import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
 import { archivarOriginal, type ConfigDrive, moverPendiente, rutaDefinitiva, STORAGE_BUCKET } from "./archivo.ts";
+import { decidirCoincidencia, leerPagina, type PaginaDocumento } from "./paginasDocumento.ts";
 
 // deno-lint-ignore no-explicit-any
 type Supa = any;
@@ -57,6 +58,20 @@ export interface ResumenExistente {
   archivo_path?: string | null;
   updated_at?: string | null;
   motivo?: string | null;
+  /** 20261010150000: para no ofrecer «Sustituir» entre páginas distintas. */
+  paginas?: number | null;
+  paginas_lineas?: number[] | null;
+  totales_lineas?: (number | null)[] | null;
+  trabajo_pendiente?: boolean | null;
+  created_at?: string | null;
+}
+
+/** «Añadir como página x a la factura N» (en vez de duplicado). */
+export interface Anadible {
+  trabajo_id: string;
+  existente: ResumenExistente;
+  pagina: PaginaDocumento;
+  nuevo: ReturnType<typeof resumenNuevo>;
 }
 
 export interface RespuestaProcesado {
@@ -78,6 +93,12 @@ export interface RespuestaProcesado {
     existente: ResumenExistente;
     nuevo: { total: number | null; total_origen: OrigenImporte | null; lineas: number; alertas: number; proveedor: string | null; fecha: string };
   } | null;
+  /** Es otra página de un documento que ya existe: se ofrece añadirla (nunca sustituir). */
+  anadible?: Anadible | null;
+  /** Por qué no se ofrece «Sustituir» (si no se ofrece). */
+  motivo_no_sustituible?: string | null;
+  /** Página añadida a una factura existente. */
+  pagina_anadida?: boolean;
 }
 
 export type ResultadoGuardado =
@@ -125,6 +146,38 @@ export async function buscarExistente(supabase: Supa, d: DatosNormalizados): Pro
       : 0,
     motivo: dup.motivo ?? null,
   };
+}
+
+/** Número provisional de una nota sin número: `SN-<PROVEEDOR>-<AAAAMMDD>` (extracción, 10/10/2026). */
+export function esNumeroProvisional(n: string | null | undefined): boolean {
+  return typeof n === "string" && /^SN-/i.test(n.trim());
+}
+
+const MAX_SUFIJO_PROVISIONAL = 9;
+
+/**
+ * Dos notas sin número del mismo proveedor y día tendrían el mismo número
+ * provisional (y chocarían con el UNIQUE numero_documento + proveedor). Se
+ * prueba `SN-…`, `SN-…-2`, `SN-…-3`…: si una ya existe con el MISMO total es
+ * la misma nota (duplicado); si no, se usa el primer número libre (cambia
+ * `d.numero_documento`). Devuelve el duplicado o null.
+ */
+export async function numeroProvisionalLibre(supabase: Supa, d: DatosNormalizados): Promise<ResumenExistente | null> {
+  const base = d.numero_documento.trim();
+  for (let k = 1; k <= MAX_SUFIJO_PROVISIONAL; k++) {
+    const numero = k === 1 ? base : `${base}-${k}`;
+    const ex = await buscarExistente(supabase, { ...d, numero_documento: numero });
+    const mismoNumero = !!ex && String(ex.numero_documento ?? "").replace(/[^A-Za-z0-9]/g, "").toUpperCase() ===
+      numero.replace(/[^A-Za-z0-9]/g, "").toUpperCase();
+    if (!ex || !mismoNumero) {
+      d.numero_documento = numero;
+      return null;
+    }
+    const mismoTotal = ex.total !== null && d.total !== null && Math.abs(Number(ex.total) - Number(d.total)) < 0.01;
+    if (mismoTotal) return ex;
+  }
+  d.numero_documento = `${base}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+  return null;
 }
 
 function textoEmbedding(d: DatosNormalizados): string {
@@ -273,8 +326,10 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     }
   }
 
-  // 4) Duplicado
-  const existente = await buscarExistente(supabase, d);
+  // 4) Duplicado (las notas sin número llevan uno provisional, ver abajo)
+  const existente = esNumeroProvisional(d.numero_documento)
+    ? await numeroProvisionalLibre(supabase, d)
+    : await buscarExistente(supabase, d);
   if (existente) {
     console.log(`[procesar-factura] DUPLICADO: ${d.numero_documento} (ya existe la factura ${existente.id})`);
     return {
@@ -293,6 +348,13 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
       },
     };
   }
+
+  // Página suelta de un documento de varias («Página 2/2»): sus líneas llevan
+  // su número de página (así, al llegar las demás, se sabe cuáles faltan) y
+  // un aviso de que faltan las otras.
+  const pagSuelta = (e.paginas ?? 1) <= 1 ? leerPagina(d) : null;
+  const alertasPrevias = pagSuelta ? [...e.alertasPrevias, alertaPaginaSuelta(pagSuelta)] : e.alertasPrevias;
+  if (pagSuelta) d.productos = d.productos.map((p) => ({ ...p, pagina: pagSuelta.actual }));
 
   // 5) Embedding de la factura
   const [embFactura] = await openai.embed(textoEmbedding(d));
@@ -355,7 +417,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     }
 
     // 8) Validación de cordura
-    const alertas = await validarYGuardarAlertas(supabase, facturaId, e.alertasPrevias);
+    const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias);
 
     // 9) Original
     let archivo = { ok: false, error: null as string | null };
@@ -392,6 +454,17 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   }
 }
 
+export const CODIGO_PAGINA_SUELTA = "pagina_suelta";
+
+export function alertaPaginaSuelta(p: PaginaDocumento): Alerta {
+  return {
+    codigo: CODIGO_PAGINA_SUELTA,
+    severidad: "media",
+    mensaje: `Es la página ${p.actual} de ${p.total} y las demás no están: súbelas y se ofrecerá añadirlas a este documento.`,
+    pagina: p,
+  };
+}
+
 // ─── Duplicado pendiente de sustituir ───────────────────────────────────────
 
 export interface DocumentoPendiente {
@@ -400,6 +473,35 @@ export interface DocumentoPendiente {
   totalOrigen: OrigenImporte | null;
   paginas: number;
   existente: ResumenExistente;
+  /** Si es OTRA página de la existente: cuál (se añade, nunca se sustituye). */
+  pagina?: PaginaDocumento | null;
+}
+
+/**
+ * Qué se ofrece para un documento pendiente: «Añadir como página x» (otra
+ * página del mismo documento), «Sustituir la existente» (solo si es seguro)
+ * o nada (duplicado sin más). Rellena `pendiente.pagina`.
+ */
+export function ofertasDuplicado(pendiente: DocumentoPendiente, trabajoId: string): {
+  sustituible: NonNullable<RespuestaProcesado["sustituible"]> | null;
+  anadible: Anadible | null;
+  motivo: string | null;
+} {
+  const dec = decidirCoincidencia(
+    { ...pendiente.datos, paginas: pendiente.paginas },
+    { ...pendiente.existente, lineas: Number(pendiente.existente.lineas ?? 0) },
+  );
+  const nuevo = resumenNuevo(pendiente);
+  if (dec.tipo === "pagina") {
+    pendiente.pagina = dec.pagina;
+    return { sustituible: null, anadible: { trabajo_id: trabajoId, existente: pendiente.existente, pagina: dec.pagina, nuevo }, motivo: null };
+  }
+  pendiente.pagina = null;
+  return {
+    sustituible: dec.sustituible ? { trabajo_id: trabajoId, existente: pendiente.existente, nuevo } : null,
+    anadible: null,
+    motivo: dec.motivo,
+  };
 }
 
 export function resumenNuevo(p: Pick<DocumentoPendiente, "datos" | "alertasPrevias" | "totalOrigen">) {
@@ -436,19 +538,24 @@ export async function sustituirFactura(
   if (Number(p.existente?.id) !== Number(a.facturaId)) {
     throw new Error("La factura a sustituir no es la que se detectó como duplicada.");
   }
+  if (p.pagina) {
+    // Revisión del 10/10/2026 (factura 352): sustituir entre páginas
+    // distintas borra la otra página. Se une con «Añadir como página».
+    throw new Error(
+      `No se ha sustituido nada: es la página ${p.pagina.actual} de ${p.pagina.total} de esa factura. Usa «Añadir como página».`,
+    );
+  }
   const d = p.datos;
 
   const [embFactura] = await openai.embed(textoEmbedding(d));
   const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
 
-  let archivoPath: string | null = null;
-  let archivoError: string | null = null;
-  if (t.original_path) {
-    const destino = rutaDefinitiva(d.fecha, a.facturaId, `sust-${String(a.trabajoId).slice(0, 8)}-${t.nombre_original}`);
-    const m = await moverPendiente(supabase, t.original_path, destino);
-    archivoPath = m.path ?? t.original_path;
-    archivoError = m.error;
-  }
+  // El original nuevo se mueve a su carpeta definitiva SOLO si la RPC sale
+  // bien: la RPC ya apunta a la ruta definitiva y, si luego no se puede
+  // mover, la factura vuelve a apuntar a la copia de pendientes/.
+  const destino = t.original_path
+    ? rutaDefinitiva(d.fecha, a.facturaId, `sust-${String(a.trabajoId).slice(0, 8)}-${t.nombre_original}`)
+    : null;
 
   const { data: res, error } = await supabase.rpc("ocr_sustituir_factura", {
     p_factura_id: a.facturaId,
@@ -471,9 +578,21 @@ export async function sustituirFactura(
     },
     p_lineas: filasProductos(d, embs, true),
     p_esperado: a.esperado,
-    p_archivo_path: archivoPath,
+    p_archivo_path: destino,
   });
   if (error) throw new Error(error.message.replace(/^.*SUSTITUCIÓN ABORTADA: /, "No se ha sustituido nada: "));
+
+  let archivoPath: string | null = null;
+  let archivoError: string | null = null;
+  if (t.original_path && destino) {
+    const m = await moverPendiente(supabase, t.original_path, destino);
+    archivoPath = m.path ?? t.original_path;
+    archivoError = m.error;
+    if (!m.path) {
+      const { error: eArch } = await supabase.from("facturas").update({ archivo_path: t.original_path }).eq("id", a.facturaId);
+      if (eArch) console.error("[sustituir] no se pudo apuntar al original en pendientes/:", eArch.message);
+    }
+  }
 
   // Coste de leer el documento nuevo: la lectura del trabajo + los embeddings de esta
   // sustitución. Sustituye al coste que tuviera la factura antes.
@@ -491,6 +610,109 @@ export async function sustituirFactura(
     message: `Factura ${a.facturaId} sustituida: ${res?.lineas_antes ?? "?"} → ${res?.lineas ?? d.productos.length} líneas.` +
       (alertas.length > 0 ? ` Revisa ${alertas.length} aviso(s).` : ""),
   });
+}
+
+/**
+ * «Añadir como página x a la factura N» (revisión del 10/10/2026): AÑADE las
+ * líneas de la página nueva a la factura existente SIN borrar las suyas, y
+ * recalcula (totales, avisos y coste) — todo lo de base de datos dentro de la
+ * RPC ocr_anadir_pagina (una transacción, con copia de auditoría en
+ * facturas_sustituciones). El original de la página se mueve a su carpeta
+ * definitiva solo si la RPC sale bien.
+ */
+export async function anadirPagina(
+  ctx: ContextoGuardado,
+  a: { trabajoId: string; facturaId: number; userId: string; esperado: { lineas?: number; updated_at?: string | null } },
+): Promise<RespuestaProcesado> {
+  const { supabase, openai } = ctx;
+  const { data: t, error: tErr } = await supabase.from("ocr_trabajos")
+    .select("id, estado, documento_pendiente, original_path, original_mime, nombre_original, creado_por")
+    .eq("id", a.trabajoId).maybeSingle();
+  if (tErr) throw new Error(`No se pudo leer el trabajo: ${tErr.message}`);
+  if (!t) throw new Error("No existe ese documento pendiente (puede haber caducado).");
+  if (t.estado !== "duplicado" || !t.documento_pendiente) {
+    throw new Error("Ese documento ya no está pendiente (¿ya se añadió?).");
+  }
+  const p = t.documento_pendiente as DocumentoPendiente;
+  if (Number(p.existente?.id) !== Number(a.facturaId)) {
+    throw new Error("La factura no es la que se detectó para esta página.");
+  }
+  if (!p.pagina) throw new Error("No se ha añadido nada: este documento no es otra página de esa factura.");
+  const pag = p.pagina;
+  const d = p.datos;
+
+  const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
+  const lineas = filasProductos({ ...d, productos: d.productos.map((x) => ({ ...x, pagina: pag.actual })) }, embs, true);
+  const destino = t.original_path
+    ? rutaDefinitiva(p.existente.fecha ?? d.fecha, a.facturaId, `pag${pag.actual}-${String(a.trabajoId).slice(0, 8)}-${t.nombre_original}`)
+    : null;
+
+  const { data: res, error } = await supabase.rpc("ocr_anadir_pagina", {
+    p_factura_id: a.facturaId,
+    p_trabajo_id: a.trabajoId,
+    p_usuario: a.userId,
+    p_pagina: pag.actual,
+    p_paginas_total: pag.total,
+    p_cabecera: {
+      proveedor: d.proveedor,
+      cif: d.cif,
+      fecha: d.fecha,
+      subtotal: d.subtotal,
+      iva: d.iva,
+      total: d.total,
+      total_origen: p.totalOrigen,
+    },
+    p_lineas: lineas,
+    p_esperado: a.esperado,
+    p_archivo_path: destino,
+  });
+  if (error) throw new Error(error.message.replace(/^.*AÑADIDO ABORTADO: /, "No se ha añadido nada: "));
+
+  let archivo = { ok: !destino, error: null as string | null };
+  if (t.original_path && destino) {
+    const m = await moverPendiente(supabase, t.original_path, destino);
+    archivo = { ok: true, error: m.path ? null : `no se pudo mover a su carpeta definitiva (${m.error}); queda en ${t.original_path}` };
+  }
+
+  // Coste: el que ya tenía la factura + la lectura de esta página + estos embeddings.
+  const lectura = sumarCostes(await leerCosteTrabajo(supabase, a.trabajoId), costeDeCliente(openai.uso, null));
+  const { data: fa } = await supabase.from("facturas")
+    .select("coste_lectura_usd, lectura_llamadas, lectura_modelo").eq("id", a.facturaId).maybeSingle();
+  const previo = {
+    usd: Number(fa?.coste_lectura_usd ?? 0) || 0,
+    llamadas: fa?.lectura_llamadas === null || fa?.lectura_llamadas === undefined ? null : Number(fa.lectura_llamadas),
+    modelo: fa?.lectura_modelo ?? null,
+  };
+  await guardarCosteLectura(supabase, a.facturaId, sumarCostes(previo, lectura));
+
+  // Avisos: los que ya tenía (menos «página suelta») + los de la página nueva;
+  // si siguen faltando páginas, el aviso vuelve con lo que falta.
+  const recogidas: number[] = Array.isArray(res?.paginas_lineas) ? res.paginas_lineas.map(Number) : [];
+  const faltan = Array.from({ length: pag.total }, (_, i) => i + 1).filter((n) => !recogidas.includes(n));
+  const antes: Alerta[] = Array.isArray(res?.alertas_antes) ? res.alertas_antes : [];
+  const sinSuelta = (xs: Alerta[]) => xs.filter((x) => x?.codigo !== CODIGO_PAGINA_SUELTA);
+  const previas: Alerta[] = [...sinSuelta(antes), ...sinSuelta(p.alertasPrevias ?? [])];
+  if (faltan.length > 0) {
+    previas.push({
+      codigo: CODIGO_PAGINA_SUELTA,
+      severidad: "media",
+      mensaje: `Faltan la${faltan.length > 1 ? "s" : ""} página${faltan.length > 1 ? "s" : ""} ${faltan.join(", ")} de ${pag.total}.`,
+    });
+  }
+  const alertas = await validarYGuardarAlertas(supabase, a.facturaId, previas);
+  console.log(
+    `[procesar-factura] PÁGINA ${pag.actual}/${pag.total} añadida a la factura ${a.facturaId}: ` +
+      `${res?.lineas_antes} + ${res?.lineas_anadidas} líneas; total ${res?.total}`,
+  );
+  const r = respuestaExito(d, t.nombre_original, a.facturaId, alertas, (res?.total_origen ?? p.totalOrigen) as OrigenImporte | null, archivo, {
+    pagina_anadida: true,
+    coste_usd: lectura.usd,
+    message: `Página ${pag.actual} añadida a la factura ${p.existente.numero_documento}: ` +
+      `${res?.lineas_antes ?? "?"} + ${res?.lineas_anadidas ?? d.productos.length} líneas.` +
+      (alertas.length > 0 ? ` Revisa ${alertas.length} aviso(s).` : ""),
+  });
+  r.webhookResponse = { ...r.webhookResponse, numero_documento: p.existente.numero_documento, total: res?.total ?? null };
+  return r;
 }
 
 /** Guarda en Storage (pendientes/) el original de un duplicado del camino síncrono. */

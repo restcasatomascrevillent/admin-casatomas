@@ -5,7 +5,7 @@ import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.t
 import { configModelo } from "./modelo.ts";
 import { crearClienteOpenAI } from "./openai.ts";
 import { crearRegistroUso, type RegistroUsoOcr } from "./registroUso.ts";
-import { type ContextoGuardado, sustituirFactura } from "./guardado.ts";
+import { anadirPagina, type ContextoGuardado, sustituirFactura } from "./guardado.ts";
 import { iniciarTrabajo, validarInicio } from "./trabajos.ts";
 import { ficheroDesdePayload, procesarSincrono } from "./unico.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
@@ -32,6 +32,10 @@ const createClient = clienteConAuditoria(createClientBase, "procesar-factura");
 //
 //   · `modo: "sustituir"`: reemplaza EN SITIO la factura duplicada por el
 //     documento nuevo ya leído (exige permiso de EDICIÓN en Facturas).
+//
+//   · `modo: "anadir_pagina"` (10-oct-2026): el documento nuevo es OTRA
+//     página («página x/y») de una factura que ya existe: le AÑADE sus
+//     líneas sin borrar nada y recalcula (mismo permiso que sustituir).
 //
 //  Desde el 05-oct-2026 el código vive en módulos (prompts, modelo, openai,
 //  extraccion, guardado, archivo, auth, pagina, pieza, consolidacion,
@@ -98,8 +102,9 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
       return jsonResponse(await iniciarTrabajo(ctx.supabase, auth.userId, v.peticion, modelo));
     }
 
-    // ── Sustituir la factura existente por el documento nuevo ──
-    if (payload?.modo === "sustituir") {
+    // ── Sustituir la factura existente por el documento nuevo, o añadirle
+    //    el documento nuevo como otra página (20261010150000) ──
+    if (payload?.modo === "sustituir" || payload?.modo === "anadir_pagina") {
       const authEdit = await autenticar(req, cfgAuth, "edit");
       if (!authEdit.ok) return authEdit.response;
       const facturaId = Number(payload.factura_id);
@@ -115,7 +120,10 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
         : {};
       const ctx = contexto(`trabajo:${trabajoId.slice(0, 36)}`);
       try {
-        return jsonResponse(await sustituirFactura(ctx, { trabajoId, facturaId, userId: authEdit.userId, esperado }));
+        const args = { trabajoId, facturaId, userId: authEdit.userId, esperado };
+        return jsonResponse(
+          payload.modo === "anadir_pagina" ? await anadirPagina(ctx, args) : await sustituirFactura(ctx, args),
+        );
       } finally {
         await ctx.registro.esperar();
       }

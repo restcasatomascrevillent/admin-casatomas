@@ -29,12 +29,16 @@ import { costeDeRespuesta } from "./costeLectura";
 import {
   describirProgreso,
   esperarTrabajo,
+  type Anadible,
   type EstadoTrabajo,
   iniciarDocumentoLargo,
   iniciarDocumentoUnico,
   type InicioDocumentoLargo,
+  MAX_PAGINAS_UNIDAS,
+  MIMES_UNIBLES,
   type PlanDocumento,
   planificarDocumento,
+  planificarGrupo,
   SinDocumentosLargos,
   type Sustituible,
 } from "./documentoLargo";
@@ -62,6 +66,12 @@ export interface ResultadoProcesamiento {
   sustituible?: Sustituible | null;
   /** Ya se ha sustituido la factura existente por este documento. */
   sustituida?: boolean;
+  /** Es otra página de una factura que ya existe: se puede AÑADIR (nunca sustituir). */
+  anadible?: Anadible | null;
+  /** Ya se ha añadido como página a la factura existente. */
+  paginaAnadida?: boolean;
+  /** Por qué no se ofrece «Sustituir» en un duplicado. */
+  motivoNoSustituible?: string;
   /** Documento largo leído por trozos (páginas o franjas). */
   piezas?: number;
   /** Id del documento guardado (o del ya existente si es un duplicado): el «Ver» abre ESE en Compras. */
@@ -97,6 +107,9 @@ export function aResultado(nombre: string, data: any, piezas?: number, facturaId
     archivoGuardado: data.duplicado === true ? undefined : data.archivo_guardado !== false,
     duplicado: data.duplicado === true,
     sustituible: data.sustituible ?? null,
+    anadible: data.anadible ?? null,
+    ...(typeof data.motivo_no_sustituible === "string" ? { motivoNoSustituible: data.motivo_no_sustituible } : {}),
+    ...(data.pagina_anadida === true ? { paginaAnadida: true } : {}),
     piezas,
     facturaId: idDocumento(data, facturaIdTrabajo),
     ...(costeDeRespuesta(data) !== null ? { costeUsd: costeDeRespuesta(data) as number } : {}),
@@ -110,6 +123,7 @@ function idDocumento(data: any, facturaIdTrabajo?: number | null): number | unde
     data?.webhookResponse?.factura_id,
     data?.webhookResponse?.factura_existente_id,
     data?.sustituible?.existente?.id,
+    data?.anadible?.existente?.id,
     facturaIdTrabajo,
   ];
   const id = candidatos.find((c) => typeof c === "number" && Number.isInteger(c) && c > 0);
@@ -121,8 +135,8 @@ export type ClaseResultado = "guardada" | "avisos" | "sin_original" | "duplicada
 /** Cómo se cuenta un resultado (toast, indicador y resumen de la campana). */
 export function clasificarResultado(r: ResultadoProcesamiento | undefined): ClaseResultado {
   if (!r || !r.success) return "fallida";
-  if (r.sustituida) return "sustituida";
-  if (r.duplicado) return r.sustituible ? "pendiente" : "duplicada";
+  if (r.sustituida || r.paginaAnadida) return "sustituida";
+  if (r.duplicado) return r.sustituible || r.anadible ? "pendiente" : "duplicada";
   if (r.archivoGuardado === false) return "sin_original";
   if ((r.alertas?.length ?? 0) > 0) return "avisos";
   return "guardada";
@@ -157,6 +171,13 @@ export interface ElementoCola {
   trabajoId?: string;
   piezas?: number;
   resultado?: ResultadoProcesamiento;
+  /**
+   * Fotos unidas como UN documento (páginas 1..n, en este orden). `file` es la
+   * primera. Se envían por el camino de documento largo.
+   */
+  fotos?: File[];
+  /** Miniaturas de `fotos` (mismo orden). */
+  previews?: string[];
 }
 
 export interface EstadoCola {
@@ -183,6 +204,8 @@ export interface DepsCola {
    * (SinDocumentosLargos), se usa `procesarUnico`.
    */
   iniciarUnico?: (file: File, onProgreso: (subidas: number, total: number) => void) => Promise<InicioDocumentoLargo>;
+  /** Fotos unidas como un documento → plan de documento largo (una página por foto). */
+  planificarGrupo?: (fotos: File[]) => Promise<Extract<PlanDocumento, { camino: "largo" }>>;
   esperar: (trabajoId: string, onCambio: (t: EstadoTrabajo | null) => void) => Promise<EstadoTrabajo>;
   /** Camino síncrono de una página (respaldo): lee el fichero y llama a procesar-factura. */
   procesarUnico: (file: File, nombre: string) => Promise<ResultadoProcesamiento>;
@@ -299,6 +322,21 @@ export function crearColaSubida(deps: DepsCola) {
     const { file, nombre } = e;
     actualizar(id, { fase: "preparando", progreso: "Preparando…" });
     let resultado: ResultadoProcesamiento | null = null;
+    if (e.fotos && e.fotos.length >= 2) {
+      try {
+        resultado = await procesarGrupo(id, nombre, e.fotos, liberarHueco);
+      } catch (err) {
+        resultado = {
+          nombre,
+          success: false,
+          error: err instanceof SinDocumentosLargos
+            ? "El servidor aún no admite documentos de varias fotos: envíalas por separado o espera a que se actualice."
+            : mensajeError(err),
+        };
+      }
+      terminar(id, resultado);
+      return;
+    }
     try {
       // Documento LARGO (imagen muy alta o PDF de varias páginas): se trocea
       // aquí y se lee en el servidor por trozos. Si el servidor aún no lo
@@ -344,6 +382,16 @@ export function crearColaSubida(deps: DepsCola) {
       resultado = { nombre, success: false, error: mensajeError(err) };
     }
     terminar(id, resultado);
+  };
+
+  /** Fotos unidas: un documento largo con una página por foto. */
+  const procesarGrupo = async (id: string, nombre: string, fotos: File[], liberarHueco: () => void) => {
+    const plan = await (deps.planificarGrupo ?? ((f: File[]) => planificarGrupo(f)))(fotos);
+    actualizar(id, { fase: "subiendo", progreso: "Subiendo…", piezas: plan.piezas.length });
+    const inicio = await deps.iniciarLargo(fotos[0], plan, (n, t) => actualizar(id, { progreso: `Subiendo ${n} de ${t}…` }));
+    actualizar(id, { fase: "procesando", trabajoId: inicio.trabajoId, piezas: inicio.numPiezas, progreso: "En cola…" });
+    liberarHueco();
+    return seguirTrabajo(id, nombre, inicio.trabajoId, inicio.numPiezas);
   };
 
   const bombear = () => {
@@ -422,8 +470,67 @@ export function crearColaSubida(deps: DepsCola) {
     quitar(id: string) {
       const e = buscar(id);
       if (!e || (e.fase !== "seleccionado" && e.fase !== "terminado")) return;
-      revocarPreview(e.preview);
+      (e.previews ?? [e.preview]).forEach(revocarPreview);
       fijar({ ...estado, elementos: estado.elementos.filter((x) => x.id !== id) });
+    },
+
+    /**
+     * Une fotos seleccionadas como UN documento (páginas 1..n en el orden de
+     * `ids`). Solo fotos (no PDF) aún sin enviar; las ya unidas se aplanan.
+     * Devuelve el id del documento nuevo o el motivo para avisar.
+     */
+    unir(ids: string[]): { id: string } | { error: string } {
+      const elegidos = ids.map((i) => buscar(i)).filter((e): e is ElementoCola => !!e && e.fase === "seleccionado");
+      const fotos = elegidos.flatMap((e) => e.fotos ?? (e.file ? [e.file] : []));
+      const previews = elegidos.flatMap((e) => e.previews ?? [e.preview]);
+      if (fotos.length < 2) return { error: "Elige al menos dos fotos para unirlas." };
+      if (fotos.some((f) => !MIMES_UNIBLES.includes(f.type))) return { error: "Solo se pueden unir fotos (JPG, PNG o WEBP), no PDF." };
+      if (fotos.length > MAX_PAGINAS_UNIDAS) return { error: `Como mucho ${MAX_PAGINAS_UNIDAS} páginas por documento.` };
+      const usados = new Set(estado.elementos.filter((e) => !elegidos.includes(e)).map((e) => e.nombre));
+      const base = fotos[0].name.replace(/\.[^.]+$/, "");
+      let nombre = `${base} (${fotos.length} páginas)`;
+      for (let n = 2; usados.has(nombre); n += 1) nombre = `${base} (${fotos.length} páginas) ${n}`;
+      const nuevo: ElementoCola = {
+        id: generarId(), nombre, file: fotos[0], fotos, previews, preview: previews[0] ?? "",
+        tamano: fotos.reduce((t, f) => t + f.size, 0), fase: "seleccionado", progreso: "", tanda: 0,
+      };
+      const primero = estado.elementos.findIndex((e) => elegidos.includes(e));
+      const resto = estado.elementos.filter((e) => !elegidos.includes(e));
+      resto.splice(Math.max(0, Math.min(primero, resto.length)), 0, nuevo);
+      fijar({ ...estado, elementos: resto });
+      return { id: nuevo.id };
+    },
+
+    /** Deshace una unión: vuelven a ser fotos sueltas. */
+    separar(id: string) {
+      const e = buscar(id);
+      if (!e || e.fase !== "seleccionado" || !e.fotos) return;
+      const usados = new Set(estado.elementos.filter((x) => x.id !== id).map((x) => x.nombre));
+      const sueltas: ElementoCola[] = e.fotos.map((f, i) => ({
+        id: generarId(), nombre: nombreUnico(f, usados), file: f, preview: e.previews?.[i] ?? "", tamano: f.size,
+        fase: "seleccionado", progreso: "", tanda: 0,
+      }));
+      const i = estado.elementos.findIndex((x) => x.id === id);
+      const elementos = [...estado.elementos];
+      elementos.splice(i, 1, ...sueltas);
+      fijar({ ...estado, elementos });
+    },
+
+    /** Cambia el orden de las páginas de unas fotos unidas (arrastrar o flechas). */
+    moverPagina(id: string, desde: number, hasta: number) {
+      const e = buscar(id);
+      if (!e || e.fase !== "seleccionado" || !e.fotos) return;
+      const n = e.fotos.length;
+      if (desde < 0 || desde >= n || hasta < 0 || hasta >= n || desde === hasta) return;
+      function mover<T>(xs: T[]): T[] {
+        const c = [...xs];
+        const [x] = c.splice(desde, 1);
+        c.splice(hasta, 0, x);
+        return c;
+      }
+      const fotos = mover(e.fotos);
+      const previews = e.previews ? mover(e.previews) : undefined;
+      actualizar(id, { fotos, previews, file: fotos[0], preview: previews?.[0] ?? e.preview });
     },
 
     /** Envía TODOS los seleccionados. Se puede llamar con otros aún en marcha. */
@@ -436,7 +543,7 @@ export function crearColaSubida(deps: DepsCola) {
     /** Quita de la lista los terminados (los pendientes de decidir siguen en su lista, que sale de la BD). */
     limpiarTerminados() {
       const quedan = estado.elementos.filter((e) => e.fase !== "terminado");
-      estado.elementos.filter((e) => e.fase === "terminado").forEach((e) => revocarPreview(e.preview));
+      estado.elementos.filter((e) => e.fase === "terminado").forEach((e) => (e.previews ?? [e.preview]).forEach(revocarPreview));
       fijar({ ...estado, elementos: quedan });
     },
 
@@ -465,6 +572,18 @@ export function crearColaSubida(deps: DepsCola) {
           });
       }
       return elementos.length;
+    },
+
+    /** La fila del documento que se ha añadido como página a una factura existente. */
+    marcarPaginaAnadida(trabajoId: string, alertas: AlertaValidacion[] = []) {
+      fijar({
+        ...estado,
+        elementos: estado.elementos.map((e) =>
+          e.resultado?.anadible?.trabajo_id === trabajoId
+            ? { ...e, resultado: { ...e.resultado, duplicado: false, paginaAnadida: true, anadible: null, sustituible: null, alertas } }
+            : e,
+        ),
+      });
     },
 
     /** La fila del documento cuyo duplicado ya se ha sustituido. */
@@ -552,9 +671,13 @@ export async function procesarDocumentoUnico(file: File, nombre: string): Promis
   return aResultado(nombre, data);
 }
 
-export function depsSupabase(): Pick<DepsCola, "planificar" | "iniciarLargo" | "iniciarUnico" | "esperar" | "procesarUnico"> {
+export function depsSupabase(): Pick<
+  DepsCola,
+  "planificar" | "planificarGrupo" | "iniciarLargo" | "iniciarUnico" | "esperar" | "procesarUnico"
+> {
   return {
     planificar: planificarDocumento,
+    planificarGrupo: (fotos) => planificarGrupo(fotos),
     iniciarLargo: iniciarDocumentoLargo,
     iniciarUnico: (file) => iniciarDocumentoUnico(file),
     esperar: (id, onCambio) => esperarTrabajo(id, onCambio),

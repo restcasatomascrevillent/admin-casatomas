@@ -19,7 +19,13 @@ import {
   type ResumenTanda,
   textoResumenTanda,
 } from "@/lib/facturas/colaSubida";
-import { sustituirExistente, type Sustituible } from "@/lib/facturas/documentoLargo";
+import {
+  type Anadible,
+  anadirComoPagina,
+  type Esperado,
+  sustituirExistente,
+  type Sustituible,
+} from "@/lib/facturas/documentoLargo";
 import { ETIQUETA_TIPO, tipoDocumento } from "@/lib/facturas/resultadosCarga";
 import {
   fusionarPendientes,
@@ -95,8 +101,10 @@ export function ColaSubidaProvider({ children, deps }: Props) {
           break;
         case "pendiente":
           queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
-          toast(`${e.nombre}: ya existía`, {
-            description: "Queda en «Pendientes de decidir» por si quieres sustituir la que hay.",
+          toast(r?.anadible ? `${e.nombre}: es otra página de ${r.anadible.existente.numero_documento}` : `${e.nombre}: ya existía`, {
+            description: r?.anadible
+              ? "Queda en «Pendientes de decidir» para añadirla a la factura que ya existe."
+              : "Queda en «Pendientes de decidir» por si quieres sustituir la que hay.",
             action: { label: "Decidir", onClick: () => navegarRef.current(RUTA_CARGAR) },
           });
           break;
@@ -175,11 +183,24 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   }, []);
 
   const sustituir = useCallback(
-    async (s: Sustituible) => {
-      const r = await sustituirExistente(s);
+    async (s: Sustituible, esperado?: Esperado) => {
+      const r = await sustituirExistente(s, esperado);
       toast.success("Factura sustituida", { description: r.message });
       setSustituidos((prev) => new Set(prev).add(s.trabajo_id));
       cola.marcarSustituida(s.trabajo_id, r.alertas as AlertaValidacion[]);
+      queryClient.invalidateQueries({ queryKey: ["facturas"] });
+      queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+      queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
+    },
+    [cola, queryClient],
+  );
+
+  const anadirPagina = useCallback(
+    async (a: Anadible, esperado?: Esperado) => {
+      const r = await anadirComoPagina(a, esperado);
+      toast.success(`Página ${a.pagina.actual} añadida`, { description: r.message });
+      setSustituidos((prev) => new Set(prev).add(a.trabajo_id));
+      cola.marcarPaginaAnadida(a.trabajo_id, r.alertas as AlertaValidacion[]);
       queryClient.invalidateQueries({ queryKey: ["facturas"] });
       queryClient.invalidateQueries({ queryKey: ["albaranes"] });
       queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
@@ -193,8 +214,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   }, [pendientesBd, estado.elementos, descartados, sustituidos]);
 
   const valor = useMemo<ContextoColaSubida>(
-    () => ({ cola, estado, activos: cuentaActivos(estado), pendientes, descartarPendiente, sustituir }),
-    [cola, estado, pendientes, descartarPendiente, sustituir],
+    () => ({ cola, estado, activos: cuentaActivos(estado), pendientes, descartarPendiente, sustituir, anadirPagina }),
+    [cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina],
   );
 
   return <ColaSubidaContext.Provider value={valor}>{children}</ColaSubidaContext.Provider>;

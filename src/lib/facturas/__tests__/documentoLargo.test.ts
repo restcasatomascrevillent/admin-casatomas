@@ -26,6 +26,10 @@ import {
   esperarTrabajo,
   esTerminal,
   iniciarDocumentoUnico,
+  anadirComoPagina,
+  FacturaCambiada,
+  motivoBloqueo,
+  planificarGrupo,
   SinDocumentosLargos,
   sustituirExistente,
 } from "../documentoLargo";
@@ -117,6 +121,51 @@ describe("sustituirExistente", () => {
   });
   it("propaga el motivo del servidor", async () => {
     invoke.mockResolvedValue({ data: { success: false, error: "No se ha sustituido nada: la factura 54 tiene ahora 9 líneas" }, error: null });
-    await expect(sustituirExistente(s)).rejects.toThrow(/9 líneas/);
+    const err = await sustituirExistente(s).catch((e) => e);
+    expect(err).toBeInstanceOf(FacturaCambiada);
+    expect(err.message).toMatch(/revisa los datos y confirma de nuevo.*9 líneas/);
+  });
+});
+
+describe("fotos unidas como un documento", () => {
+  const foto = (n: string, tipo = "image/jpeg") => new File([n], n, { type: tipo });
+  it("una página por foto, en orden, con el PDF como original", async () => {
+    const pdf = new File(["%PDF"], "a-2pag.pdf", { type: "application/pdf" });
+    const plan = await planificarGrupo([foto("a.jpg"), foto("b.png", "image/png")], { hacerPdf: async () => pdf });
+    expect(plan.paginasDocumento).toBe(2);
+    expect(plan.original).toBe(pdf);
+    expect(plan.piezas.map((p) => [p.pieza, p.pagina_doc, p.mime])).toEqual([["pagina", 1, "image/jpeg"], ["pagina", 2, "image/png"]]);
+  });
+  it("sin PDF el original queda en null; un PDF suelto no se une", async () => {
+    const plan = await planificarGrupo([foto("a.jpg"), foto("b.jpg")], { hacerPdf: async () => null });
+    expect(plan.original).toBeNull();
+    await expect(planificarGrupo([foto("a.jpg"), foto("b.pdf", "application/pdf")])).rejects.toThrow(/no es una foto/);
+    await expect(planificarGrupo([foto("a.jpg")])).rejects.toThrow(/al menos dos/);
+  });
+});
+
+describe("añadir como página / bloqueos", () => {
+  const a = {
+    trabajo_id: "t7",
+    existente: { id: 352, numero_documento: "P26/24306", proveedor: "NyV", fecha: "2026-10-09", total: 1029.64, total_origen: "leido", lineas: 2, alertas: 0, alertas_graves: 0, updated_at: "u0" },
+    pagina: { actual: 1, total: 2 },
+    nuevo: { total: null, total_origen: null, lineas: 2, alertas: 1, proveedor: "NyV", fecha: "2026-10-09" },
+  };
+  it("manda modo anadir_pagina con lo que el usuario vio", async () => {
+    invoke.mockResolvedValue({ data: { success: true, message: "Página 1 añadida", alertas: [] }, error: null });
+    await anadirComoPagina(a, { lineas: 3, updated_at: "u1" });
+    expect(invoke.mock.calls[0][1].body).toEqual({ modo: "anadir_pagina", factura_id: 352, trabajo_id: "t7", esperado: { lineas: 3, updated_at: "u1" } });
+  });
+  it("factura cambiada → FacturaCambiada; otro error, tal cual", async () => {
+    invoke.mockResolvedValue({ data: { success: false, error: "No se ha añadido nada: la factura 352 ha cambiado desde que la viste. Revisa y confirma de nuevo." }, error: null });
+    await expect(anadirComoPagina(a)).rejects.toBeInstanceOf(FacturaCambiada);
+    invoke.mockResolvedValue({ data: { success: false, error: "Sin permiso" }, error: null });
+    await expect(anadirComoPagina(a)).rejects.toThrow("Sin permiso");
+  });
+  it("no se sustituye una existente sin líneas o que aún se está guardando", () => {
+    expect(motivoBloqueo({ lineas: 0, trabajo_pendiente: false }, "sustituir")).toMatch(/no tiene líneas/);
+    expect(motivoBloqueo({ lineas: 4, trabajo_pendiente: true }, "sustituir")).toMatch(/aún se está guardando/);
+    expect(motivoBloqueo({ lineas: 0, trabajo_pendiente: false }, "anadir")).toBeNull();
+    expect(motivoBloqueo({ lineas: 4, trabajo_pendiente: false }, "sustituir")).toBeNull();
   });
 });

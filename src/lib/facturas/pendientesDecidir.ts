@@ -13,23 +13,42 @@
 // ============================================================================
 
 import { supabase } from "@/integrations/supabase/client";
-import type { Sustituible } from "./documentoLargo";
+import type { Anadible, Sustituible } from "./documentoLargo";
 import type { ElementoCola } from "./colaSubida";
 
 export const DIAS_PENDIENTES = 7;
 export const CLAVE_DESCARTADOS = "facturas.pendientesDescartados";
 
-export interface PendienteDecidir {
+/**
+ * Un documento por decidir: o se puede SUSTITUIR la existente por él, o es
+ * OTRA página de la existente y se puede AÑADIR (nunca las dos cosas).
+ */
+export type PendienteDecidir = {
   trabajoId: string;
   nombre: string;
   creado: string | null;
-  sustituible: Sustituible;
-}
+} & ({ sustituible: Sustituible; anadible?: null } | { sustituible?: null; anadible: Anadible });
 
 const esSustituible = (s: unknown): s is Sustituible => {
   const x = s as Sustituible | null;
   return !!x && typeof x.trabajo_id === "string" && !!x.existente && typeof x.existente.id === "number" && !!x.nuevo;
 };
+
+const esAnadible = (s: unknown): s is Anadible => {
+  const x = s as Anadible | null;
+  return esSustituible(s) && !!x!.pagina && Number.isInteger(x!.pagina.actual) && Number.isInteger(x!.pagina.total);
+};
+
+/** Lo que se ofrece para un resultado: añadir como página (si lo es) o sustituir. */
+function oferta(r: { sustituible?: unknown; anadible?: unknown } | null | undefined):
+  { sustituible: Sustituible; anadible?: null } | { sustituible?: null; anadible: Anadible } | null {
+  if (esAnadible(r?.anadible)) return { anadible: r!.anadible as Anadible };
+  if (esSustituible(r?.sustituible)) return { sustituible: r!.sustituible as Sustituible };
+  return null;
+}
+
+/** Id del trabajo del pendiente. */
+export const trabajoDe = (p: PendienteDecidir) => p.trabajoId;
 
 /** Duplicados sustituibles del usuario (últimos 7 días). Sin tabla o sin permiso: []. */
 export async function leerPendientesDecidir(usuarioId: string, ahora: number = Date.now()): Promise<PendienteDecidir[]> {
@@ -43,15 +62,18 @@ export async function leerPendientesDecidir(usuarioId: string, ahora: number = D
     .order("created_at", { ascending: false })
     .limit(20);
   if (error || !Array.isArray(data)) return [];
-  const filas = data as unknown as { id: string; nombre_original: string; resultado: { sustituible?: unknown } | null; created_at: string | null }[];
-  return filas
-    .filter((f) => esSustituible(f.resultado?.sustituible))
-    .map((f) => ({
-      trabajoId: f.id,
-      nombre: f.nombre_original,
-      creado: f.created_at,
-      sustituible: f.resultado!.sustituible as Sustituible,
-    }));
+  const filas = data as unknown as {
+    id: string;
+    nombre_original: string;
+    resultado: { sustituible?: unknown; anadible?: unknown } | null;
+    created_at: string | null;
+  }[];
+  const out: PendienteDecidir[] = [];
+  for (const f of filas) {
+    const o = oferta(f.resultado);
+    if (o) out.push({ trabajoId: f.id, nombre: f.nombre_original, creado: f.created_at, ...o });
+  }
+  return out;
 }
 
 /**
@@ -73,9 +95,10 @@ export function fusionarPendientes(
     out.push(p);
   };
   for (const e of elementos) {
-    const s = e.resultado?.sustituible;
-    if (e.fase === "terminado" && e.resultado?.duplicado && esSustituible(s)) {
-      meter({ trabajoId: s.trabajo_id, nombre: e.nombre, creado: null, sustituible: s });
+    const o = e.fase === "terminado" && e.resultado?.duplicado ? oferta(e.resultado) : null;
+    if (o) {
+      const trabajoId = (o.anadible ?? o.sustituible)!.trabajo_id;
+      meter({ trabajoId, nombre: e.nombre, creado: null, ...o });
     }
   }
   deBd.forEach(meter);

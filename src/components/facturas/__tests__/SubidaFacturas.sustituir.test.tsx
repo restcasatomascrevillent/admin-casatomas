@@ -83,7 +83,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     );
     montarSubida();
     await enviarUno("a.pdf");
-    expect(await screen.findByText(/mismo número, proveedor, fecha y total/)).toBeTruthy();
+    expect(await screen.findByText(/mismo número y proveedor/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Sustituir la existente/ })).toBeNull();
     // El PDF falso no se puede trocear: va como una página; el servidor
     // antiguo no admite la pieza única y se manda por el camino síncrono.
@@ -134,5 +134,87 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     fireEvent.click(within(seccion).getByRole("button", { name: "Dejar la que hay" }));
     await waitFor(() => expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull());
     expect(window.localStorage.getItem(CLAVE_DESCARTADOS)).toContain(sustituible.trabajo_id);
+  });
+});
+
+describe("SubidaFacturas · páginas sueltas, relectura de la existente y unir fotos", () => {
+  const anadible = {
+    trabajo_id: "44444444-4444-4444-8444-444444444444",
+    existente: {
+      id: 352, numero_documento: "P26/24306", proveedor: "NICOLAS Y VALERO", fecha: "2026-10-09", total: 1029.64,
+      total_origen: "leido", lineas: 2, alertas: 0, alertas_graves: 0, updated_at: "2026-10-10T10:00:00",
+    },
+    pagina: { actual: 1, total: 2 },
+    nuevo: { total: null, total_origen: null, lineas: 2, alertas: 1, proveedor: "NICOLAS Y VALERO", fecha: "2026-10-09" },
+  };
+
+  it("otra página: ofrece «Añadir como página», nunca «Sustituir», y confirma con la factura RELEÍDA", async () => {
+    doble.fijarRespuestas((tabla, llamadas) =>
+      tabla === "ocr_trabajos" && filtra(llamadas, "estado", "duplicado")
+        ? [{ id: anadible.trabajo_id, nombre_original: "pag1.jpg", created_at: "2026-10-10T10:00:00Z", resultado: { success: true, duplicado: true, anadible } }]
+        : [],
+    );
+    doble.fijarRpc((nombre) =>
+      nombre === "ocr_resumen_factura" ? { ...anadible.existente, lineas: 3, updated_at: "2026-10-10T11:00:00", trabajo_pendiente: false } : null,
+    );
+    invoke.mockResolvedValue({ data: { success: true, message: "Página 1 añadida a la factura P26/24306: 3 + 2 líneas.", alertas: [] }, error: null });
+    montarSubida();
+    const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
+    expect(within(seccion).queryByRole("button", { name: /Sustituir/ })).toBeNull();
+    fireEvent.click(within(seccion).getByRole("button", { name: /Añadir como página 1 a la factura P26\/24306/ }));
+    expect(await screen.findByText(/¿Añadir como página 1 de 2 a la factura P26\/24306\?/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("3")).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: /Sí, añadir la página/ }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    expect(invoke.mock.calls[0][1].body).toEqual({
+      modo: "anadir_pagina", factura_id: 352, trabajo_id: anadible.trabajo_id,
+      esperado: { lineas: 3, updated_at: "2026-10-10T11:00:00" },
+    });
+    expect(doble.rpcs[0]).toEqual({ nombre: "ocr_resumen_factura", args: { p_factura_id: 352 } });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull());
+  });
+
+  it("no deja sustituir una existente sin líneas y, si la factura cambió, lo dice y deja confirmar de nuevo", async () => {
+    doble.fijarRespuestas((tabla, llamadas) =>
+      tabla === "ocr_trabajos" && filtra(llamadas, "estado", "duplicado")
+        ? [{ id: sustituible.trabajo_id, nombre_original: "ML101511.pdf", created_at: "2026-10-05T10:00:00Z", resultado: { success: true, duplicado: true, sustituible } }]
+        : [],
+    );
+    let lineas = 0;
+    doble.fijarRpc(() => ({ ...sustituible.existente, lineas, trabajo_pendiente: false }));
+    montarSubida();
+    const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
+    fireEvent.click(within(seccion).getByRole("button", { name: /Sustituir la existente/ }));
+    expect(await screen.findByText(/no tiene líneas todavía/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: /Sí, sustituir/ }) as HTMLButtonElement).disabled).toBe(true);
+
+    // Se cierra y se vuelve a abrir cuando ya tiene líneas; el servidor aborta porque cambió otra vez.
+    fireEvent.click(screen.getByRole("button", { name: /No, dejar la que hay/ }));
+    lineas = 8;
+    invoke.mockResolvedValue({
+      data: { success: false, error: "No se ha sustituido nada: la factura 54 ha cambiado desde que la viste (ahora tiene 9 líneas; tú viste 8). Revisa y confirma de nuevo." },
+      error: null,
+    });
+    fireEvent.click(within(seccion).getByRole("button", { name: /Sustituir la existente/ }));
+    await waitFor(() => expect((screen.getByRole("button", { name: /Sí, sustituir/ }) as HTMLButtonElement).disabled).toBe(false));
+    lineas = 9;
+    fireEvent.click(screen.getByRole("button", { name: /Sí, sustituir/ }));
+    expect(await screen.findByText(/La factura ha cambiado: revisa los datos y confirma de nuevo/)).toBeTruthy();
+    await waitFor(() => expect(screen.getByText("9")).toBeTruthy());
+    expect(screen.getByText(/¿Sustituir la factura ML\/101511\?/)).toBeTruthy();
+  });
+
+  it("marca dos fotos y las une como un documento de 2 páginas", async () => {
+    montarSubida();
+    fireEvent.change(screen.getByLabelText("Elegir facturas o albaranes (PDF o imágenes)"), {
+      target: { files: [new File(["a"], "pag1.jpg", { type: "image/jpeg" }), new File(["b"], "pag2.jpg", { type: "image/jpeg" })] },
+    });
+    fireEvent.click(await screen.findByRole("checkbox", { name: /Marcar pag1.jpg/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Marcar pag2.jpg/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Unir 2 fotos como un documento \(páginas 1–2\)/ }));
+    expect(await screen.findByText(/Un documento de 2 páginas/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Enviar 1 documento/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Bajar la página 1 \(pag1.jpg\)/ }));
+    expect(screen.getByRole("button", { name: /Bajar la página 1 \(pag2.jpg\)/ })).toBeTruthy();
   });
 });

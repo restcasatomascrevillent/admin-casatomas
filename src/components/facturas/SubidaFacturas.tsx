@@ -6,11 +6,12 @@ import { toast } from "sonner";
 import {
   Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, AlertTriangle, Copy,
   Camera, FolderOpen, Replace, RotateCcw, Clock, Image as ImageIcon, File as FileIcon,
+  Layers, ChevronUp, ChevronDown, FilePlus2, Ungroup,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useColaSubida } from "@/hooks/useColaSubida";
 import { type ElementoCola, progresoTanda } from "@/lib/facturas/colaSubida";
-import type { Sustituible } from "@/lib/facturas/documentoLargo";
+import type { Esperado } from "@/lib/facturas/documentoLargo";
 import type { PendienteDecidir } from "@/lib/facturas/pendientesDecidir";
 import {
   claseFichero,
@@ -23,7 +24,7 @@ import {
 } from "@/lib/facturas/resultadosCarga";
 import { cn } from "@/lib/utils";
 import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
-import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
+import { type DecisionDuplicado, SustituirFacturaDialog } from "./SustituirFacturaDialog";
 
 /** Dónde se ve el documento ya guardado (la pestaña Compras, en Documentos). */
 const RUTA_COMPRAS = "/facturas?tab=compras";
@@ -43,13 +44,15 @@ const DORADO = "bg-[hsl(38,59%,45%)] text-white hover:bg-[hsl(38,59%,38%)] focus
  * botones fijos; la lista hace scroll por dentro.
  */
 export function SubidaFacturas() {
-  const { cola, estado, pendientes, descartarPendiente, sustituir } = useColaSubida();
+  const { cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina } = useColaSubida();
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Segundo input solo para la cámara de la tablet/móvil (`capture`): abre la
   // cámara directamente en vez del selector de archivos.
   const camaraInputRef = useRef<HTMLInputElement>(null);
-  const [aSustituir, setASustituir] = useState<Sustituible | null>(null);
+  const [decision, setDecision] = useState<DecisionDuplicado | null>(null);
+  /** Fotos marcadas para unirlas como UN documento. */
+  const [marcados, setMarcados] = useState<Set<string>>(() => new Set());
 
   const elementos = estado.elementos;
   const seleccionados = elementos.filter((e) => e.fase === "seleccionado");
@@ -74,13 +77,30 @@ export function SubidaFacturas() {
     if (camaraInputRef.current) camaraInputRef.current.value = "";
   };
 
-  const confirmarSustitucion = async (s: Sustituible) => {
-    try {
-      await sustituir(s);
-      setASustituir(null);
-    } catch (err) {
-      toast.error("No se ha sustituido", { description: err instanceof Error ? err.message : String(err) });
+  // Los errores los enseña el propio diálogo (se queda abierto con el motivo).
+  const confirmarDecision = async (esperado: Esperado) => {
+    if (!decision) return;
+    if (decision.tipo === "sustituir") await sustituir(decision.s, esperado);
+    else await anadirPagina(decision.a, esperado);
+    setDecision(null);
+  };
+
+  const marcables = seleccionados.filter((e) => e.fotos || claseFichero(e) === "imagen");
+  const marcadosVigentes = marcables.filter((e) => marcados.has(e.id));
+  const alternarMarca = (id: string) =>
+    setMarcados((prev) => {
+      const nuevo = new Set(prev);
+      if (nuevo.has(id)) nuevo.delete(id);
+      else nuevo.add(id);
+      return nuevo;
+    });
+  const unirMarcados = () => {
+    const r = cola.unir(marcadosVigentes.map((e) => e.id));
+    if ("error" in r) {
+      toast.error("No se han unido", { description: r.error });
+      return;
     }
+    setMarcados(new Set());
   };
 
   const botonesSubida = (
@@ -207,21 +227,56 @@ export function SubidaFacturas() {
           {pendientes.length > 0 && (
             <SeccionPendientes
               pendientes={pendientes}
-              onSustituir={(p) => setASustituir(p.sustituible)}
+              onDecidir={(p) =>
+                setDecision(p.anadible ? { tipo: "anadir", a: p.anadible } : p.sustituible ? { tipo: "sustituir", s: p.sustituible } : null)}
               onDescartar={(p) => descartarPendiente(p.trabajoId)}
             />
           )}
 
           {seleccionados.length > 0 && (
             <section aria-label="Archivos seleccionados">
-              <h3 className="text-xs font-medium text-muted-foreground">Archivos seleccionados ({seleccionados.length})</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-xs font-medium text-muted-foreground">Archivos seleccionados ({seleccionados.length})</h3>
+                {marcables.length >= 2 && (
+                  <p className="text-xs text-muted-foreground">
+                    ¿Varias fotos del mismo documento? Márcalas y únelas: se leen como páginas 1, 2, 3…
+                  </p>
+                )}
+              </div>
+              {marcadosVigentes.length >= 2 && (
+                <Button type="button" variant="outline" className="my-2 h-11 gap-2" onClick={unirMarcados}>
+                  <Layers className="h-4 w-4" aria-hidden="true" />
+                  Unir {marcadosVigentes.length} fotos como un documento (páginas 1–{
+                    marcadosVigentes.reduce((n, e) => n + (e.fotos?.length ?? 1), 0)
+                  })
+                </Button>
+              )}
               <ul className="divide-y divide-border/60">
                 {seleccionados.map((e) => (
                   <li key={e.id} className="flex items-center gap-3 py-2">
+                    {marcables.includes(e) && (
+                      <input
+                        type="checkbox"
+                        className="h-5 w-5 shrink-0 accent-[hsl(38,59%,45%)]"
+                        checked={marcados.has(e.id)}
+                        onChange={() => alternarMarca(e.id)}
+                        aria-label={`Marcar ${e.nombre} para unirla con otras fotos`}
+                      />
+                    )}
                     <Miniatura e={e} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{e.nombre}</p>
-                      <p className="text-xs text-muted-foreground">{formatoTamano(e.tamano)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {e.fotos ? `Un documento de ${e.fotos.length} páginas · ` : ""}
+                        {formatoTamano(e.tamano)}
+                      </p>
+                      {e.fotos && (
+                        <PaginasGrupo
+                          e={e}
+                          onMover={(desde, hasta) => cola.moverPagina(e.id, desde, hasta)}
+                          onSeparar={() => cola.separar(e.id)}
+                        />
+                      )}
                     </div>
                     <Button
                       variant="ghost"
@@ -273,9 +328,9 @@ export function SubidaFacturas() {
         </div>
       )}
       <SustituirFacturaDialog
-        sustituible={aSustituir}
-        onCancelar={() => setASustituir(null)}
-        onConfirmar={confirmarSustitucion}
+        decision={decision}
+        onCancelar={() => setDecision(null)}
+        onConfirmar={confirmarDecision}
       />
     </div>
   );
@@ -293,13 +348,92 @@ function Miniatura({ e }: { e: ElementoCola }) {
   );
 }
 
+/**
+ * Páginas de unas fotos unidas: arrastrar para ordenar (ratón) o flechas
+ * (tablet y teclado). La primera es la página 1.
+ */
+function PaginasGrupo({
+  e,
+  onMover,
+  onSeparar,
+}: {
+  e: ElementoCola;
+  onMover: (desde: number, hasta: number) => void;
+  onSeparar: () => void;
+}) {
+  const [arrastrando, setArrastrando] = useState<number | null>(null);
+  const fotos = e.fotos ?? [];
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      <ol className="flex flex-wrap gap-2" aria-label={`Orden de las páginas de ${e.nombre}`}>
+        {fotos.map((f, i) => (
+          <li
+            key={`${f.name}-${f.size}-${f.lastModified}-${i}`}
+            draggable
+            onDragStart={(ev) => {
+              ev.stopPropagation();
+              setArrastrando(i);
+            }}
+            onDragOver={(ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+            }}
+            onDrop={(ev) => {
+              ev.preventDefault();
+              ev.stopPropagation();
+              if (arrastrando !== null) onMover(arrastrando, i);
+              setArrastrando(null);
+            }}
+            onDragEnd={() => setArrastrando(null)}
+            className={cn(
+              "flex cursor-grab items-center gap-1 rounded-md border bg-background p-1 active:cursor-grabbing",
+              arrastrando === i && "opacity-50",
+            )}
+          >
+            {e.previews?.[i] ? (
+              <img src={e.previews[i]} alt="" className="h-10 w-10 rounded object-cover" />
+            ) : (
+              <ImageIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+            )}
+            <span className="px-0.5 text-xs font-medium">Pág. {i + 1}</span>
+            <span className="flex flex-col">
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                disabled={i === 0}
+                onClick={() => onMover(i, i - 1)}
+                aria-label={`Subir la página ${i + 1} (${f.name})`}
+              >
+                <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                disabled={i === fotos.length - 1}
+                onClick={() => onMover(i, i + 1)}
+                aria-label={`Bajar la página ${i + 1} (${f.name})`}
+              >
+                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5 px-2 text-muted-foreground" onClick={onSeparar}>
+        <Ungroup className="h-4 w-4" aria-hidden="true" />
+        Separar
+      </Button>
+    </div>
+  );
+}
+
 function SeccionPendientes({
   pendientes,
-  onSustituir,
+  onDecidir,
   onDescartar,
 }: {
   pendientes: PendienteDecidir[];
-  onSustituir: (p: PendienteDecidir) => void;
+  onDecidir: (p: PendienteDecidir) => void;
   onDescartar: (p: PendienteDecidir) => void;
 }) {
   return (
@@ -313,16 +447,31 @@ function SeccionPendientes({
           <li key={p.trabajoId} className="space-y-2 py-3">
             <p className="text-sm">
               <span className="font-medium">{p.nombre}</span>
-              <span className="block text-xs text-muted-foreground">
-                Ya existe la factura {p.sustituible.existente.numero_documento} ({p.sustituible.existente.lineas} líneas):
-                no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.
-              </span>
+              {p.anadible ? (
+                <span className="block text-xs text-muted-foreground">
+                  Es la página {p.anadible.pagina.actual} de {p.anadible.pagina.total} de la factura{" "}
+                  {p.anadible.existente.numero_documento}, que ya existe con {p.anadible.existente.lineas} líneas. Añádela
+                  para completarla (no se borra nada).
+                </span>
+              ) : p.sustituible ? (
+                <span className="block text-xs text-muted-foreground">
+                  Ya existe la factura {p.sustituible.existente.numero_documento} ({p.sustituible.existente.lineas} líneas):
+                  no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.
+                </span>
+              ) : null}
             </p>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onSustituir(p)}>
-                <Replace className="h-4 w-4" aria-hidden="true" />
-                Sustituir la existente
-              </Button>
+              {p.anadible ? (
+                <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
+                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+                  Añadir como página {p.anadible.pagina.actual} a la factura {p.anadible.existente.numero_documento}
+                </Button>
+              ) : (
+                <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
+                  <Replace className="h-4 w-4" aria-hidden="true" />
+                  Sustituir la existente
+                </Button>
+              )}
               <Button type="button" variant="ghost" className="h-11 text-muted-foreground hover:text-foreground" onClick={() => onDescartar(p)}>
                 Dejar la que hay
               </Button>

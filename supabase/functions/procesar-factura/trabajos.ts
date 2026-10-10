@@ -19,7 +19,7 @@
 import { encodeBase64 } from "./base64.ts";
 import { consolidar, prepararDocumentoConsolidado } from "./consolidacion.ts";
 import { type DocumentoListo, type FicheroUnico, leerDocumentoUnico } from "./extraccion.ts";
-import { type ContextoGuardado, type DocumentoPendiente, guardarDocumento, type RespuestaProcesado, resumenNuevo } from "./guardado.ts";
+import { type ContextoGuardado, type DocumentoPendiente, guardarDocumento, ofertasDuplicado, type RespuestaProcesado } from "./guardado.ts";
 import { bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import type { MotivoRelectura, PaginaCerrada } from "./pagina.ts";
 import { leerPieza } from "./pieza.ts";
@@ -197,7 +197,8 @@ async function descargarB64(supabase: Supa, path: string): Promise<string> {
 
 /** Error que puede salir bien al reintentar (red, límites, Storage). */
 export function esErrorTransitorio(msg: string): boolean {
-  return /\b(429|500|502|503|504)\b|fetch failed|network|timeout|descarga /i.test(msg);
+  return /\b(429|500|502|503|504|57014|40001|40P01)\b|fetch failed|network|timeout|descarga |deadlock|could not serialize|too many connections|connection (?:reset|refused|terminated)|terminating connection|ECONNRESET/i
+    .test(msg);
 }
 
 /**
@@ -410,7 +411,12 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
     return;
   }
   const dup = g.existente ? pendienteUnico(listo, g.existente, trabajo.id) : null;
-  const respuesta: RespuestaProcesado = { ...g.respuesta, sustituible: dup?.sustituible ?? null };
+  const respuesta: RespuestaProcesado = {
+    ...g.respuesta,
+    sustituible: dup?.sustituible ?? null,
+    ...(dup?.anadible ? { anadible: dup.anadible } : {}),
+    ...(dup?.motivo ? { motivo_no_sustituible: dup.motivo } : {}),
+  };
   await terminar(supabase, trabajo.id, "duplicado", { ...respuesta, ...comun }, g.existente?.id ?? null, null, dup?.pendiente ?? null);
 }
 
@@ -486,9 +492,12 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
       const pendiente: DocumentoPendiente | null = g.existente
         ? { datos: listo.datos, alertasPrevias: listo.alertasPrevias, totalOrigen: listo.totalOrigen, paginas: c.paginasDocumento, existente: g.existente }
         : null;
+      const o = pendiente ? ofertasDuplicado(pendiente, trabajo.id) : null;
       const respuesta: RespuestaProcesado = {
         ...g.respuesta,
-        sustituible: pendiente ? { trabajo_id: trabajo.id, existente: pendiente.existente, nuevo: resumenNuevo(pendiente) } : null,
+        sustituible: o?.sustituible ?? null,
+        ...(o?.anadible ? { anadible: o.anadible } : {}),
+        ...(o?.motivo ? { motivo_no_sustituible: o.motivo } : {}),
       };
       await terminar(supabase, trabajo.id, "duplicado", { ...respuesta, ...comun }, g.existente?.id ?? null, null, pendiente);
     }
@@ -499,10 +508,26 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
     //  puede venir de la de una pieza.)
     const transitorio = esErrorTransitorio(msg);
     if (transitorio && (trabajo.intentos_consolidacion ?? 1) < 3) {
-      // Se deja caducar el lease: el cron la vuelve a intentar.
+      // Carga masiva (10/10/2026: 48 a la vez, inserts de 40-100 s): no se
+      // espera a que caduque el lease de 180 s. Se apunta el motivo y se
+      // suelta el lease ya: el cron (reanudar_trabajos_ocr, cada minuto) la
+      // devuelve a la cola y se reintenta en ~1 min.
+      await soltarConsolidacion(supabase, trabajo.id, msg);
       return;
     }
     await terminar(supabase, trabajo.id, "fallido", { success: false, error: msg }, null, msg, null);
+  }
+}
+
+/** Apunta el error de una consolidación que se reintentará y suelta su lease ya (nunca lanza). */
+export async function soltarConsolidacion(supabase: Supa, trabajoId: string, msg: string): Promise<void> {
+  try {
+    const { error } = await supabase.from("ocr_trabajos")
+      .update({ error: `Fallo al guardar (se reintenta): ${msg}`.slice(0, 2000), lease_hasta: new Date().toISOString() })
+      .eq("id", trabajoId).eq("estado", "consolidando");
+    if (error) console.error("[ocr-trabajo] no se pudo soltar la consolidación:", error.message);
+  } catch (e) {
+    console.error("[ocr-trabajo] no se pudo soltar la consolidación:", e);
   }
 }
 

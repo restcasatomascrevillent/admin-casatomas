@@ -12,6 +12,9 @@ export function crearDobleSupabase() {
   const inserts: { tabla: string; fila: unknown }[] = [];
   let responder: (tabla: string, llamadas: Llamada[]) => unknown = () => [];
   const invoke = vi.fn();
+  /** RPC: por defecto no contesta nada (como si la función no existiera aún). */
+  let responderRpc: (nombre: string, args: Record<string, unknown>) => unknown = () => null;
+  const rpcs: { nombre: string; args: Record<string, unknown> }[] = [];
 
   const cadena = (tabla: string, llamadas: Llamada[] = []): unknown =>
     new Proxy(
@@ -36,6 +39,10 @@ export function crearDobleSupabase() {
   const subidas: { bucket: string; path: string }[] = [];
   const supabase = {
     from: (tabla: string) => cadena(tabla),
+    rpc: async (nombre: string, args: Record<string, unknown>) => {
+      rpcs.push({ nombre, args });
+      return { data: responderRpc(nombre, args), error: null };
+    },
     functions: { invoke: (...a: unknown[]) => invoke(...a) },
     auth: { getUser: async () => ({ data: { user: { id: "u1" } }, error: null }) },
     storage: {
@@ -54,6 +61,12 @@ export function crearDobleSupabase() {
     inserts,
     /** Ficheros subidos a Storage (documentos en segundo plano). */
     subidas,
+    /** RPC llamadas. */
+    rpcs,
+    /** Qué contesta cada RPC. */
+    fijarRpc(f: (nombre: string, args: Record<string, unknown>) => unknown) {
+      responderRpc = f;
+    },
     /** Qué contesta cada consulta. */
     fijarRespuestas(f: (tabla: string, llamadas: Llamada[]) => unknown) {
       responder = f;
@@ -62,6 +75,8 @@ export function crearDobleSupabase() {
       inserts.length = 0;
       subidas.length = 0;
       responder = () => [];
+      responderRpc = () => null;
+      rpcs.length = 0;
       invoke.mockReset();
     },
   };

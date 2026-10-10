@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import type { ColaSubida, EstadoCola } from "@/lib/facturas/colaSubida";
 import type { PendienteDecidir } from "@/lib/facturas/pendientesDecidir";
-import type { Sustituible } from "@/lib/facturas/documentoLargo";
+import type { Anadible, Esperado, Sustituible } from "@/lib/facturas/documentoLargo";
 
 /**
  * Lo que publica <ColaSubidaProvider> (montado UNA vez en App.tsx, por encima
@@ -16,8 +16,10 @@ export interface ContextoColaSubida {
   pendientes: PendienteDecidir[];
   /** «Dejar la existente»: se olvida el pendiente en este navegador. */
   descartarPendiente: (trabajoId: string) => void;
-  /** «Sustituir la existente» ya confirmado. Lanza si el servidor lo rechaza. */
-  sustituir: (s: Sustituible) => Promise<void>;
+  /** «Sustituir la existente» ya confirmado con lo que el usuario vio. Lanza si el servidor lo rechaza. */
+  sustituir: (s: Sustituible, esperado?: Esperado) => Promise<void>;
+  /** «Añadir como página x» ya confirmado. Lanza si el servidor lo rechaza. */
+  anadirPagina: (a: Anadible, esperado?: Esperado) => Promise<void>;
 }
 
 /** Facturas → pestaña «Cargar» (indicador, toasts y campana llevan aquí). */

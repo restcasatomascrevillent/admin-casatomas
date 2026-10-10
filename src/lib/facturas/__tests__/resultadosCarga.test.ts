@@ -121,7 +121,7 @@ describe("lineaEstado: una sola línea por documento", () => {
   });
 
   it("duplicado, sustituido, guardado y en marcha", () => {
-    expect(lineaEstado(el("d", ok({ duplicado: true }))).texto).toMatch(/mismo número, proveedor, fecha y total/);
+    expect(lineaEstado(el("d", ok({ duplicado: true }))).texto).toMatch(/mismo número y proveedor/);
     expect(lineaEstado(el("p", ok({ duplicado: true, sustituible: {} as never }))).texto).toMatch(/«Pendientes de decidir»/);
     expect(lineaEstado(el("x", ok({ sustituida: true }))).texto).toMatch(/sustituida/);
     expect(lineaEstado(el("g", ok()))).toEqual({ nivel: "ok", texto: "Guardado" });
