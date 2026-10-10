@@ -9,6 +9,7 @@ do $$
 declare
   v_admin uuid := (select user_id from public.super_admins limit 1);
   v_hoy   date := (now() at time zone 'utc')::date;
+  d0 date := (now() at time zone 'utc')::date - 6;   -- Default: clave mixta con gasto muy superior a ia_uso (tope 1,3)
   d1 date := (now() at time zone 'utc')::date - 5;   -- Default: mixto + ajeno + ocr, con ia_uso
   d2 date := (now() at time zone 'utc')::date - 4;   -- Default: solo la clave mixta, sin ia_uso
   d3 date := (now() at time zone 'utc')::date - 3;   -- Default sin uso (se excluye); Casa sin uso (su proceso)
@@ -98,6 +99,7 @@ begin
   --     mixto 6, ocr 2, ajeno 2 (excluido). Casa 1 $ con uso de su clave general → otros 1.
   --     ia_uso de d1: ocr 1,0 · chat 3,0 · chatweb 1,0 → el mixto (6) se reparte 1/5 · 3/5 · 1/5 = 1,2 · 3,6 · 1,2
   insert into public.openai_uso_diario (fecha, project_id, api_key_id, modelo, input_tokens, peticiones) values
+    (d0, 'p_def',  'k_mix', 'zz-test-modelo',            1000000, 10),
     (d1, 'p_def',  'k_mix', 'zz-test-modelo-2026-01-01', 3000000, 10),
     (d1, 'p_def',  'k_ocr', 'zz-test-modelo',            1000000, 10),
     (d1, 'p_def',  'k_aj',  'zz-test-modelo',            1000000, 10),
@@ -107,6 +109,7 @@ begin
     (d4, 'p_def',  'k_mix', 'zz-modelo-sin-tarifa',      1000, 10),
     (d4, 'p_def',  'k_aj',  'zz-modelo-sin-tarifa',      1000, 30);
   insert into public.openai_costes_diarios (fecha, project_id, line_item, usd) values
+    (d0, 'p_def',  'a', 10.00),                             -- R = 10, E = 2 (chat) → chat 2 × 1,3 = 2,6 · sin_identificar 7,4
     (d1, 'p_def',  'a', 6.00), (d1, 'p_def', 'b', 4.00),   -- 10,00
     (d1, 'p_casa', 'a', 1.00),
     (d2, 'p_def',  'a', 4.00),                              -- todo mixto, sin ia_uso → otros
@@ -119,32 +122,40 @@ begin
     (d1 - 60, 'p_def', 'a', 7.00);                          -- fuera de la ventana
   insert into public.ia_uso (funcion, modelo, coste_usd, created_at) values
     ('procesar-factura', 'gpt-4.1', 1.0, (d1::timestamp + interval '12 hours') at time zone 'utc'),
+    ('chat-facturas',    'gpt-4.1', 2.0, (d0::timestamp + interval '12 hours') at time zone 'utc'),
     ('chat-facturas',    'gpt-4.1', 3.0, (d1::timestamp + interval '13 hours') at time zone 'utc');
   insert into public.chat_web_uso (session_id, estado, coste_usd, created_at) values
     ('s1', 'ok', 1.0, (d1::timestamp + interval '14 hours') at time zone 'utc'),
     ('s2', 'rechazado', 50, (d1::timestamp + interval '14 hours') at time zone 'utc');
 
   -- 4. Totales por proceso (30 días)
-  --    ocr = 2 + 1,2 = 3,2 · chat = 3,6 · chatweb = 1,2 · vinos = 0
-  --    otros = 1 (Casa d1) + 4 (d2 mixto sin ia_uso) + 2 (Casa d3) + 2 (d4 mixto) = 9
-  --    total = 17,00 (se excluyen: 2 de la clave ajena d1, 5 de Default d3, 6 de la clave ajena d4)
+  --    ocr = 2 + 1,2 = 3,2 · chat = 3,6 + 2,6 (d0) = 6,2 · chatweb = 1,2 · vinos = 0
+  --    otros = 1 (Casa d1) + 4 (d2: E = 0, sin identificar) + 2 (Casa d3) + 2 (d4: sin identificar)
+  --            + 7,4 (d0: R − 1,3 × E, sin identificar) = 16,4  (de ellos sin_identificar = 4 + 2 + 7,4 = 13,4)
+  --    total = 27,00 (se excluyen: 2 de la clave ajena d1, 5 de Default d3, 6 de la clave ajena d4)
   for r in select * from public.gasto_ia_real_resumen(30) where proceso not like 'otros:%' loop
     if r.ultimo_dia_real <> d4 then raise exception 'FALLO 4: ultimo_dia_real % (se esperaba %)', r.ultimo_dia_real, d4; end if;
     if r.proceso = 'ocr'     and round(r.usd_real, 4) <> 3.2 then raise exception 'FALLO 4: ocr % (3.2)', r.usd_real; end if;
-    if r.proceso = 'chat'    and round(r.usd_real, 4) <> 3.6 then raise exception 'FALLO 4: chat % (3.6)', r.usd_real; end if;
+    if r.proceso = 'chat'    and round(r.usd_real, 4) <> 6.2 then raise exception 'FALLO 4: chat % (6.2)', r.usd_real; end if;
     if r.proceso = 'chatweb' and round(r.usd_real, 4) <> 1.2 then raise exception 'FALLO 4: chatweb % (1.2)', r.usd_real; end if;
     if r.proceso = 'vinos'   and r.usd_real <> 0 then raise exception 'FALLO 4: vinos % (0)', r.usd_real; end if;
-    if r.proceso = 'otros'   and round(r.usd_real, 4) <> 9.0 then raise exception 'FALLO 4: otros % (9.0)', r.usd_real; end if;
+    if r.proceso = 'otros'   and round(r.usd_real, 4) <> 16.4 then raise exception 'FALLO 4: otros % (16.4)', r.usd_real; end if;
     if r.proceso = 'sin_asignar' and r.usd_real <> 0.35 then raise exception 'FALLO 4: sin_asignar % (0.35)', r.usd_real; end if;
     if r.reparto <> 'clave_peticiones' then raise exception 'FALLO 4: reparto % (clave_peticiones: d4 sin tarifa)', r.reparto; end if;
   end loop;
   select coalesce(sum(usd_real), 0) into v_suma
     from public.gasto_ia_real_resumen(30) where proceso in ('ocr', 'chat', 'chatweb', 'vinos', 'otros');
-  if v_suma <> 17.00 then raise exception 'FALLO 4: la suma por procesos (%) no es el total no ajeno exacto 17,00', v_suma; end if;
+  if v_suma <> 27.00 then raise exception 'FALLO 4: la suma por procesos (%) no es el total no ajeno exacto 27,00', v_suma; end if;
+  -- Sub-líneas de «otros»: sin_identificar 13,4 + resto 3,0 (no hay ia_uso de otros) = 16,4
+  if (select usd_real from public.gasto_ia_real_resumen(30) where proceso = 'otros:sin_identificar') <> 13.4 then
+    raise exception 'FALLO 4: otros:sin_identificar % (13,4)', (select usd_real from public.gasto_ia_real_resumen(30) where proceso = 'otros:sin_identificar');
+  end if;
+  select coalesce(sum(usd_real), 0) into v_suma from public.gasto_ia_real_resumen(30) where proceso like 'otros:%';
+  if v_suma <> 16.4 then raise exception 'FALLO 4: las sub-líneas de otros suman % (16,4)', v_suma; end if;
   select count(*) into v_n from public.gasto_ia_real_resumen(30) where proceso not like 'otros:%';
   if v_n <> 6 then raise exception 'FALLO 4: se esperaban 6 filas (5 procesos + sin_asignar), hay %', v_n; end if;
 
-  -- 5. Una ventana más corta (solo d4): 2,00 al mixto → otros
+  -- 5. Una ventana más corta (solo d4): 2,00 de la clave mixta sin ia_uso → otros (sin identificar)
   select coalesce(sum(usd_real), 0) into v_suma
     from public.gasto_ia_real_resumen(1) where proceso in ('ocr', 'chat', 'chatweb', 'vinos', 'otros');
   if v_suma <> 2.00 then raise exception 'FALLO 5: con p_dias = 1 el total es % (2,00)', v_suma; end if;

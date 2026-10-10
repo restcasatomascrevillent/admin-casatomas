@@ -169,7 +169,7 @@ export function fmtEurIa(v: number | null | undefined): string {
 //  el día siguiente (`usd_estimado_hoy`). Hay UN proyecto de OpenAI para todo
 //  el restaurante: el total real es exacto y se REPARTE por proceso según el
 //  coste de cada clave (`reparto`). Las filas `otros:traducciones`, `otros:
-//  novedades` y `otros:resto` son un desglose ESTIMADO de «otros» escalado a su
+//  novedades`, `otros:resto` y `otros:sin_identificar` (gasto sin rastro en ia_uso: pruebas o scripts) son un desglose ESTIMADO de «otros» escalado a su
 //  real. `sin_asignar` = proyectos sin marcar: informativo, NO suma al total.
 //  `tipo_cambio_usd_eur_actual()` da el tipo del BCE (0,92 «por_defecto» si aún
 //  no hay ninguno). Todo sin IVA.
@@ -321,8 +321,9 @@ const ETIQUETA_SUB: Record<string, string> = {
   traducciones: "Traducciones",
   novedades: "Novedades (formato)",
   resto: "Resto",
+  sin_identificar: "Sin identificar (pruebas o scripts)",
 };
-const ORDEN_SUB = ["traducciones", "novedades", "resto"];
+const ORDEN_SUB = ["traducciones", "novedades", "resto", "sin_identificar"];
 
 export function textoReparto(reparto: string | null | undefined): string {
   switch (reparto) {
