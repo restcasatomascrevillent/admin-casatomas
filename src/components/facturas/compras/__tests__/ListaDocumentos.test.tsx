@@ -215,4 +215,18 @@ describe("ListaDocumentos agrupada", () => {
     expect(cabeceraMes(/^Octubre 2026/).className).toMatch(/min-h-11/);
     expect(cabeceraProveedor("Octubre 2026", /^Makro\s*· 1 doc/).className).toMatch(/min-h-11/);
   });
+  it("tabula los tres niveles: mes a ras, proveedor con sangría y documentos con guía vertical", () => {
+    const { container } = pintar();
+    const mes = container.querySelector('section[data-mes="2026-10"]') as HTMLElement;
+    const h3 = mes.querySelector("h3") as HTMLElement;
+    expect(h3.className).not.toMatch(/ml-/);
+    const h4 = mes.querySelector('[data-nivel="proveedor"]') as HTMLElement;
+    expect(h4.className).toMatch(/(^| )ml-2( |$)/);
+    expect(h4.className).toMatch(/sm:ml-4/);
+    const lista = mes.querySelector('[data-nivel="documentos"]') as HTMLElement;
+    expect(lista.className).toMatch(/(^| )ml-4( |$)/);
+    expect(lista.className).toMatch(/sm:ml-8/);
+    expect(lista.className).toMatch(/border-l/);
+    expect(lista.className).toMatch(/border-border(\s|$)/);
+  });
 });
