@@ -19,8 +19,14 @@
  *  Angelmar), y trocearlas no empeora las cortas (ver 04b §1.14). */
 export const UMBRAL_RELACION = 1.9;
 /** Alto mínimo en píxeles: una imagen alta pero pequeña (un recibo de 400 px)
- *  no gana nada troceándola. */
-export const UMBRAL_ALTO_PX = 1400;
+ *  no gana nada troceándola. Subido de 1400 a 1800 (10/10/2026): una captura
+ *  de móvil reenviada por WhatsApp (736×1600, factura 374 de Central de
+ *  Carnes, 3 líneas) se partía en 5 franjas con 11 llamadas (0,0177 USD, 3,5×
+ *  la media) y sus notas acababan en las observaciones. A 1600 px de alto el
+ *  modelo ya la ve a resolución completa (lado corto < 768 px: no la reduce);
+ *  las capturas largas de verdad (945×2048: Luga, Equipalia) se siguen
+ *  troceando. 04b §1.14 ya medía que trocear las cortas no mejoraba nada. */
+export const UMBRAL_ALTO_PX = 1800;
 /** Alto de cada franja respecto del ancho (0,5-0,6 según el diagnóstico). */
 export const ALTO_FRANJA_RELATIVO = 0.55;
 /** Solape respecto del ancho (≈ 85 px en una captura de 945 px: 3-4 renglones). */

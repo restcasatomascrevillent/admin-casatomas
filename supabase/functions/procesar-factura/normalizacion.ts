@@ -80,6 +80,9 @@ export function parseImporte(raw: string): number | null {
     s = s.slice(1);
   }
 
+  // Apóstrofo de manuscrito como coma decimal: «51'00» = 51,00 (y «1'234,56»
+  // con 3 cifras detrás = miles). Ver apostrofoDecimal en esquema.ts.
+  s = s.replace(/['’‘´`](\d{1,2})(?!\d)/g, ",$1");
   // Fuera símbolos de moneda, espacios (incluido NBSP) u otro ruido que a
   // veces cuela el OCR/el modelo: "1.234,56 €", "1 234,56".
   s = s.replace(/[^\d.,]/g, "");
