@@ -1,4 +1,4 @@
-import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, Gift, LogOut, Shield, Settings } from "lucide-react";
+import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, Gift, LogOut, Shield, Settings, HelpCircle } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -30,7 +30,8 @@ import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidas
 // item en el sidebar (independiente del permiso por sección): por defecto es
 // el propio sectionKey cuando es uno solo, o se declara aparte cuando el item
 // agrupa varias secciones o comparte permiso con otro item.
-const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey: SectionKey | SectionKey[]; toggleKey?: string }[] = [
+// Sin `sectionKey` (Ayuda): lo ve todo el mundo, sin permisos ni interruptor.
+const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey?: SectionKey | SectionKey[]; toggleKey?: string }[] = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
   { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas", toggleKey: "reservas" },
   // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
@@ -43,6 +44,7 @@ const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGS
   { title: "Cheques", url: "/cheques", icon: Gift, sectionKey: "cheques", toggleKey: "cheques" },
   { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas", toggleKey: "facturas" },
   { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios", toggleKey: "usuarios" },
+  { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
 ];
 
 export function AppSidebar() {
@@ -68,6 +70,7 @@ export function AppSidebar() {
   // Filtrar items según permisos y funcionalidades activadas por el Super Admin
   const visibleItems = menuItems.filter((item) => {
     if (loading || togglesLoading || superAdminLoading) return false;
+    if (!item.sectionKey) return true;
     if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
     const keys = Array.isArray(item.sectionKey) ? item.sectionKey : [item.sectionKey];
     // Usuarios es solo para admins, no configurable por permisos (2026-09-26).

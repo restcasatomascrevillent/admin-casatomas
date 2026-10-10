@@ -314,7 +314,7 @@ export function TabCompras({
     <div className="flex h-full min-h-0 flex-col gap-2" data-testid="tab-compras">
       {/* UN buscador + qué mirar (con el nº de resultados de cada modo) */}
       <div className="flex shrink-0 flex-col gap-2 md:flex-row md:items-center">
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1" data-tour="facturas-buscar">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <Input
             value={texto}
@@ -334,7 +334,7 @@ export function TabCompras({
             </button>
           )}
         </div>
-        <div role="group" aria-label="Qué mirar" className="grid shrink-0 grid-cols-3 gap-1 rounded-lg bg-muted/40 p-1">
+        <div role="group" aria-label="Qué mirar" data-tour="facturas-modos" className="grid shrink-0 grid-cols-3 gap-1 rounded-lg bg-muted/40 p-1">
           {MODOS_COMPRAS.map((m) => (
             <button
               key={m.valor}
@@ -360,11 +360,12 @@ export function TabCompras({
         <section
           ref={listaRef}
           aria-label={`Lista de ${modo}`}
+          data-tour="facturas-lista"
           className="flex h-full min-h-0 flex-col gap-1 overflow-hidden rounded-xl border border-border/50 bg-card px-2 pt-1 shadow-sm"
         >
           {modo === "documentos" && (
             <>
-              <div className={barraChips} role="toolbar" aria-label="Filtrar documentos">
+              <div className={barraChips} role="toolbar" aria-label="Filtrar documentos" data-tour="facturas-filtros">
                 {FILTROS_DOCUMENTOS.map((f) => (
                   <button key={f.valor} type="button" className={chipClase} aria-pressed={filtroDocs === f.valor} onClick={() => setFiltroDocs(f.valor)}>
                     {f.etiqueta}
@@ -453,6 +454,7 @@ export function TabCompras({
         {/* Ficha (derecha; en pantallas estrechas, un panel encima de la lista) */}
         <aside
           aria-label="Ficha"
+          data-tour="facturas-ficha"
           className={`min-h-0 flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm max-md:absolute max-md:inset-0 max-md:z-20 ${
             hayFicha ? "flex" : "hidden md:flex"
           }`}

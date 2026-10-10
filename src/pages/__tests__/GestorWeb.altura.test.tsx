@@ -49,7 +49,8 @@ async function montar() {
   );
   await screen.findByText("Contenido de la carta");
 }
-const pagina = () => screen.getByText(/Todo lo que aparece en las webs/).parentElement as HTMLElement;
+// La raíz de la página: el primer hijo del <main> (el subtítulo va en una fila con el botón «?» de ayuda).
+const pagina = () => document.querySelector("main > div") as HTMLElement;
 // Por `aria-label` y no por rol: una pestaña oculta (`hidden`) no tiene nombre accesible.
 const panel = (nombre: string) => {
   const el = document.querySelector<HTMLElement>(`section[role="tabpanel"][aria-label="${nombre}"]`);
@@ -70,7 +71,7 @@ describe("Gestor Web · ocupa el alto de la pantalla, sin scroll de página", ()
     // 800 − 24 − 24: termina en el borde inferior del <main>, sin scroll de página.
     expect(pagina().style.height).toBe("752px");
     expect(pagina()).toHaveClass("flex", "flex-col");
-    expect(screen.getByText(/Todo lo que aparece en las webs/)).toHaveClass("shrink-0");
+    expect(screen.getByText(/Todo lo que aparece en las webs/).closest(".shrink-0")).not.toBeNull();
     expect(screen.getByRole("tablist").closest(".shrink-0")).not.toBeNull();
   });
 

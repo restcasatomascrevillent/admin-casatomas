@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
 import {
   PESTANAS_GESTOR_WEB,
   esPestanaGestorWeb,
@@ -123,9 +124,12 @@ export default function GestorWeb() {
             del menú lateral. Se conserva el subtítulo: no es relleno, aclara
             que la página cubre DOS webs distintas (Casa Tomás y Touza), algo
             que el menú no dice. */}
-        <p className="shrink-0 text-muted-foreground">
-          Todo lo que aparece en las webs de Casa Tomás y Touza: carta, novedades, menús y tapas.
-        </p>
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <p className="text-muted-foreground" data-tour="gw-intro">
+            Todo lo que aparece en las webs de Casa Tomás y Touza: carta, novedades, menús y tapas.
+          </p>
+          <BotonAyuda seccion="gestor-web" />
+        </div>
 
         {loading ? (
           <Cargando />
@@ -138,7 +142,7 @@ export default function GestorWeb() {
                 {pestanasVisibles.map((p) => {
                   const Icono = ICONOS[p.id];
                   return (
-                    <TabsTrigger key={p.id} value={p.id} className="min-h-11 gap-2 px-4 py-2">
+                    <TabsTrigger key={p.id} value={p.id} className="min-h-11 gap-2 px-4 py-2" data-tour={`gw-pestana-${p.id}`}>
                       <Icono className="h-4 w-4" />
                       {p.label}
                     </TabsTrigger>

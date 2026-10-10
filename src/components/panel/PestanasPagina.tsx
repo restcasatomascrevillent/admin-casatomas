@@ -30,6 +30,8 @@ export interface PestanaPagina {
   /** Por defecto el contador se oculta por debajo de `sm` (poco sitio); `true` lo deja siempre. */
   contadorEnMovil?: boolean;
   disabled?: boolean;
+  /** Marca para el tour guiado (`data-tour`), ver `lib/ayuda/tours.ts`. */
+  tour?: string;
 }
 
 interface PestanasPaginaProps {
@@ -89,7 +91,7 @@ export function PestanasPagina({ pestanas, acciones, className }: PestanasPagina
           )}
         >
           {pestanas.map((p) => (
-            <TabsTrigger key={p.valor} value={p.valor} disabled={p.disabled} className={CLASE_PESTANA}>
+            <TabsTrigger key={p.valor} value={p.valor} disabled={p.disabled} className={CLASE_PESTANA} data-tour={p.tour}>
               {p.icono && (
                 <span className="inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">
                   {p.icono}

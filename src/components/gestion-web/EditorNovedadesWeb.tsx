@@ -836,7 +836,7 @@ export function EditorNovedadesWeb() {
         <p className="text-sm text-muted-foreground">
           Se muestran en la web de Casa Tomás y los cambios se ven al momento.
         </p>
-        <Button onClick={empezarNueva}>
+        <Button onClick={empezarNueva} data-tour="gw-novedades-nueva">
           <Plus className="w-4 h-4 mr-1.5" />
           Nueva novedad
         </Button>
@@ -1315,7 +1315,7 @@ export function EditorNovedadesWeb() {
               </div>
 
               {/* Publicación */}
-              <div className="rounded-lg border p-4 space-y-4">
+              <div className="rounded-lg border p-4 space-y-4" data-tour="gw-novedades-publicacion">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">Publicación</p>
                   <Badge variant="outline" className={`text-[11px] ${ESTILO_ESTADO[estadoBorrador.clave]}`}>
@@ -1463,7 +1463,7 @@ export function EditorNovedadesWeb() {
         </div>
 
         {/* ------------------------------------------------ Vista previa */}
-        <aside className="hidden xl:block xl:max-h-full xl:overflow-y-auto xl:overscroll-contain">
+        <aside className="hidden xl:block xl:max-h-full xl:overflow-y-auto xl:overscroll-contain" data-tour="gw-novedades-vista">
           <h3 className="text-sm font-medium text-muted-foreground mb-3 text-center">Así se ve en el móvil</h3>
           {vistaPrevia}
         </aside>

@@ -6,6 +6,7 @@ import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFactura
 import { TabCompras } from "@/components/facturas/compras/TabCompras";
 import { GastoIaPestana } from "@/components/facturas/GastoIaPestana";
 import { MonitorGastoIA } from "@/components/facturas/MonitorGastoIA";
+import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
 import { MODOS_COMPRAS, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
@@ -147,11 +148,16 @@ const Facturas = () => {
               a la derecha, para que no parezca una pestaña más; abre su desglose al tocarlo. */}
           <PestanasPagina
             pestanas={[
-              { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos },
-              { valor: "chat", etiqueta: "IA", icono: <MessageSquare />, contador: totalConversaciones, tonoContador: "dorado" },
-              { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true },
+              { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
+              { valor: "chat", etiqueta: "IA", icono: <MessageSquare />, contador: totalConversaciones, tonoContador: "dorado", tour: "facturas-pestana-ia" },
+              { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ]}
-            acciones={<GastoIaPestana className="ml-auto" />}
+            acciones={
+              <>
+                <GastoIaPestana className="ml-auto" />
+                <BotonAyuda seccion="facturas" />
+              </>
+            }
           />
 
           {/* Área de Visualización */}

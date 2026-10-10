@@ -209,7 +209,7 @@ export default function TabCarta() {
       >
         {/* Barra: secciones + acciones */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="max-w-full overflow-x-auto">
+          <div className="max-w-full overflow-x-auto" data-tour="gw-carta-secciones">
             <TabsList className="h-auto w-auto">
               {(Object.keys(secciones) as Seccion[]).map((seccion) => (
                 <TabsTrigger key={seccion} value={seccion} className="min-h-11 gap-1.5 px-4">
@@ -219,7 +219,7 @@ export default function TabCarta() {
               ))}
             </TabsList>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-acciones">
             <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
               <Percent className="mr-2 h-4 w-4" />
               Ajustar precios
@@ -241,7 +241,7 @@ export default function TabCarta() {
         </div>
 
         {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-filtros">
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input

@@ -506,7 +506,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
             </CardContent>
           </Card>
           {/* ---------------------------------------------- Formulario */}
-          <Card ref={formRef} className={`scroll-mt-4 ${editandoFecha ? "border-primary" : ""}`}>
+          <Card ref={formRef} className={`scroll-mt-4 ${editandoFecha ? "border-primary" : ""}`} data-tour="gw-menu-formulario">
             <CardHeader className="p-4 pb-3">
               <CardTitle className="text-base flex items-center gap-2 flex-wrap">
                 {editandoFecha ? `Editar ${config.singular}` : esMenu ? "Nuevo menú del día" : "Nuevas tapas del día"}

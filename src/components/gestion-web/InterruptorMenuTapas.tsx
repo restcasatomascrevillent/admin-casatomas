@@ -8,7 +8,7 @@ export function InterruptorMenuTapas({ boton }: { boton: BotonMenuTapas }) {
   const { mostrarBotonesMenuTapas, botonesMenuTapasDisponibles, isLoading, isError, cambiarBotonMenuTapas } = useConfiguracionWeb();
   const nombre = boton === "menu" ? "Menú del día" : "Tapas";
   return (
-    <div className="rounded-lg border bg-muted/30 px-4 py-3">
+    <div className="rounded-lg border bg-muted/30 px-4 py-3" data-tour="gw-menu-interruptor">
       <div className="flex min-h-11 items-center justify-between gap-4">
         <Label htmlFor={id} className="cursor-pointer">Mostrar «{nombre}» en la web de Casa Tomás</Label>
         <Switch id={id} checked={mostrarBotonesMenuTapas[boton]}

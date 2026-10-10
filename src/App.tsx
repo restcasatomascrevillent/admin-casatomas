@@ -28,6 +28,7 @@ import NotFound from "./pages/NotFound";
 import Cheques from "./pages/Cheques";
 import Facturas from "./pages/Facturas";
 import Usuarios from "./pages/Usuarios";
+import Ayuda from "./pages/Ayuda";
 import GestorGasto from "./pages/GestorGasto";
 import Costes from "./pages/Costes";
 import GestionResenas from "./pages/GestionResenas";
@@ -100,6 +101,8 @@ const App = () => (
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
+                  {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
+                  <Route path="/ayuda" element={pagina(<Ayuda />)} />
                   <Route path="/super-admin/login" element={<SuperAdminLogin />} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />
