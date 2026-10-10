@@ -62,12 +62,12 @@ describe("Marketing › Estadísticas · todo cabe sin scroll", () => {
     expect(panel.children).toHaveLength(1);
     expect(estadisticas).toHaveClass("md:h-full");
 
-    // El historial, dentro del bloque y en la misma columna que el desglose, al lado de la gráfica.
+    // El historial, dentro del bloque y en su columna, al lado de la gráfica.
     const historial = within(estadisticas).getByText("Historial de prueba");
     const zona = within(estadisticas).getByTestId("zona-grafica");
     expect(zona).toContainElement(within(estadisticas).getByRole("figure", { name: "Últimos 7 días" }));
-    const columna = (within(zona).getByText("Desglose").closest(".rounded-lg") as HTMLElement).parentElement as HTMLElement;
-    expect(columna).toContainElement(historial);
+    expect(zona).toContainElement(historial);
+    expect(within(estadisticas).queryByText("Desglose")).toBeNull();
   });
 
   it("las otras pestañas no cambian: «Enviar Newsletter» sigue a dos columnas desde lg y «Suscriptores» con su scroll", () => {

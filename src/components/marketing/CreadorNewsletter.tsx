@@ -67,17 +67,17 @@ export function CreadorNewsletter() {
           lado y llenan el alto de la pestaña (Marketing.tsx lo calcula): cada
           una hace su propio scroll. Por debajo van apiladas y desplaza la
           pestaña entera. */}
-      <div className="grid gap-6 lg:flex-1 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]">
+      <div className="grid gap-4 lg:flex-1 lg:min-h-0 lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)]">
         {/* Columna del formulario */}
-        <div className="space-y-6 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
+        <div className="space-y-4 lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-1">
           <Card>
-            <CardHeader>
+            <CardHeader className="p-4 pb-2">
               <CardTitle>Crear newsletter</CardTitle>
               <CardDescription>
                 Elige el tipo, escribe el texto y revisa cómo queda en la vista previa.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-4 p-4 pt-2">
               {/* Type Selector */}
               <div className="space-y-2">
                 <Label>Tipo de comunicación</Label>

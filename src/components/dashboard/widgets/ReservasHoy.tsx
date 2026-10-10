@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { CalendarCheck, Users, ShieldBan, MessageSquare, AlertTriangle, Utensils, Moon, Clock, SquarePen } from "lucide-react";
+import { CalendarCheck, ShieldBan, MessageSquare, AlertTriangle, SquarePen } from "lucide-react";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
 import { useIsCompactNav } from "@/hooks/use-mobile";
@@ -8,6 +8,7 @@ import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/use
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
+import { TiraCifras } from "@/components/panel/TiraCifras";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -57,47 +58,10 @@ function useEspaciosCapacidad() {
 }
 
 const getStatusColor = (p: number) => {
-  if (p < 50) return { bg: "bg-green-500/10", text: "text-green-600", bar: "bg-green-500", label: "Baja" };
-  if (p < 80) return { bg: "bg-amber-500/10", text: "text-amber-600", bar: "bg-amber-500", label: "Moderada" };
-  return { bg: "bg-red-500/10", text: "text-red-600", bar: "bg-red-500", label: "Alta" };
+  if (p < 50) return { text: "text-green-600", bar: "bg-green-500", label: "Baja" };
+  if (p < 80) return { text: "text-amber-600", bar: "bg-amber-500", label: "Moderada" };
+  return { text: "text-red-600", bar: "bg-red-500", label: "Alta" };
 };
-
-/** Comida o Cena en una sola fila baja: nombre (y «Ahora») a la izquierda; reservas y comensales a la derecha. */
-function TurnoHoy({ icono, nombre, ahora, reservas, comensales }: {
-  icono: ReactNode;
-  nombre: string;
-  ahora: boolean;
-  reservas: number;
-  comensales: number;
-}) {
-  return (
-    <div
-      data-testid={`turno-${nombre.toLowerCase()}`}
-      className={cn(
-        "flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border px-3 py-1.5",
-        ahora ? "border-primary bg-primary/5" : "bg-muted/30",
-      )}
-    >
-      <div className="flex items-center gap-1.5">
-        {icono}
-        <span className="text-sm font-medium">{nombre}</span>
-        {ahora && <Badge variant="default" className="px-1.5 py-0 text-xs">Ahora</Badge>}
-      </div>
-      <div className="ml-auto flex items-center gap-1.5 whitespace-nowrap">
-        <span className="text-xl font-bold leading-none tabular-nums">{reservas}</span>
-        <span className="text-xs text-muted-foreground">reservas</span>
-        <span className="ml-1 flex items-center gap-1 text-xs text-muted-foreground">
-          <Users className="h-3 w-3" aria-hidden="true" />
-          {comensales} comensales
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/** Cifra de estado (Activas, Confirmadas, Pendientes, Próxima): baja, con la cifra y su nombre en una fila desde `sm`. */
-const MOSAICO = "flex flex-col items-center justify-center gap-x-2 rounded-lg px-1 py-1.5 text-center sm:flex-row sm:py-2";
-const CIFRA_MOSAICO = "text-xl font-bold leading-tight tabular-nums sm:text-2xl";
 
 export function ReservasHoy() {
   const navigate = useNavigate();
@@ -288,7 +252,7 @@ export function ReservasHoy() {
             su propia línea en el móvil). El desglose de las reservas activas, en la ayuda «ⓘ». */}
         <div
           data-testid="franja-ocupacion"
-          className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-3 py-2", colors.bg)}
+          className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-1"
         >
           <div className="flex items-center gap-2">
             <span className={cn("text-2xl font-bold leading-none tabular-nums", colors.text)}>{porcentaje}%</span>
@@ -324,64 +288,24 @@ export function ReservasHoy() {
           className="py-1"
         />
 
-        {/* Desglose por turno */}
-        <div className="grid grid-cols-1 gap-2 xs:grid-cols-2">
-          <TurnoHoy
-            icono={<Utensils className="h-4 w-4 text-amber-600" aria-hidden="true" />}
-            nombre="Comida"
-            ahora={horaActual < 17}
-            reservas={reservasComida.length}
-            comensales={comensalesComida}
-          />
-          <TurnoHoy
-            icono={<Moon className="h-4 w-4 text-indigo-500" aria-hidden="true" />}
-            nombre="Cena"
-            ahora={horaActual >= 17}
-            reservas={reservasCena.length}
-            comensales={comensalesCena}
-          />
-        </div>
-
-        {/* Estados + Próxima reserva */}
-        <div data-testid="mosaicos-estado" className="grid grid-cols-4 gap-1.5 sm:gap-2">
-          <div className={cn(MOSAICO, "bg-primary/10")}>
-            <div className={cn(CIFRA_MOSAICO, "text-primary")}>{reservasActivas.length}</div>
-            <p className="text-xs text-muted-foreground">Activas</p>
-          </div>
-          <div className={cn(MOSAICO, "bg-green-500/10")}>
-            <div className={cn(CIFRA_MOSAICO, "text-green-600")}>{numConfirmadas}</div>
-            <p className="text-xs text-muted-foreground">Confirmadas</p>
-          </div>
-          <div
-            role="link"
-            tabIndex={0}
-            className={cn(MOSAICO, "cursor-pointer bg-amber-500/10 transition-colors hover:bg-amber-500/20 active:bg-amber-500/20")}
-            onClick={() => navigate('/reservas?tab=reservas&status=pendiente&date=today')}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                navigate('/reservas?tab=reservas&status=pendiente&date=today');
-              }
-            }}
-          >
-            <div className={cn(CIFRA_MOSAICO, "text-amber-600")}>{reservasPendientes}</div>
-            <p className="text-xs text-muted-foreground">Pendientes</p>
-          </div>
-          {proximaReserva ? (
-            <div className={cn(MOSAICO, "bg-muted/50")}>
-              <div className="flex items-center justify-center gap-1">
-                <Clock className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <span className={CIFRA_MOSAICO}>{proximaReserva.hora.slice(0, 5)}</span>
-              </div>
-              <p className="text-xs text-muted-foreground">Próxima</p>
-            </div>
-          ) : (
-            <div className={cn(MOSAICO, "bg-muted/50")}>
-              <div className={cn(CIFRA_MOSAICO, "text-muted-foreground")}>—</div>
-              <p className="text-xs text-muted-foreground">Próxima</p>
-            </div>
-          )}
-        </div>
+        {/* UNA tira de cifras sin fondos de color: estados, próxima reserva y los dos turnos (umbral 17:00). El color
+            solo avisa: Pendientes en ámbar si hay alguna. El turno en curso lleva «· ahora» en su nombre. */}
+        <TiraCifras
+          data-testid="cifras-hoy"
+          cifras={[
+            { etiqueta: "Activas", valor: reservasActivas.length },
+            { etiqueta: "Confirmadas", valor: numConfirmadas },
+            {
+              etiqueta: "Pendientes",
+              valor: reservasPendientes,
+              tono: reservasPendientes > 0 ? "ambar" : undefined,
+              onClick: () => navigate('/reservas?tab=reservas&status=pendiente&date=today'),
+            },
+            { etiqueta: "Próxima", valor: proximaReserva ? proximaReserva.hora.slice(0, 5) : "—" },
+            { etiqueta: horaActual < 17 ? "Comida · ahora" : "Comida", valor: reservasComida.length, detalle: `res. · ${comensalesComida} pax` },
+            { etiqueta: horaActual >= 17 ? "Cena · ahora" : "Cena", valor: reservasCena.length, detalle: `res. · ${comensalesCena} pax` },
+          ]}
+        />
       </CardContent>
       {/* Editor de la reserva elegida en el popup de notas. `null` hasta que se pide. */}
       {dialogoEdicion}

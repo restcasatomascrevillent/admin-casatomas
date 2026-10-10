@@ -30,7 +30,9 @@ describe("ListaSuscriptores", () => {
     expect(screen.getByRole("tab", { name: "Activos (1)" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Dados de baja (1)" })).toBeInTheDocument();
     expect(screen.getByText("activo@ejemplo.es")).toBeInTheDocument();
-    expect(screen.getByText("Se apuntó por: Reserva web")).toBeInTheDocument();
+    expect(screen.getByText(/Ana · Se apuntó por: Reserva web/)).toBeInTheDocument();
+    // Lista plana: una fila por suscriptor, sin tarjetas.
+    expect(screen.getByRole("list", { name: "Suscriptores activos" })).toHaveClass("divide-y");
   });
 
   it("los dados de baja muestran fecha y motivo, y no hay botón para reactivarlos", () => {

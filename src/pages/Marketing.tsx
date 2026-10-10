@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { CreadorNewsletter } from "@/components/marketing/CreadorNewsletter";
 import { GestionCorreos } from "@/components/marketing/GestionCorreos";
 import { EstadisticasNewsletter } from "@/components/marketing/EstadisticasNewsletter";
@@ -39,21 +40,14 @@ export default function Marketing() {
       {/* Sin título de página (2026-09-25): la pestaña "Newsletter" activa
           en el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
-        <Tabs defaultValue="crear" className="flex flex-1 min-h-0 flex-col gap-4 sm:gap-6">
-          <TabsList className="h-auto shrink-0 flex-wrap justify-start self-start">
-            <TabsTrigger value="crear" className="min-h-11 gap-2 px-4">
-              <Send className="h-4 w-4" />
-              Enviar Newsletter
-            </TabsTrigger>
-            <TabsTrigger value="suscriptores" className="min-h-11 gap-2 px-4">
-              <Users className="h-4 w-4" />
-              Suscriptores
-            </TabsTrigger>
-            <TabsTrigger value="estadisticas" className="min-h-11 gap-2 px-4">
-              <BarChart3 className="h-4 w-4" />
-              Estadísticas
-            </TabsTrigger>
-          </TabsList>
+        <Tabs defaultValue="crear" className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
+          <PestanasPagina
+            pestanas={[
+              { valor: "crear", etiqueta: "Enviar Newsletter", icono: <Send /> },
+              { valor: "suscriptores", etiqueta: "Suscriptores", icono: <Users /> },
+              { valor: "estadisticas", etiqueta: "Estadísticas", icono: <BarChart3 /> },
+            ]}
+          />
 
           {/* Desde `lg` el formulario y la vista previa van lado a lado y cada
               columna hace su propio scroll (CreadorNewsletter); por debajo van

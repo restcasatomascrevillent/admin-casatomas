@@ -4,7 +4,8 @@ import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CloudCog, Loader2, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, CloudCog, Info, Loader2, RefreshCw, Send } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -62,9 +63,15 @@ interface PropsSincronizacionResend {
    * tarjeta no se actualiza sola.
    */
   activos?: number | null;
+  /**
+   * Una sola línea (pestaña Suscriptores): contactos con barra fina, última actualización y botón «Actualizar»;
+   * el resto del detalle (recibirían el próximo envío, añadidos, quitados, contactos ajenos, errores) va en un
+   * popover «Detalle». Mismos datos y misma actualización automática que la tarjeta.
+   */
+  compacta?: boolean;
 }
 
-export function SincronizacionResend({ activos }: PropsSincronizacionResend = {}) {
+export function SincronizacionResend({ activos, compacta = false }: PropsSincronizacionResend = {}) {
   const { data: estado, isLoading, error } = useEstadoResend();
   const { mutate: sincronizar, isPending, variables } = useSincronizarResend();
   const { canAccess: puedeSincronizar, loading: cargandoPermiso } = useCanAccessSection("marketing", "edit");
@@ -82,6 +89,9 @@ export function SincronizacionResend({ activos }: PropsSincronizacionResend = {}
   }, [estado, isLoading, activos, cargandoPermiso, puedeSincronizar, isPending, sincronizar]);
   const actualizandoSola = isPending && variables?.automatica === true;
 
+  if (isLoading && compacta) {
+    return <Skeleton className="h-9 w-full" />;
+  }
   if (isLoading) {
     return (
       <Card>
@@ -93,6 +103,24 @@ export function SincronizacionResend({ activos }: PropsSincronizacionResend = {}
     );
   }
 
+  if ((error || !estado) && compacta) {
+    return (
+      <div className="flex items-start gap-2 border-t border-border/60 pt-3 text-sm text-muted-foreground">
+        <CloudCog className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <div className="min-w-0">
+          <p>
+            <span className="font-medium text-foreground">La lista de envío todavía no está disponible.</span> Por ahora la
+            newsletter se envía por correo directo, con un límite de destinatarios. Avisa al equipo técnico para activarla.
+          </p>
+          <details className="text-xs">
+            <summary className="cursor-pointer select-none py-2">Detalle técnico</summary>
+            <p>Falta desplegar la función de sincronización con Resend o aplicar su migración.</p>
+            {error instanceof Error && error.message ? <p className="mt-1 break-words">{error.message}</p> : null}
+          </details>
+        </div>
+      </div>
+    );
+  }
   if (error || !estado) {
     return (
       <Card className="border-dashed">
@@ -127,6 +155,101 @@ export function SincronizacionResend({ activos }: PropsSincronizacionResend = {}
   const sinClave = !estado.configurado.api_key;
   // Con poco uso el relleno mediría menos de un píxel y parecería vacío: mínimo visible.
   const anchoRelleno = usados && usados > 0 ? Math.max(porcentajeCuota(usados, limite), 3) : 0;
+
+  if (compacta) {
+    const hayError = ultima?.estado === "error" || Boolean(ultima?.mensaje_error);
+    return (
+      <div data-testid="lista-envio-compacta" className="flex shrink-0 flex-col gap-1.5 border-t border-border/60 pt-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <span className="flex items-center gap-1.5 font-medium">
+            <CloudCog className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            Lista de envío
+            <AyudaPopover etiqueta="Qué es la lista de envío">{TEXTO_AYUDA}</AyudaPopover>
+          </span>
+          <span className="text-xs text-muted-foreground">Envío actual: {textoCanal(estado.canal)}</span>
+          <span className="flex items-center gap-2 tabular-nums">
+            <span className="text-muted-foreground">Contactos</span>
+            <span className="whitespace-nowrap font-semibold">
+              {usados ?? "—"} de {formatoNumero(limite)}
+            </span>
+            <span
+              className="h-1.5 w-20 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-label="Contactos usados del plan"
+              aria-valuemin={0}
+              aria-valuemax={limite}
+              aria-valuenow={usados ?? 0}
+            >
+              <span className={cn("block h-full rounded-full transition-all", COLOR_BARRA[nivel])} style={{ width: `${anchoRelleno}%` }} />
+            </span>
+          </span>
+          <span className="min-w-0 truncate text-xs text-muted-foreground">
+            {actualizandoSola ? (
+              <span role="status" className="inline-flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                Actualizando lista de envío…
+              </span>
+            ) : ultima ? (
+              <>
+                Actualizada {hace(ultima.terminada_at ?? ultima.iniciada_at)}:{" "}
+                <span className={cn("font-medium", ultima.estado === "error" ? "text-destructive" : "text-foreground")}>{etiquetaPasada(ultima)}</span>
+              </>
+            ) : (
+              "Todavía no se ha actualizado nunca."
+            )}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
+            {ultima && ultima.estado !== "en_curso" && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className={cn("gap-1 text-muted-foreground", hayError && "text-destructive")}>
+                    <Info className="h-4 w-4" aria-hidden="true" />
+                    Detalle
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-[min(24rem,calc(100vw-2rem))] space-y-2 p-3 text-sm">
+                  <p>
+                    {ultima.destinatarios ?? 0} recibirían el próximo envío · {plural(ultima.altas, "añadido", "añadidos")} ·{" "}
+                    {plural(ultima.borrados, "quitado", "quitados")}
+                    {ultima.bajas_resend ? ` · ${plural(ultima.bajas_resend, "baja nueva", "bajas nuevas")}` : ""}
+                    {ultima.errores ? ` · ${plural(ultima.errores, "aviso", "avisos")}` : ""}
+                    {ultima.pendientes ? ` · ${plural(ultima.pendientes, "cambio pendiente", "cambios pendientes")}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Origen: {etiquetaOrigenPasada(ultima)}.</p>
+                  {ajenos ? <p className="text-xs text-muted-foreground">{ajenos}</p> : null}
+                  {ultima.mensaje_error ? (
+                    <details className="text-destructive">
+                      <summary className="cursor-pointer select-none py-2">La última actualización tuvo un problema. Detalle técnico</summary>
+                      <p className="break-words">{ultima.mensaje_error}</p>
+                    </details>
+                  ) : null}
+                </PopoverContent>
+              </Popover>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={() => sincronizar({})} disabled={isPending || sinClave} aria-label="Actualizar lista de envío">
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              Actualizar
+            </Button>
+          </div>
+        </div>
+        {aviso ? (
+          <p className={cn("flex items-start gap-2 text-sm", nivel === "lleno" ? "text-destructive" : "text-amber-700 dark:text-amber-400")}>
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            {aviso}
+          </p>
+        ) : null}
+        {sinClave ? (
+          <div className="text-sm text-destructive">
+            <p>{MENSAJE_NO_DISPONIBLE}</p>
+            <details className="text-xs">
+              <summary className="cursor-pointer select-none py-2">Detalle técnico</summary>
+              <p>Falta la clave de Resend Marketing (RESEND_MARKETING_API_KEY).</p>
+            </details>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <Card>

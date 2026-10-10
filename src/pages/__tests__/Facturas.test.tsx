@@ -131,7 +131,7 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
     // (no es una pestaña más)…
     expect(within(screen.getByRole("tablist")).queryByTestId("gasto-ia-pestana")).not.toBeInTheDocument();
     expect(texto.className).toContain("ml-auto");
-    expect(texto.parentElement).toBe(screen.getByRole("tablist").parentElement);
+    expect(texto.closest("[data-testid=pestanas-pagina]")).toBe(screen.getByRole("tablist").closest("[data-testid=pestanas-pagina]"));
     // …y la línea fija de antes ya no ocupa sitio encima del chat.
     expect(screen.queryByTestId("monitor-gasto-ia-chat")).not.toBeInTheDocument();
 
