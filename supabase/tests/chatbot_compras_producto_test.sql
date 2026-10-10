@@ -47,6 +47,11 @@ select f.id, l.nombre, l.cantidad, l.unidad, l.precio, l.total
   ) l(doc, nombre, cantidad, unidad, precio, total)
   join facturas f on f.numero_documento = l.doc;
 
+-- 20261010170000_chatbot_ronda9: el albarán A1 solo cuenta como facturado si la factura F1 CITA su
+-- número (antes bastaba con que la línea coincidiera).
+update productos_factura set albaran_ref = 'T-CP-A1'
+ where factura_id = (select id from facturas where numero_documento = 'T-CP-F1') and nombre like 'MERLUZA%';
+
 do $$
 declare
   j  jsonb;
@@ -144,8 +149,11 @@ begin
   assert j ->> 'coincidencia' = 'exacta+raiz', format('S1 coincidencia: %s', j ->> 'coincidencia');
   assert (j -> 'por_unidad' -> 0 ->> 'cantidad')::numeric = 22
      and (j -> 'por_unidad' -> 0 ->> 'importe')::numeric = 220
-     and (j -> 'por_unidad' -> 0 ->> 'precio_medio')::numeric = 11.58      -- 220 / 19 kg con precio
-     and (j -> 'por_unidad' -> 0 -> 'de_albaranes' ->> 'cantidad')::numeric = 4, format('S1 por_unidad: %s', j -> 'por_unidad');
+     and not (j -> 'por_unidad' -> 0) ? 'precio_medio'                      -- ronda 9: variantes de 10 y 16 €/kg: sin media global
+     and (j -> 'total' ->> 'en_albaranes_sin_factura')::numeric = 40, format('S1 por_unidad: %s', j);
+  assert jsonb_array_length(j -> 'por_variante') = 3 and (j -> 'por_variante' -> 0 ->> 'precio_medio')::numeric = 10
+     and (j -> 'por_variante' -> 1 ->> 'precio_medio')::numeric = 16,
+    format('S1 por_variante: %s', j -> 'por_variante');
   -- El albarán A1 repite la línea de F1: no se cuenta dos veces.
   assert (j -> 'avisos' ->> 'albaranes_ya_facturados')::int = 1 and (j -> 'avisos' ->> 'sin_importe')::int = 1,
     format('S1 avisos: %s', j -> 'avisos');

@@ -130,6 +130,8 @@ begin
   insert into public.productos_factura (factura_id, nombre, cantidad, unidad, precio_unitario, total)
   values (v_fac, 'NATOP (20% nata animal de 35mg) 2 L -Debic-', 24, 'kg', 4.14, 99.36),
          (v_alb, 'NATOP (20% nata animal de 35mg) 2 L -Debic-', 24, 'kg', 4.14, 99.36);
+  -- 20261010170000_chatbot_ronda9: solo cuenta como facturado el albarán que la factura CITA.
+  update public.productos_factura set albaran_ref = 'TEST-CAT-A1' where factura_id = v_fac;
   k := public.gasto_categorias_agente('lacteos', '2098-01-01', '2098-12-31');
   assert (k #>> '{total,importe}')::numeric = 99.36 and (k #>> '{total,lineas}')::int = 1
      and (k #>> '{avisos,albaranes_ya_facturados}')::int = 1, format('T1aj: albarán ya facturado: %s', k);

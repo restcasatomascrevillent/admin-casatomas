@@ -57,6 +57,7 @@ describe("TOOLS", () => {
       "gasto_por_categoria",
       "variacion_precios",
       "ficha_proveedor",
+      "albaranes_sin_factura",
       "grafico_precio",
       "buscar_productos",
       "buscar_facturas",
@@ -83,6 +84,7 @@ describe("TOOLS", () => {
         historial_precios: { producto: "jamon" },
         compras_producto: { producto: "centollo" },
         ficha_proveedor: { proveedor: "luga" },
+        albaranes_sin_factura: { proveedor: "luga" },
         grafico_precio: { producto: "jamon" },
         buscar_productos: { consulta: "gambas" },
         buscar_facturas: { consulta: "pescado", tipo: null },
@@ -179,9 +181,11 @@ describe("systemPrompt", () => {
     expect(p).toMatch(/Cita un numero de documento solo si aparece literal/);
   });
 
-  it("no hay relacion albaran-factura: no se puede saber, sin llamar herramientas (prueba 2: q19)", () => {
+  it("albaranes sin factura: herramienta propia (ronda 9; antes «no se puede saber», prueba 2: q19)", () => {
     expect(p).toMatch(/Albaran facturado = su factura cita su numero \(no se cuenta dos veces\)/);
-    expect(p).toMatch(/SIN llamar herramientas/);
+    expect(p).toMatch(/"sin factura"\/"sin facturar"\/pendientes: albaranes_sin_factura/);
+    expect(p).not.toMatch(/SIN llamar herramientas/);
+    expect(p).not.toMatch(/con los datos no se puede saber/);
     expect(p).toMatch(/"sin_total" NO significa sin factura/);
     const filtrar = TOOLS.find((t) => t.function.name === "filtrar_documentos")!.function;
     expect(filtrar.description).toMatch(/sin_total = sin importe leido; NO significa sin factura/);
@@ -368,6 +372,7 @@ describe("prepararLlamada", () => {
         historial_precios: { producto: "jamon" },
         compras_producto: { producto: "jamon" },
         ficha_proveedor: { proveedor: "luga" },
+        albaranes_sin_factura: { proveedor: "luga" },
         grafico_precio: { producto: "jamon" },
         buscar_productos: { consulta: "jamon" },
         buscar_facturas: { consulta: "jamon" },
@@ -695,6 +700,40 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     const p = systemPrompt("2026-10-08");
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
+    expect(p.length).toBeLessThanOrEqual(5730);
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(9620);
+  });
+});
+
+describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
+  const p = systemPrompt("2026-10-10");
+
+  it("albaranes_sin_factura: traduccion a su RPC (proveedor y fechas opcionales)", () => {
+    expect(prepararLlamada("albaranes_sin_factura", { proveedor: " Narejos ", desde: null, hasta: "2026-10-31" })).toEqual({
+      tipo: "rpc",
+      rpc: "albaranes_sin_factura_agente",
+      params: { p_proveedor: "Narejos", p_desde: null, p_hasta: "2026-10-31" },
+      limite: null,
+    });
+    expect(prepararLlamada("albaranes_sin_factura", { proveedor: null, desde: null, hasta: null })).toMatchObject({
+      params: { p_proveedor: null, p_desde: null, p_hasta: null },
+    });
+    expect(() => prepararLlamada("albaranes_sin_factura", { desde: "ayer" })).toThrow(/fecha/);
+    expect(() => prepararLlamada("albaranes_sin_factura", { desde: "2026-10-31", hasta: "2026-10-01" })).toThrow(/rango/i);
+    const t = TOOLS.find((x) => x.function.name === "albaranes_sin_factura")!.function;
+    expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["proveedor", "desde", "hasta"]);
+    // Su resultado vacio («Ninguno: todos estan facturados») no se marca como «no hay datos».
+    expect(marcarResultado("albaranes_sin_factura", { albaranes_sin_factura: 0, nota: "Ninguno" }, null)).toEqual({
+      albaranes_sin_factura: 0, nota: "Ninguno",
+    });
+  });
+
+  it("variantes con precios distintos: cada una con su precio, no una media", () => {
+    expect(p).toMatch(/Con por_variante da cada variante con su precio, no una media/);
+    expect(p).toMatch(/si "variantes_distintas" > 1 da cada una \(por_variante\)/);
+  });
+
+  it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(5730);
     expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(9620);
   });
