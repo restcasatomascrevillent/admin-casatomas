@@ -1,5 +1,7 @@
 import { completeAuditEnabled } from "@/lib/audit-version";
 import { useCallback, useEffect, useState, useRef } from "react";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface AuditLogEntry {
@@ -113,6 +115,102 @@ export function useAuditLog(filtros: AuditLogFiltros, pagina: number) {
   }, [fetchEntradas]);
 
   return { entradas, total, tablas, accesosActivos, pageSize: PAGE_SIZE, loading, error, refetch: fetchEntradas };
+}
+
+/** Rango de meses hacia atrás que ofrecen las pestañas "Por mes" y "Por día". */
+export const RANGOS_MESES_AGRUPADO = [1, 3, 6, 12] as const;
+export type RangoMesesAuditoria = (typeof RANGOS_MESES_AGRUPADO)[number];
+
+/**
+ * Tope de filas de las vistas agrupadas: agrupar por mes/día necesita tener
+ * cargado el rango completo (no una página de 25), pero sin límite un rango
+ * amplio sin filtrar podría traerse la tabla entera. Si se alcanza el tope,
+ * `truncado` avisa para que se acote con el selector de meses o con
+ * "Desde"/"Hasta".
+ */
+const LIMITE_AGRUPADO = 1000;
+
+export interface AuditLogAgrupadoResultado {
+  entradas: AuditLogEntry[];
+  loading: boolean;
+  error: string | null;
+  truncado: boolean;
+  refetch: () => void;
+}
+
+/**
+ * Carga para las pestañas "Por mes" y "Por día": a diferencia de
+ * `useAuditLog` (paginada de 25 en 25) aquí hace falta el rango completo para
+ * agrupar bien. Si los filtros ya acotan fechas ("Desde"/"Hasta") se respetan
+ * tal cual; si no, se usa `rangoMeses` como ventana desde hace N meses hasta
+ * ahora. Siempre con el tope de `LIMITE_AGRUPADO` filas.
+ */
+export function useAuditLogAgrupado(filtros: AuditLogFiltros, rangoMeses: RangoMesesAuditoria): AuditLogAgrupadoResultado {
+  const secuencia = useRef(0);
+  const [entradas, setEntradas] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [truncado, setTruncado] = useState(false);
+
+  const fetchEntradas = useCallback(async () => {
+    const miConsulta = ++secuencia.current;
+    setLoading(true);
+    setError(null);
+
+    const ahora = new Date();
+    const desdeFecha = filtros.desde
+      ? new Date(`${filtros.desde}T00:00:00`)
+      : new Date(ahora.getFullYear(), ahora.getMonth() - (rangoMeses - 1), 1);
+    let hastaFecha = ahora;
+    if (filtros.hasta) {
+      hastaFecha = new Date(`${filtros.hasta}T00:00:00`);
+      hastaFecha.setDate(hastaFecha.getDate() + 1);
+    }
+
+    const consultar = (columnaActor: "actor_label" | "actor_email") => {
+      let query = supabase.from("audit_log").select("*");
+      if (filtros.actor?.trim()) {
+        const actor = filtros.actor.trim();
+        query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor) ? query.eq("actor_user_id", actor) : query.ilike(columnaActor, `%${actor}%`);
+      }
+      if (filtros.dispositivo?.trim()) query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
+      if (filtros.accion) query = query.eq("accion", filtros.accion);
+      if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
+      query = query.gte("created_at", desdeFecha.toISOString()).lt("created_at", hastaFecha.toISOString());
+      // +1 para saber si hay más filas que el tope sin pedir un `count` aparte (más caro).
+      return query.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(LIMITE_AGRUPADO + 1);
+    };
+
+    try {
+      let resultado = await consultar("actor_label");
+      if (resultado.error?.code === "42703" && resultado.error.message.includes("actor_label")) {
+        resultado = await consultar("actor_email");
+      }
+      if (miConsulta !== secuencia.current) return;
+      const { data, error: queryError } = resultado;
+
+      if (queryError) {
+        setError(queryError.message);
+        setEntradas([]);
+        setTruncado(false);
+      } else {
+        const filas = (data ?? []) as AuditLogEntry[];
+        setTruncado(filas.length > LIMITE_AGRUPADO);
+        setEntradas(filas.slice(0, LIMITE_AGRUPADO));
+      }
+    } catch (error) {
+      if (miConsulta === secuencia.current) setError(error instanceof Error ? error.message : "No se pudo cargar la auditoría");
+    } finally {
+      if (miConsulta === secuencia.current) setLoading(false);
+    }
+  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, rangoMeses]);
+
+  useEffect(() => {
+    void fetchEntradas();
+    return () => { ++secuencia.current; };
+  }, [fetchEntradas]);
+
+  return { entradas, loading, error, truncado, refetch: () => void fetchEntradas() };
 }
 
 /** Catálogo anterior como respaldo durante el despliegue; el SQL devuelve el catálogo real. */
@@ -267,4 +365,100 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
 export function identificarActor(entrada: AuditLogEntry): string {
   return entrada.actor_label?.trim() || entrada.actor_email?.trim()
     || (entrada.actor_user_id ? `Usuario · ${entrada.actor_user_id}` : `Registro histórico · ${entrada.id}`);
+}
+
+function capitalizar(texto: string): string {
+  return texto.length > 0 ? texto[0].toUpperCase() + texto.slice(1) : texto;
+}
+
+export interface DesgloseAccion {
+  accion: AuditLogEntry["accion"];
+  cantidad: number;
+}
+
+/** Nº de registros por tipo de acción, de más a menos frecuente: para el resumen de cada día/mes. */
+function calcularDesglosePorAccion(entradas: AuditLogEntry[]): DesgloseAccion[] {
+  const cuentas = new Map<AuditLogEntry["accion"], number>();
+  for (const entrada of entradas) cuentas.set(entrada.accion, (cuentas.get(entrada.accion) ?? 0) + 1);
+  return [...cuentas.entries()].sort((a, b) => b[1] - a[1]).map(([accion, cantidad]) => ({ accion, cantidad }));
+}
+
+export interface AuditLogGrupoDia {
+  /** Clave estable, "yyyy-MM-dd" en hora local. */
+  key: string;
+  /** "Jueves, 9 de octubre de 2026". */
+  etiqueta: string;
+  entradas: AuditLogEntry[];
+  totalRegistros: number;
+  desglosePorAccion: DesgloseAccion[];
+  actoresDistintos: number;
+}
+
+/**
+ * Agrupa por día (hora local del navegador), manteniendo el orden de
+ * `entradas` de entrada: si ya viene ordenada de más a menos reciente (como
+ * la devuelve `useAuditLogAgrupado`), el resultado también queda del día más
+ * reciente al más antiguo y, dentro de cada día, de la hora más reciente a la
+ * más antigua.
+ */
+export function agruparPorDia(entradas: AuditLogEntry[]): AuditLogGrupoDia[] {
+  const dias: AuditLogGrupoDia[] = [];
+  for (const entrada of entradas) {
+    const fecha = new Date(entrada.created_at);
+    const clave = format(fecha, "yyyy-MM-dd");
+    const actual = dias[dias.length - 1];
+    if (actual && actual.key === clave) {
+      actual.entradas.push(entrada);
+    } else {
+      dias.push({
+        key: clave,
+        etiqueta: capitalizar(format(fecha, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })),
+        entradas: [entrada],
+        totalRegistros: 0,
+        desglosePorAccion: [],
+        actoresDistintos: 0,
+      });
+    }
+  }
+  for (const dia of dias) {
+    dia.totalRegistros = dia.entradas.length;
+    dia.desglosePorAccion = calcularDesglosePorAccion(dia.entradas);
+    dia.actoresDistintos = new Set(dia.entradas.map(identificarActor)).size;
+  }
+  return dias;
+}
+
+export interface AuditLogGrupoMes {
+  /** Clave estable, "yyyy-MM" en hora local. */
+  key: string;
+  /** "Octubre 2026". */
+  etiqueta: string;
+  totalRegistros: number;
+  desglosePorAccion: DesgloseAccion[];
+  dias: AuditLogGrupoDia[];
+}
+
+/** Igual que `agruparPorDia` pero un nivel por encima: por mes, con los días ya agrupados dentro. */
+export function agruparPorMes(entradas: AuditLogEntry[]): AuditLogGrupoMes[] {
+  const entradasPorMes = new Map<string, AuditLogEntry[]>();
+  const orden: string[] = [];
+  for (const entrada of entradas) {
+    const clave = format(new Date(entrada.created_at), "yyyy-MM");
+    if (!entradasPorMes.has(clave)) {
+      entradasPorMes.set(clave, []);
+      orden.push(clave);
+    }
+    entradasPorMes.get(clave)!.push(entrada);
+  }
+
+  return orden.map((clave) => {
+    const entradasDelMes = entradasPorMes.get(clave)!;
+    return {
+      key: clave,
+      etiqueta: capitalizar(format(new Date(entradasDelMes[0].created_at), "LLLL yyyy", { locale: es })),
+      totalRegistros: entradasDelMes.length,
+      desglosePorAccion: calcularDesglosePorAccion(entradasDelMes),
+      dias: agruparPorDia(entradasDelMes),
+    };
+  });
 }

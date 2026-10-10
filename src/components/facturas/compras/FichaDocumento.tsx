@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura } from "@/hooks/useFacturas";
 import { formatCurrency, formatDate, formatDateTime } from "@/components/facturas/shared/formatters";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
+import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
 import { FilaProducto } from "@/components/facturas/shared/FilaProducto";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
@@ -231,6 +232,13 @@ export function FichaDocumento({
           {doc.created_at && <>Creado {formatDateTime(doc.created_at)}</>}
         </p>
       )}
+
+      {/* Al final de la ficha, dentro de su scroll: la foto (o el PDF) del original. */}
+      <OriginalIncrustado
+        driveUrl={doc.drive_url}
+        archivoPath={doc.archivo_path}
+        titulo={`${esAlbaran ? "Albarán" : "Factura"} ${doc.numero_documento}`}
+      />
     </div>
   );
 }

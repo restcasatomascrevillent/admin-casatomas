@@ -2,13 +2,17 @@ import { ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SuperAdminSidebar } from "@/components/SuperAdminSidebar";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
-import { ShieldAlert } from "lucide-react";
+import { useIsCompactNav } from "@/hooks/use-mobile";
 
 interface SuperAdminLayoutProps {
   children: ReactNode;
 }
 
 export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
+  // Mismo umbral que el sidebar (`ui/sidebar.tsx`): por debajo de 1024px el
+  // menú es un panel deslizante y necesita el botón de fuera para abrirse.
+  const isCompactNav = useIsCompactNav();
+
   return (
     <SidebarProvider>
       {/* Sin `overflow-x-hidden` aquí ni en el div de abajo (2026-09-25):
@@ -28,18 +32,19 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
       <div className="min-h-app flex w-full bg-background">
         <SuperAdminSidebar />
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="h-14 sm:h-16 border-b border-border bg-card flex items-center px-3 sm:px-6 sticky top-0 z-50 w-full">
-            <SidebarTrigger className="mr-2 sm:mr-4 shrink-0" />
-            <div className="flex items-center gap-2 min-w-0">
-              <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
-              <div className="min-w-0">
-                <h1 className="text-base sm:text-xl font-semibold text-foreground truncate">Super Admin</h1>
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Área restringida de control del sistema
-                </p>
-              </div>
-            </div>
-          </header>
+          {/* Sin cabecera en escritorio (2026-10-09, petición del dueño, "para
+              tener más hueco"): la franja "Super Admin · Área restringida de
+              control del sistema" repetía lo que ya dice el sidebar y se comía
+              64px de alto en todas las páginas. El plegador del menú se muda a
+              la cabecera del sidebar (SuperAdminSidebar.tsx), como en
+              DashboardLayout. En tablet vertical / móvil (< 1024px) queda una
+              barra mínima: el sidebar es un Sheet y no hay otra forma de
+              abrirlo. */}
+          {isCompactNav && (
+            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-border bg-card flex items-center gap-2 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
+              <SidebarTrigger className="shrink-0" />
+            </header>
+          )}
           <main className="flex-1 min-w-0 p-3 sm:p-6">
             <RouteErrorBoundary>{children}</RouteErrorBoundary>
           </main>
