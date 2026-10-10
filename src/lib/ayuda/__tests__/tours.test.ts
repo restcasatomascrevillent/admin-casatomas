@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { TOURS, TOUR_BOTON_AYUDA, claveTourVisto, esEstadoLanzarTour, esperarA, pestanasDelTour } from "../tours";
+import { TOURS, TOUR_BOTON_AYUDA, claveTourVisto, esEstadoLanzarTour, esperarA, pestanasDelTour, cadenaPestanas } from "../tours";
 import { FICHAS_AYUDA, esArchivoVideo } from "../centroAyuda";
 
 describe("tours de ayuda", () => {
@@ -33,16 +33,21 @@ describe("tours de ayuda", () => {
     ]);
     expect(pestanasDelTour(TOURS["gestor-web"])).toEqual([
       "gw-pestana-carta",
-      "gw-carta-vinos",
       "gw-pestana-novedades",
       "gw-pestana-menus",
       "gw-pestana-tapas",
     ]);
   });
 
+  it("los pasos de una subpestaña abren antes su pestaña de fuera (Carta > Vinos)", () => {
+    const vinos = TOURS["gestor-web"].filter((p) => cadenaPestanas(p).includes("gw-carta-vinos"));
+    expect(vinos.length).toBe(2);
+    for (const paso of vinos) expect(cadenaPestanas(paso)).toEqual(["gw-pestana-carta", "gw-carta-vinos"]);
+  });
+
   it("los pasos de una pestaña van juntos (no se salta de una a otra y vuelve)", () => {
     for (const pasos of Object.values(TOURS)) {
-      const secuencia = pasos.map((p) => p.pestana).filter(Boolean);
+      const secuencia = pasos.map((p) => cadenaPestanas(p).join(" > ")).filter(Boolean);
       const bloques = secuencia.filter((p, i) => p !== secuencia[i - 1]);
       expect(new Set(bloques).size).toBe(bloques.length);
     }

@@ -6,6 +6,7 @@ import "@/components/ayuda/tour.css";
 import { useAuth } from "@/hooks/useAuth";
 import {
   TOURS,
+  cadenaPestanas,
   cambiarPestanaComoTour,
   claveTourVisto,
   esEstadoLanzarTour,
@@ -139,8 +140,19 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
       try {
         while (i >= 0 && i < pasos.length) {
           const paso = pasos[i];
-          if (paso.pestana) apuntarPestanaInicial();
-          let cambio = paso.pestana ? abrirPestana(paso.pestana) : false;
+          // Pestaña y, si hace falta, subpestaña, en orden: yendo hacia atrás la
+          // de fuera puede no estar abierta y el botón de dentro no verse.
+          const cadena = cadenaPestanas(paso);
+          if (cadena.length > 0) apuntarPestanaInicial();
+          let cambio = false;
+          for (const [n, pestana] of cadena.entries()) {
+            if (n > 0) {
+              // El botón de la subpestaña aparece al abrirse (o mostrarse) la de fuera.
+              await esperarA(() => elementoVisible(pestana), cambio ? ESPERA_TRAS_PESTANA_MS : ESPERA_SIN_CAMBIO_MS);
+              if (!vigente()) return;
+            }
+            if (abrirPestana(pestana)) cambio = true;
+          }
           if (paso.abrir) {
             // Tras abrir la pestaña, el desplegable puede tardar en montarse.
             const abrir = paso.abrir;

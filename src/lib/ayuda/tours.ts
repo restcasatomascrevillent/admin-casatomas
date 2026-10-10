@@ -2,8 +2,8 @@
 // Tours guiados del panel (driver.js), uno por sección.
 //
 // Cada paso apunta a un elemento marcado con `data-tour="<id>"` en la pantalla
-// real. Si el paso dice `pestana` (el `data-tour` del botón de una pestaña),
-// el tour abre esa pestaña antes de enseñarlo (solo cambia de pestaña: nunca
+// real. Si el paso dice `pestana` (el `data-tour` del botón de una pestaña, o
+// la cadena pestaña › subpestaña), el tour la abre antes de enseñarlo (solo cambia de pestaña: nunca
 // rellena ni guarda nada) y espera a que el elemento aparezca. Si aun así no
 // está a la vista (pantalla estrecha, sin permiso, sin datos):
 //   · paso `opcional`: se salta;
@@ -23,8 +23,12 @@ export type LadoPaso = "top" | "right" | "bottom" | "left";
 export interface PasoTour {
   /** Valor de `data-tour` del elemento a resaltar. Sin él, el paso sale centrado. */
   elemento?: string;
-  /** `data-tour` del botón de la pestaña que hay que abrir antes de este paso. */
-  pestana?: string;
+  /**
+   * `data-tour` del botón de la pestaña que hay que abrir antes de este paso.
+   * Si es una subpestaña, la cadena desde la pestaña de fuera, en orden
+   * (p. ej. `[Carta, Vinos]`): así se llega también yendo hacia atrás.
+   */
+  pestana?: string | string[];
   /**
    * `data-tour` de un botón desplegable (con `aria-expanded`) que hay que
    * desplegar para que el elemento se vea. Solo despliega: nunca envía nada.
@@ -231,7 +235,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     // --- Carta › Vinos (solo se señala: el tour nunca abre la cámara ni sube fotos) ---
     {
       elemento: GW_CARTA_VINOS,
-      pestana: GW_CARTA_VINOS,
+      pestana: [GW_CARTA, GW_CARTA_VINOS],
       titulo: "Vinos con una foto",
       texto:
         "En «Vinos» puedes dar de alta una botella sin escribir: le haces una foto a la etiqueta y la ficha se rellena sola.",
@@ -240,7 +244,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     },
     {
       elemento: "gw-carta-vinos-foto",
-      pestana: GW_CARTA_VINOS,
+      pestana: [GW_CARTA, GW_CARTA_VINOS],
       titulo: "Añadir botella con foto",
       texto:
         "«Añadir botella con foto» abre la cámara: foto a la etiqueta de delante, de cerca y con luz. Se rellenan el nombre, la categoría, la D.O., la uva, la región y una descripción, y te sugiere un precio. Lo revisas y guardas tú. «Varias botellas» sirve para hacer una foto tras otra y revisarlas después. Cada foto usa la IA.",
@@ -315,9 +319,13 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
 
 export const selectorTour = (id: string): string => `[data-tour="${id}"]`;
 
-/** Botones de pestaña distintos que usa un tour, en orden. */
+/** Pestañas que hay que abrir, en orden, antes de un paso (de fuera a dentro). */
+export const cadenaPestanas = (paso: PasoTour): string[] =>
+  paso.pestana === undefined ? [] : Array.isArray(paso.pestana) ? paso.pestana : [paso.pestana];
+
+/** Botones de pestaña principales (las de fuera) distintos que usa un tour, en orden. */
 export const pestanasDelTour = (pasos: PasoTour[]): string[] =>
-  Array.from(new Set(pasos.map((p) => p.pestana).filter((p): p is string => Boolean(p))));
+  Array.from(new Set(pasos.map((p) => cadenaPestanas(p)[0]).filter((p): p is string => Boolean(p))));
 
 /**
  * Espera (sondeando) a que `buscar()` devuelva algo, como mucho `maxMs`.

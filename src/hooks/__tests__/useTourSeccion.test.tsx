@@ -100,6 +100,74 @@ describe("useTourSeccion", () => {
     document.body.innerHTML = "";
   });
 
+  it("hacia atrás desde Novedades vuelve a Vinos abriendo antes Carta y luego la subpestaña", async () => {
+    document.body.innerHTML = `
+      <button class="top" data-tour="gw-pestana-carta" aria-selected="true"></button>
+      <button class="top" data-tour="gw-pestana-novedades" aria-selected="false"></button>
+      <button class="sub" data-tour="gw-carta-vinos" aria-selected="false"></button>
+      <div data-tour="gw-carta-vinos-foto"></div>`;
+    const sel = (id: string) => document.querySelector<HTMLElement>(`[data-tour="${id}"]`)!;
+    const abierta = (id: string) => sel(id).getAttribute("aria-selected") === "true";
+    const visibleSi = (el: HTMLElement, cond: () => boolean) => {
+      el.getClientRects = () => (cond() ? [{}] : []) as unknown as DOMRectList;
+    };
+    visibleSi(sel("gw-pestana-carta"), () => true);
+    visibleSi(sel("gw-pestana-novedades"), () => true);
+    // La subpestaña y su contenido solo se ven con Carta abierta (si no, siguen en el DOM, ocultos).
+    visibleSi(sel("gw-carta-vinos"), () => abierta("gw-pestana-carta"));
+    visibleSi(sel("gw-carta-vinos-foto"), () => abierta("gw-pestana-carta") && abierta("gw-carta-vinos"));
+    const pulsadas: string[] = [];
+    document.querySelectorAll<HTMLElement>("button").forEach((b) =>
+      b.addEventListener("mousedown", () => {
+        pulsadas.push(b.getAttribute("data-tour") ?? "");
+        if (b.classList.contains("top")) {
+          document.querySelectorAll(".top").forEach((o) => o.setAttribute("aria-selected", String(o === b)));
+        } else {
+          b.setAttribute("aria-selected", "true");
+        }
+      }),
+    );
+    const { result } = renderHook(() => useTourSeccion("gestor-web", { auto: false }), { wrapper: envoltorio });
+    await act(async () => {
+      result.current.lanzar();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const config = driverMock.mock.calls[0][0];
+    const actual = () => config.steps[activo ?? -1]?.element;
+
+    for (let i = 0; i < 30 && actual() !== sel("gw-pestana-novedades"); i++) {
+      await act(async () => {
+        config.onNextClick();
+        await vi.advanceTimersByTimeAsync(2500);
+      });
+    }
+    expect(actual()).toBe(sel("gw-pestana-novedades"));
+    expect(abierta("gw-pestana-carta")).toBe(false);
+
+    pulsadas.length = 0;
+    await act(async () => {
+      config.onPrevClick();
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(pulsadas).toEqual(["gw-pestana-carta"]);
+    expect(actual()).toBe(sel("gw-carta-vinos-foto"));
+
+    // Con la subpestaña ya en Vinos solo hace falta abrir Carta; si no, también la pulsa.
+    sel("gw-carta-vinos").setAttribute("aria-selected", "false");
+    await act(async () => {
+      config.onNextClick();
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    pulsadas.length = 0;
+    await act(async () => {
+      config.onPrevClick();
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+    expect(pulsadas).toEqual(["gw-pestana-carta", "gw-carta-vinos"]);
+    expect(actual()).toBe(sel("gw-carta-vinos-foto"));
+    document.body.innerHTML = "";
+  });
+
   it("sus cambios de pestaña van marcados como del tour (sin historial); los del usuario no", async () => {
     document.body.innerHTML = `
       <button data-tour="facturas-pestana-cargar" aria-selected="false"></button>
