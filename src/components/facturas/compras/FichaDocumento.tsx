@@ -10,6 +10,7 @@ import { FilaProducto } from "@/components/facturas/shared/FilaProducto";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
 import { AlbaranesDeFactura } from "./AlbaranesDeFactura";
 import { FacturaDelAlbaran } from "./FacturaDelAlbaran";
+import { CosteLecturaFactura } from "@/components/facturas/CosteLecturaDocumento";
 
 /** Observaciones: dos líneas como mucho; el resto, tras «ver más». */
 function Observaciones({ texto }: { texto: string }) {
@@ -211,6 +212,7 @@ export function FichaDocumento({
           {doc.created_at && <>Creado {formatDateTime(doc.created_at)}</>}
         </p>
       )}
+      <CosteLecturaFactura facturaId={doc.id} className="text-[11px] text-muted-foreground/80" />
 
       {/* Al final de la ficha, dentro de su scroll: la foto (o el PDF) del original. */}
       <OriginalIncrustado
