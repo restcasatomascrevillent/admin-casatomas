@@ -26,12 +26,28 @@ import {
 
 const OPENAI = "https://api.openai.com/v1";
 const MODELO_EMBEDDINGS = "text-embedding-3-small";
+/** USD por millón de tokens de entrada de text-embedding-3-small (misma tarifa que ia_precios). */
+const PRECIO_EMBEDDINGS_USD_M = 0.02;
 
 export interface UsoAcumulado {
+  /** Llamadas de visión/texto (extracción, relectura, pie, contador). */
   llamadas: number;
   tokensEntrada: number;
   tokensSalida: number;
+  /** Coste de las llamadas de visión/texto: es lo que se guarda por pieza en ocr_trabajos. */
   costeUsd: number;
+  /** Embeddings, aparte para no cambiar lo que ya se guardaba por pieza (10-oct-2026). */
+  llamadasEmbeddings: number;
+  tokensEmbeddings: number;
+  costeEmbeddingsUsd: number;
+}
+
+/** Coste y llamadas TOTALES de un cliente: visión/texto + embeddings (coste de leer un documento). */
+export function totalesUso(uso: UsoAcumulado): { usd: number; llamadas: number } {
+  return {
+    usd: Math.round((uso.costeUsd + uso.costeEmbeddingsUsd) * 1e6) / 1e6,
+    llamadas: uso.llamadas + uso.llamadasEmbeddings,
+  };
 }
 
 /** Paso del OCR al que pertenece una llamada (va al `disparador` de ia_uso). */
@@ -90,7 +106,15 @@ export const vec = (arr: number[]) => "[" + arr.join(",") + "]";
 export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
   const f = deps.fetch ?? fetch;
   const cfg = deps.config;
-  const uso: UsoAcumulado = { llamadas: 0, tokensEntrada: 0, tokensSalida: 0, costeUsd: 0 };
+  const uso: UsoAcumulado = {
+    llamadas: 0,
+    tokensEntrada: 0,
+    tokensSalida: 0,
+    costeUsd: 0,
+    llamadasEmbeddings: 0,
+    tokensEmbeddings: 0,
+    costeEmbeddingsUsd: 0,
+  };
   const cabeceras = { "Content-Type": "application/json", Authorization: `Bearer ${deps.apiKey}` };
 
   const avisar = (etapa: EtapaOcr, operacion: UsoLlamada["operacion"], modelo: string, usage: unknown, t0: number) => {
@@ -265,8 +289,14 @@ export function crearClienteOpenAI(deps: DependenciasOpenAI): ClienteOpenAI {
       });
       if (!res.ok) throw new Error(`OpenAI embeddings ${res.status}: ${await res.text()}`);
       const json = await res.json();
-      // No suma a `uso` (ese es el coste de la lectura que se guarda por
-      // página en ocr_trabajos), pero sí va a ia_uso.
+      // No suma a `costeUsd` (el coste de la lectura que se guarda por página
+      // en ocr_trabajos), pero sí a sus propios contadores y a ia_uso.
+      const tokens = Number(json?.usage?.prompt_tokens ?? json?.usage?.total_tokens ?? 0);
+      uso.llamadasEmbeddings++;
+      uso.tokensEmbeddings += Number.isFinite(tokens) ? tokens : 0;
+      uso.costeEmbeddingsUsd = Math.round(
+        (uso.costeEmbeddingsUsd + (Number.isFinite(tokens) ? tokens : 0) * PRECIO_EMBEDDINGS_USD_M / 1_000_000) * 1e6,
+      ) / 1e6;
       avisar("embeddings", "embedding", MODELO_EMBEDDINGS, json?.usage, t0);
       // deno-lint-ignore no-explicit-any
       for (const d of json.data) salida.push((d as any).embedding);

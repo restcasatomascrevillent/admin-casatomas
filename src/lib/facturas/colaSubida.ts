@@ -25,6 +25,7 @@
 
 import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
+import { costeDeRespuesta } from "./costeLectura";
 import {
   describirProgreso,
   esperarTrabajo,
@@ -65,6 +66,8 @@ export interface ResultadoProcesamiento {
   piezas?: number;
   /** Id del documento guardado (o del ya existente si es un duplicado): el «Ver» abre ESE en Compras. */
   facturaId?: number;
+  /** USD que costó leer el documento (todas sus llamadas a OpenAI); undefined = el servidor aún no lo manda. */
+  costeUsd?: number;
 }
 
 export type TipoDocumento = "factura" | "albaran";
@@ -96,6 +99,7 @@ export function aResultado(nombre: string, data: any, piezas?: number, facturaId
     sustituible: data.sustituible ?? null,
     piezas,
     facturaId: idDocumento(data, facturaIdTrabajo),
+    ...(costeDeRespuesta(data) !== null ? { costeUsd: costeDeRespuesta(data) as number } : {}),
   };
 }
 

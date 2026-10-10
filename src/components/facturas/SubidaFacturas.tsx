@@ -22,6 +22,7 @@ import {
   tipoDocumento,
 } from "@/lib/facturas/resultadosCarga";
 import { cn } from "@/lib/utils";
+import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
 import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
 
 /** Dónde se ve el documento ya guardado (la pestaña Compras, en Documentos). */
@@ -368,7 +369,16 @@ function FilaEnviado({ e, onReintentar }: { e: ElementoCola; onReintentar: () =>
           <span className="min-w-0 truncate text-sm font-medium">{e.nombre}</span>
           {tipo && <span className="shrink-0 text-xs text-muted-foreground">{ETIQUETA_TIPO[tipo]}</span>}
         </div>
-        <p className="break-words text-xs text-muted-foreground">{linea.texto}</p>
+        <p className="break-words text-xs text-muted-foreground">
+          {linea.texto}
+          {/* Lo que costó leerlo (también si resultó duplicado: la lectura se pagó igual). */}
+          {r?.success && r.costeUsd !== undefined && (
+            <>
+              {" · "}
+              <CosteLecturaDocumento costeUsd={r.costeUsd} />
+            </>
+          )}
+        </p>
       </div>
       {r && !r.success && e.file && (
         <Button

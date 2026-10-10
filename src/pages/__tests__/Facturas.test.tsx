@@ -41,6 +41,8 @@ vi.mock("@/hooks/useGastoIa", () => ({
   useTopeIaMes: () => ({ data: 5 }),
 }));
 
+vi.mock("@/hooks/useEstadisticasLectura", () => ({ useEstadisticasLectura: () => ({ data: null }) }));
+
 import Facturas from "@/pages/Facturas";
 
 const fila = (over: Partial<FilaGastoIa>): FilaGastoIa => ({

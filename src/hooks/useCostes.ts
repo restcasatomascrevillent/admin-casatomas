@@ -86,9 +86,10 @@ export function useCosteSerie(desde: string, hasta: string, funcion: FiltroFunci
 }
 
 // ─── Desglose por función (qué parte del sistema gasta) ──────────────────────
-export function useCostePorFuncion(desde: string, hasta: string) {
+export function useCostePorFuncion(desde: string, hasta: string, habilitado = true) {
   return useQuery({
     queryKey: [RAIZ, "ia_coste_por_funcion", { desde, hasta }],
+    enabled: habilitado,
     staleTime: STALE_TIME,
     queryFn: async (): Promise<FilaCostePorFuncion[]> => {
       const { data, error } = await supabase.rpc("ia_coste_por_funcion", { p_desde: desde, p_hasta: hasta });

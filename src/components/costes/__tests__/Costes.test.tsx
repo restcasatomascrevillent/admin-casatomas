@@ -258,6 +258,43 @@ describe("Costes · Detalles", () => {
     expect(screen.getByText(/Real \(OpenAI\) hasta el 8 oct/)).toBeInTheDocument();
   });
 
+  it("compara la lectura de facturas: estimado (ia_uso) frente a real (OpenAI) en la misma ventana", async () => {
+    datosConReal();
+    // Real del mes hasta el 8 oct = 2 USD (ventana de 8 días). Estimado de ia_uso: 1,2 + 0,5 + 0,1 = 1,8 USD (-10 %).
+    rpcData.ia_coste_por_funcion = [
+      { funcion: "procesar-factura", coste_usd: 1.2 },
+      { funcion: "ocr-trabajo", coste_usd: 0.5 },
+      { funcion: "clasificar-productos", coste_usd: 0.1 },
+      { funcion: "chat-facturas", coste_usd: 9 }, // otro proceso: no cuenta
+    ];
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    const linea = await screen.findByTestId("contraste-lectura");
+    expect(linea).toHaveTextContent(/Lectura de facturas: estimado \(ia_uso\) 1,80 \$ vs real \(OpenAI\) 2,00 \$ \([-−]10 %\) hasta el 8 oct/);
+    // La ventana pedida es del 1 de octubre al último día cerrado.
+    const pedida = llamadas.find((l) => l.fn === "ia_coste_por_funcion");
+    expect(pedida?.args).toEqual({ p_desde: "2026-10-01", p_hasta: "2026-10-08" });
+  });
+
+  it("si ia_uso no tiene tarifa para la lectura, el estimado sale «sin datos» (no 0)", async () => {
+    datosConReal();
+    rpcData.ia_coste_por_funcion = [{ funcion: "procesar-factura", coste_usd: null }];
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    expect(await screen.findByTestId("contraste-lectura")).toHaveTextContent("estimado (ia_uso) sin datos vs real (OpenAI) 2,00 $");
+  });
+
+  it("sin gasto real no hay contraste que hacer", async () => {
+    tablaData.costes_fijos = [fijo("f1", "Supabase", 25)];
+    renderPagina();
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    await screen.findByText(/Todavía no hay gasto real/);
+    expect(screen.queryByTestId("contraste-lectura")).not.toBeInTheDocument();
+  });
+
   it("sin avisos no hay punto", async () => {
     datosConReal();
     tablaData.costes_fijos = [fijo("f1", "Supabase", 25)]; // verificado y reciente

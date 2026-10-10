@@ -20,6 +20,7 @@
 //  Sin Deno.env: todo llega por parámetro (vitest y el banco local lo usan).
 // ============================================================================
 
+import { costeDeCliente, guardarCosteLectura } from "./costeLectura.ts";
 import { type DocumentoListo, type FicheroUnico, leerDocumentoUnico } from "./extraccion.ts";
 import {
   type ContextoGuardado,
@@ -88,6 +89,9 @@ export async function registrarDuplicadoSincrono(
     totalOrigen: DocumentoListo["totalOrigen"];
     existente: DocumentoPendiente["existente"];
     modelo: string;
+    /** Coste de la lectura (USD) y nº de llamadas: «Sustituir la existente» los hereda. */
+    costeUsd?: number;
+    llamadas?: number | null;
   },
 ): Promise<RespuestaProcesado["sustituible"]> {
   const { pendiente, sustituible } = pendienteUnico(a, a.existente, a.trabajoId);
@@ -101,6 +105,7 @@ export async function registrarDuplicadoSincrono(
     original_path: a.originalPath,
     original_mime: a.mime,
     modelo: a.modelo,
+    ...(a.costeUsd ? { coste_usd: a.costeUsd } : {}),
     documento_pendiente: pendiente,
     resultado: { success: true, duplicado: true, sustituible },
     terminado_at: new Date().toISOString(),
@@ -108,6 +113,12 @@ export async function registrarDuplicadoSincrono(
   if (error) {
     console.warn("[duplicado] no se pudo registrar el pendiente (¿migración sin aplicar?):", error.message);
     return null;
+  }
+  // El nº de llamadas va aparte: si la columna aún no existe (migración
+  // 20261010120000 sin aplicar) no puede tumbar el registro del pendiente.
+  if (a.llamadas) {
+    const { error: eLl } = await supabase.from("ocr_trabajos").update({ llamadas: a.llamadas }).eq("id", a.trabajoId);
+    if (eLl) console.warn("[coste-lectura] no se pudo anotar las llamadas del duplicado:", eLl.message);
   }
   return sustituible;
 }
@@ -132,6 +143,8 @@ export async function procesarSincrono(
   const listo = await leerDocumentoUnico(ctx.openai, f);
   // 4) → 9) Duplicado, embeddings, cabecera, líneas, validación, archivo.
   const g = await guardarLecturaUnica(ctx, listo, f, null);
+  // Todo lo que costó leer este documento: visión, relecturas, pie, contador y embeddings.
+  const lectura = costeDeCliente(ctx.openai.uso, ctx.openai.config.modelo);
 
   if (g.estado === "duplicado" && g.existente) {
     // Se guarda lo leído (sin volver a pagar el OCR) para «Sustituir la existente».
@@ -149,6 +162,8 @@ export async function procesarSincrono(
       totalOrigen: listo.totalOrigen,
       existente: g.existente,
       modelo: ctx.openai.config.modelo,
+      costeUsd: lectura.usd,
+      llamadas: lectura.llamadas,
     });
     if (sustituible) {
       const originalPath = await guardarOriginalPendiente(ctx.supabase, userId, trabajoId, f.b64, f.mime);
@@ -156,7 +171,8 @@ export async function procesarSincrono(
         await ctx.supabase.from("ocr_trabajos").update({ original_path: originalPath }).eq("id", trabajoId);
       }
     }
-    return { ...g.respuesta, sustituible };
+    return { ...g.respuesta, sustituible, coste_usd: lectura.usd };
   }
-  return g.respuesta as unknown as Record<string, unknown>;
+  if (g.estado === "guardado") await guardarCosteLectura(ctx.supabase, g.facturaId, lectura);
+  return { ...g.respuesta, coste_usd: lectura.usd } as unknown as Record<string, unknown>;
 }

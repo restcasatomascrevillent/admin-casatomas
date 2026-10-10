@@ -11,6 +11,7 @@
 import type { OrigenImporte } from "./esquema.ts";
 import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
+import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
 import { archivarOriginal, type ConfigDrive, moverPendiente, rutaDefinitiva, STORAGE_BUCKET } from "./archivo.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -64,6 +65,8 @@ export interface RespuestaProcesado {
   tipo: string;
   duplicado?: boolean;
   sustituida?: boolean;
+  /** USD que costó leer este documento (todas sus llamadas a OpenAI). Lo pinta «Cargar». */
+  coste_usd?: number;
   message: string;
   alertas: Alerta[];
   archivo_guardado: boolean;
@@ -472,6 +475,11 @@ export async function sustituirFactura(
   });
   if (error) throw new Error(error.message.replace(/^.*SUSTITUCIÓN ABORTADA: /, "No se ha sustituido nada: "));
 
+  // Coste de leer el documento nuevo: la lectura del trabajo + los embeddings de esta
+  // sustitución. Sustituye al coste que tuviera la factura antes.
+  const lectura = sumarCostes(await leerCosteTrabajo(supabase, a.trabajoId), costeDeCliente(openai.uso, null));
+  await guardarCosteLectura(supabase, a.facturaId, lectura);
+
   const alertas = await validarYGuardarAlertas(supabase, a.facturaId, p.alertasPrevias ?? []);
   console.log(
     `[procesar-factura] SUSTITUIDA factura ${a.facturaId} (${d.numero_documento}): ` +
@@ -479,6 +487,7 @@ export async function sustituirFactura(
   );
   return respuestaExito(d, t.nombre_original, a.facturaId, alertas, p.totalOrigen, { ok: !!archivoPath, error: archivoError }, {
     sustituida: true,
+    coste_usd: lectura.usd,
     message: `Factura ${a.facturaId} sustituida: ${res?.lineas_antes ?? "?"} → ${res?.lineas ?? d.productos.length} líneas.` +
       (alertas.length > 0 ? ` Revisa ${alertas.length} aviso(s).` : ""),
   });

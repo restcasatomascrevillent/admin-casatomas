@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import type { FilaGastoIa, GastoReal } from "@/lib/facturas/gastoIa";
+import type { EstadisticasLectura } from "@/lib/facturas/costeLectura";
 
 let datos: FilaGastoIa[] | undefined = [];
 let cargando = false;
@@ -10,6 +11,11 @@ vi.mock("@/hooks/useGastoIa", () => ({
   useGastoIa: () => ({ data: datos, isLoading: cargando }),
   useGastoIaRealMes: () => ({ data: datosReal ? { actual: datosReal, anterior: null } : null, isLoading: false }),
   useTopeIaMes: () => ({ data: tope }),
+}));
+
+let estadisticas: EstadisticasLectura | null = null;
+vi.mock("@/hooks/useEstadisticasLectura", () => ({
+  useEstadisticasLectura: (_dias: number, habilitado = true) => ({ data: habilitado ? estadisticas : undefined }),
 }));
 
 import { MonitorGastoIA } from "../MonitorGastoIA";
@@ -25,6 +31,62 @@ describe("MonitorGastoIA", () => {
     cargando = false;
     datosReal = null;
     tope = 5;
+    estadisticas = null;
+  });
+
+  describe("coste de leer cada documento (Cargar)", () => {
+    const stats: EstadisticasLectura = {
+      documentos: 12,
+      totalUsd: 0.12,
+      mediaUsd: 0.01,
+      medianaUsd: 0.0085,
+      llamadasMedia: 3,
+      masCara: { id: 54, proveedor: "LUGA SABORES S.L.", numero: "ML/101511", usd: 0.0349 },
+      porPaginas: [{ tramo: "1 página", documentos: 10, mediaUsd: 0.006, totalUsd: 0.06 }],
+      porLineas: [{ tramo: "1-10 líneas", documentos: 8, mediaUsd: 0.004, totalUsd: 0.03 }],
+    };
+
+    it("añade «N docs · media X cént./doc · más cara: Luga Y cént.» a la línea y el detalle al desglose", () => {
+      estadisticas = stats;
+      datos = [fila({ funcion: "ocr-trabajo", coste_usd: 1, unidades: 4, documentos_ocr: 4 })];
+      render(<MonitorGastoIA modo="ocr" />);
+      const boton = screen.getByTestId("monitor-gasto-ia-ocr");
+      // 0,01 $ x 0,92 = 0,92 cént.; 0,0349 $ x 0,92 = 3,2 cént.
+      expect(boton).toHaveTextContent("12 docs · media 0,9 cént./doc · más cara: Luga 3,2 cént.");
+      fireEvent.click(boton);
+      const det = screen.getByTestId("desglose-lectura");
+      expect(det).toHaveTextContent("12 documentos leídos");
+      expect(det).toHaveTextContent("media 0,9 cént. · mediana 0,8 cént.");
+      expect(det).toHaveTextContent("la más cara: Luga (ML/101511) · 3,2 cént.");
+      expect(det).toHaveTextContent("1 página (10)");
+      expect(det).toHaveTextContent("1-10 líneas (8)");
+    });
+
+    it("con gasto real usa el tipo de cambio del BCE para los céntimos", () => {
+      estadisticas = stats;
+      datosReal = {
+        filas: [{ proceso: "ocr", usd_real: 1, ultimo_dia_real: "2026-10-07", usd_estimado_hoy: 0 }],
+        tipo: { eurPorUsd: 0.5, fecha: "2026-10-07", fuente: "bce" },
+      };
+      render(<MonitorGastoIA modo="ocr" />);
+      expect(screen.getByTestId("monitor-gasto-ia-ocr")).toHaveTextContent("media 0,5 cént./doc · más cara: Luga 1,7 cént.");
+    });
+
+    it("el chatbot no muestra nada de la lectura", () => {
+      estadisticas = stats;
+      render(<MonitorGastoIA modo="chat" />);
+      expect(screen.getByTestId("monitor-gasto-ia-chat")).not.toHaveTextContent("cént.");
+    });
+
+    it("sin documentos medidos (null): la línea de siempre", () => {
+      estadisticas = null;
+      datos = [fila({ funcion: "ocr-trabajo", coste_usd: 1, unidades: 4, documentos_ocr: 4 })];
+      render(<MonitorGastoIA modo="ocr" />);
+      const boton = screen.getByTestId("monitor-gasto-ia-ocr");
+      expect(boton).not.toHaveTextContent("cént.");
+      fireEvent.click(boton);
+      expect(screen.queryByTestId("desglose-lectura")).not.toBeInTheDocument();
+    });
   });
 
   it("pestaña IA: una línea con total, preguntas y coste por pregunta", () => {

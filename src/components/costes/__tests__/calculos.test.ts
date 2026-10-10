@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   CosteFijo,
   FilaCosteMes,
+  FilaCostePorFuncion,
   FilaCostePorModelo,
   FilaCosteSerie,
   FilaFuncionSinRegistro,
@@ -12,6 +13,7 @@ import {
   calcularAvisosCostes,
   calcularTotalMensual,
   construirPuntosCoste,
+  contrasteLectura,
   diasDesde,
   iaUsdMes,
   resumirEstimacion,
@@ -358,5 +360,40 @@ describe("formato de dinero", () => {
     // Intl mete un espacio duro (U+00A0) entre número y sufijo: se normaliza
     // para que el test no dependa de qué espacio use cada versión de ICU.
     expect(fmtTokens(1200000).replace(/\s/g, " ")).toBe("1,2 M");
+  });
+});
+
+describe("contrasteLectura: estimado (ia_uso) frente a real (OpenAI)", () => {
+  const f = (funcion: string, coste_usd: number | null) => ({ funcion, coste_usd }) as FilaCostePorFuncion;
+
+  it("suma solo las funciones de la lectura de facturas y vuelve el real a dólares", () => {
+    const c = contrasteLectura({
+      porFuncion: [f("procesar-factura", 1.2), f("ocr-trabajo", 0.5), f("clasificar-productos", 0.1), f("chat-facturas", 9)],
+      realOcrEur: 1, // 1 € a 0,5 €/USD = 2 USD
+      eurPorUsd: 0.5,
+    });
+    expect(c!.estimadoUsd).toBeCloseTo(1.8, 6);
+    expect(c!.realUsd).toBe(2);
+    expect(c!.difPct).toBeCloseTo(-10, 6);
+  });
+
+  it("estimado mayor que el real: diferencia positiva", () => {
+    const c = contrasteLectura({ porFuncion: [f("ocr-trabajo", 2.2)], realOcrEur: 2 * USD_EUR, eurPorUsd: USD_EUR });
+    expect(c!.difPct).toBeCloseTo(10, 6);
+  });
+
+  it("sin tarifa o sin filas el estimado es null (no 0) y no hay diferencia", () => {
+    expect(contrasteLectura({ porFuncion: [f("procesar-factura", null)], realOcrEur: 1, eurPorUsd: 0.5 })).toEqual({
+      estimadoUsd: null,
+      realUsd: 2,
+      difPct: null,
+    });
+    expect(contrasteLectura({ porFuncion: undefined, realOcrEur: 1, eurPorUsd: 0.5 })!.estimadoUsd).toBeNull();
+  });
+
+  it("real a 0: sin porcentaje (no divide por cero); sin real o sin tipo de cambio, no hay contraste", () => {
+    expect(contrasteLectura({ porFuncion: [f("ocr-trabajo", 1)], realOcrEur: 0, eurPorUsd: 0.5 })!.difPct).toBeNull();
+    expect(contrasteLectura({ porFuncion: [], realOcrEur: null, eurPorUsd: 0.5 })).toBeNull();
+    expect(contrasteLectura({ porFuncion: [], realOcrEur: 1, eurPorUsd: 0 })).toBeNull();
   });
 });

@@ -7,6 +7,7 @@
 import type {
   CosteFijo,
   FilaCosteMes,
+  FilaCostePorFuncion,
   FilaCostePorModelo,
   FilaCosteSerie,
   FilaFuncionSinRegistro,
@@ -380,3 +381,38 @@ export function calcularTotalMensual(
   return { iaEurAprox, fijosEur: fijos, totalEurAprox, margenEur, margenPct };
 }
 
+
+// ─── Lectura de facturas: estimado (ia_uso) frente a real (OpenAI) ───────────
+
+/** Funciones de ia_uso que cuentan como «Lectura de facturas» (= proceso 'ocr', ver ia_proceso_gasto). */
+export const FUNCIONES_LECTURA = ["procesar-factura", "ocr-trabajo", "clasificar-productos"] as const;
+
+export interface ContrasteLectura {
+  /** USD estimados con ia_uso (tokens × tarifa) en la misma ventana que el real. null = sin tarifa/datos. */
+  estimadoUsd: number | null;
+  /** USD reales que OpenAI ha facturado a la clave 'ocr' en esa ventana. */
+  realUsd: number;
+  /** (estimado − real) / real en %; null si no se puede calcular. */
+  difPct: number | null;
+}
+
+/**
+ * Compara, para la ventana ya cerrada del mes (1 del mes → último día real),
+ * lo ESTIMADO por la app para la lectura de facturas con lo REAL de OpenAI. Si
+ * cuadra, la contabilidad de `ia_uso` es fiable. `realEur` es el real de la
+ * línea 'ocr' en euros; se vuelve a dólares con el mismo tipo de cambio.
+ */
+export function contrasteLectura(args: {
+  porFuncion: FilaCostePorFuncion[] | undefined;
+  realOcrEur: number | null | undefined;
+  eurPorUsd: number;
+}): ContrasteLectura | null {
+  const { porFuncion, realOcrEur, eurPorUsd } = args;
+  if (realOcrEur === null || realOcrEur === undefined || !Number.isFinite(realOcrEur) || !(eurPorUsd > 0)) return null;
+  const realUsd = realOcrEur / eurPorUsd;
+  const propias = (porFuncion ?? []).filter((f) => (FUNCIONES_LECTURA as readonly string[]).includes(f.funcion));
+  const conCoste = propias.filter((f) => !esNulo(f.coste_usd));
+  const estimadoUsd = conCoste.length === 0 ? null : conCoste.reduce((s, f) => s + (f.coste_usd as number), 0);
+  const difPct = estimadoUsd !== null && realUsd > 0 ? ((estimadoUsd - realUsd) / realUsd) * 100 : null;
+  return { estimadoUsd, realUsd, difPct };
+}

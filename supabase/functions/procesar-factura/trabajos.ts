@@ -24,6 +24,7 @@ import { bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import type { MotivoRelectura, PaginaCerrada } from "./pagina.ts";
 import { leerPieza } from "./pieza.ts";
 import { STORAGE_BUCKET } from "./archivo.ts";
+import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes, sumarGastoTrabajo } from "./costeLectura.ts";
 import { guardarLecturaUnica, pendienteUnico } from "./unico.ts";
 
 export { registrarDuplicadoSincrono } from "./unico.ts";
@@ -251,9 +252,13 @@ export async function procesarPagina(supabase: Supa, openai: ClienteOpenAI, pagi
       p_modelo: openai.config.modelo,
     });
     if (error) throw new Error(`ocr_cerrar_pagina: ${error.message}`);
+    // El coste ya lo ha sumado ocr_cerrar_pagina; aquí solo el nº de llamadas.
+    await sumarGastoTrabajo(supabase, pagina.trabajo_id, openai.uso, false);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[ocr-trabajo] pieza ${pagina.id} falló:`, msg);
+    // Lo que OpenAI haya facturado en este intento se paga igual: se suma al trabajo.
+    await sumarGastoTrabajo(supabase, pagina.trabajo_id, openai.uso, true);
     const { error } = await supabase.rpc("ocr_fallo_pagina", { p_pagina_id: pagina.id, p_error: msg });
     if (error) console.error("[ocr-trabajo] ocr_fallo_pagina:", error.message);
   }
@@ -307,9 +312,11 @@ async function leerPiezaUnica(supabase: Supa, cliente: ClienteOpenAI, pagina: an
       p_modelo: cliente.config.modelo,
     });
     if (error) throw new Error(`ocr_cerrar_pagina: ${error.message}`);
+    await sumarGastoTrabajo(supabase, pagina.trabajo_id, cliente.uso, false);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[ocr-trabajo] pieza única ${pagina.id} falló:`, msg);
+    await sumarGastoTrabajo(supabase, pagina.trabajo_id, cliente.uso, true);
     if (esErrorTransitorio(msg)) {
       const { error } = await supabase.rpc("ocr_fallo_pagina", { p_pagina_id: pagina.id, p_error: msg });
       if (error) console.error("[ocr-trabajo] ocr_fallo_pagina:", error.message);
@@ -368,17 +375,19 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
   const fichero: FicheroUnico = { b64, mime: f.mime ?? trabajo.original_mime ?? "image/jpeg", nombre: trabajo.nombre_original };
   const g = await guardarLecturaUnica(ctx, listo, fichero, trabajo.id);
 
-  const { data: tCoste } = await supabase.from("ocr_trabajos").select("coste_usd, modelo").eq("id", trabajo.id).single();
+  // Coste de leer el documento: lo que sumaron las piezas + los embeddings de esta consolidación.
+  const lectura = sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
   const comun = {
     paginas: [{
       numero: 1, pieza: "pagina", franja: null, estado: f.estado, lineas: f.filas_extraidas, contadas: f.filas_contadas,
       relecturas: f.relecturas, duracion_ms: f.duracion_ms,
     }],
-    coste_usd: Number(tCoste?.coste_usd ?? 0),
-    modelo: tCoste?.modelo ?? null,
+    coste_usd: lectura.usd,
+    modelo: lectura.modelo,
   };
 
   if (g.estado === "guardado") {
+    await guardarCosteLectura(supabase, g.facturaId, lectura);
     let respuesta = g.respuesta;
     if (b64) {
       if (respuesta.archivo_guardado) {
@@ -467,10 +476,11 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
       relecturas: f.relecturas,
       duracion_ms: f.duracion_ms,
     }));
-    const { data: tCoste } = await supabase.from("ocr_trabajos").select("coste_usd, modelo").eq("id", trabajo.id).single();
-    const comun = { paginas: infoPaginas, consolidacion: c.stats, coste_usd: Number(tCoste?.coste_usd ?? 0), modelo: tCoste?.modelo ?? null };
+    const lectura = sumarCostes(await leerCosteTrabajo(supabase, trabajo.id), costeDeCliente(ctx.openai.uso, null));
+    const comun = { paginas: infoPaginas, consolidacion: c.stats, coste_usd: lectura.usd, modelo: lectura.modelo };
 
     if (g.estado === "guardado") {
+      await guardarCosteLectura(supabase, g.facturaId, lectura);
       await terminar(supabase, trabajo.id, "completado", { ...g.respuesta, ...comun }, g.facturaId, null, null);
     } else {
       const pendiente: DocumentoPendiente | null = g.existente

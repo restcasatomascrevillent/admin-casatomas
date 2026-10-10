@@ -1,7 +1,10 @@
 import { AlertTriangle, ChevronDown, Coins } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useGastoIa, useGastoIaRealMes, useTopeIaMes } from "@/hooks/useGastoIa";
+import { useEstadisticasLectura } from "@/hooks/useEstadisticasLectura";
+import { type EstadisticasLectura, fmtCentimos, nombreCortoProveedor, textoResumenLectura } from "@/lib/facturas/costeLectura";
 import {
+  diaDelMes,
   type EstadoTope,
   evaluarTope,
   fmtEurIa,
@@ -14,7 +17,7 @@ import {
   TOPE_IA_POR_DEFECTO,
   textoTipoCambioReal,
 } from "@/lib/facturas/gastoIa";
-import { TEXTO_TIPO_CAMBIO } from "@/components/costes/formato";
+import { TEXTO_TIPO_CAMBIO, USD_EUR } from "@/components/costes/formato";
 
 const fmtEntero = new Intl.NumberFormat("es-ES");
 const fmtPct = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
@@ -83,6 +86,45 @@ function DesgloseGastoReal({ g, modo }: { g: ResumenGastoReal; modo: ModoMonitor
   );
 }
 
+/** Coste de leer documentos (media, mediana, el más caro y reparto), solo en «Cargar». */
+function DesgloseLectura({ e, eurPorUsd }: { e: EstadisticasLectura; eurPorUsd: number }) {
+  const k = eurPorUsd;
+  const reparto = [...e.porPaginas, ...e.porLineas];
+  return (
+    <div data-testid="desglose-lectura" className="mt-3 border-t pt-2">
+      <p className="mb-1 font-medium">Coste por documento · mes en curso</p>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        {fmtEntero.format(e.documentos)} {e.documentos === 1 ? "documento leído" : "documentos leídos"}
+        {e.totalUsd !== null ? ` · ${fmtEurIa(e.totalUsd * k)} en total` : ""}
+      </p>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        media {fmtCentimos(e.mediaUsd, k)} · mediana {fmtCentimos(e.medianaUsd, k)}
+      </p>
+      {e.masCara && (
+        <p className="text-xs text-muted-foreground tabular-nums">
+          la más cara: {nombreCortoProveedor(e.masCara.proveedor) || "—"}
+          {e.masCara.numero ? ` (${e.masCara.numero})` : ""} · {fmtCentimos(e.masCara.usd, k)}
+        </p>
+      )}
+      {reparto.length > 0 && (
+        <ul className="mt-1 space-y-0.5 border-l pl-3 text-xs text-muted-foreground" aria-label="Coste medio por tamaño">
+          {reparto.map((t) => (
+            <li key={t.tramo} className="flex justify-between gap-3 tabular-nums">
+              <span>
+                {t.tramo} ({fmtEntero.format(t.documentos)})
+              </span>
+              <span>media {fmtCentimos(t.mediaUsd, k)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">
+        Lo que costó leer cada documento (visión, relecturas y embeddings), estimado con la tarifa del modelo.
+      </p>
+    </div>
+  );
+}
+
 /**
  * Cuerpo del desglose del proceso de la pestaña (OCR en «Cargar», chatbot en
  * «IA»): solo lo que cuesta ese proceso; el resto del gasto de IA se ve en
@@ -95,19 +137,24 @@ export function DesgloseGastoIa({
   modo,
   estadoTope,
   topeEur = TOPE_IA_POR_DEFECTO,
+  lectura,
 }: {
   r: ResumenGastoIa;
   real?: ResumenGastoReal | null;
   modo: ModoMonitor;
   estadoTope?: EstadoTope;
   topeEur?: number;
+  /** Estadísticas del coste de lectura (solo modo «ocr»). */
+  lectura?: EstadisticasLectura | null;
 }) {
   const aviso = estadoTope ? <AvisoTopeIa estado={estadoTope} topeEur={topeEur} className="mb-2" /> : null;
+  const detalleLectura = modo === "ocr" && lectura ? <DesgloseLectura e={lectura} eurPorUsd={real?.tipo.eurPorUsd ?? USD_EUR} /> : null;
   if (real) {
     return (
       <>
         {aviso}
         <DesgloseGastoReal g={real} modo={modo} />
+        {detalleLectura}
       </>
     );
   }
@@ -145,6 +192,7 @@ export function DesgloseGastoIa({
       <p className="mt-2 text-xs text-muted-foreground">
         Estimado: tokens × tarifa de OpenAI (aún sin el gasto real de OpenAI). Sin IVA. {TEXTO_TIPO_CAMBIO}.
       </p>
+      {detalleLectura}
     </>
   );
 }
@@ -184,6 +232,9 @@ export function useMonitorGastoIa(modo: ModoMonitor) {
  */
 export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; className?: string }) {
   const { r, real, cargando, topeEur, estadoTope } = useMonitorGastoIa(modo);
+  // Solo «Cargar»: coste de leer cada documento (media, la más cara…) del mes en curso.
+  const { data: lectura } = useEstadisticasLectura(diaDelMes(new Date()), modo === "ocr");
+  const resumenLectura = modo === "ocr" ? textoResumenLectura(lectura, real?.tipo.eurPorUsd ?? USD_EUR) : null;
   const singular = modo === "chat" ? "pregunta" : "documento";
 
   // Con gasto real de OpenAI manda lo real (+ el estimado de hoy); si la RPC no
@@ -205,6 +256,8 @@ export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; cl
             "estimado",
           ].join(" · ");
 
+  const resumenCompleto = resumenLectura ? `${resumen} · ${resumenLectura}` : resumen;
+
   // Texto gris compacto, sin tarjeta ni borde; solo el tope lo tiñe de ámbar o rojo.
   const tinte =
     estadoTope.nivel === "superado"
@@ -223,18 +276,18 @@ export function MonitorGastoIA({ modo, className = "" }: { modo: ModoMonitor; cl
           data-testid={`monitor-gasto-ia-${modo}`}
           data-nivel-tope={estadoTope.nivel}
           className={`flex min-h-11 w-fit max-w-full items-center gap-1.5 rounded-md px-2 text-left text-xs transition-colors ${tinte} ${className}`}
-          aria-label={`${TITULO[modo]}: ${resumen}.${avisoTexto ? ` ${avisoTexto}` : ""} Ver desglose`}
+          aria-label={`${TITULO[modo]}: ${resumenCompleto}.${avisoTexto ? ` ${avisoTexto}` : ""} Ver desglose`}
         >
           <Icono className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           <span className="min-w-0 flex-1 truncate">
             <span>{TITULO[modo]}:</span>{" "}
-            <span className="tabular-nums">{resumen}</span>
+            <span className="tabular-nums">{resumenCompleto}</span>
           </span>
           <ChevronDown className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(22rem,calc(100vw-2rem))] p-3 text-sm">
-        <DesgloseGastoIa r={r} real={real} modo={modo} estadoTope={estadoTope} topeEur={topeEur} />
+        <DesgloseGastoIa r={r} real={real} modo={modo} estadoTope={estadoTope} topeEur={topeEur} lectura={lectura} />
       </PopoverContent>
     </Popover>
   );
