@@ -74,6 +74,7 @@ export function ReservaCard({
   isDragOverlay,
   sinArrastre,
   telefonoEnlace,
+  compacta = false,
   anchoColumna,
 }: {
   reserva: ReservaServicio;
@@ -112,6 +113,12 @@ export function ReservaCard({
   sinArrastre?: boolean;
   /** El teléfono de la tarjeta es un enlace `tel:` (el desplegable de la sala privada). */
   telefonoEnlace?: boolean;
+  /**
+   * Versión de fila y media (panel del Plano de Hoy, 10/10/2026): punto de color del estado,
+   * nombre, hora · personas · mesa · teléfono (tocable) y, si hay nota, su icono; a la derecha
+   * «Ha llegado» en icono y «⋮» (zona táctil de 44 px). Tocar la fila abre el menú.
+   */
+  compacta?: boolean;
   /**
    * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
    * texto o solo iconos. Va por ancho de COLUMNA y no de ventana a propósito:
@@ -199,7 +206,7 @@ export function ReservaCard({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-muted-foreground"
+            className={cn("h-6 w-6 text-muted-foreground", compacta && "touch-hit h-8 w-8")}
             aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
           >
             {acciones.estaEnCurso(reserva.id) ? (
@@ -292,12 +299,15 @@ export function ReservaCard({
     </div>
   );
 
+  const estadoInfo = infoEstadoReserva(reserva.estado);
+  const nota = reserva.notas_cliente?.trim();
+
   return (
     <div
       ref={setNodeRef}
       className={cn(
         "rounded-lg border bg-card transition-shadow duration-200 group outline-none select-none touch-manipulation [-webkit-touch-callout:none]",
-        soloIcono ? "p-2" : "p-2.5 sm:p-3",
+        compacta ? "px-2 py-1" : soloIcono ? "p-2" : "p-2.5 sm:p-3",
         "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         arrastrable
           ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30"
@@ -321,6 +331,48 @@ export function ReservaCard({
       aria-disabled={arrastrable ? attributes["aria-disabled"] : undefined}
       data-arrastrable={arrastrable ? "true" : "false"}
     >
+      {compacta ? (
+        <div className="flex min-h-11 items-center gap-2">
+          <span
+            className={cn("h-2.5 w-2.5 shrink-0 rounded-full", estadoInfo ? estadoInfo.insignia : "bg-gray-500")}
+            title={estadoInfo?.etiqueta ?? reserva.estado}
+            aria-hidden="true"
+          />
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="flex items-center gap-1 text-sm font-semibold">
+              {reserva.importante && <Star className="h-3 w-3 shrink-0 fill-amber-400 text-amber-400" aria-label="Importante" />}
+              <span className="truncate" title={reserva.nombre || "Sin nombre"}>{reserva.nombre || "Sin nombre"}</span>
+              {nota && (
+                <span title={nota} className="shrink-0" data-testid="nota-cliente">
+                  <MessageSquareText className="h-3.5 w-3.5 text-amber-600" aria-hidden="true" />
+                  <span className="sr-only">Nota del cliente: {nota}</span>
+                </span>
+              )}
+            </p>
+            <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground tabular-nums">
+              <span>{typeof reserva.hora === "string" ? reserva.hora.substring(0, 5) : reserva.hora}</span>
+              <span>· {reserva.numero_comensales} p.</span>
+              <span aria-hidden="true">·</span>
+              <span className={cn(!textoMesas && sinMesa && "text-amber-700 dark:text-amber-400")}>
+                {textoMesas || (sinMesa ? "Sin mesa" : "—")}
+              </span>
+              {reserva.telefono && (
+                <a
+                  href={`tel:${reserva.telefono}`}
+                  className="touch-hit underline-offset-2 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  · {reserva.telefono}
+                </a>
+              )}
+            </p>
+          </div>
+          <ControlLlegada reserva={reserva} acciones={acciones} canEdit={puedeEditar} compacto soloIcono />
+          {menuAcciones}
+        </div>
+      ) : (
+      <>
       <div className="flex items-start justify-between gap-1 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {/* Sin permiso, deshabilitada y con el motivo a la vista (en el envoltorio:
@@ -363,6 +415,8 @@ export function ReservaCard({
         </div>
       ) : (
         <ControlLlegada reserva={reserva} acciones={acciones} canEdit={puedeEditar} compacto className="mt-2" />
+      )}
+      </>
       )}
     </div>
   );

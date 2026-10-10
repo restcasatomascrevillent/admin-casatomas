@@ -504,6 +504,7 @@ export function VistaPlanoHoy({
       puedeEditar={puedeEditar}
       sinArrastre
       telefonoEnlace
+      compacta
     />
   );
 
@@ -534,7 +535,7 @@ export function VistaPlanoHoy({
       {reservasGrupo.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">{vacio}</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="space-y-1">
           {reservasGrupo.map((r) => (
             <li key={r.id} className="min-w-0">
               {tarjeta(r)}

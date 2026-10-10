@@ -135,10 +135,14 @@ begin
     (v_ayer, 'proj_casa', 'key_gen',   'zz-test-modelo',            250000,  0, 0, 5),               -- 0,25  (total 5,5)
     (v_ayer, 'proj_casa', 'key_desconocida', 'zz-test-modelo',      0, 0, 0, 0),                    -- sin clave en openai_claves → otros
     (v_ayer, 'proj_default', 'key_ajena', 'zz-test-modelo',         99000000, 0, 0, 999);            -- proyecto ajeno: no cuenta
+  -- Desde 20261010100000 el reparto es por proyecto y DÍA: anteayer necesita su propio uso (mismos pesos que ayer).
+  insert into public.openai_uso_diario (fecha, project_id, api_key_id, modelo, input_tokens, cached_tokens, output_tokens, peticiones)
+    select v_anteayer, project_id, api_key_id, modelo, input_tokens, cached_tokens, output_tokens, peticiones
+      from public.openai_uso_diario where fecha = v_ayer and project_id = 'proj_casa';
   insert into public.openai_costes_diarios (fecha, project_id, line_item, usd) values
     (v_ayer,     'proj_casa',    'a', 4.40),
     (v_ayer,     'proj_casa',    'b', 1.60),
-    (v_anteayer, 'proj_casa',    'a', 5.00),                    -- sin uso ese día: entra en el total y se reparte igual
+    (v_anteayer, 'proj_casa',    'a', 5.00),                    -- mismos pesos que ayer (ver arriba)
     (v_ayer,     'proj_default', 'y', 99.00),                   -- ajeno
     (v_ayer,     'proj_sin',     'x', 0.30),                    -- sin marcar → sin_asignar, no suma
     (v_ayer,     '',             '',  0.05),                    -- sin proyecto → sin_asignar
@@ -196,7 +200,7 @@ begin
 
   -- 8. Falta una tarifa: reparto a partes iguales por PETICIONES; la suma sigue siendo el total
   insert into public.openai_uso_diario (fecha, project_id, api_key_id, modelo, input_tokens, peticiones)
-    values (v_ayer, 'proj_casa', 'key_web', 'zz-modelo-sin-tarifa', 1000, 60);
+    values (v_ayer, 'proj_casa', 'key_web', 'zz-modelo-sin-tarifa', 1000, 60), (v_anteayer, 'proj_casa', 'key_web', 'zz-modelo-sin-tarifa', 1000, 60);
   -- peticiones: ocr 10 · chat 20 · chatweb 30+60 = 90 · vinos 5 · otros 5 + 0 = 5 (total 130)
   select coalesce(sum(usd_real), 0) into v_suma
     from public.gasto_ia_real_resumen(30) where proceso in ('ocr', 'chat', 'chatweb', 'vinos', 'otros');
