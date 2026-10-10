@@ -225,3 +225,24 @@ export function estadoMesasHoy(
   }
   return estado;
 }
+
+// ─── Panel del Plano de Hoy: «Reservas en <sala>» ────────────────────────────
+
+/** Ya no esperan a nadie: sentadas, liberadas o «No vino» (van al final y atenuadas). */
+export function yaAtendida(r: { estado: string; salida_at?: string | null }): boolean {
+  return estaTerminada(r.estado) || !!r.salida_at;
+}
+
+/**
+ * Las reservas de una sala que YA tienen mesa (sin canceladas), por hora; las ya atendidas al final.
+ * El turno y el buscador se aplican antes, en la lista que se pasa.
+ */
+export function reservasConMesaEnSala<R extends { id: string; hora: string; estado: string; espacio_id: string | null; salida_at?: string | null }>(
+  reservas: readonly R[],
+  salaId: string,
+  tieneMesa: (reservaId: string) => boolean,
+): R[] {
+  return reservas
+    .filter((r) => r.espacio_id === salaId && r.estado !== "cancelada" && tieneMesa(r.id))
+    .sort((a, b) => Number(yaAtendida(a)) - Number(yaAtendida(b)) || a.hora.localeCompare(b.hora) || a.id.localeCompare(b.id));
+}

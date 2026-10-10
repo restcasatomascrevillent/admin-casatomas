@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { agruparHoyMovil, estadoMesasHoy, lleganAhora, mesasQueCaben, textoMesas, type ReservaHoyMovil } from "../hoyMovil";
+import {
+  agruparHoyMovil,
+  estadoMesasHoy,
+  lleganAhora,
+  mesasQueCaben,
+  reservasConMesaEnSala,
+  textoMesas,
+  type ReservaHoyMovil,
+} from "../hoyMovil";
 
 const r = (id: string, hora: string, estado: string, espacio: string | null, pax = 2, nombre = id): ReservaHoyMovil => ({
   id,
@@ -131,5 +139,22 @@ describe("estadoMesasHoy", () => {
     expect(e.get("3")).toBeUndefined();
     expect(e.get("4")).toBeUndefined();
     expect(e.get("5")).toBeUndefined();
+  });
+});
+
+describe("reservasConMesaEnSala (panel del Plano de Hoy)", () => {
+  it("solo las de la sala con mesa, por hora; sentadas, liberadas y «No vino» al final", () => {
+    const lista = [
+      { ...r("b", "21:00:00", "confirmada", "c"), salida_at: null },
+      { ...r("a", "20:30:00", "completada", "c"), salida_at: null },
+      { ...r("c", "20:00:00", "confirmada", "c"), salida_at: null },
+      { ...r("d", "19:00:00", "no_show", "c"), salida_at: null },
+      { ...r("e", "19:30:00", "confirmada", "c"), salida_at: "2026-10-10T18:00:00Z" },
+      { ...r("f", "20:00:00", "confirmada", "c"), salida_at: null },
+      { ...r("g", "20:00:00", "confirmada", "s"), salida_at: null },
+      { ...r("h", "20:00:00", "cancelada", "c"), salida_at: null },
+    ];
+    const conMesa = new Set(["a", "b", "c", "d", "e", "g", "h"]);
+    expect(reservasConMesaEnSala(lista, "c", (id) => conMesa.has(id)).map((x) => x.id)).toEqual(["c", "b", "d", "e", "a"]);
   });
 });

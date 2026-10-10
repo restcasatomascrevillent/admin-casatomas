@@ -361,7 +361,15 @@ describe("Plano de Hoy · las reservas por sentar", () => {
       "Diana Cena",
     ]);
     expect(within(sinMesa).getAllByText("Sin mesa")).toHaveLength(2);
+    // «Reservas en Comedor» (10/10/2026): las que ya tienen mesa, por hora; las sentadas al final.
+    const enSala = screen.getByRole("region", { name: "Reservas en Comedor" });
+    expect(
+      within(enSala).getAllByRole("button", { name: /^[A-ZÁÉÍÓÚ][a-záéíóú]+ [A-Z][a-z]+,/ }).map((b) => b.getAttribute("aria-label")?.split(",")[0]),
+    ).toEqual(["Raúl Retrasado", "Rosa Reservada", "Pablo Porliberar", "Olga Ocupada"]);
+    // «Sin sala», plegado porque la sala tiene reservas; se abre con su cabecera.
     const sinSala = screen.getByRole("region", { name: "Sin sala" });
+    expect(within(sinSala).queryByRole("button", { name: /^Carlos Sinsala,/ })).toBeNull();
+    fireEvent.click(within(sinSala).getByRole("button", { name: /Sin sala/ }));
     expect(within(sinSala).getByRole("button", { name: /^Carlos Sinsala,/ })).toBeInTheDocument();
   });
 

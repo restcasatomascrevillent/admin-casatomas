@@ -38,7 +38,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { decidirSoltar } from "@/lib/reservas/sentarAhora";
+import { reservasConMesaEnSala, yaAtendida } from "@/lib/reservas/hoyMovil";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -271,6 +272,18 @@ export function VistaPlanoHoy({
   const pendientesSala = useMemo(
     () => (sala ? visibles.filter((r) => columnaDeReserva(r, columnas) === sala.id && estaSinMesa(r)).sort(porHora) : []),
     [sala, visibles, columnas, estaSinMesa],
+  );
+  /** «Reservas en <sala>»: las que ya tienen mesa (turno y buscador aplicados), las atendidas al final. */
+  const conMesaSala = useMemo(
+    () =>
+      sala
+        ? reservasConMesaEnSala(
+            visibles.filter((r) => turnoDeHora(r.hora) === turno || filtroTurno === "todo"),
+            sala.id,
+            (id) => mesasPorReserva.has(id),
+          )
+        : [],
+    [sala, visibles, turno, filtroTurno, mesasPorReserva],
   );
   const sinSala = useMemo(
     () =>
@@ -508,7 +521,17 @@ export function VistaPlanoHoy({
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [objetivo, mesas, asignacionesDeHoy, estadoPiezas, reservasEnMesas],
   );
-  const coincidentesMapa = mesasValidas ?? coincidentes;
+  /** Tocar una tarjeta del panel resalta su mesa en el plano. */
+  const [reservaResaltada, setReservaResaltada] = useState<string | null>(null);
+  useEffect(() => setReservaResaltada(null), [sala?.id]);
+  const mesasResaltadas = useMemo(
+    () =>
+      reservaResaltada
+        ? new Set(asignacionesSala.filter((a) => a.reserva_id === reservaResaltada).map((a) => a.mesa_id))
+        : null,
+    [reservaResaltada, asignacionesSala],
+  );
+  const coincidentesMapa = mesasValidas ?? (mesasResaltadas?.size ? mesasResaltadas : coincidentes);
   const alEmpezarArrastre = (e: DragStartEvent) => {
     setArrastrando((e.active.data.current as ReservaServicio | undefined) ?? null);
     setEligiendoPara(null);
@@ -617,6 +640,14 @@ export function VistaPlanoHoy({
             }
       }
       textoDarMesa="Elegir mesa en el plano"
+      textoCambiarMesa={proponiendo ? undefined : "Cambiar mesa (elegir en el plano)"}
+      accionesExtra={
+        haLlegado(r.estado) && mesasPorReserva.has(r.id) && puedeEditar
+          ? (r as ReservaMesaServicio).salida_at
+            ? [{ texto: "Deshacer liberar", onSelect: () => void servicio.deshacerLiberarMesa(r) }]
+            : [{ texto: "Liberar mesa", onSelect: () => void servicio.liberarMesa(r) }]
+          : undefined
+      }
       sinMesa={estaSinMesa(r) || (listo && ocupaEspacio(r.estado) && !mesasPorReserva.has(r.id))}
       mesas={mesasPorReserva.get(r.id)}
       puedeEditar={puedeEditar}
@@ -642,35 +673,57 @@ export function VistaPlanoHoy({
   );
   const leyenda = leyendaEn(false);
 
+  const filas = (reservasGrupo: ReservaServicio[]) => (
+    <ul className="space-y-1">
+      {reservasGrupo.map((r) => (
+        <li
+          key={r.id}
+          className={cn("min-w-0", yaAtendida(r) && "opacity-60")}
+          // Tocarla resalta su mesa en el plano (y la tarjeta abre sus acciones, como siempre).
+          onClickCapture={() => setReservaResaltada(mesasPorReserva.has(r.id) ? r.id : null)}
+        >
+          {tarjeta(r)}
+        </li>
+      ))}
+    </ul>
+  );
+  const cabeceraGrupo = (titulo: string, n: number) => (
+    <span className="flex items-center gap-2 text-[13px] font-semibold text-muted-foreground">
+      {titulo}
+      <Badge variant="outline" className="h-5 px-1.5 text-xs tabular-nums">
+        {n}
+      </Badge>
+    </span>
+  );
   const grupo = (titulo: string, reservasGrupo: ReservaServicio[], vacio: string) => (
-    <section aria-label={titulo} className="space-y-2">
-      <h4 className="flex items-center gap-2 text-[13px] font-semibold text-muted-foreground">
-        {titulo}
-        <Badge variant="outline" className="h-5 px-1.5 text-xs tabular-nums">
-          {reservasGrupo.length}
-        </Badge>
-      </h4>
-      {reservasGrupo.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">{vacio}</p>
-      ) : (
-        <ul className="space-y-1">
-          {reservasGrupo.map((r) => (
-            <li key={r.id} className="min-w-0">
-              {tarjeta(r)}
-            </li>
-          ))}
-        </ul>
-      )}
+    <section aria-label={titulo} className="space-y-1.5">
+      <h4>{cabeceraGrupo(titulo, reservasGrupo.length)}</h4>
+      {reservasGrupo.length === 0 ? <p className="text-[13px] text-muted-foreground">{vacio}</p> : filas(reservasGrupo)}
     </section>
   );
+  // «Sin sala» plegado si la sala ya tiene reservas: que no tape la lista de la sala.
+  const [sinSalaAbierto, setSinSalaAbierto] = useState<boolean | null>(null);
+  useEffect(() => setSinSalaAbierto(null), [sala?.id]);
+  const salaConReservas = pendientesSala.length + conMesaSala.length > 0;
+  const verSinSala = sinSalaAbierto ?? !salaConReservas;
 
   const panelPendientes = sala && !listo ? (errorDatos ? avisoError : esqueletoLista) : sala && (
-    <div className="space-y-4 p-3">
+    <div className="space-y-3 p-3">
       {grupo(`Sin mesa en ${sala.title}`, pendientesSala, `Todas las reservas de ${sala.title} tienen mesa.`)}
-      {grupo("Sin sala", sinSala, "No hay reservas sin sala.")}
-      <p className="text-[13px] text-muted-foreground">
-        Toca una tarjeta para sus acciones: «Dar mesa» abre el plano para elegirla y «Mover a…» la pasa a otra sala.
-      </p>
+      {grupo(`Reservas en ${sala.title}`, conMesaSala, `Ninguna reserva de ${sala.title} tiene mesa todavía.`)}
+      <section aria-label="Sin sala" className="space-y-1.5">
+        <button
+          type="button"
+          className="flex min-h-11 w-full items-center justify-between rounded-md text-left"
+          aria-expanded={verSinSala}
+          onClick={() => setSinSalaAbierto(!verSinSala)}
+        >
+          {cabeceraGrupo("Sin sala", sinSala.length)}
+          <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", verSinSala && "rotate-180")} aria-hidden="true" />
+        </button>
+        {verSinSala &&
+          (sinSala.length === 0 ? <p className="text-[13px] text-muted-foreground">No hay reservas sin sala.</p> : filas(sinSala))}
+      </section>
     </div>
   );
 

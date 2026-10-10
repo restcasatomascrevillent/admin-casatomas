@@ -76,6 +76,8 @@ export function ReservaCard({
   telefonoEnlace,
   compacta = false,
   textoDarMesa = "Dar mesa",
+  textoCambiarMesa,
+  accionesExtra,
   anchoColumna,
 }: {
   reserva: ReservaServicio;
@@ -122,6 +124,10 @@ export function ReservaCard({
   compacta?: boolean;
   /** Texto del «Dar mesa» del menú (en el Plano de Hoy: «Elegir mesa en el plano»). */
   textoDarMesa?: string;
+  /** Con mesa: ofrecer también «Cambiar mesa» (usa `onDarMesa`). */
+  textoCambiarMesa?: string;
+  /** Acciones de más al principio del menú (p. ej. «Liberar mesa» en el Plano de Hoy). */
+  accionesExtra?: ReadonlyArray<{ texto: string; onSelect: () => void }>;
   /**
    * Ancho de la columna en la que vive la tarjeta. Decide si la botonera lleva
    * texto o solo iconos. Va por ancho de COLUMNA y no de ventana a propósito:
@@ -241,15 +247,20 @@ export function ReservaCard({
           {/* «Dar mesa» (04/10/2026): abre el plano de SU sala con la reserva señalada, el mismo
               diálogo que sale tras moverla. Como «Dar mesa» de la Lista, no mira el permiso: el
               plano ya lo comprueba al guardar. */}
-          {sinMesa && onDarMesa && (
+          {onDarMesa && (sinMesa || textoCambiarMesa) && (
             <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => onDarMesa(reserva)}>
                 <CircleDashed className="h-3.5 w-3.5 mr-2" />
-                {textoDarMesa}
+                {sinMesa ? textoDarMesa : textoCambiarMesa}
               </DropdownMenuItem>
             </>
           )}
+          {accionesExtra?.map((a) => (
+            <DropdownMenuItem key={a.texto} onSelect={a.onSelect}>
+              {a.texto}
+            </DropdownMenuItem>
+          ))}
           {reserva.telefono && (
             <>
               <DropdownMenuSeparator />
