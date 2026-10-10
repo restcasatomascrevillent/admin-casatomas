@@ -32,7 +32,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
     seccion: "facturas",
     titulo: "Facturas",
     ruta: "/facturas?tab=compras",
-    videoUrl: "/ayuda/videos/facturas.webm",
+    videoUrl: "/ayuda/videos/facturas.mp4",
     queEs:
       "Aquí se guardan las facturas y albaranes de los proveedores. Les haces una foto, la aplicación los lee sola y luego puedes buscar qué compraste, a quién, cuándo y a qué precio, o preguntárselo a la IA.",
     pasos: [
@@ -85,7 +85,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
     seccion: "gestor-web",
     titulo: "Gestor Web",
     ruta: "/gestion-web",
-    videoUrl: "/ayuda/videos/gestor-web.webm",
+    videoUrl: "/ayuda/videos/gestor-web.mp4",
     queEs:
       "Desde aquí cambias lo que ven los clientes en las webs de Casa Tomás y Touza: la carta (platos, bebidas, vinos y cócteles), las novedades, el menú del día y las tapas.",
     pasos: [
