@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollText, Loader2 } from "lucide-react";
+import { ScrollText, Loader2, SlidersHorizontal, ChevronDown } from "lucide-react";
 import {
   useAuditLog,
   agruparEntradas,
@@ -31,6 +31,8 @@ const FILTROS_VACIOS: AuditLogFiltros = {};
 export default function SuperAdminAuditoria() {
   const [filtrosPendientes, setFiltrosPendientes] = useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [filtros, setFiltros] = useState<AuditLogFiltros>(FILTROS_VACIOS);
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
+  const filtrosActivos = Object.values(filtros).filter((valor) => Boolean(valor?.trim())).length;
   const [pagina, setPagina] = useState(0);
   // Compartido por las tres pestañas: la clave es siempre el ID de una fila de `audit_log`,
   // así que no hay colisión entre lo que despliega "Lista" y lo que despliega "Por mes"/"Por día".
@@ -56,6 +58,7 @@ export default function SuperAdminAuditoria() {
 
   const aplicarFiltros = () => {
     setFiltros(filtrosPendientes);
+    setFiltrosAbiertos(false);
     setPagina(0);
   };
 
@@ -69,12 +72,12 @@ export default function SuperAdminAuditoria() {
 
   return (
     <SuperAdminLayout>
-      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
+      <div ref={setRaiz} className="flex min-w-0 flex-col gap-3 sm:gap-6" style={alto ? { height: alto } : undefined}>
         <div className="flex shrink-0 items-center gap-3">
-          <ScrollText className="h-8 w-8 text-destructive" />
+          <ScrollText className="h-6 w-6 shrink-0 text-destructive sm:h-8 sm:w-8" />
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Auditoría</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">Auditoría</h1>
+            <p className="hidden text-muted-foreground sm:block">
               Accesos, intentos y acciones de todas las personas y dispositivos.
             </p>
           </div>
@@ -84,12 +87,41 @@ export default function SuperAdminAuditoria() {
           Pendiente de activar el registro completo de accesos en el servidor. Todavía no se recogen todos los intentos ni las sesiones restauradas.
         </p>}
         <Card className="shrink-0">
-          <CardHeader>
+          <div className="flex items-center gap-2 p-2 sm:hidden">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 min-w-0 flex-1 justify-between px-3"
+              aria-expanded={filtrosAbiertos}
+              aria-controls="auditoria-filtros"
+              onClick={() => setFiltrosAbiertos((abiertos) => !abiertos)}
+            >
+              <span className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+                Filtros
+                {filtrosActivos > 0 && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                    {filtrosActivos} activo{filtrosActivos === 1 ? "" : "s"}
+                  </span>
+                )}
+              </span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${filtrosAbiertos ? "rotate-180" : ""}`} aria-hidden="true" />
+            </Button>
+            {filtrosActivos > 0 && (
+              <Button type="button" variant="ghost" className="h-11 px-3" onClick={limpiarFiltros}>
+                Limpiar
+              </Button>
+            )}
+          </div>
+          <CardHeader className="hidden sm:flex">
             <CardTitle>Filtros</CardTitle>
             <CardDescription>Combínalos como haga falta; se aplican todos a la vez, en las tres pestañas de abajo.</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="space-y-2">
+          <CardContent
+            id="auditoria-filtros"
+            className={`${filtrosAbiertos ? "grid" : "hidden"} max-h-[45dvh] grid-cols-2 gap-3 overflow-y-auto overscroll-contain px-3 pb-3 sm:grid sm:max-h-none sm:gap-4 sm:overflow-visible sm:px-6 sm:pb-6 lg:grid-cols-6`}
+          >
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="auditoria-actor">Quién actuó / origen</Label>
               <Input
                 id="auditoria-actor"
@@ -99,13 +131,13 @@ export default function SuperAdminAuditoria() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="auditoria-dispositivo">Dispositivo</Label>
               <Input id="auditoria-dispositivo" placeholder="ID del dispositivo"
                 value={filtrosPendientes.dispositivo ?? ""}
                 onChange={(e) => setFiltrosPendientes(prev => ({ ...prev, dispositivo: e.target.value }))} />
             </div>
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Acción</Label>
               <Select
                 value={filtrosPendientes.accion ?? "todas"}
@@ -125,7 +157,7 @@ export default function SuperAdminAuditoria() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label>Tabla</Label>
               <Select
                 value={filtrosPendientes.tabla ?? "todas"}
@@ -145,7 +177,7 @@ export default function SuperAdminAuditoria() {
               </Select>
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="auditoria-desde">Desde</Label>
               <Input
                 id="auditoria-desde"
@@ -155,7 +187,7 @@ export default function SuperAdminAuditoria() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <Label htmlFor="auditoria-hasta">Hasta</Label>
               <Input
                 id="auditoria-hasta"
@@ -165,7 +197,7 @@ export default function SuperAdminAuditoria() {
               />
             </div>
 
-            <div className="sm:col-span-2 lg:col-span-5 flex gap-2">
+            <div className="col-span-2 flex flex-wrap gap-2 lg:col-span-6">
               <Button onClick={aplicarFiltros}>Aplicar filtros</Button>
               <Button variant="outline" onClick={limpiarFiltros}>
                 Limpiar
@@ -174,18 +206,17 @@ export default function SuperAdminAuditoria() {
           </CardContent>
         </Card>
 
-        {/* Nunca por debajo de 12rem: en un móvil, con los filtros apilados,
-            antes que una tabla de 0 px vuelve el scroll de página. */}
-        <Card className="flex min-h-48 flex-1 flex-col">
+        {/* Conserva espacio para los registros incluso al desplegar los filtros. */}
+        <Card className="flex min-h-48 min-w-0 flex-1 flex-col">
           <Tabs defaultValue="lista" className="flex min-h-0 flex-1 flex-col">
-            <CardHeader className="shrink-0 gap-3">
-              <TabsList className="self-start">
+            <CardHeader className="shrink-0 gap-3 p-3 sm:p-6">
+              <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:self-start">
                 <TabsTrigger value="lista">Lista</TabsTrigger>
                 <TabsTrigger value="mes">Por mes</TabsTrigger>
                 <TabsTrigger value="dia">Por día</TabsTrigger>
               </TabsList>
             </CardHeader>
-            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 sm:px-6 sm:pb-6">
               <TabsContent value="lista" className="mt-0">
                 <div className="mb-3 flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
@@ -204,7 +235,7 @@ export default function SuperAdminAuditoria() {
                 ) : (
                   <>
                     <TablaEntradasAuditoria grupos={grupos} expandidas={expandidas} onToggle={alternarExpandida} />
-                    <div className="flex items-center justify-between pt-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
                       <p className="text-sm text-muted-foreground">
                         Página {pagina + 1} de {totalPaginas}
                       </p>
