@@ -20,6 +20,8 @@ export interface AuditLogEntry {
   ip_address?: string | null;
   request_id?: string | null;
   session_id?: string | null;
+  tipo_evento?: string;
+  resultado?: string;
 }
 
 export interface AuditLogFiltros {
@@ -29,6 +31,8 @@ export interface AuditLogFiltros {
   tabla?: string;
   desde?: string;
   hasta?: string;
+  texto?: string;
+  resultado?: string;
 }
 
 const PAGE_SIZE = 25;
@@ -66,13 +70,18 @@ export function useAuditLog(filtros: AuditLogFiltros, pagina: number) {
 
     const desde = pagina * PAGE_SIZE;
     const consultar = (columnaActor: "actor_label" | "actor_email") => {
-      let query = supabase.from("audit_log").select("*", { count: "exact" });
+      let query = supabase.from("audit_log_visible" as "audit_log").select("*", { count: "exact" });
       if (filtros.actor?.trim()) {
         const actor = filtros.actor.trim();
         query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor) ? query.eq("actor_user_id", actor) : query.ilike(columnaActor, `%${actor}%`);
       }
       if (filtros.dispositivo?.trim()) query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
-      if (filtros.accion) query = query.eq("accion", filtros.accion);
+      if (filtros.accion) {
+        const columna = ["login", "logout", "crear", "actualizar", "eliminar", "ejecutar", "intento_login", "login_fallido", "acceso", "acceso_denegado"].includes(filtros.accion) ? "accion" : "tipo_evento";
+        query = query.eq(columna, filtros.accion);
+      } else query = query.eq("visible_por_defecto", true);
+      if (filtros.texto?.trim()) query = query.ilike("texto_busqueda", `%${filtros.texto.trim()}%`);
+      if (filtros.resultado) query = query.eq("resultado", filtros.resultado);
       if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
       if (filtros.desde) query = query.gte("created_at", new Date(`${filtros.desde}T00:00:00`).toISOString());
       if (filtros.hasta) {
@@ -104,14 +113,15 @@ export function useAuditLog(filtros: AuditLogFiltros, pagina: number) {
     } finally {
       if (miConsulta === secuencia.current) setLoading(false);
     }
-  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, pagina]);
+  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, filtros.texto, filtros.resultado, pagina]);
 
   useEffect(() => {
     void fetchEntradas();
     const refresh = () => { if (document.visibilityState === "visible") void fetchEntradas(true); };
+    window.addEventListener("auditoria-actualizada", refresh);
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener("focus", refresh);
-    return () => { ++secuencia.current; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+    return () => { ++secuencia.current; window.clearInterval(timer); window.removeEventListener("focus", refresh); window.removeEventListener("auditoria-actualizada", refresh); };
   }, [fetchEntradas]);
 
   return { entradas, total, tablas, accesosActivos, pageSize: PAGE_SIZE, loading, error, refetch: fetchEntradas };
@@ -168,13 +178,18 @@ export function useAuditLogAgrupado(filtros: AuditLogFiltros, rangoMeses: RangoM
     }
 
     const consultar = (columnaActor: "actor_label" | "actor_email") => {
-      let query = supabase.from("audit_log").select("*");
+      let query = supabase.from("audit_log_visible" as "audit_log").select("*");
       if (filtros.actor?.trim()) {
         const actor = filtros.actor.trim();
         query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor) ? query.eq("actor_user_id", actor) : query.ilike(columnaActor, `%${actor}%`);
       }
       if (filtros.dispositivo?.trim()) query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
-      if (filtros.accion) query = query.eq("accion", filtros.accion);
+      if (filtros.accion) {
+        const columna = ["login", "logout", "crear", "actualizar", "eliminar", "ejecutar", "intento_login", "login_fallido", "acceso", "acceso_denegado"].includes(filtros.accion) ? "accion" : "tipo_evento";
+        query = query.eq(columna, filtros.accion);
+      } else query = query.eq("visible_por_defecto", true);
+      if (filtros.texto?.trim()) query = query.ilike("texto_busqueda", `%${filtros.texto.trim()}%`);
+      if (filtros.resultado) query = query.eq("resultado", filtros.resultado);
       if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
       query = query.gte("created_at", desdeFecha.toISOString()).lt("created_at", hastaFecha.toISOString());
       // +1 para saber si hay más filas que el tope sin pedir un `count` aparte (más caro).
@@ -203,11 +218,13 @@ export function useAuditLogAgrupado(filtros: AuditLogFiltros, rangoMeses: RangoM
     } finally {
       if (miConsulta === secuencia.current) setLoading(false);
     }
-  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, rangoMeses]);
+  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, filtros.texto, filtros.resultado, rangoMeses]);
 
   useEffect(() => {
     void fetchEntradas();
-    return () => { ++secuencia.current; };
+    const refresh = () => void fetchEntradas();
+    window.addEventListener("auditoria-actualizada", refresh);
+    return () => { ++secuencia.current; window.removeEventListener("auditoria-actualizada", refresh); };
   }, [fetchEntradas]);
 
   return { entradas, loading, error, truncado, refetch: () => void fetchEntradas() };
@@ -339,6 +356,7 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
       anterior.actor_origin === entrada.actor_origin &&
       anterior.accion === entrada.accion &&
       anterior.tabla === entrada.tabla &&
+      anterior.entradas[0].registro_id === entrada.registro_id &&
       anterior.created_at === entrada.created_at;
 
     if (mismoBloque) {
@@ -462,3 +480,4 @@ export function agruparPorMes(entradas: AuditLogEntry[]): AuditLogGrupoMes[] {
     };
   });
 }
+

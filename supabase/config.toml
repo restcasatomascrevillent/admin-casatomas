@@ -239,3 +239,7 @@ verify_jwt = false
 # y la migración 20261008150000_openai_costes_reales.sql.
 [functions.sincronizar-costes-openai]
 verify_jwt = false
+
+
+[functions.auditoria-revertir]
+verify_jwt = true

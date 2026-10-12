@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { clienteConAuditoria, conAuditoriaDePeticion } from "../../../supabase/functions/_shared/audit-client";
+import { clienteConAuditoria, conAuditoriaDePeticion, registrarHerramientaChat } from "../../../supabase/functions/_shared/audit-client";
 
 function doble() {
   const requests: Headers[] = [];
@@ -172,4 +172,18 @@ it('la función conserva navegador y dispositivo del iniciador sin aceptar un ac
   expect(d.requests[0].get('x-audit-user-agent')).toBe('iPhone Safari');
   expect(d.requests[0].get('x-audit-device-id')).toBe('phone-1');
   expect(d.requests[0].get('x-audit-actor-id')).toBe('verified');
+});
+
+
+
+it("el chat registra la pregunta, respuesta, regeneración y consultas con el autor verificado", async () => {
+  const d=doble();
+  const handler=conAuditoriaDePeticion("chat-facturas",d.factory,async req=>{
+    expect((await req.json()).mensaje).toBe("¿Qué proveedor subió precios?");
+    registrarHerramientaChat({nombre:"ranking",argumentos:{periodo:"octubre"},resultado:"completada",duracion_ms:12});
+    return new Response(JSON.stringify({success:true,respuesta:"Proveedor A",adjuntos:[{tipo:"serie_precio"}]}),{headers:{"Content-Type":"application/json"}});
+  },async()=>({id:"verified-user"}));
+  const result=await handler(new Request("https://edge.test/chat-facturas",{method:"POST",headers:{Authorization:"Bearer token"},body:JSON.stringify({mensaje:"¿Qué proveedor subió precios?",session_id:"conversation",tipo_interaccion:"regeneracion",actor_id:"fake"})}));
+  expect(result.status).toBe(200);
+  expect(d.rpc).toHaveBeenCalledWith("registrar_accion_auditoria_panel",expect.objectContaining({p_operacion:"chat-facturas",p_detalles:expect.objectContaining({tipo_evento:"regeneracion_ia",pregunta:"¿Qué proveedor subió precios?",respuesta:"Proveedor A",conversacion_id:"conversation",herramientas:[{nombre:"ranking",argumentos:{periodo:"octubre"},resultado:"completada",duracion_ms:12}],adjuntos:["serie_precio"]})}));
 });
