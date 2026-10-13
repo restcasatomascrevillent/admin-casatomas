@@ -30,16 +30,16 @@ export default function SuperAdminUsuarios() {
 
   return (
     <SuperAdminLayout>
-      <div ref={setRaiz} className="flex flex-col gap-6" style={alto ? { height: alto } : undefined}>
+      <div ref={setRaiz} className="flex min-w-0 flex-col gap-3 sm:gap-6" style={alto ? { height: alto } : undefined}>
         <div className="flex justify-end">
           <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
             <DialogTrigger asChild>
-              <Button className="flex h-11 items-center gap-2 px-5">
+              <Button className="flex h-11 w-full items-center justify-center gap-2 px-5 sm:w-auto">
                 <UserPlus className="h-4 w-4" />
                 Añadir Usuario
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[85dvh] overflow-y-auto">
+            <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[85dvh] overflow-y-auto p-4 sm:p-6">
               <DialogHeader>
                 <DialogTitle>Añadir Nuevo Usuario</DialogTitle>
                 <DialogDescription>
@@ -51,14 +51,14 @@ export default function SuperAdminUsuarios() {
           </Dialog>
         </div>
 
-        <Card className="flex min-h-0 flex-1 flex-col">
-          <CardHeader>
+        <Card className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <CardHeader className="shrink-0 p-4 sm:p-6">
             <CardTitle>Lista de Usuarios</CardTitle>
             <CardDescription>
               Gestiona permisos, contraseñas y el acceso de los usuarios del sistema
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col">
+          <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
             <ListaUsuarios canManageSuperAdmins />
           </CardContent>
         </Card>

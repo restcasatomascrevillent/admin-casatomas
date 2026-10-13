@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/table";
 import {
   Loader2,
+  ChevronDown,
   Settings,
   Shield,
   ShieldAlert,
@@ -361,283 +362,304 @@ export function ListaUsuarios({
     };
   });
 
-  if (isMobile && !canManageSuperAdmins) {
-    return <TarjetasUsuarios usuarios={usuariosConAccesos} />;
-  }
+  const opcionesUsuario = (user: ManagedUser) => (
+    <>
+      {canManageUsers && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-11 px-4"
+          disabled={user.id === currentUser?.id}
+          title={
+            user.id === currentUser?.id
+              ? "No puedes quitarte a ti mismo el acceso de super admin"
+              : undefined
+          }
+          onClick={() => handleToggleSuperAdmin(user)}
+        >
+          <ShieldAlert className="h-4 w-4 mr-1" />
+          {user.is_super_admin
+            ? "Quitar Super Admin"
+            : "Hacer Super Admin"}
+        </Button>
+      )}
+      {canManageUsers && user.id === currentUser?.id && (
+        <p className={isMobile ? "text-left text-xs text-muted-foreground" : "basis-full text-right text-xs text-muted-foreground"}>
+          No puedes quitarte a ti mismo el acceso de super admin.
+        </p>
+      )}
+      {canManageUsers && !user.is_super_admin && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className={isMobile ? "h-11 w-full gap-2 px-3 text-destructive hover:text-destructive" : "h-11 w-11 px-0 text-destructive hover:text-destructive"}
+          disabled={user.id === currentUser?.id}
+          title={
+            user.id === currentUser?.id
+              ? "No puedes eliminar tu propio usuario"
+              : undefined
+          }
+          aria-label={`Eliminar a ${getUserDisplayName(user)}`}
+          onClick={() => handleDeleteUser(user.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+          {isMobile && <span>Eliminar usuario</span>}
+        </Button>
+      )}
+    </>
+  );
+
+  const accionesUsuario = (user: ManagedUser) => (
+    <div className={isMobile ? "grid grid-cols-2 gap-2" : "flex flex-wrap justify-end gap-2"}>
+      {(!canManageUsers || user.is_super_admin) && (
+        <VisorPermisosUsuario
+          user={user}
+          nombre={getUserDisplayName(user)}
+          className={isMobile ? "order-1 col-span-2 w-full" : undefined}
+        />
+      )}
+      {canManageUsers && !user.is_super_admin && (
+        <Dialog
+          open={selectedUser?.id === user.id}
+          onOpenChange={(open) => {
+            if (!open) closePermissionsDialog();
+          }}
+        >
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              className={isMobile ? "order-1 h-11 w-full min-w-0 gap-1.5 px-2 text-[13px] pointer-coarse:px-2 [&_svg]:mr-0" : "h-11 px-4"}
+              onClick={() => openPermissionsDialog(user)}
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              Permisos
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
+            <DialogHeader className="pr-10 text-left">
+              <DialogTitle className="flex min-w-0 items-start gap-2 text-base leading-snug sm:text-lg">
+                <Shield className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">Permisos de {getUserDisplayName(selectedUser)}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Elige qué secciones ve este usuario y en cuáles
+                puede editar
+              </DialogDescription>
+            </DialogHeader>
+            <fieldset disabled={savingPermissions} className="min-w-0 space-y-4 py-2 sm:py-4">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label className="text-sm font-medium">
+                    Rol preconfigurado
+                  </Label>
+                  <ConfigurarRolesModal
+                    currentPermissions={editingPermissions}
+                    presets={presets}
+                    presetsLoading={presetsLoading}
+                    onCreatePreset={createPreset}
+                    onUpdatePreset={handleUpdatePresetOnly}
+                    onDeletePreset={handleDeletePresetOnly}
+                    puedeConcederEdicion={isSuperAdmin}
+                  />
+                </div>
+                <Select
+                  value={selectedPresetId}
+                  onValueChange={handlePresetChange}
+                  disabled={presetsLoading || !isSuperAdmin}
+                >
+                  <SelectTrigger className="h-11 w-full sm:w-[360px]">
+                    <SelectValue
+                      placeholder={
+                        presetsLoading
+                          ? "Cargando roles..."
+                          : "Sin rol preconfigurado"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">
+                      Sin rol preconfigurado
+                    </SelectItem>
+                    {presets.map((preset) => (
+                      <SelectItem
+                        key={preset.id}
+                        value={preset.id}
+                      >
+                        {preset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="max-h-[52dvh] overflow-y-auto pr-1">
+                <TablaPermisosSecciones
+                  permisos={editingPermissions}
+                  onCambiarVer={handleVerChange}
+                  onCambiarEditar={handleEditarChange}
+                  puedeConcederEdicion={isSuperAdmin}
+                  soloLectura={!isSuperAdmin}
+                />
+              </div>
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                <Button
+                  variant="outline"
+                  className="h-11 px-5"
+                  onClick={closePermissionsDialog}
+                >
+                  Cancelar
+                </Button>
+                {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón.
+                      (El motivo también está escrito arriba, en la tabla: con el dedo no hay hover.) */}
+                <ConMotivo
+                  motivo={
+                    isSuperAdmin
+                      ? undefined
+                      : SOLO_SUPER_ADMIN_CAMBIA_PERMISOS
+                  }
+                >
+                  <Button
+                    onClick={savePermissions}
+                    disabled={!isSuperAdmin || savingPermissions}
+                    className="h-11 w-full px-5 sm:w-auto"
+                  >
+                    {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                    {savingPermissions ? "Guardando..." : "Guardar Permisos"}
+                  </Button>
+                </ConMotivo>
+              </div>
+            </fieldset>
+          </DialogContent>
+        </Dialog>
+      )}
+      {canManageUsers && (
+        <Button
+          variant="outline"
+          size="sm"
+          className={isMobile ? "order-3 col-span-2 h-11 w-full px-3" : "h-11 px-4"}
+          disabled={
+            updatingAccess ||
+            user.id === currentUser?.id ||
+            typeof user.access_blocked !== "boolean" ||
+            (user.is_super_admin && !user.access_blocked)
+          }
+          title={
+            typeof user.access_blocked !== "boolean"
+              ? "Bloqueo de acceso pendiente de activar"
+              : user.id === currentUser?.id
+                ? "No puedes bloquear tu propia cuenta"
+                : user.is_super_admin && !user.access_blocked
+                  ? "Quita primero el acceso de super admin"
+                  : undefined
+          }
+          onClick={() => setAccessTarget(user)}
+        >
+          {user.access_blocked ? (
+            <UnlockKeyhole className="h-4 w-4 mr-1" />
+          ) : (
+            <LockKeyhole className="h-4 w-4 mr-1" />
+          )}
+          {user.access_blocked
+            ? "Desbloquear acceso"
+            : "Bloquear acceso"}
+        </Button>
+      )}
+      {canManageUsers && (
+        <Button
+          variant="outline"
+          size="sm"
+          className={isMobile ? "order-2 h-11 w-full min-w-0 gap-1.5 px-2 text-[13px] pointer-coarse:px-2 [&_svg]:mr-0 " + (user.is_super_admin ? "col-span-2" : "") : "h-11 px-4"}
+          disabled={user.id === currentUser?.id}
+          onClick={() => openPasswordDialog(user)}
+        >
+          <Key className="h-4 w-4 mr-1" />
+          Contraseña
+        </Button>
+      )}
+      {isMobile && canManageUsers ? (
+        <details className="group order-4 col-span-2 rounded-lg border bg-muted/20">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+            Más opciones
+            <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="grid gap-2 px-2 pb-2 [&>button]:w-full [&>button]:px-2">
+            {opcionesUsuario(user)}
+          </div>
+        </details>
+      ) : (
+        opcionesUsuario(user)
+      )}
+    </div>
+  );
 
   return (
-    // Con alto medido (Usuarios / SuperAdminUsuarios) la lista llena lo que queda de la tarjeta y
-    // solo hace scroll el cuerpo de la tabla. El contenedor de scroll es el `div` que el primitivo
-    // `Table` pone alrededor de la tabla; su alto se fija desde aquí con `[&>div]:…` (como en
-    // ListaReservasAvanzada) para no tocar `ui/table.tsx`, que es compartido. Los diálogos van en
-    // portal, así que ese `div` es el único hijo `div`. La cabecera se pega arriba (`sticky top-0`)
-    // con el fondo de la tarjeta para tapar las filas; la sombra de 1 px hace de línea inferior
-    // cuando está pegada (con `border-collapse` el borde de la fila no viaja con el thead; en
-    // reposo coincide con ese borde y no se nota).
-    <div className="flex min-h-0 flex-1 flex-col [&>div]:min-h-0 [&>div]:flex-1">
-      <Table>
-        <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
-          <TableRow>
-            <TableHead>Usuario</TableHead>
-            <TableHead>Accesos</TableHead>
-            <TableHead className="text-right">
-              {canManageUsers ? "Acciones" : "Permisos"}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {usuariosConAccesos.map(({ user, accessCount, editCount }) => {
-            return (
-              <TableRow key={user.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {user.is_super_admin ? (
-                      <ShieldCheck className="h-4 w-4 text-red-500" />
-                    ) : (
-                      <User className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <div className="flex flex-col items-start">
-                      <span className="font-medium">
-                        {getUserDisplayName(user)}
-                      </span>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {user.access_blocked ? (
-                    <div className="space-y-1">
-                      <Badge variant="destructive">Acceso bloqueado</Badge>
-                      <p className="text-xs text-muted-foreground">
-                        Permisos conservados
-                      </p>
-                    </div>
-                  ) : user.is_super_admin ? (
-                    <span className="text-sm text-muted-foreground">
-                      Acceso completo
-                    </span>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">{accessCount} secciones</Badge>
-                      {editCount > 0 && (
-                        <Badge variant="outline">{editCount} con edición</Badge>
-                      )}
-                    </div>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex flex-wrap justify-end gap-2">
-                    {(!canManageUsers || user.is_super_admin) && (
-                      <VisorPermisosUsuario
-                        user={user}
-                        nombre={getUserDisplayName(user)}
-                      />
-                    )}
-                    {canManageUsers && !user.is_super_admin && (
-                      <Dialog
-                        open={selectedUser?.id === user.id}
-                        onOpenChange={(open) => {
-                          if (!open) closePermissionsDialog();
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-11 px-4"
-                            onClick={() => openPermissionsDialog(user)}
-                          >
-                            <Settings className="h-4 w-4 mr-1" />
-                            Permisos
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
-                          <DialogHeader className="pr-6">
-                            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-                              <Shield className="h-5 w-5" />
-                              Permisos de {getUserDisplayName(selectedUser)}
-                            </DialogTitle>
-                            <DialogDescription>
-                              Elige qué secciones ve este usuario y en cuáles
-                              puede editar
-                            </DialogDescription>
-                          </DialogHeader>
-                          <fieldset disabled={savingPermissions} className="min-w-0 space-y-4 py-2 sm:py-4">
-                            <div className="space-y-2">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <Label className="text-sm font-medium">
-                                  Rol preconfigurado
-                                </Label>
-                                <ConfigurarRolesModal
-                                  currentPermissions={editingPermissions}
-                                  presets={presets}
-                                  presetsLoading={presetsLoading}
-                                  onCreatePreset={createPreset}
-                                  onUpdatePreset={handleUpdatePresetOnly}
-                                  onDeletePreset={handleDeletePresetOnly}
-                                  puedeConcederEdicion={isSuperAdmin}
-                                />
-                              </div>
-                              <Select
-                                value={selectedPresetId}
-                                onValueChange={handlePresetChange}
-                                disabled={presetsLoading || !isSuperAdmin}
-                              >
-                                <SelectTrigger className="h-11 w-full sm:w-[360px]">
-                                  <SelectValue
-                                    placeholder={
-                                      presetsLoading
-                                        ? "Cargando roles..."
-                                        : "Sin rol preconfigurado"
-                                    }
-                                  />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="manual">
-                                    Sin rol preconfigurado
-                                  </SelectItem>
-                                  {presets.map((preset) => (
-                                    <SelectItem
-                                      key={preset.id}
-                                      value={preset.id}
-                                    >
-                                      {preset.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="max-h-[52dvh] overflow-y-auto pr-1">
-                              <TablaPermisosSecciones
-                                permisos={editingPermissions}
-                                onCambiarVer={handleVerChange}
-                                onCambiarEditar={handleEditarChange}
-                                puedeConcederEdicion={isSuperAdmin}
-                                soloLectura={!isSuperAdmin}
-                              />
-                            </div>
-                            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                              <Button
-                                variant="outline"
-                                className="h-11 px-5"
-                                onClick={closePermissionsDialog}
-                              >
-                                Cancelar
-                              </Button>
-                              {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón.
-                                    (El motivo también está escrito arriba, en la tabla: con el dedo no hay hover.) */}
-                              <ConMotivo
-                                motivo={
-                                  isSuperAdmin
-                                    ? undefined
-                                    : SOLO_SUPER_ADMIN_CAMBIA_PERMISOS
-                                }
-                              >
-                                <Button
-                                  onClick={savePermissions}
-                                  disabled={!isSuperAdmin || savingPermissions}
-                                  className="h-11 w-full px-5 sm:w-auto"
-                                >
-                                  {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
-                                  {savingPermissions ? "Guardando..." : "Guardar Permisos"}
-                                </Button>
-                              </ConMotivo>
-                            </div>
-                          </fieldset>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                    {canManageUsers && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-11 px-4"
-                        disabled={
-                          updatingAccess ||
-                          user.id === currentUser?.id ||
-                          typeof user.access_blocked !== "boolean" ||
-                          (user.is_super_admin && !user.access_blocked)
-                        }
-                        title={
-                          typeof user.access_blocked !== "boolean"
-                            ? "Bloqueo de acceso pendiente de activar"
-                            : user.id === currentUser?.id
-                              ? "No puedes bloquear tu propia cuenta"
-                              : user.is_super_admin && !user.access_blocked
-                                ? "Quita primero el acceso de super admin"
-                                : undefined
-                        }
-                        onClick={() => setAccessTarget(user)}
-                      >
-                        {user.access_blocked ? (
-                          <UnlockKeyhole className="h-4 w-4 mr-1" />
-                        ) : (
-                          <LockKeyhole className="h-4 w-4 mr-1" />
-                        )}
-                        {user.access_blocked
-                          ? "Desbloquear acceso"
-                          : "Bloquear acceso"}
-                      </Button>
-                    )}
-                    {canManageUsers && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-11 px-4"
-                        disabled={user.id === currentUser?.id}
-                        onClick={() => openPasswordDialog(user)}
-                      >
-                        <Key className="h-4 w-4 mr-1" />
-                        Contraseña
-                      </Button>
-                    )}
-                    {canManageUsers && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-11 px-4"
-                        disabled={user.id === currentUser?.id}
-                        title={
-                          user.id === currentUser?.id
-                            ? "No puedes quitarte a ti mismo el acceso de super admin"
-                            : undefined
-                        }
-                        onClick={() => handleToggleSuperAdmin(user)}
-                      >
-                        <ShieldAlert className="h-4 w-4 mr-1" />
-                        {user.is_super_admin
-                          ? "Quitar Super Admin"
-                          : "Hacer Super Admin"}
-                      </Button>
-                    )}
-                    {canManageUsers && user.id === currentUser?.id && (
-                      <p className="basis-full text-right text-xs text-muted-foreground">
-                        No puedes quitarte a ti mismo el acceso de super admin.
-                      </p>
-                    )}
-                    {canManageUsers && !user.is_super_admin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-11 w-11 px-0 text-destructive hover:text-destructive"
-                        disabled={user.id === currentUser?.id}
-                        title={
-                          user.id === currentUser?.id
-                            ? "No puedes eliminar tu propio usuario"
-                            : undefined
-                        }
-                        aria-label={`Eliminar a ${getUserDisplayName(user)}`}
-                        onClick={() => handleDeleteUser(user.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+    // La lista ocupa el alto disponible: tarjetas con scroll en móvil y tabla
+    // con cabecera fija en escritorio. Solo se monta una vista y los mismos
+    // controles de gestión se utilizan en ambas; los diálogos globales permanecen.
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {isMobile ? (
+        <TarjetasUsuarios usuarios={usuariosConAccesos} renderAcciones={accionesUsuario} />
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col [&>div]:min-h-0 [&>div]:flex-1">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
+              <TableRow>
+                <TableHead>Usuario</TableHead>
+                <TableHead>Accesos</TableHead>
+                <TableHead className="text-right">
+                  {canManageUsers ? "Acciones" : "Permisos"}
+                </TableHead>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+            </TableHeader>
+            <TableBody>
+              {usuariosConAccesos.map(({ user, accessCount, editCount }) => {
+                return (
+                  <TableRow key={user.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {user.is_super_admin ? (
+                          <ShieldCheck className="h-4 w-4 text-red-500" />
+                        ) : (
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <div className="flex flex-col items-start">
+                          <span className="font-medium">
+                            {getUserDisplayName(user)}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {user.access_blocked ? (
+                        <div className="space-y-1">
+                          <Badge variant="destructive">Acceso bloqueado</Badge>
+                          <p className="text-xs text-muted-foreground">
+                            Permisos conservados
+                          </p>
+                        </div>
+                      ) : user.is_super_admin ? (
+                        <span className="text-sm text-muted-foreground">
+                          Acceso completo
+                        </span>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          <Badge variant="outline">{accessCount} secciones</Badge>
+                          {editCount > 0 && (
+                            <Badge variant="outline">{editCount} con edición</Badge>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {accionesUsuario(user)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <Dialog
         open={!!accessTarget}
@@ -652,7 +674,7 @@ export function ListaUsuarios({
                 ? "Desbloquear acceso"
                 : "Bloquear acceso"}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words [overflow-wrap:anywhere]">
               {accessTarget?.access_blocked
                 ? `${getUserDisplayName(accessTarget)} podrá volver a iniciar sesión con los mismos permisos.`
                 : `Se cerrarán las sesiones abiertas de ${getUserDisplayName(accessTarget)} y no podrá volver a entrar. Su cuenta, datos y permisos se conservarán.`}

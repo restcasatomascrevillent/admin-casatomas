@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { ManagedUser } from "@/hooks/useUsersManagement";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,8 @@ export interface ResumenUsuario {
 const textoBusqueda = (texto: string) =>
   texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
 
-/** Consulta móvil: una sola tarjeta por usuario, sin controles de gestión. */
-export function TarjetasUsuarios({ usuarios }: { usuarios: ResumenUsuario[] }) {
+/** Una tarjeta por usuario; la gestión la proporciona el área autorizada. */
+export function TarjetasUsuarios({ usuarios, renderAcciones }: { usuarios: ResumenUsuario[]; renderAcciones?: (user: ManagedUser) => ReactNode }) {
   const [busqueda, setBusqueda] = useState("");
   const consulta = textoBusqueda(busqueda.trim());
   const visibles = usuarios.filter(({ user, nombre }) =>
@@ -93,7 +94,7 @@ export function TarjetasUsuarios({ usuarios }: { usuarios: ResumenUsuario[] }) {
                     </>
                   )}
                 </div>
-                <VisorPermisosUsuario user={user} nombre={nombre} className="w-full" />
+                {renderAcciones ? renderAcciones(user) : <VisorPermisosUsuario user={user} nombre={nombre} className="w-full" />}
               </li>
             ))}
           </ul>

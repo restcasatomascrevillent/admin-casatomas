@@ -549,7 +549,8 @@ describe("ListaUsuarios · el guardado no deja a nadie con menos permisos (2026-
   });
 });
 
-it("bloquea y desbloquea sin borrar la cuenta ni sus permisos", async () => {
+it.each([1280, 390])("bloquea y desbloquea sin borrar la cuenta ni sus permisos a %s px", async (ancho) => {
+  window.innerWidth = ancho;
   let blocked = false;
   vi.mocked(supabase.functions.invoke).mockImplementation(
     async (name, options) => {
@@ -579,7 +580,7 @@ it("bloquea y desbloquea sin borrar la cuenta ni sus permisos", async () => {
     },
   );
   render(<ListaUsuarios canManageSuperAdmins />);
-  let fila = (await screen.findByText("camarero1")).closest("tr")!;
+  let fila = (await screen.findByText("camarero1")).closest(ancho < 768 ? "li" : "tr")!;
   fireEvent.click(
     within(fila).getByRole("button", { name: "Bloquear acceso" }),
   );
@@ -591,7 +592,7 @@ it("bloquea y desbloquea sin borrar la cuenta ni sus permisos", async () => {
     within(dialogo).getByRole("button", { name: "Confirmar bloqueo" }),
   );
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fila = screen.getByText("camarero1").closest("tr")!;
+  fila = screen.getByText("camarero1").closest(ancho < 768 ? "li" : "tr")!;
   expect(within(fila).getByText("Acceso bloqueado")).toBeInTheDocument();
   expect(doble.bd.operaciones).toEqual([]);
   expect(supabase.functions.invoke).toHaveBeenCalledWith(
@@ -603,7 +604,7 @@ it("bloquea y desbloquea sin borrar la cuenta ni sus permisos", async () => {
   );
   fireEvent.click(screen.getByRole("button", { name: "Confirmar desbloqueo" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fila = screen.getByText("camarero1").closest("tr")!;
+  fila = screen.getByText("camarero1").closest(ancho < 768 ? "li" : "tr")!;
   expect(within(fila).getByText("3 secciones")).toBeInTheDocument();
   expect(doble.bd.operaciones).toEqual([]);
 });
@@ -696,14 +697,42 @@ describe("Usuarios · consulta en teléfono", () => {
   });
 });
 
-it("el cambio de contraseña conserva el diálogo si falla y lo cierra al guardar correctamente", async () => {
+it("en superadmin móvil permite editar permisos desde la tarjeta y mantiene las protecciones propias", async () => {
+  window.innerWidth = 320;
+  render(<ListaUsuarios canManageSuperAdmins />);
+  const tarjeta = (await screen.findByText("camarero1")).closest("li")!;
+  expect(screen.queryByRole("table")).toBeNull();
+  expect(screen.getByRole("searchbox", { name: "Buscar usuarios por nombre o correo" })).toBeInTheDocument();
+  expect(within(tarjeta).getByRole("button", { name: "Contraseña" })).toBeEnabled();
+  expect(within(tarjeta).getByRole("button", { name: "Bloquear acceso" })).toBeEnabled();
+  fireEvent.click(within(tarjeta).getByRole("button", { name: "Permisos" }));
+  const dialogo = await screen.findByRole("dialog");
+  fireEvent.click(interruptor(dialogo, "Puede editar Facturas"));
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(within(tarjeta).getByText("2 con edición")).toBeInTheDocument();
+  const propia = screen.getByText("Dueño").closest("li")!;
+  expect(within(propia).getByRole("button", { name: "Contraseña" })).toBeDisabled();
+  expect(within(propia).getByRole("button", { name: "Bloquear acceso" })).toBeDisabled();
+  const opciones = within(propia).getByText("Más opciones").closest("details")!;
+  fireEvent.click(within(opciones).getByText("Más opciones"));
+  expect(opciones).toHaveAttribute("open");
+  expect(within(opciones).getByRole("button", { name: "Quitar Super Admin" })).toBeDisabled();
+  const acciones = within(tarjeta).getByText("Más opciones").closest("details")!;
+  fireEvent.click(within(acciones).getByText("Más opciones"));
+  expect(within(acciones).getByRole("button", { name: "Hacer Super Admin" })).toBeEnabled();
+  expect(within(acciones).getByRole("button", { name: "Eliminar a camarero1" })).toHaveTextContent("Eliminar usuario");
+});
+
+it.each([1280, 390])("el cambio de contraseña conserva el diálogo si falla y lo cierra al guardar a %s px", async (ancho) => {
+  window.innerWidth = ancho;
   const listado = { users: [{ id: "u-yo", email: "dueno@example.com", display_name: "Dueño", access_blocked: false }, { id: CAMARERO, email: "camarero1@staff.local", display_name: "camarero1", access_blocked: false }] };
   let fallar = true;
   vi.mocked(supabase.functions.invoke).mockImplementation(async name => name === "admin-update-user-password"
     ? fallar ? { data: null, error: { context: new Response(JSON.stringify({ error: "La nueva contraseña debe ser diferente de la actual" }), { status: 400 }) } } as never : { data: { success: true }, error: null } as never
     : { data: listado, error: null } as never);
   render(<ListaUsuarios canManageSuperAdmins />);
-  const fila = (await screen.findByText("camarero1")).closest("tr")!;
+  const fila = (await screen.findByText("camarero1")).closest(ancho < 768 ? "li" : "tr")!;
   fireEvent.click(within(fila).getByRole("button", { name: "Contraseña" }));
   const dialogo = await screen.findByRole("dialog");
   fireEvent.change(within(dialogo).getByLabelText("Nueva contraseña"), { target: { value: "prueba-123" } });
