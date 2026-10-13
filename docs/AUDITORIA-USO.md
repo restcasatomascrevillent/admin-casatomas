@@ -42,4 +42,6 @@ Bloquear revoca todas las sesiones y tokens de renovación en la misma transacci
 
 La auditoría muestra quién ha bloqueado o desbloqueado el acceso y de qué cuenta, con filtros específicos para ambas acciones. Se desbloquea desde Usuarios; no se revierte Auth desde el botón genérico de auditoría.
 
-Activación: aplicar `20261013080832_bloquear_acceso_usuarios.sql` y publicar `admin-set-user-access` y `list-users` con sus dependencias compartidas. Mientras el servidor no devuelva el estado `access_blocked`, el botón queda deshabilitado para no ofrecer una acción incompleta.
+Activación: aplicar `20261013082609_bloquear_acceso_usuarios.sql` y publicar `admin-set-user-access` y `list-users` con sus dependencias compartidas. Mientras el servidor no devuelva el estado `access_blocked`, el botón queda deshabilitado para no ofrecer una acción incompleta.
+
+Activación completada en producción el 13/10/2026: migración aplicada y funciones `admin-set-user-access` y `list-users` activas. Verificado que una sesión vigente pasa, una sesión revocada se rechaza, y los accesos anónimos y procesos siguen permitidos.
