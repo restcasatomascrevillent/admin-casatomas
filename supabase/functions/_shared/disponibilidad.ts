@@ -315,6 +315,13 @@ export interface EntradaDisponibilidad {
    * 150->170 al dar de alta "El Reservado", ver esa función).
    */
   capacidadTotal: number;
+  /**
+   * Servicios de ESTE día en los que no se cogen reservas (cierre semanal o a
+   * mano, ver `_shared/cierres.ts`). Los periodos cuyo inicio cae en un turno
+   * cerrado no generan huecos; si no queda ninguno, el día sale `cerrado` con
+   * `motivoCierre = "cierre_reservas"`. Sin él (el panel), no se cierra nada.
+   */
+  serviciosCerrados?: ReadonlyArray<"comida" | "cena">;
   /** `null` = no aplicar corte horario ni reglas de "hoy". */
   ahora?: AhoraMadrid | null;
   politica?: PoliticaReservas;
@@ -422,7 +429,12 @@ export interface PeriodoResuelto {
   huecos_completos: number;
 }
 
-export type MotivoCierre = "dia_no_configurado" | "sin_configuracion" | null;
+/**
+ * `cierre_reservas`: el restaurante abre, pero ese día (o los servicios que
+ * tenía) no se cogen reservas por los canales públicos — regla semanal o
+ * cierre a mano del calendario (`_shared/cierres.ts`, tabla `cierres_reserva`).
+ */
+export type MotivoCierre = "dia_no_configurado" | "sin_configuracion" | "cierre_reservas" | null;
 
 export interface ResultadoDisponibilidad {
   fecha: string;
@@ -943,6 +955,18 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
   if (seleccionadas.length === 0) {
     return vacio(true, "dia_no_configurado", reservable, motivoNoReservable);
   }
+  // Cierres de reservas (semanal / a mano): fuera los periodos de un turno cerrado.
+  const turnosCerrados = new Set(entrada.serviciosCerrados || []);
+  const abiertas =
+    turnosCerrados.size === 0
+      ? seleccionadas
+      : seleccionadas.filter((c) => {
+          const inicio = horaAMinutos(c.hora_inicio);
+          return inicio === null || !turnosCerrados.has(turnoDeHora(inicio));
+        });
+  if (abiertas.length === 0) {
+    return vacio(true, "cierre_reservas", reservable, motivoNoReservable);
+  }
 
   // Se acumulan con su minuto ABSOLUTO (que puede pasar de 1440 en un
   // periodo que cruza medianoche) para poder ordenar por orden real de
@@ -955,7 +979,7 @@ export function calcularDisponibilidad(entrada: EntradaDisponibilidad): Resultad
   const esHoy = ahora ? ahora.fechaHoy === fecha : false;
   const minutosCorte = Number.isFinite(Number(politica.minutosCorte)) ? Number(politica.minutosCorte) : 0;
 
-  for (const config of seleccionadas) {
+  for (const config of abiertas) {
     const nombre = config.nombre_periodo ?? null;
     const inicio = horaAMinutos(config.hora_inicio);
     const finBruto = horaAMinutos(config.hora_fin);

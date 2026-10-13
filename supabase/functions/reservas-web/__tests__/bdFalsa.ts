@@ -253,5 +253,15 @@ export function estadoPrueba(): EstadoPrueba {
 export function crearClienteFalso(_url: string, _key: string) {
   return {
     from: (tabla: string) => new ConsultaFalsa(estadoPrueba().db, tabla),
+    // Cierres de reservas (2026-10-13): por defecto NINGÚN servicio cerrado,
+    // para que las pruebas de antes no dependan del día de la semana. Una
+    // prueba de cierres puede rellenar `globalThis.__cierresFalsos`.
+    rpc: async (nombre: string) => {
+      if (nombre !== "servicios_cerrados_reserva") {
+        return { data: null, error: { message: `rpc ${nombre} no simulada` } };
+      }
+      const g = globalThis as unknown as { __cierresFalsos?: unknown[] };
+      return { data: g.__cierresFalsos ?? [], error: null };
+    },
   };
 }

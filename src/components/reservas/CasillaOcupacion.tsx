@@ -39,6 +39,7 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Lock } from "lucide-react";
+import type { ServicioCerrado } from "../../../supabase/functions/_shared/cierres";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,8 @@ export interface CasillaOcupacionProps {
   densidad?: DensidadCasilla;
   /** Tamaño (px) de la cifra de comensales cuando hay `densidad`. */
   fuenteComensales?: number;
+  /** Servicios sin reservas web/teléfono ese día (cierre semanal o manual). */
+  cierres?: readonly ServicioCerrado[];
 }
 
 /** «jueves, 15 de octubre» → «Jueves, 15 de octubre» (solo la primera letra: `capitalize` pondría «De»). */
@@ -93,7 +96,12 @@ export function CasillaOcupacion({
   onSeleccionar,
   densidad,
   fuenteComensales,
+  cierres,
 }: CasillaOcupacionProps) {
+  const cierraComida = !!cierres?.some((c) => c.turno === "comida");
+  const cierraCena = !!cierres?.some((c) => c.turno === "cena");
+  const textoCierre =
+    cierraComida && cierraCena ? "Cerrado" : cierraComida ? "Sin comida" : cierraCena ? "Sin cena" : null;
   const fija = densidad !== undefined;
   const compacta = densidad === "compacta";
   const verReservas = fija && densidad === "completa";
@@ -102,7 +110,9 @@ export function CasillaOcupacion({
   // Un día pasado se ve atenuado, tenga o no reservas.
   const estilo = estiloNivel(esPasado ? "pasado" : nivel);
   const descripcion = describirDia(resumen, ventanaHoras);
-  const etiqueta = `${format(dia, "d 'de' MMMM", { locale: es })}: ${descripcion.aria}`;
+  const etiqueta = `${format(dia, "d 'de' MMMM", { locale: es })}: ${descripcion.aria}${
+    textoCierre ? `. ${textoCierre} para reservas` : ""
+  }`;
 
   const conReservas = !!resumen && resumen.reservas > 0;
   // El Reservado ocupado (fuera de aforo): indicador aparte, aunque no haya más reservas.
@@ -165,6 +175,7 @@ export function CasillaOcupacion({
       data-fecha={fechaISO}
       data-densidad={densidad}
       data-nivel={esPasado && conReservas ? "pasado" : nivel}
+      data-cierre={textoCierre ? (cierraComida && cierraCena ? "dia" : cierraComida ? "comida" : "cena") : undefined}
       className={cn(
         "relative flex w-full cursor-pointer flex-col overflow-hidden rounded-lg border text-left",
         "transition-shadow hover:shadow-md motion-reduce:transition-none",
@@ -175,6 +186,10 @@ export function CasillaOcupacion({
         // Cada casilla mide su propio ancho: el número grande se escala con él (cqw).
         "[container-type:inline-size]",
         estilo.celda,
+        // Día cerrado entero para reservas: rayado diagonal, se distingue sin color.
+        cierraComida &&
+          cierraCena &&
+          "bg-[repeating-linear-gradient(135deg,transparent_0_6px,hsl(var(--muted-foreground)/0.12)_6px_8px)]",
         seleccionada && "z-10 ring-2 ring-primary ring-offset-1",
       )}
     >
@@ -201,6 +216,18 @@ export function CasillaOcupacion({
         )}
       </span>
 
+      {textoCierre && (
+        <span
+          data-testid="cierre-casilla"
+          className={cn(
+            "truncate text-[10px] font-semibold uppercase leading-none tracking-wide",
+            cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
+            compacta && !(cierraComida && cierraCena) && "hidden",
+          )}
+        >
+          {textoCierre}
+        </span>
+      )}
       {conReservas && (
         <>
           {!compacta && cifra}

@@ -21,6 +21,7 @@
 export type RutaReservasWeb =
   | "disponibilidad"
   | "crear"
+  | "cierres"
   | "confirmar"
   | "cancelar"
   | "cancelar/ejecutar";
@@ -32,6 +33,7 @@ export type RutaReservasWeb =
 export const RUTAS_RESERVAS_WEB: ReadonlyArray<{ metodo: "GET" | "POST"; ruta: RutaReservasWeb }> = [
   { metodo: "POST", ruta: "disponibilidad" },
   { metodo: "POST", ruta: "crear" },
+  { metodo: "POST", ruta: "cierres" },
   { metodo: "GET", ruta: "confirmar" },
   { metodo: "GET", ruta: "cancelar" },
   { metodo: "GET", ruta: "cancelar/ejecutar" },

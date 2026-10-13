@@ -25,6 +25,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { verificarAforoTurno } from "@/hooks/useDisponibilidad";
+import { useCierresReserva } from "@/hooks/useCierresReserva";
+import { textoTurnosCerrados, turnoDeHoraServicio, turnosCerradosEn } from "../../../supabase/functions/_shared/cierres";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -363,6 +365,13 @@ export const FormularioReserva = ({
   // Reservas + salas del día de Casa Tomás (una sola consulta, compartida con
   // las rejillas por la clave de React Query). La sala es asignación interna.
   const { data: datosDia } = useOcupacionSalasDia(fechaStr);
+  // Cierres de reservas (lunes, jueves, domingo noche, calendario): el panel
+  // NO bloquea, solo avisa — el personal puede hacer una excepción.
+  const { data: cierresFecha } = useCierresReserva(isPublic ? null : fechaStr, isPublic ? null : fechaStr);
+  const turnosCerradosFecha = fechaStr ? turnosCerradosEn(cierresFecha?.cierres ?? [], fechaStr) : [];
+  const cierreAfectaHora =
+    turnosCerradosFecha.length === 2 ||
+    (!!watchedHora && turnosCerradosFecha.includes(turnoDeHoraServicio(watchedHora)));
   const salas = useMemo(() => datosDia?.espacios ?? [], [datosDia]);
   const { rejilla } = useRejillaCuartos({
     fecha: fechaStr,
@@ -1332,6 +1341,24 @@ export const FormularioReserva = ({
                   <li key={mensaje}>{mensaje}</li>
                 ))}
               </ul>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isPublic && turnosCerradosFecha.length > 0 && (
+          <Alert
+            data-testid="aviso-cierre-reservas"
+            className={
+              cierreAfectaHora
+                ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200"
+                : undefined
+            }
+          >
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Ese día el restaurante está cerrado para reservas {textoTurnosCerrados(turnosCerradosFecha)} (la web y el
+              teléfono no las cogen).
+              {cierreAfectaHora ? " Puedes guardarla igualmente si es una excepción." : ""}
             </AlertDescription>
           </Alert>
         )}

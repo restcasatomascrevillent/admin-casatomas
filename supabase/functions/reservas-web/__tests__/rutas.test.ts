@@ -47,6 +47,7 @@ describe("rutas públicas — sin cambios", () => {
   it.each([
     ["POST", "disponibilidad"],
     ["POST", "crear"],
+    ["POST", "cierres"],
     ["GET", "confirmar"],
     ["GET", "cancelar"],
     ["GET", "cancelar/ejecutar"],
@@ -66,10 +67,11 @@ describe("rutas públicas — sin cambios", () => {
     expect(resolverRuta("POST", `${BASE}/cancelar/ejecutar`)).toBeNull();
   });
 
-  it("exactamente las 5 rutas de antes menos /notificar-estado", () => {
+  it("las 5 rutas de antes menos /notificar-estado, más /cierres (2026-10-13)", () => {
     expect(RUTAS_RESERVAS_WEB).toEqual([
       { metodo: "POST", ruta: "disponibilidad" },
       { metodo: "POST", ruta: "crear" },
+      { metodo: "POST", ruta: "cierres" },
       { metodo: "GET", ruta: "confirmar" },
       { metodo: "GET", ruta: "cancelar" },
       { metodo: "GET", ruta: "cancelar/ejecutar" },
@@ -96,9 +98,9 @@ describe("secretoCompartidoValido — /disponibilidad y /crear siguen sin necesi
     expect(secretoCompartidoValido("s3cr3t", "otro")).toBe(false);
   });
 
-  it("index.ts solo la usa en las dos rutas POST públicas", () => {
+  it("index.ts solo la usa en las tres rutas POST públicas (/cierres, 2026-10-13: solo lectura)", () => {
     const fuente = readFileSync(resolve(__dirname, "../index.ts"), "utf-8");
     const usos = fuente.match(/if \(!checkSharedSecret\(req\)\)/g) ?? [];
-    expect(usos).toHaveLength(2);
+    expect(usos).toHaveLength(3);
   });
 });

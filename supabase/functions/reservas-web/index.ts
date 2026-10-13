@@ -107,6 +107,16 @@ import {
   type ResultadoNotificarEmailsReserva,
 } from "./plantillas.ts";
 import { resolverRuta, rutaDelPath, secretoCompartidoValido } from "./rutas.ts";
+// Cierres de reservas (lunes, jueves, domingo noche + calendario del panel).
+import {
+  normalizarServiciosCerrados,
+  serviciosCerradosPorSemana,
+  textoTurnosCerrados,
+  turnoDeHoraServicio,
+  turnosCerradosEn,
+  type ServicioCerrado,
+  type TurnoServicio,
+} from "../_shared/cierres.ts";
 // Doble opt-in del newsletter (migración 20261003184500): ver handleConfirmar.
 import { registrarEmailVerificado, type ClienteVerificacion } from "../_shared/verificacion-email.ts";
 
@@ -249,6 +259,24 @@ interface ReservationConfig {
 async function getReservationConfig(): Promise<ReservationConfig> {
   const { data } = await supabase.from("configuracion_reservas").select("*").limit(1).single();
   return (data as ReservationConfig) || ({} as ReservationConfig);
+}
+
+// --- Cierres de reservas (migración 20261013120000) ---
+// La regla es la RPC `servicios_cerrados_reserva`, la misma que usan el bot
+// y el panel. Si aún no existe (migración sin aplicar) o falla, se aplica la
+// regla semanal por defecto de `_shared/cierres.ts`.
+async function leerServiciosCerrados(desde: string, hasta: string): Promise<ServicioCerrado[]> {
+  try {
+    const { data, error } = await supabase.rpc("servicios_cerrados_reserva", { p_desde: desde, p_hasta: hasta });
+    if (error) throw error;
+    return normalizarServiciosCerrados(data);
+  } catch (err) {
+    console.warn("[CIERRES] RPC no disponible, regla por defecto:", (err as Error)?.message || err);
+    return serviciosCerradosPorSemana(desde, hasta);
+  }
+}
+async function turnosCerradosDe(fecha: string): Promise<TurnoServicio[]> {
+  return turnosCerradosEn(await leerServiciosCerrados(fecha, fecha), fecha);
 }
 
 // --- Blacklist ---
@@ -1006,6 +1034,7 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   }
 
   const config = await getReservationConfig();
+  const turnosCerrados = await turnosCerradosDe(fecha);
   const capacidadTotal = sumarCapacidadPorMarca(
     (espaciosRaw || []).map((e: { capacidad_maxima: number; caracteristicas: Record<string, unknown> | null }) => ({
       capacidad_maxima: e.capacidad_maxima,
@@ -1024,6 +1053,7 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     // Las reservas en una sala privada (fuera de aforo) no ocupan turno.
     salasPrivadas: idsSalasPrivadas(espaciosRaw as Array<{ id: string; caracteristicas: unknown }> | null),
     capacidadTotal,
+    serviciosCerrados: turnosCerrados,
     ahora: ahoraEnMadrid(),
     politica: {
       // `/crear` rechaza SIEMPRE las reservas para hoy (motivo `reserva_hoy`).
@@ -1098,6 +1128,9 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
     // ese día (cero periodos). Un turno lleno NO es un día cerrado.
     cerrado: resultado.cerrado,
     motivo_cierre: resultado.motivoCierre,
+    // NUEVO (2026-10-13): servicios sin reservas ese día ("comida" | "cena").
+    // Con los dos, `cerrado = true` y `motivo_cierre = "cierre_reservas"`.
+    servicios_cerrados: turnosCerrados,
     aforo_turno: {
       comida: resultado.aforo.comida,
       cena: resultado.aforo.cena,
@@ -1118,6 +1151,33 @@ async function handleDisponibilidad(req: Request): Promise<Response> {
   };
 
   return json([meta, ...periodosOut, ...ocupacionOut, ...huecosOut, ...descartadosOut]);
+}
+
+// ============================================================
+// ACCIÓN: cierres
+// ============================================================
+// Para el calendario de la web: qué servicios NO admiten reservas en un
+// rango. Cuerpo `{ desde, hasta }` (YYYY-MM-DD, máx. 120 días). Respuesta
+// `{ ok: true, cierres: [{ fecha, turno }] }` — solo fecha y turno: el
+// motivo de un cierre manual es interno y no sale a la web.
+async function handleCierres(req: Request): Promise<Response> {
+  if (!checkSharedSecret(req)) return json({ ok: false, error: "unauthorized" }, 401);
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ ok: false, error: "invalid_json" }, 400);
+  }
+  const desde = typeof body?.desde === "string" ? body.desde : "";
+  const hasta = typeof body?.hasta === "string" ? body.hasta : "";
+  const re = /^\d{4}-\d{2}-\d{2}$/;
+  if (!re.test(desde) || !re.test(hasta) || hasta < desde) {
+    return json({ ok: false, error: "rango_invalido" }, 400);
+  }
+  const dias = (Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86_400_000;
+  if (!Number.isFinite(dias) || dias > 120) return json({ ok: false, error: "rango_demasiado_largo" }, 400);
+  const cierres = await leerServiciosCerrados(desde, hasta);
+  return json({ ok: true, cierres: cierres.map((c) => ({ fecha: c.fecha, turno: c.turno })) });
 }
 
 // ============================================================
@@ -1271,6 +1331,24 @@ async function handleCrear(req: Request): Promise<Response> {
     return json({ ok: false, motivo, mensaje: mensajeCliente }, status);
   };
 
+  // Cierres de reservas: ese día/servicio no se cogen reservas. Sin
+  // solicitud pendiente ni correo: no es algo que el personal tenga que
+  // gestionar, el restaurante está cerrado.
+  const turnosCerradosCrear = await turnosCerradosDe(fecha);
+  if (turnosCerradosCrear.includes(turnoDeHoraServicio(hora))) {
+    const cuando = textoTurnosCerrados(turnosCerradosCrear);
+    return json(
+      {
+        ok: false,
+        motivo: "restaurante_cerrado",
+        error: "restaurante_cerrado",
+        mensaje: `Ese día el restaurante está cerrado ${cuando} y no admite reservas. Elige otra fecha.`,
+        servicios_cerrados: turnosCerradosCrear,
+      },
+      422,
+    );
+  }
+
   // Blacklist — igual que fnCreateReservation: NO se registra en
   // solicitudes_pendientes (ya está fichado) y el motivo devuelto al
   // cliente es genérico, para no confirmarle que está en la lista.
@@ -1407,6 +1485,7 @@ async function handleCrear(req: Request): Promise<Response> {
         })),
         marcaTemprana,
       ),
+      serviciosCerrados: turnosCerradosCrear,
       ahora: null,
     });
 
@@ -1664,6 +1743,7 @@ serve(conAuditoriaDePeticion("reservas-web", createClientBase, async (req: Reque
     switch (resolverRuta(req.method, pathname)) {
       case "disponibilidad": return await handleDisponibilidad(req);
       case "crear": return await handleCrear(req);
+      case "cierres": return await handleCierres(req);
       case "confirmar": return await handleConfirmar(req);
       case "cancelar": return await handleCancelarPreview(req);
       case "cancelar/ejecutar": return await handleCancelarEjecutar(req);

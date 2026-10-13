@@ -96,6 +96,9 @@ import { configAsignacionDesde, fechaMadrid } from "@/lib/reservas/ventanaAsigna
 import { DetalleDiaEspacios } from "./DetalleDiaEspacios";
 import { CasillaOcupacion } from "./CasillaOcupacion";
 import { LeyendaOcupacion } from "./LeyendaOcupacion";
+import { CierreDiaControl } from "./CierreDiaControl";
+import { useCierresReserva } from "@/hooks/useCierresReserva";
+import { cierresPorDia } from "../../../supabase/functions/_shared/cierres";
 
 // `onDayClick` ya no existe. Estaba declarada y desestructurada, pero NUNCA se
 // llamaba ni nadie la pasaba (el único consumidor es `Reservas.tsx`, que pasa
@@ -283,6 +286,14 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
     [espacios],
   );
 
+  // Cierres de reservas del mes (lunes, jueves, domingo noche + los manuales).
+  const { data: cierresMes } = useCierresReserva(
+    format(startOfMonth(currentMonth), "yyyy-MM-dd"),
+    format(endOfMonth(currentMonth), "yyyy-MM-dd"),
+  );
+  const cierresDia = useMemo(() => cierresPorDia(cierresMes?.cierres ?? []), [cierresMes]);
+  const fechaSeleccionada = format(selectedDate, "yyyy-MM-dd");
+
   // Cifras y nivel de cada día del mes.
   const resumenes = useMemo(
     () => (reservasMes ? resumirMes(reservasMes, aforo, { hoy, ahora, ventanaHoras, salasPrivadas }) : {}),
@@ -446,6 +457,7 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
                           dia={day}
                           fechaISO={dateKey}
                           resumen={resumenes[dateKey]}
+                          cierres={cierresDia[dateKey]}
                           esPasado={dateKey < hoy}
                           esHoy={dateKey === hoy}
                           seleccionada={isSameDay(day, selectedDate)}
@@ -477,6 +489,12 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
             <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-4">
               {/* La rejilla por cuartos del panel ya la refresca `useReservasEnVivo`:
                   sin un segundo canal a `reservas` (`ReservasEnVivoContexto`). */}
+              <CierreDiaControl
+                fecha={fechaSeleccionada}
+                cierres={cierresDia[fechaSeleccionada] ?? []}
+                esPasado={fechaSeleccionada < hoy}
+                esquemaPendiente={cierresMes?.esquemaPendiente}
+              />
               <ReservasEnVivoContexto.Provider value={true}>
                 <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
               </ReservasEnVivoContexto.Provider>
