@@ -1,43 +1,19 @@
 import { useMemo, useState } from "react";
-import { ACCIONES_ESPECIFICAS } from "@/lib/auditoria";
+import { FiltrosAuditoria } from "@/components/auditoria/FiltrosAuditoria";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  ScrollText,
-  Loader2,
-  SlidersHorizontal,
-  ChevronDown,
-} from "lucide-react";
+import { ScrollText, Loader2 } from "lucide-react";
 import {
   useAuditLog,
   agruparEntradas,
   TABLAS_AUDITADAS,
-  TABLA_LABEL,
   type AuditLogFiltros,
   type RangoMesesAuditoria,
 } from "@/hooks/useAuditLog";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import {
-  ACCION_UI,
-  TablaEntradasAuditoria,
-} from "@/components/auditoria/TablaEntradasAuditoria";
+import { TablaEntradasAuditoria } from "@/components/auditoria/TablaEntradasAuditoria";
 import { VistaPorMes } from "@/components/auditoria/VistaPorMes";
 import { VistaPorDia } from "@/components/auditoria/VistaPorDia";
 
@@ -47,16 +23,19 @@ import { VistaPorDia } from "@/components/auditoria/VistaPorDia";
  */
 const ALTURA_MINIMA_AUDITORIA = 480;
 
-const FILTROS_VACIOS: AuditLogFiltros = {};
+const FILTROS_VACIOS: AuditLogFiltros = { origen: "sin_servidor" };
+const FILTROS_RAPIDOS = [
+  ["", "Todos"],
+  ["grupo_cambios", "Cambios"],
+  ["grupo_ia", "IA facturas"],
+  ["grupo_accesos", "Accesos"],
+  ["reversion", "Reversiones"],
+] as const;
 
 export default function SuperAdminAuditoria() {
   const [filtrosPendientes, setFiltrosPendientes] =
     useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [filtros, setFiltros] = useState<AuditLogFiltros>(FILTROS_VACIOS);
-  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
-  const filtrosActivos = Object.values(filtros).filter((valor) =>
-    Boolean(valor?.trim()),
-  ).length;
   const [pagina, setPagina] = useState(0);
   // Compartido por las tres pestañas: la clave es siempre el ID de una fila de `audit_log`,
   // así que no hay colisión entre lo que despliega "Lista" y lo que despliega "Por mes"/"Por día".
@@ -91,13 +70,19 @@ export default function SuperAdminAuditoria() {
 
   const aplicarFiltros = () => {
     setFiltros(filtrosPendientes);
-    setFiltrosAbiertos(false);
     setPagina(0);
   };
 
   const limpiarFiltros = () => {
     setFiltrosPendientes(FILTROS_VACIOS);
     setFiltros(FILTROS_VACIOS);
+    setPagina(0);
+  };
+
+  const filtroRapido = (accion: string) => {
+    const siguientes = { ...filtros, accion: accion || undefined };
+    setFiltros(siguientes);
+    setFiltrosPendientes(siguientes);
     setPagina(0);
   };
 
@@ -132,212 +117,43 @@ export default function SuperAdminAuditoria() {
             restauradas.
           </p>
         )}
-        <Card className="shrink-0">
-          <div className="flex items-center gap-2 p-2 sm:hidden">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-11 min-w-0 flex-1 justify-between px-3"
-              aria-expanded={filtrosAbiertos}
-              aria-controls="auditoria-filtros"
-              onClick={() => setFiltrosAbiertos((abiertos) => !abiertos)}
-            >
-              <span className="flex items-center gap-2">
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                Filtros
-                {filtrosActivos > 0 && (
-                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                    {filtrosActivos} activo{filtrosActivos === 1 ? "" : "s"}
-                  </span>
-                )}
-              </span>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform ${filtrosAbiertos ? "rotate-180" : ""}`}
-                aria-hidden="true"
-              />
-            </Button>
-            {filtrosActivos > 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-11 px-3"
-                onClick={limpiarFiltros}
-              >
-                Limpiar
-              </Button>
-            )}
-          </div>
-          <CardHeader className="hidden sm:flex">
-            <CardTitle>Filtros</CardTitle>
-            <CardDescription>
-              Combínalos como haga falta; se aplican todos a la vez, en las tres
-              pestañas de abajo.
-            </CardDescription>
-          </CardHeader>
-          <CardContent
-            id="auditoria-filtros"
-            className={`${filtrosAbiertos ? "grid" : "hidden"} max-h-[45dvh] grid-cols-2 gap-3 overflow-y-auto overscroll-contain px-3 pb-3 sm:grid sm:max-h-none sm:gap-4 sm:overflow-visible sm:px-6 sm:pb-6 lg:grid-cols-6`}
+        <FiltrosAuditoria
+          pendientes={filtrosPendientes}
+          activos={filtros}
+          tablas={tablas}
+          onChange={setFiltrosPendientes}
+          onAplicar={aplicarFiltros}
+          onLimpiar={limpiarFiltros}
+        />
+
+        <div className="shrink-0 space-y-2">
+          <div
+            className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap"
+            role="group"
+            aria-label="Filtros rápidos por tipo de acción"
           >
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="auditoria-actor">Quién actuó / origen</Label>
-              <Input
-                id="auditoria-actor"
-                placeholder="Email, ID de usuario u origen"
-                value={filtrosPendientes.actor ?? ""}
-                onChange={(e) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    actor: e.target.value,
-                  }))
+            {FILTROS_RAPIDOS.map(([valor, label]) => (
+              <Button
+                key={valor || "todos"}
+                type="button"
+                size="sm"
+                className="h-10 px-2 sm:px-3"
+                variant={
+                  (filtros.accion ?? "") === valor ? "default" : "outline"
                 }
-              />
-            </div>
-
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="auditoria-dispositivo">Dispositivo</Label>
-              <Input
-                id="auditoria-dispositivo"
-                placeholder="ID del dispositivo"
-                value={filtrosPendientes.dispositivo ?? ""}
-                onChange={(e) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    dispositivo: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label>Acción</Label>
-              <Select
-                value={filtrosPendientes.accion ?? "todas"}
-                onValueChange={(v) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    accion: v === "todas" ? undefined : v,
-                  }))
-                }
+                aria-pressed={(filtros.accion ?? "") === valor}
+                onClick={() => filtroRapido(valor)}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {ACCIONES_ESPECIFICAS.map(([valor, label]) => (
-                    <SelectItem key={valor} value={valor}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                  {Object.entries(ACCION_UI).map(([valor, { label }]) => (
-                    <SelectItem key={valor} value={valor}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="min-w-0 space-y-2">
-              <Label>Sección</Label>
-              <Select
-                value={filtrosPendientes.tabla ?? "todas"}
-                onValueChange={(v) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    tabla: v === "todas" ? undefined : v,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Todas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {tablas.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      {TABLA_LABEL[t] ?? t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="auditoria-desde">Desde</Label>
-              <Input
-                id="auditoria-desde"
-                type="date"
-                value={filtrosPendientes.desde ?? ""}
-                onChange={(e) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    desde: e.target.value || undefined,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="auditoria-hasta">Hasta</Label>
-              <Input
-                id="auditoria-hasta"
-                type="date"
-                value={filtrosPendientes.hasta ?? ""}
-                onChange={(e) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    hasta: e.target.value || undefined,
-                  }))
-                }
-              />
-            </div>
-
-            <div className="col-span-2 min-w-0 space-y-2 lg:col-span-4">
-              <Label htmlFor="auditoria-texto">
-                Buscar cambio, pregunta o respuesta de la IA
-              </Label>
-              <Input
-                id="auditoria-texto"
-                placeholder="Plato, vino, pregunta, respuesta…"
-                value={filtrosPendientes.texto ?? ""}
-                onChange={(e) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    texto: e.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="col-span-2 min-w-0 space-y-2 lg:col-span-2">
-              <Label>Resultado</Label>
-              <Select
-                value={filtrosPendientes.resultado ?? "todos"}
-                onValueChange={(v) =>
-                  setFiltrosPendientes((prev) => ({
-                    ...prev,
-                    resultado: v === "todos" ? undefined : v,
-                  }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="completada">Completado</SelectItem>
-                  <SelectItem value="fallida">Fallido</SelectItem>
-                  <SelectItem value="parcial">Parcial</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-2 flex flex-wrap gap-2 lg:col-span-6">
-              <Button onClick={aplicarFiltros}>Aplicar filtros</Button>
-              <Button variant="outline" onClick={limpiarFiltros}>
-                Limpiar
+                {label}
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+          {filtros.origen === "sin_servidor" && (
+            <p className="text-xs text-muted-foreground">
+              Procesos del servidor ocultos
+            </p>
+          )}
+        </div>
 
         {/* Conserva espacio para los registros incluso al desplegar los filtros. */}
         <Card className="flex min-h-48 min-w-0 flex-1 flex-col">

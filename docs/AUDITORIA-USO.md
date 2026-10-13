@@ -4,6 +4,14 @@ La vista del superadmin consulta `audit_log_visible`, con las mismas políticas 
 
 Los registros muestran quién actuó, qué hizo y los datos relevantes. Los precios se muestran en euros, los booleanos como Sí/No y los cambios con su valor anterior y nuevo. UUID, navegador, sesión, petición y JSON quedan en «Detalles técnicos». Los filtros por acción específica, resultado y texto se aplican en SQL, antes de paginar, también en las vistas por día y por mes.
 
+## Filtros y uso móvil
+
+La vista inicial excluye los autores `servicio` y `base_de_datos`, por lo que no muestra los procesos identificados como `API · service_role`. Los accesos fallidos de identidad no verificada y el histórico conservan su visibilidad. Para incluir los procesos, se selecciona explícitamente otro origen en el formulario.
+
+Los botones rápidos Todos, Cambios, IA facturas, Accesos y Reversiones aplican la selección inmediatamente y conservan la exclusión del servidor. Los grupos filtran todas sus acciones en SQL antes de paginar, tanto en la lista como en las vistas por día y por mes.
+
+En teléfono el formulario se abre en un panel independiente con campos a todo el ancho, desplazamiento interno y botones Limpiar/Aplicar siempre fuera del área desplazable. Los filtros de persona, fechas, dispositivo y resultado se despliegan aparte. Se pueden seleccionar tanto familias de acciones como eventos concretos y resultados pendientes.
+
 ## IA de facturas
 
 `chat-facturas` registra, en el servidor, la pregunta, respuesta, conversación, consultas realizadas por las herramientas, argumentos sanitizados, resultado, duración y tipos de adjuntos. El autor procede de la validación del JWT; no de un identificador enviado por el navegador. Regenerar una respuesta se identifica expresamente y no comparte el caché de una pregunta normal.
