@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { ShieldAlert } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SuperAdminSidebar } from "@/components/SuperAdminSidebar";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
@@ -41,8 +42,12 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
               barra mínima: el sidebar es un Sheet y no hay otra forma de
               abrirlo. */}
           {isCompactNav && (
-            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-border bg-card flex items-center gap-2 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
-              <SidebarTrigger className="shrink-0" />
+            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-destructive/20 bg-destructive/5 flex items-center gap-3 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
+              <SidebarTrigger className="shrink-0 text-destructive hover:bg-destructive/10" />
+              <span className="flex min-w-0 items-center gap-2 text-base font-semibold text-destructive">
+                <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
+                <span className="truncate">Super Admin</span>
+              </span>
             </header>
           )}
           <main className="flex-1 min-w-0 p-3 sm:p-6">

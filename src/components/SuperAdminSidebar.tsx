@@ -86,7 +86,7 @@ export function SuperAdminSidebar() {
           <SidebarTrigger className="text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent" />
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
-              <h2 className="flex items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
+              <h2 className="flex items-center gap-1.5 text-base font-semibold text-destructive">
                 <ShieldAlert
                   className="h-4 w-4 shrink-0 text-destructive"
                   aria-hidden="true"
