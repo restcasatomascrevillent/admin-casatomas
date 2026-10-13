@@ -1,5 +1,14 @@
 import { completeAuditEnabled } from "@/lib/audit-version";
-import { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  ReactNode,
+} from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -8,7 +17,10 @@ import { z } from "zod";
 const signUpSchema = z.object({
   email: z.string().email("Email inválido").max(255),
   password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
-  nombre_restaurante: z.string().min(1, "El nombre del restaurante es requerido").max(100),
+  nombre_restaurante: z
+    .string()
+    .min(1, "El nombre del restaurante es requerido")
+    .max(100),
   telefono: z.string().optional(),
 });
 
@@ -25,9 +37,12 @@ interface AuthContextValue {
     email: string,
     password: string,
     nombre_restaurante: string,
-    telefono?: string
+    telefono?: string,
   ) => Promise<{ data?: unknown; error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ data?: unknown; error: Error | null }>;
+  signIn: (
+    email: string,
+    password: string,
+  ) => Promise<{ data?: unknown; error: Error | null }>;
   signOut: () => Promise<{ error: Error | null }>;
 }
 
@@ -38,16 +53,27 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * debe avisar y no presentar el acceso como registrado correctamente.
  */
 async function registrarAccesoAuditoria(accion: "acceso" | "logout") {
-  if (!await completeAuditEnabled()) {
+  if (!(await completeAuditEnabled())) {
     if (accion === "acceso") return; // servidor anterior: todavía no registra restauraciones
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) throw new Error("La sesión ya no es válida");
-    const { error } = await supabase.from("audit_log").insert({ actor_user_id: user.id, actor_email: user.email, accion, user_agent: navigator.userAgent });
-    if (error) throw new Error("No se pudo registrar la salida en la auditoría");
+    const { error } = await supabase
+      .from("audit_log")
+      .insert({
+        actor_user_id: user.id,
+        actor_email: user.email,
+        accion,
+        user_agent: navigator.userAgent,
+      });
+    if (error)
+      throw new Error("No se pudo registrar la salida en la auditoría");
     return;
   }
   const { error } = await supabase.rpc("registrar_acceso_panel", {
-    p_tipo: accion, p_ruta: window.location.pathname,
+    p_tipo: accion,
+    p_ruta: window.location.pathname,
   });
   if (error) throw new Error(`No se pudo registrar ${accion} en la auditoría`);
 }
@@ -62,8 +88,16 @@ async function registrarAccesoAuditoria(accion: "acceso" | "logout") {
  * ProtectedRoute) se relanzaría con loading=true y desmontaría la página.
  * Solo un cambio real (otro id, o cambio de email) renueva la referencia.
  */
-function conservarUsuario(previo: User | null, nuevo: User | null): User | null {
-  if (previo && nuevo && previo.id === nuevo.id && previo.email === nuevo.email) {
+function conservarUsuario(
+  previo: User | null,
+  nuevo: User | null,
+): User | null {
+  if (
+    previo &&
+    nuevo &&
+    previo.id === nuevo.id &&
+    previo.email === nuevo.email
+  ) {
     return previo;
   }
   return nuevo;
@@ -91,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Una entrada por sesión de página. Nunca se comparte entre dispositivos ni
   // usa localStorage para omitir accesos; refrescar el JWT no crea otro login.
   const accesos = useRef(new Map<string, Promise<void>>());
+  const usuariosBloqueados = useRef(new Set<string>());
 
   useEffect(() => {
     let isMounted = true;
@@ -109,7 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const syncValidatedSession = async (incomingSession: Session | null) => {
       const miSincronizacion = ++ultimaSincronizacion;
-      const esVigente = () => isMounted && miSincronizacion === ultimaSincronizacion;
+      const esVigente = () =>
+        isMounted && miSincronizacion === ultimaSincronizacion;
 
       if (!incomingSession) {
         accesos.current.clear();
@@ -120,13 +156,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const { data: userData, error: userError } =
+        await supabase.auth.getUser();
       if (!esVigente()) return;
-      const status = typeof userError === "object" && userError !== null && "status" in userError
-        ? Number((userError as { status?: unknown }).status)
-        : null;
+      const status =
+        typeof userError === "object" &&
+        userError !== null &&
+        "status" in userError
+          ? Number((userError as { status?: unknown }).status)
+          : null;
 
-      if ((status === 401 || status === 403) || (!userData.user && !userError)) {
+      if (status === 401 || status === 403 || (!userData.user && !userError)) {
         await clearLocalSession();
         return;
       }
@@ -135,24 +175,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Solo conservar una sesión que ya ha registrado su entrada en esta
         // página; una sesión recién restaurada no puede saltarse la auditoría.
         if (!accesos.current.has(incomingSession.user.id)) {
-          setSession(null); setUser(null); setLoading(false);
-          toast.error("No se pudo verificar y registrar el acceso. Recarga la página para reintentarlo.");
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          toast.error(
+            "No se pudo verificar y registrar el acceso. Recarga la página para reintentarlo.",
+          );
           return;
         }
         setSession(incomingSession);
-        setUser((previo) => conservarUsuario(previo, incomingSession.user ?? null));
+        setUser((previo) =>
+          conservarUsuario(previo, incomingSession.user ?? null),
+        );
         setLoading(false);
         return;
       }
 
       const userId = userData.user!.id;
-      if (!accesos.current.has(userId)) accesos.current.set(userId, registrarAccesoAuditoria("acceso"));
-      try { await accesos.current.get(userId); }
-      catch {
+      if (usuariosBloqueados.current.has(userId)) {
+        await clearLocalSession();
+        return;
+      }
+      if (!accesos.current.has(userId))
+        accesos.current.set(userId, registrarAccesoAuditoria("acceso"));
+      try {
+        await accesos.current.get(userId);
+      } catch {
         accesos.current.delete(userId);
         if (esVigente()) {
-          setSession(null); setUser(null); setLoading(false);
-          toast.error("No se pudo registrar el acceso al panel. Recarga la página para reintentarlo.");
+          setSession(null);
+          setUser(null);
+          setLoading(false);
+          toast.error(
+            "No se pudo registrar el acceso al panel. Recarga la página para reintentarlo.",
+          );
         }
         return;
       }
@@ -167,7 +223,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, incomingSession) => {
       // Fuera del bloqueo de Auth: las RPC necesitan obtener el token actual.
-      setTimeout(() => { if (isMounted) void syncValidatedSession(incomingSession); }, 0);
+      setTimeout(() => {
+        if (isMounted) void syncValidatedSession(incomingSession);
+      }, 0);
     });
 
     // THEN check for existing session
@@ -181,89 +239,199 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signUp = useCallback(async (
-    email: string,
-    password: string,
-    nombre_restaurante: string,
-    telefono?: string
-  ) => {
-    try {
-      const validatedData = signUpSchema.parse({
-        email,
-        password,
-        nombre_restaurante,
-        telefono,
-      });
-
-      const redirectUrl = `${window.location.origin}/`;
-
-      const { data, error } = await supabase.auth.signUp({
-        email: validatedData.email,
-        password: validatedData.password,
-        options: {
-          emailRedirectTo: redirectUrl,
-          data: {
-            nombre_restaurante: validatedData.nombre_restaurante,
-            telefono: validatedData.telefono,
-          },
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let activo = true;
+    let comprobando = false;
+    const cerrarPorBloqueo = async () => {
+      if (!activo || usuariosBloqueados.current.has(userId)) return;
+      usuariosBloqueados.current.add(userId);
+      accesos.current.clear();
+      // Retira inmediatamente la identidad: las rutas protegidas desmontan
+      // el panel antes de esperar la limpieza del almacenamiento de Auth.
+      setSession(null);
+      setUser(null);
+      toast.error(
+        "Tu acceso al panel ha sido bloqueado. Contacta con el superadmin.",
+      );
+      await supabase.auth.signOut({ scope: "local" });
+    };
+    const comprobar = async () => {
+      if (!activo || comprobando || document.visibilityState === "hidden")
+        return;
+      comprobando = true;
+      try {
+        const { error, data } = await supabase.auth.getUser();
+        if (
+          error?.status === 401 ||
+          error?.status === 403 ||
+          (!error && !data.user)
+        )
+          await cerrarPorBloqueo();
+      } catch {
+        /* Un corte de red no cierra una sesión válida. El servidor mantiene el bloqueo. */
+      } finally {
+        comprobando = false;
+      }
+    };
+    const canal = supabase
+      .channel(`user-access-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_access_status",
+          filter: `user_id=eq.${userId}`,
         },
-      });
+        (payload) => {
+          if (
+            "access_blocked" in payload.new &&
+            payload.new.access_blocked === true
+          )
+            void cerrarPorBloqueo();
+        },
+      )
+      .subscribe();
+    // Respaldo si el canal se desconecta y al volver a la aplicación. La
+    // comprobación inicial cubre un bloqueo durante la suscripción al canal.
+    void comprobar();
+    const timer = window.setInterval(() => void comprobar(), 15000);
+    const alVolver = () => {
+      void comprobar();
+    };
+    window.addEventListener("focus", alVolver);
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      activo = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", alVolver);
+      document.removeEventListener("visibilitychange", alVolver);
+      void supabase.removeChannel(canal);
+    };
+  }, [userId]);
 
-      if (error) {
-        if (error.message.includes("already registered")) {
-          toast.error("Este email ya está registrado");
-        } else {
-          toast.error("Error al registrar: " + error.message);
+  const signUp = useCallback(
+    async (
+      email: string,
+      password: string,
+      nombre_restaurante: string,
+      telefono?: string,
+    ) => {
+      try {
+        const validatedData = signUpSchema.parse({
+          email,
+          password,
+          nombre_restaurante,
+          telefono,
+        });
+
+        const redirectUrl = `${window.location.origin}/`;
+
+        const { data, error } = await supabase.auth.signUp({
+          email: validatedData.email,
+          password: validatedData.password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              nombre_restaurante: validatedData.nombre_restaurante,
+              telefono: validatedData.telefono,
+            },
+          },
+        });
+
+        if (error) {
+          if (error.message.includes("already registered")) {
+            toast.error("Este email ya está registrado");
+          } else {
+            toast.error("Error al registrar: " + error.message);
+          }
+          return { error };
         }
-        return { error };
-      }
 
-      toast.success("Registro exitoso. Por favor verifica tu email.");
-      return { data, error: null };
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-        return { error: new Error(error.errors[0].message) };
+        toast.success("Registro exitoso. Por favor verifica tu email.");
+        return { data, error: null };
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          toast.error(error.errors[0].message);
+          return { error: new Error(error.errors[0].message) };
+        }
+        toast.error("Error inesperado al registrar");
+        return { error: error as Error };
       }
-      toast.error("Error inesperado al registrar");
-      return { error: error as Error };
-    }
-  }, []);
+    },
+    [],
+  );
 
   const signIn = useCallback(async (email: string, password: string) => {
     try {
       const validatedData = signInSchema.parse({ email, password });
 
-      if (!await completeAuditEnabled()) {
+      if (!(await completeAuditEnabled())) {
         // Compatibilidad durante la publicación: no se llama a una función
         // aún inexistente. La pantalla de auditoría avisa de la activación pendiente.
-        const { data, error } = await supabase.auth.signInWithPassword({ email: validatedData.email, password: validatedData.password });
-        if (error) { toast.error("Email o contraseña incorrectos"); return { error }; }
-        if (!data.user) return { error: new Error("No se pudo abrir la sesión") };
-        const { error: auditError } = await supabase.from("audit_log").insert({
-          actor_user_id: data.user.id, actor_email: data.user.email, accion: "login", user_agent: navigator.userAgent,
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: validatedData.email,
+          password: validatedData.password,
         });
-        if (auditError) { await supabase.auth.signOut({ scope: "local" }); return { error: new Error("No se pudo registrar el acceso en auditoría") }; }
+        if (error) {
+          toast.error("Email o contraseña incorrectos");
+          return { error };
+        }
+        if (!data.user)
+          return { error: new Error("No se pudo abrir la sesión") };
+        const { error: auditError } = await supabase.from("audit_log").insert({
+          actor_user_id: data.user.id,
+          actor_email: data.user.email,
+          accion: "login",
+          user_agent: navigator.userAgent,
+        });
+        if (auditError) {
+          await supabase.auth.signOut({ scope: "local" });
+          return {
+            error: new Error("No se pudo registrar el acceso en auditoría"),
+          };
+        }
         toast.success("Sesión iniciada correctamente");
         return { data, error: null };
       }
       const response = await supabase.functions.invoke("panel-auth", {
-        body: { email: validatedData.email, password: validatedData.password, ruta: window.location.pathname },
+        body: {
+          email: validatedData.email,
+          password: validatedData.password,
+          ruta: window.location.pathname,
+        },
       });
       if (response.error || !response.data?.session || !response.data?.user) {
-        const context = response.error && "context" in response.error ? response.error.context : null;
-        const detail = context instanceof Response ? await context.json().catch(() => null) : null;
-        const error = new Error(detail?.error ?? response.data?.error ?? "No se pudo registrar y comprobar el acceso. Inténtalo de nuevo.");
+        const context =
+          response.error && "context" in response.error
+            ? response.error.context
+            : null;
+        const detail =
+          context instanceof Response
+            ? await context.json().catch(() => null)
+            : null;
+        const error = new Error(
+          detail?.error ??
+            response.data?.error ??
+            "No se pudo registrar y comprobar el acceso. Inténtalo de nuevo.",
+        );
         toast.error(error.message);
         return { error };
       }
       // El servidor ya ha guardado este acceso. Evita que SIGNED_IN lo duplique.
       const data = response.data;
+      usuariosBloqueados.current.delete(data.user.id);
       accesos.current.set(data.user.id, Promise.resolve());
-      const { error: sessionError } = await supabase.auth.setSession(data.session);
+      const { error: sessionError } = await supabase.auth.setSession(
+        data.session,
+      );
       if (sessionError) {
         accesos.current.delete(data.user.id);
-        toast.error("El acceso se registró, pero no se pudo abrir la sesión. Inténtalo de nuevo.");
+        toast.error(
+          "El acceso se registró, pero no se pudo abrir la sesión. Inténtalo de nuevo.",
+        );
         return { error: sessionError };
       }
 
@@ -301,20 +469,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Hay que leer quién es ANTES de cerrar sesión: `signOut()` invalida el
     // token, y la política de `audit_log` exige `actor_user_id = auth.uid()`
     // con el usuario todavía autenticado.
-    const { data: { user: saliente } } = await supabase.auth.getUser();
+    const {
+      data: { user: saliente },
+    } = await supabase.auth.getUser();
     if (saliente) {
-      try { await registrarAccesoAuditoria("logout"); }
-      catch (auditError) {
-        toast.error("No se pudo registrar el cierre de sesión. Vuelve a intentarlo.");
+      try {
+        await registrarAccesoAuditoria("logout");
+      } catch (auditError) {
+        toast.error(
+          "No se pudo registrar el cierre de sesión. Vuelve a intentarlo.",
+        );
         return { error: auditError as Error };
       }
     }
 
     const { error } = await supabase.auth.signOut();
     if (error) {
-      const status = typeof error === "object" && error !== null && "status" in error
-        ? Number((error as { status?: unknown }).status)
-        : null;
+      const status =
+        typeof error === "object" && error !== null && "status" in error
+          ? Number((error as { status?: unknown }).status)
+          : null;
 
       // Si el token ya no es válido, limpiamos sesión local para evitar estado corrupto.
       if (status === 403) {

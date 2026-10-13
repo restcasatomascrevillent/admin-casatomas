@@ -33,3 +33,13 @@ No hay restauración automática de pagos, facturas emitidas, correos enviados, 
 - Vitest: identidad del usuario, registro del chat y sus herramientas, formateo, componentes y validación de reversión.
 - `node scripts/verificar-auditoria.mjs`: prueba aislada en PGlite de actualizaciones, restauración de borrados, identidades generadas, conflictos, relaciones, permisos, límite de intentos, sanitización, histórico y eliminación del ruido.
 - La migración y las funciones Edge deben estar desplegadas antes de publicar la interfaz. La migración del repositorio debe conservar el mismo número de versión que la aplicada en Supabase.
+
+## Bloqueo de usuarios
+
+En Superadmin → Usuarios, Bloquear acceso y Desbloquear acceso requieren confirmación. La cuenta, documentos y permisos se conservan. No se puede bloquear la propia cuenta ni una cuenta que conserve acceso de superadmin. El estado de bloqueo procede de Supabase Auth, nunca de metadatos modificables por el usuario.
+
+Bloquear revoca todas las sesiones y tokens de renovación en la misma transacción de Auth. Los dispositivos reciben el aviso por Realtime y limpian su sesión local; si se pierde ese canal, se comprueba el acceso cada 15 segundos con la página visible y al recuperar foco. PostgREST, RLS y Storage rechazan el token revocado aunque la pantalla no haya recibido el aviso. Desbloquear permite iniciar una nueva sesión, sin restaurar las sesiones antiguas.
+
+La auditoría muestra quién ha bloqueado o desbloqueado el acceso y de qué cuenta, con filtros específicos para ambas acciones. Se desbloquea desde Usuarios; no se revierte Auth desde el botón genérico de auditoría.
+
+Activación: aplicar `20261013080832_bloquear_acceso_usuarios.sql` y publicar `admin-set-user-access` y `list-users` con sus dependencias compartidas. Mientras el servidor no devuelva el estado `access_blocked`, el botón queda deshabilitado para no ofrecer una acción incompleta.

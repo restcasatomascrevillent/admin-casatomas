@@ -51,6 +51,8 @@ const GRUPOS_ACCION = [
       ["cambiar_permisos", "Cambiar permisos"],
       ["cambiar_roles", "Cambiar roles"],
       ["cambiar_credenciales", "Cambiar credenciales"],
+      ["bloquear_acceso", "Bloquear acceso de usuario"],
+      ["desbloquear_acceso", "Desbloquear acceso de usuario"],
       ["reversion", "Revertir un cambio"],
     ],
   },

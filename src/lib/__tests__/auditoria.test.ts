@@ -87,3 +87,29 @@ describe("auditoría legible", () => {
     ).toBe(false);
   });
 });
+
+it.each([true, false])(
+  "explica el bloqueo y desbloqueo de un usuario (%s)",
+  (blocked) => {
+    const e = entry({
+      tabla: "auth.users",
+      detalles: {
+        antes: {
+          email: "persona@staff.local",
+          banned_until: blocked ? null : "2126-10-13T08:00:00Z",
+        },
+        despues: {
+          email: "persona@staff.local",
+          banned_until: blocked ? "2126-10-13T08:00:00Z" : null,
+        },
+      },
+    });
+    expect(tipoEvento(e)).toBe(
+      blocked ? "bloquear_acceso" : "desbloquear_acceso",
+    );
+    expect(resumenEntrada(e)).toBe(
+      `Ha ${blocked ? "bloqueado" : "desbloqueado"} el acceso de «persona@staff.local»`,
+    );
+    expect(puedeRevertir(e)).toBe(false);
+  },
+);

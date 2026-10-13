@@ -5,9 +5,12 @@ import { SECCIONES_CONFIGURABLES } from "@/components/usuarios/permisosSecciones
 import { toast } from "sonner";
 
 /** Secciones que gestiona el diálogo «Permisos»: el guardado no toca ninguna otra. */
-const SECCIONES_DEL_DIALOGO = new Set<string>(SECCIONES_CONFIGURABLES.map((s) => s.key));
+const SECCIONES_DEL_DIALOGO = new Set<string>(
+  SECCIONES_CONFIGURABLES.map((s) => s.key),
+);
 
-const etiquetaSeccion = (clave: string) => SECCIONES_CONFIGURABLES.find((s) => s.key === clave)?.label ?? clave;
+const etiquetaSeccion = (clave: string) =>
+  SECCIONES_CONFIGURABLES.find((s) => s.key === clave)?.label ?? clave;
 
 /**
  * ¿Lo ha rechazado la BD (código de Postgres o de PostgREST)? Entonces la escritura no se
@@ -25,6 +28,7 @@ export interface ManagedUser {
   role: AppRole | null;
   is_super_admin: boolean;
   created_at: string;
+  access_blocked?: boolean;
   permissions: {
     section_key: string;
     can_view: boolean;
@@ -37,7 +41,10 @@ export function useUsersManagement() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const extractFunctionErrorMessage = async (error: unknown, fallbackMessage: string) => {
+  const extractFunctionErrorMessage = async (
+    error: unknown,
+    fallbackMessage: string,
+  ) => {
     if (
       typeof error === "object" &&
       error !== null &&
@@ -45,7 +52,9 @@ export function useUsersManagement() {
       (error as { context?: unknown }).context instanceof Response
     ) {
       try {
-        const payload = await (error as { context: Response }).context.clone().json() as { error?: string };
+        const payload = (await (error as { context: Response }).context
+          .clone()
+          .json()) as { error?: string };
         if (payload?.error) return payload.error;
       } catch {
         // ignore parse errors and fallback below
@@ -59,154 +68,177 @@ export function useUsersManagement() {
     return fallbackMessage;
   };
 
-  const fetchUsers = useCallback(async (mostrarCarga = true) => {
-    if (!isAdmin) {
-      setUsers([]);
-      setLoading(false);
-      return;
-    }
-
-    if (mostrarCarga) setLoading(true);
-    try {
-      // Obtener usuarios desde auth.users mediante edge function
-      const authUsersMap = new Map<
-        string,
-        { email: string; display_name: string | null; created_at: string }
-      >();
-
-      try {
-        const response = await supabase.functions.invoke<{
-          users: Array<{ id: string; email: string | null; display_name: string | null; created_at: string }>;
-        }>("list-users");
-
-        if (response.error) {
-          throw response.error;
-        }
-
-        if (response.data?.users) {
-          response.data.users.forEach((u) => {
-            authUsersMap.set(u.id, {
-              email: u.email ?? "",
-              display_name: u.display_name,
-              created_at: u.created_at,
-            });
-          });
-        }
-      } catch (e) {
-        console.error("Error fetching auth users:", e);
-
-        const status =
-          typeof e === "object" &&
-          e !== null &&
-          "context" in e &&
-          (e as { context?: unknown }).context instanceof Response
-            ? (e as { context: Response }).context.status
-            : null;
-
-        if (status === 401 || status === 403) {
-          await supabase.auth.signOut({ scope: "local" });
-          throw new Error("Tu sesión ha expirado. Inicia sesión de nuevo.");
-        }
+  const fetchUsers = useCallback(
+    async (mostrarCarga = true) => {
+      if (!isAdmin) {
+        setUsers([]);
+        setLoading(false);
+        return;
       }
 
-      const [
-        { data: rolesData, error: rolesError },
-        { data: permissionsData, error: permError },
-        { data: superAdminsData, error: superAdminsError },
-      ] = await Promise.all([
-        supabase.from("user_roles").select("user_id, role, created_at"),
-        supabase.from("user_permissions").select("user_id, section_key, can_view, can_edit"),
-        supabase.from("super_admins").select("user_id"),
-      ]);
-
-      if (rolesError) throw rolesError;
-      if (permError) throw permError;
-      if (superAdminsError) throw superAdminsError;
-
-      const superAdminIds = new Set(
-        (superAdminsData ?? []).map((s) => s.user_id).filter((id): id is string => !!id)
-      );
-
-      const userMap = new Map<string, ManagedUser>();
-
-      authUsersMap.forEach((authUser, userId) => {
-        userMap.set(userId, {
-          id: userId,
-          email: authUser.email,
-          display_name: authUser.display_name,
-          role: null,
-          is_super_admin: superAdminIds.has(userId),
-          created_at: authUser.created_at,
-          permissions: [],
-        });
-      });
-
-      rolesData?.forEach((r) => {
-        const existing = userMap.get(r.user_id);
-        if (existing) {
-          existing.role = r.role as AppRole;
-          if (!existing.created_at && r.created_at) {
-            existing.created_at = r.created_at;
+      if (mostrarCarga) setLoading(true);
+      try {
+        // Obtener usuarios desde auth.users mediante edge function
+        const authUsersMap = new Map<
+          string,
+          {
+            email: string;
+            display_name: string | null;
+            created_at: string;
+            access_blocked?: boolean;
           }
-          return;
+        >();
+
+        try {
+          const response = await supabase.functions.invoke<{
+            users: Array<{
+              id: string;
+              email: string | null;
+              display_name: string | null;
+              created_at: string;
+              access_blocked?: boolean;
+            }>;
+          }>("list-users");
+
+          if (response.error) {
+            throw response.error;
+          }
+
+          if (response.data?.users) {
+            response.data.users.forEach((u) => {
+              authUsersMap.set(u.id, {
+                email: u.email ?? "",
+                display_name: u.display_name,
+                created_at: u.created_at,
+                access_blocked: u.access_blocked,
+              });
+            });
+          }
+        } catch (e) {
+          console.error("Error fetching auth users:", e);
+
+          const status =
+            typeof e === "object" &&
+            e !== null &&
+            "context" in e &&
+            (e as { context?: unknown }).context instanceof Response
+              ? (e as { context: Response }).context.status
+              : null;
+
+          if (status === 401 || status === 403) {
+            await supabase.auth.signOut({ scope: "local" });
+            throw new Error("Tu sesión ha expirado. Inicia sesión de nuevo.");
+          }
         }
 
-        userMap.set(r.user_id, {
-          id: r.user_id,
-          email: "",
-          display_name: null,
-          role: r.role as AppRole,
-          is_super_admin: superAdminIds.has(r.user_id),
-          created_at: r.created_at || "",
-          permissions: [],
-        });
-      });
+        const [
+          { data: rolesData, error: rolesError },
+          { data: permissionsData, error: permError },
+          { data: superAdminsData, error: superAdminsError },
+        ] = await Promise.all([
+          supabase.from("user_roles").select("user_id, role, created_at"),
+          supabase
+            .from("user_permissions")
+            .select("user_id, section_key, can_view, can_edit"),
+          supabase.from("super_admins").select("user_id"),
+        ]);
 
-      permissionsData?.forEach((p) => {
-        let user = userMap.get(p.user_id);
-        if (!user) {
-          user = {
-            id: p.user_id,
+        if (rolesError) throw rolesError;
+        if (permError) throw permError;
+        if (superAdminsError) throw superAdminsError;
+
+        const superAdminIds = new Set(
+          (superAdminsData ?? [])
+            .map((s) => s.user_id)
+            .filter((id): id is string => !!id),
+        );
+
+        const userMap = new Map<string, ManagedUser>();
+
+        authUsersMap.forEach((authUser, userId) => {
+          userMap.set(userId, {
+            id: userId,
+            email: authUser.email,
+            display_name: authUser.display_name,
+            role: null,
+            is_super_admin: superAdminIds.has(userId),
+            created_at: authUser.created_at,
+            access_blocked: authUser.access_blocked,
+            permissions: [],
+          });
+        });
+
+        rolesData?.forEach((r) => {
+          const existing = userMap.get(r.user_id);
+          if (existing) {
+            existing.role = r.role as AppRole;
+            if (!existing.created_at && r.created_at) {
+              existing.created_at = r.created_at;
+            }
+            return;
+          }
+
+          userMap.set(r.user_id, {
+            id: r.user_id,
             email: "",
             display_name: null,
-            role: null,
-            is_super_admin: superAdminIds.has(p.user_id),
-            created_at: "",
+            role: r.role as AppRole,
+            is_super_admin: superAdminIds.has(r.user_id),
+            created_at: r.created_at || "",
             permissions: [],
-          };
-          userMap.set(p.user_id, user);
-        }
-
-        const canEdit = Boolean(p.can_edit);
-        const canView = Boolean(p.can_view) || canEdit;
-
-        user.permissions.push({
-          section_key: p.section_key,
-          can_view: canView,
-          can_edit: canEdit,
+          });
         });
-      });
 
-      const usersArray = Array.from(userMap.values()).sort((a, b) => {
-        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-        return timeB - timeA;
-      });
+        permissionsData?.forEach((p) => {
+          let user = userMap.get(p.user_id);
+          if (!user) {
+            user = {
+              id: p.user_id,
+              email: "",
+              display_name: null,
+              role: null,
+              is_super_admin: superAdminIds.has(p.user_id),
+              created_at: "",
+              permissions: [],
+            };
+            userMap.set(p.user_id, user);
+          }
 
-      setUsers(usersArray);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast.error("Error al cargar usuarios");
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin]);
+          const canEdit = Boolean(p.can_edit);
+          const canView = Boolean(p.can_view) || canEdit;
+
+          user.permissions.push({
+            section_key: p.section_key,
+            can_view: canView,
+            can_edit: canEdit,
+          });
+        });
+
+        const usersArray = Array.from(userMap.values()).sort((a, b) => {
+          const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return timeB - timeA;
+        });
+
+        setUsers(usersArray);
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        toast.error("Error al cargar usuarios");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [isAdmin],
+  );
 
   useEffect(() => {
     void fetchUsers();
   }, [fetchUsers]);
 
-  const updateUserRole = async (userId: string, newRole: AppRole): Promise<boolean> => {
+  const updateUserRole = async (
+    userId: string,
+    newRole: AppRole,
+  ): Promise<boolean> => {
     try {
       const { error } = await supabase
         .from("user_roles")
@@ -228,24 +260,22 @@ export function useUsersManagement() {
     userId: string,
     sectionKey: string,
     canView: boolean,
-    canEdit: boolean
+    canEdit: boolean,
   ) => {
     try {
-      const { error } = await supabase
-        .from("user_permissions")
-        .upsert(
-          {
-            user_id: userId,
-            section_key: sectionKey,
-            // Editar implica ver. can_edit se escribe tal cual (hasta el
-            // 2026-10-01 se forzaba a false y la edición no se podía dar desde
-            // el panel). Solo un super admin puede escribir aquí (RLS).
-            can_view: canEdit ? true : canView,
-            can_edit: canEdit,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id,section_key" }
-        );
+      const { error } = await supabase.from("user_permissions").upsert(
+        {
+          user_id: userId,
+          section_key: sectionKey,
+          // Editar implica ver. can_edit se escribe tal cual (hasta el
+          // 2026-10-01 se forzaba a false y la edición no se podía dar desde
+          // el panel). Solo un super admin puede escribir aquí (RLS).
+          can_view: canEdit ? true : canView,
+          can_edit: canEdit,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id,section_key" },
+      );
 
       if (error) throw error;
 
@@ -277,13 +307,21 @@ export function useUsersManagement() {
    */
   const setAllPermissions = async (
     userId: string,
-    permissions: { section_key: string; can_view: boolean; can_edit: boolean }[],
-    { puedeConcederEdicion }: { puedeConcederEdicion: boolean }
+    permissions: {
+      section_key: string;
+      can_view: boolean;
+      can_edit: boolean;
+    }[],
+    { puedeConcederEdicion }: { puedeConcederEdicion: boolean },
   ): Promise<boolean> => {
-    const delDialogo = permissions.filter((p) => SECCIONES_DEL_DIALOGO.has(p.section_key));
+    const delDialogo = permissions.filter((p) =>
+      SECCIONES_DEL_DIALOGO.has(p.section_key),
+    );
     // Editar implica ver.
     const marcadas = delDialogo.filter((p) => p.can_view || p.can_edit);
-    const desmarcadas = delDialogo.filter((p) => !p.can_view && !p.can_edit).map((p) => p.section_key);
+    const desmarcadas = delDialogo
+      .filter((p) => !p.can_view && !p.can_edit)
+      .map((p) => p.section_key);
     const ahora = new Date().toISOString();
 
     try {
@@ -296,7 +334,7 @@ export function useUsersManagement() {
             ...(puedeConcederEdicion ? { can_edit: Boolean(p.can_edit) } : {}),
             updated_at: ahora,
           })),
-          { onConflict: "user_id,section_key" }
+          { onConflict: "user_id,section_key" },
         );
         if (error) throw error;
       }
@@ -304,10 +342,15 @@ export function useUsersManagement() {
       console.error("Error setting permissions:", error);
       const description = (error as { message?: string })?.message || undefined;
       if (esRechazoDeLaBd(error)) {
-        toast.error("No se han guardado los permisos: no se ha cambiado nada", { description });
+        toast.error("No se han guardado los permisos: no se ha cambiado nada", {
+          description,
+        });
       } else {
         // Pudo aplicarse antes de perder la respuesta: se relee la lista.
-        toast.error("Puede que no se haya guardado: revisa cómo han quedado los permisos", { description });
+        toast.error(
+          "Puede que no se haya guardado: revisa cómo han quedado los permisos",
+          { description },
+        );
         await fetchUsers(false);
       }
       return false;
@@ -333,14 +376,19 @@ export function useUsersManagement() {
         if (errorRelectura) throw errorRelectura;
         const siguen = (releidas ?? []).filter((f) => f.can_view || f.can_edit);
         if (siguen.length > 0) {
-          throw new Error(`Siguen activos: ${siguen.map((f) => etiquetaSeccion(f.section_key)).join(", ")}.`);
+          throw new Error(
+            `Siguen activos: ${siguen.map((f) => etiquetaSeccion(f.section_key)).join(", ")}.`,
+          );
         }
       }
     } catch (error) {
       console.error("Error removing unchecked permissions:", error);
-      toast.error("No se han podido quitar algunos permisos: vuelve a guardar", {
-        description: (error as { message?: string })?.message || undefined,
-      });
+      toast.error(
+        "No se han podido quitar algunos permisos: vuelve a guardar",
+        {
+          description: (error as { message?: string })?.message || undefined,
+        },
+      );
       await fetchUsers(false);
       return false;
     }
@@ -352,60 +400,111 @@ export function useUsersManagement() {
 
   const updateUserPassword = async (userId: string, password: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
-        "admin-update-user-password",
-        {
-          body: { userId, password },
-        }
-      );
+      const { data, error } = await supabase.functions.invoke<{
+        success?: boolean;
+        error?: string;
+      }>("admin-update-user-password", {
+        body: { userId, password },
+      });
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "No se pudo actualizar la contraseña");
+      if (!data?.success)
+        throw new Error(data?.error || "No se pudo actualizar la contraseña");
 
       toast.success("Contraseña actualizada correctamente");
       return true;
     } catch (error) {
       console.error("Error updating password:", error);
-      const message = await extractFunctionErrorMessage(error, "Error al actualizar la contraseña");
+      const message = await extractFunctionErrorMessage(
+        error,
+        "Error al actualizar la contraseña",
+      );
       toast.error(message);
+      return false;
+    }
+  };
+
+  const setUserAccessBlocked = async (
+    userId: string,
+    blocked: boolean,
+  ): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.functions.invoke<{
+        success?: boolean;
+        error?: string;
+      }>("admin-set-user-access", { body: { userId, blocked } });
+      if (error) throw error;
+      if (!data?.success)
+        throw new Error(data?.error || "No se pudo cambiar el acceso");
+      toast.success(
+        blocked
+          ? "Acceso bloqueado y sesiones cerradas"
+          : "Acceso desbloqueado",
+      );
+      await fetchUsers(false);
+      return true;
+    } catch (error) {
+      toast.error(
+        await extractFunctionErrorMessage(
+          error,
+          "No se pudo cambiar el acceso",
+        ),
+      );
+      await fetchUsers(false);
       return false;
     }
   };
 
   const setSuperAdmin = async (userId: string, makeSuperAdmin: boolean) => {
     try {
-      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
-        "admin-set-super-admin",
-        {
-          body: { userId, makeSuperAdmin },
-        }
-      );
+      const { data, error } = await supabase.functions.invoke<{
+        success?: boolean;
+        error?: string;
+      }>("admin-set-super-admin", {
+        body: { userId, makeSuperAdmin },
+      });
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "No se pudo actualizar el acceso de super admin");
+      if (!data?.success)
+        throw new Error(
+          data?.error || "No se pudo actualizar el acceso de super admin",
+        );
 
       toast.success(
-        makeSuperAdmin ? "Usuario añadido como super admin" : "Acceso de super admin revocado"
+        makeSuperAdmin
+          ? "Usuario añadido como super admin"
+          : "Acceso de super admin revocado",
       );
       fetchUsers();
       return true;
     } catch (error) {
       console.error("Error updating super admin status:", error);
-      const message = await extractFunctionErrorMessage(error, "Error al actualizar el acceso de super admin");
+      const message = await extractFunctionErrorMessage(
+        error,
+        "Error al actualizar el acceso de super admin",
+      );
       toast.error(message);
       return false;
     }
   };
 
-  const inviteUser = async (email: string, role: AppRole, permissions: { section_key: string; can_view: boolean; can_edit: boolean }[]) => {
+  const inviteUser = async (
+    email: string,
+    role: AppRole,
+    permissions: {
+      section_key: string;
+      can_view: boolean;
+      can_edit: boolean;
+    }[],
+  ) => {
     try {
       // Crear usuario mediante Supabase Auth Admin (requiere service role key)
       // Por ahora, el admin puede registrar usuarios manualmente
       toast.info("El usuario debe registrarse con este email: " + email);
-      
+
       // Guardamos la configuración pendiente para cuando el usuario se registre
       // Esto requeriría una tabla adicional o un trigger
-      
+
       return true;
     } catch (error) {
       console.error("Error inviting user:", error);
@@ -414,7 +513,10 @@ export function useUsersManagement() {
     }
   };
 
-  const assignRoleToNewUser = async (userId: string, role: AppRole = "staff") => {
+  const assignRoleToNewUser = async (
+    userId: string,
+    role: AppRole = "staff",
+  ) => {
     try {
       const { error } = await supabase
         .from("user_roles")
@@ -431,9 +533,11 @@ export function useUsersManagement() {
         can_edit: false,
       }));
 
-      const { error: permissionsError } = await supabase.from("user_permissions").upsert(defaultPermissions, {
-        onConflict: "user_id,section_key",
-      });
+      const { error: permissionsError } = await supabase
+        .from("user_permissions")
+        .upsert(defaultPermissions, {
+          onConflict: "user_id,section_key",
+        });
       if (permissionsError) throw permissionsError;
 
       return true;
@@ -445,21 +549,24 @@ export function useUsersManagement() {
 
   const deleteUser = async (userId: string) => {
     try {
-      const { data, error } = await supabase.functions.invoke<{ success?: boolean; error?: string }>(
-        "admin-delete-user",
-        {
-          body: { userId },
-        }
-      );
+      const { data, error } = await supabase.functions.invoke<{
+        success?: boolean;
+        error?: string;
+      }>("admin-delete-user", {
+        body: { userId },
+      });
 
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || "No se pudo eliminar el usuario");
+      if (!data?.success)
+        throw new Error(data?.error || "No se pudo eliminar el usuario");
 
       toast.success("Usuario eliminado correctamente");
       fetchUsers();
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast.error(error instanceof Error ? error.message : "Error al eliminar usuario");
+      toast.error(
+        error instanceof Error ? error.message : "Error al eliminar usuario",
+      );
     }
   };
 
@@ -473,6 +580,7 @@ export function useUsersManagement() {
     setAllPermissions,
     updateUserPassword,
     setSuperAdmin,
+    setUserAccessBlocked,
     inviteUser,
     assignRoleToNewUser,
     deleteUser,

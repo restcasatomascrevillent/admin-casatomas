@@ -95,6 +95,8 @@ const EVENTO_LABEL: Record<string, string> = {
   cambiar_permisos: "Cambio de permisos",
   cambiar_roles: "Cambio de roles",
   cambiar_credenciales: "Credenciales",
+  bloquear_acceso: "Acceso bloqueado",
+  desbloquear_acceso: "Acceso desbloqueado",
   reversion: "Reversión",
 };
 const HERRAMIENTAS: Record<string, string> = {

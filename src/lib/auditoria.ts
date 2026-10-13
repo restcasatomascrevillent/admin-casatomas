@@ -181,6 +181,15 @@ export function tipoEvento(entrada: AuditLogEntry): string {
   const despues = d.despues as Record<string, unknown> | undefined;
   if (entrada.accion === "actualizar" && antes && despues) {
     if (
+      entrada.tabla === "auth.users" &&
+      antes.banned_until !== despues.banned_until
+    )
+      return despues.banned_until &&
+        new Date(String(despues.banned_until)).getTime() >
+          new Date(entrada.created_at).getTime()
+        ? "bloquear_acceso"
+        : "desbloquear_acceso";
+    if (
       entrada.tabla === "cheques_regalo" &&
       (antes.usado !== despues.usado ||
         antes.canjeado_en !== despues.canjeado_en)
@@ -200,6 +209,11 @@ export function resumenEntrada(entrada: AuditLogEntry): string {
   if (entrada.tabla === "mensajes_chat") {
     const fila = (d.despues ?? d.antes ?? {}) as Record<string, unknown>;
     return `${entrada.accion === "eliminar" ? "Ha eliminado un mensaje" : (fila.rol ?? fila.role) === "assistant" ? "La IA de facturas ha respondido" : "Ha preguntado a la IA de facturas"}: «${String(fila.contenido ?? fila.content ?? "").slice(0, 180)}»`;
+  }
+  const evento = tipoEvento(entrada);
+  if (evento === "bloquear_acceso" || evento === "desbloquear_acceso") {
+    const fila = (d.despues ?? d.antes ?? {}) as Record<string, unknown>;
+    return `Ha ${evento === "bloquear_acceso" ? "bloqueado" : "desbloqueado"} el acceso de ${fila.email ? `«${String(fila.email)}»` : "un usuario"}`;
   }
   if (d.credenciales_actualizadas)
     return "Ha cambiado las credenciales de un usuario";

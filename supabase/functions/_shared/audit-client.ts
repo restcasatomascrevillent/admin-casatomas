@@ -59,7 +59,7 @@ export function clienteConAuditoria<T extends Fabrica>(fabrica: T, fuente: strin
 }
 
 const SIN_EVENTO_PROPIO = new Set([
-  "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password",
+  "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password", "admin-set-user-access",
   "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "vapi-analytics", "sync-trafico-web",
 ]);
 

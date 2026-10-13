@@ -243,3 +243,6 @@ verify_jwt = false
 
 [functions.auditoria-revertir]
 verify_jwt = true
+
+[functions.admin-set-user-access]
+verify_jwt = true
