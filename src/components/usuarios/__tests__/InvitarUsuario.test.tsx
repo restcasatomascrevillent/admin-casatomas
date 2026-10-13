@@ -37,6 +37,7 @@ vi.mock("@/hooks/useUserRolePresets", () => ({
 
 import { supabase } from "@/integrations/supabase/client";
 import { InvitarUsuario } from "@/components/usuarios/InvitarUsuario";
+import { toast } from "sonner";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -152,4 +153,25 @@ describe("InvitarUsuario · «Puede editar» al crear", () => {
 
     expect(de(await permisosEnviados(), "reservas")).toEqual({ section_key: "reservas", can_view: true, can_edit: false });
   });
+});
+
+it("explica el alta duplicada y conserva el formulario para corregirlo", async () => {
+  vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({ data: null, error: { context: new Response(JSON.stringify({ error: "Este nombre de usuario ya está registrado" }), { status: 409 }) } } as never);
+  render(<InvitarUsuario />);
+  rellenarYCrear();
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Este nombre de usuario ya está registrado"));
+  expect(screen.getByLabelText("Nombre de Usuario")).toHaveValue("camarero2");
+  expect(toast.success).not.toHaveBeenCalled();
+});
+
+it("un alta normal creada cuyo acceso de superadmin falla muestra solo el aviso real", async () => {
+  vi.mocked(supabase.functions.invoke).mockImplementation(async name => name === "admin-create-user"
+    ? { data: { success: true, userId: "u-nuevo" }, error: null } as never
+    : { data: null, error: { context: new Response(JSON.stringify({ error: "No se pudo conceder el acceso" }), { status: 500 }) } } as never);
+  render(<InvitarUsuario allowSuperAdmin />);
+  fireEvent.click(screen.getByRole("checkbox", { name: /Crear como Super Admin/ }));
+  rellenarYCrear();
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/Usuario creado, pero.*No se pudo conceder el acceso/)));
+  expect(toast.success).not.toHaveBeenCalled();
+  expect(screen.getByLabelText("Nombre de Usuario")).toHaveValue("");
 });

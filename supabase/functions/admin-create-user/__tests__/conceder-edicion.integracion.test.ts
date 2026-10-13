@@ -27,6 +27,9 @@ const h = vi.hoisted(() => ({
   /** Llamadas a auth.admin.createUser. */
   creados: [] as Array<Record<string, unknown>>,
   tablas: {} as Record<string, Array<Record<string, unknown>>>,
+  fallo: "" as string,
+  eliminados: [] as string[],
+  bloqueados: [] as string[],
 }));
 
 vi.mock("https://esm.sh/@supabase/supabase-js@2", () => ({
@@ -62,10 +65,21 @@ vi.mock("https://esm.sh/@supabase/supabase-js@2", () => ({
             tabla("user_permissions").push({ user_id: user.id, section_key: "dashboard", can_view: true, can_edit: false });
             return { data: { user }, error: null };
           },
+          deleteUser: async (id: string) => {
+            if (h.fallo === "cancelar") return { error: { message: "fallo cancelación" } };
+            h.eliminados.push(id);
+            for (const nombre of Object.keys(h.tablas)) h.tablas[nombre] = h.tablas[nombre].filter(f => f.user_id !== id);
+            return { error: null };
+          },
+          updateUserById: async (id: string, atributos: { ban_duration: string }) => {
+            if (atributos.ban_duration) h.bloqueados.push(id);
+            return { error: null };
+          },
         },
       },
       from: (nombre: string) => ({
         upsert: async (fila: Record<string, unknown>, opciones?: { onConflict?: string }) => {
+          if (h.fallo === "role") return { data: null, error: { message: "fallo rol" } };
           const col = opciones?.onConflict ?? "id";
           const filas = tabla(nombre);
           const i = filas.findIndex((f) => f[col] === fila[col]);
@@ -74,11 +88,13 @@ vi.mock("https://esm.sh/@supabase/supabase-js@2", () => ({
           return { data: null, error: null };
         },
         insert: async (v: Record<string, unknown> | Array<Record<string, unknown>>) => {
+          if (h.fallo === "insert" || h.fallo === "cancelar") return { data: null, error: { message: "fallo permisos" } };
           tabla(nombre).push(...(Array.isArray(v) ? v : [v]));
           return { data: null, error: null };
         },
         delete: () => ({
           eq: async (col: string, valor: unknown) => {
+            if (h.fallo === "delete") return { data: null, error: { message: "fallo preparación" } };
             h.tablas[nombre] = tabla(nombre).filter((f) => f[col] !== valor);
             return { data: null, error: null };
           },
@@ -116,6 +132,7 @@ function sembrar() {
   h.rpcs = [];
   h.creados = [];
   h.tablas = {};
+  h.fallo = ""; h.eliminados = []; h.bloqueados = [];
 }
 
 async function crear(token: string | null, permissions: unknown, extra: Fila = {}) {
@@ -263,5 +280,33 @@ describe("super admin por SUPER_ADMIN_EMAILS (sin fila en super_admins)", () => 
       ENV.SUPER_ADMIN_EMAILS = "";
       h.handler = original;
     }
+  });
+});
+
+describe("Alta · no anuncia éxito ni deja una cuenta incompleta accesible", () => {
+  it.each(["role", "delete", "insert"])("cancela el usuario nuevo si falla %s", async fallo => {
+    h.fallo = fallo;
+    const r = await crear("Bearer super", CON_EDICION);
+    expect(r.status).toBe(500);
+    expect(r.cuerpo.success).toBeUndefined();
+    expect(r.cuerpo.error).toMatch(/cancelado el alta/);
+    expect(h.eliminados).toEqual(["nuevo-1"]);
+    expect(permisosDe("nuevo-1")).toEqual([]);
+  });
+  it("bloquea la cuenta recién creada si no se puede cancelar el alta", async () => {
+    h.fallo = "cancelar";
+    const r = await crear("Bearer super", CON_EDICION);
+    expect(r.status).toBe(500);
+    expect(r.cuerpo.error).toMatch(/ha quedado bloqueado/);
+    expect(h.bloqueados).toEqual(["nuevo-1"]);
+  });
+  it.each([{ role: "root" }, { password: 123456 }, { username: ".." }, { permissions: "todos" }, { permissions: [{ section_key: "reservas", can_view: "true" }] }, { permissions: [CON_EDICION[0], CON_EDICION[0]] }])("valida antes de crear: %j", async extra => {
+    expect((await crear("Bearer super", CON_EDICION, extra)).status).toBe(400);
+    expect(h.creados).toEqual([]);
+  });
+  it("editar implica ver aunque el payload indique lo contrario", async () => {
+    const r = await crear("Bearer super", [{ section_key: "reservas", can_view: false, can_edit: true }]);
+    expect(r.status).toBe(200);
+    expect(permisosDe("nuevo-1")).toEqual([{ user_id: "nuevo-1", section_key: "reservas", can_view: true, can_edit: true }]);
   });
 });

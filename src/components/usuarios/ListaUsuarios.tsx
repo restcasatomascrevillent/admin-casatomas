@@ -45,6 +45,8 @@ import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
 import { VisorPermisosUsuario } from "@/components/usuarios/VisorPermisosUsuario";
+import { TarjetasUsuarios } from "@/components/usuarios/TarjetasUsuarios";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   cambiarEditar,
   cambiarVer,
@@ -65,9 +67,11 @@ interface ListaUsuariosProps {
 export function ListaUsuarios({
   canManageSuperAdmins = false,
 }: ListaUsuariosProps) {
+  const isMobile = useIsMobile();
   const {
     users,
     loading,
+    loadError,
     updateUserRole,
     setAllPermissions,
     updateUserPassword,
@@ -93,6 +97,7 @@ export function ListaUsuarios({
     PermisoSeccion[]
   >([]);
   const [selectedPresetId, setSelectedPresetId] = useState("manual");
+  const [savingPermissions, setSavingPermissions] = useState(false);
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [passwordTargetUser, setPasswordTargetUser] =
     useState<ManagedUser | null>(null);
@@ -131,6 +136,7 @@ export function ListaUsuarios({
   };
 
   const closePermissionsDialog = () => {
+    if (savingPermissions) return;
     setSelectedUser(null);
     setEditingPermissions([]);
     setSelectedPresetId("manual");
@@ -156,7 +162,9 @@ export function ListaUsuarios({
   };
 
   const savePermissions = async () => {
-    if (!selectedUser || !canManageUsers) return;
+    if (!selectedUser || !canManageUsers || savingPermissions) return;
+    setSavingPermissions(true);
+    try {
     // «Puede editar» solo lo escribe un super admin. Si el guardado falla, el
     // diálogo sigue abierto con lo elegido (para reintentar) y el rol no se toca.
     const guardado = await setAllPermissions(
@@ -180,12 +188,15 @@ export function ListaUsuarios({
       }
     }
     closePermissionsDialog();
+    } finally {
+      setSavingPermissions(false);
+    }
   };
 
   const handleDeleteUser = async (userId: string) => {
     if (!canManageUsers) return;
     if (
-      confirm("¿Estás seguro de eliminar este usuario del sistema de permisos?")
+      confirm("¿Eliminar este usuario definitivamente? Se borrará su cuenta. Para impedir el acceso sin borrarla, usa «Bloquear acceso».")
     ) {
       await deleteUser(userId);
     }
@@ -234,7 +245,7 @@ export function ListaUsuarios({
   };
 
   const handleChangePassword = async () => {
-    if (!passwordTargetUser || !canManageUsers) return;
+    if (!passwordTargetUser || !canManageUsers || updatingPassword) return;
 
     if (newPassword.length < 6) {
       toast.error("La contraseña debe tener al menos 6 caracteres");
@@ -288,7 +299,7 @@ export function ListaUsuarios({
   const handleUpdatePresetOnly = async (
     presetId: string,
     name: string,
-    baseRole: "manager" | "staff",
+    baseRole: UserRolePreset["base_role"],
     presetPermissions: PermisoSeccion[],
   ) => {
     const updatedPreset = await updatePreset(
@@ -324,6 +335,13 @@ export function ListaUsuarios({
     );
   }
 
+  if (loadError) {
+    return <div className="space-y-3 py-6 text-center">
+      <p className="text-sm text-destructive" role="alert">{loadError}</p>
+      <Button variant="outline" className="h-11" onClick={() => void fetchUsers()}>Reintentar</Button>
+    </div>;
+  }
+
   if (users.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
@@ -331,6 +349,20 @@ export function ListaUsuarios({
         <p>No hay usuarios registrados con roles asignados</p>
       </div>
     );
+  }
+
+  const usuariosConAccesos = users.map((user) => {
+    const permisosActuales = permisosParaEditar(user.permissions);
+    return {
+      user,
+      nombre: getUserDisplayName(user),
+      accessCount: permisosActuales.filter((p) => p.can_view).length,
+      editCount: permisosActuales.filter((p) => p.can_edit).length,
+    };
+  });
+
+  if (isMobile && !canManageSuperAdmins) {
+    return <TarjetasUsuarios usuarios={usuariosConAccesos} />;
   }
 
   return (
@@ -347,7 +379,6 @@ export function ListaUsuarios({
         <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
           <TableRow>
             <TableHead>Usuario</TableHead>
-            <TableHead>Rol</TableHead>
             <TableHead>Accesos</TableHead>
             <TableHead className="text-right">
               {canManageUsers ? "Acciones" : "Permisos"}
@@ -355,17 +386,7 @@ export function ListaUsuarios({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {users.map((user) => {
-            const permisosActuales = permisosParaEditar(user.permissions);
-            const matchingPreset = findMatchingPreset(
-              user.role,
-              permisosActuales,
-            );
-            const accessCount = permisosActuales.filter(
-              (p) => p.can_view,
-            ).length;
-            const editCount = permisosActuales.filter((p) => p.can_edit).length;
-
+          {usuariosConAccesos.map(({ user, accessCount, editCount }) => {
             return (
               <TableRow key={user.id}>
                 <TableCell>
@@ -380,27 +401,6 @@ export function ListaUsuarios({
                         {getUserDisplayName(user)}
                       </span>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {!user.is_super_admin && (
-                      <Badge variant="outline">
-                        {matchingPreset?.name ?? "Acceso por permisos"}
-                      </Badge>
-                    )}
-                    {user.role === "admin" && !user.is_super_admin && (
-                      <Badge variant="outline">Gestiona usuarios</Badge>
-                    )}
-                    {user.is_super_admin && (
-                      <Badge
-                        variant="outline"
-                        className="gap-1 border-amber-500 text-amber-600"
-                      >
-                        <ShieldAlert className="h-3 w-3" />
-                        Super Admin
-                      </Badge>
-                    )}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -461,7 +461,7 @@ export function ListaUsuarios({
                               puede editar
                             </DialogDescription>
                           </DialogHeader>
-                          <div className="space-y-4 py-2 sm:py-4">
+                          <fieldset disabled={savingPermissions} className="min-w-0 space-y-4 py-2 sm:py-4">
                             <div className="space-y-2">
                               <div className="flex flex-wrap items-center justify-between gap-2">
                                 <Label className="text-sm font-medium">
@@ -534,14 +534,15 @@ export function ListaUsuarios({
                               >
                                 <Button
                                   onClick={savePermissions}
-                                  disabled={!isSuperAdmin}
+                                  disabled={!isSuperAdmin || savingPermissions}
                                   className="h-11 w-full px-5 sm:w-auto"
                                 >
-                                  Guardar Permisos
+                                  {savingPermissions && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
+                                  {savingPermissions ? "Guardando..." : "Guardar Permisos"}
                                 </Button>
                               </ConMotivo>
                             </div>
-                          </div>
+                          </fieldset>
                         </DialogContent>
                       </Dialog>
                     )}
@@ -687,10 +688,10 @@ export function ListaUsuarios({
         open={passwordDialogOpen}
         onOpenChange={(open) => !open && closePasswordDialog()}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-md p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>Cambiar contraseña</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="break-words [overflow-wrap:anywhere]">
               Define una nueva contraseña para{" "}
               {getUserDisplayName(passwordTargetUser)} (
               {passwordTargetUser?.email || passwordTargetUser?.id}).
@@ -706,6 +707,7 @@ export function ListaUsuarios({
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
+                className="h-11 text-base"
               />
             </div>
             <div className="space-y-2">
@@ -719,9 +721,10 @@ export function ListaUsuarios({
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
+                className="h-11 text-base"
               />
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
                 variant="outline"
                 className="h-11 px-5"

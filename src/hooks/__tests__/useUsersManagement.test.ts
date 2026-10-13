@@ -90,6 +90,24 @@ const fila = (filas: Array<Fila & { user_id: string }>, clave: string) => filas.
 const enBd = (clave: string, userId = USUARIO) =>
   doble.filasDe("user_permissions", userId).find((f) => f.section_key === clave);
 
+it("un 403 al listar muestra el motivo sin cerrar una sesión válida ni inventar usuarios", async () => {
+  vi.mocked(supabase.functions.invoke).mockResolvedValue({ data: null, error: { context: new Response(JSON.stringify({ error: "No tienes permiso para ver usuarios" }), { status: 403 }) } } as never);
+  const { result } = await montarHook();
+  expect(result.current.users).toEqual([]);
+  expect(result.current.loadError).toBe("No tienes permiso para ver usuarios");
+  expect(supabase.auth.signOut).not.toHaveBeenCalled();
+});
+
+it("un error de contraseña conserva el mensaje de la función y no anuncia éxito", async () => {
+  const { result } = await montarHook();
+  vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({ data: null, error: { context: new Response(JSON.stringify({ error: "La nueva contraseña debe ser diferente de la actual" }), { status: 400 }) } } as never);
+  let guardado = true;
+  await act(async () => { guardado = await result.current.updateUserPassword(USUARIO, "prueba-123"); });
+  expect(guardado).toBe(false);
+  expect(toast.error).toHaveBeenCalledWith("La nueva contraseña debe ser diferente de la actual");
+  expect(toast.success).not.toHaveBeenCalled();
+});
+
 describe("useUsersManagement · lectura", () => {
   it("devuelve el can_edit real guardado en la BD (true sigue siendo true)", async () => {
     sembrar([

@@ -1,11 +1,13 @@
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { datosUsuarios, errorAuthUsuarios } from "../_shared/gestion-usuarios.ts";
 const createClient = clienteConAuditoria(createClientBase, "admin-create-user");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
@@ -19,21 +21,13 @@ const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
 const isSuperAdminEmail = (email?: string | null) =>
   !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 
-interface CreateUserRequest {
-  username: string;
-  password: string;
-  role: "admin" | "manager" | "staff";
-  permissions: Array<{
-    section_key: string;
-    can_view: boolean;
-    can_edit: boolean;
-  }>;
-}
-
 Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   try {
@@ -107,11 +101,14 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
     }
 
     // Parse request body
-    const body: CreateUserRequest = await req.json();
-    const { username, password, role, permissions } = body;
+    const body = await datosUsuarios(req);
+    const username = typeof body?.username === "string" ? body.username.trim() : "";
+    const password = body?.password;
+    const role = body?.role;
+    const permissions = body?.permissions ?? [];
 
     // Validate input
-    if (!username || !password) {
+    if (!username || typeof password !== "string" || !password) {
       return new Response(
         JSON.stringify({ error: "Nombre de usuario y contraseña son requeridos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -120,7 +117,7 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
 
     // Validate username format (letters, numbers, dots, underscores)
     const usernameRegex = /^[a-zA-Z0-9._]+$/;
-    if (!usernameRegex.test(username)) {
+    if (!usernameRegex.test(username) || username.length > 64 || username.startsWith(".") || username.endsWith(".") || username.includes("..")) {
       return new Response(
         JSON.stringify({ error: "El nombre de usuario solo puede contener letras, números, puntos y guiones bajos" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -132,6 +129,18 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
         JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (role !== "admin" && role !== "manager" && role !== "staff") {
+      return new Response(JSON.stringify({ error: "Configuración de acceso no válida" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const claves = new Set<string>();
+    if (!Array.isArray(permissions) || permissions.length > 64 || permissions.some((p) => {
+      if (!p || typeof p !== "object" || typeof p.section_key !== "string" || !/^[a-z_]{1,64}$/.test(p.section_key) || typeof p.can_view !== "boolean" || (p.can_edit != null && typeof p.can_edit !== "boolean") || claves.has(p.section_key)) return true;
+      claves.add(p.section_key);
+      return false;
+    })) {
+      return new Response(JSON.stringify({ error: "Los permisos enviados no son válidos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Generate internal email from username
@@ -154,20 +163,38 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
 
     if (createError) {
       console.error("Error creating user:", createError);
-      if (createError.message.includes("already been registered")) {
-        return new Response(
-          JSON.stringify({ error: "Este email ya está registrado" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      const fallo = errorAuthUsuarios(createError, "No se pudo crear el usuario. Vuelve a intentarlo.");
       return new Response(
-        JSON.stringify({ error: createError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: fallo.error }),
+        { status: fallo.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const newUserId = newUserData.user.id;
+    const newUserId = newUserData?.user?.id;
+    if (!newUserId) throw new Error("Auth no devolvió el usuario creado");
     console.log("User created with ID:", newUserId);
+
+    const cancelarAlta = async () => {
+      try {
+        const { error: cancelarError } = await ejecutarOperacionAuthAuditada(
+          supabaseAdmin, currentUser.id, "eliminar", { userId: newUserId },
+          () => supabaseAdmin.auth.admin.deleteUser(newUserId),
+        );
+        if (cancelarError) throw cancelarError;
+        return new Response(JSON.stringify({ error: "No se pudieron guardar los accesos. Se ha cancelado el alta; vuelve a intentarlo." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      } catch (cancelarError) {
+        console.error("No se pudo cancelar el alta incompleta:", cancelarError);
+        const { error: bloqueoError } = await ejecutarOperacionAuthAuditada(
+          supabaseAdmin, currentUser.id, "actualizar", { userId: newUserId },
+          () => supabaseAdmin.auth.admin.updateUserById(newUserId, { ban_duration: "876000h" }),
+        );
+        return new Response(JSON.stringify({ error: bloqueoError
+          ? "No se pudo completar ni cancelar el alta. Revisa el usuario en la lista antes de repetirla."
+          : "No se pudo completar el alta. El usuario ha quedado bloqueado; revisa sus accesos en la lista antes de desbloquearlo.", userId: newUserId }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    };
+
+    try {
 
     // The trigger will create default staff role and dashboard permission
     // But we want to set the specific role requested
@@ -177,21 +204,25 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
 
     if (roleError) {
       console.error("Error setting role:", roleError);
-      // Don't fail completely, user was created
+      return await cancelarAlta();
     }
 
     // Delete any existing permissions and set new ones
-    await supabaseAdmin
+    const { error: limpiarError } = await supabaseAdmin
       .from("user_permissions")
       .delete()
       .eq("user_id", newUserId);
+    if (limpiarError) {
+      console.error("Error preparing permissions:", limpiarError);
+      return await cancelarAlta();
+    }
 
     if (permissions && permissions.length > 0) {
       const permissionsToInsert = permissions.map((p) => ({
         user_id: newUserId,
         section_key: p.section_key,
-        can_view: p.can_view,
-        can_edit: p.can_edit,
+        can_view: p.can_view || Boolean(p.can_edit),
+        can_edit: Boolean(p.can_edit),
       }));
 
       const { error: permError } = await supabaseAdmin
@@ -200,7 +231,12 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
 
       if (permError) {
         console.error("Error setting permissions:", permError);
+        return await cancelarAlta();
       }
+    }
+    } catch (setupError) {
+      console.error("Error configurando el usuario nuevo:", setupError);
+      return await cancelarAlta();
     }
 
     console.log("User setup complete:", newUserId);

@@ -1,11 +1,13 @@
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { datosUsuarios, errorAuthUsuarios, esIdUsuario } from "../_shared/gestion-usuarios.ts";
 const createClient = clienteConAuditoria(createClientBase, "admin-delete-user");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
@@ -19,14 +21,11 @@ const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
 const isSuperAdminEmail = (email?: string | null) =>
   !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 
-interface DeleteUserRequest {
-  userId: string;
-}
-
 Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (req.method !== "POST") return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
     const authHeader = req.headers.get("Authorization");
@@ -85,10 +84,10 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
       });
     }
 
-    const body: DeleteUserRequest = await req.json();
+    const body = await datosUsuarios(req);
     const userId = body?.userId;
 
-    if (!userId) {
+    if (!esIdUsuario(userId)) {
       return new Response(JSON.stringify({ error: "userId es obligatorio" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -100,6 +99,12 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+
+    const { data: objetivo, error: objetivoError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (objetivoError || !objetivo?.user) {
+      const fallo = errorAuthUsuarios(objetivoError ?? { status: 404 }, "No se pudo consultar el usuario. Vuelve a intentarlo.");
+      return new Response(JSON.stringify({ error: fallo.error }), { status: fallo.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Un super admin nunca se puede eliminar directamente, ni siquiera otro
@@ -117,7 +122,7 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
       });
     }
 
-    if (targetSuperAdminData) {
+    if (targetSuperAdminData || isSuperAdminEmail(objetivo.user.email)) {
       return new Response(
         JSON.stringify({ error: "No se puede eliminar a un super admin: quítale antes el acceso de super admin" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -130,8 +135,9 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
     );
 
     if (deleteError) {
-      return new Response(JSON.stringify({ error: deleteError.message }), {
-        status: 500,
+      const fallo = errorAuthUsuarios(deleteError, "No se pudo eliminar el usuario. Vuelve a intentarlo.");
+      return new Response(JSON.stringify({ error: fallo.error }), {
+        status: fallo.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

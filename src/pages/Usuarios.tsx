@@ -24,14 +24,14 @@ export default function Usuarios() {
         {/* Sin título de página (2026-09-25): la pestaña "Usuarios" activa en
             el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
 
-        <Card className="flex min-h-0 flex-1 flex-col">
-          <CardHeader>
+        <Card className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <CardHeader className="shrink-0 p-4 sm:p-6">
             <CardTitle>Lista de Usuarios</CardTitle>
             <CardDescription>
               Consulta los accesos de cada usuario. Toda la gestión se realiza desde el superadmin.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col">
+          <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
             <ListaUsuarios />
           </CardContent>
         </Card>

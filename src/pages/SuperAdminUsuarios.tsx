@@ -55,7 +55,7 @@ export default function SuperAdminUsuarios() {
           <CardHeader>
             <CardTitle>Lista de Usuarios</CardTitle>
             <CardDescription>
-              Gestiona roles, permisos y el acceso de super admin de todos los usuarios del sistema
+              Gestiona permisos, contraseñas y el acceso de los usuarios del sistema
             </CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col">

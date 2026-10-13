@@ -16,13 +16,14 @@
  * useSuperAdmin / useUserRolePresets van mockeados para fijar quién mira la
  * pantalla y qué roles preconfigurados hay.
  */
-import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
 import {
   render,
   screen,
   fireEvent,
   waitFor,
   within,
+  act,
 } from "@testing-library/react";
 import type { UserRolePreset } from "@/hooks/useUserRolePresets";
 import { crearDoblePermisos } from "@/hooks/__tests__/doblePermisosUsuario";
@@ -129,6 +130,7 @@ const preset = (
 });
 
 beforeEach(() => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 1024 });
   vi.clearAllMocks();
   h.esSuperAdmin = true;
   h.presets = [];
@@ -159,6 +161,10 @@ beforeEach(() => {
   } as never);
 });
 
+afterEach(() => {
+  window.innerWidth = 1024;
+});
+
 async function abrirPermisosDelCamarero() {
   render(<ListaUsuarios canManageSuperAdmins />);
   fireEvent.click(await screen.findByRole("button", { name: "Permisos" }));
@@ -176,8 +182,8 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     const fila = (await screen.findByText("camarero1")).closest("tr")!;
     expect(within(fila).queryByText("Administrador")).toBeNull();
     expect(within(fila).queryByText("Acceso completo")).toBeNull();
-    expect(within(fila).getByText("Acceso por permisos")).toBeInTheDocument();
-    expect(within(fila).getByText("Gestiona usuarios")).toBeInTheDocument();
+    expect(within(fila).queryByText("Acceso por permisos")).toBeNull();
+    expect(within(fila).queryByText("Gestiona usuarios")).toBeNull();
     expect(within(fila).getByText("3 secciones")).toBeInTheDocument();
     expect(within(fila).getByText("1 con edición")).toBeInTheDocument();
   });
@@ -186,7 +192,7 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     h.presets = [preset("p-sala", "Sala", PERMISOS_CAMARERO)];
     render(<ListaUsuarios canManageSuperAdmins />);
     let fila = (await screen.findByText("camarero1")).closest("tr")!;
-    expect(within(fila).getByText("Sala")).toBeInTheDocument();
+    expect(within(fila).queryByText("Sala")).toBeNull();
     fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
     const dialogo = await screen.findByRole("dialog");
     fireEvent.click(interruptor(dialogo, "Ver Reservas"));
@@ -196,7 +202,7 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fila = screen.getByText("camarero1").closest("tr")!;
     expect(within(fila).queryByText("Sala")).toBeNull();
-    expect(within(fila).getByText("Acceso por permisos")).toBeInTheDocument();
+    expect(within(fila).queryByText("Acceso por permisos")).toBeNull();
     expect(within(fila).getByText("2 secciones")).toBeInTheDocument();
     expect(within(fila).queryByText(/con edición/)).toBeNull();
   });
@@ -217,14 +223,14 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     const actualizada = screen.getByText("camarero1").closest("tr")!;
     expect(doble.filasDe("user_roles", CAMARERO)[0].role).toBe("staff");
-    expect(within(actualizada).getByText("Sala")).toBeInTheDocument();
+    expect(within(actualizada).queryByText("Sala")).toBeNull();
     expect(within(actualizada).queryByText("Gestiona usuarios")).toBeNull();
   });
 
   it("el acceso completo solo se muestra a los super admins", async () => {
     render(<ListaUsuarios canManageSuperAdmins />);
     const fila = (await screen.findByText("Dueño")).closest("tr")!;
-    expect(within(fila).getByText("Super Admin")).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Rol" })).toBeNull();
     expect(within(fila).getByText("Acceso completo")).toBeInTheDocument();
   });
 });
@@ -350,8 +356,8 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
         "admin";
       render(<ListaUsuarios />);
       const fila = (await screen.findByText("camarero1")).closest("tr")!;
-      expect(within(fila).getByText("Acceso por permisos")).toBeInTheDocument();
-      expect(within(fila).getByText("Gestiona usuarios")).toBeInTheDocument();
+      expect(within(fila).queryByText("Acceso por permisos")).toBeNull();
+      expect(within(fila).queryByText("Gestiona usuarios")).toBeNull();
       expect(within(fila).getByText("3 secciones")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "Contraseña" })).toBeNull();
       expect(screen.queryByRole("button", { name: /^Eliminar/ })).toBeNull();
@@ -612,4 +618,102 @@ it("la propia cuenta está protegida y el panel normal no ofrece bloqueo", async
   render(<ListaUsuarios />);
   await screen.findByText("Dueño");
   expect(screen.queryByRole("button", { name: "Bloquear acceso" })).toBeNull();
+});
+
+describe("Usuarios · consulta en teléfono", () => {
+  it("muestra tarjetas con los accesos reales y abre permisos sin controles de gestión", async () => {
+    window.innerWidth = 390;
+    h.presets = [preset("p-sala", "Sala", PERMISOS_CAMARERO)];
+    render(<ListaUsuarios />);
+    const tarjeta = (await screen.findByText("camarero1")).closest("li")!;
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(within(tarjeta).queryByText("Sala")).toBeNull();
+    expect(within(tarjeta).getByText("3 secciones")).toBeInTheDocument();
+    expect(within(tarjeta).getByText("1 con edición")).toBeInTheDocument();
+    expect(within(tarjeta).getAllByRole("button")).toHaveLength(1);
+    fireEvent.click(within(tarjeta).getByRole("button", { name: "Ver permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByLabelText("Editar Reservas: Sí")).toHaveTextContent("Sí");
+    expect(within(dialogo).getByLabelText("Editar Facturas: No")).toHaveTextContent("No");
+    expect(within(dialogo).queryByRole("switch")).toBeNull();
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cerrar" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.bd.operaciones).toEqual([]);
+  });
+
+  it("busca por nombre sin tildes y por correo, y permite recuperar la lista vacía", async () => {
+    window.innerWidth = 320;
+    render(<ListaUsuarios />);
+    await screen.findByText("camarero1");
+    const buscar = screen.getByRole("searchbox", { name: "Buscar usuarios por nombre o correo" });
+    fireEvent.change(buscar, { target: { value: "DUENO" } });
+    expect(screen.getByText("Dueño")).toBeInTheDocument();
+    expect(screen.queryByText("camarero1")).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent("1 de 2 usuarios");
+    fireEvent.change(buscar, { target: { value: "camarero1@staff.local" } });
+    expect(screen.getByText("camarero1")).toBeInTheDocument();
+    expect(screen.queryByText("Dueño")).toBeNull();
+    fireEvent.change(buscar, { target: { value: "nadie@example.com" } });
+    expect(screen.getByText(/No hay usuarios que coincidan/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Ver todos los usuarios" }));
+    expect(screen.getByText("Dueño")).toBeInTheDocument();
+    expect(screen.getByText("camarero1")).toBeInTheDocument();
+    expect(buscar).toHaveValue("");
+  });
+
+  it("conserva la consulta sin gestión al cambiar de teléfono a escritorio", async () => {
+    window.innerWidth = 390;
+    render(<ListaUsuarios />);
+    await screen.findByText("camarero1");
+    expect(screen.getByRole("list", { name: "Usuarios" })).toBeInTheDocument();
+    act(() => {
+      window.innerWidth = 1280;
+      window.dispatchEvent(new Event("resize"));
+    });
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Usuarios" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Ver permisos" })).toHaveLength(2);
+    expect(screen.queryByRole("button", { name: "Contraseña" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Bloquear acceso" })).toBeNull();
+    expect(doble.bd.operaciones).toEqual([]);
+  });
+
+  it("distingue el acceso bloqueado de los permisos que mantiene el usuario", async () => {
+    window.innerWidth = 390;
+    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+      data: { users: [{ id: CAMARERO, email: "camarero1@staff.local", display_name: "camarero1", access_blocked: true }] },
+      error: null,
+    } as never);
+    render(<ListaUsuarios />);
+    const tarjeta = (await screen.findByText("camarero1")).closest("li")!;
+    expect(within(tarjeta).getByText("Acceso bloqueado")).toBeInTheDocument();
+    expect(within(tarjeta).getByText("Permisos conservados")).toBeInTheDocument();
+    fireEvent.click(within(tarjeta).getByRole("button", { name: "Ver permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByText(/Acceso bloqueado. Se conservan/)).toBeInTheDocument();
+    expect(within(dialogo).getByLabelText("Editar Reservas: Sí")).toHaveTextContent("Sí");
+    expect(doble.bd.operaciones).toEqual([]);
+  });
+});
+
+it("el cambio de contraseña conserva el diálogo si falla y lo cierra al guardar correctamente", async () => {
+  const listado = { users: [{ id: "u-yo", email: "dueno@example.com", display_name: "Dueño", access_blocked: false }, { id: CAMARERO, email: "camarero1@staff.local", display_name: "camarero1", access_blocked: false }] };
+  let fallar = true;
+  vi.mocked(supabase.functions.invoke).mockImplementation(async name => name === "admin-update-user-password"
+    ? fallar ? { data: null, error: { context: new Response(JSON.stringify({ error: "La nueva contraseña debe ser diferente de la actual" }), { status: 400 }) } } as never : { data: { success: true }, error: null } as never
+    : { data: listado, error: null } as never);
+  render(<ListaUsuarios canManageSuperAdmins />);
+  const fila = (await screen.findByText("camarero1")).closest("tr")!;
+  fireEvent.click(within(fila).getByRole("button", { name: "Contraseña" }));
+  const dialogo = await screen.findByRole("dialog");
+  fireEvent.change(within(dialogo).getByLabelText("Nueva contraseña"), { target: { value: "prueba-123" } });
+  fireEvent.change(within(dialogo).getByLabelText("Confirmar contraseña"), { target: { value: "prueba-123" } });
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Actualizar contraseña" }));
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("La nueva contraseña debe ser diferente de la actual"));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  expect(within(dialogo).getByLabelText("Nueva contraseña")).toHaveValue("prueba-123");
+  fallar = false;
+  fireEvent.click(within(dialogo).getByRole("button", { name: "Actualizar contraseña" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(toast.success).toHaveBeenCalledWith("Contraseña actualizada correctamente");
 });

@@ -85,31 +85,21 @@ Deno.serve(
         );
       }
 
-      // Get all users from auth.users
-      const { data: authUsers, error: usersError } =
-        await supabaseAdmin.auth.admin.listUsers();
-
-      if (usersError) {
-        console.error("Error listing users:", usersError);
-        return new Response(
-          JSON.stringify({ error: "Error al listar usuarios" }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
-        );
+      // Auth entrega solo una página si se omiten page/perPage.
+      const users: Array<{ id: string; email?: string; display_name: string | null; created_at: string; access_blocked: boolean }> = [];
+      const perPage = 1000;
+      for (let page = 1; ; page++) {
+        const { data: authUsers, error: usersError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+        if (usersError || !authUsers?.users) throw usersError ?? new Error("Auth no devolvió la lista de usuarios");
+        users.push(...authUsers.users.map((user) => ({
+          id: user.id,
+          email: user.email,
+          display_name: typeof user.user_metadata?.display_name === "string" ? user.user_metadata.display_name : null,
+          created_at: user.created_at,
+          access_blocked: !!user.banned_until && new Date(user.banned_until).getTime() > Date.now(),
+        })));
+        if (authUsers.users.length < perPage) break;
       }
-
-      // Map users to return id, email, and display_name
-      const users = authUsers.users.map((user) => ({
-        id: user.id,
-        email: user.email,
-        display_name: user.user_metadata?.display_name || null,
-        created_at: user.created_at,
-        access_blocked:
-          !!user.banned_until &&
-          new Date(user.banned_until).getTime() > Date.now(),
-      }));
 
       return new Response(JSON.stringify({ users }), {
         status: 200,

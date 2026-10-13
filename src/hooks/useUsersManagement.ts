@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useUserRole, AppRole, SECTIONS } from "./useUserRole";
 import { SECCIONES_CONFIGURABLES } from "@/components/usuarios/permisosSecciones";
 import { toast } from "sonner";
+import { mensajeErrorUsuarios } from "@/lib/errores-usuarios";
 
 /** Secciones que gestiona el diálogo «Permisos»: el guardado no toca ninguna otra. */
 const SECCIONES_DEL_DIALOGO = new Set<string>(
@@ -40,43 +41,19 @@ export function useUsersManagement() {
   const { isAdmin } = useUserRole();
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const extractFunctionErrorMessage = async (
-    error: unknown,
-    fallbackMessage: string,
-  ) => {
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "context" in error &&
-      (error as { context?: unknown }).context instanceof Response
-    ) {
-      try {
-        const payload = (await (error as { context: Response }).context
-          .clone()
-          .json()) as { error?: string };
-        if (payload?.error) return payload.error;
-      } catch {
-        // ignore parse errors and fallback below
-      }
-    }
-
-    if (error instanceof Error && error.message) {
-      return error.message;
-    }
-
-    return fallbackMessage;
-  };
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchUsers = useCallback(
     async (mostrarCarga = true) => {
       if (!isAdmin) {
         setUsers([]);
         setLoading(false);
+        setLoadError(null);
         return;
       }
 
       if (mostrarCarga) setLoading(true);
+      setLoadError(null);
       try {
         // Obtener usuarios desde auth.users mediante edge function
         const authUsersMap = new Map<
@@ -104,6 +81,7 @@ export function useUsersManagement() {
             throw response.error;
           }
 
+          if (!Array.isArray(response.data?.users)) throw new Error("No se pudo cargar la lista de usuarios. Vuelve a intentarlo.");
           if (response.data?.users) {
             response.data.users.forEach((u) => {
               authUsersMap.set(u.id, {
@@ -125,10 +103,11 @@ export function useUsersManagement() {
               ? (e as { context: Response }).context.status
               : null;
 
-          if (status === 401 || status === 403) {
+          if (status === 401) {
             await supabase.auth.signOut({ scope: "local" });
             throw new Error("Tu sesión ha expirado. Inicia sesión de nuevo.");
           }
+          throw e;
         }
 
         const [
@@ -223,7 +202,9 @@ export function useUsersManagement() {
         setUsers(usersArray);
       } catch (error) {
         console.error("Error fetching users:", error);
-        toast.error("Error al cargar usuarios");
+        const mensaje = await mensajeErrorUsuarios(error, "No se pudo cargar la lista de usuarios. Vuelve a intentarlo.");
+        setLoadError(mensaje);
+        toast.error(mensaje);
       } finally {
         setLoading(false);
       }
@@ -415,7 +396,7 @@ export function useUsersManagement() {
       return true;
     } catch (error) {
       console.error("Error updating password:", error);
-      const message = await extractFunctionErrorMessage(
+      const message = await mensajeErrorUsuarios(
         error,
         "Error al actualizar la contraseña",
       );
@@ -445,7 +426,7 @@ export function useUsersManagement() {
       return true;
     } catch (error) {
       toast.error(
-        await extractFunctionErrorMessage(
+        await mensajeErrorUsuarios(
           error,
           "No se pudo cambiar el acceso",
         ),
@@ -475,11 +456,11 @@ export function useUsersManagement() {
           ? "Usuario añadido como super admin"
           : "Acceso de super admin revocado",
       );
-      fetchUsers();
+      await fetchUsers(false);
       return true;
     } catch (error) {
       console.error("Error updating super admin status:", error);
-      const message = await extractFunctionErrorMessage(
+      const message = await mensajeErrorUsuarios(
         error,
         "Error al actualizar el acceso de super admin",
       );
@@ -561,18 +542,19 @@ export function useUsersManagement() {
         throw new Error(data?.error || "No se pudo eliminar el usuario");
 
       toast.success("Usuario eliminado correctamente");
-      fetchUsers();
+      await fetchUsers(false);
+      return true;
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Error al eliminar usuario",
-      );
+      toast.error(await mensajeErrorUsuarios(error, "Error al eliminar usuario"));
+      return false;
     }
   };
 
   return {
     users,
     loading,
+    loadError,
     isAdmin,
     fetchUsers,
     updateUserRole,

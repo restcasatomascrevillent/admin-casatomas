@@ -1,6 +1,7 @@
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { ejecutarOperacionAuthAuditada } from "../_shared/audit-auth.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { datosUsuarios, errorAuthUsuarios, esIdUsuario } from "../_shared/gestion-usuarios.ts";
 const createClient = clienteConAuditoria(createClientBase, "admin-update-user-password");
 
 const corsHeaders = {
@@ -20,14 +21,12 @@ const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
 const isSuperAdminEmail = (email?: string | null) =>
   !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 
-interface UpdatePasswordRequest {
-  userId: string;
-  password: string;
-}
-
 Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Método no permitido" }), { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
   try {
@@ -79,11 +78,11 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
       );
     }
 
-    const body: UpdatePasswordRequest = await req.json();
+    const body = await datosUsuarios(req);
     const userId = body?.userId;
     const password = body?.password;
 
-    if (!userId || !password) {
+    if (!esIdUsuario(userId) || typeof password !== "string") {
       return new Response(JSON.stringify({ error: "userId y password son obligatorios" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -107,13 +106,20 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
       });
     }
 
+    const { data: objetivo, error: objetivoError } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (objetivoError || !objetivo?.user) {
+      const fallo = errorAuthUsuarios(objetivoError ?? { status: 404 }, "No se pudo consultar el usuario. Vuelve a intentarlo.");
+      return new Response(JSON.stringify({ error: fallo.error }), { status: fallo.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { error: updateError } = await ejecutarOperacionAuthAuditada(
       supabaseAdmin, currentUser.id, "actualizar", { userId },
       () => supabaseAdmin.auth.admin.updateUserById(userId, { password }),
     );
     if (updateError) {
-      return new Response(JSON.stringify({ error: updateError.message }), {
-        status: 500,
+      const fallo = errorAuthUsuarios(updateError, "No se pudo actualizar la contraseña. Vuelve a intentarlo.");
+      return new Response(JSON.stringify({ error: fallo.error }), {
+        status: fallo.status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

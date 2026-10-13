@@ -15,6 +15,7 @@ import {
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { mensajeErrorUsuarios } from "@/lib/errores-usuarios";
 import { useUserRolePresets, UserRolePreset, PresetBaseRole } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
@@ -143,15 +144,17 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    const nombreNormalizado = username.trim();
     
-    if (!username || !password) {
+    if (!nombreNormalizado || !password) {
       toast.error("Nombre de usuario y contraseña son requeridos");
       return;
     }
 
     // Validate username format
     const usernameRegex = /^[a-zA-Z0-9._]+$/;
-    if (!usernameRegex.test(username)) {
+    if (!usernameRegex.test(nombreNormalizado) || nombreNormalizado.length > 64 || nombreNormalizado.startsWith(".") || nombreNormalizado.endsWith(".") || nombreNormalizado.includes("..")) {
       toast.error("El nombre de usuario solo puede contener letras, números, puntos y guiones bajos");
       return;
     }
@@ -176,7 +179,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
         userId?: string;
       }>("admin-create-user", {
         body: {
-          username,
+          username: nombreNormalizado,
           password,
           role,
           // La función respeta el can_edit que le llega: solo un super admin lo envía.
@@ -185,14 +188,15 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
       });
 
       if (error) {
-        throw new Error(error.message || "Error al crear el usuario");
+        throw error;
       }
 
       if (!data?.success) {
         throw new Error(data?.error || "Error al crear el usuario");
       }
 
-      if (createAsSuperAdmin && data.userId) {
+      let avisoSuperAdmin: string | null = null;
+      if (createAsSuperAdmin && allowSuperAdmin && isSuperAdmin && data.userId) {
         const { data: superAdminData, error: superAdminError } = await supabase.functions.invoke<{
           success?: boolean;
           error?: string;
@@ -201,14 +205,13 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
         });
 
         if (superAdminError || !superAdminData?.success) {
-          toast.error(
-            "Usuario creado, pero no se pudo dar acceso de super admin: " +
-              (superAdminData?.error || superAdminError?.message || "error desconocido")
-          );
+          avisoSuperAdmin = "Usuario creado, pero no se pudo dar acceso de super admin: " +
+            (superAdminData?.error || await mensajeErrorUsuarios(superAdminError, "Vuelve a intentarlo desde la lista de usuarios."));
         }
       }
 
-      toast.success("Usuario creado correctamente");
+      if (avisoSuperAdmin) toast.error(avisoSuperAdmin);
+      else toast.success("Usuario creado correctamente");
       window.dispatchEvent(new Event("users-management-refresh"));
 
       // Reset form
@@ -221,7 +224,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
       onSuccess?.();
     } catch (error: unknown) {
       console.error("Error creating user:", error);
-      const message = error instanceof Error ? error.message : "Error al crear el usuario";
+      const message = await mensajeErrorUsuarios(error, "Error al crear el usuario");
       toast.error(message);
     } finally {
       setLoading(false);
@@ -240,6 +243,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
+            maxLength={64}
             // En la tablet el teclado pondría la primera letra en mayúscula y
             // corregiría el nombre: el usuario es minúsculas, sin corrector.
             autoCapitalize="none"
@@ -270,7 +274,7 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
         </div>
       </div>
 
-      {allowSuperAdmin && (
+      {allowSuperAdmin && isSuperAdmin && (
         <div className="flex min-h-11 items-center gap-3 rounded-md border border-amber-500/40 bg-amber-500/5 p-3">
           <Checkbox
             id="create-as-super-admin"
