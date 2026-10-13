@@ -6,9 +6,9 @@ Los registros muestran quién actuó, qué hizo y los datos relevantes. Los prec
 
 ## Filtros y uso móvil
 
-La vista inicial excluye los autores `servicio` y `base_de_datos`, por lo que no muestra los procesos identificados como `API · service_role`. Los accesos fallidos de identidad no verificada y el histórico conservan su visibilidad. Para incluir los procesos, se selecciona explícitamente otro origen en el formulario.
+La vista inicial excluye los autores `servicio` y `base_de_datos`, por lo que no muestra los procesos identificados como `API · service_role`. Los accesos fallidos de identidad no verificada y el histórico conservan su visibilidad. El botón Procesos muestra exclusivamente la actividad automática del servidor y de la base de datos. También se puede seleccionar el origen en el formulario.
 
-Los botones rápidos Todos, Cambios, IA facturas, Accesos y Reversiones aplican la selección inmediatamente y conservan la exclusión del servidor. Los grupos filtran todas sus acciones en SQL antes de paginar, tanto en la lista como en las vistas por día y por mes.
+Las pestañas rápidas Todos, Inicios de sesión, Platos, Bebidas, Novedades, IA facturas, Cambios y Reversiones aplican la selección inmediatamente y excluyen el servidor. Platos y Bebidas muestran modificaciones (incluidos precios y visibilidad); Novedades muestra creación, modificación y eliminación. En móvil se desplazan horizontalmente y Procesos permanece accesible. Al cambiar de categoría se reemplazan acción, sección y origen, manteniendo fechas, persona, resultado y búsqueda. Los grupos filtran todas sus acciones en SQL antes de paginar, tanto en la lista como en las vistas por día y por mes.
 
 En teléfono el formulario se abre en un panel independiente con campos a todo el ancho, desplazamiento interno y botones Limpiar/Aplicar siempre fuera del área desplazable. Los filtros de persona, fechas, dispositivo y resultado se despliegan aparte. Se pueden seleccionar tanto familias de acciones como eventos concretos y resultados pendientes.
 

@@ -23,6 +23,7 @@ vi.mock("@/hooks/useAuditLog", async (original) => ({
       entradas: state.entradas,
       total: state.entradas.length,
       pageSize: 25,
+      tablas: ["Platos", "Bebidas", "novedades"],
       loading: false,
       error: null,
     };
@@ -126,4 +127,84 @@ it("los filtros rápidos conservan la exclusión de los procesos del servidor", 
   fireEvent.click(screen.getByRole("button", { name: "Todos", exact: true }));
   expect(state.filtros.at(-1)?.origen).toBe("sin_servidor");
   expect(state.filtros.at(-1)?.accion).toBeUndefined();
+});
+
+it("cambia de sección sin arrastrar filtros y separa los procesos de las personas", () => {
+  render(<SuperAdminAuditoria />);
+  const elegir = (name: string) =>
+    fireEvent.click(screen.getByRole("button", { name, exact: true }));
+  elegir("Platos");
+  expect(state.filtros.at(-1)).toMatchObject({
+    origen: "sin_servidor",
+    accion: "actualizar",
+    tabla: "Platos",
+  });
+  expect(
+    screen.getByRole("button", { name: "Platos", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  elegir("Bebidas");
+  expect(state.filtros.at(-1)).toMatchObject({
+    accion: "actualizar",
+    tabla: "Bebidas",
+  });
+  elegir("Novedades");
+  expect(state.filtros.at(-1)).toMatchObject({
+    accion: "grupo_cambios",
+    tabla: "novedades",
+  });
+  elegir("IA facturas");
+  expect(state.filtros.at(-1)).toMatchObject({
+    origen: "sin_servidor",
+    accion: "grupo_ia",
+  });
+  expect(state.filtros.at(-1)?.tabla).toBeUndefined();
+  elegir("Procesos");
+  expect(state.filtros.at(-1)).toEqual({
+    origen: "servidor",
+    accion: undefined,
+    tabla: undefined,
+  });
+  expect(
+    screen.getByRole("button", { name: "Procesos", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(
+    screen.getByRole("button", { name: "IA facturas", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  elegir("Inicios de sesión");
+  expect(state.filtros.at(-1)).toEqual({
+    origen: "sin_servidor",
+    accion: "login",
+    tabla: undefined,
+  });
+  elegir("Todos");
+  expect(state.filtros.at(-1)).toEqual({
+    origen: "sin_servidor",
+    accion: undefined,
+    tabla: undefined,
+  });
+});
+
+it("conserva búsqueda y fechas al elegir una categoría rápida", () => {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    value: 1280,
+  });
+  render(<SuperAdminAuditoria />);
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), {
+    target: { value: "paella" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: /Persona, fechas/ }));
+  fireEvent.change(screen.getByLabelText("Desde"), {
+    target: { value: "2026-10-01" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+  fireEvent.click(screen.getByRole("button", { name: "Platos", exact: true }));
+  expect(state.filtros.at(-1)).toMatchObject({
+    origen: "sin_servidor",
+    accion: "actualizar",
+    tabla: "Platos",
+    texto: "paella",
+    desde: "2026-10-01",
+  });
+  expect(screen.getByLabelText("Sección")).toHaveValue("Platos");
 });

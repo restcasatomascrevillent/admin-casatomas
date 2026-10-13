@@ -4,7 +4,7 @@ import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollText, Loader2 } from "lucide-react";
+import { ScrollText, Loader2, Cog } from "lucide-react";
 import {
   useAuditLog,
   agruparEntradas,
@@ -24,13 +24,64 @@ import { VistaPorDia } from "@/components/auditoria/VistaPorDia";
 const ALTURA_MINIMA_AUDITORIA = 480;
 
 const FILTROS_VACIOS: AuditLogFiltros = { origen: "sin_servidor" };
-const FILTROS_RAPIDOS = [
-  ["", "Todos"],
-  ["grupo_cambios", "Cambios"],
-  ["grupo_ia", "IA facturas"],
-  ["grupo_accesos", "Accesos"],
-  ["reversion", "Reversiones"],
-] as const;
+const FILTROS_RAPIDOS: {
+  id: string;
+  label: string;
+  accion?: string;
+  tabla?: string;
+  descripcion: string;
+}[] = [
+  {
+    id: "todos",
+    label: "Todos",
+    descripcion: "Actividad sin procesos del servidor",
+  },
+  {
+    id: "login",
+    label: "Inicios de sesión",
+    accion: "login",
+    descripcion: "Inicios de sesión de las personas",
+  },
+  {
+    id: "platos",
+    label: "Platos",
+    accion: "actualizar",
+    tabla: "Platos",
+    descripcion: "Modificaciones de platos, incluidos precios y visibilidad",
+  },
+  {
+    id: "bebidas",
+    label: "Bebidas",
+    accion: "actualizar",
+    tabla: "Bebidas",
+    descripcion: "Modificaciones de bebidas, incluidos precios y visibilidad",
+  },
+  {
+    id: "novedades",
+    label: "Novedades",
+    accion: "grupo_cambios",
+    tabla: "novedades",
+    descripcion: "Creación, modificación y eliminación de novedades",
+  },
+  {
+    id: "ia",
+    label: "IA facturas",
+    accion: "grupo_ia",
+    descripcion: "Preguntas, respuestas y conversaciones con la IA de facturas",
+  },
+  {
+    id: "cambios",
+    label: "Cambios",
+    accion: "grupo_cambios",
+    descripcion: "Creación, modificación y eliminación de datos",
+  },
+  {
+    id: "reversiones",
+    label: "Reversiones",
+    accion: "reversion",
+    descripcion: "Cambios revertidos desde la auditoría",
+  },
+];
 
 export default function SuperAdminAuditoria() {
   const [filtrosPendientes, setFiltrosPendientes] =
@@ -79,12 +130,28 @@ export default function SuperAdminAuditoria() {
     setPagina(0);
   };
 
-  const filtroRapido = (accion: string) => {
-    const siguientes = { ...filtros, accion: accion || undefined };
+  // Cada acceso reemplaza acción, sección y origen para evitar combinar categorías
+  // incompatibles. Conserva los filtros de fecha, persona, resultado y búsqueda.
+  const filtroRapido = (accion?: string, tabla?: string, procesos = false) => {
+    const siguientes: AuditLogFiltros = {
+      ...filtros,
+      accion,
+      tabla,
+      origen: procesos ? "servidor" : "sin_servidor",
+    };
     setFiltros(siguientes);
     setFiltrosPendientes(siguientes);
     setPagina(0);
   };
+  const procesosActivos = filtros.origen === "servidor";
+  const categoriaActiva =
+    filtros.origen === "sin_servidor"
+      ? FILTROS_RAPIDOS.find(
+          (categoria) =>
+            (filtros.accion || undefined) === categoria.accion &&
+            (filtros.tabla || undefined) === categoria.tabla,
+        )
+      : undefined;
 
   const totalPaginas = Math.max(1, Math.ceil(total / pageSize));
 
@@ -126,33 +193,48 @@ export default function SuperAdminAuditoria() {
           onLimpiar={limpiarFiltros}
         />
 
-        <div className="shrink-0 space-y-2">
-          <div
-            className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap"
-            role="group"
-            aria-label="Filtros rápidos por tipo de acción"
-          >
-            {FILTROS_RAPIDOS.map(([valor, label]) => (
-              <Button
-                key={valor || "todos"}
-                type="button"
-                size="sm"
-                className="h-10 px-2 sm:px-3"
-                variant={
-                  (filtros.accion ?? "") === valor ? "default" : "outline"
-                }
-                aria-pressed={(filtros.accion ?? "") === valor}
-                onClick={() => filtroRapido(valor)}
-              >
-                {label}
-              </Button>
-            ))}
+        <div className="min-w-0 shrink-0 space-y-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <nav
+              className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain border-b pb-1"
+              aria-label="Filtros rápidos por tipo de acción"
+            >
+              {FILTROS_RAPIDOS.map((categoria) => (
+                <Button
+                  key={categoria.id}
+                  type="button"
+                  size="sm"
+                  className={`h-11 shrink-0 rounded-none border-b-2 px-3 ${categoriaActiva?.id === categoria.id ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground"}`}
+                  variant="ghost"
+                  aria-pressed={categoriaActiva?.id === categoria.id}
+                  onClick={() =>
+                    filtroRapido(categoria.accion, categoria.tabla)
+                  }
+                >
+                  {categoria.label}
+                </Button>
+              ))}
+            </nav>
+            <Button
+              type="button"
+              size="sm"
+              className="h-11 shrink-0 gap-1.5 px-3"
+              variant={procesosActivos ? "default" : "outline"}
+              aria-pressed={procesosActivos}
+              onClick={() => filtroRapido(undefined, undefined, true)}
+            >
+              <Cog className="h-4 w-4" aria-hidden="true" />
+              Procesos
+            </Button>
           </div>
-          {filtros.origen === "sin_servidor" && (
-            <p className="text-xs text-muted-foreground">
-              Procesos del servidor ocultos
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground" role="status">
+            {procesosActivos
+              ? "Procesos automáticos del servidor y de la base de datos"
+              : (categoriaActiva?.descripcion ??
+                (filtros.origen === "sin_servidor"
+                  ? "Procesos del servidor ocultos"
+                  : "Filtros personalizados"))}
+          </p>
         </div>
 
         {/* Conserva espacio para los registros incluso al desplegar los filtros. */}
