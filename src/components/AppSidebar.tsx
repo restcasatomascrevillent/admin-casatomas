@@ -1,4 +1,15 @@
-import { LayoutDashboard, UtensilsCrossed, Globe, Megaphone, Receipt, Gift, LogOut, Shield, Settings, HelpCircle } from "lucide-react";
+import {
+  LayoutDashboard,
+  UtensilsCrossed,
+  Globe,
+  Megaphone,
+  Receipt,
+  Gift,
+  LogOut,
+  Shield,
+  Settings,
+  HelpCircle,
+} from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -16,7 +27,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
@@ -31,19 +41,66 @@ import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidas
 // el propio sectionKey cuando es uno solo, o se declara aparte cuando el item
 // agrupa varias secciones o comparte permiso con otro item.
 // Sin `sectionKey` (Ayuda): lo ve todo el mundo, sin permisos ni interruptor.
-const menuItems: { title: string; url: string; icon: ComponentType<SVGProps<SVGSVGElement>>; sectionKey?: SectionKey | SectionKey[]; toggleKey?: string }[] = [
-  { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, sectionKey: "dashboard" },
-  { title: "Reservas", url: "/reservas", icon: UtensilsCrossed, sectionKey: "reservas", toggleKey: "reservas" },
+const menuItems: {
+  title: string;
+  url: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  sectionKey?: SectionKey | SectionKey[];
+  toggleKey?: string;
+}[] = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: LayoutDashboard,
+    sectionKey: "dashboard",
+  },
+  {
+    title: "Reservas",
+    url: "/reservas",
+    icon: UtensilsCrossed,
+    sectionKey: "reservas",
+    toggleKey: "reservas",
+  },
   // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
   // docs/funcionalidades/10-retirada-seccion-personal.md.
   // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
   // Email, Tráfico web y Espacios se gestionan exclusivamente desde el
   // Super Admin y ya no forman parte del Admin Panel normal (ver /super-admin).
-  { title: "Gestor Web", url: "/gestion-web", icon: Globe, sectionKey: SECCIONES_GESTOR_WEB, toggleKey: "gestion_web" },
-  { title: "Newsletter", url: "/marketing", icon: Megaphone, sectionKey: "marketing", toggleKey: "marketing" },
-  { title: "Cheques", url: "/cheques", icon: Gift, sectionKey: "cheques", toggleKey: "cheques" },
-  { title: "Facturas", url: "/facturas", icon: Receipt, sectionKey: "facturas", toggleKey: "facturas" },
-  { title: "Usuarios", url: "/usuarios", icon: Shield, sectionKey: "usuarios", toggleKey: "usuarios" },
+  {
+    title: "Gestor Web",
+    url: "/gestion-web",
+    icon: Globe,
+    sectionKey: SECCIONES_GESTOR_WEB,
+    toggleKey: "gestion_web",
+  },
+  {
+    title: "Newsletter",
+    url: "/marketing",
+    icon: Megaphone,
+    sectionKey: "marketing",
+    toggleKey: "marketing",
+  },
+  {
+    title: "Cheques",
+    url: "/cheques",
+    icon: Gift,
+    sectionKey: "cheques",
+    toggleKey: "cheques",
+  },
+  {
+    title: "Facturas",
+    url: "/facturas",
+    icon: Receipt,
+    sectionKey: "facturas",
+    toggleKey: "facturas",
+  },
+  {
+    title: "Usuarios",
+    url: "/usuarios",
+    icon: Shield,
+    sectionKey: "usuarios",
+    toggleKey: "usuarios",
+  },
   { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
 ];
 
@@ -72,13 +129,17 @@ export function AppSidebar() {
     if (loading || togglesLoading || superAdminLoading) return false;
     if (!item.sectionKey) return true;
     if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
-    const keys = Array.isArray(item.sectionKey) ? item.sectionKey : [item.sectionKey];
+    const keys = Array.isArray(item.sectionKey)
+      ? item.sectionKey
+      : [item.sectionKey];
     // Usuarios es solo para admins, no configurable por permisos (2026-09-26).
     if (keys.includes("usuarios")) return isAdmin;
     // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
     // todo pase lo que pase en la tabla de permisos.
     if (isSuperAdmin) return true;
-    return keys.some((key) => permissions.find((p) => p.section_key === key)?.can_view);
+    return keys.some(
+      (key) => permissions.find((p) => p.section_key === key)?.can_view,
+    );
   });
 
   return (
@@ -90,20 +151,26 @@ export function AppSidebar() {
           ReservasHoy.tsx) para que el cubierto decorativo pudiera volver:
           con los dos dentro no cabía todo y "Gestión del Restaurante" se
           cortaba a media palabra (11px medidos). */}
-      <SidebarHeader
-        className={`border-b border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
-      >
-        <div className={`flex items-center gap-2 ${isCollapsed ? "flex-col justify-center" : ""}`}>
-          <UtensilsCrossed className="h-6 w-6 text-sidebar-primary shrink-0" />
+      <SidebarHeader className="h-20 shrink-0 justify-center border-b border-sidebar-border py-2 pl-[calc((var(--sidebar-width-icon)-theme(spacing.11))/2)] pr-3">
+        <div className="flex w-full min-w-0 items-center gap-2">
+          <SidebarTrigger className="text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent" />
           {!isCollapsed && (
-            <div className="flex flex-col min-w-0">
-              <h2 className="text-lg font-semibold text-sidebar-foreground truncate">Admin Panel</h2>
-              <span className="text-xs text-sidebar-foreground/70 truncate">Gestión del Restaurante</span>
+            <div className="min-w-0 flex-1">
+              <h2 className="flex items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
+                <UtensilsCrossed
+                  className="h-4 w-4 shrink-0 text-sidebar-primary"
+                  aria-hidden="true"
+                />
+                <span className="truncate">Admin Panel</span>
+              </h2>
+              <p
+                className="truncate text-xs text-sidebar-foreground/70"
+                title="Gestión del Restaurante"
+              >
+                Gestión del Restaurante
+              </p>
             </div>
           )}
-          <SidebarTrigger
-            className={`text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent shrink-0 ${!isCollapsed ? "ml-auto" : ""}`}
-          />
         </div>
       </SidebarHeader>
 
@@ -114,13 +181,22 @@ export function AppSidebar() {
             <SidebarMenu>
               {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={item.title}
+                    className="rounded-lg"
+                  >
                     <NavLink
                       to={item.url}
-                      className="flex items-center gap-3 hover:bg-sidebar-accent rounded-md transition-colors"
+                      aria-label={item.title}
+                      className="flex items-center gap-3 rounded-lg hover:bg-sidebar-accent"
                     >
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      {!isCollapsed && <span>{item.title}</span>}
+                      <item.icon
+                        className="h-5 w-5 shrink-0"
+                        aria-hidden="true"
+                      />
+                      <span>{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -130,38 +206,39 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter
-        className={`border-t border-sidebar-border transition-[padding] duration-200 ease-in-out ${isCollapsed ? "px-0 py-4" : "p-4"}`}
-      >
-        {/* Subidas de facturas en segundo plano («Facturas: 2 procesando»): visible
-            en cualquier sección. En el panel deslizante (< 1024 px) va en la
-            barra superior (DashboardLayout), no aquí. */}
+      <SidebarFooter className="shrink-0 border-t border-sidebar-border p-2">
         {!isMobile && (
-          <IndicadorSubidasFacturas variante="menu" colapsado={isCollapsed} className={isCollapsed ? "flex justify-center" : ""} />
+          <IndicadorSubidasFacturas
+            variante="menu"
+            colapsado={isCollapsed}
+            className={isCollapsed ? "flex justify-center" : ""}
+          />
         )}
-        <div className={`flex gap-2 ${isCollapsed ? "flex-col items-center" : "flex-row"}`}>
-          <Button
-            variant="ghost"
-            size={isCollapsed ? "icon" : "default"}
-            className={`text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent ${isCollapsed ? "" : "flex-1 justify-start"}`}
-            onClick={() => signOut()}
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {!isCollapsed && <span className="ml-3">Cerrar sesión</span>}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent shrink-0"
-            onClick={() => navigate("/super-admin/login")}
-            title="Super Admin"
-            aria-label="Super Admin"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Cerrar sesión"
+              aria-label="Cerrar sesión"
+              className="rounded-lg gap-3"
+              onClick={() => void signOut()}
+            >
+              <LogOut aria-hidden="true" />
+              <span>Cerrar sesión</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="Super Admin"
+              aria-label="Super Admin"
+              className="rounded-lg gap-3"
+              onClick={() => navigate("/super-admin/login")}
+            >
+              <Settings aria-hidden="true" />
+              <span>Super Admin</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );
 }
-
