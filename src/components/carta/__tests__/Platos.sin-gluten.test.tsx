@@ -43,7 +43,6 @@ describe("Marcador sin gluten al crear y editar platos", () => {
     fireEvent.change(screen.getByLabelText("Nombre"), {
       target: { value: "Croquetas" },
     });
-    fireEvent.click(screen.getByText("Información adicional (opcional)"));
     expect(
       screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
     ).not.toBeInTheDocument();
@@ -82,7 +81,6 @@ describe("Marcador sin gluten al crear y editar platos", () => {
 
   it("recupera el marcador guardado y permite quitarlo sin borrar el alérgeno gluten", async () => {
     render(<EditarPlatoModal open onOpenChange={vi.fn()} plato={plato} />);
-    fireEvent.click(screen.getByText("Información adicional (opcional)"));
     const checkbox = screen.getByRole("checkbox", {
       name: "Se puede hacer sin gluten",
     });
@@ -124,6 +122,9 @@ it("ofrece una sola Unidad y guarda el precio por la cantidad de gramos elegida"
     screen.getAllByRole("option", { name: "Unidad", exact: true }),
   ).toHaveLength(1);
   fireEvent.click(screen.getByRole("option", { name: "Gramos", exact: true }));
+  fireEvent.click(
+    screen.getByRole("button", { name: "Sin alérgenos declarados" }),
+  );
   fireEvent.change(screen.getByLabelText("Cantidad de gramos"), {
     target: { value: "150" },
   });
@@ -184,6 +185,9 @@ it("rechaza nombres en blanco y no obliga a rellenar la información opcional", 
   fireEvent.change(screen.getByLabelText("Nombre"), {
     target: { value: "Sopa" },
   });
+  fireEvent.click(
+    screen.getByRole("button", { name: "Sin alérgenos declarados" }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "Guardar Plato" }));
   await waitFor(() =>
     expect(mutaciones.crear).toHaveBeenCalledWith(
@@ -203,4 +207,72 @@ it("no convierte un precio vacío en un plato gratuito", async () => {
   fireEvent.click(screen.getByRole("button", { name: "Guardar Plato" }));
   await screen.findByText("Indica un precio válido");
   expect(mutaciones.crear).not.toHaveBeenCalled();
+});
+
+it("exige una declaración al crear y guarda una confirmación expresa sin alérgenos", async () => {
+  render(<PlatoForm open onOpenChange={vi.fn()} categoriaInicial="SNACK" />);
+  fireEvent.change(screen.getByLabelText("Nombre"), {
+    target: { value: "Arroz" },
+  });
+  expect(
+    screen.getByRole("button", { name: "Gluten", exact: true }),
+  ).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Guardar Plato" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Selecciona los alérgenos",
+  );
+  expect(mutaciones.crear).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Sin alérgenos declarados" }),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Guardar Plato" }));
+  await waitFor(() =>
+    expect(mutaciones.crear).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alergenos_oficiales: ["sin alérgenos declarados"],
+      }),
+    ),
+  );
+});
+
+it("un plato antiguo sin datos debe confirmarse, y sin alérgenos es excluyente", async () => {
+  render(
+    <EditarPlatoModal
+      open
+      onOpenChange={vi.fn()}
+      plato={{ ...plato, alergenos_oficiales: null }}
+    />,
+  );
+  const ninguno = screen.getByRole("button", {
+    name: "Sin alérgenos declarados",
+  });
+  expect(ninguno).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await screen.findByRole("alert");
+  expect(mutaciones.actualizar).not.toHaveBeenCalled();
+  fireEvent.click(ninguno);
+  fireEvent.click(screen.getByRole("button", { name: "Gluten", exact: true }));
+  expect(ninguno).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+  await waitFor(() =>
+    expect(mutaciones.actualizar).toHaveBeenCalledWith(
+      expect.objectContaining({ alergenos_oficiales: ["gluten"] }),
+    ),
+  );
+});
+
+it("recupera la declaración sin alérgenos al volver a editar", () => {
+  render(
+    <EditarPlatoModal
+      open
+      onOpenChange={vi.fn()}
+      plato={{ ...plato, alergenos_oficiales: ["sin alérgenos declarados"] }}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "Sin alérgenos declarados" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(
+    screen.queryByRole("button", { name: "Quitar sin alérgenos declarados" }),
+  ).not.toBeInTheDocument();
 });

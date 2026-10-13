@@ -2,7 +2,11 @@ import { normalizarUnidadPlato } from "@/lib/unidades-platos";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
+import {
+  combinarAlergenos,
+  parseAlergenos,
+  validarDeclaracionAlergenos,
+} from "@/lib/alergenos";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 
 export interface Plato {
@@ -138,8 +142,8 @@ export function usePlatos() {
 
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
-      const alergenosArray = normalizarAlergenos(
-        nuevoPlato.alergenos_oficiales,
+      const alergenosArray = validarDeclaracionAlergenos(
+        normalizarAlergenos(nuevoPlato.alergenos_oficiales),
       );
 
       // 1. Traducir primero (no escribe nada; solo devuelve las columnas *_en/*_fr).
@@ -206,7 +210,9 @@ export function usePlatos() {
         cambios.unidad = normalizarUnidadPlato(cambios.unidad);
       // Si la edición toca alérgenos, se guarda en vocabulario canónico.
       if ("alergenos_oficiales" in cambios) {
-        const normalizados = normalizarAlergenos(cambios.alergenos_oficiales);
+        const normalizados = validarDeclaracionAlergenos(
+          normalizarAlergenos(cambios.alergenos_oficiales),
+        );
         cambios.alergenos_oficiales =
           normalizados.length > 0 ? normalizados : null;
       }

@@ -60,7 +60,7 @@ export const ALERGENOS_OFICIALES: AlergenoOficial[] = [
  */
 const SINONIMOS: Record<string, string[]> = {
   gluten: ["gluten", "cereales con gluten", "cereales que contengan gluten"],
-  "crustáceos": ["crustaceos", "crustaceo"],
+  crustáceos: ["crustaceos", "crustaceo"],
   huevos: ["huevos", "huevo"],
   pescado: ["pescado", "pescados"],
   cacahuetes: ["cacahuetes", "cacahuete", "cacahuates", "cacahuate", "mani"],
@@ -73,10 +73,16 @@ const SINONIMOS: Record<string, string[]> = {
     "fruto seco",
     "nueces",
   ],
-  "lácteos": ["lacteos", "lacteo", "leche", "lactosa", "productos lacteos"],
+  lácteos: ["lacteos", "lacteo", "leche", "lactosa", "productos lacteos"],
   apio: ["apio"],
   mostaza: ["mostaza"],
-  "sésamo": ["sesamo", "sesamos", "granos de sesamo", "semillas de sesamo", "ajonjoli"],
+  sésamo: [
+    "sesamo",
+    "sesamos",
+    "granos de sesamo",
+    "semillas de sesamo",
+    "ajonjoli",
+  ],
   sulfitos: [
     "sulfitos",
     "sulfito",
@@ -151,7 +157,11 @@ export function normalizarAlergeno(valor: unknown): string | null {
   if (typeof valor !== "string") return null;
   const plegado = plegar(valor);
   if (!plegado) return null;
-  return INDICE_CANONICO.get(plegado) ?? INDICE_CANONICO.get(singularizar(plegado)) ?? null;
+  return (
+    INDICE_CANONICO.get(plegado) ??
+    INDICE_CANONICO.get(singularizar(plegado)) ??
+    null
+  );
 }
 
 /** `true` si el texto corresponde a uno de los 14 alérgenos oficiales. */
@@ -265,4 +275,24 @@ export function combinarAlergenos(
   }
 
   return resultado;
+}
+
+/** Declaración expresa, distinta de dejar la información sin completar. */
+export const SIN_ALERGENOS_DECLARADOS = "sin alérgenos declarados";
+export const esSinAlergenosDeclarados = (valor: string) =>
+  ["sin alergenos declarados", "sin alergenos", "ninguno"].includes(
+    plegar(valor),
+  );
+export function validarDeclaracionAlergenos(valores: string[]): string[] {
+  if (!valores.length)
+    throw new Error(
+      "Selecciona los alérgenos o confirma que no hay alérgenos declarados",
+    );
+  const sin = valores.some(esSinAlergenosDeclarados);
+  const presentes = valores.filter((v) => !esSinAlergenosDeclarados(v));
+  if (sin && presentes.length)
+    throw new Error(
+      "No se puede indicar sin alérgenos y seleccionar alérgenos a la vez",
+    );
+  return sin ? [SIN_ALERGENOS_DECLARADOS] : valores;
 }
