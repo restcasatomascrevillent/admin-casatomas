@@ -1,3 +1,4 @@
+import { guardarUnidadPlato, opcionesUnidadPlato } from "@/lib/unidades-platos";
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -39,15 +40,34 @@ import {
   normalizarAlergeno,
 } from "@/lib/alergenos";
 
-const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio"),
-  categoria: z.string().min(1, "La categoría es obligatoria"),
-  precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
-  descripcion: z.string().optional(),
-  sin_gluten_disponible: z.boolean().default(false),
-  ingredientes: z.string().optional(),
-  unidad: z.string().optional(),
-});
+const formSchema = z
+  .object({
+    nombre: z.string().trim().min(1, "El nombre es obligatorio"),
+    categoria: z.string().trim().min(1, "La categoría es obligatoria"),
+    precio_eur: z.preprocess(
+      (v) => (v === "" ? undefined : v),
+      z.coerce
+        .number({ invalid_type_error: "Indica un precio válido" })
+        .finite("Indica un precio válido")
+        .min(0, "El precio debe ser mayor o igual a 0"),
+    ),
+    descripcion: z.string().optional(),
+    sin_gluten_disponible: z.boolean().default(false),
+    ingredientes: z.string().optional(),
+    unidad: z.string().default("Unidad"),
+    gramos: z.coerce.number().optional(),
+  })
+  .superRefine((values, ctx) => {
+    if (
+      values.unidad === "gramos" &&
+      (!Number.isInteger(values.gramos) || !values.gramos || values.gramos <= 0)
+    )
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["gramos"],
+        message: "Indica una cantidad de gramos entera y mayor que cero",
+      });
+  });
 
 interface PlatoFormProps {
   open: boolean;
@@ -55,16 +75,24 @@ interface PlatoFormProps {
   categoriaInicial?: string;
 }
 
-export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormProps) {
+export function PlatoForm({
+  open,
+  onOpenChange,
+  categoriaInicial,
+}: PlatoFormProps) {
   const { crearPlato, actualizarPlato, categorias, unidades } = usePlatos();
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Estado para alérgenos
-  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<string[]>([]);
-  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<string[]>([]);
+  const [alergenosSeleccionados, setAlergenosSeleccionados] = useState<
+    string[]
+  >([]);
+  const [alergenosPersonalizados, setAlergenosPersonalizados] = useState<
+    string[]
+  >([]);
   const [nuevoAlergeno, setNuevoAlergeno] = useState("");
   const tieneGluten = alergenosSeleccionados.includes("gluten");
 
@@ -77,7 +105,8 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
       descripcion: "",
       sin_gluten_disponible: false,
       ingredientes: "",
-      unidad: "",
+      unidad: "Unidad",
+      gramos: 100,
     },
   });
 
@@ -85,10 +114,8 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
     if (id === "gluten" && tieneGluten) {
       form.setValue("sin_gluten_disponible", false, { shouldDirty: true });
     }
-    setAlergenosSeleccionados(prev => 
-      prev.includes(id) 
-        ? prev.filter(a => a !== id)
-        : [...prev, id]
+    setAlergenosSeleccionados((prev) =>
+      prev.includes(id) ? prev.filter((a) => a !== id) : [...prev, id],
     );
   };
 
@@ -101,21 +128,21 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
     // una entrada suelta: así no se guardan dos veces lo mismo.
     const canonico = normalizarAlergeno(trimmed);
     if (canonico) {
-      setAlergenosSeleccionados(prev =>
-        prev.includes(canonico) ? prev : [...prev, canonico]
+      setAlergenosSeleccionados((prev) =>
+        prev.includes(canonico) ? prev : [...prev, canonico],
       );
       setNuevoAlergeno("");
       return;
     }
 
     if (!alergenosPersonalizados.includes(trimmed)) {
-      setAlergenosPersonalizados(prev => [...prev, trimmed]);
+      setAlergenosPersonalizados((prev) => [...prev, trimmed]);
     }
     setNuevoAlergeno("");
   };
 
   const removeAlergenoPersonalizado = (alergeno: string) => {
-    setAlergenosPersonalizados(prev => prev.filter(a => a !== alergeno));
+    setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,47 +170,49 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
     try {
       // Combinar oficiales + personalizados en vocabulario canónico y sin
       // duplicados (ver src/lib/alergenos.ts).
-      const todosAlergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
-      
+      const todosAlergenos = combinarAlergenos(
+        alergenosSeleccionados,
+        alergenosPersonalizados,
+      );
+
       // 1. Crear el plato primero
       const platoData: NuevoPlato = {
         nombre: values.nombre,
         categoria: values.categoria,
         precio_eur: values.precio_eur,
         descripcion: values.descripcion,
-        sin_gluten_disponible: todosAlergenos.includes("gluten") && values.sin_gluten_disponible,
+        sin_gluten_disponible:
+          todosAlergenos.includes("gluten") && values.sin_gluten_disponible,
         ingredientes: values.ingredientes,
-        unidad: values.unidad,
+        unidad: guardarUnidadPlato(values.unidad, values.gramos),
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
       };
       // La traducción ya no se genera aquí: crearPlato (usePlatos.ts) llama a
       // traducir-contenido internamente al guardar (ver informe, TAREA 2).
       const nuevoPlato = await crearPlato.mutateAsync(platoData);
-      
+
       // 2. Si hay imagen, subirla a Storage
       if (imageFile && nuevoPlato?.id) {
-        const fileExt = imageFile.name.split('.').pop();
+        const fileExt = imageFile.name.split(".").pop();
         const fileName = `${nuevoPlato.id}.${fileExt}`;
-        
+
         // Eliminar imagen anterior si existe
-        await supabase.storage
-          .from('platos')
-          .remove([fileName]);
-        
+        await supabase.storage.from("platos").remove([fileName]);
+
         // Subir nueva imagen
         const { error: uploadError } = await supabase.storage
-          .from('platos')
+          .from("platos")
           .upload(fileName, imageFile);
-        
+
         if (uploadError) {
-          console.error('Error uploading image:', uploadError);
+          console.error("Error uploading image:", uploadError);
           toast.error("Plato creado pero error al subir imagen");
         } else {
           // Obtener URL pública
           const { data: urlData } = supabase.storage
-            .from('platos')
+            .from("platos")
             .getPublicUrl(fileName);
-          
+
           // Se pasa por la mutación del hook (antes era un UPDATE directo a
           // Supabase): así se invalida la caché y, sobre todo, se dispara la
           // republicación de las webs — sin esto la foto no llegaba nunca.
@@ -193,14 +222,14 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
           });
         }
       }
-      
+
       form.reset();
       clearImage();
       setAlergenosSeleccionados([]);
       setAlergenosPersonalizados([]);
       onOpenChange(false);
     } catch (error) {
-      console.error('Error creating plato:', error);
+      console.error("Error creating plato:", error);
     } finally {
       setIsUploading(false);
     }
@@ -212,7 +241,7 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
         <DialogHeader>
           <DialogTitle>Añadir Plato</DialogTitle>
           <DialogDescription>
-            Completa los datos del nuevo plato
+            Solo nombre, categoría y precio son obligatorios.
           </DialogDescription>
         </DialogHeader>
 
@@ -244,20 +273,20 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                         <SelectValue placeholder="Selecciona una categoría" />
                       </SelectTrigger>
                     </FormControl>
-                <SelectContent className="bg-popover z-50">
-                  {categorias.map((cat) => (
-                    <SelectItem key={cat} value={cat as string}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
+                    <SelectContent className="bg-popover z-50">
+                      {categorias.map((cat) => (
+                        <SelectItem key={cat} value={cat as string}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
               <FormField
                 control={form.control}
                 name="precio_eur"
@@ -265,7 +294,13 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                   <FormItem>
                     <FormLabel>Precio (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
+                      <Input
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -285,9 +320,9 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-popover z-50">
-                        {unidades.map((unidad) => (
+                        {opcionesUnidadPlato(unidades).map((unidad) => (
                           <SelectItem key={unidad} value={unidad as string}>
-                            {unidad}
+                            {unidad === "gramos" ? "Gramos" : unidad}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -298,175 +333,220 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="descripcion"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Descripción del plato"
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="ingredientes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Ingredientes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Ingredientes del plato"
-                      className="resize-none"
-                      rows={2}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-2">
-              <FormLabel>Imagen del Plato</FormLabel>
-              <div className="flex flex-col gap-3">
-                {imagePreview ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={imagePreview}
-                      alt="Vista previa"
-                      className="w-32 h-32 object-cover rounded-lg border"
-                    />
-                    <button
-                      type="button"
-                      onClick={clearImage}
-                      aria-label="Quitar la imagen"
-                      className="absolute -top-3 -right-3 flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full h-24 border-2 border-dashed border-muted-foreground/25 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-muted-foreground/50 transition-colors"
-                  >
-                    <Camera className="h-8 w-8 text-muted-foreground/50" />
-                    <span className="text-sm text-muted-foreground mt-1">
-                      Haz clic para subir o usar cámara
-                    </span>
-                  </div>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-              </div>
-            </div>
-
-            {/* Selector de Alérgenos */}
-            <div className="space-y-3">
-              <FormLabel>Alérgenos</FormLabel>
-              
-              {/* Grid de alérgenos oficiales */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {ALERGENOS_OFICIALES.map((alergeno) => {
-                  const isSelected = alergenosSeleccionados.includes(alergeno.id);
-                  return (
-                    <button
-                      key={alergeno.id}
-                      type="button"
-                      onClick={() => toggleAlergeno(alergeno.id)}
-                      className={`
-                        flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-md text-sm font-medium
-                        transition-all duration-200 border
-                        ${isSelected 
-                          ? "bg-primary text-primary-foreground border-primary" 
-                          : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
-                        }
-                      `}
-                    >
-                      <span className="truncate">{alergeno.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-              
-              {/* Añadir alérgeno personalizado */}
-              <div className="flex gap-2">
-                <Input
-                  value={nuevoAlergeno}
-                  onChange={(e) => setNuevoAlergeno(e.target.value)}
-                  placeholder="Añadir alérgeno personalizado..."
-                  className="h-11 flex-1 text-base md:text-base"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addAlergenoPersonalizado();
-                    }
-                  }}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  size="icon"
-                  onClick={addAlergenoPersonalizado}
-                  disabled={!nuevoAlergeno.trim()}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {/* Lista de alérgenos personalizados */}
-              {alergenosPersonalizados.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {alergenosPersonalizados.map((alergeno) => (
-                    <Badge 
-                      key={alergeno} 
-                      variant="secondary"
-                      className="gap-0 py-0 pl-3 pr-0 text-sm"
-                    >
-                      {alergeno}
-                      <button
-                        type="button"
-                        onClick={() => removeAlergenoPersonalizado(alergeno)}
-                        className="flex h-11 w-11 items-center justify-center hover:text-destructive"
-                        aria-label={`Quitar ${alergeno}`}
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {tieneGluten && (
+            {form.watch("unidad") === "gramos" && (
               <FormField
                 control={form.control}
-                name="sin_gluten_disponible"
+                name="gramos"
                 render={({ field }) => (
-                  <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
+                  <FormItem>
+                    <FormLabel>Cantidad de gramos</FormLabel>
                     <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={value => field.onChange(value === true)} />
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min="1"
+                        step="1"
+                        placeholder="Ej.: 150"
+                        {...field}
+                      />
                     </FormControl>
-                    <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">Se puede hacer sin gluten</FormLabel>
+                    <p className="text-sm text-muted-foreground">
+                      El precio indicado corresponde a esta cantidad de gramos.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
             )}
+
+            <details className="rounded-lg border p-3">
+              <summary className="cursor-pointer font-medium">
+                Información adicional (opcional)
+              </summary>
+              <div className="space-y-4 pt-4">
+                <FormField
+                  control={form.control}
+                  name="descripcion"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Descripción</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Descripción del plato"
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ingredientes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ingredientes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Ingredientes del plato"
+                          className="resize-none"
+                          rows={2}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="space-y-2">
+                  <FormLabel>Imagen del Plato</FormLabel>
+                  <div className="flex flex-col gap-3">
+                    {imagePreview ? (
+                      <div className="relative inline-block">
+                        <img
+                          src={imagePreview}
+                          alt="Vista previa"
+                          className="w-32 h-32 object-cover rounded-lg border"
+                        />
+                        <button
+                          type="button"
+                          onClick={clearImage}
+                          aria-label="Quitar la imagen"
+                          className="absolute -top-3 -right-3 flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => fileInputRef.current?.click()}
+                        className="w-full h-24 border-2 border-dashed border-muted-foreground/25 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-muted-foreground/50 transition-colors"
+                      >
+                        <Camera className="h-8 w-8 text-muted-foreground/50" />
+                        <span className="text-sm text-muted-foreground mt-1">
+                          Haz clic para subir o usar cámara
+                        </span>
+                      </div>
+                    )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                  </div>
+                </div>
+
+                {/* Selector de Alérgenos */}
+                <div className="space-y-3">
+                  <FormLabel>Alérgenos</FormLabel>
+
+                  {/* Grid de alérgenos oficiales */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {ALERGENOS_OFICIALES.map((alergeno) => {
+                      const isSelected = alergenosSeleccionados.includes(
+                        alergeno.id,
+                      );
+                      return (
+                        <button
+                          key={alergeno.id}
+                          type="button"
+                          onClick={() => toggleAlergeno(alergeno.id)}
+                          className={`
+                        flex items-center gap-1.5 min-h-11 px-3 py-1.5 rounded-md text-sm font-medium
+                        transition-all duration-200 border
+                        ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                        }
+                      `}
+                        >
+                          <span className="truncate">{alergeno.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Añadir alérgeno personalizado */}
+                  <div className="flex gap-2">
+                    <Input
+                      value={nuevoAlergeno}
+                      onChange={(e) => setNuevoAlergeno(e.target.value)}
+                      placeholder="Añadir alérgeno personalizado..."
+                      className="h-11 flex-1 text-base md:text-base"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addAlergenoPersonalizado();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={addAlergenoPersonalizado}
+                      disabled={!nuevoAlergeno.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Lista de alérgenos personalizados */}
+                  {alergenosPersonalizados.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {alergenosPersonalizados.map((alergeno) => (
+                        <Badge
+                          key={alergeno}
+                          variant="secondary"
+                          className="gap-0 py-0 pl-3 pr-0 text-sm"
+                        >
+                          {alergeno}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeAlergenoPersonalizado(alergeno)
+                            }
+                            className="flex h-11 w-11 items-center justify-center hover:text-destructive"
+                            aria-label={`Quitar ${alergeno}`}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {tieneGluten && (
+                  <FormField
+                    control={form.control}
+                    name="sin_gluten_disponible"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={(value) =>
+                              field.onChange(value === true)
+                            }
+                          />
+                        </FormControl>
+                        <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">
+                          Se puede hacer sin gluten
+                        </FormLabel>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
+            </details>
 
             <div className="flex justify-end gap-2">
               <Button
@@ -477,8 +557,14 @@ export function PlatoForm({ open, onOpenChange, categoriaInicial }: PlatoFormPro
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={crearPlato.isPending || isUploading}>
-                {crearPlato.isPending || isUploading ? "Guardando..." : "Guardar Plato"}
+              <Button
+                type="submit"
+                className="h-11 px-5"
+                disabled={crearPlato.isPending || isUploading}
+              >
+                {crearPlato.isPending || isUploading
+                  ? "Guardando..."
+                  : "Guardar Plato"}
               </Button>
             </div>
           </form>

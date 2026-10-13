@@ -1,3 +1,4 @@
+import { normalizarUnidadPlato } from "@/lib/unidades-platos";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -62,9 +63,12 @@ async function traducirPlato(datos: {
   alergenos: string[];
 }): Promise<Record<string, unknown> | null> {
   try {
-    const { data, error } = await supabase.functions.invoke("traducir-contenido", {
-      body: { tipo: "plato", datos },
-    });
+    const { data, error } = await supabase.functions.invoke(
+      "traducir-contenido",
+      {
+        body: { tipo: "plato", datos },
+      },
+    );
     if (error || !data?.ok) {
       console.error("Traducción de plato no disponible:", error || data?.error);
       return null;
@@ -95,7 +99,9 @@ function alergenosKey(valor: unknown): string {
  * posiblemente con `?t=` de cache-busting detrás, ver `EditarPlatoModal.tsx`).
  * Devuelve null si no hay imagen o si la URL no encaja con ese patrón, para
  * no intentar borrar nada por error (ver informe, TAREA 2). */
-function rutaStorageDesdeUrl(imagenUrl: string | null | undefined): string | null {
+function rutaStorageDesdeUrl(
+  imagenUrl: string | null | undefined,
+): string | null {
   if (!imagenUrl) return null;
   try {
     const sinQuery = imagenUrl.split("?")[0].split("#")[0];
@@ -123,13 +129,18 @@ export function usePlatos() {
         .order("id", { ascending: true });
 
       if (error) throw error;
-      return data as unknown as Plato[];
+      return ((data ?? []) as unknown as Plato[]).map((plato) => ({
+        ...plato,
+        unidad: normalizarUnidadPlato(plato.unidad),
+      }));
     },
   });
 
   const crearPlato = useMutation({
     mutationFn: async (nuevoPlato: NuevoPlato) => {
-      const alergenosArray = normalizarAlergenos(nuevoPlato.alergenos_oficiales);
+      const alergenosArray = normalizarAlergenos(
+        nuevoPlato.alergenos_oficiales,
+      );
 
       // 1. Traducir primero (no escribe nada; solo devuelve las columnas *_en/*_fr).
       const traducciones = await traducirPlato({
@@ -150,10 +161,13 @@ export function usePlatos() {
             categoria: nuevoPlato.categoria,
             precio_eur: nuevoPlato.precio_eur,
             descripcion: nuevoPlato.descripcion || null,
-            ...(nuevoPlato.sin_gluten_disponible === true ? { sin_gluten_disponible: true } : {}),
+            ...(nuevoPlato.sin_gluten_disponible === true
+              ? { sin_gluten_disponible: true }
+              : {}),
             ingredientes: nuevoPlato.ingredientes || null,
-            unidad: nuevoPlato.unidad || null,
-            alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
+            unidad: normalizarUnidadPlato(nuevoPlato.unidad),
+            alergenos_oficiales:
+              alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoPlato.alergenos_notas || null,
             orden: nuevoPlato.orden ?? "0",
             activado: true,
@@ -169,7 +183,9 @@ export function usePlatos() {
       if (error) throw error;
 
       if (!traducciones) {
-        toast.warning("Plato guardado sin traducción automática. Revísala más tarde en inglés/francés.");
+        toast.warning(
+          "Plato guardado sin traducción automática. Revísala más tarde en inglés/francés.",
+        );
       }
 
       return data;
@@ -186,10 +202,13 @@ export function usePlatos() {
 
   const actualizarPlato = useMutation({
     mutationFn: async ({ id, ...cambios }: Partial<Plato> & { id: string }) => {
+      if ("unidad" in cambios)
+        cambios.unidad = normalizarUnidadPlato(cambios.unidad);
       // Si la edición toca alérgenos, se guarda en vocabulario canónico.
       if ("alergenos_oficiales" in cambios) {
         const normalizados = normalizarAlergenos(cambios.alergenos_oficiales);
-        cambios.alergenos_oficiales = normalizados.length > 0 ? normalizados : null;
+        cambios.alergenos_oficiales =
+          normalizados.length > 0 ? normalizados : null;
       }
 
       // Retraducir SOLO si cambia un campo que de verdad alimenta alguna
@@ -200,11 +219,17 @@ export function usePlatos() {
       // anterior en caché (no contra "está presente en cambios") para que un
       // guardado de precio o de imagen_url/imagen_posicion_y (que reenvían
       // solo esa clave) nunca llame a la función de traducción.
-      const anterior = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === id);
+      const anterior = queryClient
+        .getQueryData<Plato[]>(["platos"])
+        ?.find((p) => p.id === id);
 
       // Antes de aplicar la migración la columna no viene en select('*').
       // Una edición normal con la casilla apagada sigue guardándose.
-      if (cambios.sin_gluten_disponible === false && anterior && anterior.sin_gluten_disponible === undefined) {
+      if (
+        cambios.sin_gluten_disponible === false &&
+        anterior &&
+        anterior.sin_gluten_disponible === undefined
+      ) {
         delete cambios.sin_gluten_disponible;
       }
 
@@ -217,19 +242,27 @@ export function usePlatos() {
       // Mejor una traducción desactualizada que una corrompida: se guarda
       // igual con `cambios`, solo se salta la retraducción.
       const tocaCampoTraducible =
-        "nombre" in cambios || "descripcion" in cambios || "categoria" in cambios || "alergenos_oficiales" in cambios;
+        "nombre" in cambios ||
+        "descripcion" in cambios ||
+        "categoria" in cambios ||
+        "alergenos_oficiales" in cambios;
       const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
       if (saltaRetraduccionSinAnterior) {
-        console.warn(`usePlatos.actualizarPlato: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+        console.warn(
+          `usePlatos.actualizarPlato: se salta la retraducción de "${id}" — sin estado previo en caché.`,
+        );
       }
 
       const cambiaTraducible = Boolean(
         anterior &&
           (("nombre" in cambios && cambios.nombre !== anterior.nombre) ||
-            ("descripcion" in cambios && cambios.descripcion !== anterior.descripcion) ||
-            ("categoria" in cambios && cambios.categoria !== anterior.categoria) ||
+            ("descripcion" in cambios &&
+              cambios.descripcion !== anterior.descripcion) ||
+            ("categoria" in cambios &&
+              cambios.categoria !== anterior.categoria) ||
             ("alergenos_oficiales" in cambios &&
-              alergenosKey(cambios.alergenos_oficiales) !== alergenosKey(anterior.alergenos_oficiales))),
+              alergenosKey(cambios.alergenos_oficiales) !==
+                alergenosKey(anterior.alergenos_oficiales))),
       );
 
       // Traducir primero (no escribe nada), igual que en la creación. Si
@@ -241,7 +274,9 @@ export function usePlatos() {
           descripcion: (cambios.descripcion ?? anterior?.descripcion) || "",
           ingredientes: (cambios.ingredientes ?? anterior?.ingredientes) || "",
           categoria: (cambios.categoria ?? anterior?.categoria) || "",
-          alergenos: normalizarAlergenos(cambios.alergenos_oficiales ?? anterior?.alergenos_oficiales),
+          alergenos: normalizarAlergenos(
+            cambios.alergenos_oficiales ?? anterior?.alergenos_oficiales,
+          ),
         });
       }
 
@@ -259,7 +294,9 @@ export function usePlatos() {
           "Plato actualizado, pero no se pudo comprobar si había que retraducirlo (la lista de platos no estaba cargada). Vuelve a editarlo con la lista cargada para revisar el inglés/francés.",
         );
       } else if (cambiaTraducible && !traducciones) {
-        toast.warning("Plato actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.");
+        toast.warning(
+          "Plato actualizado sin volver a traducir. Revísalo más tarde en inglés/francés.",
+        );
       }
 
       return data;
@@ -281,21 +318,28 @@ export function usePlatos() {
       // -no se puede derivar la ruta, o el propio borrado del objeto falla-
       // NO debe impedir que se borre el registro; solo dejamos constancia
       // por consola (ver informe, TAREA 2).
-      const anterior = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === id);
+      const anterior = queryClient
+        .getQueryData<Plato[]>(["platos"])
+        ?.find((p) => p.id === id);
       const ruta = rutaStorageDesdeUrl(anterior?.imagen_url);
       if (ruta) {
-        const { error: storageError } = await supabase.storage.from("platos").remove([ruta]);
+        const { error: storageError } = await supabase.storage
+          .from("platos")
+          .remove([ruta]);
         if (storageError) {
-          console.error("No se pudo borrar la imagen del plato en Storage:", storageError);
+          console.error(
+            "No se pudo borrar la imagen del plato en Storage:",
+            storageError,
+          );
         }
       } else if (anterior?.imagen_url) {
-        console.warn("No se pudo derivar la ruta de Storage desde imagen_url:", anterior.imagen_url);
+        console.warn(
+          "No se pudo derivar la ruta de Storage desde imagen_url:",
+          anterior.imagen_url,
+        );
       }
 
-      const { error } = await supabase
-        .from("Platos")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("Platos").delete().eq("id", id);
 
       if (error) throw error;
     },
@@ -310,7 +354,14 @@ export function usePlatos() {
   });
 
   const toggleActivado = useMutation({
-    mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
+    mutationFn: async ({
+      id,
+      activado,
+    }: {
+      id: string;
+      activado: boolean;
+      nombre?: string;
+    }) => {
       const { error } = await supabase
         .from("Platos")
         .update({ activado })
@@ -333,7 +384,14 @@ export function usePlatos() {
   });
 
   const toggleExpanded = useMutation({
-    mutationFn: async ({ id, expanded }: { id: string; expanded: boolean; nombre?: string }) => {
+    mutationFn: async ({
+      id,
+      expanded,
+    }: {
+      id: string;
+      expanded: boolean;
+      nombre?: string;
+    }) => {
       const { error } = await supabase
         .from("Platos")
         .update({ expanded })
@@ -394,7 +452,13 @@ export function usePlatos() {
   });
 
   const toggleRestaurante = useMutation({
-    mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
+    mutationFn: async ({
+      id,
+      restaurante,
+    }: {
+      id: string;
+      restaurante: boolean;
+    }) => {
       const { error } = await supabase
         .from("Platos")
         .update({ restaurante })
@@ -436,7 +500,7 @@ export function usePlatos() {
     : [];
 
   const unidades = platos
-    ? Array.from(new Set(platos.map((p) => p.unidad).filter(Boolean)))
+    ? Array.from(new Set(platos.map((p) => normalizarUnidadPlato(p.unidad))))
     : [];
 
   return {
