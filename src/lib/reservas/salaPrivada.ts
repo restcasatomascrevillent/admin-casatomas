@@ -5,7 +5,7 @@
 // «el Reservado no quiero que se tenga en cuenta en los aforos porque no es
 // accesible, es para gente especial y está fuera del sistema de reservas, pero
 // que sepamos que está». Una sala con `espacios_reserva.caracteristicas.privada
-// = true` (hoy el «Reservado» de Casa Tomás, 20 plazas):
+// = true` (hoy el «Reservado» de Casa Tomás, 14 plazas desde 13/10/2026):
 //   · NO suma su capacidad al aforo de la marca (Casa Tomás: 150, no 170);
 //   · una reserva en ella NO consume aforo (ni capacidad ni comensales): no
 //     entra en las cifras de ocupación, comensales ni porcentajes;

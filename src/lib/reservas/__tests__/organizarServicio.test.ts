@@ -99,9 +99,9 @@ describe("organizarServicio", () => {
     expect(abierta.resumen).toBe("Ya está bien organizado");
   });
 
-  it("terraza flexible: un grupo de 9 junta dos sitios", () => {
+  it("terraza flexible: un grupo de 7 junta dos sitios", () => {
     const mesas = [sitio("1", 0, 0), sitio("2", 1.8, 0), sitio("3", 0, 1.8), pieza("C", "3", 2)];
-    const r = organizarServicio(entrada(mesas, [res("Boda", 9, "14:00:00")]));
+    const r = organizarServicio(entrada(mesas, [res("Boda", 7, "14:00:00")]));
     expect(r.movimientos[0].hacia.salaNombre).toBe("Terraza");
     expect(r.movimientos[0].hacia.mesaIds).toHaveLength(2);
     expect(r.movimientos[0].detalle).toMatch(/^junta la/);
@@ -184,5 +184,53 @@ describe("vista previa de la propuesta", () => {
       { ...r.movimientos[0], ajustes: [{ salaId: "S", cambios: [{ mesaId: "S5", piezas: 2, picos: 1, unidaA: null }] }] },
     ]);
     expect(ajustes.find((a) => a.mesaId === "S5")).toMatchObject({ picos: 1, espacioId: "S" });
+  });
+});
+
+describe("organizarServicio · automático sencillo (13/10/2026)", () => {
+  it("grupos de 8 o más: no se colocan solos, salen para revisar a mano con la sugerencia", () => {
+    const mesas = [pieza("C", "1", 3, { picos_base: 1 }), redonda("S", "5", 10), pieza("S", "2", 2)];
+    const r = organizarServicio(
+      entrada(mesas, [res("Boda", 18, "14:00:00"), res("Cena", 8, "14:30:00"), res("Pareja", 2, "14:00:00")], {
+        sugerirGrupo: (x) => (x.comensales > 14 ? "mesa larga en el Salón" : "al Reservado"),
+      }),
+    );
+    expect(r.movimientos.map((m) => m.reservaId)).toEqual(["Pareja"]);
+    expect(r.sinSitio).toEqual([]);
+    expect(r.revisarAMano.map((x) => [x.reservaId, x.sugerencia])).toEqual([
+      ["Boda", "mesa larga en el Salón"],
+      ["Cena", "al Reservado"],
+    ]);
+    expect(r.yaOrganizado).toBe(false);
+  });
+
+  it("un grupo grande que ya tiene mesa no se mueve y su mesa no se da a otro", () => {
+    const mesas = [redonda("S", "5", 10), pieza("S", "2", 2)];
+    const r = organizarServicio(entrada(mesas, [res("Cena", 9, "21:00:00", ["S5"]), res("Seis", 6, "21:00:00")]));
+    expect(r.movimientos.map((m) => m.reservaId)).not.toContain("Cena");
+    expect(r.revisarAMano).toEqual([]);
+    expect(r.sinSitio.map((s) => s.reservaId)).toEqual(["Seis"]);
+  });
+
+  it("nunca junta piezas de TRES mesas: destino + una donante como mucho", () => {
+    const g = { grupo_piezas: "g" };
+    const mesas = [
+      pieza("C", "D", 1, { ...g, piezas_max: 3, pos_y: 0 }),
+      pieza("C", "A", 2, { ...g, piezas_max: 2, pos_y: 1.5 }),
+      pieza("C", "B", 2, { ...g, piezas_max: 2, pos_y: 3 }),
+    ];
+    const sentadas = [
+      res("Ana", 2, "14:00:00", ["CA"], { estado: "completada" }),
+      res("Luis", 2, "14:00:00", ["CB"], { estado: "completada" }),
+    ];
+    // A y B solo pueden soltar UNA pieza cada una: para 6 en la D harían falta las dos.
+    const r = organizarServicio(entrada(mesas, [...sentadas, res("Seis", 6, "14:30:00")]));
+    expect(r.movimientos).toEqual([]);
+    expect(r.sinSitio.map((s) => s.reservaId)).toEqual(["Seis"]);
+    // Con una sola donante sí: para 5 basta una pieza de la A (o la B) y pico.
+    const cinco = organizarServicio(entrada(mesas, [...sentadas, res("Cinco", 5, "14:30:00")]));
+    const m = cinco.movimientos.find((x) => x.reservaId === "Cinco")!;
+    expect(m.hacia.mesaNombres).toEqual(["D"]);
+    expect(m.detalle).toMatch(/pasa una pieza de la (A|B) a la D y pon pico/);
   });
 });

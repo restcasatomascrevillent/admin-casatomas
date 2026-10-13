@@ -2299,14 +2299,25 @@ export function PlanoEspacio2D({
       return franja ? [{ mesa_id: a.mesa_id, franja }] : [];
     });
 
-    const { propuestas, sinHueco } = calcularDistribucionMesas({
+    const { propuestas, sinHueco, paraRevisar } = calcularDistribucionMesas({
       reservas: reservasPendientes,
       mesasLibres: mesasCandidatas,
       franjaDe: (r) => franjaDeHora(r.hora, configOcupacion),
       ocupaciones,
     });
 
+    // Grupos de 8 o más (13/10/2026): no se reparten solos, los asigna una persona.
+    if (paraRevisar.length > 0) {
+      toast.info(
+        paraRevisar.length === 1
+          ? `${paraRevisar[0].nombre} (${paraRevisar[0].numero_comensales} p.) es un grupo grande: asígnalo a mano (Reservado hasta 14; si son más, mesa larga en el Salón, pared de abajo a la derecha).`
+          : `${paraRevisar.length} grupos de 8 o más: asígnalos a mano (Reservado hasta 14; si son más, mesa larga en el Salón, pared de abajo a la derecha).`,
+        { duration: 9000 },
+      );
+    }
+
     if (propuestas.length === 0) {
+      if (paraRevisar.length > 0 && sinHueco.length === 0) return;
       toast.info(
         reservasPendientes.length === 0
           ? `No hay reservas pendientes de mesa en ${etiquetaFiltroTurno(filtroTurno).toLowerCase()}.`

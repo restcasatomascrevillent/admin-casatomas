@@ -16,6 +16,12 @@
 //   7. «Terraza cerrada»: no se asigna nada ahí y lo que hubiera se recoloca.
 //   8. Las importantes se colocan antes y se mueven menos.
 //   9. Las que no caben salen con el motivo.
+//  10. (13/10/2026) Lo automático es SENCILLO: hasta 7 comensales (lo que admite la
+//      web), en UNA mesa o como mucho DOS (juntas, o una que recibe piezas de otra;
+//      piezas de 2 + pico: 6 + pico = 7). Nunca combina 3 o más mesas solo.
+//      Los grupos de 8 o más los revisa una persona: no se colocan; salen en
+//      `revisarAMano` con la sugerencia (Reservado hasta 14; si no, mesa larga en el
+//      Salón, ver `grupoGrande.ts`). Si ya tienen mesa, se respeta y no se mueven.
 // Principio que manda: «ayudar en momentos frenéticos, no perjudicarlos».
 //   · Con el servicio empezado (`minutoAhora`), las reservas con mesa que llegan
 //     en los próximos 30 min (o ya deberían estar) no se tocan, sus mesas no
@@ -35,6 +41,7 @@
 // ============================================================================
 
 import { minutosDeHora } from "./ocupacionMesa";
+import { esGrupoGrande, MAX_MESAS_AUTO } from "./grupoGrande";
 import {
   aplicarCambios,
   candidatasParaJuntar,
@@ -105,9 +112,21 @@ export interface SinSitioOrg {
   motivo: string;
 }
 
+/** Grupo de 8 o más sin mesa: lo asigna una persona (con la sugerencia como ayuda). */
+export interface RevisarOrg {
+  reservaId: string;
+  nombre: string;
+  hora: string;
+  comensales: number;
+  /** «Grupo de 18 (…): mesa larga en el Salón, pegada a la pared de abajo a la derecha…». */
+  sugerencia: string;
+}
+
 export interface ResultadoOrg {
   movimientos: MovimientoOrg[];
   sinSitio: SinSitioOrg[];
+  /** Grupos de 8 o más sin mesa: no se asignan solos. */
+  revisarAMano: RevisarOrg[];
   /** No hay nada que cambiar (ni nadie sin sitio). */
   yaOrganizado: boolean;
   /** «3 cambios», «Ya está bien organizado». */
@@ -127,6 +146,8 @@ export interface EntradaOrg {
   minutoAhora?: number | null;
   /** Mesas que Configuración no ofrece al asignar. */
   excluidas?: ReadonlySet<string>;
+  /** Sugerencia para un grupo grande (Reservado / mesa larga en el Salón). */
+  sugerirGrupo?: (r: ReservaOrg) => string | null;
 }
 
 // ─── Costes ──────────────────────────────────────────────────────────────────
@@ -297,7 +318,9 @@ function mejorColocacion(
         maximo: 1,
       });
       const p = res.propuestas[0];
-      if (p) {
+      // Como mucho DOS mesas: la de destino y UNA que le pase piezas (nunca de varias).
+      const donantes = new Set(p?.pasos.flatMap((x) => (x.tipo === "mover" ? [x.desde] : [])) ?? []);
+      if (p && donantes.size + 1 <= MAX_MESAS_AUTO) {
         const final = aplicarCambios(estado, p.cambios).get(m.id)!;
         const plazasFinal = plazasMesa(m.mp, final);
         considerar({
@@ -497,8 +520,21 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
     r.mesaIds.every((id) => ctx.mesaPorId.has(id) && salaOk.has(ctx.mesaPorId.get(id)!.salaId)) &&
     r.mesaIds.reduce((s, id) => s + plazasDe(ctx, ctx.estadoInicial, id), 0) >= r.comensales;
 
-  const fijasBase = relevantes.filter(inamovible);
-  const movibles = relevantes.filter((r) => !inamovible(r));
+  // Grupos de 8 o más: no se colocan solos. Si ya tienen mesa se respeta (fija); si no, a revisar.
+  const grande = (r: ReservaOrg) => esGrupoGrande(r.comensales) && !ESTADOS_FIJOS.has(r.estado);
+  const grandes = relevantes.filter(grande);
+  const fijasBase = [...relevantes.filter((r) => !grande(r) && inamovible(r)), ...grandes.filter((r) => r.mesaIds.length > 0)];
+  const movibles = relevantes.filter((r) => !grande(r) && !inamovible(r));
+  const revisarAMano: RevisarOrg[] = grandes
+    .filter((r) => r.mesaIds.length === 0)
+    .sort((a, b) => a.hora.localeCompare(b.hora) || a.id.localeCompare(b.id))
+    .map((r) => ({
+      reservaId: r.id,
+      nombre: r.nombre,
+      hora: r.hora,
+      comensales: r.comensales,
+      sugerencia: entrada.sugerirGrupo?.(r) ?? `Grupo de ${r.comensales}: asígnalo a mano.`,
+    }));
 
   const conservador = hacerPlan(
     ctx,
@@ -570,11 +606,12 @@ export function organizarServicio(entrada: EntradaOrg): ResultadoOrg {
           : `No queda mesa libre para ${r.comensales}${entrada.terrazaCerrada ? " (Terraza cerrada)" : ""}`,
     }));
 
-  const yaOrganizado = movimientos.length === 0 && sinSitio.length === 0;
+  const yaOrganizado = movimientos.length === 0 && sinSitio.length === 0 && revisarAMano.length === 0;
   const n = movimientos.length;
   return {
     movimientos,
     sinSitio,
+    revisarAMano,
     yaOrganizado,
     resumen: yaOrganizado
       ? "Ya está bien organizado"

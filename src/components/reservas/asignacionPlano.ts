@@ -28,6 +28,7 @@ import {
   type Turno,
 } from "@/lib/reservas/asignacionMesas";
 import { seSolapan, type Franja } from "@/lib/reservas/ocupacionMesa";
+import { MAX_MESAS_AUTO, seAsignaSolo } from "@/lib/reservas/grupoGrande";
 
 // Reexportado por comodidad del componente: la implementación vive en
 // `@/lib/reservas/asignacionMesas`, aquí solo se pasa la pelota.
@@ -280,6 +281,8 @@ export interface DistribucionPropuesta {
   propuestas: PropuestaAsignacion[];
   /** Reservas para las que no quedan mesas que las cubran. NO es un error. */
   sinHueco: ReservaSala[];
+  /** Grupos de 8 o más: no se reparten solos, los asigna una persona (13/10/2026). */
+  paraRevisar: ReservaSala[];
 }
 
 /**
@@ -306,10 +309,13 @@ export interface DistribucionPropuesta {
  *    revés no pasa: lo grande solo cabe donde cabe.
  *  - **Para una sola mesa, la más justa que valga** (best fit): sentar a 2 en
  *    la de 10 desperdicia el plano. Se elige la de menor capacidad que llegue.
- *  - **Si no hay ninguna que llegue, se juntan mesas**, de mayor a menor para
- *    usar las menos posibles, con un tope (`maxMesasPorReserva`, 3 por
- *    defecto): juntar cuatro mesas para un grupo es algo que decide una
- *    persona mirando la sala, no un reparto automático.
+ *  - **Si no hay ninguna que llegue, se juntan DOS mesas como mucho**
+ *    (`maxMesasPorReserva`, 2 por defecto = `MAX_MESAS_AUTO`), de mayor a
+ *    menor. Decisión del dueño (13/10/2026): lo automático es sencillo (la web
+ *    admite hasta 7: piezas de 2 + pico, 6 + pico = 7).
+ *  - **Los grupos de 8 o más no se reparten** (`paraRevisar`): entran por
+ *    teléfono y los asigna una persona (Reservado hasta 14; si no, mesa larga
+ *    en el Salón, ver `@/lib/reservas/grupoGrande`).
  *  - **Nunca toca a quien ya tiene mesa.** El reparto solo rellena lo que está
  *    pendiente: el trabajo manual del encargado no se pisa.
  *  - **Determinista.** A igualdad de capacidad manda el nombre de la mesa, y a
@@ -325,10 +331,12 @@ export function calcularDistribucionMesas(params: {
   /** Lo que ya está sentado (de otras reservas), para no pisarlo. */
   ocupaciones?: ReadonlyArray<{ mesa_id: string; franja: Franja }>;
 }): DistribucionPropuesta {
-  const tope = Math.max(1, params.maxMesasPorReserva ?? 3);
+  const tope = Math.max(1, Math.min(MAX_MESAS_AUTO, params.maxMesasPorReserva ?? MAX_MESAS_AUTO));
 
-  const candidatas = [...(params.reservas ?? [])]
-    .filter((r) => r && Number(r.numero_comensales) > 0)
+  const conComensales = [...(params.reservas ?? [])].filter((r) => r && Number(r.numero_comensales) > 0);
+  const paraRevisar = conComensales.filter((r) => !seAsignaSolo(r.numero_comensales));
+  const candidatas = conComensales
+    .filter((r) => seAsignaSolo(r.numero_comensales))
     .sort(
       (a, b) =>
         b.numero_comensales - a.numero_comensales ||
@@ -397,7 +405,7 @@ export function calcularDistribucionMesas(params: {
     sinHueco.push(reserva);
   }
 
-  return { propuestas, sinHueco };
+  return { propuestas, sinHueco, paraRevisar };
 }
 
 /** Sin franja: la reserva ocupa la mesa todo el día (una reserva por mesa). */

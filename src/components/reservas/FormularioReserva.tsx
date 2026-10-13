@@ -56,6 +56,7 @@ import {
 } from "@/lib/reservas/altaPanel";
 import { esErrorEsquemaPendiente } from "@/lib/reservas/propuestaCliente";
 import { esErrorSalaPrivadaOcupada, mensajeSalaPrivadaOcupada } from "@/lib/reservas/salaPrivada";
+import { esGrupoGrande, esSalaMesaLarga, excedeReservado, sugerenciaGrupoGrande } from "@/lib/reservas/grupoGrande";
 import { notificarCambioReserva } from "@/hooks/useVerificacionReservas";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import { notificarAlCliente } from "@/lib/reservas/notificarCliente";
@@ -390,6 +391,20 @@ export const FormularioReserva = ({
   // a cualquier hora; el aforo lo sigue validando el trigger.
   const horaFueraDeFranja = !!rejilla && !!watchedHora && !horariosDisponibles.includes(watchedHora);
 
+  // Grupo de 8 o más, o el Reservado con más de su capacidad (14): ayuda para la sala (13/10/2026).
+  const sugerenciaGrupo = useMemo(() => {
+    const n = Number(watchedComensales) || 0;
+    const reservado = salas.find((s) => s.privada) ?? null;
+    const excedeElReservado = !!reservado && watchedEspacio === reservado.id && excedeReservado(n, reservado.capacidad_maxima);
+    if (!excedeElReservado && !esGrupoGrande(n)) return null;
+    const salon = salas.find((s) => esSalaMesaLarga(s.nombre)) ?? null;
+    return sugerenciaGrupoGrande({
+      comensales: n,
+      reservado: reservado ? { id: reservado.id, nombre: reservado.nombre, capacidad: reservado.capacidad_maxima } : null,
+      salon: salon ? { id: salon.id, nombre: salon.nombre } : null,
+      forzarSalon: excedeElReservado,
+    });
+  }, [salas, watchedComensales, watchedEspacio]);
   const nombreSalaElegida = watchedEspacio ? salas.find((e) => e.id === watchedEspacio)?.nombre ?? "Sala" : "sin sala";
   const mostrarInputHora = modoOtraHora || horaFueraDeFranja;
 
@@ -1209,6 +1224,26 @@ export const FormularioReserva = ({
             <AlertDescription>
               Grupo de {watchedComensales} personas: supera el máximo automático ({configReservas.max_comensales_por_reserva}).
               {editando ? "Al editar se permite." : "Como alta manual se permite."}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!isPublic && sugerenciaGrupo && (
+          <Alert data-testid="sugerencia-grupo-grande">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              {sugerenciaGrupo.texto}
+              {esGrupoGrande(Number(watchedComensales) || 0) && " Los grupos de 8 o más no se asignan solos: la mesa la pone una persona."}
+              {sugerenciaGrupo.tipo !== "manual" && watchedEspacio !== sugerenciaGrupo.sala.id && (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto p-0 pl-1"
+                  onClick={() => form.setValue("espacio_id", sugerenciaGrupo.sala.id)}
+                >
+                  Poner en {sugerenciaGrupo.sala.nombre}
+                </Button>
+              )}
             </AlertDescription>
           </Alert>
         )}

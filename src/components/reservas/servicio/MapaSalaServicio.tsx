@@ -64,6 +64,11 @@ export interface MapaSalaServicioProps {
   /** Mesas cuya reserva coincide con la búsqueda; `null` = no hay búsqueda y no se atenúa nada. */
   coincidentes: ReadonlySet<string> | null;
   onTocarMesa: (mesa: Mesa) => void;
+  /**
+   * Mesa que NO existe en la BD y se propone montar (la mesa larga del Salón para un grupo de más
+   * de 14, `@/lib/reservas/grupoGrande`). Se dibuja con borde discontinuo y sin eventos.
+   */
+  mesaPropuesta?: { pos_x: number; pos_y: number; ancho: number; alto: number; texto: string } | null;
 }
 
 export function MapaSalaServicio({
@@ -78,6 +83,7 @@ export function MapaSalaServicio({
   seleccionada,
   coincidentes,
   onTocarMesa,
+  mesaPropuesta = null,
 }: MapaSalaServicioProps) {
   const [contenedor, setContenedor] = useState<HTMLDivElement | null>(null);
   const tamano = useTamanoElemento(contenedor);
@@ -236,6 +242,22 @@ export function MapaSalaServicio({
               onClick={tocar(mesa)}
             />
           ))}
+          {mesaPropuesta && (
+            <div
+              data-testid="mesa-propuesta"
+              title={mesaPropuesta.texto}
+              className="pointer-events-none absolute flex items-center justify-center rounded-lg border-2 border-dashed border-sky-600 bg-sky-200/50 px-1 text-center text-[12px] font-semibold leading-tight text-sky-900 dark:border-sky-400 dark:bg-sky-900/50 dark:text-sky-100"
+              style={{
+                left: (mesaPropuesta.pos_x * pixelsPorMetro - offsetX) * escala,
+                top: (mesaPropuesta.pos_y * pixelsPorMetro - offsetY) * escala,
+                width: (mesaPropuesta.ancho / 100) * pixelsPorMetro * escala,
+                height: (mesaPropuesta.alto / 100) * pixelsPorMetro * escala,
+                zIndex: 35,
+              }}
+            >
+              <span className="truncate">{mesaPropuesta.texto}</span>
+            </div>
+          )}
         </div>
       )}
 

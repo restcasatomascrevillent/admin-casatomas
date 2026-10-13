@@ -31,6 +31,9 @@ import { mensajeErrorAsignacion, turnoDeHora } from "@/lib/reservas/asignacionMe
 import { hoyLocal } from "@/components/reservas/asignacionPlano";
 import { minutosDeHora } from "@/lib/reservas/ocupacionMesa";
 import { organizarServicio, type MovimientoOrg, type ReservaOrg, type ResultadoOrg } from "@/lib/reservas/organizarServicio";
+import { esSalaMesaLarga, esGrupoGrande, sugerenciaGrupoGrande, type SugerenciaGrupo } from "@/lib/reservas/grupoGrande";
+import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
+import { usePlanoEspacio } from "@/hooks/usePlanosEspacio";
 import type { AjusteMesa } from "@/lib/reservas/piezasMesa";
 
 export function BotonOrganizarServicio({ fecha, turno }: { fecha: string; turno: TurnoServicio }) {
@@ -104,6 +107,16 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
   const terraza = salas.find((s) => s.terraza) ?? null;
   const cierre = useSalaCerradaServicio(terraza?.id ?? null, fecha, turno);
 
+  // Grupos de 8 o más (no se asignan solos): el Reservado y el Salón para la sugerencia.
+  const reservado = useMemo(
+    () =>
+      ((espacios ?? []) as Array<{ id: string; nombre: string; capacidad_maxima?: number | null; activa?: boolean | null; caracteristicas?: unknown }>)
+        .find((e) => e.activa !== false && esSalaPrivada(e)) ?? null,
+    [espacios],
+  );
+  const salon = salas.find((s) => esSalaMesaLarga(s.nombre)) ?? null;
+  const { data: planoSalon } = usePlanoEspacio(activo ? salon?.id : undefined);
+
   const cargando = !espacios || !mesas || !asignaciones || !reservas;
 
   /** Mesas de cada reserva en este turno (lo que hay ahora). */
@@ -115,6 +128,35 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
     }
     return mapa;
   }, [asignaciones, turno]);
+
+  /** Sugerencia (Reservado / mesa larga en el Salón) de cada grupo grande del turno. */
+  const sugerencias = useMemo(() => {
+    const mapa = new Map<string, SugerenciaGrupo>();
+    if (cargando || !activo) return mapa;
+    const delTurno = (reservas ?? []).filter((r) => turnoDeHora(r.hora) === turno);
+    const ocupadoPor = (id: string) => {
+      const otra = reservado
+        ? delTurno.find((x) => x.id !== id && x.espacio_id === reservado.id && ocupaEspacio(x.estado))
+        : undefined;
+      return otra ? otra.nombre?.trim() || "otra reserva" : null;
+    };
+    const ocupadas = new Set<string>();
+    for (const ids of mesasDe.values()) for (const id of ids) ocupadas.add(id);
+    for (const r of delTurno) {
+      if (!esGrupoGrande(r.numero_comensales) || (mesasDe.get(r.id)?.length ?? 0) > 0) continue;
+      const s = sugerenciaGrupoGrande({
+        comensales: r.numero_comensales,
+        reservado: reservado
+          ? { id: reservado.id, nombre: reservado.nombre, capacidad: reservado.capacidad_maxima, ocupadoPor: ocupadoPor(r.id) }
+          : null,
+        salon: salon
+          ? { id: salon.id, nombre: salon.nombre, mesas: (mesas ?? []).filter((m) => m.espacio_id === salon.id), plano: planoSalon, ocupadas }
+          : null,
+      });
+      if (s) mapa.set(r.id, s);
+    }
+    return mapa;
+  }, [cargando, activo, reservas, turno, reservado, salon, mesas, planoSalon, mesasDe]);
 
   const resultado = useMemo(() => {
     if (cargando || !activo) return null;
@@ -142,8 +184,9 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
       terrazaCerrada: cierre.cerrada,
       minutoAhora: empezado ? minutosDeHora(ahora.toTimeString().slice(0, 5)) : null,
       excluidas: new Set(configAsignacionDesde(config).mesasExcluidas),
+      sugerirGrupo: (r) => sugerencias.get(r.id)?.texto ?? null,
     });
-  }, [cargando, activo, salas, mesasDe, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config]);
+  }, [cargando, activo, salas, mesasDe, reservas, mesas, ajustesDia, turno, fecha, cierre.cerrada, config, sugerencias]);
 
   const refrescar = () => {
     for (const clave of CLAVES_POR_CAMBIO.ocupacion) void qc.invalidateQueries({ queryKey: [clave] });
@@ -210,7 +253,7 @@ export function usePropuestaOrganizar(fecha: string, turno: TurnoServicio, activ
     }
   };
 
-  return { resultado, aplicar, aplicando, terraza, cierre, cargando, mesasDe, reservas, ajustesDia, salas };
+  return { resultado, aplicar, aplicando, terraza, cierre, cargando, mesasDe, reservas, ajustesDia, salas, sugerencias };
 }
 
 function ContenidoOrganizar({ fecha, turno, onCerrar }: { fecha: string; turno: TurnoServicio; onCerrar: () => void }) {
@@ -279,6 +322,18 @@ export function ListaPropuesta({
           </Button>
         </div>
       ))}
+      {resultado.revisarAMano.length > 0 && (
+        <div className="rounded-md border border-sky-300 bg-sky-50 p-2 text-sm dark:border-sky-800 dark:bg-sky-950/40" data-testid="revisar-a-mano">
+          <p className="font-medium">Grupos de 8 o más: asígnalos a mano ({resultado.revisarAMano.length})</p>
+          <ul className="mt-1 space-y-1">
+            {resultado.revisarAMano.map((g) => (
+              <li key={g.reservaId}>
+                <span className="font-medium">{g.nombre || "Sin nombre"}</span> ({g.comensales} p., {g.hora.slice(0, 5)}): {g.sugerencia}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {resultado.sinSitio.length > 0 && (
         <div className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">
           <p className="font-medium">Sin sitio ({resultado.sinSitio.length})</p>

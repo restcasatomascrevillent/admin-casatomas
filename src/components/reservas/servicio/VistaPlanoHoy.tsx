@@ -112,6 +112,8 @@ import { SIN_ASIGNAR, columnaDeReserva, construirColumnas, esSinAsignar } from "
 import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
 import { TITULO_SIN_PERMISO_EDITAR, accionesDisponibles } from "@/lib/reservas/accionesReserva";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
+import { esGrupoGrande, esSalaMesaLarga, sugerenciaGrupoGrande, type SugerenciaGrupo } from "@/lib/reservas/grupoGrande";
+import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import {
   ESTADOS_MESA_SERVICIO,
   configServicioSalaDesde,
@@ -515,6 +517,45 @@ export function VistaPlanoHoy({
   };
   /** Mientras se arrastra o se elige: las mesas donde cabe y están libres, en verde; el resto, atenuadas. */
   const objetivo = arrastrando ?? eligiendoPara;
+
+  // ── Grupo de 8 o más: ayuda para asignarlo a mano (13/10/2026, `grupoGrande.ts`) ─
+  // Reservado hasta 14; si son más (o está cogido), la mesa larga del Salón se dibuja
+  // en discontinuo en su esquina (pared de abajo a la derecha). No crea ninguna mesa.
+  const salaEsSalon = esSalaMesaLarga(sala?.title);
+  const sugerenciaObjetivo = useMemo<SugerenciaGrupo | null>(() => {
+    if (!objetivo || !esGrupoGrande(objetivo.numero_comensales)) return null;
+    const turnoObj = turnoDeHora(objetivo.hora);
+    const reservado =
+      ((espacios ?? []) as Array<{ id: string; nombre: string; capacidad_maxima?: number | null; activa?: boolean | null; caracteristicas?: unknown }>)
+        .find((e) => e.activa !== false && esSalaPrivada(e)) ?? null;
+    const otra = reservado
+      ? lista.find((r) => r.id !== objetivo.id && r.espacio_id === reservado.id && ocupaEspacio(r.estado) && turnoDeHora(r.hora) === turnoObj)
+      : undefined;
+    const ocupadas = new Set(
+      (asignacionesDeHoy ?? []).filter((a) => turnoDeHora(a.reservas?.hora ?? "") === turnoObj).map((a) => a.mesa_id),
+    );
+    return sugerenciaGrupoGrande({
+      comensales: objetivo.numero_comensales,
+      reservado: reservado
+        ? { id: reservado.id, nombre: reservado.nombre, capacidad: reservado.capacidad_maxima, ocupadoPor: otra ? otra.nombre?.trim() || "otra reserva" : null }
+        : null,
+      salon: salaEsSalon && sala ? { id: sala.id, nombre: sala.title, mesas, plano, ocupadas } : null,
+    });
+  }, [objetivo, espacios, lista, asignacionesDeHoy, salaEsSalon, sala, mesas, plano]);
+  /** La mesa larga propuesta para dibujar en el Salón (eligiendo mesa o en «Organizar»). */
+  const mesaPropuesta = useMemo(() => {
+    if (!salaEsSalon) return null;
+    const conNombre = (s: SugerenciaGrupo | null | undefined, nombre: string | null | undefined, pax: number) =>
+      s?.tipo === "mesa_larga"
+        ? { pos_x: s.mesaLarga.pos_x, pos_y: s.mesaLarga.pos_y, ancho: s.mesaLarga.ancho, alto: s.mesaLarga.alto, texto: `Mesa larga · ${nombre || "grupo"} (${pax} p.)` }
+        : null;
+    if (objetivo) return conNombre(sugerenciaObjetivo, objetivo.nombre, objetivo.numero_comensales);
+    if (proponiendo) {
+      const g = org.resultado?.revisarAMano.find((x) => org.sugerencias.get(x.reservaId)?.tipo === "mesa_larga");
+      return g ? conNombre(org.sugerencias.get(g.reservaId), g.nombre, g.comensales) : null;
+    }
+    return null;
+  }, [salaEsSalon, objetivo, sugerenciaObjetivo, proponiendo, org.resultado, org.sugerencias]);
   const mesasValidas = useMemo(
     () => (objetivo ? new Set(mesas.filter((m) => decidir(objetivo, m).tipo === "asignar").map((m) => m.id)) : null),
     // `decidir` depende de lo mismo que las mesas y las asignaciones.
@@ -950,6 +991,25 @@ export function VistaPlanoHoy({
                 </PopoverContent>
               </Popover>
             )}
+            {org.resultado && org.resultado.revisarAMano.length > 0 && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-11 border-sky-400 text-sky-800 dark:text-sky-300">
+                    {org.resultado.revisarAMano.length} a mano (8+)
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96 text-sm">
+                  <p className="mb-1 font-medium">Grupos de 8 o más: los asigna una persona</p>
+                  <ul className="space-y-1">
+                    {org.resultado.revisarAMano.map((x) => (
+                      <li key={x.reservaId}>
+                        <span className="font-medium">{x.nombre || "Sin nombre"}</span> ({x.comensales} p., {x.hora.slice(0, 5)}): {x.sugerencia}
+                      </li>
+                    ))}
+                  </ul>
+                </PopoverContent>
+              </Popover>
+            )}
             {org.terraza && (
               <label className="flex h-11 items-center gap-2 rounded-md border bg-background px-2 text-sm">
                 <Switch checked={org.cierre.cerrada} onCheckedChange={(v) => void org.cierre.cambiar(v)} />
@@ -1095,12 +1155,20 @@ export function VistaPlanoHoy({
                     seleccionada={mesaSelId}
                     coincidentes={coincidentesMapa}
                     onTocarMesa={tocarMesa}
+                    mesaPropuesta={mesaPropuesta}
                   />
                 )}
                 {eligiendoPara && (
                   <div className="absolute inset-x-2 top-2 z-50 flex items-center justify-between gap-2 rounded-lg bg-primary px-3 py-2 text-primary-foreground shadow-lg">
-                    <span className="min-w-0 truncate text-sm font-medium">
-                      Toca una mesa para {eligiendoPara.nombre || "la reserva"} ({eligiendoPara.numero_comensales} p.)
+                    <span className="min-w-0 text-sm font-medium">
+                      <span className="block truncate">
+                        Toca una mesa para {eligiendoPara.nombre || "la reserva"} ({eligiendoPara.numero_comensales} p.)
+                      </span>
+                      {sugerenciaObjetivo && (
+                        <span className="block text-xs font-normal opacity-90" data-testid="sugerencia-grupo">
+                          {sugerenciaObjetivo.texto}
+                        </span>
+                      )}
                     </span>
                     <Button variant="secondary" className="h-10 shrink-0" onClick={() => setEligiendoPara(null)}>
                       Cancelar

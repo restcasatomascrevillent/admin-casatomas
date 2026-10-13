@@ -265,12 +265,12 @@ describe("calcularDistribucionMesas", () => {
     // Si se repartiera por orden de llegada, la pareja cogería la de 10 y el
     // grupo de 10 se quedaría fuera.
     const { propuestas, sinHueco } = calcularDistribucionMesas({
-      reservas: [reserva("pareja", 2, "13:00:00"), reserva("grupo", 10, "14:00:00")],
-      mesasLibres: [mesa("M10", 10), mesa("M2", 2)],
+      reservas: [reserva("pareja", 2, "13:00:00"), reserva("grupo", 7, "14:00:00")],
+      mesasLibres: [mesa("M7", 7), mesa("M2", 2)],
     });
     expect(sinHueco).toEqual([]);
     const porReserva = Object.fromEntries(propuestas.map((p) => [p.reserva.id, p.mesaIds]));
-    expect(porReserva.grupo).toEqual(["m-M10"]);
+    expect(porReserva.grupo).toEqual(["m-M7"]);
     expect(porReserva.pareja).toEqual(["m-M2"]);
   });
 
@@ -284,15 +284,35 @@ describe("calcularDistribucionMesas", () => {
     expect(propuestas[0].plazas).toBe(6);
   });
 
-  it("no junta más mesas de las que permite el tope", () => {
+  it("no junta más de DOS mesas, aunque se pida un tope mayor", () => {
     const { propuestas, sinHueco } = calcularDistribucionMesas({
-      reservas: [reserva("a", 8)],
+      reservas: [reserva("a", 6)],
       mesasLibres: [mesa("A", 2), mesa("B", 2), mesa("C", 2), mesa("D", 2)],
       maxMesasPorReserva: 3,
     });
-    // 3 mesas de 2 son 6 < 8, así que no se propone nada disparatado.
+    // 2 mesas de 2 son 4 < 6: con tres llegaría, pero eso lo decide una persona.
     expect(propuestas).toEqual([]);
     expect(sinHueco.map((r) => r.id)).toEqual(["a"]);
+  });
+
+  it("junta dos mesas (4 + pico y 2) para un grupo de 7", () => {
+    const { propuestas } = calcularDistribucionMesas({
+      reservas: [reserva("a", 7)],
+      mesasLibres: [mesa("M5", 5), mesa("M2", 2), mesa("M2b", 2)],
+    });
+    expect(propuestas).toHaveLength(1);
+    expect(propuestas[0].mesaIds).toHaveLength(2);
+    expect(propuestas[0].plazas).toBe(7);
+  });
+
+  it("los grupos de 8 o más no se reparten: quedan para revisar a mano", () => {
+    const { propuestas, sinHueco, paraRevisar } = calcularDistribucionMesas({
+      reservas: [reserva("ocho", 8), reserva("veinte", 20), reserva("pareja", 2)],
+      mesasLibres: [mesa("M10", 10), mesa("M20", 20), mesa("M2", 2)],
+    });
+    expect(propuestas.map((p) => p.reserva.id)).toEqual(["pareja"]);
+    expect(sinHueco).toEqual([]);
+    expect(paraRevisar.map((r) => r.id).sort()).toEqual(["ocho", "veinte"]);
   });
 
   it("nunca reutiliza una mesa ya propuesta para otra reserva", () => {
@@ -307,7 +327,7 @@ describe("calcularDistribucionMesas", () => {
 
   it("deja en sinHueco a quien no cabe, sin tratarlo como error", () => {
     const { propuestas, sinHueco } = calcularDistribucionMesas({
-      reservas: [reserva("cabe", 2), reserva("nocabe", 20)],
+      reservas: [reserva("cabe", 2), reserva("nocabe", 6)],
       mesasLibres: [mesa("M2", 2)],
     });
     expect(propuestas.map((p) => p.reserva.id)).toEqual(["cabe"]);
@@ -326,7 +346,7 @@ describe("calcularDistribucionMesas", () => {
   it("sin reservas pendientes no propone nada", () => {
     expect(
       calcularDistribucionMesas({ reservas: [], mesasLibres: [mesa("M4", 4)] }),
-    ).toEqual({ propuestas: [], sinHueco: [] });
+    ).toEqual({ propuestas: [], sinHueco: [], paraRevisar: [] });
   });
 
   it("es determinista: dos llamadas iguales proponen lo mismo", () => {
