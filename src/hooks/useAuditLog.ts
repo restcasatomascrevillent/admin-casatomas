@@ -10,8 +10,23 @@ export interface AuditLogEntry {
   actor_user_id: string | null;
   actor_email: string | null;
   actor_label?: string;
-  actor_origin?: "usuario" | "servicio" | "base_de_datos" | "historico" | "intento";
-  accion: "login" | "logout" | "crear" | "actualizar" | "eliminar" | "ejecutar" | "intento_login" | "login_fallido" | "acceso" | "acceso_denegado";
+  actor_origin?:
+    | "usuario"
+    | "servicio"
+    | "base_de_datos"
+    | "historico"
+    | "intento";
+  accion:
+    | "login"
+    | "logout"
+    | "crear"
+    | "actualizar"
+    | "eliminar"
+    | "ejecutar"
+    | "intento_login"
+    | "login_fallido"
+    | "acceso"
+    | "acceso_denegado";
   tabla: string | null;
   registro_id: string | null;
   detalles: Record<string, unknown> | null;
@@ -20,6 +35,8 @@ export interface AuditLogEntry {
   ip_address?: string | null;
   request_id?: string | null;
   session_id?: string | null;
+  tipo_evento?: string;
+  resultado?: string;
 }
 
 export interface AuditLogFiltros {
@@ -29,9 +46,39 @@ export interface AuditLogFiltros {
   tabla?: string;
   desde?: string;
   hasta?: string;
+  texto?: string;
+  resultado?: string;
+  origen?: "sin_servidor" | "usuario" | "servidor" | "intento" | "historico";
 }
 
 const PAGE_SIZE = 25;
+const GRUPOS_ACCION: Record<string, { columna: string; valores: string[] }> = {
+  grupo_cambios: {
+    columna: "accion",
+    valores: ["crear", "actualizar", "eliminar"],
+  },
+  grupo_ia: {
+    columna: "tipo_evento",
+    valores: [
+      "consulta_ia",
+      "regeneracion_ia",
+      "crear_chat_ia",
+      "eliminar_chat_ia",
+      "mensaje_ia",
+    ],
+  },
+  grupo_accesos: {
+    columna: "accion",
+    valores: [
+      "login",
+      "logout",
+      "login_fallido",
+      "acceso_denegado",
+      "acceso",
+      "intento_login",
+    ],
+  },
+};
 
 /**
  * Lista paginada de `audit_log` para /super-admin/auditoria. Solo
@@ -50,71 +97,163 @@ export function useAuditLog(filtros: AuditLogFiltros, pagina: number) {
 
   useEffect(() => {
     let activo = true;
-    void completeAuditEnabled().then(enabled => { if (activo) setAccesosActivos(enabled); }).catch(() => { if (activo) setAccesosActivos(null); });
-    void supabase.rpc("listar_tablas_auditoria_panel").then(({ data, error }) => {
-      if (activo && !error && Array.isArray(data) && data.length > 0) {
-        setTablas(data.map((fila: { tabla: string }) => fila.tabla));
-      }
-    });
-    return () => { activo = false; };
+    void completeAuditEnabled()
+      .then((enabled) => {
+        if (activo) setAccesosActivos(enabled);
+      })
+      .catch(() => {
+        if (activo) setAccesosActivos(null);
+      });
+    void supabase
+      .rpc("listar_tablas_auditoria_panel")
+      .then(({ data, error }) => {
+        if (activo && !error && Array.isArray(data) && data.length > 0) {
+          setTablas(data.map((fila: { tabla: string }) => fila.tabla));
+        }
+      });
+    return () => {
+      activo = false;
+    };
   }, []);
 
-  const fetchEntradas = useCallback(async (silencioso = false) => {
-    const miConsulta = ++secuencia.current;
-    if (!silencioso) setLoading(true);
-    setError(null);
+  const fetchEntradas = useCallback(
+    async (silencioso = false) => {
+      const miConsulta = ++secuencia.current;
+      if (!silencioso) setLoading(true);
+      setError(null);
 
-    const desde = pagina * PAGE_SIZE;
-    const consultar = (columnaActor: "actor_label" | "actor_email") => {
-      let query = supabase.from("audit_log").select("*", { count: "exact" });
-      if (filtros.actor?.trim()) {
-        const actor = filtros.actor.trim();
-        query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor) ? query.eq("actor_user_id", actor) : query.ilike(columnaActor, `%${actor}%`);
-      }
-      if (filtros.dispositivo?.trim()) query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
-      if (filtros.accion) query = query.eq("accion", filtros.accion);
-      if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
-      if (filtros.desde) query = query.gte("created_at", new Date(`${filtros.desde}T00:00:00`).toISOString());
-      if (filtros.hasta) {
-        const fin = new Date(`${filtros.hasta}T00:00:00`);
-        fin.setDate(fin.getDate() + 1);
-        query = query.lt("created_at", fin.toISOString());
-      }
-      return query.order("created_at", { ascending: false }).order("id", { ascending: false }).range(desde, desde + PAGE_SIZE - 1);
-    };
-    try {
-    let resultado = await consultar("actor_label");
-    // Mantiene el filtro de emails operativo durante el despliegue del SQL.
-    if (resultado.error?.code === "42703" && resultado.error.message.includes("actor_label")) {
-      resultado = await consultar("actor_email");
-    }
-    if (miConsulta !== secuencia.current) return;
-    const { data, error: queryError, count } = resultado;
+      const desde = pagina * PAGE_SIZE;
+      const consultar = (columnaActor: "actor_label" | "actor_email") => {
+        let query = supabase
+          .from("audit_log_visible" as "audit_log")
+          .select("*", { count: "exact" });
+        if (filtros.actor?.trim()) {
+          const actor = filtros.actor.trim();
+          query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor)
+            ? query.eq("actor_user_id", actor)
+            : query.ilike(columnaActor, `%${actor}%`);
+        }
+        if (filtros.dispositivo?.trim())
+          query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
+        if (filtros.accion && GRUPOS_ACCION[filtros.accion]) {
+          const grupo = GRUPOS_ACCION[filtros.accion];
+          query = query.in(grupo.columna, grupo.valores);
+        } else if (filtros.accion) {
+          const columna = [
+            "login",
+            "logout",
+            "crear",
+            "actualizar",
+            "eliminar",
+            "ejecutar",
+            "intento_login",
+            "login_fallido",
+            "acceso",
+            "acceso_denegado",
+          ].includes(filtros.accion)
+            ? "accion"
+            : "tipo_evento";
+          query = query.eq(columna, filtros.accion);
+        } else query = query.eq("visible_por_defecto", true);
+        if (filtros.texto?.trim())
+          query = query.ilike("texto_busqueda", `%${filtros.texto.trim()}%`);
+        if (filtros.resultado) query = query.eq("resultado", filtros.resultado);
+        if (filtros.origen)
+          query = query.in(
+            "actor_origin",
+            filtros.origen === "servidor"
+              ? ["servicio", "base_de_datos"]
+              : filtros.origen === "sin_servidor"
+                ? ["usuario", "intento", "historico"]
+                : [filtros.origen],
+          );
+        if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
+        if (filtros.desde)
+          query = query.gte(
+            "created_at",
+            new Date(`${filtros.desde}T00:00:00`).toISOString(),
+          );
+        if (filtros.hasta) {
+          const fin = new Date(`${filtros.hasta}T00:00:00`);
+          fin.setDate(fin.getDate() + 1);
+          query = query.lt("created_at", fin.toISOString());
+        }
+        return query
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(desde, desde + PAGE_SIZE - 1);
+      };
+      try {
+        let resultado = await consultar("actor_label");
+        // Mantiene el filtro de emails operativo durante el despliegue del SQL.
+        if (
+          resultado.error?.code === "42703" &&
+          resultado.error.message.includes("actor_label")
+        ) {
+          resultado = await consultar("actor_email");
+        }
+        if (miConsulta !== secuencia.current) return;
+        const { data, error: queryError, count } = resultado;
 
-    if (queryError) {
-      setError(queryError.message);
-      setEntradas([]);
-      setTotal(0);
-    } else {
-      setEntradas((data ?? []) as AuditLogEntry[]);
-      setTotal(count ?? 0);
-    }
-    } catch (error) {
-      if (miConsulta === secuencia.current) setError(error instanceof Error ? error.message : "No se pudo cargar la auditoría");
-    } finally {
-      if (miConsulta === secuencia.current) setLoading(false);
-    }
-  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, pagina]);
+        if (queryError) {
+          setError(queryError.message);
+          setEntradas([]);
+          setTotal(0);
+        } else {
+          setEntradas((data ?? []) as AuditLogEntry[]);
+          setTotal(count ?? 0);
+        }
+      } catch (error) {
+        if (miConsulta === secuencia.current)
+          setError(
+            error instanceof Error
+              ? error.message
+              : "No se pudo cargar la auditoría",
+          );
+      } finally {
+        if (miConsulta === secuencia.current) setLoading(false);
+      }
+    },
+    [
+      filtros.actor,
+      filtros.dispositivo,
+      filtros.accion,
+      filtros.tabla,
+      filtros.desde,
+      filtros.hasta,
+      filtros.texto,
+      filtros.resultado,
+      filtros.origen,
+      pagina,
+    ],
+  );
 
   useEffect(() => {
     void fetchEntradas();
-    const refresh = () => { if (document.visibilityState === "visible") void fetchEntradas(true); };
+    const refresh = () => {
+      if (document.visibilityState === "visible") void fetchEntradas(true);
+    };
+    window.addEventListener("auditoria-actualizada", refresh);
     const timer = window.setInterval(refresh, 15000);
     window.addEventListener("focus", refresh);
-    return () => { ++secuencia.current; window.clearInterval(timer); window.removeEventListener("focus", refresh); };
+    return () => {
+      ++secuencia.current;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("auditoria-actualizada", refresh);
+    };
   }, [fetchEntradas]);
 
-  return { entradas, total, tablas, accesosActivos, pageSize: PAGE_SIZE, loading, error, refetch: fetchEntradas };
+  return {
+    entradas,
+    total,
+    tablas,
+    accesosActivos,
+    pageSize: PAGE_SIZE,
+    loading,
+    error,
+    refetch: fetchEntradas,
+  };
 }
 
 /** Rango de meses hacia atrás que ofrecen las pestañas "Por mes" y "Por día". */
@@ -145,7 +284,10 @@ export interface AuditLogAgrupadoResultado {
  * tal cual; si no, se usa `rangoMeses` como ventana desde hace N meses hasta
  * ahora. Siempre con el tope de `LIMITE_AGRUPADO` filas.
  */
-export function useAuditLogAgrupado(filtros: AuditLogFiltros, rangoMeses: RangoMesesAuditoria): AuditLogAgrupadoResultado {
+export function useAuditLogAgrupado(
+  filtros: AuditLogFiltros,
+  rangoMeses: RangoMesesAuditoria,
+): AuditLogAgrupadoResultado {
   const secuencia = useRef(0);
   const [entradas, setEntradas] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,22 +310,64 @@ export function useAuditLogAgrupado(filtros: AuditLogFiltros, rangoMeses: RangoM
     }
 
     const consultar = (columnaActor: "actor_label" | "actor_email") => {
-      let query = supabase.from("audit_log").select("*");
+      let query = supabase.from("audit_log_visible" as "audit_log").select("*");
       if (filtros.actor?.trim()) {
         const actor = filtros.actor.trim();
-        query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor) ? query.eq("actor_user_id", actor) : query.ilike(columnaActor, `%${actor}%`);
+        query = /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(actor)
+          ? query.eq("actor_user_id", actor)
+          : query.ilike(columnaActor, `%${actor}%`);
       }
-      if (filtros.dispositivo?.trim()) query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
-      if (filtros.accion) query = query.eq("accion", filtros.accion);
+      if (filtros.dispositivo?.trim())
+        query = query.ilike("device_id", `%${filtros.dispositivo.trim()}%`);
+      if (filtros.accion && GRUPOS_ACCION[filtros.accion]) {
+        const grupo = GRUPOS_ACCION[filtros.accion];
+        query = query.in(grupo.columna, grupo.valores);
+      } else if (filtros.accion) {
+        const columna = [
+          "login",
+          "logout",
+          "crear",
+          "actualizar",
+          "eliminar",
+          "ejecutar",
+          "intento_login",
+          "login_fallido",
+          "acceso",
+          "acceso_denegado",
+        ].includes(filtros.accion)
+          ? "accion"
+          : "tipo_evento";
+        query = query.eq(columna, filtros.accion);
+      } else query = query.eq("visible_por_defecto", true);
+      if (filtros.texto?.trim())
+        query = query.ilike("texto_busqueda", `%${filtros.texto.trim()}%`);
+      if (filtros.resultado) query = query.eq("resultado", filtros.resultado);
+      if (filtros.origen)
+        query = query.in(
+          "actor_origin",
+          filtros.origen === "servidor"
+            ? ["servicio", "base_de_datos"]
+            : filtros.origen === "sin_servidor"
+              ? ["usuario", "intento", "historico"]
+              : [filtros.origen],
+        );
       if (filtros.tabla) query = query.eq("tabla", filtros.tabla);
-      query = query.gte("created_at", desdeFecha.toISOString()).lt("created_at", hastaFecha.toISOString());
+      query = query
+        .gte("created_at", desdeFecha.toISOString())
+        .lt("created_at", hastaFecha.toISOString());
       // +1 para saber si hay más filas que el tope sin pedir un `count` aparte (más caro).
-      return query.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(LIMITE_AGRUPADO + 1);
+      return query
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(LIMITE_AGRUPADO + 1);
     };
 
     try {
       let resultado = await consultar("actor_label");
-      if (resultado.error?.code === "42703" && resultado.error.message.includes("actor_label")) {
+      if (
+        resultado.error?.code === "42703" &&
+        resultado.error.message.includes("actor_label")
+      ) {
         resultado = await consultar("actor_email");
       }
       if (miConsulta !== secuencia.current) return;
@@ -199,18 +383,45 @@ export function useAuditLogAgrupado(filtros: AuditLogFiltros, rangoMeses: RangoM
         setEntradas(filas.slice(0, LIMITE_AGRUPADO));
       }
     } catch (error) {
-      if (miConsulta === secuencia.current) setError(error instanceof Error ? error.message : "No se pudo cargar la auditoría");
+      if (miConsulta === secuencia.current)
+        setError(
+          error instanceof Error
+            ? error.message
+            : "No se pudo cargar la auditoría",
+        );
     } finally {
       if (miConsulta === secuencia.current) setLoading(false);
     }
-  }, [filtros.actor, filtros.dispositivo, filtros.accion, filtros.tabla, filtros.desde, filtros.hasta, rangoMeses]);
+  }, [
+    filtros.actor,
+    filtros.dispositivo,
+    filtros.accion,
+    filtros.tabla,
+    filtros.desde,
+    filtros.hasta,
+    filtros.texto,
+    filtros.resultado,
+    filtros.origen,
+    rangoMeses,
+  ]);
 
   useEffect(() => {
     void fetchEntradas();
-    return () => { ++secuencia.current; };
+    const refresh = () => void fetchEntradas();
+    window.addEventListener("auditoria-actualizada", refresh);
+    return () => {
+      ++secuencia.current;
+      window.removeEventListener("auditoria-actualizada", refresh);
+    };
   }, [fetchEntradas]);
 
-  return { entradas, loading, error, truncado, refetch: () => void fetchEntradas() };
+  return {
+    entradas,
+    loading,
+    error,
+    truncado,
+    refetch: () => void fetchEntradas(),
+  };
 }
 
 /** Catálogo anterior como respaldo durante el despliegue; el SQL devuelve el catálogo real. */
@@ -246,23 +457,60 @@ export const TABLA_LABEL: Record<string, string> = {
   dashboard_config: "Configuración del panel",
   phone_system_config: "Configuración de telefonía",
   user_role_presets: "Plantillas de rol",
-  reservas: "Reservas", solicitudes_pendientes: "Solicitudes de reserva", configuracion_turnos: "Turnos",
-  espacios_reserva: "Espacios", mesas: "Mesas", planos_espacio: "Planos", asignaciones_mesa: "Asignación de mesas",
-  blacklist: "Lista de bloqueo", sugerencias_blacklist: "Sugerencias de bloqueo", notificaciones_dashboard: "Notificaciones",
-  Platos: "Platos", Vinos: "Vinos", Bebidas: "Bebidas", Cocteles: "Cócteles", menus_diarios: "Menús diarios", tapas: "Tapas",
-  novedades: "Novedades", resenas: "Reseñas", config_google_places: "Configuración de Google",
-  facturas: "Facturas de proveedores", productos_factura: "Líneas de factura", productos_catalogo: "Catálogo de productos",
-  proveedores: "Proveedores", proveedores_alias: "Nombres de proveedores", categorias_producto: "Categorías de productos",
-  configuracion_facturas: "Configuración de facturas", ocr_trabajos: "Procesamiento de facturas", ocr_trabajo_paginas: "Páginas procesadas",
-  oficiososia_facturas: "Facturas emitidas", oficiososia_borradores: "Borradores", oficiososia_facturacion_config: "Configuración de facturación",
-  cheques_regalo: "Cheques regalo", facturas_cheques: "Facturas de cheques", plantilla_cheques_regalo: "Plantilla de cheques",
-  plantilla_factura_cheques: "Plantilla de factura de cheques", newsletter_suscriptores: "Suscriptores",
-  newsletter_envios: "Envíos de newsletter", newsletter_sincronizaciones_resend: "Sincronización de newsletter",
-  plantillas_email_reserva: "Plantillas de correo", envios_email_reserva: "Correos de reservas", email_eventos: "Eventos de correo",
-  BebidasVENTA: "Bebidas de venta", ComidaVENTA: "Comida de venta", pedidos_ecommerce: "Pedidos", lineas_pedido: "Líneas de pedido",
-  movimientos_stock: "Movimientos de stock", costes_fijos: "Costes fijos", ia_funciones: "Funciones de IA", ia_coste_estimado: "Estimaciones de IA",
-  web_rebuild_state: "Publicación de webs", profiles: "Perfiles", "auth.users": "Usuarios y credenciales",
-  "storage.objects": "Archivos", acciones_servidor: "Acciones del servidor",
+  reservas: "Reservas",
+  solicitudes_pendientes: "Solicitudes de reserva",
+  configuracion_turnos: "Turnos",
+  espacios_reserva: "Espacios",
+  mesas: "Mesas",
+  planos_espacio: "Planos",
+  asignaciones_mesa: "Asignación de mesas",
+  blacklist: "Lista de bloqueo",
+  sugerencias_blacklist: "Sugerencias de bloqueo",
+  notificaciones_dashboard: "Notificaciones",
+  Platos: "Platos",
+  Vinos: "Vinos",
+  Bebidas: "Bebidas",
+  Cocteles: "Cócteles",
+  menus_diarios: "Menús diarios",
+  tapas: "Tapas",
+  novedades: "Novedades",
+  resenas: "Reseñas",
+  config_google_places: "Configuración de Google",
+  facturas: "Facturas de proveedores",
+  productos_factura: "Líneas de factura",
+  productos_catalogo: "Catálogo de productos",
+  proveedores: "Proveedores",
+  proveedores_alias: "Nombres de proveedores",
+  categorias_producto: "Categorías de productos",
+  configuracion_facturas: "Configuración de facturas",
+  ocr_trabajos: "Procesamiento de facturas",
+  ocr_trabajo_paginas: "Páginas procesadas",
+  oficiososia_facturas: "Facturas emitidas",
+  oficiososia_borradores: "Borradores",
+  oficiososia_facturacion_config: "Configuración de facturación",
+  cheques_regalo: "Cheques regalo",
+  facturas_cheques: "Facturas de cheques",
+  plantilla_cheques_regalo: "Plantilla de cheques",
+  plantilla_factura_cheques: "Plantilla de factura de cheques",
+  newsletter_suscriptores: "Suscriptores",
+  newsletter_envios: "Envíos de newsletter",
+  newsletter_sincronizaciones_resend: "Sincronización de newsletter",
+  plantillas_email_reserva: "Plantillas de correo",
+  envios_email_reserva: "Correos de reservas",
+  email_eventos: "Eventos de correo",
+  BebidasVENTA: "Bebidas de venta",
+  ComidaVENTA: "Comida de venta",
+  pedidos_ecommerce: "Pedidos",
+  lineas_pedido: "Líneas de pedido",
+  movimientos_stock: "Movimientos de stock",
+  costes_fijos: "Costes fijos",
+  ia_funciones: "Funciones de IA",
+  ia_coste_estimado: "Estimaciones de IA",
+  web_rebuild_state: "Publicación de webs",
+  profiles: "Perfiles",
+  "auth.users": "Usuarios y credenciales",
+  "storage.objects": "Archivos",
+  acciones_servidor: "Acciones del servidor",
 };
 
 export interface AuditLogGrupo {
@@ -293,7 +541,12 @@ export interface CambioCampo {
   despues: unknown;
 }
 
-const CAMPOS_IGNORADOS_EN_DIFF = new Set(["updated_at", "created_at", "actualizado_en", "modified_at"]);
+const CAMPOS_IGNORADOS_EN_DIFF = new Set([
+  "updated_at",
+  "created_at",
+  "actualizado_en",
+  "modified_at",
+]);
 
 /**
  * De `{antes, despues}` (lo que guarda `fn_registrar_auditoria` en un
@@ -301,12 +554,20 @@ const CAMPOS_IGNORADOS_EN_DIFF = new Set(["updated_at", "created_at", "actualiza
  * obligar a leer el JSON entero cuando solo cambió un campo de ocho.
  * Devuelve [] si no hay antes/después que comparar (p. ej. en "crear").
  */
-export function resumirCambios(detalles: Record<string, unknown> | null): CambioCampo[] {
+export function resumirCambios(
+  detalles: Record<string, unknown> | null,
+): CambioCampo[] {
   if (!detalles) return [];
   // Conceder/retirar un permiso tiene un estado efectivo anterior y posterior
   // aunque la fila SQL sea nueva o se haya borrado. Los snapshots se conservan.
-  const antes = (detalles.permiso_antes ?? detalles.antes) as Record<string, unknown> | null | undefined;
-  const despues = (detalles.permiso_despues ?? detalles.despues) as Record<string, unknown> | null | undefined;
+  const antes = (detalles.permiso_antes ?? detalles.antes) as
+    | Record<string, unknown>
+    | null
+    | undefined;
+  const despues = (detalles.permiso_despues ?? detalles.despues) as
+    | Record<string, unknown>
+    | null
+    | undefined;
   if (!antes || !despues) return [];
 
   const campos = new Set([...Object.keys(antes), ...Object.keys(despues)]);
@@ -339,6 +600,7 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
       anterior.actor_origin === entrada.actor_origin &&
       anterior.accion === entrada.accion &&
       anterior.tabla === entrada.tabla &&
+      anterior.entradas[0].registro_id === entrada.registro_id &&
       anterior.created_at === entrada.created_at;
 
     if (mismoBloque) {
@@ -363,8 +625,13 @@ export function agruparEntradas(entradas: AuditLogEntry[]): AuditLogGrupo[] {
 
 /** Compatible con históricos y con datos leídos antes de aplicar la migración. */
 export function identificarActor(entrada: AuditLogEntry): string {
-  return entrada.actor_label?.trim() || entrada.actor_email?.trim()
-    || (entrada.actor_user_id ? `Usuario · ${entrada.actor_user_id}` : `Registro histórico · ${entrada.id}`);
+  return (
+    entrada.actor_label?.trim() ||
+    entrada.actor_email?.trim() ||
+    (entrada.actor_user_id
+      ? `Usuario · ${entrada.actor_user_id}`
+      : `Registro histórico · ${entrada.id}`)
+  );
 }
 
 function capitalizar(texto: string): string {
@@ -377,10 +644,15 @@ export interface DesgloseAccion {
 }
 
 /** Nº de registros por tipo de acción, de más a menos frecuente: para el resumen de cada día/mes. */
-function calcularDesglosePorAccion(entradas: AuditLogEntry[]): DesgloseAccion[] {
+function calcularDesglosePorAccion(
+  entradas: AuditLogEntry[],
+): DesgloseAccion[] {
   const cuentas = new Map<AuditLogEntry["accion"], number>();
-  for (const entrada of entradas) cuentas.set(entrada.accion, (cuentas.get(entrada.accion) ?? 0) + 1);
-  return [...cuentas.entries()].sort((a, b) => b[1] - a[1]).map(([accion, cantidad]) => ({ accion, cantidad }));
+  for (const entrada of entradas)
+    cuentas.set(entrada.accion, (cuentas.get(entrada.accion) ?? 0) + 1);
+  return [...cuentas.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([accion, cantidad]) => ({ accion, cantidad }));
 }
 
 export interface AuditLogGrupoDia {
@@ -412,7 +684,9 @@ export function agruparPorDia(entradas: AuditLogEntry[]): AuditLogGrupoDia[] {
     } else {
       dias.push({
         key: clave,
-        etiqueta: capitalizar(format(fecha, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })),
+        etiqueta: capitalizar(
+          format(fecha, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es }),
+        ),
         entradas: [entrada],
         totalRegistros: 0,
         desglosePorAccion: [],
@@ -455,7 +729,11 @@ export function agruparPorMes(entradas: AuditLogEntry[]): AuditLogGrupoMes[] {
     const entradasDelMes = entradasPorMes.get(clave)!;
     return {
       key: clave,
-      etiqueta: capitalizar(format(new Date(entradasDelMes[0].created_at), "LLLL yyyy", { locale: es })),
+      etiqueta: capitalizar(
+        format(new Date(entradasDelMes[0].created_at), "LLLL yyyy", {
+          locale: es,
+        }),
+      ),
       totalRegistros: entradasDelMes.length,
       desglosePorAccion: calcularDesglosePorAccion(entradasDelMes),
       dias: agruparPorDia(entradasDelMes),

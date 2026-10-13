@@ -14,7 +14,7 @@ import {
   systemPrompt,
   TOOLS,
 } from "./herramientas.ts";
-import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion, registrarHerramientaChat } from "../_shared/audit-client.ts";
 const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 
 // ============================================================================
@@ -270,7 +270,8 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       if (!mensaje || !String(mensaje).trim()) {
         return json({ success: false, respuesta: "No he recibido ninguna pregunta." }, 200);
       }
-      console.log("[chat-facturas] mensaje:", mensaje, "· session:", session_id);
+      if (typeof mensaje !== "string" || mensaje.length > 16000) return json({ success: false, respuesta: "La pregunta debe tener como máximo 16000 caracteres." }, 400);
+      // El contenido de la consulta queda en auditoría, no en logs técnicos.
 
       // ── Historial de la conversacion ──
       // deno-lint-ignore no-explicit-any
@@ -354,7 +355,10 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           for (const tc of atendidas) {
             let args = {};
             try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* el modelo mando JSON invalido */ }
+            const inicioTool = Date.now();
             const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
+            const resultadoError = (() => { try { return Boolean(JSON.parse(r.contenido).error); } catch { return false; } })();
+            registrarHerramientaChat({ nombre: tc.function.name, argumentos: args, resultado: r.fallo || resultadoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool });
             if (r.fallo) huboFalloDeHerramienta = true;
             if (r.adjunto) adjuntos.push(r.adjunto);
             messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
@@ -362,6 +366,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           // La API exige una respuesta por cada tool_call emitida: las que se
           // descartan por el tope tienen que contestarse igualmente.
           for (const tc of msg.tool_calls.slice(MAX_TOOL_CALLS_POR_RONDA)) {
+            registrarHerramientaChat({ nombre: tc.function?.name ?? "consulta", argumentos: {}, resultado: "no_ejecutada", duracion_ms: 0 });
             console.warn(`[chat-facturas] tool_call descartada por tope de ronda: ${tc.function?.name}`);
             messages.push({
               role: "tool",
@@ -424,7 +429,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
   const peticion = await req.clone().json().catch(() => null);
   const texto = String(peticion?.mensaje ?? "").trim();
   if (!texto) return await ejecutar();
-  const guardada = await sinDuplicar(`${user.id}|${peticion?.session_id ?? ""}|${texto}`, async () => {
+  const guardada = await sinDuplicar(`${user.id}|${peticion?.session_id ?? ""}|${peticion?.tipo_interaccion ?? "consulta"}|${texto}`, async () => {
     const r = await ejecutar();
     return { status: r.status, cuerpo: await r.text() };
   });
@@ -433,3 +438,4 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }));
+

@@ -1,8 +1,15 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 type Actor = { id: string; email?: string | null };
-type Contexto = { fuente: string; peticionId: string; actor: Actor | null; userAgent: string; deviceId: string; ip: string };
+type Contexto = { fuente: string; peticionId: string; actor: Actor | null; userAgent: string; deviceId: string; ip: string; herramientasChat: HerramientaChatAuditada[] };
+type HerramientaChatAuditada = { nombre: string; argumentos: unknown; resultado: "completada" | "fallida" | "no_ejecutada"; duracion_ms: number };
 const contexto = new AsyncLocalStorage<Contexto>();
+
+/** Solo metadatos de las consultas ejecutadas, nunca resultados de facturas ni claves. */
+export function registrarHerramientaChat(herramienta: HerramientaChatAuditada): void {
+  const actual = contexto.getStore();
+  if (actual?.fuente === "chat-facturas") actual.herramientasChat.push(herramienta);
+}
 
 // Conserva las firmas genéricas de las versiones de supabase-js usadas por
 // las funciones. El contexto nunca se toma de un UUID enviado por el cliente.
@@ -52,8 +59,8 @@ export function clienteConAuditoria<T extends Fabrica>(fabrica: T, fuente: strin
 }
 
 const SIN_EVENTO_PROPIO = new Set([
-  "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password",
-  "list-users", "leer-metricas", "registrar-metrica", "vapi-analytics", "sync-trafico-web",
+  "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password", "admin-set-user-access",
+  "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "vapi-analytics", "sync-trafico-web",
 ]);
 
 const ADMITE_INTEGRACION = new Set([
@@ -104,11 +111,15 @@ export function conAuditoriaDePeticion(
     }
     const info = req.headers.get("x-client-info")?.split("/") ?? [];
     const actual: Contexto = { fuente, actor, peticionId: crypto.randomUUID(),
+      herramientasChat: [],
       userAgent: req.headers.get("user-agent")?.slice(0, 1024) ?? "",
       deviceId: info[0] === "adminpanel" ? (info[1] ?? "").slice(0, 128) : "",
       ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 128) ?? "",
     };
     return contexto.run(actual, async () => {
+      const inicio = Date.now();
+      // Se lee una copia: el handler conserva su cuerpo y su validación.
+      const preguntaChat = fuente === "chat-facturas" ? await req.clone().json().catch(() => null) : null;
       let response: Response;
       try { response = await handler(req); }
       catch (error) {
@@ -122,14 +133,25 @@ export function conAuditoriaDePeticion(
       // por trigger. No se guarda el cuerpo de la petición ni de la respuesta.
       if (actor && req.method !== "OPTIONS" && (!SIN_EVENTO_PROPIO.has(fuente) || !response.ok)) {
         let fallo = !response.ok;
+        let cuerpo: Record<string, unknown> | null = null;
         if (response.headers.get("Content-Type")?.includes("application/json")) {
-          const cuerpo = await response.clone().json().catch(() => null);
+          cuerpo = await response.clone().json().catch(() => null);
           fallo ||= cuerpo?.success === false || cuerpo?.ok === false || !!cuerpo?.error;
         }
         const cliente = clienteConAuditoria(fabrica, fuente)(env("SUPABASE_URL"), env("SUPABASE_SERVICE_ROLE_KEY"));
         const { error } = await cliente.rpc("registrar_accion_auditoria_panel", {
           p_operacion: fuente + new URL(req.url).pathname.split(fuente).slice(1).join(fuente),
-          p_detalles: { resultado: fallo ? "fallida" : "completada", codigo_http: response.status },
+          p_detalles: { resultado: fallo ? "fallida" : actual.herramientasChat.some(h => h.resultado === "fallida") ? "parcial" : "completada", codigo_http: response.status,
+            ...(fuente === "chat-facturas" ? {
+              tipo_evento: preguntaChat?.tipo_interaccion === "regeneracion" ? "regeneracion_ia" : "consulta_ia",
+              pregunta: typeof preguntaChat?.mensaje === "string" ? preguntaChat.mensaje : "",
+              respuesta: typeof cuerpo?.respuesta === "string" ? cuerpo.respuesta : "No se ha recibido respuesta del asistente.",
+              conversacion_id: typeof preguntaChat?.session_id === "string" ? preguntaChat.session_id : null,
+              herramientas: actual.herramientasChat,
+              duracion_ms: Date.now() - inicio,
+              adjuntos: Array.isArray(cuerpo?.adjuntos) ? cuerpo.adjuntos.map((a: { tipo?: string }) => a.tipo ?? "adjunto") : [],
+            } : {}),
+          },
         });
         if (error) {
           console.error("No se pudo registrar la acción del panel:", error);
@@ -144,3 +166,4 @@ export function conAuditoriaDePeticion(
     });
   };
 }
+

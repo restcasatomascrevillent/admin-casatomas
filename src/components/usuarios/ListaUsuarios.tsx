@@ -29,7 +29,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2, Settings, Shield, ShieldAlert, ShieldCheck, User, Trash2, Key } from "lucide-react";
+import {
+  Loader2,
+  Settings,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  User,
+  Trash2,
+  Key,
+  LockKeyhole,
+  UnlockKeyhole,
+} from "lucide-react";
 import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
@@ -51,7 +62,9 @@ interface ListaUsuariosProps {
   canManageSuperAdmins?: boolean;
 }
 
-export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosProps) {
+export function ListaUsuarios({
+  canManageSuperAdmins = false,
+}: ListaUsuariosProps) {
   const {
     users,
     loading,
@@ -59,6 +72,7 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     setAllPermissions,
     updateUserPassword,
     setSuperAdmin,
+    setUserAccessBlocked,
     deleteUser,
     fetchUsers,
   } = useUsersManagement();
@@ -67,15 +81,26 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   // regla que la BD: la RLS de user_permissions solo deja escribir a super admins.
   const { isSuperAdmin } = useSuperAdmin();
   const canManageUsers = canManageSuperAdmins && isSuperAdmin;
-  const { presets, loading: presetsLoading, createPreset, updatePreset, deletePreset } = useUserRolePresets();
+  const {
+    presets,
+    loading: presetsLoading,
+    createPreset,
+    updatePreset,
+    deletePreset,
+  } = useUserRolePresets();
   const [selectedUser, setSelectedUser] = useState<ManagedUser | null>(null);
-  const [editingPermissions, setEditingPermissions] = useState<PermisoSeccion[]>([]);
+  const [editingPermissions, setEditingPermissions] = useState<
+    PermisoSeccion[]
+  >([]);
   const [selectedPresetId, setSelectedPresetId] = useState("manual");
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [passwordTargetUser, setPasswordTargetUser] = useState<ManagedUser | null>(null);
+  const [passwordTargetUser, setPasswordTargetUser] =
+    useState<ManagedUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [updatingPassword, setUpdatingPassword] = useState(false);
+  const [accessTarget, setAccessTarget] = useState<ManagedUser | null>(null);
+  const [updatingAccess, setUpdatingAccess] = useState(false);
 
   const getUserDisplayName = (user: ManagedUser | null) => {
     if (!user) return "usuario";
@@ -90,7 +115,10 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
   // preconfigurado (mismo rol base y mismos «Ver» y «Puede editar» en cada
   // sección), se selecciona ese preset en vez de dejarlo en "Sin rol preconfigurado".
   const findMatchingPreset = (role: AppRole | null, perms: PermisoSeccion[]) =>
-    presets.find((preset) => preset.base_role === role && mismosPermisos(perms, preset.permissions));
+    presets.find(
+      (preset) =>
+        preset.base_role === role && mismosPermisos(perms, preset.permissions),
+    );
 
   const openPermissionsDialog = (user: ManagedUser) => {
     setSelectedUser(user);
@@ -131,14 +159,23 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     if (!selectedUser || !canManageUsers) return;
     // «Puede editar» solo lo escribe un super admin. Si el guardado falla, el
     // diálogo sigue abierto con lo elegido (para reintentar) y el rol no se toca.
-    const guardado = await setAllPermissions(selectedUser.id, editingPermissions, {
-      puedeConcederEdicion: isSuperAdmin,
-    });
+    const guardado = await setAllPermissions(
+      selectedUser.id,
+      editingPermissions,
+      {
+        puedeConcederEdicion: isSuperAdmin,
+      },
+    );
     if (!guardado) return;
     if (selectedPresetId !== "manual") {
-      const selectedPreset = presets.find((preset) => preset.id === selectedPresetId);
+      const selectedPreset = presets.find(
+        (preset) => preset.id === selectedPresetId,
+      );
       if (selectedPreset) {
-        const actualizado = await updateUserRole(selectedUser.id, selectedPreset.base_role);
+        const actualizado = await updateUserRole(
+          selectedUser.id,
+          selectedPreset.base_role,
+        );
         if (!actualizado) return;
       }
     }
@@ -147,8 +184,24 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
 
   const handleDeleteUser = async (userId: string) => {
     if (!canManageUsers) return;
-    if (confirm("¿Estás seguro de eliminar este usuario del sistema de permisos?")) {
+    if (
+      confirm("¿Estás seguro de eliminar este usuario del sistema de permisos?")
+    ) {
       await deleteUser(userId);
+    }
+  };
+
+  const handleAccessChange = async () => {
+    if (!accessTarget || !canManageUsers || updatingAccess) return;
+    setUpdatingAccess(true);
+    try {
+      const updated = await setUserAccessBlocked(
+        accessTarget.id,
+        !accessTarget.access_blocked,
+      );
+      if (updated) setAccessTarget(null);
+    } finally {
+      setUpdatingAccess(false);
     }
   };
 
@@ -194,7 +247,10 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     }
 
     setUpdatingPassword(true);
-    const updated = await updateUserPassword(passwordTargetUser.id, newPassword);
+    const updated = await updateUserPassword(
+      passwordTargetUser.id,
+      newPassword,
+    );
     setUpdatingPassword(false);
 
     if (updated) {
@@ -233,9 +289,14 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     presetId: string,
     name: string,
     baseRole: "manager" | "staff",
-    presetPermissions: PermisoSeccion[]
+    presetPermissions: PermisoSeccion[],
   ) => {
-    const updatedPreset = await updatePreset(presetId, name, baseRole, presetPermissions);
+    const updatedPreset = await updatePreset(
+      presetId,
+      name,
+      baseRole,
+      presetPermissions,
+    );
     if (!updatedPreset) return null;
 
     if (selectedPresetId === presetId) {
@@ -251,7 +312,8 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
     };
 
     window.addEventListener("users-management-refresh", handleRefresh);
-    return () => window.removeEventListener("users-management-refresh", handleRefresh);
+    return () =>
+      window.removeEventListener("users-management-refresh", handleRefresh);
   }, [fetchUsers]);
 
   if (loading) {
@@ -287,14 +349,21 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
             <TableHead>Usuario</TableHead>
             <TableHead>Rol</TableHead>
             <TableHead>Accesos</TableHead>
-            <TableHead className="text-right">{canManageUsers ? "Acciones" : "Permisos"}</TableHead>
+            <TableHead className="text-right">
+              {canManageUsers ? "Acciones" : "Permisos"}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {users.map((user) => {
             const permisosActuales = permisosParaEditar(user.permissions);
-            const matchingPreset = findMatchingPreset(user.role, permisosActuales);
-            const accessCount = permisosActuales.filter((p) => p.can_view).length;
+            const matchingPreset = findMatchingPreset(
+              user.role,
+              permisosActuales,
+            );
+            const accessCount = permisosActuales.filter(
+              (p) => p.can_view,
+            ).length;
             const editCount = permisosActuales.filter((p) => p.can_edit).length;
 
             return (
@@ -307,20 +376,27 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                       <User className="h-4 w-4 text-muted-foreground" />
                     )}
                     <div className="flex flex-col items-start">
-                      <span className="font-medium">{getUserDisplayName(user)}</span>
+                      <span className="font-medium">
+                        {getUserDisplayName(user)}
+                      </span>
                     </div>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {!user.is_super_admin && (
-                      <Badge variant="outline">{matchingPreset?.name ?? "Acceso por permisos"}</Badge>
+                      <Badge variant="outline">
+                        {matchingPreset?.name ?? "Acceso por permisos"}
+                      </Badge>
                     )}
                     {user.role === "admin" && !user.is_super_admin && (
                       <Badge variant="outline">Gestiona usuarios</Badge>
                     )}
                     {user.is_super_admin && (
-                      <Badge variant="outline" className="gap-1 border-amber-500 text-amber-600">
+                      <Badge
+                        variant="outline"
+                        className="gap-1 border-amber-500 text-amber-600"
+                      >
                         <ShieldAlert className="h-3 w-3" />
                         Super Admin
                       </Badge>
@@ -328,102 +404,178 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                   </div>
                 </TableCell>
                 <TableCell>
-                  {user.is_super_admin ? (
-                    <span className="text-sm text-muted-foreground">Acceso completo</span>
+                  {user.access_blocked ? (
+                    <div className="space-y-1">
+                      <Badge variant="destructive">Acceso bloqueado</Badge>
+                      <p className="text-xs text-muted-foreground">
+                        Permisos conservados
+                      </p>
+                    </div>
+                  ) : user.is_super_admin ? (
+                    <span className="text-sm text-muted-foreground">
+                      Acceso completo
+                    </span>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       <Badge variant="outline">{accessCount} secciones</Badge>
-                      {editCount > 0 && <Badge variant="outline">{editCount} con edición</Badge>}
+                      {editCount > 0 && (
+                        <Badge variant="outline">{editCount} con edición</Badge>
+                      )}
                     </div>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex flex-wrap justify-end gap-2">
-                    {(!canManageUsers || user.is_super_admin) && <VisorPermisosUsuario user={user} nombre={getUserDisplayName(user)} />}
+                    {(!canManageUsers || user.is_super_admin) && (
+                      <VisorPermisosUsuario
+                        user={user}
+                        nombre={getUserDisplayName(user)}
+                      />
+                    )}
                     {canManageUsers && !user.is_super_admin && (
-                        <Dialog
-                          open={selectedUser?.id === user.id}
-                          onOpenChange={(open) => { if (!open) closePermissionsDialog(); }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-11 px-4"
-                              onClick={() => openPermissionsDialog(user)}
-                            >
-                              <Settings className="h-4 w-4 mr-1" />
-                              Permisos
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
-                            <DialogHeader className="pr-6">
-                              <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
-                                <Shield className="h-5 w-5" />
-                                Permisos de {getUserDisplayName(selectedUser)}
-                              </DialogTitle>
-                              <DialogDescription>
-                                Elige qué secciones ve este usuario y en cuáles puede editar
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-2 sm:py-4">
-                              <div className="space-y-2">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <Label className="text-sm font-medium">Rol preconfigurado</Label>
-                                  <ConfigurarRolesModal
-                                    currentPermissions={editingPermissions}
-                                    presets={presets}
-                                    presetsLoading={presetsLoading}
-                                    onCreatePreset={createPreset}
-                                    onUpdatePreset={handleUpdatePresetOnly}
-                                    onDeletePreset={handleDeletePresetOnly}
-                                    puedeConcederEdicion={isSuperAdmin}
-                                  />
-                                </div>
-                                <Select
-                                  value={selectedPresetId}
-                                  onValueChange={handlePresetChange}
-                                  disabled={presetsLoading || !isSuperAdmin}
-                                >
-                                  <SelectTrigger className="h-11 w-full sm:w-[360px]">
-                                    <SelectValue
-                                      placeholder={presetsLoading ? "Cargando roles..." : "Sin rol preconfigurado"}
-                                    />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="manual">Sin rol preconfigurado</SelectItem>
-                                    {presets.map((preset) => (
-                                      <SelectItem key={preset.id} value={preset.id}>
-                                        {preset.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="max-h-[52dvh] overflow-y-auto pr-1">
-                                <TablaPermisosSecciones
-                                  permisos={editingPermissions}
-                                  onCambiarVer={handleVerChange}
-                                  onCambiarEditar={handleEditarChange}
+                      <Dialog
+                        open={selectedUser?.id === user.id}
+                        onOpenChange={(open) => {
+                          if (!open) closePermissionsDialog();
+                        }}
+                      >
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-11 px-4"
+                            onClick={() => openPermissionsDialog(user)}
+                          >
+                            <Settings className="h-4 w-4 mr-1" />
+                            Permisos
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-y-auto p-4 sm:p-6">
+                          <DialogHeader className="pr-6">
+                            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                              <Shield className="h-5 w-5" />
+                              Permisos de {getUserDisplayName(selectedUser)}
+                            </DialogTitle>
+                            <DialogDescription>
+                              Elige qué secciones ve este usuario y en cuáles
+                              puede editar
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="space-y-4 py-2 sm:py-4">
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <Label className="text-sm font-medium">
+                                  Rol preconfigurado
+                                </Label>
+                                <ConfigurarRolesModal
+                                  currentPermissions={editingPermissions}
+                                  presets={presets}
+                                  presetsLoading={presetsLoading}
+                                  onCreatePreset={createPreset}
+                                  onUpdatePreset={handleUpdatePresetOnly}
+                                  onDeletePreset={handleDeletePresetOnly}
                                   puedeConcederEdicion={isSuperAdmin}
-                                  soloLectura={!isSuperAdmin}
                                 />
                               </div>
-                              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                                <Button variant="outline" className="h-11 px-5" onClick={closePermissionsDialog}>
-                                  Cancelar
-                                </Button>
-                                {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón.
-                                    (El motivo también está escrito arriba, en la tabla: con el dedo no hay hover.) */}
-                                <ConMotivo motivo={isSuperAdmin ? undefined : SOLO_SUPER_ADMIN_CAMBIA_PERMISOS}>
-                                  <Button onClick={savePermissions} disabled={!isSuperAdmin} className="h-11 w-full px-5 sm:w-auto">
-                                    Guardar Permisos
-                                  </Button>
-                                </ConMotivo>
-                              </div>
+                              <Select
+                                value={selectedPresetId}
+                                onValueChange={handlePresetChange}
+                                disabled={presetsLoading || !isSuperAdmin}
+                              >
+                                <SelectTrigger className="h-11 w-full sm:w-[360px]">
+                                  <SelectValue
+                                    placeholder={
+                                      presetsLoading
+                                        ? "Cargando roles..."
+                                        : "Sin rol preconfigurado"
+                                    }
+                                  />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="manual">
+                                    Sin rol preconfigurado
+                                  </SelectItem>
+                                  {presets.map((preset) => (
+                                    <SelectItem
+                                      key={preset.id}
+                                      value={preset.id}
+                                    >
+                                      {preset.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </div>
-                          </DialogContent>
-                        </Dialog>
+                            <div className="max-h-[52dvh] overflow-y-auto pr-1">
+                              <TablaPermisosSecciones
+                                permisos={editingPermissions}
+                                onCambiarVer={handleVerChange}
+                                onCambiarEditar={handleEditarChange}
+                                puedeConcederEdicion={isSuperAdmin}
+                                soloLectura={!isSuperAdmin}
+                              />
+                            </div>
+                            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                              <Button
+                                variant="outline"
+                                className="h-11 px-5"
+                                onClick={closePermissionsDialog}
+                              >
+                                Cancelar
+                              </Button>
+                              {/* Deshabilitado, el motivo va en el envoltorio: el botón no recibe el ratón.
+                                    (El motivo también está escrito arriba, en la tabla: con el dedo no hay hover.) */}
+                              <ConMotivo
+                                motivo={
+                                  isSuperAdmin
+                                    ? undefined
+                                    : SOLO_SUPER_ADMIN_CAMBIA_PERMISOS
+                                }
+                              >
+                                <Button
+                                  onClick={savePermissions}
+                                  disabled={!isSuperAdmin}
+                                  className="h-11 w-full px-5 sm:w-auto"
+                                >
+                                  Guardar Permisos
+                                </Button>
+                              </ConMotivo>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    )}
+                    {canManageUsers && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-11 px-4"
+                        disabled={
+                          updatingAccess ||
+                          user.id === currentUser?.id ||
+                          typeof user.access_blocked !== "boolean" ||
+                          (user.is_super_admin && !user.access_blocked)
+                        }
+                        title={
+                          typeof user.access_blocked !== "boolean"
+                            ? "Bloqueo de acceso pendiente de activar"
+                            : user.id === currentUser?.id
+                              ? "No puedes bloquear tu propia cuenta"
+                              : user.is_super_admin && !user.access_blocked
+                                ? "Quita primero el acceso de super admin"
+                                : undefined
+                        }
+                        onClick={() => setAccessTarget(user)}
+                      >
+                        {user.access_blocked ? (
+                          <UnlockKeyhole className="h-4 w-4 mr-1" />
+                        ) : (
+                          <LockKeyhole className="h-4 w-4 mr-1" />
+                        )}
+                        {user.access_blocked
+                          ? "Desbloquear acceso"
+                          : "Bloquear acceso"}
+                      </Button>
                     )}
                     {canManageUsers && (
                       <Button
@@ -451,7 +603,9 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                         onClick={() => handleToggleSuperAdmin(user)}
                       >
                         <ShieldAlert className="h-4 w-4 mr-1" />
-                        {user.is_super_admin ? "Quitar Super Admin" : "Hacer Super Admin"}
+                        {user.is_super_admin
+                          ? "Quitar Super Admin"
+                          : "Hacer Super Admin"}
                       </Button>
                     )}
                     {canManageUsers && user.id === currentUser?.id && (
@@ -465,7 +619,11 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
                         size="sm"
                         className="h-11 w-11 px-0 text-destructive hover:text-destructive"
                         disabled={user.id === currentUser?.id}
-                        title={user.id === currentUser?.id ? "No puedes eliminar tu propio usuario" : undefined}
+                        title={
+                          user.id === currentUser?.id
+                            ? "No puedes eliminar tu propio usuario"
+                            : undefined
+                        }
                         aria-label={`Eliminar a ${getUserDisplayName(user)}`}
                         onClick={() => handleDeleteUser(user.id)}
                       >
@@ -480,12 +638,62 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
         </TableBody>
       </Table>
 
-      <Dialog open={passwordDialogOpen} onOpenChange={(open) => !open && closePasswordDialog()}>
+      <Dialog
+        open={!!accessTarget}
+        onOpenChange={(open) => {
+          if (!open && !updatingAccess) setAccessTarget(null);
+        }}
+      >
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {accessTarget?.access_blocked
+                ? "Desbloquear acceso"
+                : "Bloquear acceso"}
+            </DialogTitle>
+            <DialogDescription>
+              {accessTarget?.access_blocked
+                ? `${getUserDisplayName(accessTarget)} podrá volver a iniciar sesión con los mismos permisos.`
+                : `Se cerrarán las sesiones abiertas de ${getUserDisplayName(accessTarget)} y no podrá volver a entrar. Su cuenta, datos y permisos se conservarán.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              className="h-11"
+              disabled={updatingAccess}
+              onClick={() => setAccessTarget(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant={accessTarget?.access_blocked ? "default" : "destructive"}
+              className="h-11"
+              disabled={updatingAccess}
+              onClick={() => void handleAccessChange()}
+            >
+              {updatingAccess && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              {accessTarget?.access_blocked
+                ? "Confirmar desbloqueo"
+                : "Confirmar bloqueo"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={passwordDialogOpen}
+        onOpenChange={(open) => !open && closePasswordDialog()}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Cambiar contraseña</DialogTitle>
             <DialogDescription>
-              Define una nueva contraseña para {getUserDisplayName(passwordTargetUser)} ({passwordTargetUser?.email || passwordTargetUser?.id}).
+              Define una nueva contraseña para{" "}
+              {getUserDisplayName(passwordTargetUser)} (
+              {passwordTargetUser?.email || passwordTargetUser?.id}).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -501,7 +709,9 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="user-confirm-password">Confirmar contraseña</Label>
+              <Label htmlFor="user-confirm-password">
+                Confirmar contraseña
+              </Label>
               <Input
                 id="user-confirm-password"
                 type="password"
@@ -512,11 +722,22 @@ export function ListaUsuarios({ canManageSuperAdmins = false }: ListaUsuariosPro
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" className="h-11 px-5" onClick={closePasswordDialog} disabled={updatingPassword}>
+              <Button
+                variant="outline"
+                className="h-11 px-5"
+                onClick={closePasswordDialog}
+                disabled={updatingPassword}
+              >
                 Cancelar
               </Button>
-              <Button className="h-11 px-5" onClick={handleChangePassword} disabled={updatingPassword}>
-                {updatingPassword ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              <Button
+                className="h-11 px-5"
+                onClick={handleChangePassword}
+                disabled={updatingPassword}
+              >
+                {updatingPassword ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : null}
                 Actualizar contraseña
               </Button>
             </div>

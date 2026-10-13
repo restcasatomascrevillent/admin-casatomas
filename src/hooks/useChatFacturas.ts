@@ -310,7 +310,7 @@ export function useChatFacturas() {
     setIsSending(true);
     try {
       const { data, error } = await supabase.functions.invoke("chat-facturas", {
-        body: { mensaje: lastUserMsg.contenido, session_id: conversacionActiva.session_id },
+        body: { mensaje: lastUserMsg.contenido, session_id: conversacionActiva.session_id, tipo_interaccion: "regeneracion" },
       });
       if (error) throw new Error(error.message);
       const respuesta = data?.respuesta || "No pude obtener una respuesta.";
@@ -359,3 +359,4 @@ export function useChatFacturas() {
     cargarConversaciones,
   };
 }
+
