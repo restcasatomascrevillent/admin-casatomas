@@ -133,6 +133,7 @@ export function PanelPiezasMesa({
   estado,
   reservas,
   hayServicio,
+  turno,
   ocupado,
   onGuardar,
   onProponer,
@@ -143,6 +144,8 @@ export function PanelPiezasMesa({
   reservas: ReservaEnMesas[];
   /** Falso con «Todo el día»: los ajustes son de comida o de cena. */
   hayServicio: boolean;
+  /** Servicio de los ajustes, para decir «solo esta cena» / «solo esta comida». */
+  turno?: "comida" | "cena" | null;
   ocupado: boolean;
   onGuardar: (cambios: AjusteMesa[], mensaje: string) => void | Promise<void>;
   onProponer: (p: PropuestaAbierta) => void;
@@ -162,6 +165,8 @@ export function PanelPiezasMesa({
   const piezasTxt = (n: number) => (n === 1 ? "1 pieza" : `${n} piezas`);
   const resumen = `${piezasTxt(e.piezas)}${e.picos ? ` + ${e.picos === 1 ? "pico" : `${e.picos} picos`}` : ""} · ${plazasDe(e)} plazas`;
   const otrasDeLaUnion = union.filter((id) => id !== mesa.id).map((id) => nombres.get(id)).join(", ");
+  // La unión es solo de este servicio (el plano base no cambia): que se lea así.
+  const juntaTxt = `Junta con ${otrasDeLaUnion} · solo ${turno ? `esta ${turno}` : "este servicio"}`;
 
   const botonesJuntar = (
     <>
@@ -231,8 +236,8 @@ export function PanelPiezasMesa({
             <p className="text-lg font-semibold tabular-nums">{plazas} plazas</p>
             <p className="text-xs text-muted-foreground">
               de {mesa.sitio.min} a {mesa.sitio.max}
-              {junta && ` · junta con ${otrasDeLaUnion}`}
             </p>
+            {junta && <p className="text-xs font-medium text-sky-700 dark:text-sky-400">{juntaTxt}</p>}
           </div>
           <Button
             variant="outline"
@@ -263,11 +268,11 @@ export function PanelPiezasMesa({
     <div className="space-y-2">
       <div className="rounded-md bg-muted/60 p-2 text-sm">
         <p className="font-medium tabular-nums">{resumen}</p>
-        {(cambiada || junta) && (
+        {junta && <p className="text-xs font-medium text-sky-700 dark:text-sky-400">{juntaTxt}</p>}
+        {cambiada && (
           <p className="text-xs text-muted-foreground">
             Plano base: {piezasTxt(mesa.piezas)}
             {mesa.picos ? " + pico" : ""} · {plazasDe(mesa)} plazas
-            {junta && ` · junta con ${otrasDeLaUnion}`}
           </p>
         )}
       </div>

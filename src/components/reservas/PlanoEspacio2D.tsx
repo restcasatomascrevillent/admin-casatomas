@@ -1115,18 +1115,24 @@ export function PlanoEspacio2D({
     [mesasPiezas, turnoServicio, ajustesServicio],
   );
   /** Las mesas tal y como están en ESTE servicio (largo y plazas recalculados). */
-  const { mesasVista, unionesVista } = useMemo(() => {
+  const { mesasVista, unionesVista, girosVista } = useMemo(() => {
+    const verticales = new Map<string, boolean>();
     const conPiezas = localMesas.map((m) => {
       const g = geometriaServicio(m, estadoPiezas.get(m.id));
+      if (g) verticales.set(m.id, g.vertical);
       return g ? { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad } : m;
     });
-    // Mesas juntas en este servicio: se arriman a su principal y llevan contorno común.
+    // Mesas juntas en este servicio: UNA mesa larga (piezas en fila, horizontal si cabe) dentro
+    // de las paredes del plano y sin pisar otras mesas, con contorno y rótulo comunes.
     const dibujo = dibujarUniones(
-      conPiezas.filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0),
+      conPiezas
+        .filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0)
+        .map((m) => ({ ...m, vertical: verticales.get(m.id) })),
       estadoPiezas,
+      { plano },
     );
-    return { mesasVista: aplicarPosicionesUnion(conPiezas, dibujo), unionesVista: dibujo.uniones };
-  }, [localMesas, estadoPiezas]);
+    return { mesasVista: aplicarPosicionesUnion(conPiezas, dibujo), unionesVista: dibujo.uniones, girosVista: dibujo.giros };
+  }, [localMesas, estadoPiezas, plano]);
   /** Reservas del servicio y sus mesas: para no quitar piezas que alguien necesita. */
   const reservasEnMesas = useMemo<ReservaEnMesas[]>(() => {
     const porReserva = new Map<string, ReservaEnMesas>();
@@ -2770,7 +2776,8 @@ export function PlanoEspacio2D({
                         onSeleccionar={seleccionarMesa}
                         piezasInfo={(() => {
                           const g = geometriaServicio(mesa, estadoPiezas.get(mesa.id));
-                          return g ? { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico, vertical: g.vertical } : undefined;
+                          // En una unión, las piezas van a lo largo de la fila (`girosVista`).
+                          return g ? { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico, vertical: g.vertical, ...girosVista.get(mesa.id) } : undefined;
                         })()}
                         onAlternar={alternarMesa}
                         scale={scale}
@@ -2900,6 +2907,7 @@ export function PlanoEspacio2D({
                         estado={estadoPiezas}
                         reservas={reservasEnMesas}
                         hayServicio={!!turnoServicio}
+                        turno={turnoServicio}
                         ocupado={guardarAjustes.isPending}
                         onGuardar={async (cambios, mensaje) => {
                           if (await guardarPiezas(cambios, mensaje)) setPropuestaPiezas(null);

@@ -122,15 +122,22 @@ export interface Limites {
   abajo: number;
 }
 
+/** Tramo de pared del plano, en metros (solo horizontales o verticales). */
+export interface TramoPared {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  orientacion: "horizontal" | "vertical";
+}
+
 /**
- * Paredes exteriores de la sala, en metros: con las paredes dibujadas en el
- * plano (la horizontal más baja es la de abajo, la vertical más a la derecha la
- * de la derecha…); sin paredes, las de la configuración.
+ * Paredes dibujadas en el plano (`tipo: "wall"`), pasadas a metros. Se quedan
+ * fuera los trozos cortos (< 1 m) y las paredes inclinadas.
  */
-export function limitesSala(plano: PlanoSalaMin | null | undefined, config: ConfigMesaLarga = MESA_LARGA_SALON): Limites {
+export function paredesPlano(plano: PlanoSalaMin | null | undefined): TramoPared[] {
   const ppm = Number(plano?.pixels_per_meter) > 0 ? Number(plano?.pixels_per_meter) : 50;
-  const horizontales: number[] = [];
-  const verticales: number[] = [];
+  const tramos: TramoPared[] = [];
   for (const e of plano?.configuracion?.elementos ?? []) {
     if (e?.tipo !== "wall" || !e.props) continue;
     const x1 = Number(e.props.x1) / ppm;
@@ -141,9 +148,21 @@ export function limitesSala(plano: PlanoSalaMin | null | undefined, config: Conf
     const dx = Math.abs(x2 - x1);
     const dy = Math.abs(y2 - y1);
     if (dx < 1 && dy < 1) continue; // trozos cortos: no son paredes de la sala
-    if (dy <= dx * 0.1) horizontales.push((y1 + y2) / 2);
-    else if (dx <= dy * 0.1) verticales.push((x1 + x2) / 2);
+    if (dy <= dx * 0.1) tramos.push({ x1, y1, x2, y2, orientacion: "horizontal" });
+    else if (dx <= dy * 0.1) tramos.push({ x1, y1, x2, y2, orientacion: "vertical" });
   }
+  return tramos;
+}
+
+/**
+ * Paredes exteriores de la sala, en metros: con las paredes dibujadas en el
+ * plano (la horizontal más baja es la de abajo, la vertical más a la derecha la
+ * de la derecha…); sin paredes, las de la configuración.
+ */
+export function limitesSala(plano: PlanoSalaMin | null | undefined, config: ConfigMesaLarga = MESA_LARGA_SALON): Limites {
+  const tramos = paredesPlano(plano);
+  const horizontales = tramos.filter((t) => t.orientacion === "horizontal").map((t) => (t.y1 + t.y2) / 2);
+  const verticales = tramos.filter((t) => t.orientacion === "vertical").map((t) => (t.x1 + t.x2) / 2);
   const d = config.paredesPorDefecto;
   if (horizontales.length >= 2 && verticales.length >= 2) {
     return {
@@ -182,7 +201,8 @@ function rectDe(m: MesaPlanoMin): Rect {
   return { x: Number(m.pos_x) || 0, y: Number(m.pos_y) || 0, ancho: (Number(m.ancho) || 80) / 100, alto: (Number(m.alto) || 80) / 100 };
 }
 
-function seSolapan(a: Rect, b: Rect): boolean {
+/** ¿Se pisan dos rectángulos? (tocarse por el borde no cuenta). */
+export function seSolapan(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.ancho && b.x < a.x + a.ancho && a.y < b.y + b.alto && b.y < a.y + a.alto;
 }
 

@@ -329,10 +329,19 @@ export function VistaPlanoHoy({
         piezas.set(m.id, { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico, vertical: g.vertical });
         return { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad };
       });
-    // Mesas juntas en este servicio: arrimadas a su principal, con contorno y rótulo comunes.
-    const dibujo = dibujarUniones(conPiezas, estadoPiezas);
+    // Mesas juntas en este servicio: UNA mesa larga (piezas en fila, horizontal si cabe) dentro de
+    // las paredes del plano y sin pisar otras mesas, con contorno y rótulo comunes.
+    const dibujo = dibujarUniones(
+      conPiezas.map((m) => ({ ...m, vertical: piezas.get(m.id)?.vertical })),
+      estadoPiezas,
+      { plano },
+    );
+    for (const [id, giro] of dibujo.giros) {
+      const info = piezas.get(id);
+      if (info) piezas.set(id, { ...info, ...giro });
+    }
     return { mesas: aplicarPosicionesUnion(conPiezas, dibujo), unionesMapa: dibujo.uniones, piezasMapa: piezas };
-  }, [mesasBase, estadoPiezas]);
+  }, [mesasBase, estadoPiezas, plano]);
   const asignacionesSala = useMemo(() => {
     const ids = new Set(mesas.map((m) => m.id));
     return (asignacionesDeHoy ?? [])
@@ -887,6 +896,7 @@ export function VistaPlanoHoy({
           estado={estadoPiezas}
           reservas={reservasEnMesas}
           hayServicio
+          turno={turno}
           ocupado={guardandoPiezas || !puedeEditar}
           onGuardar={(cambios, mensaje) => guardarPiezas(cambios, mensaje)}
           onProponer={setPropuestaPiezas}
