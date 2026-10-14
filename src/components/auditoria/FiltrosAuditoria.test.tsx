@@ -83,6 +83,8 @@ describe("filtros móviles de auditoría", () => {
       value: 1280,
     });
     render(<Harness />);
+    expect(screen.queryByLabelText("Tipo de acción")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
     expect(screen.getByLabelText("Tipo de acción")).toBeInTheDocument();
     expect(
       screen.getByRole("option", { name: "Cambiar precio" }),
@@ -92,4 +94,28 @@ describe("filtros móviles de auditoría", () => {
     ).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
+});
+
+it("en escritorio recoge sin aplicar ni perder el borrador y mantiene un resumen al aplicar", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  render(<Harness />);
+  const mostrar = screen.getByRole("button", { name: "Mostrar filtros" });
+  expect(mostrar).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(mostrar);
+  fireEvent.change(screen.getByLabelText("Tipo de acción"), { target: { value: "consulta_ia" } });
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "paella" } });
+  fireEvent.click(screen.getByRole("button", { name: "Recoger filtros" }));
+  expect(aplicar).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText("Tipo de acción")).not.toBeInTheDocument();
+  expect(screen.getByText("Cambios sin aplicar")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
+  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("paella");
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+  expect(aplicar).toHaveBeenCalledWith({ accion: "consulta_ia", texto: "paella" });
+  expect(screen.queryByLabelText("Tipo de acción")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Mostrar filtros" })).toHaveFocus();
+  expect(screen.getByText("Acción: Pregunta a la IA de facturas")).toBeInTheDocument();
+  expect(screen.getByText("Búsqueda: paella")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Limpiar filtros activos" }));
+  expect(screen.queryByText("Búsqueda: paella")).not.toBeInTheDocument();
 });

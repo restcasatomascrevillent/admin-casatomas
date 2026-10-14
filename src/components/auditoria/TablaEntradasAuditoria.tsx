@@ -203,16 +203,16 @@ function DetalleEntrada({ entrada }: { entrada: AuditLogEntry }) {
           Credenciales actualizadas. La contraseña no se guarda en la auditoría.
         </p>
       ) : cambios.length > 0 ? (
-        <dl className="space-y-2 text-sm">
+        <dl className="grid grid-cols-1 gap-2 text-sm lg:grid-cols-2">
           {cambios.map((c) => (
-            <div key={c.campo} className="rounded-md border p-2">
+            <div key={c.campo} className="min-w-0 rounded-md border p-2">
               <dt className="font-medium">{etiquetaCampo(c.campo)}</dt>
               <dd className="mt-1 flex flex-wrap items-center gap-2">
-                <span className="break-words text-muted-foreground line-through">
+                <span className="min-w-0 break-words text-muted-foreground line-through [overflow-wrap:anywhere]">
                   {valorLegible(c.campo, c.antes)}
                 </span>
                 <span aria-label="cambia a">→</span>
-                <span className="break-words">
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">
                   {valorLegible(c.campo, c.despues)}
                 </span>
               </dd>
@@ -278,6 +278,9 @@ export function TablaEntradasAuditoria({
   return (
     <>
       <div className="space-y-2">
+        <div aria-hidden="true" className="hidden grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)_10.5rem] gap-x-4 px-3 pl-9 pb-1 text-xs font-medium text-muted-foreground lg:grid">
+          <span>Usuario / origen</span><span>Acción y detalle</span><span className="text-right">{columnaCuando === "solo-hora" ? "Hora" : "Fecha y hora"}</span>
+        </div>
         {grupos.map((grupo) => {
           const entrada = grupo.entradas[0];
           const ui = ACCION_UI[grupo.accion] ?? ACCION_UI.actualizar;
@@ -306,13 +309,13 @@ export function TablaEntradasAuditoria({
                   className={`mt-1 h-4 w-4 shrink-0 transition-transform ${abierta ? "rotate-180" : ""}`}
                   aria-hidden="true"
                 />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="break-all text-sm font-semibold">
+                <div className="min-w-0 flex-1 space-y-2 lg:grid lg:grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)_10.5rem] lg:gap-x-4 lg:gap-y-1.5 lg:space-y-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2 lg:contents">
+                    <span className="break-all text-sm font-semibold lg:col-start-1 lg:row-start-1">
                       {grupo.actor_label}
                     </span>
                     <time
-                      className="text-xs text-muted-foreground"
+                      className="text-xs text-muted-foreground lg:col-start-3 lg:row-start-1 lg:text-right lg:whitespace-nowrap"
                       dateTime={grupo.created_at}
                     >
                       {format(
@@ -324,13 +327,13 @@ export function TablaEntradasAuditoria({
                       )}
                     </time>
                   </div>
-                  <p className="break-words text-sm">
+                  <p className="break-words text-sm lg:col-start-2 lg:row-start-1">
                     {resumenEntrada(entrada)}
                     {grupo.entradas.length > 1
                       ? ` (${grupo.entradas.length} cambios)`
                       : ""}
                   </p>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 lg:col-start-2 lg:col-span-2 lg:row-start-2">
                     <Badge
                       variant="outline"
                       className={`gap-1 ${ui.className}`}
@@ -365,7 +368,7 @@ export function TablaEntradasAuditoria({
                     (!grupo.actor_email &&
                       !grupo.actor_user_id &&
                       !grupo.actor_origin)) && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground lg:col-span-3">
                       El registro original no conservó el autor.
                     </p>
                   )}
@@ -374,7 +377,7 @@ export function TablaEntradasAuditoria({
               {abierta && (
                 <div
                   id={`detalle-${grupo.key}`}
-                  className="space-y-3 border-t p-3"
+                  className="space-y-3 border-t p-3 lg:bg-muted/10 lg:p-4"
                 >
                   {grupo.entradas.map((e) => (
                     <div key={e.id} className="space-y-3">

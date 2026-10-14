@@ -88,6 +88,7 @@ export default function SuperAdminAuditoria() {
     useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [filtros, setFiltros] = useState<AuditLogFiltros>(FILTROS_VACIOS);
   const [pagina, setPagina] = useState(0);
+  const [vista, setVista] = useState("lista");
   // Compartido por las tres pestañas: la clave es siempre el ID de una fila de `audit_log`,
   // así que no hay colisión entre lo que despliega "Lista" y lo que despliega "Por mes"/"Por día".
   const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
@@ -159,16 +160,16 @@ export default function SuperAdminAuditoria() {
     <SuperAdminLayout>
       <div
         ref={setRaiz}
-        className="flex min-w-0 flex-col gap-3 sm:gap-6"
+        className="flex min-w-0 flex-col gap-3 lg:gap-4"
         style={alto ? { height: alto } : undefined}
       >
         <div className="flex shrink-0 items-center gap-3">
           <ScrollText className="h-6 w-6 shrink-0 text-destructive sm:h-8 sm:w-8" />
           <div>
-            <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+            <h1 className="text-2xl font-bold text-foreground">
               Auditoría
             </h1>
-            <p className="hidden text-muted-foreground sm:block">
+            <p className="hidden text-sm text-muted-foreground sm:block">
               Accesos, intentos y acciones de todas las personas y dispositivos.
             </p>
           </div>
@@ -196,7 +197,7 @@ export default function SuperAdminAuditoria() {
         <div className="min-w-0 shrink-0 space-y-2">
           <div className="flex min-w-0 items-center gap-2">
             <nav
-              className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain border-b pb-1"
+              className="flex min-w-0 flex-1 gap-1 overflow-x-auto overscroll-x-contain border-b pb-1 lg:flex-wrap lg:overflow-visible lg:border-0 lg:pb-0"
               aria-label="Filtros rápidos por tipo de acción"
             >
               {FILTROS_RAPIDOS.map((categoria) => (
@@ -204,7 +205,7 @@ export default function SuperAdminAuditoria() {
                   key={categoria.id}
                   type="button"
                   size="sm"
-                  className={`h-11 shrink-0 rounded-none border-b-2 px-3 ${categoriaActiva?.id === categoria.id ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground"}`}
+                  className={`h-11 shrink-0 rounded-none border-b-2 px-3 lg:h-9 lg:rounded-lg lg:border ${categoriaActiva?.id === categoria.id ? "border-primary bg-primary/10 text-primary" : "border-transparent text-muted-foreground"}`}
                   variant="ghost"
                   aria-pressed={categoriaActiva?.id === categoria.id}
                   onClick={() =>
@@ -239,19 +240,17 @@ export default function SuperAdminAuditoria() {
 
         {/* Conserva espacio para los registros incluso al desplegar los filtros. */}
         <Card className="flex min-h-48 min-w-0 flex-1 flex-col">
-          <Tabs defaultValue="lista" className="flex min-h-0 flex-1 flex-col">
-            <CardHeader className="shrink-0 gap-3 p-3 sm:p-6">
+          <Tabs value={vista} onValueChange={setVista} className="flex min-h-0 flex-1 flex-col">
+            <CardHeader className="shrink-0 gap-3 border-b bg-muted/20 p-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 lg:px-4">
               <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:self-start">
                 <TabsTrigger value="lista">Lista</TabsTrigger>
                 <TabsTrigger value="mes">Por mes</TabsTrigger>
                 <TabsTrigger value="dia">Por día</TabsTrigger>
               </TabsList>
-            </CardHeader>
-            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 sm:px-6 sm:pb-6">
-              <TabsContent value="lista" className="mt-0">
-                <div className="mb-3 flex items-center justify-between">
+              {vista === "lista" && (
+                <div className="flex items-center justify-between gap-3 lg:ml-auto">
                   <p className="text-sm text-muted-foreground">
-                    {total} registro{total === 1 ? "" : "s"}
+                    {total.toLocaleString("es-ES")} registro{total === 1 ? "" : "s"}
                   </p>
                   <Button
                     variant="outline"
@@ -262,6 +261,10 @@ export default function SuperAdminAuditoria() {
                     Actualizar
                   </Button>
                 </div>
+              )}
+            </CardHeader>
+            <CardContent className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 lg:p-4">
+              <TabsContent value="lista" className="mt-0">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -275,36 +278,11 @@ export default function SuperAdminAuditoria() {
                     No hay registros con estos filtros.
                   </p>
                 ) : (
-                  <>
-                    <TablaEntradasAuditoria
-                      grupos={grupos}
-                      expandidas={expandidas}
-                      onToggle={alternarExpandida}
-                    />
-                    <div className="flex flex-wrap items-center justify-between gap-3 pt-4">
-                      <p className="text-sm text-muted-foreground">
-                        Página {pagina + 1} de {totalPaginas}
-                      </p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={pagina === 0}
-                          onClick={() => setPagina((p) => p - 1)}
-                        >
-                          Anterior
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={pagina + 1 >= totalPaginas}
-                          onClick={() => setPagina((p) => p + 1)}
-                        >
-                          Siguiente
-                        </Button>
-                      </div>
-                    </div>
-                  </>
+                  <TablaEntradasAuditoria
+                    grupos={grupos}
+                    expandidas={expandidas}
+                    onToggle={alternarExpandida}
+                  />
                 )}
               </TabsContent>
 
@@ -328,6 +306,31 @@ export default function SuperAdminAuditoria() {
                 />
               </TabsContent>
             </CardContent>
+            {vista === "lista" && !loading && !error && grupos.length > 0 && (
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t px-3 py-3 lg:px-4">
+                <p className="text-sm text-muted-foreground">
+                  Página {pagina + 1} de {totalPaginas}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagina === 0}
+                    onClick={() => setPagina((p) => p - 1)}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagina + 1 >= totalPaginas}
+                    onClick={() => setPagina((p) => p + 1)}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
           </Tabs>
         </Card>
       </div>

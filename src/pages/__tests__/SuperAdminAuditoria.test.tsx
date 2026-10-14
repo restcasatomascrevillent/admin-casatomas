@@ -5,6 +5,8 @@ import type { AuditLogEntry, AuditLogFiltros } from "@/hooks/useAuditLog";
 const state = vi.hoisted(() => ({
   entradas: [] as AuditLogEntry[],
   filtros: [] as AuditLogFiltros[],
+  paginas: [] as number[],
+  total: 0,
 }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/components/SuperAdminLayout", () => ({
@@ -17,11 +19,12 @@ vi.mock("@/hooks/useAlturaDisponible", () => ({
 }));
 vi.mock("@/hooks/useAuditLog", async (original) => ({
   ...(await original<typeof import("@/hooks/useAuditLog")>()),
-  useAuditLog: (filtros: AuditLogFiltros) => {
+  useAuditLog: (filtros: AuditLogFiltros, pagina: number) => {
     state.filtros.push(filtros);
+    state.paginas.push(pagina);
     return {
       entradas: state.entradas,
-      total: state.entradas.length,
+      total: state.total || state.entradas.length,
       pageSize: 25,
       tablas: ["Platos", "Bebidas", "novedades"],
       loading: false,
@@ -46,6 +49,29 @@ const entry = (overrides: Partial<AuditLogEntry>): AuditLogEntry => ({
 beforeEach(() => {
   state.entradas = [];
   state.filtros = [];
+  state.paginas = [];
+  state.total = 0;
+});
+
+it("recoger filtros mantiene la lectura de detalles y la paginación sin aplicar el borrador", () => {
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
+  state.entradas = [entry({ actor_label: "María", actor_user_id: "maria-id", actor_origin: "usuario" })];
+  state.total = 60;
+  render(<SuperAdminAuditoria />);
+  fireEvent.click(screen.getByText("María"));
+  expect(screen.getByText("Usuario: maria-id")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
+  fireEvent.change(screen.getByLabelText("Buscar en auditoría"), { target: { value: "paella" } });
+  fireEvent.click(screen.getByRole("button", { name: "Recoger filtros" }));
+  expect(screen.getByText("Usuario: maria-id")).toBeInTheDocument();
+  expect(state.filtros.at(-1)).toEqual({ origen: "sin_servidor" });
+  fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+  expect(state.paginas.at(-1)).toBe(1);
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
+  expect(screen.getByLabelText("Buscar en auditoría")).toHaveValue("paella");
+  fireEvent.click(screen.getByRole("button", { name: "Aplicar filtros" }));
+  expect(state.paginas.at(-1)).toBe(0);
+  expect(state.filtros.at(-1)).toMatchObject({ texto: "paella", origen: "sin_servidor" });
 });
 
 describe("tabla de auditoría", () => {
@@ -190,6 +216,7 @@ it("conserva búsqueda y fechas al elegir una categoría rápida", () => {
     value: 1280,
   });
   render(<SuperAdminAuditoria />);
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
   fireEvent.change(screen.getByLabelText("Buscar en auditoría"), {
     target: { value: "paella" },
   });
@@ -206,5 +233,7 @@ it("conserva búsqueda y fechas al elegir una categoría rápida", () => {
     texto: "paella",
     desde: "2026-10-01",
   });
+  expect(screen.getByText("Sección: Platos")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Mostrar filtros" }));
   expect(screen.getByLabelText("Sección")).toHaveValue("Platos");
 });

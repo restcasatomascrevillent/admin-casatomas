@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { AuditLogFiltros } from "@/hooks/useAuditLog";
 import { TABLA_LABEL } from "@/hooks/useAuditLog";
@@ -99,6 +99,7 @@ export function FiltrosAuditoria({
   const mobile = useIsMobile();
   const [open, setOpen] = useState(false);
   const [avanzados, setAvanzados] = useState(false);
+  const desktopTrigger = useRef<HTMLButtonElement>(null);
   const cantidad = Object.entries(activos).filter(
     ([campo, v]) =>
       Boolean(v?.trim()) && !(campo === "origen" && v === "sin_servidor"),
@@ -108,6 +109,17 @@ export function FiltrosAuditoria({
   const opcionActiva = GRUPOS_ACCION.flatMap((g) => g.opciones).find(
     ([valor]) => valor === activos.accion,
   )?.[1];
+  const resumen = Object.entries(activos)
+    .filter(([campo, valor]) => Boolean(valor?.trim()) && !(campo === "origen" && valor === "sin_servidor"))
+    .map(([campo, valor]) => {
+      const etiquetas: Record<string, string> = { accion: "Acción", tabla: "Sección", texto: "Búsqueda", actor: "Persona", desde: "Desde", hasta: "Hasta", dispositivo: "Dispositivo", resultado: "Resultado", origen: "Origen" };
+      const origenes: Record<string, string> = { usuario: "Personas", servidor: "Procesos", intento: "Intentos", historico: "Histórico" };
+      const legible = campo === "accion" ? opcionActiva ?? valor : campo === "tabla" ? TABLA_LABEL[valor!] ?? valor : campo === "origen" ? origenes[valor!] ?? valor : valor;
+      return `${etiquetas[campo] ?? campo}: ${legible}`;
+    });
+  const sinAplicar = Object.keys({ ...pendientes, ...activos }).some(
+    campo => (pendientes[campo as keyof AuditLogFiltros] ?? "") !== (activos[campo as keyof AuditLogFiltros] ?? ""),
+  );
 
   const form = (
     <form
@@ -115,6 +127,7 @@ export function FiltrosAuditoria({
       onSubmit={(e) => {
         e.preventDefault();
         onAplicar();
+        if (!mobile) desktopTrigger.current?.focus();
         setOpen(false);
       }}
     >
@@ -292,8 +305,32 @@ export function FiltrosAuditoria({
 
   if (!mobile)
     return (
-      <Card className="shrink-0">
-        <CardContent className="p-4">{form}</CardContent>
+      <Card className="shrink-0 overflow-hidden shadow-none">
+        <div className="flex min-w-0 items-center gap-3 px-2 py-1.5">
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-11 shrink-0 gap-2 px-3"
+            aria-label={open ? "Recoger filtros" : "Mostrar filtros"}
+            aria-expanded={open}
+            aria-controls="auditoria-filtros-escritorio"
+            ref={desktopTrigger}
+            onClick={() => setOpen(v => !v)}
+          >
+            <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+            Filtros
+            {cantidad > 0 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs">{cantidad}</span>}
+            <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+          </Button>
+          <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+            {sinAplicar ? "Cambios sin aplicar" : cantidad > 0 ? "Filtros aplicados" : "Filtra por acción, sección, persona o fecha"}
+          </p>
+          {cantidad > 0 && <Button type="button" variant="ghost" className="h-11 shrink-0 text-xs" onClick={onLimpiar} aria-label="Limpiar filtros activos">Limpiar</Button>}
+        </div>
+        {resumen.length > 0 && <div aria-label="Filtros aplicados" className="flex min-w-0 flex-wrap gap-1.5 px-4 pb-3">
+          {resumen.map(texto => <span key={texto} className="max-w-full rounded-md bg-muted px-2 py-1 text-xs break-words [overflow-wrap:anywhere]">{texto}</span>)}
+        </div>}
+        {open && <CardContent id="auditoria-filtros-escritorio" className="border-t bg-muted/10 p-4">{form}</CardContent>}
       </Card>
     );
   return (
