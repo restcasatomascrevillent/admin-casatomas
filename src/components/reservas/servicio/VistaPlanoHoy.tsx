@@ -85,6 +85,8 @@ import {
   type MesaPiezas,
   type ReservaEnMesas,
 } from "@/lib/reservas/piezasMesa";
+import { aplicarPosicionesUnion, dibujarUniones } from "@/lib/reservas/dibujoMesas";
+import type { PiezasDibujo } from "../DibujoPiezas";
 import {
   ajustesPropuestos,
   disposicionPropuesta,
@@ -317,16 +319,20 @@ export function VistaPlanoHoy({
   );
   const estadoPiezas = useMemo(() => estadoServicio(mesasPiezas, ajustesSala), [mesasPiezas, ajustesSala]);
   /** Las mesas como están (o quedarían) en este servicio: largo y plazas recalculados; sin piezas, fuera. */
-  const mesas = useMemo(
-    () =>
-      mesasBase
-        .filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0)
-        .map((m) => {
-          const g = geometriaServicio(m, estadoPiezas.get(m.id));
-          return g ? { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad } : m;
-        }),
-    [mesasBase, estadoPiezas],
-  );
+  const { mesas, unionesMapa, piezasMapa } = useMemo(() => {
+    const piezas = new Map<string, PiezasDibujo>();
+    const conPiezas = mesasBase
+      .filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0)
+      .map((m) => {
+        const g = geometriaServicio(m, estadoPiezas.get(m.id));
+        if (!g) return m;
+        piezas.set(m.id, { piezas: g.piezas, picos: g.picos, ladoPico: g.ladoPico, vertical: g.vertical });
+        return { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad };
+      });
+    // Mesas juntas en este servicio: arrimadas a su principal, con contorno y rótulo comunes.
+    const dibujo = dibujarUniones(conPiezas, estadoPiezas);
+    return { mesas: aplicarPosicionesUnion(conPiezas, dibujo), unionesMapa: dibujo.uniones, piezasMapa: piezas };
+  }, [mesasBase, estadoPiezas]);
   const asignacionesSala = useMemo(() => {
     const ids = new Set(mesas.map((m) => m.id));
     return (asignacionesDeHoy ?? [])
@@ -1156,6 +1162,8 @@ export function VistaPlanoHoy({
                     coincidentes={coincidentesMapa}
                     onTocarMesa={tocarMesa}
                     mesaPropuesta={mesaPropuesta}
+                    uniones={unionesMapa}
+                    piezas={piezasMapa}
                   />
                 )}
                 {eligiendoPara && (

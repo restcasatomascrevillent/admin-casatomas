@@ -36,6 +36,8 @@ import type { ResultadoEstadoMesa } from "@/lib/reservas/servicioSala";
 import { nombreCartelMesa, tiempoCortoMesa } from "@/lib/reservas/vistaHoy";
 import { limitesContenidoPlano, renderElementoPlano, type ElementoPlano } from "../elementosPlano";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
+import type { UnionDibujo } from "@/lib/reservas/dibujoMesas";
+import { ContornoUnion, RanurasPiezas, type PiezasDibujo } from "../DibujoPiezas";
 
 /** Margen alrededor del plano encuadrado, en px (el mismo total que el plano de reparto). */
 const MARGEN_ENCUADRE = 32;
@@ -69,6 +71,10 @@ export interface MapaSalaServicioProps {
    * de 14, `@/lib/reservas/grupoGrande`). Se dibuja con borde discontinuo y sin eventos.
    */
   mesaPropuesta?: { pos_x: number; pos_y: number; ancho: number; alto: number; texto: string } | null;
+  /** Mesas juntas en este servicio: contorno común y rótulo «3+4 · 8 plazas» (`dibujarUniones`). */
+  uniones?: readonly UnionDibujo[];
+  /** Piezas y pico de cada mesa por piezas, para pintar las ranuras entre piezas. */
+  piezas?: ReadonlyMap<string, PiezasDibujo>;
 }
 
 export function MapaSalaServicio({
@@ -84,6 +90,8 @@ export function MapaSalaServicio({
   coincidentes,
   onTocarMesa,
   mesaPropuesta = null,
+  uniones = [],
+  piezas,
 }: MapaSalaServicioProps) {
   const [contenedor, setContenedor] = useState<HTMLDivElement | null>(null);
   const tamano = useTamanoElemento(contenedor);
@@ -226,8 +234,19 @@ export function MapaSalaServicio({
           }}
         >
           {elementos.map((elem) => renderElementoPlano(elem, { offsetX, offsetY, scale: escala }))}
+          {uniones.map((u) => (
+            <ContornoUnion
+              key={u.ids.join("+")}
+              x={(u.pos_x * pixelsPorMetro - offsetX) * escala}
+              y={(u.pos_y * pixelsPorMetro - offsetY) * escala}
+              ancho={(u.ancho / 100) * pixelsPorMetro * escala}
+              alto={(u.alto / 100) * pixelsPorMetro * escala}
+              texto={u.texto}
+            />
+          ))}
           {mesas.map((mesa) => (
             <MesaServicio
+              piezas={piezas?.get(mesa.id)}
               key={mesa.id}
               mesa={mesa}
               x={((mesa.pos_x || 0) * pixelsPorMetro - offsetX) * escala}
@@ -302,7 +321,10 @@ function MesaServicio({
   atenuada,
   resaltada,
   onClick,
+  piezas,
 }: {
+  /** Piezas y pico: ranuras entre piezas (mesas por piezas). */
+  piezas?: PiezasDibujo;
   mesa: Mesa;
   /** Esquina y tamaño YA en píxeles de pantalla. */
   x: number;
@@ -376,7 +398,9 @@ function MesaServicio({
           "focus-visible:ring-4 focus-visible:ring-ring",
         )}
         style={{ ...caja, zIndex: z, transform: `rotate(${mesa.rotacion || 0}deg)`, transformOrigin: "center center" }}
-      />
+      >
+        {piezas && <RanurasPiezas info={piezas} redonda={mesa.forma === "circular"} />}
+      </button>
       <div
         aria-hidden="true"
         className={cn("pointer-events-none absolute", atenuada && "opacity-40")}

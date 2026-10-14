@@ -125,6 +125,8 @@ import {
   type MesaPiezas,
   type ReservaEnMesas,
 } from "@/lib/reservas/piezasMesa";
+import { aplicarPosicionesUnion, dibujarUniones } from "@/lib/reservas/dibujoMesas";
+import { ContornoUnion, RanurasPiezas } from "./DibujoPiezas";
 import { DialogoPropuestaPiezas, PanelPiezasMesa, type PropuestaAbierta } from "@/components/reservas/PiezasMesa";
 import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
 import { BotonOrganizarServicio } from "@/components/reservas/OrganizarServicio";
@@ -689,32 +691,7 @@ function MesaPlano({
                   : "transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 200ms ease",
               }}
             >
-              {piezasInfo &&
-                Array.from({ length: Math.max(0, piezasInfo.piezas - 1) }, (_, i) => (
-                  <span
-                    key={i}
-                    aria-hidden
-                    className={cn(
-                      "pointer-events-none absolute border-dashed border-slate-400",
-                      piezasInfo.vertical ? "left-0 right-0 border-t" : "bottom-0 top-0 border-l",
-                    )}
-                    style={
-                      piezasInfo.vertical
-                        ? { top: `${((i + 1) * 100) / piezasInfo.piezas}%` }
-                        : { left: `${((i + 1) * 100) / piezasInfo.piezas}%` }
-                    }
-                  />
-                ))}
-              {piezasInfo && piezasInfo.picos > 0 && (
-                <span
-                  aria-hidden
-                  className={cn(
-                    "pointer-events-none absolute rounded-sm bg-amber-500",
-                    piezasInfo.vertical ? "left-1/2 h-1.5 w-1/2 -translate-x-1/2" : "top-1/2 h-1/2 w-1.5 -translate-y-1/2",
-                  )}
-                  style={{ [piezasInfo.ladoPico === "arriba" ? "top" : piezasInfo.ladoPico === "abajo" ? "bottom" : piezasInfo.ladoPico === "izquierda" ? "left" : "right"]: -8 }}
-                />
-              )}
+              {piezasInfo && <RanurasPiezas info={piezasInfo} redonda={mesa.forma === "circular"} />}
               <span
                 className="pointer-events-none break-words text-center font-bold leading-tight"
                 style={{ fontSize: `${fontSize}px`, maxWidth: "100%", wordBreak: "break-word", lineHeight: 1.1 }}
@@ -1138,14 +1115,18 @@ export function PlanoEspacio2D({
     [mesasPiezas, turnoServicio, ajustesServicio],
   );
   /** Las mesas tal y como están en ESTE servicio (largo y plazas recalculados). */
-  const mesasVista = useMemo(
-    () =>
-      localMesas.map((m) => {
-        const g = geometriaServicio(m, estadoPiezas.get(m.id));
-        return g ? { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad } : m;
-      }),
-    [localMesas, estadoPiezas],
-  );
+  const { mesasVista, unionesVista } = useMemo(() => {
+    const conPiezas = localMesas.map((m) => {
+      const g = geometriaServicio(m, estadoPiezas.get(m.id));
+      return g ? { ...m, pos_x: g.pos_x, pos_y: g.pos_y, ancho: g.ancho, alto: g.alto, capacidad: g.capacidad } : m;
+    });
+    // Mesas juntas en este servicio: se arriman a su principal y llevan contorno común.
+    const dibujo = dibujarUniones(
+      conPiezas.filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0),
+      estadoPiezas,
+    );
+    return { mesasVista: aplicarPosicionesUnion(conPiezas, dibujo), unionesVista: dibujo.uniones };
+  }, [localMesas, estadoPiezas]);
   /** Reservas del servicio y sus mesas: para no quitar piezas que alguien necesita. */
   const reservasEnMesas = useMemo<ReservaEnMesas[]>(() => {
     const porReserva = new Map<string, ReservaEnMesas>();
@@ -2734,6 +2715,17 @@ export function PlanoEspacio2D({
                   }}
                 >
                   {elementosPlano.map((elem) => renderElementoPlano(elem, { offsetX, offsetY, scale }))}
+
+                  {unionesVista.map((u) => (
+                    <ContornoUnion
+                      key={u.ids.join("+")}
+                      x={(u.pos_x * PIXELS_PER_METER - offsetX) * scale}
+                      y={(u.pos_y * PIXELS_PER_METER - offsetY) * scale}
+                      ancho={(u.ancho / 100) * PIXELS_PER_METER * scale}
+                      alto={(u.alto / 100) * PIXELS_PER_METER * scale}
+                      texto={u.texto}
+                    />
+                  ))}
 
                   {mesasVista.filter((m) => (estadoPiezas.get(m.id)?.piezas ?? 1) > 0).map((mesa) => {
                     const ocupantes = ocupantesDeMesa(mesa.id).map((asignacion) => {
