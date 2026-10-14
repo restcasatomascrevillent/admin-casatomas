@@ -5,7 +5,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { DetalleCompra } from "./DetalleCompra";
 
 interface Ticket {
@@ -24,7 +23,6 @@ export function ListaTickets() {
   const [datos, setDatos] = useState<Listado | null>(null);
   const [error, setError] = useState("");
   const [cargando, setCargando] = useState(true);
-  const [revision, setRevision] = useState(0);
   const [compraSeleccionada, setCompraSeleccionada] = useState<string | null>(null);
   useEffect(() => {
     let activo = true;
@@ -43,22 +41,21 @@ export function ListaTickets() {
     // Agrupa las pulsaciones; al cambiar el texto se descartan las respuestas anteriores.
     const timer = window.setTimeout(() => void cargar(), busqueda ? 250 : 0);
     return () => { activo = false; window.clearTimeout(timer); };
-  }, [pagina, revision, busqueda, hoy]);
-  // Con alto medido (pestaña Expedición de Cheques.tsx) la lista llena la pestaña: título, búsqueda,
+  }, [pagina, busqueda, hoy]);
+  // Con alto medido (pestaña Expedición de Cheques.tsx) la lista llena la pestaña: búsqueda,
   // totales y paginación quedan fijos y solo la tabla hace scroll, con la cabecera de columnas pegada
   // (`sticky top-0`; el `bg-background` del thead tapa las filas y la fila conserva su `bg-muted/50`).
-  // Suelo de la tabla (como la lista de Suscriptores): 12 rem desde `md` y 32 rem en el móvil, donde
-  // los totales van apilados; por debajo de ese suelo desplaza la pestaña entera. Sin
+  // Suelo de la tabla (como la lista de Suscriptores): 12 rem desde `md` y 32 rem en el móvil;
+  // por debajo de ese suelo desplaza la pestaña entera. Sin
   // `overscroll-contain` en la tabla: al llegar a su final, el gesto sigue en la pestaña.
-  return <div className="flex min-h-0 flex-1 flex-col gap-4">
-    <div className="flex items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">Expedición total de tickets</h2><p className="text-sm text-muted-foreground">Cheques expedidos, del más reciente al más antiguo. Pulsa una compra para ver sus datos.</p></div><Button variant="outline" disabled={cargando} onClick={() => setRevision(r => r + 1)}>Actualizar</Button></div>
+  return <div className="flex min-h-0 flex-1 flex-col gap-3">
     <form role="search" className="flex flex-col sm:flex-row gap-3" onSubmit={e => e.preventDefault()}>
       <Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="sm:max-w-md h-11" />
       {texto && <Button type="button" variant="outline" className="h-11" onClick={() => { setTexto(""); setPagina(0); }}>Limpiar</Button>}
     </form>
     {cargando && datos && <span role="status" className="sr-only">Filtrando tickets…</span>}
     {cargando && !datos ? <p role="status">Cargando tickets…</p> : error ? <p role="alert" className="rounded-xl border border-destructive/40 p-4">{error}</p> : datos && <>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{[["Tickets expedidos", datos.expedidos], ["Tickets canjeados", datos.canjeados], ["Tickets caducados", datos.caducados ?? 0], ["Importe con pago confirmado", euro(Number(datos.importe_pagado))]].map(([nombre, valor]) => <Card key={nombre}><CardContent className="pt-5"><p className="text-sm text-muted-foreground">{nombre}</p><p className="text-2xl font-semibold mt-1">{valor}</p></CardContent></Card>)}</div>
+      <dl aria-label="Resumen de tickets" className="grid grid-cols-2 gap-2 lg:grid-cols-4">{[["Tickets expedidos", datos.expedidos], ["Tickets canjeados", datos.canjeados], ["Tickets caducados", datos.caducados ?? 0], ["Importe con pago confirmado", euro(Number(datos.importe_pagado))]].map(([nombre, valor]) => <div key={nombre} className="min-w-0 rounded-lg border bg-card px-3 py-2"><dt className="text-xs leading-4 text-muted-foreground">{nombre}</dt><dd className="mt-1 break-words text-base font-semibold tabular-nums sm:text-lg">{valor}</dd></div>)}</dl>
       <div className="min-h-[32rem] flex-1 overflow-auto rounded-xl border md:min-h-[12rem]"><table aria-busy={cargando} className="w-full text-sm"><thead className="sticky top-0 z-10 bg-background"><tr className="bg-muted/50">{["Fecha", "Código", "Comprador", "Teléfono", "Importe", "Caducidad", "Días restantes", "Estado"].map((label, i) => <th key={i} className="p-3 text-left whitespace-nowrap">{label}</th>)}</tr></thead><tbody>
         {datos.tickets.map(t => <tr key={t.id} onClick={() => setCompraSeleccionada(t.id)} className={`border-t cursor-pointer hover:brightness-95 ${(t.usado || estadoCaducidad(t.caduca_el, hoy).caducado) ? "bg-red-50 text-red-950 dark:bg-red-950/30 dark:text-red-100" : t.estado === "pagado" ? "bg-emerald-50 text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100" : ""}`}><td className="p-3 whitespace-nowrap">{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td><td className="p-3 font-mono whitespace-nowrap"><button type="button" aria-label={`Ver compra ${t.codigo}`} className="underline underline-offset-4 rounded focus-visible:outline focus-visible:outline-2" onClick={e => { e.stopPropagation(); setCompraSeleccionada(t.id); }}>{t.codigo}</button></td><td className="p-3">{t.comprador_nombre}</td><td className="p-3 whitespace-nowrap">{t.comprador_telefono || "—"}</td><td className="p-3 whitespace-nowrap">{euro(Number(t.importe_eur))}</td><td className="p-3 whitespace-nowrap">{fechaCaducidad(t.caduca_el)}</td><td className="p-3 whitespace-nowrap">{t.usado || t.estado !== "pagado" ? "—" : estadoCaducidad(t.caduca_el, hoy).texto}</td><td className="p-3 whitespace-nowrap">{t.estado === "cancelado" ? "Cancelado" : t.estado !== "pagado" ? "Pendiente de pago" : t.usado ? "Canjeado" : estadoCaducidad(t.caduca_el, hoy).caducado ? "Caducado" : "Disponible"}</td></tr>)}
         {!datos.tickets.length && <tr><td colSpan={8} className="p-6 text-center text-muted-foreground">No hay tickets que coincidan con la búsqueda.</td></tr>}
