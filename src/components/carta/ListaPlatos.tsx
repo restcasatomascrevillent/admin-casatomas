@@ -7,7 +7,7 @@ import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
+import { FotoExpandidaToggle } from "./FotoExpandidaToggle";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +63,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   };
 
   const handleToggleExpanded = (plato: Plato, checked: boolean) => {
+    if (!plato.imagen_url?.trim()) return;
     // El toast (y el aviso de si se ha publicado o no) lo emite el hook.
     toggleExpanded.mutate({
       id: plato.id,
@@ -165,8 +166,9 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                     variant="ghost"
                     size="icon"
                     className="h-11 w-11"
-                    title={fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
-                    aria-label={fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
+                    disabled={!plato.imagen_url?.trim()}
+                    title={!plato.imagen_url?.trim() ? "Este plato no tiene foto" : fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={!plato.imagen_url?.trim() ? "Este plato no tiene foto" : fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
                     onClick={() => toggleFotoVisible(plato.id)}
                   >
                     {fotosOcultas.has(plato.id) ? (
@@ -192,15 +194,13 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 compact
               />
 
-              <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
-                <span className="text-sm text-muted-foreground">Foto expandida en carta web</span>
-                <Switch
-                  checked={plato.expanded ?? false}
-                  onCheckedChange={(checked) => handleToggleExpanded(plato, checked)}
-                  disabled={toggleExpanded.isPending}
-                  className="data-[state=checked]:bg-amber-600"
-                />
-              </label>
+              <FotoExpandidaToggle
+                imagenUrl={plato.imagen_url}
+                nombre={plato.nombre || "Plato"}
+                expanded={plato.expanded}
+                isPending={toggleExpanded.isPending}
+                onChange={(checked) => handleToggleExpanded(plato, checked)}
+              />
 
               {plato.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">

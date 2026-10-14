@@ -6,7 +6,7 @@ import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+import { FotoExpandidaToggle } from "./FotoExpandidaToggle";
 import { toast } from "sonner";
 import { etiquetaAlergeno, parseAlergenos } from "@/lib/alergenos";
 import {
@@ -64,6 +64,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   };
 
   const handleToggleExpanded = (vino: Vino, checked: boolean) => {
+    if (!vino.imagen_url?.trim()) return;
     // El toast (y el aviso de si se ha publicado o no) lo emite el hook.
     toggleExpanded.mutate({
       id: vino.id,
@@ -158,8 +159,9 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     variant="ghost"
                     size="icon"
                     className="h-11 w-11"
-                    title={fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
-                    aria-label={fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
+                    disabled={!vino.imagen_url?.trim()}
+                    title={!vino.imagen_url?.trim() ? "Este vino no tiene foto" : fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={!vino.imagen_url?.trim() ? "Este vino no tiene foto" : fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
                     onClick={() => toggleFotoVisible(vino.id)}
                   >
                     {fotosOcultas.has(vino.id) ? (
@@ -189,15 +191,13 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 isActivadoPending={toggleActivado.isPending}
                 compact
               />
-              <label className="flex min-h-11 cursor-pointer items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
-                <span className="text-sm text-muted-foreground">Foto expandida en carta web</span>
-                <Switch
-                  checked={vino.expanded ?? false}
-                  onCheckedChange={(checked) => handleToggleExpanded(vino, checked)}
-                  disabled={toggleExpanded.isPending}
-                  className="data-[state=checked]:bg-amber-600"
-                />
-              </label>
+              <FotoExpandidaToggle
+                imagenUrl={vino.imagen_url}
+                nombre={vino.nombre || "Vino"}
+                expanded={vino.expanded}
+                isPending={toggleExpanded.isPending}
+                onChange={(checked) => handleToggleExpanded(vino, checked)}
+              />
               {vino.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {vino.descripcion}

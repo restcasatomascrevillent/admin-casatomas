@@ -12,6 +12,10 @@ describe("Listado de tickets", () => {
     expect(codigo.closest("tr")).toHaveClass("bg-red-50");
     expect(screen.getByText("Tickets canjeados").parentElement).toHaveTextContent("12");
     expect(screen.getByText("Tickets expedidos").parentElement).toHaveTextContent("90");
+    expect(screen.queryByRole("heading", { name: "Expedición total de tickets" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cheques expedidos, del más reciente/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Actualizar" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Resumen de tickets").querySelectorAll("dt")).toHaveLength(4);
     fireEvent.change(screen.getByLabelText("Buscar tickets por código o comprador"), { target: { value: " Ana " } });
     expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull();
     await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v2", { p_pagina: 0, p_busqueda: "Ana" }));

@@ -22,6 +22,7 @@ import {
 } from "@/hooks/useAuditLog";
 import {
   camposLegibles,
+  camposArchivoLegibles,
   etiquetaCampo,
   puedeRevertir,
   resumenEntrada,
@@ -121,6 +122,7 @@ function DetalleEntrada({ entrada }: { entrada: AuditLogEntry }) {
   const d = entrada.detalles ?? {};
   const evento = tipoEvento(entrada);
   const chat = ["consulta_ia", "regeneracion_ia"].includes(evento);
+  const archivo = entrada.tabla === "storage.objects";
   const cambios =
     entrada.accion === "actualizar"
       ? resumirCambios(entrada.detalles).filter(
@@ -202,6 +204,15 @@ function DetalleEntrada({ entrada }: { entrada: AuditLogEntry }) {
         <p className="text-sm">
           Credenciales actualizadas. La contraseña no se guarda en la auditoría.
         </p>
+      ) : archivo ? (
+        <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+          {camposArchivoLegibles(entrada).map((c) => (
+            <div key={c.campo} className="min-w-0 rounded-md bg-muted/40 p-2">
+              <dt className="font-medium">{c.etiqueta}</dt>
+              <dd className="break-words text-muted-foreground">{c.valor}</dd>
+            </div>
+          ))}
+        </dl>
       ) : cambios.length > 0 ? (
         <dl className="grid grid-cols-1 gap-2 text-sm lg:grid-cols-2">
           {cambios.map((c) => (
@@ -288,7 +299,7 @@ export function TablaEntradasAuditoria({
           const evento = tipoEvento(entrada);
           const abierta = expandidas.has(grupo.key);
           const resultado = String(
-            entrada.detalles?.resultado ??
+            entrada.resultado ?? entrada.detalles?.resultado ??
               (["login_fallido", "acceso_denegado"].includes(entrada.accion)
                 ? "fallida"
                 : "completada"),
