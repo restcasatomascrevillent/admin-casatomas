@@ -70,8 +70,6 @@ import { FormularioReserva, type ReservaCreadaDesdeFormulario } from "./Formular
 import { SolicitudGestionPanel } from "./SolicitudGestionPanel";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { EstadoPropuestaBadge } from "./EstadoPropuestaBadge";
-import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
-import { estaFueraDeAforo, idsSalasPrivadasActivas } from "@/lib/reservas/salaPrivada";
 import {
   estadoPropuestaVista,
   fechaHoraCorta,
@@ -476,9 +474,7 @@ export function ListaReservasAvanzada({
   }, [espacios]);
   const nombreSalaDe = (reserva: Reservation) =>
     reserva.espacio_id ? nombresDeSala.get(reserva.espacio_id) ?? null : null;
-  // Salas privadas (el Reservado): sus reservas están FUERA DE AFORO y se etiquetan.
-  const salasPrivadas = useMemo(() => new Set(idsSalasPrivadasActivas(espacios)), [espacios]);
-  const fueraDeAforo = (reserva: Reservation) => estaFueraDeAforo(reserva, salasPrivadas);
+  // El Reservado ya no lleva etiqueta «Fuera de aforo» aquí: solo se ve en Hoy (dueño, 2026-10-15).
   // Solicitud del bot que se está convirtiendo en reserva / gestionando.
   const [solicitudAConvertir, setSolicitudAConvertir] = useState<SolicitudPendiente | null>(null);
   // Día/hora/pax/sala editados en el diálogo de gestión (SolicitudGestionPanel).
@@ -1052,7 +1048,6 @@ export function ListaReservasAvanzada({
                       />
                       <EstrellaImportante reserva={reservation} canEdit={canEdit} variante="tarjeta" onClick={al.importante} />
                       <span className="font-medium text-sm">{reservation.nombre || "Sin nombre"}</span>
-                      {fueraDeAforo(reservation) && <EtiquetaFueraDeAforo />}
                     </div>
                     <InsigniaEstado estado={reservation.estado} />
                   </div>
@@ -1198,7 +1193,6 @@ export function ListaReservasAvanzada({
                                 {reservation.telefono}
                               </p>
                             )}
-                            {fueraDeAforo(reservation) && <EtiquetaFueraDeAforo className="mt-0.5" />}
                           </div>
                         </div>
                       </TableCell>

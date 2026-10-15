@@ -13,10 +13,8 @@
 //   4. El nº de reservas, pequeño.
 //   5. Un punto discreto si hay reservas SIN SALA dentro de la ventana de
 //      asignación (48 h por defecto). Fuera de la ventana no hay nada que decir.
-//   6. Un candado si el Reservado (sala privada) está ocupado ese día en la comida
-//      o en la cena. Está FUERA DE AFORO (2026-10-03): no suma comensales, reservas
-//      ni %, pero el personal tiene que ver que está. El detalle (qué turno) va en
-//      el tooltip y en el `aria-label`.
+//   (El candado del Reservado se quitó el 2026-10-15: el Reservado solo se ve en
+//   la pestaña Hoy. Sigue fuera de aforo: no suma comensales, reservas ni %.)
 //
 // Los días PASADOS van atenuados y sin escala ni barras (histórico: lo que se
 // reservó, sin canceladas). Hoy y el futuro cuentan solo las reservas vivas.
@@ -38,7 +36,6 @@
 
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { Lock } from "lucide-react";
 import type { ServicioCerrado } from "../../../supabase/functions/_shared/cierres";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -115,8 +112,6 @@ export function CasillaOcupacion({
   }`;
 
   const conReservas = !!resumen && resumen.reservas > 0;
-  // El Reservado ocupado (fuera de aforo): indicador aparte, aunque no haya más reservas.
-  const hayPrivada = !!resumen && resumen.salasPrivadas.length > 0;
   const hayBarras =
     conReservas &&
     !resumen.esPasado &&
@@ -128,16 +123,9 @@ export function CasillaOcupacion({
         : `${resumen.masLleno.porcentaje}%`
       : null;
 
-  // El Reservado ocupado (candado) y el punto de «sin sala»: mismos en todas las densidades.
+  // El punto de «sin sala»: mismo en todas las densidades.
   const indicadores = (
     <>
-      {hayPrivada && (
-        <Lock
-          aria-hidden="true"
-          data-testid="indicador-sala-privada"
-          className="mt-0.5 h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5"
-        />
-      )}
       {conReservas && resumen.sinSalaEnVentana > 0 && (
         <span
           aria-hidden="true"
@@ -207,7 +195,7 @@ export function CasillaOcupacion({
           >
             {format(dia, "d")}
           </span>
-          {compacta && (hayPrivada || (conReservas && resumen.sinSalaEnVentana > 0)) && indicadores}
+          {compacta && conReservas && resumen.sinSalaEnVentana > 0 && indicadores}
         </span>
         {compacta ? (
           conReservas && cifra
@@ -263,7 +251,7 @@ export function CasillaOcupacion({
   );
 
   // Sin nada que contar no hay tooltip: no diría más que la propia casilla.
-  if (!conReservas && !hayPrivada) return boton;
+  if (!conReservas) return boton;
 
   return (
     <Tooltip>

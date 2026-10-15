@@ -14,7 +14,7 @@
 // completa: salen de la misma tabla.
 // ============================================================================
 
-import { Info, Lock } from "lucide-react";
+import { Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -80,10 +80,6 @@ export function LeyendaOcupacion({
               <span aria-hidden="true" className={cn("mx-0.5 h-3 w-3 shrink-0", CLASES_PUNTO_SIN_SALA)} />
               <span>Sin sala ({ventanaHoras} h)</span>
             </li>
-            <li className="flex items-center gap-1.5">
-              <Lock aria-hidden="true" className="mx-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>Reservado (fuera de aforo)</span>
-            </li>
             {aforoNoDisponible && (
               <li role="status" className="font-medium text-muted-foreground">
                 Aforo no disponible: sin porcentaje.
@@ -104,8 +100,9 @@ export function LeyendaOcupacion({
               <p>
                 Color: ocupación del turno más lleno del día (comida o cena)
                 {aforo !== null && <> sobre el aforo de {aforo} comensales por turno</>}. Día pasado: lo que se reservó, sin
-                porcentaje. El punto ámbar marca reservas sin sala en las próximas {ventanaHoras} h; el candado, el Reservado
-                ocupado (no cuenta en las cifras).
+                porcentaje. El punto ámbar marca reservas sin sala en las próximas {ventanaHoras} h.
+                Cada casilla dice si el día está cerrado para reservas («Cerrado», «Sin comida», «Sin cena»); pulsa un
+                día para cerrarlo o abrirlo.
               </p>
               <p className="text-muted-foreground">
                 Cifra grande: comensales del día. Cifra pequeña: reservas. Barras: comida (izquierda) y cena (derecha).
@@ -155,10 +152,6 @@ export function LeyendaOcupacion({
               className={cn("mx-0.5 h-3 w-3 shrink-0", CLASES_PUNTO_SIN_SALA)}
             />
             <span>Reservas sin sala en las próximas {ventanaHoras} h</span>
-          </li>
-          <li className="flex items-center gap-2">
-            <Lock aria-hidden="true" data-testid="muestra-sala-privada" className="mx-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>Reservado ocupado (fuera de aforo: no cuenta en las cifras)</span>
           </li>
         </ul>
 

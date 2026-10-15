@@ -1,10 +1,11 @@
 // ============================================================================
 // CALENDARIO DEL MES — pestaña Calendario de /reservas
 // ----------------------------------------------------------------------------
-// Dos piezas: la cuadrícula del mes y, al lado, el REPARTO DEL DÍA por salas
-// (`DetalleDiaEspacios`). El encargo del dueño (2026-09-26) era ese panel:
-//   "y luego en el calendario que al hacer click un día se vean los espacios
-//    bien puestos"
+// La cuadrícula del mes a TODO EL ANCHO. Desde el 2026-10-15 (dueño: «para no
+// duplicar cosas») ya no hay panel del día a la derecha (`DetalleDiaEspacios`,
+// con el reparto por salas y los interruptores de cierre): al pulsar un día se
+// abre un pop-up (`DialogoCierreDia`) para cerrar/abrir comida, cena o las dos.
+// El Reservado (sala privada) solo se enseña en la pestaña Hoy (mismo encargo).
 //
 // ---------------------------------------------------------------------------
 // QUÉ SE VE EN LA CUADRÍCULA (rediseño del 2026-10-01)
@@ -29,8 +30,6 @@
 // · La CUADRÍCULA lee la tabla `reservas` del mes entero (`reservas_mes`), y el
 //   aforo de Casa Tomás de `espacios_reserva` (la caché que ya usa media app: no
 //   es una consulta más). Nada de N+1: una consulta por mes.
-// · El PANEL DEL DÍA lee la vista `vista_asignacion_dia` por su cuenta, desde
-//   `useResumenAsignacionDia`, y de ahí saca también las mesas.
 //
 // CUIDADO CON LAS 1000 FILAS: PostgREST devuelve como mucho 1000 filas por
 // petición (el tope por defecto de Supabase). Con ~1.000 reservas confirmadas
@@ -67,7 +66,7 @@
 //     layout de siempre / el suelo, y la página hace scroll.
 // ============================================================================
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -88,28 +87,17 @@ import {
   tamanoCasilla,
 } from "@/lib/reservas/alturaCalendario";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
-import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
+import { useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { aforoCasaTomas, resumirMes, type ReservaCalendario } from "@/lib/reservas/ocupacionCalendario";
 import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
 import { configAsignacionDesde, fechaMadrid } from "@/lib/reservas/ventanaAsignacion";
-import { DetalleDiaEspacios } from "./DetalleDiaEspacios";
 import { CasillaOcupacion } from "./CasillaOcupacion";
 import { LeyendaOcupacion } from "./LeyendaOcupacion";
-import { CierreDiaControl } from "./CierreDiaControl";
+import { DialogoCierreDia } from "./DialogoCierreDia";
 import { useCierresReserva } from "@/hooks/useCierresReserva";
 import { cierresPorDia } from "../../../supabase/functions/_shared/cierres";
 
-// `onDayClick` ya no existe. Estaba declarada y desestructurada, pero NUNCA se
-// llamaba ni nadie la pasaba (el único consumidor es `Reservas.tsx`, que pasa
-// solo `onEspacioClick`), así que era una promesa falsa: quien la usara no
-// recibiría nada. Se ha quitado en vez de cablearla porque nadie la ha pedido.
-// El día se selecciona dentro de este componente y el panel de la derecha ya
-// enseña todo lo del día.
-interface CalendarioOcupacionProps {
-  /** Salta al plano de una sala. La pasa `Reservas.tsx`. Sigue siendo opcional. */
-  onEspacioClick?: (espacioId: string) => void;
-}
 
 /** Filas por petición de PostgREST (el tope por defecto de Supabase). */
 const FILAS_POR_PAGINA = 1000;
@@ -223,17 +211,19 @@ function BloqueErrorMes({
   );
 }
 
-export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps) {
+export function CalendarioOcupacion() {
   // Nodos medidos (ref de callback + estado: el raíz no existe mientras carga el mes).
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const [rejilla, setRejilla] = useState<HTMLDivElement | null>(null);
   const alturaBloque = useAlturaDisponible(raiz);
   const tamanoRejilla = useTamanoElemento(rejilla);
-  // Menú fijo desde 1024 px (= `lg`): calendario y panel van lado a lado.
+  // Menú fijo desde 1024 px (= `lg`).
   const apilado = useIsCompactNav();
 
   const [currentMonth, setCurrentMonth] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(() => new Date());
+  // Día del pop-up de cierre (YYYY-MM-DD); null = cerrado.
+  const [diaDialogo, setDiaDialogo] = useState<string | null>(null);
 
   // El reloj de la pantalla: una vez por minuto, para que «hoy» y la ventana de
   // asignación se muevan solos si la pestaña se queda abierta (p. ej. toda la noche).
@@ -246,12 +236,10 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
   // asignación se miden con la hora del restaurante.
   const hoy = fechaMadrid(ahora);
 
-  // Cambios de `reservas` y de mesas hechos en otro dispositivo: refrescan la
-  // cuadrícula (`reservas_mes`) y el panel del día (`resumen-asignacion-dia`).
+  // Cambios de `reservas` hechos en otro dispositivo: refrescan la cuadrícula.
   useReservasEnVivo();
 
-  // Reservas del mes: la consulta de la CUADRÍCULA y de nadie más. El panel del
-  // día NO come de aquí: lee `vista_asignacion_dia`. Con el respaldo de cada
+  // Reservas del mes: la consulta de la CUADRÍCULA. Con el respaldo de cada
   // minuto (solo con la pestaña a la vista) mientras no llegue realtime.
   const {
     data: reservasMes,
@@ -277,7 +265,8 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
   const { data: configuracion } = useConfiguracionReservas();
   const { ventanaHoras } = configAsignacionDesde(configuracion);
   const aforo = useMemo(() => aforoCasaTomas(espacios), [espacios]);
-  // Las salas privadas (el Reservado) están fuera de aforo: no suman en las cifras, pero la casilla las marca.
+  // Las salas privadas (el Reservado) están fuera de aforo: no suman en las cifras.
+  // Desde el 2026-10-15 la casilla ya no las marca (el Reservado solo se ve en Hoy).
   const salasPrivadas = useMemo(
     () =>
       ((espacios ?? []) as Array<{ id?: string; nombre?: string }>)
@@ -292,11 +281,16 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
     format(endOfMonth(currentMonth), "yyyy-MM-dd"),
   );
   const cierresDia = useMemo(() => cierresPorDia(cierresMes?.cierres ?? []), [cierresMes]);
-  const fechaSeleccionada = format(selectedDate, "yyyy-MM-dd");
 
   // Cifras y nivel de cada día del mes.
   const resumenes = useMemo(
-    () => (reservasMes ? resumirMes(reservasMes, aforo, { hoy, ahora, ventanaHoras, salasPrivadas }) : {}),
+    () => {
+      if (!reservasMes) return {};
+      // El Reservado sale de las cifras (`salasPrivadas`) y además no se avisa de él
+      // en la casilla ni en su tooltip: solo se ve en Hoy (dueño, 2026-10-15).
+      const mes = resumirMes(reservasMes, aforo, { hoy, ahora, ventanaHoras, salasPrivadas });
+      return Object.fromEntries(Object.entries(mes).map(([f, r]) => [f, { ...r, salasPrivadas: [] }]));
+    },
     [reservasMes, aforo, hoy, ahora, ventanaHoras, salasPrivadas],
   );
 
@@ -305,19 +299,10 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
    * mover la selección: los datos cargados son los del mes visible, así que un
    * día de otro mes pintaría "no hay reservas" siendo mentira.
    */
-  // Apilado (por debajo de `lg`) el panel del día queda debajo de la rejilla: tocar un día no
-  // cambiaba nada a la vista. Con dedo, si el panel no se ve, se baja hasta él.
-  const panelDiaRef = useRef<HTMLDivElement | null>(null);
+  // Pulsar un día lo selecciona y abre el pop-up de cierre.
   const elegirDia = (dia: Date) => {
     setSelectedDate(dia);
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
-    if (!window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(min-width: 1024px)").matches) return;
-    window.requestAnimationFrame(() => {
-      const caja = panelDiaRef.current?.getBoundingClientRect();
-      if (caja && caja.top > window.innerHeight * 0.6) {
-        panelDiaRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-      }
-    });
+    setDiaDialogo(format(dia, "yyyy-MM-dd"));
   };
 
   const cambiarMes = (offset: number) => {
@@ -390,22 +375,9 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
           </CardContent>
         </Card>
 
-        {/* `grid-cols-1` explícito: sin él, por debajo de `lg` la columna es
-            `auto` y se ensancha hasta lo más ancho que lleve dentro, con lo que la
-            cuadrícula se salía de la pantalla en el móvil (pasó con la antigua
-            tabla de cuartos de hora del panel). Con altura fija, desde `lg` la
-            única fila ocupa todo el alto que queda (`minmax(0,1fr)`) y ambas
-            tarjetas lo llenan.
-            Desde `lg`, 3/5 del ancho para el mes y 2/5 para el panel del día
-            (2026-10-06; antes 2/3 y 1/3): con 1/3 el panel se quedaba en 290-370 px
-            y no se leía en tablet. Con 2/5 gana un ~22 % y las casillas del mes
-            siguen por encima de 68 px de ancho (1024 px de ventana). */}
-        <div
-          className={cn(
-            "grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]",
-            medida ? "lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)]" : "sm:gap-6",
-          )}
-        >
+        {/* El mes a todo el ancho (sin panel del día desde el 2026-10-15). Con
+            altura fija la tarjeta llena el alto que queda (`flex-1`). */}
+        <div className={cn("grid grid-cols-1", medida && "min-h-0 flex-1 grid-rows-[minmax(0,1fr)]")}>
           {/* Calendario. Apilado (< lg) con altura fija: cabecera + mes entero a la vista. */}
           <Card
             data-testid="tarjeta-mes"
@@ -474,32 +446,6 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
             </CardContent>
           </Card>
 
-          {/* Panel del día: el reparto por salas. Desde `lg`, en columna junto al
-              calendario: con altura medida llena la fila (el alto lo pone la
-              rejilla) y hace scroll INTERNO; sin medir, tope de 620 px. Apilado
-              (por debajo de `lg`) crece libre, que es lo que evita que se corte nada. */}
-          <Card
-            ref={panelDiaRef}
-            className={cn("flex min-w-0 flex-col scroll-mt-4", medida ? "lg:min-h-0" : "lg:max-h-[620px]")}
-          >
-            {/* `relative`: sin él, los hijos `position:absolute` del panel (cualquier `sr-only`;
-                lo fue el `caption` de la antigua tabla por cuartos) se anclan al documento, escapan
-                del `overflow-hidden` y añaden unos píxeles de scroll de página bajo el calendario
-                de altura fija. */}
-            <CardContent className="relative flex min-h-0 flex-1 flex-col overflow-hidden p-4">
-              {/* La rejilla por cuartos del panel ya la refresca `useReservasEnVivo`:
-                  sin un segundo canal a `reservas` (`ReservasEnVivoContexto`). */}
-              <CierreDiaControl
-                fecha={fechaSeleccionada}
-                cierres={cierresDia[fechaSeleccionada] ?? []}
-                esPasado={fechaSeleccionada < hoy}
-                esquemaPendiente={cierresMes?.esquemaPendiente}
-              />
-              <ReservasEnVivoContexto.Provider value={true}>
-                <DetalleDiaEspacios fecha={selectedDate} onEspacioClick={onEspacioClick} />
-              </ReservasEnVivoContexto.Provider>
-            </CardContent>
-          </Card>
         </div>
 
         <LeyendaOcupacion
@@ -507,6 +453,14 @@ export function CalendarioOcupacion({ onEspacioClick }: CalendarioOcupacionProps
           aforo={aforo}
           aforoNoDisponible={errorEspacios}
           compacta={medida && !apilado && alturaBloque < ALTURA_LEYENDA_COMPLETA}
+        />
+
+        <DialogoCierreDia
+          fecha={diaDialogo}
+          onClose={() => setDiaDialogo(null)}
+          cierres={diaDialogo ? (cierresDia[diaDialogo] ?? []) : []}
+          esPasado={!!diaDialogo && diaDialogo < hoy}
+          esquemaPendiente={cierresMes?.esquemaPendiente}
         />
       </div>
     </TooltipProvider>

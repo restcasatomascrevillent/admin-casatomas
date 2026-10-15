@@ -7,7 +7,7 @@
  *   2. El color es el % de ocupación (comensales / aforo), no «sin sala».
  *   3. «Sin sala» como indicador discreto, solo dentro de la ventana de asignación.
  *
- * Se monta el calendario ENTERO (con su panel del día) contra un doble en memoria
+ * Se monta el calendario ENTERO (sin panel del día desde el 2026-10-15) contra un doble en memoria
  * del cliente de Supabase que respeta filtros, `range` y el recuento, y que puede
  * imitar el tope de filas de PostgREST. La lógica fina (umbrales, estados, aforo,
  * ventana) está en `ocupacionCalendario.test.ts`; aquí se prueba que la pantalla
@@ -76,17 +76,6 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
-// La rejilla por cuartos se prueba aparte; aquí solo si queda dentro de `ReservasEnVivoContexto`
-// (así no abre su propio canal a `reservas`).
-vi.mock("@/components/reservas/DisponibilidadCuartos", async () => {
-  const { useContext } = await import("react");
-  const { ReservasEnVivoContexto } = await import("@/hooks/useReservasEnVivo");
-  return {
-    DisponibilidadCuartos: () => (
-      <div data-testid="rejilla-cuartos" data-en-vivo={String(useContext(ReservasEnVivoContexto))} />
-    ),
-  };
-});
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // La suscripción realtime tiene sus tests (useReservasEnVivo.test.tsx); aquí solo se mira que el
 // calendario la monte.
@@ -745,30 +734,15 @@ describe("CalendarioOcupacion · estados de la consulta del mes", () => {
 // ─── 10. Estructura (el desborde en móvil) ───────────────────────────────────
 
 describe("CalendarioOcupacion · estructura", () => {
-  it("la columna de la cuadrícula y la del panel no se ensanchan con su contenido (`grid-cols-1` + `min-w-0`)", async () => {
-    // Sin `grid-cols-1`, por debajo de `lg` la columna es `auto` y se estira hasta lo más
-    // ancho del panel (lo fue la antigua tabla de cuartos de hora): en un móvil de 375 px
-    // la cuadrícula se salía de la pantalla (medido con Chrome headless). jsdom no calcula
-    // layout: aquí solo se protege que las clases que lo arreglan no se pierdan.
-    montar();
-    await mesPintado();
-    const rejilla = screen.getByTestId("tarjeta-mes").parentElement as HTMLElement;
-    expect(rejilla).toContainElement(screen.getByTestId("panel-dia"));
-    expect(rejilla.className).toMatch(/(^|\s)grid-cols-1(\s|$)/);
-    for (const hijo of Array.from(rejilla.children)) {
-      expect((hijo as HTMLElement).className).toMatch(/\bmin-w-0\b/);
-    }
-  });
-
-  it("desde `lg`, 3/5 del ancho para el mes y 2/5 para el panel del día (antes 2/3 y 1/3: el panel no se leía)", async () => {
-    // Medido en el navegador (capturas del 06/10/2026): a 1024 px el panel pasa de 291 a 355 px y la casilla
-    // del mes se queda en 69 px de ancho; a 1280 px al 150 % (la captura del dueño), de 315 a 384 px.
+  it("el mes va a TODO el ancho: ya no hay panel del día a la derecha (dueño, 2026-10-15)", async () => {
     montar();
     await mesPintado();
     const mes = screen.getByTestId("tarjeta-mes");
-    expect(mes.parentElement).toHaveClass("lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]");
-    expect(mes.parentElement).not.toHaveClass("lg:grid-cols-3");
-    expect(mes).not.toHaveClass("lg:col-span-2");
+    expect(mes.parentElement?.children).toHaveLength(1);
+    expect(mes.parentElement).toHaveClass("grid-cols-1");
+    expect(mes.parentElement?.className).not.toMatch(/lg:grid-cols-\[/);
+    expect(screen.queryByTestId("panel-dia")).toBeNull();
+    expect(screen.queryByTestId("cierre-dia")).toBeNull();
   });
 
   it("la casilla seleccionada marca `aria-pressed` y se mueve al pulsar otra", async () => {
@@ -776,15 +750,23 @@ describe("CalendarioOcupacion · estructura", () => {
     await mesPintado();
     expect(casilla(14)).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(casilla(20));
+    // El pop-up (modal) deja el resto oculto al lector de pantalla mientras está abierto.
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Listo" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(casilla(20)).toHaveAttribute("aria-pressed", "true");
     expect(casilla(14)).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("el selector del panel sigue el día pulsado (con el título bien escrito: «Martes, 20 de octubre»)", async () => {
+  it("al pulsar un día se abre el pop-up de cierre de ese día («Martes, 20 de octubre»)", async () => {
     montar();
     await mesPintado();
+    expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.click(casilla(20));
-    await waitFor(() => expect(screen.getByRole("heading", { level: 4 })).toHaveTextContent(/^Martes, 20 de octubre$/));
+    const dialogo = await screen.findByRole("dialog");
+    expect(within(dialogo).getByRole("heading", { name: "Martes, 20 de octubre" })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("button", { name: "Cerrar comida" })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("button", { name: "Cerrar cena" })).toBeInTheDocument();
+    expect(within(dialogo).getByRole("button", { name: /Cerrar las dos/ })).toBeInTheDocument();
   });
 });
 
@@ -829,8 +811,7 @@ describe("CalendarioOcupacion · altura fija, sin scroll", () => {
     expect(screen.getByTestId("calendario-ocupacion")).not.toHaveAttribute("data-altura-fija");
     expect(casilla(14)).not.toHaveAttribute("data-densidad");
     expect(screen.queryByTestId("leyenda-compacta")).toBeNull();
-    // El panel conserva su tope de siempre.
-    expect(container.querySelector('[class*="lg:max-h-"]')).not.toBeNull();
+    expect(container.querySelector('[class*="grid-rows-[minmax"]')).toBeNull();
   });
 
   it("el bloque mide lo que queda de ventana: alto visual − posición del bloque", async () => {
@@ -897,7 +878,7 @@ describe("CalendarioOcupacion · altura fija, sin scroll", () => {
 // ─── 11. Lo que cambia en OTRO dispositivo ───────────────────────────────────
 
 describe("CalendarioOcupacion · cambios de otros dispositivos", () => {
-  it("monta la suscripción compartida a `reservas` (`useReservasEnVivo`): refresca la cuadrícula y el panel del día", async () => {
+  it("monta la suscripción compartida a `reservas` (`useReservasEnVivo`): refresca la cuadrícula", async () => {
     montar();
     await mesPintado();
     expect(vi.mocked(useReservasEnVivo)).toHaveBeenCalled();
@@ -911,21 +892,6 @@ describe("CalendarioOcupacion · cambios de otros dispositivos", () => {
       refetchInterval: 60_000,
       refetchIntervalInBackground: false,
     });
-  });
-
-  it("el panel del día (`resumen-asignacion-dia`) también se relee cada minuto, solo con la pestaña a la vista", async () => {
-    const { qc } = montar();
-    await mesPintado();
-    await waitFor(() => expect(qc.getQueryCache().findAll({ queryKey: ["resumen-asignacion-dia"] }).length).toBeGreaterThan(0));
-    for (const consulta of qc.getQueryCache().findAll({ queryKey: ["resumen-asignacion-dia"] })) {
-      expect(consulta.observers[0]?.options).toMatchObject({ refetchInterval: 60_000, refetchIntervalInBackground: false });
-    }
-  });
-
-  it("la rejilla por cuartos del panel del día queda dentro de `ReservasEnVivoContexto`: sin segundo canal a `reservas`", async () => {
-    montar();
-    await mesPintado();
-    expect(await screen.findByTestId("rejilla-cuartos")).toHaveAttribute("data-en-vivo", "true");
   });
 });
 
@@ -951,37 +917,31 @@ describe("CalendarioOcupacion · el Reservado (sala privada) está fuera de afor
     };
   });
 
-  it("la leyenda dice que el aforo es 150 (no 170) y explica el candado", async () => {
+  it("la leyenda dice que el aforo es 150 (no 170) y ya no habla del Reservado (solo se ve en Hoy)", async () => {
     montar();
     await mesPintado();
     expect(screen.getByText(/sobre el aforo de 150 comensales por turno/)).toBeInTheDocument();
-    expect(screen.getByTestId("muestra-sala-privada")).toBeInTheDocument();
-    expect(screen.getByText(/Reservado ocupado \(fuera de aforo/)).toBeInTheDocument();
+    expect(screen.queryByTestId("muestra-sala-privada")).toBeNull();
+    expect(screen.queryByText(/Reservado/)).toBeNull();
   });
 
-  it("sus comensales no suman en la cifra grande ni en el %, y la casilla lleva el candado", async () => {
+  it("sus comensales no suman en la cifra grande ni en el %, y la casilla no lo marca", async () => {
     montar();
     await mesPintado();
     expect(comensales(20)).toHaveTextContent("30"); // sin los 8 del Reservado
     expect(within(casilla(20)).getByTestId("reservas-casilla")).toHaveTextContent("3 res.");
     expect(within(casilla(20)).getByTestId("porcentaje-casilla")).toHaveTextContent("20%"); // 30/150, no 38/170
-    expect(within(casilla(20)).getByTestId("indicador-sala-privada")).toBeInTheDocument();
-    expect(casilla(20)).toHaveAttribute("aria-label", expect.stringContaining("Reservado ocupado en la comida (fuera de aforo)"));
+    expect(within(casilla(20)).queryByTestId("indicador-sala-privada")).toBeNull();
+    expect(casilla(20).getAttribute("aria-label")).not.toMatch(/Reservado/);
   });
 
-  it("un día con solo el Reservado: sin cifras ni color, pero con candado y explicación", async () => {
+  it("un día con solo el Reservado se ve como un día vacío", async () => {
     montar();
     await mesPintado();
     const solo = casilla(21);
     expect(within(solo).queryByTestId("comensales-casilla")).not.toBeInTheDocument();
-    expect(within(solo).getByTestId("indicador-sala-privada")).toBeInTheDocument();
+    expect(within(solo).queryByTestId("indicador-sala-privada")).toBeNull();
     expect(solo).toHaveAttribute("data-nivel", "vacio");
-    expect(solo).toHaveAttribute("aria-label", "21 de octubre: Reservado ocupado en la cena (fuera de aforo)");
-  });
-
-  it("los días sin el Reservado no llevan candado", async () => {
-    montar();
-    await mesPintado();
-    expect(within(casilla(22)).queryByTestId("indicador-sala-privada")).not.toBeInTheDocument();
+    expect(solo.getAttribute("aria-label")).not.toMatch(/Reservado/);
   });
 });

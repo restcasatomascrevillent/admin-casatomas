@@ -387,7 +387,7 @@ export default function Reservas() {
         </TabsContent>
 
         <TabsContent value="calendario" className="space-y-6 mt-6">
-          <CalendarioOcupacion onEspacioClick={handleEspacioClick} />
+          <CalendarioOcupacion />
         </TabsContent>
 
         {/* "Asignación" (reservas-sin-salas, Fase B): el cliente solo reserva

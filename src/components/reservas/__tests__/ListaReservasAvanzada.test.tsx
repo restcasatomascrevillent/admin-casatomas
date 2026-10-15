@@ -1878,12 +1878,11 @@ describe("ListaReservasAvanzada · el Reservado (sala privada) está fuera de af
     ];
   });
 
-  it("solo las reservas del Reservado llevan la etiqueta «Fuera de aforo»", async () => {
+  it("ninguna reserva lleva la etiqueta «Fuera de aforo»: el Reservado solo se ve en Hoy (dueño, 2026-10-15)", async () => {
     const { tabla } = await montar();
 
-    expect(within(filaDe(tabla, "Rosa Reservada")).getByTestId("etiqueta-fuera-de-aforo")).toBeInTheDocument();
+    expect(within(filaDe(tabla, "Rosa Reservada")).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
     expect(within(filaDe(tabla, "Carmen Comedor")).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
-    expect(within(filaDe(tabla, "Sara SinSala")).queryByTestId("etiqueta-fuera-de-aforo")).not.toBeInTheDocument();
   });
 
   it("sin salas privadas (o con la sala desactivada) no hay etiqueta", async () => {
