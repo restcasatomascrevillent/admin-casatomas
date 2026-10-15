@@ -53,3 +53,21 @@ export function variantesTelefono(telefono: string | null | undefined): string[]
 export function telefonoValido(telefono: string | null | undefined): boolean {
   return /^\d{9,15}$/.test(normalizarTelefono(telefono));
 }
+
+/** Para leerlo de un vistazo (vista móvil de Hoy): un español de 9 cifras ->
+ * "618 19 04 32" (sin el +34); otro -> "+<cifras>"; si no son cifras, tal cual.
+ * Vacío -> null. */
+export function telefonoLegible(telefono: string | null | undefined): string | null {
+  const bruto = (telefono ?? "").trim();
+  if (!bruto) return null;
+  const n = normalizarTelefono(bruto);
+  if (!/^\d+$/.test(n)) return bruto;
+  if (n.length === 9) return `${n.slice(0, 3)} ${n.slice(3, 5)} ${n.slice(5, 7)} ${n.slice(7)}`;
+  return n.length > 9 ? `+${n}` : n;
+}
+
+/** Enlace `tel:` (marca con un toque): "+34XXXXXXXXX" o lo que haya. Vacío -> null. */
+export function enlaceTelefono(telefono: string | null | undefined): string | null {
+  const f = formatearTelefonoReserva(telefono);
+  return f ? `tel:${f.replace(/\s/g, "")}` : null;
+}

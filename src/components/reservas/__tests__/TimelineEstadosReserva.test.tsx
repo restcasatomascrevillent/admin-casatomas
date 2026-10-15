@@ -8,7 +8,7 @@
  *   datos y aquí no, este test lo dice.
  * · Los nombres son los de los badges de la lista y del kanban («Llegó», «No
  *   vino»), no los de la base de datos («completada», «no_show»).
- * · Plegable, y la elección se recuerda en el navegador.
+ * · Sin desplegable (15/10/2026): siempre a la vista, sin botón de plegar.
  * · 04/10/2026: ya no se monta en la pestaña Hoy (el dueño lo quitó por ruido visual; lo
  *   vigila VistaHoy.test.tsx). Vive en la pestaña Lista, como filtro por estado.
  * · Nodos pulsables (`onElegirEstado` + `estadoActivo`): solo si quien monta el
@@ -117,15 +117,14 @@ describe("TimelineEstadosReserva — una fila fina, sin cifras", () => {
     expect(container).not.toHaveTextContent(/cifras/);
   });
 
-  it("es UNA fila: el botón de plegar y los estados, uno al lado del otro, sin frases debajo", () => {
+  it("es UNA fila: el rótulo y los estados, uno al lado del otro, sin frases debajo", () => {
     render(<TimelineEstadosReserva onElegirEstado={vi.fn()} />);
 
     const region = screen.getByRole("region", { name: /Cómo avanza una reserva/ });
     expect(region).toHaveClass("flex", "items-center");
     expect(region).not.toHaveClass("flex-col");
-    // El rótulo (con el botón de plegar) y la lista de estados son hijos de la misma fila.
-    const plegar = screen.getByRole("button", { name: /Cómo avanza una reserva/ });
-    expect(plegar.closest("h3")?.parentElement).toBe(region);
+    // El rótulo y la lista de estados son hijos de la misma fila.
+    expect(region.querySelector("h3")?.parentElement).toBe(region);
     expect(screen.getByRole("list").closest("section")).toBe(region);
     expect(screen.getByRole("list")).toHaveClass("flex", "items-center");
     // Nada de párrafos: ni la cabecera de dos líneas ni la frase de cada estado.
@@ -161,7 +160,7 @@ describe("TimelineEstadosReserva — una fila fina, sin cifras", () => {
     });
   });
 
-  it("plegada y desplegada miden lo mismo: el botón de plegar tiene el alto de la fila de estados (36 px; 44 con dedo)", () => {
+  it("la fila mide 36 px (44 con dedo)", () => {
     render(<TimelineEstadosReserva onElegirEstado={vi.fn()} />);
 
     // Desplegada: burbuja de 24 px + 6 px de hueco arriba y abajo = 36 (con dedo, el botón de 44 px sin hueco).
@@ -169,69 +168,24 @@ describe("TimelineEstadosReserva — una fila fina, sin cifras", () => {
     expect(fila).toHaveClass("py-1.5", "pointer-coarse:py-0");
     expect(nodos()[0].querySelector('[aria-hidden="true"]')).toHaveClass("h-6");
     expect(botones()[0]).toHaveClass("pointer-coarse:min-h-11");
-    // Plegada solo queda el botón de plegar, con ese mismo alto.
-    expect(screen.getByRole("button", { name: /Cómo avanza una reserva/ })).toHaveClass("min-h-9", "pointer-coarse:min-h-11");
   });
 });
 
-describe("TimelineEstadosReserva — plegado", () => {
-  const disparador = () => screen.getByRole("button", { name: /Cómo avanza una reserva/ });
+describe("TimelineEstadosReserva — sin desplegable (15/10/2026)", () => {
+  it("siempre a la vista: no hay botón de plegar, aunque quede guardado «plegado» de antes", () => {
+    window.localStorage.setItem(CLAVE_ABIERTO, "0");
+    render(<TimelineEstadosReserva onElegirEstado={vi.fn()} />);
 
-  it("sale abierto por defecto", () => {
-    render(<TimelineEstadosReserva />);
-
-    expect(disparador()).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("list")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cómo avanza una reserva/ })).toBeNull();
+    expect(screen.queryByRole("button", { expanded: true })).toBeNull();
+    expect(screen.getByRole("list", { name: /Cómo avanza una reserva/ })).toBeInTheDocument();
+    expect(botones()).toHaveLength(6);
   });
 
-  it("se pliega, y recuerda la elección en este navegador", () => {
-    const primera = render(<TimelineEstadosReserva />);
-
-    fireEvent.click(disparador());
-    expect(disparador()).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("0");
-
-    // Otra visita: sigue plegado.
-    primera.unmount();
+  it("el rótulo se ve desde `xl` y, por debajo, solo lo oye el lector de pantalla", () => {
     render(<TimelineEstadosReserva />);
-    expect(disparador()).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-
-    // Y se vuelve a abrir.
-    fireEvent.click(disparador());
-    expect(screen.getByRole("list")).toBeInTheDocument();
-    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("1");
-  });
-
-  it("plegado, el rótulo se VE (no es solo para el lector de pantalla); desplegado, solo desde `xl`", () => {
-    render(<TimelineEstadosReserva />);
-    const rotulo = () => within(disparador()).getByText("Cómo avanza una reserva");
-
-    // Desplegado: oculto por debajo de `xl` (los seis estados ocupan la fila) y visible desde `xl`.
-    expect(rotulo()).toHaveClass("group-data-[state=open]:sr-only", "xl:group-data-[state=open]:not-sr-only");
-    expect(rotulo()).not.toHaveClass("sr-only");
-    // Plegado: el disparador ya no está «open», así que ninguna de esas clases lo oculta.
-    fireEvent.click(disparador());
-    expect(disparador()).toHaveAttribute("data-state", "closed");
-    expect(rotulo()).not.toHaveClass("sr-only");
-  });
-
-  it("si el navegador no deja usar el almacenamiento, funciona igual (sin recordar nada)", () => {
-    const getItem = vi.spyOn(window.localStorage, "getItem").mockImplementation(() => {
-      throw new Error("bloqueado");
-    });
-    const setItem = vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
-      throw new Error("bloqueado");
-    });
-
-    render(<TimelineEstadosReserva />);
-    expect(screen.getByRole("list")).toBeInTheDocument();
-    fireEvent.click(disparador());
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-
-    getItem.mockRestore();
-    setItem.mockRestore();
+    const rotulo = screen.getByRole("heading", { name: "Cómo avanza una reserva" });
+    expect(rotulo).toHaveClass("sr-only", "xl:not-sr-only");
   });
 });
 
@@ -323,13 +277,5 @@ describe("TimelineEstadosReserva — nodos pulsables (el filtro por estado de la
     expect(items[4]).toHaveTextContent("Salida");
     // El paso queda FUERA del botón: el nombre del botón es el estado, no «Paso 1 de 4: Pendiente…».
     expect(within(items[0]).getByRole("button").textContent).not.toMatch(/Paso/);
-  });
-
-  it("el plegado sigue funcionando igual con los nodos pulsables", () => {
-    render(<TimelineEstadosReserva onElegirEstado={vi.fn()} />);
-
-    fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
-    expect(screen.queryByRole("list")).not.toBeInTheDocument();
-    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("0");
   });
 });

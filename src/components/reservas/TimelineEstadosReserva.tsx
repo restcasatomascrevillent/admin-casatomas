@@ -1,6 +1,5 @@
-import { useId, useState } from "react";
-import { ChevronRight, type LucideIcon } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useId } from "react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ESTADOS_RESERVA, ORDEN_ESTADOS, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 
@@ -21,7 +20,7 @@ import { ESTADOS_RESERVA, ORDEN_ESTADOS, type EstadoReserva } from "@/lib/reserv
  * ratón) y en `aria-description` del botón (la lee el lector de pantalla). El
  * rótulo «Cómo avanza una reserva» va en la propia fila, discreto, solo desde `xl`
  * (por debajo no cabe junto a los seis estados; sigue siendo el nombre accesible
- * del botón de plegar y de la región) y siempre que esté plegado.
+ * de la región y de la lista).
  *
  * ----------------------------------------------------------------------------
  * LOS SEIS ESTADOS Y QUIÉN MUEVE CADA UNO (comprobado en el código, no en la doc)
@@ -103,18 +102,15 @@ import { ESTADOS_RESERVA, ORDEN_ESTADOS, type EstadoReserva } from "@/lib/reserv
  *     pantalla). `estadoActivo` solo vale con él.
  *
  * ----------------------------------------------------------------------------
- * PLEGADO: SE RECUERDA EN ESTE NAVEGADOR
+ * SIN DESPLEGABLE (15/10/2026, petición del dueño: «en el timeline quita el
+ * desplegable y deja solo el timeline»)
  * ----------------------------------------------------------------------------
- * El dueño ya pidió (2026-09-25) que la parte de arriba no se coma la pantalla,
- * así que va plegable y recuerda la elección en este navegador. Abierta por
- * defecto: quien no la conoce tiene que verla sin buscarla. Plegada queda solo
- * «▸ CÓMO AVANZA UNA RESERVA», en una fila del MISMO alto que desplegada: plegar
- * no mueve la lista de debajo.
- *
- * La clave (`CLAVE_ABIERTO`) es la que compartía con la pestaña Hoy cuando también
- * salía allí; se conserva para no perder la preferencia que ya tenga guardada cada
- * navegador. Las pestañas se desmontan al cambiar (Radix `Tabs`), así que la Lista
- * siempre lee la preferencia al montarse.
+ * Hasta el 15/10/2026 iba en un `Collapsible` («▸ CÓMO AVANZA UNA RESERVA») que
+ * recordaba en el navegador si estaba plegado (`reservas:timeline-estados:abierto`).
+ * Ya no: siempre a la vista, sin botón de plegar. El rótulo queda como texto
+ * (visible desde `xl`; por debajo solo para el lector de pantalla, porque no cabe
+ * junto a los seis estados). Si los estados no caben, el scroll horizontal es de
+ * su propio contenedor, nunca de la página.
  */
 
 interface NodoEstado {
@@ -143,26 +139,6 @@ const CAMINO: readonly NodoEstado[] = ORDEN_ESTADOS.slice(0, PASOS_DEL_CAMINO).m
 /** Las salidas: no son un paso más, son por donde se sale del camino. Borde discontinuo. */
 const SALIDAS: readonly NodoEstado[] = ORDEN_ESTADOS.slice(PASOS_DEL_CAMINO).map(aNodo);
 
-// Preferencia por navegador (plegada o no; ver la cabecera: «Plegado»). Puede fallar —almacenamiento
-// bloqueado, modo privado—: en ese caso simplemente no se recuerda.
-const CLAVE_ABIERTO = "reservas:timeline-estados:abierto";
-
-function leerAbierto(): boolean {
-  try {
-    return window.localStorage.getItem(CLAVE_ABIERTO) !== "0";
-  } catch {
-    return true;
-  }
-}
-
-function guardarAbierto(abierto: boolean) {
-  try {
-    window.localStorage.setItem(CLAVE_ABIERTO, abierto ? "1" : "0");
-  } catch {
-    // Sin almacenamiento: la próxima vez vuelve a salir abierta.
-  }
-}
-
 export interface TimelineEstadosReservaProps {
   /**
    * Hace pulsables los nodos: cada estado es un botón de alternancia que llama a
@@ -180,87 +156,67 @@ export interface TimelineEstadosReservaProps {
 
 export function TimelineEstadosReserva({ onElegirEstado, estadoActivo, className }: TimelineEstadosReservaProps) {
   const idTitulo = useId();
-  const [abierto, setAbierto] = useState(leerAbierto);
   const pulsables = onElegirEstado !== undefined;
 
-  const alCambiar = (valor: boolean) => {
-    setAbierto(valor);
-    guardarAbierto(valor);
-  };
-
   return (
-    <Collapsible open={abierto} onOpenChange={alCambiar} asChild>
-      {/* UNA fila: el botón de plegar (con el rótulo) y, desplegado, los seis estados a su derecha. Plegada y
-          desplegada miden lo mismo (36 px por dentro; 44 con dedo): plegarla no mueve lo de debajo. */}
-      <section
-        aria-labelledby={idTitulo}
-        className={cn("flex min-w-0 items-center gap-2 rounded-xl border bg-card/50 px-2 sm:px-3", className)}
+    // UNA fila: el rótulo y los seis estados a su derecha (36 px por dentro; 44 con dedo).
+    <section
+      aria-labelledby={idTitulo}
+      className={cn("flex min-w-0 items-center gap-2 rounded-xl border bg-card/50 px-2 sm:px-3", className)}
+    >
+      {/* El rótulo: siempre el nombre de la región y de la lista. Se VE desde `xl` (por debajo no cabe junto a
+          los seis estados sin empujarlos a un scroll). */}
+      <h3
+        id={idTitulo}
+        className="sr-only shrink-0 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-muted-foreground xl:not-sr-only"
       >
-        <h3 id={idTitulo} className="shrink-0">
-          <CollapsibleTrigger
-            title={abierto ? "Ocultar «Cómo avanza una reserva»" : "Mostrar «Cómo avanza una reserva»"}
-            className={cn(
-              "group relative flex min-h-9 items-center gap-1.5 rounded-md text-left touch-manipulation pointer-coarse:min-h-11 pointer-coarse:min-w-11",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            )}
-          >
-            <ChevronRight
-              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:text-foreground group-data-[state=open]:rotate-90 motion-reduce:transition-none"
-              aria-hidden="true"
-            />
-            {/* El rótulo: siempre el nombre del botón y de la región. Se VE plegado y, desplegado, desde `xl`
-                (por debajo no cabe junto a los seis estados sin empujarlos a un scroll). */}
-            <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-muted-foreground group-data-[state=open]:sr-only xl:group-data-[state=open]:not-sr-only">
-              Cómo avanza una reserva
-            </span>
-          </CollapsibleTrigger>
-        </h3>
+        Cómo avanza una reserva
+      </h3>
 
-        <CollapsibleContent className="min-w-0 flex-1">
-          {/* Si los seis estados no caben (móvil, tablet vertical), ESTE contenedor —no la página— hace scroll
-              horizontal. `overscroll-x-contain` evita que el gesto de deslizar llegue al final y dispare el
-              "atrás" del navegador.
+      <div className="min-w-0 flex-1">
+        {/* Si los seis estados no caben (móvil, tablet vertical), ESTE contenedor —no la página— hace scroll
+            horizontal. `overscroll-x-contain` evita que el gesto de deslizar llegue al final y dispare el
+            "atrás" del navegador.
 
-              `relative` NO es decorativo: los `sr-only` son `position:absolute`, y sin un ancestro posicionado
-              su bloque contenedor es la ventana, no este scroller — no los recorta y los que caen fuera de la
-              vista ensanchan el documento entero (medido: 1213px en una ventana de 1024, con barra de scroll
-              horizontal en toda la página).
+            `relative` NO es decorativo: los `sr-only` son `position:absolute`, y sin un ancestro posicionado
+            su bloque contenedor es la ventana, no este scroller — no los recorta y los que caen fuera de la
+            vista ensanchan el documento entero (medido: 1213px en una ventana de 1024, con barra de scroll
+            horizontal en toda la página).
 
-              El relleno (`py-1.5`, y `px-1` con nodos pulsables) es el hueco que necesitan la zona de
-              pulsación, su anillo de foco y la barra de «pulsado», que sobresalen del nodo: al hacer scroll,
-              este contenedor recorta lo que se sale de su caja. Con dedo el botón ya mide 44 px y todo cabe
-              dentro: sin relleno vertical. */}
-          <div
-            className={cn(
-              "relative overflow-x-auto overscroll-x-contain py-1.5 pointer-coarse:py-0",
-              pulsables && "px-1",
-            )}
-          >
-            <ol aria-labelledby={idTitulo} className="flex w-max min-w-full items-center gap-1.5 xl:gap-3">
-              {CAMINO.map((nodo, i) => (
-                <Nodo
-                  key={nodo.estado}
-                  nodo={nodo}
-                  paso={{ n: i + 1, de: CAMINO.length }}
-                  conConector={i < CAMINO.length - 1}
-                  onElegir={onElegirEstado}
-                  activo={pulsables && nodo.estado === estadoActivo}
-                />
-              ))}
-              {SALIDAS.map((nodo, i) => (
-                <Nodo
-                  key={nodo.estado}
-                  nodo={nodo}
-                  abreSalidas={i === 0}
-                  onElegir={onElegirEstado}
-                  activo={pulsables && nodo.estado === estadoActivo}
-                />
-              ))}
-            </ol>
-          </div>
-        </CollapsibleContent>
-      </section>
-    </Collapsible>
+            El relleno (`py-1.5`, y `px-1` con nodos pulsables) es el hueco que necesitan la zona de
+            pulsación, su anillo de foco y la barra de «pulsado», que sobresalen del nodo: al hacer scroll,
+            este contenedor recorta lo que se sale de su caja. Con dedo el botón ya mide 44 px y todo cabe
+            dentro: sin relleno vertical. */}
+        <div
+          className={cn(
+            "relative overflow-x-auto overscroll-x-contain py-1.5 pointer-coarse:py-0",
+            pulsables && "px-1",
+          )}
+        >
+          <ol aria-labelledby={idTitulo} className="flex w-max min-w-full items-center gap-1.5 xl:gap-3">
+            {CAMINO.map((nodo, i) => (
+              <Nodo
+                key={nodo.estado}
+                nodo={nodo}
+                paso={{ n: i + 1, de: CAMINO.length }}
+                conConector={i < CAMINO.length - 1}
+                onElegir={onElegirEstado}
+                activo={pulsables && nodo.estado === estadoActivo}
+              />
+            ))}
+            {SALIDAS.map((nodo, i) => (
+              <Nodo
+                key={nodo.estado}
+                nodo={nodo}
+                abreSalidas={i === 0}
+                onElegir={onElegirEstado}
+                activo={pulsables && nodo.estado === estadoActivo}
+              />
+            ))}
+          </ol>
+        </div>
+      </div>
+    </section>
   );
 }
 

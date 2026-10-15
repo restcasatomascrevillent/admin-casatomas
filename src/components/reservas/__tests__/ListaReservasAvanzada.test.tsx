@@ -1312,37 +1312,14 @@ describe("ListaReservasAvanzada · «Cómo avanza una reserva»: una fila, sin c
     expect(screen.queryByText(/Página \d+ de/)).not.toBeInTheDocument();
   });
 
-  it("se pliega, recuerda la elección y NO cambia lo que enseña la lista", async () => {
-    const { tabla } = await montar();
-    const disparador = () => screen.getByRole("button", { name: /Cómo avanza una reserva/ });
-    expect(disparador()).toHaveAttribute("aria-expanded", "true");
-    expect(filasDeDatos(tabla)).toHaveLength(6);
-
-    fireEvent.click(disparador());
-
-    expect(disparador()).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("list", { name: /Cómo avanza una reserva/ })).not.toBeInTheDocument();
-    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("0");
-    expect(filasDeDatos(tabla)).toHaveLength(6);
-  });
-
-  it("si se plegó antes en este navegador, la Lista sale plegada (y la lista y sus filtros, a la vista)", async () => {
+  it("sin desplegable (15/10/2026): el timeline está siempre a la vista, aunque quede guardado «plegado» de antes", async () => {
     window.localStorage.setItem(CLAVE_ABIERTO, "0");
     const { tabla } = await montar();
 
-    expect(screen.getByRole("button", { name: /Cómo avanza una reserva/ })).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("list", { name: /Cómo avanza una reserva/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Cómo avanza una reserva/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: /Cómo avanza una reserva/ })).toBeInTheDocument();
     expect(filasDeDatos(tabla)).toHaveLength(6);
     expect(buscador()).toBeInTheDocument();
-  });
-
-  it("plegar y desplegar deja guardado «1» (abierto)", async () => {
-    await montar();
-
-    fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Cómo avanza una reserva/ }));
-
-    expect(window.localStorage.getItem(CLAVE_ABIERTO)).toBe("1");
   });
 
   it("deja intactos los filtros de siempre: un solo buscador, el atajo «Hoy» y el desplegable «Estado»", async () => {

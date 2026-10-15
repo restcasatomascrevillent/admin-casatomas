@@ -23,7 +23,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Armchair, ChevronRight, Clock, DoorOpen, MapPin, Undo2, Users, UserX } from "lucide-react";
+import { Armchair, ChevronRight, Clock, DoorOpen, MapPin, Phone, Undo2, Users, UserX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -66,6 +66,7 @@ import {
   type MesaPiezas,
 } from "@/lib/reservas/piezasMesa";
 import { horaActual, opcionesParaSentar, type AjusteDia } from "@/lib/reservas/sentarAhora";
+import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { cn } from "@/lib/utils";
 
 type ReservaMovil = ReservaMesaServicio;
@@ -153,40 +154,17 @@ export function VistaHoyMovil({
 
   const abierta = (reservas ?? []).find((r) => r.id === abiertaId) ?? null;
 
-  const fila = (reserva: ReservaMovil, nombresMesa: string[], terminada: boolean, extra?: { tarde?: boolean; sala?: boolean }) => {
-    const info = infoEstado(reserva.estado);
-    return (
-      <li key={reserva.id}>
-        <button
-          type="button"
-          onClick={() => setAbiertaId(reserva.id)}
-          className={cn(
-            "flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left active:bg-muted/60",
-            terminada && "opacity-50",
-          )}
-        >
-          <span className="w-12 shrink-0 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
-            <span className={cn("block text-sm", nombresMesa.length ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>
-              {textoMesas(nombresMesa)}
-              {extra?.sala && reserva.espacio_id && ` · ${salaPorId.get(reserva.espacio_id) ?? ""}`}
-            </span>
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-sm tabular-nums">
-            <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
-            {reserva.numero_comensales}
-          </span>
-          {extra?.tarde ? (
-            <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
-          ) : (
-            info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
-          )}
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-        </button>
-      </li>
-    );
-  };
+  const fila = (reserva: ReservaMovil, nombresMesa: string[], terminada: boolean, extra?: { tarde?: boolean; sala?: boolean }) => (
+    <FilaReservaMovil
+      key={reserva.id}
+      reserva={reserva}
+      nombresMesa={nombresMesa}
+      terminada={terminada}
+      tarde={extra?.tarde}
+      sala={extra?.sala && reserva.espacio_id ? (salaPorId.get(reserva.espacio_id) ?? "") : undefined}
+      onAbrir={() => setAbiertaId(reserva.id)}
+    />
+  );
 
   return (
     <div ref={setRaiz} className="flex min-h-0 flex-col gap-2" style={alto ? { height: alto } : undefined}>
@@ -293,6 +271,78 @@ export function VistaHoyMovil({
 }
 
 // ─── Vista «Mesas» ───────────────────────────────────────────────────────────
+
+/**
+ * Una reserva en la lista móvil de Hoy. Toda la fila abre su panel, salvo el teléfono (15/10/2026, petición del
+ * dueño: «en la vista móvil de Hoy hay que añadir el teléfono»), que es un enlace `tel:` para llamar con un toque.
+ * Un `<a>` no puede ir dentro de un `<button>`: el botón va por debajo, cubriendo la fila (`absolute inset-0`), y el
+ * contenido por encima sin recibir toques (`pointer-events-none`), salvo el enlace del teléfono.
+ */
+export function FilaReservaMovil({
+  reserva,
+  nombresMesa,
+  terminada,
+  tarde,
+  sala,
+  onAbrir,
+}: {
+  reserva: ReservaMovil;
+  nombresMesa: string[];
+  terminada: boolean;
+  tarde?: boolean;
+  /** Nombre de la sala, si hay que enseñarlo junto a las mesas. */
+  sala?: string;
+  onAbrir: () => void;
+}) {
+  const info = infoEstado(reserva.estado);
+  const telefono = telefonoLegible(reserva.telefono);
+  const tel = enlaceTelefono(reserva.telefono);
+  return (
+    <li className="relative">
+      <button
+        type="button"
+        onClick={onAbrir}
+        aria-label={`${horaCorta(reserva.hora)} ${reserva.nombre || "Sin nombre"}, ${reserva.numero_comensales} personas, ${textoMesas(nombresMesa)}`}
+        className="absolute inset-0 h-full w-full active:bg-muted/60"
+      />
+      <div
+        className={cn(
+          "pointer-events-none relative flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left",
+          terminada && "opacity-50",
+        )}
+      >
+        <span className="w-12 shrink-0 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
+          <span className={cn("block text-sm", nombresMesa.length ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>
+            {textoMesas(nombresMesa)}
+            {sala !== undefined && ` · ${sala}`}
+          </span>
+          {telefono && tel && (
+            <a
+              href={tel}
+              aria-label={`Llamar a ${reserva.nombre || "la reserva"}: ${telefono}`}
+              className="pointer-events-auto -my-1 inline-flex min-h-11 items-center gap-1.5 pr-3 text-sm font-medium tabular-nums text-primary underline-offset-2 active:underline"
+            >
+              <Phone className="h-4 w-4 shrink-0" aria-hidden />
+              {telefono}
+            </a>
+          )}
+        </span>
+        <span className="flex shrink-0 items-center gap-1 text-sm tabular-nums">
+          <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
+          {reserva.numero_comensales}
+        </span>
+        {tarde ? (
+          <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
+        ) : (
+          info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
+        )}
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </div>
+    </li>
+  );
+}
 
 function CuadriculaMesas({
   salas,
@@ -659,6 +709,14 @@ function PanelReservaMovil({
           </div>
         </SheetDescription>
       </SheetHeader>
+
+      {telefonoLegible(reserva.telefono) && (
+        <Button asChild variant="outline" className="h-11 w-full justify-start text-base tabular-nums">
+          <a href={enlaceTelefono(reserva.telefono) ?? undefined}>
+            <Phone className="mr-2 h-5 w-5" aria-hidden /> Llamar · {telefonoLegible(reserva.telefono)}
+          </a>
+        </Button>
+      )}
 
       {reserva.notas_cliente && (
         <p className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">{reserva.notas_cliente}</p>
