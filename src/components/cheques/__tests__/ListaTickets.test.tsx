@@ -15,7 +15,7 @@ describe("Listado de tickets", () => {
     expect(screen.queryByRole("button", { name: "Actualizar" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Buscar tickets por código o comprador"), { target: { value: " Ana " } });
     expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull();
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 7, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
   });
   it("filtra al escribir desde la primera página y limpiar recupera todos los tickets", async () => {
     const ticket = { id: "1", codigo: "CT-ABC", creado_en: null, comprador_nombre: "Ana", importe_eur: 100, estado: "pagado", usado: false };
@@ -23,15 +23,15 @@ describe("Listado de tickets", () => {
     render(<ListaTickets />);
     await screen.findByText("CT-ABC");
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 1, p_busqueda: "", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 1, p_busqueda: "", p_tamano: 7, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
     const buscador = screen.getByLabelText("Buscar tickets por código o comprador");
     fireEvent.change(buscador, { target: { value: "A" } });
     fireEvent.change(buscador, { target: { value: "An" } });
     fireEvent.change(buscador, { target: { value: "Ana" } });
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 7, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
     expect(rpc).toHaveBeenCalledTimes(3);
     fireEvent.click(screen.getByRole("button", { name: "Limpiar" }));
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "", p_tamano: 7, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
     expect(buscador).toHaveValue("");
   });
   it("una respuesta lenta no sustituye los resultados de lo último escrito", async () => {
@@ -91,7 +91,7 @@ describe("Listado de tickets", () => {
   });
 
   it("ordena y filtra todas las coincidencias desde la primera página", async () => {
-    rpc.mockResolvedValue({ data: { expedidos: 40, canjeados: 0, coincidencias: 40, importe_pagado: 2000, tickets: [] }, error: null });
+    rpc.mockResolvedValue({ data: { expedidos: 28, canjeados: 0, coincidencias: 28, importe_pagado: 2000, tickets: [] }, error: null });
     render(<ListaTickets />);
     await screen.findByText("Página 1 de 4");
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));

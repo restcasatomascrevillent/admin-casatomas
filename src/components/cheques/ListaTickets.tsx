@@ -17,8 +17,8 @@ interface Ticket {
 interface Listado { caducados?: number; disponibles?: number; total: number; expedidos: number; canjeados: number; coincidencias: number; importe_pagado: number; tickets: Ticket[] }
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 // Tamaño de página fijo (petición del dueño, 2026-10-16): antes era elegible (5/10/20) con un
-// selector «Por página»; ahora siempre son 10 y no hay forma de cambiarlo desde la interfaz.
-const tamano = 10;
+// selector «Por página»; ahora siempre son 7 y no hay forma de cambiarlo desde la interfaz.
+const tamano = 7;
 
 /** Texto y tono de un ticket: antes decidían el color de fondo de TODA la fila (muy saturado);
  * ahora solo un acento fino en el borde izquierdo de la fila y una píldora en «Estado». */
@@ -131,7 +131,9 @@ export function ListaTickets() {
               <tbody className={CUERPO_CLASE}>
                 {datos.tickets.map(t => {
                   const { texto: estadoTexto, tono } = estadoTicket(t, hoy);
-                  const diasTexto = t.usado || t.estado !== "pagado" ? "—" : estadoCaducidad(t.caduca_el, hoy).texto;
+                  // Sin "Queda(n)": en una columna estrecha repetida fila tras fila sobra (en Verificar
+                  // cheque y en el detalle de la compra, donde es una frase suelta, sí se conserva.
+                  const diasTexto = t.usado || t.estado !== "pagado" ? "—" : estadoCaducidad(t.caduca_el, hoy).texto.replace(/^Quedan? /, "");
                   return <tr key={t.id} onClick={() => setCompraSeleccionada(t.id)} className={`grid grid-cols-2 rounded-xl border-y border-r border-l-4 ${TONOS[tono].borde} [@container(min-width:60rem)]:table-row [@container(min-width:60rem)]:rounded-none [@container(min-width:60rem)]:border-r-0 [@container(min-width:60rem)]:border-b-0 cursor-pointer hover:bg-muted/50`}>
                     <td className={CELDA_CLASE}><span className={ETIQUETA_MOVIL}>Fecha</span>{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td>
                     <td className={CELDA_SIN_SALTO}><span className={ETIQUETA_MOVIL}>Código</span><button type="button" aria-label={`Ver compra ${t.codigo}`} className="rounded font-mono underline underline-offset-4 focus-visible:outline focus-visible:outline-2" onClick={e => { e.stopPropagation(); setCompraSeleccionada(t.id); }}>{t.codigo}</button></td>
