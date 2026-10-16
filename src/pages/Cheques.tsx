@@ -164,7 +164,7 @@ export default function Cheques() {
   const estado = !resultado?.encontrado ? "Cheque no encontrado" : resultado.estado !== "pagado" ? "Cheque cancelado o sin pago confirmado" : resultado.usado ? "Este cheque ya está canjeado" : caducado ? "Este cheque está caducado" : puedeCanjear ? "Cheque válido para canjear" : "Cheque no disponible para canjear";
 
   return <DashboardLayout>
-    <div ref={setRaiz} className="flex flex-col" style={alto ? (pestana === "expedicion" ? { minHeight: alto } : { height: alto }) : undefined}>
+    <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
       <Tabs value={pestana} onValueChange={setPestana} className="flex min-h-0 flex-1 flex-col gap-6">
         <TabsList className="flex w-full shrink-0 justify-start gap-1 overflow-x-auto h-auto rounded-xl p-1.5 bg-muted/60">
           <TabsTrigger value="expedicion" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg"><Ticket aria-hidden="true" className="h-4 w-4 shrink-0" />Expedición de tickets</TabsTrigger>
@@ -174,7 +174,7 @@ export default function Cheques() {
           <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText aria-hidden="true" className="h-4 w-4 shrink-0" />Plantilla de factura</TabsTrigger>
           <TabsTrigger value="stripe" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><CreditCard aria-hidden="true" className="h-4 w-4 shrink-0" />Stripe</TabsTrigger>
         </TabsList>
-        <TabsContent value="expedicion" className="mt-0 min-w-0 data-[state=inactive]:hidden"><ListaTickets /></TabsContent>
+        <TabsContent value="expedicion" className={`${CONTENIDO_PESTANA} min-w-0`}><ListaTickets /></TabsContent>
         <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
         <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo /></TabsContent>
         <TabsContent value="stripe" className={CONTENIDO_PESTANA}><PanelStripe /></TabsContent>
