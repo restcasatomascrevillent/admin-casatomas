@@ -177,7 +177,7 @@ export default function Cheques() {
         <TabsContent value="expedicion" className="mt-0 min-w-0 data-[state=inactive]:hidden"><ListaTickets /></TabsContent>
         <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
         <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo /></TabsContent>
-        <TabsContent value="stripe" className={`${CONTENIDO_PESTANA} max-w-4xl`}><PanelStripe /></TabsContent>
+        <TabsContent value="stripe" className={CONTENIDO_PESTANA}><PanelStripe /></TabsContent>
         <TabsContent value="verificar" className={`${CONTENIDO_PESTANA} space-y-5 max-w-4xl`}>
           <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
             <form onSubmit={verificar} className="flex flex-col sm:flex-row sm:items-end gap-3">
