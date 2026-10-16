@@ -17,8 +17,8 @@ interface Ticket {
 interface Listado { caducados?: number; disponibles?: number; total: number; expedidos: number; canjeados: number; coincidencias: number; importe_pagado: number; tickets: Ticket[] }
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 // Tamaño de página fijo (petición del dueño, 2026-10-16): antes era elegible (5/10/20) con un
-// selector «Por página»; ahora siempre son 7 y no hay forma de cambiarlo desde la interfaz.
-const tamano = 7;
+// selector «Por página»; ahora siempre son 6 y no hay forma de cambiarlo desde la interfaz.
+const tamano = 6;
 
 /** Texto y tono de un ticket: antes decidían el color de fondo de TODA la fila (muy saturado);
  * ahora solo un acento fino en el borde izquierdo de la fila y una píldora en «Estado». */
