@@ -5,20 +5,17 @@ vi.mock("@/integrations/supabase/client", () => ({ supabase: { rpc } }));
 import { ListaTickets } from "../ListaTickets";
 describe("Listado de tickets", () => {
   beforeEach(() => rpc.mockReset());
-  it("destaca canjeados, muestra totales globales y busca en el servidor", async () => {
+  it("destaca canjeados y busca en el servidor", async () => {
     rpc.mockResolvedValue({ data: { total: 100, expedidos: 90, canjeados: 12, coincidencias: 100, importe_pagado: 1000, tickets: [{ id: "1", codigo: "CT-ABC", creado_en: null, comprador_nombre: "Ana", importe_eur: 100, estado: "pagado", usado: true }] }, error: null });
     render(<ListaTickets />);
     const codigo = await screen.findByText("CT-ABC");
-    expect(codigo.closest("tr")).toHaveClass("bg-red-50");
-    expect(screen.getByText("Tickets canjeados").parentElement).toHaveTextContent("12");
-    expect(screen.getByText("Tickets expedidos").parentElement).toHaveTextContent("90");
+    expect(codigo.closest("tr")).toHaveClass("border-l-rose-400");
     expect(screen.queryByRole("heading", { name: "Expedición total de tickets" })).not.toBeInTheDocument();
     expect(screen.queryByText(/Cheques expedidos, del más reciente/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Actualizar" })).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Resumen de tickets").querySelectorAll("dt")).toHaveLength(4);
     fireEvent.change(screen.getByLabelText("Buscar tickets por código o comprador"), { target: { value: " Ana " } });
     expect(screen.queryByRole("button", { name: "Buscar" })).toBeNull();
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 5, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
   });
   it("filtra al escribir desde la primera página y limpiar recupera todos los tickets", async () => {
     const ticket = { id: "1", codigo: "CT-ABC", creado_en: null, comprador_nombre: "Ana", importe_eur: 100, estado: "pagado", usado: false };
@@ -26,15 +23,15 @@ describe("Listado de tickets", () => {
     render(<ListaTickets />);
     await screen.findByText("CT-ABC");
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 1, p_busqueda: "", p_tamano: 5, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 1, p_busqueda: "", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
     const buscador = screen.getByLabelText("Buscar tickets por código o comprador");
     fireEvent.change(buscador, { target: { value: "A" } });
     fireEvent.change(buscador, { target: { value: "An" } });
     fireEvent.change(buscador, { target: { value: "Ana" } });
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 5, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "Ana", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
     expect(rpc).toHaveBeenCalledTimes(3);
     fireEvent.click(screen.getByRole("button", { name: "Limpiar" }));
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "", p_tamano: 5, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
+    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", { p_pagina: 0, p_busqueda: "", p_tamano: 10, p_orden: "fecha_desc", p_estado: "todos", p_desde: null, p_hasta: null }));
     expect(buscador).toHaveValue("");
   });
   it("una respuesta lenta no sustituye los resultados de lo último escrito", async () => {
@@ -75,9 +72,8 @@ describe("Listado de tickets", () => {
     const tabla = (await screen.findByText("CT-XYZ")).closest("table")!;
     const caja = tabla.parentElement!;
     expect(caja.className).not.toMatch(/overflow|h-\[/);
-    expect(tabla).toHaveClass("xl:table-fixed");
-    expect(tabla.querySelector("thead")).toHaveClass("hidden", "xl:table-header-group");
-    expect(caja).not.toContainElement(screen.getByText("Tickets expedidos"));
+    expect(tabla).toHaveClass("[@container(min-width:60rem)]:table-fixed");
+    expect(tabla.querySelector("thead")).toHaveClass("hidden", "[@container(min-width:60rem)]:table-header-group");
     expect(caja).not.toContainElement(screen.getByRole("button", { name: "Siguiente" }));
   });
   it("separa caducados y disponibles y muestra la fecha y los días restantes", async () => {
@@ -88,19 +84,18 @@ describe("Listado de tickets", () => {
       { ...base, id: "2", codigo: "CT-HOY", caduca_el: hoy },
     ] }, error: null });
     render(<ListaTickets />);
-    expect((await screen.findByText("CT-EXP")).closest("tr")).toHaveClass("bg-red-50");
-    expect(screen.getByText("CT-HOY").closest("tr")).toHaveClass("bg-emerald-50");
+    expect((await screen.findByText("CT-EXP")).closest("tr")).toHaveClass("border-l-rose-400");
+    expect(screen.getByText("CT-HOY").closest("tr")).toHaveClass("border-l-emerald-400");
     expect(screen.getByText("Caduca hoy")).toBeTruthy();
     expect(screen.getByText("01/01/2020")).toBeTruthy();
-    expect(screen.getByText("Tickets caducados").parentElement).toHaveTextContent("1");
   });
 
   it("ordena y filtra todas las coincidencias desde la primera página", async () => {
     rpc.mockResolvedValue({ data: { expedidos: 40, canjeados: 0, coincidencias: 40, importe_pagado: 2000, tickets: [] }, error: null });
     render(<ListaTickets />);
-    await screen.findByText("Página 1 de 8");
+    await screen.findByText("Página 1 de 4");
     fireEvent.click(screen.getByRole("button", { name: "Siguiente" }));
-    await screen.findByText("Página 2 de 8");
+    await screen.findByText("Página 2 de 4");
     await waitFor(() => expect(screen.getByRole("button", { name: "Siguiente" })).toBeEnabled());
     fireEvent.change(screen.getByLabelText("Ordenar tickets"), { target: { value: "importe_asc" } });
     await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", expect.objectContaining({ p_pagina: 0, p_orden: "importe_asc" })));
@@ -108,8 +103,6 @@ describe("Listado de tickets", () => {
     fireEvent.change(screen.getByLabelText("Fecha desde"), { target: { value: "2026-10-01" } });
     fireEvent.change(screen.getByLabelText("Fecha hasta"), { target: { value: "2026-10-15" } });
     await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", expect.objectContaining({ p_estado: "disponible", p_desde: "2026-10-01", p_hasta: "2026-10-15" })));
-    fireEvent.change(screen.getByLabelText("Tickets por página"), { target: { value: "10" } });
-    await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", expect.objectContaining({ p_tamano: 10, p_pagina: 0 })));
     expect(screen.getByText("Página 1 de 4")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Limpiar" }));
     await waitFor(() => expect(rpc).toHaveBeenLastCalledWith("listar_cheques_regalo_v3", expect.objectContaining({ p_estado: "todos", p_orden: "fecha_desc", p_desde: null, p_hasta: null })));
