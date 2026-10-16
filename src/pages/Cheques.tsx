@@ -2,7 +2,7 @@ import { estadoCaducidad, fechaCaducidad } from "@/lib/cheques/caducidad";
 import { useHoyCheques } from "@/hooks/useHoyCheques";
 import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, Ticket, HandCoins } from "lucide-react";
+import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, Ticket, HandCoins, CreditCard } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ import { ListaTickets } from "@/components/cheques/ListaTickets";
 import { VistaFacturaCheque } from "@/components/cheques/VistaFacturaCheque";
 import { CompraManual } from "@/components/cheques/CompraManual";
 import { PlantillaChequeRegalo } from "@/components/cheques/PlantillaChequeRegalo";
+import { PanelStripe } from "@/components/cheques/PanelStripe";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 
 /**
@@ -171,10 +172,12 @@ export default function Cheques() {
           <TabsTrigger value="manual" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><HandCoins aria-hidden="true" className="h-4 w-4 shrink-0" />Compra manual</TabsTrigger>
           <TabsTrigger value="regalo" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><Palette aria-hidden="true" className="h-4 w-4 shrink-0" />Configuración</TabsTrigger>
           <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText aria-hidden="true" className="h-4 w-4 shrink-0" />Plantilla de factura</TabsTrigger>
+          <TabsTrigger value="stripe" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><CreditCard aria-hidden="true" className="h-4 w-4 shrink-0" />Stripe</TabsTrigger>
         </TabsList>
         <TabsContent value="expedicion" className="mt-0 min-w-0 data-[state=inactive]:hidden"><ListaTickets /></TabsContent>
         <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
         <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo /></TabsContent>
+        <TabsContent value="stripe" className={`${CONTENIDO_PESTANA} max-w-4xl`}><PanelStripe /></TabsContent>
         <TabsContent value="verificar" className={`${CONTENIDO_PESTANA} space-y-5 max-w-4xl`}>
           <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
             <form onSubmit={verificar} className="flex flex-col sm:flex-row sm:items-end gap-3">

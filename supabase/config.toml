@@ -168,6 +168,10 @@ verify_jwt = true
 [functions.vapi-analytics]
 verify_jwt = true
 
+# JWT de usuario + can_read_section('cheques').
+[functions.stripe-estado-cuenta]
+verify_jwt = true
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — SIN autenticación propia: el gateway es lo único delante
