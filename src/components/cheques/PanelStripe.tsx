@@ -31,8 +31,8 @@ async function mensajeDeError(error: unknown): Promise<string> {
 
 function FilaEstado({ ok, children }: { ok?: boolean; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-2 text-sm">
-      {ok ? <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" /> : <XCircle className="h-4 w-4 shrink-0 text-destructive" />}
+    <div className={`flex items-center gap-2.5 rounded-xl border p-3 text-sm font-medium ${ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
+      {ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
       <span>{children}</span>
     </div>
   );
@@ -119,7 +119,7 @@ export function PanelStripe() {
                 {estado.nombre_negocio && <span className="text-sm text-muted-foreground">{estado.nombre_negocio}</span>}
                 {estado.pais && <span className="text-sm text-muted-foreground">· {estado.pais} · {estado.moneda_por_defecto?.toUpperCase()}</span>}
               </div>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-3">
                 <FilaEstado ok={estado.cobros_activos}>Puede cobrar</FilaEstado>
                 <FilaEstado ok={estado.payouts_activos}>Pagos a tu banco activos</FilaEstado>
                 <FilaEstado ok={estado.detalles_completos}>Datos de la cuenta completos</FilaEstado>
