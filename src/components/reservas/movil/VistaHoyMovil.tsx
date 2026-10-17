@@ -314,9 +314,21 @@ export function FilaReservaMovil({
         <span className="w-12 shrink-0 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
         <span className="min-w-0 flex-1">
           <span className="block truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
-          <span className={cn("block text-sm", nombresMesa.length ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>
-            {textoMesas(nombresMesa)}
-            {sala !== undefined && ` · ${sala}`}
+          {/* Mesa/sala, comensales y estado en su propia línea: los cinco en la fila de arriba dejaban el nombre con ~110px y lo truncaban enseguida («Carlos Ruiz…»). */}
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={cn("text-sm", nombresMesa.length ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>
+              {textoMesas(nombresMesa)}
+              {sala !== undefined && ` · ${sala}`}
+            </span>
+            <span className="flex items-center gap-1 text-sm tabular-nums">
+              <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
+              {reserva.numero_comensales}
+            </span>
+            {tarde ? (
+              <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
+            ) : (
+              info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
+            )}
           </span>
           {telefono && tel && (
             <a
@@ -329,15 +341,6 @@ export function FilaReservaMovil({
             </a>
           )}
         </span>
-        <span className="flex shrink-0 items-center gap-1 text-sm tabular-nums">
-          <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
-          {reserva.numero_comensales}
-        </span>
-        {tarde ? (
-          <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
-        ) : (
-          info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
-        )}
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
       </div>
     </li>
