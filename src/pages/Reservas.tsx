@@ -21,7 +21,7 @@ import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection, useUserRole } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
-import { contarSolicitudesPendientes, resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
+import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { toast } from "sonner";
@@ -86,15 +86,9 @@ export default function Reservas() {
   // Editar una reserva: cada vista de reservas (Lista, Kanban de Hoy, Asignación,
   // plano, modo servicio…) lleva su propio diálogo de edición.
   const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
-  // ÚNICA instancia en la página: el tab la usa para el contador y la lista
-  // unificada para pintar las solicitudes (ver aviso de realtime en el hook).
+  // ÚNICA instancia en la página: la lista unificada la usa para pintar las
+  // solicitudes (ver aviso de realtime en el hook).
   const solicitudesState = useSolicitudesPendientes();
-  // La insignia cuenta lo mismo que enseña la lista: solo solicitudes de Casa
-  // Tomás (Touza no admite reservas, decisión del dueño 2026-10-01).
-  const countPendientes = useMemo(
-    () => contarSolicitudesPendientes(solicitudesState.solicitudes),
-    [solicitudesState.solicitudes],
-  );
   const listaRef = useRef<HTMLElement | null>(null);
 
   // Identidad estable mientras el diálogo está abierto: si se recreara en cada render,
@@ -266,18 +260,7 @@ export default function Reservas() {
         <PestanasPagina
           pestanas={[
             { valor: "hoy", etiqueta: "Hoy" },
-            {
-              valor: "reservas",
-              etiqueta: "Lista",
-              // Antes la insignia era roja (bg-destructive text-destructive-foreground): avisaba de
-              // solicitudes del bot sin resolver. PestanasPagina solo ofrece los tonos "primario" o
-              // "dorado" (sin rojo/alerta); se usa "primario" (el valor por defecto) como el más
-              // parecido. Si la distinción de color importa para el dueño, hace falta ampliar
-              // PestanasPagina con un tono de alerta en vez de recuperarlo aquí a mano.
-              contador: countPendientes,
-              etiquetaContador: `${countPendientes} solicitud${countPendientes === 1 ? "" : "es"} sin resolver`,
-              contadorEnMovil: true,
-            },
+            { valor: "reservas", etiqueta: "Lista" },
             { valor: "calendario", etiqueta: "Calendario" },
             { valor: "asignacion", etiqueta: "Próximas reservas" },
             { valor: "blacklist", etiqueta: "Blacklist" },
@@ -328,9 +311,9 @@ export default function Reservas() {
             incluida la de hoy, con su propio filtro de fecha y el atajo
             "Hoy": no se oculta a propósito, así sigue pudiéndose buscar
             una reserva de hoy cancelada o un dato que el kanban no
-            muestre. Las solicitudes del bot sin resolver (con su insignia
-            en la pestaña "Lista") siguen viviendo aquí, mezcladas como
-            filas "Solicitud". */}
+            muestre. Las solicitudes del bot sin resolver siguen viviendo
+            aquí, mezcladas como filas "Solicitud" (sin insignia en la
+            pestaña desde el 17/10/2026, petición del dueño). */}
         <TabsContent value="reservas" className="mt-6">
           {/* Sin título ni subtítulo (2026-10-06, petición del dueño: «perdemos mucho espacio vertical»):
               la pestaña «Lista» ya dice dónde estás. La región conserva su nombre para el lector de pantalla
