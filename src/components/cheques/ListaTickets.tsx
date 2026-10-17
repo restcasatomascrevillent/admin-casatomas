@@ -44,13 +44,13 @@ const TONOS: Record<Tono, { borde: string; pildora: string }> = {
 const ANCHO_CONTENEDOR = "[container-type:inline-size]";
 const TABLA_CLASE = "block w-full text-sm [@container(min-width:60rem)]:table [@container(min-width:60rem)]:table-fixed";
 const CABECERA_CLASE = "hidden bg-muted/50 [@container(min-width:60rem)]:table-header-group";
-const CUERPO_CLASE = "grid gap-3 [@container(min-width:60rem)]:table-row-group";
+const CUERPO_CLASE = "grid gap-2 [@container(min-width:60rem)]:table-row-group";
 const ETIQUETA_MOVIL = "mb-1 block text-xs font-medium text-muted-foreground [@container(min-width:60rem)]:hidden";
-const CELDA_CLASE = "min-w-0 p-2.5 break-words tabular-nums [overflow-wrap:anywhere]";
+const CELDA_CLASE = "min-w-0 p-2 break-words tabular-nums [overflow-wrap:anywhere]";
 // Código y caducidad tienen formato fijo generado por el sistema ("CT-" + 12 hex, "dd/mm/aaaa"):
 // en modo tabla no deben partirse nunca a media palabra, y si por lo que sea no cupieran, mejor
 // un "…" que desbordar sobre la columna de al lado.
-const CELDA_SIN_SALTO = "min-w-0 p-2.5 break-words tabular-nums [overflow-wrap:anywhere] [@container(min-width:60rem)]:overflow-hidden [@container(min-width:60rem)]:whitespace-nowrap [@container(min-width:60rem)]:text-ellipsis";
+const CELDA_SIN_SALTO = "min-w-0 p-2 break-words tabular-nums [overflow-wrap:anywhere] [@container(min-width:60rem)]:overflow-hidden [@container(min-width:60rem)]:whitespace-nowrap [@container(min-width:60rem)]:text-ellipsis";
 // Anchos pensados para el contenido real (no un reparto ciego a partes iguales): Código
 // ("CT-C08320E6EB6A", monoespacio) y Comprador (nombres completos) son las columnas más
 // anchas; Fecha lleva fecha+hora. Teléfono/Importe/Caducidad/Estado son cortas y no
@@ -100,24 +100,24 @@ export function ListaTickets() {
   // Cada página crece con sus filas: la tabla no tiene contenedor de scroll.
   return <div className="flex min-w-0 flex-col gap-3">
     <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden">
-      <CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6">
-        <div className="flex items-center gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><TicketIcon className="h-6 w-6" /></div>
+      <CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-4 sm:p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><TicketIcon className="h-5 w-5" /></div>
           <div><CardTitle className="text-xl sm:text-2xl">Tickets expedidos</CardTitle></div>
         </div>
       </CardHeader>
-      <CardContent className="p-5 sm:p-6 space-y-4">
+      <CardContent className="p-4 sm:p-5 space-y-3">
         <form role="search" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,2fr)_repeat(4,minmax(0,1fr))_auto] items-end" onSubmit={e => e.preventDefault()}>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Buscar<Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="h-11" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Estado<select aria-label="Filtrar por estado" value={estado} onChange={e => { setEstado(e.target.value); setPagina(0); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Buscar<Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="h-10" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Estado<select aria-label="Filtrar por estado" value={estado} onChange={e => { setEstado(e.target.value); setPagina(0); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
             <option value="todos">Todos</option><option value="disponible">Disponibles</option><option value="canjeado">Canjeados</option><option value="caducado">Caducados</option><option value="cancelado">Cancelados</option>
           </select></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Desde<Input aria-label="Fecha desde" type="date" value={desde} max={hasta || undefined} onChange={e => { setDesde(e.target.value); setPagina(0); }} className="h-11 min-w-0" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Hasta<Input aria-label="Fecha hasta" type="date" value={hasta} min={desde || undefined} onChange={e => { setHasta(e.target.value); setPagina(0); }} className="h-11 min-w-0" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Ordenar por<select aria-label="Ordenar tickets" value={orden} onChange={e => { setOrden(e.target.value); setPagina(0); }} className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Desde<Input aria-label="Fecha desde" type="date" value={desde} max={hasta || undefined} onChange={e => { setDesde(e.target.value); setPagina(0); }} className="h-10 min-w-0" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Hasta<Input aria-label="Fecha hasta" type="date" value={hasta} min={desde || undefined} onChange={e => { setHasta(e.target.value); setPagina(0); }} className="h-10 min-w-0" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Ordenar por<select aria-label="Ordenar tickets" value={orden} onChange={e => { setOrden(e.target.value); setPagina(0); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
             <option value="fecha_desc">Más recientes</option><option value="fecha_asc">Más antiguos</option><option value="importe_asc">Importe: menor a mayor</option><option value="importe_desc">Importe: mayor a menor</option><option value="comprador_asc">Comprador: A–Z</option><option value="comprador_desc">Comprador: Z–A</option><option value="caducidad_asc">Caducidad: más próxima</option><option value="caducidad_desc">Caducidad: más lejana</option>
           </select></label>
-          {hayFiltros && <Button type="button" variant="outline" className="h-11" onClick={limpiar}>Limpiar</Button>}
+          {hayFiltros && <Button type="button" variant="outline" className="h-10" onClick={limpiar}>Limpiar</Button>}
         </form>
         {fechasInvalidas && <p role="alert" className="text-sm text-destructive">La fecha inicial no puede ser posterior a la final.</p>}
         {cargando && datos && <span role="status" className="sr-only">Filtrando tickets…</span>}
@@ -127,7 +127,7 @@ export function ListaTickets() {
               <colgroup className="hidden [@container(min-width:60rem)]:table-column-group">
                 {ANCHOS_COLUMNA.map((ancho, i) => <col key={i} className={ancho} />)}
               </colgroup>
-              <thead className={CABECERA_CLASE}><tr>{["Fecha", "Código", "Comprador", "Teléfono", "Importe", "Caducidad", "Días restantes", "Estado"].map((label, i) => <th key={i} className="p-2.5 text-left text-xs font-medium text-muted-foreground">{label}</th>)}</tr></thead>
+              <thead className={CABECERA_CLASE}><tr>{["Fecha", "Código", "Comprador", "Teléfono", "Importe", "Caducidad", "Días restantes", "Estado"].map((label, i) => <th key={i} className="p-2 text-left text-xs font-medium text-muted-foreground">{label}</th>)}</tr></thead>
               <tbody className={CUERPO_CLASE}>
                 {datos.tickets.map(t => {
                   const { texto: estadoTexto, tono } = estadoTicket(t, hoy);
@@ -149,7 +149,7 @@ export function ListaTickets() {
               </tbody>
             </table>
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eee7dc] pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eee7dc] pt-3">
             <p role="status" className="text-sm text-muted-foreground">{datos.coincidencias ? pagina * tamano + 1 : 0}–{Math.min((pagina + 1) * tamano, datos.coincidencias)} de {datos.coincidencias} tickets</p>
             <nav aria-label="Paginación de tickets" className="flex w-full items-center justify-between gap-2 sm:w-auto">
               <Button variant="outline" disabled={cargando || fechasInvalidas || pagina === 0} onClick={() => setPagina(p => p - 1)}>Anterior</Button>
