@@ -4,7 +4,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Search, CheckCircle2, XCircle, Loader2, FileText, Palette, ShieldCheck, Ticket, HandCoins, CreditCard } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -166,14 +167,16 @@ export default function Cheques() {
   return <DashboardLayout>
     <div ref={setRaiz} className="flex flex-col" style={alto ? (pestana === "expedicion" ? undefined : { height: alto }) : undefined}>
       <Tabs value={pestana} onValueChange={setPestana} className="flex min-h-0 flex-1 flex-col gap-6">
-        <TabsList className="flex w-full shrink-0 justify-start gap-1 overflow-x-auto h-auto rounded-xl p-1.5 bg-muted/60">
-          <TabsTrigger value="expedicion" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg"><Ticket aria-hidden="true" className="h-4 w-4 shrink-0" />Expedición de tickets</TabsTrigger>
-          <TabsTrigger value="verificar" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><Search aria-hidden="true" className="h-4 w-4 shrink-0" />Verificar cheque</TabsTrigger>
-          <TabsTrigger value="manual" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><HandCoins aria-hidden="true" className="h-4 w-4 shrink-0" />Compra manual</TabsTrigger>
-          <TabsTrigger value="regalo" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg"><Palette aria-hidden="true" className="h-4 w-4 shrink-0" />Configuración</TabsTrigger>
-          <TabsTrigger value="plantilla" className="min-h-11 shrink-0 gap-2 whitespace-normal text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><FileText aria-hidden="true" className="h-4 w-4 shrink-0" />Plantilla de factura</TabsTrigger>
-          <TabsTrigger value="stripe" className="min-h-11 shrink-0 gap-2 text-xs sm:text-sm rounded-lg data-[state=active]:shadow-sm"><CreditCard aria-hidden="true" className="h-4 w-4 shrink-0" />Stripe</TabsTrigger>
-        </TabsList>
+        <PestanasPagina
+          pestanas={[
+            { valor: "expedicion", etiqueta: "Expedición de tickets", icono: <Ticket /> },
+            { valor: "verificar", etiqueta: "Verificar cheque", icono: <Search /> },
+            { valor: "manual", etiqueta: "Compra manual", icono: <HandCoins /> },
+            { valor: "regalo", etiqueta: "Configuración", icono: <Palette /> },
+            { valor: "plantilla", etiqueta: "Plantilla de factura", icono: <FileText /> },
+            { valor: "stripe", etiqueta: "Stripe", icono: <CreditCard /> },
+          ]}
+        />
         <TabsContent value="expedicion" className="mt-0 min-w-0 data-[state=inactive]:hidden"><ListaTickets /></TabsContent>
         <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
         <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo /></TabsContent>

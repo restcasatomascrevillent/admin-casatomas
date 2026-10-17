@@ -2,7 +2,8 @@ import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType } from
 import { useSearchParams } from "react-router-dom";
 import { BookOpen, CalendarDays, Loader2, Newspaper, UtensilsCrossed } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
@@ -137,19 +138,12 @@ export default function GestorWeb() {
           <p className="text-sm text-muted-foreground">No tienes acceso a ninguna parte del Gestor Web.</p>
         ) : (
           <Tabs value={pestanaActiva} onValueChange={cambiarPestana} className="shrink-0">
-            <div className="-mx-3 px-3 sm:mx-0 sm:px-0 overflow-x-auto">
-              <TabsList className="h-auto p-1 gap-1 w-max">
-                {pestanasVisibles.map((p) => {
-                  const Icono = ICONOS[p.id];
-                  return (
-                    <TabsTrigger key={p.id} value={p.id} className="min-h-11 gap-2 px-4 py-2" data-tour={`gw-pestana-${p.id}`}>
-                      <Icono className="h-4 w-4" />
-                      {p.label}
-                    </TabsTrigger>
-                  );
-                })}
-              </TabsList>
-            </div>
+            <PestanasPagina
+              pestanas={pestanasVisibles.map((p) => {
+                const Icono = ICONOS[p.id];
+                return { valor: p.id, etiqueta: p.label, icono: <Icono />, tour: `gw-pestana-${p.id}` };
+              })}
+            />
           </Tabs>
         )}
 

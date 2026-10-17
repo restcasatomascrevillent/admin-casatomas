@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Plus, Settings } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanzada";
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
@@ -253,93 +253,62 @@ export default function Reservas() {
   return (
     <DashboardLayout>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        {/* Pestañas y acción principal en la MISMA línea (2026-09-25, petición
-            del dueño): "Nueva Reserva" tenía su propia banda encima, que solo
-            servía para alinear un botón a la derecha y se comía ~64px de alto
-            (botón + separación). Ahora comparte fila con las pestañas —o con el
-            desplegable, cuando estas no caben—, que miden lo mismo (40px), así
-            que la fila queda alineada sin alto extra. Sin título de página: la
-            pestaña "Reservas" del menú lateral ya dice dónde estás. */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* `min-w-0`: deja que las pestañas se midan contra el hueco que
-              queda junto al botón — de eso vive `checkOverflow` para decidir si
-              cambia al desplegable. Sin esto no encogerían nunca. */}
-          <div className="flex-1 min-w-0">
-            {/* Muy estrecho (móvil): selector desplegable. En tablet las pestañas se quedan
-                visibles aunque no quepan todas (la fila hace scroll horizontal): para una
-                sección que se usa todo el día, dos toques por cambio de vista era peor. */}
-            <div className="sm:hidden">
-              <Select value={activeTab} onValueChange={handleTabChange}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecciona vista" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="hoy">Hoy</SelectItem>
-                  <SelectItem value="reservas">
-                    Lista{countPendientes > 0 ? ` (${countPendientes} solicitud${countPendientes === 1 ? "" : "es"})` : ""}
-                  </SelectItem>
-                  <SelectItem value="calendario">Calendario</SelectItem>
-                  <SelectItem value="asignacion">Próximas reservas</SelectItem>
-                  <SelectItem value="blacklist">Blacklist</SelectItem>
-                  {isAdmin && <SelectItem value="configuracion">Configuración</SelectItem>}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Tablet/desktop: pestañas */}
-            <div className="hidden sm:block scroll-x-touch no-scrollbar">
-              <TabsList className="h-9 w-max min-w-max justify-start gap-1 p-0.5 pointer-coarse:h-10 pointer-coarse:min-h-0">
-                <TabsTrigger value="hoy" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Hoy</TabsTrigger>
-                <TabsTrigger value="reservas" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base gap-1">
-                  Lista
-                  {countPendientes > 0 && (
-                    <span
-                      className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-bold bg-destructive text-destructive-foreground rounded-full"
-                      aria-label={`${countPendientes} solicitud${countPendientes === 1 ? "" : "es"} sin resolver`}
-                      title="Solicitudes del bot sin resolver"
-                    >
-                      {countPendientes}
-                    </span>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="calendario" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Calendario</TabsTrigger>
-                <TabsTrigger value="asignacion" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Próximas reservas</TabsTrigger>
-                <TabsTrigger value="blacklist" className="touch-hit pointer-coarse:min-h-9 flex-shrink-0 text-sm lg:text-base">Blacklist</TabsTrigger>
-                {isAdmin && (
-                  <TabsTrigger value="configuracion" className="touch-hit pointer-coarse:min-h-9 gap-1 flex-shrink-0 text-sm lg:text-base">
-                    <Settings className="h-4 w-4" />
-                    <span className="hidden sm:inline">Configuración</span>
-                    <span className="sm:hidden">Config</span>
-                  </TabsTrigger>
-                )}
-              </TabsList>
-            </div>
-          </div>
-
-          {/* Crear una reserva exige permiso de EDICIÓN en «reservas», como el resto
-              de acciones que escriben (y la RLS del INSERT, 20261001170000). Sin él
-              el botón sale deshabilitado y explica por qué: el motivo va en el
-              envoltorio (`ConMotivo`), porque un botón deshabilitado no recibe el ratón. */}
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <ConMotivo motivo={puedeEditarReservas ? undefined : MOTIVO_SIN_PERMISO_ALTA} className="shrink-0">
-              <DialogTrigger asChild>
-                <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9" disabled={!puedeEditarReservas}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nueva Reserva
-                </Button>
-              </DialogTrigger>
-            </ConMotivo>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Crear Nueva Reserva</DialogTitle>
-              </DialogHeader>
-              <FormularioReserva
-                datosPreseleccionados={datosNuevaReserva}
-                onSuccess={() => setOpenDialog(false)}
-              />
-            </DialogContent>
-          </Dialog>
-        </div>
+        {/* Pestañas y «Nueva Reserva» en la MISMA línea (2026-09-25, petición del dueño): "Nueva
+            Reserva" tenía su propia banda encima, que solo servía para alinear un botón a la derecha
+            y se comía ~64px de alto (botón + separación). Ahora comparte fila con las pestañas vía
+            `acciones` de PestanasPagina (como en Facturas), que ocupa el hueco de la derecha sin
+            cortarlas. El desplegable de móvil de antes ya no hace falta (2026-10-17, migración al
+            estilo común de pestañas): PestanasPagina resuelve el mismo problema — pestañas que no
+            caben en poco ancho — con scroll horizontal y degradado en el borde, igual que en
+            Facturas/Ecommerce; dos toques por cambio de vista era peor para una sección que se usa
+            todo el día. Sin título de página: la pestaña "Reservas" del menú lateral ya dice dónde
+            estás. */}
+        <PestanasPagina
+          pestanas={[
+            { valor: "hoy", etiqueta: "Hoy" },
+            {
+              valor: "reservas",
+              etiqueta: "Lista",
+              // Antes la insignia era roja (bg-destructive text-destructive-foreground): avisaba de
+              // solicitudes del bot sin resolver. PestanasPagina solo ofrece los tonos "primario" o
+              // "dorado" (sin rojo/alerta); se usa "primario" (el valor por defecto) como el más
+              // parecido. Si la distinción de color importa para el dueño, hace falta ampliar
+              // PestanasPagina con un tono de alerta en vez de recuperarlo aquí a mano.
+              contador: countPendientes,
+              etiquetaContador: `${countPendientes} solicitud${countPendientes === 1 ? "" : "es"} sin resolver`,
+              contadorEnMovil: true,
+            },
+            { valor: "calendario", etiqueta: "Calendario" },
+            { valor: "asignacion", etiqueta: "Próximas reservas" },
+            { valor: "blacklist", etiqueta: "Blacklist" },
+            ...(isAdmin ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
+          ]}
+          acciones={
+            /* Crear una reserva exige permiso de EDICIÓN en «reservas», como el resto de acciones
+               que escriben (y la RLS del INSERT, 20261001170000). Sin él el botón sale deshabilitado
+               y explica por qué: el motivo va en el envoltorio (`ConMotivo`), porque un botón
+               deshabilitado no recibe el ratón. */
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <ConMotivo motivo={puedeEditarReservas ? undefined : MOTIVO_SIN_PERMISO_ALTA} className="shrink-0">
+                <DialogTrigger asChild>
+                  <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9" disabled={!puedeEditarReservas}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nueva Reserva
+                  </Button>
+                </DialogTrigger>
+              </ConMotivo>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Crear Nueva Reserva</DialogTitle>
+                </DialogHeader>
+                <FormularioReserva
+                  datosPreseleccionados={datosNuevaReserva}
+                  onSuccess={() => setOpenDialog(false)}
+                />
+              </DialogContent>
+            </Dialog>
+          }
+        />
 
         {/* "Hoy" (2026-09-25, petición del dueño): el kanban por espacios
             es la vista principal — lo primero que se ve al entrar en
@@ -359,8 +328,9 @@ export default function Reservas() {
             incluida la de hoy, con su propio filtro de fecha y el atajo
             "Hoy": no se oculta a propósito, así sigue pudiéndose buscar
             una reserva de hoy cancelada o un dato que el kanban no
-            muestre. Las solicitudes del bot sin resolver (insignia roja)
-            siguen viviendo aquí, mezcladas como filas "Solicitud". */}
+            muestre. Las solicitudes del bot sin resolver (con su insignia
+            en la pestaña "Lista") siguen viviendo aquí, mezcladas como
+            filas "Solicitud". */}
         <TabsContent value="reservas" className="mt-6">
           {/* Sin título ni subtítulo (2026-10-06, petición del dueño: «perdemos mucho espacio vertical»):
               la pestaña «Lista» ya dice dónde estás. La región conserva su nombre para el lector de pantalla
