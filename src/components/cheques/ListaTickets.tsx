@@ -103,7 +103,7 @@ export function ListaTickets() {
       <CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6">
         <div className="flex items-center gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><TicketIcon className="h-6 w-6" /></div>
-          <div><CardTitle className="text-xl sm:text-2xl">Tickets expedidos</CardTitle><p className="text-sm text-muted-foreground mt-1">Busca, filtra y abre cualquier cheque regalo vendido.</p></div>
+          <div><CardTitle className="text-xl sm:text-2xl">Tickets expedidos</CardTitle></div>
         </div>
       </CardHeader>
       <CardContent className="p-5 sm:p-6 space-y-4">
