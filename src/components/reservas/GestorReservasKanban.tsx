@@ -23,7 +23,6 @@ import { admiteReservas } from "@/lib/reservas/negocios";
 import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
-import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
 import { comensalesEnEspacioTurno, type ReservaServicio } from "@/lib/reservas/servicioSala";
 import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
 import { format } from "date-fns";
@@ -135,7 +134,7 @@ function KanbanColumn({
   id: string;
   title: string;
   capacidadMax?: number;
-  /** Sala privada (el Reservado): fuera de aforo; no tiene barras de aforo y lleva su etiqueta. */
+  /** Sala privada (el Reservado): fuera de aforo; no tiene barras de aforo. */
   privada?: boolean;
   paxComida: number;
   paxCena: number;
@@ -236,7 +235,6 @@ function KanbanColumn({
           </div>
           <Badge variant="secondary" className="text-xs tabular-nums">{count}</Badge>
         </div>
-        {privada && <EtiquetaFueraDeAforo />}
         {!privada && capacidadMax != null && capacidadMax > 0 && (
           <div className="space-y-1.5">
             {filtroTurno !== "cena" && <BarraTurno etiqueta="Comida" pax={paxComida} capacidad={capacidadMax} />}
@@ -587,8 +585,7 @@ export function GestorReservasKanban({
 
   // Todas las columnas posibles como DESTINO: "Sin asignar" + las salas activas de Casa Tomás (por id: hay
   // dos «Terraza», una de cada negocio), el Reservado (sala privada) incluido, para poder mandar ahí una
-  // reserva con «⋮ → Mover a…». Las que se PINTAN son `columnasPintadas`: sin las privadas (el Reservado
-  // se ve en el aviso desplegable de «Hoy»).
+  // reserva con «⋮ → Mover a…». Las que se PINTAN son `columnasPintadas`: sin las privadas.
   const columnas = useMemo<Columna[]>(() => construirColumnas(espacios), [espacios]);
   const columnasPintadas = useMemo(() => columnasVisibles(columnas), [columnas]);
   const itemsFila = useMemo<ItemColumna[]>(

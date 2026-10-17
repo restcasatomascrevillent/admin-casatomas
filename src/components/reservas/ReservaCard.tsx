@@ -1,6 +1,5 @@
 // ============================================================================
-// TARJETA DE UNA RESERVA DEL SERVICIO — la del kanban de «Hoy» y la del
-// desplegable de la sala privada
+// TARJETA DE UNA RESERVA DEL SERVICIO — la del kanban de «Hoy» y la del plano de «Hoy»
 // ----------------------------------------------------------------------------
 // Sacada de `GestorReservasKanban.tsx` (04/10/2026) para que el aviso de la sala
 // privada (`AvisoSalasPrivadas`: Hoy y Dashboard) enseñe a quien está en el
@@ -48,7 +47,6 @@ import { columnaDeReserva, type Columna } from "@/lib/reservas/columnasServicio"
 import type { ReservaServicio } from "@/lib/reservas/servicioSala";
 import { ConMotivo } from "./ConMotivo";
 import { ControlLlegada } from "./ControlLlegada";
-import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
 import { accionesSoloIcono } from "./kanbanLayout";
 
 type Acciones = ReturnType<typeof useAccionesServicioReserva>;
@@ -172,8 +170,6 @@ export function ReservaCard({
 
   const columnaActual = columnaDeReserva(reserva, columnas);
   const destinos = columnas.filter((c) => c.id !== columnaActual);
-  // En una sala privada (el Reservado) la reserva está FUERA DE AFORO: se etiqueta.
-  const fueraDeAforo = !!columnas.find((c) => c.id === columnaActual)?.privada;
   const textoMesas = etiquetaMesasReserva(mesas);
 
   /** Un toque en una zona neutra de la tarjeta = pulsar «⋮». */
@@ -417,7 +413,6 @@ export function ReservaCard({
         </div>
         {!soloIcono && menuAcciones}
       </div>
-      {fueraDeAforo && <EtiquetaFueraDeAforo className="mb-2" />}
       <ContenidoTarjeta reserva={reserva} sinCabecera sinMesa={sinMesa} mesas={mesas} telefonoEnlace={telefonoEnlace} />
       {soloIcono ? (
         /* `flex-wrap`: antes que recortar un botón, que baje de línea. Así el

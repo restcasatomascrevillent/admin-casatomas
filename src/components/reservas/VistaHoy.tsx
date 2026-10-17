@@ -1,7 +1,7 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
-import { ChevronDown, Clock, Info, Lock, MapIcon, Search, SquareKanban, Wand2 } from "lucide-react";
+import { ChevronDown, Clock, Info, MapIcon, Search, SquareKanban, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -14,7 +14,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
-import { avisosSalasPrivadas, textoAvisoSalaPrivada } from "@/lib/reservas/salaPrivada";
 import {
   esModoVistaHoy,
   guardarSalaPlanoHoy,
@@ -24,7 +23,6 @@ import {
   type FiltroTurnoHoy,
   type ModoVistaHoy,
 } from "@/lib/reservas/vistaHoy";
-import { AvisoSalasPrivadas } from "./AvisoSalasPrivadas";
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -61,7 +59,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
  * DOS VISTAS (06/10/2026, petición del dueño: «montar aquí DOS VISTAS: una de kanban y luego
  * montar la vista con los planos del local»): «Kanban | Plano», en la fila del buscador y del
  * turno, sin alto de más. Por defecto el kanban; la elección (y la sala del plano) se recuerda
- * en este navegador. Lo de arriba —cifras, aviso del Reservado, cuartos de hora, buscador y
+ * en este navegador. Lo de arriba —cifras, cuartos de hora, buscador y
  * «Todo el día / Comida / Cena»— es UNO para las dos: el buscador y el turno viven aquí (antes
  * dentro del kanban) y filtran igual el kanban y el plano (`coincideFiltroHoy`). El plano está en
  * `servicio/VistaPlanoHoy.tsx`. Tocar el nombre de una sala en el kanban abre su plano.
@@ -120,18 +118,18 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   // Ojo con el orden: estos hooks van ANTES de los `return` de carga/error de
   // arriba, o React se queda sin hooks a mitad de render.
   // Cambios de `reservas` y de mesas hechos en otro dispositivo: UNA suscripción
-  // para toda la pestaña (kanban, aviso de salas privadas, cifras y la rejilla
+  // para toda la pestaña (kanban, cifras y la rejilla
   // por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
   useReservasEnVivo();
   // Cambia a medianoche (la tablet se queda toda la noche en «Hoy»).
   const hoy = useHoyLocal();
   const { data: espacios } = useEspaciosReserva();
   /**
-   * Reservas de hoy de Casa Tomás, para el aviso de salas privadas y las tarjetas de su desplegable
+   * Reservas de hoy de Casa Tomás, para el plano del servicio y la vista de hoy en móvil
    * (`marca`, para quedarse con las de Casa Tomás: `admiteReservas`).
    *
    * `select("*")`, como el kanban: trae `llegada_at`, `importante`, `telefono`… si existen (las tarjetas
-   * del Reservado los necesitan) sin romper si una migración no está aplicada. NO se reutiliza
+   * del plano los necesitan) sin romper si una migración no está aplicada. NO se reutiliza
    * `useReservasServicioDia`: ese pide `llegada_at` y `salida_at` por nombre, y su error subiría hasta
    * aquí y tumbaría la pestaña entera. (`"reservas" as any` porque `espacio_id` no está en los tipos generados.)
    *
@@ -160,13 +158,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
       return ((data ?? []) as unknown as ReservaPlanoHoy[]).filter((r) => admiteReservas(r.marca));
     },
   });
-
-  // El Reservado (sala privada) está FUERA DE AFORO: no entra en las cifras de arriba, pero se avisa
-  // aparte de si está ocupado hoy.
-  const avisosPrivadas = useMemo(
-    () => avisosSalasPrivadas(espacios as Array<{ id?: string; nombre?: string }> | undefined, reservasHoy),
-    [espacios, reservasHoy],
-  );
 
   if (isLoading) {
     return (
@@ -222,14 +213,9 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     <ReservasEnVivoContexto.Provider value={true}>
       <div className="space-y-2">
         {/* Revisión 10/10/2026 (tablet): las cifras ya no ocupan su propia franja; van en chips pequeños en
-            la fila de filtros (`cifras`). En el kanban siguen el aviso del Reservado y los cuartos de hora,
-            plegados; el plano empieza justo debajo de la fila de filtros. */}
-        {vista !== "plano" && (
-          <>
-            {reservasHoy !== undefined && <AvisoSalasPrivadas avisos={avisosPrivadas} reservas={reservasHoy} />}
-            <CuartosDeHoy fecha={hoy} />
-          </>
-        )}
+            la fila de filtros (`cifras`). En el kanban sigue «Disponibilidad por cuartos de hora», plegada;
+            el plano empieza justo debajo de la fila de filtros. */}
+        {vista !== "plano" && <CuartosDeHoy fecha={hoy} />}
 
         <BarraFiltrosHoy
           busqueda={busqueda}
@@ -259,14 +245,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
                 <strong className="tabular-nums text-foreground">{`${resumen?.porcentajeTotal ?? 0} %`}</strong> de{" "}
                 <span className="tabular-nums">{resumen?.capacidadTotal ?? 0}</span>
               </span>
-              {vista === "plano" &&
-                reservasHoy !== undefined &&
-                avisosPrivadas.map((aviso) => (
-                  <span key={aviso.espacioId} className="flex min-w-0 items-center gap-1 text-violet-800 dark:text-violet-200">
-                    <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                    <span className="truncate">{textoAvisoSalaPrivada(aviso)}</span>
-                  </span>
-                ))}
             </p>
           }
           accion={

@@ -8,7 +8,7 @@
 // QUÉ HAY (todo reutilizado; aquí solo se junta y se coloca)
 //   · Pestañas de sala (Casa Tomás: `construirColumnas`, las mismas del kanban)
 //     con cuántas reservas tiene cada una y cuántas siguen sin mesa. El Reservado
-//     (sala privada) va el último, con candado y «Fuera de aforo».
+//     (sala privada) va el último, con candado.
 //   · El plano de la sala (`MapaSalaServicio`) con cada mesa del color de su
 //     estado: libre / reservada / retrasada / ocupada / por liberar. El estado lo
 //     calcula `estadoMesaServicio` con los umbrales de Configuración, EXACTAMENTE
@@ -135,7 +135,6 @@ import {
 } from "@/lib/reservas/vistaHoy";
 import { BlacklistModal } from "../BlacklistModal";
 import { ConMotivo } from "../ConMotivo";
-import { EtiquetaFueraDeAforo } from "../EtiquetaFueraDeAforo";
 import { ReservaCard } from "../ReservaCard";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
 import { MapaSalaServicio } from "./MapaSalaServicio";
@@ -1076,7 +1075,6 @@ export function VistaPlanoHoy({
                     <TabsTrigger key={s.id} value={s.id} className="gap-1.5" aria-label={s.title}>
                       {s.privada && <Lock className="h-3.5 w-3.5" aria-hidden="true" />}
                       <span>{s.title}</span>
-                      {s.privada && <EtiquetaFueraDeAforo className="h-5 text-xs" />}
                     </TabsTrigger>
                   );
                 }
@@ -1100,7 +1098,6 @@ export function VistaPlanoHoy({
                     {cuenta.sinMesa > 0 && (
                       <span className="hidden text-[13px] font-normal tabular-nums text-muted-foreground sm:inline">{`· ${cuenta.sinMesa} sin mesa`}</span>
                     )}
-                    {s.privada && <EtiquetaFueraDeAforo className="h-5 text-xs" />}
                   </TabsTrigger>
                 );
               })}

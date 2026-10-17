@@ -21,7 +21,6 @@ import {
   type Turno,
 } from "@/lib/reservas/ocupacionSalas";
 import { fechaLegible } from "@/lib/reservas/solicitudPropuesta";
-import { EtiquetaFueraDeAforo } from "./EtiquetaFueraDeAforo";
 
 // ============================================================================
 // "Ocupación de salas": rejilla salas × franjas de un día para decidir dónde
@@ -419,7 +418,6 @@ function FilaRejilla({
         {sala.capacidad != null && (
           <span className="block text-[10px] font-normal text-muted-foreground">{sala.capacidad} plazas</span>
         )}
-        {sala.privada && <EtiquetaFueraDeAforo className="mt-0.5" />}
       </th>
       {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => {
         const celda = sala.turnos[t];

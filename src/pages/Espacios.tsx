@@ -13,7 +13,6 @@ import { EspacioForm } from "@/components/reservas/EspacioForm";
 import { EditorPlanoEspacio } from "@/components/espacios/EditorPlanoEspacio";
 import { salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { capacidadDeAforo, esSalaPrivada } from "@/lib/reservas/salaPrivada";
-import { EtiquetaFueraDeAforo } from "@/components/reservas/EtiquetaFueraDeAforo";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -124,7 +123,6 @@ export default function Espacios() {
                   titulo={
                     <span className="inline-flex items-center gap-2">
                       {espacio.nombre}
-                      {esSalaPrivada(espacio) && <EtiquetaFueraDeAforo />}
                     </span>
                   }
                   subtitulo={[

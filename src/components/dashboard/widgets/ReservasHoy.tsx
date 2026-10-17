@@ -21,9 +21,7 @@ import { format } from "date-fns";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { sumarCapacidadPorMarca } from "@/hooks/useDisponibilidad";
 import { marcaDeEspacio, MARCA_POR_DEFECTO } from "@/lib/reservas/negocios";
-import { avisosSalasPrivadas, estaFueraDeAforo, esSalaPrivada, idsSalasPrivadasActivas } from "@/lib/reservas/salaPrivada";
-import { AvisoSalasPrivadas } from "@/components/reservas/AvisoSalasPrivadas";
-import type { ReservaServicio } from "@/lib/reservas/servicioSala";
+import { estaFueraDeAforo, esSalaPrivada, idsSalasPrivadasActivas } from "@/lib/reservas/salaPrivada";
 
 /**
  * Aforo de Casa Tomás: suma de sus salas activas SIN las privadas (150: el
@@ -98,7 +96,6 @@ export function ReservasHoy() {
   const reservasActivas = todasReservas?.filter(r =>
     ["pendiente", "verificada", "confirmada"].includes(r.estado) && !estaFueraDeAforo(r, idsPrivadas)
   ) || [];
-  const avisosPrivadas = avisosSalasPrivadas(espaciosCapacidad, todasReservas);
 
   // Desglose por turno (umbral 17:00, el mismo que usa el trigger)
   const reservasComida = reservasActivas.filter(r => parseInt(r.hora.split(':')[0]) < 17);
@@ -281,13 +278,6 @@ export function ReservasHoy() {
             <AyudaPopover etiqueta={`Desglose: ${desgloseActivas}`}>{desgloseActivas}</AyudaPopover>
           </div>
         </div>
-        {/* Sala privada (el Reservado): fuera de aforo y de las cifras de arriba, pero a la vista. Una línea fina. */}
-        <AvisoSalasPrivadas
-          avisos={avisosPrivadas}
-          reservas={todasReservas as unknown as ReservaServicio[] | undefined}
-          className="py-1"
-        />
-
         {/* UNA tira de cifras sin fondos de color: estados, próxima reserva y los dos turnos (umbral 17:00). El color
             solo avisa: Pendientes en ámbar si hay alguna. El turno en curso lleva «· ahora» en su nombre. */}
         <TiraCifras
