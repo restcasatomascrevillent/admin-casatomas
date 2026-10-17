@@ -192,12 +192,11 @@ describe("Hoy · el kanban mide el alto de la pantalla", () => {
     expect(bloque()).not.toHaveClass("flex-1");
   });
 
-  it("lo de arriba queda FUERA de ese bloque (fijo): cifras, cuartos de hora, buscador y turnos", async () => {
+  it("lo de arriba queda FUERA de ese bloque (fijo): cuartos de hora, buscador y turnos", async () => {
     conLayout(800);
     await montar();
 
     const fijos = [
-      screen.getByTestId("cifras-hoy"),
       screen.getByRole("button", { name: /Disponibilidad por cuartos de hora/ }),
       screen.getByRole("textbox", { name: "Buscar reservas" }),
       screen.getByRole("group", { name: "Filtrar por turno" }),

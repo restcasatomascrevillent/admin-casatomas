@@ -108,7 +108,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   };
 
   const {
-    data: resumen,
     isLoading,
     isError: errorResumen,
     error: errorResumenDetalle,
@@ -180,8 +179,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     );
   }
 
-  const reservasCanceladas = resumen?.reservasCanceladas ?? 0;
-
   if (esMovil) {
     return (
       <ReservasEnVivoContexto.Provider value={true}>
@@ -212,9 +209,9 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     // `reservas`.
     <ReservasEnVivoContexto.Provider value={true}>
       <div className="space-y-2">
-        {/* Revisión 10/10/2026 (tablet): las cifras ya no ocupan su propia franja; van en chips pequeños en
-            la fila de filtros (`cifras`). En el kanban sigue «Disponibilidad por cuartos de hora», plegada;
-            el plano empieza justo debajo de la fila de filtros. */}
+        {/* Revisión 17/10/2026: sin cifras de ocupación en la fila de filtros (a petición del
+            dueño). En el kanban sigue «Disponibilidad por cuartos de hora», plegada; el plano
+            empieza justo debajo de la fila de filtros. */}
         {vista !== "plano" && <CuartosDeHoy fecha={hoy} />}
 
         <BarraFiltrosHoy
@@ -227,26 +224,6 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             cambiarVista(v);
             if (v !== "plano") setOrganizando(null);
           }}
-          cifras={
-            <p
-              data-testid="cifras-hoy"
-              className="flex min-w-0 items-center gap-x-2 overflow-hidden whitespace-nowrap text-xs text-muted-foreground"
-            >
-              <span>
-                <strong className="tabular-nums text-foreground">{resumen?.totalReservas ?? 0}</strong> reservas
-                {reservasCanceladas > 0 && ` (${reservasCanceladas} canc.)`}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                <strong className="tabular-nums text-foreground">{resumen?.totalComensales ?? 0}</strong> comensales
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                <strong className="tabular-nums text-foreground">{`${resumen?.porcentajeTotal ?? 0} %`}</strong> de{" "}
-                <span className="tabular-nums">{resumen?.capacidadTotal ?? 0}</span>
-              </span>
-            </p>
-          }
           accion={
             <div className="flex shrink-0 gap-2 sm:order-2">
               <Button className="touch-hit h-9 gap-1.5 px-4 pointer-coarse:h-9" onClick={pulsarOrganizar} disabled={!!organizando}>
@@ -326,10 +303,7 @@ function BarraFiltrosHoy({
   onVista,
   soloFiltros = false,
   accion,
-  cifras,
 }: {
-  /** Cifras del día en pequeño, al final de la fila (tablet y escritorio). */
-  cifras?: ReactNode;
   /** Botón de acción junto al turno («Sin reserva»). */
   accion?: ReactNode;
   /** Móvil: solo buscador y turno (sin «Kanban | Plano» ni la ayuda). */
@@ -412,7 +386,6 @@ function BarraFiltrosHoy({
           <Info className="h-4 w-4" aria-hidden="true" />
         </span>
       )}
-      {!soloFiltros && cifras && <div className="min-w-0 sm:order-5 sm:ml-auto">{cifras}</div>}
     </div>
   );
 }

@@ -194,7 +194,8 @@ describe("VistaHoy — lo que ya NO hay (retirado el 04/10/2026 a petición del 
     const { queryClient } = montar();
     await esperarCarga(queryClient);
 
-    expect(screen.getByTestId("cifras-hoy")).toHaveTextContent("reservas");
+    expect(screen.getByLabelText("Buscar reservas")).toBeInTheDocument();
+    expect(screen.getByLabelText("Filtrar por turno")).toBeInTheDocument();
   });
 });
 

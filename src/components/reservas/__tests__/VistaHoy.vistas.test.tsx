@@ -183,30 +183,23 @@ describe("Hoy · el selector «Kanban | Plano»", () => {
 
 describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
   const bloqueDeArriba = () => [
-    screen.getByTestId("cifras-hoy"),
     screen.getByRole("button", { name: /Disponibilidad por cuartos de hora/ }),
     screen.getByRole("textbox", { name: "Buscar reservas" }),
     screen.getByRole("group", { name: "Filtrar por turno" }),
     selector(),
   ];
 
-  it("en el kanban: cifras, cuartos de hora, buscador, turno y selector, FUERA de la vista", () => {
+  it("en el kanban: cuartos de hora, buscador, turno y selector, FUERA de la vista", () => {
     montar();
     for (const pieza of bloqueDeArriba()) expect(screen.getByTestId("vista-kanban")).not.toContainElement(pieza);
   });
 
-  it("en el plano: las cifras en UNA línea, sin cuartos de hora; buscador, turno y selector siguen", async () => {
+  it("en el plano: sin cuartos de hora; buscador, turno y selector siguen", () => {
     montar();
     fireEvent.click(opcion("Plano"));
-    // 10/10/2026: las cifras van en chips pequeños dentro de la fila de filtros (las dos vistas).
-    const resumen = await screen.findByTestId("cifras-hoy");
-    expect(resumen).toHaveTextContent("23 reservas");
-    expect(resumen).toHaveTextContent("89 comensales");
-    expect(resumen).toHaveTextContent("59 % de 150");
     expect(screen.queryByRole("button", { name: /Disponibilidad por cuartos de hora/ })).toBeNull();
     expect(screen.queryByText("Reservas hoy")).toBeNull();
     for (const pieza of [
-      resumen,
       screen.getByRole("textbox", { name: "Buscar reservas" }),
       screen.getByRole("group", { name: "Filtrar por turno" }),
       selector(),
