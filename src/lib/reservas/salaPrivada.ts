@@ -11,17 +11,14 @@
 //     entra en las cifras de ocupación, comensales ni porcentajes;
 //   · SIGUE habiendo una sola reserva (viva o ya sentada) por día y turno;
 //   · solo se reserva desde el panel (la web y el bot no la ofrecen);
-//   · el personal tiene que VERLA: aviso aparte en Hoy y en el Dashboard
-//     (`avisosSalasPrivadas`), etiqueta «Fuera de aforo» en el kanban y en la
-//     Lista, e indicador en el calendario.
+//   · el personal tiene que VERLA: indicador en el calendario.
 // La BD lo hace cumplir (`validar_capacidad_reserva`, migración
 // 20261003150000_sala_privada_fuera_de_aforo.sql; la exclusividad viene de
 // 20261003130000). Este módulo es el PUNTO ÚNICO para el panel:
 //   · reconoce una sala privada (`esSalaPrivada`) y la saca del aforo
 //     (`capacidadDeAforo`, `reservasQueConsumenAforo`);
 //   · reconoce y traduce el error de la BD (23514 «Sala privada ocupada: …»);
-//   · avisa ANTES de intentar el movimiento en el kanban (`salaPrivadaOcupadaPor`);
-//   · arma el aviso «Reservado: ocupado — García, 8 pax (comida)».
+//   · avisa ANTES de intentar el movimiento en el kanban (`salaPrivadaOcupadaPor`).
 //
 // El mensaje de la BD NO contiene la palabra «Aforo» a propósito: los
 // traductores que buscan «Aforo» (mensajeErrorEdicion, mensajeErrorServicio,
@@ -34,13 +31,6 @@ import {
   turnoDeHora,
 } from "../../../supabase/functions/_shared/disponibilidad";
 import { ocupaEspacio } from "./estadosReserva";
-
-/** Etiqueta corta de lo que no cuenta en el aforo (kanban, Lista, calendario). */
-export const ETIQUETA_FUERA_DE_AFORO = "Fuera de aforo";
-
-/** Frase para el `title`/tooltip de la etiqueta. */
-export const AYUDA_FUERA_DE_AFORO =
-  "Sala privada: no cuenta en el aforo ni en las cifras de ocupación. Solo admite una reserva por turno.";
 
 /** Prefijo fijo del mensaje del trigger (ver la migración). */
 export const PREFIJO_SALA_PRIVADA_OCUPADA = "Sala privada ocupada";
@@ -172,92 +162,4 @@ export function salaPrivadaOcupadaPor<T extends ReservaDeSala>(
         r.id !== excluirId && r.espacio_id === espacioId && ocupaEspacio(r.estado) && turnoDeHora(r.hora) === turno,
     ) ?? null
   );
-}
-
-// ----------------------------------------------------------------------------
-// AVISO «Reservado: ocupado — García, 8 pax (comida)» (Hoy y Dashboard)
-// ----------------------------------------------------------------------------
-// La sala privada está fuera de las cifras de aforo, pero el personal tiene que
-// saber si está ocupada. El aviso va APARTE de las cifras de ocupación y
-// comensales: nunca se suma a ellas.
-
-export type TurnoSala = "comida" | "cena";
-const TURNOS_SALA: readonly TurnoSala[] = ["comida", "cena"];
-
-/** Lo mínimo de una reserva para el aviso (`nombre` puede faltar). */
-export interface ReservaParaAviso {
-  id?: string;
-  nombre?: string | null;
-  hora: string;
-  numero_comensales: number | string | null;
-  estado: string;
-  espacio_id?: string | null;
-}
-
-export interface TurnoAvisoSalaPrivada {
-  turno: TurnoSala;
-  /** La reserva que tiene la sala en ese turno; `null` = libre. */
-  reserva: ReservaParaAviso | null;
-}
-
-export interface AvisoSalaPrivada {
-  espacioId: string;
-  nombre: string;
-  /** Siempre los dos turnos, en orden de servicio. */
-  turnos: TurnoAvisoSalaPrivada[];
-  /** ¿Está ocupada en algún turno? */
-  ocupada: boolean;
-}
-
-/**
- * Un aviso por cada sala privada ACTIVA, con quién la tiene en la comida y en la
- * cena. `reservas` son las de UN día (cualquier estado: aquí se filtran con
- * `ocupaEspacio`; cancelada y «No vino» la liberan). Si hay dos reservas en el
- * mismo turno (dato heredado que la BD ya no permite) se muestra la primera.
- */
-export function avisosSalasPrivadas(
-  espacios: ReadonlyArray<{ id?: string | null; nombre?: string | null; caracteristicas?: unknown; privada?: unknown; activa?: boolean | null } | null | undefined> | null | undefined,
-  reservas: readonly ReservaParaAviso[] | null | undefined,
-): AvisoSalaPrivada[] {
-  const avisos: AvisoSalaPrivada[] = [];
-  for (const e of espacios ?? []) {
-    if (!e?.id || !esSalaPrivada(e)) continue;
-    const id = String(e.id);
-    const delaSala = (reservas ?? []).filter((r) => r && r.espacio_id === id && ocupaEspacio(r.estado));
-    const turnos = TURNOS_SALA.map((turno) => ({
-      turno,
-      reserva: delaSala.find((r) => turnoDeHora(r.hora) === turno) ?? null,
-    }));
-    avisos.push({
-      espacioId: id,
-      nombre: (e.nombre ?? "").trim() || "Sala privada",
-      turnos,
-      ocupada: turnos.some((t) => t.reserva !== null),
-    });
-  }
-  return avisos;
-}
-
-/** «García, 8 pax (comida)». */
-export function textoReservaDeAviso(turno: TurnoSala, reserva: ReservaParaAviso): string {
-  const nombre = (reserva.nombre ?? "").trim() || "Sin nombre";
-  const pax = Number(reserva.numero_comensales) || 0;
-  return `${nombre}, ${pax} pax (${turno})`;
-}
-
-/**
- * La frase del aviso. Libre en los dos turnos: «Reservado: libre». Con reserva:
- * «Reservado: ocupado — García, 8 pax (comida)»; con las dos:
- * «Reservado: ocupado — García, 8 pax (comida) · López, 4 pax (cena)»; y si solo
- * uno de los turnos está ocupado se dice que el otro está libre.
- * `soloTurno`: limita el aviso a un turno (p. ej. el filtro del kanban).
- */
-export function textoAvisoSalaPrivada(aviso: AvisoSalaPrivada, soloTurno?: TurnoSala | null): string {
-  const turnos = aviso.turnos.filter((t) => !soloTurno || t.turno === soloTurno);
-  const ocupados = turnos.filter((t) => t.reserva !== null);
-  if (ocupados.length === 0) return `${aviso.nombre}: libre`;
-  const quien = ocupados.map((t) => textoReservaDeAviso(t.turno, t.reserva as ReservaParaAviso)).join(" · ");
-  const libres = turnos.filter((t) => t.reserva === null);
-  const resto = libres.length > 0 ? `; libre en ${libres.map((t) => (t.turno === "comida" ? "la comida" : "la cena")).join(" y ")}` : "";
-  return `${aviso.nombre}: ocupado — ${quien}${resto}`;
 }
