@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  avisosSalasPrivadas,
   capacidadDeAforo,
   esErrorSalaPrivadaOcupada,
   estaFueraDeAforo,
   idsSalasPrivadasActivas,
   reservasQueConsumenAforo,
-  textoAvisoSalaPrivada,
   esMensajeSalaPrivadaOcupada,
   esSalaPrivada,
   mensajeSalaPrivadaOcupada,
@@ -146,59 +144,5 @@ describe("fuera de aforo: la sala privada no suma capacidad ni consume aforo", (
     expect(reservasQueConsumenAforo(rs, ["reservado"])).toEqual([{ espacio_id: "comedor" }, { espacio_id: null }]);
     expect(reservasQueConsumenAforo(rs, [])).toHaveLength(3);
     expect(reservasQueConsumenAforo(rs, undefined)).toHaveLength(3);
-  });
-});
-
-describe("avisosSalasPrivadas / textoAvisoSalaPrivada", () => {
-  const ESPACIOS = [
-    { id: "comedor", nombre: "Comedor", caracteristicas: { marca: "casa_tomas" } },
-    { id: "reservado", nombre: "Reservado", caracteristicas: { marca: "casa_tomas", privada: true } },
-  ];
-  const res = (o: Record<string, unknown>) => ({
-    id: "r1",
-    nombre: "García",
-    hora: "14:00:00",
-    numero_comensales: 8,
-    estado: "confirmada",
-    espacio_id: "reservado",
-    ...o,
-  });
-
-  it("sin reservas en el Reservado: «Reservado: libre»", () => {
-    const [aviso] = avisosSalasPrivadas(ESPACIOS, [res({ espacio_id: "comedor" })]);
-    expect(aviso.ocupada).toBe(false);
-    expect(textoAvisoSalaPrivada(aviso)).toBe("Reservado: libre");
-  });
-
-  it("ocupado en la comida: «Reservado: ocupado — García, 8 pax (comida)» y la cena libre", () => {
-    const [aviso] = avisosSalasPrivadas(ESPACIOS, [res({})]);
-    expect(aviso.ocupada).toBe(true);
-    expect(textoAvisoSalaPrivada(aviso)).toBe("Reservado: ocupado — García, 8 pax (comida); libre en la cena");
-  });
-
-  it("ocupado en los dos turnos", () => {
-    const [aviso] = avisosSalasPrivadas(ESPACIOS, [
-      res({}),
-      res({ id: "r2", nombre: "López", hora: "21:00:00", numero_comensales: 4 }),
-    ]);
-    expect(textoAvisoSalaPrivada(aviso)).toBe("Reservado: ocupado — García, 8 pax (comida) · López, 4 pax (cena)");
-  });
-
-  it("canceladas y «No vino» no lo ocupan; completada (ya sentada) sí", () => {
-    expect(avisosSalasPrivadas(ESPACIOS, [res({ estado: "cancelada" })])[0].ocupada).toBe(false);
-    expect(avisosSalasPrivadas(ESPACIOS, [res({ estado: "no_show" })])[0].ocupada).toBe(false);
-    expect(avisosSalasPrivadas(ESPACIOS, [res({ estado: "completada" })])[0].ocupada).toBe(true);
-  });
-
-  it("limitado a un turno (filtro del kanban) y sin nombre", () => {
-    const [aviso] = avisosSalasPrivadas(ESPACIOS, [res({ nombre: null })]);
-    expect(textoAvisoSalaPrivada(aviso, "cena")).toBe("Reservado: libre");
-    expect(textoAvisoSalaPrivada(aviso, "comida")).toBe("Reservado: ocupado — Sin nombre, 8 pax (comida)");
-  });
-
-  it("solo hay aviso de salas privadas ACTIVAS", () => {
-    expect(avisosSalasPrivadas([{ id: "x", nombre: "X", activa: false, caracteristicas: { privada: true } }], [])).toEqual([]);
-    expect(avisosSalasPrivadas([ESPACIOS[0]], [])).toEqual([]);
-    expect(avisosSalasPrivadas(null, null)).toEqual([]);
   });
 });

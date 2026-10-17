@@ -84,13 +84,6 @@ describe("Espacios · solo las salas de Casa Tomás", () => {
     expect(screen.getByText(/Aforo por turno/).textContent).toMatch(/sin las salas privadas/);
   });
 
-  it("el Reservado (sala privada) lleva la etiqueta «Fuera de aforo» y las demás no", () => {
-    montar();
-
-    expect(screen.getAllByTestId("etiqueta-fuera-de-aforo")).toHaveLength(1);
-    expect(screen.getByText("Fuera de aforo")).toBeInTheDocument();
-  });
-
   it("el enlace `?editar=` no abre el plano de una sala de Touza (ni aunque se llame igual que una de Casa Tomás)", () => {
     montar("/super-admin/espacios?editar=tz-terraza");
 

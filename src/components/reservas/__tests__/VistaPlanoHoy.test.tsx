@@ -261,8 +261,6 @@ describe("Plano de Hoy · las salas", () => {
       "Terraza: 0 reservas",
       "Reservado: 1 reserva, sala privada fuera de aforo",
     ]);
-    expect(within(pestanas[3]).getByTestId("etiqueta-fuera-de-aforo")).toHaveTextContent("Fuera de aforo");
-    for (const p of pestanas.slice(0, 3)) expect(within(p).queryByTestId("etiqueta-fuera-de-aforo")).toBeNull();
     // Sin sala elegida (o una que ya no existe): la primera.
     expect(pestanas[0]).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("region", { name: "Plano de Comedor" })).toBeInTheDocument();

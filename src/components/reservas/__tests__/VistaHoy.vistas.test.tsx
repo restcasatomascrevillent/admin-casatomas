@@ -3,7 +3,7 @@
  * de kanban y luego montar la vista con los planos del local»).
  *
  * Aquí se prueba lo que es de `VistaHoy`: el selector (por defecto, se recuerda, accesible), qué vista se
- * monta, que el bloque de arriba —cifras, aviso del Reservado, cuartos de hora, buscador y turno— es UNO
+ * monta, que el bloque de arriba —cifras, cuartos de hora, buscador y turno— es UNO
  * para las dos (y fuera de ellas) y que tocar el nombre de una sala en el kanban abre su plano. El kanban y
  * el plano son dobles que enseñan lo que reciben: cada uno tiene sus propios tests.
  */
@@ -184,20 +184,18 @@ describe("Hoy · el selector «Kanban | Plano»", () => {
 describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
   const bloqueDeArriba = () => [
     screen.getByTestId("cifras-hoy"),
-    screen.getByTestId("aviso-sala-privada"),
     screen.getByRole("button", { name: /Disponibilidad por cuartos de hora/ }),
     screen.getByRole("textbox", { name: "Buscar reservas" }),
     screen.getByRole("group", { name: "Filtrar por turno" }),
     selector(),
   ];
 
-  it("en el kanban: cifras, Reservado, cuartos de hora, buscador, turno y selector, FUERA de la vista", async () => {
+  it("en el kanban: cifras, cuartos de hora, buscador, turno y selector, FUERA de la vista", () => {
     montar();
-    await screen.findByTestId("aviso-sala-privada");
     for (const pieza of bloqueDeArriba()) expect(screen.getByTestId("vista-kanban")).not.toContainElement(pieza);
   });
 
-  it("en el plano el plano necesita el alto: cifras y Reservado en UNA línea, sin cuartos de hora; buscador, turno y selector siguen", async () => {
+  it("en el plano: las cifras en UNA línea, sin cuartos de hora; buscador, turno y selector siguen", async () => {
     montar();
     fireEvent.click(opcion("Plano"));
     // 10/10/2026: las cifras van en chips pequeños dentro de la fila de filtros (las dos vistas).
@@ -205,8 +203,6 @@ describe("Hoy · el bloque de arriba es el mismo para las dos vistas", () => {
     expect(resumen).toHaveTextContent("23 reservas");
     expect(resumen).toHaveTextContent("89 comensales");
     expect(resumen).toHaveTextContent("59 % de 150");
-    await waitFor(() => expect(resumen).toHaveTextContent("Reservado: libre"));
-    expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
     expect(screen.queryByRole("button", { name: /Disponibilidad por cuartos de hora/ })).toBeNull();
     expect(screen.queryByText("Reservas hoy")).toBeNull();
     for (const pieza of [
@@ -280,23 +276,12 @@ describe("Hoy · del kanban al plano de una sala", () => {
   });
 });
 
-describe("Hoy · nada de «Reservado: libre» sin haber leído las reservas (revisión 07/10/2026)", () => {
-  it("mientras cargan las reservas de hoy no sale el aviso del Reservado (ni en el kanban ni en la línea del plano)", async () => {
-    h.respuesta = "pendiente";
-    montar();
-    await screen.findByTestId("vista-kanban");
-    expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
-    fireEvent.click(opcion("Plano"));
-    expect(screen.getByTestId("cifras-hoy")).not.toHaveTextContent("Reservado");
-    h.respuesta = "ok";
-  });
-
+describe("Hoy · el plano conoce el error de carga de las reservas de hoy (revisión 07/10/2026)", () => {
   it("si fallan, el plano lo sabe (para decirlo con «Reintentar») en vez de esperar para siempre", async () => {
     h.respuesta = "error";
     window.localStorage.setItem(CLAVE_VISTA_HOY, "plano");
     montar();
     await waitFor(() => expect(screen.getByTestId("vista-plano")).toHaveAttribute("data-reservas-error", "true"));
-    expect(screen.queryByTestId("aviso-sala-privada")).toBeNull();
     h.respuesta = "ok";
   });
 });

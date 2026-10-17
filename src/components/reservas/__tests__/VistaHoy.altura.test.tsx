@@ -4,7 +4,7 @@
  *
  * Mismo mecanismo que el Calendario, «Próximas reservas» y la Newsletter (`useAlturaDisponible`): la fila de
  * columnas del kanban mide el alto visible menos su posición y el relleno inferior del <main>; lo de arriba
- * (cifras, aviso del Reservado, «Disponibilidad por cuartos de hora», buscador y filtros) queda fijo y cada
+ * (cifras, «Disponibilidad por cuartos de hora», buscador y filtros) queda fijo y cada
  * columna desplaza sus tarjetas por dentro. Antes cada columna tenía un tope de `65dvh` que no descontaba lo de
  * encima, y con «Sin asignar» llena la página entera hacía scroll.
  *
@@ -192,13 +192,12 @@ describe("Hoy · el kanban mide el alto de la pantalla", () => {
     expect(bloque()).not.toHaveClass("flex-1");
   });
 
-  it("lo de arriba queda FUERA de ese bloque (fijo): cifras, aviso del Reservado, cuartos de hora, buscador y turnos", async () => {
+  it("lo de arriba queda FUERA de ese bloque (fijo): cifras, cuartos de hora, buscador y turnos", async () => {
     conLayout(800);
     await montar();
 
     const fijos = [
       screen.getByTestId("cifras-hoy"),
-      screen.getByTestId("aviso-sala-privada"),
       screen.getByRole("button", { name: /Disponibilidad por cuartos de hora/ }),
       screen.getByRole("textbox", { name: "Buscar reservas" }),
       screen.getByRole("group", { name: "Filtrar por turno" }),

@@ -10,8 +10,7 @@
  * `caracteristicas` o dejara pasar las reservas de Touza, la cifra cambiaría y este test caería.
  *
  * El Reservado de Casa Tomás (`privada: true`) está FUERA DE AFORO (decisión del dueño, 2026-10-03): no suma
- * sus 20 plazas (el aforo es 150, no 170), sus reservas no entran en ninguna cifra y un aviso aparte dice
- * si está ocupado.
+ * sus 20 plazas (el aforo es 150, no 170) y sus reservas no entran en ninguna cifra.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -107,7 +106,7 @@ describe("ReservasHoy · ocupación de Casa Tomás contra su aforo", () => {
     expect(screen.getByText("4%")).toBeInTheDocument();
   });
 
-  it("el Reservado ocupado NO entra en las cifras (ni reservas ni comensales ni %) pero se avisa aparte", async () => {
+  it("el Reservado ocupado NO entra en las cifras (ni reservas ni comensales ni %)", async () => {
     (doble.tablas.reservas as unknown[]).push(
       reserva("ct-reservado-garcia", { hora: "14:00:00", nombre: "García", numero_comensales: 8, espacio_id: "ct-reservado" }),
     );
@@ -115,15 +114,5 @@ describe("ReservasHoy · ocupación de Casa Tomás contra su aforo", () => {
 
     expect(await screen.findByText("6/150 pax · 2 res.")).toBeInTheDocument();
     expect(screen.getByText("4%")).toBeInTheDocument();
-    const aviso = await screen.findByTestId("aviso-sala-privada");
-    expect(aviso).toHaveTextContent("ct-reservado: ocupado — García, 8 pax (comida); libre en la cena");
-    expect(aviso).toHaveTextContent("Fuera de aforo");
-  });
-
-  it("con el Reservado libre dice «libre» (y las cifras no cambian)", async () => {
-    montar();
-
-    expect(await screen.findByText("6/150 pax · 2 res.")).toBeInTheDocument();
-    expect(await screen.findByTestId("aviso-sala-privada")).toHaveTextContent("ct-reservado: libre");
   });
 });
