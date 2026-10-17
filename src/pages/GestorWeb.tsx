@@ -123,13 +123,11 @@ export default function GestorWeb() {
     <DashboardLayout>
       <div ref={setRaiz} className="flex flex-col space-y-6" style={alto ? { height: alto } : undefined}>
         {/* Sin título "Gestor Web" (2026-09-25): ya lo dice la pestaña activa
-            del menú lateral. Se conserva el subtítulo: no es relleno, aclara
-            que la página cubre DOS webs distintas (Casa Tomás y Touza), algo
-            que el menú no dice. */}
-        <div className="flex shrink-0 items-center justify-between gap-2">
-          <p className="text-muted-foreground" data-tour="gw-intro">
-            Todo lo que aparece en las webs de Casa Tomás y Touza: carta, novedades, menús y tapas.
-          </p>
+            del menú lateral. Sin subtítulo (2026-10-17): el recorrido de ayuda
+            ya explica que la página cubre Casa Tomás y Touza. `data-tour`
+            se queda en el contenedor para que el recorrido siga teniendo
+            dónde anclarse. */}
+        <div className="flex shrink-0 items-center justify-end gap-2" data-tour="gw-intro">
           <BotonAyuda seccion="gestor-web" />
         </div>
 

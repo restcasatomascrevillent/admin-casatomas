@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/DashboardLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListaUsuarios } from "@/components/usuarios/ListaUsuarios";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 
@@ -27,9 +27,6 @@ export default function Usuarios() {
         <Card className="flex min-h-0 min-w-0 flex-1 flex-col">
           <CardHeader className="shrink-0 p-4 sm:p-6">
             <CardTitle>Lista de Usuarios</CardTitle>
-            <CardDescription>
-              Consulta los accesos de cada usuario. Toda la gestión se realiza desde el superadmin.
-            </CardDescription>
           </CardHeader>
           <CardContent className="flex min-h-0 min-w-0 flex-1 flex-col px-3 pb-3 pt-0 sm:px-6 sm:pb-6">
             <ListaUsuarios />
