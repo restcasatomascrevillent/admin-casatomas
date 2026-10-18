@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Loader2, Percent, Search, X, Maximize2, Minimize2 } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import {
   Select,
   SelectContent,
@@ -208,43 +209,40 @@ export default function TabCarta() {
         className="w-full space-y-4"
       >
         {/* Barra: secciones + acciones */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="max-w-full overflow-x-auto" data-tour="gw-carta-secciones">
-            <TabsList className="h-auto w-auto">
-              {(Object.keys(secciones) as Seccion[]).map((seccion) => (
-                <TabsTrigger
-                  key={seccion}
-                  value={seccion}
-                  className="min-h-11 gap-1.5 px-4"
-                  data-tour={seccion === "vinos" ? "gw-carta-vinos" : undefined}
-                >
-                  {secciones[seccion].etiqueta}
-                  <span className="text-xs text-muted-foreground tabular-nums">{secciones[seccion].total}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
-          <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-acciones">
-            <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)}>
-              <Percent className="mr-2 h-4 w-4" />
-              Ajustar precios
-            </Button>
-            {seccionActiva === "vinos" && (
-              <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-vinos-foto">
-                <BotonVinoDesdeFoto
-                  categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
-                  onLeido={(resultado) => {
-                    setPrecargaVino(resultado);
-                    setDialogVinoOpen(true);
-                  }}
-                />
+        <div data-tour="gw-carta-secciones">
+          <PestanasPagina
+            pestanas={(Object.keys(secciones) as Seccion[]).map((seccion) => ({
+              valor: seccion,
+              etiqueta: secciones[seccion].etiqueta,
+              contador: secciones[seccion].total,
+              etiquetaContador: `${secciones[seccion].total} ${secciones[seccion].etiqueta.toLowerCase()}`,
+              contadorEnMovil: true,
+              tour: seccion === "vinos" ? "gw-carta-vinos" : undefined,
+            }))}
+            acciones={
+              <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-acciones">
+                <Button variant="outline" onClick={() => setDialogAjustePreciosOpen(true)} title="Ajustar precios">
+                  <Percent className="h-4 w-4 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only">Ajustar precios</span>
+                </Button>
+                {seccionActiva === "vinos" && (
+                  <div className="flex flex-wrap items-center gap-2" data-tour="gw-carta-vinos-foto">
+                    <BotonVinoDesdeFoto
+                      categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
+                      onLeido={(resultado) => {
+                        setPrecargaVino(resultado);
+                        setDialogVinoOpen(true);
+                      }}
+                    />
+                  </div>
+                )}
+                <Button onClick={actual.abrirDialogo} title={actual.añadir}>
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="sr-only sm:not-sr-only">{actual.añadir}</span>
+                </Button>
               </div>
-            )}
-            <Button onClick={actual.abrirDialogo}>
-              <Plus className="mr-2 h-4 w-4" />
-              {actual.añadir}
-            </Button>
-          </div>
+            }
+          />
         </div>
 
         {/* Filtros */}

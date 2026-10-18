@@ -101,23 +101,22 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                       {coctel.categoria}
                     </Badge>
                   )}
-                  {coctel.imagen_url && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11"
-                      title={fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
-                      aria-label={fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
-                      onClick={() => toggleFotoVisible(coctel.id)}
-                    >
-                      {fotosOcultas.has(coctel.id) ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11"
+                    disabled={!coctel.imagen_url?.trim()}
+                    title={!coctel.imagen_url?.trim() ? "Este cóctel no tiene foto" : fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={!coctel.imagen_url?.trim() ? "Este cóctel no tiene foto" : fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
+                    onClick={() => toggleFotoVisible(coctel.id)}
+                  >
+                    {fotosOcultas.has(coctel.id) ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
 

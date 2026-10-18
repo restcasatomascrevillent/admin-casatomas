@@ -89,25 +89,24 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                 <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
                   {bebida.nombre}
                 </h3>
-                {bebida.imagen_url && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11"
-                      title={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
-                      aria-label={fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
-                      onClick={() => toggleFotoVisible(bebida.id)}
-                    >
-                      {fotosOcultas.has(bebida.id) ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-11 w-11"
+                    disabled={!bebida.imagen_url?.trim()}
+                    title={!bebida.imagen_url?.trim() ? "Esta bebida no tiene foto" : fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={!bebida.imagen_url?.trim() ? "Esta bebida no tiene foto" : fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
+                    onClick={() => toggleFotoVisible(bebida.id)}
+                  >
+                    {fotosOcultas.has(bebida.id) ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
 
               {/* Visibilidad Web */}
