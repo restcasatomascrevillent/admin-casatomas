@@ -19,7 +19,7 @@ export function InterruptorMenuTapas({ boton }: { boton: BotonMenuTapas }) {
         : null;
   return (
     <Card data-tour="gw-menu-interruptor">
-      <CardContent className="space-y-1 p-4">
+      <CardContent className="space-y-1 px-4 py-2.5">
         <div className="flex min-h-11 items-center justify-between gap-4">
           <Label htmlFor={id} className="cursor-pointer">Mostrar «{nombre}» en la web de Casa Tomás</Label>
           <Switch id={id} checked={mostrarBotonesMenuTapas[boton]}
