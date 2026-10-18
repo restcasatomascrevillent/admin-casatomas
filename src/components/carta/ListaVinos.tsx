@@ -158,7 +158,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11"
+                    className="h-11 w-11 disabled:opacity-100"
                     disabled={!vino.imagen_url?.trim()}
                     title={!vino.imagen_url?.trim() ? "Este vino no tiene foto" : fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
                     aria-label={!vino.imagen_url?.trim() ? "Este vino no tiene foto" : fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}

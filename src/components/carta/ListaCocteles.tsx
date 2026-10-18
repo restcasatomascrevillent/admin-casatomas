@@ -105,7 +105,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11"
+                    className="h-11 w-11 disabled:opacity-100"
                     disabled={!coctel.imagen_url?.trim()}
                     title={!coctel.imagen_url?.trim() ? "Este cóctel no tiene foto" : fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
                     aria-label={!coctel.imagen_url?.trim() ? "Este cóctel no tiene foto" : fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}

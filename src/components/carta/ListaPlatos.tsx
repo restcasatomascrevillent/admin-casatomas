@@ -165,7 +165,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11"
+                    className="h-11 w-11 disabled:opacity-100"
                     disabled={!plato.imagen_url?.trim()}
                     title={!plato.imagen_url?.trim() ? "Este plato no tiene foto" : fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}
                     aria-label={!plato.imagen_url?.trim() ? "Este plato no tiene foto" : fotosOcultas.has(plato.id) ? "Mostrar foto" : "Ocultar foto"}

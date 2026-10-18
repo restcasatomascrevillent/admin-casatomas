@@ -94,7 +94,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-11 w-11"
+                    className="h-11 w-11 disabled:opacity-100"
                     disabled={!bebida.imagen_url?.trim()}
                     title={!bebida.imagen_url?.trim() ? "Esta bebida no tiene foto" : fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
                     aria-label={!bebida.imagen_url?.trim() ? "Esta bebida no tiene foto" : fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
