@@ -123,15 +123,6 @@ export default function GestorWeb() {
   return (
     <DashboardLayout>
       <div ref={setRaiz} className="flex flex-col space-y-6" style={alto ? { height: alto } : undefined}>
-        {/* Sin título "Gestor Web" (2026-09-25): ya lo dice la pestaña activa
-            del menú lateral. Sin subtítulo (2026-10-17): el recorrido de ayuda
-            ya explica que la página cubre Casa Tomás y Touza. `data-tour`
-            se queda en el contenedor para que el recorrido siga teniendo
-            dónde anclarse. */}
-        <div className="flex shrink-0 items-center justify-end gap-2" data-tour="gw-intro">
-          <BotonAyuda seccion="gestor-web" />
-        </div>
-
         {loading ? (
           <Cargando />
         ) : !pestanaActiva ? (
@@ -143,6 +134,15 @@ export default function GestorWeb() {
                 const Icono = ICONOS[p.id];
                 return { valor: p.id, etiqueta: p.label, icono: <Icono />, tour: `gw-pestana-${p.id}` };
               })}
+              acciones={
+                // Sin título "Gestor Web" (2026-09-25): ya lo dice la pestaña activa del menú
+                // lateral. Sin subtítulo (2026-10-17): el recorrido de ayuda ya explica que la
+                // página cubre Casa Tomás y Touza. `data-tour="gw-intro"` es el arranque del
+                // recorrido; se queda en este botón al no haber ya una franja propia para él.
+                <span data-tour="gw-intro">
+                  <BotonAyuda seccion="gestor-web" />
+                </span>
+              }
             />
           </Tabs>
         )}

@@ -64,13 +64,15 @@ afterEach(() => {
 });
 
 describe("Gestor Web · ocupa el alto de la pantalla, sin scroll de página", () => {
-  it("la página mide justo lo que queda de ventana y deja fijos el subtítulo y la barra de pestañas", async () => {
+  it("la página mide justo lo que queda de ventana y deja fija la barra de pestañas (con la ayuda dentro)", async () => {
     conLayout(800);
     await montar();
 
     // 800 − 24 − 24: termina en el borde inferior del <main>, sin scroll de página.
     expect(pagina().style.height).toBe("752px");
     expect(pagina()).toHaveClass("flex", "flex-col");
+    // Sin franja propia para el botón de ayuda (2026-10-18): vive en las acciones de la
+    // barra de pestañas, a la misma altura que en el resto de módulos.
     expect(screen.getByRole("button", { name: /Ayuda/ }).closest(".shrink-0")).not.toBeNull();
     expect(screen.getByRole("tablist").closest(".shrink-0")).not.toBeNull();
   });
