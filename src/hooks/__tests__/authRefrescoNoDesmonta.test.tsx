@@ -82,6 +82,15 @@ vi.mock("@/integrations/supabase/client", () => {
         signInWithPassword: vi.fn(),
       },
       functions: { invoke: vi.fn() },
+      // AuthProvider se suscribe por Realtime a `user_access_status` para
+      // cerrar la sesión de un usuario bloqueado (bloqueo de acceso). Sin
+      // estos dos métodos el efecto lanzaba y la página protegida no llegaba
+      // a montarse en el test.
+      channel: vi.fn(() => {
+        const canal = { on: () => canal, subscribe: () => canal };
+        return canal;
+      }),
+      removeChannel: vi.fn(async () => "ok"),
     },
   };
 });
