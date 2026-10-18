@@ -8,7 +8,10 @@ const deleted = '30000000-0000-0000-0000-000000000003';
 let checks = 0;
 const check = (value, expected, name) => { assert.deepEqual(value, expected, name); checks++; };
 const sql = (s, p) => db.query(s, p);
-const last = async () => (await sql('select * from public.audit_log order by created_at desc, id desc limit 1')).rows[0];
+// Desempate por transacción (xmin): dos sentencias seguidas pueden compartir
+// `created_at` en PGlite y el `id` es un UUID aleatorio; sin esto la prueba
+// a veces leía la fila anterior ("API · anon" en vez de "Base de datos").
+const last = async () => (await sql('select * from public.audit_log order by created_at desc, xmin::text::bigint desc, id desc limit 1')).rows[0];
 await db.exec(`
  create role anon; create role authenticated; create role service_role bypassrls;
  create role supabase_auth_admin superuser;
