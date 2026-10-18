@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:auditoria:db": "node scripts/test-auditoria.mjs"
+    "test:auditoria:db": "node scripts/test-auditoria.mjs",
+    "test:cheques:db": "node scripts/test-cheques-regalo.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
