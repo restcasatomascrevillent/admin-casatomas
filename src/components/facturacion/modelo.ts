@@ -41,7 +41,17 @@ export type Factura = z.infer<typeof facturaSchema>;
 export type LineaFactura = Factura["lineas"][number];
 export type ParteFactura = Factura["emisor"];
 export const euros = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
-export const redondear = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+/**
+ * Redondeo comercial a céntimos: la mitad hacia arriba y simétrico en negativos.
+ * `toPrecision(15)` quita el ruido binario ANTES de redondear: 21,50 € × 21 % =
+ * 4,515 se guarda como 4,51499999… y el `Math.round((n + EPSILON) * 100)` de antes
+ * daba 4,51 € (EPSILON solo compensa números cercanos a 1).
+ */
+export const redondear = (n: number) => {
+  const centimos = Math.round(Number((Math.abs(n) * 100).toPrecision(15)));
+  if (centimos === 0) return 0;
+  return (n < 0 ? -centimos : centimos) / 100;
+};
 export function nuevaLinea(categoria: LineaFactura["categoria"] = "Módulo"): LineaFactura {
   return { id: crypto.randomUUID(), categoria, concepto: categoria === "Instalación" ? "Instalación y puesta en marcha" : categoria,
     periodicidad: categoria === "Instalación" ? "Puntual" : "Mensual",
