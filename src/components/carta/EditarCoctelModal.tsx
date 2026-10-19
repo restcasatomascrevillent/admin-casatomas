@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { supabase } from "@/integrations/supabase/client";
+import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Coctel, useCocteles } from "@/hooks/useCocteles";
 import { toast } from "sonner";
 import {
@@ -177,6 +178,10 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
     try {
       const alergenos = combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados);
       let imageUrlUpdate: string | null | undefined = undefined;
+      // Foto que esta ficha deja de usar: se borra DESPUÉS de guardar (si el
+      // guardado falla, la ficha la sigue mostrando) y solo si ninguna otra
+      // ficha la usa (dos fichas pueden compartir la misma foto).
+      let fotoAntigua: string | null = null;
 
       if (imageFile) {
         const fileExt = imageFile.name.split(".").pop() || "jpg";
@@ -190,41 +195,13 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
 
         const { data: urlData } = supabase.storage.from("cocteles").getPublicUrl(fileName);
         imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
-
-        // Borrado defensivo de la imagen anterior cuando el nuevo fichero
-        // cambia de nombre (p.ej. extensión distinta: .jpg -> .png). El
-        // upsert solo sobrescribe cuando el nombre coincide EXACTO, y
-        // ".JPG"/".jpg" son objetos distintos en Storage, así que sin esto
-        // el objeto viejo queda huérfano. Si el borrado falla (fichero ya
-        // no existe, red, permisos...) no debe impedir que se guarde el
-        // resto de cambios del registro.
+        // Si el nuevo fichero cambia de nombre (p. ej. .jpg -> .png), el upsert
+        // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
         const nombreArchivoAnterior = nombreArchivoStorage(coctel.id, coctel.imagen_url);
-        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) {
-          try {
-            const { error: removeError } = await supabase.storage.from("cocteles").remove([nombreArchivoAnterior]);
-            if (removeError) {
-              console.error("No se pudo borrar la imagen antigua de Storage (cocteles):", removeError);
-            }
-          } catch (removeErr) {
-            console.error("Error borrando imagen antigua de Storage (cocteles):", removeErr);
-          }
-        }
+        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
       } else if (removeImage) {
         imageUrlUpdate = null;
-
-        // Borrado defensivo: si falla (fichero ya no existe, red, permisos...)
-        // no debe impedir que se guarde el resto de cambios del registro.
-        const nombreArchivo = nombreArchivoStorage(coctel.id, coctel.imagen_url);
-        if (nombreArchivo) {
-          try {
-            const { error: removeError } = await supabase.storage.from("cocteles").remove([nombreArchivo]);
-            if (removeError) {
-              console.error("No se pudo borrar la imagen antigua de Storage (cocteles):", removeError);
-            }
-          } catch (removeErr) {
-            console.error("Error borrando imagen antigua de Storage (cocteles):", removeErr);
-          }
-        }
+        fotoAntigua = nombreArchivoStorage(coctel.id, coctel.imagen_url);
       }
 
       await actualizarCoctel.mutateAsync({
@@ -239,6 +216,10 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
         alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
       });
+
+      if (fotoAntigua) {
+        await borrarFotoSiNoSeUsa({ tabla: "Cocteles", bucket: "cocteles", ruta: fotoAntigua, excluirId: coctel.id });
+      }
 
       onOpenChange(false);
     } catch (error) {

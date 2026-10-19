@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
+import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 
 export interface Vino {
   id: string;
@@ -298,28 +299,30 @@ export function useVinos() {
 
   const eliminarVino = useMutation({
     mutationFn: async (id: string) => {
-      // Best-effort: borramos la foto de Storage ANTES de borrar la fila
-      // (después ya no hay dónde consultar imagen_url). Si algo falla aquí
-      // -no se puede derivar la ruta, o el propio borrado del objeto falla-
-      // NO debe impedir que se borre el registro; solo dejamos constancia
-      // por consola (ver informe, TAREA 2).
+      // La URL de la foto se toma de la caché ANTES de borrar la fila. La
+      // fila se borra primero: si falla, la foto sigue intacta (antes se
+      // borraba la foto y, si la fila no se borraba, el vino seguía en la
+      // carta con la imagen rota). La foto se borra después, best-effort y
+      // solo si ninguna otra ficha la usa (la Magnum comparte la de la
+      // botella normal).
       const anterior = queryClient.getQueryData<Vino[]>(["vinos"])?.find((v) => v.id === id);
+
+      const { data: borradas, error } = await supabase
+        .from("Vinos")
+        .delete()
+        .eq("id", id)
+        .select("id");
+
+      if (error) throw error;
+      // Con RLS, un DELETE sin permiso no da error: afecta a 0 filas.
+      if (!borradas?.length) throw new Error("El vino no se ha eliminado: puede que ya no exista o que no tengas permiso.");
+
       const ruta = rutaStorageDesdeUrl(anterior?.imagen_url);
       if (ruta) {
-        const { error: storageError } = await supabase.storage.from("vinos").remove([ruta]);
-        if (storageError) {
-          console.error("No se pudo borrar la imagen del vino en Storage:", storageError);
-        }
+        await borrarFotoSiNoSeUsa({ tabla: "Vinos", bucket: "vinos", ruta, excluirId: id });
       } else if (anterior?.imagen_url) {
         console.warn("No se pudo derivar la ruta de Storage desde imagen_url:", anterior.imagen_url);
       }
-
-      const { error } = await supabase
-        .from("Vinos")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
