@@ -1,0 +1,1 @@
+UPDATE "Vinos" SET imagen_url = '/images/ritus-balbas.jpeg', updated_at = now() WHERE id = '453220b5-59f9-4f44-b472-dc7d61be506c';

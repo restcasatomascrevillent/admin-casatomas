@@ -1,0 +1,41 @@
+-- ============================================================================
+--  Fijar search_path en validar_capacidad_reserva
+-- ----------------------------------------------------------------------------
+--  Es la ÚNICA función que quedó con `search_path` mutable tras la migración
+--  20260922200000_endurecer_funciones.sql. Se excluyó allí a propósito porque
+--  en ese momento otra tarea estaba reescribiendo su cuerpo
+--  (20260922190000_aforo_por_marca.sql, aforo filtrado por marca de negocio).
+--  Esa reescritura ya está aplicada, así que se puede cerrar el hueco.
+--
+--  POR QUÉ IMPORTA: la función es SECURITY DEFINER y respalda el trigger
+--  trg_validar_capacidad, que es la autoridad final del aforo. Con el
+--  search_path sin fijar, se la puede inducir a resolver `espacios_reserva` o
+--  `reservas` contra objetos de otro esquema (p. ej. `pg_temp`) y falsear el
+--  cálculo de aforo. Es el vector clásico de escalada en funciones DEFINER.
+--
+--  Se usa 'public' y no '' porque el cuerpo referencia las tablas sin
+--  cualificar (`FROM espacios_reserva`, `FROM reservas`). Mismo criterio que
+--  las 14 funciones equivalentes de la migración 20260922200000. Cierra el
+--  aviso del advisor; el shadowing residual por pg_temp solo se elimina
+--  cualificando cada referencia, lo que exigiría reescribir el cuerpo.
+--
+--  Idempotente: ALTER FUNCTION ... SET es seguro de re-ejecutar.
+-- ============================================================================
+
+alter function public.validar_capacidad_reserva() set search_path = 'public';
+
+-- ----------------------------------------------------------------------------
+-- VERIFICACIÓN (ejecutar a mano antes y después)
+-- ----------------------------------------------------------------------------
+--   select proname, proconfig
+--   from pg_proc
+--   where pronamespace = 'public'::regnamespace
+--     and proname = 'validar_capacidad_reserva';
+--
+--   Antes:   proconfig = NULL
+--   Después: proconfig = {search_path=public}
+--
+--   Y que el advisor deje de listarla:
+--   GET https://api.supabase.com/v1/projects/<ref>/advisors/security
+--     -> function_search_path_mutable debe bajar de 1 a 0
+-- ----------------------------------------------------------------------------

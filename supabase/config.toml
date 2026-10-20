@@ -1,0 +1,252 @@
+project_id = "jeamoczmbfsnwkfjxcyo"
+
+# ============================================================================
+# verify_jwt — criterio de este proyecto
+# ----------------------------------------------------------------------------
+# LEER ANTES DE TOCAR NADA: `verify_jwt = true` NO ES AUTENTICACIÓN.
+# La anon/publishable key es un JWT válido y viaja en el bundle público de las
+# webs y del panel, así que cualquiera puede copiarla y pasar el filtro. Lo
+# único que hace `true` es descartar en la pasarela las peticiones que no traen
+# NINGUNA cabecera (bots, curl a pelo, escáneres). Es un filtro barato, no una
+# barrera. La autorización de verdad la tiene que hacer cada función.
+#
+# Regla aplicada aquí:
+#   · false  SOLO si la función necesita ser alcanzable SIN cabeceras
+#            (enlaces GET dentro de un correo, webhooks de terceros) Y lleva su
+#            propia autenticación real (HMAC, firma svix).  -> 3 funciones.
+#   · true   en todo lo demás. Todos sus llamadores usan
+#            `supabase.functions.invoke()` con sesión iniciada, o `fetch` con
+#            `apikey` + `Authorization`, así que el filtro no les afecta.
+#
+# TODA función desplegable tiene entrada explícita abajo. Si falta una, la CLI
+# asume `verify_jwt = true` al desplegarla y puede romperla en silencio.
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = false — las funciones que TIENEN que responder sin cabeceras
+# ----------------------------------------------------------------------------
+
+# Rutas GET dentro de un correo electrónico: el cliente pulsa "Confirmar" o
+# "Cancelar" desde Gmail y el navegador NO manda `Authorization` ni `apikey`.
+# Con verify_jwt = true la pasarela devuelve 401 antes de ejecutar la función y
+# el flujo de confirmación de reservas queda muerto.
+# La autenticación real es un token HMAC-SHA256 de un solo uso por reserva
+# (RESERVAS_WEB_TOKEN_SECRET, firma sobre id+acción+huella de la fila; el
+# primer uso mueve `updated_at` e invalida el token). Ver index.ts:275-345.
+# Las 2 rutas POST (/disponibilidad, /crear) sí reciben
+# `apikey` + `Authorization` desde casa-tomas-story, así que no pierden nada.
+[functions.reservas-web]
+verify_jwt = false
+
+# Pública sin JWT: la visitan destinatarios anónimos del newsletter (enlace de
+# baja en el email / cabecera List-Unsubscribe). Se autoriza con un HMAC propio
+# en vez de con Supabase Auth (ver supabase/functions/newsletter-baja/index.ts).
+[functions.newsletter-baja]
+verify_jwt = false
+
+# La llama Resend, no el panel: nunca va a traer un JWT de Supabase. Verifica
+# la firma svix de la petición, que es su autenticación de verdad.
+[functions.resend-webhook]
+verify_jwt = false
+
+# Rutas GET dentro de un correo electrónico: el cliente pulsa "Sí, confirmo
+# mi asistencia" o "No puedo, cancelar reserva" desde Gmail y el navegador
+# NO manda `Authorization` ni `apikey`. Mismo motivo exacto que
+# reservas-web arriba. La autenticación real es un token HMAC-SHA256 de un
+# solo uso por reserva (EMAILS_RESERVA_TOKEN_SECRET, ver
+# supabase/functions/emails-reserva/tokens.ts). Las 3 rutas POST
+# (/notificar, /recordatorios, /detectar-ausencias) se autentican con
+# EMAILS_RESERVA_SHARED_SECRET (cabecera x-webhook-secret) y FALLAN CERRADO
+# si esa env var falta — a diferencia de checkSharedSecret en reservas-web,
+# que falla abierto (ver docs/REVISION-PUERTOS-N8N.md A-3).
+[functions.emails-reserva]
+verify_jwt = false
+
+# La llama pg_cron (net.http_post, 03:30 UTC) sin usuario ni JWT: con
+# verify_jwt = true la pasarela la cortaría con 401. La autenticación real es
+# la cabecera x-webhook-secret == TRAFICO_WEB_CRON_SECRET (comparación en
+# tiempo constante, FALLA CERRADO si la env var falta -> 500). El valor sale
+# del secreto de Vault 'trafico_web_cron_secret'. Ver
+# supabase/functions/sync-trafico-web/{index.ts,DEPLOY.md} y la migración
+# 20260923200000_trafico_web.sql.
+[functions.sync-trafico-web]
+verify_jwt = false
+
+# La llama pg_cron / el Cron del Dashboard una vez al día SIN usuario ni JWT
+# (sincronización diaria del newsletter con Resend Marketing). Mismo caso que
+# sync-trafico-web. Autenticación real, una de dos:
+#   · x-webhook-secret == NEWSLETTER_SYNC_CRON_SECRET (tiempo constante, FALLA
+#     CERRADO -> 500 si la env var falta), o
+#   · JWT de usuario + can_read_section/can_write_section('marketing') (panel).
+# Sin ninguna de las dos cabeceras -> 401. Ver
+# supabase/functions/newsletter-sync-resend/{index.ts,peticion.ts}.
+[functions.newsletter-sync-resend]
+verify_jwt = false
+
+# OCR de documentos largos en segundo plano (04b). La llama SOLO Postgres
+# (net.http_post desde ocr_despachar() y el cron reanudar-trabajos-ocr), sin
+# usuario ni JWT. Autenticación real: cabecera x-ocr-secret ==
+# OCR_TRABAJOS_SECRET (tiempo constante, FALLA CERRADO -> 500 si falta). El
+# valor sale del secreto de Vault 'ocr_trabajos_secret'. Solo acepta ids, nunca
+# rutas. Ver supabase/functions/ocr-trabajo/index.ts y la migración
+# 20261005120000_ocr_trabajos_multipagina.sql.
+[functions.ocr-trabajo]
+verify_jwt = false
+
+# clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
+# JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
+# mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con
+# el JWT de un usuario: entonces comprueba que tiene permiso de EDICIÓN en
+# facturas (has_section_permission). No acepta datos del cuerpo. Ver
+# supabase/functions/clasificar-productos/index.ts y la migración
+# 20261007160000_productos_catalogo_categorias.sql.
+[functions.clasificar-productos]
+verify_jwt = false
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = true — autenticación propia REAL + filtro barato encima
+# ----------------------------------------------------------------------------
+# Estas validan un usuario real (`auth.getUser()`) y, casi todas, el permiso
+# concreto. `true` es solo el prefiltro del gateway.
+
+# JWT de usuario + `is_admin()` + allowlist SUPER_ADMIN_EMAILS.
+[functions.admin-create-user]
+verify_jwt = true
+
+[functions.admin-delete-user]
+verify_jwt = true
+
+[functions.admin-update-user-password]
+verify_jwt = true
+
+[functions.list-users]
+verify_jwt = true
+
+[functions.admin-set-super-admin]
+verify_jwt = true
+
+# JWT de usuario + has_section_permission().
+[functions.chat-facturas]
+verify_jwt = true
+
+[functions.procesar-factura]
+verify_jwt = true
+
+# Proxy de OpenAI (antes Lovable/Gemini). La autenticación REAL la hace la
+# propia función (usuario autenticado + has_section_permission 'espacios'),
+# mismo patrón que procesar-factura.
+[functions.procesar-dibujo-perimetro]
+verify_jwt = true
+
+[functions.notify-reservation-change]
+verify_jwt = true
+
+# Proxy de OpenAI. La autenticación REAL la hace la propia función
+# (usuario autenticado + has_section_permission 'gestion_web').
+[functions.format-novedad]
+verify_jwt = true
+
+# JWT de usuario + has_section_permission('gestor_carta'). Además cada llamada
+# puede disparar builds de pago en Vercel, así que el prefiltro interesa.
+[functions.rebuild-webs]
+verify_jwt = true
+
+# JWT de usuario + can_write_section('marketing') (enviar-newsletter/permiso.ts
+# -> _shared/permiso-marketing.ts). La anon key NO cuela aquí, porque no tiene
+# usuario asociado.
+[functions.enviar-newsletter]
+verify_jwt = true
+
+[functions.registrar-metrica]
+verify_jwt = true
+
+[functions.leer-metricas]
+verify_jwt = true
+
+[functions.vapi-analytics]
+verify_jwt = true
+
+# JWT de usuario + can_read_section('cheques').
+[functions.stripe-estado-cuenta]
+verify_jwt = true
+
+
+# ----------------------------------------------------------------------------
+# verify_jwt = true — SIN autenticación propia: el gateway es lo único delante
+# ----------------------------------------------------------------------------
+# Todas se invocan solo desde el panel con sesión, así que `true` no molesta.
+# Casi todas queman crédito de un tercero de pago por llamada, de modo que
+# dejarlas en `false` es regalar la factura a quien encuentre la URL.
+# PENDIENTE (no es despliegue, es deuda): darles una comprobación de permiso
+# propia al estilo de `rebuild-webs`.
+
+# Crédito de Perplexity por llamada.
+[functions.buscar-precios-mercado]
+verify_jwt = true
+
+# Crédito de OpenAI por llamada. El modo `bulk` sí exige la service role key.
+[functions.traducir-contenido]
+verify_jwt = true
+
+[functions.extraer-vino-foto]
+verify_jwt = true
+
+[functions.traducir-carta]
+verify_jwt = true
+
+[functions.traducir-carta-auto]
+verify_jwt = true
+
+[functions.traducir-novedad]
+verify_jwt = true
+
+[functions.traducir-novedad-auto]
+verify_jwt = true
+
+# Escribe en `resenas` y `config_google_places` con service role y consume
+# cuota de Google Places. Nunca comprueba `req.method` ni lee el body: un GET
+# pelado a la URL dispara la sincronización entera. Es la más expuesta del lote.
+[functions.sync-google-reviews]
+verify_jwt = true
+
+# Endpoint público del chatbot de casa-tomas-story. Sin JWT (igual que
+# reservas-web): la web manda una publishable key `sb_publishable_…`, que no es
+# un JWT, y con `true` la pasarela respondería 401 a todo. La protección real es
+# el cupo `chat_web_reservar_cupo` + limitadores fail-closed (503 si fallan).
+[functions.chat-web]
+verify_jwt = false
+
+# Huérfanas: cero llamadores en los cuatro repos. Se dejan a `true` para que no
+# queden como endpoints abiertos mientras se decide si se borran.
+# - enviar-imagen-webhook: sin llamadores y sin variables de entorno.
+# - notify-config-bot-change: relay sin autenticar a un webhook de n8n
+#   hardcodeado en el código (index.ts:8).
+[functions.enviar-imagen-webhook]
+verify_jwt = true
+
+[functions.notify-config-bot-change]
+verify_jwt = true
+
+
+# Login público: comprueba las credenciales en Auth, registra antes/después
+# desde service_role y limita intentos en SQL. Nunca confía en actor del body.
+[functions.panel-auth]
+verify_jwt = false
+
+# sincronizar-costes-openai: la llama SOLO el cron «sincronizar-costes-openai»
+# por pg_net (sin JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo
+# secreto y mismo valor de Vault que ocr-trabajo). No acepta datos del cuerpo:
+# con OPENAI_ADMIN_KEY trae de OpenAI el gasto real (GET /v1/organization/costs)
+# y el tipo de cambio del BCE. Ver supabase/functions/sincronizar-costes-openai/
+# y la migración 20261008150000_openai_costes_reales.sql.
+[functions.sincronizar-costes-openai]
+verify_jwt = false
+
+
+[functions.auditoria-revertir]
+verify_jwt = true
+
+[functions.admin-set-user-access]
+verify_jwt = true

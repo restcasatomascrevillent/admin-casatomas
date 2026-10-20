@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Tablet táctil: NO se bloquea el zoom (sin maximum-scale / user-scalable=no).
+         viewport-fit=cover permite usar el área segura (notch / barra de inicio) con
+         env(safe-area-inset-*); interactive-widget=resizes-content hace que en Android el
+         teclado en pantalla reduzca el viewport (en iOS lo cubre useVisualViewportVars). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Casa Tomás" />
+    <link rel="icon" href="/favicon.ico" type="image/x-icon" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#393F47" />
+    <title>Casa Tomás · Panel de gestión</title>
+    <meta name="description" content="Panel de administración interno de Casa Tomás: gestión de reservas, espacios, carta, facturas y comunicación con clientes." />
+    <meta name="author" content="Casa Tomás" />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <meta property="og:title" content="aroma-assist-pro" />
+    <meta property="og:description" content="Panel de administración interno de Casa Tomás." />
+    <meta property="og:type" content="website" />
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

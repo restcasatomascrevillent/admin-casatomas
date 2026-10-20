@@ -1,0 +1,1 @@
+UPDATE "Vinos" SET imagen_url = '/images/terreus.jpeg', updated_at = now() WHERE id = '8ae1eafd-7999-4180-93dc-362364091af0';

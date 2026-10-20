@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "Casa Tomás · Panel de gestión",
+  "short_name": "Casa Tomás",
+  "description": "Panel de gestión interno de Casa Tomás: reservas, espacios, carta, facturas y clientes.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#FFFFFF",
+  "theme_color": "#393F47",
+  "lang": "es",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "food"],
+  "icons": [
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}

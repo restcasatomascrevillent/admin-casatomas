@@ -1,0 +1,165 @@
+import { describe, it, expect } from "vitest";
+import {
+  comensalesEnEspacioTurno,
+  esErrorColumnaLlegadaInexistente,
+  evaluarMovimiento,
+  ocupaEspacio,
+  aplicarCambioReserva,
+  mensajeErrorServicio,
+  type ReservaServicio,
+} from "@/lib/reservas/servicioSala";
+// Los predicados de estado viven en el mapa único; los alias de este módulo
+// (`esperandoLlegada`, `puedeMoverReserva`) se quitaron en el paso 4.
+import { esEstadoVivo } from "@/lib/reservas/estadosReserva";
+
+const r = (o: Partial<ReservaServicio> = {}): ReservaServicio => ({
+  id: "x",
+  nombre: "Cliente",
+  hora: "21:00:00",
+  numero_comensales: 4,
+  estado: "confirmada",
+  espacio_id: null,
+  ...o,
+});
+
+describe("reglas de estado", () => {
+  it("no se mueven canceladas ni no presentadas (no ocupan sitio)", () => {
+    expect(ocupaEspacio("cancelada")).toBe(false);
+    expect(ocupaEspacio("no_show")).toBe(false);
+    expect(ocupaEspacio("completada")).toBe(true);
+    expect(ocupaEspacio("pendiente")).toBe(true);
+  });
+
+  it("solo se espera llegada en estados activos (vivos)", () => {
+    expect(esEstadoVivo("confirmada")).toBe(true);
+    expect(esEstadoVivo("pendiente")).toBe(true);
+    expect(esEstadoVivo("completada")).toBe(false);
+    expect(esEstadoVivo("cancelada")).toBe(false);
+  });
+});
+
+describe("comensalesEnEspacioTurno", () => {
+  const reservas = [
+    r({ id: "a", espacio_id: "comedor", hora: "13:30:00", numero_comensales: 10 }),
+    r({ id: "b", espacio_id: "comedor", hora: "21:00:00", numero_comensales: 6 }),
+    r({ id: "c", espacio_id: "comedor", hora: "21:30:00", numero_comensales: 5, estado: "completada" }),
+    r({ id: "d", espacio_id: "comedor", hora: "22:00:00", numero_comensales: 9, estado: "no_show" }),
+    r({ id: "e", espacio_id: "comedor", hora: "22:00:00", numero_comensales: 9, estado: "cancelada" }),
+    r({ id: "f", espacio_id: null, hora: "21:00:00", numero_comensales: 2 }),
+  ];
+
+  it("separa comida y cena con el corte de las 17:00 y cuenta a los que ya llegaron", () => {
+    expect(comensalesEnEspacioTurno(reservas, "comedor", "comida")).toBe(10);
+    expect(comensalesEnEspacioTurno(reservas, "comedor", "cena")).toBe(11);
+    expect(comensalesEnEspacioTurno(reservas, null, "cena")).toBe(2);
+  });
+
+  it("puede excluir la propia reserva", () => {
+    expect(comensalesEnEspacioTurno(reservas, "comedor", "cena", "b")).toBe(5);
+  });
+});
+
+describe("evaluarMovimiento", () => {
+  const todas = [
+    r({ id: "ya", espacio_id: "terraza", numero_comensales: 18 }),
+    r({ id: "mueve", espacio_id: null, numero_comensales: 4 }),
+    r({ id: "comida", espacio_id: "terraza", hora: "14:00:00", numero_comensales: 20 }),
+  ];
+
+  it("ok cuando cabe en el turno", () => {
+    const ev = evaluarMovimiento(todas[1], "terraza", todas, 30);
+    expect(ev).toEqual({ tipo: "ok", turno: "cena", ocupacionTras: 22, capacidad: 30 });
+  });
+
+  it("excede_capacidad si se pasa (sin mezclar el turno de comida)", () => {
+    const ev = evaluarMovimiento(todas[1], "terraza", todas, 20);
+    expect(ev).toMatchObject({ tipo: "excede_capacidad", ocupacionTras: 22, capacidad: 20 });
+  });
+
+  it("sin_cambio si ya está en el destino", () => {
+    expect(evaluarMovimiento(todas[0], "terraza", todas, 30)).toEqual({ tipo: "sin_cambio" });
+  });
+
+  it("'Sin asignar' no tiene capacidad", () => {
+    expect(evaluarMovimiento(todas[0], null, todas, undefined)).toMatchObject({ tipo: "ok", capacidad: null });
+  });
+
+  it("bloquea canceladas y no_show", () => {
+    expect(evaluarMovimiento(r({ estado: "cancelada" }), "terraza", todas, 30).tipo).toBe("bloqueado");
+    expect(evaluarMovimiento(r({ estado: "no_show" }), "terraza", todas, 30).tipo).toBe("bloqueado");
+  });
+
+  it("y lo explica con el vocabulario único: «No vino», no «no se presentó»", () => {
+    expect(evaluarMovimiento(r({ estado: "cancelada" }), "terraza", todas, 30)).toEqual({
+      tipo: "bloqueado",
+      motivo: "Las reservas canceladas no se pueden mover.",
+    });
+    expect(evaluarMovimiento(r({ estado: "no_show" }), "terraza", todas, 30)).toEqual({
+      tipo: "bloqueado",
+      motivo: "Una reserva marcada como «No vino» no ocupa espacio.",
+    });
+  });
+});
+
+describe("utilidades", () => {
+  it("aplicarCambioReserva no muta y solo toca la fila indicada", () => {
+    const lista = [r({ id: "a" }), r({ id: "b" })];
+    const nueva = aplicarCambioReserva(lista, "b", { espacio_id: "salon" });
+    expect(nueva?.[1].espacio_id).toBe("salon");
+    expect(lista[1].espacio_id).toBeNull();
+    expect(nueva?.[0]).toBe(lista[0]);
+    expect(aplicarCambioReserva(undefined, "a", {})).toBeUndefined();
+  });
+
+  it("detecta que la columna llegada_at aún no existe", () => {
+    expect(esErrorColumnaLlegadaInexistente({ code: "PGRST204", message: "Could not find the 'llegada_at' column of 'reservas' in the schema cache" })).toBe(true);
+    expect(esErrorColumnaLlegadaInexistente({ code: "42703", message: 'column "llegada_at" of relation "reservas" does not exist' })).toBe(true);
+    expect(esErrorColumnaLlegadaInexistente({ code: "42501", message: "permission denied" })).toBe(false);
+    expect(esErrorColumnaLlegadaInexistente(null)).toBe(false);
+  });
+
+  it("traduce el error de aforo del trigger", () => {
+    expect(mensajeErrorServicio({ code: "23514", message: "Aforo superado para el turno" }, "deshacer la llegada")).toMatch(/turno ya está completo/);
+    expect(mensajeErrorServicio({ message: "boom" }, "mover la reserva")).toBe("No se pudo mover la reserva: boom");
+  });
+});
+
+describe("sala privada (el Reservado)", () => {
+  const ocupante = r({ id: "primera", nombre: "Ana", espacio_id: "reservado", numero_comensales: 5, estado: "confirmada" });
+  const entrante = r({ id: "segunda", nombre: "Luis", espacio_id: null, numero_comensales: 2 });
+
+  it("bloquea mover a la sala privada si ya hay otra reserva en el turno", () => {
+    const ev = evaluarMovimiento(entrante, "reservado", [ocupante, entrante], 20, { nombre: "Reservado" });
+    expect(ev.tipo).toBe("bloqueado");
+    expect(ev).toMatchObject({ motivo: expect.stringContaining("«Reservado»") });
+    expect(ev).toMatchObject({ motivo: expect.stringContaining("Ya la tiene Ana") });
+  });
+
+  it("deja mover si la sala está libre en ese turno (otro turno, cancelada, «No vino»)", () => {
+    const comida = r({ id: "c", espacio_id: "reservado", hora: "14:00:00" });
+    expect(evaluarMovimiento(entrante, "reservado", [comida, entrante], 20, { nombre: "Reservado" }).tipo).toBe("ok");
+    const cancelada = { ...ocupante, estado: "cancelada" };
+    expect(evaluarMovimiento(entrante, "reservado", [cancelada, entrante], 20, { nombre: "Reservado" }).tipo).toBe("ok");
+    const noShow = { ...ocupante, estado: "no_show" };
+    expect(evaluarMovimiento(entrante, "reservado", [noShow, entrante], 20, { nombre: "Reservado" }).tipo).toBe("ok");
+  });
+
+  it("una reserva que ya está en la sala y vuelve a 'moverse' ahí es sin_cambio, no un choque consigo misma", () => {
+    expect(evaluarMovimiento(ocupante, "reservado", [ocupante], 20, { nombre: "Reservado" })).toEqual({ tipo: "sin_cambio" });
+  });
+
+  it("sin el flag (sala normal) no cambia nada: caben varias", () => {
+    const ev = evaluarMovimiento(entrante, "reservado", [ocupante, entrante], 20);
+    expect(ev.tipo).toBe("ok");
+  });
+
+  it("mensajeErrorServicio traduce el error de la sala privada y no lo confunde con un aforo lleno", () => {
+    const m = mensajeErrorServicio(
+      { code: "23514", message: "Sala privada ocupada: «Reservado» ya tiene una reserva el 04/10/2026 en el turno de cena." },
+      "mover la reserva",
+    );
+    expect(m).toContain("No se pudo mover la reserva.");
+    expect(m).toContain("«Reservado»");
+    expect(m).not.toMatch(/aforo/i);
+  });
+});

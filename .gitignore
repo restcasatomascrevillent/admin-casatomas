@@ -1,0 +1,37 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Estado local de la CLI de Supabase (project-ref, pooler-url, versiones)
+# No debe versionarse: es cache de la maquina, no del proyecto
+supabase/.temp/
+
+# Sesión guardada para grabar los vídeos de ayuda (scripts/videos-ayuda): credenciales, nunca a git
+scripts/videos-ayuda/.sesion.json

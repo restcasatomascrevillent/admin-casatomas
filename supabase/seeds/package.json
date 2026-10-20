@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "commonjs",
+  "description": "Ambito local para que gen_seed.js (CommonJS, sin dependencias) se ejecute con 'node gen_seed.js ...' aunque el package.json raiz del proyecto sea \"type\": \"module\". No afecta a ningun otro paquete del repo."
+}

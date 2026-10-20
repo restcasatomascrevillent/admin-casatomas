@@ -1,0 +1,172 @@
+-- ===========================================================================
+-- ROLLBACK de supabase/migrations/20260926120000_capacidad_efectiva_mesas.sql
+-- ===========================================================================
+--
+-- Este fichero NO es una migracion y no debe copiarse a
+-- supabase/migrations/ (ver supabase/rollbacks/README.md sobre por que
+-- viven aqui separados: dentro de migrations/ la CLI los indexa como
+-- migraciones normales y `supabase db push` los ejecutaria en orden
+-- alfabetico justo despues de la migracion que revierten -- aqui seria
+-- peor de lo normal, porque `..._ROLLBACK.sql` ordena DESPUES de
+-- `20260926120000_capacidad_efectiva_mesas.sql`: la vista y las dos
+-- funciones se crearian y se borrarian en el mismo push).
+--
+-- Se ejecuta A MANO (psql / SQL editor) y solo para deshacer un despliegue
+-- que salio mal.
+--
+-- ---------------------------------------------------------------------------
+-- QUE REVIERTE
+-- ---------------------------------------------------------------------------
+--   Borra los tres objetos que anade la migracion, y nada mas:
+--     * vista    public.vista_capacidad_espacios
+--     * funcion  public.fn_capacidad_efectiva_espacio(uuid)
+--     * funcion  public.fn_capacidad_efectiva_marca(text)
+--
+--   No hay datos que restaurar: la migracion no crea ni modifica ninguna
+--   tabla, ninguna fila, ninguna politica RLS y ningun trigger. Es
+--   puramente aditiva y de solo lectura, asi que este rollback la deshace
+--   por completo sin perdida de informacion.
+--
+--   Los GRANT/REVOKE de la migracion desaparecen con los propios objetos
+--   (los permisos viven en el catalogo del objeto), no hace falta
+--   revertirlos aparte.
+--
+-- ---------------------------------------------------------------------------
+-- QUE NO REVIERTE
+-- ---------------------------------------------------------------------------
+--   El comportamiento del aforo, porque la migracion nunca lo cambio: el
+--   trigger `trg_validar_capacidad` y la funcion
+--   `public.validar_capacidad_reserva()` quedan intactos y siguen sumando
+--   `espacios_reserva.capacidad_maxima` (paso 1, tal como lo dejo
+--   `20260922190000_aforo_por_marca.sql`). Ejecutar este rollback no altera
+--   el resultado de ninguna reserva.
+--
+-- ---------------------------------------------------------------------------
+-- *** AVISO CRITICO: SI ALGUIEN YA ENCENDIO LA REGLA, NO EJECUTAR ESTO ***
+-- ---------------------------------------------------------------------------
+--   `public.fn_capacidad_efectiva_marca(text)` esta pensada para acabar
+--   DENTRO de `validar_capacidad_reserva()` el dia que el dueno encienda la
+--   capacidad efectiva por mesas (ver el bloque "COMO ENCENDER LA REGLA" de
+--   la migracion). Si ese cambio ya se aplico, el trigger la LLAMA en cada
+--   INSERT/UPDATE de `reservas`.
+--
+--   Borrarla en ese estado NO da un error al ejecutar este script: el
+--   `drop function` funciona, y el trigger revienta DESPUES, en la primera
+--   reserva, con un `function public.fn_capacidad_efectiva_marca(text) does
+--   not exist`. Resultado: **TODAS las reservas bloqueadas** (telefono, web
+--   y panel), y con un mensaje que no se parece en nada a un problema de
+--   aforo, asi que cuesta de diagnosticar.
+--
+--   ORDEN CORRECTO si la regla esta encendida:
+--     1) Revertir PRIMERO el trigger: un `CREATE OR REPLACE FUNCTION
+--        public.validar_capacidad_reserva()` que vuelva a poner en el paso 1
+--        las 5 lineas originales
+--
+--          SELECT COALESCE(SUM(capacidad_maxima), 0)
+--          INTO v_capacidad_total
+--          FROM espacios_reserva
+--          WHERE activa = true
+--            AND COALESCE(caracteristicas->>'marca', 'casa_tomas') = v_marca;
+--
+--        en lugar de `v_capacidad_total :=
+--        public.fn_capacidad_efectiva_marca(v_marca);` -- o ejecutar el
+--        fichero de este mismo directorio correspondiente a la migracion
+--        que la encendio. Y no olvidar
+--        `alter function public.validar_capacidad_reserva()
+--           set search_path = 'public';`
+--        (ver 20260922210000_search_path_validar_capacidad.sql).
+--     2) Deshacer tambien el PASO B (el motor de estimacion del cliente:
+--        `sumarCapacidadPorMarca` en
+--        `supabase/functions/_shared/disponibilidad.ts` y sus consumidores),
+--        o el cliente y el servidor volveran a medir cosas distintas.
+--     3) Comprobar que el trigger ya NO la referencia:
+--
+--          select pg_get_functiondef('public.validar_capacidad_reserva()'::regprocedure)
+--                 like '%fn_capacidad_efectiva_marca%' as sigue_usandola;
+--          -- tiene que dar FALSE antes de seguir
+--
+--     4) Solo entonces, ejecutar este rollback.
+--
+--   La comprobacion del paso 3 esta tambien al final de este fichero, como
+--   consulta previa recomendada.
+--
+-- ---------------------------------------------------------------------------
+-- CUANDO USAR ESTO
+-- ---------------------------------------------------------------------------
+--   Casi nunca. La migracion es aditiva y nadie la llama, asi que no hay
+--   escenario en el que "moleste". Los dos motivos legitimos son: dejar la
+--   base limpia si se decide abandonar el enfoque de capacidad por mesas, o
+--   recrear los objetos desde cero tras un cambio de definicion (aunque
+--   para eso basta el `create or replace` de la propia migracion, salvo que
+--   cambien nombres o tipos de columnas de la vista, que es el unico caso en
+--   que `create or replace view` falla y hace falta el drop).
+--
+--   A fecha 2026-09-26 la migracion que revierte esta TODAVIA PENDIENTE
+--   (`supabase db push` bloqueado: historial local y remoto descuadrados
+--   por `20260925150523` y `20260925154109`, aplicadas en produccion sin
+--   commitear los ficheros). Si nunca se aplica, aqui no hay nada que
+--   revertir y ejecutar este script es un no-op: los `if exists` lo hacen
+--   inofensivo.
+--
+-- ---------------------------------------------------------------------------
+
+begin;
+
+-- Idempotente y en cualquier orden: la vista no depende de las funciones ni
+-- las funciones de la vista (la vista calcula la suma en linea, a proposito,
+-- para poder leerse de un tiron sin saltar a la definicion de una funcion).
+drop view if exists public.vista_capacidad_espacios;
+
+-- OJO: leer el "AVISO CRITICO" de arriba antes de ejecutar esta linea.
+-- Si el trigger de aforo ya la usa, esto deja TODAS las reservas rotas.
+drop function if exists public.fn_capacidad_efectiva_marca(text);
+
+drop function if exists public.fn_capacidad_efectiva_espacio(uuid);
+
+commit;
+
+-- ---------------------------------------------------------------------------
+-- COMPROBACION PREVIA (ejecutar ANTES del bloque de arriba; solo lectura)
+-- ---------------------------------------------------------------------------
+--   1) El trigger NO debe estar usando fn_capacidad_efectiva_marca:
+--      select pg_get_functiondef('public.validar_capacidad_reserva()'::regprocedure)
+--             like '%fn_capacidad_efectiva_marca%' as sigue_usandola;
+--      -- TRUE  -> PARAR. Revertir el trigger primero (ver AVISO CRITICO).
+--      -- FALSE -> se puede ejecutar el rollback.
+--
+--   2) Y que nada mas en la base las referencie (RPC del panel, otra vista,
+--      otra funcion, una politica RLS...):
+--      select p.proname
+--      from pg_proc p
+--      where p.pronamespace = 'public'::regnamespace
+--        and p.proname <> 'fn_capacidad_efectiva_marca'
+--        and pg_get_functiondef(p.oid) like '%fn_capacidad_efectiva%';
+--      -- esperado: 0 filas
+--
+-- ---------------------------------------------------------------------------
+-- VERIFICACION POSTERIOR (solo lectura)
+-- ---------------------------------------------------------------------------
+--   1) Los tres objetos han desaparecido:
+--      select 'vista' as tipo, count(*) from pg_class c
+--      join pg_namespace n on n.oid = c.relnamespace
+--      where n.nspname = 'public' and c.relname = 'vista_capacidad_espacios'
+--      union all
+--      select 'funciones', count(*) from pg_proc
+--      where pronamespace = 'public'::regnamespace
+--        and proname in ('fn_capacidad_efectiva_espacio', 'fn_capacidad_efectiva_marca');
+--      -- esperado: ('vista', 0), ('funciones', 0)
+--
+--   2) El aforo sigue funcionando exactamente igual que antes (el trigger
+--      nunca se toco, ni al aplicar la migracion ni al revertirla):
+--      select coalesce(caracteristicas->>'marca', 'casa_tomas') as marca,
+--             coalesce(sum(capacidad_maxima), 0) as capacidad_total
+--      from public.espacios_reserva
+--      where activa = true
+--      group by 1;
+--      -- esperado (datos de 2026-09-26): ('casa_tomas', 170), ('touza', 80)
+--
+--   3) Y que el trigger sigue vivo y apuntando a su funcion:
+--      select tgname, tgenabled, tgrelid::regclass
+--      from pg_trigger where tgname = 'trg_validar_capacidad';
+--      -- esperado: 1 fila, tgenabled = 'O', tabla = reservas
+-- ---------------------------------------------------------------------------

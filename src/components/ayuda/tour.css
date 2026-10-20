@@ -1,0 +1,105 @@
+/*
+ * Bocadillos del tour guiado (driver.js) con el tema del panel: mismas
+ * variables que Shadcn (claro y oscuro), letra grande y botones de 44 px para
+ * la tablet. Se aplica con `popoverClass: "tour-panel"` (useTourSeccion).
+ */
+.driver-popover.tour-panel {
+  font-family: inherit;
+  background-color: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px -8px rgb(0 0 0 / 0.35);
+  min-width: min(280px, calc(100vw - 24px));
+  max-width: min(400px, calc(100vw - 24px));
+  padding: 20px;
+}
+
+.tour-panel .driver-popover-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.35;
+  padding-right: 32px;
+}
+
+.tour-panel .driver-popover-description {
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.tour-panel .driver-popover-footer {
+  margin-top: 18px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tour-panel .driver-popover-progress-text {
+  font-size: 14px;
+  color: hsl(var(--muted-foreground));
+}
+
+.tour-panel .driver-popover-navigation-btns {
+  gap: 8px;
+}
+
+.tour-panel .driver-popover-navigation-btns button + button {
+  margin-left: 0;
+}
+
+.tour-panel .driver-popover-footer-btn {
+  min-height: 44px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 500;
+  text-shadow: none;
+  border-radius: calc(var(--radius) - 4px);
+  border: 1px solid hsl(var(--border));
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+
+.tour-panel .driver-popover-footer-btn:hover,
+.tour-panel .driver-popover-footer-btn:focus-visible {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+.tour-panel .driver-popover-next-btn,
+.tour-panel .driver-popover-next-btn:hover,
+.tour-panel .driver-popover-next-btn:focus-visible {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.tour-panel .driver-popover-next-btn:hover {
+  opacity: 0.9;
+}
+
+.tour-panel .driver-popover-close-btn {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
+  color: hsl(var(--muted-foreground));
+}
+
+.tour-panel .driver-popover-close-btn:hover,
+.tour-panel .driver-popover-close-btn:focus-visible {
+  color: hsl(var(--foreground));
+}
+
+/* La flecha: solo se colorea el lado que apunta al elemento. */
+.tour-panel .driver-popover-arrow-side-left {
+  border-left-color: hsl(var(--popover));
+}
+.tour-panel .driver-popover-arrow-side-right {
+  border-right-color: hsl(var(--popover));
+}
+.tour-panel .driver-popover-arrow-side-top {
+  border-top-color: hsl(var(--popover));
+}
+.tour-panel .driver-popover-arrow-side-bottom {
+  border-bottom-color: hsl(var(--popover));
+}

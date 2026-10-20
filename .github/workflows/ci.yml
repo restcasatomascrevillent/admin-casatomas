@@ -1,0 +1,59 @@
+# Comprobaciones automáticas del panel (propuesta de la auditoría de regresión
+# del 18/10/2026). Ningún paso necesita secretos ni habla con Supabase: los
+# tests usan un host local inalcanzable (vitest.config.ts) y las pruebas SQL
+# corren en Postgres en memoria (PGlite).
+#
+# BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL y build.
+# NO BLOQUEAN todavía (deuda previa, cifras de la auditoría): typecheck con 20
+# errores y ESLint con 480. Quitar `continue-on-error` cuando lleguen a cero.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests-y-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Tests unitarios y de componentes
+        run: npm test
+      - name: Ciclo de vida de cheques regalo (PGlite)
+        run: npm run test:cheques:db
+      - name: Auditoría (PGlite)
+        run: npm run test:auditoria:db
+      - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
+        run: |
+          node scripts/verificar-auditoria.mjs
+          node scripts/verificar-bloqueo-usuarios.mjs
+          node scripts/verificar-gestion-superadmin.mjs
+      - name: Build de producción
+        run: npm run build
+
+  calidad-no-bloqueante:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck (20 errores previos)
+        run: npx tsc --noEmit -p tsconfig.app.json
+      - name: ESLint (480 errores previos)
+        run: npm run lint
