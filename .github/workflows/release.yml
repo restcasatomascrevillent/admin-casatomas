@@ -1,0 +1,58 @@
+name: Publicar versión de producción
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión semántica, por ejemplo v0.1.0 o v1.2.3"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Crear etiqueta y release
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Verificar versión
+        env:
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          if [[ ! "$VERSION" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::Usa una versión semántica válida, por ejemplo v0.1.0"
+            exit 1
+          fi
+      - name: Descargar commit exacto de main
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verificar que main no haya cambiado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
+          if [ "$HEAD_SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::main ha avanzado; ejecuta la publicación desde el HEAD actual de main"
+            exit 1
+          fi
+      - name: Crear GitHub Release y etiqueta en main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "::error::La versión $VERSION ya existe"
+            exit 1
+          fi
+          gh release create "$VERSION" --target "$GITHUB_SHA" --title "$VERSION" --generate-notes

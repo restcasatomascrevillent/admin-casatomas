@@ -11,7 +11,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches-ignore: [main]
+    branches: [staging, main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -57,3 +57,18 @@ jobs:
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: ESLint (480 errores previos)
         run: npm run lint
+
+
+  control-promocion:
+    name: Validar promoción a producción
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    steps:
+      - name: Solo staging puede promocionarse a main
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+        run: |
+          if [ "$SOURCE_BRANCH" != "staging" ]; then
+            echo "::error::Producción solo admite PR desde staging (rama recibida: $SOURCE_BRANCH)"
+            exit 1
+          fi
