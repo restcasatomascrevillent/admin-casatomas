@@ -3,17 +3,19 @@
 # puerto de Postgres. Plan completo: README.md de esa carpeta en web-casatomas.
 #
 # Secrets del repositorio (Settings → Secrets and variables → Actions):
-#   ORIGEN_DB_URL                 conexión Session pooler del proyecto jeamoczmbfsnwkfjxcyo
-#   PROD_DB_URL, DEMO_DB_URL      lo mismo de haqmmdfdzzatdnrrcgez y sfonaclosuafvlhutkon
 #   SUPABASE_ACCESS_TOKEN         token personal de la cuenta del restaurante
 #   SUPABASE_ACCESS_TOKEN_ORIGEN  token personal de la cuenta oficiososia
-#   SECRETOS_FUNCIONES_PROD       .env con las claves externas de producción
-#   SECRETOS_FUNCIONES_DEMO       .env con las claves de pruebas (Stripe test…)
 #   GH_TOKEN_LECTURA              token "fine-grained" de solo lectura (Contents: Read)
 #                                 de web-casatomas: el repo es privado y ahí viven el kit
 #                                 y 4 Edge Functions. El token propio del workflow
 #                                 (github.token) solo ve este repo.
-#   SMTP_PASS                     opcional, si Auth usa SMTP propio
+# Opcionales:
+#   SECRETOS_FUNCIONES_PROD/_DEMO .env con las claves externas (plantilla en el kit).
+#                                 Sin ellos el paso secretos solo crea los internos.
+#   ORIGEN_DB_URL, PROD_DB_URL,   cadenas de conexión. Sin ellas no hacen falta
+#   DEMO_DB_URL                   contraseñas: migrar.sh pide roles temporales a la
+#                                 Management API (de solo lectura en el origen).
+#   SMTP_PASS                     si Auth usa SMTP propio
 #
 # Los volcados (con datos personales) se quedan en el runner y desaparecen con
 # él: no se suben como artefacto. Los scripts no imprimen filas ni secretos.
