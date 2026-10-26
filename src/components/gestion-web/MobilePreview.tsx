@@ -160,7 +160,7 @@ export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
                             src={novedad.imagen_url}
                             alt={t.titulo}
                             className="absolute inset-0 w-full h-full object-cover"
-                            style={{ objectPosition: `center ${novedad.imagen_posicion_y || 50}%` }}
+                            style={{ objectPosition: `center ${novedad.imagen_posicion_y ?? 50}%` }}
                           />
                         ) : (
                           // La web pública rellena el hueco con una foto genérica
