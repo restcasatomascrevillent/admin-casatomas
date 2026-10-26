@@ -508,6 +508,28 @@ export function EditorNovedadesWeb() {
     }
   };
 
+  // «Aplicar posición» en una novedad ya guardada guarda el encuadre al momento,
+  // igual que en la carta (ListaPlatos/ListaVinos). Antes solo cambiaba el
+  // formulario y, si no se pulsaba «Guardar», la web seguía igual. Si la foto
+  // también ha cambiado y aún no se ha guardado, el encuadre se guarda con ella
+  // al pulsar «Guardar».
+  const handleEncuadre = async (posicion: number) => {
+    setCampo("imagen_posicion_y", posicion);
+    if (!editingId || formData.imagen_url !== imagenOriginal) return;
+    try {
+      await actualizarNovedad.mutateAsync({ id: editingId, imagen_posicion_y: posicion });
+      toast.success("Encuadre guardado. Recarga la web para verlo.");
+      // Mantener el formulario coherente con lo guardado sin perder otros cambios.
+      setHuellaGuardada((prev) => {
+        const base = JSON.parse(prev) as Record<string, unknown>;
+        return JSON.stringify({ ...base, imagen_posicion_y: posicion });
+      });
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo guardar el encuadre. Pulsa «Guardar» para intentarlo de nuevo.");
+    }
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
@@ -1534,7 +1556,7 @@ export function EditorNovedadesWeb() {
         onOpenChange={setImageModalOpen}
         imageUrl={formData.imagen_url}
         currentPosition={formData.imagen_posicion_y}
-        onPositionChange={(pos) => setCampo("imagen_posicion_y", pos)}
+        onPositionChange={handleEncuadre}
         aspectRatio={NOVEDAD_CARD_IMAGE_ASPECT_RATIO}
       />
 

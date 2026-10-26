@@ -1,0 +1,119 @@
+# Ejecuta docs/migracion-cuenta-restaurante/supabase/migrar.sh (del repo
+# web-casatomas) contra Supabase desde un runner de GitHub, que sí llega al
+# puerto de Postgres. Plan completo: README.md de esa carpeta en web-casatomas.
+#
+# Secrets del repositorio (Settings → Secrets and variables → Actions):
+#   ORIGEN_DB_URL                 conexión Session pooler del proyecto jeamoczmbfsnwkfjxcyo
+#   PROD_DB_URL, DEMO_DB_URL      lo mismo de haqmmdfdzzatdnrrcgez y sfonaclosuafvlhutkon
+#   SUPABASE_ACCESS_TOKEN         token personal de la cuenta del restaurante
+#   SUPABASE_ACCESS_TOKEN_ORIGEN  token personal de la cuenta oficiososia
+#   SECRETOS_FUNCIONES_PROD       .env con las claves externas de producción
+#   SECRETOS_FUNCIONES_DEMO       .env con las claves de pruebas (Stripe test…)
+#   GH_TOKEN_LECTURA              token "fine-grained" de solo lectura (Contents: Read)
+#                                 de web-casatomas: el repo es privado y ahí viven el kit
+#                                 y 4 Edge Functions. El token propio del workflow
+#                                 (github.token) solo ve este repo.
+#   SMTP_PASS                     opcional, si Auth usa SMTP propio
+#
+# Los volcados (con datos personales) se quedan en el runner y desaparecen con
+# él: no se suben como artefacto. Los scripts no imprimen filas ni secretos.
+
+name: Migración Supabase a la cuenta del restaurante
+
+on:
+  workflow_dispatch:
+    inputs:
+      destino:
+        description: "Proyecto destino"
+        required: true
+        type: choice
+        options: [demo, prod]
+      pasos:
+        description: "Pasos de migrar.sh, separados por espacios (vacío = montaje completo)"
+        required: false
+        type: string
+      confirmar:
+        description: "Solo para 'recargar': ref del destino"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: migracion-supabase
+  cancel-in-progress: false
+
+jobs:
+  migrar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Panel (funciones de admin-casatomas)
+        uses: actions/checkout@v4
+        with:
+          path: panel
+          persist-credentials: false
+
+      - name: Web (kit y funciones de web-casatomas)
+        uses: actions/checkout@v4
+        with:
+          repository: restcasatomascrevillent/web-casatomas
+          token: ${{ secrets.GH_TOKEN_LECTURA }}
+          path: web
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: psql 17 (el servidor es Postgres 17)
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: migrar.sh
+        env:
+          DESTINO: ${{ inputs.destino }}
+          PASOS: ${{ inputs.pasos }}
+          CONFIRMAR: ${{ inputs.confirmar }}
+          ORIGEN_DB_URL: ${{ secrets.ORIGEN_DB_URL }}
+          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
+          DEMO_DB_URL: ${{ secrets.DEMO_DB_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_ACCESS_TOKEN_ORIGEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_ORIGEN }}
+          SECRETOS_FUNCIONES_PROD: ${{ secrets.SECRETOS_FUNCIONES_PROD }}
+          SECRETOS_FUNCIONES_DEMO: ${{ secrets.SECRETOS_FUNCIONES_DEMO }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          REPO_PANEL: ${{ github.workspace }}/panel
+          REPO_WEB: ${{ github.workspace }}/web
+          TRABAJO: ${{ runner.temp }}/volcado
+        run: |
+          set -euo pipefail
+          # URLs de las webs viejas → nuevas ("vieja=>nueva;..."). Falta Touza
+          # en prod y los alias fijos de staging en demo: se añaden cuando
+          # existan esos proyectos/dominios en el Vercel del restaurante. Una
+          # URL inventada aquí sería peor que ninguna.
+          if [ "$DESTINO" = "prod" ]; then
+            export DESTINO_REF=haqmmdfdzzatdnrrcgez DESTINO_DB_URL="$PROD_DB_URL" SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_PROD"
+            export CRON_MODO=todos
+            export REEMPLAZOS="https://casa-tomas-story.vercel.app=>https://web-casatomas.vercel.app;https://admin-panel-alpha-eight-66.vercel.app=>https://admin-casatomas-o9ep.vercel.app"
+            por_defecto="volcar restaurar storage gestionados ajustar cron secretos funciones auth verificar"
+          else
+            export DESTINO_REF=sfonaclosuafvlhutkon DESTINO_DB_URL="$DEMO_DB_URL" SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_DEMO"
+            export CRON_MODO=internos
+            export REEMPLAZOS=""
+            # Demo con copia completa de los datos (decisión del 26-10-2026). Para
+            # vaciar los datos de clientes, añadir el paso "clientes" a mano.
+            por_defecto="volcar restaurar storage gestionados ajustar cron secretos funciones auth verificar"
+          fi
+          bash "$REPO_WEB/docs/migracion-cuenta-restaurante/supabase/migrar.sh" ${PASOS:-$por_defecto}
