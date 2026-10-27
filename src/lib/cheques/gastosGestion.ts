@@ -22,6 +22,11 @@ export function configGastosValida(c: Pick<ConfigGastosGestion, "porcentaje" | "
     && c.fijo_eur >= 0 && c.fijo_eur <= LIMITES_GASTOS.fijoMax;
 }
 
+/** Comisión de Stripe para una tarjeta europea estándar (1,5 % + 0,25 €), solo para los ejemplos del panel. */
+export function comisionEstandarStripe(totalEur: number): number {
+  return (Math.round(totalEur * 100 * 0.015) + 25) / 100;
+}
+
 export function calcularGastosGestion(importeEur: number, config: ConfigGastosGestion): number {
   if (!config.activos || !configGastosValida(config) || !Number.isFinite(importeEur) || importeEur <= 0) return 0;
   const importe = Math.round(importeEur * 100);

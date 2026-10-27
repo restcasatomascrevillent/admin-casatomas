@@ -23,6 +23,8 @@ describe("Gastos de gestión de los cheques", () => {
     const interruptor = screen.getByRole("switch", { name: "Cobrar gastos de gestión en la compra online" });
     expect(interruptor).toHaveAttribute("aria-checked", "false");
     expect(screen.getByText(/^51,02\s€$/)).toBeTruthy(); // cheque de 50 € con 1,5 % + 0,25 €
+    expect(screen.getByRole("columnheader", { name: "Te queda" })).toBeTruthy();
+    expect(screen.getAllByText(/^50,00\s€$/)).toHaveLength(2); // el cheque de 50 € y lo que queda tras la comisión
     expect(screen.getByRole("button", { name: "Guardar gastos de gestión" })).toBeDisabled();
     fireEvent.click(interruptor);
     fireEvent.change(screen.getByLabelText("Porcentaje (%)"), { target: { value: "2.8" } });

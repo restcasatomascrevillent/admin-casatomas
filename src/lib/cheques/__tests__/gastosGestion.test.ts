@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcularGastosGestion, configGastosValida } from "../gastosGestion";
+import { calcularGastosGestion, comisionEstandarStripe, configGastosValida } from "../gastosGestion";
 
 const ESTANDAR = { activos: true, porcentaje: 1.5, fijo_eur: 0.25 };
 
@@ -16,5 +16,15 @@ describe("gastos de gestión (copia del cálculo de casa-tomas-story)", () => {
     expect(calcularGastosGestion(50, { ...ESTANDAR, porcentaje: 10 })).toBe(0);
     expect(configGastosValida({ porcentaje: 1.5, fijo_eur: 5.01 })).toBe(false);
     expect(configGastosValida({ porcentaje: 0, fijo_eur: 0 })).toBe(true);
+  });
+
+  it("con la tarifa estándar, lo que paga el comprador menos la comisión deja el cheque íntegro", () => {
+    expect(comisionEstandarStripe(51.02)).toBe(1.02);
+    for (const importe of [25, 50, 100, 150, 250, 500]) {
+      const total = Math.round((importe + calcularGastosGestion(importe, ESTANDAR)) * 100) / 100;
+      const neto = Math.round((total - comisionEstandarStripe(total)) * 100) / 100;
+      expect(neto).toBeGreaterThanOrEqual(importe);
+      expect(neto).toBeLessThanOrEqual(importe + 0.01);
+    }
   });
 });
