@@ -1,5 +1,7 @@
 # Flujo CI/CD · Casa Tomás
 
+> **Proceso vigente:** [PROCESO-DE-CAMBIOS.md](PROCESO-DE-CAMBIOS.md) (desarrollo → demo → PR → aceptación del dueño). Este documento queda como referencia técnica del CI y de Vercel.
+
 ## Ramas y entornos
 
 - `feature/*` / `fix/*`: implementar cambios; abrir PR a `staging`.
@@ -25,16 +27,9 @@
 - Se incluye la comprobación de origen de promoción a main.
 - En GitHub configurar los checks como **required** y exigir al menos una aprobación cuando el plan permita protección de ramas.
 
-## Versionado semántico
+## Versiones
 
-Las versiones se identifican por etiquetas Git y GitHub Releases independientes para la web y el panel:
-
-- `vMAJOR.MINOR.PATCH`; **MAJOR** rompe compatibilidad, **MINOR** añade funcionalidades compatibles, **PATCH** corrige errores.
-- Primer hito sugerido: `v0.1.0` (no presuponer que hay una versión 1.0 estable).
-- Una vez fusionado `staging → main` y verificado el despliegue, ejecutar en GitHub Actions el workflow «Publicar versión de producción», desde `main`, indicando `v0.1.0` o la siguiente versión.
-- El workflow crea **tag y GitHub Release** en el commit de main; no despliega por sí mismo ni modifica package.json.
-- Para mantener `package.json` sincronizado con la versión comercial, cambiar `version` y su lockfile en el PR a staging antes de promocionar.
-- El workflow release debe existir primero en la rama predeterminada para que GitHub permita ejecutarlo manualmente. No activar una release si Vercel aún no está configurado.
+Automáticas, sin etiquetas manuales ni cambios en `package.json`: formato `M.N` calculado del historial por `scripts/version.mjs` (cada commit suma 1, los merges no). Al aceptar el PR `staging → main`, el workflow `release.yml` crea la etiqueta `vM.N` y la GitHub Release. Detalle en [PROCESO-DE-CAMBIOS.md](PROCESO-DE-CAMBIOS.md#versiones).
 
 ## Seguridad y datos
 
@@ -49,4 +44,4 @@ Las versiones se identifican por etiquetas Git y GitHub Releases independientes 
 2. Ejecutar CI en staging, reparar fallos bloqueantes.
 3. Revisar PR staging → main.
 4. Fusionar tras aprobación, comprobar deployment prod.
-5. Crear tag + GitHub Release y registrar cambios.
+5. La etiqueta y la GitHub Release se crean solas al aceptar el PR (`release.yml`).
