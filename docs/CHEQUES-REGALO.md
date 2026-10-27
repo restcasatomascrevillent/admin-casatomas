@@ -110,3 +110,15 @@ Los cheques anteriores reciben un año desde su fecha de compra. Se conserva su 
 La expedición y la ficha muestran la fecha y los días restantes; el verificador muestra «Caduca hoy» en el último día y rechaza los caducados. El canje vuelve a comprobar la fecha de forma atómica en el servidor. Un trigger también impide marcar como usado un cheque caducado y mantiene fija la fecha frente a reintentos.
 
 El correo (HTML y texto), la tarjeta PDF y las vistas previas incluyen la fecha incluso al ocultar el importe. Se admite `{caducidad}` en los textos personalizados. Las funciones `cheques-regalo-web`, `cheques-regalo-admin` y `stripe-webhook-cheques-regalo`, en `casa-tomas-story`, deben desplegarse tras aplicar la migración de caducidad.
+
+## Gastos de gestión de la compra online (27 de octubre de 2026)
+
+En **Cheques → Configuración → Gastos de gestión de la compra online** se activan y se ajusta la tarifa que deben cubrir: por defecto 1,5 % + 0,25 €, la estándar de Stripe para tarjetas europeas. Vienen **apagados**. Al activarlos, la web suma al cobro `total = (importe + fijo) / (1 − %)`, redondeado al céntimo hacia arriba, para que tras la comisión al restaurante le quede el valor del cheque: un cheque de 50 € cuesta 51,02 €. El comprador ve el desglose (cheque, gastos y total) en el resumen antes de pagar, y en Stripe como una línea aparte, «Gastos de gestión». La factura los recoge en su propia línea y el total pagado los incluye. El valor del cheque, el que se canjea, no cambia.
+
+Son iguales para cualquier forma de pago: en España el comercio no puede cobrar un recargo por usar un medio de pago concreto (art. 35.2 del Real Decreto-ley 19/2018). Actívalos solo con el visto bueno de la gestoría, que también debe confirmar su IVA en la factura. Las tarjetas premium (2,8 %), internacionales (3,15 %) y Klarna cuestan más a Stripe; en esos pagos los gastos no cubren toda la comisión.
+
+La pestaña **Stripe** separa lo cobrado en valor de los cheques y gastos de gestión, muestra lo que se lleva Stripe (la comisión real que guarda el webhook; estimada si falta) y la ganancia neta, y si los gastos cubren la comisión. La ficha de cada compra web muestra valor, gastos, total cobrado, comisión y neto.
+
+El cálculo vive en `casa-tomas-story/supabase/functions/_shared/cheques-regalo/gastos-gestion.ts`; lo usan la web para enseñarlo y `cheques-regalo-web` para cobrarlo. El panel lleva una copia en `src/lib/cheques/gastosGestion.ts` solo para los ejemplos. La web solo enseña gastos si se los anuncia la función que los cobra (`/plantilla-vista`), así que activar el interruptor antes de desplegar la función no cobra nada.
+
+Activación: aplicar `supabase/migrations/20261027090000_gastos_gestion_cheques.sql` y desplegar `cheques-regalo-web` y `stripe-webhook-cheques-regalo` (este último, para la línea de gastos en la factura). Estado: aplicada en prod y demo; funciones desplegadas en demo.
