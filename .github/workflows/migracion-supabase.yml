@@ -38,6 +38,12 @@ on:
         description: "Solo para 'recargar': ref del destino"
         required: false
         type: string
+      cron:
+        description: "Cron de prod: internos hasta el corte, todos el día del corte (la demo va siempre en internos)"
+        required: true
+        type: choice
+        options: [internos, todos]
+        default: internos
 
 permissions:
   contents: read
@@ -88,6 +94,7 @@ jobs:
           DESTINO: ${{ inputs.destino }}
           PASOS: ${{ inputs.pasos }}
           CONFIRMAR: ${{ inputs.confirmar }}
+          CRON: ${{ inputs.cron }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_ACCESS_TOKEN_ORIGEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_ORIGEN }}
           SECRETOS_FUNCIONES_PROD: ${{ secrets.SECRETOS_FUNCIONES_PROD }}
@@ -104,7 +111,10 @@ jobs:
           # los alias de su rama staging.
           if [ "$DESTINO" = "prod" ]; then
             export DESTINO_REF=haqmmdfdzzatdnrrcgez SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_PROD"
-            export CRON_MODO=todos
+            # Hasta el corte, el proyecto viejo sigue mandando los correos y
+            # llamando a OpenAI y Google: con "todos" saldría cada cosa dos
+            # veces. Los trabajos que faltan se programan el día del corte.
+            export CRON_MODO="$CRON"
             export REEMPLAZOS="https://casa-tomas-story.vercel.app=>https://web-casatomas.vercel.app;https://admin-panel-alpha-eight-66.vercel.app=>https://admin-casatomas.vercel.app;https://touza-restaurant-website.vercel.app=>https://touza-casatomas.vercel.app"
             por_defecto="volcar restaurar storage gestionados ajustar cron secretos funciones auth verificar"
           else
