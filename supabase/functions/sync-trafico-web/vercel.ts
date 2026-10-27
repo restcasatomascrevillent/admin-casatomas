@@ -25,7 +25,7 @@
 // ============================================================================
 
 export const VERCEL_API_BASE = "https://api.vercel.com";
-export const VERCEL_TEAM_ID = "team_wUrFe4kT5oMBrGSl6b3Gvl9Z";
+export const VERCEL_TEAM_ID = "team_18KKVg7ueSX0PL4Ycy1QakZj"; // equipo "Casa tomas"
 export const LIMITE_FILAS_API = 100;
 
 /** Dimensiones de la API -> dimensión guardada en trafico_web_desglose. */
