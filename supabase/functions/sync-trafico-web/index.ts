@@ -32,6 +32,7 @@ import { createClient as createClientBase, type SupabaseClient } from "https://e
 
 import { crearClienteVercel } from "./vercel.ts";
 import {
+  PRIMER_DIA,
   procesarPeticion,
   TITULO_AVISO_PREFIJO,
   type FilaDesglose,
@@ -112,6 +113,7 @@ serve(conAuditoriaDePeticion("sync-trafico-web", createClientBase, (req) =>
       repo: crearRepositorio(createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })),
       ahora: () => new Date(),
       log: (m) => console.log(m),
+      primerDia: PRIMER_DIA,
     }),
   }).catch((e) => {
     console.error("[sync-trafico-web] error no controlado:", e);

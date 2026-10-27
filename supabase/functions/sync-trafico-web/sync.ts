@@ -27,10 +27,19 @@ import {
 // ---------------------------------------------------------------------------
 export type SlugProyecto = "casa-tomas-story" | "touza-restaurant-website";
 
+// Los slugs son la clave de las filas ya guardadas: se mantienen aunque los
+// proyectos de Vercel ahora se llamen web-casatomas y touza-casatomas.
 export const PROYECTOS: ReadonlyArray<{ slug: SlugProyecto; projectId: string }> = [
-  { slug: "casa-tomas-story", projectId: "prj_c2Wks17JsKHSG5slQ8zRlLI5Vkgu" },
-  { slug: "touza-restaurant-website", projectId: "prj_uyKzP43QuXo1hfFrTj2jataWbnqb" },
+  { slug: "casa-tomas-story", projectId: "prj_0sGVG2CWWPpZWwy1zrr0nCPftcYQ" },
+  { slug: "touza-restaurant-website", projectId: "prj_rV4u5MRropGlLxSVPCCJV8kbwkgv" },
 ];
+
+/**
+ * Primer día con las webs en el Vercel del restaurante (corte del 27-10-2026).
+ * Los días anteriores vienen de los proyectos viejos y ya están guardados: si
+ * se volvieran a pedir, las cifras de los proyectos nuevos los pisarían.
+ */
+export const PRIMER_DIA = "2026-10-27";
 
 /** Hobby da 31 días; 30 deja margen por la frontera de medianoche UTC. */
 export const DIAS_BACKFILL = 30;
@@ -85,7 +94,7 @@ export interface Rango {
  *   hoy-30 (límite Hobby).
  * Hoy no se sincroniza nunca: el día está abierto.
  */
-export function calcularRango(ultimoOkEn: string | null, ahora: Date): Rango {
+export function calcularRango(ultimoOkEn: string | null, ahora: Date, primerDia?: string): Rango {
   const hoy = fechaUtc(ahora);
   const hasta = sumarDias(hoy, -1);
   const minimo = sumarDias(hoy, -DIAS_BACKFILL);
@@ -102,6 +111,8 @@ export function calcularRango(ultimoOkEn: string | null, ahora: Date): Rango {
     desde = recuperar < normal ? recuperar : normal;
     if (desde < minimo) desde = minimo;
   }
+  if (primerDia && desde < primerDia) desde = primerDia;
+  // Con primerDia puede no haber aún ningún día cerrado: dias <= 0.
   return { desde, hasta, dias: diasEntre(desde, hasta), backfill };
 }
 
@@ -221,6 +232,8 @@ export interface Dependencias {
   repo: Repositorio;
   ahora: () => Date;
   log?: (msg: string) => void;
+  /** Ver PRIMER_DIA. Sin él, no hay límite por abajo. */
+  primerDia?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -262,8 +275,12 @@ export async function sincronizarProyecto(
 
   try {
     estado = await deps.repo.leerEstado(proyecto.slug);
-    const rango = calcularRango(estado?.ultimo_ok_en ?? null, inicio);
+    const rango = calcularRango(estado?.ultimo_ok_en ?? null, inicio, deps.primerDia);
     const { desde, hasta } = rango;
+    if (rango.dias <= 0) {
+      // Ningún día cerrado desde primerDia: nada que pedir ni que guardar.
+      return { ok: true, desde, hasta, dias: 0, backfill: rango.backfill, filas: { diario: 0, desglose: 0 }, avisos };
+    }
 
     // 1) Rutas (top 100). Un fallo aquí no es fatal si by=day funciona.
     let filasRuta: FilaVercel[] | null = null;

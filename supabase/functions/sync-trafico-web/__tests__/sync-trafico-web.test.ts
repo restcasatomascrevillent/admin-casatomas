@@ -103,7 +103,7 @@ describe("construirUrlAggregate", () => {
   it("incluye teamId, projectId, since/until, by=day + dimensión y limit=100", () => {
     const u = new URL(construirUrlAggregate({ projectId: "prj_x", desde: "2026-09-20", hasta: "2026-09-22", dimension: "country" }));
     expect(u.pathname).toBe("/v1/query/web-analytics/visits/aggregate");
-    expect(u.searchParams.get("teamId")).toBe("team_wUrFe4kT5oMBrGSl6b3Gvl9Z");
+    expect(u.searchParams.get("teamId")).toBe("team_18KKVg7ueSX0PL4Ycy1QakZj");
     expect(u.searchParams.get("projectId")).toBe("prj_x");
     expect(u.searchParams.get("since")).toBe("2026-09-20");
     expect(u.searchParams.get("until")).toBe("2026-09-22");
@@ -239,6 +239,15 @@ describe("calcularRango", () => {
   it("cruza cambio de mes/año en UTC", () => {
     expect(calcularRango("2026-12-31T03:30:00Z", new Date("2027-01-01T03:30:00Z"))).toMatchObject({ desde: "2026-12-29", hasta: "2026-12-31" });
   });
+
+  it("con primerDia no pide días anteriores", () => {
+    expect(calcularRango("2026-09-22T03:30:05Z", AHORA, "2026-09-22")).toEqual({ desde: "2026-09-22", hasta: "2026-09-22", dias: 1, backfill: false });
+    expect(calcularRango(null, AHORA, "2026-09-10")).toMatchObject({ desde: "2026-09-10", dias: 13, backfill: true });
+  });
+
+  it("con primerDia aún sin cerrar, dias <= 0", () => {
+    expect(calcularRango("2026-09-22T03:30:05Z", AHORA, "2026-09-23").dias).toBeLessThanOrEqual(0);
+  });
 });
 
 describe("fusionarPorClave / calcularTotales", () => {
@@ -267,6 +276,16 @@ describe("fusionarPorClave / calcularTotales", () => {
 const CASA = PROYECTOS[0];
 
 describe("sincronizarProyecto", () => {
+  it("sin días cerrados desde primerDia no llama a Vercel ni toca el estado", async () => {
+    const repo = new RepoMemoria();
+    const llamadas: string[] = [];
+    const r = await sincronizarProyecto(CASA, { ...deps(vercelFalso({}, llamadas), repo), primerDia: "2026-09-23" });
+    expect(r).toMatchObject({ ok: true, dias: 0, filas: { diario: 0, desglose: 0 } });
+    expect(llamadas).toHaveLength(0);
+    expect(repo.diario.size).toBe(0);
+    expect(await repo.leerEstado(CASA.slug)).toBeNull();
+  });
+
   it("guarda totales '*', rutas y desgloses y marca estado OK", async () => {
     const repo = new RepoMemoria();
     const r = await sincronizarProyecto(
