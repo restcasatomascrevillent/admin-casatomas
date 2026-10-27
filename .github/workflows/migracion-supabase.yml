@@ -99,19 +99,18 @@ jobs:
         run: |
           set -euo pipefail
           unset ORIGEN_DB_URL DESTINO_DB_URL
-          # URLs de las webs viejas → nuevas ("vieja=>nueva;..."). Falta Touza
-          # en prod y los alias fijos de staging en demo: se añaden cuando
-          # existan esos proyectos/dominios en el Vercel del restaurante. Una
-          # URL inventada aquí sería peor que ninguna.
+          # URLs de las webs viejas → nuevas ("vieja=>nueva;..."): los dominios de
+          # producción de los proyectos del Vercel del restaurante y, en demo,
+          # los alias de su rama staging.
           if [ "$DESTINO" = "prod" ]; then
             export DESTINO_REF=haqmmdfdzzatdnrrcgez SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_PROD"
             export CRON_MODO=todos
-            export REEMPLAZOS="https://casa-tomas-story.vercel.app=>https://web-casatomas.vercel.app;https://admin-panel-alpha-eight-66.vercel.app=>https://admin-casatomas-o9ep.vercel.app"
+            export REEMPLAZOS="https://casa-tomas-story.vercel.app=>https://web-casatomas.vercel.app;https://admin-panel-alpha-eight-66.vercel.app=>https://admin-casatomas.vercel.app;https://touza-restaurant-website.vercel.app=>https://touza-casatomas.vercel.app"
             por_defecto="volcar restaurar storage gestionados ajustar cron secretos funciones auth verificar"
           else
             export DESTINO_REF=sfonaclosuafvlhutkon SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_DEMO"
             export CRON_MODO=internos
-            export REEMPLAZOS=""
+            export REEMPLAZOS="https://casa-tomas-story.vercel.app=>https://web-casatomas-git-staging-casa-tomas.vercel.app;https://admin-panel-alpha-eight-66.vercel.app=>https://admin-casatomas-git-staging-casa-tomas.vercel.app;https://touza-restaurant-website.vercel.app=>https://touza-casatomas-git-staging-casa-tomas.vercel.app"
             # Demo con copia completa de los datos (decisión del 26-10-2026). Para
             # vaciar los datos de clientes, añadir el paso "clientes" a mano.
             por_defecto="volcar restaurar storage gestionados ajustar cron secretos funciones auth verificar"
