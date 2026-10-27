@@ -12,9 +12,9 @@
 # Opcionales:
 #   SECRETOS_FUNCIONES_PROD/_DEMO .env con las claves externas (plantilla en el kit).
 #                                 Sin ellos el paso secretos solo crea los internos.
-#   ORIGEN_DB_URL, PROD_DB_URL,   cadenas de conexión. Sin ellas no hacen falta
-#   DEMO_DB_URL                   contraseñas: migrar.sh pide roles temporales a la
-#                                 Management API (de solo lectura en el origen).
+# No usa contraseñas de base de datos: migrar.sh pide roles temporales a la
+# Management API (de solo lectura en el origen). Si existen secrets
+# ORIGEN_DB_URL / PROD_DB_URL / DEMO_DB_URL se ignoran a propósito.
 #   SMTP_PASS                     si Auth usa SMTP propio
 #
 # Los volcados (con datos personales) se quedan en el runner y desaparecen con
@@ -88,9 +88,6 @@ jobs:
           DESTINO: ${{ inputs.destino }}
           PASOS: ${{ inputs.pasos }}
           CONFIRMAR: ${{ inputs.confirmar }}
-          ORIGEN_DB_URL: ${{ secrets.ORIGEN_DB_URL }}
-          PROD_DB_URL: ${{ secrets.PROD_DB_URL }}
-          DEMO_DB_URL: ${{ secrets.DEMO_DB_URL }}
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_ACCESS_TOKEN_ORIGEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_ORIGEN }}
           SECRETOS_FUNCIONES_PROD: ${{ secrets.SECRETOS_FUNCIONES_PROD }}
@@ -101,17 +98,18 @@ jobs:
           TRABAJO: ${{ runner.temp }}/volcado
         run: |
           set -euo pipefail
+          unset ORIGEN_DB_URL DESTINO_DB_URL
           # URLs de las webs viejas → nuevas ("vieja=>nueva;..."). Falta Touza
           # en prod y los alias fijos de staging en demo: se añaden cuando
           # existan esos proyectos/dominios en el Vercel del restaurante. Una
           # URL inventada aquí sería peor que ninguna.
           if [ "$DESTINO" = "prod" ]; then
-            export DESTINO_REF=haqmmdfdzzatdnrrcgez DESTINO_DB_URL="$PROD_DB_URL" SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_PROD"
+            export DESTINO_REF=haqmmdfdzzatdnrrcgez SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_PROD"
             export CRON_MODO=todos
             export REEMPLAZOS="https://casa-tomas-story.vercel.app=>https://web-casatomas.vercel.app;https://admin-panel-alpha-eight-66.vercel.app=>https://admin-casatomas-o9ep.vercel.app"
             por_defecto="volcar restaurar storage gestionados ajustar cron secretos funciones auth verificar"
           else
-            export DESTINO_REF=sfonaclosuafvlhutkon DESTINO_DB_URL="$DEMO_DB_URL" SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_DEMO"
+            export DESTINO_REF=sfonaclosuafvlhutkon SECRETOS_FUNCIONES="$SECRETOS_FUNCIONES_DEMO"
             export CRON_MODO=internos
             export REEMPLAZOS=""
             # Demo con copia completa de los datos (decisión del 26-10-2026). Para
