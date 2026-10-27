@@ -1,58 +1,57 @@
-name: Publicar versión de producción
+# Versión de producción (docs/PROCESO-DE-CAMBIOS.md).
+#
+# Al aceptar un PR staging → main deja constancia de lo publicado: etiqueta vM.N
+# y GitHub Release con los cambios. No despliega nada (eso lo hace Vercel) y no
+# toca package.json: la versión se calcula del historial (scripts/version.mjs).
+name: Versión de producción
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Versión semántica, por ejemplo v0.1.0 o v1.2.3"
-        required: true
-        type: string
+  push:
+    branches: [main]
 
 permissions:
   contents: write
 
 concurrency:
-  group: production-release
+  group: version-produccion
   cancel-in-progress: false
 
 jobs:
   release:
-    name: Crear etiqueta y release
-    if: github.ref == 'refs/heads/main'
+    name: Etiqueta y release
     runs-on: ubuntu-latest
-    environment: production
     steps:
-      - name: Verificar versión
-        env:
-          VERSION: ${{ inputs.version }}
-        shell: bash
-        run: |
-          if [[ ! "$VERSION" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::Usa una versión semántica válida, por ejemplo v0.1.0"
-            exit 1
-          fi
-      - name: Descargar commit exacto de main
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          persist-credentials: false
-      - name: Verificar que main no haya cambiado
+          fetch-depth: 0
+
+      - name: Crear la versión si se ha aceptado un PR desde staging
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: bash
         run: |
-          HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
-          if [ "$HEAD_SHA" != "$GITHUB_SHA" ]; then
-            echo "::error::main ha avanzado; ejecuta la publicación desde el HEAD actual de main"
+          # Misma regla que usa Vercel para publicar (scripts/vercel-produccion.mjs): sale 1 si publica.
+          if VERCEL_ENV=production VERCEL_GIT_COMMIT_MESSAGE="$(git log -1 --format=%B)" node scripts/vercel-produccion.mjs >/dev/null; then
+            echo "::warning::El último commit de main no es un PR aceptado desde staging: Vercel no lo publica y no se crea versión."
+            exit 0
+          fi
+          VERSION=$(node scripts/version.mjs --solo-version)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::No se pudo calcular la versión: $VERSION"
             exit 1
           fi
-      - name: Crear GitHub Release y etiqueta en main
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
-        shell: bash
-        run: |
-          if gh release view "$VERSION" >/dev/null 2>&1; then
-            echo "::error::La versión $VERSION ya existe"
-            exit 1
+          TAG="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "La versión $TAG ya existe: este PR no traía commits nuevos." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
-          gh release create "$VERSION" --target "$GITHUB_SHA" --title "$VERSION" --generate-notes
+          ANTERIOR=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD^1 2>/dev/null || true)
+          DESDE=${ANTERIOR:-$(git log -1 --format=%H -- versionado.json)^}
+          {
+            echo "Publicada en producción al aceptar «$(git log -1 --format=%s)»."
+            echo
+            echo "### Cambios"
+            git log --no-merges --format='- %s (`%h`)' "$DESDE..HEAD"
+          } > notas.md
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notas.md
+          echo "Creada la versión $TAG." >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,96 @@
+# Propuesta de paso a producción (docs/PROCESO-DE-CAMBIOS.md).
+#
+# En cada subida a staging abre, o actualiza, el PR staging → main con la versión
+# que tendría producción, la lista de cambios y lo que Vercel NO aplica (Supabase).
+# Aceptarlo es decisión de una persona en GitHub: este workflow nunca lo fusiona.
+#
+# Necesita en Settings → Actions → General: «Allow GitHub Actions to create and
+# approve pull requests». Sin eso falla avisando y deja el enlace para abrirlo a mano.
+name: Propuesta a producción
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: propuesta-produccion
+  cancel-in-progress: true
+
+jobs:
+  pr:
+    name: Abrir o actualizar el PR staging → main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: staging
+          fetch-depth: 0
+
+      - name: Preparar título y descripción
+        id: datos
+        shell: bash
+        env:
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          PENDIENTES=$(git rev-list --count --no-merges origin/main..HEAD)
+          echo "pendientes=$PENDIENTES" >> "$GITHUB_OUTPUT"
+          if [ "$PENDIENTES" = "0" ]; then
+            echo "staging no tiene cambios que no estén ya en producción." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          con_v() { [[ "$1" =~ ^[0-9] ]] && echo "v$1" || echo "sin versión"; }
+          V_DEMO=$(con_v "$(node scripts/version.mjs --solo-version)")
+          V_PROD=$(con_v "$(node scripts/version.mjs --ref origin/main --solo-version)")
+          DEMO="https://${REPO}-git-staging-casa-tomas.vercel.app"
+          echo "titulo=Producción ${REPO}: ${V_DEMO} (ahora ${V_PROD})" >> "$GITHUB_OUTPUT"
+          SUPABASE=$(git diff --name-only origin/main...HEAD -- supabase/ | grep -v '/__tests__/' | grep -v '\.test\.' || true)
+          {
+            echo "## Paso a producción de **${REPO}**: ${V_DEMO} (producción: ${V_PROD})"
+            echo
+            echo "Al aceptar este PR, Vercel publica en producción exactamente lo que hay ahora en la demo."
+            echo
+            echo "Demo: ${DEMO}"
+            echo
+            echo "### Antes de aceptar"
+            echo "- [ ] Lo he probado en la demo y funciona."
+            echo "- [ ] He leído la lista de cambios."
+            if [ -n "$SUPABASE" ]; then
+              echo "- [ ] Sé que los cambios de Supabase de abajo se aplican en producción **después** de aceptar."
+            fi
+            echo
+            echo "### Cómo aceptar"
+            echo "Botón **Merge pull request** con la opción **Create a merge commit**. Con *Squash* o *Rebase*, Vercel **no** publica (ver \`docs/PROCESO-DE-CAMBIOS.md\`)."
+            echo
+            echo "### Cambios (${PENDIENTES})"
+            git log --no-merges --format='- %s (`%h`, %an)' origin/main..HEAD
+            echo
+            echo "### Supabase (Vercel no lo aplica)"
+            if [ -n "$SUPABASE" ]; then
+              echo "Ya están en la demo. Tras aceptar, hay que comprobar que estén en producción y aplicar los que falten:"
+              echo "$SUPABASE" | sed 's/^/- `/; s/$/`/'
+            else
+              echo "Ninguno: este paso no toca la base de datos ni las funciones."
+            fi
+          } > cuerpo.md
+          cat cuerpo.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Abrir o actualizar el PR
+        if: steps.datos.outputs.pendientes != '0'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITULO: ${{ steps.datos.outputs.titulo }}
+        run: |
+          NUM=$(gh pr list --base main --head staging --state open --json number --jq '.[0].number // empty')
+          if [ -n "$NUM" ]; then
+            gh pr edit "$NUM" --title "$TITULO" --body-file cuerpo.md
+            echo "PR #$NUM actualizado." >> "$GITHUB_STEP_SUMMARY"
+          elif ! gh pr create --base main --head staging --title "$TITULO" --body-file cuerpo.md; then
+            echo "::error::GitHub no deja a Actions crear el PR. Actívalo en Settings → Actions → General → «Allow GitHub Actions to create and approve pull requests». Mientras tanto, ábrelo a mano: https://github.com/${{ github.repository }}/compare/main...staging"
+            exit 1
+          fi
