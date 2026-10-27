@@ -20,6 +20,8 @@ interface EstadoStripe {
 }
 interface Metricas {
   pagos: number; bruto_eur: number; comision_eur: number; neto_eur: number; comision_incompleta: boolean;
+  // Desde la migración de gastos de gestión; ausentes con el RPC anterior.
+  valor_cheques_eur?: number; gastos_gestion_eur?: number; pagos_con_gastos?: number;
   por_hora: { hora: number; pagos: number }[]; por_dia: { dia: string; pagos: number; bruto_eur: number }[];
 }
 
@@ -34,6 +36,22 @@ function FilaEstado({ ok, children }: { ok?: boolean; children: React.ReactNode 
     <div className={`flex items-center gap-2.5 rounded-xl border p-3 text-sm font-medium ${ok ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>
       {ok ? <CheckCircle2 className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
       <span>{children}</span>
+    </div>
+  );
+}
+
+/** De dónde sale lo cobrado y si los gastos de gestión cubren lo que se lleva Stripe. */
+function DesgloseGastos({ metricas }: { metricas: Metricas }) {
+  const gastos = metricas.gastos_gestion_eur ?? 0;
+  const saldo = Math.round((gastos - metricas.comision_eur) * 100) / 100;
+  return (
+    <div className="space-y-2">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Valor de los cheques vendidos</p><p className="mt-1 text-xl font-semibold">{euro(metricas.valor_cheques_eur ?? 0)}</p></div>
+        <div className="rounded-xl border p-4"><p className="text-xs text-muted-foreground">Gastos de gestión cobrados</p><p className="mt-1 text-xl font-semibold">{euro(gastos)}</p><p className="text-xs text-muted-foreground mt-1">{metricas.pagos_con_gastos ?? 0} de {metricas.pagos} pagos</p></div>
+        <div className={`rounded-xl border p-4 ${saldo < 0 ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}><p className="text-xs text-muted-foreground">Gastos de gestión − comisión</p><p className={`mt-1 text-xl font-semibold ${saldo < 0 ? "text-amber-800" : "text-emerald-700"}`}>{saldo > 0 ? "+" : ""}{euro(saldo)}</p><p className="text-xs text-muted-foreground mt-1">{saldo < 0 ? "La comisión no la cubren del todo los gastos" : "Los gastos cubren la comisión"}</p></div>
+      </div>
+      <p className="text-xs text-muted-foreground">Cobrado = valor de los cheques + gastos de gestión. Ganancia neta = cobrado − lo que se lleva Stripe.</p>
     </div>
   );
 }
@@ -162,10 +180,11 @@ export function PanelStripe() {
               {metricas.comision_incompleta && <p className="flex items-center gap-1.5 text-xs text-amber-700"><AlertTriangle className="h-3.5 w-3.5 shrink-0" />Algunos pagos no tienen la comisión real guardada: se estima con la tarifa estándar (1,5% + 0,25€).</p>}
               <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-xl bg-[#faf7f1] p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Hash className="h-3.5 w-3.5" />Pagos</div><p className="mt-1 text-2xl font-semibold">{metricas.pagos}</p></div>
-                <div className="rounded-xl bg-[#faf7f1] p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><TrendingUp className="h-3.5 w-3.5" />Ingresos brutos</div><p className="mt-1 text-2xl font-semibold">{euro(metricas.bruto_eur)}</p></div>
-                <div className="rounded-xl bg-[#faf7f1] p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Receipt className="h-3.5 w-3.5" />Comisión Stripe</div><p className="mt-1 text-2xl font-semibold">{euro(metricas.comision_eur)}</p></div>
-                <div className="rounded-xl bg-emerald-50 p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Wallet className="h-3.5 w-3.5" />Ganancia neta</div><p className="mt-1 text-2xl font-semibold text-emerald-700">{euro(metricas.neto_eur)}</p></div>
+                <div className="rounded-xl bg-[#faf7f1] p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><TrendingUp className="h-3.5 w-3.5" />Cobrado</div><p className="mt-1 text-2xl font-semibold">{euro(metricas.bruto_eur)}</p></div>
+                <div className="rounded-xl bg-[#faf7f1] p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Receipt className="h-3.5 w-3.5" />Se lleva Stripe</div><p className="mt-1 text-2xl font-semibold">{euro(metricas.comision_eur)}</p></div>
+                <div className="rounded-xl bg-emerald-50 p-4"><div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Wallet className="h-3.5 w-3.5" />Ganancia neta con cheques</div><p className="mt-1 text-2xl font-semibold text-emerald-700">{euro(metricas.neto_eur)}</p></div>
               </div>
+              {metricas.valor_cheques_eur !== undefined && <DesgloseGastos metricas={metricas} />}
               <div>
                 <h3 className="text-sm font-medium mb-2">Pagos por hora del día</h3>
                 <div className="h-[220px]">
