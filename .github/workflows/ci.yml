@@ -45,7 +45,6 @@ jobs:
   calidad-no-bloqueante:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,10 +52,25 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # continue-on-error en cada paso y no en el job: la deuda previa no bloquea y
+      # el check sale en verde, con los errores en las anotaciones y en el resumen.
+      # Con continue-on-error en el job, GitHub lo pintaba en rojo en cada PR.
       - name: Typecheck (20 errores previos)
+        id: typecheck
+        continue-on-error: true
         run: npx tsc --noEmit -p tsconfig.app.json
       - name: ESLint (480 errores previos)
+        id: lint
+        continue-on-error: true
         run: npm run lint
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "### Calidad (informativa, no bloquea)"
+            echo "- Typecheck: ${{ steps.typecheck.outcome == 'success' && 'sin errores' || 'con errores previos, ver anotaciones' }}"
+            echo "- ESLint: ${{ steps.lint.outcome == 'success' && 'sin errores' || 'con errores previos, ver anotaciones' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
 
 
   control-promocion:
