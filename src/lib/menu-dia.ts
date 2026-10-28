@@ -169,8 +169,11 @@ export function itemDesdePlato(plato: PlatoParaMenu): ItemMenu {
   };
 }
 
-/** Lee un item del jsonb. Devuelve `null` si no tiene ni nombre. */
-function parseItem(valor: unknown): ItemMenu | null {
+/**
+ * Lee un item del jsonb. Devuelve `null` si no tiene ni nombre. Exportado para
+ * el menú de las novedades (`src/lib/menu-novedad.ts`), que usa el mismo item.
+ */
+export function parseItemMenu(valor: unknown): ItemMenu | null {
   if (!valor || typeof valor !== "object" || Array.isArray(valor)) return null;
   const obj = valor as Record<string, unknown>;
   const nombre = texto(obj.nombre);
@@ -230,7 +233,7 @@ export function parseMenuDia(valor: unknown): MenuEstructurado {
     for (const seccion of SECCIONES_MENU) {
       const lista = mapa[seccion];
       if (!Array.isArray(lista)) continue;
-      const items = lista.map(parseItem).filter((item): item is ItemMenu => item !== null);
+      const items = lista.map(parseItemMenu).filter((item): item is ItemMenu => item !== null);
       secciones[seccion] = items;
       if (items.length > 0) hayAlguno = true;
     }

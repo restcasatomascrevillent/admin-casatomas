@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
+import type { TipoBoton } from "@/lib/menu-novedad";
 
 export interface Novedad {
   id: string;
@@ -33,6 +35,13 @@ export interface Novedad {
   tags: string[] | null;
   tags_en: string[] | null;
   tags_fr: string[] | null;
+  /**
+   * Botones de la tarjeta (`["llamar", "ver_menu"]`...) y menú de «Ver menú».
+   * Opcionales: una BBDD sin la migración 20261028170000 no los devuelve. Se
+   * leen con `parseBotonesNovedad` / `parseMenuNovedad` (src/lib/menu-novedad.ts).
+   */
+  botones?: Json;
+  menu?: Json | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;
@@ -68,6 +77,9 @@ export interface NuevaNovedad {
   tags?: string[] | null;
   tags_en?: string[] | null;
   tags_fr?: string[] | null;
+  /** Solo si la novedad tiene botones o los tenía (regla 2.4: `camposBotonesPayload`). */
+  botones?: TipoBoton[];
+  menu?: Json | null;
 }
 
 export function useNovedades() {

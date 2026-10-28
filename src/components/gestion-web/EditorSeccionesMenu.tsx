@@ -14,7 +14,7 @@
 // personalizados que ya usa la carta). No hay aquí un sistema paralelo.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -27,7 +27,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Trash2,
   UtensilsCrossed,
   X,
@@ -36,14 +35,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +54,8 @@ import {
 } from "@/lib/menu-dia";
 import { ACCEPT_FOTO_MENU, subirFotoMenu, validarFotoMenu } from "@/lib/foto-menu-dia";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
+import { posicionImagen } from "./previewConstants";
+import { SelectorPlato } from "./SelectorPlato";
 
 type Secciones = Record<SeccionMenu, ItemMenu[]>;
 
@@ -78,9 +71,6 @@ type Secciones = Record<SeccionMenu, ItemMenu[]>;
  */
 const CONTENEDOR_SECCIONES = "[container-type:inline-size]";
 const REJILLA_SECCIONES = "grid grid-cols-1 gap-3 [@container(min-width:62rem)]:grid-cols-3";
-
-/** `object-position` a partir de `imagen_posicion_y` (0..100, 50 por defecto). */
-const posicionImagen = (y: number | null) => `50% ${typeof y === "number" ? y : 50}%`;
 
 // ---------------------------------------------------------------------------
 // Miniatura
@@ -430,90 +420,6 @@ function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
         {item.alergenosNotas && (
           <p className="text-xs text-muted-foreground border-t pt-2">{item.alergenosNotas}</p>
         )}
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Selector de plato de la carta
-// ---------------------------------------------------------------------------
-
-interface SelectorPlatoProps {
-  platos: PlatoDeCarta[];
-  cargando: boolean;
-  onElegir: (plato: PlatoDeCarta) => void;
-}
-
-function SelectorPlato({ platos, cargando, onElegir }: SelectorPlatoProps) {
-  const [abierto, setAbierto] = useState(false);
-
-  // `cmdk` filtra por el `value` de cada item: se le da nombre + categoría para
-  // poder buscar también por "postres" o "entrantes".
-  const opciones = useMemo(
-    () =>
-      platos
-        .filter((plato) => (plato.nombre ?? "").trim() !== "")
-        .map((plato) => ({
-          plato,
-          busqueda: [plato.nombre, plato.categoria, plato.descripcion].filter(Boolean).join(" "),
-        })),
-    [platos],
-  );
-
-  return (
-    <Popover open={abierto} onOpenChange={setAbierto}>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="h-11 px-4">
-          <Search className="h-3.5 w-3.5 mr-1.5" />
-          De la carta
-        </Button>
-      </PopoverTrigger>
-      {/* En un móvil de 375px los 22rem iban pegados al borde derecho. */}
-      <PopoverContent align="start" collisionPadding={12} className="w-[min(22rem,calc(100vw-1.5rem))] p-0">
-        <Command>
-          <CommandInput placeholder="Buscar en la carta..." />
-          <CommandList>
-            <CommandEmpty>
-              {cargando ? "Cargando la carta..." : "Ningún plato coincide. Puedes escribirlo a mano."}
-            </CommandEmpty>
-            <CommandGroup>
-              {opciones.map(({ plato, busqueda }) => (
-                <CommandItem
-                  key={plato.id}
-                  value={`${busqueda} ${plato.id}`}
-                  onSelect={() => {
-                    onElegir(plato);
-                    setAbierto(false);
-                  }}
-                  className="min-h-11 gap-2.5 items-start"
-                >
-                  {plato.imagen_url ? (
-                    <img
-                      src={plato.imagen_url}
-                      alt=""
-                      loading="lazy"
-                      className="h-9 w-9 shrink-0 rounded object-cover border mt-0.5"
-                      style={{ objectPosition: posicionImagen(plato.imagen_posicion_y) }}
-                    />
-                  ) : (
-                    <div className="h-9 w-9 shrink-0 rounded border border-dashed bg-muted/40 flex items-center justify-center mt-0.5">
-                      <UtensilsCrossed className="h-3.5 w-3.5 text-muted-foreground/50" aria-hidden="true" />
-                    </div>
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm truncate">{plato.nombre}</span>
-                    <span className="block text-xs text-muted-foreground truncate">
-                      {[plato.categoria, plato.activado === false ? "desactivado en la carta" : null]
-                        .filter(Boolean)
-                        .join(" · ") || "Sin categoría"}
-                    </span>
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
       </PopoverContent>
     </Popover>
   );

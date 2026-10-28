@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Los platos de la carta, en la forma mínima que necesita el menú del día.
+ * Los platos de la carta, en la forma mínima que necesita el menú del día (y
+ * el menú y el botón «Échale un vistazo» de las novedades).
  *
  * Hook aparte de `usePlatos` a propósito:
  *  - `usePlatos` hace `select("*")` de las 128 filas y arrastra las mutaciones
@@ -27,6 +28,8 @@ export interface PlatoDeCarta {
   alergenos_inferidos: unknown;
   alergenos_notas: string | null;
   activado: boolean | null;
+  /** Sale en la carta del restaurante. «En la carta» = `activado` y `restaurante`. */
+  restaurante: boolean | null;
   orden: string | null;
 }
 
@@ -45,6 +48,7 @@ const COLUMNAS = [
   "alergenos_inferidos",
   "alergenos_notas",
   "activado",
+  "restaurante",
   "orden",
 ].join(", ");
 

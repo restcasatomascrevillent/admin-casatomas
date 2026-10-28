@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Coffee, Cake, ImageIcon, EyeOff } from "lucide-react";
+import { Wine, UtensilsCrossed, Gift, Calendar, Star, Sparkles, Coffee, Cake, ImageIcon, EyeOff, Phone, BookOpen, Eye } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
+import { ETIQUETA_BOTON, ETIQUETA_BOTON_IDIOMA, botonesVisiblesEnWeb, type TipoBoton } from "@/lib/menu-novedad";
 
 export interface NovedadPreview {
   id?: string;
@@ -29,6 +30,12 @@ export interface NovedadPreview {
   tags_fr?: string[] | null;
   /** Solo para el borrador: motivo por el que NO se vería en la web todavía. */
   avisoVisibilidad?: string | null;
+  /** Botones al pie de la tarjeta, en su orden. Sin ellos la tarjeta es la de siempre. */
+  botones?: TipoBoton[];
+  /** El plato de «Échale un vistazo» está en la carta (si no, la web oculta el botón). */
+  platoEnCarta?: boolean;
+  /** El menú de «Ver menú» tiene algún plato (si no, la web oculta el botón). */
+  menuConPlatos?: boolean;
 }
 
 interface MobilePreviewProps {
@@ -59,6 +66,12 @@ const getTextoIdioma = (novedad: NovedadPreview, idioma: Idioma) => {
     bullets: pick(novedad.bullets || [], novedad.bullets_en?.length ? novedad.bullets_en : null, novedad.bullets_fr?.length ? novedad.bullets_fr : null),
     tags: pick(novedad.tags || [], novedad.tags_en?.length ? novedad.tags_en : null, novedad.tags_fr?.length ? novedad.tags_fr : null),
   };
+};
+
+const ICONOS_BOTON: Record<TipoBoton, React.ComponentType<{ className?: string }>> = {
+  llamar: Phone,
+  ver_menu: BookOpen,
+  ver_plato: Eye,
 };
 
 // Mismos iconos (y mismo icono por defecto: estrella) que la web pública.
@@ -96,7 +109,8 @@ const TEXTOS_SECCION: Record<Idioma, { titulo: string; subtitulo: string; vacio:
  * Réplica en miniatura de la sección «Novedades» de la web de Casa Tomás
  * (casa-tomas-story/src/components/NovedadesSection.tsx) tal y como se ve en
  * un móvil: una tarjeta por fila, foto de 176px de alto, badge solo si hay
- * texto, puntos destacados como lista y etiquetas como chips.
+ * texto, puntos destacados como lista, etiquetas como chips y, si los tiene,
+ * los botones al pie (solo los que la web pintaría).
  */
 export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
   const [idioma, setIdioma] = useState<Idioma>("es");
@@ -147,6 +161,12 @@ export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
                   const IconComponent = ICONOS_MAP[novedad.icono || "star"] || Star;
                   const resaltado = !!idResaltado && novedad.id === idResaltado;
                   const t = getTextoIdioma(novedad, idioma);
+                  const botones = novedad.botones ?? [];
+                  const botonesVisibles = botonesVisiblesEnWeb(botones, {
+                    platoEnCarta: !!novedad.platoEnCarta,
+                    menuConPlatos: !!novedad.menuConPlatos,
+                  });
+                  const botonesOcultos = botones.filter((b) => !botonesVisibles.includes(b));
                   return (
                     <Card
                       key={novedad.id || index}
@@ -178,6 +198,12 @@ export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
                         <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] px-3 py-1">
                           <EyeOff className="w-3 h-3 shrink-0" />
                           {novedad.avisoVisibilidad}
+                        </div>
+                      )}
+                      {resaltado && botonesOcultos.length > 0 && (
+                        <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] px-3 py-1">
+                          <EyeOff className="w-3 h-3 shrink-0" />
+                          No saldrá en la web: {botonesOcultos.map((b) => `«${ETIQUETA_BOTON[b]}»`).join(" y ")}
                         </div>
                       )}
                       <CardHeader className="p-4 pb-2">
@@ -213,6 +239,29 @@ export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
                               </Badge>
                             ))}
                           </div>
+                        )}
+                        {/* Al pie, como en la web: lado a lado si caben y, si no,
+                            apilados a todo el ancho. En la vista previa no se pulsan. */}
+                        {botonesVisibles.length > 0 && (
+                          <ul className="flex flex-wrap gap-2 pt-2" aria-label="Botones de la tarjeta" data-testid="botones-tarjeta">
+                            {botonesVisibles.map((tipo, i) => {
+                              const Icono = ICONOS_BOTON[tipo];
+                              return (
+                                <li
+                                  key={tipo}
+                                  data-boton={tipo}
+                                  className={`flex min-h-9 flex-auto items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium ${
+                                    i === 0
+                                      ? "bg-primary text-primary-foreground"
+                                      : "border border-primary/40 bg-background text-primary"
+                                  }`}
+                                >
+                                  <Icono className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  {ETIQUETA_BOTON_IDIOMA[idioma][tipo]}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         )}
                       </CardContent>
                     </Card>
