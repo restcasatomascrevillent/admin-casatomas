@@ -1,0 +1,57 @@
+# Versión de producción (docs/PROCESO-DE-CAMBIOS.md).
+#
+# Al aceptar un PR staging → main deja constancia de lo publicado: etiqueta vM.N
+# y GitHub Release con los cambios. No despliega nada (eso lo hace Vercel) y no
+# toca package.json: la versión se calcula del historial (scripts/version.mjs).
+name: Versión de producción
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-produccion
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Etiqueta y release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Crear la versión si se ha aceptado un PR desde staging
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Misma regla que usa Vercel para publicar (scripts/vercel-produccion.mjs): sale 1 si publica.
+          if VERCEL_ENV=production VERCEL_GIT_COMMIT_MESSAGE="$(git log -1 --format=%B)" node scripts/vercel-produccion.mjs >/dev/null; then
+            echo "::warning::El último commit de main no es un PR aceptado desde staging: Vercel no lo publica y no se crea versión."
+            exit 0
+          fi
+          VERSION=$(node scripts/version.mjs --solo-version)
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::No se pudo calcular la versión: $VERSION"
+            exit 1
+          fi
+          TAG="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "La versión $TAG ya existe: este PR no traía commits nuevos." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          ANTERIOR=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD^1 2>/dev/null || true)
+          DESDE=${ANTERIOR:-$(git log -1 --format=%H -- versionado.json)^}
+          {
+            echo "Publicada en producción al aceptar «$(git log -1 --format=%s)»."
+            echo
+            echo "### Cambios"
+            git log --no-merges --format='- %s (`%h`)' "$DESDE..HEAD"
+          } > notas.md
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notas.md
+          echo "Creada la versión $TAG." >> "$GITHUB_STEP_SUMMARY"

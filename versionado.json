@@ -1,0 +1,4 @@
+{
+  "mayor": 0,
+  "_como_funciona": "La versión es M.N. M es 'mayor'. N cuenta los commits (sin merges) desde el último cambio de este fichero: cada commit suma 1. Solo se toca para cambiar de M (0 → 1 en la primera salida a producción). Ver docs/PROCESO-DE-CAMBIOS.md."
+}

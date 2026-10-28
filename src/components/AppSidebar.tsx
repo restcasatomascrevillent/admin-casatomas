@@ -13,6 +13,7 @@ import {
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
+import { VersionPanel } from "@/components/panel/VersionPanel";
 import {
   Sidebar,
   SidebarContent,
@@ -238,6 +239,7 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <VersionPanel colapsado={isCollapsed} />
       </SidebarFooter>
     </Sidebar>
   );

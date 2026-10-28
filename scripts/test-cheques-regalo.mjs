@@ -84,12 +84,16 @@ await db.exec(`
     pago_manual_metodo text check (pago_manual_metodo in ('efectivo','tarjeta','transferencia','cortesia')),
     ocultar_importe boolean not null default false, creado_por uuid references auth.users(id),
     solicitud_manual_id uuid unique, plantilla_cheque jsonb,
-    emitido_en timestamptz, caduca_el date, stripe_fee_eur numeric
+    emitido_en timestamptz, caduca_el date, stripe_fee_eur numeric,
+    gastos_gestion_eur numeric(10,2) not null default 0 check (gastos_gestion_eur >= 0)
   );
   create table public.plantilla_cheques_regalo (
     id boolean primary key default true check (id),
     pdf_titulo text not null default 'Cheque regalo',
-    caducidad_meses integer not null default 12 check (caducidad_meses between 1 and 120)
+    caducidad_meses integer not null default 12 check (caducidad_meses between 1 and 120),
+    gastos_gestion_activos boolean not null default false,
+    gastos_gestion_porcentaje numeric(5,2) not null default 1.5 check (gastos_gestion_porcentaje >= 0 and gastos_gestion_porcentaje < 10),
+    gastos_gestion_fijo_eur numeric(6,2) not null default 0.25 check (gastos_gestion_fijo_eur >= 0 and gastos_gestion_fijo_eur <= 5)
   );
   insert into public.plantilla_cheques_regalo(id) values (true);
   create table public.plantilla_factura_cheques (
@@ -106,7 +110,8 @@ await db.exec(`
     cheque_id uuid not null unique references public.cheques_regalo(id),
     numero text not null unique default ('CT-' || lpad(nextval('public.facturas_cheques_numero_seq')::text, 8, '0')),
     emitida_en timestamptz not null default now(), emisor jsonb not null, cliente jsonb not null,
-    importe_eur numeric(10,2) not null, iva_porcentaje numeric(5,2) not null, email_enviado_en timestamptz
+    importe_eur numeric(10,2) not null, iva_porcentaje numeric(5,2) not null, email_enviado_en timestamptz,
+    gastos_gestion_eur numeric(10,2) not null default 0 check (gastos_gestion_eur >= 0)
   );
 `);
 for (const definicion of await definiciones()) await db.exec(definicion);
@@ -123,9 +128,9 @@ const canjear = async (codigo) => (await una(`select public.canjear_cheque_regal
 
 /** Compra web: fila «pendiente» como la crea `cheques-regalo-web/crear`. */
 const crearPendiente = async (importe = 50, extra = {}) => (await una(
-  `insert into public.cheques_regalo (importe_eur, comprador_nombre, comprador_email, solicita_factura, datos_factura)
-   values ($1, 'Ana Prueba', 'ana@test.local', $2, $3) returning id`,
-  [importe, extra.solicita_factura ?? false, extra.datos_factura ?? null],
+  `insert into public.cheques_regalo (importe_eur, comprador_nombre, comprador_email, solicita_factura, datos_factura, gastos_gestion_eur)
+   values ($1, 'Ana Prueba', 'ana@test.local', $2, $3, $4) returning id`,
+  [importe, extra.solicita_factura ?? false, extra.datos_factura ?? null, extra.gastos_gestion_eur ?? 0],
 )).id;
 
 /** Exactamente la sentencia de `procesarPagoCompletado` en el webhook. */
@@ -249,5 +254,31 @@ igual([m1.id === m2.id, m1.codigo === m2.codigo, m1.estado, m1.origen, m1.caduca
 await falla(sql(`select public.crear_cheque_manual($1, $2)`, ["50000000-0000-0000-0000-000000000005", { ...datos, importe_eur: 5 }]), /importe/, "importe mínimo de 10 €");
 await como(LECTOR);
 await falla(sql(`select public.crear_cheque_manual($1, $2)`, ["60000000-0000-0000-0000-000000000006", datos]), /permiso/, "solo lectura no expide cheques");
+
+// --- 10. Gastos de gestión: factura y métricas de la pestaña Stripe -----------------------------
+await como(AJENO);
+await falla(sql(`select public.metricas_cheques_regalo()`), /permiso/, "sin permiso de Cheques no hay métricas");
+await como(LECTOR);
+const metricas = async () => (await una(`select public.metricas_cheques_regalo() as m`)).m;
+const antes = await metricas();
+// Cheque de 50 € con 1,02 € de gastos y la comisión real que guarda el webhook (1,02 €).
+const conGastos = await crearPendiente(50, { gastos_gestion_eur: 1.02, solicita_factura: true, datos_factura: { nombre: "Ana SL", nif: "B11111111", direccion: "Calle 1" } });
+await pagar(conGastos, "CT-GGGG7777", "pi_gastos");
+await sql(`update public.cheques_regalo set stripe_fee_eur = 1.02 where id = $1`, [conGastos]);
+const factura = (await una(`select public.emitir_factura_cheque($1) as f`, [conGastos])).f;
+igual([Number(factura.importe_eur), Number(factura.gastos_gestion_eur)], [50, 1.02], "la factura recoge el cheque y los gastos por separado");
+// Cheque de 100 € con 1,78 € de gastos y sin comisión real todavía: se estima sobre lo cobrado.
+await pagar(await crearPendiente(100, { gastos_gestion_eur: 1.78 }), "CT-HHHH8888", "pi_estimada");
+// Una compra manual nunca entra en las métricas de Stripe.
+await como(EDITOR);
+await sql(`select public.crear_cheque_manual_v2($1, $2)`, ["70000000-0000-0000-0000-000000000007", { ...datos, importe_eur: 40 }]);
+await como(LECTOR);
+const despues = await metricas();
+const delta = (campo) => Math.round((Number(despues[campo]) - Number(antes[campo])) * 100) / 100;
+igual([delta("pagos"), delta("pagos_con_gastos")], [2, 2], "cuenta los dos pagos web con gastos y no la compra manual");
+igual([delta("valor_cheques_eur"), delta("gastos_gestion_eur"), delta("bruto_eur")], [150, 2.8, 152.8], "separa valor de los cheques, gastos y lo cobrado");
+// 1,02 real + round(101,78 × 1,5 % + 0,25) = 1,78 estimada.
+igual([delta("comision_eur"), delta("neto_eur")], [2.8, 150], "los gastos cubren la comisión: al restaurante le queda el valor íntegro");
+igual(despues.comision_incompleta, true, "avisa de que hay comisiones estimadas");
 
 console.log(`test-cheques-regalo: ${comprobaciones} comprobaciones superadas`);
