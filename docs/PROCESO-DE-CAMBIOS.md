@@ -97,11 +97,13 @@ Dónde se ve:
 - En **`/version.json`** de la web y del panel, en cada entorno.
 - En el **título del PR** a producción y en las **Releases** de GitHub.
 
-Si la versión sale como `v0.?`, el build no tuvo el historial de git completo y el motivo aparece al pasar el ratón. Se arregla añadiendo en Vercel la variable de entorno `VERCEL_DEEP_CLONE=true` (Settings → Environment Variables) y volviendo a desplegar.
+La versión necesita el historial completo de git al compilar. Por defecto, Vercel clona solo los últimos commits; por eso los dos proyectos tienen la variable `VERCEL_DEEP_CLONE=true` (Preview y Production, puesta el 27-10-2026). No está en la documentación oficial de Vercel, pero es la forma conocida de pedir el clon completo. Si alguna vez la versión sale como `v0.?`, falta esa variable o ha dejado de funcionar. El motivo aparece al pasar el ratón y en el log del build: `Versión 0.? · … · AVISO: …`.
 
-## Configuración de GitHub (una vez, la hace el dueño)
+## Configuración necesaria (una vez)
 
-Hay que hacerla en **los dos repos**:
+**Vercel** (hecho el 27-10-2026): `VERCEL_DEEP_CLONE=true` en Preview y Production de `web-casatomas` y `admin-casatomas`.
+
+**GitHub** (la hace el dueño), en **los dos repos**:
 
 1. **Settings → Actions → General → Workflow permissions:** marca **Read and write permissions** y **Allow GitHub Actions to create and approve pull requests**. Sin esto no se crea el PR automático y el workflow avisa con el enlace para abrirlo a mano. Si la opción sale bloqueada, hay que activarla antes en **Organization settings → Actions → General**.
 2. **Settings → General → Pull Requests:** deja marcada solo **Allow merge commits** y desmarca **Allow squash merging** y **Allow rebase merging**. Así el único botón disponible es el correcto.
