@@ -51,7 +51,7 @@ export const ETIQUETA_BOTON: Record<TipoBoton, string> = {
 /** Rótulos por idioma para la vista previa del móvil. */
 export const ETIQUETA_BOTON_IDIOMA: Record<"es" | "en" | "fr", Record<TipoBoton, string>> = {
   es: ETIQUETA_BOTON,
-  en: { llamar: "Call", ver_menu: "See menu", ver_plato: "Take a look" },
+  en: { llamar: "Call", ver_menu: "View menu", ver_plato: "Take a look" },
   fr: { llamar: "Appeler", ver_menu: "Voir le menu", ver_plato: "Jetez un œil" },
 };
 

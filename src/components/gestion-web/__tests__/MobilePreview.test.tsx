@@ -75,6 +75,11 @@ describe("MobilePreview — botones de la tarjeta", () => {
       />,
     );
     expect(botonesDe()).toEqual(["Ver menú", "Llamar"]);
+    // Los mismos textos que la web (web-casatomas 6c9d0f0).
+    fireEvent.click(screen.getByRole("radio", { name: "Inglés" }));
+    expect(botonesDe()).toEqual(["View menu", "Call"]);
+    fireEvent.click(screen.getByRole("radio", { name: "Francés" }));
+    expect(botonesDe()).toEqual(["Voir le menu", "Appeler"]);
   });
 
   it("traduce las etiquetas con el idioma de la vista previa", () => {
