@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
@@ -642,6 +643,14 @@ export function EditarPlatoModal({
                       >
                         Cambiar foto
                       </Button>
+                      <BotonCambiarFondo
+                        recorte={fotoCarta}
+                        url={removeImage ? null : plato?.imagen_url}
+                        onIniciado={() => {
+                          setRemoveImage(false);
+                          setImagePreview(null);
+                        }}
+                      />
                       {(imagePreview || fotoCarta.original) && (
                         <Button
                           type="button"

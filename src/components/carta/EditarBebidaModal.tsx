@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
@@ -272,6 +273,14 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   Cambiar foto
                 </Button>
+                <BotonCambiarFondo
+                  recorte={fotoCarta}
+                  url={removeImage ? null : bebida?.imagen_url}
+                  onIniciado={() => {
+                    setRemoveImage(false);
+                    setImagePreview(null);
+                  }}
+                />
                 {(imagePreview || fotoCarta.original) && (
                   <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                     Quitar foto

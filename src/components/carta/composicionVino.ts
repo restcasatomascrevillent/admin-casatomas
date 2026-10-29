@@ -121,6 +121,36 @@ export const TEMAS = {
     radioContorno: 24,
     sombra: [25, 32, 40, 0.48],
   },
+  /** Crema champán: dorado pálido, más claro y luminoso que la cartulina. */
+  champan: {
+    nombre: "Champán",
+    fondo: ["#ece0c4", "#dccdab"],
+    vineta: "rgba(100, 78, 36, 0.1)",
+    ruido: 4,
+    contorno: "rgba(255, 250, 232, 0.3)",
+    radioContorno: 20,
+    sombra: [92, 70, 30, 0.42],
+  },
+  /** Verde oliva oscuro suave: contrasta con vidrio y etiquetas claras. */
+  oliva: {
+    nombre: "Oliva oscuro",
+    fondo: ["#7d8161", "#6c7052"],
+    vineta: "rgba(25, 30, 15, 0.16)",
+    ruido: 4,
+    contorno: "rgba(244, 246, 228, 0.3)",
+    radioContorno: 22,
+    sombra: [26, 30, 14, 0.55],
+  },
+  /** Negro cálido carbón: hace destacar botellas y platos claros. */
+  carbon: {
+    nombre: "Carbón cálido",
+    fondo: ["#3b3835", "#2a2826"],
+    vineta: "rgba(0, 0, 0, 0.22)",
+    ruido: 3,
+    contorno: "rgba(255, 244, 226, 0.26)",
+    radioContorno: 20,
+    sombra: [0, 0, 0, 0.6],
+  },
 } satisfies Record<string, TemaFondo>;
 
 export type NombreTema = keyof typeof TEMAS;

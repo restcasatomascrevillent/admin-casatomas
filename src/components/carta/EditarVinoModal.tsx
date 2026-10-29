@@ -23,6 +23,7 @@ import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -259,6 +260,15 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   Cambiar foto
                 </Button>
+                <BotonCambiarFondo
+                  recorte={recorte}
+                  url={removeImage || urlRestaurada ? null : vino?.imagen_url}
+                  onIniciado={() => {
+                    setRemoveImage(false);
+                    setUrlRestaurada(null);
+                    setImagePreview(null);
+                  }}
+                />
                 {original && (
                   <Button type="button" variant="outline" onClick={volverAOriginal}>
                     <Undo2 className="mr-2 h-4 w-4" />

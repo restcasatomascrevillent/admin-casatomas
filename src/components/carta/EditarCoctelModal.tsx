@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Coctel, useCocteles } from "@/hooks/useCocteles";
@@ -387,6 +388,14 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                     Cambiar foto
                   </Button>
+                  <BotonCambiarFondo
+                    recorte={fotoCarta}
+                    url={removeImage ? null : coctel?.imagen_url}
+                    onIniciado={() => {
+                      setRemoveImage(false);
+                      setImagePreview(null);
+                    }}
+                  />
                   {(imagePreview || fotoCarta.original) && (
                     <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                       Quitar foto
