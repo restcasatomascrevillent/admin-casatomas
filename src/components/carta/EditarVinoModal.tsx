@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Camera, Loader2, X } from "lucide-react";
+import { Camera, Loader2, Sparkles, Undo2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,7 @@ import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
 import { CamposVino } from "./CamposVino";
+import { esFotoCarta, hacerFotoCarta, nombreSubida, rutaOriginalDesdeCarta } from "./fotoCartaVino";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -59,6 +60,9 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [poniendoFondo, setPoniendoFondo] = useState(false);
+  // «Volver a la foto original»: URL a guardar en imagen_url (sin tocar Storage).
+  const [urlRestaurada, setUrlRestaurada] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -92,6 +96,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     setImageFile(null);
     setImagePreview(vino.imagen_url ?? null);
     setRemoveImage(false);
+    setUrlRestaurada(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -103,6 +108,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
     setImageFile(file);
     setRemoveImage(false);
+    setUrlRestaurada(null);
 
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -111,7 +117,31 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     reader.readAsDataURL(file);
   };
 
+  const ponerFondoCarta = async () => {
+    if (!imageFile) return;
+    setPoniendoFondo(true);
+    try {
+      const { foto } = await hacerFotoCarta(imageFile);
+      setImageFile(foto);
+      setImagePreview(URL.createObjectURL(foto));
+    } catch (e) {
+      console.warn("[recortar-fondo-vino]", e);
+      toast.error((e as Error)?.message || "No se pudo poner el fondo de carta");
+    } finally {
+      setPoniendoFondo(false);
+    }
+  };
+
+  const original = !imageFile && !removeImage && !urlRestaurada ? rutaOriginalDesdeCarta(vino?.imagen_url) : null;
+  const volverAOriginal = () => {
+    if (!original) return;
+    const url = `${original}?t=${Date.now()}`;
+    setUrlRestaurada(url);
+    setImagePreview(url);
+  };
+
   const clearImage = () => {
+    setUrlRestaurada(null);
     setImageFile(null);
     setImagePreview(null);
     setRemoveImage(true);
@@ -132,8 +162,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       let fotoAntigua: string | null = null;
 
       if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop() || "jpg";
-        const fileName = `${vino.id}.${fileExt}`;
+        const fileName = nombreSubida(vino.id, imageFile);
 
         const { error: uploadError } = await supabase.storage
           .from("vinos")
@@ -147,6 +176,10 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
         const nombreArchivoAnterior = nombreArchivoStorage(vino.id, vino.imagen_url);
         if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
+      } else if (urlRestaurada) {
+        // Deshacer el fondo de carta: el original sigue en Storage, solo se
+        // vuelve a apuntar a él (la foto de carta se queda, no se borra).
+        imageUrlUpdate = urlRestaurada;
       } else if (removeImage) {
         imageUrlUpdate = null;
         fotoAntigua = nombreArchivoStorage(vino.id, vino.imagen_url);
@@ -225,10 +258,22 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   Cambiar foto
                 </Button>
+                {imageFile && !esFotoCarta(imageFile.name) && (
+                  <Button type="button" variant="outline" disabled={poniendoFondo} onClick={() => void ponerFondoCarta()}>
+                    {poniendoFondo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                    Fondo de carta
+                  </Button>
+                )}
+                {original && (
+                  <Button type="button" variant="outline" onClick={volverAOriginal}>
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Volver a la foto original
+                  </Button>
+                )}
                 {imagePreview && (
                   <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                     Quitar foto
@@ -249,7 +294,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage || poniendoFondo}>
                 {actualizarVino.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

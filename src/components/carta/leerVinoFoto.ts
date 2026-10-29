@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { redimensionarFoto } from "./redimensionarFoto";
 import { recortarFoto, type RecorteNormalizado } from "./recorteFoto";
+import { avisoSinFondoCarta, hacerFotoCarta } from "./fotoCartaVino";
 
 export interface FuentePrecioMercado {
   tienda: string;
@@ -31,8 +32,13 @@ export interface DatosVinoFoto {
 
 export interface VinoDesdeFoto {
   datos: DatosVinoFoto;
-  /** Foto ya redimensionada y, si hay recorte válido, encuadrada en 3:4. */
+  /**
+   * Foto de carta (botella sin fondo sobre el fondo fijo, `botella-carta.webp`)
+   * o, si no se pudo quitar el fondo, la foto redimensionada y encuadrada en 3:4.
+   */
   foto: File;
+  /** Si no se pudo poner el fondo de carta: aviso corto para el usuario. */
+  avisoFoto?: string;
   /** Modo lote: se llama al guardar el vino en el formulario. */
   alGuardar?: () => void;
   /** Modo lote: se llama al cerrar el formulario (guardado o no). */
@@ -102,5 +108,13 @@ export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<
       .map(([k]) => k),
   );
   const blob = await recortarFoto(r.blob, datos.recorte);
-  return { datos, foto: new File([blob], "botella.jpg", { type: "image/jpeg" }) };
+  // Fondo de carta: quitar el fondo (recortar-fondo-vino) y componer. Si
+  // falla (sin token, error, timeout), se queda la foto encuadrada de siempre.
+  try {
+    const { foto } = await hacerFotoCarta(blob);
+    return { datos, foto };
+  } catch (e) {
+    console.warn("[recortar-fondo-vino] se usa la foto sin fondo de carta", e);
+    return { datos, foto: new File([blob], "botella.jpg", { type: "image/jpeg" }), avisoFoto: avisoSinFondoCarta(e) };
+  }
 }

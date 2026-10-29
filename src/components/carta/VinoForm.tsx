@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { useVinos, NuevoVino } from "@/hooks/useVinos";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { nombreSubida } from "./fotoCartaVino";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
@@ -148,8 +149,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     if (imageFile && nuevoVino?.id) {
       setIsUploading(true);
       try {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${nuevoVino.id}.${fileExt}`;
+        // Foto de carta (sin fondo, compuesta) → `<id>-carta.<ext>`: así el
+        // script de homogeneizar la reconoce como ya procesada.
+        const fileName = nombreSubida(nuevoVino.id, imageFile);
 
         const { error: uploadError } = await supabase.storage
           .from('vinos')

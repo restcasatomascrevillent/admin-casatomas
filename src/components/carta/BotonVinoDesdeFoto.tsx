@@ -44,6 +44,7 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
       if (!resultado.datos.nombre) {
         toast.warning("No se ha podido leer el nombre en la etiqueta. Revisa los datos o prueba con una foto más cerca y con luz.");
       }
+      if (resultado.avisoFoto) toast.message(resultado.avisoFoto);
       onLeido(resultado);
     } catch (e) {
       console.error("[extraer-vino-foto]", e);
