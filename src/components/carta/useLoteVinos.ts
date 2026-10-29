@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { leerVinoDeFoto, type VinoDesdeFoto } from "./leerVinoFoto";
+import { hacerFotoCarta } from "./fotoCartaVino";
 
 /** Lecturas a la vez (cada una es una llamada a la IA). */
 export const CONCURRENCIA_LOTE = 2;
 
 export type EstadoFila = "cola" | "leyendo" | "listo" | "error" | "guardado";
+export type EstadoRecorteFila = "recortando" | "listo" | "fallo";
 
 export interface FilaLote {
   id: string;
@@ -13,6 +15,10 @@ export interface FilaLote {
   miniatura: string;
   estado: EstadoFila;
   resultado?: VinoDesdeFoto;
+  /** Recorte sin fondo (en segundo plano tras leer la etiqueta). */
+  recorte?: EstadoRecorteFila;
+  /** Object URL del sticker (botella sin fondo) cuando está listo. */
+  sticker?: string;
 }
 
 let contador = 0;
@@ -57,13 +63,17 @@ export function useLoteVinos(categorias: string[]) {
     setFilas((prev) => {
       const f = prev.find((x) => x.id === id);
       if (f) liberarUrl(f.miniatura);
+      if (f?.sticker) liberarUrl(f.sticker);
       return prev.filter((x) => x.id !== id);
     });
   }, []);
 
   const vaciar = useCallback(() => {
     setFilas((prev) => {
-      prev.forEach((f) => liberarUrl(f.miniatura));
+      prev.forEach((f) => {
+        liberarUrl(f.miniatura);
+        if (f.sticker) liberarUrl(f.sticker);
+      });
       return [];
     });
   }, []);
@@ -93,10 +103,27 @@ export function useLoteVinos(categorias: string[]) {
           if (!montado.current) return;
           // URLs fuera del updater (StrictMode lo llama dos veces).
           const mini = crearUrl(resultado.foto);
+          // Recorte en segundo plano (el worker los hace de uno en uno); el
+          // formulario espera esta misma promesa si se abre antes de acabar.
+          const recorte = hacerFotoCarta(resultado.foto);
           setFilas((prev) =>
-            prev.map((f) => (f.id === fila.id ? { ...f, estado: "listo", resultado, miniatura: mini } : f)),
+            prev.map((f) =>
+              f.id === fila.id ? { ...f, estado: "listo", resultado: { ...resultado, recorte }, miniatura: mini, recorte: "recortando" } : f,
+            ),
           );
           liberarUrl(fila.miniatura);
+          recorte.then(
+            (r) => {
+              if (!montado.current) return;
+              const sticker = crearUrl(r.sticker);
+              setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, recorte: "listo", sticker } : f)));
+            },
+            (e) => {
+              console.warn("[recorte] lote", e);
+              if (!montado.current) return;
+              setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, recorte: "fallo" } : f)));
+            },
+          );
         })
         .catch((e) => {
           console.error("[extraer-vino-foto] lote", e);

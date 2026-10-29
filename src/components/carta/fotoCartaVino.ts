@@ -11,13 +11,21 @@
  *     guardado: no hay nada que deshacer).
  *   Cualquier ruta con `-carta` antes de la extensión cuenta como procesada.
  *
- * Quitar el fondo en el panel usa la Edge Function `recortar-fondo-vino`
- * (Replicate, respaldo OPCIONAL de pago). Si no está configurada o falla, el
- * llamador sigue con la foto de siempre; las fotos sin procesar se pueden
- * homogeneizar gratis con el script local `scripts/fotos-vino/`.
+ * Quitar el fondo en el panel, por orden:
+ *   1. GRATIS en el navegador (recorte/quitarFondoNavegador.ts: isnet en un
+ *      Web Worker con onnxruntime-web; el modelo se baja una vez y se cachea).
+ *   2. Si falla: Edge Function `recortar-fondo-vino` (Replicate, de pago,
+ *      opcional; sin token → 503 `sin_token`).
+ *   3. Si también falla: el llamador sigue con la foto encuadrada de siempre
+ *      (recorteFoto.ts) y avisa.
+ * Las fotos ya subidas sin procesar se pueden homogeneizar con el script
+ * local `scripts/fotos-vino/`.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { componerFotoVino, extensionFoto } from "./composicionVino";
+import { quitarFondoNavegador, type ProgresoRecorte } from "./recorte/quitarFondoNavegador";
+
+export type { ProgresoRecorte } from "./recorte/quitarFondoNavegador";
 
 export { esFotoCarta, nombreSubida, rutaCartaDesdeOriginal, rutaOriginalDesdeCarta } from "./rutasFotoCarta";
 
@@ -59,24 +67,42 @@ export async function quitarFondoRemoto(foto: Blob): Promise<Blob> {
 export interface ResultadoFotoCarta {
   /** Foto de carta (WebP 900×1200, o JPEG en Safari). */
   foto: File;
+  /** La botella recortada sin fondo (PNG con transparencia). */
+  sticker: Blob;
+  /** Quién quitó el fondo. */
+  metodo: "navegador" | "replicate";
+}
+
+/** Quita el fondo: navegador gratis → Replicate. Lanza el error del último intento. */
+export async function quitarFondo(
+  foto: Blob,
+  onProgreso?: (p: ProgresoRecorte) => void,
+): Promise<{ sticker: Blob; metodo: ResultadoFotoCarta["metodo"] }> {
+  try {
+    return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
+  } catch (e) {
+    console.warn("[recorte-navegador] falló, se prueba Replicate", e);
+  }
+  onProgreso?.({ fase: "recortando" });
+  return { sticker: await quitarFondoRemoto(foto), metodo: "replicate" };
 }
 
 /**
- * Foto (JPEG/PNG/WebP con fondo) → foto de carta lista para subir, con nombre
- * `botella-carta.<ext>` (los formularios suben `<id>-carta.<ext>`).
- * Lanza error si no se pudo (sin token, timeout, imagen vacía…).
+ * Foto (JPEG/PNG/WebP con fondo) → sticker + foto de carta lista para subir,
+ * con nombre `botella-carta.<ext>` (los formularios suben `<id>-carta.<ext>`).
+ * Lanza error si no se pudo por ninguna vía.
  */
-export async function hacerFotoCarta(foto: Blob): Promise<ResultadoFotoCarta> {
-  const png = await quitarFondoRemoto(foto);
-  const compuesta = await componerFotoVino(png);
+export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoRecorte) => void): Promise<ResultadoFotoCarta> {
+  const { sticker, metodo } = await quitarFondo(foto, onProgreso);
+  const compuesta = await componerFotoVino(sticker);
   const ext = extensionFoto(compuesta);
-  return { foto: new File([compuesta], `botella-carta.${ext}`, { type: compuesta.type }) };
+  return { foto: new File([compuesta], `botella-carta.${ext}`, { type: compuesta.type }), sticker, metodo };
 }
 
 /** Mensaje corto para el aviso cuando no se pudo aplicar el fondo de carta. */
 export function avisoSinFondoCarta(e: unknown): string {
   const codigo = (e as { codigo?: string } | null)?.codigo;
-  if (codigo === "sin_token") return "Fondo de carta no disponible todavía: se guarda la foto normal.";
+  if (codigo === "sin_token") return "No se pudo quitar el fondo en este móvil: se guarda la foto normal.";
   if (codigo === "timeout") return "Quitar el fondo tardó demasiado: se guarda la foto normal.";
   return "No se pudo poner el fondo de carta: se guarda la foto normal.";
 }

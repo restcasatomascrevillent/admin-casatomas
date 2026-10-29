@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatoEuros, precioMercado, precioSugerido } from "./leerVinoFoto";
 import type { FilaLote, LoteVinos } from "./useLoteVinos";
+import { ESTILO_DAMERO } from "./recorte/useRecorteVino";
 
 interface Props {
   open: boolean;
@@ -42,7 +43,17 @@ function TextoEstado({ fila }: { fila: FilaLote }) {
         </span>
       );
     default:
-      return <span className="font-medium text-primary">Listo · toca para revisar</span>;
+      if (fila.recorte === "recortando")
+        return (
+          <span className="inline-flex items-center gap-1 text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Recortando… · ya puedes revisar
+          </span>
+        );
+      return (
+        <span className="font-medium text-primary">
+          {fila.recorte === "fallo" ? "Listo (sin recorte)" : "Listo"} · toca para revisar
+        </span>
+      );
   }
 }
 
@@ -104,11 +115,17 @@ export function LoteVinosDialog({ open, onOpenChange, lote, onAbrirFila }: Props
                   className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-default"
                   aria-label={abrible ? `Revisar ${d?.nombre || "botella"}` : undefined}
                 >
-                  <img
-                    src={fila.miniatura}
-                    alt=""
-                    className="h-16 w-12 shrink-0 rounded-md border bg-muted object-cover"
-                  />
+                  {fila.sticker ? (
+                    <span className="relative h-16 w-12 shrink-0 overflow-hidden rounded-md border" style={ESTILO_DAMERO}>
+                      <img src={fila.sticker} alt="Recorte" className="h-full w-full object-contain" />
+                    </span>
+                  ) : (
+                    <img
+                      src={fila.miniatura}
+                      alt=""
+                      className="h-16 w-12 shrink-0 rounded-md border bg-muted object-cover"
+                    />
+                  )}
                   <span className="min-w-0 flex-1 text-sm">
                     <span className="block truncate font-medium">
                       {d?.nombre || (fila.estado === "listo" || fila.estado === "guardado" ? "Sin nombre leído" : "Botella")}

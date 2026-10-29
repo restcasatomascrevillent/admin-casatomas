@@ -37,6 +37,10 @@ export default defineConfig(({ command }) => {
     __VERSION_APP__: JSON.stringify(VERSION_APP),
   },
   plugins: [react(), versionJson()],
+  // Worker del recorte de fotos de vino (onnxruntime-web): módulo ES, y sin
+  // pre-empaquetar en dev para que encuentre su .wasm.
+  worker: { format: "es" as const },
+  optimizeDeps: { exclude: ["onnxruntime-web"] },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

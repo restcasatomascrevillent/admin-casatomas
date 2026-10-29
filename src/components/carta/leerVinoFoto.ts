@@ -1,7 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { redimensionarFoto } from "./redimensionarFoto";
 import { recortarFoto, type RecorteNormalizado } from "./recorteFoto";
-import { avisoSinFondoCarta, hacerFotoCarta } from "./fotoCartaVino";
+import type { ResultadoFotoCarta } from "./fotoCartaVino";
 
 export interface FuentePrecioMercado {
   tienda: string;
@@ -33,11 +33,13 @@ export interface DatosVinoFoto {
 export interface VinoDesdeFoto {
   datos: DatosVinoFoto;
   /**
-   * Foto de carta (botella sin fondo sobre el fondo fijo, `botella-carta.webp`)
-   * o, si no se pudo quitar el fondo, la foto redimensionada y encuadrada en 3:4.
+   * Foto redimensionada y encuadrada en 3:4 (recorteFoto.ts). El recorte sin
+   * fondo y la foto de carta los hace el formulario (recorte/useRecorteVino).
    */
   foto: File;
-  /** Si no se pudo poner el fondo de carta: aviso corto para el usuario. */
+  /** Modo lote: recorte ya lanzado en segundo plano (el formulario lo espera). */
+  recorte?: Promise<ResultadoFotoCarta>;
+  /** Aviso corto sobre la foto para el usuario. */
   avisoFoto?: string;
   /** Modo lote: se llama al guardar el vino en el formulario. */
   alGuardar?: () => void;
@@ -81,7 +83,7 @@ export function formatoEuros(n: number): string {
   return `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
-/** Redimensiona, manda a `extraer-vino-foto`, y recorta la foto. Lanza error si la lectura falla. */
+/** Redimensiona, manda a `extraer-vino-foto` y encuadra la foto. Lanza error si la lectura falla. */
 export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<VinoDesdeFoto> {
   const r = await redimensionarFoto(file);
   const imagen = await aDataUrl(r.blob);
@@ -108,13 +110,5 @@ export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<
       .map(([k]) => k),
   );
   const blob = await recortarFoto(r.blob, datos.recorte);
-  // Fondo de carta: quitar el fondo (recortar-fondo-vino) y componer. Si
-  // falla (sin token, error, timeout), se queda la foto encuadrada de siempre.
-  try {
-    const { foto } = await hacerFotoCarta(blob);
-    return { datos, foto };
-  } catch (e) {
-    console.warn("[recortar-fondo-vino] se usa la foto sin fondo de carta", e);
-    return { datos, foto: new File([blob], "botella.jpg", { type: "image/jpeg" }), avisoFoto: avisoSinFondoCarta(e) };
-  }
+  return { datos, foto: new File([blob], "botella.jpg", { type: "image/jpeg" }) };
 }

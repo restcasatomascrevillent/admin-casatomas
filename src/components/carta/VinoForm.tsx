@@ -22,6 +22,8 @@ import { nombreSubida } from "./fotoCartaVino";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
+import { useRecorteVino } from "./recorte/useRecorteVino";
+import { VistaRecorteVino } from "./recorte/VistaRecorteVino";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -45,8 +47,10 @@ interface VinoFormProps {
 export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: VinoFormProps) {
   const { crearVino, actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
   const queryClient = useQueryClient();
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // Foto: recorte gratis en el navegador → sticker → foto con fondo de carta.
+  const recorte = useRecorteVino();
+  const imageFile = recorte.archivoFinal;
+  const { iniciar: iniciarRecorte, limpiar: limpiarRecorte } = recorte;
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -79,8 +83,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
       if (precargadoRef.current) {
         precargadoRef.current = false;
         form.reset({ ...form.formState.defaultValues, categoria: categoriaInicial || "" });
-        setImageFile(null);
-        setImagePreview(null);
+        limpiarRecorte();
       }
       return;
     }
@@ -98,11 +101,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
       ubicacion_pais: d.ubicacion_pais ?? "",
       ubicacion_region: d.ubicacion_region ?? "",
     });
-    setImageFile(precarga.foto);
-    const url = URL.createObjectURL(precarga.foto);
-    setImagePreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [open, precarga, form, categoriaInicial]);
+    iniciarRecorte(precarga.foto, precarga.recorte);
+  }, [open, precarga, form, categoriaInicial, iniciarRecorte, limpiarRecorte]);
 
   const sugerido = precarga ? precioSugerido(precarga.datos) : null;
   const enTienda = precarga ? precioMercado(precarga.datos) : null;
@@ -110,19 +110,11 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) recorte.iniciar(file);
   };
 
   const clearImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+    recorte.limpiar();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -207,14 +199,12 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                 className="hidden"
               />
               
-              {imagePreview ? (
-                <div className="relative mx-auto h-56 w-full max-w-xs overflow-hidden rounded-lg border bg-muted">
-                  {/* object-contain: la botella se ve entera (foto vertical del móvil) */}
-                  <img
-                    src={imagePreview}
-                    alt={precarga ? "Foto de la botella" : "Vista previa"}
-                    className="h-full w-full object-contain"
-                  />
+              {recorte.original ? (
+                <VistaRecorteVino
+                  recorte={recorte}
+                  alt={precarga ? "Foto de la botella" : "Vista previa"}
+                  superpuesto={
+                  <>
                   <Button
                     type="button"
                     variant="secondary"
@@ -235,7 +225,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                   >
                     <X className="h-4 w-4" />
                   </Button>
-                </div>
+                  </>
+                  }
+                />
               ) : (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
@@ -305,8 +297,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={crearVino.isPending || isUploading}>
-                {crearVino.isPending || isUploading ? "Guardando..." : "Guardar Vino"}
+              <Button type="submit" className="h-11 px-5" disabled={crearVino.isPending || isUploading || recorte.trabajando}>
+                {crearVino.isPending || isUploading ? "Guardando..." : recorte.trabajando ? "Recortando foto…" : "Guardar Vino"}
               </Button>
             </div>
           </form>

@@ -1,0 +1,2 @@
+# Modelos ONNX del recorte de fotos (public/modelos/): binarios, sin diff.
+*.onnx binary
