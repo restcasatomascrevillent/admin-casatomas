@@ -182,7 +182,7 @@ export interface OpcionesFotoCarta {
 export async function componerFotoCarta(sticker: Blob, { tipo, tema = FONDO_ACTIVO }: OpcionesFotoCarta): Promise<Blob> {
   const fuente = await decodificar(sticker);
   try {
-    const lienzo = componerCartaEnLienzo(crearLienzoDom, fuente.img, fuente.ancho, fuente.alto, tipo, TEMAS[tema]) as
+    const lienzo = componerCartaEnLienzo(crearLienzoDom, fuente.img, fuente.ancho, fuente.alto, tipo, TEMAS[tema] ?? TEMAS[FONDO_ACTIVO]) as
       | HTMLCanvasElement
       | null;
     if (!lienzo) throw new Error("La imagen sin fondo está vacía");

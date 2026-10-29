@@ -81,26 +81,6 @@ export const TEMAS = {
     radioContorno: 16,
     sombra: [80, 65, 40, 0.38],
   },
-  /** Verde salvia apagado. */
-  salvia: {
-    nombre: "Verde salvia",
-    fondo: ["#bcc3ab", "#aab298"],
-    vineta: "rgba(40, 50, 30, 0.1)",
-    ruido: 4,
-    contorno: "rgba(250, 252, 240, 0.3)",
-    radioContorno: 22,
-    sombra: [40, 48, 30, 0.45],
-  },
-  /** Terracota suave: barro rosado, poco saturado. */
-  terracota: {
-    nombre: "Terracota suave",
-    fondo: ["#d6af98", "#c89f86"],
-    vineta: "rgba(90, 45, 25, 0.1)",
-    ruido: 4,
-    contorno: "rgba(255, 240, 228, 0.3)",
-    radioContorno: 22,
-    sombra: [80, 40, 22, 0.45],
-  },
   /** Piedra cálida: gris topo claro. */
   piedra: {
     nombre: "Piedra cálida",
@@ -111,16 +91,6 @@ export const TEMAS = {
     radioContorno: 22,
     sombra: [50, 44, 36, 0.45],
   },
-  /** Pizarra suave: el azul pizarra de la marca (hsl(206 11% 25%)) muy aclarado. */
-  pizarra: {
-    nombre: "Pizarra suave",
-    fondo: ["#a3adb6", "#919ca6"],
-    vineta: "rgba(25, 32, 40, 0.12)",
-    ruido: 4,
-    contorno: "rgba(245, 248, 252, 0.34)",
-    radioContorno: 24,
-    sombra: [25, 32, 40, 0.48],
-  },
   /** Crema champán: dorado pálido, más claro y luminoso que la cartulina. */
   champan: {
     nombre: "Champán",
@@ -130,16 +100,6 @@ export const TEMAS = {
     contorno: "rgba(255, 250, 232, 0.3)",
     radioContorno: 20,
     sombra: [92, 70, 30, 0.42],
-  },
-  /** Verde oliva oscuro suave: contrasta con vidrio y etiquetas claras. */
-  oliva: {
-    nombre: "Oliva oscuro",
-    fondo: ["#7d8161", "#6c7052"],
-    vineta: "rgba(25, 30, 15, 0.16)",
-    ruido: 4,
-    contorno: "rgba(244, 246, 228, 0.3)",
-    radioContorno: 22,
-    sombra: [26, 30, 14, 0.55],
   },
   /** Negro cálido carbón: hace destacar botellas y platos claros. */
   carbon: {
