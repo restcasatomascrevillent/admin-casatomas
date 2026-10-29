@@ -9,7 +9,7 @@
  *        Lee la tabla Vinos y baja las fotos sin procesar a <dir>/orig/<id>.<ext>.
  *   2. <venv>/Scripts/python -I recortar.py <dir>
  *        Quita el fondo → <dir>/sinfondo/<id>.png
- *   3. npx tsx homogeneizar.mts componer <dir> [--tema oscuro|burdeos|champan]
+ *   3. npx tsx homogeneizar.mts componer <dir> [--tema cartulina|arena|marfil|salvia|terracota|piedra|pizarra]
  *        → <dir>/carta/<id>.webp y <dir>/revision/<id>.jpg (antes | después) para mirarlas.
  *   4. npx tsx homogeneizar.mts subir <dir> [--solo id1,id2] [--aplicar]
  *        SIN --aplicar solo enseña lo que haría. CON --aplicar sube a Storage

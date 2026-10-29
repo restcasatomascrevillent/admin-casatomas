@@ -3,15 +3,15 @@
  * transparencia) y la coloca sobre el fondo fijo de la carta, igual para
  * todos los vinos, para que la carta sea homogénea:
  *
- *   - Fondo fijo: uno de los TEMAS de abajo, elegido en FONDO_ACTIVO (ÚNICO
- *     sitio que hay que tocar para cambiarlo). Paleta de casa-tomas-story:
- *     oro hsl(38 59% 45%), oro oscuro hsl(38 62% 32%), papel hsl(36 50% 97%),
- *     pizarra hsl(206 11% 25%).
+ *   - Fondo fijo: uno de los TEMAS de abajo (un solo color mate, sin mesa ni
+ *     línea de horizonte), elegido en FONDO_ACTIVO (ÚNICO sitio que hay que
+ *     tocar para cambiarlo). Referencia de marca (casa-tomas-story): oro
+ *     hsl(38 59% 45%), pizarra hsl(206 11% 25%).
  *   - La botella se recorta a sus píxeles opacos, se escala a la misma altura
  *     (ALTURA_BOTELLA del alto del lienzo) y se apoya en la misma línea de base.
- *   - Halo de luz detrás, brillo de contorno (que los tintos oscuros no se
- *     pierdan en fondos oscuros ni el vidrio claro en los claros), sombra de
- *     contacto en la base y reflejo tenue en la mesa. Sin borde de sticker.
+ *   - Brillo de contorno suave (que ningún vidrio se pierda en el fondo) y
+ *     sombra de contacto en la base para que no flote. Sin reflejo, sin
+ *     halo, sin borde de sticker.
  *
  * El dibujo no depende del DOM: recibe una fábrica de lienzos, así el mismo
  * código sirve en el navegador (componerFotoVino) y en Node con
@@ -31,85 +31,102 @@ export const UMBRAL_ALFA = 24;
 
 export interface TemaFondo {
   nombre: string;
-  /** Pared: degradado radial desde detrás de la botella hacia las esquinas. */
-  pared: [centro: string, medio: string, borde: string];
-  /** Fracción del alto donde empieza la mesa. */
-  horizonte: number;
-  /** Mesa: arriba → abajo. */
-  mesa: [arriba: string, abajo: string];
-  /** Línea de luz en el canto de la mesa. */
-  cantoMesa: string;
-  /** Halo de luz detrás de la botella (color con alfa) y radio (× ancho del lienzo). */
-  halo: string;
-  radioHalo: number;
-  /** Viñeta en las esquinas. */
+  /** Fondo liso: degradado radial MUY sutil desde detrás de la botella al borde. Sin mesa ni horizonte. */
+  fondo: [centro: string, borde: string];
+  /** Viñeta en las esquinas (casi imperceptible). */
   vineta: string;
-  /** Intensidad del grano (0-255). */
+  /** Intensidad del grano (0-255): textura mate de cartulina. */
   ruido: number;
-  /** Brillo alrededor de la silueta (sombra difusa sin desplazamiento). */
+  /** Brillo alrededor de la silueta (sombra difusa sin desplazamiento), suave. */
   contorno: string;
   radioContorno: number;
-  /** Sombra de contacto: r, g, b, alfa. */
+  /** Sombra de contacto bajo la botella (para que no flote): r, g, b, alfa. */
   sombra: [r: number, g: number, b: number, alfa: number];
-  /** Opacidad del reflejo en la mesa (0 = sin reflejo). */
-  reflejo: number;
 }
 
+/**
+ * Fondos de un solo color, mates y relajados (pedido del dueño 28/10/2026:
+ * sin la raya de la mesa, sin reflejo, sin halos fuertes). El dorado parte
+ * del oro de marca de casa-tomas-story (hsl(38 59% 45%) ≈ #b6852f), aclarado
+ * y desaturado hacia una cartulina kraft dorada.
+ */
 export const TEMAS = {
-  /** A) Oscuro elegante: carbón cálido, halo ámbar, canto de mesa dorado. */
-  oscuro: {
-    nombre: "Oscuro elegante",
-    pared: ["#4a3a28", "#211a14", "#0b0908"],
-    horizonte: 0.8,
-    mesa: ["#1c1611", "#070605"],
-    cantoMesa: "rgba(214, 168, 88, 0.75)",
-    halo: "rgba(222, 170, 80, 0.42)",
-    radioHalo: 0.62,
-    vineta: "rgba(0, 0, 0, 0.55)",
-    ruido: 6,
-    contorno: "rgba(236, 188, 104, 0.38)",
-    radioContorno: 34,
-    sombra: [0, 0, 0, 0.75],
-    reflejo: 0.2,
-  },
-  /** B) Burdeos de bodega: vino profundo a negro con foco dorado cálido. */
-  burdeos: {
-    nombre: "Burdeos de bodega",
-    pared: ["#7a2a32", "#35111a", "#0e0407"],
-    horizonte: 0.8,
-    mesa: ["#220b10", "#080304"],
-    cantoMesa: "rgba(222, 172, 96, 0.7)",
-    halo: "rgba(246, 196, 120, 0.38)",
-    radioHalo: 0.58,
-    vineta: "rgba(0, 0, 0, 0.55)",
-    ruido: 6,
-    contorno: "rgba(250, 200, 128, 0.34)",
-    radioContorno: 34,
-    sombra: [0, 0, 0, 0.75],
-    reflejo: 0.2,
-  },
-  /** C) Champán: crema y oro claro satinado, viñeta suave. */
-  champan: {
-    nombre: "Champán",
-    pared: ["#fdf7ea", "#f0dfbd", "#d2b37c"],
-    horizonte: 0.8,
-    mesa: ["#e3c896", "#c9a76b"],
-    cantoMesa: "rgba(255, 250, 236, 0.85)",
-    halo: "rgba(255, 252, 242, 0.75)",
-    radioHalo: 0.8,
-    vineta: "rgba(110, 76, 30, 0.28)",
+  /** Dorado cartulina: kraft dorado mate, cálido, no metálico. */
+  cartulina: {
+    nombre: "Dorado cartulina",
+    fondo: ["#d3b47e", "#c4a46d"],
+    vineta: "rgba(90, 62, 20, 0.12)",
     ruido: 5,
-    contorno: "rgba(92, 62, 24, 0.38)",
-    radioContorno: 18,
-    sombra: [70, 46, 16, 0.5],
-    reflejo: 0.16,
+    contorno: "rgba(255, 244, 218, 0.32)",
+    radioContorno: 22,
+    sombra: [74, 50, 16, 0.5],
+  },
+  /** Arena: beige cálido claro. */
+  arena: {
+    nombre: "Arena",
+    fondo: ["#e6d8be", "#d8c7a8"],
+    vineta: "rgba(90, 70, 40, 0.1)",
+    ruido: 4,
+    contorno: "rgba(255, 250, 238, 0.3)",
+    radioContorno: 20,
+    sombra: [80, 60, 30, 0.42],
+  },
+  /** Crema / marfil: casi blanco cálido. */
+  marfil: {
+    nombre: "Crema marfil",
+    fondo: ["#f5efe3", "#e9e0ce"],
+    vineta: "rgba(90, 75, 50, 0.08)",
+    ruido: 3,
+    contorno: "rgba(70, 55, 30, 0.16)",
+    radioContorno: 16,
+    sombra: [80, 65, 40, 0.38],
+  },
+  /** Verde salvia apagado. */
+  salvia: {
+    nombre: "Verde salvia",
+    fondo: ["#bcc3ab", "#aab298"],
+    vineta: "rgba(40, 50, 30, 0.1)",
+    ruido: 4,
+    contorno: "rgba(250, 252, 240, 0.3)",
+    radioContorno: 22,
+    sombra: [40, 48, 30, 0.45],
+  },
+  /** Terracota suave: barro rosado, poco saturado. */
+  terracota: {
+    nombre: "Terracota suave",
+    fondo: ["#d6af98", "#c89f86"],
+    vineta: "rgba(90, 45, 25, 0.1)",
+    ruido: 4,
+    contorno: "rgba(255, 240, 228, 0.3)",
+    radioContorno: 22,
+    sombra: [80, 40, 22, 0.45],
+  },
+  /** Piedra cálida: gris topo claro. */
+  piedra: {
+    nombre: "Piedra cálida",
+    fondo: ["#cbc4b9", "#bab2a6"],
+    vineta: "rgba(50, 45, 38, 0.1)",
+    ruido: 4,
+    contorno: "rgba(255, 252, 245, 0.3)",
+    radioContorno: 22,
+    sombra: [50, 44, 36, 0.45],
+  },
+  /** Pizarra suave: el azul pizarra de la marca (hsl(206 11% 25%)) muy aclarado. */
+  pizarra: {
+    nombre: "Pizarra suave",
+    fondo: ["#a3adb6", "#919ca6"],
+    vineta: "rgba(25, 32, 40, 0.12)",
+    ruido: 4,
+    contorno: "rgba(245, 248, 252, 0.34)",
+    radioContorno: 24,
+    sombra: [25, 32, 40, 0.48],
   },
 } satisfies Record<string, TemaFondo>;
 
 export type NombreTema = keyof typeof TEMAS;
 
 /** Fondo de la carta. Cambiar AQUÍ para cambiarlo en todas las fotos nuevas. */
-export const FONDO_ACTIVO: NombreTema = "oscuro";
+export const FONDO_ACTIVO: NombreTema = "cartulina";
 
 const SEMILLA_RUIDO = 20261026;
 
@@ -236,54 +253,14 @@ export function conAlfaMitad(rgba: string): string {
   return m ? `rgba(${m[1].trim()}, ${m[2].trim()}, ${m[3].trim()}, ${Number(m[4]) / 2})` : rgba;
 }
 
-/** Pinta el fondo del tema en todo el lienzo; el halo se centra en (ancho/2, haloY·alto). */
-export function pintarFondo(ctx: CanvasRenderingContext2D, ancho: number, alto: number, tema: TemaFondo, haloY = 0.45) {
-  const yh = Math.round(alto * tema.horizonte);
+/** Pinta el fondo liso del tema en todo el lienzo; el centro del degradado en (ancho/2, centroY·alto). */
+export function pintarFondo(ctx: CanvasRenderingContext2D, ancho: number, alto: number, tema: TemaFondo, centroY = 0.45) {
   const cx = ancho / 2;
-  const cy = alto * haloY;
-  const lejos = Math.hypot(ancho, alto) * 0.7;
-
-  const pared = ctx.createRadialGradient(cx, cy, 0, cx, cy, lejos);
-  pared.addColorStop(0, tema.pared[0]);
-  pared.addColorStop(0.45, tema.pared[1]);
-  pared.addColorStop(1, tema.pared[2]);
-  ctx.fillStyle = pared;
-  ctx.fillRect(0, 0, ancho, yh);
-
-  const mesa = ctx.createLinearGradient(0, yh, 0, alto);
-  mesa.addColorStop(0, tema.mesa[0]);
-  mesa.addColorStop(1, tema.mesa[1]);
-  ctx.fillStyle = mesa;
-  ctx.fillRect(0, yh, ancho, alto - yh);
-
-  // Halo de luz detrás de la botella (solo en la pared).
-  const r = ancho * tema.radioHalo;
-  const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  halo.addColorStop(0, tema.halo);
-  halo.addColorStop(0.55, conAlfaMitad(tema.halo));
-  halo.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = halo;
-  ctx.fillRect(0, 0, ancho, yh);
-
-  // Luz del halo derramada sobre la mesa, más tenue y aplastada.
-  ctx.save();
-  ctx.translate(cx, yh);
-  ctx.scale(1, 0.22);
-  const charco = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.1);
-  charco.addColorStop(0, tema.halo);
-  charco.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.globalAlpha = 0.6;
-  ctx.fillStyle = charco;
-  ctx.fillRect(-ancho, 0, ancho * 2, (alto - yh) / 0.22);
-  ctx.restore();
-
-  // Canto de la mesa: línea de luz que se apaga hacia los lados.
-  const canto = ctx.createLinearGradient(0, 0, ancho, 0);
-  canto.addColorStop(0, "rgba(0,0,0,0)");
-  canto.addColorStop(0.5, tema.cantoMesa);
-  canto.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = canto;
-  ctx.fillRect(0, yh, ancho, 2);
+  const fondo = ctx.createRadialGradient(cx, alto * centroY, 0, cx, alto * centroY, Math.hypot(ancho, alto) * 0.65);
+  fondo.addColorStop(0, tema.fondo[0]);
+  fondo.addColorStop(1, tema.fondo[1]);
+  ctx.fillStyle = fondo;
+  ctx.fillRect(0, 0, ancho, alto);
 
   // Viñeta.
   const v = ctx.createRadialGradient(cx, alto * 0.48, Math.min(ancho, alto) * 0.38, cx, alto * 0.48, Math.hypot(ancho, alto) * 0.6);
@@ -360,29 +337,7 @@ export function componerEnLienzo(
   fctx.imageSmoothingQuality = "high";
   pintarFondo(fctx, LIENZO_ANCHO, LIENZO_ALTO, tema, (d.y + d.h * 0.42) / LIENZO_ALTO);
 
-  // 2. Reflejo tenue en la mesa: botella volteada que se desvanece hacia abajo.
-  const altoReflejo = Math.round(Math.min(d.h * 0.28, LIENZO_ALTO - plan.base));
-  if (tema.reflejo > 0 && altoReflejo > 4) {
-    const refl = crear(d.w, altoReflejo);
-    const rctx = ctx2d(refl);
-    rctx.save();
-    rctx.translate(0, d.h);
-    rctx.scale(1, -1);
-    rctx.drawImage(fuente, caja.x, caja.y, caja.w, caja.h, 0, 0, d.w, d.h);
-    rctx.restore();
-    rctx.globalCompositeOperation = "destination-in";
-    const fade = rctx.createLinearGradient(0, 0, 0, altoReflejo);
-    fade.addColorStop(0, "rgba(0,0,0,1)");
-    fade.addColorStop(1, "rgba(0,0,0,0)");
-    rctx.fillStyle = fade;
-    rctx.fillRect(0, 0, d.w, altoReflejo);
-    fctx.save();
-    fctx.globalAlpha = tema.reflejo;
-    fctx.drawImage(refl as unknown as CanvasImageSource, d.x, plan.base + 1);
-    fctx.restore();
-  }
-
-  // 3. Sombra de contacto y botella con brillo de contorno.
+  // 2. Sombra de contacto y botella con brillo de contorno.
   pintarSombra(fctx, LIENZO_ANCHO / 2, plan.base, plan.anchoBase, tema);
   fctx.save();
   fctx.shadowColor = tema.contorno;
