@@ -2639,6 +2639,7 @@ export type Database = {
           badge_text_en: string | null
           badge_text_fr: string | null
           bebida_id: string | null
+          botones: Json
           bullets: string[] | null
           bullets_en: string[] | null
           bullets_fr: string[] | null
@@ -2654,6 +2655,7 @@ export type Database = {
           id: string
           imagen_posicion_y: number | null
           imagen_url: string | null
+          menu: Json | null
           orden: number | null
           plato_id: string | null
           seccion: string | null
@@ -2674,6 +2676,7 @@ export type Database = {
           badge_text_en?: string | null
           badge_text_fr?: string | null
           bebida_id?: string | null
+          botones?: Json
           bullets?: string[] | null
           bullets_en?: string[] | null
           bullets_fr?: string[] | null
@@ -2689,6 +2692,7 @@ export type Database = {
           id?: string
           imagen_posicion_y?: number | null
           imagen_url?: string | null
+          menu?: Json | null
           orden?: number | null
           plato_id?: string | null
           seccion?: string | null
@@ -2709,6 +2713,7 @@ export type Database = {
           badge_text_en?: string | null
           badge_text_fr?: string | null
           bebida_id?: string | null
+          botones?: Json
           bullets?: string[] | null
           bullets_en?: string[] | null
           bullets_fr?: string[] | null
@@ -2724,6 +2729,7 @@ export type Database = {
           id?: string
           imagen_posicion_y?: number | null
           imagen_url?: string | null
+          menu?: Json | null
           orden?: number | null
           plato_id?: string | null
           seccion?: string | null

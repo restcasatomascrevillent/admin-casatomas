@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNovedades, type Novedad } from "@/hooks/useNovedades";
+import { indexarPlatos, usePlatosParaMenu, type PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +44,7 @@ import {
   ArrowDown,
   ChevronDown,
   AlertCircle,
+  AlertTriangle,
   RefreshCw,
   Eraser,
   Newspaper,
@@ -55,6 +58,22 @@ import { MobilePreview, type NovedadPreview } from "./MobilePreview";
 import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
+import { BloqueBotonesNovedad } from "./BloqueBotonesNovedad";
+import {
+  camposBotonesPayload,
+  esErrorSinColumnasBotones,
+  estadoPlatoEnlazado,
+  menuNovedadVacio,
+  menuTieneComida,
+  parseBotonesNovedad,
+  parseMenuNovedad,
+  platoEnCarta,
+  platoRetiradoDeLaCarta,
+  traducirMenuNovedad,
+  validarBotonesNovedad,
+  type MenuNovedad,
+  type TipoBoton,
+} from "@/lib/menu-novedad";
 
 // ---------------------------------------------------------------------------
 // Novedades de la web (tabla `novedades`)
@@ -158,6 +177,12 @@ interface FormData {
   tags_en: string[];
   tags_fr: string[];
   campos_tipo: Record<string, string>;
+  /** Botones de la tarjeta, en orden (vacío = «Sin botones»). */
+  botones: TipoBoton[];
+  /** Plato de «Échale un vistazo». Solo se guarda si está ese botón. */
+  plato_id: string | null;
+  /** Menú de «Ver menú». Solo se guarda si está ese botón. */
+  menu: MenuNovedad;
 }
 
 interface ResultadoIA {
@@ -201,6 +226,9 @@ const nuevoFormulario = (): FormData => ({
   tags_en: [],
   tags_fr: [],
   campos_tipo: {},
+  botones: [],
+  plato_id: null,
+  menu: menuNovedadVacio(),
 });
 
 const formularioDesdeNovedad = (n: Novedad): FormData => ({
@@ -228,6 +256,11 @@ const formularioDesdeNovedad = (n: Novedad): FormData => ({
   tags_en: n.tags_en || [],
   tags_fr: n.tags_fr || [],
   campos_tipo: {},
+  // Una novedad de antes de los botones (o una BBDD sin la migración) no trae
+  // estas columnas: se lee como «Sin botones» y se guarda como siempre.
+  botones: parseBotonesNovedad(n.botones),
+  plato_id: n.plato_id ?? null,
+  menu: parseMenuNovedad(n.menu) ?? menuNovedadVacio(),
 });
 
 /** Lo que se traduce: si cambia, las traducciones guardadas quedan viejas. */
@@ -269,7 +302,7 @@ const rutaEnBucket = (url: string | null | undefined): string | null => {
   return decodeURIComponent(url.slice(i + marca.length).split("?")[0]);
 };
 
-const aPreview = (f: FormData | Novedad, id: string): NovedadPreview => ({
+const aPreview = (f: FormData | Novedad, id: string, platosPorId: Map<string, PlatoDeCarta>): NovedadPreview => ({
   id,
   titulo: f.titulo || "",
   descripcion: f.descripcion || "",
@@ -290,6 +323,9 @@ const aPreview = (f: FormData | Novedad, id: string): NovedadPreview => ({
   tags: f.tags || [],
   tags_en: f.tags_en,
   tags_fr: f.tags_fr,
+  botones: parseBotonesNovedad(f.botones),
+  platoEnCarta: platoEnCarta(f.plato_id ? platosPorId.get(f.plato_id) : undefined),
+  menuConPlatos: menuTieneComida(parseMenuNovedad(f.menu) ?? menuNovedadVacio()),
 });
 
 const ID_NUEVA = "__nueva__";
@@ -326,6 +362,13 @@ export function EditorNovedadesWeb() {
     toggleActivo,
     reordenar,
   } = useNovedades();
+  const queryClient = useQueryClient();
+
+  // La carta: para enlazar el plato de «Échale un vistazo», componer el menú de
+  // «Ver menú» y avisar cuando un plato enlazado ya no está en la carta.
+  const { platos, isLoading: cargandoPlatos, error: errorPlatos } = usePlatosParaMenu();
+  const platosPorId = useMemo(() => indexarPlatos(platos), [platos]);
+  const cartaCargada = !cargandoPlatos && !errorPlatos;
 
   // --- Formulario -----------------------------------------------------------
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -341,6 +384,12 @@ export function EditorNovedadesWeb() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [traduccionesAbiertas, setTraduccionesAbiertas] = useState(false);
   const [nuevaEtiqueta, setNuevaEtiqueta] = useState("");
+  /** Botones y plato que tenía la novedad al abrirla (regla 2.4 del payload y aviso de plato retirado). */
+  const [alAbrir, setAlAbrir] = useState<{ botones: TipoBoton[]; platoId: string | null }>({
+    botones: [],
+    platoId: null,
+  });
+  const bloqueBotonesRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const tituloRef = useRef<HTMLInputElement>(null);
@@ -370,6 +419,15 @@ export function EditorNovedadesWeb() {
     fecha_fin: formData.fecha_fin || null,
   });
   const novedadEditada = editando ? novedades.find((n) => n.id === editingId) : undefined;
+
+  const estadoPlato = estadoPlatoEnlazado(formData.plato_id, platosPorId, cartaCargada);
+  const erroresBotones = validarBotonesNovedad({ botones: formData.botones, menu: formData.menu, estadoPlato });
+  // «El plato ya no está en la carta»: se desactivó o salió del restaurante, o
+  // se borró (la FK dejó `plato_id` a NULL y así llegó al abrir la novedad).
+  const platoRetiradoEnFormulario =
+    formData.botones.includes("ver_plato") &&
+    (estadoPlato === "fuera_de_carta" ||
+      (estadoPlato === "sin_plato" && editando && alAbrir.botones.includes("ver_plato") && alAbrir.platoId === null));
 
   // Aviso del navegador si se cierra/recarga con cambios sin guardar.
   useEffect(() => {
@@ -439,6 +497,7 @@ export function EditorNovedadesWeb() {
     setTraduccionManual(false);
     setImagenOriginal(datos.imagen_url);
     setNuevaEtiqueta("");
+    setAlAbrir({ botones: datos.botones, platoId: datos.plato_id });
   };
 
   /** Ejecuta `accion` y, si hay cambios sin guardar, pregunta antes. */
@@ -654,17 +713,44 @@ export function EditorNovedadesWeb() {
       toast.error("La fecha «hasta» no puede ser anterior a la fecha «desde».");
       return;
     }
+    if (erroresBotones.length > 0) {
+      toast.error(
+        erroresBotones.length === 1
+          ? `No se puede guardar: ${erroresBotones[0].mensaje}`
+          : `No se puede guardar: ${erroresBotones.map((e) => e.mensaje).join(" ")}`,
+        { duration: 8000 },
+      );
+      bloqueBotonesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const conMenu = formData.botones.includes("ver_menu");
+    // Sin la carta cargada no se sabe si el plato enlazado sigue en ella, ni qué
+    // platos del menú tienen ya su traducción.
+    if ((conMenu || formData.botones.includes("ver_plato")) && cargandoPlatos) {
+      toast.info("Un momento: todavía se está cargando la carta.");
+      return;
+    }
 
     setIsSaving(true);
     let datos = formData;
     let avisoTraduccion: string | null = null;
+    let avisoTraduccionMenu: string | null = null;
 
     // Traducción automática al guardar si el español ha cambiado desde la
     // última traducción y nadie ha tocado las traducciones a mano. Antes solo
     // se traducía al CREAR: al editar una novedad las versiones EN/FR se
-    // quedaban con el texto viejo para siempre.
-    if (espanolCambiado && !traduccionManual) {
-      const t = await traducir(formData);
+    // quedaban con el texto viejo para siempre. El menú de «Ver menú» se
+    // traduce en la misma pasada (solo lo que no tiene ya traducción).
+    const traducirNovedad = espanolCambiado && !traduccionManual;
+    const [t, menuTraducido] = await Promise.all([
+      traducirNovedad ? traducir(formData) : Promise.resolve(null),
+      conMenu
+        ? traducirMenuNovedad(formData.menu, platosPorId, (body) =>
+            supabase.functions.invoke("traducir-contenido", { body }),
+          )
+        : Promise.resolve(null),
+    ]);
+    if (traducirNovedad) {
       if (t) {
         datos = { ...formData, ...t };
       } else {
@@ -672,6 +758,10 @@ export function EditorNovedadesWeb() {
           ? "No se pudo actualizar la traducción: en inglés y francés sigue el texto anterior."
           : "No se pudo traducir: en inglés y francés se mostrará el texto en español.";
       }
+    }
+    if (menuTraducido && menuTraducido.sinTraducir > 0) {
+      avisoTraduccionMenu =
+        "Menú: los platos de la carta llevan su traducción, pero lo escrito a mano se ha guardado en español porque el traductor automático no responde.";
     }
 
     const nullSiVacio = (v: string) => (v.trim() ? v.trim() : null);
@@ -706,6 +796,15 @@ export function EditorNovedadesWeb() {
       tags: arrayONull(datos.tags),
       tags_en: arrayONull(datos.tags_en),
       tags_fr: arrayONull(datos.tags_fr),
+      // Regla 2.4: botones, menu y plato_id solo viajan si la novedad tiene
+      // botones o los tenía al abrirla. Una novedad sin botones se guarda
+      // exactamente igual que antes (también contra una BBDD sin la migración).
+      ...camposBotonesPayload({
+        botonesAlAbrir: alAbrir.botones,
+        botones: datos.botones,
+        platoId: datos.plato_id,
+        menu: menuTraducido?.menu ?? datos.menu,
+      }),
     };
 
     try {
@@ -728,11 +827,21 @@ export function EditorNovedadesWeb() {
         toast.success(`${accion}. No se muestra en la web: ${estado.texto.toLowerCase()}.`);
       }
       if (avisoTraduccion) toast.warning(avisoTraduccion, { duration: 10000 });
+      if (avisoTraduccionMenu) toast.warning(avisoTraduccionMenu, { duration: 10000 });
 
       cargarEnFormulario(null);
     } catch (e) {
       console.error(e);
       const mensaje = e instanceof Error ? e.message : "Error desconocido";
+      const crudo =
+        e && typeof e === "object" && "message" in e && typeof e.message === "string" ? e.message : mensaje;
+      if (esErrorSinColumnasBotones(crudo)) {
+        toast.error(
+          "No se pudo guardar: la base de datos todavía no admite botones en las novedades. Quita los botones para guardarla y avisa para que la actualicen.",
+          { duration: 10000 },
+        );
+        return;
+      }
       toast.error(`No se pudo guardar la novedad: ${mensaje}`);
     } finally {
       setIsSaving(false);
@@ -821,7 +930,7 @@ export function EditorNovedadesWeb() {
     lista.forEach((n, pos) => {
       if (n.id === editingId) return;
       if (estadoEnWeb(n).clave !== "visible") return;
-      items.push({ ...aPreview(n, n.id), _orden: n.orden ?? 0, _pos: pos });
+      items.push({ ...aPreview(n, n.id, platosPorId), _orden: n.orden ?? 0, _pos: pos });
     });
     const ordenBorrador = editingId
       ? novedadEditada?.orden ?? 0
@@ -830,7 +939,7 @@ export function EditorNovedadesWeb() {
     const tieneContenido = formData.titulo.trim() || formData.descripcion.trim() || formData.imagen_url;
     if (editingId || tieneContenido) {
       items.push({
-        ...aPreview(formData, idBorrador),
+        ...aPreview(formData, idBorrador, platosPorId),
         avisoVisibilidad: estadoBorrador.clave === "visible" ? null : `No se verá en la web: ${estadoBorrador.texto.toLowerCase()}`,
         _orden: ordenBorrador,
         _pos: posBorrador,
@@ -840,7 +949,7 @@ export function EditorNovedadesWeb() {
       (a, b) => Number(!!b.destacado) - Number(!!a.destacado) || a._orden - b._orden || a._pos - b._pos,
     );
     return items.map(({ _orden: _o, _pos: _p, ...rest }) => rest);
-  }, [lista, editingId, novedadEditada, formData, idBorrador, estadoBorrador.clave, estadoBorrador.texto]);
+  }, [lista, editingId, novedadEditada, formData, idBorrador, estadoBorrador.clave, estadoBorrador.texto, platosPorId]);
 
   const visiblesEnWeb = lista.filter((n) => estadoEnWeb(n).clave === "visible").length;
 
@@ -910,6 +1019,12 @@ export function EditorNovedadesWeb() {
                   {lista.map((novedad, index) => {
                     const estado = estadoEnWeb(novedad);
                     const esEditada = novedad.id === editingId;
+                    const platoRetirado = platoRetiradoDeLaCarta(
+                      parseBotonesNovedad(novedad.botones),
+                      novedad.plato_id,
+                      platosPorId,
+                      cartaCargada,
+                    );
                     const mismoGrupoArriba = index > 0 && !!lista[index - 1].destacado === !!novedad.destacado;
                     const mismoGrupoAbajo =
                       index < lista.length - 1 && !!lista[index + 1].destacado === !!novedad.destacado;
@@ -949,6 +1064,15 @@ export function EditorNovedadesWeb() {
                                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                                   <Star className="w-2.5 h-2.5 mr-0.5" />
                                   Destacada
+                                </Badge>
+                              )}
+                              {platoRetirado && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900"
+                                >
+                                  <AlertTriangle className="w-2.5 h-2.5 mr-0.5" aria-hidden="true" />
+                                  El plato ya no está en la carta
                                 </Badge>
                               )}
                               {esEditada && <span className="text-[10px] text-primary font-medium">Editando</span>}
@@ -1336,6 +1460,25 @@ export function EditorNovedadesWeb() {
                 </Select>
               </div>
 
+              {/* Botones de la tarjeta */}
+              <div ref={bloqueBotonesRef} className="scroll-mt-4">
+                <BloqueBotonesNovedad
+                  botones={formData.botones}
+                  onBotonesChange={(botones) => setCampo("botones", botones)}
+                  platoId={formData.plato_id}
+                  onPlatoChange={(platoId) => setCampo("plato_id", platoId)}
+                  menu={formData.menu}
+                  onMenuChange={(menu) => setCampo("menu", menu)}
+                  platos={platos}
+                  platosPorId={platosPorId}
+                  cargandoPlatos={cargandoPlatos}
+                  errorPlatos={errorPlatos}
+                  onReintentarPlatos={() => queryClient.invalidateQueries({ queryKey: ["platos-para-menu"] })}
+                  platoRetirado={platoRetiradoEnFormulario}
+                  errores={erroresBotones}
+                />
+              </div>
+
               {/* Publicación */}
               <div className="rounded-lg border p-4 space-y-4" data-tour="gw-novedades-publicacion">
                 <div className="flex items-center justify-between gap-2">
@@ -1471,7 +1614,9 @@ export function EditorNovedadesWeb() {
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      {espanolCambiado && !traduccionManual ? "Traduciendo y guardando..." : "Guardando..."}
+                      {(espanolCambiado && !traduccionManual) || formData.botones.includes("ver_menu")
+                        ? "Traduciendo y guardando..."
+                        : "Guardando..."}
                     </>
                   ) : editando ? (
                     "Guardar cambios"

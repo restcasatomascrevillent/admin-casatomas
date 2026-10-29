@@ -1,0 +1,10 @@
+{
+  "name": "fotos-vino",
+  "private": true,
+  "type": "module",
+  "description": "Homogeneizar fotos de vino en local (ver cabecera de homogeneizar.mts). No forma parte del build del panel.",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.80",
+    "tsx": "^4.20.0"
+  }
+}

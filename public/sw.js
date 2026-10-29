@@ -9,6 +9,8 @@
 //     guarda, así un despliegue nuevo se ve en la siguiente carga.
 //   - Shell estático: /assets/* (con hash de Vite, inmutable), iconos,
 //     manifest y la página offline: cache-first con relleno al vuelo.
+//   - /modelos/* (modelo ONNX del recorte de fotos de vino) NO pasa por aquí:
+//     lo guarda el propio worker en la caché «modelos-recorte-v1».
 //
 // Versionado: la caché lleva el id del build (`?v=` en la URL del SW). Cada
 // despliegue instala un SW nuevo (skipWaiting + clients.claim) que borra las
@@ -43,7 +45,11 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      // Solo las cachés del shell: «modelos-recorte-*» (modelo del recorte de
+      // fotos de vino, ~47 MB) sobrevive a los despliegues.
+      .then((keys) =>
+        Promise.all(keys.filter((k) => k.startsWith("panel-casa-tomas-") && k !== CACHE).map((k) => caches.delete(k))),
+      )
       .then(() => self.clients.claim()),
   );
 });

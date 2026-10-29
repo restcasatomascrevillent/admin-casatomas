@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { redimensionarFoto } from "./redimensionarFoto";
 import { recortarFoto, type RecorteNormalizado } from "./recorteFoto";
+import type { ResultadoFotoCarta } from "./fotoCartaVino";
 
 export interface FuentePrecioMercado {
   tienda: string;
@@ -31,8 +32,15 @@ export interface DatosVinoFoto {
 
 export interface VinoDesdeFoto {
   datos: DatosVinoFoto;
-  /** Foto ya redimensionada y, si hay recorte válido, encuadrada en 3:4. */
+  /**
+   * Foto redimensionada y encuadrada en 3:4 (recorteFoto.ts). El recorte sin
+   * fondo y la foto de carta los hace el formulario (recorte/useRecorteVino).
+   */
   foto: File;
+  /** Modo lote: recorte ya lanzado en segundo plano (el formulario lo espera). */
+  recorte?: Promise<ResultadoFotoCarta>;
+  /** Aviso corto sobre la foto para el usuario. */
+  avisoFoto?: string;
   /** Modo lote: se llama al guardar el vino en el formulario. */
   alGuardar?: () => void;
   /** Modo lote: se llama al cerrar el formulario (guardado o no). */
@@ -75,7 +83,7 @@ export function formatoEuros(n: number): string {
   return `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
-/** Redimensiona, manda a `extraer-vino-foto`, y recorta la foto. Lanza error si la lectura falla. */
+/** Redimensiona, manda a `extraer-vino-foto` y encuadra la foto. Lanza error si la lectura falla. */
 export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<VinoDesdeFoto> {
   const r = await redimensionarFoto(file);
   const imagen = await aDataUrl(r.blob);

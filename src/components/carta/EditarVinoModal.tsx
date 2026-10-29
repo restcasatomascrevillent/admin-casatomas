@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Camera, Loader2, X } from "lucide-react";
+import { Camera, Loader2, Undo2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -15,11 +15,15 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
 import { CamposVino } from "./CamposVino";
+import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
+import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
+import { useRecorteVino } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -55,10 +59,16 @@ interface EditarVinoModalProps {
 
 export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalProps) {
   const { actualizarVino, categorias, denominaciones, regiones, paises } = useVinos();
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Foto nueva: recorte gratis en el navegador → sticker → foto con fondo de carta.
+  const recorte = useRecorteVino();
+  const { limpiar: limpiarRecorte } = recorte;
+  const imageFile = recorte.archivoFinal;
+  // Foto ya guardada (URL) o restaurada; la foto nueva la enseña SelectorFotoCarta.
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  // «Volver a la foto original»: URL a guardar en imagen_url (sin tocar Storage).
+  const [urlRestaurada, setUrlRestaurada] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -89,30 +99,36 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       ubicacion_region: vino.ubicacion_region ?? "",
     });
 
-    setImageFile(null);
+    limpiarRecorte();
     setImagePreview(vino.imagen_url ?? null);
     setRemoveImage(false);
+    setUrlRestaurada(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, vino, form]);
+  }, [open, vino, form, limpiarRecorte]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageFile(file);
+    recorte.iniciar(file);
     setRemoveImage(false);
+    setUrlRestaurada(null);
+    setImagePreview(null);
+  };
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+  const original = !imageFile && !removeImage && !urlRestaurada ? rutaOriginalDesdeCarta(vino?.imagen_url) : null;
+  const volverAOriginal = () => {
+    if (!original) return;
+    const url = `${original}?t=${Date.now()}`;
+    setUrlRestaurada(url);
+    setImagePreview(url);
   };
 
   const clearImage = () => {
-    setImageFile(null);
+    setUrlRestaurada(null);
+    limpiarRecorte();
     setImagePreview(null);
     setRemoveImage(true);
     if (fileInputRef.current) {
@@ -132,24 +148,23 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       let fotoAntigua: string | null = null;
 
       if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop() || "jpg";
-        const fileName = `${vino.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("vinos")
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from("vinos").getPublicUrl(fileName);
-        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
+        // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+        const subida = await subirFotoCarta("vinos", vino.id, {
+          original: recorte.original,
+          compuesta: recorte.usaCarta ? recorte.compuesta : null,
+        });
+        imageUrlUpdate = subida.url;
         // Si el nuevo fichero cambia de nombre (p. ej. .jpg -> .png), el upsert
         // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
-        const nombreArchivoAnterior = nombreArchivoStorage(vino.id, vino.imagen_url);
-        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
+        const nombreArchivoAnterior = rutaEnBucket(vino.imagen_url, "vinos") ?? nombreArchivoStorage(vino.id, vino.imagen_url);
+        if (nombreArchivoAnterior && !subida.rutas.includes(nombreArchivoAnterior)) fotoAntigua = nombreArchivoAnterior;
+      } else if (urlRestaurada) {
+        // Deshacer el fondo de carta: el original sigue en Storage, solo se
+        // vuelve a apuntar a él (la foto de carta se queda, no se borra).
+        imageUrlUpdate = urlRestaurada;
       } else if (removeImage) {
         imageUrlUpdate = null;
-        fotoAntigua = nombreArchivoStorage(vino.id, vino.imagen_url);
+        fotoAntigua = rutaEnBucket(vino.imagen_url, "vinos") ?? nombreArchivoStorage(vino.id, vino.imagen_url);
       }
 
       await actualizarVino.mutateAsync({
@@ -202,7 +217,23 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 className="hidden"
               />
 
-              {imagePreview ? (
+              {recorte.original ? (
+                <SelectorFotoCarta
+                  recorte={recorte}
+                  superpuesto={
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 right-2 h-11 w-11"
+                      aria-label="Quitar foto"
+                      onClick={clearImage}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+              ) : imagePreview ? (
                 <div className="relative mx-auto h-56 w-full max-w-xs overflow-hidden rounded-lg border bg-muted">
                   <img src={imagePreview} alt="Foto de la botella" className="h-full w-full object-contain" />
                   <Button
@@ -225,11 +256,26 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   Cambiar foto
                 </Button>
-                {imagePreview && (
+                <BotonCambiarFondo
+                  recorte={recorte}
+                  url={removeImage || urlRestaurada ? null : vino?.imagen_url}
+                  onIniciado={() => {
+                    setRemoveImage(false);
+                    setUrlRestaurada(null);
+                    setImagePreview(null);
+                  }}
+                />
+                {original && (
+                  <Button type="button" variant="outline" onClick={volverAOriginal}>
+                    <Undo2 className="mr-2 h-4 w-4" />
+                    Volver a la foto original
+                  </Button>
+                )}
+                {(imagePreview || recorte.original) && (
                   <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                     Quitar foto
                   </Button>
@@ -249,7 +295,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarVino.isPending || isUploadingImage || recorte.trabajando}>
                 {actualizarVino.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

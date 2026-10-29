@@ -32,7 +32,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
-import { supabase } from "@/integrations/supabase/client";
+import { useFotoCarta } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import {
   ALERGENOS_OFICIALES,
@@ -83,8 +85,9 @@ export function PlatoForm({
   categoriaInicial,
 }: PlatoFormProps) {
   const { crearPlato, actualizarPlato, categorias, unidades } = usePlatos();
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // Foto: recorte automático → sticker → foto con el fondo elegido.
+  const fotoCarta = useFotoCarta("plato");
+  const imageFile = fotoCarta.original;
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -155,19 +158,11 @@ export function PlatoForm({
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (file) fotoCarta.iniciar(file);
   };
 
   const clearImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
+    fotoCarta.limpiar();
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -208,33 +203,19 @@ export function PlatoForm({
 
       // 2. Si hay imagen, subirla a Storage
       if (imageFile && nuevoPlato?.id) {
-        const fileExt = imageFile.name.split(".").pop();
-        const fileName = `${nuevoPlato.id}.${fileExt}`;
-
-        // Eliminar imagen anterior si existe
-        await supabase.storage.from("platos").remove([fileName]);
-
-        // Subir nueva imagen
-        const { error: uploadError } = await supabase.storage
-          .from("platos")
-          .upload(fileName, imageFile);
-
-        if (uploadError) {
-          console.error("Error uploading image:", uploadError);
-          toast.error("Plato creado pero error al subir imagen");
-        } else {
-          // Obtener URL pública
-          const { data: urlData } = supabase.storage
-            .from("platos")
-            .getPublicUrl(fileName);
-
+        try {
+          // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+          const { url } = await subirFotoCarta("platos", nuevoPlato.id, {
+            original: imageFile,
+            compuesta: fotoCarta.usaCarta ? fotoCarta.compuesta : null,
+          });
           // Se pasa por la mutación del hook (antes era un UPDATE directo a
           // Supabase): así se invalida la caché y, sobre todo, se dispara la
           // republicación de las webs — sin esto la foto no llegaba nunca.
-          await actualizarPlato.mutateAsync({
-            id: nuevoPlato.id,
-            imagen_url: urlData.publicUrl,
-          });
+          await actualizarPlato.mutateAsync({ id: nuevoPlato.id, imagen_url: url });
+        } catch (uploadError) {
+          console.error("Error uploading image:", uploadError);
+          toast.error("Plato creado pero error al subir imagen");
         }
       }
 
@@ -557,22 +538,21 @@ export function PlatoForm({
                 <div className="space-y-2">
                   <FormLabel>Imagen del Plato</FormLabel>
                   <div className="flex flex-col gap-3">
-                    {imagePreview ? (
-                      <div className="relative inline-block">
-                        <img
-                          src={imagePreview}
-                          alt="Vista previa"
-                          className="w-32 h-32 object-cover rounded-lg border"
-                        />
+                    {fotoCarta.original ? (
+                      <SelectorFotoCarta
+                        recorte={fotoCarta}
+                        alt="Foto del plato"
+                        superpuesto={
                         <button
                           type="button"
                           onClick={clearImage}
                           aria-label="Quitar la imagen"
-                          className="absolute -top-3 -right-3 flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                           <X className="h-4 w-4" />
                         </button>
-                      </div>
+                        }
+                      />
                     ) : (
                       <div
                         onClick={() => fileInputRef.current?.click()}
@@ -608,7 +588,7 @@ export function PlatoForm({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={crearPlato.isPending || isUploading}
+                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando}
               >
                 {crearPlato.isPending || isUploading
                   ? "Guardando..."

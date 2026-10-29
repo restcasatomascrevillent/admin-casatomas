@@ -35,7 +35,10 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
+import { useFotoCarta } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
+import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
@@ -107,7 +110,10 @@ export function EditarPlatoModal({
   plato,
 }: EditarPlatoModalProps) {
   const { actualizarPlato, categorias, unidades } = usePlatos();
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Foto nueva: recorte automático → sticker → foto con el fondo elegido.
+  const fotoCarta = useFotoCarta("plato");
+  const { limpiar: limpiarFoto } = fotoCarta;
+  const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -171,13 +177,13 @@ export function EditarPlatoModal({
     setErrorAlergenos(false);
     setNuevoAlergeno("");
 
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(plato.imagen_url ?? null);
     setRemoveImage(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, plato, form]);
+  }, [open, plato, form, limpiarFoto]);
 
   const toggleAlergeno = (id: string) => {
     setSinAlergenos(false);
@@ -224,18 +230,13 @@ export function EditarPlatoModal({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageFile(file);
+    fotoCarta.iniciar(file);
     setRemoveImage(false);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setImagePreview(null);
   };
 
   const clearImage = () => {
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(null);
     setRemoveImage(true);
     if (fileInputRef.current) {
@@ -266,29 +267,20 @@ export function EditarPlatoModal({
       let fotoAntigua: string | null = null;
 
       if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop() || "jpg";
-        const fileName = `${plato.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("platos")
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from("platos")
-          .getPublicUrl(fileName);
-        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
+        // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+        const subida = await subirFotoCarta("platos", plato.id, {
+          original: fotoCarta.original,
+          compuesta: fotoCarta.usaCarta ? fotoCarta.compuesta : null,
+        });
+        imageUrlUpdate = subida.url;
         // Si el nuevo fichero cambia de nombre (p. ej. .jpg -> .png), el upsert
         // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
-        const nombreArchivoAnterior = nombreArchivoStorage(
-          plato.id,
-          plato.imagen_url,
-        );
-        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
+        const nombreArchivoAnterior =
+          rutaEnBucket(plato.imagen_url, "platos") ?? nombreArchivoStorage(plato.id, plato.imagen_url);
+        if (nombreArchivoAnterior && !subida.rutas.includes(nombreArchivoAnterior)) fotoAntigua = nombreArchivoAnterior;
       } else if (removeImage) {
         imageUrlUpdate = null;
-        fotoAntigua = nombreArchivoStorage(plato.id, plato.imagen_url);
+        fotoAntigua = rutaEnBucket(plato.imagen_url, "platos") ?? nombreArchivoStorage(plato.id, plato.imagen_url);
       }
 
       await actualizarPlato.mutateAsync({
@@ -614,7 +606,9 @@ export function EditarPlatoModal({
                 <div className="space-y-2">
                   <FormLabel>Imagen del Plato</FormLabel>
                   <div className="flex flex-col gap-3">
-                    {imagePreview ? (
+                    {fotoCarta.original ? (
+                      <SelectorFotoCarta recorte={fotoCarta} alt="Foto del plato" />
+                    ) : imagePreview ? (
                       <div className="relative inline-block">
                         <img
                           src={imagePreview}
@@ -649,7 +643,15 @@ export function EditarPlatoModal({
                       >
                         Cambiar foto
                       </Button>
-                      {imagePreview && (
+                      <BotonCambiarFondo
+                        recorte={fotoCarta}
+                        url={removeImage ? null : plato?.imagen_url}
+                        onIniciado={() => {
+                          setRemoveImage(false);
+                          setImagePreview(null);
+                        }}
+                      />
+                      {(imagePreview || fotoCarta.original) && (
                         <Button
                           type="button"
                           variant="outline"
@@ -684,7 +686,7 @@ export function EditarPlatoModal({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={actualizarPlato.isPending || isUploadingImage}
+                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando}
               >
                 {actualizarPlato.isPending || isUploadingImage ? (
                   <>

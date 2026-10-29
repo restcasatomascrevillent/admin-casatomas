@@ -11,3 +11,10 @@ export const MOBILE_PREVIEW_IMAGE_ASPECT_RATIO = 296 / 96;
 // El editor de novedades encuadra la foto con ESTA proporción; la de arriba
 // se conserva porque la usan los selectores de la carta (ListaPlatos/Vinos).
 export const NOVEDAD_CARD_IMAGE_ASPECT_RATIO = 343 / 176;
+
+/**
+ * `object-position` de una miniatura de plato a partir de `imagen_posicion_y`
+ * (0..100, 50 por defecto). Lo comparten el menú del día, el buscador de platos
+ * y el bloque «Botones» de las novedades.
+ */
+export const posicionImagen = (y: number | null) => `50% ${typeof y === "number" ? y : 50}%`;

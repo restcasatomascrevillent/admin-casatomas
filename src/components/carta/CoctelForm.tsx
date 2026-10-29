@@ -10,7 +10,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useCocteles } from "@/hooks/useCocteles";
-import { supabase } from "@/integrations/supabase/client";
+import { useFotoCarta } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { Loader2, Upload, X, Plus } from "lucide-react";
 import {
@@ -37,7 +39,10 @@ interface CoctelFormProps {
 
 export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormProps) {
   const { crearCoctel, actualizarCoctel, categorias } = useCocteles();
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Foto: recorte automático → sticker → foto con el fondo elegido.
+  const fotoCarta = useFotoCarta("bebida");
+  const { limpiar: limpiarFoto } = fotoCarta;
+  const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -103,7 +108,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file);
+      fotoCarta.iniciar(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -113,7 +118,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
   };
 
   const clearImage = () => {
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(null);
   };
 
@@ -144,23 +149,16 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
       if (imageFile && nuevoCoctel?.id) {
         setIsUploading(true);
         try {
-          const fileExt = imageFile.name.split('.').pop() || 'jpg';
-          const fileName = `${nuevoCoctel.id}.${fileExt}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('cocteles')
-            .upload(fileName, imageFile, { upsert: true });
-
-          if (uploadError) throw uploadError;
-
-          const { data: urlData } = supabase.storage
-            .from('cocteles')
-            .getPublicUrl(fileName);
+          // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+          const subida = await subirFotoCarta("cocteles", nuevoCoctel.id, {
+            original: imageFile,
+            compuesta: fotoCarta.usaCarta ? fotoCarta.compuesta : null,
+          });
 
           // Vía el hook, para que invalide la caché y republique las webs.
           await actualizarCoctel.mutateAsync({
             id: nuevoCoctel.id,
-            imagen_url: urlData.publicUrl,
+            imagen_url: subida.url,
           });
         } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
@@ -298,7 +296,17 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
             {/* Imagen */}
             <div className="space-y-2">
               <FormLabel>Imagen</FormLabel>
-              {imagePreview ? (
+              {fotoCarta.original ? (
+                <SelectorFotoCarta
+                  recorte={fotoCarta}
+                  alt="Foto del producto"
+                  superpuesto={
+                    <Button type="button" variant="destructive" size="icon" className="absolute right-2 top-2 h-11 w-11" onClick={clearImage} aria-label="Quitar la imagen">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+              ) : imagePreview ? (
                 <div className="relative w-32 h-32">
                   <img
                     src={imagePreview}
@@ -431,7 +439,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
               </Button>
               <Button
                 type="submit"
-                disabled={crearCoctel.isPending || isUploading}
+                disabled={crearCoctel.isPending || isUploading || fotoCarta.trabajando}
               >
                 {(crearCoctel.isPending || isUploading) && (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
