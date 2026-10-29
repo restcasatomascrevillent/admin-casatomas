@@ -23,7 +23,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
-import { supabase } from "@/integrations/supabase/client";
+import { useFotoCarta } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -47,7 +49,10 @@ interface BebidaFormProps {
 export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormProps) {
   const { crearBebida, actualizarBebida, categorias } = useBebidas();
   const queryClient = useQueryClient();
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Foto: recorte automático → sticker → foto con el fondo elegido.
+  const fotoCarta = useFotoCarta("bebida");
+  const { limpiar: limpiarFoto } = fotoCarta;
+  const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +72,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setImageFile(file);
+      fotoCarta.iniciar(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -77,7 +82,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
   };
 
   const clearImage = () => {
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -102,22 +107,15 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     if (imageFile && nuevaBebida?.id) {
       setIsUploading(true);
       try {
-        const fileExt = imageFile.name.split('.').pop();
-        const fileName = `${nuevaBebida.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('bebidas')
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('bebidas')
-          .getPublicUrl(fileName);
+        // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+        const subida = await subirFotoCarta("bebidas", nuevaBebida.id, {
+          original: imageFile,
+          compuesta: fotoCarta.usaCarta ? fotoCarta.compuesta : null,
+        });
 
         await actualizarBebida.mutateAsync({
           id: nuevaBebida.id,
-          imagen_url: urlData.publicUrl,
+          imagen_url: subida.url,
         });
 
         queryClient.invalidateQueries({ queryKey: ["bebidas"] });
@@ -196,7 +194,17 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 className="hidden"
               />
               
-              {imagePreview ? (
+              {fotoCarta.original ? (
+                <SelectorFotoCarta
+                  recorte={fotoCarta}
+                  alt="Foto del producto"
+                  superpuesto={
+                    <Button type="button" variant="destructive" size="icon" className="absolute right-2 top-2 h-11 w-11" onClick={clearImage} aria-label="Quitar la imagen">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  }
+                />
+              ) : imagePreview ? (
                 <div className="relative w-full h-48 rounded-lg overflow-hidden border">
                   <img 
                     src={imagePreview} 
@@ -309,7 +317,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
               >
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={crearBebida.isPending || isUploading}>
+              <Button type="submit" className="h-11 px-5" disabled={crearBebida.isPending || isUploading || fotoCarta.trabajando}>
                 {crearBebida.isPending || isUploading ? "Guardando..." : "Guardar Bebida"}
               </Button>
             </div>

@@ -23,7 +23,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
-import { supabase } from "@/integrations/supabase/client";
+import { useFotoCarta } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Coctel, useCocteles } from "@/hooks/useCocteles";
 import { toast } from "sonner";
@@ -67,7 +69,10 @@ interface EditarCoctelModalProps {
 
 export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelModalProps) {
   const { actualizarCoctel, categorias } = useCocteles();
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Foto: recorte automático → sticker → foto con el fondo elegido.
+  const fotoCarta = useFotoCarta("bebida");
+  const { limpiar: limpiarFoto } = fotoCarta;
+  const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -111,13 +116,13 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
     setAlergenosPersonalizados(personalizados);
     setNuevoAlergeno("");
 
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(coctel.imagen_url ?? null);
     setRemoveImage(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, coctel, form]);
+  }, [open, coctel, form, limpiarFoto]);
 
   const toggleAlergeno = (id: string) => {
     setAlergenosSeleccionados((prev) =>
@@ -152,7 +157,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageFile(file);
+    fotoCarta.iniciar(file);
     setRemoveImage(false);
 
     const reader = new FileReader();
@@ -163,7 +168,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
   };
 
   const clearImage = () => {
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(null);
     setRemoveImage(true);
     if (fileInputRef.current) {
@@ -184,24 +189,20 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
       let fotoAntigua: string | null = null;
 
       if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop() || "jpg";
-        const fileName = `${coctel.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("cocteles")
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from("cocteles").getPublicUrl(fileName);
-        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
+        // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+        const subida = await subirFotoCarta("cocteles", coctel.id, {
+          original: imageFile,
+          compuesta: fotoCarta.usaCarta ? fotoCarta.compuesta : null,
+        });
+        imageUrlUpdate = subida.url;
         // Si el nuevo fichero cambia de nombre (p. ej. .jpg -> .png), el upsert
         // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
-        const nombreArchivoAnterior = nombreArchivoStorage(coctel.id, coctel.imagen_url);
-        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
+        const nombreArchivoAnterior =
+          rutaEnBucket(coctel.imagen_url, "cocteles") ?? nombreArchivoStorage(coctel.id, coctel.imagen_url);
+        if (nombreArchivoAnterior && !subida.rutas.includes(nombreArchivoAnterior)) fotoAntigua = nombreArchivoAnterior;
       } else if (removeImage) {
         imageUrlUpdate = null;
-        fotoAntigua = nombreArchivoStorage(coctel.id, coctel.imagen_url);
+        fotoAntigua = rutaEnBucket(coctel.imagen_url, "cocteles") ?? nombreArchivoStorage(coctel.id, coctel.imagen_url);
       }
 
       await actualizarCoctel.mutateAsync({
@@ -350,7 +351,12 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
             <div className="space-y-2">
               <FormLabel>Imagen del Cóctel</FormLabel>
               <div className="flex flex-col gap-3">
-                {imagePreview ? (
+                {fotoCarta.original ? (
+                  <SelectorFotoCarta
+                    recorte={fotoCarta}
+                    alt="Foto del producto"
+                  />
+                ) : imagePreview ? (
                   <div className="relative inline-block">
                     <img
                       src={imagePreview}
@@ -381,7 +387,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
                   <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                     Cambiar foto
                   </Button>
-                  {imagePreview && (
+                  {(imagePreview || fotoCarta.original) && (
                     <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                       Quitar foto
                     </Button>
@@ -486,7 +492,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={actualizarCoctel.isPending || isUploadingImage}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarCoctel.isPending || isUploadingImage || fotoCarta.trabajando}>
                 {actualizarCoctel.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />

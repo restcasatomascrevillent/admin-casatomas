@@ -16,14 +16,13 @@ import {
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { useVinos, NuevoVino } from "@/hooks/useVinos";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { nombreSubida } from "./fotoCartaVino";
+import { subirFotoCarta } from "./subirFotoCarta";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 import { useRecorteVino } from "./recorte/useRecorteVino";
-import { VistaRecorteVino } from "./recorte/VistaRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -141,23 +140,17 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     if (imageFile && nuevoVino?.id) {
       setIsUploading(true);
       try {
-        // Foto de carta (sin fondo, compuesta) → `<id>-carta.<ext>`: así el
-        // script de homogeneizar la reconoce como ya procesada.
-        const fileName = nombreSubida(nuevoVino.id, imageFile);
-
-        const { error: uploadError } = await supabase.storage
-          .from('vinos')
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage
-          .from('vinos')
-          .getPublicUrl(fileName);
+        // Original intacto `<id>.<ext>` + foto de carta `<id>-carta-<ext>.webp`
+        // (subirFotoCarta.ts): el script de homogeneizar la reconoce como ya
+        // procesada y se puede volver a la original.
+        const { url } = await subirFotoCarta("vinos", nuevoVino.id, {
+          original: recorte.original,
+          compuesta: recorte.usaCarta ? recorte.compuesta : null,
+        });
 
         await actualizarVino.mutateAsync({
           id: nuevoVino.id,
-          imagen_url: urlData.publicUrl,
+          imagen_url: url,
         });
 
         queryClient.invalidateQueries({ queryKey: ["vinos"] });
@@ -200,7 +193,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               />
               
               {recorte.original ? (
-                <VistaRecorteVino
+                <SelectorFotoCarta
                   recorte={recorte}
                   alt={precarga ? "Foto de la botella" : "Vista previa"}
                   superpuesto={

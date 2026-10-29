@@ -15,14 +15,14 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { toast } from "sonner";
 import { CamposVino } from "./CamposVino";
-import { nombreSubida, rutaOriginalDesdeCarta } from "./fotoCartaVino";
+import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
+import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
-import { VistaRecorteVino } from "./recorte/VistaRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -62,7 +62,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   const recorte = useRecorteVino();
   const { limpiar: limpiarRecorte } = recorte;
   const imageFile = recorte.archivoFinal;
-  // Foto ya guardada (URL) o restaurada; la foto nueva la enseña VistaRecorteVino.
+  // Foto ya guardada (URL) o restaurada; la foto nueva la enseña SelectorFotoCarta.
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -147,27 +147,23 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       let fotoAntigua: string | null = null;
 
       if (imageFile) {
-        const fileName = nombreSubida(vino.id, imageFile);
-
-        const { error: uploadError } = await supabase.storage
-          .from("vinos")
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from("vinos").getPublicUrl(fileName);
-        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
+        // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+        const subida = await subirFotoCarta("vinos", vino.id, {
+          original: recorte.original,
+          compuesta: recorte.usaCarta ? recorte.compuesta : null,
+        });
+        imageUrlUpdate = subida.url;
         // Si el nuevo fichero cambia de nombre (p. ej. .jpg -> .png), el upsert
         // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
-        const nombreArchivoAnterior = nombreArchivoStorage(vino.id, vino.imagen_url);
-        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
+        const nombreArchivoAnterior = rutaEnBucket(vino.imagen_url, "vinos") ?? nombreArchivoStorage(vino.id, vino.imagen_url);
+        if (nombreArchivoAnterior && !subida.rutas.includes(nombreArchivoAnterior)) fotoAntigua = nombreArchivoAnterior;
       } else if (urlRestaurada) {
         // Deshacer el fondo de carta: el original sigue en Storage, solo se
         // vuelve a apuntar a él (la foto de carta se queda, no se borra).
         imageUrlUpdate = urlRestaurada;
       } else if (removeImage) {
         imageUrlUpdate = null;
-        fotoAntigua = nombreArchivoStorage(vino.id, vino.imagen_url);
+        fotoAntigua = rutaEnBucket(vino.imagen_url, "vinos") ?? nombreArchivoStorage(vino.id, vino.imagen_url);
       }
 
       await actualizarVino.mutateAsync({
@@ -221,7 +217,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               />
 
               {recorte.original ? (
-                <VistaRecorteVino
+                <SelectorFotoCarta
                   recorte={recorte}
                   superpuesto={
                     <Button

@@ -1,35 +1,48 @@
 import type { ReactNode } from "react";
-import { Image as ImageIcon, Loader2, RotateCw, Sparkles } from "lucide-react";
+import { Check, Image as ImageIcon, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ESTILO_DAMERO, textoProgreso, type RecorteVino } from "./useRecorteVino";
+import { temasDisponibles } from "../composicionCarta";
+import { ESTILO_DAMERO, textoProgreso, type FotoCarta } from "./useRecorteVino";
 
 interface Props {
-  recorte: RecorteVino;
+  recorte: FotoCarta;
   /** Botones superpuestos (cambiar / quitar foto). */
   superpuesto?: ReactNode;
   alt?: string;
 }
 
+const TEMAS_LISTA = temasDisponibles();
+
 /**
- * Vista de la foto tras hacerla: primero el sticker (botella recortada sobre
- * damero, etiqueta «Recorte») y luego, solo, «Con fondo de carta». Selector
- * «Sticker | Con fondo de carta» y botones «Usar fondo de carta» (por defecto),
- * «Usar foto original» y «Repetir recorte».
+ * Foto de producto de la carta tras elegirla: se recorta sola, se enseña el
+ * sticker sobre damero y debajo las muestras de FONDO (los temas de la carta);
+ * al tocar una se ve al momento la foto con ese fondo. Selector «Sticker |
+ * Con fondo», «Usar foto original» y «Repetir recorte».
  */
-export function VistaRecorteVino({ recorte, superpuesto, alt = "Foto de la botella" }: Props) {
-  const { estado, eleccion, vista, urls } = recorte;
+export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del producto" }: Props) {
+  const { estado, eleccion, vista, urls, tema, tipo } = recorte;
   const listo = estado.fase === "listo";
-  const verSticker = listo && eleccion === "carta" && vista === "sticker";
-  const src = listo && eleccion === "carta" ? (vista === "sticker" ? urls.sticker : urls.carta) : urls.original;
+  const usaCarta = listo && eleccion === "carta";
+  const verSticker = usaCarta && (vista === "sticker" || !urls.carta);
+  const src = usaCarta ? (verSticker ? urls.sticker : urls.carta) : urls.original;
 
   return (
     <div className="space-y-2">
       <div
-        className="relative mx-auto h-64 w-full max-w-xs overflow-hidden rounded-lg border bg-muted"
+        className={cn(
+          "relative mx-auto w-full max-w-xs overflow-hidden rounded-lg border bg-muted",
+          tipo === "plato" ? "aspect-[4/3]" : "h-64",
+        )}
         style={verSticker ? ESTILO_DAMERO : undefined}
       >
-        {src && <img src={src} alt={alt} className={cn("h-full w-full object-contain", estado.fase === "trabajando" && "opacity-60")} />}
+        {src && (
+          <img
+            src={src}
+            alt={alt}
+            className={cn("h-full w-full object-contain", (estado.fase === "trabajando" || recorte.trabajando) && "opacity-60")}
+          />
+        )}
         {verSticker && (
           <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs font-medium text-white">Recorte</span>
         )}
@@ -49,12 +62,12 @@ export function VistaRecorteVino({ recorte, superpuesto, alt = "Foto de la botel
         {superpuesto}
       </div>
 
-      {listo && eleccion === "carta" && (
+      {usaCarta && (
         <div role="radiogroup" aria-label="Vista de la foto" className="mx-auto grid max-w-xs grid-cols-2 rounded-md border p-0.5 text-sm">
           {(
             [
               ["sticker", "Sticker"],
-              ["fondo", "Con fondo de carta"],
+              ["fondo", "Con fondo"],
             ] as const
           ).map(([v, texto]) => (
             <button
@@ -74,23 +87,42 @@ export function VistaRecorteVino({ recorte, superpuesto, alt = "Foto de la botel
         </div>
       )}
 
+      {listo && (
+        <div>
+          <p className="mb-1 text-center text-xs font-medium text-muted-foreground">Fondo</p>
+          <div role="radiogroup" aria-label="Fondo de la foto" className="flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:justify-center">
+            {TEMAS_LISTA.map((t) => {
+              const activo = usaCarta && tema === t.clave;
+              return (
+                <button
+                  key={t.clave}
+                  type="button"
+                  role="radio"
+                  aria-checked={activo}
+                  onClick={() => recorte.setTema(t.clave)}
+                  className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-md p-1 text-[11px] leading-tight hover:bg-muted"
+                >
+                  <span
+                    className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-full border shadow-sm",
+                      activo && "ring-2 ring-primary ring-offset-2",
+                    )}
+                    style={{ backgroundColor: t.color }}
+                  >
+                    {activo && <Check className="h-4 w-4 text-black/60" />}
+                  </span>
+                  <span className={cn("text-center", activo ? "font-medium text-foreground" : "text-muted-foreground")}>{t.nombre}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {estado.fase === "fallo" && <p className="text-center text-xs text-muted-foreground">{estado.aviso}</p>}
 
       {(listo || estado.fase === "fallo") && (
         <div className="flex flex-wrap justify-center gap-2">
-          {listo && (
-            <Button
-              type="button"
-              size="sm"
-              className="h-10"
-              variant={eleccion === "carta" ? "default" : "outline"}
-              aria-pressed={eleccion === "carta"}
-              onClick={() => recorte.setEleccion("carta")}
-            >
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              Usar fondo de carta
-            </Button>
-          )}
           <Button
             type="button"
             size="sm"
@@ -112,3 +144,6 @@ export function VistaRecorteVino({ recorte, superpuesto, alt = "Foto de la botel
     </div>
   );
 }
+
+/** Nombre antiguo (formularios de vino). */
+export const VistaRecorteVino = SelectorFotoCarta;

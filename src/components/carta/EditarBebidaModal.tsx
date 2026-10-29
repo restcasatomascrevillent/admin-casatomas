@@ -28,7 +28,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { useFotoCarta } from "./recorte/useRecorteVino";
+import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
@@ -64,7 +66,10 @@ interface EditarBebidaModalProps {
 
 export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaModalProps) {
   const { actualizarBebida, categorias } = useBebidas();
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  // Foto: recorte automático → sticker → foto con el fondo elegido.
+  const fotoCarta = useFotoCarta("bebida");
+  const { limpiar: limpiarFoto } = fotoCarta;
+  const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -92,19 +97,19 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
       tamano: bebida.tamano ?? "",
     });
 
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(bebida.imagen_url ?? null);
     setRemoveImage(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, bebida, form]);
+  }, [open, bebida, form, limpiarFoto]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImageFile(file);
+    fotoCarta.iniciar(file);
     setRemoveImage(false);
 
     const reader = new FileReader();
@@ -115,7 +120,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
   };
 
   const clearImage = () => {
-    setImageFile(null);
+    limpiarFoto();
     setImagePreview(null);
     setRemoveImage(true);
     if (fileInputRef.current) {
@@ -135,24 +140,20 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
       let fotoAntigua: string | null = null;
 
       if (imageFile) {
-        const fileExt = imageFile.name.split(".").pop() || "jpg";
-        const fileName = `${bebida.id}.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("bebidas")
-          .upload(fileName, imageFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from("bebidas").getPublicUrl(fileName);
-        imageUrlUpdate = `${urlData.publicUrl}?t=${Date.now()}`;
+        // Original intacto + foto de carta `-carta-<ext>.webp` (subirFotoCarta.ts).
+        const subida = await subirFotoCarta("bebidas", bebida.id, {
+          original: imageFile,
+          compuesta: fotoCarta.usaCarta ? fotoCarta.compuesta : null,
+        });
+        imageUrlUpdate = subida.url;
         // Si el nuevo fichero cambia de nombre (p. ej. .jpg -> .png), el upsert
         // no sobrescribe el antiguo: se anota para borrarlo tras guardar.
-        const nombreArchivoAnterior = nombreArchivoStorage(bebida.id, bebida.imagen_url);
-        if (nombreArchivoAnterior && nombreArchivoAnterior !== fileName) fotoAntigua = nombreArchivoAnterior;
+        const nombreArchivoAnterior =
+          rutaEnBucket(bebida.imagen_url, "bebidas") ?? nombreArchivoStorage(bebida.id, bebida.imagen_url);
+        if (nombreArchivoAnterior && !subida.rutas.includes(nombreArchivoAnterior)) fotoAntigua = nombreArchivoAnterior;
       } else if (removeImage) {
         imageUrlUpdate = null;
-        fotoAntigua = nombreArchivoStorage(bebida.id, bebida.imagen_url);
+        fotoAntigua = rutaEnBucket(bebida.imagen_url, "bebidas") ?? nombreArchivoStorage(bebida.id, bebida.imagen_url);
       }
 
       await actualizarBebida.mutateAsync({
@@ -239,7 +240,12 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 className="hidden"
               />
 
-              {imagePreview ? (
+              {fotoCarta.original ? (
+                <SelectorFotoCarta
+                  recorte={fotoCarta}
+                  alt="Foto del producto"
+                />
+              ) : imagePreview ? (
                 <div className="relative w-full h-48 rounded-lg overflow-hidden border">
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                   <Button
@@ -266,7 +272,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                   Cambiar foto
                 </Button>
-                {imagePreview && (
+                {(imagePreview || fotoCarta.original) && (
                   <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                     Quitar foto
                   </Button>
@@ -326,7 +332,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" className="h-11 px-5" disabled={actualizarBebida.isPending || isUploadingImage}>
+              <Button type="submit" className="h-11 px-5" disabled={actualizarBebida.isPending || isUploadingImage || fotoCarta.trabajando}>
                 {actualizarBebida.isPending || isUploadingImage ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
