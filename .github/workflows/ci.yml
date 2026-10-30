@@ -42,6 +42,8 @@ jobs:
         run: npm run test:minimo-privilegio:db
       - name: Limitadores de abuso, superadmin mínimo y secreto de fotos (PGlite)
         run: npm run test:abuso:db
+      - name: RLS de espacios_reserva por sección (PGlite)
+        run: npm run test:espacios:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
