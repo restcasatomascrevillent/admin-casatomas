@@ -19,6 +19,9 @@ const corsHeaders = {
 // email en SUPER_ADMIN_EMAILS) NO se cambia desde esta función, la pida quien
 // la pida: su titular usa su propio flujo de recuperación. Así un super admin
 // secundario (o una sesión robada) no puede tomar la cuenta del dueño.
+// Contraseña mínima de las cuentas del panel (CT-REM-FN-03).
+const LONGITUD_MINIMA_CONTRASENA = 10;
+
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
@@ -93,9 +96,9 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
       });
     }
 
-    if (password.length < 6) {
+    if (password.length < LONGITUD_MINIMA_CONTRASENA) {
       return new Response(
-        JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
+        JSON.stringify({ error: `La contraseña debe tener al menos ${LONGITUD_MINIMA_CONTRASENA} caracteres` }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },

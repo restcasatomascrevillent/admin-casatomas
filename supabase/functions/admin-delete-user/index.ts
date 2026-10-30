@@ -10,8 +10,10 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin por email: se comprueba la tabla super_admins.
+// Quién puede eliminar: SOLO la tabla super_admins (RPC is_super_admin). El
+// email del JWT ya no basta aunque esté en SUPER_ADMIN_EMAILS (CT-REM-FN-12);
+// si la RPC falla se responde 503 sin borrar nada (fail-closed).
+// SUPER_ADMIN_EMAILS solo sirve aquí para PROTEGER cuentas objetivo.
 // El rol admin solo permite consultar usuarios, nunca gestionarlos.
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
@@ -71,13 +73,19 @@ Deno.serve(conAuditoriaDePeticion("admin-delete-user", createClientBase, async (
       },
     });
 
-    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
-
     const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin.rpc("is_super_admin", {
       _user_id: currentUser.id,
     });
 
-    if (superAdminCheckError || (!isSuperAdminResult && !currentUserIsSuperAdmin)) {
+    if (superAdminCheckError) {
+      console.error("Error checking super admin status:", superAdminCheckError);
+      return new Response(JSON.stringify({ error: "No se pudieron verificar tus permisos. No se ha eliminado nada; vuelve a intentarlo." }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (isSuperAdminResult !== true) {
       return new Response(JSON.stringify({ error: "Solo un super admin puede eliminar usuarios" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

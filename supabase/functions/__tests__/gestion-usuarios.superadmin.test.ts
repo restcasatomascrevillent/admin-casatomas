@@ -62,9 +62,11 @@ describe.each(["eliminar", "contraseña"])("%s: solo desde superadmin", (accion)
     expect((await llamar(accion)).status).toBe(200);
     expect(h.mutaciones).toEqual([accion]);
   });
+  // CT-REM-FN-12 (30-oct-2026): admin-delete-user responde 503 (no se pudo
+  // verificar) en vez de 403; admin-update-user-password sigue en 403.
   it("deniega si no se puede verificar el permiso", async () => {
     h.superadmin = true; h.errorPermisos = true;
-    expect((await llamar(accion)).status).toBe(403);
+    expect((await llamar(accion)).status).toBe(accion === "eliminar" ? 503 : 403);
     expect(h.mutaciones).toEqual([]);
   });
   it("rechaza una sesión inválida y actuar sobre uno mismo", async () => {
@@ -85,10 +87,19 @@ describe("Cambio de contraseña · validación y errores", () => {
     method, headers: { Authorization: "Bearer valido", "Content-Type": "application/json" },
     ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
   }));
-  it.each([null, [], { userId: h.objetivoId, password: 123456 }, { userId: "incorrecto", password: "prueba-segura" }, { userId: h.objetivoId, password: "abc" }])("rechaza datos inválidos sin llamar a Auth: %j", async body => {
+  it.each([null, [], { userId: h.objetivoId, password: 123456 }, { userId: "incorrecto", password: "prueba-segura" }, { userId: h.objetivoId, password: "abc" }, { userId: h.objetivoId, password: "123456789" }])("rechaza datos inválidos sin llamar a Auth: %j", async body => {
     h.superadmin = true;
     expect((await pedir(body)).status).toBe(400);
     expect(h.mutaciones).toEqual([]);
+  });
+  it("contraseña de 9 caracteres → 400 con mensaje legible; con 10 sí se cambia (CT-REM-FN-03)", async () => {
+    h.superadmin = true;
+    const corta = await pedir({ userId: h.objetivoId, password: "abcdefghi" });
+    expect(corta.status).toBe(400);
+    expect((await corta.json()).error).toBe("La contraseña debe tener al menos 10 caracteres");
+    expect(h.mutaciones).toEqual([]);
+    expect((await pedir({ userId: h.objetivoId, password: "abcdefghij" })).status).toBe(200);
+    expect(h.cambioPassword).toEqual({ password: "abcdefghij" });
   });
   it("rechaza otros métodos y JSON roto", async () => {
     h.superadmin = true;
