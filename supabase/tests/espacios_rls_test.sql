@@ -1,5 +1,11 @@
 -- ===========================================================================
--- Tests SQL de 20260928140000_espacios_reserva_rls_por_seccion.sql
+-- Tests SQL de 20260928140000_espacios_reserva_rls_por_seccion.sql y de
+-- 20261030210000_rls_espacios_reserva_por_seccion.sql (CT-REM-DB-02, D-005,
+-- D-008), que deja el MISMO estado final partiendo de la demo (9 politicas
+-- viejas) o de Git: 6 politicas propias + la restrictiva
+-- acceso_panel_no_bloqueado (20261013082609). DELETE solo superadmin (D-008).
+-- La version automatizada en PGlite es supabase/tests/t7_espacios_reserva_test.sql
+-- (npm run test:espacios:db); este fichero es para una base local completa.
 -- ---------------------------------------------------------------------------
 -- SQL plano (no pgTAP), como supabase/tests/mesas_rls_test.sql y
 -- supabase/tests/trafico_web_test.sql: cada comprobacion es un ASSERT dentro
@@ -11,7 +17,9 @@
 --        -v ON_ERROR_STOP=1 -f supabase/tests/espacios_rls_test.sql
 -- Si termina en ROLLBACK sin ERROR, todo ha pasado.
 --
--- ESTADO: ESCRITO Y SIN EJECUTAR. El 2026-09-28 no hay base local contra la
+-- ESTADO (actualizado 2026-10-30, D-008): sigue SIN EJECUTAR contra una base
+-- completa; su contenido se cubre en PGlite con t7_espacios_reserva_test.sql.
+-- Historico (2026-09-28): ESCRITO Y SIN EJECUTAR. El 2026-09-28 no hay base local contra la
 -- que lanzarlo (Docker Desktop esta instalado pero APAGADO: `supabase start`
 -- y `supabase db dump` fallan con "failed to inspect docker image"), y la
 -- migracion que prueba **no esta aplicada en produccion** -- espera el OK del
@@ -21,7 +29,7 @@
 -- prosecdef, las 7 FK que apuntan a la tabla, los 4 usuarios y sus permisos.
 -- Este fichero no se ha ejecutado nunca.
 --
--- Cubre: forma del catalogo (6 politicas, ninguna a `public`), grants (sin
+-- Cubre: forma del catalogo (6 politicas + restrictiva, ninguna a `public`), grants (sin
 -- TRUNCATE para authenticated, `anon` SOLO con SELECT), FORCE RLS apagado,
 -- las funciones que leen la tabla siguen con el prosecdef que se supone,
 -- authenticated sin la seccion no ve ni escribe, authenticated CON la seccion
@@ -30,21 +38,27 @@
 -- queda cortada (y sigue existiendo para quien si puede borrar), y TRUNCATE
 -- rechazado.
 --
--- SI SE APLICA LA OPCION C (DELETE por seccion en vez de por super admin),
--- hay que tocar T1 (nombre de la politica) y T7d/T8c (quien puede borrar).
+-- D-008 (CTO, 2026-10-30): el DELETE es SOLO de superadmin; la OPCION C
+-- (DELETE por seccion) queda descartada.
+--
+-- La restrictiva acceso_panel_no_bloqueado exige una sesion valida: los
+-- usuarios de prueba tienen fila en auth.sessions y session_id en los claims.
 -- ===========================================================================
 
 begin;
 
 -- ---------------------------------------------------------------------------
--- T1 catalogo: exactamente las 6 politicas nuevas, con su verbo y su rol
+-- T1 catalogo: exactamente las 6 politicas nuevas + la restrictiva
 -- ---------------------------------------------------------------------------
 do $$
 declare n int;
 begin
   select count(*) into n from pg_policies
    where schemaname = 'public' and tablename = 'espacios_reserva';
-  assert n = 6, format('T1a: se esperaban 6 politicas en espacios_reserva, hay %s', n);
+  assert n = 7, format('T1a: se esperaban 7 politicas en espacios_reserva (6 + restrictiva), hay %s', n);
+  assert exists (select 1 from pg_policies where tablename='espacios_reserva'
+                  and policyname='acceso_panel_no_bloqueado' and permissive='RESTRICTIVE'),
+         'T1a2: falta la restrictiva acceso_panel_no_bloqueado';
 
   assert exists (select 1 from pg_policies where tablename='espacios_reserva'
                   and policyname='espacios_reserva_select_anon_activos' and cmd='SELECT'
@@ -58,7 +72,10 @@ begin
                   and policyname='espacios_reserva_update_seccion' and cmd='UPDATE'),  'T1e: falta espacios_reserva_update_seccion';
   assert exists (select 1 from pg_policies where tablename='espacios_reserva'
                   and policyname='espacios_reserva_delete_super_admin' and cmd='DELETE'),
-         'T1f: falta espacios_reserva_delete_super_admin (si se aplico la OPCION C, ajustar este test)';
+         'T1f: falta espacios_reserva_delete_super_admin (D-008)';
+  assert (select qual from pg_policies where tablename='espacios_reserva'
+           and policyname='espacios_reserva_delete_super_admin') like '%is_super_admin%',
+         'T1f2: el DELETE ya no es solo de superadmin (D-008)';
   assert exists (select 1 from pg_policies where tablename='espacios_reserva'
                   and policyname='espacios_reserva_service_role' and cmd='ALL'),        'T1g: falta espacios_reserva_service_role';
 
@@ -68,6 +85,7 @@ begin
     select 1 from pg_policies
      where schemaname='public' and tablename='espacios_reserva'
        and policyname not like 'espacios\_reserva\_%'
+       and policyname <> 'acceso_panel_no_bloqueado'
   ), 'T1h: sobrevive alguna politica vieja';
 end;
 $$;
@@ -224,6 +242,11 @@ insert into auth.users (id, email) values
   ('00000000-0000-0000-0000-00000000cb01', 'test-espacios-con-permiso@rls.local'),
   ('00000000-0000-0000-0000-00000000cb02', 'test-espacios-super-admin@rls.local');
 
+-- Sesiones validas para la restrictiva acceso_panel_no_bloqueado.
+insert into auth.sessions (id, user_id) values
+  ('00000000-0000-0000-0000-00000000ab01', '00000000-0000-0000-0000-00000000cb01'),
+  ('00000000-0000-0000-0000-00000000ab02', '00000000-0000-0000-0000-00000000cb02');
+
 insert into public.user_permissions (user_id, section_key, can_view, can_edit)
 values ('00000000-0000-0000-0000-00000000cb01', 'reservas', true, false);
 -- can_edit = false A PROPOSITO: hoy NINGUNA fila de user_permissions tiene
@@ -282,7 +305,7 @@ reset role;
 --    asignaciones) queda cortada.
 -- ---------------------------------------------------------------------------
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000cb01","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000cb01","role":"authenticated","session_id":"00000000-0000-0000-0000-00000000ab01"}';
 
 do $$
 begin
@@ -302,7 +325,7 @@ begin
    where id = '00000000-0000-0000-0000-0000000e5b03';
   assert found, 'T8c: con permiso no pudo actualizar';
 
-  -- OPCION A: el DELETE es solo de super admin. No falla: no alcanza filas.
+  -- D-008: el DELETE es solo de super admin. No falla: no alcanza filas.
   delete from public.espacios_reserva where id = '00000000-0000-0000-0000-0000000e5b03';
   assert not found, 'T8d: un usuario de seccion (sin super admin) pudo BORRAR un espacio';
 end;
@@ -336,7 +359,7 @@ $$;
 --    el dueno se ha quedado fuera de su propio panel de Espacios.
 -- ---------------------------------------------------------------------------
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000cb02","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000cb02","role":"authenticated","session_id":"00000000-0000-0000-0000-00000000ab02"}';
 
 do $$
 begin
@@ -430,7 +453,7 @@ $$;
 --     aunque pasara, el ROLLBACK final lo deshace.)
 -- ---------------------------------------------------------------------------
 set local role authenticated;
-set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000cb01","role":"authenticated"}';
+set local request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000cb01","role":"authenticated","session_id":"00000000-0000-0000-0000-00000000ab01"}';
 do $$
 begin
   begin
