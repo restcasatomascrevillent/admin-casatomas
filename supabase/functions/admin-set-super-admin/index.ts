@@ -9,9 +9,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin y la autorización recae por completo en is_super_admin()
-// (tabla super_admins). Nunca conceder acceso por defecto — fail-closed.
+// Quién puede actuar: SOLO is_super_admin() (tabla super_admins). El email del
+// JWT ya no sustituye a la BD cuando la RPC falla ni cuando devuelve false
+// (CT-REM-FN-12): si alguien consigue poner en su cuenta un email del
+// allowlist, no se convierte en super admin. SUPER_ADMIN_EMAILS solo protege
+// las cuentas objetivo (no se les retira el acceso). Fail-closed.
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
@@ -74,14 +76,12 @@ Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, asy
     // gestionar roles/permisos normales, así que el listón es más alto que en
     // el resto de funciones admin-*: ser "admin" no basta, hay que ser super
     // admin ya (tabla super_admins), no solo tener el rol "admin".
-    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
-
     const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin.rpc(
       "is_super_admin",
       { _user_id: currentUser.id }
     );
 
-    if (superAdminCheckError && !currentUserIsSuperAdmin) {
+    if (superAdminCheckError) {
       console.error("Error checking super admin status:", superAdminCheckError);
       return new Response(JSON.stringify({ error: "Error verificando permisos" }), {
         status: 500,
@@ -89,7 +89,7 @@ Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, asy
       });
     }
 
-    if (!isSuperAdminResult && !currentUserIsSuperAdmin) {
+    if (isSuperAdminResult !== true) {
       return new Response(
         JSON.stringify({ error: "Solo un super admin puede gestionar otros super admins" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

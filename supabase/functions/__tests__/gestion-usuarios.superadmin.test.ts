@@ -97,10 +97,18 @@ describe("Cambio de contraseña · validación y errores", () => {
     expect(respuesta.status).toBe(400);
     expect(h.mutaciones).toEqual([]);
   });
-  it("el superadmin cambia contraseñas sin depender del rol del destinatario ni tocar el bloqueo", async () => {
-    h.superadmin = true; h.objetivoSuperadmin = true;
+  it("el superadmin cambia la contraseña de un staff sin tocar el bloqueo", async () => {
+    h.superadmin = true;
     expect((await llamar("contraseña")).status).toBe(200);
     expect(h.cambioPassword).toEqual({ password: "prueba-segura" });
+  });
+  // CT-REM-FN-05 (30-oct-2026): antes este caso daba 200 y permitía tomar la
+  // cuenta de otro super admin (incluido el dueño). Ahora se rechaza siempre.
+  it("un superadmin NO puede cambiar la contraseña de otro superadmin", async () => {
+    h.superadmin = true; h.objetivoSuperadmin = true;
+    expect((await llamar("contraseña")).status).toBe(403);
+    expect(h.mutaciones).toEqual([]);
+    expect(h.cambioPassword).toBeNull();
   });
   it("detecta una cuenta eliminada antes de intentar actualizarla", async () => {
     h.superadmin = true; h.objetivoNoExiste = true;
