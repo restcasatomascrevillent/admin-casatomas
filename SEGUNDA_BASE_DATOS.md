@@ -4,7 +4,7 @@
 
 Este proyecto ahora utiliza **dos bases de datos Supabase separadas**:
 
-1. **Base de datos principal** (`jeamoczmbfsnwkfjxcyo`): Para reservas, espacios, usuarios, etc.
+1. **Base de datos principal** (demo `sfonaclosuafvlhutkon`; producción `haqmmdfdzzatdnrrcgez`): Para reservas, espacios, usuarios, etc.
 2. **Base de datos de métricas** (`yfnrkmxnmtrqmdtfvqix`): Para métricas, incidencias e instalaciones
 
 ## 🔧 Configuración
@@ -15,9 +15,9 @@ Asegúrate de tener las siguientes variables en tu archivo `.env`:
 
 ```env
 # Base de datos principal
-VITE_SUPABASE_PROJECT_ID="jeamoczmbfsnwkfjxcyo"
+VITE_SUPABASE_PROJECT_ID="<project-ref>"
 VITE_SUPABASE_PUBLISHABLE_KEY="..."
-VITE_SUPABASE_URL="https://jeamoczmbfsnwkfjxcyo.supabase.co"
+VITE_SUPABASE_URL="https://<project-ref>.supabase.co"
 
 # Base de datos de métricas
 VITE_SUPABASE_METRICS_PROJECT_ID="yfnrkmxnmtrqmdtfvqix"

@@ -147,3 +147,24 @@ export async function verificarWebhookResend(
   if (!algunaCoincide) return { valido: false, motivo: "firma_invalida" };
   return { valido: true };
 }
+
+/**
+ * Decide si un webhook entrante se acepta (CT-REM-FN-04). FALLA CERRADO:
+ * - sin RESEND_WEBHOOK_SECRET configurado -> 500 (no se procesa nada);
+ * - firma ausente o inválida -> 401;
+ * - firma correcta -> ok.
+ */
+export type AutenticacionWebhook =
+  | { ok: true }
+  | { ok: false; status: 401 | 500; error: string; motivo?: string };
+
+export async function autenticarWebhookResend(
+  secreto: string | undefined | null,
+  cabeceras: CabecerasSvix,
+  cuerpoCrudo: string,
+): Promise<AutenticacionWebhook> {
+  if (!secreto) return { ok: false, status: 500, error: "webhook_secret_not_configured" };
+  const r = await verificarWebhookResend(secreto, cabeceras, cuerpoCrudo);
+  if (!r.valido) return { ok: false, status: 401, error: "invalid_signature", motivo: r.motivo };
+  return { ok: true };
+}

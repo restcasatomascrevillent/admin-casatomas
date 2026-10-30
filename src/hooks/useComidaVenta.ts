@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface ComidaVenta {
   id: string;
@@ -61,7 +62,7 @@ export function useComidaVenta() {
       toast.success("Producto añadido");
     },
     onError: (error) => {
-      toast.error("No se pudo añadir el producto", { description: error.message });
+      toast.error("No se pudo añadir el producto", { description: mensajeUsuario(error) });
     },
   });
 
@@ -78,7 +79,7 @@ export function useComidaVenta() {
       toast.success("Producto actualizado");
     },
     onError: (error) => {
-      toast.error("No se pudo actualizar el producto", { description: error.message });
+      toast.error("No se pudo actualizar el producto", { description: mensajeUsuario(error) });
     },
   });
 
@@ -92,7 +93,7 @@ export function useComidaVenta() {
       toast.success("Producto eliminado");
     },
     onError: (error) => {
-      toast.error("No se pudo eliminar el producto", { description: error.message });
+      toast.error("No se pudo eliminar el producto", { description: mensajeUsuario(error) });
     },
   });
 

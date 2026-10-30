@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface PedidoEcommerce {
   id: string;
@@ -140,7 +141,7 @@ export function usePedidosEcommerce(filtros?: {
       toast.success("Pedido creado");
     },
     onError: (error) => {
-      toast.error("No se pudo crear el pedido", { description: error.message });
+      toast.error("No se pudo crear el pedido", { description: mensajeUsuario(error) });
     },
   });
 
@@ -157,7 +158,7 @@ export function usePedidosEcommerce(filtros?: {
       toast.success("Pedido actualizado");
     },
     onError: (error) => {
-      toast.error("No se pudo actualizar el pedido", { description: error.message });
+      toast.error("No se pudo actualizar el pedido", { description: mensajeUsuario(error) });
     },
   });
 
@@ -182,7 +183,7 @@ export function usePedidosEcommerce(filtros?: {
       toast.success(`Pedido marcado como «${estado}»`);
     },
     onError: (error) => {
-      toast.error("No se pudo cambiar el estado del pedido", { description: error.message });
+      toast.error("No se pudo cambiar el estado del pedido", { description: mensajeUsuario(error) });
     },
   });
 
@@ -199,7 +200,7 @@ export function usePedidosEcommerce(filtros?: {
       toast.success("Pedido eliminado");
     },
     onError: (error) => {
-      toast.error("No se pudo eliminar el pedido", { description: error.message });
+      toast.error("No se pudo eliminar el pedido", { description: mensajeUsuario(error) });
     },
   });
 

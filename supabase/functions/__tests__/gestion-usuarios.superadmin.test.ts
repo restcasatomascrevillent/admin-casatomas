@@ -62,9 +62,12 @@ describe.each(["eliminar", "contraseña"])("%s: solo desde superadmin", (accion)
     expect((await llamar(accion)).status).toBe(200);
     expect(h.mutaciones).toEqual([accion]);
   });
+  // CT-REM-FN-12 (30-oct-2026): admin-delete-user responde 503 (no se pudo
+  // verificar) en vez de 403. T6-CIERRE: admin-update-user-password también
+  // pasa de 403 a 503, para que el fallo de la RPC de rol sea uniforme.
   it("deniega si no se puede verificar el permiso", async () => {
     h.superadmin = true; h.errorPermisos = true;
-    expect((await llamar(accion)).status).toBe(403);
+    expect((await llamar(accion)).status).toBe(503);
     expect(h.mutaciones).toEqual([]);
   });
   it("rechaza una sesión inválida y actuar sobre uno mismo", async () => {
@@ -85,10 +88,19 @@ describe("Cambio de contraseña · validación y errores", () => {
     method, headers: { Authorization: "Bearer valido", "Content-Type": "application/json" },
     ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
   }));
-  it.each([null, [], { userId: h.objetivoId, password: 123456 }, { userId: "incorrecto", password: "prueba-segura" }, { userId: h.objetivoId, password: "abc" }])("rechaza datos inválidos sin llamar a Auth: %j", async body => {
+  it.each([null, [], { userId: h.objetivoId, password: 123456 }, { userId: "incorrecto", password: "prueba-segura" }, { userId: h.objetivoId, password: "abc" }, { userId: h.objetivoId, password: "123456789" }])("rechaza datos inválidos sin llamar a Auth: %j", async body => {
     h.superadmin = true;
     expect((await pedir(body)).status).toBe(400);
     expect(h.mutaciones).toEqual([]);
+  });
+  it("contraseña de 9 caracteres → 400 con mensaje legible; con 10 sí se cambia (CT-REM-FN-03)", async () => {
+    h.superadmin = true;
+    const corta = await pedir({ userId: h.objetivoId, password: "abcdefghi" });
+    expect(corta.status).toBe(400);
+    expect((await corta.json()).error).toBe("La contraseña debe tener al menos 10 caracteres");
+    expect(h.mutaciones).toEqual([]);
+    expect((await pedir({ userId: h.objetivoId, password: "abcdefghij" })).status).toBe(200);
+    expect(h.cambioPassword).toEqual({ password: "abcdefghij" });
   });
   it("rechaza otros métodos y JSON roto", async () => {
     h.superadmin = true;
@@ -97,10 +109,18 @@ describe("Cambio de contraseña · validación y errores", () => {
     expect(respuesta.status).toBe(400);
     expect(h.mutaciones).toEqual([]);
   });
-  it("el superadmin cambia contraseñas sin depender del rol del destinatario ni tocar el bloqueo", async () => {
-    h.superadmin = true; h.objetivoSuperadmin = true;
+  it("el superadmin cambia la contraseña de un staff sin tocar el bloqueo", async () => {
+    h.superadmin = true;
     expect((await llamar("contraseña")).status).toBe(200);
     expect(h.cambioPassword).toEqual({ password: "prueba-segura" });
+  });
+  // CT-REM-FN-05 (30-oct-2026): antes este caso daba 200 y permitía tomar la
+  // cuenta de otro super admin (incluido el dueño). Ahora se rechaza siempre.
+  it("un superadmin NO puede cambiar la contraseña de otro superadmin", async () => {
+    h.superadmin = true; h.objetivoSuperadmin = true;
+    expect((await llamar("contraseña")).status).toBe(403);
+    expect(h.mutaciones).toEqual([]);
+    expect(h.cambioPassword).toBeNull();
   });
   it("detecta una cuenta eliminada antes de intentar actualizarla", async () => {
     h.superadmin = true; h.objetivoNoExiste = true;

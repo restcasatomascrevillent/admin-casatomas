@@ -13,10 +13,13 @@ import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
+import type { QueryClient } from "@tanstack/react-query";
+import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 const signUpSchema = z.object({
   email: z.string().email("Email inválido").max(255),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  password: z.string().min(10, "La contraseña debe tener al menos 10 caracteres"),
   nombre_restaurante: z
     .string()
     .min(1, "El nombre del restaurante es requerido")
@@ -118,7 +121,36 @@ function conservarUsuario(
  * Admin. Ahora el estado vive una sola vez aquí, en AuthProvider, y useAuth()
  * solo lee ese contexto: una suscripción, un getSession(), un getUser().
  */
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({
+  children,
+  queryClient,
+}: {
+  children: ReactNode;
+  /** Caché a vaciar al cerrar sesión o cambiar de usuario (CT-REM-FE-01). */
+  queryClient?: QueryClient;
+}) {
+  const clienteConsultas = useRef(queryClient);
+  clienteConsultas.current = queryClient;
+  // Id del usuario cuya sesión pinta la app ahora (null = nadie).
+  const idPintado = useRef<string | null>(null);
+  /** Cancela y VACÍA la caché: invalidar no basta, serviría datos viejos en el primer render. */
+  const vaciarCache = useCallback(() => {
+    const qc = clienteConsultas.current;
+    if (!qc) return;
+    void qc.cancelQueries();
+    qc.clear();
+  }, []);
+  /** Llamar justo ANTES de publicar el usuario nuevo (o null) en el estado. */
+  const cambiarIdentidad = useCallback(
+    (nuevoId: string | null) => {
+      if (idPintado.current !== nuevoId) {
+        // Salida (null) o usuario distinto: nada del anterior sobrevive.
+        if (idPintado.current !== null || nuevoId === null) vaciarCache();
+        idPintado.current = nuevoId;
+      }
+    },
+    [vaciarCache],
+  );
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -135,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let ultimaSincronizacion = 0;
 
     const clearLocalSession = async () => {
+      cambiarIdentidad(null);
       await supabase.auth.signOut({ scope: "local" });
       if (!isMounted) return;
       setSession(null);
@@ -150,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!incomingSession) {
         accesos.current.clear();
         if (!esVigente()) return;
+        cambiarIdentidad(null);
         setSession(null);
         setUser(null);
         setLoading(false);
@@ -175,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Solo conservar una sesión que ya ha registrado su entrada en esta
         // página; una sesión recién restaurada no puede saltarse la auditoría.
         if (!accesos.current.has(incomingSession.user.id)) {
+          cambiarIdentidad(null);
           setSession(null);
           setUser(null);
           setLoading(false);
@@ -203,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         accesos.current.delete(userId);
         if (esVigente()) {
+          cambiarIdentidad(null);
           setSession(null);
           setUser(null);
           setLoading(false);
@@ -213,6 +249,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (!esVigente()) return;
+      // Otra cuenta en la misma pestaña: caché fuera ANTES de pintarla.
+      cambiarIdentidad(userId);
       setSession(incomingSession);
       setUser((previo) => conservarUsuario(previo, userData.user));
       setLoading(false);
@@ -221,7 +259,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener FIRST
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, incomingSession) => {
+    } = supabase.auth.onAuthStateChange((evento, incomingSession) => {
+      // Rol/permisos pueden haber cambiado: se releen sin recargar (FE-02).
+      if (evento === "TOKEN_REFRESHED") emitirRevalidacionSesion();
       // Fuera del bloqueo de Auth: las RPC necesitan obtener el token actual.
       setTimeout(() => {
         if (isMounted) void syncValidatedSession(incomingSession);
@@ -237,7 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [cambiarIdentidad]);
 
   const userId = user?.id;
   useEffect(() => {
@@ -248,6 +288,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!activo || usuariosBloqueados.current.has(userId)) return;
       usuariosBloqueados.current.add(userId);
       accesos.current.clear();
+      cambiarIdentidad(null);
       // Retira inmediatamente la identidad: las rutas protegidas desmontan
       // el panel antes de esperar la limpieza del almacenamiento de Auth.
       setSession(null);
@@ -267,8 +308,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error?.status === 401 ||
           error?.status === 403 ||
           (!error && !data.user)
-        )
+        ) {
           await cerrarPorBloqueo();
+        } else if (!error) {
+          // Sesión válida: reutiliza esta misma comprobación (15 s, foco y
+          // visibilidad) para releer rol y permisos (CT-REM-FE-02).
+          emitirRevalidacionSesion();
+        }
       } catch {
         /* Un corte de red no cierra una sesión válida. El servidor mantiene el bloqueo. */
       } finally {
@@ -310,7 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", alVolver);
       void supabase.removeChannel(canal);
     };
-  }, [userId]);
+  }, [userId, cambiarIdentidad]);
 
   const signUp = useCallback(
     async (
@@ -345,7 +391,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (error.message.includes("already registered")) {
             toast.error("Este email ya está registrado");
           } else {
-            toast.error("Error al registrar: " + error.message);
+            toast.error("Error al registrar: " + mensajeUsuario(error, "inténtalo de nuevo"));
           }
           return { error };
         }
@@ -417,7 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             response.data?.error ??
             "No se pudo registrar y comprobar el acceso. Inténtalo de nuevo.",
         );
-        toast.error(error.message);
+        toast.error(mensajeUsuario(error));
         return { error };
       }
       // El servidor ya ha guardado este acceso. Evita que SIGNED_IN lo duplique.
@@ -493,17 +539,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Si el token ya no es válido, limpiamos sesión local para evitar estado corrupto.
       if (status === 403) {
         await supabase.auth.signOut({ scope: "local" });
+        cambiarIdentidad(null);
         toast.success("Sesión cerrada correctamente");
         return { error: null };
       }
 
-      toast.error("Error al cerrar sesión: " + error.message);
+      toast.error("Error al cerrar sesión: " + mensajeUsuario(error, "inténtalo de nuevo"));
       return { error };
     }
     accesos.current.clear();
+    cambiarIdentidad(null);
     toast.success("Sesión cerrada correctamente");
     return { error: null };
-  }, []);
+  }, [cambiarIdentidad]);
 
   // Valor estable: solo cambia si cambia user/session/loading (los métodos son
   // estables), así los consumidores no se re-renderizan por nada más.

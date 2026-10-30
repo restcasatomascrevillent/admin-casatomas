@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { salaAdmiteReservas } from "@/lib/reservas/negocios";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface EspacioReserva {
   id: string;
@@ -59,7 +60,7 @@ export const useCrearEspacio = () => {
       toast.success("Espacio creado correctamente");
     },
     onError: (error: Error) => {
-      toast.error("Error al crear espacio: " + error.message);
+      toast.error("Error al crear espacio: " + mensajeUsuario(error, "inténtalo de nuevo"));
     },
   });
 };
@@ -84,7 +85,7 @@ export const useActualizarEspacio = () => {
       toast.success("Espacio actualizado correctamente");
     },
     onError: (error: Error) => {
-      toast.error("Error al actualizar espacio: " + error.message);
+      toast.error("Error al actualizar espacio: " + mensajeUsuario(error, "inténtalo de nuevo"));
     },
   });
 };
@@ -125,7 +126,7 @@ export const useEliminarEspacio = () => {
       toast.success("Espacio y todos sus elementos eliminados correctamente");
     },
     onError: (error: Error) => {
-      toast.error("Error al eliminar espacio: " + error.message);
+      toast.error("Error al eliminar espacio: " + mensajeUsuario(error, "inténtalo de nuevo"));
     },
   });
 };

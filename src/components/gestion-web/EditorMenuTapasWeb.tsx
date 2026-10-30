@@ -40,6 +40,7 @@ import {
   type SeccionMenu,
   type VarianteIdioma,
 } from "@/lib/menu-dia";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 // ---------------------------------------------------------------------------
 // Menús diarios y tapas (tablas `menus_diarios` y `tapas`)
@@ -192,7 +193,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       }
     } catch (error) {
       console.error(error);
-      setErrorCarga(error instanceof Error ? error.message : "Error desconocido");
+      setErrorCarga(mensajeUsuario(error, "Error desconocido"));
     } finally {
       setIsLoading(false);
     }
@@ -379,7 +380,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
       await cargarDatos();
     } catch (error) {
       console.error(error);
-      toast.error(`No se pudo guardar: ${error instanceof Error ? error.message : "error desconocido"}`);
+      toast.error(`No se pudo guardar: ${mensajeUsuario(error, "error desconocido")}`);
     } finally {
       setIsSaving(false);
     }

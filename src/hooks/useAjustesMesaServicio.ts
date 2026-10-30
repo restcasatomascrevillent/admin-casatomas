@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { AjusteMesa } from "@/lib/reservas/piezasMesa";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 // Ajustes de piezas/picos/uniones de las mesas de una sala en un servicio
 // (fecha + comida/cena). El plano base (`mesas`) no se toca. Lógica pura en
@@ -63,7 +64,7 @@ export function useGuardarAjustesMesa(espacioId: string, fecha: string, turno: T
       if (error) throw error;
       if ((data ?? []).length !== filas.length) throw new Error("No se han podido guardar todos los cambios (permisos).");
     },
-    onError: (e: Error) => toast.error(`No se ha podido ajustar la mesa: ${e.message}`),
+    onError: (e: Error) => toast.error(`No se ha podido ajustar la mesa: ${mensajeUsuario(e, "inténtalo de nuevo")}`),
     onSettled: () => qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA, espacioId, fecha, turno] }),
   });
 }
@@ -89,7 +90,7 @@ export function useVolverAPlanoBase(espacioId: string, fecha: string, turno: Tur
       if (esperadas > 0 && (data ?? []).length === 0) throw new Error("No tienes permiso para cambiar las mesas.");
       return (data ?? []).length;
     },
-    onError: (e: Error) => toast.error(`No se ha podido volver al plano base: ${e.message}`),
+    onError: (e: Error) => toast.error(`No se ha podido volver al plano base: ${mensajeUsuario(e, "inténtalo de nuevo")}`),
     onSettled: () => qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA, espacioId, fecha, turno] }),
   });
 }

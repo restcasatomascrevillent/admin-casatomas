@@ -15,6 +15,7 @@ import { ResumenCostesMesFila } from "@/components/costes/ResumenCostesMes";
 import { TablaPartidas } from "@/components/costes/TablaPartidas";
 import { DetallesCostes } from "@/components/costes/DetallesCostes";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 const ISO = "yyyy-MM-dd";
 
@@ -60,7 +61,7 @@ function BotonSincronizar() {
               : toast.info("Ya se sincronizó hace menos de un minuto"),
           onError: (e) => {
             setHasta(0);
-            toast.error(e instanceof Error ? e.message : "No se ha podido sincronizar");
+            toast.error(mensajeUsuario(e, "No se ha podido sincronizar"));
           },
         });
       }}

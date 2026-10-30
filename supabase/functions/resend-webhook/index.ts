@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient as createClientBase, type SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { verificarWebhookResend, type CabecerasSvix } from "./firma.ts";
+import { autenticarWebhookResend, type CabecerasSvix } from "./firma.ts";
 import {
   mapearEventoAEstadoEntrega,
   debeAvisarPersonal,
@@ -148,26 +148,24 @@ serve(conAuditoriaDePeticion("resend-webhook", createClientBase, async (req: Req
     // VERIFICACIÓN DE FIRMA (real, criptográfica) — ver firma.ts para el
     // formato exacto y por qué. Se hace ANTES de parsear el JSON: no tiene
     // sentido procesar un cuerpo que no se puede confiar que viene de
-    // Resend. Mismo criterio que antes (solo se exige si hay secreto
-    // configurado, para no romper un entorno de desarrollo sin
-    // RESEND_WEBHOOK_SECRET) pero ahora FALLA CERRADO de verdad: antes,
+    // Resend. CT-REM-FN-04: sin RESEND_WEBHOOK_SECRET se responde 500
+    // (fail-closed, ya no se acepta sin firma). Además, antes,
     // si faltaban las cabeceras svix con el secreto configurado, el
     // código solo avisaba por log y DEJABA PASAR el evento sin verificar
     // nada — ese hueco queda cerrado aquí (verificarWebhookResend ya
     // rechaza por "faltan_cabeceras_svix").
     // ------------------------------------------------------------------
-    const webhookSecret = Deno.env.get("RESEND_WEBHOOK_SECRET");
-    if (webhookSecret) {
-      const cabeceras: CabecerasSvix = { svixId, svixTimestamp, svixSignature };
-      const resultadoFirma = await verificarWebhookResend(webhookSecret, cabeceras, body);
-      if (!resultadoFirma.valido) {
-        console.error("[resend-webhook] Firma rechazada:", resultadoFirma.motivo);
-        return jsonResponse({ error: "invalid_signature", motivo: resultadoFirma.motivo }, 401);
+    const cabeceras: CabecerasSvix = { svixId, svixTimestamp, svixSignature };
+    const auth = await autenticarWebhookResend(Deno.env.get("RESEND_WEBHOOK_SECRET"), cabeceras, body);
+    if (!auth.ok) {
+      if (auth.status === 500) {
+        console.error("[resend-webhook] RESEND_WEBHOOK_SECRET no configurado — rechazando (fail closed)");
+        return jsonResponse({ error: "server_configuration_error" }, 500);
       }
-      console.log("[resend-webhook] Firma verificada correctamente");
-    } else {
-      console.warn("[resend-webhook] RESEND_WEBHOOK_SECRET no configurado — aceptando SIN verificar firma (solo debería pasar en desarrollo)");
+      console.error("[resend-webhook] Firma rechazada:", auth.motivo);
+      return jsonResponse({ error: auth.error }, 401);
     }
+    console.log("[resend-webhook] Firma verificada correctamente");
 
     // Parsear el body (ya lo tenemos como texto crudo, arriba)
     let event: ResendWebhookEvent;
@@ -238,7 +236,7 @@ serve(conAuditoriaDePeticion("resend-webhook", createClientBase, async (req: Req
 
     if (error) {
       console.error("Error insertando evento:", error);
-      return jsonResponse({ error: "Database error", details: error.message }, 500);
+      return jsonResponse({ error: "Database error" }, 500);
     }
 
     console.log("Evento guardado exitosamente:", data.id);
@@ -311,8 +309,8 @@ serve(conAuditoriaDePeticion("resend-webhook", createClientBase, async (req: Req
     });
   } catch (error: unknown) {
     console.error("Error procesando webhook:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return jsonResponse({ error: "Internal server error", message: errorMessage }, 500);
+    // CT-REM-FN-15: el detalle solo va al log, nunca al cliente.
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 }));
 

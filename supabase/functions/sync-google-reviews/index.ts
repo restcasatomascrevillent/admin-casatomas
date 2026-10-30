@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { esServiceRole, exigirPermiso } from "../_shared/autorizacion.ts";
 const createClient = clienteConAuditoria(createClientBase, "sync-google-reviews");
 
 const corsHeaders = {
@@ -15,9 +16,19 @@ const corsHeaders = {
 // propietario verificado de la ficha), que es otra integración distinta.
 const GOOGLE_MAX_REVIEWS = 5;
 
+// Escribe `resenas` con service role y gasta cuota de Places: hace falta la
+// sección Novedades/web en modo edición (CT-REM-FN-02). La pantalla es de super
+// admin, que siempre la tiene. La service role (dueño por CLI) sigue pasando.
+export const SECCION_RESENAS = "gestion_web";
+
 serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+
+  if (!esServiceRole(req)) {
+    const auth = await exigirPermiso(req, SECCION_RESENAS, "edit", { crearCliente: createClient, corsHeaders });
+    if (!auth.ok) return auth.response;
   }
 
   try {
@@ -63,7 +74,7 @@ serve(conAuditoriaDePeticion("sync-google-reviews", createClientBase, async (req
       const errText = await placesRes.text();
       console.error("Google Places API error:", errText);
       return new Response(
-        JSON.stringify({ error: `Google Places API error: ${placesRes.status}`, detail: errText }),
+        JSON.stringify({ error: `Google Places API error: ${placesRes.status}` }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -11,6 +11,7 @@ import { useFijarTopeIa } from "@/hooks/useGastoIa";
 import { evaluarTope, fmtEurIa } from "@/lib/facturas/gastoIa";
 import { esNulo, fmtEur, SIN_DATOS } from "./formato";
 import type { ResumenCostesMes } from "./resumenMes";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 interface KpiProps {
   titulo: string;
@@ -96,7 +97,7 @@ function EditorTope({ topeEur }: { topeEur: number }) {
                 toast.success("Tope guardado");
                 setAbierto(false);
               },
-              onError: (e) => toast.error(e instanceof Error ? e.message : "No se ha podido guardar el tope"),
+              onError: (e) => toast.error(mensajeUsuario(e, "No se ha podido guardar el tope")),
             })
           }
         >

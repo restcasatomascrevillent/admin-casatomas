@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useSuperAdmin } from "./useSuperAdmin";
+import { alRevalidarSesion } from "@/lib/revalidacion-sesion";
 import { SUPER_ADMIN_EMAILS, isSuperAdmin as checkIsSuperAdmin } from "@/config/permissions";
 
 export type AppRole = "admin" | "manager" | "staff";
@@ -136,6 +137,53 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+    };
+  }, [userId, authLoading, isSuperAdminUser]);
+
+  // CT-REM-FE-02: relectura silenciosa de rol y permisos cuando AuthProvider
+  // revalida la sesión (TOKEN_REFRESHED, foco y sondeo de 15 s). No toca
+  // `loading`, así que no desmonta la página; si falla la lectura se conserva
+  // lo último conocido (un corte de red no debe quitar permisos).
+  useEffect(() => {
+    if (authLoading || !userId) return;
+    let vivo = true;
+    let enCurso = false;
+    const releer = async () => {
+      if (enCurso) return;
+      enCurso = true;
+      try {
+        const { data: roleData, error: roleError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .single();
+        if (!vivo) return;
+        // PGRST116 = sin fila: el rol se ha retirado de verdad.
+        const roleOk = !roleError || roleError.code === "PGRST116";
+        const { data: permData, error: permError } = await supabase
+          .from("user_permissions")
+          .select("section_key, can_view, can_edit")
+          .eq("user_id", userId);
+        if (!vivo) return;
+        if (roleOk) {
+          const nuevo = (roleData?.role as AppRole | undefined) ?? (isSuperAdminUser ? "admin" : null);
+          setRole((previo) => (previo === nuevo ? previo : nuevo));
+        }
+        if (!permError && permData) {
+          setPermissions((previo) =>
+            JSON.stringify(previo) === JSON.stringify(permData) ? previo : permData,
+          );
+        }
+      } catch (error) {
+        console.error("Error revalidando rol/permisos:", error);
+      } finally {
+        enCurso = false;
+      }
+    };
+    const baja = alRevalidarSesion(() => void releer());
+    return () => {
+      vivo = false;
+      baja();
     };
   }, [userId, authLoading, isSuperAdminUser]);
 

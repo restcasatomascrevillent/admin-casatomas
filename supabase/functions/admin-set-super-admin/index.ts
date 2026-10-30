@@ -9,9 +9,11 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin y la autorización recae por completo en is_super_admin()
-// (tabla super_admins). Nunca conceder acceso por defecto — fail-closed.
+// Quién puede actuar: SOLO is_super_admin() (tabla super_admins). El email del
+// JWT ya no sustituye a la BD cuando la RPC falla ni cuando devuelve false
+// (CT-REM-FN-12): si alguien consigue poner en su cuenta un email del
+// allowlist, no se convierte en super admin. SUPER_ADMIN_EMAILS solo protege
+// las cuentas objetivo (no se les retira el acceso). Fail-closed.
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
@@ -74,22 +76,22 @@ Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, asy
     // gestionar roles/permisos normales, así que el listón es más alto que en
     // el resto de funciones admin-*: ser "admin" no basta, hay que ser super
     // admin ya (tabla super_admins), no solo tener el rol "admin".
-    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
-
     const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin.rpc(
       "is_super_admin",
       { _user_id: currentUser.id }
     );
 
-    if (superAdminCheckError && !currentUserIsSuperAdmin) {
+    if (superAdminCheckError) {
       console.error("Error checking super admin status:", superAdminCheckError);
-      return new Response(JSON.stringify({ error: "Error verificando permisos" }), {
-        status: 500,
+      // 503 como admin-create-user / admin-delete-user / list-users: fallo
+      // transitorio de la BD, no falta de permisos. Fail-closed: no cambia nada.
+      return new Response(JSON.stringify({ error: "No se pudieron verificar tus permisos. No se ha cambiado nada; vuelve a intentarlo." }), {
+        status: 503,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (!isSuperAdminResult && !currentUserIsSuperAdmin) {
+    if (isSuperAdminResult !== true) {
       return new Response(
         JSON.stringify({ error: "Solo un super admin puede gestionar otros super admins" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -133,12 +135,16 @@ Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, asy
     });
     if (cambioError) {
       console.error("Error cambiando el acceso de super admin:", cambioError);
+      // 23514: el trigger de FN-13 (20261030152000) impide quitar al último
+      // superadmin. Es un conflicto con el estado actual, no un fallo: 409.
       return new Response(JSON.stringify({ error: cambioError.code === "P0002"
         ? "El usuario ya no existe. Actualiza la lista."
         : cambioError.code === "22023"
           ? "Desbloquea el acceso del usuario antes de hacerlo super admin"
-          : "No se pudo cambiar el acceso de super admin. No se ha aplicado ningún cambio; vuelve a intentarlo." }), {
-        status: cambioError.code === "P0002" ? 404 : cambioError.code === "22023" ? 400 : 500,
+          : cambioError.code === "23514"
+            ? "Debe quedar al menos un superadministrador"
+            : "No se pudo cambiar el acceso de super admin. No se ha aplicado ningún cambio; vuelve a intentarlo." }), {
+        status: cambioError.code === "P0002" ? 404 : cambioError.code === "22023" ? 400 : cambioError.code === "23514" ? 409 : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

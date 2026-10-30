@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface MovimientoStock {
   id: string;
@@ -119,7 +120,7 @@ export function useMovimientosStock(productoId?: string, productoTipo?: string) 
       });
     },
     onError: (error) => {
-      toast.error("No se pudo actualizar el stock", { description: error.message });
+      toast.error("No se pudo actualizar el stock", { description: mensajeUsuario(error) });
     },
   });
 

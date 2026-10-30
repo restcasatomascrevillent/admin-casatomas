@@ -181,7 +181,7 @@ que es lo único que el panel sigue mostrando, no se han tocado.
 ```bash
 # Desde la raíz del repo (codigo-restaurante), con el token de gestión de Supabase:
 TK="$(tr -d '\r\n ' < .tokens-local/TOKEN-SUPABASE.txt)"
-curl -s -X POST "https://api.supabase.com/v1/projects/jeamoczmbfsnwkfjxcyo/database/query" \
+curl -s -X POST "https://api.supabase.com/v1/projects/<project-ref>/database/query" \
   -H "Authorization: Bearer $TK" -H "Content-Type: application/json" \
   --data-binary "$(node -e "const fs=require('fs');console.log(JSON.stringify({query:fs.readFileSync('adminpanelct/supabase/seeds/cleanup_demo_data.sql','utf8')}))")"
 ```

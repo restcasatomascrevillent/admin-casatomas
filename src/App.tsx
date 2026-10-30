@@ -70,7 +70,7 @@ const paginaSuperAdmin = (contenido: ReactNode) => (
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <VisualViewportVars />
-    <AuthProvider>
+    <AuthProvider queryClient={queryClient}>
       <UserRoleProvider>
         <SuperAdminProvider>
           <TooltipProvider>

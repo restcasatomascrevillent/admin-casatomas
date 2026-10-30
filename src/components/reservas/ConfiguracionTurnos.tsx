@@ -49,6 +49,7 @@ import {
   type NivelEscalera,
   type BaseUmbral,
 } from "../../../supabase/functions/_shared/disponibilidad";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 const diasSemana = [
   { id: 0, label: "Dom" },
@@ -268,7 +269,7 @@ export function ConfiguracionTurnos() {
       // Los errores de guardado de la escalera (p. ej. migración pendiente,
       // ver `useConfiguracionTurnos.ts`) traen un mensaje ya en lenguaje
       // llano — se muestra tal cual en vez de taparlo con uno genérico.
-      const mensaje = error instanceof Error ? error.message : "Error al guardar la configuración";
+      const mensaje = mensajeUsuario(error, "Error al guardar la configuración");
       toast.error(mensaje);
     }
   };

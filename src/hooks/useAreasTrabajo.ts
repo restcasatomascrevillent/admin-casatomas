@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface AreaTrabajo {
   id: string;
@@ -65,7 +66,7 @@ export const useCrearAreaTrabajo = () => {
       toast.success("Área de trabajo creada correctamente");
     },
     onError: (error: any) => {
-      toast.error("Error al crear área de trabajo: " + error.message);
+      toast.error("Error al crear área de trabajo: " + mensajeUsuario(error, "inténtalo de nuevo"));
     },
   });
 };
@@ -91,7 +92,7 @@ export const useActualizarAreaTrabajo = () => {
       toast.success("Área de trabajo actualizada correctamente");
     },
     onError: (error: any) => {
-      toast.error("Error al actualizar área de trabajo: " + error.message);
+      toast.error("Error al actualizar área de trabajo: " + mensajeUsuario(error, "inténtalo de nuevo"));
     },
   });
 };
@@ -114,7 +115,7 @@ export const useEliminarAreaTrabajo = () => {
       toast.success("Área de trabajo eliminada correctamente");
     },
     onError: (error: any) => {
-      toast.error("Error al eliminar área de trabajo: " + error.message);
+      toast.error("Error al eliminar área de trabajo: " + mensajeUsuario(error, "inténtalo de nuevo"));
     },
   });
 };

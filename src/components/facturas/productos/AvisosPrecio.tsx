@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 /**
  * Facturas › Productos: umbral del aviso automático de subida de precio
@@ -63,7 +64,7 @@ export function AvisosPrecio({ puedeEditar, soloIcono = false }: { puedeEditar: 
       qc.invalidateQueries({ queryKey: CLAVE });
       toast.success("Avisos de precio guardados");
     },
-    onError: (e) => toast.error("No se ha guardado", { description: (e as { message?: string }).message }),
+    onError: (e) => toast.error("No se ha guardado", { description: mensajeUsuario(e) }),
   });
 
   if (!config.data) return null;

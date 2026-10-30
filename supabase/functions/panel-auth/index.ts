@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 import { handlePanelLogin } from './handler.ts';
+import { ipCliente } from '../_shared/ip-cliente.ts';
 
 Deno.serve(async (req: Request) => {
   const info = req.headers.get('x-client-info')?.split('/') ?? [];
@@ -10,7 +11,9 @@ Deno.serve(async (req: Request) => {
       'x-audit-source': 'panel-auth', 'x-audit-request-id': crypto.randomUUID(),
       'x-audit-user-agent': req.headers.get('user-agent')?.slice(0, 1024) ?? '',
       'x-audit-device-id': info[0] === 'adminpanel' ? (info[1] ?? '').slice(0, 128) : '',
-      'x-audit-ip': req.headers.get('x-forwarded-for')?.split(',')[0]?.trim().slice(0, 128) ?? '',
+      // cf-connecting-ip o ÚLTIMO salto de XFF: el límite por IP de
+      // iniciar_intento_panel no se puede esquivar rotando X-Forwarded-For (CT-REM-FN-03).
+      'x-audit-ip': ipCliente(req),
     } },
   });
   const auth = createClient(url, Deno.env.get('SUPABASE_ANON_KEY')!, {

@@ -10,9 +10,18 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin por email: se comprueba la tabla super_admins.
+// Quién puede actuar: SOLO la tabla super_admins (RPC is_super_admin). El email
+// del JWT ya no basta aunque esté en SUPER_ADMIN_EMAILS (CT-REM-FN-12).
+// SUPER_ADMIN_EMAILS solo sirve aquí para PROTEGER cuentas objetivo.
 // El rol admin solo permite consultar usuarios, nunca gestionarlos.
+//
+// Regla CT-REM-FN-05: la contraseña de un super admin (tabla super_admins o
+// email en SUPER_ADMIN_EMAILS) NO se cambia desde esta función, la pida quien
+// la pida: su titular usa su propio flujo de recuperación. Así un super admin
+// secundario (o una sesión robada) no puede tomar la cuenta del dueño.
+// Contraseña mínima de las cuentas del panel (CT-REM-FN-03).
+const LONGITUD_MINIMA_CONTRASENA = 10;
+
 const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
   .split(",")
   .map((email) => email.trim().toLowerCase())
@@ -62,13 +71,21 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
       });
     }
 
-    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
-
     const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin.rpc("is_super_admin", {
       _user_id: currentUser.id,
     });
 
-    if (superAdminCheckError || (!isSuperAdminResult && !currentUserIsSuperAdmin)) {
+    if (superAdminCheckError) {
+      console.error("Error checking super admin status:", superAdminCheckError);
+      // 503 como admin-create-user / admin-delete-user / list-users: fallo
+      // transitorio de la BD, no falta de permisos. Fail-closed: no cambia nada.
+      return new Response(JSON.stringify({ error: "No se pudieron verificar tus permisos. No se ha cambiado la contraseña; vuelve a intentarlo." }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (isSuperAdminResult !== true) {
       return new Response(
         JSON.stringify({ error: "Solo un super admin puede actualizar contraseñas" }),
         {
@@ -89,9 +106,9 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
       });
     }
 
-    if (password.length < 6) {
+    if (password.length < LONGITUD_MINIMA_CONTRASENA) {
       return new Response(
-        JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
+        JSON.stringify({ error: `La contraseña debe tener al menos ${LONGITUD_MINIMA_CONTRASENA} caracteres` }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -110,6 +127,25 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
     if (objetivoError || !objetivo?.user) {
       const fallo = errorAuthUsuarios(objetivoError ?? { status: 404 }, "No se pudo consultar el usuario. Vuelve a intentarlo.");
       return new Response(JSON.stringify({ error: fallo.error }), { status: fallo.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { data: objetivoSuperAdmin, error: objetivoSuperAdminError } = await supabaseAdmin
+      .from("super_admins")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (objetivoSuperAdminError) {
+      console.error("Error comprobando si el objetivo es super admin:", objetivoSuperAdminError);
+      return new Response(JSON.stringify({ error: "No se pudo comprobar la cuenta. No se ha cambiado la contraseña." }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (objetivoSuperAdmin || isSuperAdminEmail(objetivo.user.email)) {
+      return new Response(JSON.stringify({ error: "La contraseña de un super admin no se puede cambiar desde aquí: debe usar su propia recuperación de contraseña" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const { error: updateError } = await ejecutarOperacionAuthAuditada(

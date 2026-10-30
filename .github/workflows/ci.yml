@@ -3,9 +3,11 @@
 # tests usan un host local inalcanzable (vitest.config.ts) y las pruebas SQL
 # corren en Postgres en memoria (PGlite).
 #
-# BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL y build.
-# NO BLOQUEAN todavía (deuda previa, cifras de la auditoría): typecheck con 20
-# errores y ESLint con 480. Quitar `continue-on-error` cuando lleguen a cero.
+# BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL, build y el
+# TOPE DE DEUDA de calidad: typecheck con 20 errores y ESLint con 479 errores
+# (cifras del 30/10/2026, CT-REM-OPS-09). Es un "trinquete": el job falla si el
+# recuento SUBE; si baja, hay que bajar también el tope en este fichero (los dos
+# valores TOPE_* de abajo). Cuando lleguen a cero, sustituir por el check normal.
 name: CI
 
 on:
@@ -36,6 +38,12 @@ jobs:
         run: npm run test:auditoria:db
       - name: Botones y menú de las novedades (PGlite)
         run: npm run test:novedades:db
+      - name: Mínimo privilegio y RLS de tablas núcleo (PGlite)
+        run: npm run test:minimo-privilegio:db
+      - name: Limitadores de abuso, superadmin mínimo y secreto de fotos (PGlite)
+        run: npm run test:abuso:db
+      - name: RLS de espacios_reserva por sección (PGlite)
+        run: npm run test:espacios:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
@@ -44,9 +52,12 @@ jobs:
       - name: Build de producción
         run: npm run build
 
-  calidad-no-bloqueante:
+  calidad-tope-deuda:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      TOPE_TSC: "20"
+      TOPE_ESLINT: "479"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,26 +65,31 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # continue-on-error en cada paso y no en el job: la deuda previa no bloquea y
-      # el check sale en verde, con los errores en las anotaciones y en el resumen.
-      # Con continue-on-error en el job, GitHub lo pintaba en rojo en cada PR.
-      - name: Typecheck (20 errores previos)
-        id: typecheck
-        continue-on-error: true
-        run: npx tsc --noEmit -p tsconfig.app.json
-      - name: ESLint (480 errores previos)
-        id: lint
-        continue-on-error: true
-        run: npm run lint
-      - name: Resumen
-        if: always()
+      - name: Typecheck (no puede superar el tope)
         run: |
-          {
-            echo "### Calidad (informativa, no bloquea)"
-            echo "- Typecheck: ${{ steps.typecheck.outcome == 'success' && 'sin errores' || 'con errores previos, ver anotaciones' }}"
-            echo "- ESLint: ${{ steps.lint.outcome == 'success' && 'sin errores' || 'con errores previos, ver anotaciones' }}"
-          } >> "$GITHUB_STEP_SUMMARY"
-
+          npx tsc --noEmit -p tsconfig.app.json > tsc.log || true
+          n=$(grep -c "error TS" tsc.log || true)
+          echo "Errores de tipos: $n (tope $TOPE_TSC)"
+          if [ "$n" -gt "$TOPE_TSC" ]; then
+            grep "error TS" tsc.log | head -50
+            echo "::error::Typecheck: $n errores, el tope es $TOPE_TSC. No se puede aumentar la deuda."
+            exit 1
+          fi
+          if [ "$n" -lt "$TOPE_TSC" ]; then
+            echo "::warning::Bajaste a $n errores de tipos: baja TOPE_TSC a $n en .github/workflows/ci.yml."
+          fi
+      - name: ESLint (no puede superar el tope)
+        run: |
+          npx eslint . -f json -o eslint.json || true
+          n=$(node -e "const r=require('./eslint.json');console.log(r.reduce((a,f)=>a+f.errorCount,0))")
+          echo "Errores de ESLint: $n (tope $TOPE_ESLINT)"
+          if [ "$n" -gt "$TOPE_ESLINT" ]; then
+            echo "::error::ESLint: $n errores, el tope es $TOPE_ESLINT. No se puede aumentar la deuda."
+            exit 1
+          fi
+          if [ "$n" -lt "$TOPE_ESLINT" ]; then
+            echo "::warning::Bajaste a $n errores de ESLint: baja TOPE_ESLINT a $n en .github/workflows/ci.yml."
+          fi
 
   control-promocion:
     name: Validar promoción a producción

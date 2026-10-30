@@ -74,6 +74,7 @@ import {
   type MenuNovedad,
   type TipoBoton,
 } from "@/lib/menu-novedad";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 // ---------------------------------------------------------------------------
 // Novedades de la web (tabla `novedades`)
@@ -832,7 +833,7 @@ export function EditorNovedadesWeb() {
       cargarEnFormulario(null);
     } catch (e) {
       console.error(e);
-      const mensaje = e instanceof Error ? e.message : "Error desconocido";
+      const mensaje = mensajeUsuario(e, "Error desconocido");
       const crudo =
         e && typeof e === "object" && "message" in e && typeof e.message === "string" ? e.message : mensaje;
       if (esErrorSinColumnasBotones(crudo)) {
@@ -999,7 +1000,7 @@ export function EditorNovedadesWeb() {
                   <AlertCircle className="h-4 w-4" />
                   <AlertTitle>No se pudieron cargar las novedades</AlertTitle>
                   <AlertDescription className="space-y-2">
-                    <p>{error instanceof Error ? error.message : "Error desconocido"}</p>
+                    <p>{mensajeUsuario(error, "Error desconocido")}</p>
                     <Button size="sm" variant="outline" className="h-11 bg-background" onClick={() => refetch()}>
                       <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
                       Reintentar

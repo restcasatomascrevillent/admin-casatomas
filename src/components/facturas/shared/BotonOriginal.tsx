@@ -3,6 +3,7 @@ import { ExternalLink, Loader2, Pencil, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { urlSegura } from "@/lib/url-segura";
 
 const BUCKET = "facturas-originales";
 /** Vida de la URL firmada. Corta a proposito: el enlace no debe poder reenviarse. */
@@ -34,7 +35,9 @@ interface BotonOriginalProps {
  * `ListaReservasAvanzada` — lo que no aplica a una fila sale apagado, nunca se
  * quita, porque si no los botones bailan de sitio al bajar por la lista.
  */
-export function BotonOriginal({ driveUrl, archivoPath, variant, label = "Escaneo" }: BotonOriginalProps) {
+export function BotonOriginal({ driveUrl: driveUrlBruta, archivoPath, variant, label = "Escaneo" }: BotonOriginalProps) {
+  // Solo http(s): un `javascript:`/`data:` de BD no se enlaza (CT-REM-FE-06).
+  const driveUrl = urlSegura(driveUrlBruta);
   const [cargando, setCargando] = useState(false);
   // `ficha`: solo icono en estrecho, icono + palabra corta desde `sm`, con el nombre accesible siempre puesto.
   const corto = label.replace(/^Ver /i, "").replace(/^./, (c) => c.toUpperCase());
