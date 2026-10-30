@@ -1,5 +1,6 @@
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { exigirPermiso } from "../_shared/autorizacion.ts";
 const createClient = clienteConAuditoria(createClientBase, "vapi-analytics");
 
 /**
@@ -11,10 +12,12 @@ const createClient = clienteConAuditoria(createClientBase, "vapi-analytics");
  * Edge Function keeps the key server-side and only lets authenticated admins
  * trigger queries.
  *
- * Input (POST JSON) — one of the two forms:
- *   A) Raw passthrough (full control):
- *      { "queries": [ { "table": "call", "groupBy": [...], "metrics": [...] } ] }
- *   B) Preset form (convenience):
+ * Acceso (CT-REM-FN-02, 30-oct-2026): usuario con la sección `dashboard`
+ * (view; los super admins siempre). El antiguo modo A «raw passthrough»
+ * ({ queries: [...] } reenviado tal cual a VAPI) se ha RETIRADO: solo presets.
+ *
+ * Input (POST JSON):
+ *   Preset form:
  *      {
  *        "presetName": "calls_by_ended_reason" | "calls_by_assistant"
  *                    | "calls_over_time" | "cost_over_time",
@@ -42,6 +45,13 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+
+export const SECCION_VAPI_ANALYTICS = "dashboard";
+export const PRESETS_PERMITIDOS: ReadonlySet<string> = new Set([
+  "calls_by_ended_reason", "calls_by_assistant", "calls_over_time", "cost_over_time",
+]);
+const FECHA = /^\d{4}-\d{2}-\d{2}(T[0-9:.]+(Z|[+-]\d{2}:\d{2})?)?$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ── Preset translation ────────────────────────────────────────────────────────
 type PresetName =
@@ -147,22 +157,9 @@ Deno.serve(conAuditoriaDePeticion("vapi-analytics", createClientBase, async (req
     return json({ error: "Method not allowed" }, 405);
   }
 
-  // 1. Auth — require a valid Supabase JWT
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return json({ error: "Unauthorized: missing Authorization header" }, 401);
-  }
-
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(
-    authHeader.replace("Bearer ", ""),
-  );
-  if (authError || !user) {
-    return json({ error: "Unauthorized" }, 401);
-  }
+  // 1. Auth — usuario real con la sección (401 / 403 / 503, fail-closed)
+  const auth = await exigirPermiso(req, SECCION_VAPI_ANALYTICS, "view", { crearCliente: createClient, corsHeaders });
+  if (!auth.ok) return auth.response;
 
   // 2. VAPI key
   const vapiKey = Deno.env.get("VAPI_API_KEY");
@@ -181,19 +178,26 @@ Deno.serve(conAuditoriaDePeticion("vapi-analytics", createClientBase, async (req
   try {
     const incoming = await req.json().catch(() => ({}));
 
-    if (Array.isArray(incoming?.queries) && incoming.queries.length > 0) {
-      vapiBody = { queries: incoming.queries };
-    } else if (incoming?.presetName) {
-      vapiBody = { queries: buildPresetQueries(incoming as PresetBody) };
-    } else {
+    const valido = typeof incoming?.presetName === "string" && PRESETS_PERMITIDOS.has(incoming.presetName)
+      && (incoming.dateFrom === undefined || (typeof incoming.dateFrom === "string" && FECHA.test(incoming.dateFrom)))
+      && (incoming.dateTo === undefined || (typeof incoming.dateTo === "string" && FECHA.test(incoming.dateTo)))
+      && (incoming.assistantId === undefined || (typeof incoming.assistantId === "string" && UUID.test(incoming.assistantId)));
+    if (!valido) {
       return json(
         {
           error:
-            "Invalid body. Expected { queries: [...] } or { presetName, dateFrom, dateTo, assistantId? }",
+            "Invalid body. Expected { presetName, dateFrom?, dateTo?, assistantId? } with a known presetName",
         },
         400,
       );
     }
+    const preset: PresetBody = {
+      presetName: incoming.presetName,
+      dateFrom: incoming.dateFrom,
+      dateTo: incoming.dateTo,
+      assistantId: incoming.assistantId,
+    };
+    vapiBody = { queries: buildPresetQueries(preset) };
   } catch (err) {
     return json(
       { error: err instanceof Error ? err.message : "Invalid JSON body" },
