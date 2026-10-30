@@ -38,6 +38,10 @@ jobs:
         run: npm run test:auditoria:db
       - name: Botones y menú de las novedades (PGlite)
         run: npm run test:novedades:db
+      - name: Mínimo privilegio y RLS de tablas núcleo (PGlite)
+        run: npm run test:minimo-privilegio:db
+      - name: Limitadores de abuso, superadmin mínimo y secreto de fotos (PGlite)
+        run: npm run test:abuso:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
@@ -84,14 +88,6 @@ jobs:
           if [ "$n" -lt "$TOPE_ESLINT" ]; then
             echo "::warning::Bajaste a $n errores de ESLint: baja TOPE_ESLINT a $n en .github/workflows/ci.yml."
           fi
-
-  # PROPUESTA (no activada: los nombres finales de los tests de las ramas de
-  # remediacion no se conocen). Cuando existan los tests PGlite nuevos de
-  # rem/t1*, t4a y t4b, anadir al job tests-y-build un paso por cada script
-  # npm "test:*:db" nuevo, igual que los tres de arriba, p. ej.:
-  #   - name: <descripcion> (PGlite)
-  #     run: npm run test:<nombre>:db
-  # y comprobar que el glob de vitest.config.ts los incluye en "npm test".
 
   control-promocion:
     name: Validar promoción a producción
