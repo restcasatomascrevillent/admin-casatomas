@@ -236,7 +236,7 @@ serve(conAuditoriaDePeticion("resend-webhook", createClientBase, async (req: Req
 
     if (error) {
       console.error("Error insertando evento:", error);
-      return jsonResponse({ error: "Database error", details: error.message }, 500);
+      return jsonResponse({ error: "Database error" }, 500);
     }
 
     console.log("Evento guardado exitosamente:", data.id);
