@@ -36,6 +36,15 @@ const NOMBRES_TECNICOS = new Set([
 const JERGA_TECNICA =
   /PGRST\d|SQLSTATE|violates|relation ".*"|column ".*"|constraint|duplicate key|null value|row-level security|permission denied|JWT|syntax error|does not exist|Failed to fetch|NetworkError|Load failed|fetch failed|non-2xx|Edge Function|\bat \w+.*\(|Unexpected token|<!DOCTYPE|\bundefined\b/i;
 
+/**
+ * SQLSTATE de clase P0 (PL/pgSQL): P0001 = `RAISE EXCEPTION` sin ERRCODE, que es
+ * como las funciones/triggers de la BD (canjear_cheque_regalo, aforo de reservas...)
+ * devuelven errores de negocio ya redactados en español. Llegan por supabase-js como
+ * `{ code: "P0001", message }`. Los ERRCODE personalizados de las migraciones
+ * (28000, 42501) son de acceso y siguen siendo técnicos.
+ */
+const esCodigoNegocioSql = (code: unknown) => typeof code === "string" && /^P0\d{3}$/.test(code);
+
 export function esErrorTecnico(error: unknown): boolean {
   if (error instanceof ErrorNegocio) return false;
   if (error === null || error === undefined) return true;
@@ -50,6 +59,7 @@ export function esErrorTecnico(error: unknown): boolean {
     status?: unknown;
     context?: unknown;
   };
+  if (esCodigoNegocioSql(e.code) && typeof e.message === "string" && e.message.trim()) return false;
   if (typeof e.name === "string" && NOMBRES_TECNICOS.has(e.name)) return true;
   if (e.code !== undefined || e.details !== undefined || e.hint !== undefined) return true;
   if (e.status !== undefined || e.context !== undefined) return true;

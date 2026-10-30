@@ -73,4 +73,15 @@ describe("mensajeUsuario (FE-08)", () => {
     expect(mensajeUsuario(new Error("La mesa ya está ocupada a esa hora"), "g")).toBe("La mesa ya está ocupada a esa hora");
     expect(mensajeUsuario(new ErrorNegocio("Falta el NIF"), "g")).toBe("Falta el NIF");
   });
+  it("RAISE EXCEPTION de negocio (P0001) se muestra tal cual", () => {
+    const e = { code: "P0001", message: "El cheque no es válido o ya ha sido canjeado", details: null, hint: null };
+    expect(mensajeUsuario(e, "g")).toBe("El cheque no es válido o ya ha sido canjeado");
+  });
+  it("códigos técnicos siguen genéricos (42501, 23505, PGRST)", () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const code of ["42501", "23505", "PGRST301", "28000"]) {
+      expect(mensajeUsuario({ code, message: "Aforo superado" }, "g")).toBe("g");
+    }
+    spy.mockRestore();
+  });
 });
