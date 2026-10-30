@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
+import { alRevalidarSesion } from "@/lib/revalidacion-sesion";
 
 interface SuperAdminData {
   isSuperAdmin: boolean;
@@ -52,6 +53,27 @@ export function SuperAdminProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false;
+    };
+  }, [userId, authLoading]);
+
+  // CT-REM-FE-02: relectura silenciosa al revalidar la sesión.
+  useEffect(() => {
+    if (authLoading || !userId) return;
+    let vivo = true;
+    const baja = alRevalidarSesion(() => {
+      void supabase
+        .from("super_admins")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!vivo || error) return; // un fallo no cambia el estado conocido
+          setIsSuperAdmin(!!data);
+        });
+    });
+    return () => {
+      vivo = false;
+      baja();
     };
   }, [userId, authLoading]);
 

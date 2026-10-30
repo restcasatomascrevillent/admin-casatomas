@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export type PresetBaseRole = "admin" | "manager" | "staff";
 
@@ -131,7 +132,7 @@ export function useUserRolePresets() {
       return createdPreset;
     } catch (error) {
       console.error("Error creating role preset:", error);
-      const message = error instanceof Error ? error.message : "Error al crear el rol preconfigurado";
+      const message = mensajeUsuario(error, "Error al crear el rol preconfigurado");
       toast.error(message);
       return null;
     }
@@ -198,7 +199,7 @@ export function useUserRolePresets() {
       return updatedPreset;
     } catch (error) {
       console.error("Error updating role preset:", error);
-      const message = error instanceof Error ? error.message : "Error al actualizar el rol preconfigurado";
+      const message = mensajeUsuario(error, "Error al actualizar el rol preconfigurado");
       toast.error(message);
       return null;
     }

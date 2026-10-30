@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./useAuth";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 // Misma lista y mismo orden que TIPOS_PLANTILLA de la Edge Function
 // (emails-reserva/plantillas.ts); lo comprueba plantillaReservaModificada.test.tsx.
@@ -223,7 +224,7 @@ export function useGuardarPlantilla(tipo: TipoPlantilla) {
       toast.success("Plantilla guardada. Los próximos correos usarán esta versión.");
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Error al guardar la plantilla");
+      toast.error(mensajeUsuario(error, "Error al guardar la plantilla"));
     },
   });
 }
@@ -249,7 +250,7 @@ export function useRestaurarVersionPlantilla(tipo: TipoPlantilla) {
       toast.success(`Restaurada como nueva versión (v${data?.version ?? "?"}). Ya es la vigente.`);
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Error al restaurar la versión");
+      toast.error(mensajeUsuario(error, "Error al restaurar la versión"));
     },
   });
 }
@@ -357,7 +358,7 @@ export function useEnviarPruebaPlantilla(tipo: TipoPlantilla) {
       toast.success(`Correo de prueba enviado a ${variables.destinatario}`);
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast.error(mensajeUsuario(error));
     },
   });
 }

@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { desglosarIvaIncluido, redondearCentimos } from "@/config/fiscal";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface LineaTPV {
   producto_id: string;
@@ -279,7 +280,7 @@ export function useTPV() {
       cancelar();
     },
     onError: (error) => {
-      toast.error("No se pudo completar la venta", { description: error.message });
+      toast.error("No se pudo completar la venta", { description: mensajeUsuario(error) });
     },
   });
 

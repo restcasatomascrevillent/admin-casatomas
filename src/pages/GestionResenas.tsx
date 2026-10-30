@@ -14,6 +14,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 /** Suelo (px) del alto de la página: por debajo deja de encoger y vuelve el scroll de página. */
 const ALTURA_MINIMA_RESENAS = 360;
@@ -68,7 +69,7 @@ export default function GestionResenas() {
             setEditingPlaceId(false);
             setNewPlaceId("");
         } catch (error: any) {
-            toast.error(`Error al guardar Place ID: ${error.message}`);
+            toast.error(`Error al guardar Place ID: ${mensajeUsuario(error, "inténtalo de nuevo")}`);
         } finally {
             setSavingPlaceId(false);
         }

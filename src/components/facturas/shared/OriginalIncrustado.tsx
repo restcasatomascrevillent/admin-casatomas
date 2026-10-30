@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileText, ImageOff, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ImagenZoom } from "./ImagenZoom";
+import { urlSegura } from "@/lib/url-segura";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const BUCKET = "facturas-originales";
@@ -61,7 +62,8 @@ function VisorPantallaCompleta({ url, abierto, onCerrar, titulo }: { url: string
  *   - nada                  -> no pinta nada.
  * Solo se monta con la ficha abierta, así que la URL firmada no se pide antes.
  */
-export function OriginalIncrustado({ driveUrl, archivoPath, titulo }: { driveUrl: string | null; archivoPath: string | null; titulo: string }) {
+export function OriginalIncrustado({ driveUrl: driveUrlBruta, archivoPath, titulo }: { driveUrl: string | null; archivoPath: string | null; titulo: string }) {
+  const driveUrl = urlSegura(driveUrlBruta); // CT-REM-FE-06
   if (archivoPath) return <OriginalDeStorage archivoPath={archivoPath} titulo={titulo} />;
   if (driveUrl) {
     return (

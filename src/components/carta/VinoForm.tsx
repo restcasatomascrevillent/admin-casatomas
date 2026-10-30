@@ -23,6 +23,7 @@ import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { urlSegura } from "@/lib/url-segura";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -263,10 +264,10 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                   {enTienda !== null && (
                     <p className="text-xs text-muted-foreground">
                       En tienda: <span className="font-medium text-foreground">~{formatoEuros(enTienda)}</span>
-                      {fuentesTienda.map((f) => (
+                      {fuentesTienda.flatMap((f) => { const href = urlSegura(f.url); return href ? [{ ...f, href }] : []; }).map((f) => (
                         <a
                           key={f.url}
-                          href={f.url}
+                          href={f.href}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="ml-2 underline underline-offset-2 hover:text-foreground"

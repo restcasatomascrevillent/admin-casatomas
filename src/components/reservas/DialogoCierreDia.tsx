@@ -26,6 +26,7 @@ import {
   type ServicioCerrado,
   type TurnoServicio,
 } from "../../../supabase/functions/_shared/cierres";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 const NOMBRE_TURNO: Record<TurnoServicio, string> = { comida: "Comida", cena: "Cena" };
 
@@ -67,7 +68,7 @@ export function DialogoCierreDia({ fecha, onClose, cierres, esPasado, esquemaPen
               ? "Cerrado para reservas por web y teléfono"
               : "Abierto: la web y el teléfono ya admiten reservas",
           ),
-        onError: (e) => toast.error((e as Error)?.message || "No se pudo guardar el cierre"),
+        onError: (e) => toast.error(mensajeUsuario(e, "No se pudo guardar el cierre")),
       },
     );
   };

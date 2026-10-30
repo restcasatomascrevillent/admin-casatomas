@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface AdminFeatureToggle {
   section_key: string;
@@ -53,7 +54,7 @@ export function useAdminFeatureToggles() {
     );
 
     if (error) {
-      toast.error("Error al actualizar la funcionalidad: " + error.message);
+      toast.error("Error al actualizar la funcionalidad: " + mensajeUsuario(error, "inténtalo de nuevo"));
       return false;
     }
 

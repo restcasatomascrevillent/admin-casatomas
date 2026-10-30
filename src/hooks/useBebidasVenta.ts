@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface BebidaVenta {
   id: string;
@@ -64,7 +65,7 @@ export function useBebidasVenta() {
       toast.success("Bebida añadida");
     },
     onError: (error) => {
-      toast.error("No se pudo añadir la bebida", { description: error.message });
+      toast.error("No se pudo añadir la bebida", { description: mensajeUsuario(error) });
     },
   });
 
@@ -81,7 +82,7 @@ export function useBebidasVenta() {
       toast.success("Bebida actualizada");
     },
     onError: (error) => {
-      toast.error("No se pudo actualizar la bebida", { description: error.message });
+      toast.error("No se pudo actualizar la bebida", { description: mensajeUsuario(error) });
     },
   });
 
@@ -95,7 +96,7 @@ export function useBebidasVenta() {
       toast.success("Bebida eliminada");
     },
     onError: (error) => {
-      toast.error("No se pudo eliminar la bebida", { description: error.message });
+      toast.error("No se pudo eliminar la bebida", { description: mensajeUsuario(error) });
     },
   });
 

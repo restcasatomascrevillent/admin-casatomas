@@ -3,6 +3,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowUp, Bot, Zap, FileText, BarChart3, Package, Copy, Check, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-seguro";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
 import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
 import { GraficoSeriePrecio } from "./GraficoSeriePrecio";
@@ -227,7 +228,7 @@ export function ChatArea({
                     <div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-end gap-0.5 duration-300">
                       <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[hsl(38,59%,45%)] px-3.5 py-2 text-white sm:max-w-[75%]">
                         <div className="prose prose-sm prose-invert max-w-none prose-p:my-0">
-                          <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                          <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>{msg.contenido}</ReactMarkdown>
                         </div>
                       </div>
                       <p className="px-1 text-[11px] text-muted-foreground/70">
@@ -243,7 +244,7 @@ export function ChatArea({
                       )}
                     >
                       <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
-                        <ReactMarkdown>{msg.contenido}</ReactMarkdown>
+                        <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>{msg.contenido}</ReactMarkdown>
                       </div>
 
                       {/* Gráficas adjuntas (evolución de precio) */}
