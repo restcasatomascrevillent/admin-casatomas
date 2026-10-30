@@ -197,7 +197,9 @@ describe("refrescos de sesión del MISMO usuario no desmontan la página protegi
       expect(input.value).toBe("factura a medias");
       expect(montajes).toBe(1);
       expect(desmontajes).toBe(0);
-      expect(estado.consultasRol.length).toBe(consultasIniciales); // no se vuelve a pedir el rol
+      // SIGNED_IN no relee el rol. TOKEN_REFRESHED SI lo relee, pero en silencio
+      // (CT-REM-FE-02): sin spinner ni remontaje, que es lo que se comprueba arriba.
+      if (evento === "SIGNED_IN") expect(estado.consultasRol.length).toBe(consultasIniciales);
     },
   );
 
