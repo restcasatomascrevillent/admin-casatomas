@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   handler: null as ((req: Request) => Promise<Response>) | null,
-  superadmin: true, bloqueado: false, falta: false, fallo: false,
+  superadmin: true, bloqueado: false, falta: false, fallo: false, codigoFallo: "23514", errorPermiso: false,
   cambios: [] as unknown[],
   actor: "11111111-1111-4111-8111-111111111111", objetivo: "22222222-2222-4222-8222-222222222222",
 }));
@@ -12,9 +12,9 @@ vi.mock("https://esm.sh/@supabase/supabase-js@2", () => ({ createClient: () => (
     admin: { getUserById: async () => ({ data: { user: h.falta ? null : { id: h.objetivo, email: "usuario@staff.local", banned_until: h.bloqueado ? "2126-01-01" : null } }, error: null }) },
   },
   rpc: async (fn: string, args: unknown) => {
-    if (fn === "is_super_admin") return { data: h.superadmin, error: null };
+    if (fn === "is_super_admin") return h.errorPermiso ? { data: null, error: { message: "db offline" } } : { data: h.superadmin, error: null };
     h.cambios.push(args);
-    return { data: null, error: h.fallo ? { code: "23514" } : null };
+    return { data: null, error: h.fallo ? { code: h.codigoFallo } : null };
   },
 }) }));
 beforeAll(async () => {
@@ -22,7 +22,7 @@ beforeAll(async () => {
   await import("../admin-set-super-admin/index.ts");
 });
 afterAll(() => vi.unstubAllGlobals());
-beforeEach(() => { h.superadmin = true; h.bloqueado = false; h.falta = false; h.fallo = false; h.cambios = []; });
+beforeEach(() => { h.superadmin = true; h.bloqueado = false; h.falta = false; h.fallo = false; h.codigoFallo = "23514"; h.errorPermiso = false; h.cambios = []; });
 const pedir = (makeSuperAdmin: unknown, userId = h.objetivo) => h.handler!(new Request("https://example.test/admin-set-super-admin", { method: "POST", headers: { Authorization: "Bearer valido" }, body: JSON.stringify({ userId, makeSuperAdmin }) }));
 it.each([true, false])("conceder/retirar (%s) usa una sola transacción", async activo => {
   expect((await pedir(activo)).status).toBe(200);
@@ -46,9 +46,25 @@ it("un admin normal no puede conceder superadmin", async () => {
   expect((await pedir(true)).status).toBe(403);
   expect(h.cambios).toEqual([]);
 });
+// T6-CIERRE: antes este caso simulaba el fallo con el código 23514 y esperaba
+// 500. 23514 es ahora el «último superadmin» de FN-13 y responde 409 (caso
+// propio abajo); el fallo genérico de la transacción sigue siendo 500.
 it("un fallo de la transacción se muestra como error y nunca como éxito", async () => {
-  h.fallo = true;
+  h.fallo = true; h.codigoFallo = "XX000";
   const respuesta = await pedir(true);
   expect(respuesta.status).toBe(500);
   expect((await respuesta.json()).error).toMatch(/No se ha aplicado ningún cambio/);
+});
+it("quitar al último superadmin (23514, FN-13) responde 409 con mensaje claro", async () => {
+  h.fallo = true; h.codigoFallo = "23514";
+  const respuesta = await pedir(false);
+  expect(respuesta.status).toBe(409);
+  expect((await respuesta.json()).error).toBe("Debe quedar al menos un superadministrador");
+});
+it("si la RPC de rol falla responde 503 sin cambiar nada (como las funciones de T1b)", async () => {
+  h.errorPermiso = true;
+  const respuesta = await pedir(true);
+  expect(respuesta.status).toBe(503);
+  expect((await respuesta.json()).error).toMatch(/No se ha cambiado nada/);
+  expect(h.cambios).toEqual([]);
 });

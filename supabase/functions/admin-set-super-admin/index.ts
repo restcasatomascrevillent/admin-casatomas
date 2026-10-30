@@ -83,8 +83,10 @@ Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, asy
 
     if (superAdminCheckError) {
       console.error("Error checking super admin status:", superAdminCheckError);
-      return new Response(JSON.stringify({ error: "Error verificando permisos" }), {
-        status: 500,
+      // 503 como admin-create-user / admin-delete-user / list-users: fallo
+      // transitorio de la BD, no falta de permisos. Fail-closed: no cambia nada.
+      return new Response(JSON.stringify({ error: "No se pudieron verificar tus permisos. No se ha cambiado nada; vuelve a intentarlo." }), {
+        status: 503,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -133,12 +135,16 @@ Deno.serve(conAuditoriaDePeticion("admin-set-super-admin", createClientBase, asy
     });
     if (cambioError) {
       console.error("Error cambiando el acceso de super admin:", cambioError);
+      // 23514: el trigger de FN-13 (20261030152000) impide quitar al último
+      // superadmin. Es un conflicto con el estado actual, no un fallo: 409.
       return new Response(JSON.stringify({ error: cambioError.code === "P0002"
         ? "El usuario ya no existe. Actualiza la lista."
         : cambioError.code === "22023"
           ? "Desbloquea el acceso del usuario antes de hacerlo super admin"
-          : "No se pudo cambiar el acceso de super admin. No se ha aplicado ningún cambio; vuelve a intentarlo." }), {
-        status: cambioError.code === "P0002" ? 404 : cambioError.code === "22023" ? 400 : 500,
+          : cambioError.code === "23514"
+            ? "Debe quedar al menos un superadministrador"
+            : "No se pudo cambiar el acceso de super admin. No se ha aplicado ningún cambio; vuelve a intentarlo." }), {
+        status: cambioError.code === "P0002" ? 404 : cambioError.code === "22023" ? 400 : cambioError.code === "23514" ? 409 : 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

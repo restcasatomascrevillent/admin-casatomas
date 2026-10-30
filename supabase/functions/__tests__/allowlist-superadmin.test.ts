@@ -69,7 +69,8 @@ describe.each(["contraseña", "superadmin"] as const)("%s · el email del allowl
   });
   it("si is_super_admin falla, tampoco basta el email (fail-closed)", async () => {
     h.errorRpc = true;
-    expect((await pedir(accion)).status).not.toBe(200);
+    // T6-CIERRE: el fallo de la RPC de rol es 503 en las dos (antes 403/500).
+    expect((await pedir(accion)).status).toBe(503);
     expect(h.mutaciones).toEqual([]);
   });
   it("con fila en super_admins sí puede (staff como objetivo)", async () => {

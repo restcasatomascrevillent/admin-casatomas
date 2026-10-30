@@ -63,10 +63,11 @@ describe.each(["eliminar", "contraseña"])("%s: solo desde superadmin", (accion)
     expect(h.mutaciones).toEqual([accion]);
   });
   // CT-REM-FN-12 (30-oct-2026): admin-delete-user responde 503 (no se pudo
-  // verificar) en vez de 403; admin-update-user-password sigue en 403.
+  // verificar) en vez de 403. T6-CIERRE: admin-update-user-password también
+  // pasa de 403 a 503, para que el fallo de la RPC de rol sea uniforme.
   it("deniega si no se puede verificar el permiso", async () => {
     h.superadmin = true; h.errorPermisos = true;
-    expect((await llamar(accion)).status).toBe(accion === "eliminar" ? 503 : 403);
+    expect((await llamar(accion)).status).toBe(503);
     expect(h.mutaciones).toEqual([]);
   });
   it("rechaza una sesión inválida y actuar sobre uno mismo", async () => {
