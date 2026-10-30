@@ -1,4 +1,7 @@
-project_id = "jeamoczmbfsnwkfjxcyo"
+# Demo (se enlaza primero, ver docs/PROCESO-DE-CAMBIOS.md). El despliegue siempre usa
+# --project-ref explicito; este valor solo nombra el stack local. El proyecto viejo
+# jeamoczmbfsnwkfjxcyo esta prohibido (CT-REM-OPS-01).
+project_id = "sfonaclosuafvlhutkon"
 
 # ============================================================================
 # verify_jwt — criterio de este proyecto
@@ -196,18 +199,6 @@ verify_jwt = true
 [functions.recortar-fondo-vino]
 verify_jwt = true
 
-[functions.traducir-carta]
-verify_jwt = true
-
-[functions.traducir-carta-auto]
-verify_jwt = true
-
-[functions.traducir-novedad]
-verify_jwt = true
-
-[functions.traducir-novedad-auto]
-verify_jwt = true
-
 # Escribe en `resenas` y `config_google_places` con service role y consume
 # cuota de Google Places. Nunca comprueba `req.method` ni lee el body: un GET
 # pelado a la URL dispara la sincronización entera. Es la más expuesta del lote.
@@ -221,17 +212,10 @@ verify_jwt = true
 [functions.chat-web]
 verify_jwt = false
 
-# Huérfanas: cero llamadores en los cuatro repos. Se dejan a `true` para que no
-# queden como endpoints abiertos mientras se decide si se borran.
-# - enviar-imagen-webhook: sin llamadores y sin variables de entorno.
-# - notify-config-bot-change: relay sin autenticar a un webhook de n8n
-#   hardcodeado en el código (index.ts:8).
-[functions.enviar-imagen-webhook]
-verify_jwt = true
-
-[functions.notify-config-bot-change]
-verify_jwt = true
-
+# Relés eliminados en T2 (FN-06, rem/t2-backend): traducir-carta, traducir-carta-auto,
+# traducir-novedad, traducir-novedad-auto, enviar-imagen-webhook y
+# notify-config-bot-change. Sin entrada aquí; hay que borrarlas con
+# supabase functions delete en demo y producción cuando el dueño lo decida.
 
 # Login público: comprueba las credenciales en Auth, registra antes/después
 # desde service_role y limita intentos en SQL. Nunca confía en actor del body.
