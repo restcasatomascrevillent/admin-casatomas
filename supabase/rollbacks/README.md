@@ -79,6 +79,7 @@ Se ejecutan **a mano** (psql / SQL editor) y solo para deshacer un despliegue qu
 | `20261030120000_rls_tablas_nucleo_idempotente_ROLLBACK.sql` | `migrations/20261030120000_rls_tablas_nucleo_idempotente.sql` (CT-REM-DB-04 parte 1) | Devuelve SELECT de `reservas` a `anon`, quita las políticas de sección de `salas`/`bew` y vuelve a apagar su RLS (estado de Git). No apaga la RLS de otras tablas núcleo. |
 | `20261030130000_rls_minimo_privilegio_tablas_abiertas_ROLLBACK.sql` | `migrations/20261030130000_rls_minimo_privilegio_tablas_abiertas.sql` (CT-REM-DB-02) | **Reabre CT-REM-DB-02**: restaura las políticas «complete admin access» (`USING true` / `auth.uid() IS NOT NULL`) y los GRANT revocados en ~30 tablas. |
 | `20261030140000_rpc_roles_y_mantenimiento_minimo_privilegio_ROLLBACK.sql` | `migrations/20261030140000_rpc_roles_y_mantenimiento_minimo_privilegio.sql` (CT-REM-DB-05) | **Reabre CT-REM-DB-05**: `anon` vuelve a ejecutar `is_admin`/`is_super_admin`; `authenticated`, las 3 RPC de mantenimiento; 3 políticas de `user_permissions` vuelven a `TO public`. Orden si se revierten varias T4a: 140000 → 130000 → 120000 → 110000 → 100000. |
+| `20261030200000_panel_auth_cubo_sin_ip_ROLLBACK.sql` | `migrations/20261030200000_panel_auth_cubo_sin_ip.sql` (CT-REM-FN-03, residual «cubo sin-ip» de V2; requiere `20261030151000`) — **NO APLICADA** | Devuelve `iniciar_intento_panel` a la definición de `20261030151000` y borra `idx_audit_log_accesos_panel_ip_cubo`. **Reabre el residual**: con `x-audit-ip` vacía las filas guardan `''` y el conteo por IP las compara con NULL, así que los intentos sin IP vuelven a no tener límite por IP (el de email, 10/15 min, sigue). No se pierden datos. Idempotente. Test: `npm run test:abuso:db`. |
 
 **Estado a 2026-10-01 (corrige lo que digan los párrafos de debajo, escritos el 28 y el 30/09).**
 Comprobado ese día con `SELECT` de solo lectura, migración por migración y por sus objetos (no
@@ -171,3 +172,39 @@ Por ser **parcial sobre `coalesce(activa,true) = true`**, desactivar una mesa (`
 false`) libera su número para otra mesa de la misma sala. De eso depende que el editor de
 plano pueda fusionar sin borrar filas; ver `EditorPlanoEspacio.tsx`. Ejecutar ese rollback
 ya NO es inofensivo: borra un índice que está en uso.
+
+## Cómo se invoca `ejecutar_limpieza_gdpr()` tras CT-REM-DB-01 (`20261030100000`)
+
+Desde `20261030100000_gdpr_limpieza_solo_servicio.sql` la limpieza RGPD solo la ejecuta
+`service_role` (y el dueño `postgres`); `authenticated` y `anon` reciben `42501`. **Hoy no la
+llama nadie**: ni el panel (solo aparece en `types.ts`), ni la web, ni el bot, ni ninguna Edge
+Function, y no hay `cron.schedule` en Git. No es una regresión de DB-01: antes tampoco había
+llamador de servidor.
+
+La limpieza anonimiza `reservas` y `resenas` y borra `blacklist`, y esas escrituras pasan por
+la auditoría. El trigger `fn_identificar_actor_auditoria` (`20261008080000`) exige a
+`service_role` saber **qué proceso** actúa: sin la cabecera `x-audit-source`, o con una de las
+fuentes que necesitan un usuario (`admin-create-user`, `admin-delete-user`,
+`admin-set-super-admin`, `admin-update-user-password`), aborta toda la limpieza con `28000`
+«Auditoría: falta el usuario responsable o el origen del proceso» y no cambia nada.
+
+Formas válidas de invocarla (comprobado en el laboratorio PGlite de V3, rama T4a, con una
+reserva de hace 1000 días y 730 de retención, todo dentro de `ROLLBACK`):
+
+| Quién | Cómo | Resultado |
+|---|---|---|
+| Dueño desde el SQL editor o `psql` (rol `postgres`, sin JWT) | `select * from public.ejecutar_limpieza_gdpr();` | OK (`reservas:1`); la auditoría la atribuye a «Base de datos · postgres» |
+| Tarea `pg_cron` del dueño (se ejecuta como `postgres`) | `select cron.schedule('limpieza-gdpr', '30 4 * * *', $$select public.ejecutar_limpieza_gdpr()$$);` | Igual que la fila anterior (no se ha programado: lo decide el dueño) |
+| Edge Function o script con la service role key (PostgREST) | cliente con `global.headers['x-audit-source'] = 'limpieza-gdpr'` (o `clienteConAuditoria(createClient, "limpieza-gdpr")` de `_shared/audit-client.ts`) y `rpc('ejecutar_limpieza_gdpr')` | OK (`reservas:1`); auditoría «API · service_role · limpieza-gdpr» |
+| Lo mismo **sin** `x-audit-source` | | `28000`, no se anonimiza nada |
+| Cualquier sesión del panel (`authenticated`) | | `42501` |
+
+No se ha probado contra demo ni producción (en PGlite `session_user` es siempre `postgres`; en
+Supabase, PostgREST entra como `authenticator`, pero el trigger decide por el rol del JWT, así que
+el resultado esperado es el mismo).
+
+**Propuesta (no aplicada; no es un defecto de DB-01):** si el dueño quiere la limpieza
+automática, lo más sencillo es la tarea `pg_cron` de la tabla, que no necesita cabeceras ni una
+función nueva. Antes conviene decidir la `CHECK` de retención mínima que dejó pendiente T4a
+(p. ej. `dias_retencion >= 365`), porque con la tarea programada un valor erróneo en
+`gdpr_config` anonimizaría reservas sin que nadie lo ejecute a mano.

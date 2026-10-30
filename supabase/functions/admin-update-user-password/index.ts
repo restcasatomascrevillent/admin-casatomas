@@ -75,7 +75,17 @@ Deno.serve(conAuditoriaDePeticion("admin-update-user-password", createClientBase
       _user_id: currentUser.id,
     });
 
-    if (superAdminCheckError || isSuperAdminResult !== true) {
+    if (superAdminCheckError) {
+      console.error("Error checking super admin status:", superAdminCheckError);
+      // 503 como admin-create-user / admin-delete-user / list-users: fallo
+      // transitorio de la BD, no falta de permisos. Fail-closed: no cambia nada.
+      return new Response(JSON.stringify({ error: "No se pudieron verificar tus permisos. No se ha cambiado la contraseña; vuelve a intentarlo." }), {
+        status: 503,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (isSuperAdminResult !== true) {
       return new Response(
         JSON.stringify({ error: "Solo un super admin puede actualizar contraseñas" }),
         {
