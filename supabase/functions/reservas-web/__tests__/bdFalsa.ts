@@ -256,12 +256,31 @@ export function crearClienteFalso(_url: string, _key: string) {
     // Cierres de reservas (2026-10-13): por defecto NINGÚN servicio cerrado,
     // para que las pruebas de antes no dependan del día de la semana. Una
     // prueba de cierres puede rellenar `globalThis.__cierresFalsos`.
-    rpc: async (nombre: string) => {
+    rpc: async (nombre: string, args: Record<string, unknown> = {}) => {
+      const g = globalThis as unknown as {
+        __cierresFalsos?: unknown[];
+        __limitadorFalso?: LimitadorFalso;
+      };
+      // Limitador de /crear (CT-REM-FN-07). Por defecto lo PERMITE todo, para
+      // que las pruebas de antes no dependan de él; las pruebas del limitador
+      // instalan `globalThis.__limitadorFalso` (ver limitador.integracion.test.ts).
+      if (nombre === "reservas_web_reservar_cupo" || nombre === "reservas_web_reservar_correo_rechazo") {
+        const lim = g.__limitadorFalso;
+        lim?.llamadas.push({ nombre, args });
+        if (nombre === "reservas_web_reservar_cupo") return lim ? lim.cupo(String(args.p_ip_hash)) : { data: { permitido: true }, error: null };
+        return lim ? lim.correo(String(args.p_email)) : { data: true, error: null };
+      }
       if (nombre !== "servicios_cerrados_reserva") {
         return { data: null, error: { message: `rpc ${nombre} no simulada` } };
       }
-      const g = globalThis as unknown as { __cierresFalsos?: unknown[] };
       return { data: g.__cierresFalsos ?? [], error: null };
     },
   };
+}
+
+/** Doble de las RPC del limitador de /crear (CT-REM-FN-07). */
+export interface LimitadorFalso {
+  llamadas: Array<{ nombre: string; args: Record<string, unknown> }>;
+  cupo(ipHash: string): { data: unknown; error: unknown };
+  correo(email: string): { data: unknown; error: unknown };
 }
