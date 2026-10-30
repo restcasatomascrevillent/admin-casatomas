@@ -4,7 +4,7 @@
 # corren en Postgres en memoria (PGlite).
 #
 # BLOQUEAN: instalación reproducible, tests unitarios, pruebas SQL, build y el
-# TOPE DE DEUDA de calidad: typecheck con 20 errores y ESLint con 480 errores
+# TOPE DE DEUDA de calidad: typecheck con 20 errores y ESLint con 479 errores
 # (cifras del 30/10/2026, CT-REM-OPS-09). Es un "trinquete": el job falla si el
 # recuento SUBE; si baja, hay que bajar también el tope en este fichero (los dos
 # valores TOPE_* de abajo). Cuando lleguen a cero, sustituir por el check normal.
@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 15
     env:
       TOPE_TSC: "20"
-      TOPE_ESLINT: "480"
+      TOPE_ESLINT: "479"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
