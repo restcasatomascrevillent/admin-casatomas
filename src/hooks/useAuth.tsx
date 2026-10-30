@@ -19,7 +19,7 @@ import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 const signUpSchema = z.object({
   email: z.string().email("Email inválido").max(255),
-  password: z.string().min(6, "La contraseña debe tener al menos 6 caracteres"),
+  password: z.string().min(10, "La contraseña debe tener al menos 10 caracteres"),
   nombre_restaurante: z
     .string()
     .min(1, "El nombre del restaurante es requerido")

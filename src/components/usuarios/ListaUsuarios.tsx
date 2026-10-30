@@ -248,8 +248,8 @@ export function ListaUsuarios({
   const handleChangePassword = async () => {
     if (!passwordTargetUser || !canManageUsers || updatingPassword) return;
 
-    if (newPassword.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
+    if (newPassword.length < 10) {
+      toast.error("La contraseña debe tener al menos 10 caracteres");
       return;
     }
 
@@ -725,7 +725,7 @@ export function ListaUsuarios({
               <Input
                 id="user-new-password"
                 type="password"
-                placeholder="Mínimo 6 caracteres"
+                placeholder="Mínimo 10 caracteres"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
