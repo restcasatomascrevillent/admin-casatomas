@@ -1,6 +1,8 @@
 # Lista de despliegue a producción
 
-Proyecto Supabase: `jeamoczmbfsnwkfjxcyo` · URL base: `https://jeamoczmbfsnwkfjxcyo.supabase.co`
+> **AVISO (30/10/2026):** este documento es histórico (19-09-2026). El proyecto `jeamoczmbfsnwkfjxcyo` ya no es producción y no se toca: usa la demo `sfonaclosuafvlhutkon` primero y producción `haqmmdfdzzatdnrrcgez` solo con el «sí» del dueño. Las migraciones NO se aplican con `db push`: una a una con `supabase db query --linked -f supabase/migrations/<fichero>.sql` (ver docs/PROCESO-DE-CAMBIOS.md). Donde el texto de abajo diga `db push`, léase así. Los relés de n8n (`traducir-carta`, `traducir-novedad` y sus `-auto`, `enviar-imagen-webhook`, `notify-config-bot-change`) están eliminados (T2/FN-06).
+
+Proyecto Supabase: demo `sfonaclosuafvlhutkon` · URL base: `https://<project-ref>.supabase.co`
 
 Estado comprobado contra producción el **19-09-2026**:
 última migración aplicada `20260918120000_rls_por_permisos_de_seccion`.
@@ -8,8 +10,7 @@ Quedan **8 migraciones** pendientes y **16 funciones** por desplegar.
 No hay migraciones remotas sin fichero local ni versiones duplicadas: `db push`
 aplicará exactamente esas 8, en orden de nombre.
 
-Confirmado con `supabase db push --dry-run --project-ref jeamoczmbfsnwkfjxcyo`
-(CLI 2.117.0): las 8 esperadas, en orden, sin errores, `20260920000000` la última.
+Confirmado en su día con un dry-run de la CLI 2.117.0 (el procedimiento actual no usa `db push`): las 8 esperadas, en orden, sin errores, `20260920000000` la última.
 
 Orden global, sin saltarse pasos:
 
@@ -161,7 +162,7 @@ SUPABASE_SECRET_KEYS    SUPABASE_SERVICE_ROLE_KEY   SUPABASE_URL
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`, `GOOGLE_DRIVE_PARENT_FOLDER_ID` | `procesar-factura` | `DRIVE_ENABLED = false` y el original se guarda en el bucket privado `facturas-originales` en vez de Drive. Es el diseño previsto. Cómo sacar el refresh token: `supabase/functions/DEPLOY-facturas.md` §2. |
 | `NEWSLETTER_UNSUB_SECRET` | `enviar-newsletter`, `newsletter-baja` | Ambas caen a `SUPABASE_SERVICE_ROLE_KEY`, **el mismo fallback**, así que las firmas siguen cuadrando. ⚠️ Si lo defines **más adelante**, los enlaces de baja ya enviados dejan de validar. Decídelo ahora o nunca. |
 | `RESERVAS_WEB_PUBLIC_URL` | `reservas-web` | Se deriva de `SUPABASE_URL`: los enlaces del correo apuntan a `…supabase.co/functions/v1/reservas-web/…`. Funciona; solo cámbialo si quieres un dominio propio. |
-| `N8N_TRADUCIR_NOVEDAD_WEBHOOK` | `traducir-novedad` | **Devuelve traducciones falsas** (`"Título (EN)"`, `"Título (FR)"`) y lo guarda como si fueran buenas (`index.ts:40-49`). No rompe, pero ensucia datos. `traducir-contenido` ya la sustituye en casi todos los sitios. |
+| `N8N_TRADUCIR_NOVEDAD_WEBHOOK` | `traducir-novedad` (ELIMINADA en T2; ya no aplica) | **Devuelve traducciones falsas** (`"Título (EN)"`, `"Título (FR)"`) y lo guarda como si fueran buenas (`index.ts:40-49`). No rompe, pero ensucia datos. `traducir-contenido` ya la sustituye en casi todos los sitios. |
 
 **Comando** (solo los que decidas poner):
 
@@ -170,16 +171,16 @@ supabase secrets set \
   RESERVAS_WEB_TOKEN_SECRET='<cadena-aleatoria-larga>' \
   RESEND_FROM_EMAIL='Casa Tomás <reservas@tu-dominio.es>' \
   VAPI_API_KEY='<key-de-vapi>' \
-  --project-ref jeamoczmbfsnwkfjxcyo
+  --project-ref sfonaclosuafvlhutkon
 ```
 
 **Verificación del Paso 0** — los nombres tienen que aparecer en la lista:
 
 ```bash
-supabase secrets list --project-ref jeamoczmbfsnwkfjxcyo
+supabase secrets list --project-ref sfonaclosuafvlhutkon
 ```
 
-**Rollback:** `supabase secrets unset NOMBRE --project-ref jeamoczmbfsnwkfjxcyo`.
+**Rollback:** `supabase secrets unset NOMBRE --project-ref sfonaclosuafvlhutkon`.
 Ojo: quitar `RESERVAS_WEB_TOKEN_SECRET` invalida todos los enlaces ya enviados.
 
 ---
@@ -187,7 +188,10 @@ Ojo: quitar `RESERVAS_WEB_TOKEN_SECRET` invalida todos los enlaces ya enviados.
 ## Paso 1 — Las 8 migraciones, en este orden exacto
 
 ```bash
-supabase db push --project-ref jeamoczmbfsnwkfjxcyo
+# Procedimiento del repo (docs/PROCESO-DE-CAMBIOS.md): NUNCA `db push` ni `migration repair`.
+# Demo primero; en producción (haqmmdfdzzatdnrrcgez) solo con el «sí» del dueño. Una a una, en orden de nombre:
+supabase link --project-ref sfonaclosuafvlhutkon
+supabase db query --linked -f supabase/migrations/<fichero>.sql
 ```
 
 `db push` ordena por el prefijo de versión, así que el orden de la tabla sale
@@ -328,12 +332,12 @@ Después, las que no dependen de ninguna migración pendiente:
 | 7 | `reservas-web` | **Nueva.** No depende de ninguna de las 8 (usa `reservas`, `blacklist`, `configuracion_reservas`, `configuracion_turnos`, `espacios_reserva`, `solicitudes_pendientes`, todas ya en producción). Sí depende del secret `RESERVAS_WEB_TOKEN_SECRET` del Paso 0. |
 | 8 | `notify-reservation-change` | Llama a `emails-reserva/notificar` (ya no a `reservas-web/notificar-estado`, retirada el 2026-09-30). |
 | 9 | `vapi-analytics` | **Nunca desplegada**, y el panel ya la llama. Necesita `VAPI_API_KEY`. Va en esta tanda a propósito: ver ⚠️ 3. |
-| 10 | `traducir-contenido` | **Nueva.** Sustituye a `traducir-carta` / `traducir-novedad` en 12 sitios del panel. |
+| 10 | `traducir-contenido` | **Nueva.** Sustituye a `traducir-carta` / `traducir-novedad` (ya eliminadas) en 12 sitios del panel. |
 | 11 | `admin-create-user` · `admin-delete-user` · `admin-update-user-password` · `list-users` | Cambios de código. |
 | 12 | `format-novedad` · `sync-google-reviews` | Cambios de código. |
 
 ```bash
-R=jeamoczmbfsnwkfjxcyo
+R=sfonaclosuafvlhutkon
 for f in chat-web chat-facturas procesar-factura newsletter-baja enviar-newsletter \
          rebuild-webs reservas-web notify-reservation-change vapi-analytics \
          traducir-contenido admin-create-user admin-delete-user \
@@ -374,7 +378,7 @@ Exactamente lo que hace el navegador del cliente al pulsar desde Gmail: sin
 
 ```bash
 curl -s -o /tmp/r.html -w 'HTTP %{http_code}\n' \
-  'https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/reservas-web/confirmar?token=token-falso'
+  'https://<project-ref>.supabase.co/functions/v1/reservas-web/confirmar?token=token-falso'
 grep -o '<title>[^<]*</title>' /tmp/r.html
 ```
 
@@ -390,7 +394,7 @@ Repite con las otras dos rutas GET, que deben dar lo mismo:
 ```bash
 for ruta in 'cancelar?token=x' 'cancelar/ejecutar?token=x'; do
   curl -s -o /dev/null -w "$ruta -> HTTP %{http_code}\n" \
-    "https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/reservas-web/$ruta"
+    "https://<project-ref>.supabase.co/functions/v1/reservas-web/$ruta"
 done   # los dos: 200
 ```
 
@@ -412,7 +416,7 @@ solo uso: el `UPDATE` mueve `updated_at` y rompe la huella).
 ```bash
 KEY='<publishable-key>'
 curl -s -o /dev/null -w 'disponibilidad -> HTTP %{http_code}\n' \
-  -X POST 'https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/reservas-web/disponibilidad' \
+  -X POST 'https://<project-ref>.supabase.co/functions/v1/reservas-web/disponibilidad' \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
   -d '{"fecha":"2026-09-25"}'    # 200
 ```
@@ -420,7 +424,7 @@ curl -s -o /dev/null -w 'disponibilidad -> HTTP %{http_code}\n' \
 **C) `chat-web` responde y guarda memoria:**
 
 ```bash
-curl -s -X POST 'https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/chat-web' \
+curl -s -X POST 'https://<project-ref>.supabase.co/functions/v1/chat-web' \
   -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
   -d '{"mensaje":"¿a qué hora abrís?","idioma":"es","id":"prueba-despliegue"}'
 ```
@@ -439,7 +443,7 @@ el histórico, la #8 no está aplicada.
 ni 500. Revisa logs de cualquiera con:
 
 ```bash
-supabase functions logs <nombre> --project-ref jeamoczmbfsnwkfjxcyo
+supabase functions logs <nombre> --project-ref sfonaclosuafvlhutkon
 ```
 
 ### Rollback del Paso 2
@@ -453,7 +457,7 @@ nueva y la anterior sigue ahí.
   redespliega esa función. No hace falta tocar el código.
 - **Funciones nuevas** (`reservas-web`, `chat-web`, `rebuild-webs`,
   `newsletter-baja`, `traducir-contenido`, `vapi-analytics`): si hay que
-  retirarlas, `supabase functions delete <nombre> --project-ref jeamoczmbfsnwkfjxcyo`.
+  retirarlas, `supabase functions delete <nombre> --project-ref sfonaclosuafvlhutkon`.
   Antes de borrar `reservas-web`, ten en cuenta que dejarás sin destino los
   enlaces de confirmar/cancelar ya enviados.
 - **`notify-reservation-change`** es *fire-and-forget* en los dos llamadores del
@@ -520,7 +524,7 @@ No las arregles hoy, pero que no te pillen por sorpresa:
   `reservas-web`; `fetch-noticias-hosteleria` se ha borrado en local en este
   mismo cambio pero **sigue viva en producción**. Desplegar por nombre no las
   toca. Límpialas en una pasada aparte, cuando lo nuevo lleve unos días estable.
-- **3 funciones huérfanas con código y cero llamadores:** `enviar-imagen-webhook`,
+- **(YA ELIMINADAS en T2/FN-06, `leer-metricas` no) 3 funciones huérfanas con código y cero llamadores:** `enviar-imagen-webhook`,
   `leer-metricas`, `notify-config-bot-change`. Esta última es un relay **sin
   autenticar** hacia un webhook de n8n hardcodeado (`index.ts:8`). Candidatas a borrar.
 - **Ocho funciones no comprueban absolutamente nada** por su cuenta

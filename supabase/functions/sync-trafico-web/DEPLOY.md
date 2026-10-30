@@ -12,7 +12,7 @@ El orden importa: migración -> secrets -> deploy -> Vault -> primer run.
       -> 200 con `data:[{timestamp, visitors, pageviews}]`. **Anotar qué devuelve `by=day` solo** (no verificado; si da 400, la función cae a sumar rutas y el total es cota inferior).
 
 ## 1. Migración (Fase 1)
-- [ ] `supabase db push` de `supabase/migrations/20260923200000_trafico_web.sql`.
+- [ ] `supabase db query --linked -f supabase/migrations/20260923200000_trafico_web.sql` (demo primero; nunca `db push`).
       El job `sync-trafico-web` queda creado pero MUDO (no hay secreto en Vault todavía).
 
 ## 2. Secrets de la Edge Function
@@ -26,7 +26,7 @@ El orden importa: migración -> secrets -> deploy -> Vault -> primer run.
 - [ ] `supabase/config.toml` tiene `[functions.sync-trafico-web] verify_jwt = false` (ya añadido).
 - [ ] `supabase functions deploy sync-trafico-web`
 - [ ] Prueba de humo sin cabecera -> **401**:
-      `curl -i -X POST https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/sync-trafico-web`
+      `curl -i -X POST https://<project-ref>.supabase.co/functions/v1/sync-trafico-web`
 
 ## 4. Vault (enciende el cron) — SOLO después del deploy
 - [ ] `select vault.create_secret('<MISMO valor que TRAFICO_WEB_CRON_SECRET>', 'trafico_web_cron_secret');`
@@ -35,7 +35,7 @@ El orden importa: migración -> secrets -> deploy -> Vault -> primer run.
 - [ ] Lanzar:
       ```sql
       select net.http_post(
-        url := 'https://jeamoczmbfsnwkfjxcyo.supabase.co/functions/v1/sync-trafico-web',
+        url := 'https://<project-ref>.supabase.co/functions/v1/sync-trafico-web',
         headers := jsonb_build_object('Content-Type','application/json',
           'x-webhook-secret',(select decrypted_secret from vault.decrypted_secrets where name='trafico_web_cron_secret')),
         body := '{}'::jsonb, timeout_milliseconds := 55000);
