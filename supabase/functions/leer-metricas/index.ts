@@ -1,5 +1,6 @@
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { exigirAdmin } from "../_shared/autorizacion.ts";
 const createClient = clienteConAuditoria(createClientBase, "leer-metricas");
 
 const corsHeaders = {
@@ -7,31 +8,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+export const LIMITE_MAXIMO = 500;
+
 Deno.serve(conAuditoriaDePeticion("leer-metricas", createClientBase, async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(
-    authHeader.replace("Bearer ", "")
-  );
-  if (authError || !user) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
+  // Guarda los emails de login de todo el personal: solo admin o super admin
+  // (CT-REM-FN-02). 401 sin usuario, 403 sin rol, 503 si no se puede comprobar.
+  const auth = await exigirAdmin(req, { crearCliente: createClient, corsHeaders });
+  if (!auth.ok) return auth.response;
 
   try {
     const metricsUrl = "https://yfnrkmxnmtrqmdtfvqix.supabase.co";
@@ -46,7 +33,9 @@ Deno.serve(conAuditoriaDePeticion("leer-metricas", createClientBase, async (req)
     // Parse query params
     const url = new URL(req.url);
     const tabla = url.searchParams.get("tabla") || "metricas";
-    const limite = parseInt(url.searchParams.get("limite") || "100");
+    // Tope de filas por petición (antes sin límite).
+    const pedido = parseInt(url.searchParams.get("limite") || "100", 10);
+    const limite = Number.isFinite(pedido) ? Math.min(Math.max(pedido, 1), LIMITE_MAXIMO) : 100;
     const tipo = url.searchParams.get("tipo");
     const desde = url.searchParams.get("desde");
     const hasta = url.searchParams.get("hasta");

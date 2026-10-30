@@ -1,6 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
-import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { exigirPermiso } from "../_shared/autorizacion.ts";
+import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
+
+const createClient = clienteConAuditoria(createClientBase, "buscar-precios-mercado");
+
+// Sin llamadores en el panel (candidata a borrarse, CT-REM-FN-06). Mientras
+// exista: sección Facturas (view), consulta corta y gasto registrado en ia_uso
+// (CT-REM-FN-02).
+export const SECCION_PRECIOS = "facturas";
+export const MAX_LONGITUD_QUERY = 200;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,12 +22,23 @@ serve(conAuditoriaDePeticion("buscar-precios-mercado", createClientBase, async (
     return new Response(null, { headers: corsHeaders });
   }
 
+  const auth = await exigirPermiso(req, SECCION_PRECIOS, "view", { crearCliente: createClient, corsHeaders });
+  if (!auth.ok) return auth.response;
+
+  const uso = new AcumuladorUso("buscar-precios-mercado", "sonar", "chat");
+  const inicioMs = Date.now();
   try {
     const { query } = await req.json();
     
-    if (!query || typeof query !== 'string') {
+    if (!query || typeof query !== 'string' || query.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: "Se requiere un término de búsqueda" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (query.length > MAX_LONGITUD_QUERY) {
+      return new Response(
+        JSON.stringify({ error: `La búsqueda no puede superar ${MAX_LONGITUD_QUERY} caracteres` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -61,6 +82,8 @@ Responde siempre en español de forma concisa y estructurada.`;
     });
 
     if (!response.ok) {
+      uso.sumar(null);
+      uso.marcarError();
       const errorText = await response.text();
       console.error("Error de Perplexity:", response.status, errorText);
       
@@ -78,6 +101,7 @@ Responde siempre en español de forma concisa y estructurada.`;
     }
 
     const data = await response.json();
+    uso.sumar(data?.usage);
     const content = data.choices?.[0]?.message?.content || "No se encontraron resultados";
     const citations = data.citations || [];
 
@@ -92,10 +116,13 @@ Responde siempre en español de forma concisa y estructurada.`;
     );
 
   } catch (error) {
+    uso.marcarError();
     console.error("Error en buscar-precios-mercado:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Error desconocido" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+  } finally {
+    await registrarUso(uso, { disparador: `usuario:${auth.userId}`, duracionMs: Date.now() - inicioMs });
   }
 }));

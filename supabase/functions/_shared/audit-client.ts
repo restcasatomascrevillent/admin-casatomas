@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { ipCliente } from "./ip-cliente.ts";
 
 type Actor = { id: string; email?: string | null };
 type Contexto = { fuente: string; peticionId: string; actor: Actor | null; userAgent: string; deviceId: string; ip: string; herramientasChat: HerramientaChatAuditada[] };
@@ -63,9 +64,16 @@ const SIN_EVENTO_PROPIO = new Set([
   "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "vapi-analytics", "sync-trafico-web",
 ]);
 
-const ADMITE_INTEGRACION = new Set([
+// Funciones que pueden ejecutarse SIN usuario ni service role porque tienen
+// autenticación propia (secreto en tiempo constante, firma, HMAC) o son
+// públicas a propósito con su propio control de abuso. Cada entrada DEBE
+// figurar en `_shared/__tests__/admite-integracion.test.ts` con el mecanismo
+// que la protege; el test falla si se añade una sin él (CT-REM-FN-01).
+// `traducir-contenido` salió de aquí: su modo bulk usa la service role, que ya
+// pasa este envoltorio, y la excepción dejaba sus otras ramas abiertas a anon.
+export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   "chat-web", "newsletter-baja", "resend-webhook", "reservas-web", "emails-reserva",
-  "newsletter-sync-resend", "sync-trafico-web", "ocr-trabajo", "clasificar-productos", "traducir-contenido",
+  "newsletter-sync-resend", "sync-trafico-web", "ocr-trabajo", "clasificar-productos",
   "sincronizar-costes-openai",
 ]);
 
@@ -114,7 +122,8 @@ export function conAuditoriaDePeticion(
       herramientasChat: [],
       userAgent: req.headers.get("user-agent")?.slice(0, 1024) ?? "",
       deviceId: info[0] === "adminpanel" ? (info[1] ?? "").slice(0, 128) : "",
-      ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim().slice(0, 128) ?? "",
+      // cf-connecting-ip o ÚLTIMO salto de XFF; el primero lo controla el cliente (CT-REM-FN-03).
+      ip: ipCliente(req),
     };
     return contexto.run(actual, async () => {
       const inicio = Date.now();
