@@ -11,6 +11,8 @@
 //   FN-03  20261030151000_panel_auth_limite_por_email.sql
 //          11 intentos al mismo email desde IPs distintas -> bloqueado;
 //          el límite por IP sigue; los logins correctos no cuentan.
+//   FN-03  20261030200000_panel_auth_cubo_sin_ip.sql (residual V2)
+//          x-audit-ip vacía o ausente -> cubo común «sin-ip» con 30/min.
 //   FN-13  20261030152000_superadmin_minimo_uno.sql
 //          nunca 0 superadmins (RPC, DELETE directo, cascada, TRUNCATE,
 //          dos degradaciones lanzadas a la vez).
@@ -205,6 +207,84 @@ const hex = (c) => c.repeat(64);
   igual((await una(db, "select has_function_privilege('service_role', 'public.iniciar_intento_panel(text,text)', 'execute') p")).p, true, "service_role ejecuta");
   await db.exec("set test.role='authenticated'");
   await falla(db.query("select public.iniciar_intento_panel('x@staff.local', '/auth')"), /Solo panel-auth/, "fuera de panel-auth sigue rechazado");
+
+  // ---------------------------------------------------------------------------
+  // FN-03 residual «cubo sin-ip» · 20261030200000_panel_auth_cubo_sin_ip.sql
+  // Con x-audit-ip '' el trigger guarda ip_address = '' y la versión 151000
+  // contaba con IS NULL: el cubo sin IP no tenía límite por IP.
+  // ---------------------------------------------------------------------------
+  await db.exec("set test.role='service_role'");
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  // Defecto reproducido con la versión 151000: 31 intentos con IP '' admitidos.
+  const conIp = (ip, req = "s") => JSON.stringify(ip === undefined
+    ? { "x-audit-source": "panel-auth", "x-audit-request-id": req }
+    : { "x-audit-source": "panel-auth", "x-audit-request-id": req, "x-audit-ip": ip });
+  const intentoCon = async (cab, email) =>
+    (await una(db, "select (select set_config('request.headers', $1, false)) h, public.iniciar_intento_panel($2, '/auth') d", [cab, email])).d;
+  let admitidos = 0;
+  for (let i = 0; i < 31; i++) if ((await intentoCon(conIp(""), `sinip${i}@staff.local`)).permitido) admitidos++;
+  igual(admitidos, 31, "con 151000 el cubo sin IP no se limita (defecto reproducido)");
+
+  const SINIP = await leer("20261030200000_panel_auth_cubo_sin_ip.sql");
+  await db.exec(SINIP);
+  await db.exec(SINIP); // idempotente
+
+  // 1) x-audit-ip vacía: 30 admitidos, el 31.º denegado por IP.
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  for (let i = 0; i < 30; i++) {
+    igual((await intentoCon(conIp(""), `v${i}@staff.local`)).permitido, true, `sin IP ('') intento ${i + 1}/30 admitido`);
+  }
+  const vacia = await intentoCon(conIp(""), "v31@staff.local");
+  igual([vacia.permitido, vacia.motivo, typeof vacia.id], [false, "ip", "string"], "x-audit-ip '' : el 31.º se deniega por IP con contrato {id, permitido, motivo}");
+  igual((await una(db, "select ip_address from public.audit_log where id = $1", [vacia.id])).ip_address, "", "la fila sigue guardando '' (el trigger no cambia)");
+
+  // 2) '' y cabecera ausente (NULL) comparten el mismo cubo.
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  for (let i = 0; i < 15; i++) await intentoCon(conIp(""), `m${i}@staff.local`);
+  for (let i = 15; i < 30; i++) await intentoCon(conIp(undefined), `m${i}@staff.local`);
+  igual((await una(db, "select count(*) filter (where ip_address = '')::int v, count(*) filter (where ip_address is null)::int n from public.audit_log where tabla = 'accesos_panel'")),
+    { v: 15, n: 15 }, "hay 15 filas con '' y 15 con NULL");
+  const mixta = await intentoCon(conIp(undefined), "m31@staff.local");
+  igual([mixta.permitido, mixta.motivo], [false, "ip"], "'' y NULL cuentan juntos en el cubo «sin-ip»");
+  const mixta2 = await intentoCon(conIp(""), "m32@staff.local");
+  igual([mixta2.permitido, mixta2.motivo], [false, "ip"], "el cubo «sin-ip» también deniega con ''");
+
+  // 3) Una IP real no se ve afectada por el cubo sin IP agotado.
+  igual((await intentoCon(conIp("203.0.113.7"), "real@staff.local")).permitido, true, "una IP real no comparte el cubo «sin-ip»");
+
+  // 4) El límite por IP real y el de email siguen igual.
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  for (let i = 0; i < 30; i++) await intentoCon(conIp("203.0.113.8"), `r${i}@staff.local`);
+  igual((await intentoCon(conIp("203.0.113.8"), "r31@staff.local")).motivo, "ip", "IP real: 30/min se mantiene");
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  for (let i = 1; i <= 10; i++) await intentoCon(conIp(`198.18.0.${i}`), "victima@staff.local");
+  igual((await intentoCon(conIp("198.18.0.11"), "victima@staff.local")).motivo, "email", "el límite por email se mantiene");
+  // Sin IP, el email también se limita (el cubo IP no tapa el de email).
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  for (let i = 1; i <= 10; i++) await intentoCon(conIp(""), "victima@staff.local");
+  igual((await intentoCon(conIp(""), "victima@staff.local")).motivo, "email", "sin IP, el 11.º al mismo email se deniega por email");
+
+  // 5) Ráfaga «simultánea» sin IP: como mucho 30 admitidas.
+  await db.exec("delete from public.audit_log where tabla = 'accesos_panel'");
+  const rafagaSinIp = await Promise.all(Array.from({ length: 40 }, (_, i) => intentoCon(conIp(i % 2 ? "" : undefined, `q${i}`), `q${i}@staff.local`)));
+  igual(rafagaSinIp.filter((d) => d.permitido).length, 30, "ráfaga sin IP: como mucho 30 admitidas");
+
+  // 6) Firma, seguridad y permisos.
+  igual((await una(db, "select pg_get_function_identity_arguments('public.iniciar_intento_panel(text,text)'::regprocedure) a")).a, "p_email text, p_ruta text", "misma firma");
+  igual((await una(db, "select prosecdef s, proconfig c from pg_proc where oid = 'public.iniciar_intento_panel(text,text)'::regprocedure")),
+    { s: true, c: ['search_path=""'] }, "SECURITY DEFINER y search_path vacío");
+  for (const [rol, esperado] of [["anon", false], ["authenticated", false], ["service_role", true]]) {
+    igual((await una(db, "select has_function_privilege($1, 'public.iniciar_intento_panel(text,text)', 'execute') p", [rol])).p, esperado, `${rol} execute = ${esperado}`);
+  }
+  igual((await una(db, "select count(*)::int n from pg_indexes where indexname = 'idx_audit_log_accesos_panel_ip_cubo'")).n, 1, "índice del cubo creado");
+  await db.exec("set test.role='authenticated'");
+  await falla(db.query("select public.iniciar_intento_panel('x@staff.local', '/auth')"), /Solo panel-auth/, "fuera de panel-auth sigue rechazado (cubo sin-ip)");
+
+  // 7) El rollback se ejecuta y vuelve a la 151000 (reabre el residual).
+  await db.exec(await readFile("supabase/rollbacks/20261030200000_panel_auth_cubo_sin_ip_ROLLBACK.sql", "utf8"));
+  igual((await una(db, "select count(*)::int n from pg_indexes where indexname = 'idx_audit_log_accesos_panel_ip_cubo'")).n, 0, "el rollback borra el índice del cubo");
+  igual((await una(db, "select position('is not distinct from nullif(v_ip' in prosrc) > 0 p from pg_proc where oid = 'public.iniciar_intento_panel(text,text)'::regprocedure")).p, true, "el rollback repone la definición de 151000");
+  igual((await una(db, "select has_function_privilege('authenticated', 'public.iniciar_intento_panel(text,text)', 'execute') p")).p, false, "tras el rollback authenticated sigue sin ejecutar");
   await db.close();
 }
 
