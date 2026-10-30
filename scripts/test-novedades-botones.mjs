@@ -8,9 +8,10 @@
 //
 // Cubre: valor por defecto en filas previas y nuevas, compatibilidad con el
 // panel de hoy, combinaciones válidas e inválidas de botones, forma del menú,
-// «Ver menú» sin menú, borrado del plato enlazado (ON DELETE SET NULL),
-// reparación de la FK si no fuera SET NULL, reejecución, RLS sin cambios y el
-// bloque REVERSIÓN comentado de la propia migración.
+// «Ver menú» sin menú, el menú versión 2 (maridaje y cata) con la misma
+// migración, borrado del plato enlazado (ON DELETE SET NULL), reparación de la
+// FK si no fuera SET NULL, reejecución, RLS sin cambios y el bloque REVERSIÓN
+// comentado de la propia migración.
 import { PGlite } from "@electric-sql/pglite";
 import { readdir, readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -61,6 +62,43 @@ const MENU = {
     bebidas: [{ id: "m3", origen: "libre", platoId: null, nombre: "Vino de la casa" }],
   },
 };
+
+// Menú versión 2 (historia «Maridajes y catas»): copia literal de los fixtures
+// canónicos del plan del CTO, sección 2. Las copias del panel viven en
+// FIXTURES_V2 y, cuando existen, tienen que ser idénticas (se comprueba en 4b).
+const FIXTURES_V2 = "src/lib/__tests__/fixtures";
+const MENU_V2_MARIDAJE = JSON.parse(`{"version":2,"tipo":"menu","incluye_bebidas":true,"maridaje":true,"secciones":{
+ "primero":[{"id":"p1","origen":"libre","platoId":null,"nombre":"Gamba roja de Santa Pola","descripcion":"A la plancha","imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null,
+   "traducciones":{"en":{"nombre":"Santa Pola red prawn","descripcion":"Grilled"},"fr":{"nombre":"Crevette rouge de Santa Pola","descripcion":"À la plancha"}},
+   "maridaje":{"id":"m1","origen":"libre","refId":null,"nombre":"Cava brut nature","descripcion":"Bien frío","sulfitos":true,
+     "traducciones":{"en":{"nombre":"Brut nature cava","descripcion":"Well chilled"},"fr":{"nombre":"Cava brut nature","descripcion":"Bien frais"}}}}],
+ "segundo":[{"id":"s1","origen":"libre","platoId":null,"nombre":"Arroz a banda","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null}],
+ "postre":[{"id":"d1","origen":"libre","platoId":null,"nombre":"Turrón de Jijona","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null,
+   "maridaje":{"id":"m2","origen":"vino","refId":"vino-fondillon","nombre":"Fondillón","descripcion":null,"sulfitos":true}}],
+ "bebidas":[{"id":"b1","origen":"libre","platoId":null,"nombre":"Agua mineral","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null}]}}`);
+const MENU_V2_CATA = JSON.parse(`{"version":2,"tipo":"cata","incluye_bebidas":false,"maridaje":false,"secciones":{"primero":[],"segundo":[],"postre":[],"bebidas":[],
+ "cata":[
+  {"id":"c1","origen":"bebida","refId":"bebida-whisky-12","nombre":"Whisky de malta 12 años","descripcion":null,"sulfitos":false,
+   "traducciones":{"en":{"nombre":"12-year-old malt whisky","descripcion":null}}},
+  {"id":"c2","origen":"vino","refId":"vino-fondillon","nombre":"Fondillón","descripcion":"Alicante, dulce","sulfitos":true},
+  {"id":"c3","origen":"libre","refId":null,"nombre":"Ginebra de Mahón","descripcion":null,"sulfitos":false}]}}`);
+/** El fixture del panel si ya existe (null si aún no), para compararlo con la copia literal. */
+async function fixturePanel(nombre) {
+  try {
+    return JSON.parse(await readFile(`${FIXTURES_V2}/${nombre}`, "utf8"));
+  } catch (e) {
+    if (e.code === "ENOENT") return null;
+    throw e;
+  }
+}
+/** Copia profunda del menú con incluye_bebidas quitado (SIN_CLAVE) o cambiado por otro valor. */
+const SIN_CLAVE = Symbol("sin la clave");
+function conIncluyeBebidas(menu, valor) {
+  const copia = structuredClone(menu);
+  if (valor === SIN_CLAVE) delete copia.incluye_bebidas;
+  else copia.incluye_bebidas = valor;
+  return copia;
+}
 
 /** Postgres nuevo con Platos, Vinos, Bebidas y la tabla novedades de antes de esta migración. */
 async function montar() {
@@ -228,6 +266,65 @@ const MENUS_INVALIDOS = [
 ];
 for (const [menu, caso] of MENUS_INVALIDOS) {
   await falla(insertar(db, ["ver_menu"], { menu }), /novedades_menu_forma/, `rechaza un menú que es ${caso}`);
+}
+
+// =============================================================================
+// 4b. Menú versión 2 (maridaje y cata) con la misma migración, sin otra nueva
+// =============================================================================
+for (const [nombre, literal] of [
+  ["menu-novedad-v2-maridaje.json", MENU_V2_MARIDAJE],
+  ["menu-novedad-v2-cata.json", MENU_V2_CATA],
+]) {
+  const delPanel = await fixturePanel(nombre);
+  if (delPanel !== null) igual(delPanel, literal, `${FIXTURES_V2}/${nombre} coincide con el fixture canónico del plan`);
+}
+igual(["primero", "segundo", "postre", "bebidas"].map((s) => MENU_V2_CATA.secciones[s].length), [0, 0, 0, 0],
+  "(control) la cata canónica no lleva comida ni bebidas sueltas");
+
+// Una novedad con menú v1 guardada antes de los casos v2.
+const v1Previa = (await insertar(db, ["ver_menu"], { menu: MENU, titulo: "Menú v1 previo" })).rows[0];
+
+// Caso 1: v2 de tipo Menú con maridaje.
+const maridada = (await insertar(db, ["ver_menu"], { menu: MENU_V2_MARIDAJE, titulo: "Menú maridado" })).rows[0];
+igual([maridada.botones, maridada.menu], [["ver_menu"], MENU_V2_MARIDAJE],
+  "acepta una v2 con maridaje y [\"ver_menu\"], y la devuelve igual (maridajes dentro de los platos incluidos)");
+
+// Caso 2: cata sin comida.
+const cata = (await insertar(db, ["ver_menu"], { menu: MENU_V2_CATA, titulo: "Cata de destilados" })).rows[0];
+igual([cata.botones, cata.menu], [["ver_menu"], MENU_V2_CATA],
+  "acepta una cata sin comida con [\"ver_menu\"], con las bebidas en el mismo orden");
+
+// La web lee las v2 como anon, igual que la v1.
+await db.exec(`set test.actor = ''; set role anon;`);
+igual(await filas(db, `select menu from public.novedades where id in ($1, $2) order by titulo`, [cata.id, maridada.id]),
+  [{ menu: MENU_V2_CATA }, { menu: MENU_V2_MARIDAJE }], "la web (anon) lee la cata y el menú maridado completos");
+await db.exec(`reset role;`);
+
+// Casos 3 y 4: incluye_bebidas ausente o no booleano, en las dos formas de la v2.
+for (const [menu, tipo] of [[MENU_V2_MARIDAJE, "con maridaje"], [MENU_V2_CATA, "de cata"]]) {
+  await falla(insertar(db, ["ver_menu"], { menu: conIncluyeBebidas(menu, SIN_CLAVE) }), /novedades_menu_forma/,
+    `rechaza una v2 ${tipo} sin incluye_bebidas`);
+  for (const valor of ["no", "false", 0, null]) {
+    await falla(insertar(db, ["ver_menu"], { menu: conIncluyeBebidas(menu, valor) }), /novedades_menu_forma/,
+      `rechaza una v2 ${tipo} con incluye_bebidas = ${JSON.stringify(valor)}`);
+  }
+}
+await falla(db.query(`update public.novedades set menu = $1::jsonb where id = $2`,
+  [json(conIncluyeBebidas(MENU_V2_MARIDAJE, SIN_CLAVE)), maridada.id]), /novedades_menu_forma/,
+  "también al actualizar: el panel no puede dejar una v2 sin incluye_bebidas");
+igual((await una(db, `select menu from public.novedades where id = $1`, [maridada.id])).menu, MENU_V2_MARIDAJE,
+  "la actualización rechazada no toca el menú guardado");
+
+// Caso 5: la v1 sigue aceptándose después de las v2, nueva y editada.
+igual((await una(db, `select menu from public.novedades where id = $1`, [v1Previa.id])).menu, MENU,
+  "la v1 guardada antes sigue intacta");
+const v1Nueva = (await insertar(db, ["ver_menu"], { menu: MENU, titulo: "Menú v1 posterior" })).rows[0];
+igual([v1Nueva.botones, v1Nueva.menu], [["ver_menu"], MENU], "una v1 de antes se sigue aceptando después de las v2");
+// Encender el maridaje, pasar a cata y volver a la v1 (lo que hace el panel al editar la misma novedad).
+for (const [menu, paso] of [[MENU_V2_MARIDAJE, "v1 → v2 con maridaje"], [MENU_V2_CATA, "maridaje → cata"], [MENU, "cata → v1"]]) {
+  igual((await db.query(`update public.novedades set menu = $1::jsonb where id = $2`, [json(menu), v1Previa.id])).affectedRows, 1,
+    `acepta la edición ${paso}`);
+  igual((await una(db, `select menu from public.novedades where id = $1`, [v1Previa.id])).menu, menu, `tras ${paso} el menú guardado es el nuevo`);
 }
 
 // =============================================================================
