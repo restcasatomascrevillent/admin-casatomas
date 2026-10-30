@@ -1,0 +1,6 @@
+{"version":2,"tipo":"cata","incluye_bebidas":false,"maridaje":false,"secciones":{"primero":[],"segundo":[],"postre":[],"bebidas":[],
+ "cata":[
+  {"id":"c1","origen":"bebida","refId":"bebida-whisky-12","nombre":"Whisky de malta 12 años","descripcion":null,"sulfitos":false,
+   "traducciones":{"en":{"nombre":"12-year-old malt whisky","descripcion":null}}},
+  {"id":"c2","origen":"vino","refId":"vino-fondillon","nombre":"Fondillón","descripcion":"Alicante, dulce","sulfitos":true},
+  {"id":"c3","origen":"libre","refId":null,"nombre":"Ginebra de Mahón","descripcion":null,"sulfitos":false}]}}
