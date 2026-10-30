@@ -6,29 +6,23 @@
 //   · reservas_web_reservar_correo_rechazo(p_email)  -> boolean
 // Aquí solo: IP del cliente, su HMAC (nunca se manda la IP en claro) e
 // interpretar la respuesta FALLANDO EN CERRADO ante cualquier error.
-// Sin dependencias de Deno: lo importan index.ts y los tests de Vitest.
+// Sin dependencias de Deno (solo `_shared/ip-cliente.ts`, también sin Deno):
+// lo importan index.ts y los tests de Vitest.
 // ============================================================================
+
+import { ipCliente as ipClienteCompartido } from "../_shared/ip-cliente.ts";
 
 /** Cliente mínimo que se necesita (el de supabase-js con service role). */
 export interface ClienteRpc {
   rpc(nombre: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: unknown }>;
 }
 
-// IP del visitante. Supabase Edge Functions va detrás de Cloudflare:
-// `cf-connecting-ip` lo pone la plataforma; de `x-forwarded-for` solo vale el
-// ÚLTIMO salto (el primero lo elige el cliente; ver chat-web/index.ts y
-// CT-REM-FN-03).
-// TODO(rem-04): sustituir por `_shared/ip-cliente.ts` cuando exista; esta
-// copia local es temporal para no tocar `_shared/` (reservado a rem-04).
+// IP del visitante con la regla común de `_shared/ip-cliente.ts`
+// (CT-REM-FN-03): `cf-connecting-ip` y, si falta, el ÚLTIMO salto de
+// `x-forwarded-for`. Aquí solo se adapta el contrato local: sin IP -> null
+// (quien llama usa entonces el cubo IP_DESCONOCIDA).
 export function ipCliente(req: Request): string | null {
-  const cf = req.headers.get("cf-connecting-ip")?.trim();
-  if (cf) return cf;
-  const xff = req.headers.get("x-forwarded-for");
-  if (xff) {
-    const saltos = xff.split(",").map((s) => s.trim()).filter(Boolean);
-    if (saltos.length) return saltos[saltos.length - 1];
-  }
-  return null;
+  return ipClienteCompartido(req) || null;
 }
 
 /** Peticiones sin IP identificable comparten un único cubo (también limitado). */
