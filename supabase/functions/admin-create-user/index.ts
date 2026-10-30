@@ -10,16 +10,14 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin por email: se comprueba la tabla super_admins.
+// Quién puede crear usuarios: SOLO la tabla super_admins (RPC is_super_admin).
+// El email del JWT no basta aunque esté en SUPER_ADMIN_EMAILS (CT-REM-FN-12):
+// un staff podría cambiar su email a uno del allowlist. Si la RPC falla se
+// responde 503 sin crear nada (fail-closed).
 // El rol admin solo permite consultar usuarios, nunca gestionarlos.
-const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
 
-const isSuperAdminEmail = (email?: string | null) =>
-  !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+// Contraseña mínima de las cuentas del panel (CT-REM-FN-03).
+const LONGITUD_MINIMA_CONTRASENA = 10;
 
 Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (req) => {
   // Handle CORS preflight
@@ -78,21 +76,20 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
     });
 
     console.log("Request from user:", currentUser.id);
-    const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
 
     // Toda la gestión de usuarios requiere ser superadmin.
     const { data: isSuperAdminResult, error: superAdminCheckError } = await supabaseAdmin
       .rpc("is_super_admin", { _user_id: currentUser.id });
 
-    if (superAdminCheckError && !currentUserIsSuperAdmin) {
+    if (superAdminCheckError) {
       console.error("Error checking super admin status:", superAdminCheckError);
       return new Response(
         JSON.stringify({ error: "Error verificando permisos" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    if (!isSuperAdminResult && !currentUserIsSuperAdmin) {
+    if (isSuperAdminResult !== true) {
       console.error("User is not super admin:", currentUser.id);
       return new Response(
         JSON.stringify({ error: "Solo un super admin puede crear usuarios" }),
@@ -124,9 +121,9 @@ Deno.serve(conAuditoriaDePeticion("admin-create-user", createClientBase, async (
       );
     }
 
-    if (password.length < 6) {
+    if (password.length < LONGITUD_MINIMA_CONTRASENA) {
       return new Response(
-        JSON.stringify({ error: "La contraseña debe tener al menos 6 caracteres" }),
+        JSON.stringify({ error: `La contraseña debe tener al menos ${LONGITUD_MINIMA_CONTRASENA} caracteres` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

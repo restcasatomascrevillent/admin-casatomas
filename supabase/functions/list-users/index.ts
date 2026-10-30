@@ -11,16 +11,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Sin fallback hardcodeado: si SUPER_ADMIN_EMAILS no está definida NO hay
-// ningún super admin y la autorización recae por completo en is_admin()
-// (rol en user_roles). Nunca conceder acceso por defecto — fail-closed.
-const SUPER_ADMIN_EMAILS = (Deno.env.get("SUPER_ADMIN_EMAILS") ?? "")
-  .split(",")
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
-
-const isSuperAdminEmail = (email?: string | null) =>
-  !!email && SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
+// Quién puede ver la lista: rol admin (is_admin) o fila en super_admins
+// (is_super_admin), siempre según la BD. El email del JWT ya no basta aunque
+// esté en SUPER_ADMIN_EMAILS (CT-REM-FN-12). is_admin solo mira user_roles, así
+// que un super admin sin rol admin entra por is_super_admin (antes entraba por
+// su email). Si alguna RPC falla se responde 503 (fail-closed).
+type RespuestaRpc = { data: unknown; error: unknown };
+const respuestaJson = (cuerpo: unknown, status: number) =>
+  new Response(JSON.stringify(cuerpo), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 
 Deno.serve(
   conAuditoriaDePeticion("list-users", createClientBase, async (req) => {
@@ -69,19 +70,28 @@ Deno.serve(
         );
       }
 
-      const currentUserIsSuperAdmin = isSuperAdminEmail(currentUser.email);
+      let puedeVer = false;
+      for (const rpc of ["is_admin", "is_super_admin"] as const) {
+        const { data, error } = (await supabaseAdmin.rpc(rpc, {
+          _user_id: currentUser.id,
+        })) as RespuestaRpc;
+        if (error) {
+          console.error(`Error comprobando ${rpc}:`, error);
+          return respuestaJson(
+            { error: "No se pudieron verificar tus permisos. Vuelve a intentarlo." },
+            503,
+          );
+        }
+        if (data === true) {
+          puedeVer = true;
+          break;
+        }
+      }
 
-      // Check if current user is admin
-      const { data: isAdminResult, error: adminCheckError } =
-        await supabaseAdmin.rpc("is_admin", { _user_id: currentUser.id });
-
-      if (adminCheckError || (!isAdminResult && !currentUserIsSuperAdmin)) {
-        return new Response(
-          JSON.stringify({ error: "Solo administradores pueden ver usuarios" }),
-          {
-            status: 403,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          },
+      if (!puedeVer) {
+        return respuestaJson(
+          { error: "Solo administradores pueden ver usuarios" },
+          403,
         );
       }
 

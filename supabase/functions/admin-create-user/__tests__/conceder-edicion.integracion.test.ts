@@ -234,16 +234,17 @@ describe("admin-create-user · gestión exclusiva del superadmin", () => {
     expect(permisosDe("nuevo-2")).toEqual([]);
   });
 
-  it("si no se puede comprobar si es super admin y pide edición: 500 y no se crea nada (falla cerrado)", async () => {
+  // CT-REM-FN-12 (30-oct-2026): 503 (no se pudo verificar) en lugar de 500.
+  it("si no se puede comprobar si es super admin y pide edición: 503 y no se crea nada (falla cerrado)", async () => {
     h.rpcConError.add("is_super_admin");
 
     const r = await crear("Bearer super", CON_EDICION);
-    expect(r.status).toBe(500);
+    expect(r.status).toBe(503);
     expect(r.cuerpo).toEqual({ error: "Error verificando permisos" });
     expect(h.creados).toHaveLength(0);
 
     // Sin edición también debe comprobarse: no se crea nada.
-    expect((await crear("Bearer super", SIN_EDICION)).status).toBe(500);
+    expect((await crear("Bearer super", SIN_EDICION)).status).toBe(503);
   });
 
   it("un usuario sin privilegios recibe 403 antes de mirar los permisos", async () => {
@@ -262,8 +263,10 @@ describe("admin-create-user · gestión exclusiva del superadmin", () => {
   });
 });
 
-describe("super admin por SUPER_ADMIN_EMAILS (sin fila en super_admins)", () => {
-  it("también puede conceder edición, como en admin-set-super-admin", async () => {
+// CT-REM-FN-12 (30-oct-2026): antes este caso daba 200 (el email del allowlist
+// sustituía a la tabla). Ahora la única fuente de verdad es super_admins.
+describe("email en SUPER_ADMIN_EMAILS sin fila en super_admins", () => {
+  it("no puede crear usuarios: 403 y no se crea nada", async () => {
     const original = h.handler;
     try {
       vi.resetModules();
@@ -273,8 +276,9 @@ describe("super admin por SUPER_ADMIN_EMAILS (sin fila en super_admins)", () => 
 
       const r = await crear("Bearer socio", CON_EDICION);
 
-      expect(r.status).toBe(200);
-      expect(permisosDe("nuevo-1")).toContainEqual({ user_id: "nuevo-1", section_key: "reservas", can_view: true, can_edit: true });
+      expect(r.status).toBe(403);
+      expect(h.creados).toHaveLength(0);
+      expect(permisosDe("nuevo-1")).toEqual([]);
       expect(h.rpcs).toEqual(["is_super_admin"]);
     } finally {
       ENV.SUPER_ADMIN_EMAILS = "";
@@ -300,7 +304,7 @@ describe("Alta · no anuncia éxito ni deja una cuenta incompleta accesible", ()
     expect(r.cuerpo.error).toMatch(/ha quedado bloqueado/);
     expect(h.bloqueados).toEqual(["nuevo-1"]);
   });
-  it.each([{ role: "root" }, { password: 123456 }, { username: ".." }, { permissions: "todos" }, { permissions: [{ section_key: "reservas", can_view: "true" }] }, { permissions: [CON_EDICION[0], CON_EDICION[0]] }])("valida antes de crear: %j", async extra => {
+  it.each([{ role: "root" }, { password: 123456 }, { password: "123456789" }, { username: ".." }, { permissions: "todos" }, { permissions: [{ section_key: "reservas", can_view: "true" }] }, { permissions: [CON_EDICION[0], CON_EDICION[0]] }])("valida antes de crear: %j", async extra => {
     expect((await crear("Bearer super", CON_EDICION, extra)).status).toBe(400);
     expect(h.creados).toEqual([]);
   });
