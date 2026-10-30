@@ -149,6 +149,7 @@ import {
   type RespuestaEnlace,
 } from "./enlaces-web.ts";
 import type { Marca } from "../reservas-web/plantillas.ts";
+import { secretoCompartidoValido } from "./secreto.ts";
 import {
   TAMANO_LOTE_POR_DEFECTO,
   PAUSA_ENTRE_LOTES_MS_POR_DEFECTO,
@@ -259,7 +260,7 @@ function comprobarSecretoCompartido(req: Request): boolean {
     console.error("[emails-reserva] EMAILS_RESERVA_SHARED_SECRET no configurado — rechazando (fail closed)");
     return false;
   }
-  return req.headers.get("x-webhook-secret") === SHARED_SECRET;
+  return secretoCompartidoValido(SHARED_SECRET, req.headers.get("x-webhook-secret"));
 }
 
 // ------------------------------------------------------------
