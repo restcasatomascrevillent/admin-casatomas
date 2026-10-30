@@ -45,6 +45,7 @@ insert into public.espacios_reserva (id, nombre, capacidad_maxima, activa) value
  ('e0000000-0000-0000-0000-000000000001', 'Comedor', 80, true),
  ('e0000000-0000-0000-0000-000000000002', 'Cerrada', 20, false),
  ('e0000000-0000-0000-0000-000000000003', 'Borrable', 10, true);
+insert into public.mesas_t7 (id, espacio_id) values ('e1000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-000000000003');
 
 -- ---------------------------------------------------------------------------
 -- E1 catálogo
@@ -56,7 +57,7 @@ do $t$ begin
                       and (coalesce(qual, '') in ('true', '(auth.uid() IS NOT NULL)') or coalesce(with_check, '') in ('true', '(auth.uid() IS NOT NULL)'))),
     'E1b: queda una permisiva abierta (true / auth.uid() IS NOT NULL) para public/authenticated/anon';
   assert (select string_agg(policyname, ',' order by policyname) from pg_policies where tablename = 'espacios_reserva') =
-    'acceso_panel_no_bloqueado,espacios_reserva_delete_seccion,espacios_reserva_insert_seccion,espacios_reserva_select_anon_activos,espacios_reserva_select_seccion,espacios_reserva_service_role,espacios_reserva_update_seccion',
+    'acceso_panel_no_bloqueado,espacios_reserva_delete_super_admin,espacios_reserva_insert_seccion,espacios_reserva_select_anon_activos,espacios_reserva_select_seccion,espacios_reserva_service_role,espacios_reserva_update_seccion',
     'E1c: el conjunto final de políticas no es el esperado';
   assert not exists (select 1 from pg_policies where tablename = 'espacios_reserva' and roles = array['public']::name[]), 'E1d: queda una política TO public';
   assert has_table_privilege('anon', 'public.espacios_reserva', 'SELECT')
@@ -67,6 +68,8 @@ do $t$ begin
   assert not has_table_privilege('authenticated', 'public.espacios_reserva', 'TRUNCATE'), 'E1f: authenticated conserva TRUNCATE';
   assert (select permissive from pg_policies where tablename = 'espacios_reserva' and policyname = 'acceso_panel_no_bloqueado') = 'RESTRICTIVE',
     'E1g: falta la restrictiva acceso_panel_no_bloqueado';
+  assert (select qual from pg_policies where tablename = 'espacios_reserva' and policyname = 'espacios_reserva_delete_super_admin') like '%is_super_admin(auth.uid())%',
+    'E1h: el DELETE no es solo de superadmin (D-008)';
 end $t$;
 
 -- ---------------------------------------------------------------------------
@@ -97,7 +100,7 @@ end $t$;
 reset role;
 
 -- ---------------------------------------------------------------------------
--- E4 LECTOR (reservas view): POSITIVA (lee todo y escribe: can_write_section = 'view')
+-- E4 LECTOR (reservas view): POSITIVA (lee, crea y edita: can_write_section = 'view'); NO borra (D-008)
 -- ---------------------------------------------------------------------------
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"b0000000-0000-0000-0000-00000000000b","role":"authenticated","session_id":"b1000000-0000-0000-0000-000000000001"}', true);
@@ -105,7 +108,7 @@ do $t$ begin
   assert pg_temp.n('select count(*) from public.espacios_reserva') = '3', 'E4a: lector no ve todos los espacios (activos e inactivos)';
   assert pg_temp.x($q$insert into public.espacios_reserva (nombre, capacidad_maxima) values ('lector', 4)$q$) = 'ok:1', 'E4b: lector no crea espacios';
   assert pg_temp.x($q$update public.espacios_reserva set capacidad_maxima = 81 where nombre = 'Comedor'$q$) = 'ok:1', 'E4c: lector no edita espacios';
-  assert pg_temp.x($q$delete from public.espacios_reserva where nombre = 'lector'$q$) = 'ok:1', 'E4d: lector no borra espacios';
+  assert pg_temp.x($q$delete from public.espacios_reserva where nombre = 'lector'$q$) = 'ok:0', 'E4d: lector (sin superadmin) borra espacios y su cascada (D-008)';
   assert pg_temp.x($q$truncate public.espacios_reserva$q$) = 'ERR:42501', 'E4e: lector con TRUNCATE';
 end $t$;
 reset role;
@@ -127,12 +130,19 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"c0000000-0000-0000-0000-00000000000c","role":"authenticated","session_id":"c1000000-0000-0000-0000-000000000001"}', true);
 do $t$ begin
-  assert pg_temp.n('select count(*) from public.espacios_reserva') = '3', 'E6a: superadmin no ve todos los espacios';
+  assert pg_temp.n('select count(*) from public.espacios_reserva') = '4', 'E6a: superadmin no ve todos los espacios';
   assert pg_temp.x($q$insert into public.espacios_reserva (nombre, capacidad_maxima) values ('sa', 2)$q$) = 'ok:1', 'E6b: superadmin no crea espacios';
   assert pg_temp.x($q$update public.espacios_reserva set activa = true where nombre = 'Cerrada'$q$) = 'ok:1', 'E6c: superadmin no edita espacios';
-  assert pg_temp.x($q$delete from public.espacios_reserva where nombre in ('sa', 'Borrable')$q$) = 'ok:2', 'E6d: superadmin no borra espacios';
+  assert pg_temp.x($q$delete from public.espacios_reserva where nombre in ('sa', 'lector')$q$) = 'ok:2', 'E6d: superadmin no borra espacios';
+  assert pg_temp.x($q$delete from public.espacios_reserva where nombre = 'Borrable'$q$) = 'ok:1', 'E6e: superadmin no borra un espacio con mesas';
 end $t$;
 reset role;
+
+-- ---------------------------------------------------------------------------
+do $t$ begin
+  assert not exists (select 1 from public.mesas_t7 where id = 'e1000000-0000-0000-0000-000000000003'),
+    'E6f: el CASCADE no se llevó la mesa del espacio borrado por el superadmin';
+end $t$;
 
 -- ---------------------------------------------------------------------------
 -- E7 service_role (bot, reservas-web, emails-reserva): sin cambios

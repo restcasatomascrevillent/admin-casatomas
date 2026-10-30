@@ -21,12 +21,12 @@ set client_encoding = 'UTF8';
 -- otros nombres): el estado real y el de Git difieren. Esta migración acepta
 -- los dos y deja ambos en el mismo estado final.
 --
--- ESTADO FINAL (D-005):
+-- ESTADO FINAL (D-005; DELETE según D-008):
 --   espacios_reserva_select_anon_activos  SELECT anon           activa = true
 --   espacios_reserva_select_seccion       SELECT authenticated  can_read_section('reservas')
 --   espacios_reserva_insert_seccion       INSERT authenticated  can_write_section('reservas')
 --   espacios_reserva_update_seccion       UPDATE authenticated  can_write_section('reservas')
---   espacios_reserva_delete_seccion       DELETE authenticated  can_write_section('reservas')
+--   espacios_reserva_delete_super_admin   DELETE authenticated  is_super_admin(auth.uid())   (D-008)
 --   espacios_reserva_service_role         ALL    service_role   true
 --   acceso_panel_no_bloqueado             RESTRICTIVE (20261013082609; se crea si falta)
 --   GRANT: anon solo SELECT; authenticated sin TRUNCATE (TRUNCATE no pasa por RLS
@@ -42,17 +42,15 @@ set client_encoding = 'UTF8';
 -- viejo de restaurante-phone/src (anon key) la incrusta en un select de
 -- reservas: se conserva el SELECT de anon para que ese join no pase a 403.
 --
--- AVISO DELETE (para revisión): D-005 pone el DELETE en la sección, igual
--- que mesas. Git (20260928140000, opción A) lo tenía en is_super_admin(). Con
--- can_write_section = 'view' hoy, un usuario con reservas/view puede borrar
--- una sala y su cascada. Sigue siendo un cierre respecto a la demo (cualquier
--- cuenta), pero es más laxo que Git. Para la opción A basta cambiar la
--- expresión de espacios_reserva_delete_seccion por
--- (select public.is_super_admin((select auth.uid()))).
+-- DELETE SOLO SUPERADMIN (D-008, CTO 30/10): borrar un espacio arrastra por
+-- CASCADE mesas, asignaciones_mesa, planos_espacio y configuracion_turnos, y
+-- deja reservas sin sala; con can_write_section = 'view' bastaría reservas/view
+-- para hacerlo. Es la intención de 20260928140000 (opción A) y la pantalla de
+-- Espacios solo existe en /super-admin. Se conserva el nombre de Git
+-- (espacios_reserva_delete_super_admin), que pasa de «esperada» a «final».
 --
 -- HUELLA (criterio de «esperadas opcionales»):
---   * Las 9 de la demo, la variante sin tilde y espacios_reserva_delete_super_admin
---     (Git) son ESPERADAS OPCIONALES: se borran con DROP POLICY IF EXISTS y,
+--   * Las 9 de la demo y la variante sin tilde son ESPERADAS OPCIONALES: se borran con DROP POLICY IF EXISTS y,
 --     si falta alguna, solo se avisa con NOTICE. Motivo: el estado de partida
 --     no es uno solo (demo = las 9; Git = las de 20260928140000; producción
 --     puede tener cualquier subconjunto si alguien tocó a mano).
@@ -97,14 +95,13 @@ declare
     'Authenticated users can insert espacios_reserva',
     'Authenticated users can update espacios_reserva',
     'Authenticated users can delete espacios_reserva',
-    'Only authenticated can read espacios',
-    'espacios_reserva_delete_super_admin'];
+    'Only authenticated can read espacios'];
   v_finales text[] := array[
     'espacios_reserva_select_anon_activos',
     'espacios_reserva_select_seccion',
     'espacios_reserva_insert_seccion',
     'espacios_reserva_update_seccion',
-    'espacios_reserva_delete_seccion',
+    'espacios_reserva_delete_super_admin',
     'espacios_reserva_service_role'];
   v_restrictiva constant text := 'acceso_panel_no_bloqueado';
   v_desconocidas text[];
@@ -191,8 +188,9 @@ begin
   create policy espacios_reserva_update_seccion on public.espacios_reserva
     as permissive for update to authenticated
     using ((select public.can_write_section('reservas'))) with check ((select public.can_write_section('reservas')));
-  create policy espacios_reserva_delete_seccion on public.espacios_reserva
-    as permissive for delete to authenticated using ((select public.can_write_section('reservas')));
+  -- D-008: el DELETE (y su cascada) solo para superadmin.
+  create policy espacios_reserva_delete_super_admin on public.espacios_reserva
+    as permissive for delete to authenticated using ((select public.is_super_admin(auth.uid())));
   create policy espacios_reserva_service_role on public.espacios_reserva
     as permissive for all to service_role using (true) with check (true);
 
