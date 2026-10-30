@@ -17,7 +17,8 @@
     "test:auditoria:db": "node scripts/test-auditoria.mjs",
     "test:cheques:db": "node scripts/test-cheques-regalo.mjs",
     "test:novedades:db": "node scripts/test-novedades-botones.mjs",
-    "test:minimo-privilegio:db": "node scripts/test-minimo-privilegio.mjs"
+    "test:minimo-privilegio:db": "node scripts/test-minimo-privilegio.mjs",
+    "test:abuso:db": "node scripts/test-abuso-limites.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

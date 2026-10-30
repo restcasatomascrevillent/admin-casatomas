@@ -139,6 +139,12 @@ import {
   type EstadoDobleOptin,
 } from "./reglas.ts";
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import {
+  puedeEnviarCorreoRechazo,
+  reservarCupoCrear,
+  respuestaDemasiadasSolicitudes,
+  respuestaLimitadorNoDisponible,
+} from "./limitador.ts";
 const createClient = clienteConAuditoria(createClientBase, "reservas-web");
 
 // ------------------------------------------------------------
@@ -152,6 +158,10 @@ const TOKEN_SECRET = Deno.env.get("RESERVAS_WEB_TOKEN_SECRET") ?? "";
 const SHARED_SECRET = Deno.env.get("RESERVAS_WEB_SHARED_SECRET") ?? "";
 const ALLOWED_ORIGIN = Deno.env.get("RESERVAS_WEB_ALLOWED_ORIGIN") || "*";
 const PUBLIC_BASE_URL = Deno.env.get("RESERVAS_WEB_PUBLIC_URL") || `${SUPABASE_URL}/functions/v1/reservas-web`;
+// Sal del HMAC de la IP para el limitador de /crear (CT-REM-FN-07). Si falta
+// RESERVAS_WEB_IP_SALT se usa la service role key (secreta y estable entre
+// isolates, que es lo que importa para contar por IP), como chat-web.
+const IP_SALT = Deno.env.get("RESERVAS_WEB_IP_SALT") || SUPABASE_SERVICE_ROLE_KEY || "";
 
 // Correo de "solicitud recibida": YA NO SE MANDA en el canal web
 // (2026-09-28, ver `handleCrear`). Esta configuracion se queda porque
@@ -1263,6 +1273,24 @@ async function handleCrear(req: Request): Promise<Response> {
   );
   if (rechazoCondiciones) return json(rechazoCondiciones.cuerpo, rechazoCondiciones.status);
 
+  // CT-REM-FN-07: limitador persistente por IP (HMAC) y cupo global diario,
+  // en SQL y atómico (reservas_web_reservar_cupo). Va justo después de las
+  // validaciones que no tocan la BD y ANTES de cualquier lectura o escritura:
+  // una solicitud bloqueada no registra solicitud pendiente, ni notificación,
+  // ni reserva, ni manda correo. FALLA EN CERRADO: si la RPC no existe o
+  // falla, 503 sin efecto.
+  const cupo = await reservarCupoCrear(supabase, req, IP_SALT);
+  if (cupo.estado === "no_disponible") {
+    console.error("[reservas-web] limitador no disponible: se rechaza /crear (fail-closed)");
+    const r = respuestaLimitadorNoDisponible(RESTAURANTE_TEL_TEXTO);
+    return json(r.cuerpo, r.status);
+  }
+  if (cupo.estado === "denegado") {
+    console.warn(`[reservas-web] /crear bloqueada por el limitador (${cupo.motivo})`);
+    const r = respuestaDemasiadasSolicitudes(RESTAURANTE_TEL_TEXTO);
+    return json(r.cuerpo, r.status);
+  }
+
   const config = await getReservationConfig();
   const maxComensales = config.max_comensales_por_reserva || 12;
   const minComensales = config.min_comensales_por_reserva || 1;
@@ -1308,6 +1336,13 @@ async function handleCrear(req: Request): Promise<Response> {
     if (email) {
       await enSegundoPlano(
         (async () => {
+          // CT-REM-FN-07: como mucho 1 correo de rechazo por dirección cada
+          // 24 h (la dirección no está verificada: sin esto, un bucle
+          // convertía al restaurante en emisor de correo hacia terceros).
+          if (!(await puedeEnviarCorreoRechazo(supabase, email))) {
+            console.log("[reservas-web] correo de rechazo omitido: ya se envió uno a esa dirección en 24 h (o el tope no está disponible)");
+            return;
+          }
           const resultadoEmail = await sendEmail(
             email,
             `Estado de reserva ${negocioTemprano.nombre}`,
