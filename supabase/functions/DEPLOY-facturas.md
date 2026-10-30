@@ -14,7 +14,7 @@ supabase secrets set \
   GOOGLE_CLIENT_SECRET=... \
   GOOGLE_REFRESH_TOKEN=1//0... \
   GOOGLE_DRIVE_PARENT_FOLDER_ID=<ID de la carpeta raíz de facturas en Drive> \
-  --project-ref jeamoczmbfsnwkfjxcyo
+  --project-ref sfonaclosuafvlhutkon
 ```
 
 `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` ya los inyecta Supabase automáticamente.
@@ -43,8 +43,8 @@ La carpeta raíz: créala en Drive, abre y copia el ID de la URL
 ## 3. Desplegar
 
 ```bash
-supabase functions deploy procesar-factura --project-ref jeamoczmbfsnwkfjxcyo
-supabase functions deploy chat-facturas     --project-ref jeamoczmbfsnwkfjxcyo
+supabase functions deploy procesar-factura --project-ref sfonaclosuafvlhutkon
+supabase functions deploy chat-facturas     --project-ref sfonaclosuafvlhutkon
 ```
 
 ## 4. Prueba
@@ -55,7 +55,7 @@ supabase functions deploy chat-facturas     --project-ref jeamoczmbfsnwkfjxcyo
 - **Chatbot**: pestaña de chat de facturas → "¿cuánto he gastado este mes?" / "última
   factura de Salazones Garre". Revisa `supabase functions logs chat-facturas`.
 
-## 5. Apagar n8n (cuando ambas estén validadas)
+## 5. Apagar n8n (cuando ambas estén validadas; n8n ya está retirado, apartado conservado como histórico)
 
 - Desactivar los workflows en `n8npersonal.miguelbenito.space`.
 - Ya no se usan los webhooks `/webhook/d96678f4-...` (OCR) ni `/webhook/chatbot`.
@@ -81,7 +81,10 @@ supabase functions deploy chat-facturas     --project-ref jeamoczmbfsnwkfjxcyo
 tras aplicarlas; si se despliega el panel antes, la tabla de facturas fallara.
 
 ```bash
-supabase db push --project-ref jeamoczmbfsnwkfjxcyo
+# Procedimiento del repo (docs/PROCESO-DE-CAMBIOS.md): NUNCA `db push` ni `migration repair`.
+# Demo primero; en producción (haqmmdfdzzatdnrrcgez) solo con el «sí» del dueño. Una a una, en orden de nombre:
+supabase link --project-ref sfonaclosuafvlhutkon
+supabase db query --linked -f supabase/migrations/<fichero>.sql
 #  20260919100000_facturas_busqueda_y_herramientas_chatbot.sql
 #  20260919110000_facturas_archivo_original_y_validacion.sql
 ```
@@ -103,8 +106,8 @@ Lo que traen:
 **2) Edge Functions.**
 
 ```bash
-supabase functions deploy procesar-factura --project-ref jeamoczmbfsnwkfjxcyo
-supabase functions deploy chat-facturas    --project-ref jeamoczmbfsnwkfjxcyo
+supabase functions deploy procesar-factura --project-ref sfonaclosuafvlhutkon
+supabase functions deploy chat-facturas    --project-ref sfonaclosuafvlhutkon
 ```
 
 **3) Panel** (build normal).
@@ -147,16 +150,16 @@ npx supabase db query --linked -f supabase/tests/ocr_trabajos_multipagina_test.s
 
 # 2) Funciones (procesar-factura sigue funcionando aunque se despliegue antes que la
 #    migración; ocr-trabajo necesita la migración)
-npx supabase functions deploy procesar-factura --project-ref jeamoczmbfsnwkfjxcyo
-npx supabase functions deploy ocr-trabajo      --project-ref jeamoczmbfsnwkfjxcyo
+npx supabase functions deploy procesar-factura --project-ref sfonaclosuafvlhutkon
+npx supabase functions deploy ocr-trabajo      --project-ref sfonaclosuafvlhutkon
 
 # 3) Secreto compartido de ocr-trabajo (un valor aleatorio largo; NO lo pegues en ningún chat)
 #    PowerShell:  -join ((48..57)+(97..102) | Get-Random -Count 64 | % {[char]$_})
 #    Git Bash:    openssl rand -hex 32
-npx supabase secrets set OCR_TRABAJOS_SECRET=<VALOR> --project-ref jeamoczmbfsnwkfjxcyo
+npx supabase secrets set OCR_TRABAJOS_SECRET=<VALOR> --project-ref sfonaclosuafvlhutkon
 #    Modelo (opcional; por defecto gpt-5.6-luna con detail original, ver 04b §1.14):
-#    npx supabase secrets set OCR_MODELO=gpt-5.4-mini --project-ref jeamoczmbfsnwkfjxcyo
-#    npx supabase secrets set OCR_MODELO_PIEZAS=gpt-5.6-luna --project-ref jeamoczmbfsnwkfjxcyo
+#    npx supabase secrets set OCR_MODELO=gpt-5.4-mini --project-ref sfonaclosuafvlhutkon
+#    npx supabase secrets set OCR_MODELO_PIEZAS=gpt-5.6-luna --project-ref sfonaclosuafvlhutkon
 ```
 
 ```sql
@@ -192,8 +195,8 @@ al revés, una `ocr-trabajo` antigua leería la pieza única como trozo de docum
 lectura de piezas, no los del síncrono).
 
 ```
-npx supabase functions deploy ocr-trabajo --project-ref jeamoczmbfsnwkfjxcyo
-npx supabase functions deploy procesar-factura --project-ref jeamoczmbfsnwkfjxcyo
+npx supabase functions deploy ocr-trabajo --project-ref sfonaclosuafvlhutkon
+npx supabase functions deploy procesar-factura --project-ref sfonaclosuafvlhutkon
 ```
 
 Comprobar: subir una foto de una página y cerrar la pestaña en cuanto pase a «En cola…»; al volver

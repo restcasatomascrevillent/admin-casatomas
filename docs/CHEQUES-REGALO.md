@@ -13,7 +13,7 @@ Activación:
 
    ```sh
    git pull origin main
-   npx supabase functions deploy cheques-regalo-admin --project-ref jeamoczmbfsnwkfjxcyo
+   npx supabase functions deploy cheques-regalo-admin --project-ref sfonaclosuafvlhutkon
    ```
 
 3. Comprobar los datos del emisor en **Cheques → Plantilla de factura**. Expedir una compra de prueba solicitando factura y comprobar ambos correos, el número de factura en la ficha y el reintento sin duplicados.
@@ -46,7 +46,7 @@ La función web añade `/vista-previa`, que devuelve el diseño del PDF con los 
 
 ### Activar esta actualización
 
-1. Aplicar `supabase/migrations/20261007190000_cheques_manual_plantilla.sql` en el proyecto compartido `jeamoczmbfsnwkfjxcyo`, después de las migraciones de Cheques anteriores.
+1. Aplicar `supabase/migrations/20261007190000_cheques_manual_plantilla.sql` en la demo `sfonaclosuafvlhutkon` (producción solo con el «sí» del dueño; `supabase db query --linked -f`, nunca `db push`), después de las migraciones de Cheques anteriores.
 2. Desde el repositorio `casa-tomas-story`, desplegar las funciones actualizadas:
 
    ```sh
