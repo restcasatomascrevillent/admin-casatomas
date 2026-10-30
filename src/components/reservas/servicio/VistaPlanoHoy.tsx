@@ -138,6 +138,7 @@ import { ConMotivo } from "../ConMotivo";
 import { ReservaCard } from "../ReservaCard";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
 import { MapaSalaServicio } from "./MapaSalaServicio";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 /** Reserva de hoy tal como la trae `VistaHoy` (`select("*")`): `salida_at`/`marca` si existen. */
 export type ReservaPlanoHoy = ReservaMesaServicio & { marca?: string | null };
@@ -464,7 +465,7 @@ export function VistaPlanoHoy({
       toast.success(mensaje);
       setPropuestaPiezas(null);
     } catch (e) {
-      toast.error(`No se ha podido ajustar la mesa: ${e instanceof Error ? e.message : "error"}`);
+      toast.error(`No se ha podido ajustar la mesa: ${mensajeUsuario(e, "error")}`);
     } finally {
       setGuardandoPiezas(false);
       void qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA] });
@@ -520,7 +521,7 @@ export function VistaPlanoHoy({
         try {
           await guardarAjustesServicio(sala.id, hoy, turno, prop.cambios);
         } catch (e) {
-          toast.error(`No se ha podido ajustar la mesa: ${e instanceof Error ? e.message : "error"}`);
+          toast.error(`No se ha podido ajustar la mesa: ${mensajeUsuario(e, "error")}`);
           return;
         }
         void qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA] });

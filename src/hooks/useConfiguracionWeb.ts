@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export type ConfiguracionWeb = Tables<"configuracion_web">;
 
@@ -131,7 +132,7 @@ export function useConfiguracionWeb() {
     },
     onError: (error: Error, _variables, contexto) => {
       if (contexto?.previo) queryClient.setQueryData(QUERY_KEY_CONFIGURACION_WEB, contexto.previo);
-      toast.error("No se pudo cambiar la visibilidad en la web", { description: error.message });
+      toast.error("No se pudo cambiar la visibilidad en la web", { description: mensajeUsuario(error) });
     },
     onSuccess: (_data, { boton, mostrar }) => {
       notificarGuardadoYPublicacion(boton, `${boton === "menu" ? "Menú del día" : "Tapas"} ${mostrar ? "visible" : "oculto"} en Casa Tomás`);

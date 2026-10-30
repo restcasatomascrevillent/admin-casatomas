@@ -68,6 +68,7 @@ import {
 import { horaActual, opcionesParaSentar, type AjusteDia } from "@/lib/reservas/sentarAhora";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { cn } from "@/lib/utils";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 type ReservaMovil = ReservaMesaServicio;
 type Vista = "reservas" | "mesas";
@@ -536,7 +537,7 @@ function PanelMesaLibre({
       await trabajo();
       onCerrar();
     } catch (e) {
-      if (e instanceof Error && e.message !== "mover") toast.error(e.message);
+      if (e instanceof Error && e.message !== "mover") toast.error(mensajeUsuario(e));
     } finally {
       setOcupado(false);
     }

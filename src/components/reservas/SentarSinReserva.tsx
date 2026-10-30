@@ -26,6 +26,7 @@ import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
 import { horaActual, nombreSinReserva, opcionesParaSentar, ordenarParaSinReserva } from "@/lib/reservas/sentarAhora";
 import type { MesaOpcion } from "@/lib/reservas/hoyMovil";
 import { cn } from "@/lib/utils";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export function BotonSentarSinReserva({
   salaPreferida = null,
@@ -118,7 +119,7 @@ function ContenidoSinReserva({ salaPreferida, onCerrar }: { salaPreferida: strin
       if (r.errorMesa) toast.warning(`${r.nombre} sentado sin mesa: ${r.errorMesa}`, { action: deshacer });
       else toast.success(`${r.nombre} → ${donde}`, { action: deshacer });
     } catch (e) {
-      toast.error(`No se ha podido sentar: ${e instanceof Error ? e.message : "error"}`);
+      toast.error(`No se ha podido sentar: ${mensajeUsuario(e, "error")}`);
     }
   };
 

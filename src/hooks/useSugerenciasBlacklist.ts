@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 // ============================================================================
 // SUGERENCIAS DE BLACKLIST — bandeja de aprobación
@@ -140,7 +141,7 @@ export function useAprobarSugerenciaBlacklist() {
       toast.success("Sugerencia aprobada: añadido a la lista negra");
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast.error(mensajeUsuario(error));
     },
   });
 }
@@ -174,7 +175,7 @@ export function useRechazarSugerenciaBlacklist() {
       toast.success("Sugerencia descartada");
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      toast.error(mensajeUsuario(error));
     },
   });
 }

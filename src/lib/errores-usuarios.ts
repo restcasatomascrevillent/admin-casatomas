@@ -1,3 +1,5 @@
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
+
 /** Conserva el mensaje que devuelve la función, también en respuestas HTTP de error. */
 export async function mensajeErrorUsuarios(error: unknown, alternativa: string): Promise<string> {
   const respuesta = (error as { context?: unknown } | null)?.context;
@@ -9,5 +11,6 @@ export async function mensajeErrorUsuarios(error: unknown, alternativa: string):
       // Una respuesta sin JSON utiliza el mensaje alternativo.
     }
   }
-  return error instanceof Error && error.message ? error.message : alternativa;
+  // Un error técnico (PostgREST, red, Functions) no llega a la pantalla.
+  return mensajeUsuario(error, alternativa);
 }

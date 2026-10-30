@@ -23,6 +23,7 @@ import { PlantillaChequeRegalo } from "@/components/cheques/PlantillaChequeRegal
 import { PanelStripe } from "@/components/cheques/PanelStripe";
 import { GastosGestionCheques } from "@/components/cheques/GastosGestionCheques";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado abierto en el
@@ -66,10 +67,10 @@ const vacia: Plantilla = { id: true, emisor_nombre: CASA_TOMAS.nombre, emisor_ni
 function mensajeError(error: unknown, accion: string) {
   const detalle = error && typeof error === "object" ? error as { code?: string; message?: string } : {};
   if (["PGRST202", "PGRST205", "42P01", "42883"].includes(detalle.code || "")) {
-    return "La configuración de Cheques todavía no está instalada en Supabase. Aplica las migraciones de Cheques en el proyecto jeamoczmbfsnwkfjxcyo y vuelve a intentarlo.";
+    return "La configuración de Cheques todavía no está instalada en Supabase. Avisa al equipo técnico para que la active y vuelve a intentarlo.";
   }
   if (detalle.code === "42501") return "Tu usuario no tiene permiso para esta operación. Revisa los permisos de Cheques.";
-  return detalle.message || `No se pudo ${accion}. Comprueba la conexión y vuelve a intentarlo.`;
+  return mensajeUsuario(error, `No se pudo ${accion}. Comprueba la conexión y vuelve a intentarlo.`);
 }
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 

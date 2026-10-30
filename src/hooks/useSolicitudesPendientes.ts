@@ -6,6 +6,7 @@ import { esErrorEsquemaPendiente, mensajeErrorPropuesta } from "@/lib/reservas/p
 import type { ContactoReserva } from "@/lib/reservas/altaPanel";
 import { notificarYAvisarSiFalla } from "@/lib/reservas/notificarCliente";
 import { INTERVALO_SONDEO_MS, nombreCanalUnico, programarSondeo, vigilarCanal } from "@/lib/realtimeCanal";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export interface SolicitudPendiente {
   id: string;
@@ -252,7 +253,7 @@ export function useSolicitudesPendientes() {
         .update({ telefono: contacto.telefono, email: contacto.email, updated_at: new Date().toISOString() })
         .eq("id", id);
       if (error) {
-        toast.error(`No se pudo guardar el teléfono/email del cliente: ${error.message}`);
+        toast.error(`No se pudo guardar el teléfono/email del cliente: ${mensajeUsuario(error, "inténtalo de nuevo")}`);
         return { ok: false, error: "error_contacto", mensaje: error.message };
       }
     }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export type IdiomaBotWeb = "es" | "en" | "fr";
 
@@ -130,7 +131,7 @@ export function useConfigBotWeb() {
       });
     },
     onError: (error: Error, variables) => {
-      toast.error(`No se pudo guardar (${variables.idioma.toUpperCase()})`, { description: error.message });
+      toast.error(`No se pudo guardar (${variables.idioma.toUpperCase()})`, { description: mensajeUsuario(error) });
     },
   });
 

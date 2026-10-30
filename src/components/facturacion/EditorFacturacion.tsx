@@ -19,6 +19,7 @@ import { SelectorServicios, EditarCatalogo } from "./SelectorServicios";
 import { FacturasEmitidas } from "./FacturasEmitidas";
 import { catalogoInicial, prepararNuevaFactura, agregarProductos, ultimaFacturaCliente, recuperarServicios, siguienteNumero, normalizar } from "./catalogo";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 // Alto de pantalla (regla del dueño, 2026-10-07): el editor mide lo que queda
 // bajo la cabecera del layout (`useAlturaDisponible`); cabecera, pestañas, barra
@@ -135,7 +136,7 @@ export function EditorFacturacion() {
   const descargarEmitida = async (g:FacturaGuardada) => {
     setBusy(true);
     try { const {descargarFactura} = await import("./pdf"); await descargarFactura(g.documento); }
-    catch(e) { toast.error(e instanceof Error ? e.message : "No se ha podido descargar la factura."); }
+    catch(e) { toast.error(mensajeUsuario(e, "No se ha podido descargar la factura.")); }
     finally {setBusy(false);}
   };
   const eliminar = async (g:FacturaGuardada,estado:"emitida"|"borrador") => {
@@ -150,12 +151,12 @@ export function EditorFacturacion() {
         setBorrador(pendiente?{id:pendiente.id,version:pendiente.actualizado_en,facturaId:null}:null);
       }
       toast.success(estado==="emitida"?"Factura eliminada":"Borrador eliminado");
-    }catch(e){toast.error(e instanceof Error?e.message:"No se ha podido eliminar.");}
+    }catch(e){toast.error(mensajeUsuario(e, "No se ha podido eliminar."));}
     finally{setBusy(false);}
   };
   const agregar = (ids:string[],paqueteId?:string) => {
     try { cambiar(agregarProductos(f,f.catalogo ?? catalogoInicial(),ids,paqueteId)); }
-    catch(e) {toast.error(e instanceof Error ? e.message : "No se han podido añadir los servicios.");}
+    catch(e) {toast.error(mensajeUsuario(e, "No se han podido añadir los servicios."));}
   };
   const guardar = async (comoFactura: boolean, descargar = false, soloCatalogo = false) => {
     const errores = comoFactura ? erroresFactura(f) : facturaSchema.safeParse(f).success ? [] : ["Revisa fechas, cantidades, precios y límites de los textos."];
@@ -175,7 +176,7 @@ export function EditorFacturacion() {
         const { descargarFactura } = await import("./pdf");
         await descargarFactura(documento);
       }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "No se ha podido guardar la factura."); }
+    } catch (e) { toast.error(mensajeUsuario(e, "No se ha podido guardar la factura.")); }
     finally { setBusy(false); }
   };
   const recargar = async () => {
@@ -252,7 +253,7 @@ export function EditorFacturacion() {
             <DatosParte titulo="Cliente" parte={f.cliente} cambiar={p => cambiar({...f,cliente:p})} />
             {ultimaCliente && <div className="rounded-lg border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Servicios detectados en la última factura de este cliente: {ultimaCliente.numero}</p>
-              <Button variant="outline" className="mt-2 h-auto whitespace-normal" onClick={()=>{try{cambiar(recuperarServicios(f,ultimaCliente.documento));}catch(e){toast.error(e instanceof Error?e.message:"No se han podido recuperar los servicios.");}}}>Añadir servicios recurrentes del cliente</Button>
+              <Button variant="outline" className="mt-2 h-auto whitespace-normal" onClick={()=>{try{cambiar(recuperarServicios(f,ultimaCliente.documento));}catch(e){toast.error(mensajeUsuario(e, "No se han podido recuperar los servicios."));}}}>Añadir servicios recurrentes del cliente</Button>
             </div>}
             <details open={!f.emisor.nif || !f.emisor.direccion} className="rounded-lg border p-3">
               <summary className="cursor-pointer text-sm font-medium">Datos del emisor · {f.emisor.nombre}</summary>
