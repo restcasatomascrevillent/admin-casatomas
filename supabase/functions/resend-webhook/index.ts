@@ -309,8 +309,8 @@ serve(conAuditoriaDePeticion("resend-webhook", createClientBase, async (req: Req
     });
   } catch (error: unknown) {
     console.error("Error procesando webhook:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    return jsonResponse({ error: "Internal server error", message: errorMessage }, 500);
+    // CT-REM-FN-15: el detalle solo va al log, nunca al cliente.
+    return jsonResponse({ error: "Internal server error" }, 500);
   }
 }));
 
