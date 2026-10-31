@@ -198,3 +198,17 @@ describe("EditorLineaBebida · acciones y accesibilidad", () => {
     expect(screen.getByRole("button", { name: "Quitar «Cava brut nature»" })).toBeDisabled();
   });
 });
+
+describe("EditorLineaBebida — la insignia de origen no se encoge (QA DEMO 31-10-2026, 390 px)", () => {
+  it.each([
+    [VINO, "Vino de la carta"],
+    [LIBRE, "Escrita a mano"],
+  ])("«%s» va en una sola línea y su columna no se encoge por debajo de ella", (linea, texto) => {
+    render(<Harness inicial={linea} onCambiar={vi.fn()} />);
+    const insignia = screen.getByTestId("origen-linea");
+    expect(insignia).toHaveTextContent(texto as string);
+    expect(insignia).toHaveClass("shrink-0", "whitespace-nowrap");
+    // Con min-w-0 la columna se encogía hasta 64 px y la insignia se partía en tres líneas.
+    expect(insignia.parentElement).not.toHaveClass("min-w-0");
+  });
+});

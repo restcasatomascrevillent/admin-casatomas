@@ -81,11 +81,13 @@ export function EditorLineaBebida({
       </legend>
 
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1 space-y-1">
+        {/* Sin min-w-0: la insignia no se encoge (a 390 px se partía en tres
+            líneas); si no cabe junto a los botones, son ellos los que bajan. */}
+        <div className="flex-1 space-y-1">
           <p className="text-xs font-medium text-muted-foreground" aria-hidden="true">
             {titulo}
           </p>
-          <Badge variant="secondary" className="font-normal">
+          <Badge variant="secondary" className="shrink-0 whitespace-nowrap font-normal" data-testid="origen-linea">
             {ETIQUETA_ORIGEN[linea.origen]}
           </Badge>
         </div>
