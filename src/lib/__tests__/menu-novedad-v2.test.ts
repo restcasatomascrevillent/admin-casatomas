@@ -15,6 +15,7 @@ import {
   ETIQUETA_LINEA_LIBRE,
   avisosMenuNovedad,
   bebidaElegibleParaMenu,
+  bebidaEsVino,
   conSulfitos,
   conservarTraduccionesLinea,
   limpiarMenuNovedad,
@@ -24,6 +25,7 @@ import {
   lineasBebidaMenu,
   menuNovedadVacio,
   menuPintable,
+  parseLineaBebida,
   parseMenuNovedad,
   serializarMenuNovedad,
   sulfitosDeVino,
@@ -309,11 +311,102 @@ describe("sulfitos y líneas de bebida (E5, E6, ADR-9)", () => {
     expect(textoSulfitosCarta(sinSulf)).toBe("La carta no declara sulfitos");
   });
 
-  it("una bebida de la carta empieza desmarcada y se puede cambiar", () => {
+  it("una bebida de la carta que no es vino empieza desmarcada y se puede cambiar", () => {
     const whisky = lineaDesdeBebida({ id: "b-1", nombre: "Whisky", nombre_en: "Whisky", nombre_fr: "Whisky" });
     expect(whisky).toMatchObject({ origen: "bebida", refId: "b-1", sulfitos: false, descripcion: null });
     expect(sulfitosEditables(whisky)).toBe(true);
     expect(conSulfitos(whisky, true).sulfitos).toBe(true);
+  });
+
+  // Decisión del dueño en QA DEMO (defecto 40a3221d, cambia la ADR-9): una bebida
+  // de la carta que es vino sale con la casilla marcada y se puede desmarcar.
+  describe("bebidaEsVino y la casilla inicial de una bebida de la carta", () => {
+    const linea = (nombre: string, categoria: string | null) =>
+      lineaDesdeBebida({ id: `b-${nombre}`, nombre, categoria });
+
+    it("Copa Verdejo, Copa Cava y los tintos de verano salen marcados (las 11 Copas de la demo)", () => {
+      for (const nombre of [
+        "Copa Verdejo",
+        "Copa Cava Edone",
+        "Copa Cava Juvé & Camps",
+        "Copa Champagne Laurent-Perrier",
+        "Copa Ribera del Duero Aster Crianza",
+        "Copa Rosado Marqués de Riscal XR",
+        "Copa Vino Dulce Oremus Tokaji",
+      ]) {
+        expect(linea(nombre, "Copas"), nombre).toMatchObject({ origen: "bebida", sulfitos: true });
+      }
+      expect(linea("Tinto de verano con limón", "Tintos de verano").sulfitos).toBe(true);
+      expect(linea("Tinto de verano casero", "Tinto de verano").sulfitos).toBe(true);
+      // El nombre también cuenta aunque la categoría no lo diga.
+      expect(linea("Tinto de verano", "Refrescos").sulfitos).toBe(true);
+      expect(linea("Sangría de la casa", "Combinados").sulfitos).toBe(true);
+      expect(linea("Vermut de grifo", "Aperitivos").sulfitos).toBe(true);
+      expect(linea("Espumoso brut", null).sulfitos).toBe(true);
+    });
+
+    it("cerveza, refresco, agua, café, licores y destilados salen desmarcados", () => {
+      const noVino: [string, string | null][] = [
+        ["Mahou Cinco Estrellas", "Cervezas"],
+        ["Ladrón de Manzanas", "Cervezas"],
+        ["Coca-Cola", "Refrescos y aguas"],
+        ["Fanta Naranja", "Refrescos"],
+        ["Agua mineral 1 l", "Aguas"],
+        ["Tónica Schweppes", "Tónicas"],
+        ["Café solo", "Cafés"],
+        ["Johnnie Walker Black Label", "Whiskies"],
+        ["Whisky de malta 12 años", "Licores"],
+        ["Gin Mare", "Ginebras"],
+        ["Tequila José Cuervo", "Tequilas"],
+        ["Ron blanco Bacardí", "Rones"],
+        ["Licor de hierbas", "Licores"],
+        ["Sin categoría", null],
+      ];
+      for (const [nombre, categoria] of noVino) {
+        expect(linea(nombre, categoria).sulfitos, nombre).toBe(false);
+        expect(bebidaEsVino(categoria, nombre), nombre).toBe(false);
+      }
+      // Palabra entera: «cava» no es «Cavalier»; «blanco» fuera de copas no es vino.
+      expect(bebidaEsVino("Cervezas", "Cavalier")).toBe(false);
+      expect(bebidaEsVino("Tequilas", "Tequila blanco")).toBe(false);
+    });
+
+    it("sin tildes ni mayúsculas", () => {
+      expect(bebidaEsVino("COPAS", "COPA VERDEJO")).toBe(true);
+      expect(bebidaEsVino("copas", "copa verdejo")).toBe(true);
+      expect(bebidaEsVino("TINTOS DE VERANO", "tinto de verano")).toBe(true);
+      expect(bebidaEsVino("Burbujas", "CHAMPÁN rosé")).toBe(true);
+      expect(bebidaEsVino("Burbujas", "champan rose")).toBe(true);
+      expect(bebidaEsVino("Aperitivos", "VERMÚ rojo")).toBe(true);
+      expect(bebidaEsVino("Aperitivos", "Sangria")).toBe(true);
+      // tinto, blanco o rosado solo si la categoría es de copas.
+      expect(bebidaEsVino("Vinos por copa", "Tinto de la casa")).toBe(true);
+      expect(bebidaEsVino("Por copas", "Blanco de la casa")).toBe(true);
+      expect(bebidaEsVino("Por COPAS", "ROSADO")).toBe(true);
+    });
+
+    it("la casilla se puede desmarcar", () => {
+      const verdejo = linea("Copa Verdejo", "Copas");
+      expect(sulfitosEditables(verdejo)).toBe(true);
+      const desmarcada = conSulfitos(verdejo, false);
+      expect(desmarcada.sulfitos).toBe(false);
+      expect(conSulfitos(desmarcada, true).sulfitos).toBe(true);
+    });
+
+    it("una línea ya guardada no cambia al reabrirla", () => {
+      // Guardada desmarcada (antes del cambio o porque se desmarcó): se queda desmarcada.
+      const guardada = { id: "g1", origen: "bebida", refId: "b-verdejo", nombre: "Copa Verdejo", sulfitos: false };
+      expect(parseLineaBebida(guardada)).toMatchObject({ origen: "bebida", nombre: "Copa Verdejo", sulfitos: false });
+      // Y una que no es vino guardada marcada a mano sigue marcada.
+      const marcada = { id: "g2", origen: "bebida", refId: "b-cerveza", nombre: "Mahou", sulfitos: true };
+      expect(parseLineaBebida(marcada)?.sulfitos).toBe(true);
+    });
+
+    it("los vinos de la carta y las escritas a mano no cambian", () => {
+      expect(lineaDesdeVino({ id: "v", nombre: "Copa Verdejo", alergenos_oficiales: null }).sulfitos).toBe(false);
+      expect(lineaLibre("otra", "Copa Verdejo").sulfitos).toBe(false);
+      expect(lineaLibre("vino", "Agua").sulfitos).toBe(true);
+    });
   });
 
   it("a mano: «Vino, cava o champagne» marca los sulfitos y «Otra bebida» no; la casilla se puede cambiar", () => {

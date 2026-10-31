@@ -493,6 +493,8 @@ export interface BebidaParaMenu {
   nombre: string | null;
   nombre_en?: string | null;
   nombre_fr?: string | null;
+  /** «Copas», «Tintos de verano», «Cervezas»…: decide la casilla de sulfitos inicial. */
+  categoria?: string | null;
 }
 
 /** E5: entra en el buscador si está en la carta (activado Y restaurante) y tiene nombre. */
@@ -551,7 +553,42 @@ export function lineaDesdeVino(vino: VinoParaMenu): LineaBebidaNovedad {
   );
 }
 
-/** Una bebida de la carta: sin alérgenos en la tabla, así que la casilla empieza desmarcada. */
+/** Categorías de `Bebidas` que son vino enteras (la carta: «Copas», «Tintos de verano»). */
+const CATEGORIAS_VINO = new Set(["copa", "copas", "tinto de verano", "tintos de verano"]);
+
+/**
+ * Palabras que hacen vino una bebida, en la categoría o en el nombre. Palabra
+ * entera (con su plural): «cava» sí, «cavalier» no. «Tinto de verano» va aquí
+ * también para cuando no es la categoría sino el nombre («Refrescos» → «Tinto
+ * de verano»).
+ */
+const PALABRAS_VINO =
+  /\b(vinos?|cavas?|champagnes?|champan(es)?|espumos[oa]s?|sangrias?|vermut(s)?|vermus?|vermouths?|tintos? de verano)\b/;
+
+/** «tinto», «blanco», «rosado» solo cuentan si la categoría es de copas («Ron blanco» no es vino). */
+const COLORES_VINO = /\b(tintos?|blancos?|rosados?)\b/;
+const CATEGORIA_DE_COPAS = /\bcopas?\b/;
+
+/**
+ * ¿Es vino esta bebida de la carta? (decisión del dueño en QA DEMO, cambia la
+ * ADR-9). `Bebidas` no tiene alérgenos, así que solo sirve para el valor
+ * INICIAL de la casilla de sulfitos: un vino sale marcado y se puede desmarcar.
+ * Sin tildes ni mayúsculas. Cerveza, refrescos, agua, café, licores y
+ * destilados no son vino.
+ */
+export function bebidaEsVino(categoria: string | null | undefined, nombre: string | null | undefined): boolean {
+  const enCategoria = normalizarBusqueda(categoria ?? "");
+  const enNombre = normalizarBusqueda(nombre ?? "");
+  if (CATEGORIAS_VINO.has(enCategoria)) return true;
+  if (PALABRAS_VINO.test(enCategoria) || PALABRAS_VINO.test(enNombre)) return true;
+  return CATEGORIA_DE_COPAS.test(enCategoria) && (COLORES_VINO.test(enCategoria) || COLORES_VINO.test(enNombre));
+}
+
+/**
+ * Una bebida de la carta: la tabla no tiene alérgenos, así que la casilla
+ * empieza marcada si es vino (`bebidaEsVino`) y desmarcada si no; se puede
+ * cambiar. Una línea ya guardada no pasa por aquí: se queda con lo guardado.
+ */
 export function lineaDesdeBebida(bebida: BebidaParaMenu): LineaBebidaNovedad {
   return conTraducciones(
     {
@@ -560,7 +597,7 @@ export function lineaDesdeBebida(bebida: BebidaParaMenu): LineaBebidaNovedad {
       refId: bebida.id,
       nombre: texto(bebida.nombre),
       descripcion: null,
-      sulfitos: false,
+      sulfitos: bebidaEsVino(bebida.categoria, bebida.nombre),
     },
     traduccionesDesdeCarta({ nombre_en: bebida.nombre_en, nombre_fr: bebida.nombre_fr }),
   );
