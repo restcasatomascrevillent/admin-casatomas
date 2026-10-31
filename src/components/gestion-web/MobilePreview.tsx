@@ -34,7 +34,10 @@ export interface NovedadPreview {
   botones?: TipoBoton[];
   /** El plato de «Échale un vistazo» está en la carta (si no, la web oculta el botón). */
   platoEnCarta?: boolean;
-  /** El menú de «Ver menú» tiene algún plato (si no, la web oculta el botón). */
+  /**
+   * «Ver menú» tiene qué enseñar (`menuPintable`): un Menú con algún plato o
+   * una Cata con alguna bebida. Si no, la web oculta el botón.
+   */
   menuConPlatos?: boolean;
 }
 
