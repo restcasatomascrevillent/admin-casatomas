@@ -375,11 +375,13 @@ describe("traducirMenuNovedad", () => {
     expect(menu.secciones.segundo[0].traducciones).toBeUndefined();
   });
 
-  it("lo escrito a mano pasa por traducir-contenido tipo «menu», y las bebidas en otra llamada", async () => {
+  it("lo escrito a mano pasa por traducir-contenido tipo «menu», y cada bebida en su propia llamada", async () => {
     const invocar = vi.fn<InvocarTraductorMenu>(async ({ datos }) =>
-      datos.primero === "Vino de la casa\nAgua"
-        ? respuestaOk({ primero: "House wine\nWater" }, { primero: "Vin de la maison\nEau" })
-        : respuestaOk({ segundo: "Roast lamb", postre: "Custard" }, { segundo: "Agneau rôti", postre: "Flan" }),
+      datos.primero === "Vino de la casa"
+        ? respuestaOk({ primero: "House wine" }, { primero: "Vin de la maison" })
+        : datos.primero === "Agua"
+          ? respuestaOk({ primero: "Water" }, { primero: "Eau" })
+          : respuestaOk({ segundo: "Roast lamb", postre: "Custard" }, { segundo: "Agneau rôti", postre: "Flan" }),
     );
     const menuInicial = conComida(
       {
@@ -392,9 +394,11 @@ describe("traducirMenuNovedad", () => {
 
     const { menu, sinTraducir } = await traducirMenuNovedad(menuInicial, platosCarta, invocar);
 
-    expect(invocar).toHaveBeenCalledTimes(2);
+    // Cada bebida en su llamada: traducir-contenido funde las de un mismo hueco (QA DEMO).
+    expect(invocar).toHaveBeenCalledTimes(3);
     expect(invocar).toHaveBeenCalledWith({ tipo: "menu", datos: { primero: "", segundo: "Cordero asado", postre: "Flan" } });
-    expect(invocar).toHaveBeenCalledWith({ tipo: "menu", datos: { primero: "Vino de la casa\nAgua", segundo: "", postre: "" } });
+    expect(invocar).toHaveBeenCalledWith({ tipo: "menu", datos: { primero: "Vino de la casa", segundo: "", postre: "" } });
+    expect(invocar).toHaveBeenCalledWith({ tipo: "menu", datos: { primero: "Agua", segundo: "", postre: "" } });
     expect(sinTraducir).toBe(0);
     expect(menu.secciones.segundo[0].traducciones).toEqual({
       en: { nombre: "Roast lamb", descripcion: null },

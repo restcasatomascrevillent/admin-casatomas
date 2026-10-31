@@ -417,6 +417,118 @@ describe("conservarTraduccionesLinea", () => {
   });
 });
 
+describe("traducirMenuNovedad — bebidas a mano con un traductor que funde líneas (QA DEMO 31-10-2026)", () => {
+  // Imita a traducir-contenido en la demo: si un hueco lleva varias líneas,
+  // devuelve una sola (las funde); con una línea, la traduce bien.
+  const traductorQueFunde = vi.fn<InvocarTraductorMenu>(async ({ datos }) => {
+    const traducir = (prefijo: string, valor: string) => {
+      const lineas = valor.split("\n").filter((l) => l.trim() !== "");
+      if (lineas.length === 0) return "";
+      return lineas.length > 1 ? `${prefijo} ${lineas.join(" y ")}` : `${prefijo} ${lineas[0]}`;
+    };
+    const idioma = (prefijo: string) => ({
+      primero: traducir(prefijo, datos.primero),
+      segundo: traducir(prefijo, datos.segundo),
+      postre: traducir(prefijo, datos.postre),
+    });
+    return { data: { ok: true, translations: { menu_en: idioma("EN"), menu_fr: idioma("FR") } }, error: null };
+  });
+
+  const cataAMano = (cuantas: number): MenuNovedad => ({
+    ...menuNovedadVacio(),
+    tipo: "cata",
+    cata: Array.from({ length: cuantas }, (_, i) =>
+      linea(`c${i + 1}`, { nombre: `Bebida ${i + 1}`, descripcion: `Nota ${i + 1}` }),
+    ),
+  });
+
+  it.each([1, 2, 4])("con %i bebidas a mano todas se traducen (nombre y descripción) y no hay aviso", async (cuantas) => {
+    traductorQueFunde.mockClear();
+    const { menu, sinTraducir } = await traducirMenuNovedad(cataAMano(cuantas), new Map(), traductorQueFunde);
+    expect(sinTraducir).toBe(0);
+    expect(traductorQueFunde).toHaveBeenCalledTimes(cuantas);
+    // Nunca dos bebidas en el mismo hueco.
+    for (const [{ datos }] of traductorQueFunde.mock.calls) {
+      for (const hueco of [datos.primero, datos.segundo, datos.postre]) expect(hueco).not.toContain("\n");
+    }
+    menu.cata.forEach((l, i) => {
+      expect(l.traducciones).toEqual({
+        en: { nombre: `EN Bebida ${i + 1}`, descripcion: `EN Nota ${i + 1}` },
+        fr: { nombre: `FR Bebida ${i + 1}`, descripcion: `FR Nota ${i + 1}` },
+      });
+    });
+  });
+
+  it("los maridajes a mano de varios platos también se traducen uno a uno", async () => {
+    traductorQueFunde.mockClear();
+    const menu: MenuNovedad = {
+      ...menuNovedadVacio(),
+      maridaje: true,
+      secciones: {
+        ...menuNovedadVacio().secciones,
+        primero: [{ ...plato("p1", "Sopa"), traducciones: { en: { nombre: "Soup", descripcion: null }, fr: { nombre: "Soupe", descripcion: null } } }],
+        segundo: [{ ...plato("p2", "Arroz"), traducciones: { en: { nombre: "Rice", descripcion: null }, fr: { nombre: "Riz", descripcion: null } } }],
+      },
+      maridajes: {
+        p1: linea("m1", { nombre: "Ginebra con tónica" }),
+        p2: linea("m2", { nombre: "Chupito de tequila", descripcion: "Reposado" }),
+      },
+    };
+    const { menu: traducido, sinTraducir } = await traducirMenuNovedad(menu, new Map(), traductorQueFunde);
+    expect(sinTraducir).toBe(0);
+    expect(traducido.maridajes.p1.traducciones?.en).toEqual({ nombre: "EN Ginebra con tónica", descripcion: null });
+    expect(traducido.maridajes.p2.traducciones?.fr).toEqual({ nombre: "FR Chupito de tequila", descripcion: "FR Reposado" });
+  });
+
+  it("las bebidas a mano de la sección Bebidas van una por llamada", async () => {
+    traductorQueFunde.mockClear();
+    const menu: MenuNovedad = {
+      ...menuNovedadVacio(),
+      incluye_bebidas: true,
+      secciones: { ...menuNovedadVacio().secciones, bebidas: [plato("b1", "Agua"), plato("b2", "Caña")] },
+    };
+    const { menu: traducido, sinTraducir } = await traducirMenuNovedad(menu, new Map(), traductorQueFunde);
+    expect(sinTraducir).toBe(0);
+    expect(traducido.secciones.bebidas.map((b) => b.traducciones?.en?.nombre)).toEqual(["EN Agua", "EN Caña"]);
+  });
+
+  it("si falla el nombre se guarda la descripción traducida (y al revés), y se avisa", async () => {
+    const soloSegundo = vi.fn<InvocarTraductorMenu>(async ({ datos }) => ({
+      data: {
+        ok: true,
+        translations: {
+          menu_en: { primero: "", segundo: datos.segundo ? `EN ${datos.segundo}` : "", postre: "" },
+          menu_fr: { primero: "", segundo: datos.segundo ? `FR ${datos.segundo}` : "", postre: "" },
+        },
+      },
+      error: null,
+    }));
+    const { menu, sinTraducir } = await traducirMenuNovedad(cataAMano(1), new Map(), soloSegundo);
+    expect(sinTraducir).toBe(1);
+    expect(menu.cata[0].traducciones).toEqual({
+      en: { nombre: "Bebida 1", descripcion: "EN Nota 1" },
+      fr: { nombre: "Bebida 1", descripcion: "FR Nota 1" },
+    });
+
+    const soloPrimero = vi.fn<InvocarTraductorMenu>(async ({ datos }) => ({
+      data: {
+        ok: true,
+        translations: {
+          menu_en: { primero: `EN ${datos.primero}`, segundo: "", postre: "" },
+          menu_fr: { primero: `FR ${datos.primero}`, segundo: "", postre: "" },
+        },
+      },
+      error: null,
+    }));
+    const otra = await traducirMenuNovedad(cataAMano(1), new Map(), soloPrimero);
+    expect(otra.sinTraducir).toBe(1);
+    expect(otra.menu.cata[0].traducciones).toEqual({
+      en: { nombre: "EN Bebida 1", descripcion: null },
+      fr: { nombre: "FR Bebida 1", descripcion: null },
+    });
+  });
+});
+
 describe("traducirMenuNovedad — bebidas del maridaje y de la cata (E8, C8)", () => {
   const respuesta = (en: Record<string, string>, fr: Record<string, string>) => ({
     data: {
@@ -429,12 +541,11 @@ describe("traducirMenuNovedad — bebidas del maridaje y de la cata (E8, C8)", (
     error: null,
   });
 
-  it("los nombres a mano y las descripciones van en una tercera llamada tipo «menu»", async () => {
-    const invocar = vi.fn<InvocarTraductorMenu>(async () =>
-      respuesta(
-        { primero: "Brut nature cava", segundo: "Well chilled\nSweet" },
-        { primero: "Cava brut nature", segundo: "Bien frais\nDoux" },
-      ),
+  it("cada bebida va en su llamada tipo «menu»: el nombre a mano en «primero» y la descripción en «segundo»", async () => {
+    const invocar = vi.fn<InvocarTraductorMenu>(async ({ datos }) =>
+      datos.primero === "Cava brut nature"
+        ? respuesta({ primero: "Brut nature cava", segundo: "Well chilled" }, { primero: "Cava brut nature", segundo: "Bien frais" })
+        : respuesta({ segundo: "Sweet" }, { segundo: "Doux" }),
     );
     const menu = modeloCata();
     menu.cata = [
@@ -451,11 +562,12 @@ describe("traducirMenuNovedad — bebidas del maridaje y de la cata (E8, C8)", (
 
     const { menu: traducido, sinTraducir } = await traducirMenuNovedad(menu, new Map(), invocar);
 
-    expect(invocar).toHaveBeenCalledTimes(1);
+    expect(invocar).toHaveBeenCalledTimes(2);
     expect(invocar).toHaveBeenCalledWith({
       tipo: "menu",
-      datos: { primero: "Cava brut nature", segundo: "Bien frío\nDulce", postre: "" },
+      datos: { primero: "Cava brut nature", segundo: "Bien frío", postre: "" },
     });
+    expect(invocar).toHaveBeenCalledWith({ tipo: "menu", datos: { primero: "", segundo: "Dulce", postre: "" } });
     expect(sinTraducir).toBe(0);
     expect(traducido.cata[0].traducciones).toEqual({
       en: { nombre: "Brut nature cava", descripcion: "Well chilled" },

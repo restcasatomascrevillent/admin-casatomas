@@ -791,6 +791,17 @@ const descripcionLineaPendiente = (linea: LineaBebidaNovedad): boolean =>
 const lineaPendiente = (linea: LineaBebidaNovedad): boolean =>
   nombreLineaPendiente(linea) || descripcionLineaPendiente(linea);
 
+const huecosVacios = (): Record<SeccionMenu, ItemMenu[]> => ({ primero: [], segundo: [], postre: [] });
+
+/** Junta las variantes de varias llamadas (los ids no se repiten entre ellas). */
+function unirVariantes(todas: Variantes[]): Variantes {
+  const resultado: Variantes = new Map(IDIOMAS_TRADUCIDOS.map((idioma) => [idioma, new Map()]));
+  for (const variantes of todas) {
+    for (const [idioma, porId] of variantes) for (const [id, variante] of porId) resultado.get(idioma)!.set(id, variante);
+  }
+  return resultado;
+}
+
 /** `emparejarTraduccion` empareja por líneas: cada texto ocupa exactamente una. */
 const comoItem = (id: string, textoLinea: string): ItemMenu => ({
   id,
@@ -814,15 +825,17 @@ const ID_DESCRIPCION = (id: string) => `descripcion:${id}`;
  *  2. Un plato de la carta copia `nombre_en/fr` y `descripcion_en/fr` del plato
  *     (gratis y exacto). Si la carta no lo tiene traducido, se queda en
  *     castellano: no se inventa una segunda versión del mismo plato.
- *  3. Lo escrito a mano, y el plato que ya no está en la carta, va a
- *     `traducir-contenido` con `tipo: "menu"`. Las bebidas van en una segunda
- *     llamada, en el hueco de `primero`.
- *  4. Las bebidas del maridaje y de la cata (E8) van en una tercera llamada:
- *     los nombres a mano en el hueco de `primero` y las descripciones en el de
- *     `segundo`, una por línea.
- * Si el traductor falla o devuelve otro número de líneas, esas líneas se
- * guardan sin traducción (la web enseña el castellano) y se cuentan en
- * `sinTraducir` para avisar.
+ *  3. Los platos escritos a mano, y el plato que ya no está en la carta, van a
+ *     `traducir-contenido` con `tipo: "menu"`, como en el menú del día.
+ *  4. Cada bebida escrita a mano va en SU PROPIA llamada: la de la sección
+ *     Bebidas en el hueco de `primero`, y la del maridaje o la cata (E8) con
+ *     el nombre a mano solo en `primero` y la descripción sola en `segundo`.
+ *     La función manda «Primero: …\nSegundo: …» y funde en una las líneas de
+ *     bebidas de un mismo hueco (QA DEMO 31-10-2026: con 2 devolvía 1), así
+ *     que nunca se mandan dos bebidas en el mismo hueco.
+ * Nombre y descripción se emparejan cada uno por su lado: si falla uno, el
+ * otro se guarda. Lo que no se traduce se guarda en castellano (la web enseña
+ * el castellano) y se cuenta en `sinTraducir` para avisar.
  */
 export async function traducirMenuNovedad(
   menu: MenuNovedad,
@@ -848,19 +861,20 @@ export async function traducirMenuNovedad(
   const comida = Object.fromEntries(
     SECCIONES_MENU.map((seccion) => [seccion, conCarta[seccion].filter(pendiente)]),
   ) as Record<SeccionMenu, ItemMenuNovedad[]>;
-  const bebidas: Record<SeccionMenu, ItemMenuNovedad[]> = {
-    primero: conCarta.bebidas.filter(pendiente),
-    segundo: [],
-    postre: [],
-  };
-  const lineas = lineasBebidaMenu(limpio);
-  const deLineas: Record<SeccionMenu, ItemMenu[]> = {
-    primero: lineas.filter(nombreLineaPendiente).map((linea) => comoItem(ID_NOMBRE(linea.id), linea.nombre)),
-    segundo: lineas
-      .filter(descripcionLineaPendiente)
-      .map((linea) => comoItem(ID_DESCRIPCION(linea.id), linea.descripcion as string)),
-    postre: [],
-  };
+  const llamadasBebidas = conCarta.bebidas
+    .filter(pendiente)
+    .map((item): Record<SeccionMenu, ItemMenu[]> => ({ ...huecosVacios(), primero: [item] }));
+  const llamadasLineas = lineasBebidaMenu(limpio)
+    .filter(lineaPendiente)
+    .map(
+      (linea): Record<SeccionMenu, ItemMenu[]> => ({
+        ...huecosVacios(),
+        primero: nombreLineaPendiente(linea) ? [comoItem(ID_NOMBRE(linea.id), linea.nombre)] : [],
+        segundo: descripcionLineaPendiente(linea)
+          ? [comoItem(ID_DESCRIPCION(linea.id), linea.descripcion as string)]
+          : [],
+      }),
+    );
 
   const pedir = async (porSeccion: Record<SeccionMenu, ItemMenu[]>): Promise<Variantes> => {
     const variantes: Variantes = new Map(IDIOMAS_TRADUCIDOS.map((idioma) => [idioma, new Map()]));
@@ -899,8 +913,8 @@ export async function traducirMenuNovedad(
 
   const [deComida, deBebidas, traduccionLineas] = await Promise.all([
     pedir(comida),
-    pedir(bebidas),
-    pedir(deLineas),
+    Promise.all(llamadasBebidas.map(pedir)).then(unirVariantes),
+    Promise.all(llamadasLineas.map(pedir)).then(unirVariantes),
   ]);
 
   let sinTraducir = 0;
@@ -923,21 +937,28 @@ export async function traducirMenuNovedad(
   const traducirLinea = (linea: LineaBebidaNovedad): LineaBebidaNovedad => {
     if (!lineaPendiente(linea)) return linea;
     const traducciones: TraduccionesNovedad = { ...linea.traducciones };
+    let falta = false;
     for (const idioma of IDIOMAS_TRADUCIDOS) {
       const actual = linea.traducciones?.[idioma];
       const delTraductor = traduccionLineas.get(idioma);
-      const nombreTraducido = actual?.nombre || delTraductor?.get(ID_NOMBRE(linea.id))?.nombre || "";
-      // A mano y sin nombre traducido no hay variante: la web enseña el castellano.
-      if (linea.origen === "libre" && !nombreTraducido) continue;
-      const descripcion =
-        actual?.descripcion || (linea.descripcion && delTraductor?.get(ID_DESCRIPCION(linea.id))?.nombre) || null;
-      if (!nombreTraducido && !descripcion) continue;
-      // Una bebida de la carta sin nombre traducido en la carta conserva el castellano.
-      traducciones[idioma] = { nombre: nombreTraducido || linea.nombre, descripcion };
+      // Nombre y descripción, cada uno por su lado: si falla uno, el otro se guarda.
+      let nombre = actual?.nombre ?? "";
+      if (!nombre && linea.origen === "libre") {
+        nombre = delTraductor?.get(ID_NOMBRE(linea.id))?.nombre ?? "";
+        if (!nombre) falta = true;
+      }
+      let descripcion = actual?.descripcion ?? null;
+      if (!descripcion && linea.descripcion) {
+        descripcion = delTraductor?.get(ID_DESCRIPCION(linea.id))?.nombre ?? null;
+        if (!descripcion) falta = true;
+      }
+      if (!nombre && !descripcion) continue;
+      // Sin nombre traducido (de la carta sin traducir, o a mano y el traductor
+      // no lo devolvió) la variante lleva el castellano y la descripción traducida.
+      traducciones[idioma] = { nombre: nombre || linea.nombre, descripcion };
     }
-    const resultado = Object.keys(traducciones).length > 0 ? { ...linea, traducciones } : linea;
-    if (lineaPendiente(resultado)) sinTraducir += 1;
-    return resultado;
+    if (falta) sinTraducir += 1;
+    return Object.keys(traducciones).length > 0 ? { ...linea, traducciones } : linea;
   };
 
   const maridajes: Record<string, LineaBebidaNovedad> = {};
