@@ -16,13 +16,13 @@
 // mientras se edita y se avisa de que no se guardará (E10).
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { EditorSeccionesMenu } from "./EditorSeccionesMenu";
+import { EditorSeccionesMenu, SeccionPlatos } from "./EditorSeccionesMenu";
 import { EditorLineaBebida, ElegirLineaBebida } from "./EditorLineaBebida";
 import { useBebidasParaMenu } from "@/hooks/useBebidasParaMenu";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
@@ -32,6 +32,12 @@ import {
   avisosMenuNovedad,
   conservarTraduccionesLinea,
   conservarTraduccionesVigentes,
+  ETIQUETA_POSICION_EXTRA,
+  platosEnOrden,
+  POSICIONES_SECCION_EXTRA,
+  seccionExtraVacia,
+  type PosicionSeccionExtra,
+  type SeccionExtraNovedad,
   type ItemMenuNovedad,
   type LineaBebidaNovedad,
   type MenuNovedad,
@@ -290,13 +296,22 @@ function EditorMenuPlatos({
           cargandoPlatos={cargandoPlatos}
         />
       ) : (
-        <EditorSeccionesMenu
-          secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
-          onChange={cambiarComida}
-          platos={platos}
-          platosPorId={platosPorId}
-          cargandoPlatos={cargandoPlatos}
-        />
+        <>
+          <EditorSeccionesMenu
+            secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+            onChange={cambiarComida}
+            platos={platos}
+            platosPorId={platosPorId}
+            cargandoPlatos={cargandoPlatos}
+          />
+          <SeccionesExtra
+            menu={menu}
+            onChange={onChange}
+            platos={platos}
+            platosPorId={platosPorId}
+            cargandoPlatos={cargandoPlatos}
+          />
+        </>
       )}
 
       <AvisosMenu avisos={avisoMaridaje} testId="aviso-maridaje" />
@@ -430,7 +445,7 @@ function PlatosConMaridaje({
   const { secciones } = menu;
 
   // Un plato sin nombre no se guarda (ni su bebida): no se ofrece hasta que lo tenga.
-  const conNombre = SECCIONES_MENU.flatMap((seccion) => secciones[seccion]).filter((item) => item.nombre.trim() !== "");
+  const conNombre = platosEnOrden(menu).filter((item) => item.nombre.trim() !== "");
   const total = conNombre.length;
   const conBebida = conNombre.filter((p) => menu.maridajes[p.id]).length;
 
@@ -517,7 +532,117 @@ function PlatosConMaridaje({
         cargandoPlatos={cargandoPlatos}
         debajoDePlato={bebidaDe}
       />
+      <SeccionesExtra
+        menu={menu}
+        onChange={onChange}
+        platos={platos}
+        platosPorId={platosPorId}
+        cargandoPlatos={cargandoPlatos}
+        debajoDePlato={bebidaDe}
+      />
     </section>
+  );
+}
+
+/**
+ * Secciones con nombre libre (Aperitivo, Entrantes, Prepostre…): cada una con
+ * su nombre, dónde va respecto a primero, segundo y postre, y sus platos.
+ */
+function SeccionesExtra({
+  menu,
+  onChange,
+  platos,
+  platosPorId,
+  cargandoPlatos,
+  debajoDePlato,
+}: PropsBloque & {
+  platos: PlatoDeCarta[];
+  platosPorId: Map<string, PlatoDeCarta>;
+  cargandoPlatos: boolean;
+  debajoDePlato?: (item: ItemMenu) => ReactNode;
+}) {
+  const [enfocar, setEnfocar] = useState<string | null>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!enfocar) return;
+    listaRef.current?.querySelector<HTMLInputElement>(`[data-seccion-extra="${enfocar}"]`)?.focus();
+    setEnfocar(null);
+  }, [enfocar]);
+
+  const cambiar = (id: string, cambio: (seccion: SeccionExtraNovedad) => SeccionExtraNovedad) =>
+    onChange({ ...menu, extras: menu.extras.map((s) => (s.id === id ? cambio(s) : s)) });
+
+  const añadir = () => {
+    const nueva = seccionExtraVacia();
+    onChange({ ...menu, extras: [...menu.extras, nueva] });
+    setEnfocar(nueva.id);
+  };
+
+  return (
+    <div ref={listaRef} className="space-y-2" data-testid="secciones-extra">
+      {menu.extras.map((seccion, indice) => {
+        const nombre = seccion.nombre.trim() || `sección ${indice + 1}`;
+        return (
+          <SeccionPlatos
+            key={seccion.id}
+            testId={`seccion-extra-${indice + 1}`}
+            titulo={
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <Input
+                  data-seccion-extra={seccion.id}
+                  value={seccion.nombre}
+                  maxLength={40}
+                  // Cambia el castellano: su traducción ya no vale (se rehace al guardar).
+                  onChange={(e) => cambiar(seccion.id, (s) => ({ ...s, nombre: e.target.value, traducciones: undefined }))}
+                  placeholder="Ej: Aperitivo"
+                  aria-label={`Nombre de la sección ${indice + 1}`}
+                  className="h-11 min-w-0 flex-1 basis-40 font-semibold"
+                />
+                <select
+                  value={seccion.posicion}
+                  onChange={(e) => cambiar(seccion.id, (s) => ({ ...s, posicion: e.target.value as PosicionSeccionExtra }))}
+                  aria-label={`Dónde va «${nombre}»`}
+                  className="h-11 min-w-0 rounded-md border bg-background px-2 text-sm"
+                >
+                  {POSICIONES_SECCION_EXTRA.map((posicion) => (
+                    <option key={posicion} value={posicion}>
+                      {ETIQUETA_POSICION_EXTRA[posicion]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            }
+            acciones={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 text-destructive hover:text-destructive"
+                onClick={() => onChange({ ...menu, extras: menu.extras.filter((s) => s.id !== seccion.id) })}
+                aria-label={`Quitar la sección «${nombre}»`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            }
+            items={seccion.items}
+            onChange={(items) =>
+              cambiar(seccion.id, (s) => ({ ...s, items: conservarTraduccionesVigentes(s.items, items) }))
+            }
+            platos={platos}
+            platosPorId={platosPorId}
+            cargandoPlatos={cargandoPlatos}
+            debajoDePlato={debajoDePlato}
+          />
+        );
+      })}
+      <Button type="button" variant="outline" size="sm" className="h-11 px-4" onClick={añadir}>
+        <Plus className="h-3.5 w-3.5 mr-1.5" />
+        Añadir sección
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        Para más tiempos aparte de primero, segundo y postre: aperitivo, entrantes, prepostre…
+      </p>
+    </div>
   );
 }
 

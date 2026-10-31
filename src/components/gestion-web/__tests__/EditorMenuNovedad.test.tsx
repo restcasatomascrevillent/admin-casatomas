@@ -469,3 +469,29 @@ describe("EditorMenuNovedad · una v1 de antes", () => {
     expect(serializarMenuNovedad(ultimo)).toEqual(V1);
   });
 });
+
+describe("EditorMenuNovedad · secciones extra (31/10/2026)", () => {
+  it("añade una sección con nombre, elige dónde va, le pone platos y, con Maridaje, su bebida; se quita", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Añadir sección" }));
+    const nombre = screen.getByLabelText("Nombre de la sección 1");
+    await waitFor(() => expect(nombre).toHaveFocus());
+    fireEvent.change(nombre, { target: { value: "Aperitivo" } });
+    fireEvent.change(screen.getByLabelText("Dónde va «Aperitivo»"), { target: { value: "antes_primero" } });
+
+    const seccion = () => within(screen.getByTestId("seccion-extra-1"));
+    fireEvent.click(seccion().getByRole("button", { name: /a mano/i }));
+    fireEvent.change(seccion().getByLabelText("Nombre del plato 1"), { target: { value: "Gilda" } });
+    expect(ultimo.extras).toEqual([
+      expect.objectContaining({ nombre: "Aperitivo", posicion: "antes_primero", items: [expect.objectContaining({ nombre: "Gilda" })] }),
+    ]);
+
+    // Con Maridaje el plato de la sección también lleva su bebida.
+    fireEvent.click(radioTipo(/^Maridaje/));
+    expect(seccion().getByRole("group", { name: "Bebida para «Gilda»" })).toBeInTheDocument();
+
+    fireEvent.click(seccion().getByRole("button", { name: "Quitar la sección «Aperitivo»" }));
+    expect(screen.queryByTestId("seccion-extra-1")).toBeNull();
+    expect(ultimo.extras).toEqual([]);
+  });
+});

@@ -26,6 +26,7 @@ import {
   lineasBebidaMenu,
   menuNovedadVacio,
   menuPintable,
+  menuTieneComida,
   parseLineaBebida,
   parseMenuNovedad,
   serializarMenuNovedad,
@@ -820,3 +821,69 @@ describe("parseMenuNovedad — L1: v1 o sin versión ignora tipo, maridaje y cat
   });
 });
 
+
+describe("secciones extra con nombre libre (31/10/2026)", () => {
+  const respuesta = (en: Record<string, string>, fr: Record<string, string>) => ({
+    data: { ok: true, translations: { menu_en: en, menu_fr: fr } },
+    error: null,
+  });
+  const conAperitivo = (menu: MenuNovedad = menuNovedadVacio()): MenuNovedad => ({
+    ...menu,
+    extras: [
+      { id: "x1", nombre: " Aperitivo ", posicion: "antes_primero", items: [plato("a1", "Gilda"), plato("a2", "  ")] },
+      { id: "x2", nombre: "Vacía", posicion: "despues_postre", items: [] },
+    ],
+  });
+
+  it("se guardan en secciones.extra (sin las vacías ni los platos sin nombre) y se vuelven a leer igual", () => {
+    const guardado = serializarMenuNovedad(conAperitivo()) as { version: number; secciones: Record<string, unknown> };
+    expect(guardado.version).toBe(1);
+    expect(guardado.secciones.extra).toEqual([
+      { id: "x1", nombre: "Aperitivo", posicion: "antes_primero", platos: [expect.objectContaining({ id: "a1", nombre: "Gilda" })] },
+    ]);
+    const releido = parseMenuNovedad(guardado)!;
+    expect(releido.extras).toHaveLength(1);
+    expect(releido.extras[0]).toMatchObject({ id: "x1", nombre: "Aperitivo", posicion: "antes_primero" });
+    mismoJson(serializarMenuNovedad(releido), guardado);
+  });
+
+  it("un menú sin secciones extra no escribe la clave (sigue igual que antes)", () => {
+    const guardado = serializarMenuNovedad(modeloMaridaje()) as { secciones: Record<string, unknown> };
+    expect(guardado.secciones).not.toHaveProperty("extra");
+  });
+
+  it("cuentan como comida, llevan maridaje y una posición desconocida va al final", () => {
+    const menu = conAperitivo({ ...menuNovedadVacio(), maridaje: true, maridajes: { a1: linea("m1", { nombre: "Fino" }) } });
+    expect(menuTieneComida(menu)).toBe(true);
+    expect(validarBotonesNovedad({ botones: ["ver_menu"], menu, estadoPlato: "sin_plato" })).toEqual([]);
+    const guardado = serializarMenuNovedad(menu) as { version: number; secciones: { extra: { platos: { maridaje?: unknown }[] }[] } };
+    expect(guardado.version).toBe(2);
+    expect(guardado.secciones.extra[0].platos[0].maridaje).toMatchObject({ nombre: "Fino" });
+    const raro = parseMenuNovedad({ version: 1, secciones: { extra: [{ nombre: "Café", posicion: "x", platos: [] }] } })!;
+    expect(raro.extras[0].posicion).toBe("despues_postre");
+  });
+
+  it("una sección con platos y sin nombre no deja guardar", () => {
+    const menu: MenuNovedad = {
+      ...menuNovedadVacio(),
+      extras: [{ id: "x1", nombre: "  ", posicion: "antes_postre", items: [plato("a1", "Sorbete")] }],
+    };
+    expect(validarBotonesNovedad({ botones: ["ver_menu"], menu, estadoPlato: "sin_plato" }).map((e) => e.codigo)).toEqual([
+      "seccion_sin_nombre",
+    ]);
+  });
+
+  it("al traducir, el nombre de la sección y sus platos a mano van en su propia llamada", async () => {
+    const invocar = vi.fn<InvocarTraductorMenu>(async ({ datos }) =>
+      respuesta(
+        { primero: datos.primero.replace("Gilda", "Gilda skewer"), segundo: datos.segundo.replace("Aperitivo", "Appetiser") },
+        { primero: datos.primero.replace("Gilda", "Gilda"), segundo: datos.segundo.replace("Aperitivo", "Apéritif") },
+      ),
+    );
+    const { menu, sinTraducir } = await traducirMenuNovedad(conAperitivo(), new Map(), invocar);
+    expect(invocar).toHaveBeenCalledTimes(1);
+    expect(menu.extras[0].traducciones).toEqual({ en: { nombre: "Appetiser" }, fr: { nombre: "Apéritif" } });
+    expect(menu.extras[0].items[0].traducciones?.en?.nombre).toBe("Gilda skewer");
+    expect(sinTraducir).toBe(0);
+  });
+});

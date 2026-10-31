@@ -265,7 +265,7 @@ describe("EditorNovedadesWeb — botones", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
 
     expect(toast.error).toHaveBeenCalledWith(
-      "No se puede guardar: «Ver menú» necesita al menos un plato en primero, segundo o postre.",
+      "No se puede guardar: «Ver menú» necesita al menos un plato.",
       expect.anything(),
     );
     expect(mocks.crear).not.toHaveBeenCalled();

@@ -176,6 +176,38 @@ export interface LineaBebidaNovedad {
 
 export type TipoMenuNovedad = "menu" | "cata";
 
+// Secciones con nombre libre (petición del dueño, 31/10/2026: «que se puedan
+// añadir más platos aparte de primero, segundo…»). Van en `secciones.extra`
+// del jsonb: una web que no las conozca las ignora. Cada una dice dónde va
+// respecto a primero, segundo y postre; dentro del mismo sitio, en su orden.
+export const POSICIONES_SECCION_EXTRA = ["antes_primero", "antes_segundo", "antes_postre", "despues_postre"] as const;
+export type PosicionSeccionExtra = (typeof POSICIONES_SECCION_EXTRA)[number];
+export const ETIQUETA_POSICION_EXTRA: Record<PosicionSeccionExtra, string> = {
+  antes_primero: "Antes del primero",
+  antes_segundo: "Entre primero y segundo",
+  antes_postre: "Entre segundo y postre",
+  despues_postre: "Después del postre",
+};
+
+/** Una sección de platos con nombre libre (Aperitivo, Entrantes, Prepostre…). */
+export interface SeccionExtraNovedad {
+  /** uuid, estable al editar. */
+  id: string;
+  /** En castellano; obligatorio si tiene platos. */
+  nombre: string;
+  posicion: PosicionSeccionExtra;
+  /** Solo el nombre traducido de la sección. */
+  traducciones?: Partial<Record<IdiomaTraducido, { nombre: string }>>;
+  items: ItemMenuNovedad[];
+}
+
+export const seccionExtraVacia = (posicion: PosicionSeccionExtra = "despues_postre"): SeccionExtraNovedad => ({
+  id: nuevoIdItem(),
+  nombre: "",
+  posicion,
+  items: [],
+});
+
 /**
  * El menú tal y como lo edita el panel (ADR-7). La versión no está aquí: la
  * decide `serializarMenuNovedad` (E1). Mientras se edita se conserva lo del
@@ -188,8 +220,10 @@ export interface MenuNovedad {
   /** Opción «Maridaje» del panel (solo cuenta con tipo Menú). */
   maridaje: boolean;
   secciones: SeccionesMenuNovedad;
-  /** Bebida de cada plato de primero, segundo y postre, por id del plato. */
+  /** Bebida de cada plato (de primero, segundo, postre y secciones extra), por id del plato. */
   maridajes: Record<string, LineaBebidaNovedad>;
+  /** Secciones de platos con nombre libre, en orden. */
+  extras: SeccionExtraNovedad[];
   /** Lista ordenada de la cata. */
   cata: LineaBebidaNovedad[];
 }
@@ -200,6 +234,7 @@ export const menuNovedadVacio = (): MenuNovedad => ({
   maridaje: false,
   secciones: { primero: [], segundo: [], postre: [], bebidas: [] },
   maridajes: {},
+  extras: [],
   cata: [],
 });
 
@@ -294,10 +329,70 @@ export function parseMenuNovedad(valor: unknown): MenuNovedad | null {
       }
     }
   }
+  if (Array.isArray(mapa.extra)) {
+    for (const valorSeccion of mapa.extra) {
+      if (!esObjeto(valorSeccion)) continue;
+      const seccion: SeccionExtraNovedad = {
+        id: texto(valorSeccion.id) || nuevoIdItem(),
+        nombre: texto(valorSeccion.nombre),
+        posicion: POSICIONES_SECCION_EXTRA.find((p) => p === valorSeccion.posicion) ?? "despues_postre",
+        items: [],
+      };
+      const traducciones = parseTraduccionesNombre(valorSeccion.traducciones);
+      if (traducciones) seccion.traducciones = traducciones;
+      for (const valorItem of Array.isArray(valorSeccion.platos) ? valorSeccion.platos : []) {
+        const item = parseItemNovedad(valorItem);
+        if (!item) continue;
+        seccion.items.push(item);
+        if (menu.maridaje) {
+          const linea = parseLineaBebida((valorItem as Record<string, unknown>).maridaje);
+          if (linea) menu.maridajes[item.id] = linea;
+        }
+      }
+      menu.extras.push(seccion);
+    }
+  }
   if (menu.tipo === "cata" && Array.isArray(mapa.cata)) {
     menu.cata = mapa.cata.map((linea) => parseLineaBebida(linea)).filter(esLinea);
   }
   return menu;
+}
+
+function parseTraduccionesNombre(valor: unknown): SeccionExtraNovedad["traducciones"] {
+  if (!esObjeto(valor)) return undefined;
+  const traducciones: NonNullable<SeccionExtraNovedad["traducciones"]> = {};
+  for (const idioma of IDIOMAS_TRADUCIDOS) {
+    const variante = valor[idioma];
+    const nombre = esObjeto(variante) ? texto(variante.nombre) : "";
+    if (nombre) traducciones[idioma] = { nombre };
+  }
+  return Object.keys(traducciones).length > 0 ? traducciones : undefined;
+}
+
+/**
+ * Secciones extra tal y como se guardan: platos sin nombre fuera y las que se
+ * quedan sin platos fuera. Si cambia el nombre en castellano, su traducción ya
+ * no vale.
+ */
+function limpiarExtras(extras: SeccionExtraNovedad[]): SeccionExtraNovedad[] {
+  return (extras ?? [])
+    .map((seccion) => ({ ...seccion, nombre: seccion.nombre.trim(), items: limpiarLineas(seccion.items) }))
+    .filter((seccion) => seccion.items.length > 0);
+}
+
+/** Todos los platos del menú en el orden de la web (secciones extra incluidas). */
+export function platosEnOrden(menu: Pick<MenuNovedad, "secciones" | "extras">): ItemMenuNovedad[] {
+  const de = (posicion: PosicionSeccionExtra) =>
+    (menu.extras ?? []).filter((seccion) => seccion.posicion === posicion).flatMap((seccion) => seccion.items);
+  return [
+    ...de("antes_primero"),
+    ...menu.secciones.primero,
+    ...de("antes_segundo"),
+    ...menu.secciones.segundo,
+    ...de("antes_postre"),
+    ...menu.secciones.postre,
+    ...de("despues_postre"),
+  ];
 }
 
 /** Líneas con nombre vacío fuera (se añade «A mano» y puede quedarse en blanco). */
@@ -332,6 +427,7 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
   if (menu.tipo === "cata") {
     return { ...menuNovedadVacio(), tipo: "cata", cata: menu.cata.map(limpiarLinea).filter(esLinea) };
   }
+  const extras = limpiarExtras(menu.extras);
   const secciones: SeccionesMenuNovedad = {
     primero: limpiarLineas(menu.secciones.primero),
     segundo: limpiarLineas(menu.secciones.segundo),
@@ -340,11 +436,9 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
   };
   const maridajes: Record<string, LineaBebidaNovedad> = {};
   if (menu.maridaje) {
-    for (const seccion of SECCIONES_MENU) {
-      for (const item of secciones[seccion]) {
-        const linea = limpiarLinea(menu.maridajes[item.id]);
-        if (linea) maridajes[item.id] = linea;
-      }
+    for (const item of platosEnOrden({ secciones, extras })) {
+      const linea = limpiarLinea(menu.maridajes[item.id]);
+      if (linea) maridajes[item.id] = linea;
     }
   }
   return {
@@ -353,21 +447,20 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
     maridaje: Object.keys(maridajes).length > 0,
     secciones,
     maridajes,
+    extras,
     cata: [],
   };
 }
 
-/** ¿Hay algún plato en primero, segundo o postre? */
+/** ¿Hay algún plato en primero, segundo, postre o en una sección extra? */
 export const menuTieneComida = (menu: MenuNovedad): boolean =>
-  SECCIONES_MENU.some((seccion) => limpiarLineas(menu.secciones[seccion]).length > 0);
+  limpiarLineas(platosEnOrden(menu)).length > 0;
 
 export const menuTieneBebidas = (menu: MenuNovedad): boolean => limpiarLineas(menu.secciones.bebidas).length > 0;
 
 /** ¿Algún plato que sigue en el menú tiene bebida de maridaje con nombre? (sin mirar el interruptor) */
 export const menuTieneMaridajes = (menu: MenuNovedad): boolean =>
-  SECCIONES_MENU.some((seccion) =>
-    menu.secciones[seccion].some((item) => item.nombre.trim() !== "" && limpiarLinea(menu.maridajes[item.id]) !== null),
-  );
+  platosEnOrden(menu).some((item) => item.nombre.trim() !== "" && limpiarLinea(menu.maridajes[item.id]) !== null);
 
 /** ¿La cata tiene alguna bebida con nombre? (sin mirar el tipo) */
 export const cataTieneBebidas = (menu: MenuNovedad): boolean => menu.cata.some((linea) => linea.nombre.trim() !== "");
@@ -383,9 +476,7 @@ export const menuPintable = (menu: MenuNovedad): boolean =>
 export function lineasBebidaMenu(menu: MenuNovedad): LineaBebidaNovedad[] {
   const limpio = limpiarMenuNovedad(menu);
   if (limpio.tipo === "cata") return limpio.cata;
-  return SECCIONES_MENU.flatMap((seccion) =>
-    limpio.secciones[seccion].flatMap((item) => (limpio.maridajes[item.id] ? [limpio.maridajes[item.id]] : [])),
-  );
+  return platosEnOrden(limpio).flatMap((item) => (limpio.maridajes[item.id] ? [limpio.maridajes[item.id]] : []));
 }
 
 // Avisos de E10: lo del otro tipo se conserva al editar, pero no se guarda.
@@ -471,12 +562,23 @@ export function serializarMenuNovedad(menu: MenuNovedad): Json {
     };
   }
   const plato = (item: ItemMenuNovedad) => serializarItem(item, limpio.maridajes[item.id]);
-  const secciones = {
+  const secciones: { [clave: string]: Json } = {
     primero: limpio.secciones.primero.map(plato),
     segundo: limpio.secciones.segundo.map(plato),
     postre: limpio.secciones.postre.map(plato),
     bebidas: limpio.secciones.bebidas.map((item) => serializarItem(item)),
   };
+  // Solo si hay alguna: un menú sin secciones extra se escribe como siempre.
+  if (limpio.extras.length > 0) {
+    secciones.extra = limpio.extras.map((seccion) => {
+      const salida: { [clave: string]: Json } = { id: seccion.id, nombre: seccion.nombre, posicion: seccion.posicion };
+      if (seccion.traducciones && Object.keys(seccion.traducciones).length > 0) {
+        salida.traducciones = seccion.traducciones as { [clave: string]: Json };
+      }
+      salida.platos = seccion.items.map(plato);
+      return salida;
+    });
+  }
   if (!limpio.maridaje) return { version: 1, incluye_bebidas: limpio.incluye_bebidas, secciones };
   return { version: 2, tipo: "menu", incluye_bebidas: limpio.incluye_bebidas, maridaje: true, secciones };
 }
@@ -651,6 +753,7 @@ export type CodigoErrorBotones =
   | "bebidas_vacias"
   | "maridaje_vacio"
   | "cata_vacia"
+  | "seccion_sin_nombre"
   | "plato_sin_enlazar"
   | "plato_fuera_de_carta";
 
@@ -694,7 +797,13 @@ export function validarBotonesNovedad({ botones, menu, estadoPlato }: BotonesPar
       if (!menuPintable(menu)) {
         errores.push({
           codigo: "menu_sin_platos",
-          mensaje: "«Ver menú» necesita al menos un plato en primero, segundo o postre.",
+          mensaje: "«Ver menú» necesita al menos un plato.",
+        });
+      }
+      if (limpiarExtras(menu.extras).some((seccion) => seccion.nombre === "")) {
+        errores.push({
+          codigo: "seccion_sin_nombre",
+          mensaje: "Cada sección que añadas necesita un nombre (por ejemplo, «Aperitivo»).",
         });
       }
       if (incluyeBebidas(menu) && !menuTieneBebidas(menu)) {
@@ -988,10 +1097,31 @@ export async function traducirMenuNovedad(
     return variantes;
   };
 
-  const [deComida, deBebidas, traduccionLineas] = await Promise.all([
+  // 5. Secciones extra: una llamada por sección, sus platos pendientes en
+  //    `primero` y su nombre (si le falta traducción) solo en `segundo`.
+  const extrasConCarta = limpio.extras.map((seccion) => ({
+    ...seccion,
+    items: seccion.items.map((item) => {
+      if (traduccionCompleta(item) || !enLaCarta(item)) return item;
+      const deCarta = traduccionesDesdeCarta(platosPorId.get(item.platoId as string) as PlatoConTraducciones);
+      return deCarta ? { ...item, traducciones: { ...item.traducciones, ...deCarta } } : item;
+    }),
+  }));
+  const nombreSeccionPendiente = (seccion: SeccionExtraNovedad) =>
+    IDIOMAS_TRADUCIDOS.some((idioma) => !seccion.traducciones?.[idioma]?.nombre);
+  const llamadasExtras = extrasConCarta.map(
+    (seccion): Record<SeccionMenu, ItemMenu[]> => ({
+      ...huecosVacios(),
+      primero: seccion.items.filter(pendiente),
+      segundo: nombreSeccionPendiente(seccion) ? [comoItem(ID_NOMBRE(seccion.id), seccion.nombre)] : [],
+    }),
+  );
+
+  const [deComida, deBebidas, traduccionLineas, deExtras] = await Promise.all([
     pedir(comida),
     Promise.all(llamadasBebidas.map(pedir)).then(unirVariantes),
     Promise.all(llamadasLineas.map(pedir)).then(unirVariantes),
+    Promise.all(llamadasExtras.map(pedir)).then(unirVariantes),
   ]);
 
   let sinTraducir = 0;
@@ -1010,6 +1140,28 @@ export async function traducirMenuNovedad(
       return resultado;
     });
   }
+
+  const extras = extrasConCarta.map((seccion): SeccionExtraNovedad => {
+    const items = seccion.items.map((item) => {
+      if (!pendiente(item)) return item;
+      const traducciones = { ...item.traducciones };
+      for (const idioma of IDIOMAS_TRADUCIDOS) {
+        const variante = deExtras.get(idioma)?.get(item.id);
+        if (variante) traducciones[idioma] = variante;
+      }
+      const resultado: ItemMenuNovedad = Object.keys(traducciones).length > 0 ? { ...item, traducciones } : item;
+      if (!traduccionCompleta(resultado)) sinTraducir += 1;
+      return resultado;
+    });
+    if (!nombreSeccionPendiente(seccion)) return { ...seccion, items };
+    const traducciones = { ...seccion.traducciones };
+    for (const idioma of IDIOMAS_TRADUCIDOS) {
+      const nombre = traducciones[idioma]?.nombre || deExtras.get(idioma)?.get(ID_NOMBRE(seccion.id))?.nombre;
+      if (nombre) traducciones[idioma] = { nombre };
+    }
+    if (IDIOMAS_TRADUCIDOS.some((idioma) => !traducciones[idioma])) sinTraducir += 1;
+    return Object.keys(traducciones).length > 0 ? { ...seccion, items, traducciones } : { ...seccion, items };
+  });
 
   const traducirLinea = (linea: LineaBebidaNovedad): LineaBebidaNovedad => {
     if (!lineaPendiente(linea)) return linea;
@@ -1041,5 +1193,5 @@ export async function traducirMenuNovedad(
   const maridajes: Record<string, LineaBebidaNovedad> = {};
   for (const [idPlato, linea] of Object.entries(limpio.maridajes)) maridajes[idPlato] = traducirLinea(linea);
 
-  return { menu: { ...limpio, secciones, maridajes, cata: limpio.cata.map(traducirLinea) }, sinTraducir };
+  return { menu: { ...limpio, secciones, maridajes, extras, cata: limpio.cata.map(traducirLinea) }, sinTraducir };
 }
