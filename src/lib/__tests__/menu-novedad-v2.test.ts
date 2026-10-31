@@ -29,6 +29,7 @@ import {
   sulfitosDeVino,
   sulfitosEditables,
   textoSulfitosCarta,
+  coincidenciaBusqueda,
   traducirMenuNovedad,
   validarBotonesNovedad,
   type InvocarTraductorMenu,
@@ -641,3 +642,65 @@ describe("traducirMenuNovedad — bebidas del maridaje y de la cata (E8, C8)", (
     expect(traducido.maridajes).toEqual({});
   });
 });
+
+describe("coincidenciaBusqueda — buscador de vinos y bebidas", () => {
+  it("exacta < empieza por < palabra < contiene < categoría < todas las palabras; si no, null", () => {
+    expect(coincidenciaBusqueda("Sol", "Cervezas", "sol")).toBe(0);
+    expect(coincidenciaBusqueda("Soleá fino", null, "Sol")).toBe(1);
+    expect(coincidenciaBusqueda("Marqués de Solar", null, "sol")).toBe(2);
+    expect(coincidenciaBusqueda("Consolación", null, "sol")).toBe(3);
+    expect(coincidenciaBusqueda("Monastrell", "TINTOS", "tintos")).toBe(4);
+    expect(coincidenciaBusqueda("Lagavulin 16 años", "Whiskys", "whiskys lagavulin")).toBe(5);
+    expect(coincidenciaBusqueda("Lagavulin 16 años", "Whiskys", "Lagavulin 8")).toBeNull();
+    expect(coincidenciaBusqueda("Fondillón", null, "FONDILLON")).toBe(0);
+    expect(coincidenciaBusqueda("Lo que sea", null, "  ")).toBe(0);
+  });
+});
+
+describe("parseMenuNovedad — L1: v1 o sin versión ignora tipo, maridaje y cata (QA DEMO)", () => {
+  const conTodo = (version?: number) => ({
+    ...(version === undefined ? {} : { version }),
+    tipo: "cata",
+    maridaje: true,
+    incluye_bebidas: true,
+    secciones: {
+      primero: [{ id: "p1", nombre: "Sopa", maridaje: { id: "m1", origen: "libre", nombre: "Cava" } }],
+      segundo: [],
+      postre: [],
+      bebidas: [{ id: "b1", nombre: "Agua" }],
+      cata: [{ id: "c1", origen: "libre", nombre: "Fondillón" }],
+    },
+  });
+
+  it.each([undefined, 1])("versión %s: Menú sin maridaje ni cata, con sus platos y bebidas", (version) => {
+    const menu = parseMenuNovedad(conTodo(version))!;
+    expect(menu.tipo).toBe("menu");
+    expect(menu.maridaje).toBe(false);
+    expect(menu.maridajes).toEqual({});
+    expect(menu.cata).toEqual([]);
+    expect(menu.incluye_bebidas).toBe(true);
+    expect(menu.secciones.primero.map((p) => p.nombre)).toEqual(["Sopa"]);
+    expect(menu.secciones.bebidas.map((b) => b.nombre)).toEqual(["Agua"]);
+  });
+
+  it("un Menú v1 con maridaje: true y sin versión tampoco enciende el maridaje", () => {
+    const { tipo: _tipo, ...sinTipo } = conTodo();
+    const menu = parseMenuNovedad(sinTipo)!;
+    expect(menu.maridaje).toBe(false);
+    expect(menu.maridajes).toEqual({});
+  });
+
+  it.each([2, 3])("versión %i: se leen el tipo y la cata", (version) => {
+    const menu = parseMenuNovedad(conTodo(version))!;
+    expect(menu.tipo).toBe("cata");
+    expect(menu.cata.map((l) => l.nombre)).toEqual(["Fondillón"]);
+  });
+
+  it("la v1 se sigue guardando igual", () => {
+    const menu = parseMenuNovedad(conTodo(1))!;
+    expect(serializarMenuNovedad(menu)).toMatchObject({ version: 1, incluye_bebidas: true });
+    expect(serializarMenuNovedad(menu)).not.toHaveProperty("tipo");
+    expect(serializarMenuNovedad(menu)).not.toHaveProperty("maridaje");
+  });
+});
+

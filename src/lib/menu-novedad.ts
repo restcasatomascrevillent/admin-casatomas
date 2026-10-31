@@ -256,8 +256,10 @@ const esLinea = (linea: LineaBebidaNovedad | null): linea is LineaBebidaNovedad 
  * ausente, NULL o algo que no es un menú). Las secciones que falten se leen
  * como vacías.
  *  - L1: sin `version`, con la 1 o con `tipo` ausente o desconocido es un
- *    Menú. Maridaje solo con `maridaje === true` y cata solo con
- *    `tipo === "cata"`. Una versión mayor se lee igual, en lo que se pueda.
+ *    Menú. Sin `version` o con la 1 se ignoran `tipo`, `maridaje` y `cata`
+ *    aunque vengan (como la web). Maridaje solo con `maridaje === true` y cata
+ *    solo con `tipo === "cata"`. Una versión mayor se lee igual, en lo que se
+ *    pueda.
  *  - L6: una v1 se reabre como Menú sin maridaje; una v2 restaura el tipo, los
  *    maridajes, la cata, los sulfitos y las traducciones.
  */
@@ -275,9 +277,10 @@ export function parseMenuNovedad(valor: unknown): MenuNovedad | null {
   if (!esObjeto(mapa)) return null;
 
   const menu = menuNovedadVacio();
-  menu.tipo = crudo.tipo === "cata" ? "cata" : "menu";
+  const v2 = typeof crudo.version === "number" && crudo.version >= 2;
+  menu.tipo = v2 && crudo.tipo === "cata" ? "cata" : "menu";
   menu.incluye_bebidas = crudo.incluye_bebidas === true;
-  menu.maridaje = menu.tipo === "menu" && crudo.maridaje === true;
+  menu.maridaje = v2 && menu.tipo === "menu" && crudo.maridaje === true;
   for (const seccion of SECCIONES_MENU_NOVEDAD) {
     const lista = mapa[seccion];
     if (!Array.isArray(lista)) continue;
