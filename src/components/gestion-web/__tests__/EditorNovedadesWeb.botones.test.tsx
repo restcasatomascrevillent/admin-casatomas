@@ -433,7 +433,8 @@ describe("EditorNovedadesWeb — maridaje y cata (historia 4093221d)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Editar «Menú maridado»" }));
     expect(tipo(/^Maridaje/)).toBeChecked();
-    expect(bloque().getByRole("radio", { name: /comida \+ bebidas/i })).toBeChecked();
+    // Con Maridaje no se ofrece «¿Qué incluye el menú?».
+    expect(bloque().queryByRole("radio", { name: /comida \+ bebidas/i })).toBeNull();
     expect(maridajes().getByText("2 de 3 con bebida")).toBeInTheDocument();
     expect(maridajes().getByRole("button", { name: "Cambiar «Cava brut nature»" })).toBeInTheDocument();
     expect(maridajes().getByRole("button", { name: "Cambiar «Fondillón»" })).toBeInTheDocument();

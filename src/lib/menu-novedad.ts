@@ -320,10 +320,14 @@ function limpiarLinea(linea: LineaBebidaNovedad | null | undefined): LineaBebida
 
 /**
  * El menú tal y como se guarda: sin líneas vacías, sin bebidas con «Solo
- * comida», sin los maridajes de platos que ya no están (ADR-7) y sin nada del
+ * comida» ni con Maridaje (la bebida va en cada plato; desde el 31/10/2026 el
+ * panel solo ofrece la sección Bebidas en Menú), sin los maridajes de platos que ya no están (ADR-7) y sin nada del
  * tipo que no se ha elegido (E10). Una cata no guarda comida ni maridaje. Un
  * maridaje que se queda sin ninguna bebida se apaga.
  */
+/** «Comida + bebidas» solo cuenta en un Menú sin maridaje. */
+const incluyeBebidas = (menu: MenuNovedad): boolean => menu.incluye_bebidas && !menu.maridaje;
+
 export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
   if (menu.tipo === "cata") {
     return { ...menuNovedadVacio(), tipo: "cata", cata: menu.cata.map(limpiarLinea).filter(esLinea) };
@@ -332,7 +336,7 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
     primero: limpiarLineas(menu.secciones.primero),
     segundo: limpiarLineas(menu.secciones.segundo),
     postre: limpiarLineas(menu.secciones.postre),
-    bebidas: menu.incluye_bebidas ? limpiarLineas(menu.secciones.bebidas) : [],
+    bebidas: incluyeBebidas(menu) ? limpiarLineas(menu.secciones.bebidas) : [],
   };
   const maridajes: Record<string, LineaBebidaNovedad> = {};
   if (menu.maridaje) {
@@ -345,7 +349,7 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
   }
   return {
     tipo: "menu",
-    incluye_bebidas: menu.incluye_bebidas,
+    incluye_bebidas: incluyeBebidas(menu),
     maridaje: Object.keys(maridajes).length > 0,
     secciones,
     maridajes,
@@ -388,6 +392,8 @@ export function lineasBebidaMenu(menu: MenuNovedad): LineaBebidaNovedad[] {
 export const AVISO_GUARDAR_COMO_CATA = "Al guardar como Cata no se guardarán los platos del menú.";
 export const AVISO_GUARDAR_COMO_MENU = "Al guardar como Menú no se guardará la lista de la cata.";
 export const AVISO_MARIDAJE_APAGADO = "Al guardar como Menú no se guardarán las bebidas de cada plato del maridaje.";
+export const AVISO_BEBIDAS_CON_MARIDAJE =
+  "Con Maridaje no se guarda la sección Bebidas de «Comida + bebidas»: la bebida va en cada plato.";
 
 /** Qué hay en el editor que no se guardará con el tipo y el maridaje elegidos (E10). */
 export function avisosMenuNovedad(menu: MenuNovedad): string[] {
@@ -397,6 +403,7 @@ export function avisosMenuNovedad(menu: MenuNovedad): string[] {
   const avisos: string[] = [];
   if (cataTieneBebidas(menu)) avisos.push(AVISO_GUARDAR_COMO_MENU);
   if (!menu.maridaje && menuTieneMaridajes(menu)) avisos.push(AVISO_MARIDAJE_APAGADO);
+  if (menu.maridaje && menu.incluye_bebidas && menuTieneBebidas(menu)) avisos.push(AVISO_BEBIDAS_CON_MARIDAJE);
   return avisos;
 }
 
@@ -690,7 +697,7 @@ export function validarBotonesNovedad({ botones, menu, estadoPlato }: BotonesPar
           mensaje: "«Ver menú» necesita al menos un plato en primero, segundo o postre.",
         });
       }
-      if (menu.incluye_bebidas && !menuTieneBebidas(menu)) {
+      if (incluyeBebidas(menu) && !menuTieneBebidas(menu)) {
         errores.push({
           codigo: "bebidas_vacias",
           mensaje: "Con «Comida + bebidas» añade al menos una bebida, o elige «Solo comida».",

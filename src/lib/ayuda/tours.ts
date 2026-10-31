@@ -328,9 +328,9 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: GW_NOVEDADES,
       titulo: "Nueva novedad",
       texto:
-        "Pulsa aquí para crear una. Elige el tipo, escribe un título y unas ideas y, si quieres, pulsa «Redactar con IA» y elige el tono: te propone un texto que revisas antes de usarlo. Puedes añadir una foto, una etiqueta, un icono y puntos destacados.",
+        "Aquí se crea una nueva (o se edita la que toques en la lista; «Cancelar edición» vuelve a una nueva). Va por pestañas: Texto, Imagen, Botones y menú y Publicación. Escribe un título y unas ideas y, si quieres, pulsa «Redactar con IA» y elige el tono: te propone un texto que revisas antes de usarlo. Puedes añadir una foto, una etiqueta, un icono y puntos destacados.",
       opcional: true,
-      lado: "bottom",
+      lado: "left",
     },
     {
       elemento: "gw-novedades-publicacion",

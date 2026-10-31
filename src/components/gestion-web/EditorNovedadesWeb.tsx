@@ -540,16 +540,6 @@ export function EditorNovedadesWeb() {
     });
   };
 
-  const empezarNueva = () => {
-    conConfirmacion(() => {
-      descartarSubidaSinGuardar();
-      cargarEnFormulario(null);
-      setPestanaForm("contenido");
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      setTimeout(() => tituloRef.current?.focus(), 300);
-    });
-  };
-
   // --- Lista y orden --------------------------------------------------------
   // Se muestran TODAS las filas de la tabla: la web pública no filtra por
   // sección ni por tipo, así que cualquier fila activa y vigente sale en la
@@ -991,16 +981,6 @@ export function EditorNovedadesWeb() {
   // debajo de `xl` va todo apilado y desplaza la pestaña entera.
   return (
     <div className="space-y-4 xl:flex xl:h-full xl:flex-col">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          Se muestran en la web de Casa Tomás y los cambios se ven al momento.
-        </p>
-        <Button onClick={empezarNueva} data-tour="gw-novedades-nueva">
-          <Plus className="w-4 h-4 mr-1.5" />
-          Nueva novedad
-        </Button>
-      </div>
-
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)] xl:flex-1 xl:min-h-0 gap-4 items-start">
         <div className="space-y-4 min-w-0 xl:h-full xl:overflow-y-auto xl:overscroll-contain">
           {/* ------------------------------------------------ Lista */}
@@ -1168,7 +1148,7 @@ export function EditorNovedadesWeb() {
           </Card>
 
           {/* ------------------------------------------------ Formulario */}
-          <Card ref={formRef} className={`scroll-mt-4 ${editando ? "border-primary" : ""}`}>
+          <Card ref={formRef} className={`scroll-mt-4 ${editando ? "border-primary" : ""}`} data-tour="gw-novedades-nueva">
             <CardHeader className="p-4 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

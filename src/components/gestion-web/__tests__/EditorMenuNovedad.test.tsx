@@ -237,7 +237,7 @@ describe("EditorMenuNovedad · tres opciones", () => {
 });
 
 describe("EditorMenuNovedad · Maridaje", () => {
-  it("no viene elegido; al elegirlo, cada plato elige, cambia o quita su bebida, y se combina con «Comida + bebidas»", async () => {
+  it("no viene elegido; al elegirlo, cada plato elige, cambia o quita su bebida debajo del propio plato, sin «¿Qué incluye el menú?»", async () => {
     const gamba = itemLibre("Gamba roja");
     const arroz = itemLibre("Arroz a banda");
     const turron = itemLibre("Turrón de Jijona");
@@ -277,23 +277,26 @@ describe("EditorMenuNovedad · Maridaje", () => {
     expect(ultimo.maridajes[arroz.id]).toBeUndefined();
     await waitFor(() => expect(within(grupoTurron()).getByRole("button", { name: /de la carta/i })).toHaveFocus());
 
-    // Con «Comida + bebidas»: v2 con la sección Bebidas y el maridaje solo en la gamba (E3).
-    fireEvent.click(screen.getByRole("radio", { name: /comida \+ bebidas/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Añadir bebida" }));
-    fireEvent.change(screen.getByLabelText("Bebida 1"), { target: { value: "Agua mineral" } });
+    // La bebida va dentro de la tarjeta de su plato.
+    const tarjetaGamba = within(screen.getByTestId("seccion-menu-primero")).getByRole("listitem");
+    expect(within(tarjetaGamba).getByDisplayValue("Cava brut nature")).toBeInTheDocument();
+
+    // Sin «¿Qué incluye el menú?»: v2 sin sección Bebidas y el maridaje solo en la gamba (E3).
+    expect(screen.queryByRole("radio", { name: /comida \+ bebidas/i })).toBeNull();
     const guardado = json(ultimo);
-    expect(guardado).toMatchObject({ version: 2, tipo: "menu", incluye_bebidas: true, maridaje: true });
+    expect(guardado).toMatchObject({ version: 2, tipo: "menu", incluye_bebidas: false, maridaje: true });
     expect(guardado.secciones.primero[0].maridaje).toMatchObject({ nombre: "Cava brut nature", sulfitos: true });
     expect(guardado.secciones.segundo[0]).not.toHaveProperty("maridaje");
     expect(guardado.secciones.postre[0]).not.toHaveProperty("maridaje");
-    expect(guardado.secciones.bebidas.map((b) => b.nombre)).toEqual(["Agua mineral"]);
+    expect(guardado.secciones.bebidas).toEqual([]);
 
     // De vuelta a «Menú»: avisa, conserva las bebidas en memoria y se guarda la v1.
     fireEvent.click(radioTipo(/^Menú/));
     expect(screen.queryByTestId("bebida-de-cada-plato")).toBeNull();
     expect(screen.getByTestId("aviso-maridaje")).toHaveTextContent(AVISO_MARIDAJE_APAGADO);
     expect(ultimo.maridajes[gamba.id]).toBeDefined();
-    expect(json(ultimo)).toMatchObject({ version: 1, incluye_bebidas: true });
+    expect(screen.getByRole("radio", { name: /solo comida/i })).toBeChecked();
+    expect(json(ultimo)).toMatchObject({ version: 1, incluye_bebidas: false });
   });
 
   it("cambiar la descripción de una bebida traducida conserva los nombres traducidos", () => {
@@ -323,7 +326,9 @@ describe("EditorMenuNovedad · Maridaje", () => {
     carta.valor = { ...carta.valor, truncado: true };
     render(<Harness inicial={{ ...vacio, maridaje: true }} />);
     const bloque = screen.getByTestId("bebida-de-cada-plato");
-    expect(within(bloque).getByText(/Añade platos arriba/)).toBeInTheDocument();
+    expect(within(bloque).getAllByText("Sin platos todavía")).toHaveLength(3);
+    fireEvent.click(within(screen.getByTestId("seccion-menu-primero")).getByRole("button", { name: /a mano/i }));
+    expect(within(bloque).getByText("Escribe el nombre del plato para elegir su bebida.")).toBeInTheDocument();
     expect(within(bloque).getByTestId("aviso-carta-truncada")).toHaveTextContent(/más vinos de los que caben/);
   });
 });

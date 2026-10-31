@@ -8,8 +8,8 @@
 // - «Menú» (por defecto, tipo menu sin maridaje): primero, segundo y postre
 //   con el mismo EditorSeccionesMenu del menú del día; «Comida + bebidas»
 //   añade la sección Bebidas, escrita a mano (ADR-3 de 4073221d).
-// - «Maridaje» (tipo menu con maridaje): lo mismo y, debajo de los platos,
-//   «Bebida de cada plato» (ADR-8), con una bebida por plato.
+// - «Maridaje» (tipo menu con maridaje): los platos con su bebida dentro de
+//   la tarjeta de cada uno, sin «¿Qué incluye el menú?» (no guarda Bebidas).
 // - «Cata»: solo una lista ordenada de bebidas (de la carta o a mano).
 //
 // Lo de la otra opción (y los maridajes al pasar a «Menú») se conserva
@@ -67,6 +67,9 @@ const opcionDeMenu = (menu: MenuNovedad): OpcionMenuNovedad =>
 
 function conOpcion(menu: MenuNovedad, opcion: OpcionMenuNovedad): MenuNovedad {
   if (opcion === "cata") return { ...menu, tipo: "cata" };
+  // El Maridaje no enseña «¿Qué incluye el menú?» y no guarda la sección
+  // Bebidas (limpiarMenuNovedad), pero se conserva en memoria: al volver a
+  // «Menú» reaparece tal cual.
   return { ...menu, tipo: "menu", maridaje: opcion === "maridaje" };
 }
 
@@ -277,17 +280,30 @@ function EditorMenuPlatos({
 
   return (
     <>
-      <EditorSeccionesMenu
-        secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
-        onChange={cambiarComida}
-        platos={platos}
-        platosPorId={platosPorId}
-        cargandoPlatos={cargandoPlatos}
-      />
+      {menu.maridaje ? (
+        <PlatosConMaridaje
+          menu={menu}
+          onChange={onChange}
+          onCambiarComida={cambiarComida}
+          platos={platos}
+          platosPorId={platosPorId}
+          cargandoPlatos={cargandoPlatos}
+        />
+      ) : (
+        <EditorSeccionesMenu
+          secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+          onChange={cambiarComida}
+          platos={platos}
+          platosPorId={platosPorId}
+          cargandoPlatos={cargandoPlatos}
+        />
+      )}
 
       <AvisosMenu avisos={avisoMaridaje} testId="aviso-maridaje" />
-      {menu.maridaje && <BebidaDeCadaPlato menu={menu} onChange={onChange} />}
 
+      {/* «¿Qué incluye el menú?» solo en Menú: el Maridaje ya lleva la bebida en cada plato. */}
+      {!menu.maridaje && (
+      <>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium mb-2">¿Qué incluye el menú?</legend>
         <RadioGroup
@@ -383,23 +399,40 @@ function EditorMenuPlatos({
           </Button>
         </section>
       )}
+      </>
+      )}
     </>
   );
 }
 
-/** «Bebida de cada plato» (ADR-8): una línea por plato con nombre, por id del plato. */
-function BebidaDeCadaPlato({ menu, onChange }: PropsBloque) {
+/**
+ * Maridaje: los platos (primero, segundo y postre) con la bebida de cada uno
+ * DENTRO de su tarjeta, justo debajo (petición del dueño, 31/10/2026: «más
+ * fácil añadir el maridaje por plato»). Antes iba en un bloque aparte debajo
+ * de todos los platos (ADR-8). Se guarda igual: `maridajes[id del plato]`.
+ */
+function PlatosConMaridaje({
+  menu,
+  onChange,
+  onCambiarComida,
+  platos,
+  platosPorId,
+  cargandoPlatos,
+}: PropsBloque & {
+  onCambiarComida: (secciones: Record<SeccionMenu, ItemMenu[]>) => void;
+  platos: PlatoDeCarta[];
+  platosPorId: Map<string, PlatoDeCarta>;
+  cargandoPlatos: boolean;
+}) {
   const carta = useBebidasParaMenu();
   const { ref, enfocar } = useEnfoque<HTMLElement>();
   const [cambiando, setCambiando] = useState<string | null>(null);
+  const { secciones } = menu;
 
   // Un plato sin nombre no se guarda (ni su bebida): no se ofrece hasta que lo tenga.
-  const grupos = SECCIONES_MENU.map((seccion) => ({
-    seccion,
-    platos: menu.secciones[seccion].filter((item) => item.nombre.trim() !== ""),
-  })).filter((grupo) => grupo.platos.length > 0);
-  const total = grupos.reduce((suma, grupo) => suma + grupo.platos.length, 0);
-  const conBebida = grupos.reduce((suma, grupo) => suma + grupo.platos.filter((p) => menu.maridajes[p.id]).length, 0);
+  const conNombre = SECCIONES_MENU.flatMap((seccion) => secciones[seccion]).filter((item) => item.nombre.trim() !== "");
+  const total = conNombre.length;
+  const conBebida = conNombre.filter((p) => menu.maridajes[p.id]).length;
 
   const ponerBebida = (platoId: string, linea: LineaBebidaNovedad) =>
     onChange({
@@ -420,16 +453,54 @@ function BebidaDeCadaPlato({ menu, onChange }: PropsBloque) {
     enfocar({ clave: platoId, selectores: [BOTON_ACTIVO] });
   };
 
+  const bebidaDe = (plato: ItemMenu) => {
+    const nombre = plato.nombre.trim();
+    if (!nombre) {
+      return <p className="text-xs text-muted-foreground">Escribe el nombre del plato para elegir su bebida.</p>;
+    }
+    const linea = menu.maridajes[plato.id];
+    return (
+      <div data-clave={plato.id} className="min-w-0 space-y-1.5">
+        {linea && cambiando !== plato.id ? (
+          <EditorLineaBebida
+            linea={linea}
+            titulo="Bebida del maridaje"
+            onChange={(siguiente) => ponerBebida(plato.id, siguiente)}
+            onQuitar={() => quitar(plato.id)}
+            onCambiar={() => {
+              setCambiando(plato.id);
+              enfocar({ clave: plato.id, selectores: [BOTON_ACTIVO] });
+            }}
+          />
+        ) : (
+          <ElegirBebida
+            carta={carta}
+            titulo={`Bebida para «${nombre}»`}
+            onElegir={(nueva) => elegir(plato.id, nueva)}
+            onCancelar={
+              linea
+                ? () => {
+                    setCambiando(null);
+                    enfocar({ clave: plato.id, selectores: ['button[aria-label^="Cambiar"]'] });
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <section
       ref={ref}
       data-testid="bebida-de-cada-plato"
       aria-labelledby="menu-novedad-bebida-de-cada-plato"
-      className="min-w-0 space-y-3 rounded-lg border bg-muted/20 p-3"
+      className="min-w-0 space-y-2"
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h4 id="menu-novedad-bebida-de-cada-plato" className="text-sm font-semibold">
-          Bebida de cada plato
+          Platos y su bebida
         </h4>
         {total > 0 && (
           <span className="text-xs text-muted-foreground tabular-nums">
@@ -437,59 +508,15 @@ function BebidaDeCadaPlato({ menu, onChange }: PropsBloque) {
           </span>
         )}
       </header>
-
       <AvisoCartaTruncada truncado={carta.truncado} />
-
-      {total === 0 ? (
-        <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
-          Añade platos arriba para elegir la bebida de cada uno.
-        </p>
-      ) : (
-        grupos.map(({ seccion, platos }) => (
-          <div key={seccion} className="space-y-2">
-            <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {ETIQUETA_SECCION[seccion]}
-            </h5>
-            <ul className="space-y-2">
-              {platos.map((plato) => {
-                const nombre = plato.nombre.trim();
-                const linea = menu.maridajes[plato.id];
-                return (
-                  <li key={plato.id} data-clave={plato.id} className="min-w-0 space-y-2 rounded-lg border bg-card p-2.5">
-                    <p className="text-sm font-medium [overflow-wrap:anywhere]">{nombre}</p>
-                    {linea && cambiando !== plato.id ? (
-                      <EditorLineaBebida
-                        linea={linea}
-                        titulo="Bebida del maridaje"
-                        onChange={(siguiente) => ponerBebida(plato.id, siguiente)}
-                        onQuitar={() => quitar(plato.id)}
-                        onCambiar={() => {
-                          setCambiando(plato.id);
-                          enfocar({ clave: plato.id, selectores: [BOTON_ACTIVO] });
-                        }}
-                      />
-                    ) : (
-                      <ElegirBebida
-                        carta={carta}
-                        titulo={`Bebida para «${nombre}»`}
-                        onElegir={(nueva) => elegir(plato.id, nueva)}
-                        onCancelar={
-                          linea
-                            ? () => {
-                                setCambiando(null);
-                                enfocar({ clave: plato.id, selectores: ['button[aria-label^="Cambiar"]'] });
-                              }
-                            : undefined
-                        }
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))
-      )}
+      <EditorSeccionesMenu
+        secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+        onChange={onCambiarComida}
+        platos={platos}
+        platosPorId={platosPorId}
+        cargandoPlatos={cargandoPlatos}
+        debajoDePlato={bebidaDe}
+      />
     </section>
   );
 }
