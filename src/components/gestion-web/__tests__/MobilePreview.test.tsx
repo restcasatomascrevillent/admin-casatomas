@@ -12,7 +12,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { MobilePreview, type NovedadPreview } from "../MobilePreview";
+import { menuNovedadVacio, menuPintable, parseMenuNovedad } from "@/lib/menu-novedad";
 
 const base: NovedadPreview = {
   id: "x",
@@ -106,6 +109,33 @@ describe("MobilePreview — botones de la tarjeta", () => {
     );
     expect(screen.getAllByRole("list", { name: "Botones de la tarjeta" })).toHaveLength(1);
     expect(botonesDe()).toEqual(["Llamar"]);
+  });
+
+  // Historia 4093221d: una cata no tiene platos, pero sí «Ver menú» si tiene bebidas (L3).
+  it("una cata con bebidas enseña «Ver menú»; una cata vacía no, y lo avisa", () => {
+    const fixtureCata = JSON.parse(
+      readFileSync(resolve(process.cwd(), "src/lib/__tests__/fixtures/menu-novedad-v2-cata.json"), "utf8"),
+    );
+    const cata = parseMenuNovedad(fixtureCata);
+    expect(cata?.tipo).toBe("cata");
+    render(
+      <MobilePreview
+        idResaltado="vacia"
+        novedades={[
+          { ...base, id: "cata", titulo: "Cata de destilados", botones: ["ver_menu", "llamar"], menuConPlatos: menuPintable(cata!) },
+          {
+            ...base,
+            id: "vacia",
+            titulo: "Cata vacía",
+            botones: ["ver_menu"],
+            menuConPlatos: menuPintable({ ...menuNovedadVacio(), tipo: "cata" }),
+          },
+        ]}
+      />,
+    );
+    expect(screen.getAllByRole("list", { name: "Botones de la tarjeta" })).toHaveLength(1);
+    expect(botonesDe()).toEqual(["Ver menú", "Llamar"]);
+    expect(screen.getByText("No saldrá en la web: «Ver menú»")).toBeInTheDocument();
   });
 
   it("en la tarjeta que se edita avisa de los botones que la web no enseñará", () => {

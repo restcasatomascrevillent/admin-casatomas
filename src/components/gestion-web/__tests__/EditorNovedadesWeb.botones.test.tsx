@@ -7,12 +7,19 @@
 // - Reabrir una novedad restaura botones, orden, plato y menú.
 // - La validación no deja guardar (criterio 5).
 // - Aviso «El plato ya no está en la carta» en la lista.
+//
+// Historia 4093221d (P4): maridaje y cata. Se guardan y se reabren en v2 (los
+// fixtures canónicos), con la validación maridaje_vacio y cata_vacia, las
+// bebidas pasan por el traductor y un menú sin maridaje sigue en v1.
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Novedad } from "@/hooks/useNovedades";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
+import type { BebidaDeCarta, VinoDeCarta } from "@/hooks/useBebidasParaMenu";
 
 const mocks = vi.hoisted(() => ({
   novedades: [] as unknown[],
@@ -20,7 +27,10 @@ const mocks = vi.hoisted(() => ({
   crear: vi.fn(),
   actualizar: vi.fn(),
   invoke: vi.fn(),
+  // La carta de vinos y bebidas de useBebidasParaMenu (el hook tiene sus pruebas).
+  carta: { vinos: [] as unknown[], bebidas: [] as unknown[], truncado: false, isLoading: false, error: null },
 }));
+vi.mock("@/hooks/useBebidasParaMenu", () => ({ useBebidasParaMenu: () => mocks.carta }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => ({
@@ -143,6 +153,31 @@ const MENU_GUARDADO = {
   },
 };
 
+const fixture = (nombre: string) =>
+  JSON.parse(readFileSync(resolve(process.cwd(), "src/lib/__tests__/fixtures", `${nombre}.json`), "utf8"));
+const MENU_MARIDAJE = fixture("menu-novedad-v2-maridaje");
+const MENU_CATA = fixture("menu-novedad-v2-cata");
+
+const FONDILLON: VinoDeCarta = {
+  id: "vino-fondillon",
+  nombre: "Fondillón",
+  nombre_en: "Fondillon",
+  nombre_fr: null,
+  categoria: "GENEROSOS",
+  alergenos_oficiales: ["sulfitos"],
+  activado: true,
+  restaurante: true,
+};
+const WHISKY: BebidaDeCarta = {
+  id: "bebida-whisky-12",
+  nombre: "Whisky de malta 12 años",
+  nombre_en: "12-year-old malt whisky",
+  nombre_fr: null,
+  categoria: "Licores",
+  activado: true,
+  restaurante: true,
+};
+
 const renderEditor = () =>
   render(
     <QueryClientProvider client={new QueryClient()}>
@@ -160,6 +195,7 @@ beforeEach(() => {
   // El traductor de la novedad no responde: la prueba no depende de él.
   mocks.invoke.mockResolvedValue({ data: { ok: false, error: "sin red" }, error: null });
   vi.spyOn(console, "error").mockImplementation(() => {});
+  mocks.carta = { vinos: [FONDILLON], bebidas: [WHISKY], truncado: false, isLoading: false, error: null };
 });
 
 describe("EditorNovedadesWeb — botones", () => {
@@ -305,5 +341,242 @@ describe("EditorNovedadesWeb — botones", () => {
     renderEditor();
     fireEvent.click(screen.getByRole("button", { name: "Editar «Plato borrado»" }));
     expect(bloque().getByText("El plato ya no está en la carta")).toBeInTheDocument();
+  });
+});
+
+// El traductor del menú, línea a línea: lo que no está en el diccionario se
+// devuelve igual. El de la novedad (tipo «novedad») no responde.
+const DICCIONARIO: Record<string, { en: string; fr: string }> = {
+  Caldo: { en: "Broth", fr: "Bouillon" },
+  "Cava brut nature": { en: "Brut nature cava", fr: "Cava brut nature" },
+  "Ginebra de Mahón": { en: "Mahon gin", fr: "Gin de Mahon" },
+};
+const traductorDeMenu = () =>
+  mocks.invoke.mockImplementation(async (_fn: string, { body }: { body: { tipo: string; datos: Record<string, string> } }) => {
+    if (body.tipo !== "menu") return { data: { ok: false, error: "sin red" }, error: null };
+    const a = (idioma: "en" | "fr") =>
+      Object.fromEntries(
+        Object.entries(body.datos).map(([seccion, texto]) => [
+          seccion,
+          texto ? texto.split("\n").map((linea) => DICCIONARIO[linea]?.[idioma] ?? linea).join("\n") : "",
+        ]),
+      );
+    return { data: { ok: true, translations: { menu_en: a("en"), menu_fr: a("fr") } }, error: null };
+  });
+
+const nuevaConVerMenu = (titulo: string) => {
+  renderEditor();
+  fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: titulo } });
+  fireEvent.click(within(bloque().getByRole("group", { name: "Añadir botón" })).getByRole("button", { name: /ver menú/i }));
+};
+const platoAMano = (nombre: string) => {
+  fireEvent.click(within(screen.getByTestId("seccion-menu-primero")).getByRole("button", { name: /a mano/i }));
+  fireEvent.change(screen.getByLabelText("Nombre del plato 1"), { target: { value: nombre } });
+};
+const tipo = (nombre: RegExp) => bloque().getByRole("radio", { name: nombre });
+const interruptorMaridaje = () => bloque().getByRole("switch", { name: /con maridaje/i });
+const maridajes = () => within(screen.getByTestId("bebida-de-cada-plato"));
+const cata = () => within(screen.getByTestId("editor-cata"));
+// En la vista previa solo lleva botones la tarjeta que se edita.
+const botonesEnVistaPrevia = () =>
+  screen.queryAllByRole("list", { name: "Botones de la tarjeta" }).map((lista) => lista.textContent);
+const cambiarTitulo = (titulo: string) => fireEvent.change(screen.getByLabelText(/^Título/), { target: { value: titulo } });
+
+describe("EditorNovedadesWeb — maridaje y cata (historia 4093221d)", () => {
+  it("guarda un menú con maridaje en v2 y la bebida a mano pasa por el traductor", async () => {
+    mocks.novedades = [];
+    traductorDeMenu();
+    nuevaConVerMenu("Menú maridado");
+    platoAMano("Caldo");
+    fireEvent.click(interruptorMaridaje());
+    fireEvent.click(
+      within(maridajes().getByRole("group", { name: "Bebida para «Caldo»" })).getByRole("button", {
+        name: "Vino, cava o champagne",
+      }),
+    );
+    fireEvent.change(maridajes().getByLabelText("Nombre"), { target: { value: "Cava brut nature" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
+
+    await waitFor(() => expect(mocks.crear).toHaveBeenCalledTimes(1));
+    // E8: una llamada para la comida y otra para las bebidas de los platos.
+    expect(mocks.invoke).toHaveBeenCalledWith("traducir-contenido", {
+      body: { tipo: "menu", datos: { primero: "Caldo", segundo: "", postre: "" } },
+    });
+    expect(mocks.invoke).toHaveBeenCalledWith("traducir-contenido", {
+      body: { tipo: "menu", datos: { primero: "Cava brut nature", segundo: "", postre: "" } },
+    });
+    const { menu, botones } = mocks.crear.mock.calls[0][0];
+    expect(botones).toEqual(["ver_menu"]);
+    expect(menu).toMatchObject({ version: 2, tipo: "menu", incluye_bebidas: false, maridaje: true });
+    expect(menu.secciones).not.toHaveProperty("cata");
+    expect(menu.secciones.primero[0]).toMatchObject({
+      nombre: "Caldo",
+      traducciones: { en: { nombre: "Broth", descripcion: null }, fr: { nombre: "Bouillon", descripcion: null } },
+      maridaje: {
+        origen: "libre",
+        refId: null,
+        nombre: "Cava brut nature",
+        descripcion: null,
+        sulfitos: true,
+        traducciones: {
+          en: { nombre: "Brut nature cava", descripcion: null },
+          fr: { nombre: "Cava brut nature", descripcion: null },
+        },
+      },
+    });
+    expect(toast.warning).not.toHaveBeenCalledWith(expect.stringMatching(/^Menú:/), expect.anything());
+  });
+
+  it("reabre la v2 con maridaje tal cual y, sin traductor, la guarda igual que el fixture", async () => {
+    mocks.novedades = [novedad("n-6", "Menú maridado", { botones: ["ver_menu"], menu: MENU_MARIDAJE })];
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Menú maridado»" }));
+    expect(tipo(/^Menú/)).toBeChecked();
+    expect(interruptorMaridaje()).toBeChecked();
+    expect(bloque().getByRole("radio", { name: /comida \+ bebidas/i })).toBeChecked();
+    expect(maridajes().getByText("2 de 3 con bebida")).toBeInTheDocument();
+    expect(maridajes().getByRole("button", { name: "Cambiar «Cava brut nature»" })).toBeInTheDocument();
+    expect(maridajes().getByRole("button", { name: "Cambiar «Fondillón»" })).toBeInTheDocument();
+    expect(botonesEnVistaPrevia()).toEqual(["Ver menú"]);
+
+    cambiarTitulo("Menú maridado de otoño");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalledTimes(1));
+    const payload = mocks.actualizar.mock.calls[0][0];
+    expect(payload.botones).toEqual(["ver_menu"]);
+    expect(payload.menu).toEqual(MENU_MARIDAJE);
+    // Lo escrito a mano sin traducir se guarda en castellano y se avisa.
+    expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/^Menú: /), expect.anything());
+  });
+
+  it("crea una cata con bebidas de la carta y a mano, en orden y sin comida; la vista previa enseña «Ver menú»", async () => {
+    mocks.novedades = [];
+    traductorDeMenu();
+    nuevaConVerMenu("Cata de destilados");
+    fireEvent.click(tipo(/^Cata/));
+    // Una cata vacía no tendría botón en la web.
+    expect(botonesEnVistaPrevia()).toEqual([]);
+    expect(screen.getByText("No saldrá en la web: «Ver menú»")).toBeInTheDocument();
+
+    const añadir = () => cata().getByRole("group", { name: "Añadir bebida a la cata" });
+    fireEvent.click(within(añadir()).getByRole("button", { name: /de la carta/i }));
+    fireEvent.click(await screen.findByRole("option", { name: /Whisky/ }));
+    fireEvent.click(within(añadir()).getByRole("button", { name: "Otra bebida" }));
+    fireEvent.change(within(cata().getByRole("group", { name: /Bebida 2 de la cata/ })).getByLabelText("Nombre"), {
+      target: { value: "Ginebra de Mahón" },
+    });
+    expect(botonesEnVistaPrevia()).toEqual(["Ver menú"]);
+    expect(screen.queryByText("No saldrá en la web: «Ver menú»")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
+    await waitFor(() => expect(mocks.crear).toHaveBeenCalledTimes(1));
+    // El nombre de la carta no se traduce: solo va la línea a mano.
+    expect(mocks.invoke).toHaveBeenCalledWith("traducir-contenido", {
+      body: { tipo: "menu", datos: { primero: "Ginebra de Mahón", segundo: "", postre: "" } },
+    });
+    expect(mocks.crear.mock.calls[0][0].menu).toEqual({
+      version: 2,
+      tipo: "cata",
+      incluye_bebidas: false,
+      maridaje: false,
+      secciones: {
+        primero: [],
+        segundo: [],
+        postre: [],
+        bebidas: [],
+        cata: [
+          {
+            id: expect.any(String),
+            origen: "bebida",
+            refId: "bebida-whisky-12",
+            nombre: "Whisky de malta 12 años",
+            descripcion: null,
+            sulfitos: false,
+            traducciones: { en: { nombre: "12-year-old malt whisky", descripcion: null } },
+          },
+          {
+            id: expect.any(String),
+            origen: "libre",
+            refId: null,
+            nombre: "Ginebra de Mahón",
+            descripcion: null,
+            sulfitos: false,
+            traducciones: { en: { nombre: "Mahon gin", descripcion: null }, fr: { nombre: "Gin de Mahon", descripcion: null } },
+          },
+        ],
+      },
+    });
+  });
+
+  it("reabre una cata en su orden y, sin traductor, la guarda igual que el fixture", async () => {
+    mocks.novedades = [novedad("n-7", "Cata de destilados", { botones: ["ver_menu", "llamar"], menu: MENU_CATA })];
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Cata de destilados»" }));
+    expect(tipo(/^Cata/)).toBeChecked();
+    const cambiar = cata().getAllByRole("button", { name: /^Cambiar «/ });
+    expect(cambiar).toHaveLength(3);
+    expect(cambiar[0]).toHaveAccessibleName("Cambiar «Whisky de malta 12 años»");
+    expect(cambiar[1]).toHaveAccessibleName("Cambiar «Fondillón»");
+    expect(cambiar[2]).toHaveAccessibleName("Cambiar «Ginebra de Mahón»");
+    expect(botonesEnVistaPrevia()).toEqual([expect.stringMatching(/^Ver menú/)]);
+
+    cambiarTitulo("Cata de destilados de otoño");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalledTimes(1));
+    const payload = mocks.actualizar.mock.calls[0][0];
+    expect(payload.botones).toEqual(["ver_menu", "llamar"]);
+    expect(payload.menu).toEqual(MENU_CATA);
+    expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/^Cata: /), expect.anything());
+  });
+
+  it("no deja guardar «Con maridaje» sin ninguna bebida (maridaje_vacio) y lo explica", () => {
+    mocks.novedades = [];
+    nuevaConVerMenu("Menú maridado");
+    platoAMano("Caldo");
+    fireEvent.click(interruptorMaridaje());
+    fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
+
+    const mensaje = "“Con maridaje” necesita al menos una bebida en algún plato, o apágalo.";
+    expect(toast.error).toHaveBeenCalledWith(`No se puede guardar: ${mensaje}`, expect.anything());
+    expect(bloque().getByTestId("errores-botones")).toHaveTextContent(mensaje);
+    expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it("no deja guardar una cata sin bebidas (cata_vacia) y lo explica", () => {
+    mocks.novedades = [];
+    nuevaConVerMenu("Cata de vinos");
+    fireEvent.click(tipo(/^Cata/));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
+
+    expect(toast.error).toHaveBeenCalledWith("No se puede guardar: Una cata necesita al menos una bebida.", expect.anything());
+    expect(bloque().getByTestId("errores-botones")).toHaveTextContent("Una cata necesita al menos una bebida.");
+    expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it("un menú v1 sigue guardándose en v1 aunque se toquen el tipo y el maridaje", async () => {
+    mocks.novedades = [novedad("n-8", "Menú de Navidad", { botones: ["ver_menu"], menu: MENU_GUARDADO })];
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Menú de Navidad»" }));
+    expect(tipo(/^Menú/)).toBeChecked();
+    expect(interruptorMaridaje()).not.toBeChecked();
+    fireEvent.click(interruptorMaridaje());
+    fireEvent.click(interruptorMaridaje());
+    fireEvent.click(tipo(/^Cata/));
+    fireEvent.click(tipo(/^Menú/));
+    cambiarTitulo("Menú de Navidad 2026");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalledTimes(1));
+    const { menu } = mocks.actualizar.mock.calls[0][0];
+    expect(menu).toEqual(MENU_GUARDADO);
+    expect(menu).not.toHaveProperty("tipo");
+    expect(menu).not.toHaveProperty("maridaje");
+    // Ya estaba traducido: el traductor del menú no se llama.
+    expect(mocks.invoke.mock.calls.filter(([, { body }]) => body.tipo === "menu")).toHaveLength(0);
   });
 });
