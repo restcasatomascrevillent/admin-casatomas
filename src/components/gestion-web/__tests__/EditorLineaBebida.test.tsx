@@ -1,6 +1,6 @@
 // Una bebida del maridaje o de la cata (historia 4093221d, ADR-9 y E6):
 // - vino de la carta: los sulfitos se ven y no se editan;
-// - bebida de la carta: casilla, desmarcada al elegirla;
+// - bebida de la carta: casilla, marcada al elegirla si es vino y desmarcada si no;
 // - a mano: «Vino, cava o champagne» / «Otra bebida» y después la casilla.
 // Nombre editable solo a mano, descripción corta, Quitar y Cambiar.
 
@@ -117,6 +117,22 @@ describe("EditorLineaBebida · bebida de la carta", () => {
     fireEvent.click(screen.getByText("Contiene sulfitos"));
     expect(ultima?.sulfitos).toBe(false);
     expect(nombre()).toHaveAttribute("readonly");
+  });
+
+  it("una copa de vino de la carta llega marcada, lo explica y se puede desmarcar", () => {
+    render(<Harness inicial={{ ...BEBIDA, refId: "bebida-verdejo", nombre: "Copa Verdejo", sulfitos: true }} />);
+    const casilla = screen.getByRole("checkbox", { name: "Contiene sulfitos" });
+    expect(casilla).toBeChecked();
+    expect(casilla).toHaveAccessibleDescription("Marcado por ser vino; desmárcalo si no lleva sulfitos.");
+    fireEvent.click(casilla);
+    expect(ultima?.sulfitos).toBe(false);
+    expect(screen.getByRole("checkbox", { name: "Contiene sulfitos" })).not.toBeChecked();
+  });
+
+  it("una línea guardada desmarcada se reabre desmarcada aunque sea vino", () => {
+    render(<Harness inicial={{ ...BEBIDA, refId: "bebida-verdejo", nombre: "Copa Verdejo", sulfitos: false }} />);
+    expect(screen.getByRole("checkbox", { name: "Contiene sulfitos" })).not.toBeChecked();
+    expect(ultima?.sulfitos).toBe(false);
   });
 
   it("al cambiar la descripción conserva el nombre traducido y pierde la descripción traducida", () => {

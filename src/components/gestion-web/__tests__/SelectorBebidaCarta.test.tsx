@@ -107,7 +107,7 @@ describe("SelectorBebidaCarta", () => {
     expect(onElegir.mock.calls[0][0].traducciones).toBeUndefined();
   });
 
-  it("al elegir una bebida la casilla de sulfitos empieza desmarcada", async () => {
+  it("al elegir una bebida que no es vino la casilla de sulfitos empieza desmarcada", async () => {
     const { onElegir } = montar();
     abrir();
     fireEvent.click(await screen.findByRole("option", { name: /Whisky/ }));
@@ -118,6 +118,24 @@ describe("SelectorBebidaCarta", () => {
       sulfitos: false,
       traducciones: { en: { nombre: "12-year-old malt whisky", descripcion: null } },
     });
+  });
+
+  it("al elegir una copa de vino o un tinto de verano la casilla empieza marcada", async () => {
+    const VERDEJO: BebidaDeCarta = { ...WHISKY, id: "bebida-verdejo", nombre: "Copa Verdejo", nombre_en: null, categoria: "Copas" };
+    const TINTO_VERANO: BebidaDeCarta = {
+      ...WHISKY,
+      id: "bebida-tinto-verano",
+      nombre: "Tinto de verano con limón",
+      nombre_en: null,
+      categoria: "Tintos de verano",
+    };
+    const { onElegir } = montar({ bebidas: [WHISKY, VERDEJO, TINTO_VERANO] });
+    abrir();
+    fireEvent.click(await screen.findByRole("option", { name: /Copa Verdejo/ }));
+    expect(onElegir.mock.calls[0][0]).toMatchObject({ origen: "bebida", refId: "bebida-verdejo", sulfitos: true });
+    abrir();
+    fireEvent.click(await screen.findByRole("option", { name: /Tinto de verano/ }));
+    expect(onElegir.mock.calls[1][0]).toMatchObject({ origen: "bebida", refId: "bebida-tinto-verano", sulfitos: true });
   });
 
   it("busca por categoría y se elige con el teclado", async () => {

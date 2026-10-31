@@ -4,7 +4,8 @@
 // - `EditorLineaBebida`: nombre (editable solo si se escribió a mano),
 //   descripción corta (ADR-10) y sulfitos según ADR-9 / E6:
 //     · vino de la carta → solo texto, no se edita;
-//     · bebida de la carta → casilla, desmarcada al elegirla;
+//     · bebida de la carta → casilla, marcada al elegirla si es vino
+//       (`bebidaEsVino`: Copas, Tintos de verano, cava…) y desmarcada si no;
 //     · a mano → casilla, con el valor que dio el botón con el que se añadió.
 //   Y Quitar (y Cambiar, si quien lo usa sabe cambiarla).
 // - `ElegirLineaBebida`: cómo se crea una línea. De la carta (buscador) o a
@@ -43,6 +44,15 @@ const ETIQUETA_ORIGEN: Record<OrigenLineaBebida, string> = {
 };
 
 const nombreVisible = (linea: LineaBebidaNovedad) => linea.nombre.trim() || "bebida sin nombre";
+
+/**
+ * Ayuda de la casilla en una bebida de la carta (la tabla no tiene alérgenos).
+ * Marcada: sale así por ser vino (o porque alguien la marcó), se puede quitar.
+ */
+const ayudaSulfitosBebida = (sulfitos: boolean): string =>
+  sulfitos
+    ? "Marcado por ser vino; desmárcalo si no lleva sulfitos."
+    : "La carta de bebidas no indica alérgenos: márcalo si los lleva.";
 
 export interface EditorLineaBebidaProps {
   linea: LineaBebidaNovedad;
@@ -174,7 +184,7 @@ export function EditorLineaBebida({
           </div>
           {linea.origen === "bebida" && (
             <p id={idAyudaSulfitos} className="text-xs text-muted-foreground">
-              La carta de bebidas no indica alérgenos: márcalo si la lleva.
+              {ayudaSulfitosBebida(linea.sulfitos)}
             </p>
           )}
         </div>

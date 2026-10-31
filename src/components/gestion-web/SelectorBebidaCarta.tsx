@@ -3,7 +3,7 @@
 // SelectorPlato. Para el maridaje de un plato y la cata de las novedades
 // (historia 4093221d). Al elegir, la línea se COPIA de la carta (E5):
 // `lineaDesdeVino` (sulfitos de la carta, fijos) o `lineaDesdeBebida` (casilla
-// desmarcada y editable).
+// editable, marcada si la bebida es vino: Copas, Tintos de verano, cava…).
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
