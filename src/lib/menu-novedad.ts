@@ -83,7 +83,8 @@ export function parseBotonesNovedad(valor: unknown): TipoBoton[] {
 
 /**
  * Los botones que de verdad pintaría la web: «Échale un vistazo» solo con el
- * plato en la carta y «Ver menú» solo si el menú tiene algún plato.
+ * plato en la carta y «Ver menú» solo si el menú es pintable (`menuPintable`: algún
+ * plato o, en una cata, alguna bebida).
  */
 export function botonesVisiblesEnWeb(
   botones: readonly TipoBoton[],

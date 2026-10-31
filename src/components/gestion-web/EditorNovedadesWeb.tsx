@@ -64,7 +64,7 @@ import {
   esErrorSinColumnasBotones,
   estadoPlatoEnlazado,
   menuNovedadVacio,
-  menuTieneComida,
+  menuPintable,
   parseBotonesNovedad,
   parseMenuNovedad,
   platoEnCarta,
@@ -326,7 +326,9 @@ const aPreview = (f: FormData | Novedad, id: string, platosPorId: Map<string, Pl
   tags_fr: f.tags_fr,
   botones: parseBotonesNovedad(f.botones),
   platoEnCarta: platoEnCarta(f.plato_id ? platosPorId.get(f.plato_id) : undefined),
-  menuConPlatos: menuTieneComida(parseMenuNovedad(f.menu) ?? menuNovedadVacio()),
+  // L3: «Ver menú» sale con algún plato (Menú) o alguna bebida (Cata). El
+  // formulario ya trae el modelo (con la cata y los maridajes); una fila, el jsonb.
+  menuConPlatos: menuPintable("campos_tipo" in f ? f.menu : parseMenuNovedad(f.menu) ?? menuNovedadVacio()),
 });
 
 const ID_NUEVA = "__nueva__";
@@ -762,7 +764,9 @@ export function EditorNovedadesWeb() {
     }
     if (menuTraducido && menuTraducido.sinTraducir > 0) {
       avisoTraduccionMenu =
-        "Menú: los platos de la carta llevan su traducción, pero lo escrito a mano se ha guardado en español porque el traductor automático no responde.";
+        formData.menu.tipo === "cata"
+          ? "Cata: las bebidas de la carta llevan su nombre traducido, pero lo escrito a mano se ha guardado en español porque el traductor automático no responde."
+          : "Menú: los platos de la carta llevan su traducción, pero lo escrito a mano se ha guardado en español porque el traductor automático no responde.";
     }
 
     const nullSiVacio = (v: string) => (v.trim() ? v.trim() : null);
