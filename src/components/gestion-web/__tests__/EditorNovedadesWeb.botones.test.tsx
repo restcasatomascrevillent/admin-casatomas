@@ -265,7 +265,7 @@ describe("EditorNovedadesWeb — botones", () => {
     fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
 
     expect(toast.error).toHaveBeenCalledWith(
-      "No se puede guardar: «Ver menú» necesita al menos un plato en primero, segundo o postre.",
+      "No se puede guardar: «Ver menú» necesita al menos un plato.",
       expect.anything(),
     );
     expect(mocks.crear).not.toHaveBeenCalled();
@@ -374,7 +374,7 @@ const platoAMano = (nombre: string) => {
   fireEvent.change(screen.getByLabelText("Nombre del plato 1"), { target: { value: nombre } });
 };
 const tipo = (nombre: RegExp) => bloque().getByRole("radio", { name: nombre });
-const interruptorMaridaje = () => bloque().getByRole("switch", { name: /con maridaje/i });
+const interruptorMaridaje = () => tipo(/^Maridaje/);
 const maridajes = () => within(screen.getByTestId("bebida-de-cada-plato"));
 const cata = () => within(screen.getByTestId("editor-cata"));
 // En la vista previa solo lleva botones la tarjeta que se edita.
@@ -432,9 +432,9 @@ describe("EditorNovedadesWeb — maridaje y cata (historia 4093221d)", () => {
     renderEditor();
 
     fireEvent.click(screen.getByRole("button", { name: "Editar «Menú maridado»" }));
-    expect(tipo(/^Menú/)).toBeChecked();
-    expect(interruptorMaridaje()).toBeChecked();
-    expect(bloque().getByRole("radio", { name: /comida \+ bebidas/i })).toBeChecked();
+    expect(tipo(/^Maridaje/)).toBeChecked();
+    // Con Maridaje no se ofrece «¿Qué incluye el menú?».
+    expect(bloque().queryByRole("radio", { name: /comida \+ bebidas/i })).toBeNull();
     expect(maridajes().getByText("2 de 3 con bebida")).toBeInTheDocument();
     expect(maridajes().getByRole("button", { name: "Cambiar «Cava brut nature»" })).toBeInTheDocument();
     expect(maridajes().getByRole("button", { name: "Cambiar «Fondillón»" })).toBeInTheDocument();
@@ -533,17 +533,42 @@ describe("EditorNovedadesWeb — maridaje y cata (historia 4093221d)", () => {
     expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/^Cata: /), expect.anything());
   });
 
-  it("no deja guardar «Con maridaje» sin ninguna bebida (maridaje_vacio) y lo explica", () => {
+  it("no deja guardar un Maridaje sin ninguna bebida (maridaje_vacio) y lo explica", () => {
     mocks.novedades = [];
     nuevaConVerMenu("Menú maridado");
     platoAMano("Caldo");
     fireEvent.click(interruptorMaridaje());
     fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
 
-    const mensaje = "“Con maridaje” necesita al menos una bebida en algún plato, o apágalo.";
+    const mensaje = "Un maridaje necesita la bebida de al menos un plato, o elige «Menú».";
     expect(toast.error).toHaveBeenCalledWith(`No se puede guardar: ${mensaje}`, expect.anything());
     expect(bloque().getByTestId("errores-botones")).toHaveTextContent(mensaje);
     expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it("con un error en los botones abre la subpestaña «Botones y menú» y la marca", () => {
+    mocks.novedades = [];
+    nuevaConVerMenu("Menú maridado");
+    platoAMano("Caldo");
+    fireEvent.click(interruptorMaridaje());
+    const pestana = (nombre: RegExp) => screen.getByRole("tab", { name: nombre });
+    fireEvent.mouseDown(pestana(/^Texto/));
+    expect(pestana(/^Texto/)).toHaveAttribute("data-state", "active");
+    expect(pestana(/^Botones y menú/)).toHaveAccessibleName(/con errores/);
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
+    expect(pestana(/^Botones y menú/)).toHaveAttribute("data-state", "active");
+    expect(mocks.crear).not.toHaveBeenCalled();
+  });
+
+  it("sin título vuelve a la subpestaña «Texto»", () => {
+    mocks.novedades = [];
+    renderEditor();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Publicación/ }));
+    expect(screen.getByRole("tab", { name: /^Publicación/ })).toHaveAttribute("data-state", "active");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar novedad" }));
+    expect(screen.getByRole("tab", { name: /^Texto/ })).toHaveAttribute("data-state", "active");
+    expect(toast.error).toHaveBeenCalledWith("El título es obligatorio.");
   });
 
   it("no deja guardar una cata sin bebidas (cata_vacia) y lo explica", () => {
@@ -565,7 +590,7 @@ describe("EditorNovedadesWeb — maridaje y cata (historia 4093221d)", () => {
     expect(tipo(/^Menú/)).toBeChecked();
     expect(interruptorMaridaje()).not.toBeChecked();
     fireEvent.click(interruptorMaridaje());
-    fireEvent.click(interruptorMaridaje());
+    fireEvent.click(tipo(/^Menú/));
     fireEvent.click(tipo(/^Cata/));
     fireEvent.click(tipo(/^Menú/));
     cambiarTitulo("Menú de Navidad 2026");

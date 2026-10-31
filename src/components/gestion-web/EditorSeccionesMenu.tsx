@@ -14,7 +14,7 @@
 // personalizados que ya usa la carta). No hay aquí un sistema paralelo.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { type ReactNode, useEffect, useRef, useState, type ChangeEvent } from "react";
 import {
   AlertTriangle,
   Camera,
@@ -437,9 +437,11 @@ interface LineaMenuProps {
   onCambiar: (item: ItemMenu) => void;
   onQuitar: () => void;
   onMover: (direccion: -1 | 1) => void;
+  /** Lo que va debajo de la línea, a todo el ancho (la bebida del maridaje). */
+  debajo?: ReactNode;
 }
 
-function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMover }: LineaMenuProps) {
+function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMover, debajo }: LineaMenuProps) {
   const enlazado = item.origen === "carta" && item.platoId !== null;
   const desaparecido = enlazado && !platoActual;
   const desactualizado = difiereDeLaCarta(item, platoActual);
@@ -561,7 +563,91 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
+      {debajo && <div className="basis-full min-w-0 border-t pt-2">{debajo}</div>}
     </li>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Una sección de platos (las tres fijas y las extra del menú de una novedad)
+// ---------------------------------------------------------------------------
+
+interface SeccionPlatosProps {
+  testId: string;
+  /** Rótulo. Las secciones extra ponen aquí su campo de nombre. */
+  titulo: ReactNode;
+  items: ItemMenu[];
+  onChange: (items: ItemMenu[]) => void;
+  platos: PlatoDeCarta[];
+  platosPorId: Map<string, PlatoDeCarta>;
+  cargandoPlatos: boolean;
+  debajoDePlato?: (item: ItemMenu) => ReactNode;
+  /** Botones de la cabecera (p. ej. «Quitar sección»). */
+  acciones?: ReactNode;
+}
+
+export function SeccionPlatos({
+  testId,
+  titulo,
+  items,
+  onChange,
+  platos,
+  platosPorId,
+  cargandoPlatos,
+  debajoDePlato,
+  acciones,
+}: SeccionPlatosProps) {
+  const añadirDeCarta = (plato: PlatoDeCarta) => onChange([...items, itemDesdePlato(plato)]);
+  const añadirAMano = () => onChange([...items, itemLibre("")]);
+
+  return (
+    <section data-testid={testId} className="rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0">
+      <header className="flex items-center justify-between gap-2">
+        {typeof titulo === "string" ? <h4 className="text-sm font-semibold">{titulo}</h4> : titulo}
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {items.length === 1 ? "1 plato" : `${items.length} platos`}
+          </span>
+          {acciones}
+        </span>
+      </header>
+
+      {items.length === 0 ? (
+        <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
+          Sin platos todavía
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item, indice) => (
+            <LineaMenu
+              key={item.id}
+              item={item}
+              indice={indice}
+              total={items.length}
+              platoActual={item.platoId ? platosPorId.get(item.platoId) : undefined}
+              debajo={debajoDePlato?.(item)}
+              onCambiar={(nuevo) => onChange(items.map((x) => (x.id === item.id ? nuevo : x)))}
+              onQuitar={() => onChange(items.filter((x) => x.id !== item.id))}
+              onMover={(direccion) => {
+                const destino = indice + direccion;
+                if (destino < 0 || destino >= items.length) return;
+                const copia = [...items];
+                [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
+                onChange(copia);
+              }}
+            />
+          ))}
+        </ul>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <SelectorPlato platos={platos} cargando={cargandoPlatos} onElegir={añadirDeCarta} />
+        <Button type="button" variant="ghost" size="sm" className="h-11 px-4" onClick={añadirAMano}>
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          A mano
+        </Button>
+      </div>
+    </section>
   );
 }
 
@@ -575,6 +661,11 @@ interface EditorSeccionesMenuProps {
   platos: PlatoDeCarta[];
   platosPorId: Map<string, PlatoDeCarta>;
   cargandoPlatos: boolean;
+  /**
+   * Opcional: algo debajo de cada plato, dentro de su tarjeta (el menú de una
+   * novedad con Maridaje pone ahí la bebida de ese plato).
+   */
+  debajoDePlato?: (item: ItemMenu, seccion: SeccionMenu) => ReactNode;
 }
 
 export function EditorSeccionesMenu({
@@ -583,6 +674,7 @@ export function EditorSeccionesMenu({
   platos,
   platosPorId,
   cargandoPlatos,
+  debajoDePlato,
 }: EditorSeccionesMenuProps) {
   const actualizarSeccion = (seccion: SeccionMenu, items: ItemMenu[]) =>
     onChange({ ...secciones, [seccion]: items });
@@ -612,66 +704,18 @@ export function EditorSeccionesMenu({
       <div className={CONTENEDOR_SECCIONES} data-testid="contenedor-secciones-menu">
         <div className={REJILLA_SECCIONES}>
           {SECCIONES_MENU.map((seccion) => {
-            const items = secciones[seccion];
-
-            const añadirDeCarta = (plato: PlatoDeCarta) =>
-              actualizarSeccion(seccion, [...items, itemDesdePlato(plato)]);
-
-            const añadirAMano = () => actualizarSeccion(seccion, [...items, itemLibre("")]);
-
             return (
-              <section
+              <SeccionPlatos
                 key={seccion}
-                data-testid={`seccion-menu-${seccion}`}
-                className="rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0"
-              >
-                <header className="flex items-center justify-between gap-2">
-                  <h4 className="text-sm font-semibold">{ETIQUETA_SECCION[seccion]}</h4>
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {items.length === 1 ? "1 plato" : `${items.length} platos`}
-                  </span>
-                </header>
-
-                {items.length === 0 ? (
-                  <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
-                    Sin platos todavía
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {items.map((item, indice) => (
-                      <LineaMenu
-                        key={item.id}
-                        item={item}
-                        indice={indice}
-                        total={items.length}
-                        platoActual={item.platoId ? platosPorId.get(item.platoId) : undefined}
-                        onCambiar={(nuevo) =>
-                          actualizarSeccion(
-                            seccion,
-                            items.map((x) => (x.id === item.id ? nuevo : x)),
-                          )
-                        }
-                        onQuitar={() => actualizarSeccion(seccion, items.filter((x) => x.id !== item.id))}
-                        onMover={(direccion) => {
-                          const destino = indice + direccion;
-                          if (destino < 0 || destino >= items.length) return;
-                          const copia = [...items];
-                          [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
-                          actualizarSeccion(seccion, copia);
-                        }}
-                      />
-                    ))}
-                  </ul>
-                )}
-
-                <div className="flex flex-wrap gap-2">
-                  <SelectorPlato platos={platos} cargando={cargandoPlatos} onElegir={añadirDeCarta} />
-                  <Button type="button" variant="ghost" size="sm" className="h-11 px-4" onClick={añadirAMano}>
-                    <Plus className="h-3.5 w-3.5 mr-1.5" />
-                    A mano
-                  </Button>
-                </div>
-              </section>
+                testId={`seccion-menu-${seccion}`}
+                titulo={ETIQUETA_SECCION[seccion]}
+                items={secciones[seccion]}
+                onChange={(items) => actualizarSeccion(seccion, items)}
+                platos={platos}
+                platosPorId={platosPorId}
+                cargandoPlatos={cargandoPlatos}
+                debajoDePlato={debajoDePlato ? (item) => debajoDePlato(item, seccion) : undefined}
+              />
             );
           })}
         </div>

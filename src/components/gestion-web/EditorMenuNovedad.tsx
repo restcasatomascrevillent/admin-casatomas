@@ -3,25 +3,26 @@
 // Navidad) o una cata, no el menú del día ni la carta. Contrato en
 // src/lib/menu-novedad.ts (v1 y v2, historia 4093221d).
 //
-// - Tipo «Menú» (por defecto): primero, segundo y postre con el mismo
-//   EditorSeccionesMenu del menú del día; «Comida + bebidas» añade la sección
-//   Bebidas, escrita a mano (ADR-3 de 4073221d); y el interruptor «Con
-//   maridaje» abre «Bebida de cada plato», un bloque aparte debajo de los
-//   platos (ADR-8), con una bebida por plato.
-// - Tipo «Cata»: solo una lista ordenada de bebidas (de la carta o a mano).
+// Tres opciones (petición del dueño, 31/10/2026: «Menú, cata y maridaje, tres
+// opciones»), que en el modelo siguen siendo `tipo` + `maridaje`:
+// - «Menú» (por defecto, tipo menu sin maridaje): primero, segundo y postre
+//   con el mismo EditorSeccionesMenu del menú del día; «Comida + bebidas»
+//   añade la sección Bebidas, escrita a mano (ADR-3 de 4073221d).
+// - «Maridaje» (tipo menu con maridaje): los platos con su bebida dentro de
+//   la tarjeta de cada uno, sin «¿Qué incluye el menú?» (no guarda Bebidas).
+// - «Cata»: solo una lista ordenada de bebidas (de la carta o a mano).
 //
-// Lo del otro tipo (y los maridajes con el interruptor apagado) se conserva
+// Lo de la otra opción (y los maridajes al pasar a «Menú») se conserva
 // mientras se edita y se avisa de que no se guardará (E10).
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
-import { EditorSeccionesMenu } from "./EditorSeccionesMenu";
+import { EditorSeccionesMenu, SeccionPlatos } from "./EditorSeccionesMenu";
 import { EditorLineaBebida, ElegirLineaBebida } from "./EditorLineaBebida";
 import { useBebidasParaMenu } from "@/hooks/useBebidasParaMenu";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
@@ -31,10 +32,15 @@ import {
   avisosMenuNovedad,
   conservarTraduccionesLinea,
   conservarTraduccionesVigentes,
+  ETIQUETA_POSICION_EXTRA,
+  platosEnOrden,
+  POSICIONES_SECCION_EXTRA,
+  seccionExtraVacia,
+  type PosicionSeccionExtra,
+  type SeccionExtraNovedad,
   type ItemMenuNovedad,
   type LineaBebidaNovedad,
   type MenuNovedad,
-  type TipoMenuNovedad,
 } from "@/lib/menu-novedad";
 
 interface EditorMenuNovedadProps {
@@ -53,10 +59,25 @@ interface PropsBloque {
 const OPCION_SOLO_COMIDA = "solo_comida";
 const OPCION_CON_BEBIDAS = "con_bebidas";
 
-const TIPOS: { valor: TipoMenuNovedad; texto: string; detalle: string }[] = [
-  { valor: "menu", texto: "Menú", detalle: "Platos por secciones, con bebidas o maridaje." },
+/** Las tres opciones que ve el usuario. En el modelo: `tipo` + `maridaje`. */
+type OpcionMenuNovedad = "menu" | "maridaje" | "cata";
+
+const OPCIONES: { valor: OpcionMenuNovedad; texto: string; detalle: string }[] = [
+  { valor: "menu", texto: "Menú", detalle: "Primero, segundo y postre." },
+  { valor: "maridaje", texto: "Maridaje", detalle: "Los platos y una bebida para cada uno." },
   { valor: "cata", texto: "Cata", detalle: "Una lista ordenada de vinos y bebidas." },
 ];
+
+const opcionDeMenu = (menu: MenuNovedad): OpcionMenuNovedad =>
+  menu.tipo === "cata" ? "cata" : menu.maridaje ? "maridaje" : "menu";
+
+function conOpcion(menu: MenuNovedad, opcion: OpcionMenuNovedad): MenuNovedad {
+  if (opcion === "cata") return { ...menu, tipo: "cata" };
+  // El Maridaje no enseña «¿Qué incluye el menú?» y no guarda la sección
+  // Bebidas (limpiarMenuNovedad), pero se conserva en memoria: al volver a
+  // «Menú» reaparece tal cual.
+  return { ...menu, tipo: "menu", maridaje: opcion === "maridaje" };
+}
 
 // Opción de un RadioGroup o del interruptor: la tarjeta entera es la zona táctil (44 px).
 const CLASE_OPCION =
@@ -178,13 +199,13 @@ export function EditorMenuNovedad({ menu, onChange, platos, platosPorId, cargand
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium mb-2">¿Menú o cata?</legend>
+        <legend className="text-sm font-medium mb-2">¿Qué es?</legend>
         <RadioGroup
-          value={menu.tipo}
-          onValueChange={(valor) => onChange({ ...menu, tipo: valor === "cata" ? "cata" : "menu" })}
-          className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+          value={opcionDeMenu(menu)}
+          onValueChange={(valor) => onChange(conOpcion(menu, valor as OpcionMenuNovedad))}
+          className="grid grid-cols-1 gap-2 sm:grid-cols-3"
         >
-          {TIPOS.map((opcion) => (
+          {OPCIONES.map((opcion) => (
             <Label key={opcion.valor} htmlFor={`menu-novedad-tipo-${opcion.valor}`} className={CLASE_OPCION}>
               <RadioGroupItem value={opcion.valor} id={`menu-novedad-tipo-${opcion.valor}`} />
               <span className="min-w-0">
@@ -265,30 +286,39 @@ function EditorMenuPlatos({
 
   return (
     <>
-      <EditorSeccionesMenu
-        secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
-        onChange={cambiarComida}
-        platos={platos}
-        platosPorId={platosPorId}
-        cargandoPlatos={cargandoPlatos}
-      />
-
-      <div className="space-y-2">
-        <div className={CLASE_OPCION}>
-          <Label htmlFor="menu-novedad-maridaje" className="flex min-h-11 min-w-0 flex-1 cursor-pointer flex-col justify-center font-normal">
-            <span className="block text-sm font-medium">Con maridaje</span>
-            <span className="block text-xs text-muted-foreground">Una bebida para cada plato, de la carta o a mano.</span>
-          </Label>
-          <Switch
-            id="menu-novedad-maridaje"
-            checked={menu.maridaje}
-            onCheckedChange={(encendido) => onChange({ ...menu, maridaje: encendido })}
+      {menu.maridaje ? (
+        <PlatosConMaridaje
+          menu={menu}
+          onChange={onChange}
+          onCambiarComida={cambiarComida}
+          platos={platos}
+          platosPorId={platosPorId}
+          cargandoPlatos={cargandoPlatos}
+        />
+      ) : (
+        <>
+          <EditorSeccionesMenu
+            secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+            onChange={cambiarComida}
+            platos={platos}
+            platosPorId={platosPorId}
+            cargandoPlatos={cargandoPlatos}
           />
-        </div>
-        <AvisosMenu avisos={avisoMaridaje} testId="aviso-maridaje" />
-        {menu.maridaje && <BebidaDeCadaPlato menu={menu} onChange={onChange} />}
-      </div>
+          <SeccionesExtra
+            menu={menu}
+            onChange={onChange}
+            platos={platos}
+            platosPorId={platosPorId}
+            cargandoPlatos={cargandoPlatos}
+          />
+        </>
+      )}
 
+      <AvisosMenu avisos={avisoMaridaje} testId="aviso-maridaje" />
+
+      {/* «¿Qué incluye el menú?» solo en Menú: el Maridaje ya lleva la bebida en cada plato. */}
+      {!menu.maridaje && (
+      <>
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium mb-2">¿Qué incluye el menú?</legend>
         <RadioGroup
@@ -384,23 +414,40 @@ function EditorMenuPlatos({
           </Button>
         </section>
       )}
+      </>
+      )}
     </>
   );
 }
 
-/** «Bebida de cada plato» (ADR-8): una línea por plato con nombre, por id del plato. */
-function BebidaDeCadaPlato({ menu, onChange }: PropsBloque) {
+/**
+ * Maridaje: los platos (primero, segundo y postre) con la bebida de cada uno
+ * DENTRO de su tarjeta, justo debajo (petición del dueño, 31/10/2026: «más
+ * fácil añadir el maridaje por plato»). Antes iba en un bloque aparte debajo
+ * de todos los platos (ADR-8). Se guarda igual: `maridajes[id del plato]`.
+ */
+function PlatosConMaridaje({
+  menu,
+  onChange,
+  onCambiarComida,
+  platos,
+  platosPorId,
+  cargandoPlatos,
+}: PropsBloque & {
+  onCambiarComida: (secciones: Record<SeccionMenu, ItemMenu[]>) => void;
+  platos: PlatoDeCarta[];
+  platosPorId: Map<string, PlatoDeCarta>;
+  cargandoPlatos: boolean;
+}) {
   const carta = useBebidasParaMenu();
   const { ref, enfocar } = useEnfoque<HTMLElement>();
   const [cambiando, setCambiando] = useState<string | null>(null);
+  const { secciones } = menu;
 
   // Un plato sin nombre no se guarda (ni su bebida): no se ofrece hasta que lo tenga.
-  const grupos = SECCIONES_MENU.map((seccion) => ({
-    seccion,
-    platos: menu.secciones[seccion].filter((item) => item.nombre.trim() !== ""),
-  })).filter((grupo) => grupo.platos.length > 0);
-  const total = grupos.reduce((suma, grupo) => suma + grupo.platos.length, 0);
-  const conBebida = grupos.reduce((suma, grupo) => suma + grupo.platos.filter((p) => menu.maridajes[p.id]).length, 0);
+  const conNombre = platosEnOrden(menu).filter((item) => item.nombre.trim() !== "");
+  const total = conNombre.length;
+  const conBebida = conNombre.filter((p) => menu.maridajes[p.id]).length;
 
   const ponerBebida = (platoId: string, linea: LineaBebidaNovedad) =>
     onChange({
@@ -421,16 +468,54 @@ function BebidaDeCadaPlato({ menu, onChange }: PropsBloque) {
     enfocar({ clave: platoId, selectores: [BOTON_ACTIVO] });
   };
 
+  const bebidaDe = (plato: ItemMenu) => {
+    const nombre = plato.nombre.trim();
+    if (!nombre) {
+      return <p className="text-xs text-muted-foreground">Escribe el nombre del plato para elegir su bebida.</p>;
+    }
+    const linea = menu.maridajes[plato.id];
+    return (
+      <div data-clave={plato.id} className="min-w-0 space-y-1.5">
+        {linea && cambiando !== plato.id ? (
+          <EditorLineaBebida
+            linea={linea}
+            titulo="Bebida del maridaje"
+            onChange={(siguiente) => ponerBebida(plato.id, siguiente)}
+            onQuitar={() => quitar(plato.id)}
+            onCambiar={() => {
+              setCambiando(plato.id);
+              enfocar({ clave: plato.id, selectores: [BOTON_ACTIVO] });
+            }}
+          />
+        ) : (
+          <ElegirBebida
+            carta={carta}
+            titulo={`Bebida para «${nombre}»`}
+            onElegir={(nueva) => elegir(plato.id, nueva)}
+            onCancelar={
+              linea
+                ? () => {
+                    setCambiando(null);
+                    enfocar({ clave: plato.id, selectores: ['button[aria-label^="Cambiar"]'] });
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
+    );
+  };
+
   return (
     <section
       ref={ref}
       data-testid="bebida-de-cada-plato"
       aria-labelledby="menu-novedad-bebida-de-cada-plato"
-      className="min-w-0 space-y-3 rounded-lg border bg-muted/20 p-3"
+      className="min-w-0 space-y-2"
     >
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h4 id="menu-novedad-bebida-de-cada-plato" className="text-sm font-semibold">
-          Bebida de cada plato
+          Platos y su bebida
         </h4>
         {total > 0 && (
           <span className="text-xs text-muted-foreground tabular-nums">
@@ -438,60 +523,126 @@ function BebidaDeCadaPlato({ menu, onChange }: PropsBloque) {
           </span>
         )}
       </header>
-
       <AvisoCartaTruncada truncado={carta.truncado} />
-
-      {total === 0 ? (
-        <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
-          Añade platos arriba para elegir la bebida de cada uno.
-        </p>
-      ) : (
-        grupos.map(({ seccion, platos }) => (
-          <div key={seccion} className="space-y-2">
-            <h5 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {ETIQUETA_SECCION[seccion]}
-            </h5>
-            <ul className="space-y-2">
-              {platos.map((plato) => {
-                const nombre = plato.nombre.trim();
-                const linea = menu.maridajes[plato.id];
-                return (
-                  <li key={plato.id} data-clave={plato.id} className="min-w-0 space-y-2 rounded-lg border bg-card p-2.5">
-                    <p className="text-sm font-medium [overflow-wrap:anywhere]">{nombre}</p>
-                    {linea && cambiando !== plato.id ? (
-                      <EditorLineaBebida
-                        linea={linea}
-                        titulo="Bebida del maridaje"
-                        onChange={(siguiente) => ponerBebida(plato.id, siguiente)}
-                        onQuitar={() => quitar(plato.id)}
-                        onCambiar={() => {
-                          setCambiando(plato.id);
-                          enfocar({ clave: plato.id, selectores: [BOTON_ACTIVO] });
-                        }}
-                      />
-                    ) : (
-                      <ElegirBebida
-                        carta={carta}
-                        titulo={`Bebida para «${nombre}»`}
-                        onElegir={(nueva) => elegir(plato.id, nueva)}
-                        onCancelar={
-                          linea
-                            ? () => {
-                                setCambiando(null);
-                                enfocar({ clave: plato.id, selectores: ['button[aria-label^="Cambiar"]'] });
-                              }
-                            : undefined
-                        }
-                      />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))
-      )}
+      <EditorSeccionesMenu
+        secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+        onChange={onCambiarComida}
+        platos={platos}
+        platosPorId={platosPorId}
+        cargandoPlatos={cargandoPlatos}
+        debajoDePlato={bebidaDe}
+      />
+      <SeccionesExtra
+        menu={menu}
+        onChange={onChange}
+        platos={platos}
+        platosPorId={platosPorId}
+        cargandoPlatos={cargandoPlatos}
+        debajoDePlato={bebidaDe}
+      />
     </section>
+  );
+}
+
+/**
+ * Secciones con nombre libre (Aperitivo, Entrantes, Prepostre…): cada una con
+ * su nombre, dónde va respecto a primero, segundo y postre, y sus platos.
+ */
+function SeccionesExtra({
+  menu,
+  onChange,
+  platos,
+  platosPorId,
+  cargandoPlatos,
+  debajoDePlato,
+}: PropsBloque & {
+  platos: PlatoDeCarta[];
+  platosPorId: Map<string, PlatoDeCarta>;
+  cargandoPlatos: boolean;
+  debajoDePlato?: (item: ItemMenu) => ReactNode;
+}) {
+  const [enfocar, setEnfocar] = useState<string | null>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!enfocar) return;
+    listaRef.current?.querySelector<HTMLInputElement>(`[data-seccion-extra="${enfocar}"]`)?.focus();
+    setEnfocar(null);
+  }, [enfocar]);
+
+  const cambiar = (id: string, cambio: (seccion: SeccionExtraNovedad) => SeccionExtraNovedad) =>
+    onChange({ ...menu, extras: menu.extras.map((s) => (s.id === id ? cambio(s) : s)) });
+
+  const añadir = () => {
+    const nueva = seccionExtraVacia();
+    onChange({ ...menu, extras: [...menu.extras, nueva] });
+    setEnfocar(nueva.id);
+  };
+
+  return (
+    <div ref={listaRef} className="space-y-2" data-testid="secciones-extra">
+      {menu.extras.map((seccion, indice) => {
+        const nombre = seccion.nombre.trim() || `sección ${indice + 1}`;
+        return (
+          <SeccionPlatos
+            key={seccion.id}
+            testId={`seccion-extra-${indice + 1}`}
+            titulo={
+              <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                <Input
+                  data-seccion-extra={seccion.id}
+                  value={seccion.nombre}
+                  maxLength={40}
+                  // Cambia el castellano: su traducción ya no vale (se rehace al guardar).
+                  onChange={(e) => cambiar(seccion.id, (s) => ({ ...s, nombre: e.target.value, traducciones: undefined }))}
+                  placeholder="Ej: Aperitivo"
+                  aria-label={`Nombre de la sección ${indice + 1}`}
+                  className="h-11 min-w-0 flex-1 basis-40 font-semibold"
+                />
+                <select
+                  value={seccion.posicion}
+                  onChange={(e) => cambiar(seccion.id, (s) => ({ ...s, posicion: e.target.value as PosicionSeccionExtra }))}
+                  aria-label={`Dónde va «${nombre}»`}
+                  className="h-11 min-w-0 rounded-md border bg-background px-2 text-sm"
+                >
+                  {POSICIONES_SECCION_EXTRA.map((posicion) => (
+                    <option key={posicion} value={posicion}>
+                      {ETIQUETA_POSICION_EXTRA[posicion]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            }
+            acciones={
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-11 w-11 text-destructive hover:text-destructive"
+                onClick={() => onChange({ ...menu, extras: menu.extras.filter((s) => s.id !== seccion.id) })}
+                aria-label={`Quitar la sección «${nombre}»`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            }
+            items={seccion.items}
+            onChange={(items) =>
+              cambiar(seccion.id, (s) => ({ ...s, items: conservarTraduccionesVigentes(s.items, items) }))
+            }
+            platos={platos}
+            platosPorId={platosPorId}
+            cargandoPlatos={cargandoPlatos}
+            debajoDePlato={debajoDePlato}
+          />
+        );
+      })}
+      <Button type="button" variant="outline" size="sm" className="h-11 px-4" onClick={añadir}>
+        <Plus className="h-3.5 w-3.5 mr-1.5" />
+        Añadir sección
+      </Button>
+      <p className="text-xs text-muted-foreground">
+        Para más tiempos aparte de primero, segundo y postre: aperitivo, entrantes, prepostre…
+      </p>
+    </div>
   );
 }
 

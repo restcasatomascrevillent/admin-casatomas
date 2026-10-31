@@ -67,7 +67,7 @@ const MENU = {
 // canónicos del plan del CTO, sección 2. Las copias del panel viven en
 // FIXTURES_V2 y, cuando existen, tienen que ser idénticas (se comprueba en 4b).
 const FIXTURES_V2 = "src/lib/__tests__/fixtures";
-const MENU_V2_MARIDAJE = JSON.parse(`{"version":2,"tipo":"menu","incluye_bebidas":true,"maridaje":true,"secciones":{
+const MENU_V2_MARIDAJE = JSON.parse(`{"version":2,"tipo":"menu","incluye_bebidas":false,"maridaje":true,"secciones":{
  "primero":[{"id":"p1","origen":"libre","platoId":null,"nombre":"Gamba roja de Santa Pola","descripcion":"A la plancha","imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null,
    "traducciones":{"en":{"nombre":"Santa Pola red prawn","descripcion":"Grilled"},"fr":{"nombre":"Crevette rouge de Santa Pola","descripcion":"À la plancha"}},
    "maridaje":{"id":"m1","origen":"libre","refId":null,"nombre":"Cava brut nature","descripcion":"Bien frío","sulfitos":true,
@@ -75,7 +75,7 @@ const MENU_V2_MARIDAJE = JSON.parse(`{"version":2,"tipo":"menu","incluye_bebidas
  "segundo":[{"id":"s1","origen":"libre","platoId":null,"nombre":"Arroz a banda","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null}],
  "postre":[{"id":"d1","origen":"libre","platoId":null,"nombre":"Turrón de Jijona","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null,
    "maridaje":{"id":"m2","origen":"vino","refId":"vino-fondillon","nombre":"Fondillón","descripcion":null,"sulfitos":true}}],
- "bebidas":[{"id":"b1","origen":"libre","platoId":null,"nombre":"Agua mineral","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null}]}}`);
+ "bebidas":[]}}`);
 const MENU_V2_CATA = JSON.parse(`{"version":2,"tipo":"cata","incluye_bebidas":false,"maridaje":false,"secciones":{"primero":[],"segundo":[],"postre":[],"bebidas":[],
  "cata":[
   {"id":"c1","origen":"bebida","refId":"bebida-whisky-12","nombre":"Whisky de malta 12 años","descripcion":null,"sulfitos":false,

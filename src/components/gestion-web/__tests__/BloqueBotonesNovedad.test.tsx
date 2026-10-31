@@ -187,7 +187,7 @@ describe("BloqueBotonesNovedad", () => {
     expect(screen.queryByTestId("editor-menu-novedad")).toBeNull();
     fireEvent.click(anadir().getByRole("button", { name: /ver menú/i }));
     expect(screen.getByTestId("editor-menu-novedad")).toBeInTheDocument();
-    expect(screen.getByText("«Ver menú» necesita al menos un plato en primero, segundo o postre.")).toBeInTheDocument();
+    expect(screen.getByText("«Ver menú» necesita al menos un plato.")).toBeInTheDocument();
 
     // Un plato a mano basta.
     fireEvent.click(within(screen.getByTestId("seccion-menu-primero")).getByRole("button", { name: /a mano/i }));

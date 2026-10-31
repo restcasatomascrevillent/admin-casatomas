@@ -46,6 +46,13 @@ interface MobilePreviewProps {
   novedades: NovedadPreview[];
   /** id de la tarjeta que se está editando (se resalta). */
   idResaltado?: string | null;
+  /**
+   * El teléfono ocupa el alto que le deje el contenedor (hasta 640 px) en vez
+   * de medir siempre 640 px: así la columna de la vista previa no hace scroll
+   * y solo se desplaza la pantalla del móvil. El contenedor tiene que tener
+   * alto definido.
+   */
+  ajustarAlto?: boolean;
 }
 
 type Idioma = "es" | "en" | "fr";
@@ -115,17 +122,17 @@ const TEXTOS_SECCION: Record<Idioma, { titulo: string; subtitulo: string; vacio:
  * texto, puntos destacados como lista, etiquetas como chips y, si los tiene,
  * los botones al pie (solo los que la web pintaría).
  */
-export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
+export function MobilePreview({ novedades, idResaltado, ajustarAlto = false }: MobilePreviewProps) {
   const [idioma, setIdioma] = useState<Idioma>("es");
   const textos = TEXTOS_SECCION[idioma];
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className={`flex flex-col items-center gap-3 ${ajustarAlto ? "h-full min-h-0" : ""}`}>
       <ToggleGroup
         type="single"
         value={idioma}
         onValueChange={(v) => v && setIdioma(v as Idioma)}
-        className="bg-muted rounded-lg p-1"
+        className="bg-muted rounded-lg p-1 shrink-0"
         aria-label="Idioma de la vista previa"
       >
         {IDIOMAS.map((i) => (
@@ -142,7 +149,12 @@ export function MobilePreview({ novedades, idResaltado }: MobilePreviewProps) {
       </ToggleGroup>
 
       {/* Marco del teléfono */}
-      <div className="relative w-[320px] h-[640px] max-w-full bg-zinc-900 rounded-[3rem] p-2 shadow-2xl">
+      <div
+        className={`relative w-[320px] max-w-full bg-zinc-900 rounded-[3rem] p-2 shadow-2xl ${
+          ajustarAlto ? "flex-1 min-h-[360px] max-h-[640px]" : "h-[640px]"
+        }`}
+        data-testid="marco-movil"
+      >
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-7 bg-zinc-900 rounded-b-2xl z-10" />
 
         <div className="w-full h-full bg-background rounded-[2.5rem] overflow-hidden relative">

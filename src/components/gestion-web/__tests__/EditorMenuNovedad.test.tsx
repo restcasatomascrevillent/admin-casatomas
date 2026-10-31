@@ -205,7 +205,7 @@ describe("EditorMenuNovedad · Menú o Cata (E10)", () => {
     expect(screen.getByTestId("avisos-tipo-menu")).toHaveTextContent(AVISO_GUARDAR_COMO_CATA);
     expect(screen.queryByTestId("seccion-menu-primero")).toBeNull();
     expect(screen.queryByRole("radio", { name: /comida \+ bebidas/i })).toBeNull();
-    expect(screen.queryByRole("switch", { name: /con maridaje/i })).toBeNull();
+    expect(screen.queryByTestId("bebida-de-cada-plato")).toBeNull();
     expect(screen.getByTestId("editor-cata")).toBeInTheDocument();
 
     const añadir = screen.getByRole("group", { name: "Añadir bebida a la cata" });
@@ -223,14 +223,27 @@ describe("EditorMenuNovedad · Menú o Cata (E10)", () => {
   });
 });
 
-describe("EditorMenuNovedad · Con maridaje", () => {
-  it("apagado por defecto; encendido, cada plato elige, cambia o quita su bebida, y se combina con «Comida + bebidas»", async () => {
+describe("EditorMenuNovedad · tres opciones", () => {
+  it("son Menú, Maridaje y Cata, en ese orden, y empieza en Menú", () => {
+    render(<Harness />);
+    expect(screen.getAllByRole("radio").slice(0, 3).map((r) => r.id)).toEqual([
+      "menu-novedad-tipo-menu",
+      "menu-novedad-tipo-maridaje",
+      "menu-novedad-tipo-cata",
+    ]);
+    expect(radioTipo(/^Menú/)).toBeChecked();
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+});
+
+describe("EditorMenuNovedad · Maridaje", () => {
+  it("no viene elegido; al elegirlo, cada plato elige, cambia o quita su bebida debajo del propio plato, sin «¿Qué incluye el menú?»", async () => {
     const gamba = itemLibre("Gamba roja");
     const arroz = itemLibre("Arroz a banda");
     const turron = itemLibre("Turrón de Jijona");
     render(<Harness inicial={{ ...vacio, secciones: { ...vacio.secciones, primero: [gamba], segundo: [arroz], postre: [turron] } }} />);
 
-    const interruptor = screen.getByRole("switch", { name: /con maridaje/i });
+    const interruptor = radioTipo(/^Maridaje/);
     expect(interruptor).not.toBeChecked();
     expect(screen.queryByTestId("bebida-de-cada-plato")).toBeNull();
 
@@ -264,23 +277,26 @@ describe("EditorMenuNovedad · Con maridaje", () => {
     expect(ultimo.maridajes[arroz.id]).toBeUndefined();
     await waitFor(() => expect(within(grupoTurron()).getByRole("button", { name: /de la carta/i })).toHaveFocus());
 
-    // Con «Comida + bebidas»: v2 con la sección Bebidas y el maridaje solo en la gamba (E3).
-    fireEvent.click(screen.getByRole("radio", { name: /comida \+ bebidas/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Añadir bebida" }));
-    fireEvent.change(screen.getByLabelText("Bebida 1"), { target: { value: "Agua mineral" } });
+    // La bebida va dentro de la tarjeta de su plato.
+    const tarjetaGamba = within(screen.getByTestId("seccion-menu-primero")).getByRole("listitem");
+    expect(within(tarjetaGamba).getByDisplayValue("Cava brut nature")).toBeInTheDocument();
+
+    // Sin «¿Qué incluye el menú?»: v2 sin sección Bebidas y el maridaje solo en la gamba (E3).
+    expect(screen.queryByRole("radio", { name: /comida \+ bebidas/i })).toBeNull();
     const guardado = json(ultimo);
-    expect(guardado).toMatchObject({ version: 2, tipo: "menu", incluye_bebidas: true, maridaje: true });
+    expect(guardado).toMatchObject({ version: 2, tipo: "menu", incluye_bebidas: false, maridaje: true });
     expect(guardado.secciones.primero[0].maridaje).toMatchObject({ nombre: "Cava brut nature", sulfitos: true });
     expect(guardado.secciones.segundo[0]).not.toHaveProperty("maridaje");
     expect(guardado.secciones.postre[0]).not.toHaveProperty("maridaje");
-    expect(guardado.secciones.bebidas.map((b) => b.nombre)).toEqual(["Agua mineral"]);
+    expect(guardado.secciones.bebidas).toEqual([]);
 
-    // Apagado: avisa, conserva las bebidas en memoria y se guarda la v1.
-    fireEvent.click(interruptor);
+    // De vuelta a «Menú»: avisa, conserva las bebidas en memoria y se guarda la v1.
+    fireEvent.click(radioTipo(/^Menú/));
     expect(screen.queryByTestId("bebida-de-cada-plato")).toBeNull();
     expect(screen.getByTestId("aviso-maridaje")).toHaveTextContent(AVISO_MARIDAJE_APAGADO);
     expect(ultimo.maridajes[gamba.id]).toBeDefined();
-    expect(json(ultimo)).toMatchObject({ version: 1, incluye_bebidas: true });
+    expect(screen.getByRole("radio", { name: /solo comida/i })).toBeChecked();
+    expect(json(ultimo)).toMatchObject({ version: 1, incluye_bebidas: false });
   });
 
   it("cambiar la descripción de una bebida traducida conserva los nombres traducidos", () => {
@@ -310,7 +326,9 @@ describe("EditorMenuNovedad · Con maridaje", () => {
     carta.valor = { ...carta.valor, truncado: true };
     render(<Harness inicial={{ ...vacio, maridaje: true }} />);
     const bloque = screen.getByTestId("bebida-de-cada-plato");
-    expect(within(bloque).getByText(/Añade platos arriba/)).toBeInTheDocument();
+    expect(within(bloque).getAllByText("Sin platos todavía")).toHaveLength(3);
+    fireEvent.click(within(screen.getByTestId("seccion-menu-primero")).getByRole("button", { name: /a mano/i }));
+    expect(within(bloque).getByText("Escribe el nombre del plato para elegir su bebida.")).toBeInTheDocument();
     expect(within(bloque).getByTestId("aviso-carta-truncada")).toHaveTextContent(/más vinos de los que caben/);
   });
 });
@@ -434,20 +452,46 @@ describe("EditorMenuNovedad · una v1 de antes", () => {
     },
   };
 
-  it("se abre como Menú sin maridaje y, aunque se toquen tipo e interruptor, se guarda igual", () => {
+  it("se abre como Menú sin maridaje y, aunque se toquen las opciones, se guarda igual", () => {
     const menu = parseMenuNovedad(V1);
     expect(menu).not.toBeNull();
     render(<Harness inicial={menu!} />);
     expect(radioTipo(/^Menú/)).toBeChecked();
-    expect(screen.getByRole("switch", { name: /con maridaje/i })).not.toBeChecked();
+    expect(radioTipo(/^Maridaje/)).not.toBeChecked();
     expect(screen.getByRole("radio", { name: /comida \+ bebidas/i })).toBeChecked();
     expect(serializarMenuNovedad(ultimo)).toEqual(V1);
 
-    fireEvent.click(screen.getByRole("switch", { name: /con maridaje/i }));
-    fireEvent.click(screen.getByRole("switch", { name: /con maridaje/i }));
+    fireEvent.click(radioTipo(/^Maridaje/));
+    fireEvent.click(radioTipo(/^Menú/));
     fireEvent.click(radioTipo(/^Cata/));
     fireEvent.click(radioTipo(/^Menú/));
     expect(screen.getByTestId("avisos-tipo-menu")).toBeEmptyDOMElement();
     expect(serializarMenuNovedad(ultimo)).toEqual(V1);
+  });
+});
+
+describe("EditorMenuNovedad · secciones extra (31/10/2026)", () => {
+  it("añade una sección con nombre, elige dónde va, le pone platos y, con Maridaje, su bebida; se quita", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Añadir sección" }));
+    const nombre = screen.getByLabelText("Nombre de la sección 1");
+    await waitFor(() => expect(nombre).toHaveFocus());
+    fireEvent.change(nombre, { target: { value: "Aperitivo" } });
+    fireEvent.change(screen.getByLabelText("Dónde va «Aperitivo»"), { target: { value: "antes_primero" } });
+
+    const seccion = () => within(screen.getByTestId("seccion-extra-1"));
+    fireEvent.click(seccion().getByRole("button", { name: /a mano/i }));
+    fireEvent.change(seccion().getByLabelText("Nombre del plato 1"), { target: { value: "Gilda" } });
+    expect(ultimo.extras).toEqual([
+      expect.objectContaining({ nombre: "Aperitivo", posicion: "antes_primero", items: [expect.objectContaining({ nombre: "Gilda" })] }),
+    ]);
+
+    // Con Maridaje el plato de la sección también lleva su bebida.
+    fireEvent.click(radioTipo(/^Maridaje/));
+    expect(seccion().getByRole("group", { name: "Bebida para «Gilda»" })).toBeInTheDocument();
+
+    fireEvent.click(seccion().getByRole("button", { name: "Quitar la sección «Aperitivo»" }));
+    expect(screen.queryByTestId("seccion-extra-1")).toBeNull();
+    expect(ultimo.extras).toEqual([]);
   });
 });

@@ -244,14 +244,14 @@ describe("validarBotonesNovedad — no deja guardar y explica por qué", () => {
 
   it("«Ver menú» sin ningún plato (las líneas en blanco no cuentan)", () => {
     expect(mensajes(["ver_menu"], conComida({ primero: [itemLibre("  ")] }))).toEqual([
-      "«Ver menú» necesita al menos un plato en primero, segundo o postre.",
+      "«Ver menú» necesita al menos un plato.",
     ]);
     expect(mensajes(["ver_menu"], conComida({ postre: [itemLibre("Flan")] }))).toEqual([]);
   });
 
   it("solo bebidas no basta para «Ver menú»", () => {
     expect(mensajes(["ver_menu"], conComida({ bebidas: [itemLibre("Agua")] }, true))).toEqual([
-      "«Ver menú» necesita al menos un plato en primero, segundo o postre.",
+      "«Ver menú» necesita al menos un plato.",
     ]);
   });
 

@@ -1,4 +1,4 @@
-{"version":2,"tipo":"menu","incluye_bebidas":true,"maridaje":true,"secciones":{
+{"version":2,"tipo":"menu","incluye_bebidas":false,"maridaje":true,"secciones":{
  "primero":[{"id":"p1","origen":"libre","platoId":null,"nombre":"Gamba roja de Santa Pola","descripcion":"A la plancha","imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null,
    "traducciones":{"en":{"nombre":"Santa Pola red prawn","descripcion":"Grilled"},"fr":{"nombre":"Crevette rouge de Santa Pola","descripcion":"À la plancha"}},
    "maridaje":{"id":"m1","origen":"libre","refId":null,"nombre":"Cava brut nature","descripcion":"Bien frío","sulfitos":true,
@@ -6,4 +6,4 @@
  "segundo":[{"id":"s1","origen":"libre","platoId":null,"nombre":"Arroz a banda","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null}],
  "postre":[{"id":"d1","origen":"libre","platoId":null,"nombre":"Turrón de Jijona","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null,
    "maridaje":{"id":"m2","origen":"vino","refId":"vino-fondillon","nombre":"Fondillón","descripcion":null,"sulfitos":true}}],
- "bebidas":[{"id":"b1","origen":"libre","platoId":null,"nombre":"Agua mineral","descripcion":null,"imagenUrl":null,"imagenPosicionY":null,"alergenos":[],"alergenosInferidos":[],"alergenosNotas":null}]}}
+ "bebidas":[]}}
