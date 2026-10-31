@@ -21,6 +21,7 @@ import {
 import type { BebidaDeCarta, VinoDeCarta } from "@/hooks/useBebidasParaMenu";
 import {
   bebidaElegibleParaMenu,
+  coincidenciaBusqueda,
   lineaDesdeBebida,
   lineaDesdeVino,
   sulfitosDeVino,
@@ -42,6 +43,25 @@ export interface SelectorBebidaCartaProps {
 const detalle = (categoria: string | null, extra: string | null) =>
   [categoria, extra].filter(Boolean).join(" · ") || "Sin categoría";
 
+/**
+ * Las opciones que coinciden con la búsqueda, de la mejor a la peor
+ * (`coincidenciaBusqueda`); a igualdad, en el orden de la carta.
+ */
+function filtrarYOrdenar<T>(
+  opciones: T[],
+  datos: (opcion: T) => { nombre: string | null; categoria: string | null },
+  busqueda: string,
+): { opcion: T; puntos: number }[] {
+  return opciones
+    .map((opcion, indice) => {
+      const { nombre, categoria } = datos(opcion);
+      return { opcion, indice, puntos: coincidenciaBusqueda(nombre ?? "", categoria, busqueda) };
+    })
+    .filter((x): x is { opcion: T; indice: number; puntos: number } => x.puntos !== null)
+    .sort((a, b) => a.puntos - b.puntos || a.indice - b.indice)
+    .map(({ opcion, puntos }) => ({ opcion, puntos }));
+}
+
 export function SelectorBebidaCarta({
   vinos,
   bebidas,
@@ -52,31 +72,62 @@ export function SelectorBebidaCarta({
   disabled = false,
 }: SelectorBebidaCartaProps) {
   const [abierto, setAbierto] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
 
-  // `cmdk` filtra por el `value`: nombre + categoría, para poder buscar también
-  // por «tintos» o «licores».
-  const opcionesVinos = useMemo(
+  // El filtro y el orden son nuestros, no los de `cmdk` (su puntuación difusa
+  // ponía vinos sin relación delante de «Lagavulin 8» y la cerveza «Sol» en el
+  // puesto 130): exacta, empieza por, palabra, contiene y, por último, la
+  // categoría («tintos», «licores»). Intro elige la primera, que es la mejor.
+  const vinosVisibles = useMemo(
     () =>
-      vinos.filter(bebidaElegibleParaMenu).map((vino) => ({
-        vino,
-        sulfitos: sulfitosDeVino(vino.alergenos_oficiales),
-        busqueda: [vino.nombre, vino.categoria].filter(Boolean).join(" "),
+      filtrarYOrdenar(vinos.filter(bebidaElegibleParaMenu), (vino) => vino, busqueda).map(({ opcion, puntos }) => ({
+        vino: opcion,
+        sulfitos: sulfitosDeVino(opcion.alergenos_oficiales),
+        puntos,
       })),
-    [vinos],
+    [vinos, busqueda],
   );
-  const opcionesBebidas = useMemo(
+  const bebidasVisibles = useMemo(
     () =>
-      bebidas.filter(bebidaElegibleParaMenu).map((bebida) => ({
-        bebida,
-        busqueda: [bebida.nombre, bebida.categoria].filter(Boolean).join(" "),
-      })),
-    [bebidas],
+      filtrarYOrdenar(bebidas.filter(bebidaElegibleParaMenu), (bebida) => bebida, busqueda).map(
+        ({ opcion, puntos }) => ({ bebida: opcion, puntos }),
+      ),
+    [bebidas, busqueda],
   );
+  // El grupo con la mejor coincidencia va primero (a igualdad, los vinos).
+  const bebidasPrimero =
+    bebidasVisibles.length > 0 && (vinosVisibles.length === 0 || bebidasVisibles[0].puntos < vinosVisibles[0].puntos);
+
+  const cambiarAbierto = (valor: boolean) => {
+    setAbierto(valor);
+    if (!valor) setBusqueda("");
+  };
 
   const elegir = (linea: LineaBebidaNovedad) => {
     onElegir(linea);
-    setAbierto(false);
+    cambiarAbierto(false);
   };
+
+  const grupoBebidas = bebidasVisibles.length > 0 && (
+  <CommandGroup heading="Bebidas">
+    {bebidasVisibles.map(({ bebida }) => (
+      <CommandItem
+        key={`bebida-${bebida.id}`}
+        value={`bebida-${bebida.id}`}
+        onSelect={() => elegir(lineaDesdeBebida(bebida))}
+        className="min-h-11 gap-2.5 items-start"
+      >
+        <GlassWater className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" aria-hidden="true" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm [overflow-wrap:anywhere]">{bebida.nombre}</span>
+          <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">
+            {detalle(bebida.categoria, null)}
+          </span>
+        </span>
+      </CommandItem>
+    ))}
+  </CommandGroup>
+  );
 
   const textoVacio = cargando
     ? "Cargando la carta..."
@@ -85,7 +136,7 @@ export function SelectorBebidaCarta({
       : "Ninguna bebida coincide. Puedes escribirla a mano.";
 
   return (
-    <Popover open={abierto} onOpenChange={setAbierto}>
+    <Popover open={abierto} onOpenChange={cambiarAbierto}>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="h-11 px-4" disabled={disabled}>
           <Search className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
@@ -95,16 +146,17 @@ export function SelectorBebidaCarta({
       {/* En un móvil de 375-390 px no puede pasar del ancho de la pantalla. */}
       <PopoverContent align="start" collisionPadding={12} className="w-[min(22rem,calc(100vw-1.5rem))] p-0">
         {/* `label` da nombre accesible al buscador (cmdk lo enlaza con aria-labelledby). */}
-        <Command label="Buscar vino o bebida en la carta">
-          <CommandInput placeholder="Buscar vino o bebida..." />
+        <Command label="Buscar vino o bebida en la carta" shouldFilter={false}>
+          <CommandInput placeholder="Buscar vino o bebida..." value={busqueda} onValueChange={setBusqueda} />
           <CommandList>
             <CommandEmpty>{textoVacio}</CommandEmpty>
-            {opcionesVinos.length > 0 && (
+            {bebidasPrimero && grupoBebidas}
+            {vinosVisibles.length > 0 && (
               <CommandGroup heading="Vinos">
-                {opcionesVinos.map(({ vino, sulfitos, busqueda }) => (
+                {vinosVisibles.map(({ vino, sulfitos }) => (
                   <CommandItem
                     key={`vino-${vino.id}`}
-                    value={`${busqueda} vino-${vino.id}`}
+                    value={`vino-${vino.id}`}
                     onSelect={() => elegir(lineaDesdeVino(vino))}
                     className="min-h-11 gap-2.5 items-start"
                   >
@@ -119,26 +171,7 @@ export function SelectorBebidaCarta({
                 ))}
               </CommandGroup>
             )}
-            {opcionesBebidas.length > 0 && (
-              <CommandGroup heading="Bebidas">
-                {opcionesBebidas.map(({ bebida, busqueda }) => (
-                  <CommandItem
-                    key={`bebida-${bebida.id}`}
-                    value={`${busqueda} bebida-${bebida.id}`}
-                    onSelect={() => elegir(lineaDesdeBebida(bebida))}
-                    className="min-h-11 gap-2.5 items-start"
-                  >
-                    <GlassWater className="h-4 w-4 shrink-0 mt-0.5 text-muted-foreground" aria-hidden="true" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm [overflow-wrap:anywhere]">{bebida.nombre}</span>
-                      <span className="block text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                        {detalle(bebida.categoria, null)}
-                      </span>
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
+            {!bebidasPrimero && grupoBebidas}
           </CommandList>
         </Command>
       </PopoverContent>

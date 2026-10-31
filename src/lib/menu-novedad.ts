@@ -497,6 +497,36 @@ export const bebidaElegibleParaMenu = (fila: PlatoEnlazable & { nombre?: string 
   platoEnCarta(fila) && texto(fila.nombre) !== "";
 
 /** ¿Declara `alergenos_oficiales` los sulfitos? Null, vacío o ilegible es false. */
+/** Minúsculas, sin tildes y sin signos, para comparar «Fondillón» con «fondillon». */
+const normalizarBusqueda = (valor: string): string =>
+  valor
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * Cómo coincide un vino o una bebida de la carta con lo que se busca, de mejor
+ * a peor: 0 nombre exacto, 1 el nombre empieza por, 2 una palabra del nombre
+ * empieza por, 3 el nombre lo contiene, 4 la categoría lo contiene («tintos»,
+ * «licores»), 5 todas las palabras están en el nombre o la categoría. `null`
+ * si no coincide. Sin texto, todo vale 0 (se queda el orden de la carta).
+ */
+export function coincidenciaBusqueda(nombre: string, categoria: string | null, busqueda: string): number | null {
+  const buscado = normalizarBusqueda(busqueda);
+  if (!buscado) return 0;
+  const enNombre = normalizarBusqueda(nombre);
+  if (enNombre === buscado) return 0;
+  if (enNombre.startsWith(buscado)) return 1;
+  if (` ${enNombre}`.includes(` ${buscado}`)) return 2;
+  if (enNombre.includes(buscado)) return 3;
+  const enCategoria = normalizarBusqueda(categoria ?? "");
+  if (enCategoria.includes(buscado)) return 4;
+  const todo = `${enNombre} ${enCategoria}`;
+  return buscado.split(" ").every((palabra) => todo.includes(palabra)) ? 5 : null;
+}
+
 export const sulfitosDeVino = (alergenosOficiales: unknown): boolean =>
   parseAlergenos(alergenosOficiales).some((valor) => normalizarAlergeno(valor) === "sulfitos");
 

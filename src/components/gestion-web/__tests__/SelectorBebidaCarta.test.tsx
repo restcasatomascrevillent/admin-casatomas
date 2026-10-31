@@ -151,3 +151,64 @@ describe("SelectorBebidaCarta", () => {
     expect(boton).toBeDisabled();
   });
 });
+
+describe("SelectorBebidaCarta — orden por coincidencia (QA DEMO 31-10-2026)", () => {
+  const vino = (id: string, nombre: string, categoria = "TINTOS"): VinoDeCarta => ({ ...TINTO, id, nombre, categoria });
+  const bebida = (id: string, nombre: string, categoria = "Cervezas"): BebidaDeCarta => ({ ...WHISKY, id, nombre, categoria });
+  const VINOS = [
+    vino("v-consolacion", "Consolación crianza"),
+    vino("v-marques", "Marqués de Solar"),
+    vino("v-lagar", "Lagar de Cervera", "BLANCOS"),
+    vino("v-solea", "Soleá fino", "GENEROSOS"),
+  ];
+  const BEBIDAS = [
+    bebida("b-lagavulin-16", "Lagavulin 16 años", "Whiskys"),
+    bebida("b-whisky-8", "Whisky Lagavulin 8", "Whiskys"),
+    bebida("b-lagavulin-8", "Lagavulin 8 años", "Whiskys"),
+    bebida("b-sol", "Sol"),
+  ];
+
+  const buscar = async (texto: string) => {
+    abrir();
+    const buscador = await screen.findByPlaceholderText("Buscar vino o bebida...");
+    fireEvent.change(buscador, { target: { value: texto } });
+    return buscador;
+  };
+  const nombres = () => screen.getAllByRole("option").map((opcion) => opcion.textContent ?? "");
+
+  it("«Sol»: exacta, empieza por, palabra y contiene; la cerveza sale la primera e Intro la elige", async () => {
+    const { onElegir } = montar({ vinos: VINOS, bebidas: BEBIDAS });
+    const buscador = await buscar("Sol");
+    await waitFor(() => expect(nombres()[0]).toMatch(/^Sol/));
+    expect(nombres().map((n) => n.split(/Cervezas|TINTOS|GENEROSOS/)[0])).toEqual([
+      "Sol",
+      "Soleá fino",
+      "Marqués de Solar",
+      "Consolación crianza",
+    ]);
+    await waitFor(() => expect(screen.getAllByRole("option")[0]).toHaveAttribute("aria-selected", "true"));
+    fireEvent.keyDown(buscador, { key: "Enter" });
+    expect(onElegir).toHaveBeenCalledWith(expect.objectContaining({ origen: "bebida", refId: "b-sol", nombre: "Sol" }));
+  });
+
+  it("«Lagavulin 8»: solo lo que coincide, la mejor primero, e Intro elige la buena", async () => {
+    const { onElegir } = montar({ vinos: VINOS, bebidas: BEBIDAS });
+    const buscador = await buscar("Lagavulin 8");
+    await waitFor(() => expect(nombres()).toHaveLength(2));
+    expect(nombres()[0]).toMatch(/^Lagavulin 8 años/);
+    expect(nombres()[1]).toMatch(/^Whisky Lagavulin 8/);
+    expect(screen.queryByRole("group", { name: "Vinos" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByRole("option")[0]).toHaveAttribute("aria-selected", "true"));
+    fireEvent.keyDown(buscador, { key: "Enter" });
+    expect(onElegir).toHaveBeenCalledWith(expect.objectContaining({ refId: "b-lagavulin-8" }));
+  });
+
+  it("sin tildes y por categoría también encuentra", async () => {
+    montar({ vinos: VINOS, bebidas: BEBIDAS });
+    await buscar("solea");
+    await waitFor(() => expect(nombres()[0]).toMatch(/^Soleá fino/));
+    fireEvent.change(screen.getByPlaceholderText("Buscar vino o bebida..."), { target: { value: "blancos" } });
+    await waitFor(() => expect(nombres()).toEqual([expect.stringMatching(/^Lagar de Cervera/)]));
+  });
+});
+
