@@ -185,7 +185,7 @@ export interface MenuNovedad {
   tipo: TipoMenuNovedad;
   /** «Comida + bebidas» (true) o «Solo comida» (false). */
   incluye_bebidas: boolean;
-  /** Interruptor «Con maridaje» (solo cuenta con tipo Menú). */
+  /** Opción «Maridaje» del panel (solo cuenta con tipo Menú). */
   maridaje: boolean;
   secciones: SeccionesMenuNovedad;
   /** Bebida de cada plato de primero, segundo y postre, por id del plato. */
@@ -387,7 +387,7 @@ export function lineasBebidaMenu(menu: MenuNovedad): LineaBebidaNovedad[] {
 // Avisos de E10: lo del otro tipo se conserva al editar, pero no se guarda.
 export const AVISO_GUARDAR_COMO_CATA = "Al guardar como Cata no se guardarán los platos del menú.";
 export const AVISO_GUARDAR_COMO_MENU = "Al guardar como Menú no se guardará la lista de la cata.";
-export const AVISO_MARIDAJE_APAGADO = "Con el maridaje apagado no se guardarán las bebidas de los platos.";
+export const AVISO_MARIDAJE_APAGADO = "Al guardar como Menú no se guardarán las bebidas de cada plato del maridaje.";
 
 /** Qué hay en el editor que no se guardará con el tipo y el maridaje elegidos (E10). */
 export function avisosMenuNovedad(menu: MenuNovedad): string[] {
@@ -699,7 +699,7 @@ export function validarBotonesNovedad({ botones, menu, estadoPlato }: BotonesPar
       if (menu.maridaje && !menuTieneMaridajes(menu)) {
         errores.push({
           codigo: "maridaje_vacio",
-          mensaje: "“Con maridaje” necesita al menos una bebida en algún plato, o apágalo.",
+          mensaje: "Un maridaje necesita la bebida de al menos un plato, o elige «Menú».",
         });
       }
     }

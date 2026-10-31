@@ -3,14 +3,16 @@
 // Navidad) o una cata, no el menú del día ni la carta. Contrato en
 // src/lib/menu-novedad.ts (v1 y v2, historia 4093221d).
 //
-// - Tipo «Menú» (por defecto): primero, segundo y postre con el mismo
-//   EditorSeccionesMenu del menú del día; «Comida + bebidas» añade la sección
-//   Bebidas, escrita a mano (ADR-3 de 4073221d); y el interruptor «Con
-//   maridaje» abre «Bebida de cada plato», un bloque aparte debajo de los
-//   platos (ADR-8), con una bebida por plato.
-// - Tipo «Cata»: solo una lista ordenada de bebidas (de la carta o a mano).
+// Tres opciones (petición del dueño, 31/10/2026: «Menú, cata y maridaje, tres
+// opciones»), que en el modelo siguen siendo `tipo` + `maridaje`:
+// - «Menú» (por defecto, tipo menu sin maridaje): primero, segundo y postre
+//   con el mismo EditorSeccionesMenu del menú del día; «Comida + bebidas»
+//   añade la sección Bebidas, escrita a mano (ADR-3 de 4073221d).
+// - «Maridaje» (tipo menu con maridaje): lo mismo y, debajo de los platos,
+//   «Bebida de cada plato» (ADR-8), con una bebida por plato.
+// - «Cata»: solo una lista ordenada de bebidas (de la carta o a mano).
 //
-// Lo del otro tipo (y los maridajes con el interruptor apagado) se conserva
+// Lo de la otra opción (y los maridajes al pasar a «Menú») se conserva
 // mientras se edita y se avisa de que no se guardará (E10).
 // ---------------------------------------------------------------------------
 
@@ -20,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Switch } from "@/components/ui/switch";
 import { EditorSeccionesMenu } from "./EditorSeccionesMenu";
 import { EditorLineaBebida, ElegirLineaBebida } from "./EditorLineaBebida";
 import { useBebidasParaMenu } from "@/hooks/useBebidasParaMenu";
@@ -34,7 +35,6 @@ import {
   type ItemMenuNovedad,
   type LineaBebidaNovedad,
   type MenuNovedad,
-  type TipoMenuNovedad,
 } from "@/lib/menu-novedad";
 
 interface EditorMenuNovedadProps {
@@ -53,10 +53,22 @@ interface PropsBloque {
 const OPCION_SOLO_COMIDA = "solo_comida";
 const OPCION_CON_BEBIDAS = "con_bebidas";
 
-const TIPOS: { valor: TipoMenuNovedad; texto: string; detalle: string }[] = [
-  { valor: "menu", texto: "Menú", detalle: "Platos por secciones, con bebidas o maridaje." },
+/** Las tres opciones que ve el usuario. En el modelo: `tipo` + `maridaje`. */
+type OpcionMenuNovedad = "menu" | "maridaje" | "cata";
+
+const OPCIONES: { valor: OpcionMenuNovedad; texto: string; detalle: string }[] = [
+  { valor: "menu", texto: "Menú", detalle: "Primero, segundo y postre." },
+  { valor: "maridaje", texto: "Maridaje", detalle: "Los platos y una bebida para cada uno." },
   { valor: "cata", texto: "Cata", detalle: "Una lista ordenada de vinos y bebidas." },
 ];
+
+const opcionDeMenu = (menu: MenuNovedad): OpcionMenuNovedad =>
+  menu.tipo === "cata" ? "cata" : menu.maridaje ? "maridaje" : "menu";
+
+function conOpcion(menu: MenuNovedad, opcion: OpcionMenuNovedad): MenuNovedad {
+  if (opcion === "cata") return { ...menu, tipo: "cata" };
+  return { ...menu, tipo: "menu", maridaje: opcion === "maridaje" };
+}
 
 // Opción de un RadioGroup o del interruptor: la tarjeta entera es la zona táctil (44 px).
 const CLASE_OPCION =
@@ -178,13 +190,13 @@ export function EditorMenuNovedad({ menu, onChange, platos, platosPorId, cargand
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium mb-2">¿Menú o cata?</legend>
+        <legend className="text-sm font-medium mb-2">¿Qué es?</legend>
         <RadioGroup
-          value={menu.tipo}
-          onValueChange={(valor) => onChange({ ...menu, tipo: valor === "cata" ? "cata" : "menu" })}
-          className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+          value={opcionDeMenu(menu)}
+          onValueChange={(valor) => onChange(conOpcion(menu, valor as OpcionMenuNovedad))}
+          className="grid grid-cols-1 gap-2 sm:grid-cols-3"
         >
-          {TIPOS.map((opcion) => (
+          {OPCIONES.map((opcion) => (
             <Label key={opcion.valor} htmlFor={`menu-novedad-tipo-${opcion.valor}`} className={CLASE_OPCION}>
               <RadioGroupItem value={opcion.valor} id={`menu-novedad-tipo-${opcion.valor}`} />
               <span className="min-w-0">
@@ -273,21 +285,8 @@ function EditorMenuPlatos({
         cargandoPlatos={cargandoPlatos}
       />
 
-      <div className="space-y-2">
-        <div className={CLASE_OPCION}>
-          <Label htmlFor="menu-novedad-maridaje" className="flex min-h-11 min-w-0 flex-1 cursor-pointer flex-col justify-center font-normal">
-            <span className="block text-sm font-medium">Con maridaje</span>
-            <span className="block text-xs text-muted-foreground">Una bebida para cada plato, de la carta o a mano.</span>
-          </Label>
-          <Switch
-            id="menu-novedad-maridaje"
-            checked={menu.maridaje}
-            onCheckedChange={(encendido) => onChange({ ...menu, maridaje: encendido })}
-          />
-        </div>
-        <AvisosMenu avisos={avisoMaridaje} testId="aviso-maridaje" />
-        {menu.maridaje && <BebidaDeCadaPlato menu={menu} onChange={onChange} />}
-      </div>
+      <AvisosMenu avisos={avisoMaridaje} testId="aviso-maridaje" />
+      {menu.maridaje && <BebidaDeCadaPlato menu={menu} onChange={onChange} />}
 
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium mb-2">¿Qué incluye el menú?</legend>

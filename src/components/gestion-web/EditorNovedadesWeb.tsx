@@ -55,6 +55,7 @@ import {
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MobilePreview, type NovedadPreview } from "./MobilePreview";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
@@ -352,6 +353,20 @@ const CLAVES_IDIOMA = {
   },
 } as const;
 
+
+type PestanaFormNovedad = "contenido" | "imagen" | "botones" | "publicacion";
+
+/** Subpestañas del formulario de una novedad, en orden. */
+const PESTANAS_FORM_NOVEDAD: { id: PestanaFormNovedad; label: string }[] = [
+  { id: "contenido", label: "Texto" },
+  { id: "imagen", label: "Imagen" },
+  { id: "botones", label: "Botones y menú" },
+  { id: "publicacion", label: "Publicación" },
+];
+
+// forceMount: la pestaña inactiva se oculta pero sigue montada.
+const CLASE_PESTANA_FORM = "mt-4 space-y-5 data-[state=inactive]:hidden";
+
 export function EditorNovedadesWeb() {
   const {
     novedades,
@@ -396,6 +411,9 @@ export function EditorNovedadesWeb() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLDivElement>(null);
   const tituloRef = useRef<HTMLInputElement>(null);
+  // Subpestaña del formulario (mucho scroll con todo seguido). Todas siguen
+  // montadas (forceMount) para que los refs y la validación funcionen.
+  const [pestanaForm, setPestanaForm] = useState<PestanaFormNovedad>("contenido");
 
   // --- Diálogos -------------------------------------------------------------
   const [deleteTarget, setDeleteTarget] = useState<Novedad | null>(null);
@@ -517,6 +535,7 @@ export function EditorNovedadesWeb() {
     conConfirmacion(() => {
       descartarSubidaSinGuardar();
       cargarEnFormulario(novedad);
+      setPestanaForm("contenido");
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   };
@@ -525,6 +544,7 @@ export function EditorNovedadesWeb() {
     conConfirmacion(() => {
       descartarSubidaSinGuardar();
       cargarEnFormulario(null);
+      setPestanaForm("contenido");
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       setTimeout(() => tituloRef.current?.focus(), 300);
     });
@@ -709,11 +729,13 @@ export function EditorNovedadesWeb() {
     const titulo = formData.titulo.trim();
     if (!titulo) {
       toast.error("El título es obligatorio.");
-      tituloRef.current?.focus();
+      setPestanaForm("contenido");
+      setTimeout(() => tituloRef.current?.focus(), 0);
       return;
     }
     if (formData.fecha_fin && formData.fecha_inicio && formData.fecha_fin < formData.fecha_inicio) {
       toast.error("La fecha «hasta» no puede ser anterior a la fecha «desde».");
+      setPestanaForm("publicacion");
       return;
     }
     if (erroresBotones.length > 0) {
@@ -723,7 +745,8 @@ export function EditorNovedadesWeb() {
           : `No se puede guardar: ${erroresBotones.map((e) => e.mensaje).join(" ")}`,
         { duration: 8000 },
       );
-      bloqueBotonesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setPestanaForm("botones");
+      setTimeout(() => bloqueBotonesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
       return;
     }
     const conMenu = formData.botones.includes("ver_menu");
@@ -1185,6 +1208,24 @@ export function EditorNovedadesWeb() {
             </CardHeader>
 
             <CardContent className="p-4 pt-0 space-y-5">
+              <Tabs value={pestanaForm} onValueChange={(v) => setPestanaForm(v as PestanaFormNovedad)}>
+                <TabsList className="w-full justify-start" aria-label="Partes de la novedad">
+                  {PESTANAS_FORM_NOVEDAD.map((p) => (
+                    <TabsTrigger
+                      key={p.id}
+                      value={p.id}
+                      data-tour={p.id === "publicacion" ? "gw-novedades-publicacion" : undefined}
+                      className="gap-1.5"
+                    >
+                      {p.label}
+                      {p.id === "botones" && erroresBotones.length > 0 && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-label="con errores" />
+                      )}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+              <TabsContent value="contenido" forceMount className={CLASE_PESTANA_FORM}>
               {/* Título y badge */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="sm:col-span-2 space-y-1.5">
@@ -1370,6 +1411,9 @@ export function EditorNovedadesWeb() {
                 </div>
               </div>
 
+              </TabsContent>
+
+              <TabsContent value="imagen" forceMount className={CLASE_PESTANA_FORM}>
               {/* Imagen */}
               <div className="space-y-2">
                 <Label>Imagen</Label>
@@ -1465,6 +1509,9 @@ export function EditorNovedadesWeb() {
                 </Select>
               </div>
 
+              </TabsContent>
+
+              <TabsContent value="botones" forceMount className={CLASE_PESTANA_FORM}>
               {/* Botones de la tarjeta */}
               <div ref={bloqueBotonesRef} className="scroll-mt-4">
                 <BloqueBotonesNovedad
@@ -1484,8 +1531,11 @@ export function EditorNovedadesWeb() {
                 />
               </div>
 
+              </TabsContent>
+
+              <TabsContent value="publicacion" forceMount className={CLASE_PESTANA_FORM}>
               {/* Publicación */}
-              <div className="rounded-lg border p-4 space-y-4" data-tour="gw-novedades-publicacion">
+              <div className="rounded-lg border p-4 space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">Publicación</p>
                   <Badge variant="outline" className={`text-[11px] ${ESTILO_ESTADO[estadoBorrador.clave]}`}>
@@ -1601,6 +1651,9 @@ export function EditorNovedadesWeb() {
                 </CollapsibleContent>
               </Collapsible>
 
+              </TabsContent>
+              </Tabs>
+
               {/* Acciones */}
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 pt-2 border-t">
                 {editando && (
@@ -1635,9 +1688,13 @@ export function EditorNovedadesWeb() {
         </div>
 
         {/* ------------------------------------------------ Vista previa */}
-        <aside className="hidden xl:block xl:max-h-full xl:overflow-y-auto xl:overscroll-contain" data-tour="gw-novedades-vista">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3 text-center">Así se ve en el móvil</h3>
-          {vistaPrevia}
+        {/* Solo hace scroll la pantalla del móvil: la columna mide lo que queda
+            de alto y el teléfono se encoge para caber (ajustarAlto). */}
+        <aside className="hidden xl:flex xl:h-full xl:min-h-0 xl:flex-col xl:overflow-hidden" data-tour="gw-novedades-vista">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3 text-center shrink-0">Así se ve en el móvil</h3>
+          <div className="min-h-0 flex-1">
+            <MobilePreview novedades={novedadesPreview} idResaltado={idBorrador} ajustarAlto />
+          </div>
         </aside>
         <Collapsible open={previewMovilAbierta} onOpenChange={setPreviewMovilAbierta} className="xl:hidden rounded-lg border">
           <CollapsibleTrigger className="group w-full flex min-h-11 items-center justify-between p-3 text-sm font-medium">

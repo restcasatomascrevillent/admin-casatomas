@@ -203,7 +203,7 @@ describe("serializarMenuNovedad — la v1 no cambia (E1, ADR-6)", () => {
     expect(JSON.stringify(json)).not.toMatch(/maridaje|"tipo"|"cata"/);
   });
 
-  it("con el maridaje apagado no guarda las bebidas de los platos (E10)", () => {
+  it("al pasar de Maridaje a Menú no guarda las bebidas de los platos (E10)", () => {
     const menu = { ...menuV1(), maridajes: { p1: linea("m1") } };
     expect(JSON.stringify(serializarMenuNovedad(menu))).not.toMatch(/maridaje/);
   });
@@ -437,7 +437,7 @@ describe("validarBotonesNovedad v2 (C7)", () => {
     expect(validar(modeloCata())).toEqual([]);
   });
 
-  it("«Con maridaje» sin ninguna bebida en ningún plato", () => {
+  it("un Maridaje sin ninguna bebida en ningún plato", () => {
     const errores = validarBotonesNovedad({
       botones: ["ver_menu"],
       menu: { ...modeloMaridaje(), maridajes: { p1: linea("m1", { nombre: " " }), borrado: linea("m9") } },
@@ -446,7 +446,7 @@ describe("validarBotonesNovedad v2 (C7)", () => {
     expect(errores).toEqual([
       {
         codigo: "maridaje_vacio",
-        mensaje: "“Con maridaje” necesita al menos una bebida en algún plato, o apágalo.",
+        mensaje: "Un maridaje necesita la bebida de al menos un plato, o elige «Menú».",
       },
     ]);
   });

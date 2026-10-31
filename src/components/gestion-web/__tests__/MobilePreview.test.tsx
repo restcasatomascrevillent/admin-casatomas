@@ -148,3 +148,17 @@ describe("MobilePreview — botones de la tarjeta", () => {
     expect(screen.getByText("No saldrá en la web: «Ver menú» y «Échale un vistazo»")).toBeInTheDocument();
   });
 });
+
+describe("MobilePreview — alto del teléfono", () => {
+  it("por defecto mide 640 px", () => {
+    render(<MobilePreview novedades={[]} />);
+    expect(screen.getByTestId("marco-movil")).toHaveClass("h-[640px]");
+  });
+
+  it("con ajustarAlto ocupa el alto que le dejan (hasta 640 px) y solo desplaza la pantalla", () => {
+    render(<MobilePreview novedades={[]} ajustarAlto />);
+    const marco = screen.getByTestId("marco-movil");
+    expect(marco).not.toHaveClass("h-[640px]");
+    expect(marco).toHaveClass("flex-1", "max-h-[640px]");
+  });
+});
