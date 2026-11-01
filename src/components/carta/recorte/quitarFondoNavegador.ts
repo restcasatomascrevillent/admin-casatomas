@@ -27,7 +27,8 @@
  * si el modelo ya está guardado no hace nada. Lo lanza <PrecargaRecorte />.
  */
 import type { MensajeAlWorker, MensajeDelWorker, Proveedor } from "./recorte.worker";
-import { LADO_MODELO, postprocesarMascara } from "./mascaraRecorte";
+import { LADO_MODELO } from "./mascaraRecorte";
+import { aplicarCoeficientes, coeficientesGuiado, entradaGuiado, limpiarMascara, luminancia, medidasTrabajo } from "./refinarMascara";
 import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
 
 export type ProgresoRecorte =
@@ -237,7 +238,13 @@ export function mascaraModelo(rgba: Uint8ClampedArray, onProgreso?: (p: Progreso
   });
 }
 
-/** Foto → PNG con la botella sin fondo (máscara binaria con borde suavizado, como rembg). */
+/**
+ * Lado mayor al que se limpia la máscara y se calculan los coeficientes del
+ * filtro guiado de la foto; el alfa final se aplica a la resolución completa.
+ */
+export const LADO_TRABAJO_FOTO = 1600;
+
+/** Foto → PNG sin fondo: modelo + limpieza + filtro guiado (alfa suave, conserva antenas y patas finas). */
 export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: ProgresoRecorte) => void): Promise<Blob> {
   if (!recorteNavegadorDisponible()) throw new Error("Este navegador no puede recortar");
   const t0 = performance.now();
@@ -259,7 +266,11 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
     throw e;
   }
 
-  // Máscara 1024² → tamaño de la foto (suavizado del canvas) → post_process.
+  // Máscara 1024² → resolución de trabajo (≤ LADO_TRABAJO_FOTO) → limpieza +
+  // filtro guiado con la propia foto → alfa a resolución completa
+  // (refinarMascara.ts; antes: apertura + gaussiana + umbral de rembg, que
+  // borraba antenas y patas finas y dejaba el borde en escalera).
+  const tr = medidasTrabajo(ancho, alto, LADO_TRABAJO_FOTO);
   const m = lienzo(LADO_MODELO, LADO_MODELO);
   const img = m.ctx.createImageData(LADO_MODELO, LADO_MODELO);
   for (let i = 0; i < res.mascara.length; i++) {
@@ -268,25 +279,26 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
     img.data[o + 3] = 255;
   }
   m.ctx.putImageData(img, 0, 0);
-  const sal = lienzo(ancho, alto);
-  sal.ctx.imageSmoothingQuality = "high";
-  sal.ctx.drawImage(m.c, 0, 0, ancho, alto);
-  const grande = sal.ctx.getImageData(0, 0, ancho, alto).data;
-  const gris = new Uint8Array(ancho * alto);
+  const trab = lienzo(tr.ancho, tr.alto);
+  trab.ctx.imageSmoothingQuality = "high";
+  trab.ctx.drawImage(m.c, 0, 0, tr.ancho, tr.alto);
+  const grande = trab.ctx.getImageData(0, 0, tr.ancho, tr.alto).data;
+  const gris = new Uint8Array(tr.ancho * tr.alto);
   for (let i = 0; i < gris.length; i++) gris[i] = grande[i * 4];
-  const alfa = postprocesarMascara(gris, ancho, alto);
+  trab.ctx.clearRect(0, 0, tr.ancho, tr.alto);
+  trab.ctx.drawImage(bmp, 0, 0, tr.ancho, tr.alto);
+  const guia = trab.ctx.getImageData(0, 0, tr.ancho, tr.alto).data;
+  const limpia = limpiarMascara(gris, tr.ancho, tr.alto);
+  const coef = coeficientesGuiado(luminancia(guia, gris.length), entradaGuiado(limpia), tr.ancho, tr.alto);
+  trab.c.width = trab.c.height = 0;
 
-  // Recorte: la foto con alfa = máscara.
-  sal.ctx.clearRect(0, 0, ancho, alto);
+  // Recorte: la foto con el alfa refinado (escrito en el canal 3).
+  const sal = lienzo(ancho, alto);
   sal.ctx.drawImage(bmp, 0, 0);
   bmp.close();
   const px = sal.ctx.getImageData(0, 0, ancho, alto);
-  let opacos = 0;
-  for (let i = 0; i < alfa.length; i++) {
-    px.data[i * 4 + 3] = alfa[i];
-    if (alfa[i]) opacos++;
-  }
-  if (opacos < alfa.length * 0.01) throw new Error("No se encontró la botella en la foto");
+  const opacos = aplicarCoeficientes(coef, tr.ancho, tr.alto, px.data, ancho, alto);
+  if (opacos < ancho * alto * 0.01) throw new Error("No se encontró la botella en la foto");
   sal.ctx.putImageData(px, 0, 0);
   const png = await aBlob(sal.c, "image/png");
 

@@ -17,9 +17,10 @@
  *      Sin WebCodecs: reproducción de los JPEG en un lienzo a 30 fps mientras
  *      graba MediaRecorder (en tiempo real: por eso se graba al final).
  */
-import { crearWorkerRecorteDedicado, mascaraModelo, recorteNavegadorDisponible } from "../recorte/quitarFondoNavegador";
+import { crearWorkerRecorteDedicado, mascaraModelo, recorteNavegadorDisponible, recorteNavegadorSeguro } from "../recorte/quitarFondoNavegador";
 import { crearMutex, numeroWorkersRecorte, procesarEnPool } from "./paralelo";
-import { LADO_MODELO, postprocesarMascara } from "../recorte/mascaraRecorte";
+import { LADO_MODELO } from "../recorte/mascaraRecorte";
+import { refinarMascara } from "../recorte/refinarMascara";
 import { componerPlatoEnLienzo, FONDO_ACTIVO, PLATO_ALTO, PLATO_ANCHO, TEMAS, type CrearLienzo, type NombreTema } from "../composicionCarta";
 import { codificarConWebCodecs } from "./codificarWebCodecs";
 import {
@@ -32,13 +33,14 @@ import {
   elegirMimeVideo,
   FPS_VIDEO,
   indicesClaveSalida,
-  interpolarMascara,
+  interpolarMascaraNitida,
   LADO_MASCARA_VIDEO,
+  LADO_MASCARA_VIDEO_PC,
   estimarRestanteMs,
   MS_CODIFICACION,
   pasoInferencia,
   suavizarCajas,
-  suavizarMascara,
+  suavizarMascaraMovimiento,
   tiemposFotogramas,
   vecinosClave,
   type CajaVideo,
@@ -315,7 +317,9 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     const escala = Math.min(1, LADO_FOTOGRAMA / Math.max(video.videoWidth, video.videoHeight));
     const W = Math.max(2, Math.round(video.videoWidth * escala));
     const H = Math.max(2, Math.round(video.videoHeight * escala));
-    const L = LADO_MASCARA_VIDEO;
+    // Máscaras guardadas a 1024 en PC (sin perder detalle) y a 512 en móvil (memoria).
+    const L = recorteNavegadorSeguro() ? LADO_MASCARA_VIDEO_PC : LADO_MASCARA_VIDEO;
+    const guardar = (m: Uint8Array) => (L === LADO_MODELO ? m : reescalarMascara(m, LADO_MODELO, L));
 
     // --- A. Modelo en los fotogramas clave ---------------------------------
     const ent = lienzo(LADO_MODELO, LADO_MODELO);
@@ -343,7 +347,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     const rgba0 = await entrada(0);
     const msEntrada = performance.now() - tEntrada;
     const primero = await principal(rgba0);
-    mascaras.set(0, reescalarMascara(primero.mascara, LADO_MODELO, L));
+    mascaras.set(0, guardar(primero.mascara));
 
     // Sin WebGPU, en PC: 2–4 workers con su propia sesión (paralelo.ts). El
     // paso entre fotogramas clave se decide con el tiempo efectivo por
@@ -370,7 +374,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
         (modelo) => async (i: number) => {
           const r = await modelo(await entrada(i));
           abortado(signal);
-          mascaras.set(i, reescalarMascara(r.mascara, LADO_MODELO, L));
+          mascaras.set(i, guardar(r.mascara));
         },
       );
       await procesarEnPool(claves.slice(1), ejecutores, (_i, hechos) =>
@@ -386,12 +390,13 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     if (nWorkers > 1) console.info("[video-plato] recorte en paralelo", { workers: nWorkers, claves: claves.length });
 
     // Máscara del fotograma i: interpolada entre claves y suavizada en el
-    // tiempo (mismo suavizado por segundo que a 12 fps).
+    // tiempo (mismo suavizado por segundo que a 12 fps), sin mezclar ni
+    // arrastrar donde algo se mueve (antenas, patas: sin fantasma ni halo).
     const alfaMascara = alfaParaFps(ALFA_MASCARA);
     const mascaraDe = (i: number, previa: Float32Array | null) => {
       const { a, b, t } = vecinosClave(i, claves);
-      const base = interpolarMascara(mascaras.get(a)!, mascaras.get(b)!, t);
-      return suavizarMascara(previa, base, alfaMascara);
+      const base = interpolarMascaraNitida(mascaras.get(a)!, mascaras.get(b)!, t);
+      return suavizarMascaraMovimiento(previa, base, alfaMascara);
     };
 
     // Encuadre estable para todo el vídeo.
@@ -414,6 +419,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     const fotogramas: Blob[] = [];
     const reutil = lienzosReutilizables();
     const tB = performance.now();
+    let msRefinado = 0;
     previa = null;
     try {
     for (let i = 0; i < total; i++) {
@@ -425,7 +431,8 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       fr.ctx.clearRect(0, 0, W, H);
       fr.ctx.drawImage(video, 0, 0, W, H);
 
-      // Máscara L² → W×H → apertura + gaussiana + umbral (igual que la foto).
+      // Máscara L² → W×H → limpieza + filtro guiado con el propio fotograma
+      // (igual que la foto: conserva antenas y patas finas, borde suave).
       const m8 = aUint8(previa);
       const img = tmpL.ctx.createImageData(L, L);
       for (let p = 0; p < m8.length; p++) {
@@ -438,9 +445,10 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       const g = tmpG.ctx.getImageData(0, 0, W, H).data;
       const gris = new Uint8Array(W * H);
       for (let p = 0; p < gris.length; p++) gris[p] = g[p * 4];
-      const alfa = postprocesarMascara(gris, W, H);
-
       const px = fr.ctx.getImageData(0, 0, W, H);
+      const tR = performance.now();
+      const alfa = refinarMascara(gris, px.data, W, H);
+      msRefinado += performance.now() - tR;
       for (let p = 0; p < alfa.length; p++) px.data[p * 4 + 3] = alfa[p];
       fr.ctx.putImageData(px, 0, 0);
 
@@ -474,6 +482,8 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       fotogramas: total,
       inferencias: claves.length,
       ms,
+      msRefinadoPorFotograma: Math.round(msRefinado / total),
+      ladoMascara: L,
       msCodificacion: Math.round(performance.now() - tC),
       codificador: blob && formatoFinal !== formato ? "webcodecs" : "mediarecorder",
       formato: formatoFinal.mime,
