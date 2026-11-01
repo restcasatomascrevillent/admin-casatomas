@@ -18,9 +18,17 @@
  *     Replicate (fotoCartaVino.ts) y, si no hay, se guarda la foto normal.
  *   - El worker se TERMINA tras un rato sin uso (`MS_WORKER_INACTIVO`) para
  *     devolver esa memoria; antes vivía para siempre con el modelo cargado.
+ *
+ * PRECARGA (petición del dueño, 2026-11-01): `precargarRecorte()` baja el
+ * modelo (47 MB, a Cache Storage) y el motor (wasm de onnxruntime, ~27 MB, a la
+ * caché HTTP: /assets es inmutable) en segundo plano al entrar al panel, para
+ * que la primera foto no tenga que esperar la descarga. Solo donde el recorte
+ * se hace en el navegador, sin ahorro de datos ni conexión lenta, y una vez:
+ * si el modelo ya está guardado no hace nada. Lo lanza <PrecargaRecorte />.
  */
 import type { MensajeAlWorker, MensajeDelWorker, Proveedor } from "./recorte.worker";
 import { LADO_MODELO, postprocesarMascara } from "./mascaraRecorte";
+import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
 
 export type ProgresoRecorte =
   | { fase: "descargando"; pct: number }
@@ -40,6 +48,10 @@ export interface MedidaRecorte {
 export let ultimaMedida: MedidaRecorte | null = null;
 
 let worker: Worker | null = null;
+/** Precarga lanzada en esta pestaña (una vez por carga del panel). */
+let precargaLanzada = false;
+/** El worker está bajando el modelo para la precarga: no terminarlo a medias. */
+let precargaEnCurso = false;
 let temporizadorInactivo: ReturnType<typeof setTimeout> | null = null;
 let sigId = 1;
 
@@ -50,11 +62,11 @@ const pendientes = new Map<
   { ok: (m: { mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor }) => void; ko: (e: Error) => void; onProgreso?: (p: ProgresoRecorte) => void }
 >();
 
-/** Termina el worker ya (si no hay recortes pendientes) y suelta su memoria. */
+/** Termina el worker ya (si no hay recortes ni precarga en marcha) y suelta su memoria. */
 export function liberarWorkerRecorte(): void {
   if (temporizadorInactivo) clearTimeout(temporizadorInactivo);
   temporizadorInactivo = null;
-  if (!worker || pendientes.size > 0) return;
+  if (!worker || pendientes.size > 0 || precargaEnCurso) return;
   worker.terminate();
   worker = null;
 }
@@ -77,6 +89,14 @@ function obtenerWorker(): Worker {
       pendientes.forEach((p) => p.onProgreso?.({ fase: "descargando", pct }));
       return;
     }
+    if (m.tipo === "precargado") {
+      precargaEnCurso = false;
+      if (!m.ok) console.info("[recorte] la precarga del modelo no ha podido terminar:", m.mensaje);
+      // Precargado y sin fotos en marcha: fuera el worker en un rato (el modelo
+      // y el motor ya quedan guardados en el navegador).
+      if (pendientes.size === 0) programarLiberacion();
+      return;
+    }
     const p = pendientes.get(m.id);
     if (!p) return;
     if (m.tipo === "recortando") p.onProgreso?.({ fase: "recortando" });
@@ -92,6 +112,7 @@ function obtenerWorker(): Worker {
     const e = new Error(ev.message || "Error en el worker de recorte");
     pendientes.forEach((p) => p.ko(e));
     pendientes.clear();
+    precargaEnCurso = false;
     w.terminate();
     worker = null;
   };
@@ -143,6 +164,51 @@ export function recorteNavegadorSeguro(nav: Navigator | undefined = typeof navig
     /* sin matchMedia: se decide por lo anterior */
   }
   return true;
+}
+
+/** ¿Ya está el modelo guardado en este navegador? (sin Cache Storage: no). */
+export async function modeloRecorteGuardado(): Promise<boolean> {
+  try {
+    if (typeof caches === "undefined") return false;
+    const cache = await caches.open(CACHE_MODELO);
+    return Boolean(await cache.match(URL_MODELO));
+  } catch {
+    return false;
+  }
+}
+
+type ConexionRed = { saveData?: boolean; effectiveType?: string };
+
+/**
+ * Precarga en segundo plano el modelo y el motor del recorte (ver cabecera).
+ * Devuelve true si la ha lanzado; false si no toca: ya lanzada en esta pestaña,
+ * dispositivo donde el recorte no se hace en el navegador (móvil, tablet, poca
+ * memoria), ahorro de datos o conexión 2G, o el modelo ya está guardado.
+ */
+export async function precargarRecorte(
+  nav: Navigator | undefined = typeof navigator !== "undefined" ? navigator : undefined,
+): Promise<boolean> {
+  if (precargaLanzada || !nav || !recorteNavegadorSeguro(nav)) return false;
+  const conexion = (nav as Navigator & { connection?: ConexionRed }).connection;
+  if (conexion?.saveData || /(^|-)2g$/.test(conexion?.effectiveType ?? "")) return false;
+  precargaLanzada = true;
+  if (await modeloRecorteGuardado()) return false;
+  // Si mientras tanto alguien ya está recortando, el worker ya lo está bajando.
+  if (pendientes.size > 0) return false;
+  precargaEnCurso = true;
+  const msg: MensajeAlWorker = { tipo: "precargar" };
+  obtenerWorker().postMessage(msg);
+  return true;
+}
+
+/** Solo para pruebas: vuelve al estado de una pestaña recién abierta. */
+export function _reiniciarPrecargaParaPruebas(): void {
+  precargaLanzada = false;
+  precargaEnCurso = false;
+  if (temporizadorInactivo) clearTimeout(temporizadorInactivo);
+  temporizadorInactivo = null;
+  worker?.terminate();
+  worker = null;
 }
 
 export interface MascaraModelo {
