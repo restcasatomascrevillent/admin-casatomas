@@ -6,7 +6,13 @@ import {
   elegirMimeVideo,
   esErrorColumnaVideo,
   extensionVideo,
+  alfaParaFps,
+  CODECS_AVC,
+  elegirCodecAvc,
+  esClaveCodec,
+  FPS_MODELO,
   indicesClave,
+  indicesClaveSalida,
   interpolarMascara,
   pasoInferencia,
   porcentajeProgresoVideo,
@@ -14,6 +20,7 @@ import {
   suavizarCajas,
   suavizarMascara,
   textoProgresoVideo,
+  tiempoFotogramaUs,
   tiemposFotogramas,
   vecinosClave,
 } from "../video/videoPlato";
@@ -45,16 +52,23 @@ describe("elegirMimeVideo", () => {
 });
 
 describe("tiemposFotogramas", () => {
-  it("12 fps de los primeros 4 s: 48 fotogramas", () => {
+  it("30 fps de los primeros 4 s: 120 fotogramas, en el centro de cada intervalo", () => {
     const t = tiemposFotogramas(10);
-    expect(t).toHaveLength(48);
-    expect(t[0]).toBe(0);
-    expect(t[1]).toBeCloseTo(1 / 12, 3);
-    expect(t[47]).toBeLessThan(4);
+    expect(t).toHaveLength(120);
+    expect(t[0]).toBeCloseTo(1 / 60, 3);
+    expect(t[1]).toBeCloseTo(1.5 / 30, 3);
+    expect(t[119]).toBeLessThan(4);
+  });
+  it("nunca cae a menos de ¼ de fotograma de un borde (no repite fotogramas de un vídeo a 30 fps)", () => {
+    for (const x of tiemposFotogramas(4)) {
+      const fase = (x * 30) % 1;
+      expect(fase).toBeGreaterThan(0.25);
+      expect(fase).toBeLessThan(0.75);
+    }
   });
   it("vídeo corto: solo los fotogramas que hay, sin salirse", () => {
     const t = tiemposFotogramas(2);
-    expect(t).toHaveLength(24);
+    expect(t).toHaveLength(60);
     expect(Math.max(...t)).toBeLessThan(2);
   });
   it("respeta el tope de fotogramas", () => {
@@ -62,7 +76,7 @@ describe("tiemposFotogramas", () => {
     expect(tiemposFotogramas(4, { fps: 30, maxFotogramas: 60 })).toHaveLength(60);
   });
   it("duración Infinity (webm sin duración) → 4 s; 0/NaN → []", () => {
-    expect(tiemposFotogramas(Infinity)).toHaveLength(48);
+    expect(tiemposFotogramas(Infinity)).toHaveLength(120);
     expect(tiemposFotogramas(0)).toEqual([]);
     expect(tiemposFotogramas(NaN)).toEqual([]);
   });
@@ -173,5 +187,75 @@ describe("rutas, errores y textos", () => {
     expect(textoProgresoVideo(null)).toBe("Preparando vídeo…");
     expect(porcentajeProgresoVideo({ fase: "recortando", hecho: 12, total: 12 })).toBe(70);
     expect(porcentajeProgresoVideo({ fase: "componiendo", hecho: 48, total: 48 })).toBe(95);
+  });
+});
+
+describe("30 fps sin multiplicar las pasadas del modelo", () => {
+  it("las claves van a ~FPS_MODELO por segundo: 49 / 25 / 13 para 120 fotogramas", () => {
+    expect(FPS_MODELO).toBe(12);
+    const k1 = indicesClaveSalida(120, 1);
+    const k2 = indicesClaveSalida(120, 2);
+    const k4 = indicesClaveSalida(120, 4);
+    expect(k1).toHaveLength(49);
+    expect(k2).toHaveLength(25);
+    expect(k4).toHaveLength(13);
+    // Antes (12 fps, 48 fotogramas): 48 / 24 / 13 pasadas.
+    expect(indicesClave(48, 1)).toHaveLength(48);
+    expect(k1.slice(0, 6)).toEqual([0, 3, 5, 8, 10, 13]);
+    for (const k of [k1, k2, k4]) {
+      expect(k[0]).toBe(0);
+      expect(k[k.length - 1]).toBe(119);
+      for (let i = 1; i < k.length; i++) expect(k[i]).toBeGreaterThan(k[i - 1]);
+    }
+  });
+  it("con la fps del modelo = la de salida, igual que indicesClave", () => {
+    expect(indicesClaveSalida(10, 4, { fpsSalida: 12, fpsModelo: 12 })).toEqual(indicesClave(10, 4));
+    expect(indicesClaveSalida(3, 1, { fpsSalida: 12, fpsModelo: 12 })).toEqual([0, 1, 2]);
+    expect(indicesClaveSalida(0, 1)).toEqual([]);
+    expect(indicesClaveSalida(1, 1)).toEqual([0]);
+  });
+  it("cada fotograma intermedio cae entre dos claves (máscara interpolada)", () => {
+    const k = indicesClaveSalida(120, 2);
+    const v = vecinosClave(1, k);
+    expect(v.a).toBe(0);
+    expect(v.b).toBe(5);
+    expect(v.t).toBeCloseTo(0.2, 5);
+  });
+  it("alfaParaFps mantiene el suavizado por segundo", () => {
+    const a30 = alfaParaFps(0.6, 30, 12);
+    // 2,5 pasos a 30 fps ≈ 1 paso a 12 fps.
+    expect(1 - Math.pow(1 - a30, 30 / 12)).toBeCloseTo(0.6, 6);
+    expect(a30).toBeLessThan(0.6);
+    expect(alfaParaFps(0.6, 12, 12)).toBeCloseTo(0.6, 9);
+    expect(alfaParaFps(1)).toBe(1);
+    expect(alfaParaFps(0)).toBe(0);
+  });
+});
+
+describe("codificación con WebCodecs", () => {
+  it("instantes exactos en µs, sin huecos ni solapes", () => {
+    let fin = 0;
+    for (let i = 0; i < 120; i++) {
+      const { timestamp, duration } = tiempoFotogramaUs(i, 30);
+      expect(timestamp).toBe(fin);
+      expect(duration).toBeGreaterThanOrEqual(33_333);
+      expect(duration).toBeLessThanOrEqual(33_334);
+      fin = timestamp + duration;
+    }
+    expect(fin).toBe(4_000_000);
+  });
+  it("un fotograma clave por segundo", () => {
+    const claves = Array.from({ length: 120 }, (_, i) => i).filter((i) => esClaveCodec(i, 30));
+    expect(claves).toEqual([0, 30, 60, 90]);
+  });
+  it("elige el primer H.264 admitido; null → MediaRecorder", async () => {
+    expect(await elegirCodecAvc(async () => true)).toBe(CODECS_AVC[0]);
+    expect(await elegirCodecAvc(async (c) => c === "avc1.420028")).toBe("avc1.420028");
+    expect(await elegirCodecAvc(async () => false)).toBeNull();
+    expect(
+      await elegirCodecAvc(async () => {
+        throw new Error("x");
+      }),
+    ).toBeNull();
   });
 });

@@ -233,7 +233,7 @@ export function PlatoForm({
 
       if (nuevoPlato?.id) {
         try {
-          if (await videoPlato.guardar(nuevoPlato.id, null)) refrescarPlatos?.();
+          if (await videoPlato.guardar(nuevoPlato.id, null, nuevoPlato.nombre)) refrescarPlatos?.();
         } catch (errorVideo) {
           console.error("Error guardando el vídeo del plato:", errorVideo);
           toast.error(
@@ -620,7 +620,7 @@ export function PlatoForm({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando || videoPlato.procesando}
+                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando}
               >
                 {crearPlato.isPending || isUploading
                   ? "Guardando..."

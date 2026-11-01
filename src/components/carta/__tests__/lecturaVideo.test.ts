@@ -81,13 +81,13 @@ describe("argumentosConversion", () => {
   it("-t va después de -i (se corta la salida, no se busca en la entrada)", () => {
     expect(a.indexOf("-t")).toBeGreaterThan(a.indexOf("-i"));
   });
-  it("escala a lado mayor ≤ 1280 sin agrandar, dimensiones pares, 24 fps", () => {
+  it("escala a lado mayor ≤ 1280 sin agrandar, dimensiones pares, 30 fps (= vídeo generado)", () => {
     const vf = valor("-vf");
     expect(vf).toContain("min(1280,iw)");
     expect(vf).toContain("min(1280,ih)");
     expect(vf).toContain("force_original_aspect_ratio=decrease");
     expect(vf).toContain("force_divisible_by=2");
-    expect(vf).toContain("fps=24");
+    expect(vf).toContain("fps=30");
   });
   it("opciones personalizadas", () => {
     const b = argumentosConversion("i", "o", { segundos: 2, lado: 640, fps: 12 });

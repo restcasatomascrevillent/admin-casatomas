@@ -1,0 +1,133 @@
+// notificar-video
+// ---------------------------------------------------------------------------
+// Avisa por Web Push (VAPID) al que grabó un vídeo del plato y lo mandó a un
+// dispositivo potente, cuando ese dispositivo lo termina (listo o error).
+// Ver docs/video-dispositivo-potente.md.
+//
+// - Auth: verify_jwt (config.toml) + permiso de escritura en `gestor_carta`
+//   + el llamante tiene que ser quien procesó (o creó) el trabajo, y el
+//   trabajo tiene que estar terminado (logica.ts:autorizarNotificacion).
+// - Lee el trabajo y las suscripciones de `creado_por` con service role y
+//   borra las caducadas (404/410 del servicio push).
+// - Secretos: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
+//   (mailto:… o https://…). Sin ellos responde 503 y el panel sigue igual
+//   (el vídeo ya está guardado; solo no llega el aviso).
+//
+// Body: { trabajo_id: uuid }
+// Respuesta: { ok: true, enviadas, borradas, fallidas } | { ok: false, error }
+// ---------------------------------------------------------------------------
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
+import webpush from "npm:web-push@3.6.7";
+import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
+import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso-marketing.ts";
+import {
+  autorizarNotificacion,
+  construirCarga,
+  leerTrabajoId,
+  suscripcionCaducada,
+  type PlatoNotificable,
+  type TrabajoNotificable,
+} from "./logica.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const FUNCION = "notificar-video";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const VAPID_PUBLIC = (Deno.env.get("VAPID_PUBLIC_KEY") ?? "").trim();
+const VAPID_PRIVATE = (Deno.env.get("VAPID_PRIVATE_KEY") ?? "").trim();
+const VAPID_SUBJECT = (Deno.env.get("VAPID_SUBJECT") ?? "").trim();
+
+type Suscripcion = { id: string; endpoint: string; p256dh: string; auth: string };
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method !== "POST") return json({ ok: false, error: "Método no permitido" }, 405);
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return json({ ok: false, error: "No autorizado" }, 401);
+  const supabaseUser = createClientBase(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const permiso = await comprobarPermisoSeccion(
+    supabaseUser as unknown as ClientePermiso,
+    "gestor_carta",
+    "escribir",
+    "No tienes permiso para editar la carta",
+  );
+  if (!permiso.ok) return json({ ok: false, error: permiso.error }, permiso.status);
+
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE || !VAPID_SUBJECT) {
+    return json({ ok: false, codigo: "sin_vapid", error: "Avisos push sin configurar (faltan los secretos VAPID_*)" }, 503);
+  }
+
+  let cuerpo: unknown;
+  try {
+    cuerpo = await req.json();
+  } catch {
+    return json({ ok: false, error: "Body no es JSON válido" }, 400);
+  }
+  const trabajoId = leerTrabajoId(cuerpo);
+  if (!trabajoId) return json({ ok: false, error: "Falta trabajo_id" }, 400);
+
+  const admin = createClientBase(SUPABASE_URL, SERVICE_ROLE, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: trabajo, error: eT } = await admin
+    .from("trabajos_video")
+    .select("id, plato_id, estado, error, creado_por, procesado_por")
+    .eq("id", trabajoId)
+    .maybeSingle();
+  if (eT) return json({ ok: false, error: "No se pudo leer el trabajo" }, 500);
+  if (!trabajo) return json({ ok: false, error: "El trabajo no existe" }, 404);
+  const t = trabajo as TrabajoNotificable;
+  const aut = autorizarNotificacion(t, permiso.userId);
+  if (!aut.ok) return json({ ok: false, error: aut.error }, aut.status);
+  if (!t.creado_por) return json({ ok: true, enviadas: 0, borradas: 0, fallidas: 0 });
+
+  const { data: plato } = await admin.from("Platos").select("nombre, imagen_url").eq("id", t.plato_id).maybeSingle();
+  const carga = JSON.stringify(construirCarga(t, (plato ?? null) as PlatoNotificable | null));
+
+  const { data: subs, error: eS } = await admin
+    .from("suscripciones_push")
+    .select("id, endpoint, p256dh, auth")
+    .eq("user_id", t.creado_por);
+  if (eS) return json({ ok: false, error: "No se pudieron leer las suscripciones" }, 500);
+
+  webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
+  let enviadas = 0;
+  let fallidas = 0;
+  const caducadas: string[] = [];
+  await Promise.all(
+    ((subs ?? []) as Suscripcion[]).map(async (s) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
+          carga,
+          { TTL: 24 * 60 * 60, urgency: "normal" },
+        );
+        enviadas++;
+      } catch (e) {
+        const status = (e as { statusCode?: number })?.statusCode;
+        if (suscripcionCaducada(status)) caducadas.push(s.id);
+        else {
+          fallidas++;
+          console.warn(`[${FUNCION}] push fallido`, status, (e as Error)?.message);
+        }
+      }
+    }),
+  );
+  if (caducadas.length) await admin.from("suscripciones_push").delete().in("id", caducadas);
+  return json({ ok: true, enviadas, borradas: caducadas.length, fallidas });
+}));

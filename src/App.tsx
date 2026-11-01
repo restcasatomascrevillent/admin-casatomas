@@ -10,8 +10,10 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
+import { AvisoTrabajosVideo } from "@/components/carta/potente/AvisoTrabajosVideo";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
+import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Reservas = lazy(() => import("./pages/Reservas"));
@@ -100,6 +102,11 @@ const App = () => (
               {/* Cola de subida de facturas en segundo plano: por encima de las rutas
                   para que cambiar de sección no la cancele (05-oct-2026). */}
               <ColaSubidaProvider>
+              {/* Cola de «Vídeo del plato»: se procesa en segundo plano y se guarda sola (01-11-2026). */}
+              <ColaVideosProvider>
+              {/* «Hay N vídeo(s) pendiente(s)…» de otros dispositivos: solo en los potentes; los
+                  mete en la cola de arriba (docs/video-dispositivo-potente.md). */}
+              <AvisoTrabajosVideo />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta
@@ -139,6 +146,7 @@ const App = () => (
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>
+              </ColaVideosProvider>
               </ColaSubidaProvider>
             </BrowserRouter>
           </TooltipProvider>

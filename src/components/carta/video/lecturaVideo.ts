@@ -19,8 +19,8 @@ export type PasoLecturaVideo = "original" | "mp4" | "convertir";
 
 /** Lado mayor máximo del vídeo convertido (el pipeline compone a 1280). */
 export const LADO_CONVERSION = 1280;
-/** fps del vídeo convertido: el doble del muestreo (12) para que buscar caiga cerca del fotograma. */
-export const FPS_CONVERSION = 24;
+/** fps del vídeo convertido: la misma que el vídeo generado (30), para que cada búsqueda caiga en un fotograma. */
+export const FPS_CONVERSION = 30;
 
 export const MENSAJE_FORMATO_NO_COMPATIBLE = "No se pudo leer el vídeo (formato no compatible con este navegador)";
 export const MENSAJE_HEVC_NO_CONVERTIDO =

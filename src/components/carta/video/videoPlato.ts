@@ -13,18 +13,37 @@
 
 /** Segundos que se usan del vídeo (el resto se ignora). */
 export const SEGUNDOS_VIDEO = 4;
-/** Fotogramas por segundo del vídeo generado. */
-export const FPS_VIDEO = 12;
-/** Tope de fotogramas (12 fps × 4 s). */
-export const MAX_FOTOGRAMAS = 48;
+/**
+ * Fotogramas por segundo del vídeo generado. Era 12 (se veía «a saltos»);
+ * desde el 01-11-2026 son 30: el MODELO sigue pasando a ~FPS_MODELO y el
+ * resto de fotogramas usan la máscara interpolada entre claves.
+ */
+export const FPS_VIDEO = 30;
+/** Tope de fotogramas (30 fps × 4 s). */
+export const MAX_FOTOGRAMAS = 120;
+/** Ritmo máximo al que se pasa el modelo de recorte (lo que costaba antes por segundo de vídeo). */
+export const FPS_MODELO = 12;
 /** Lado al que se guardan las máscaras entre la fase de modelo y la de composición. */
 export const LADO_MASCARA_VIDEO = 512;
-/** Peso del fotograma nuevo en la media exponencial de la máscara (0–1). */
+/**
+ * Peso del fotograma nuevo en la media exponencial de la máscara (0–1),
+ * ajustado a FPS_MODELO (12 fps); a otra fps se usa alfaParaFps.
+ */
 export const ALFA_MASCARA = 0.6;
-/** Peso de la caja nueva en la media exponencial del encuadre (0–1). */
+/** Peso de la caja nueva en la media exponencial del encuadre (0–1), a FPS_MODELO. */
 export const ALFA_CAJA = 0.35;
-/** Bits por segundo del vídeo codificado. */
-export const BITRATE_VIDEO = 1_200_000;
+/** Bits por segundo del vídeo codificado (30 fps). */
+export const BITRATE_VIDEO = 2_000_000;
+
+/**
+ * Mismo suavizado en el TIEMPO a otra fps: con más fotogramas por segundo el
+ * peso de cada uno baja, `1 − (1 − alfa)^(fpsBase / fps)`.
+ */
+export function alfaParaFps(alfa: number, fps = FPS_VIDEO, fpsBase = FPS_MODELO): number {
+  const a = Math.min(1, Math.max(0, alfa));
+  if (!(fps > 0) || !(fpsBase > 0) || a === 0 || a === 1) return a;
+  return 1 - Math.pow(1 - a, fpsBase / fps);
+}
 
 export interface FormatoVideo {
   /** mimeType para MediaRecorder (puede llevar codecs). */
@@ -62,7 +81,7 @@ export function elegirMimeVideo(soporta: (mime: string) => boolean): FormatoVide
 }
 
 /**
- * Instantes (s) de los fotogramas a extraer: `fps` por segundo de los primeros
+ * Instantes (s) de los fotogramas a extraer (centro de cada intervalo): `fps` por segundo de los primeros
  * `maxSegundos`, sin pasar de `maxFotogramas`. Duración no finita (algunos webm)
  * → se asume `maxSegundos`. Vídeo vacío → [].
  */
@@ -75,10 +94,12 @@ export function tiemposFotogramas(
   if (!(usable > 0) || !(fps > 0)) return [];
   const n = Math.max(1, Math.min(maxFotogramas, Math.floor(usable * fps)));
   const paso = 1 / fps;
-  // Medio fotograma de margen al final para no pedir un instante fuera del vídeo.
+  // Se pide el CENTRO de cada intervalo ((i + ½)/fps): si se pidiera el
+  // borde, el redondeo a ms podría caer justo antes del fotograma y repetir
+  // el anterior (salto). Medio fotograma de margen al final.
   const limite = Math.max(0, usable - paso / 2);
   const t: number[] = [];
-  for (let i = 0; i < n; i++) t.push(Math.min(limite, Math.round(i * paso * 1000) / 1000));
+  for (let i = 0; i < n; i++) t.push(Math.min(limite, Math.round((i + 0.5) * paso * 1000) / 1000));
   return t;
 }
 
@@ -88,6 +109,53 @@ export function pasoInferencia(msPorFotograma: number): number {
   if (msPorFotograma < 2500) return 1; // WebGPU / PC rápido
   if (msPorFotograma < 6000) return 2;
   return 4; // CPU (WASM): ~13 s por fotograma en PC
+}
+
+/**
+ * Índices (de los fotogramas de SALIDA, a `fpsSalida`) en los que se pasa el
+ * modelo: `paso` es el de pasoInferencia medido a `fpsModelo` (1 → 12 claves
+ * por segundo, 2 → 6, 4 → 3), así subir la fps del vídeo no multiplica las
+ * pasadas del modelo. Siempre el primero y el último.
+ */
+export function indicesClaveSalida(total: number, paso: number, { fpsSalida = FPS_VIDEO, fpsModelo = FPS_MODELO } = {}): number[] {
+  if (total <= 0) return [];
+  const p = Math.max(1, Math.floor(paso));
+  const cada = Math.max(1, (p * fpsSalida) / Math.max(1e-6, fpsModelo));
+  const out: number[] = [];
+  for (let k = 0; ; k++) {
+    const i = Math.round(k * cada);
+    if (i >= total) break;
+    if (out[out.length - 1] !== i) out.push(i);
+  }
+  if (out[out.length - 1] !== total - 1) out.push(total - 1);
+  return out;
+}
+
+/** Instante (µs) y duración de cada fotograma para WebCodecs: exactos, sin depender del reloj. */
+export function tiempoFotogramaUs(i: number, fps = FPS_VIDEO): { timestamp: number; duration: number } {
+  const t = (k: number) => Math.round((k * 1_000_000) / fps);
+  return { timestamp: t(i), duration: t(i + 1) - t(i) };
+}
+
+/** Un fotograma clave del códec por segundo (y el primero). */
+export const esClaveCodec = (i: number, fps = FPS_VIDEO) => i % Math.max(1, Math.round(fps)) === 0;
+
+/**
+ * Códecs H.264 a probar con VideoEncoder para 1200×900 a 30 fps (nivel 4.0:
+ * el 3.1 se queda corto para 1200×900). High → Main → Baseline.
+ */
+export const CODECS_AVC = ["avc1.640028", "avc1.4d0028", "avc1.420028"] as const;
+
+/** Primer códec que el navegador sabe codificar (o null → MediaRecorder). */
+export async function elegirCodecAvc(soporta: (codec: string) => Promise<boolean>): Promise<string | null> {
+  for (const c of CODECS_AVC) {
+    try {
+      if (await soporta(c)) return c;
+    } catch {
+      /* siguiente */
+    }
+  }
+  return null;
 }
 
 /** Índices con máscara del modelo: 0, paso, 2·paso… y siempre el último. */
@@ -249,8 +317,9 @@ export type ProgresoVideo =
   | { fase: "descargando"; pct: number }
   /** Conversión del vídeo del móvil con ffmpeg.wasm; pct -1 = descargando/arrancando el conversor. */
   | { fase: "convirtiendo"; pct: number }
-  | { fase: "recortando"; hecho: number; total: number }
-  | { fase: "componiendo"; hecho: number; total: number }
+  /** restanteMs: estimación desde que se conoce lo que tarda el primer fotograma. */
+  | { fase: "recortando"; hecho: number; total: number; restanteMs?: number }
+  | { fase: "componiendo"; hecho: number; total: number; restanteMs?: number }
   | { fase: "codificando" };
 
 export function textoProgresoVideo(p: ProgresoVideo | null): string {
@@ -260,9 +329,9 @@ export function textoProgresoVideo(p: ProgresoVideo | null): string {
     case "convirtiendo":
       return p.pct < 0 ? "Convirtiendo vídeo del móvil… (preparando conversor)" : `Convirtiendo vídeo del móvil… ${p.pct} %`;
     case "recortando":
-      return `Procesando vídeo… quitando fondo ${p.hecho}/${p.total}`;
+      return `Procesando vídeo… quitando fondo ${p.hecho}/${p.total}${textoRestante(p.restanteMs)}`;
     case "componiendo":
-      return `Procesando vídeo… ${p.hecho}/${p.total}`;
+      return `Procesando vídeo… ${p.hecho}/${p.total}${textoRestante(p.restanteMs)}`;
     case "codificando":
       return "Procesando vídeo… codificando";
     default:
@@ -286,4 +355,40 @@ export function porcentajeProgresoVideo(p: ProgresoVideo | null): number {
     default:
       return 0;
   }
+}
+
+/** Aviso fijo mientras se procesa (el móvil puede apagar la pantalla o congelar la pestaña). */
+export const AVISO_PANTALLA_ENCENDIDA = "Deja la pantalla encendida y esta pestaña abierta";
+
+/** ms que se suponen por fotograma al componer y lo que tarda grabar el vídeo final (4 s en tiempo real + margen). */
+export const MS_COMPOSICION_FOTOGRAMA = 300;
+export const MS_CODIFICACION = 5500;
+
+/**
+ * Tiempo restante estimado (ms) en la fase de recorte: las claves que faltan
+ * repartidas entre los workers a lo que tardó el primer fotograma, más la
+ * composición de todos los fotogramas y la codificación.
+ */
+export function estimarRestanteMs({
+  msPorClave,
+  clavesPendientes,
+  workers = 1,
+  fotogramas,
+  msComposicion = MS_COMPOSICION_FOTOGRAMA,
+}: {
+  msPorClave: number;
+  clavesPendientes: number;
+  workers?: number;
+  fotogramas: number;
+  msComposicion?: number;
+}): number {
+  const rondas = Math.ceil(Math.max(0, clavesPendientes) / Math.max(1, workers));
+  return Math.round(rondas * Math.max(0, msPorClave) + Math.max(0, fotogramas) * msComposicion + MS_CODIFICACION);
+}
+
+/** « · quedan ~3 min» / « · queda menos de 1 min» / "" si no se sabe. */
+export function textoRestante(ms: number | undefined): string {
+  if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 60_000) return " · queda menos de 1 min";
+  return ` · quedan ~${Math.round(ms / 60_000)} min`;
 }

@@ -44,6 +44,8 @@ jobs:
         run: npm run test:abuso:db
       - name: RLS de espacios_reserva por sección (PGlite)
         run: npm run test:espacios:db
+      - name: Trabajos de vídeo para dispositivo potente (PGlite)
+        run: npm run test:trabajos-video:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
