@@ -305,6 +305,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
         tabla="Vinos"
         onGuardada={mostrarFoto}
         guardarUrl={(id, url) => actualizarVino.mutateAsync({ id, imagen_url: url })}
+        quitarFoto={(id) => actualizarVino.mutateAsync({ id, imagen_url: null, expanded: false })}
       />
 
       <EditarVinoModal

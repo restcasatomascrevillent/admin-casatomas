@@ -181,6 +181,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         // Sin alergenos_oficiales/alergenos_notas a propósito: el modal ya no
         // los muestra y así los valores guardados de cada vino no se tocan.
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
+        // Sin foto no hay nada que expandir en la web (la BD también lo fuerza).
+        ...(imageUrlUpdate === null ? { expanded: false } : {}),
       });
 
       if (fotoAntigua) {

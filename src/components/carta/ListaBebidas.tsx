@@ -208,6 +208,7 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
         tabla="Bebidas"
         onGuardada={mostrarFoto}
         guardarUrl={(id, url) => actualizarBebida.mutateAsync({ id, imagen_url: url })}
+        quitarFoto={(id) => actualizarBebida.mutateAsync({ id, imagen_url: null })}
       />
 
       <EditarBebidaModal

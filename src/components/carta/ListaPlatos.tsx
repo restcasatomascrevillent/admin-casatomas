@@ -27,6 +27,7 @@ import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { useInRouterContext } from "react-router-dom";
 import { AbrirPlatoDesdeUrl } from "./video/AbrirPlatoDesdeUrl";
+import { useVideosPendientesCarta } from "./potente/useVideosPendientesCarta";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -49,6 +50,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   const [posicionPlato, setPosicionPlato] = useState<Plato | null>(null);
   const fotoRapida = useRef<FotoRapidaHandle>(null);
   const enRouter = useInRouterContext();
+  const videosPendientes = useVideosPendientesCarta();
 
   // Las fotos empiezan ocultas en el panel; solo se ocultan las tarjetas que
   // aparecen por primera vez (antes, cualquier refresco volvía a ocultarlas
@@ -168,6 +170,11 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 <div className="min-w-0 flex-1 space-y-1">
                   <EtiquetaCategoria categoria={plato.categoria} />
                   <h3 className="font-semibold text-base leading-tight">{plato.nombre}</h3>
+                  {videosPendientes.has(plato.id) && (
+                    <Badge variant="outline" className="border-amber-500/40 bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                      Vídeo pendiente
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {plato.imagen_url && (
@@ -311,6 +318,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
         tabla="Platos"
         onGuardada={mostrarFoto}
         guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
+        quitarFoto={(id) => actualizarPlato.mutateAsync({ id, imagen_url: null, expanded: false })}
       />
 
       {enRouter && <AbrirPlatoDesdeUrl<Plato> platos={platos} onAbrir={setPlatoAEditar} />}

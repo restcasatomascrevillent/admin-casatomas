@@ -214,6 +214,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
         tabla="Cocteles"
         onGuardada={mostrarFoto}
         guardarUrl={(id, url) => actualizarCoctel.mutateAsync({ id, imagen_url: url })}
+        quitarFoto={(id) => actualizarCoctel.mutateAsync({ id, imagen_url: null })}
       />
 
       <EditarCoctelModal
