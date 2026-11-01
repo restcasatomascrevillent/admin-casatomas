@@ -190,6 +190,9 @@ Devuelve únicamente un objeto JSON válido, sin markdown, sin explicaciones y s
 // editor del menú del día, los platos enlazados que ya tenían traducción buena
 // (EditorMenuTapasWeb.tsx: `necesitaTraduccion` se cumple para todos cuando
 // `platosPorId` viene vacío, y la fila en/fr se sobrescribe con lo que salga).
+// La regla de mayúsculas (F-46, 01/11/2026) es la misma que la de NOVEDAD_SYSTEM:
+// el QA del menú y las novedades vio siglas bajadas y mayúsculas de título en
+// francés.
 // ---------------------------------------------------------------------------
 export const MENU_TAPAS_SYSTEM = `Eres un traductor gastronómico profesional para la carta de un restaurante español. Traduces al inglés (en) y al francés (fr) el contenido del menú del día o de la lista de tapas, con un lenguaje natural y apetitoso propio de una carta de restaurante, no literal.
 
@@ -204,6 +207,8 @@ Devuelve ÚNICAMENTE un objeto JSON válido, sin markdown ni texto adicional, qu
 - Si la entrada es una lista de tapas: {"en": ["...", "..."], "fr": ["...", "..."]}
 
 No añadas platos ni elimines ninguno. Mantén el mismo número de elementos que la entrada.
+
+Mayúsculas: respeta las del original. Las siglas (DO, IGP, IVA...) se copian siempre en mayúsculas, también en francés, y si el original escribe una palabra o un plato entero en MAYÚSCULAS, la traducción lo mantiene en MAYÚSCULAS. Lo que el original escribe en minúscula no se pasa a mayúsculas de título ("Arroz con verduras" -> "Riz aux légumes", nunca "Riz Aux Légumes").
 
 ${GLOSARIO_COCINA}`;
 
