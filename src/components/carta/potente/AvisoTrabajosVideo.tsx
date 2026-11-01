@@ -6,7 +6,10 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
 import { hayQueAvisar, MS_SONDEO, nombrePlato, pendientesReclamables, textoAviso, type TrabajoVideo } from "./colaPendientes";
 import { leerMedidaCacheada, medirDispositivoPotente } from "./dispositivoPotente";
 import { procesarTrabajoRemoto, type ProcesarYGuardar } from "./procesarTrabajoRemoto";
-import { trabajosVivos } from "./trabajosVideo";
+import { trabajosVivos, videoActualPlato } from "./trabajosVideo";
+import { EsperasCola, procesarConCola } from "./esperasCola";
+import { useColaVideos } from "../video/useColaVideos";
+import type { NombreTema } from "../composicionCarta";
 
 const ID_AVISO = "trabajos-video-pendientes";
 const ID_PROCESO = "trabajos-video-proceso";
@@ -15,8 +18,8 @@ const MS_ESPERA_INICIAL = 15_000;
 
 interface Props {
   /**
-   * Cómo procesar y guardar cada trabajo. Por defecto, el pipeline directo;
-   * la app puede pasar uno que lo meta en su cola de procesado de vídeo.
+   * Cómo procesar y guardar cada trabajo. Por defecto: la cola de vídeo de la
+   * app (ColaVideosProvider) si está montada; si no, el pipeline directo.
    */
   procesarYGuardar?: ProcesarYGuardar;
 }
@@ -36,8 +39,22 @@ export function AvisoTrabajosVideo({ procesarYGuardar }: Props) {
   const descartados = useRef(new Set<string>());
   const procesando = useRef(false);
   const sinMigracion = useRef(false);
+  // Puente con la cola de vídeo de la app: se encola el bruto y se espera a que termine.
+  const cola = useColaVideos();
+  const esperas = useRef(new EsperasCola());
+  useEffect(() => {
+    esperas.current.actualizar(cola.trabajos);
+  }, [cola.trabajos]);
   const procesarRef = useRef(procesarYGuardar);
-  procesarRef.current = procesarYGuardar;
+  procesarRef.current =
+    procesarYGuardar ??
+    (cola.disponible
+      ? procesarConCola(
+          (n) => cola.encolar({ ...n, tema: n.tema as NombreTema }),
+          esperas.current,
+          videoActualPlato,
+        )
+      : undefined);
 
   const procesarTodos = useCallback(
     async (lista: TrabajoVideo[]) => {

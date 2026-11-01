@@ -98,14 +98,15 @@ const App = () => (
           <TooltipProvider>
             {/* Los toasts viven fuera de la barrera para seguir funcionando si el router falla. */}
             <Toaster />
-            {/* «Hay N vídeo(s) pendiente(s)…»: solo en dispositivos potentes (docs/video-dispositivo-potente.md). */}
-            <AvisoTrabajosVideo />
             <BrowserRouter>
               {/* Cola de subida de facturas en segundo plano: por encima de las rutas
                   para que cambiar de sección no la cancele (05-oct-2026). */}
               <ColaSubidaProvider>
               {/* Cola de «Vídeo del plato»: se procesa en segundo plano y se guarda sola (01-11-2026). */}
               <ColaVideosProvider>
+              {/* «Hay N vídeo(s) pendiente(s)…» de otros dispositivos: solo en los potentes; los
+                  mete en la cola de arriba (docs/video-dispositivo-potente.md). */}
+              <AvisoTrabajosVideo />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta
