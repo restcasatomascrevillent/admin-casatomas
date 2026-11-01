@@ -66,7 +66,8 @@ import {
   type SeccionMenu,
   type SeccionMenuDia,
 } from "@/lib/menu-dia";
-import { ACCEPT_FOTO_MENU, subirFotoMenu, validarFotoMenu } from "@/lib/foto-menu-dia";
+import { ACCEPT_FOTO_MENU, subirFotoMenu } from "@/lib/foto-menu-dia";
+import { aceptarFoto, avisarFalloSubida } from "@/lib/aceptarFoto";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 import { ListaOrdenable } from "@/components/ui/lista-ordenable";
 import { moverEnLista } from "@/lib/mover-en-lista";
@@ -183,11 +184,8 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
     e.target.value = "";
     if (!file) return;
 
-    const error = validarFotoMenu(file);
-    if (error) {
-      toast.error(error);
-      return;
-    }
+    // Tipo real por los primeros bytes y 5 MB (avisa ella si no vale).
+    if (!(await aceptarFoto(file))) return;
 
     devolverFoco.current = document.activeElement === botonRef.current;
     setSubiendo(true);
@@ -196,7 +194,7 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
       onFotoRef.current(url);
     } catch (err) {
       console.error("Error subiendo la foto del plato del menú:", err);
-      toast.error("No se pudo subir la foto. Inténtalo de nuevo.");
+      avisarFalloSubida(err, "No se pudo subir la foto. Inténtalo de nuevo.");
     } finally {
       setSubiendo(false);
     }

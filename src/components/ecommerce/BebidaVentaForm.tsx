@@ -8,6 +8,8 @@ import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { supabase } from "@/integrations/supabase/client";
 import { useBebidasVenta, BebidaVenta, BebidaVentaInsert } from "@/hooks/useBebidasVenta";
 import { Upload, X } from "lucide-react";
+import { ACCEPT_FOTO, mensajeErrorStorage, validarFoto } from "@/lib/validarFoto";
+import { toast } from "sonner";
 
 const CATEGORIAS_DEFAULT = [
   "Vinos Tintos",
@@ -88,17 +90,26 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
   const allCategorias = [...new Set([...CATEGORIAS_DEFAULT, ...categorias])];
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.target;
+    const file = input.files?.[0];
     if (!file) return;
+    // Tipo real por los primeros bytes (un .exe renombrado a .jpg no pasa) y 5 MB.
+    const validacion = await validarFoto(file);
+    if (!validacion.ok) {
+      input.value = "";
+      toast.error(validacion.mensaje, { duration: 9000 });
+      return;
+    }
 
     setUploading(true);
-    const fileExt = file.name.split(".").pop();
+    const fileExt = validacion.tipo.split("/")[1].replace("jpeg", "jpg");
     const fileName = `${crypto.randomUUID()}.${fileExt}`;
 
-    const { error } = await supabase.storage.from("ecommerce").upload(fileName, file);
-    
+    const { error } = await supabase.storage.from("ecommerce").upload(fileName, file, { contentType: validacion.tipo });
+
     if (error) {
       console.error("Error uploading:", error);
+      toast.error(mensajeErrorStorage(error) ?? "No se pudo subir la imagen.", { duration: 9000 });
       setUploading(false);
       return;
     }
@@ -292,7 +303,7 @@ export function BebidaVentaForm({ onSuccess, bebidaEditar }: Props) {
                   </span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={ACCEPT_FOTO}
                     className="hidden"
                     onChange={handleImageUpload}
                     disabled={uploading}

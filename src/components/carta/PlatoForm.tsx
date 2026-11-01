@@ -48,6 +48,8 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
   .object({
@@ -168,9 +170,10 @@ export function PlatoForm({
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) fotoCarta.iniciar(file);
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) fotoCarta.iniciar(file);
   };
 
   const clearImage = () => {
@@ -227,7 +230,7 @@ export function PlatoForm({
           await actualizarPlato.mutateAsync({ id: nuevoPlato.id, imagen_url: url });
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
-          toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+          toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });
         }
       }
 
@@ -593,7 +596,7 @@ export function PlatoForm({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={ACCEPT_FOTO}
                       onChange={handleImageChange}
                       className="hidden"
                     />

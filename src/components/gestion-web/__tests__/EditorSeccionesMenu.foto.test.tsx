@@ -40,8 +40,12 @@ function Harness({ inicial }: { inicial: Secciones }) {
 
 const con = (primero: ItemMenu[]): Secciones => ({ primero, segundo: [], postre: [] });
 
-const foto = (tipo = "image/jpeg", bytes = 1024) =>
-  new File([new Uint8Array(bytes)], "foto.jpg", { type: tipo });
+/** Con la firma JPG en los primeros bytes (aceptarFoto mira el tipo real). */
+const foto = (tipo = "image/jpeg", bytes = 1024, cabecera = [0xff, 0xd8, 0xff, 0xe0]) => {
+  const datos = new Uint8Array(bytes);
+  datos.set(cabecera);
+  return new File([datos], "foto.jpg", { type: tipo });
+};
 
 const elegir = (file: File) =>
   fireEvent.change(screen.getByTestId("input-foto-plato"), { target: { files: [file] } });
@@ -75,18 +79,31 @@ describe("EditorSeccionesMenu — foto de un plato «A mano»", () => {
     expect(ultimo.primero[0]).toMatchObject({ imagenUrl: URL_SUBIDA, imagenPosicionY: null, origen: "libre" });
   });
 
-  it("rechaza lo que no es una foto sin llegar a subirlo", () => {
+  it("rechaza lo que no es una foto sin llegar a subirlo", async () => {
     render(<Harness inicial={con([itemLibre("polla en vinagre")])} />);
-    elegir(foto("application/pdf"));
+    elegir(foto("application/pdf", 1024, [0x25, 0x50, 0x44, 0x46]));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/JPG, PNG o WebP/), expect.anything()),
+    );
     expect(subirFotoMenu).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/JPG, PNG o WebP/));
   });
 
-  it("rechaza una foto demasiado pesada", () => {
+  it("rechaza texto renombrado a .jpg aunque diga image/jpeg", async () => {
     render(<Harness inicial={con([itemLibre("polla en vinagre")])} />);
-    elegir(foto("image/png", 6 * 1024 * 1024));
+    elegir(new File(["hola, esto es texto"], "foto.jpg", { type: "image/jpeg" }));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no es una foto válida/), expect.anything()),
+    );
     expect(subirFotoMenu).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/máximo 5 MB/));
+  });
+
+  it("rechaza una foto demasiado pesada", async () => {
+    render(<Harness inicial={con([itemLibre("polla en vinagre")])} />);
+    elegir(foto("image/jpeg", 6 * 1024 * 1024));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/máximo son 5 MB/), expect.anything()),
+    );
+    expect(subirFotoMenu).not.toHaveBeenCalled();
   });
 
   it("si Storage falla avisa en español y el hueco sigue listo para reintentar", async () => {
@@ -96,7 +113,9 @@ describe("EditorSeccionesMenu — foto de un plato «A mano»", () => {
 
     elegir(foto());
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("No se pudo subir la foto. Inténtalo de nuevo."));
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("No se pudo subir la foto. Inténtalo de nuevo.", expect.anything()),
+    );
     expect(screen.getByRole("button", { name: "Subir foto de polla en vinagre" })).toBeEnabled();
     expect(ultimo.primero[0].imagenUrl).toBeNull();
   });
@@ -132,6 +151,7 @@ describe("EditorSeccionesMenu — foto de un plato «A mano»", () => {
     render(<Harness inicial={con([itemLibre("polla")])} />);
 
     elegir(foto());
+    await waitFor(() => expect(subirFotoMenu).toHaveBeenCalled());
     fireEvent.change(screen.getByPlaceholderText("Nombre del plato"), { target: { value: "polla en vinagre" } });
     await act(async () => resolver(URL_SUBIDA));
 

@@ -36,6 +36,8 @@ import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
@@ -107,9 +109,10 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
     }
   }, [open, bebida, form, limpiarFoto]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !(await aceptarFoto(file, input))) return;
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
@@ -173,7 +176,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating bebida:", error);
-      toast.error("No se pudo actualizar la bebida");
+      toast.error("No se pudo actualizar la bebida", { description: mensajeErrorStorage(error) ?? undefined });
     } finally {
       setIsUploadingImage(false);
     }
@@ -236,7 +239,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
 
