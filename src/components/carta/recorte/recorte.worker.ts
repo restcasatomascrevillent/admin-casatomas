@@ -14,19 +14,26 @@
  */
 import * as ort from "onnxruntime-web/webgpu";
 import { LADO_MODELO, minMaxAUint8, normalizarEntrada } from "./mascaraRecorte";
+import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
 
-export const URL_MODELO = "/modelos/isnet-general-use-u8.onnx";
-export const CACHE_MODELO = "modelos-recorte-v1";
+export { CACHE_MODELO, URL_MODELO };
 
-export type MensajeAlWorker = { tipo: "recortar"; id: number; rgba: Uint8ClampedArray };
+export type MensajeAlWorker =
+  | { tipo: "recortar"; id: number; rgba: Uint8ClampedArray }
+  /** Precarga en segundo plano: baja (y guarda) el modelo y prepara el motor sin recortar nada. */
+  | { tipo: "precargar" };
 export type MensajeDelWorker =
   | { tipo: "descarga"; recibidos: number; total: number }
+  | { tipo: "precargado"; ok: boolean; desdeCache: boolean; mensaje?: string }
   | { tipo: "recortando"; id: number }
   | { tipo: "mascara"; id: number; mascara: Uint8Array; ms: number; msCarga: number; desdeCache: boolean; proveedor: Proveedor }
   | { tipo: "error"; id: number; mensaje: string };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 const enviar = (m: MensajeDelWorker, transfer: Transferable[] = []) => ctx.postMessage(m, transfer);
+
+/** «low» mientras se precarga en segundo plano: no compite con lo que pide la pantalla. */
+let prioridadDescarga: "low" | "auto" = "auto";
 
 async function descargarModelo(): Promise<{ bytes: ArrayBuffer; desdeCache: boolean }> {
   let cache: Cache | null = null;
@@ -37,7 +44,8 @@ async function descargarModelo(): Promise<{ bytes: ArrayBuffer; desdeCache: bool
   } catch {
     cache = null; // Sin Cache Storage (modo privado…): se descarga cada vez.
   }
-  const res = await fetch(URL_MODELO);
+  // `priority` (Fetch Priority) aún no está en los tipos de RequestInit de TS.
+  const res = await fetch(URL_MODELO, { priority: prioridadDescarga } as RequestInit);
   if (!res.ok || !res.body) throw new Error(`No se pudo descargar el modelo (${res.status})`);
   const total = Number(res.headers.get("Content-Length")) || 46_731_330;
   const lector = res.body.getReader();
@@ -121,6 +129,18 @@ let cola: Promise<void> = Promise.resolve();
 
 ctx.onmessage = (ev: MessageEvent<MensajeAlWorker>) => {
   const m = ev.data;
+  if (m.tipo === "precargar") {
+    // Fuera de la cola: si llega una foto mientras tanto, espera a la MISMA
+    // carga (cargarSesion la comparte) en vez de bajar el modelo otra vez.
+    prioridadDescarga = "low";
+    cargarSesion()
+      .then((r) => enviar({ tipo: "precargado", ok: true, desdeCache: r.desdeCache }))
+      .catch((e) => enviar({ tipo: "precargado", ok: false, desdeCache: false, mensaje: (e as Error)?.message || String(e) }))
+      .finally(() => {
+        prioridadDescarga = "auto";
+      });
+    return;
+  }
   if (m.tipo !== "recortar") return;
   cola = cola.then(async () => {
     try {
