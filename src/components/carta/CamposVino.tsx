@@ -38,6 +38,8 @@ interface Props<T extends CamposVinoValores> {
  * Orden pensado para el móvil en vertical: Nombre, Categoría + Precio,
  * D.O./Región/País, Uva y Descripción. La foto la pinta cada formulario
  * encima de estos campos. En móvil todo va a 1 columna; desde `sm`, 2.
+ * `min-w-0` en las celdas: un texto largo (categoría, error, enlaces de tienda)
+ * no ensancha la rejilla ni el diálogo a 390 px.
  */
 export function CamposVino<T extends CamposVinoValores>({
   control,
@@ -64,7 +66,7 @@ export function CamposVino<T extends CamposVinoValores>({
         )}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
         <FormField
           control={control}
           name={n("categoria")}
@@ -102,7 +104,7 @@ export function CamposVino<T extends CamposVinoValores>({
 
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">Origen: el país y la región sitúan el vino en el mapa de la carta.</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
           <FormField
             control={control}
             name={n("denominacion_origen")}
