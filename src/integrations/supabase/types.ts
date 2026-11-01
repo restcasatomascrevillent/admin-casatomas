@@ -3289,6 +3289,7 @@ export type Database = {
           traducciones: Json | null
           unidad: string | null
           updated_at: string | null
+          video_url: string | null
         }
         Insert: {
           sin_gluten_disponible?: boolean
@@ -3321,6 +3322,7 @@ export type Database = {
           traducciones?: Json | null
           unidad?: string | null
           updated_at?: string | null
+          video_url?: string | null
         }
         Update: {
           sin_gluten_disponible?: boolean
@@ -3353,6 +3355,7 @@ export type Database = {
           traducciones?: Json | null
           unidad?: string | null
           updated_at?: string | null
+          video_url?: string | null
         }
         Relationships: []
       }

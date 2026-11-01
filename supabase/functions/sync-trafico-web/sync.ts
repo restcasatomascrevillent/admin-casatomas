@@ -14,8 +14,11 @@
 // ============================================================================
 
 import {
+  CODIGO_ANALYTICS_DESACTIVADO,
   DIMENSION_DESGLOSE,
   ErrorVercel,
+  esAnalyticsDesactivado,
+  textoAnalyticsDesactivado,
   type ClienteVercel,
   type DimensionApi,
   type DimensionDesglose,
@@ -29,15 +32,24 @@ export type SlugProyecto = "casa-tomas-story" | "touza-restaurant-website";
 
 // Los slugs son la clave de las filas ya guardadas: se mantienen aunque los
 // proyectos de Vercel ahora se llamen web-casatomas y touza-casatomas.
-export const PROYECTOS: ReadonlyArray<{ slug: SlugProyecto; projectId: string }> = [
-  { slug: "casa-tomas-story", projectId: "prj_0sGVG2CWWPpZWwy1zrr0nCPftcYQ" },
-  { slug: "touza-restaurant-website", projectId: "prj_rV4u5MRropGlLxSVPCCJV8kbwkgv" },
+export interface ProyectoVercel {
+  slug: SlugProyecto;
+  projectId: string;
+  /** Nombre del proyecto en Vercel, para los mensajes al dueño. */
+  nombreVercel?: string;
+}
+
+export const PROYECTOS: ReadonlyArray<ProyectoVercel> = [
+  { slug: "casa-tomas-story", projectId: "prj_0sGVG2CWWPpZWwy1zrr0nCPftcYQ", nombreVercel: "web-casatomas" },
+  { slug: "touza-restaurant-website", projectId: "prj_rV4u5MRropGlLxSVPCCJV8kbwkgv", nombreVercel: "touza-casatomas" },
 ];
 
 /**
  * Primer día con las webs en el Vercel del restaurante (corte del 27-10-2026).
  * Los días anteriores vienen de los proyectos viejos y ya están guardados: si
  * se volvieran a pedir, las cifras de los proyectos nuevos los pisarían.
+ * Encima de este suelo va el de cada proyecto (`datos_desde` en
+ * trafico_web_sync_estado): ver sincronizarProyecto.
  */
 export const PRIMER_DIA = "2026-10-27";
 
@@ -114,6 +126,13 @@ export function calcularRango(ultimoOkEn: string | null, ahora: Date, primerDia?
   if (primerDia && desde < primerDia) desde = primerDia;
   // Con primerDia puede no haber aún ningún día cerrado: dias <= 0.
   return { desde, hasta, dias: diasEntre(desde, hasta), backfill };
+}
+
+/** La fecha más tardía (YYYY-MM-DD) de las que vengan; undefined si ninguna. */
+export function fechaMasTardia(...fechas: Array<string | null | undefined>): string | undefined {
+  let max: string | undefined;
+  for (const f of fechas) if (f && (!max || f > max)) max = f;
+  return max;
 }
 
 // ---------------------------------------------------------------------------
@@ -206,6 +225,14 @@ export function calcularTotales(
 export interface EstadoSync {
   ultimo_ok_en: string | null;
   fallos_consecutivos: number;
+  /**
+   * Primer día (YYYY-MM-DD) en que Vercel puede tener datos de este proyecto.
+   * Se sube al día de cada intento que encuentra Web Analytics desactivado:
+   * Vercel no guarda nada mientras está apagado y la API rellena esos días con
+   * 0, que se leerían como "0 visitas" en vez de "sin datos".
+   * Migración 20261101093700_trafico_web_datos_desde.sql.
+   */
+  datos_desde?: string | null;
 }
 
 export interface FilaEstado {
@@ -215,6 +242,7 @@ export interface FilaEstado {
   ultimo_error: string | null;
   fallos_consecutivos: number;
   dias_ultimo_sync?: number;
+  datos_desde?: string;
 }
 
 export interface Repositorio {
@@ -260,25 +288,59 @@ function mensajeError(e: unknown): string {
 
 /** by=day solo no está verificado: solo un 4xx NO reintentable (distinto de auth) activa el fallback. */
 function admiteFallbackTotales(e: unknown): boolean {
-  return e instanceof ErrorVercel && e.status !== null && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 403 && e.status !== 429;
+  return (
+    e instanceof ErrorVercel &&
+    e.status !== null &&
+    e.status >= 400 &&
+    e.status < 500 &&
+    e.status !== 401 &&
+    e.status !== 403 &&
+    e.status !== 429 &&
+    !esAnalyticsDesactivado(e)
+  );
 }
 
-export async function sincronizarProyecto(
-  proyecto: { slug: SlugProyecto; projectId: string },
-  deps: Dependencias,
-): Promise<ResultadoProyecto> {
+/**
+ * Mensaje para `ultimo_error` y el aviso cuando el proyecto de Vercel no tiene
+ * Web Analytics activado. Conserva el código y el texto original de Vercel
+ * (los reconocen el panel y la migración de datos_desde).
+ */
+export function mensajeAnalyticsDesactivado(proyecto: ProyectoVercel, e: unknown): string {
+  const nombre = proyecto.nombreVercel ?? proyecto.projectId;
+  return (
+    `Web Analytics está desactivado en el proyecto ${nombre} de Vercel y Vercel no está guardando visitas. ` +
+    `Hay que activarlo (Vercel → ${nombre} → Analytics → Enable) y volver a desplegar la web. ` +
+    `[${CODIGO_ANALYTICS_DESACTIVADO}] ${mensajeError(e)}`
+  );
+}
+
+export async function sincronizarProyecto(proyecto: ProyectoVercel, deps: Dependencias): Promise<ResultadoProyecto> {
   const log = deps.log ?? (() => {});
   const inicio = deps.ahora();
   const ahoraIso = inicio.toISOString();
+  const hoy = fechaUtc(inicio);
   const avisos: string[] = [];
   let estado: EstadoSync | null = null;
 
   try {
     estado = await deps.repo.leerEstado(proyecto.slug);
-    const rango = calcularRango(estado?.ultimo_ok_en ?? null, inicio, deps.primerDia);
+    const suelo = fechaMasTardia(deps.primerDia, estado?.datos_desde);
+    const rango = calcularRango(estado?.ultimo_ok_en ?? null, inicio, suelo);
     const { desde, hasta } = rango;
     if (rango.dias <= 0) {
-      // Ningún día cerrado desde primerDia: nada que pedir ni que guardar.
+      // Ningún día cerrado desde el suelo: no hay filas que guardar. Se
+      // comprueba igualmente el acceso con una consulta de hoy, para que un
+      // run manual justo después de activar Web Analytics confirme que ya
+      // funciona (y limpie el error) sin esperar al cron de la noche.
+      await deps.vercel.aggregate(proyecto.projectId, hoy, hoy, null);
+      await deps.repo.guardarEstado({
+        proyecto: proyecto.slug,
+        ultimo_intento_en: ahoraIso,
+        ultimo_ok_en: deps.ahora().toISOString(),
+        ultimo_error: null,
+        fallos_consecutivos: 0,
+        dias_ultimo_sync: 0,
+      });
       return { ok: true, desde, hasta, dias: 0, backfill: rango.backfill, filas: { diario: 0, desglose: 0 }, avisos };
     }
 
@@ -290,6 +352,8 @@ export async function sincronizarProyecto(
       filasRuta = r.filas;
       if (r.descartadas) avisos.push(`requestPath: ${r.descartadas} fila(s) descartada(s) sin fecha/pageviews`);
     } catch (e) {
+      // Web Analytics apagado: las demás consultas darán lo mismo.
+      if (esAnalyticsDesactivado(e)) throw e;
       errorRutas = e;
       avisos.push(`requestPath falló: ${mensajeError(e)}`);
     }
@@ -370,7 +434,8 @@ export async function sincronizarProyecto(
       avisos,
     };
   } catch (e) {
-    const error = mensajeError(e);
+    const desactivado = esAnalyticsDesactivado(e);
+    const error = desactivado ? mensajeAnalyticsDesactivado(proyecto, e) : mensajeError(e);
     log(`[sync-trafico-web] ${proyecto.slug}: ERROR ${error}`);
     try {
       await deps.repo.guardarEstado({
@@ -378,6 +443,9 @@ export async function sincronizarProyecto(
         ultimo_intento_en: ahoraIso,
         ultimo_error: error,
         fallos_consecutivos: (estado?.fallos_consecutivos ?? 0) + 1,
+        // Hoy, a esta hora, Vercel no tenía Web Analytics: no hay datos de
+        // días anteriores y no se deben pedir (llegarían como 0).
+        ...(desactivado ? { datos_desde: fechaMasTardia(hoy, estado?.datos_desde) } : {}),
       });
     } catch (e2) {
       log(`[sync-trafico-web] ${proyecto.slug}: no se pudo guardar el estado de error: ${mensajeError(e2)}`);
@@ -395,11 +463,17 @@ export function inicioDiaUtcIso(d: Date): string {
 
 export function construirAviso(fallidos: Array<{ slug: SlugProyecto; error: string }>): { titulo: string; mensaje: string } {
   const nombres = fallidos.map((f) => f.slug).join(", ");
+  const desactivado = fallidos.some((f) => textoAnalyticsDesactivado(f.error));
   return {
-    titulo: `${TITULO_AVISO_PREFIJO} fallo al sincronizar ${nombres}`,
+    titulo: desactivado
+      ? `${TITULO_AVISO_PREFIJO} Web Analytics desactivado en Vercel (${nombres})`
+      : `${TITULO_AVISO_PREFIJO} fallo al sincronizar ${nombres}`,
     mensaje:
       fallidos.map((f) => `${f.slug}: ${f.error}`).join("\n") +
-      "\nLa función sync-trafico-web lo reintentará en el próximo cron (03:30 UTC). Estado en trafico_web_sync_estado.",
+      (desactivado
+        ? "\nReintentar no lo arregla: mientras Web Analytics siga apagado, Vercel no guarda las visitas y esos días se pierden." +
+          " En cuanto se active, el cron de las 03:30 UTC vuelve a traer datos."
+        : "\nLa función sync-trafico-web lo reintentará en el próximo cron (03:30 UTC). Estado en trafico_web_sync_estado."),
   };
 }
 

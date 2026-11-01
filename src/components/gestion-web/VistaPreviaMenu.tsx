@@ -8,12 +8,25 @@
 // Los alérgenos aparecen DISCRETOS, igual que en la web: el dueño los quiere
 // disponibles para quien los busque, no en primer plano. Aquí se resumen en una
 // línea fina bajo el plato, y el detalle completo está en el editor.
+//
+// Los rótulos son los de la web, no los del editor (`rotuloEnLaWeb`): sin
+// entrante la web llama «Entrantes» al primero y «Principales» al segundo; con
+// entrante, «Entrantes», «Primeros» y «Segundos». El postre sale como lo diga
+// «¿Qué entra?» (Postre, Postre o café, Postre y café).
 // ---------------------------------------------------------------------------
 
 import { useState } from "react";
 import { UtensilsCrossed } from "lucide-react";
 import { etiquetaAlergeno } from "@/lib/alergenos";
-import { ETIQUETA_SECCION, SECCIONES_MENU, type ItemMenu, type SeccionMenu } from "@/lib/menu-dia";
+import {
+  SECCIONES_MENU_DIA,
+  completarSecciones,
+  menuTieneContenido,
+  rotuloEnLaWeb,
+  type EntradaSeccionesMenu,
+  type ItemMenu,
+  type PostreCafe,
+} from "@/lib/menu-dia";
 
 /** Foto del plato en la vista previa, con el mismo encuadre que usará la web. */
 function FotoPlato({ item }: { item: ItemMenu }) {
@@ -54,13 +67,15 @@ function LineaPrevia({ item }: { item: ItemMenu }) {
 }
 
 interface VistaPreviaMenuProps {
-  secciones: Record<SeccionMenu, ItemMenu[]>;
+  secciones: EntradaSeccionesMenu;
+  /** Qué entra en el postre; sin él (o `null`), «Postre» como siempre. */
+  postreCafe?: PostreCafe | null;
 }
 
-export function VistaPreviaMenu({ secciones }: VistaPreviaMenuProps) {
-  const vacio = SECCIONES_MENU.every((s) => secciones[s].length === 0);
+export function VistaPreviaMenu({ secciones: entrada, postreCafe = null }: VistaPreviaMenuProps) {
+  const secciones = completarSecciones(entrada);
 
-  if (vacio) {
+  if (!menuTieneContenido(secciones)) {
     return (
       <div className="flex flex-col items-center gap-2 py-8 text-center">
         <UtensilsCrossed className="w-7 h-7 text-muted-foreground/50" aria-hidden="true" />
@@ -71,13 +86,15 @@ export function VistaPreviaMenu({ secciones }: VistaPreviaMenuProps) {
 
   return (
     <div className="space-y-4">
-      {SECCIONES_MENU.map((seccion) => {
+      {SECCIONES_MENU_DIA.map((seccion) => {
         const items = secciones[seccion];
+        // El entrante es opcional: vacío no sale en la web, tampoco aquí.
+        if (seccion === "entrante" && items.length === 0) return null;
         return (
-          <div key={seccion} className="space-y-2">
+          <div key={seccion} className="space-y-2" data-testid={`previa-${seccion}`}>
             <div className="flex items-center gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shrink-0">
-                {ETIQUETA_SECCION[seccion]}
+                {rotuloEnLaWeb(seccion, secciones, postreCafe)}
               </p>
               <span className="h-px flex-1 bg-border" aria-hidden="true" />
             </div>

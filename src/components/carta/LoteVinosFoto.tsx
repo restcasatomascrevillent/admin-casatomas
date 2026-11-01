@@ -12,6 +12,7 @@ import {
 import { formatoEuros, precioMercado, precioSugerido } from "./leerVinoFoto";
 import type { FilaLote, LoteVinos } from "./useLoteVinos";
 import { ESTILO_DAMERO } from "./recorte/useRecorteVino";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 
 interface Props {
   open: boolean;
@@ -73,7 +74,10 @@ export function LoteVinosDialog({ open, onOpenChange, lote, onAbrirFila }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-lg flex-col gap-3 overflow-hidden p-4 sm:p-6">
+      <DialogContent
+        className="flex max-h-[90dvh] w-[calc(100vw-1.5rem)] max-w-lg flex-col gap-3 overflow-hidden p-4 sm:p-6"
+        onInteractOutside={noCerrarAlTocarFuera}
+      >
         <DialogHeader>
           <DialogTitle>Varias botellas</DialogTitle>
           <DialogDescription>

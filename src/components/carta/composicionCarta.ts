@@ -25,7 +25,7 @@ import {
   type TemaFondo,
 } from "./composicionVino";
 
-export { FONDO_ACTIVO, TEMAS, type NombreTema, type TemaFondo } from "./composicionVino";
+export { FONDO_ACTIVO, TEMAS, type Caja, type CrearLienzo, type NombreTema, type TemaFondo } from "./composicionVino";
 
 export type TipoFotoCarta = "vino" | "plato" | "bebida";
 
@@ -76,14 +76,27 @@ export function componerPlatoEnLienzo(
   ancho: number,
   alto: number,
   tema: TemaFondo = TEMAS[FONDO_ACTIVO],
+  /**
+   * Caja del plato ya calculada (vídeo: encuadre suavizado entre fotogramas,
+   * para que el plato no cambie de tamaño). Si se pasa, `imagen` debe medir
+   * ancho×alto y no se busca la caja opaca.
+   */
+  cajaFija?: Caja,
 ): Lienzo | null {
-  const lectura = crear(ancho, alto);
-  const lctx = ctx2d(lectura);
-  lctx.drawImage(imagen, 0, 0, ancho, alto);
-  const caja = cajaOpaca(lctx.getImageData(0, 0, ancho, alto).data, ancho, alto);
+  let caja: Caja | null;
+  let fuente: CanvasImageSource;
+  if (cajaFija) {
+    caja = cajaFija;
+    fuente = imagen;
+  } else {
+    const lectura = crear(ancho, alto);
+    const lctx = ctx2d(lectura);
+    lctx.drawImage(imagen, 0, 0, ancho, alto);
+    caja = cajaOpaca(lctx.getImageData(0, 0, ancho, alto).data, ancho, alto);
+    fuente = lectura as unknown as CanvasImageSource;
+  }
   if (!caja) return null;
   const { destino: d } = planPlato(caja);
-  const fuente = lectura as unknown as CanvasImageSource;
 
   const final = crear(PLATO_ANCHO, PLATO_ALTO);
   const f = ctx2d(final);

@@ -12,6 +12,7 @@ import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useCocteles } from "@/hooks/useCocteles";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { Loader2, Upload, X, Plus } from "lucide-react";
@@ -108,12 +109,11 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
+      // gastaba decenas de MB para una vista previa que no se enseña (la foto
+      // nueva la pinta SelectorFotoCarta).
       fotoCarta.iniciar(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setImagePreview(null);
     }
   };
 
@@ -162,7 +162,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
           });
         } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
-          toast.error("Cóctel creado, pero error al subir la imagen");
+          toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
         } finally {
           setIsUploading(false);
         }
@@ -183,7 +183,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Nuevo Cóctel</DialogTitle>
         </DialogHeader>

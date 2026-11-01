@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { driver, type Driver, type DriveStep } from "driver.js";
+import type { User } from "@supabase/supabase-js";
 import "driver.js/dist/driver.css";
 import "@/components/ayuda/tour.css";
 import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 import {
   TOURS,
   cadenaPestanas,
@@ -61,6 +63,15 @@ function leerVisto(clave: string): boolean {
   }
 }
 
+/** Como `leerVisto`, pero sin almacenamiento cuenta como «no visto» (para no apuntar de más). */
+function leerVistoLocal(clave: string): boolean {
+  try {
+    return window.localStorage.getItem(clave) === "1";
+  } catch {
+    return false;
+  }
+}
+
 function guardarVisto(clave: string) {
   try {
     window.localStorage.setItem(clave, "1");
@@ -69,10 +80,47 @@ function guardarVisto(clave: string) {
   }
 }
 
+/**
+ * Tours vistos guardados también en la cuenta (user_metadata de Supabase Auth).
+ * localStorage solo vale para ese navegador y esa dirección: con otro móvil, otra
+ * URL del panel (la migración cambió el dominio), el navegador borrando datos al
+ * cerrarse o la demo, el tour volvía a salir solo aunque el usuario ya lo hubiera
+ * cerrado. La cuenta lo recuerda en todas partes; localStorage queda como caché.
+ */
+const CLAVE_TOURS_CUENTA = "ayuda_tours_vistos";
+
+function vistosEnCuenta(usuario: User | null): string[] {
+  const valor: unknown = usuario?.user_metadata?.[CLAVE_TOURS_CUENTA];
+  return Array.isArray(valor) ? valor.filter((v): v is string => typeof v === "string") : [];
+}
+
+/** Secciones ya apuntadas en la cuenta en esta sesión (el objeto `user` no se refresca). */
+const apuntadasEnCuenta = new Set<string>();
+
+function guardarVistoEnCuenta(usuario: User | null, seccion: SeccionAyuda) {
+  if (!usuario) return;
+  const yaVistos = vistosEnCuenta(usuario);
+  if (yaVistos.includes(seccion) || apuntadasEnCuenta.has(`${usuario.id}:${seccion}`)) return;
+  apuntadasEnCuenta.add(`${usuario.id}:${seccion}`);
+  // Se guarda la unión con lo que sabe este navegador: `user` puede ser de antes
+  // de otros tours de esta misma sesión y el valor se sustituye entero.
+  const vistos = new Set<string>(yaVistos);
+  for (const s of Object.keys(TOURS) as SeccionAyuda[]) {
+    if (s === seccion || leerVistoLocal(claveTourVisto(s, usuario.id))) vistos.add(s);
+  }
+  void supabase.auth
+    .updateUser({ data: { [CLAVE_TOURS_CUENTA]: [...vistos].sort() } })
+    .then(({ error }) => {
+      // Sin red o sin sesión: se queda en localStorage y se reintenta otro día.
+      if (error) apuntadasEnCuenta.delete(`${usuario.id}:${seccion}`);
+    })
+    .catch(() => apuntadasEnCuenta.delete(`${usuario.id}:${seccion}`));
+}
+
 /** Usuario actual sin exigir <AuthProvider> (en los tests de página no lo hay). */
-function useUsuarioId(): string | null {
+function useUsuario(): User | null {
   try {
-    return useAuth().user?.id ?? null;
+    return useAuth().user ?? null;
   } catch {
     return null;
   }
@@ -87,7 +135,11 @@ function useUsuarioId(): string | null {
  *     `state: { lanzarTour: seccion }`.
  */
 export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: boolean } = {}) {
-  const usuarioId = useUsuarioId();
+  const usuario = useUsuario();
+  const usuarioId = usuario?.id ?? null;
+  // Para los efectos y `lanzar` sin depender de la referencia de `user`.
+  const usuarioRef = useRef(usuario);
+  usuarioRef.current = usuario;
   const location = useLocation();
   const navigate = useNavigate();
   const driverRef = useRef<Driver | null>(null);
@@ -99,6 +151,7 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
     const habiaTour = driverRef.current !== null;
     driverRef.current?.destroy();
     guardarVisto(claveTourVisto(seccion, usuarioId));
+    guardarVistoEnCuenta(usuarioRef.current, seccion);
 
     // Relanzado a mitad de tour: la pestaña «de vuelta» sigue siendo la de antes.
     // Si no, se apunta justo antes del primer cambio de pestaña (al lanzarse solo,
@@ -247,10 +300,20 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pedidoDesdeAyuda]);
 
-  // Primera visita a la sección: lanzarlo solo, una vez por usuario.
+  // Primera visita a la sección: lanzarlo solo, una vez por usuario (en este
+  // navegador o en cualquier otro: lo recuerda la cuenta).
   useEffect(() => {
     if (!auto || !usuarioId) return;
-    if (leerVisto(claveTourVisto(seccion, usuarioId))) return;
+    const clave = claveTourVisto(seccion, usuarioId);
+    if (leerVisto(clave)) {
+      // Visto antes de que se guardara en la cuenta: se sube para los demás dispositivos.
+      if (leerVistoLocal(clave)) guardarVistoEnCuenta(usuarioRef.current, seccion);
+      return;
+    }
+    if (vistosEnCuenta(usuarioRef.current).includes(seccion)) {
+      guardarVisto(clave);
+      return;
+    }
     programar();
   }, [auto, usuarioId, seccion, programar]);
 

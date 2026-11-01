@@ -37,11 +37,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
+import { useVideoPlato } from "./video/useVideoPlato";
+import { SeccionVideoPlato } from "./video/SeccionVideoPlato";
+import { ErrorMigracionVideo } from "./video/subirVideoPlato";
+import { columnaVideoDisponible } from "./video/videoPlato";
 import {
   ALERGENOS_OFICIALES,
   SIN_ALERGENOS_DECLARADOS,
@@ -109,10 +114,13 @@ export function EditarPlatoModal({
   onOpenChange,
   plato,
 }: EditarPlatoModalProps) {
-  const { actualizarPlato, categorias, unidades } = usePlatos();
+  const { actualizarPlato, categorias, unidades, refrescarPlatos } = usePlatos();
   // Foto nueva: recorte automático → sticker → foto con el fondo elegido.
   const fotoCarta = useFotoCarta("plato");
   const { limpiar: limpiarFoto } = fotoCarta;
+  // Vídeo del plato (opcional): se sube aparte, después de guardar el plato.
+  const videoPlato = useVideoPlato();
+  const { limpiar: limpiarVideo } = videoPlato;
   const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
@@ -143,6 +151,11 @@ export function EditarPlatoModal({
       gramos: 100,
     },
   });
+
+  // Al cerrar se cancela el vídeo en curso y se descarta el no guardado.
+  useEffect(() => {
+    if (!open) limpiarVideo();
+  }, [open, limpiarVideo]);
 
   useEffect(() => {
     if (!open || !plato) return;
@@ -178,12 +191,13 @@ export function EditarPlatoModal({
     setNuevoAlergeno("");
 
     limpiarFoto();
+    limpiarVideo();
     setImagePreview(plato.imagen_url ?? null);
     setRemoveImage(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, plato, form, limpiarFoto]);
+  }, [open, plato, form, limpiarFoto, limpiarVideo]);
 
   const toggleAlergeno = (id: string) => {
     setSinAlergenos(false);
@@ -301,6 +315,19 @@ export function EditarPlatoModal({
         await borrarFotoSiNoSeUsa({ tabla: "Platos", bucket: "platos", ruta: fotoAntigua, excluirId: plato.id });
       }
 
+      // Vídeo: aparte, para que un fallo (p. ej. migración sin aplicar) no
+      // impida guardar el plato.
+      try {
+        if (await videoPlato.guardar(plato.id, plato.video_url)) refrescarPlatos?.();
+      } catch (errorVideo) {
+        console.error("Error guardando el vídeo del plato:", errorVideo);
+        toast.error(
+          errorVideo instanceof ErrorMigracionVideo
+            ? errorVideo.message
+            : "El plato se ha guardado, pero no se pudo guardar el vídeo",
+        );
+      }
+
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating plato:", error);
@@ -312,7 +339,7 @@ export function EditarPlatoModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Editar Plato</DialogTitle>
           <DialogDescription>
@@ -671,6 +698,14 @@ export function EditarPlatoModal({
                     />
                   </div>
                 </div>
+
+                <SeccionVideoPlato
+                  video={videoPlato}
+                  urlGuardada={plato?.video_url}
+                  columnaDisponible={columnaVideoDisponible(plato ? [plato] : null)}
+                  temaFoto={fotoCarta.tema}
+                  fondoCambiado={!!fotoCarta.original}
+                />
               </div>
             </details>
 
@@ -686,7 +721,7 @@ export function EditarPlatoModal({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando}
+                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando || videoPlato.procesando}
               >
                 {actualizarPlato.isPending || isUploadingImage ? (
                   <>

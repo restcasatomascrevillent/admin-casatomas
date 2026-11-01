@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
@@ -112,12 +113,10 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
+    // gastaba decenas de MB para una vista previa que no se enseña (la foto
+    // nueva la pinta SelectorFotoCarta).
+    setImagePreview(null);
   };
 
   const clearImage = () => {
@@ -182,7 +181,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Editar Bebida</DialogTitle>
           <DialogDescription>

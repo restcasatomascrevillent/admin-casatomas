@@ -23,7 +23,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { componerFotoVino, extensionFoto } from "./composicionVino";
-import { quitarFondoNavegador, type ProgresoRecorte } from "./recorte/quitarFondoNavegador";
+import { quitarFondoNavegador, recorteNavegadorSeguro, type ProgresoRecorte } from "./recorte/quitarFondoNavegador";
 
 export type { ProgresoRecorte } from "./recorte/quitarFondoNavegador";
 
@@ -73,15 +73,24 @@ export interface ResultadoFotoCarta {
   metodo: "navegador" | "replicate";
 }
 
-/** Quita el fondo: navegador gratis → Replicate. Lanza el error del último intento. */
+/**
+ * Quita el fondo: navegador gratis → Replicate. Lanza el error del último intento.
+ * En móvil y tablet NO se intenta en el navegador (el modelo tumbaba la pestaña
+ * por memoria y la página se recargaba con la foto a medias, ver
+ * quitarFondoNavegador.ts): va directo a Replicate.
+ */
 export async function quitarFondo(
   foto: Blob,
   onProgreso?: (p: ProgresoRecorte) => void,
 ): Promise<{ sticker: Blob; metodo: ResultadoFotoCarta["metodo"] }> {
-  try {
-    return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
-  } catch (e) {
-    console.warn("[recorte-navegador] falló, se prueba Replicate", e);
+  if (recorteNavegadorSeguro()) {
+    try {
+      return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
+    } catch (e) {
+      console.warn("[recorte-navegador] falló, se prueba Replicate", e);
+    }
+  } else {
+    console.info("[recorte] móvil o poca memoria: se recorta con Replicate, no en el navegador");
   }
   onProgreso?.({ fase: "recortando" });
   return { sticker: await quitarFondoRemoto(foto), metodo: "replicate" };
@@ -102,7 +111,7 @@ export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoRecort
 /** Mensaje corto para el aviso cuando no se pudo aplicar el fondo de carta. */
 export function avisoSinFondoCarta(e: unknown): string {
   const codigo = (e as { codigo?: string } | null)?.codigo;
-  if (codigo === "sin_token") return "No se pudo quitar el fondo en este móvil: se guarda la foto normal.";
+  if (codigo === "sin_token") return "No se pudo quitar el fondo: se guarda la foto normal.";
   if (codigo === "timeout") return "Quitar el fondo tardó demasiado: se guarda la foto normal.";
   return "No se pudo poner el fondo de carta: se guarda la foto normal.";
 }

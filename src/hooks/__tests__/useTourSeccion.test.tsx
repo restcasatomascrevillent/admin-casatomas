@@ -29,8 +29,12 @@ vi.mock("driver.js", () => ({ driver: (config: ConfigFalsa) => driverMock(config
 vi.mock("driver.js/dist/driver.css", () => ({}));
 vi.mock("@/components/ayuda/tour.css", () => ({}));
 
-let usuario: { id: string } | null = null;
+let usuario: { id: string; user_metadata?: Record<string, unknown> } | null = null;
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: usuario }) }));
+const updateUser = vi.fn(async (_datos: unknown) => ({ data: {}, error: null }));
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { auth: { updateUser: (datos: unknown) => updateUser(datos) } },
+}));
 
 import { useTourSeccion } from "../useTourSeccion";
 import { TOURS, claveTourVisto, esCambioDePestanaDelTour } from "@/lib/ayuda/tours";
@@ -47,6 +51,7 @@ describe("useTourSeccion", () => {
     activo = undefined;
     localStorage.clear();
     usuario = null;
+    updateUser.mockClear();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -267,6 +272,32 @@ describe("useTourSeccion", () => {
     renderHook(() => useTourSeccion("facturas"), { wrapper: envoltorio });
     act(() => vi.advanceTimersByTime(1000));
     expect(drive).toHaveBeenCalledTimes(1);
+  });
+
+  it("lo apunta también en la cuenta, para que no vuelva a salir en otro navegador o dirección", () => {
+    usuario = { id: "u-cuenta", user_metadata: { ayuda_tours_vistos: ["gestor-web"] } };
+    renderHook(() => useTourSeccion("facturas"), { wrapper: envoltorio });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(drive).toHaveBeenCalledTimes(1);
+    expect(updateUser).toHaveBeenCalledWith({ data: { ayuda_tours_vistos: ["facturas", "gestor-web"] } });
+  });
+
+  it("no se lanza solo si la cuenta ya lo tiene visto, aunque este navegador no lo sepa", () => {
+    usuario = { id: "u-otro-movil", user_metadata: { ayuda_tours_vistos: ["facturas"] } };
+    renderHook(() => useTourSeccion("facturas"), { wrapper: envoltorio });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(drive).not.toHaveBeenCalled();
+    expect(localStorage.getItem(claveTourVisto("facturas", "u-otro-movil"))).toBe("1");
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
+  it("si solo lo sabía este navegador, lo sube a la cuenta sin relanzarlo", () => {
+    usuario = { id: "u-antiguo" };
+    localStorage.setItem(claveTourVisto("gestor-web", "u-antiguo"), "1");
+    renderHook(() => useTourSeccion("gestor-web"), { wrapper: envoltorio });
+    act(() => vi.advanceTimersByTime(1000));
+    expect(drive).not.toHaveBeenCalled();
+    expect(updateUser).toHaveBeenCalledWith({ data: { ayuda_tours_vistos: ["gestor-web"] } });
   });
 
   it("sin usuario no se lanza solo", () => {

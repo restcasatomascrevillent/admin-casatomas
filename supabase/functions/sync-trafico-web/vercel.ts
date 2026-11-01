@@ -18,6 +18,12 @@
 //     the latest 31 days"). El backfill usa 30 días (margen).
 //   - El token del conector MCP de Vercel da 404 aquí; hace falta un token
 //     personal (VERCEL_ANALYTICS_TOKEN).
+//   - Proyecto sin Web Analytics activado (verificado 2026-11-01 en
+//     web-casatomas y touza-casatomas tras la migración de cuenta):
+//     400 {error:{code:"web_analytics_not_enabled",
+//                 message:"Web Analytics is not enabled for this project"}}.
+//     Con Web Analytics apagado Vercel NO guarda visitas: esos días no se
+//     pueden recuperar después, ni con el backfill.
 //
 // NO VERIFICADO: qué devuelve `by=day` SOLO (sin segunda dimensión). Se usa
 // para el total diario (ruta '*'); si la API lo rechaza, sync.ts cae a sumar
@@ -66,10 +72,28 @@ export class ErrorVercel extends Error {
     message: string,
     readonly status: number | null, // null = error de red / timeout
     readonly reintentable: boolean,
+    readonly codigo: string | null = null, // error.code de Vercel, si lo trae
   ) {
     super(message);
     this.name = "ErrorVercel";
   }
+}
+
+/** error.code de Vercel cuando el proyecto no tiene Web Analytics activado. */
+export const CODIGO_ANALYTICS_DESACTIVADO = "web_analytics_not_enabled";
+const PATRON_ANALYTICS_DESACTIVADO = /web_analytics_not_enabled|web analytics is not enabled/i;
+
+/**
+ * ¿El texto (un mensaje de error o `ultimo_error` guardado) dice que el
+ * proyecto no tiene Web Analytics activado? Reconoce el código y el mensaje
+ * en inglés de Vercel, que se conservan dentro del mensaje en español.
+ */
+export function textoAnalyticsDesactivado(texto: string | null | undefined): boolean {
+  return !!texto && PATRON_ANALYTICS_DESACTIVADO.test(texto);
+}
+
+export function esAnalyticsDesactivado(e: unknown): boolean {
+  return e instanceof ErrorVercel && (e.codigo === CODIGO_ANALYTICS_DESACTIVADO || textoAnalyticsDesactivado(e.message));
 }
 
 export function construirUrlAggregate(opts: {
@@ -179,18 +203,19 @@ export function calcularEspera(intento: number, retryAfter: string | null): numb
   return Math.min(1000 * 2 ** (intento - 1), 8_000);
 }
 
-async function leerMensajeError(res: Response): Promise<string> {
+async function leerMensajeError(res: Response): Promise<{ mensaje: string; codigo: string | null }> {
   try {
     const txt = await res.text();
     try {
       const j = JSON.parse(txt) as { error?: { message?: string; code?: string } | string; message?: string };
-      if (typeof j.error === "string") return j.error;
-      return j.error?.message ?? j.message ?? txt.slice(0, 300);
+      if (typeof j.error === "string") return { mensaje: j.error, codigo: null };
+      const codigo = typeof j.error?.code === "string" ? j.error.code : null;
+      return { mensaje: j.error?.message ?? j.message ?? txt.slice(0, 300), codigo };
     } catch {
-      return txt.slice(0, 300);
+      return { mensaje: txt.slice(0, 300), codigo: null };
     }
   } catch {
-    return "";
+    return { mensaje: "", codigo: null };
   }
 }
 
@@ -230,9 +255,14 @@ export function crearClienteVercel(opts: OpcionesCliente): ClienteVercel {
           }
           return normalizarRespuesta(cuerpo, dimension);
         }
-        const msg = await leerMensajeError(res);
+        const { mensaje, codigo } = await leerMensajeError(res);
         const reintentable = esEstadoReintentable(res.status);
-        ultimo = new ErrorVercel(`Vercel ${res.status}${dimension ? ` (by=${dimension})` : " (by=day)"}: ${msg}`, res.status, reintentable);
+        ultimo = new ErrorVercel(
+          `Vercel ${res.status}${dimension ? ` (by=${dimension})` : " (by=day)"}: ${mensaje}`,
+          res.status,
+          reintentable,
+          codigo,
+        );
         if (!reintentable) throw ultimo;
         if (n < intentos) await esperar(calcularEspera(n, res.headers.get("retry-after")));
       }

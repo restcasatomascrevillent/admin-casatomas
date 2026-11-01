@@ -9,6 +9,13 @@ import {
   validarDeclaracionAlergenos,
 } from "@/lib/alergenos";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import {
+  cambiosDeOrden,
+  categoriasOrdenadas,
+  consultarSiguienteOrden,
+  guardarOrdenEnTabla,
+  ordenarPorOrden,
+} from "@/lib/orden-carta";
 
 export interface Plato {
   id: string;
@@ -22,11 +29,18 @@ export interface Plato {
   alergenos_oficiales: any;
   alergenos_inferidos: any;
   alergenos_notas: string | null;
-  orden: string | null;
+  /** Posición dentro de la categoría (1, 2, 3…). Texto en BD hasta la migración
+   * 20261101090000_carta_orden_entero; el panel lo trata siempre como número. */
+  orden: string | number | null;
   activado: boolean | null;
   expanded: boolean | null;
   imagen_url: string | null;
   imagen_posicion_y: number | null;
+  /**
+   * Vídeo del plato (`<id>-video.mp4|webm`). Opcional: antes de aplicar la
+   * migración 20261101120000_platos_video_url la columna no viene en select('*').
+   */
+  video_url?: string | null;
   touza: boolean | null;
   restaurante: boolean | null;
   featured: boolean | null;
@@ -44,7 +58,8 @@ export interface NuevoPlato {
   unidad?: string;
   alergenos_oficiales?: any;
   alergenos_notas?: string;
-  orden?: string;
+  /** Si no se indica, el plato va al final de su categoría. */
+  orden?: number;
 }
 
 /**
@@ -134,10 +149,15 @@ export function usePlatos() {
         .order("id", { ascending: true });
 
       if (error) throw error;
-      return ((data ?? []) as unknown as Plato[]).map((plato) => ({
-        ...plato,
-        unidad: normalizarUnidadPlato(plato.unidad),
-      }));
+      // La BD ordena `orden` como texto ("10" antes que "2") mientras no se
+      // aplique la migración a entero: aquí se reordena por número (estable,
+      // así que a igual orden se respeta el desempate por id de la consulta).
+      return ordenarPorOrden(
+        ((data ?? []) as unknown as Plato[]).map((plato) => ({
+          ...plato,
+          unidad: normalizarUnidadPlato(plato.unidad),
+        })),
+      );
     },
   });
 
@@ -156,7 +176,16 @@ export function usePlatos() {
         alergenos: alergenosArray,
       });
 
-      // 2. El panel escribe su propia carta directamente contra Supabase (RLS detrás).
+      // 2. Al final de su categoría (mayor orden + 1), salvo que se indique.
+      const orden =
+        nuevoPlato.orden ??
+        (await consultarSiguienteOrden(
+          "Platos",
+          nuevoPlato.categoria,
+          queryClient.getQueryData<Plato[]>(["platos"]),
+        ));
+
+      // 3. El panel escribe su propia carta directamente contra Supabase (RLS detrás).
       const { data, error } = await supabase
         .from("Platos")
         .insert([
@@ -174,7 +203,7 @@ export function usePlatos() {
             alergenos_oficiales:
               alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoPlato.alergenos_notas || null,
-            orden: nuevoPlato.orden ?? "0",
+            orden,
             activado: true,
             expanded: false,
             created_at: new Date().toISOString(),
@@ -257,6 +286,23 @@ export function usePlatos() {
       if (saltaRetraduccionSinAnterior) {
         console.warn(
           `usePlatos.actualizarPlato: se salta la retraducción de "${id}" — sin estado previo en caché.`,
+        );
+      }
+
+      // Cambio de categoría: el plato pasa al final de la nueva (si no, se
+      // quedaría con la posición que tenía en la otra, en medio de la lista).
+      if (
+        anterior &&
+        "categoria" in cambios &&
+        cambios.categoria &&
+        cambios.categoria !== anterior.categoria &&
+        !("orden" in cambios)
+      ) {
+        cambios.orden = await consultarSiguienteOrden(
+          "Platos",
+          cambios.categoria,
+          queryClient.getQueryData<Plato[]>(["platos"]),
+          id,
         );
       }
 
@@ -416,40 +462,25 @@ export function usePlatos() {
     },
   });
 
-  const expandirTodos = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
-        .from("Platos")
-        .update({ expanded: true })
-        .in("id", ids);
-
-      if (error) throw error;
+  /**
+   * Guarda el orden de una categoría: `idsEnOrden` pasa a ser 1, 2, 3… (solo
+   * se escriben los que cambian) y se republica la web, como cualquier otro
+   * cambio de la carta.
+   */
+  const guardarOrden = useMutation({
+    mutationFn: async ({ idsEnOrden }: { categoria: string; idsEnOrden: string[] }) => {
+      const actuales = queryClient.getQueryData<Plato[]>(["platos"]) ?? [];
+      const cambios = cambiosDeOrden(actuales, idsEnOrden);
+      await guardarOrdenEnTabla("Platos", cambios);
+      return cambios.length;
     },
-    onSuccess: () => {
+    onSuccess: (escritos, { categoria }) => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      avisar("Todas las fotos expandidas");
+      if (escritos > 0) avisar(`Orden de «${categoria}» guardado`);
     },
     onError: (error) => {
-      toast.error("Error al expandir las fotos");
-      console.error(error);
-    },
-  });
-
-  const contraerTodos = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const { error } = await supabase
-        .from("Platos")
-        .update({ expanded: false })
-        .in("id", ids);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["platos"] });
-      avisar("Todas las fotos contraídas");
-    },
-    onError: (error) => {
-      toast.error("Error al contraer las fotos");
+      toast.error(error instanceof Error ? error.message : "No se ha podido guardar el orden");
       console.error(error);
     },
   });
@@ -498,9 +529,8 @@ export function usePlatos() {
     },
   });
 
-  const categorias = platos
-    ? Array.from(new Set(platos.map((p) => p.categoria).filter(Boolean)))
-    : [];
+  // Alfabéticas: así no cambian de sitio al reordenar los platos.
+  const categorias = categoriasOrdenadas(platos);
 
   const unidades = platos
     ? Array.from(new Set(platos.map((p) => normalizarUnidadPlato(p.unidad))))
@@ -516,9 +546,10 @@ export function usePlatos() {
     eliminarPlato,
     toggleActivado,
     toggleExpanded,
-    expandirTodos,
-    contraerTodos,
+    guardarOrden,
     toggleRestaurante,
     toggleTouza,
+    /** Vuelve a leer la lista (p. ej. tras guardar el vídeo, que va aparte). */
+    refrescarPlatos: () => queryClient.invalidateQueries({ queryKey: ["platos"] }),
   };
 }

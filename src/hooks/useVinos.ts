@@ -4,6 +4,13 @@ import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
+import {
+  cambiosDeOrden,
+  categoriasOrdenadas,
+  consultarSiguienteOrden,
+  guardarOrdenEnTabla,
+  ordenarPorOrden,
+} from "@/lib/orden-carta";
 
 export interface Vino {
   id: string;
@@ -18,7 +25,9 @@ export interface Vino {
   alergenos_oficiales: any;
   alergenos_inferidos: any;
   alergenos_notas: string | null;
-  orden: string | null;
+  /** Posición dentro de la categoría (1, 2, 3…). Texto en BD hasta la migración
+   * 20261101090000_carta_orden_entero; el panel lo trata siempre como número. */
+  orden: string | number | null;
   activado: boolean | null;
   expanded: boolean | null;
   imagen_url: string | null;
@@ -41,7 +50,8 @@ export interface NuevoVino {
   ubicacion_region?: string;
   alergenos_oficiales?: any;
   alergenos_notas?: string;
-  orden?: string;
+  /** Si no se indica, el vino va al final de su categoría. */
+  orden?: number;
 }
 
 /**
@@ -131,7 +141,8 @@ export function useVinos() {
         .order("orden", { ascending: true });
 
       if (error) throw error;
-      return data as unknown as Vino[];
+      // Orden numérico en cliente (en BD `orden` es texto hasta la migración).
+      return ordenarPorOrden(data as unknown as Vino[]);
     },
   });
 
@@ -158,6 +169,11 @@ export function useVinos() {
       // 2. Insertar directamente (antes: solo esto, sin traducción — el resto
       // del flujo viejo dependía de un webhook de n8n roto). Un solo INSERT,
       // sin el UPDATE en segundo plano que fallaba por la columna inexistente.
+      // Al final de su categoría (mayor orden + 1), salvo que se indique.
+      const orden =
+        nuevoVino.orden ??
+        (await consultarSiguienteOrden("Vinos", nuevoVino.categoria, queryClient.getQueryData<Vino[]>(["vinos"])));
+
       const { data, error } = await supabase
         .from("Vinos")
         .insert([
@@ -173,7 +189,7 @@ export function useVinos() {
             ubicacion_region: region,
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
-            orden: nuevoVino.orden ?? "0",
+            orden,
             activado: true,
             restaurante: true,
             created_at: new Date().toISOString(),
@@ -242,6 +258,22 @@ export function useVinos() {
       const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
       if (saltaRetraduccionSinAnterior) {
         console.warn(`useVinos.actualizarVino: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      // Cambio de categoría: el vino pasa al final de la nueva.
+      if (
+        anterior &&
+        "categoria" in cambios &&
+        cambios.categoria &&
+        cambios.categoria !== anterior.categoria &&
+        !("orden" in cambios)
+      ) {
+        cambios.orden = await consultarSiguienteOrden(
+          "Vinos",
+          cambios.categoria,
+          queryClient.getQueryData<Vino[]>(["vinos"]),
+          id,
+        );
       }
 
       const cambiaTraducible = Boolean(
@@ -334,6 +366,28 @@ export function useVinos() {
     },
   });
 
+  /**
+   * Guarda el orden de una categoría: `idsEnOrden` pasa a ser 1, 2, 3… (solo
+   * se escriben los que cambian) y se republica la web.
+   */
+  const guardarOrden = useMutation({
+    mutationFn: async ({ idsEnOrden }: { categoria: string; idsEnOrden: string[] }) => {
+      const actuales = queryClient.getQueryData<Vino[]>(["vinos"]) ?? [];
+      const cambios = cambiosDeOrden(actuales, idsEnOrden);
+      await guardarOrdenEnTabla("Vinos", cambios);
+      return cambios.length;
+    },
+    onSuccess: (escritos, { categoria }) => {
+      queryClient.invalidateQueries({ queryKey: ["vinos"] });
+      if (escritos > 0) avisar(`Orden de «${categoria}» guardado`);
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["vinos"] });
+      toast.error(error instanceof Error ? error.message : "No se ha podido guardar el orden");
+      console.error(error);
+    },
+  });
+
   const toggleActivado = useMutation({
     mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
@@ -418,9 +472,8 @@ export function useVinos() {
     },
   });
 
-  const categorias = vinos
-    ? Array.from(new Set(vinos.map((v) => v.categoria).filter(Boolean))) as string[]
-    : [];
+  // Alfabéticas: así no cambian de sitio al reordenar.
+  const categorias = categoriasOrdenadas(vinos);
 
   const denominaciones = vinos
     ? Array.from(new Set(vinos.map((v) => v.denominacion_origen).filter(Boolean))) as string[]
@@ -444,6 +497,7 @@ export function useVinos() {
     crearVino,
     actualizarVino,
     eliminarVino,
+    guardarOrden,
     toggleActivado,
     toggleExpanded,
     toggleRestaurante,

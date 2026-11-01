@@ -23,6 +23,7 @@ import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { urlSegura } from "@/lib/url-segura";
 
 const formSchema = z.object({
@@ -157,7 +158,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
         queryClient.invalidateQueries({ queryKey: ["vinos"] });
       } catch (error) {
         console.error('Error uploading image:', error);
-        toast.error("Error al subir la imagen");
+        toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
       } finally {
         setIsUploading(false);
       }
@@ -170,7 +171,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Añadir Vino</DialogTitle>
           <DialogDescription>

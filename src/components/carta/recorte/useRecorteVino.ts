@@ -23,8 +23,15 @@ export type EleccionFoto = "carta" | "original";
 
 /** Lado a partir del cual se reduce la foto antes de recortar (las del lote ya vienen a 1200). */
 const LADO_RECORTE = 1600;
+/**
+ * Por encima de este peso se reduce sin mirar las medidas: una foto de cámara
+ * de 12-50 MP ocupa 50-200 MB descomprimida, y decodificarla una vez solo para
+ * medirla (y otra para reducirla) es memoria que el móvil no tiene.
+ */
+const BYTES_REDUCIR_SIEMPRE = 1_500_000;
 
 async function fotoParaRecorte(f: File): Promise<Blob> {
+  if (f.size > BYTES_REDUCIR_SIEMPRE) return (await redimensionarFoto(f)).blob;
   try {
     const bmp = await createImageBitmap(f);
     const grande = Math.max(bmp.width, bmp.height) > LADO_RECORTE;

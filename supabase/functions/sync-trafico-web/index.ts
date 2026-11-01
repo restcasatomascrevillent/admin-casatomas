@@ -2,9 +2,11 @@
 // SYNC-TRAFICO-WEB — Edge Function
 // ============================================================================
 // Ingesta diaria de Vercel Web Analytics (casa-tomas-story y
-// touza-restaurant-website) en trafico_web_diario / trafico_web_desglose.
-// La llama pg_cron a las 03:30 UTC (migración 20260923200000_trafico_web.sql)
-// con la cabecera x-webhook-secret leída de Vault.
+// touza-restaurant-website, hoy los proyectos web-casatomas y touza-casatomas
+// del equipo "Casa tomas") en trafico_web_diario / trafico_web_desglose.
+// La llama pg_cron a las 03:30 UTC (job `sync-trafico-web`, hoy definido en
+// 20261101093800_trafico_web_cron_url_desde_vault.sql) con la cabecera
+// x-webhook-secret leída de Vault.
 //
 //   POST /functions/v1/sync-trafico-web   body ignorado
 //     200 todo OK · 207 un proyecto falló · 502 fallaron los dos
@@ -63,12 +65,17 @@ function crearRepositorio(supabase: SupabaseClient): Repositorio {
     async leerEstado(proyecto) {
       const { data, error } = await supabase
         .from("trafico_web_sync_estado")
-        .select("ultimo_ok_en, fallos_consecutivos")
+        // datos_desde: migración 20261101093700_trafico_web_datos_desde.sql (aplicarla ANTES de desplegar).
+        .select("ultimo_ok_en, fallos_consecutivos, datos_desde")
         .eq("proyecto", proyecto)
         .maybeSingle();
       if (error) throw new Error(`leer trafico_web_sync_estado: ${error.message}`);
       return data
-        ? { ultimo_ok_en: (data.ultimo_ok_en as string | null) ?? null, fallos_consecutivos: Number(data.fallos_consecutivos) || 0 }
+        ? {
+            ultimo_ok_en: (data.ultimo_ok_en as string | null) ?? null,
+            fallos_consecutivos: Number(data.fallos_consecutivos) || 0,
+            datos_desde: (data.datos_desde as string | null) ?? null,
+          }
         : null;
     },
     upsertDiario: (filas: FilaDiario[]) => upsertEnLotes("trafico_web_diario", filas, "fecha,proyecto,ruta"),
