@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EstadoSync, FilaSerie, Tendencia } from "@/hooks/useTraficoWeb";
-import { construirPuntos, deltaMediaPct, detectarProblemasSync, resumirSerie } from "../calculos";
+import { construirPuntos, deltaMediaPct, detectarProblemasSync, esErrorAnalyticsDesactivado, resumirSerie } from "../calculos";
 import { fmtBytes, fmtNumero, SIN_DATOS } from "../formato";
 
 const fila = (fecha: string, visitas: number | null, extra: Partial<FilaSerie> = {}): FilaSerie => ({
@@ -99,6 +99,31 @@ describe("detectarProblemasSync", () => {
 
   it("nunca intentado → sin aviso (lo cubre el estado vacío)", () => {
     expect(detectarProblemasSync(["casa-tomas-story", "touza-restaurant-website"], [], ahora)).toEqual([]);
+  });
+
+  it("Web Analytics desactivado (el error que hay hoy en PROD) → explica qué activar en Vercel", () => {
+    const r = detectarProblemasSync(
+      ["casa-tomas-story"],
+      [
+        estado({
+          ultimo_ok_en: "2026-10-27T03:30:03Z",
+          ultimo_intento_en: "2026-11-01T03:30:03Z",
+          ultimo_error: "Vercel 400 (by=day): Web Analytics is not enabled for this project",
+          fallos_consecutivos: 5,
+        }),
+      ],
+      new Date("2026-11-01T12:00:00Z"),
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].motivo).toContain("Web Analytics está desactivado en Vercel");
+    expect(r[0].motivo).toContain("Analytics → Enable");
+    expect(r[0].motivo).not.toContain("Web Analytics is not enabled");
+  });
+
+  it("esErrorAnalyticsDesactivado reconoce el mensaje de Vercel y el código, y nada más", () => {
+    expect(esErrorAnalyticsDesactivado("… [web_analytics_not_enabled] Vercel 400 …")).toBe(true);
+    expect(esErrorAnalyticsDesactivado("Vercel 502")).toBe(false);
+    expect(esErrorAnalyticsDesactivado(null)).toBe(false);
   });
 });
 

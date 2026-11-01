@@ -13,6 +13,8 @@ import {
   normalizarRespuesta,
   normalizarValor,
   calcularEspera,
+  esAnalyticsDesactivado,
+  textoAnalyticsDesactivado,
   ErrorVercel,
   type ClienteVercel,
   type DimensionApi,
@@ -22,6 +24,8 @@ import {
   calcularRango,
   calcularTotales,
   compararTiempoConstante,
+  construirAviso,
+  fechaMasTardia,
   fusionarPorClave,
   procesarPeticion,
   sincronizarProyecto,
@@ -193,6 +197,33 @@ describe("crearClienteVercel (reintentos)", () => {
     expect(n).toBe(1);
   });
 
+  it("400 web_analytics_not_enabled (respuesta real de Vercel, 2026-11-01): sin reintento y con el código", async () => {
+    let n = 0;
+    const c = crearClienteVercel({
+      token: "t",
+      fetchFn: async () => {
+        n++;
+        return new Response(
+          JSON.stringify({ error: { code: "web_analytics_not_enabled", message: "Web Analytics is not enabled for this project" } }),
+          { status: 400 },
+        );
+      },
+      esperar: async () => {},
+    });
+    const e = await c.aggregate("p", "2026-10-27", "2026-10-31", "requestPath").catch((x) => x);
+    expect(e).toMatchObject({ status: 400, reintentable: false, codigo: "web_analytics_not_enabled" });
+    expect(esAnalyticsDesactivado(e)).toBe(true);
+    expect(n).toBe(1);
+  });
+
+  it("textoAnalyticsDesactivado reconoce el error guardado hoy en PROD y el código", () => {
+    expect(textoAnalyticsDesactivado("Vercel 400 (by=day): Web Analytics is not enabled for this project")).toBe(true);
+    expect(textoAnalyticsDesactivado("... [web_analytics_not_enabled] ...")).toBe(true);
+    expect(textoAnalyticsDesactivado("Vercel 503 (by=day): unavailable")).toBe(false);
+    expect(textoAnalyticsDesactivado(null)).toBe(false);
+    expect(esAnalyticsDesactivado(new ErrorVercel("Vercel 400: invalid groupBy", 400, false, "bad_request"))).toBe(false);
+  });
+
   it("5xx persistente -> ErrorVercel tras agotar intentos", async () => {
     let n = 0;
     const c = crearClienteVercel({ token: "t", intentos: 3, fetchFn: async () => (n++, new Response("boom", { status: 500 })), esperar: async () => {} });
@@ -248,6 +279,12 @@ describe("calcularRango", () => {
   it("con primerDia aún sin cerrar, dias <= 0", () => {
     expect(calcularRango("2026-09-22T03:30:05Z", AHORA, "2026-09-23").dias).toBeLessThanOrEqual(0);
   });
+
+  it("fechaMasTardia elige el suelo más alto e ignora los vacíos", () => {
+    expect(fechaMasTardia("2026-10-27", "2026-11-01")).toBe("2026-11-01");
+    expect(fechaMasTardia("2026-10-27", null)).toBe("2026-10-27");
+    expect(fechaMasTardia(undefined, null)).toBeUndefined();
+  });
 });
 
 describe("fusionarPorClave / calcularTotales", () => {
@@ -276,14 +313,29 @@ describe("fusionarPorClave / calcularTotales", () => {
 const CASA = PROYECTOS[0];
 
 describe("sincronizarProyecto", () => {
-  it("sin días cerrados desde primerDia no llama a Vercel ni toca el estado", async () => {
+  it("sin días cerrados desde el suelo: no guarda filas, solo comprueba el acceso con una consulta de hoy", async () => {
     const repo = new RepoMemoria();
     const llamadas: string[] = [];
     const r = await sincronizarProyecto(CASA, { ...deps(vercelFalso({}, llamadas), repo), primerDia: "2026-09-23" });
     expect(r).toMatchObject({ ok: true, dias: 0, filas: { diario: 0, desglose: 0 } });
-    expect(llamadas).toHaveLength(0);
+    expect(llamadas).toEqual([`${CASA.projectId}:day`]);
     expect(repo.diario.size).toBe(0);
-    expect(await repo.leerEstado(CASA.slug)).toBeNull();
+    expect(repo.estado.get(CASA.slug)).toMatchObject({ ultimo_error: null, fallos_consecutivos: 0, dias_ultimo_sync: 0 });
+  });
+
+  it("run manual el mismo día de activar Web Analytics: limpia el error sin pedir días sin datos", async () => {
+    const repo = new RepoMemoria();
+    repo.estado.set(CASA.slug, {
+      ultimo_ok_en: "2026-10-27T03:30:03Z",
+      fallos_consecutivos: 5,
+      ultimo_error: "Vercel 400 (by=day): Web Analytics is not enabled for this project",
+      datos_desde: "2026-09-23", // el cron de esta madrugada lo encontró apagado
+    });
+    const llamadas: string[] = [];
+    const r = await sincronizarProyecto(CASA, { ...deps(vercelFalso({ day: [] }, llamadas), repo), primerDia: "2026-09-01" });
+    expect(r).toMatchObject({ ok: true, dias: 0 });
+    expect(llamadas).toEqual([`${CASA.projectId}:day`]);
+    expect(repo.estado.get(CASA.slug)).toMatchObject({ ultimo_error: null, fallos_consecutivos: 0, datos_desde: "2026-09-23" });
   });
 
   it("guarda totales '*', rutas y desgloses y marca estado OK", async () => {
@@ -352,6 +404,56 @@ describe("sincronizarProyecto", () => {
     const repo = new RepoMemoria();
     const r = await sincronizarProyecto(CASA, deps(vercelFalso({ day: new ErrorVercel("Vercel 401", 401, false), requestPath: [fila("2026-09-22", 1, "/")] }), repo));
     expect(r.ok).toBe(false);
+  });
+
+  const DESACTIVADO = new ErrorVercel(
+    "Vercel 400 (by=requestPath): Web Analytics is not enabled for this project",
+    400,
+    false,
+    "web_analytics_not_enabled",
+  );
+
+  it("Web Analytics desactivado: corta tras la primera consulta, explica qué hacer y sube datos_desde a hoy", async () => {
+    const repo = new RepoMemoria();
+    repo.estado.set(CASA.slug, { ultimo_ok_en: "2026-09-18T03:30:00Z", fallos_consecutivos: 4, datos_desde: "2026-09-20" });
+    const llamadas: string[] = [];
+    const r = await sincronizarProyecto(CASA, deps(vercelFalso({ requestPath: DESACTIVADO, day: DESACTIVADO }, llamadas), repo));
+    expect(r.ok).toBe(false);
+    expect(llamadas).toEqual([`${CASA.projectId}:requestPath`]);
+    const estado = repo.estado.get(CASA.slug);
+    expect(estado).toMatchObject({ fallos_consecutivos: 5, ultimo_ok_en: "2026-09-18T03:30:00Z", datos_desde: "2026-09-23" });
+    expect(estado?.ultimo_error).toContain("Web Analytics está desactivado en el proyecto web-casatomas de Vercel");
+    expect(estado?.ultimo_error).toContain("Analytics → Enable");
+    expect(textoAnalyticsDesactivado(estado?.ultimo_error)).toBe(true);
+    expect(repo.diario.size).toBe(0);
+  });
+
+  it("by=day con Web Analytics desactivado NO cae a la suma de rutas", async () => {
+    const repo = new RepoMemoria();
+    const r = await sincronizarProyecto(CASA, deps(vercelFalso({ day: DESACTIVADO, requestPath: [fila("2026-09-22", 1, "/")] }), repo));
+    expect(r.ok).toBe(false);
+    expect(repo.diario.size).toBe(0);
+  });
+
+  it("tras activarlo, no pide días anteriores a datos_desde (llegarían como 0) ni en el re-sync", async () => {
+    const repo = new RepoMemoria();
+    // Último OK antiguo (el corte) y Web Analytics visto apagado el 2026-09-21.
+    repo.estado.set(CASA.slug, { ultimo_ok_en: "2026-09-10T03:30:00Z", fallos_consecutivos: 3, datos_desde: "2026-09-21" });
+    const rangos: string[] = [];
+    const vercel: ClienteVercel = {
+      async aggregate(_p, desde, hasta, dim) {
+        rangos.push(`${dim ?? "day"} ${desde}..${hasta}`);
+        return { filas: [fila(hasta, 4)], descartadas: 0 };
+      },
+    };
+    const r = await sincronizarProyecto(CASA, deps(vercel, repo));
+    expect(r).toMatchObject({ ok: true, desde: "2026-09-21", hasta: "2026-09-22", dias: 2 });
+    expect(new Set(rangos)).toEqual(new Set(["requestPath 2026-09-21..2026-09-22", "day 2026-09-21..2026-09-22", "deviceType 2026-09-21..2026-09-22", "country 2026-09-21..2026-09-22", "referrerHostname 2026-09-21..2026-09-22"]));
+    expect(repo.estado.get(CASA.slug)).toMatchObject({ ultimo_error: null, fallos_consecutivos: 0, datos_desde: "2026-09-21" });
+
+    // Run normal del día siguiente: hoy-3 sería el 21; el suelo lo mantiene.
+    const r2 = await sincronizarProyecto(CASA, { ...deps(vercel, repo), ahora: () => new Date("2026-09-24T03:30:00Z") });
+    expect(r2).toMatchObject({ ok: true, desde: "2026-09-21", hasta: "2026-09-23" });
   });
 });
 
@@ -429,6 +531,25 @@ describe("procesarPeticion", () => {
     expect(repo.estado.get("touza-restaurant-website")).toMatchObject({ fallos_consecutivos: 1, ultimo_error: expect.stringContaining("502") });
     expect(repo.avisos).toHaveLength(1);
     expect(repo.avisos[0].titulo).toContain("touza-restaurant-website");
+  });
+
+  it("Web Analytics desactivado en los dos -> 502 y un aviso que dice qué activar, no 'se reintentará'", async () => {
+    const repo = new RepoMemoria();
+    const e = new ErrorVercel("Vercel 400 (by=requestPath): Web Analytics is not enabled for this project", 400, false, "web_analytics_not_enabled");
+    const { cfg: c } = cfg(repo, vercelFalso({ day: e, requestPath: e }));
+    const res = await procesarPeticion(peticion("s3creto"), c);
+    expect(res.status).toBe(502);
+    expect(repo.avisos).toHaveLength(1);
+    expect(repo.avisos[0].titulo).toBe("Tráfico web: Web Analytics desactivado en Vercel (casa-tomas-story, touza-restaurant-website)");
+    expect(repo.avisos[0].mensaje).toContain("touza-casatomas");
+    expect(repo.avisos[0].mensaje).toContain("Reintentar no lo arregla");
+    expect(repo.avisos[0].mensaje).not.toContain("lo reintentará");
+  });
+
+  it("construirAviso conserva el texto de siempre para fallos transitorios", () => {
+    const a = construirAviso([{ slug: "casa-tomas-story", error: "Vercel 503: unavailable" }]);
+    expect(a.titulo).toBe("Tráfico web: fallo al sincronizar casa-tomas-story");
+    expect(a.mensaje).toContain("lo reintentará en el próximo cron");
   });
 
   it("ambos caídos -> 502; relanzar el mismo día NO crea un segundo aviso (R3)", async () => {

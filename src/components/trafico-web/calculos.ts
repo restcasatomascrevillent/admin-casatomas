@@ -61,6 +61,28 @@ export interface ProblemaSync {
   motivo: string;
 }
 
+/**
+ * La función sync-trafico-web guarda el error de Vercel cuando el proyecto no
+ * tiene Web Analytics activado (código `web_analytics_not_enabled`; mensaje
+ * "Web Analytics is not enabled for this project"). Pasó tras la migración a
+ * la cuenta del restaurante (27-10-2026): los proyectos nuevos se crearon con
+ * Web Analytics apagado y Vercel dejó de guardar visitas.
+ */
+const PATRON_ANALYTICS_DESACTIVADO = /web_analytics_not_enabled|web analytics is not enabled/i;
+
+export function esErrorAnalyticsDesactivado(error: string | null | undefined): boolean {
+  return !!error && PATRON_ANALYTICS_DESACTIVADO.test(error);
+}
+
+const MOTIVO_ANALYTICS_DESACTIVADO =
+  "Web Analytics está desactivado en Vercel para esta web, así que Vercel no está guardando visitas. " +
+  "Hay que activarlo (Vercel → proyecto de la web → Analytics → Enable) y volver a desplegar la web; " +
+  "los días que pase apagado no se pueden recuperar.";
+
+function motivoError(error: string): string {
+  return esErrorAnalyticsDesactivado(error) ? MOTIVO_ANALYTICS_DESACTIVADO : `el último intento falló: ${error}`;
+}
+
 export function detectarProblemasSync(
   proyectos: readonly ProyectoTrafico[],
   estados: EstadoSync[],
@@ -73,7 +95,12 @@ export function detectarProblemasSync(
       // Intento fallido sin ningún éxito previo → aviso. Si nunca se ha
       // intentado, lo cubre el estado vacío de la página.
       if (e?.ultimo_error) {
-        problemas.push({ proyecto: p, motivo: `nunca se ha sincronizado bien. Último error: ${e.ultimo_error}` });
+        problemas.push({
+          proyecto: p,
+          motivo: esErrorAnalyticsDesactivado(e.ultimo_error)
+            ? MOTIVO_ANALYTICS_DESACTIVADO
+            : `nunca se ha sincronizado bien. Último error: ${e.ultimo_error}`,
+        });
       }
       continue;
     }
@@ -81,8 +108,8 @@ export function detectarProblemasSync(
     const horas = (ahora.getTime() - okMs) / 36e5;
     const errorEnUltimoIntento =
       !!e.ultimo_error && !!e.ultimo_intento_en && new Date(e.ultimo_intento_en).getTime() > okMs;
-    if (errorEnUltimoIntento) {
-      problemas.push({ proyecto: p, motivo: `el último intento falló: ${e.ultimo_error}` });
+    if (errorEnUltimoIntento && e.ultimo_error) {
+      problemas.push({ proyecto: p, motivo: motivoError(e.ultimo_error) });
     } else if (horas > HORAS_SYNC_OBSOLETO) {
       problemas.push({
         proyecto: p,

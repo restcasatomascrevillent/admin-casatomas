@@ -1,64 +1,96 @@
-# sync-trafico-web — checklist de despliegue
+# sync-trafico-web — despliegue
 
-Estado: **código listo, SIN desplegar**. Nada de lo de abajo está hecho.
-El orden importa: migración -> secrets -> deploy -> Vault -> primer run.
+Lee Vercel Web Analytics de las dos webs y lo guarda en `trafico_web_diario`,
+`trafico_web_desglose` y `trafico_web_sync_estado`. La llama el job de pg_cron
+`sync-trafico-web` a las 03:30 UTC con la cabecera `x-webhook-secret` (Vault).
 
-## 0. Requisitos previos
-- [ ] `<Analytics />` desplegado en casa-tomas-story y touza-restaurant-website, y Web Analytics activado en ambos proyectos de Vercel.
-- [ ] Token **personal** de Vercel con acceso al team `team_wUrFe4kT5oMBrGSl6b3Gvl9Z`.
-      El token del conector MCP de Vercel da 404 en `/v1/query/web-analytics`: no sirve.
-      Comprobación manual (no pegar el token en ningún fichero del repo):
-      `curl -H "Authorization: Bearer $TOKEN" "https://api.vercel.com/v1/query/web-analytics/visits/aggregate?teamId=team_wUrFe4kT5oMBrGSl6b3Gvl9Z&projectId=prj_c2Wks17JsKHSG5slQ8zRlLI5Vkgu&since=<ayer>&until=<ayer>&by=day&limit=100"`
-      -> 200 con `data:[{timestamp, visitors, pageviews}]`. **Anotar qué devuelve `by=day` solo** (no verificado; si da 400, la función cae a sumar rutas y el total es cota inferior).
+| Slug guardado | Proyecto de Vercel (equipo "Casa tomas", `team_18KKVg7ueSX0PL4Ycy1QakZj`) |
+|---|---|
+| `casa-tomas-story` | `web-casatomas` · `prj_0sGVG2CWWPpZWwy1zrr0nCPftcYQ` |
+| `touza-restaurant-website` | `touza-casatomas` · `prj_rV4u5MRropGlLxSVPCCJV8kbwkgv` |
 
-## 1. Migración (Fase 1)
-- [ ] `supabase db query --linked -f supabase/migrations/20260923200000_trafico_web.sql` (demo primero; nunca `db push`).
-      El job `sync-trafico-web` queda creado pero MUDO (no hay secreto en Vault todavía).
+Los IDs están fijos en `sync.ts` (`PROYECTOS`) y `vercel.ts` (`VERCEL_TEAM_ID`).
 
-## 2. Secrets de la Edge Function
-- [ ] Generar un valor aleatorio largo para el cron (p.ej. `openssl rand -hex 32`).
-- [ ] `supabase secrets set VERCEL_ANALYTICS_TOKEN=<token personal>`
-- [ ] `supabase secrets set TRAFICO_WEB_CRON_SECRET=<valor aleatorio>`
-- [ ] `supabase secrets list` muestra las dos (sin valores).
-- Si falta `TRAFICO_WEB_CRON_SECRET` la función responde 500 a todo (fail closed). Si falta `VERCEL_ANALYTICS_TOKEN`, 500 tras autenticar.
+## Por qué dejó de funcionar tras la migración de cuenta (27-10-2026)
 
-## 3. Deploy
-- [ ] `supabase/config.toml` tiene `[functions.sync-trafico-web] verify_jwt = false` (ya añadido).
-- [ ] `supabase functions deploy sync-trafico-web`
-- [ ] Prueba de humo sin cabecera -> **401**:
-      `curl -i -X POST https://<project-ref>.supabase.co/functions/v1/sync-trafico-web`
+Desde el primer cron en el proyecto nuevo (28-10, 03:30 UTC) Vercel responde
+`400 web_analytics_not_enabled — Web Analytics is not enabled for this project`
+a los dos proyectos: se crearon en el equipo nuevo **sin Web Analytics
+activado**. El token, el secreto del cron y el job de PROD están bien. Con
+Web Analytics apagado Vercel no guarda las visitas: **los días en que estuvo
+apagado no se pueden recuperar**, ni con el backfill de 30 días.
 
-## 4. Vault (enciende el cron) — SOLO después del deploy
-- [ ] `select vault.create_secret('<MISMO valor que TRAFICO_WEB_CRON_SECRET>', 'trafico_web_cron_secret');`
+## Orden de despliegue (DEMO primero, después PROD)
 
-## 5. Primer run manual (backfill de 30 días, límite Hobby = 31)
-- [ ] Lanzar:
-      ```sql
-      select net.http_post(
-        url := 'https://<project-ref>.supabase.co/functions/v1/sync-trafico-web',
-        headers := jsonb_build_object('Content-Type','application/json',
-          'x-webhook-secret',(select decrypted_secret from vault.decrypted_secrets where name='trafico_web_cron_secret')),
-        body := '{}'::jsonb, timeout_milliseconds := 55000);
-      ```
-- [ ] Respuesta (`select status_code, content from net._http_response order by created desc limit 1;`): 200, `backfill:true`, `dias:30`, `total_origen` (`by_day` esperado; si sale `suma_rutas`, `by=day` solo no está soportado).
-- [ ] `select * from public.trafico_web_sync_estado;` -> 2 filas, `fallos_consecutivos=0`, `ultimo_error` NULL, `dias_ultimo_sync=30`.
-- [ ] `select proyecto, count(*), min(fecha), max(fecha) from public.trafico_web_diario where ruta='*' group by 1;` -> 30 días por proyecto, hasta ayer (UTC).
+El orden importa: si se activa Web Analytics con la versión anterior de la
+función desplegada, guardará como «0 visitas» los días en que estuvo apagado.
 
-## 6. Idempotencia (tarea 2.5)
-- [ ] Anotar `select count(*) from trafico_web_diario` y `... trafico_web_desglose`.
-- [ ] Relanzar el paso 5 -> los dos recuentos NO cambian (ahora es run normal de 3 días; upsert por PK).
+1. Migración `supabase/migrations/20261101093700_trafico_web_datos_desde.sql`
+   (columna `datos_desde`, sembrada con el 01-11-2026). Nunca `db push`.
+2. Desplegar la función (lee `datos_desde`):
+   `npx supabase functions deploy sync-trafico-web --project-ref <ref>`
+   (`supabase/config.toml` ya tiene `verify_jwt = false`).
+3. Solo la DEMO, o PROD cuando exista `project_url` en Vault: migración
+   `20261101093800_trafico_web_cron_url_desde_vault.sql`. En la DEMO crea el
+   job (no existía); en PROD lo reescribe sin la URL en duro. Falla sin
+   cambiar nada si falta `project_url` o `trafico_web_cron_secret` en Vault.
+4. Secrets que tiene que tener la función (`npx supabase secrets list --project-ref <ref>`):
+   `TRAFICO_WEB_CRON_SECRET` (mismo valor que el secreto de Vault
+   `trafico_web_cron_secret`) y `VERCEL_ANALYTICS_TOKEN` (token personal de
+   alguien del equipo "Casa tomas", con ese equipo como *scope*; el token del
+   conector MCP da 404 en esta API).
+5. El dueño activa Web Analytics en `web-casatomas` y `touza-casatomas` y
+   vuelve a desplegar las dos webs (las dos ya llevan `@vercel/analytics`).
+6. Run manual (sin esperar al cron):
+   ```sql
+   select net.http_post(
+     url := (select rtrim(decrypted_secret, '/') from vault.decrypted_secrets where name = 'project_url')
+            || '/functions/v1/sync-trafico-web',
+     headers := jsonb_build_object('Content-Type', 'application/json',
+       'x-webhook-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'trafico_web_cron_secret')),
+     body := '{}'::jsonb, timeout_milliseconds := 55000);
+   -- (en PROD, sin project_url, poner la URL https://haqmmdfdzzatdnrrcgez.supabase.co/functions/v1/sync-trafico-web)
+   select status_code, content from net._http_response order by created desc limit 1;
+   select proyecto, ultimo_ok_en, ultimo_error, fallos_consecutivos, datos_desde from public.trafico_web_sync_estado;
+   ```
+   Antes del paso 5: 502 y `ultimo_error` = «Web Analytics está desactivado
+   en el proyecto … de Vercel…». Después: 200, `ultimo_error` NULL,
+   `fallos_consecutivos` 0. El mismo día de activarlo no hay ningún día
+   cerrado que traer (`dias: 0`): la función solo comprueba el acceso. Los
+   datos llegan con el cron de la noche siguiente.
 
-## 7. Cron
-- [ ] `select jobname, schedule, active from cron.job where jobname='sync-trafico-web';` -> 1 fila, `30 3 * * *`.
-- [ ] Al día siguiente: `ultimo_ok_en` de hoy ~03:30 UTC.
+## Comportamiento
 
-## Comportamiento ante fallos (para no alarmarse)
-- 429/5xx/red: hasta 3 intentos por llamada (backoff 1 s, 2 s; respeta Retry-After ≤ 10 s). 400 no se reintenta.
+- Rango: últimos 3 días cerrados; tras una caída, desde el último éxito − 2
+  días, como mucho 30 días atrás (Hobby da 31). Nunca antes de `PRIMER_DIA`
+  (27-10-2026, corte) ni de `datos_desde` del proyecto.
+- `datos_desde`: primer día en que Vercel puede tener datos. Cada intento que
+  encuentra Web Analytics apagado lo sube a ese día. La API rellena con 0 los
+  días sin datos, así que sin este suelo esos días saldrían como 0 visitas en
+  vez de como hueco. El día de la activación queda parcial (desde esa hora);
+  si se activa entre las 00:00 y las 03:30 UTC, el día anterior puede quedar a 0.
+- 429/5xx/red: hasta 3 intentos por llamada (backoff 1 s, 2 s; respeta
+  Retry-After ≤ 10 s). 400 no se reintenta. Con `web_analytics_not_enabled`
+  corta tras la primera consulta.
 - Un proyecto que falla no bloquea al otro: HTTP 207 (uno) o 502 (los dos).
-- En fallo: `ultimo_error`, `fallos_consecutivos+1`, `ultimo_ok_en` se conserva. Aviso en la campana (`notificaciones_dashboard`, tipo `sistema`, título `Tráfico web: ...`), máximo 1 por día UTC.
-- Tras una caída de varios días, el siguiente run amplía el rango para cubrir el hueco (hasta 30 días atrás; lo anterior se pierde por el límite Hobby).
+- En fallo: `ultimo_error`, `fallos_consecutivos+1`, se conserva `ultimo_ok_en`.
+  Aviso en la campana (`notificaciones_dashboard`, tipo `sistema`, título
+  `Tráfico web: ...`), máximo 1 por día UTC. El panel traduce el error de Web
+  Analytics desactivado a qué hay que hacer.
+
+## Si se activó Web Analytics antes de desplegar esta versión
+
+La versión anterior habrá guardado ceros desde el 27-10 hasta el día de
+activarlo. Para dejarlos como hueco (sustituir `<día anterior a activarlo>`):
+
+```sql
+delete from public.trafico_web_diario   where fecha between '2026-10-27' and '<día anterior a activarlo>';
+delete from public.trafico_web_desglose where fecha between '2026-10-27' and '<día anterior a activarlo>';
+```
 
 ## Rollback
-- `select cron.unschedule('sync-trafico-web');` y borrar el secreto de Vault.
-- `supabase functions delete sync-trafico-web`; `supabase secrets unset VERCEL_ANALYTICS_TOKEN TRAFICO_WEB_CRON_SECRET`.
-- Tablas/RPC: ver ROLLBACK al final de la migración.
+
+- Función: volver a desplegar la versión anterior.
+- Migraciones, a mano y en este orden: `supabase/rollbacks/20261101093800_trafico_web_cron_url_desde_vault_ROLLBACK.sql`
+  y, con la función anterior ya desplegada, `supabase/rollbacks/20261101093700_trafico_web_datos_desde_ROLLBACK.sql`.
+- Apagarlo del todo: `select cron.unschedule('sync-trafico-web');`.
