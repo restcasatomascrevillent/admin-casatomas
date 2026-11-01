@@ -7,6 +7,7 @@ import {
   menuEnIdioma,
   menuTieneContenido,
   parseMenuDia,
+  rotuloEnLaWeb,
   serializarMenuDia,
   textoDeSeccion,
   type ItemMenu,
@@ -238,5 +239,104 @@ describe("textoDeSeccion y menuTieneContenido", () => {
     const vacio: Record<string, ItemMenu[]> = { primero: [], segundo: [], postre: [] };
     expect(menuTieneContenido(vacio as never)).toBe(false);
     expect(menuTieneContenido({ ...vacio, postre: [itemLibre("Flan")] } as never)).toBe(true);
+  });
+});
+
+describe("entrante del menú del día (01/11/2026)", () => {
+  it("da la vuelta completa con el entrante delante del primero", () => {
+    const secciones = {
+      entrante: [itemLibre("Gilda"), itemDesdePlato(platoCarta)],
+      primero: [itemLibre("Sopa")],
+      segundo: [],
+      postre: [],
+    };
+    const json = serializarMenuDia(secciones);
+
+    // Espejo heredado también para el entrante: quien no lo conozca lo ignora.
+    expect(json.entrante).toBe("Gilda\nPulpo a feira");
+    expect((json.secciones as Record<string, unknown>).entrante).toEqual(secciones.entrante);
+
+    const leido = parseMenuDia(json);
+    expect(leido.version).toBe(2);
+    expect(leido.secciones.entrante).toEqual(secciones.entrante);
+    expect(leido.secciones.primero[0].nombre).toBe("Sopa");
+  });
+
+  it("un menú con solo entrante también es estructurado y tiene contenido", () => {
+    const leido = parseMenuDia(serializarMenuDia({ entrante: [itemLibre("Gilda")], primero: [], segundo: [], postre: [] }));
+    expect(leido.version).toBe(2);
+    expect(menuTieneContenido(leido.secciones)).toBe(true);
+  });
+
+  it("los menús de antes se leen con el entrante vacío", () => {
+    expect(parseMenuDia({ primero: "Sopa", segundo: "", postre: "" }).secciones.entrante).toEqual([]);
+    const v2 = parseMenuDia({ v: 2, secciones: { primero: [{ id: "a", nombre: "Sopa" }], segundo: [], postre: [] } });
+    expect(v2.secciones.entrante).toEqual([]);
+  });
+
+  it("el espejo heredado lee también el entrante", () => {
+    const menu = parseMenuDia({ entrante: "Gilda\nBoquerones", primero: "Sopa", segundo: "", postre: "" });
+    expect(menu.secciones.entrante.map((i) => i.nombre)).toEqual(["Gilda", "Boquerones"]);
+  });
+
+  it("se traduce como las demás secciones", () => {
+    const gilda = itemLibre("Gilda");
+    const traducido = menuEnIdioma(
+      { entrante: [gilda], primero: [], segundo: [], postre: [] },
+      new Map([[gilda.id, { nombre: "Gilda skewer", descripcion: null }]]),
+    );
+    expect(traducido.entrante[0].nombre).toBe("Gilda skewer");
+  });
+});
+
+describe("postre o café configurable (01/11/2026)", () => {
+  const conPostre = { primero: [itemLibre("Sopa")], segundo: [], postre: [itemLibre("Flan")] };
+
+  it("un menú guardado antes de la opción no la tiene elegida (null)", () => {
+    expect(parseMenuDia({ primero: "Sopa", segundo: "", postre: "Flan" }).postreCafe).toBeNull();
+    expect(parseMenuDia(serializarMenuDia(conPostre)).postreCafe).toBeNull();
+  });
+
+  it("sin pasarla no se escribe la clave: la web sigue pintando «Postre»", () => {
+    expect(serializarMenuDia(conPostre)).not.toHaveProperty("postreCafe");
+  });
+
+  it("se guarda y se vuelve a leer", () => {
+    for (const opcion of ["postre", "postre_o_cafe", "postre_y_cafe"] as const) {
+      const json = serializarMenuDia(conPostre, opcion);
+      expect(json.postreCafe).toBe(opcion);
+      expect(parseMenuDia(json).postreCafe).toBe(opcion);
+    }
+  });
+
+  it("un valor desconocido se lee como no elegido", () => {
+    expect(parseMenuDia({ ...serializarMenuDia(conPostre), postreCafe: "cafe_solo" }).postreCafe).toBeNull();
+  });
+});
+
+describe("rotuloEnLaWeb — lo que pinta la web en castellano", () => {
+  const vacio = { entrante: [], primero: [], segundo: [], postre: [] } as Record<string, ItemMenu[]>;
+  const base = { ...vacio, primero: [itemLibre("Sopa")], segundo: [itemLibre("Merluza")], postre: [itemLibre("Flan")] };
+
+  it("sin entrante, lo de siempre: Entrantes, Principales y Postre", () => {
+    const secciones = base as never;
+    expect(rotuloEnLaWeb("primero", secciones, null)).toBe("Entrantes");
+    expect(rotuloEnLaWeb("segundo", secciones, null)).toBe("Principales");
+    expect(rotuloEnLaWeb("postre", secciones, null)).toBe("Postre");
+    expect(rotuloEnLaWeb("postre", { ...base, postre: [itemLibre("Flan"), itemLibre("Natillas")] } as never, "postre")).toBe(
+      "Postres",
+    );
+  });
+
+  it("con entrante: Entrantes, Primeros y Segundos", () => {
+    const secciones = { ...base, entrante: [itemLibre("Gilda")] } as never;
+    expect(rotuloEnLaWeb("entrante", secciones, null)).toBe("Entrantes");
+    expect(rotuloEnLaWeb("primero", secciones, null)).toBe("Primeros");
+    expect(rotuloEnLaWeb("segundo", secciones, null)).toBe("Segundos");
+  });
+
+  it("el postre según «¿Qué entra?»", () => {
+    expect(rotuloEnLaWeb("postre", base as never, "postre_o_cafe")).toBe("Postre o café");
+    expect(rotuloEnLaWeb("postre", base as never, "postre_y_cafe")).toBe("Postre y café");
   });
 });

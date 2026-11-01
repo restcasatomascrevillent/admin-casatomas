@@ -40,16 +40,98 @@
 
 import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
 
-/** Las tres secciones del menú, en el orden en que se sirven. */
+/**
+ * Las tres secciones de siempre, en el orden en que se sirven. Son también las
+ * fijas del menú de una novedad (`menu-novedad.ts`), que añade las suyas aparte
+ * con las secciones de nombre libre.
+ */
 export const SECCIONES_MENU = ["primero", "segundo", "postre"] as const;
 export type SeccionMenu = (typeof SECCIONES_MENU)[number];
 
-/** Rótulo de cada sección en el panel. "Postre o café" es el de siempre. */
-export const ETIQUETA_SECCION: Record<SeccionMenu, string> = {
+/**
+ * El menú del día lleva además un ENTRANTE opcional delante del primero
+ * (petición del dueño, 01/11/2026: «faltaría opción de entrante»). Es un tiempo
+ * fijo y no una sección de nombre libre como las de las novedades: el menú del
+ * día se rellena cada día desde el móvil y un tiempo que ya está ahí, vacío
+ * hasta que se le pone algo, es un toque menos que «añadir sección, ponerle
+ * nombre, elegir dónde va». Vacío no sale en la web: eso es «desactivarlo».
+ */
+export const SECCIONES_MENU_DIA = ["entrante", ...SECCIONES_MENU] as const;
+export type SeccionMenuDia = (typeof SECCIONES_MENU_DIA)[number];
+
+/** Las cuatro secciones del menú del día, ya normalizadas. */
+export type SeccionesMenuDia = Record<SeccionMenuDia, ItemMenu[]>;
+
+/**
+ * Lo que aceptan las funciones de este fichero: el entrante es opcional para
+ * que quien solo conoce primero/segundo/postre (el menú de una novedad, los
+ * tests de antes) siga funcionando igual.
+ */
+export type EntradaSeccionesMenu = Record<SeccionMenu, ItemMenu[]> & Partial<Record<"entrante", ItemMenu[]>>;
+
+/** Rótulo de cada sección en el editor del panel. */
+export const ETIQUETA_SECCION: Record<SeccionMenuDia, string> = {
+  entrante: "Entrante",
   primero: "Primero",
   segundo: "Segundo",
-  postre: "Postre o café",
+  postre: "Postre",
 };
+
+/**
+ * Qué entra en el postre del menú del día y, por tanto, cómo se titula la
+ * sección en la web (petición del dueño, 01/11/2026: «en nuestro menú entran
+ * las 2 cosas, que se pueda configurar»). Va en `menu.postreCafe`.
+ *
+ * - `postre`: lo de siempre; la web pone «Postre» (o «Postres» con varios).
+ *   Es lo que vale para los menús guardados antes de existir la opción, así
+ *   que ninguno cambia en la web hasta que el dueño lo cambie.
+ * - `postre_o_cafe`: «Postre o café».
+ * - `postre_y_cafe`: «Postre y café».
+ */
+export const OPCIONES_POSTRE_CAFE = ["postre", "postre_o_cafe", "postre_y_cafe"] as const;
+export type PostreCafe = (typeof OPCIONES_POSTRE_CAFE)[number];
+
+export const ETIQUETA_POSTRE_CAFE: Record<PostreCafe, string> = {
+  postre: "Postre",
+  postre_o_cafe: "Postre o café",
+  postre_y_cafe: "Postre y café",
+};
+
+/**
+ * La de un menú NUEVO cuando ningún menú guardado la tiene elegida: el dueño
+ * dijo que en su menú entran las dos cosas. Después, cada menú nuevo arranca
+ * con la del último que la tenga (ver `EditorMenuTapasWeb`).
+ */
+export const POSTRE_CAFE_POR_DEFECTO: PostreCafe = "postre_y_cafe";
+
+export const esPostreCafe = (valor: unknown): valor is PostreCafe =>
+  typeof valor === "string" && (OPCIONES_POSTRE_CAFE as readonly string[]).includes(valor);
+
+/**
+ * Título de cada sección TAL Y COMO LO PINTA LA WEB en castellano (la vista
+ * previa del panel lo imita; `CartaDelDia` de casa-tomas-story es la fuente):
+ * sin entrante, el primero sale como «Entrantes» y el segundo como
+ * «Principales», que es lo que se ve hoy; con entrante, «Entrantes»,
+ * «Primeros» y «Segundos». El postre, según `postreCafe`.
+ */
+export function rotuloEnLaWeb(
+  seccion: SeccionMenuDia,
+  secciones: EntradaSeccionesMenu,
+  postreCafe: PostreCafe | null,
+): string {
+  const conEntrante = (secciones.entrante ?? []).length > 0;
+  switch (seccion) {
+    case "entrante":
+      return "Entrantes";
+    case "primero":
+      return conEntrante ? "Primeros" : "Entrantes";
+    case "segundo":
+      return conEntrante ? "Segundos" : "Principales";
+    case "postre":
+      if (postreCafe === "postre_o_cafe" || postreCafe === "postre_y_cafe") return ETIQUETA_POSTRE_CAFE[postreCafe];
+      return secciones.postre.length > 1 ? "Postres" : "Postre";
+  }
+}
 
 /** Una línea del menú, tal y como se guarda en BD. */
 export interface ItemMenu {
@@ -77,7 +159,13 @@ export interface ItemMenu {
 export interface MenuEstructurado {
   /** 1 = los tres textos libres de siempre; 2 = con items estructurados. */
   version: 1 | 2;
-  secciones: Record<SeccionMenu, ItemMenu[]>;
+  secciones: SeccionesMenuDia;
+  /**
+   * Qué entra en el postre. `null` = el menú se guardó antes de existir la
+   * opción: se edita y se pinta como `postre`, pero no cuenta como elegida a
+   * la hora de proponer la de un menú nuevo.
+   */
+  postreCafe: PostreCafe | null;
 }
 
 /** Variante de un item en otro idioma: es lo único que cambia al traducir. */
@@ -109,7 +197,8 @@ export const nuevoIdItem = (): string => {
   return `item-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 };
 
-const seccionesVacias = (): Record<SeccionMenu, ItemMenu[]> => ({
+export const seccionesMenuDiaVacias = (): SeccionesMenuDia => ({
+  entrante: [],
   primero: [],
   segundo: [],
   postre: [],
@@ -224,26 +313,28 @@ export function parseMenuDia(valor: unknown): MenuEstructurado {
     payload = valor as Record<string, unknown>;
   }
 
-  const secciones = seccionesVacias();
+  const secciones = seccionesMenuDiaVacias();
   const crudas = payload.secciones;
+  // Sin la clave (menús de antes de la opción) o con un valor raro: null.
+  const postreCafe = esPostreCafe(payload.postreCafe) ? payload.postreCafe : null;
 
   if (crudas && typeof crudas === "object" && !Array.isArray(crudas)) {
     const mapa = crudas as Record<string, unknown>;
     let hayAlguno = false;
-    for (const seccion of SECCIONES_MENU) {
+    for (const seccion of SECCIONES_MENU_DIA) {
       const lista = mapa[seccion];
       if (!Array.isArray(lista)) continue;
       const items = lista.map(parseItemMenu).filter((item): item is ItemMenu => item !== null);
       secciones[seccion] = items;
       if (items.length > 0) hayAlguno = true;
     }
-    if (hayAlguno) return { version: 2, secciones };
+    if (hayAlguno) return { version: 2, secciones, postreCafe };
   }
 
   // Camino heredado. OJO: aquí sí se parte por "\n". La web lo hacía mal
   // (`normalizeMenuItems` devolvía el texto entero como un único elemento), así
   // que dos platos en dos líneas se pintaban como un solo bloque.
-  for (const seccion of SECCIONES_MENU) {
+  for (const seccion of SECCIONES_MENU_DIA) {
     const bruto = payload[seccion] ?? payload[`${seccion}s`];
     const lineas = Array.isArray(bruto)
       ? bruto.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean)
@@ -251,16 +342,26 @@ export function parseMenuDia(valor: unknown): MenuEstructurado {
     secciones[seccion] = lineas.map((linea) => itemLibre(linea));
   }
 
-  return { version: 1, secciones };
+  return { version: 1, secciones, postreCafe };
 }
 
 /** Nombres de una sección unidos por salto de línea (el espejo heredado). */
 export const textoDeSeccion = (items: ItemMenu[]): string =>
   items.map((item) => item.nombre).filter(Boolean).join("\n");
 
+/** Las cuatro secciones, con el entrante vacío si no venía. */
+export const completarSecciones = (secciones: EntradaSeccionesMenu): SeccionesMenuDia => ({
+  entrante: secciones.entrante ?? [],
+  primero: secciones.primero,
+  segundo: secciones.segundo,
+  postre: secciones.postre,
+});
+
 /** ¿Hay algo que guardar? */
-export const menuTieneContenido = (secciones: Record<SeccionMenu, ItemMenu[]>): boolean =>
-  SECCIONES_MENU.some((seccion) => secciones[seccion].length > 0);
+export const menuTieneContenido = (secciones: EntradaSeccionesMenu): boolean => {
+  const completas = completarSecciones(secciones);
+  return SECCIONES_MENU_DIA.some((seccion) => completas[seccion].length > 0);
+};
 
 /**
  * Construye el jsonb que se escribe en BD.
@@ -268,18 +369,29 @@ export const menuTieneContenido = (secciones: Record<SeccionMenu, ItemMenu[]>): 
  * Escribe SIEMPRE el espejo v1 (`primero`/`segundo`/`postre` con los nombres
  * unidos por "\n") además de `secciones`. Es lo que permite desplegar el panel
  * y la web por separado sin romper nada, y lo que protege a cualquier otro
- * consumidor que solo conozca el formato viejo.
+ * consumidor que solo conozca el formato viejo. El entrante va igual
+ * (`entrante` y `secciones.entrante`): quien no lo conozca lo ignora.
+ *
+ * `postreCafe` solo se escribe si se pasa; sin él la web pinta «Postre», lo
+ * mismo que con `postre`.
  */
-export function serializarMenuDia(secciones: Record<SeccionMenu, ItemMenu[]>): Record<string, unknown> {
+export function serializarMenuDia(
+  secciones: EntradaSeccionesMenu,
+  postreCafe?: PostreCafe,
+): Record<string, unknown> {
+  const completas = completarSecciones(secciones);
   return {
     v: 2,
-    primero: textoDeSeccion(secciones.primero),
-    segundo: textoDeSeccion(secciones.segundo),
-    postre: textoDeSeccion(secciones.postre),
+    entrante: textoDeSeccion(completas.entrante),
+    primero: textoDeSeccion(completas.primero),
+    segundo: textoDeSeccion(completas.segundo),
+    postre: textoDeSeccion(completas.postre),
+    ...(postreCafe ? { postreCafe } : {}),
     secciones: {
-      primero: secciones.primero,
-      segundo: secciones.segundo,
-      postre: secciones.postre,
+      entrante: completas.entrante,
+      primero: completas.primero,
+      segundo: completas.segundo,
+      postre: completas.postre,
     },
   };
 }
@@ -290,12 +402,13 @@ export function serializarMenuDia(secciones: Record<SeccionMenu, ItemMenu[]>): R
  * variante se quedan en español, que es mejor que dejarlos en blanco.
  */
 export function menuEnIdioma(
-  secciones: Record<SeccionMenu, ItemMenu[]>,
+  secciones: EntradaSeccionesMenu,
   variantes: Map<string, VarianteIdioma>,
-): Record<SeccionMenu, ItemMenu[]> {
-  const resultado = seccionesVacias();
-  for (const seccion of SECCIONES_MENU) {
-    resultado[seccion] = secciones[seccion].map((item) => {
+): SeccionesMenuDia {
+  const completas = completarSecciones(secciones);
+  const resultado = seccionesMenuDiaVacias();
+  for (const seccion of SECCIONES_MENU_DIA) {
+    resultado[seccion] = completas[seccion].map((item) => {
       const variante = variantes.get(item.id);
       if (!variante || !variante.nombre) return item;
       return { ...item, nombre: variante.nombre, descripcion: variante.descripcion };

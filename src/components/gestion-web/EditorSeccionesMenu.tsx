@@ -12,18 +12,28 @@
 //
 // Los alérgenos salen de `src/lib/alergenos.ts` (los 14 de la UE + los
 // personalizados que ya usa la carta). No hay aquí un sistema paralelo.
+//
+// Menos scroll (petición del dueño, 01/11/2026: «hay que hacer mucho scroll»):
+//   - Cada plato ocupa UNA fila: foto, nombre y un botón «⋮» con Alérgenos,
+//     Subir, Bajar y Quitar. Antes los cuatro botones no cabían junto al nombre
+//     en el móvil y bajaban a una segunda fila en cada plato.
+//   - Con `plegable`, cada sección se pliega a una cabecera con su resumen
+//     («Segundo · 3 platos» y sus nombres). El menú del día la usa.
 // ---------------------------------------------------------------------------
 
-import { type ReactNode, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
+import { PopoverAnchor } from "@radix-ui/react-popover";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Camera,
   ChevronDown,
-  ChevronUp,
   ImageOff,
   ImagePlus,
   Info,
   Loader2,
+  MoreVertical,
   Pencil,
   Plus,
   RefreshCw,
@@ -34,11 +44,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverContent } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
@@ -51,26 +62,28 @@ import {
   itemLibre,
   type ItemMenu,
   type SeccionMenu,
+  type SeccionMenuDia,
 } from "@/lib/menu-dia";
 import { ACCEPT_FOTO_MENU, subirFotoMenu, validarFotoMenu } from "@/lib/foto-menu-dia";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 import { posicionImagen } from "./previewConstants";
 import { SelectorPlato } from "./SelectorPlato";
 
-type Secciones = Record<SeccionMenu, ItemMenu[]>;
-
 /**
- * Reparto de las tres secciones según el ancho REAL del editor (ver el
- * comentario en `EditorSeccionesMenu`). Van como clases literales completas
- * para que Tailwind las genere.
+ * Reparto de las secciones según el ancho REAL del editor (ver el comentario
+ * en `EditorSeccionesMenu`). Van como clases literales completas para que
+ * Tailwind las genere.
  *
  * - `CONTENEDOR_SECCIONES`: el envoltorio es un *query container* de ancho.
  *   La contención de tamaño en línea hace además que su ancho NO dependa de lo
  *   que lleve dentro: nunca puede ensancharse con las secciones.
  * - `REJILLA_SECCIONES`: una columna; tres cuando el envoltorio mide ≥62rem.
+ * - `REJILLA_CUATRO_SECCIONES` (menú del día con entrante): una columna;
+ *   cuatro a partir de ≥82rem (4 × 320px + 3 huecos). Nunca 3 + 1.
  */
 const CONTENEDOR_SECCIONES = "[container-type:inline-size]";
 const REJILLA_SECCIONES = "grid grid-cols-1 gap-3 [@container(min-width:62rem)]:grid-cols-3";
+const REJILLA_CUATRO_SECCIONES = "grid grid-cols-1 items-start gap-3 [@container(min-width:82rem)]:grid-cols-4";
 
 // ---------------------------------------------------------------------------
 // Miniatura
@@ -287,15 +300,20 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
 interface EditorAlergenosProps {
   item: ItemMenu;
   onChange: (alergenos: string[]) => void;
+  abierto: boolean;
+  onAbiertoChange: (abierto: boolean) => void;
+  /** Dónde se ancla el desplegable (el botón «⋮» de la línea). */
+  ancla: ReactNode;
+  /** Al cerrarse, el foco vuelve aquí (no hay disparador propio al que volver). */
+  alCerrar: () => void;
 }
 
 /**
  * Los 14 oficiales como interruptores + los personalizados como texto. Es la
  * misma gramática que `PlatoForm`, para que quien edita la carta no tenga que
- * aprender dos interfaces.
+ * aprender dos interfaces. Se abre desde «Alérgenos…» del menú «⋮» del plato.
  */
-function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
-  const [abierto, setAbierto] = useState(false);
+function EditorAlergenos({ item, onChange, abierto, onAbiertoChange, ancla, alCerrar }: EditorAlergenosProps) {
   const [nuevo, setNuevo] = useState("");
 
   const seleccionados = item.alergenos;
@@ -320,21 +338,16 @@ function EditorAlergenos({ item, onChange }: EditorAlergenosProps) {
   const quitar = (valor: string) => onChange(seleccionados.filter((a) => a !== valor));
 
   return (
-    <Popover open={abierto} onOpenChange={setAbierto}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-11 gap-1.5 px-3 text-xs"
-          aria-label={`Alérgenos de ${item.nombre || "este plato"}`}
-        >
-          <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-          Alérgenos
-        </Button>
-      </PopoverTrigger>
+    <Popover open={abierto} onOpenChange={onAbiertoChange}>
+      <PopoverAnchor asChild>{ancla}</PopoverAnchor>
       <PopoverContent
         align="end"
         collisionPadding={12}
+        aria-label={`Alérgenos de ${item.nombre || "este plato"}`}
+        onCloseAutoFocus={(e) => {
+          e.preventDefault();
+          alCerrar();
+        }}
         className="w-[min(20rem,calc(100vw-1.5rem))] max-h-[var(--radix-popover-content-available-height)] space-y-3 overflow-y-auto"
       >
         <div>
@@ -445,6 +458,15 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
   const enlazado = item.origen === "carta" && item.platoId !== null;
   const desaparecido = enlazado && !platoActual;
   const desactualizado = difiereDeLaCarta(item, platoActual);
+  const nombre = item.nombre.trim() || "este plato";
+
+  // «Alérgenos…» se elige en el menú «⋮», pero el desplegable de alérgenos no
+  // puede abrirse mientras ese menú se cierra: el menú devuelve el foco a su
+  // botón y el desplegable, al perderlo, se cerraría solo. Se abre cuando el
+  // menú ya ha terminado de cerrarse (`onCloseAutoFocus`).
+  const [alergenosAbiertos, setAlergenosAbiertos] = useState(false);
+  const abrirAlergenosAlCerrar = useRef(false);
+  const opcionesRef = useRef<HTMLButtonElement>(null);
 
   const actualizarDesdeLaCarta = () => {
     if (!platoActual) return;
@@ -467,7 +489,7 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
         <Miniatura item={item} />
       )}
 
-      <div className="min-w-[8rem] flex-1 space-y-1">
+      <div className="min-w-[6rem] flex-1 space-y-1">
         {item.origen === "libre" ? (
           <Input
             value={item.nombre}
@@ -524,52 +546,83 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
         )}
       </div>
 
-      {/* Si no cabe junto al nombre, los botones pasan a una segunda línea
-          (en vez de aplastar el nombre). Cada uno mide 44x44, también en táctil. */}
-      <div className="ml-auto flex shrink-0 items-center">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11"
-          disabled={indice === 0}
-          onClick={() => onMover(-1)}
-          aria-label="Subir"
-        >
-          <ChevronUp className="h-5 w-5" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11"
-          disabled={indice === total - 1}
-          onClick={() => onMover(1)}
-          aria-label="Bajar"
-        >
-          <ChevronDown className="h-5 w-5" />
-        </Button>
-
-        <EditorAlergenos item={item} onChange={(alergenos) => onCambiar({ ...item, alergenos })} />
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-11 w-11 text-destructive hover:text-destructive"
-          onClick={onQuitar}
-          aria-label={`Quitar ${item.nombre || "plato"}`}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+      {/* Un solo botón de 44x44 con todo lo demás: así cabe junto al nombre
+          también en un móvil de 375px y cada plato ocupa una sola fila. */}
+      <EditorAlergenos
+        item={item}
+        onChange={(alergenos) => onCambiar({ ...item, alergenos })}
+        abierto={alergenosAbiertos}
+        onAbiertoChange={setAlergenosAbiertos}
+        alCerrar={() => opcionesRef.current?.focus()}
+        ancla={
+          <div className="ml-auto shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  ref={opcionesRef}
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11"
+                  aria-label={`Opciones de ${nombre}`}
+                >
+                  <MoreVertical className="h-5 w-5" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onCloseAutoFocus={(e) => {
+                  if (!abrirAlergenosAlCerrar.current) return;
+                  abrirAlergenosAlCerrar.current = false;
+                  e.preventDefault();
+                  setAlergenosAbiertos(true);
+                }}
+              >
+                <DropdownMenuItem
+                  onSelect={() => {
+                    abrirAlergenosAlCerrar.current = true;
+                  }}
+                  className="min-h-11 text-base md:text-sm"
+                >
+                  <Pencil className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+                  Alérgenos…
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={indice === 0}
+                  onSelect={() => onMover(-1)}
+                  className="min-h-11 text-base md:text-sm"
+                >
+                  <ArrowUp className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+                  Subir
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={indice === total - 1}
+                  onSelect={() => onMover(1)}
+                  className="min-h-11 text-base md:text-sm"
+                >
+                  <ArrowDown className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+                  Bajar
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={onQuitar}
+                  className="min-h-11 text-base text-destructive focus:text-destructive md:text-sm"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+                  Quitar del menú
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        }
+      />
       {debajo && <div className="basis-full min-w-0 border-t pt-2">{debajo}</div>}
     </li>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Una sección de platos (las tres fijas y las extra del menú de una novedad)
+// Una sección de platos (las fijas y las extra del menú de una novedad)
 // ---------------------------------------------------------------------------
 
 interface SeccionPlatosProps {
@@ -584,6 +637,17 @@ interface SeccionPlatosProps {
   debajoDePlato?: (item: ItemMenu) => ReactNode;
   /** Botones de la cabecera (p. ej. «Quitar sección»). */
   acciones?: ReactNode;
+  /**
+   * La cabecera pliega y despliega la sección. Plegada enseña solo el rótulo,
+   * cuántos platos lleva y sus nombres en una línea. Solo con `titulo` de texto.
+   */
+  plegable?: boolean;
+  /** Con `plegable`: si empieza desplegada. */
+  abiertaAlInicio?: boolean;
+  /** Con `plegable`: lo que pone la cabecera sin platos (por defecto «Sin platos»). */
+  detalleVacia?: string;
+  /** Lo primero de la sección desplegada (p. ej. «¿Qué entra?» del postre). */
+  cabecera?: ReactNode;
 }
 
 export function SeccionPlatos({
@@ -596,26 +660,33 @@ export function SeccionPlatos({
   cargandoPlatos,
   debajoDePlato,
   acciones,
+  plegable = false,
+  abiertaAlInicio = true,
+  detalleVacia = "Sin platos",
+  cabecera,
 }: SeccionPlatosProps) {
+  const [abierta, setAbierta] = useState(!plegable || abiertaAlInicio);
+  const idCuerpo = useId();
   const añadirDeCarta = (plato: PlatoDeCarta) => onChange([...items, itemDesdePlato(plato)]);
   const añadirAMano = () => onChange([...items, itemLibre("")]);
 
-  return (
-    <section data-testid={testId} className="rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0">
-      <header className="flex items-center justify-between gap-2">
-        {typeof titulo === "string" ? <h4 className="text-sm font-semibold">{titulo}</h4> : titulo}
-        <span className="flex shrink-0 items-center gap-1">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {items.length === 1 ? "1 plato" : `${items.length} platos`}
-          </span>
-          {acciones}
-        </span>
-      </header>
+  const recuento = items.length === 1 ? "1 plato" : `${items.length} platos`;
+  const resumen = items
+    .map((item) => item.nombre.trim())
+    .filter(Boolean)
+    .join(" · ");
 
+  const cuerpo = (
+    <>
+      {cabecera}
       {items.length === 0 ? (
-        <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
-          Sin platos todavía
-        </p>
+        // Plegable y vacía ya lo dice la cabecera: el hueco de «Sin platos
+        // todavía» solo añadía alto.
+        plegable ? null : (
+          <p className="rounded-md border border-dashed px-3 py-5 text-center text-xs text-muted-foreground">
+            Sin platos todavía
+          </p>
+        )
       ) : (
         <ul className="space-y-2">
           {items.map((item, indice) => (
@@ -647,17 +718,68 @@ export function SeccionPlatos({
           A mano
         </Button>
       </div>
+    </>
+  );
+
+  if (plegable) {
+    return (
+      <section data-testid={testId} className="rounded-lg border bg-muted/20 px-3 py-1 min-w-0">
+        <header className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-expanded={abierta}
+            aria-controls={abierta ? idCuerpo : undefined}
+            onClick={() => setAbierta((valor) => !valor)}
+            className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-md py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <ChevronDown
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${abierta ? "" : "-rotate-90"}`}
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-sm font-semibold">{titulo}</span>
+                <span className="text-xs text-muted-foreground tabular-nums">
+                  {items.length === 0 ? detalleVacia : recuento}
+                </span>
+              </span>
+              {!abierta && resumen && (
+                <span className="block truncate text-xs text-muted-foreground">{resumen}</span>
+              )}
+            </span>
+          </button>
+          {acciones}
+        </header>
+        {abierta && (
+          <div id={idCuerpo} className="space-y-2.5 pb-2 pt-1">
+            {cuerpo}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  return (
+    <section data-testid={testId} className="rounded-lg border bg-muted/20 p-3 space-y-2.5 min-w-0">
+      <header className="flex items-center justify-between gap-2">
+        {typeof titulo === "string" ? <h4 className="text-sm font-semibold">{titulo}</h4> : titulo}
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="text-xs text-muted-foreground tabular-nums">{recuento}</span>
+          {acciones}
+        </span>
+      </header>
+      {cuerpo}
     </section>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Las tres secciones
+// Las secciones
 // ---------------------------------------------------------------------------
 
-interface EditorSeccionesMenuProps {
-  secciones: Secciones;
-  onChange: (secciones: Secciones) => void;
+interface EditorSeccionesMenuProps<S extends SeccionMenuDia> {
+  secciones: Record<S, ItemMenu[]>;
+  onChange: (secciones: Record<S, ItemMenu[]>) => void;
   platos: PlatoDeCarta[];
   platosPorId: Map<string, PlatoDeCarta>;
   cargandoPlatos: boolean;
@@ -665,34 +787,55 @@ interface EditorSeccionesMenuProps {
    * Opcional: algo debajo de cada plato, dentro de su tarjeta (el menú de una
    * novedad con Maridaje pone ahí la bebida de ese plato).
    */
-  debajoDePlato?: (item: ItemMenu, seccion: SeccionMenu) => ReactNode;
+  debajoDePlato?: (item: ItemMenu, seccion: S) => ReactNode;
+  /**
+   * Qué secciones y en qué orden. Por defecto primero, segundo y postre (el
+   * menú de una novedad); el menú del día pasa también el entrante.
+   */
+  orden?: readonly S[];
+  /** Rótulos que cambian los de `ETIQUETA_SECCION` (p. ej. «Postre y café»). */
+  titulos?: Partial<Record<S, string>>;
+  /** Secciones plegables con resumen (ver `SeccionPlatos`). */
+  plegable?: boolean;
+  /** Con `plegable`: qué secciones empiezan desplegadas. Por defecto, todas. */
+  abiertaAlInicio?: (seccion: S, items: ItemMenu[]) => boolean;
+  /** Con `plegable`: lo que pone la cabecera de cada sección sin platos. */
+  detalleVacia?: Partial<Record<S, string>>;
+  /** Lo primero de cada sección desplegada. */
+  cabeceraDe?: (seccion: S) => ReactNode;
 }
 
-export function EditorSeccionesMenu({
+export function EditorSeccionesMenu<S extends SeccionMenuDia = SeccionMenu>({
   secciones,
   onChange,
   platos,
   platosPorId,
   cargandoPlatos,
   debajoDePlato,
-}: EditorSeccionesMenuProps) {
-  const actualizarSeccion = (seccion: SeccionMenu, items: ItemMenu[]) =>
-    onChange({ ...secciones, [seccion]: items });
+  orden = SECCIONES_MENU as unknown as readonly S[],
+  titulos,
+  plegable = false,
+  abiertaAlInicio,
+  detalleVacia,
+  cabeceraDe,
+}: EditorSeccionesMenuProps<S>) {
+  const actualizarSeccion = (seccion: S, items: ItemMenu[]) =>
+    onChange({ ...secciones, [seccion]: items } as Record<S, ItemMenu[]>);
 
-  // Las tres secciones van EN FILA solo si el hueco REAL del editor da para
-  // ello; si no, una debajo de otra. No vale un breakpoint de viewport
+  // Las secciones van EN FILA solo si el hueco REAL del editor da para ello;
+  // si no, una debajo de otra. No vale un breakpoint de viewport
   // (`lg:grid-cols-3`): el editor vive en la columna izquierda de
   // EditorMenuTapasWeb y desde `xl` comparte fila con la vista previa (340px),
   // así que con el viewport MÁS ancho tenía MENOS sitio. A 1280px cada sección
-  // se quedaba en ~190px, y una línea necesita 44px de foto + 92px de botones +
+  // se quedaba en ~190px, y una línea necesita 44px de foto + botones +
   // márgenes: el nombre (o el input de «A mano») se quedaba a 0px y los botones
   // se salían de la tarjeta, montándose sobre la sección de al lado.
   //
   // Se decide con una container query (`@container (min-width: 62rem)`), no
   // con media queries: mide el envoltorio, que siempre ocupa el ancho de la
-  // tarjeta. Es una rejilla de 1 o 3 columnas, así que nunca hay un 2 + 1
-  // descolgado. 62rem ≈ 3 columnas de 320px + 2 huecos de 12px: lo justo para
-  // que el nombre de una línea tenga ~120px.
+  // tarjeta. Es una rejilla de 1 o 3 columnas (1 o 4 con el entrante), así que
+  // nunca hay una sección descolgada. 62rem ≈ 3 columnas de 320px + 2 huecos de
+  // 12px: lo justo para que el nombre de una línea tenga ~120px.
   //
   // Sustituye (2026-10-01) al truco de «flex-basis negativo»
   // (`flex-basis: calc((62rem - 100%) * 999)`): ese `100%` solo funciona si el
@@ -702,19 +845,24 @@ export function EditorSeccionesMenu({
   return (
     <>
       <div className={CONTENEDOR_SECCIONES} data-testid="contenedor-secciones-menu">
-        <div className={REJILLA_SECCIONES}>
-          {SECCIONES_MENU.map((seccion) => {
+        <div className={orden.length === 4 ? REJILLA_CUATRO_SECCIONES : REJILLA_SECCIONES}>
+          {orden.map((seccion) => {
+            const items = secciones[seccion];
             return (
               <SeccionPlatos
                 key={seccion}
                 testId={`seccion-menu-${seccion}`}
-                titulo={ETIQUETA_SECCION[seccion]}
-                items={secciones[seccion]}
-                onChange={(items) => actualizarSeccion(seccion, items)}
+                titulo={titulos?.[seccion] ?? ETIQUETA_SECCION[seccion]}
+                items={items}
+                onChange={(siguientes) => actualizarSeccion(seccion, siguientes)}
                 platos={platos}
                 platosPorId={platosPorId}
                 cargandoPlatos={cargandoPlatos}
                 debajoDePlato={debajoDePlato ? (item) => debajoDePlato(item, seccion) : undefined}
+                plegable={plegable}
+                abiertaAlInicio={abiertaAlInicio ? abiertaAlInicio(seccion, items) : true}
+                detalleVacia={detalleVacia?.[seccion]}
+                cabecera={cabeceraDe?.(seccion)}
               />
             );
           })}
