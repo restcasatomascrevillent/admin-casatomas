@@ -14,7 +14,8 @@
  *      MediaRecorder (MediaRecorder graba en tiempo real: por eso se graba al
  *      final, no mientras se procesa).
  */
-import { mascaraModelo, recorteNavegadorDisponible } from "../recorte/quitarFondoNavegador";
+import { crearWorkerRecorteDedicado, mascaraModelo, recorteNavegadorDisponible } from "../recorte/quitarFondoNavegador";
+import { crearMutex, numeroWorkersRecorte, procesarEnPool } from "./paralelo";
 import { LADO_MODELO, postprocesarMascara } from "../recorte/mascaraRecorte";
 import { componerPlatoEnLienzo, FONDO_ACTIVO, PLATO_ALTO, PLATO_ANCHO, TEMAS, type CrearLienzo, type NombreTema } from "../composicionCarta";
 import {
@@ -258,26 +259,60 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     const ent = lienzo(LADO_MODELO, LADO_MODELO);
     ent.ctx.imageSmoothingQuality = "high";
     const mascaras = new Map<number, Uint8Array>();
-    const inferir = async (i: number) => {
-      abortado(signal);
-      await irA(video, tiempos[i]);
-      abortado(signal);
-      ent.ctx.drawImage(video, 0, 0, LADO_MODELO, LADO_MODELO);
-      const rgba = ent.ctx.getImageData(0, 0, LADO_MODELO, LADO_MODELO).data;
-      const r = await mascaraModelo(rgba, (p) => {
+    // Buscar en el único <video> y leer el fotograma va de uno en uno; el
+    // modelo puede ir en paralelo en varios workers.
+    const enSerie = crearMutex();
+    const entrada = (i: number) =>
+      enSerie(async () => {
+        abortado(signal);
+        await irA(video, tiempos[i]);
+        abortado(signal);
+        ent.ctx.drawImage(video, 0, 0, LADO_MODELO, LADO_MODELO);
+        return ent.ctx.getImageData(0, 0, LADO_MODELO, LADO_MODELO).data;
+      });
+    const principal = (rgba: Uint8ClampedArray) =>
+      mascaraModelo(rgba, (p) => {
         if (p.fase === "descargando") onProgreso?.({ fase: "descargando", pct: p.pct });
       });
-      mascaras.set(i, reescalarMascara(r.mascara, LADO_MODELO, L));
-      return r.ms;
-    };
     onProgreso?.({ fase: "recortando", hecho: 0, total: 1 });
-    const msPrimero = await inferir(0);
-    const claves = indicesClave(total, pasoInferencia(msPrimero));
+    const primero = await principal(await entrada(0));
+    mascaras.set(0, reescalarMascara(primero.mascara, LADO_MODELO, L));
+
+    // Sin WebGPU, en PC: 2–4 workers con su propia sesión (paralelo.ts). El
+    // paso entre fotogramas clave se decide con el tiempo efectivo por
+    // fotograma (lo que tarda uno ÷ nº de workers).
+    const nav = navigator as Navigator & { deviceMemory?: number };
+    const nWorkers = numeroWorkersRecorte({
+      webgpu: primero.proveedor === "webgpu",
+      userAgent: nav.userAgent,
+      maxTouchPoints: nav.maxTouchPoints,
+      deviceMemory: nav.deviceMemory,
+      hardwareConcurrency: nav.hardwareConcurrency,
+    });
+    const claves = indicesClave(total, pasoInferencia(primero.ms / nWorkers));
     onProgreso?.({ fase: "recortando", hecho: 1, total: claves.length });
-    for (let k = 1; k < claves.length; k++) {
-      await inferir(claves[k]);
-      onProgreso?.({ fase: "recortando", hecho: k + 1, total: claves.length });
+    const dedicados = Array.from({ length: nWorkers - 1 }, () => crearWorkerRecorteDedicado());
+    const cortar = () => dedicados.forEach((d) => d.terminar());
+    signal?.addEventListener("abort", cortar, { once: true });
+    try {
+      const ejecutores = [principal, ...dedicados.map((d) => (rgba: Uint8ClampedArray) => d.mascara(rgba))].map(
+        (modelo) => async (i: number) => {
+          const r = await modelo(await entrada(i));
+          abortado(signal);
+          mascaras.set(i, reescalarMascara(r.mascara, LADO_MODELO, L));
+        },
+      );
+      await procesarEnPool(claves.slice(1), ejecutores, (_i, hechos) =>
+        onProgreso?.({ fase: "recortando", hecho: hechos + 1, total: claves.length }),
+      );
+    } catch (e) {
+      abortado(signal);
+      throw e;
+    } finally {
+      signal?.removeEventListener("abort", cortar);
+      cortar();
     }
+    if (nWorkers > 1) console.info("[video-plato] recorte en paralelo", { workers: nWorkers, claves: claves.length });
 
     // Máscara del fotograma i: interpolada entre claves y suavizada en el tiempo.
     const mascaraDe = (i: number, previa: Float32Array | null) => {

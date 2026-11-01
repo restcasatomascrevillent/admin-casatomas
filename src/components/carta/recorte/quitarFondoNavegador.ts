@@ -299,3 +299,48 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
   console.info("[recorte-navegador]", ultimaMedida, `${ancho}x${alto}`);
   return png;
 }
+
+export interface WorkerRecorteDedicado {
+  mascara(rgba: Uint8ClampedArray): Promise<MascaraModelo>;
+  terminar(): void;
+}
+
+/**
+ * Worker del recorte APARTE del compartido, con su propia sesión del modelo
+ * (lo lee de Cache Storage si ya se bajó). Para repartir fotogramas del vídeo
+ * en paralelo en PC sin WebGPU (video/paralelo.ts). Hay que terminarlo al
+ * acabar: cada sesión ocupa cientos de MB.
+ */
+export function crearWorkerRecorteDedicado(): WorkerRecorteDedicado {
+  const w = new Worker(new URL("./recorte.worker.ts", import.meta.url), { type: "module", name: "recorte-video" });
+  const espera = new Map<number, { ok: (m: MascaraModelo) => void; ko: (e: Error) => void }>();
+  let id = 1;
+  const fallarTodo = (e: Error) => {
+    espera.forEach((p) => p.ko(e));
+    espera.clear();
+  };
+  w.onmessage = (ev: MessageEvent<MensajeDelWorker>) => {
+    const m = ev.data;
+    if (m.tipo !== "mascara" && m.tipo !== "error") return;
+    const p = espera.get(m.id);
+    if (!p) return;
+    espera.delete(m.id);
+    if (m.tipo === "mascara") p.ok({ mascara: m.mascara, ms: m.ms, desdeCache: m.desdeCache, proveedor: m.proveedor });
+    else p.ko(new Error(m.mensaje));
+  };
+  w.onerror = (ev) => fallarTodo(new Error(ev.message || "Error en el worker de recorte"));
+  return {
+    mascara(rgba) {
+      const n = id++;
+      return new Promise<MascaraModelo>((ok, ko) => {
+        espera.set(n, { ok, ko });
+        const msg: MensajeAlWorker = { tipo: "recortar", id: n, rgba };
+        w.postMessage(msg, [rgba.buffer]);
+      });
+    },
+    terminar() {
+      fallarTodo(new DOMException("Cancelado", "AbortError") as unknown as Error);
+      w.terminate();
+    },
+  };
+}
