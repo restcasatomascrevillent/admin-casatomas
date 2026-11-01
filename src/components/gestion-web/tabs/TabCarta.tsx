@@ -239,13 +239,15 @@ export default function TabCarta() {
       >
         {/* Barra: secciones + acciones */}
         <div data-tour="gw-carta-secciones">
+          {/* A 390 px las cuatro secciones con su número no caben junto a los botones (F-47):
+              en el móvil los botones van en su fila, encima, y el número se ve desde `sm`. */}
           <PestanasPagina
+            accionesArribaEnMovil
             pestanas={(Object.keys(secciones) as Seccion[]).map((seccion) => ({
               valor: seccion,
               etiqueta: secciones[seccion].etiqueta,
               contador: secciones[seccion].total,
               etiquetaContador: `${secciones[seccion].total} ${secciones[seccion].etiqueta.toLowerCase()}`,
-              contadorEnMovil: true,
               tour: seccion === "vinos" ? "gw-carta-vinos" : undefined,
             }))}
             acciones={

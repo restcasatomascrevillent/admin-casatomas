@@ -27,6 +27,7 @@ import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
+import { esquemaPrecioCarta, propsCampoPrecio } from "./precioCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,7 +37,7 @@ const UNIDADES_MEDIDA = ["cl", "ml", "L"];
 const formSchema = z.object({
   nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
   categoria: textoObligatorio(LIMITES_CARTA.categoria, "La categoría es obligatoria"),
-  precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
+  precio_eur: esquemaPrecioCarta,
   descripcion: textoOpcional(LIMITES_CARTA.descripcion),
   cantidad: z.coerce.number().optional(),
   unidad: z.string().optional(),
@@ -59,12 +60,12 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<z.input<typeof formSchema>, unknown, z.output<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nombre: "",
       categoria: categoriaInicial || "",
-      precio_eur: 0,
+      precio_eur: "",
       descripcion: "",
       cantidad: undefined,
       unidad: "cl",
@@ -90,7 +91,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.output<typeof formSchema>) => {
     const tamano = values.cantidad && values.unidad ? `${values.cantidad}${values.unidad}` : undefined;
     // La traducción ya no se genera aquí: crearBebida (useBebidas.ts) llama a
     // traducir-contenido internamente al guardar (ver informe, TAREA 2).
@@ -144,7 +145,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="nombre"
@@ -243,7 +244,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                   <FormItem>
                     <FormLabel>Precio (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
+                      <Input {...field} {...propsCampoPrecio} value={(field.value as string | number | undefined) ?? ""} placeholder="Ej.: 4,50" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

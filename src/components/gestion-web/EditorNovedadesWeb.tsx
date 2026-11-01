@@ -357,10 +357,11 @@ const CLAVES_IDIOMA = {
 type PestanaFormNovedad = "contenido" | "imagen" | "botones" | "publicacion";
 
 /** Subpestañas del formulario de una novedad, en orden. */
-const PESTANAS_FORM_NOVEDAD: { id: PestanaFormNovedad; label: string }[] = [
+/** `corta`: la que se ve por debajo de `sm` (a 390 px las cuatro largas no caben, F-47). */
+const PESTANAS_FORM_NOVEDAD: { id: PestanaFormNovedad; label: string; corta?: string }[] = [
   { id: "contenido", label: "Texto" },
   { id: "imagen", label: "Imagen" },
-  { id: "botones", label: "Botones y menú" },
+  { id: "botones", label: "Botones y menú", corta: "Botones" },
   { id: "publicacion", label: "Publicación" },
 ];
 
@@ -1039,14 +1040,16 @@ export function EditorNovedadesWeb() {
                     return (
                       <li
                         key={novedad.id}
-                        className={`flex items-center gap-2 p-2 pr-1 rounded-lg border transition-colors ${
+                        // En el móvil los botones van en una segunda fila: a 390 px no dejaban
+                        // sitio al título ni al estado (F-47). Desde `sm`, todo en una fila.
+                        className={`flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 pr-1 rounded-lg border transition-colors ${
                           esEditada ? "border-primary bg-primary/5" : "bg-card hover:bg-muted/50"
                         }`}
                       >
                         <button
                           type="button"
                           onClick={() => empezarEdicion(novedad)}
-                          className="flex min-h-11 items-center gap-3 flex-1 min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex min-h-11 items-center gap-3 flex-1 basis-full sm:basis-auto min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           aria-label={`Editar «${novedad.titulo}»`}
                         >
                           <div className="h-10 w-14 shrink-0 rounded-md overflow-hidden bg-muted flex items-center justify-center">
@@ -1088,7 +1091,7 @@ export function EditorNovedadesWeb() {
                           </div>
                         </button>
 
-                        <div className="flex items-center gap-0.5 shrink-0">
+                        <div className="ml-auto flex items-center gap-0.5 shrink-0">
                           <label className="flex min-h-11 items-center gap-1.5 px-1.5 cursor-pointer">
                             <Switch
                               checked={!!novedad.activo}
@@ -1195,9 +1198,20 @@ export function EditorNovedadesWeb() {
                       key={p.id}
                       value={p.id}
                       data-tour={p.id === "publicacion" ? "gw-novedades-publicacion" : undefined}
-                      className="gap-1.5"
+                      // Menos relleno en el móvil: con el de siempre «Publicación» quedaba
+                      // fuera a 390 px (F-47). Desde `sm`, el de siempre.
+                      className="gap-1.5 px-2 pointer-coarse:px-2 sm:px-3 sm:pointer-coarse:px-4"
                     >
-                      {p.label}
+                      {p.corta ? (
+                        <>
+                          <span className="sm:hidden" aria-hidden="true">
+                            {p.corta}
+                          </span>
+                          <span className="sr-only sm:not-sr-only">{p.label}</span>
+                        </>
+                      ) : (
+                        p.label
+                      )}
                       {p.id === "botones" && erroresBotones.length > 0 && (
                         <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-label="con errores" />
                       )}

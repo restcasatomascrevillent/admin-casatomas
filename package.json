@@ -21,6 +21,7 @@
     "test:abuso:db": "node scripts/test-abuso-limites.mjs",
     "test:espacios:db": "node scripts/test-espacios-reserva.mjs",
     "test:trabajos-video:db": "node scripts/test-trabajos-video.mjs",
+    "test:cubos-fotos:db": "node scripts/test-cubos-fotos.mjs",
     "test:restricciones-carta:db": "node scripts/test-restricciones-carta.mjs"
   },
   "dependencies": {

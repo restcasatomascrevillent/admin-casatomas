@@ -24,12 +24,13 @@ import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoD
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
+import { esquemaPrecioCarta } from "./precioCarta";
 import { urlSegura } from "@/lib/url-segura";
 
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   categoria: z.string().min(1, "La categoría es obligatoria"),
-  precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
+  precio_eur: esquemaPrecioCarta,
   descripcion: z.string().optional(),
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
@@ -55,12 +56,12 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<z.input<typeof formSchema>, unknown, z.output<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nombre: "",
       categoria: categoriaInicial || "",
-      precio_eur: 0,
+      precio_eur: "",
       descripcion: "",
       ingredientes: "",
       denominacion_origen: "",
@@ -95,7 +96,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     form.reset({
       nombre: d.nombre ?? "",
       categoria: d.categoria ?? categoriaInicial ?? "",
-      precio_eur: 0,
+      precio_eur: "",
       descripcion: d.descripcion ?? "",
       ingredientes: d.ingredientes ?? "",
       denominacion_origen: d.denominacion_origen ?? "",
@@ -121,7 +122,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.output<typeof formSchema>) => {
     // La traducción ya no se genera aquí: crearVino (useVinos.ts) llama a
     // traducir-contenido internamente al guardar (ver informe, TAREA 2).
     const vinoData: NuevoVino = {
@@ -182,7 +183,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             {/* Image upload field */}
             <div className="space-y-2">
               <FormLabel>Foto de la botella</FormLabel>
