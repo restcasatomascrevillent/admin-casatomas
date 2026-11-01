@@ -1,5 +1,5 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
-import { ImageOff, ImagePlus, Loader2, Save } from "lucide-react";
+import { ImageOff, ImagePlus, Loader2, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -33,6 +33,11 @@ interface FotoRapidaCartaProps {
   tabla: TablaCarta;
   /** Guarda `imagen_url` con la mutación del hook (invalida la caché y republica la web). */
   guardarUrl: (id: string, url: string) => Promise<unknown>;
+  /**
+   * Quita la foto: `imagen_url` a null (y, en platos y vinos, «foto expandida»
+   * desactivada: sin foto no hay nada que expandir). Con la mutación del hook.
+   */
+  quitarFoto: (id: string) => Promise<unknown>;
   /** Se llama con el id cuando la foto ya está guardada (la lista la enseña en la tarjeta). */
   onGuardada?: (id: string) => void;
 }
@@ -46,7 +51,9 @@ interface FotoRapidaCartaProps {
  * Al pulsar «Foto» se abre la ventana con la foto actual (o un recuadro de
  * «Sin foto») y debajo dos botones: «Guardar» (activo cuando hay una foto
  * nueva elegida) y «Cambiar foto» («Añadir foto» si aún no tiene ninguna),
- * que abre la galería o la cámara (petición del dueño, 01-11-2026).
+ * que abre la galería o la cámara (petición del dueño, 01-11-2026). Si tiene
+ * foto, «Eliminar foto» la quita (con confirmación) y borra el fichero de
+ * Storage si ninguna otra ficha lo usa.
  *
  * El `<input type="file">` vive FUERA del diálogo y siempre montado; se le hace
  * clic dentro del toque en «Cambiar/Añadir foto» (si no, el móvil no abre el
@@ -54,13 +61,14 @@ interface FotoRapidaCartaProps {
  * aviso de versión nueva no recarga la página.
  */
 export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps>(function FotoRapidaCarta(
-  { tipo, bucket, tabla, guardarUrl, onGuardada },
+  { tipo, bucket, tabla, guardarUrl, quitarFoto, onGuardada },
   ref,
 ) {
   const fotoCarta = useFotoCarta(tipo);
   const { limpiar } = fotoCarta;
   const [elemento, setElemento] = useState<ElementoConFoto | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [confirmandoBorrado, setConfirmandoBorrado] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const elegirFoto = useCallback(() => {
@@ -72,6 +80,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
 
   const cerrar = useCallback(() => {
     setElemento(null);
+    setConfirmandoBorrado(false);
     limpiar();
     if (inputRef.current) inputRef.current.value = "";
   }, [limpiar]);
@@ -81,6 +90,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
     () => ({
       abrir: (nuevo) => {
         limpiar();
+        setConfirmandoBorrado(false);
         setElemento(nuevo);
       },
     }),
@@ -121,6 +131,23 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
     } catch (error) {
       // El aviso de error ya lo da la mutación del hook.
       console.error("Error guardando la foto:", error);
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const eliminar = async () => {
+    if (!elemento?.imagen_url) return;
+    setGuardando(true);
+    try {
+      await quitarFoto(elemento.id);
+      const anterior = rutaEnBucket(elemento.imagen_url, bucket);
+      if (anterior) await borrarFotoSiNoSeUsa({ tabla, bucket, ruta: anterior, excluirId: elemento.id });
+      toast.success("Foto eliminada");
+      cerrar();
+    } catch (error) {
+      // El aviso de error ya lo da la mutación del hook.
+      console.error("Error quitando la foto:", error);
     } finally {
       setGuardando(false);
     }
@@ -205,6 +232,40 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
               {fotoCarta.original || fotoActual ? "Cambiar foto" : "Añadir foto"}
             </Button>
           </div>
+
+          {fotoActual && !fotoCarta.original && (
+            confirmandoBorrado ? (
+              <div className="space-y-2 rounded-md border border-destructive/40 bg-destructive/5 p-3" role="group" aria-label="Confirmar eliminar foto">
+                <p className="text-sm">¿Eliminar la foto? Se quitará de la carta y de la web.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11"
+                    onClick={() => setConfirmandoBorrado(false)}
+                    disabled={guardando}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="button" variant="destructive" className="h-11" onClick={eliminar} disabled={guardando}>
+                    {guardando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                    Sí, eliminar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-11 w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setConfirmandoBorrado(true)}
+                disabled={guardando}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar foto
+              </Button>
+            )
+          )}
         </DialogContent>
       </Dialog>
     </>

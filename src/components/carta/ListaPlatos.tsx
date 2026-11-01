@@ -308,6 +308,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
         tabla="Platos"
         onGuardada={mostrarFoto}
         guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
+        quitarFoto={(id) => actualizarPlato.mutateAsync({ id, imagen_url: null, expanded: false })}
       />
 
       <EditarPlatoModal
