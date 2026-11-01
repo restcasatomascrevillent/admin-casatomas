@@ -18,8 +18,12 @@
 //   ficticios por foto (tarifa en ia_precios, migración 20261026120000).
 //
 // Body: { imagen: "<base64 JPEG/PNG/WebP, con o sin prefijo data:>" }
-// Respuesta: { ok: true, png: "data:image/png;base64,..." } | { ok: false, error }
-//   503 si falta REPLICATE_API_TOKEN.
+// Respuesta: { ok: true, png: "data:image/png;base64,..." } | { ok: false, codigo, error }
+//   Todo error lleva `codigo` (el panel lo traduce a un aviso claro) y deja una
+//   línea en los registros de la función:
+//   503 sin_token (falta el secreto REPLICATE_API_TOKEN), token_invalido,
+//   sin_saldo · 413 demasiado_grande · 400 imagen_invalida · 504 timeout ·
+//   502 fallo_replicate · 500 error_interno.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
@@ -109,6 +113,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   if (!permiso.ok) return json({ ok: false, error: permiso.error }, permiso.status);
 
   if (!REPLICATE_TOKEN) {
+    console.warn(`[${FUNCION}] sin_token: falta el secreto REPLICATE_API_TOKEN en este proyecto`);
     return json(
       { ok: false, codigo: "sin_token", error: "Quitar fondo no está configurado (falta el secreto REPLICATE_API_TOKEN)" },
       503,
@@ -120,14 +125,16 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   try {
     payload = await req.json();
   } catch {
-    return json({ ok: false, error: "Body no es JSON válido" }, 400);
+    return json({ ok: false, codigo: "imagen_invalida", error: "La petición no trae una imagen válida" }, 400);
   }
   let imagen = typeof payload.imagen === "string" ? payload.imagen.trim() : "";
-  if (!imagen) return json({ ok: false, error: "Falta la imagen" }, 400);
-  if (imagen.length > MAX_BASE64) return json({ ok: false, error: "La imagen es demasiado grande" }, 413);
+  if (!imagen) return json({ ok: false, codigo: "imagen_invalida", error: "Falta la imagen" }, 400);
+  if (imagen.length > MAX_BASE64) {
+    return json({ ok: false, codigo: "demasiado_grande", error: "La imagen es demasiado grande" }, 413);
+  }
   if (!imagen.startsWith("data:")) imagen = `data:image/jpeg;base64,${imagen}`;
   if (!/^data:image\/(jpeg|png|webp);base64,/.test(imagen)) {
-    return json({ ok: false, error: "Formato de imagen no soportado" }, 400);
+    return json({ ok: false, codigo: "imagen_invalida", error: "Formato de imagen no soportado (usa JPEG, PNG o WebP)" }, 400);
   }
 
   const uso = new AcumuladorUso(FUNCION, MODELO_USO, "vision");
@@ -147,17 +154,19 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     );
     if (creada.status === 401 || creada.status === 403) {
       uso.marcarError();
+      console.warn(`[${FUNCION}] token_invalido: Replicate respondió ${creada.status}`);
       return json({ ok: false, codigo: "token_invalido", error: "El token de Replicate no es válido" }, 503);
     }
     if (creada.status === 402) {
       uso.marcarError();
+      console.warn(`[${FUNCION}] sin_saldo: Replicate respondió 402`);
       return json({ ok: false, codigo: "sin_saldo", error: "La cuenta de Replicate no tiene saldo o método de pago" }, 503);
     }
     let pred = creada.data;
     if (!pred || creada.status >= 400) {
       uso.marcarError();
       console.error(`[${FUNCION}] crear`, creada.status, JSON.stringify(pred)?.slice(0, 500));
-      return json({ ok: false, error: `Replicate respondió ${creada.status}` }, 502);
+      return json({ ok: false, codigo: "fallo_replicate", error: `Replicate respondió ${creada.status}` }, 502);
     }
     // Cada predicción lanzada se paga aunque luego falle.
     uso.sumar({ prompt_tokens: TOKENS_POR_FOTO });
@@ -174,17 +183,19 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
       if (pred?.status && !["failed", "canceled"].includes(pred.status) && pred.id) {
         // Se cancela para no seguir gastando GPU.
         fetch(`https://api.replicate.com/v1/predictions/${pred.id}/cancel`, { method: "POST", headers: cabeceras }).catch(() => {});
+        console.warn(`[${FUNCION}] timeout: predicción ${pred.id} en estado ${pred.status}`);
         return json({ ok: false, codigo: "timeout", error: "Quitar el fondo ha tardado demasiado" }, 504);
       }
       console.error(`[${FUNCION}] fallo`, pred?.status, String(pred?.error ?? "").slice(0, 300));
-      return json({ ok: false, error: "No se pudo quitar el fondo" }, 502);
+      return json({ ok: false, codigo: "fallo_replicate", error: "Replicate no pudo quitar el fondo de esta foto" }, 502);
     }
 
     // ---- Descargar el PNG y devolverlo en base64 ---------------------------
     const url = urlSalida(pred.output);
     if (!url) {
       uso.marcarError();
-      return json({ ok: false, error: "Replicate no devolvió imagen" }, 502);
+      console.error(`[${FUNCION}] salida sin URL`, JSON.stringify(pred.output)?.slice(0, 300));
+      return json({ ok: false, codigo: "fallo_replicate", error: "Replicate no devolvió imagen" }, 502);
     }
     const controller = new AbortController();
     const t = setTimeout(() => controller.abort(), Math.max(3000, restante()));
@@ -198,7 +209,8 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     }
     if (!bytes.length || bytes.length > MAX_PNG_BYTES) {
       uso.marcarError();
-      return json({ ok: false, error: "La imagen sin fondo no es válida" }, 502);
+      console.error(`[${FUNCION}] PNG no válido: ${bytes.length} bytes`);
+      return json({ ok: false, codigo: "fallo_replicate", error: "La imagen sin fondo no es válida" }, 502);
     }
     return json({ ok: true, png: `data:image/png;base64,${base64Encode(bytes)}`, modelo: MODELO });
   } catch (e) {
@@ -207,7 +219,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     console.error(`[${FUNCION}]`, e);
     return abortado
       ? json({ ok: false, codigo: "timeout", error: "Quitar el fondo ha tardado demasiado" }, 504)
-      : json({ ok: false, error: "Error al quitar el fondo" }, 500);
+      : json({ ok: false, codigo: "error_interno", error: "Error al quitar el fondo" }, 500);
   } finally {
     await registrarUso([uso], { disparador: `usuario:${permiso.userId}`, duracionMs: Date.now() - inicio });
   }
