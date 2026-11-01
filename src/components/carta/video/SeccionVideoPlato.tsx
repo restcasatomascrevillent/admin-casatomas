@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Film, Loader2, Trash2, Undo2, Video, X } from "lucide-react";
+import { Film, Loader2, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { temasDisponibles, type NombreTema } from "../composicionCarta";
-import { porcentajeProgresoVideo, SEGUNDOS_VIDEO, textoProgresoVideo } from "./videoPlato";
+import { AVISO_PANTALLA_ENCENDIDA, porcentajeProgresoVideo, SEGUNDOS_VIDEO, textoProgresoVideo } from "./videoPlato";
 import type { VideoPlato } from "./useVideoPlato";
 import { ACEPTA_VIDEO } from "./lecturaVideo";
 
@@ -75,6 +75,9 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
                 {textoProgresoVideo(estado.progreso)}
               </div>
               <Progress value={porcentajeProgresoVideo(estado.progreso)} />
+              <p className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                <Smartphone className="h-3.5 w-3.5 shrink-0" /> {AVISO_PANTALLA_ENCENDIDA}
+              </p>
               <Button type="button" variant="outline" size="sm" onClick={video.cancelar}>
                 <X className="mr-1 h-4 w-4" /> Cancelar
               </Button>
@@ -126,7 +129,16 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
             </div>
           ) : null}
 
-          {estado.fase === "fallo" && <p className="text-sm text-destructive">{estado.mensaje}</p>}
+          {estado.fase === "fallo" && (
+            <div className="space-y-2">
+              <p className="text-sm text-destructive">{estado.mensaje}</p>
+              {video.puedeReintentar && (
+                <Button type="button" variant="outline" size="sm" onClick={video.reintentar}>
+                  <RotateCcw className="mr-1 h-4 w-4" /> Reintentar
+                </Button>
+              )}
+            </div>
+          )}
 
           {!procesando && (
             <>

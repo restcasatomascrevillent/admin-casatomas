@@ -27,6 +27,8 @@ import {
   indicesClave,
   interpolarMascara,
   LADO_MASCARA_VIDEO,
+  estimarRestanteMs,
+  MS_CODIFICACION,
   pasoInferencia,
   suavizarCajas,
   suavizarMascara,
@@ -91,12 +93,37 @@ function lienzo(ancho: number, alto: number) {
   return { c, ctx };
 }
 
-const crearLienzoDom: CrearLienzo = (ancho, alto) => {
-  const c = document.createElement("canvas");
-  c.width = ancho;
-  c.height = alto;
-  return c;
-};
+/**
+ * Lienzos reutilizados entre fotogramas (memoria, sobre todo en móvil): la
+ * k-ésima petición de cada fotograma devuelve siempre el mismo canvas (se
+ * redimensiona si hace falta, lo que además lo limpia). `reiniciar()` al
+ * empezar cada fotograma; lo devuelto solo vale hasta el siguiente.
+ */
+function lienzosReutilizables(): { crear: CrearLienzo; reiniciar: () => void; soltar: () => void } {
+  const usados: HTMLCanvasElement[] = [];
+  let k = 0;
+  return {
+    crear: (ancho, alto) => {
+      let c = usados[k];
+      if (!c) {
+        c = document.createElement("canvas");
+        usados[k] = c;
+      }
+      k++;
+      // Asignar width/height siempre: deja el lienzo limpio y con el contexto reiniciado.
+      c.width = ancho;
+      c.height = alto;
+      return c;
+    },
+    reiniciar: () => {
+      k = 0;
+    },
+    soltar: () => {
+      for (const c of usados) c.width = c.height = 0;
+      usados.length = 0;
+    },
+  };
+}
 
 function esperarEvento(el: HTMLElement, ok: string, ms: number, error = "error"): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -212,9 +239,18 @@ async function irA(video: HTMLVideoElement, t: number) {
   await listo;
 }
 
+type Lienzo = ReturnType<typeof lienzo>;
+/** Lienzos de reescalarMascara, reutilizados durante un procesado (es síncrona: no se pisan). */
+const lienzosMascara: { src: Lienzo | null; dst: Lienzo | null } = { src: null, dst: null };
+function lienzoMascara(cual: "src" | "dst", lado: number): Lienzo {
+  let l = lienzosMascara[cual];
+  if (!l || l.c.width !== lado) l = lienzosMascara[cual] = lienzo(lado, lado);
+  return l;
+}
+
 /** Máscara 0–255 de lado `de` → lado `a` (suavizado del canvas). */
 function reescalarMascara(m: Uint8Array, de: number, a: number): Uint8Array {
-  const src = lienzo(de, de);
+  const src = lienzoMascara("src", de);
   const img = src.ctx.createImageData(de, de);
   for (let i = 0; i < m.length; i++) {
     const o = i * 4;
@@ -222,8 +258,9 @@ function reescalarMascara(m: Uint8Array, de: number, a: number): Uint8Array {
     img.data[o + 3] = 255;
   }
   src.ctx.putImageData(img, 0, 0);
-  const dst = lienzo(a, a);
+  const dst = lienzoMascara("dst", a);
   dst.ctx.imageSmoothingQuality = "high";
+  dst.ctx.clearRect(0, 0, a, a);
   dst.ctx.drawImage(src.c, 0, 0, a, a);
   const d = dst.ctx.getImageData(0, 0, a, a).data;
   const out = new Uint8Array(a * a);
@@ -275,7 +312,12 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
         if (p.fase === "descargando") onProgreso?.({ fase: "descargando", pct: p.pct });
       });
     onProgreso?.({ fase: "recortando", hecho: 0, total: 1 });
-    const primero = await principal(await entrada(0));
+    // El primer fotograma incluye cargar el modelo: para estimar se cuenta
+    // solo la inferencia (r.ms) y la búsqueda/lectura del fotograma.
+    const tEntrada = performance.now();
+    const rgba0 = await entrada(0);
+    const msEntrada = performance.now() - tEntrada;
+    const primero = await principal(rgba0);
     mascaras.set(0, reescalarMascara(primero.mascara, LADO_MODELO, L));
 
     // Sin WebGPU, en PC: 2–4 workers con su propia sesión (paralelo.ts). El
@@ -290,7 +332,11 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       hardwareConcurrency: nav.hardwareConcurrency,
     });
     const claves = indicesClave(total, pasoInferencia(primero.ms / nWorkers));
-    onProgreso?.({ fase: "recortando", hecho: 1, total: claves.length });
+    // Tiempo estimado a partir de lo que tardó el primer fotograma (con su búsqueda y lectura).
+    const msPorClave = primero.ms + msEntrada;
+    const fin = performance.now() + estimarRestanteMs({ msPorClave, clavesPendientes: claves.length - 1, workers: nWorkers, fotogramas: total });
+    const restante = () => Math.max(0, Math.round(fin - performance.now()));
+    onProgreso?.({ fase: "recortando", hecho: 1, total: claves.length, restanteMs: restante() });
     const dedicados = Array.from({ length: nWorkers - 1 }, () => crearWorkerRecorteDedicado());
     const cortar = () => dedicados.forEach((d) => d.terminar());
     signal?.addEventListener("abort", cortar, { once: true });
@@ -303,7 +349,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
         },
       );
       await procesarEnPool(claves.slice(1), ejecutores, (_i, hechos) =>
-        onProgreso?.({ fase: "recortando", hecho: hechos + 1, total: claves.length }),
+        onProgreso?.({ fase: "recortando", hecho: hechos + 1, total: claves.length, restanteMs: restante() }),
       );
     } catch (e) {
       abortado(signal);
@@ -339,9 +385,13 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     tmpG.ctx.imageSmoothingQuality = "high";
     const temaFondo = TEMAS[tema] ?? TEMAS[FONDO_ACTIVO];
     const fotogramas: Blob[] = [];
+    const reutil = lienzosReutilizables();
+    const tB = performance.now();
     previa = null;
+    try {
     for (let i = 0; i < total; i++) {
       abortado(signal);
+      reutil.reiniciar();
       previa = mascaraDe(i, previa);
       await irA(video, tiempos[i]);
       fr.ctx.clearRect(0, 0, W, H);
@@ -366,10 +416,15 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       for (let p = 0; p < alfa.length; p++) px.data[p * 4 + 3] = alfa[p];
       fr.ctx.putImageData(px, 0, 0);
 
-      const compuesto = componerPlatoEnLienzo(crearLienzoDom, fr.c, W, H, temaFondo, cajas[i]) as HTMLCanvasElement | null;
+      const compuesto = componerPlatoEnLienzo(reutil.crear, fr.c, W, H, temaFondo, cajas[i]) as HTMLCanvasElement | null;
       if (!compuesto) throw new Error("No se pudo componer el fotograma");
       fotogramas.push(await aBlob(compuesto, "image/jpeg", 0.92));
-      onProgreso?.({ fase: "componiendo", hecho: i + 1, total });
+      const msPorFotograma = (performance.now() - tB) / (i + 1);
+      onProgreso?.({ fase: "componiendo", hecho: i + 1, total, restanteMs: Math.round(msPorFotograma * (total - i - 1) + MS_CODIFICACION) });
+    }
+    } finally {
+      reutil.soltar();
+      for (const l of [fr, tmpL, tmpG]) l.c.width = l.c.height = 0;
     }
 
     // --- C. Codificación -----------------------------------------------------
@@ -381,6 +436,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     return { blob, formato, fotogramas: total, inferencias: claves.length, ms };
   } finally {
     liberar();
+    lienzosMascara.src = lienzosMascara.dst = null;
   }
 }
 

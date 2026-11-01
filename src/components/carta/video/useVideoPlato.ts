@@ -3,12 +3,19 @@ import type { NombreTema } from "../composicionCarta";
 import type { ProgresoVideo } from "./videoPlato";
 import type { DisponibilidadVideo, ResultadoVideoPlato } from "./procesarVideoPlato";
 import { guardarVideoPlato, quitarVideoPlato } from "./subirVideoPlato";
+import { toast } from "sonner";
+import { mantenerPantallaEncendida, vigilarSegundoPlano } from "./pantallaEncendida";
+
+export const AVISO_VUELTA_SEGUNDO_PLANO =
+  "La pestaña ha estado en segundo plano: el vídeo puede haberse parado mientras tanto. Déjala abierta y con la pantalla encendida hasta que termine.";
+export const MENSAJE_FALLO_SEGUNDO_PLANO = "La pestaña pasó a segundo plano mientras se procesaba y el vídeo no salió bien.";
 
 export type EstadoVideo =
   | { fase: "nada" }
   | { fase: "procesando"; progreso: ProgresoVideo | null }
   | { fase: "listo"; r: ResultadoVideoPlato; url: string; tema: NombreTema }
-  | { fase: "fallo"; mensaje: string };
+  /** seOculto: la pestaña pasó a segundo plano durante el procesado (se ofrece reintentar). */
+  | { fase: "fallo"; mensaje: string; seOculto?: boolean };
 
 // El procesado (y onnxruntime) se carga solo al usarlo: no entra en el bundle del panel.
 const cargarProcesado = () => import("./procesarVideoPlato");
@@ -24,6 +31,8 @@ export function useVideoPlato() {
   const [quitar, setQuitar] = useState(false);
   const [disponible, setDisponible] = useState<DisponibilidadVideo | null>(null);
   const control = useRef<AbortController | null>(null);
+  /** Último vídeo elegido, para «Reintentar». */
+  const ultimo = useRef<{ archivo: File; tema: NombreTema } | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -46,8 +55,13 @@ export function useVideoPlato() {
     control.current?.abort();
     const yo = new AbortController();
     control.current = yo;
+    ultimo.current = { archivo, tema };
     setQuitar(false);
     setEstado({ fase: "procesando", progreso: null });
+    const soltarPantalla = await mantenerPantallaEncendida();
+    const vigia = vigilarSegundoPlano(() => {
+      if (control.current === yo) toast.info(AVISO_VUELTA_SEGUNDO_PLANO, { duration: 10000 });
+    });
     try {
       const { procesarVideoPlato } = await cargarProcesado();
       const r = await procesarVideoPlato(archivo, {
@@ -64,12 +78,20 @@ export function useVideoPlato() {
       if ((e as Error)?.name === "AbortError") setEstado({ fase: "nada" });
       else {
         console.warn("[video-plato]", e);
-        setEstado({ fase: "fallo", mensaje: (e as Error)?.message || "No se pudo generar el vídeo" });
+        const mensaje = (e as Error)?.message || "No se pudo generar el vídeo";
+        const seOculto = vigia.seOculto();
+        setEstado({ fase: "fallo", mensaje: seOculto ? `${MENSAJE_FALLO_SEGUNDO_PLANO} (${mensaje})` : mensaje, seOculto });
       }
     } finally {
+      vigia.parar();
+      soltarPantalla();
       if (control.current === yo) control.current = null;
     }
   }, []);
+
+  const reintentar = useCallback(() => {
+    if (ultimo.current) void generar(ultimo.current.archivo, ultimo.current.tema);
+  }, [generar]);
 
   const cancelar = useCallback(() => {
     control.current?.abort();
@@ -105,6 +127,8 @@ export function useVideoPlato() {
       quitar,
       setQuitar,
       generar,
+      reintentar,
+      puedeReintentar: !!ultimo.current,
       cancelar,
       limpiar,
       guardar,
@@ -112,7 +136,7 @@ export function useVideoPlato() {
       /** Hay algo que guardar (vídeo nuevo o quitar el guardado). */
       pendiente: estado.fase === "listo" || quitar,
     }),
-    [estado, disponible, quitar, generar, cancelar, limpiar, guardar],
+    [estado, disponible, quitar, generar, reintentar, cancelar, limpiar, guardar],
   );
 }
 

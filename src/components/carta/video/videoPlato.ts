@@ -249,8 +249,9 @@ export type ProgresoVideo =
   | { fase: "descargando"; pct: number }
   /** Conversión del vídeo del móvil con ffmpeg.wasm; pct -1 = descargando/arrancando el conversor. */
   | { fase: "convirtiendo"; pct: number }
-  | { fase: "recortando"; hecho: number; total: number }
-  | { fase: "componiendo"; hecho: number; total: number }
+  /** restanteMs: estimación desde que se conoce lo que tarda el primer fotograma. */
+  | { fase: "recortando"; hecho: number; total: number; restanteMs?: number }
+  | { fase: "componiendo"; hecho: number; total: number; restanteMs?: number }
   | { fase: "codificando" };
 
 export function textoProgresoVideo(p: ProgresoVideo | null): string {
@@ -260,9 +261,9 @@ export function textoProgresoVideo(p: ProgresoVideo | null): string {
     case "convirtiendo":
       return p.pct < 0 ? "Convirtiendo vídeo del móvil… (preparando conversor)" : `Convirtiendo vídeo del móvil… ${p.pct} %`;
     case "recortando":
-      return `Procesando vídeo… quitando fondo ${p.hecho}/${p.total}`;
+      return `Procesando vídeo… quitando fondo ${p.hecho}/${p.total}${textoRestante(p.restanteMs)}`;
     case "componiendo":
-      return `Procesando vídeo… ${p.hecho}/${p.total}`;
+      return `Procesando vídeo… ${p.hecho}/${p.total}${textoRestante(p.restanteMs)}`;
     case "codificando":
       return "Procesando vídeo… codificando";
     default:
@@ -286,4 +287,40 @@ export function porcentajeProgresoVideo(p: ProgresoVideo | null): number {
     default:
       return 0;
   }
+}
+
+/** Aviso fijo mientras se procesa (el móvil puede apagar la pantalla o congelar la pestaña). */
+export const AVISO_PANTALLA_ENCENDIDA = "Deja la pantalla encendida y esta pestaña abierta";
+
+/** ms que se suponen por fotograma al componer y lo que tarda grabar el vídeo final (4 s en tiempo real + margen). */
+export const MS_COMPOSICION_FOTOGRAMA = 300;
+export const MS_CODIFICACION = 5500;
+
+/**
+ * Tiempo restante estimado (ms) en la fase de recorte: las claves que faltan
+ * repartidas entre los workers a lo que tardó el primer fotograma, más la
+ * composición de todos los fotogramas y la codificación.
+ */
+export function estimarRestanteMs({
+  msPorClave,
+  clavesPendientes,
+  workers = 1,
+  fotogramas,
+  msComposicion = MS_COMPOSICION_FOTOGRAMA,
+}: {
+  msPorClave: number;
+  clavesPendientes: number;
+  workers?: number;
+  fotogramas: number;
+  msComposicion?: number;
+}): number {
+  const rondas = Math.ceil(Math.max(0, clavesPendientes) / Math.max(1, workers));
+  return Math.round(rondas * Math.max(0, msPorClave) + Math.max(0, fotogramas) * msComposicion + MS_CODIFICACION);
+}
+
+/** « · quedan ~3 min» / « · queda menos de 1 min» / "" si no se sabe. */
+export function textoRestante(ms: number | undefined): string {
+  if (ms === undefined || !Number.isFinite(ms) || ms < 0) return "";
+  if (ms < 60_000) return " · queda menos de 1 min";
+  return ` · quedan ~${Math.round(ms / 60_000)} min`;
 }
