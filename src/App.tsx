@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { SuperAdminRoute } from "./components/SuperAdminRoute";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
@@ -13,33 +13,53 @@ import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import Auth from "./pages/Auth";
-import Dashboard from "./pages/Dashboard";
-import Reservas from "./pages/Reservas";
-import PlantillasEmail from "./pages/PlantillasEmail";
-import Espacios from "./pages/Espacios";
-import Ecommerce from "./pages/Ecommerce";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Reservas = lazy(() => import("./pages/Reservas"));
+const PlantillasEmail = lazy(() => import("./pages/PlantillasEmail"));
+const Espacios = lazy(() => import("./pages/Espacios"));
+const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 // Gestor Web unifica Carta, Novedades, Menús y Tapas en pestañas (?tab=...).
 // La ruta antigua /gestor-carta redirige aquí; /gestion-bot redirige ahora a
 // /super-admin/bot-web.
-import GestionWeb from "./pages/GestorWeb";
-import AsistenteTelefonico from "./pages/AsistenteTelefonico";
-import Marketing from "./pages/Marketing";
-import NotFound from "./pages/NotFound";
-import Cheques from "./pages/Cheques";
-import Facturas from "./pages/Facturas";
-import Usuarios from "./pages/Usuarios";
-import Ayuda from "./pages/Ayuda";
-import GestorGasto from "./pages/GestorGasto";
-import Costes from "./pages/Costes";
-import GestionResenas from "./pages/GestionResenas";
-import TraficoWeb from "./pages/TraficoWeb";
-import SuperAdminLogin from "./pages/SuperAdminLogin";
-import SuperAdminPanel from "./pages/SuperAdminPanel";
-import SuperAdminUsuarios from "./pages/SuperAdminUsuarios";
-import SuperAdminBotWeb from "./pages/SuperAdminBotWeb";
-import SuperAdminAuditoria from "./pages/SuperAdminAuditoria";
+const GestionWeb = lazy(() => import("./pages/GestorWeb"));
+const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
+const Marketing = lazy(() => import("./pages/Marketing"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Cheques = lazy(() => import("./pages/Cheques"));
+const Facturas = lazy(() => import("./pages/Facturas"));
+const Usuarios = lazy(() => import("./pages/Usuarios"));
+const Ayuda = lazy(() => import("./pages/Ayuda"));
+const GestorGasto = lazy(() => import("./pages/GestorGasto"));
+const Costes = lazy(() => import("./pages/Costes"));
+const GestionResenas = lazy(() => import("./pages/GestionResenas"));
+const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
+const SuperAdminLogin = lazy(() => import("./pages/SuperAdminLogin"));
+const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
+const SuperAdminUsuarios = lazy(() => import("./pages/SuperAdminUsuarios"));
+const SuperAdminBotWeb = lazy(() => import("./pages/SuperAdminBotWeb"));
+const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
 
 const queryClient = new QueryClient();
+
+/**
+ * Páginas bajo demanda (01-11-2026): antes App importaba las ~25 páginas y
+ * todo el panel (gráficas, editor de planos, llamadas de voz…) iba en un único
+ * fichero de 3,7 MB que se bajaba entero en cualquier pantalla y otra vez con
+ * cada despliegue. Ahora cada página es su propio fichero y se pide al
+ * entrar; si tras un despliegue falta el de la versión anterior, la barrera de
+ * errores recarga sola (ErrorBoundary › PATRON_CHUNK_OBSOLETO). El acceso
+ * (Auth) sigue dentro del fichero inicial para salir al momento.
+ */
+function CargandoPagina() {
+  return (
+    <div className="flex min-h-app w-full items-center justify-center" role="status" aria-live="polite">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" aria-hidden="true" />
+      <span className="sr-only">Cargando…</span>
+    </div>
+  );
+}
+
+const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPagina />}>{contenido}</Suspense>;
 
 /** Publica --vv-h/--vv-top/--vv-bottom (viewport visual, sin teclado) para diálogos y hojas en tablet. */
 function VisualViewportVars() {
@@ -54,7 +74,7 @@ function VisualViewportVars() {
  */
 const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[]) => (
   <RouteErrorBoundary>
-    <ProtectedRoute requiredSection={requiredSection}>{contenido}</ProtectedRoute>
+    <ProtectedRoute requiredSection={requiredSection}>{bajoDemanda(contenido)}</ProtectedRoute>
   </RouteErrorBoundary>
 );
 
@@ -63,7 +83,7 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
 // (ver botón de engranaje en AppSidebar).
 const paginaSuperAdmin = (contenido: ReactNode) => (
   <RouteErrorBoundary>
-    <SuperAdminRoute>{contenido}</SuperAdminRoute>
+    <SuperAdminRoute>{bajoDemanda(contenido)}</SuperAdminRoute>
   </RouteErrorBoundary>
 );
 
@@ -103,7 +123,7 @@ const App = () => (
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
                   <Route path="/ayuda" element={pagina(<Ayuda />)} />
-                  <Route path="/super-admin/login" element={<SuperAdminLogin />} />
+                  <Route path="/super-admin/login" element={bajoDemanda(<SuperAdminLogin />)} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />
                   <Route path="/super-admin/asistente-telefonico" element={paginaSuperAdmin(<AsistenteTelefonico />)} />
@@ -116,7 +136,7 @@ const App = () => (
                   <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />
                   <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />
                   <Route path="/super-admin/auditoria" element={paginaSuperAdmin(<SuperAdminAuditoria />)} />
-                  <Route path="*" element={<NotFound />} />
+                  <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>
               </ColaSubidaProvider>

@@ -40,6 +40,25 @@ export default defineConfig(({ command }) => {
   // Worker del recorte de fotos de vino (onnxruntime-web): módulo ES, y sin
   // pre-empaquetar en dev para que encuentre su .wasm.
   worker: { format: "es" as const },
+  build: {
+    rollupOptions: {
+      output: {
+        // Librerías que usa todo el panel en ficheros propios (01-11-2026): no
+        // cambian entre despliegues, así que el navegador las conserva y solo
+        // vuelve a bajar el código del panel que sí ha cambiado. Lo que solo
+        // usa una pantalla (gráficas, editor de planos, llamadas de voz, PDF…)
+        // se queda con su página, que ya se carga bajo demanda (App.tsx).
+        manualChunks(id: string) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom|@remix-run)[\\/]/.test(id)) return "vendor-react";
+          if (id.includes("/node_modules/@supabase/")) return "vendor-supabase";
+          if (id.includes("/node_modules/@radix-ui/")) return "vendor-radix";
+          if (id.includes("/node_modules/@tanstack/")) return "vendor-query";
+          return undefined;
+        },
+      },
+    },
+  },
   optimizeDeps: { exclude: ["onnxruntime-web"] },
   resolve: {
     alias: {
