@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { temasDisponibles, type NombreTema } from "../composicionCarta";
 import { porcentajeProgresoVideo, SEGUNDOS_VIDEO, textoProgresoVideo } from "./videoPlato";
 import type { VideoPlato } from "./useVideoPlato";
+import { ACEPTA_VIDEO } from "./lecturaVideo";
 
 interface Props {
   video: VideoPlato;
@@ -157,7 +158,7 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
             </>
           )}
           <input ref={grabarRef} type="file" accept="video/*" capture="environment" className="hidden" onChange={alElegir} />
-          <input ref={elegirRef} type="file" accept="video/*" className="hidden" onChange={alElegir} />
+          <input ref={elegirRef} type="file" accept={ACEPTA_VIDEO} className="hidden" onChange={alElegir} />
         </>
       )}
     </div>

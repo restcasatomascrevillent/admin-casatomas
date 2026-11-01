@@ -35,6 +35,14 @@ import {
   type FormatoVideo,
   type ProgresoVideo,
 } from "./videoPlato";
+import {
+  ErrorLecturaVideo,
+  esErrorLecturaVideo,
+  MENSAJE_FORMATO_NO_COMPATIBLE,
+  mensajeFalloLectura,
+  pasosLecturaVideo,
+  type PasoLecturaVideo,
+} from "./lecturaVideo";
 
 /** Lado mayor del fotograma con el que se compone (la salida es 1200×900). */
 const LADO_FOTOGRAMA = 1280;
@@ -93,7 +101,7 @@ function esperarEvento(el: HTMLElement, ok: string, ms: number, error = "error")
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => {
       limpiar();
-      reject(new Error("El vídeo no responde"));
+      reject(new ErrorLecturaVideo("El vídeo no responde", "no-responde"));
     }, ms);
     const bien = () => {
       limpiar();
@@ -101,7 +109,7 @@ function esperarEvento(el: HTMLElement, ok: string, ms: number, error = "error")
     };
     const mal = () => {
       limpiar();
-      reject(new Error("No se pudo leer el vídeo (formato no compatible con este navegador)"));
+      reject(new ErrorLecturaVideo(MENSAJE_FORMATO_NO_COMPATIBLE, "formato"));
     };
     const limpiar = () => {
       clearTimeout(t);
@@ -136,12 +144,64 @@ async function cargarVideo(archivo: Blob): Promise<{ video: HTMLVideoElement; li
       /* sin autoplay: se intenta igual */
     }
     video.pause();
-    if (!video.videoWidth || !video.videoHeight) throw new Error("El vídeo no tiene imagen");
+    if (!video.videoWidth || !video.videoHeight) throw new ErrorLecturaVideo("El vídeo no tiene imagen", "sin-imagen");
     return { video, liberar };
   } catch (e) {
     liberar();
     throw e;
   }
+}
+
+/**
+ * Abre el vídeo probando, en orden, los pasos de pasosLecturaVideo: tal cual,
+ * como video/mp4 (MOV con H.264) y convertido con ffmpeg.wasm (HEVC). Solo se
+ * pasa al siguiente si el <video> no pudo decodificarlo (ErrorLecturaVideo).
+ */
+export async function cargarVideoCompatible(
+  archivo: Blob,
+  onProgreso?: (p: ProgresoVideo) => void,
+  signal?: AbortSignal,
+): Promise<{ video: HTMLVideoElement; liberar: () => void }> {
+  const nombre = (archivo as File).name;
+  let convertir: typeof import("./convertirVideoMovil") | null = null;
+  try {
+    convertir = await import("./convertirVideoMovil");
+  } catch (e) {
+    console.warn("[video-plato] sin conversor", e);
+  }
+  const pasos = pasosLecturaVideo(archivo.type, nombre, !!convertir?.conversionDisponible());
+  let ultimo: unknown = null;
+  for (const paso of pasos) {
+    abortado(signal);
+    try {
+      return await cargarVideo(await blobParaPaso(paso, archivo, convertir, onProgreso, signal));
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") throw e;
+      ultimo = e;
+      console.warn(`[video-plato] lectura «${paso}» falló`, e);
+      // Un fallo de ffmpeg (no de lectura) también acaba aquí: era el último paso.
+      if (paso !== "convertir" && !esErrorLecturaVideo(e)) throw e;
+    }
+  }
+  console.warn("[video-plato] ningún intento de lectura funcionó", ultimo);
+  throw new Error(mensajeFalloLectura(archivo.type, nombre));
+}
+
+async function blobParaPaso(
+  paso: PasoLecturaVideo,
+  archivo: Blob,
+  convertir: typeof import("./convertirVideoMovil") | null,
+  onProgreso?: (p: ProgresoVideo) => void,
+  signal?: AbortSignal,
+): Promise<Blob> {
+  if (paso === "original") return archivo;
+  if (paso === "mp4") return new Blob([archivo], { type: "video/mp4" });
+  if (!convertir) throw new Error("Conversor no disponible");
+  onProgreso?.({ fase: "convirtiendo", pct: -1 });
+  return convertir.convertirVideoMovil(archivo, {
+    signal,
+    onProgreso: (pct) => onProgreso?.({ fase: "convirtiendo", pct }),
+  });
 }
 
 async function irA(video: HTMLVideoElement, t: number) {
@@ -184,7 +244,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
   const t0 = performance.now();
   onProgreso?.({ fase: "preparando" });
 
-  const { video, liberar } = await cargarVideo(archivo);
+  const { video, liberar } = await cargarVideoCompatible(archivo, onProgreso, signal);
   try {
     const tiempos = tiemposFotogramas(video.duration);
     if (tiempos.length < 2) throw new Error("El vídeo es demasiado corto");
