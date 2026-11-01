@@ -42,6 +42,7 @@ end
 $$;
 
 -- Posición de cada plato en su página de la web de producción (2026-11-01).
+-- (Platos.id es text en la base de datos: se compara como texto.)
 create temporary table _orden_web (id uuid primary key, pos integer not null) on commit drop;
 insert into _orden_web (id, pos) values
     ('7b153dce-517e-4f31-821b-9e7d4e575549'::uuid, 1),
@@ -187,7 +188,7 @@ with sin_ordenar as (
            order by (w.pos is null), w.pos, p.id
          ) as n
     from public."Platos" p
-    left join _orden_web w on w.id = p.id
+    left join _orden_web w on w.id::text = p.id::text
    where exists (select 1 from sin_ordenar s where s.categoria is not distinct from p.categoria)
 )
 update public."Platos" p
