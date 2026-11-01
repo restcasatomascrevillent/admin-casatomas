@@ -4,7 +4,7 @@ import * as z from "zod";
  * Máximos de los textos y del precio de la carta (Platos y Vinos).
  *
  * Son LOS MISMOS que imponen las restricciones CHECK de la base de datos
- * (supabase/migrations/20261101200000_restricciones_platos_vinos.sql). Si se
+ * (supabase/migrations/20261101220000_restricciones_platos_vinos.sql). Si se
  * cambia uno aquí, hay que cambiarlo también allí con otra migración: si el
  * formulario deja pasar más que la BD, el guardado falla con un error de
  * Postgres en vez de con el mensaje en castellano junto al campo.

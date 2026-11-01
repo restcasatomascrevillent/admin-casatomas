@@ -25,12 +25,13 @@ import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
+import { esquemaPrecioCarta, precioParaCampo } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 
 const formSchema = z.object({
   nombre: nombreCarta,
   categoria: categoriaCarta,
-  precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
+  precio_eur: esquemaPrecioCarta,
   descripcion: descripcionCarta,
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
@@ -73,12 +74,12 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
   const [urlRestaurada, setUrlRestaurada] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<z.input<typeof formSchema>, unknown, z.output<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nombre: "",
       categoria: "",
-      precio_eur: 0,
+      precio_eur: "",
       descripcion: "",
       ingredientes: "",
       denominacion_origen: "",
@@ -93,7 +94,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     form.reset({
       nombre: vino.nombre ?? "",
       categoria: vino.categoria ?? "",
-      precio_eur: vino.precio_eur ?? 0,
+      precio_eur: precioParaCampo(vino.precio_eur),
       descripcion: vino.descripcion ?? "",
       ingredientes: vino.ingredientes ?? "",
       denominacion_origen: vino.denominacion_origen ?? "",
@@ -138,7 +139,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.output<typeof formSchema>) => {
     if (!vino) return;
 
     setIsUploadingImage(true);
@@ -210,7 +211,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <FormLabel>Foto de la botella</FormLabel>
               <input

@@ -36,7 +36,7 @@
 --     subirle la foto desde el panel si se quiere.
 --
 -- Idempotente: se puede aplicar dos veces. Reversión:
--- supabase/rollbacks/20261101200000_restricciones_platos_vinos_ROLLBACK.sql
+-- supabase/rollbacks/20261101220000_restricciones_platos_vinos_ROLLBACK.sql
 -- ===========================================================================
 
 -- 1. Forma válida de una columna de alérgenos. IMMUTABLE para poder usarla en

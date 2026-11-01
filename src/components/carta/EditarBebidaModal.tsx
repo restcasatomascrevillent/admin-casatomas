@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
+import { esquemaPrecioCarta, precioParaCampo, propsCampoPrecio } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
@@ -40,7 +41,7 @@ import { toast } from "sonner";
 const formSchema = z.object({
   nombre: z.string().min(1, "El nombre es obligatorio"),
   categoria: z.string().min(1, "La categoría es obligatoria"),
-  precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
+  precio_eur: esquemaPrecioCarta,
   descripcion: z.string().optional(),
   tamano: z.string().optional(),
 });
@@ -77,12 +78,12 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<z.input<typeof formSchema>, unknown, z.output<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       nombre: "",
       categoria: "",
-      precio_eur: 0,
+      precio_eur: "",
       descripcion: "",
       tamano: "",
     },
@@ -94,7 +95,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
     form.reset({
       nombre: bebida.nombre ?? "",
       categoria: bebida.categoria ?? "",
-      precio_eur: bebida.precio_eur ?? 0,
+      precio_eur: precioParaCampo(bebida.precio_eur),
       descripcion: bebida.descripcion ?? "",
       tamano: bebida.tamano ?? "",
     });
@@ -128,7 +129,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
     }
   };
 
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const onSubmit = async (values: z.output<typeof formSchema>) => {
     if (!bebida) return;
 
     setIsUploadingImage(true);
@@ -190,7 +191,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
               name="nombre"
@@ -296,7 +297,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                   <FormItem>
                     <FormLabel>Precio (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" inputMode="decimal" step="0.01" placeholder="0.00" {...field} />
+                      <Input {...field} {...propsCampoPrecio} value={(field.value as string | number | undefined) ?? ""} placeholder="Ej.: 4,50" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

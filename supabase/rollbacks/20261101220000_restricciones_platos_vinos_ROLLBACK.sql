@@ -1,4 +1,4 @@
--- Reversión de 20261101200000_restricciones_platos_vinos.sql
+-- Reversión de 20261101220000_restricciones_platos_vinos.sql
 -- Quita los CHECK y la función. NO deshace la limpieza de datos (los "[]"
 -- convertidos a [] y la imagen_url relativa de «Terreus» puesta a NULL): esos
 -- valores ya eran inservibles.

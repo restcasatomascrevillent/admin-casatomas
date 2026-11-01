@@ -14,7 +14,7 @@ const mensaje = (r: z.SafeParseReturnType<unknown, unknown>) =>
   r.success ? null : r.error.issues[0].message;
 
 describe("límites de la carta (iguales que los CHECK de la BD)", () => {
-  it("mismos máximos que la migración 20261101200000", () => {
+  it("mismos máximos que la migración 20261101220000", () => {
     expect(MAX_NOMBRE_CARTA).toBe(150);
     expect(MAX_DESCRIPCION_CARTA).toBe(2000);
     expect(MAX_PRECIO_CARTA).toBe(9999.99);

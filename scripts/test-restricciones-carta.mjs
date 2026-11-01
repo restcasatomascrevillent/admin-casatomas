@@ -3,7 +3,7 @@
 //
 //   npm run test:restricciones-carta:db
 //
-// Cubre: la migración REAL 20261101200000 aplicada dos veces (idempotente)
+// Cubre: la migración REAL 20261101220000 aplicada dos veces (idempotente)
 // sobre filas que reproducen las que incumplían en demo y producción (vinos con
 // alergenos_inferidos = texto "[]" y uno con imagen_url relativa, a la vez),
 // que todas las restricciones quedan VALIDADAS, que la API rechaza cada dato
@@ -13,8 +13,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
-const MIGRACION = await readFile("supabase/migrations/20261101200000_restricciones_platos_vinos.sql", "utf8");
-const ROLLBACK = await readFile("supabase/rollbacks/20261101200000_restricciones_platos_vinos_ROLLBACK.sql", "utf8");
+const MIGRACION = await readFile("supabase/migrations/20261101220000_restricciones_platos_vinos.sql", "utf8");
+const ROLLBACK = await readFile("supabase/rollbacks/20261101220000_restricciones_platos_vinos_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
