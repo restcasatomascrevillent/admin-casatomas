@@ -21,6 +21,8 @@ interface Props {
   temaFoto: NombreTema;
   /** true si en este formulario se está cambiando la foto/fondo. */
   fondoCambiado?: boolean;
+  /** Avisa del fondo marcado para el vídeo (p. ej. para «Mandar a un dispositivo potente»). */
+  onTemaChange?: (tema: NombreTema) => void;
 }
 
 /**
@@ -28,7 +30,7 @@ interface Props {
  * primeros 4 s, se quita el fondo en el navegador y se compone sobre el fondo
  * elegido. Se sube al pulsar «Guardar» del formulario.
  */
-export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaFoto, fondoCambiado }: Props) {
+export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaFoto, fondoCambiado, onTemaChange }: Props) {
   const grabarRef = useRef<HTMLInputElement>(null);
   const elegirRef = useRef<HTMLInputElement>(null);
   // Fondo que ha tocado el usuario (null = no ha tocado: se marca el fondo real del vídeo).
@@ -43,6 +45,9 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
   const hayVideo = !!listo || hayGuardado;
   const temaReal = listo ? listo.tema : hayGuardado ? temaDeVideoUrl(urlGuardada) : null;
   const tema = temaMarcado(elegido, temaReal, temaFoto);
+  const avisarTema = useRef(onTemaChange);
+  avisarTema.current = onTemaChange;
+  useEffect(() => avisarTema.current?.(tema), [tema]);
   const platoId = video.platoId;
 
   // Si quiere otro fondo, mirar si el vídeo tiene original guardado.
