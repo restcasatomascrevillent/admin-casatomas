@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, Film, Loader2, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
+import { Check, Cpu, Film, Loader2, Palette, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { temasDisponibles, type NombreTema } from "../composicionCarta";
 import { AVISO_PANTALLA_ENCENDIDA, porcentajeProgresoVideo, SEGUNDOS_VIDEO, textoProgresoVideo } from "./videoPlato";
 import type { VideoPlato } from "./useVideoPlato";
 import { ACEPTA_VIDEO } from "./lecturaVideo";
+import { accionCambioFondo, MENSAJE_SIN_ORIGINAL, temaDeVideoUrl, temaMarcado, type EstadoOriginal } from "./originalVideo";
+import { buscarOriginalVideo } from "./subirVideoPlato";
+import { leerMedidaCacheada } from "../potente/dispositivoPotente";
 
 interface Props {
   video: VideoPlato;
@@ -27,10 +31,67 @@ interface Props {
 export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaFoto, fondoCambiado }: Props) {
   const grabarRef = useRef<HTMLInputElement>(null);
   const elegirRef = useRef<HTMLInputElement>(null);
-  const [tema, setTema] = useState<NombreTema>(temaFoto);
-  useEffect(() => setTema(temaFoto), [temaFoto]);
+  // Fondo que ha tocado el usuario (null = no ha tocado: se marca el fondo real del vídeo).
+  const [elegido, setElegido] = useState<NombreTema | null>(null);
+  useEffect(() => setElegido(null), [temaFoto]);
   const temas = temasDisponibles();
   const { estado, disponible } = video;
+
+  // ¿Hay vídeo ya hecho, y con qué fondo?
+  const hayGuardado = !!urlGuardada && !video.quitar;
+  const listo = estado.fase === "listo" ? estado.trabajo : null;
+  const hayVideo = !!listo || hayGuardado;
+  const temaReal = listo ? listo.tema : hayGuardado ? temaDeVideoUrl(urlGuardada) : null;
+  const tema = temaMarcado(elegido, temaReal, temaFoto);
+  const platoId = video.platoId;
+
+  // Si quiere otro fondo, mirar si el vídeo tiene original guardado.
+  const quiereCambio = hayVideo && !!elegido && elegido !== temaReal && estado.fase !== "procesando";
+  const rutaSesion = listo?.rutaOriginal;
+  const [original, setOriginal] = useState<EstadoOriginal>(null);
+  useEffect(() => {
+    if (!quiereCambio || !platoId) return;
+    if (rutaSesion) {
+      setOriginal(rutaSesion);
+      return;
+    }
+    let vivo = true;
+    setOriginal(null);
+    buscarOriginalVideo(platoId)
+      .then((r) => vivo && setOriginal(r ?? false))
+      .catch(() => vivo && setOriginal(false));
+    return () => {
+      vivo = false;
+    };
+  }, [quiereCambio, platoId, rutaSesion]);
+  const accion = platoId
+    ? accionCambioFondo({ hayVideo: quiereCambio, elegido, real: temaReal, tieneArchivo: !!listo?.archivo, original })
+    : "nada";
+  const [mandando, setMandando] = useState(false);
+  const esPotente = leerMedidaCacheada()?.potente === true;
+
+  const cambiarFondo = () => {
+    if (!elegido) return;
+    if (video.cambiarFondo(elegido, original)) setElegido(null);
+    else toast.error(MENSAJE_SIN_ORIGINAL);
+  };
+
+  const mandarCambioAPotente = async () => {
+    if (!elegido || !platoId || typeof original !== "string") return;
+    setMandando(true);
+    try {
+      const { mandarOriginalAPotente } = await import("../potente/trabajosVideo");
+      await mandarOriginalAPotente({ platoId, rutaOriginal: original, tema: elegido });
+      toast.success("Cambio de fondo mandado", {
+        description: "Lo hará el primer ordenador potente que tenga el panel abierto; el vídeo se guarda solo.",
+      });
+      setElegido(null);
+    } catch (e) {
+      toast.error("No se pudo mandar el vídeo", { description: (e as Error)?.message });
+    } finally {
+      setMandando(false);
+    }
+  };
 
   const alElegir = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -50,7 +111,6 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
     );
   }
 
-  const hayGuardado = !!urlGuardada && !video.quitar;
   const procesando = estado.fase === "procesando";
   const nombreTema = (t: NombreTema) => temas.find((x) => x.clave === t)?.nombre ?? t;
 
@@ -119,7 +179,7 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
               />
               {fondoCambiado && (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  El vídeo mantiene su fondo; vuelve a generarlo si quieres el nuevo.
+                  El vídeo mantiene su fondo; para cambiarlo, toca abajo el fondo que quieras y pulsa «Cambiar fondo del vídeo».
                 </p>
               )}
               <Button type="button" variant="outline" size="sm" className="text-destructive" onClick={() => video.setQuitar(true)}>
@@ -155,7 +215,7 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
                     <button
                       key={t.clave}
                       type="button"
-                      onClick={() => setTema(t.clave)}
+                      onClick={() => setElegido(t.clave)}
                       aria-label={`Fondo ${t.nombre}`}
                       aria-pressed={tema === t.clave}
                       title={t.nombre}
@@ -165,6 +225,25 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
                   ))}
                 </div>
               </div>
+              {accion === "boton" && (
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={cambiarFondo}>
+                    <Palette className="mr-2 h-4 w-4" /> Cambiar fondo del vídeo a {nombreTema(tema)}
+                  </Button>
+                  {!esPotente && typeof original === "string" && (
+                    <Button type="button" variant="secondary" onClick={() => void mandarCambioAPotente()} disabled={mandando}>
+                      {mandando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Cpu className="mr-2 h-4 w-4" />}
+                      Mandar a un dispositivo potente
+                    </Button>
+                  )}
+                </div>
+              )}
+              {accion === "buscando" && (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" /> Comprobando el vídeo original…
+                </p>
+              )}
+              {accion === "sin-original" && <p className="text-sm text-amber-700 dark:text-amber-400">{MENSAJE_SIN_ORIGINAL}</p>}
               <div className="flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={() => grabarRef.current?.click()} disabled={!disponible}>
                   <Video className="mr-2 h-4 w-4" /> Grabar vídeo

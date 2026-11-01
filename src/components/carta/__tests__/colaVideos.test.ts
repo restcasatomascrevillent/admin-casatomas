@@ -12,6 +12,7 @@ import {
   textoIndicador,
   trabajoDePlato,
   trabajosActivos,
+  trabajoCambioFondo,
   type NuevoTrabajoVideo,
   type TrabajoVideo,
 } from "../video/colaVideos";
@@ -123,5 +124,44 @@ describe("textos", () => {
     const f = contenidoNotificacion("Arroz meloso", "fallo", "Este vídeo está en HEVC.");
     expect(f.titulo).toBe("No se pudo generar el vídeo: Arroz meloso");
     expect(f.cuerpo).toBe("Este vídeo está en HEVC. Toca para reintentarlo.");
+  });
+});
+
+describe("trabajoCambioFondo", () => {
+  const base = { platoId: "p1", nombre: "Arroz", tema: "carbon" as const, urlActual: "https://x/p1-video.mp4?t=1&fondo=arena" };
+
+  it("con el archivo de esta sesión en memoria lo reutiliza (sin descargar ni volver a subir)", () => {
+    expect(trabajoCambioFondo({ ...base, previo: { archivo }, original: "videos-originales/p1.mov" })).toEqual({
+      ...base,
+      archivo,
+      guardarOriginal: false,
+    });
+  });
+
+  it("si el original no llegó a guardarse, lo vuelve a intentar con el archivo en memoria", () => {
+    expect(trabajoCambioFondo({ ...base, previo: { archivo }, original: false })?.guardarOriginal).toBe(true);
+  });
+
+  it("sin archivo: rehace desde el original guardado", () => {
+    expect(trabajoCambioFondo({ ...base, original: "videos-originales/p1.mov" })).toEqual({
+      ...base,
+      rutaOriginal: "videos-originales/p1.mov",
+      guardarOriginal: false,
+    });
+    expect(trabajoCambioFondo({ ...base, previo: { rutaOriginal: "videos-originales/p1.mp4" }, original: null })?.rutaOriginal).toBe(
+      "videos-originales/p1.mp4",
+    );
+  });
+
+  it("vídeo antiguo sin original: null", () => {
+    expect(trabajoCambioFondo({ ...base, original: false })).toBeNull();
+    expect(trabajoCambioFondo({ ...base, previo: null, original: null })).toBeNull();
+  });
+
+  it("el trabajo de cambio de fondo entra en la cola como cualquier otro y sustituye al activo del plato", () => {
+    const n = trabajoCambioFondo({ ...base, original: "videos-originales/p1.mov" })!;
+    const r = encolarTrabajo(cola(["t1", "p1"]), n, "t2");
+    expect(r.cancelados).toEqual(["t1"]);
+    expect(siguienteTrabajo(r.lista)).toMatchObject({ id: "t2", rutaOriginal: "videos-originales/p1.mov", tema: "carbon" });
   });
 });

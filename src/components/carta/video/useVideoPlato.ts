@@ -3,7 +3,7 @@ import type { NombreTema } from "../composicionCarta";
 import type { ProgresoVideo } from "./videoPlato";
 import type { DisponibilidadVideo } from "./procesarVideoPlato";
 import { quitarVideoPlato } from "./subirVideoPlato";
-import { estaActivo, trabajoDePlato, type TrabajoVideo } from "./colaVideos";
+import { estaActivo, trabajoCambioFondo, trabajoDePlato, type TrabajoVideo } from "./colaVideos";
 import { useColaVideos } from "./useColaVideos";
 
 export type EstadoVideo =
@@ -70,10 +70,28 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
       setQuitar(false);
       if (platoId) {
         setPendiente(null);
-        encolar({ platoId, nombre: nombrePlato || "plato", archivo, tema, urlActual });
+        encolar({ platoId, nombre: nombrePlato || "plato", archivo, tema, urlActual, guardarOriginal: true });
       } else setPendiente({ archivo, tema });
     },
     [platoId, nombrePlato, urlActual, encolar],
+  );
+
+  /**
+   * Rehace el vídeo ya hecho con otro fondo (misma cola global, se guarda
+   * solo). `original`: ruta del original guardado (o false/null si no hay).
+   * Devuelve false si no hay de dónde sacar el vídeo.
+   */
+  const trabajoListo = trabajo?.estado === "listo" ? trabajo : null;
+  const cambiarFondo = useCallback(
+    (tema: NombreTema, original: string | false | null): boolean => {
+      if (!platoId) return false;
+      const n = trabajoCambioFondo({ platoId, nombre: nombrePlato || "plato", tema, urlActual, previo: trabajoListo, original });
+      if (!n) return false;
+      setQuitar(false);
+      encolar(n);
+      return true;
+    },
+    [platoId, nombrePlato, urlActual, trabajoListo, encolar],
   );
 
   const trabajoId = trabajo?.id;
@@ -100,7 +118,7 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
   const guardar = useCallback(
     async (id: string, urlGuardada: string | null | undefined, nombre?: string | null): Promise<boolean> => {
       if (pendiente) {
-        encolar({ platoId: id, nombre: nombre || nombrePlato || "plato", archivo: pendiente.archivo, tema: pendiente.tema, urlActual: urlGuardada ?? null });
+        encolar({ platoId: id, nombre: nombre || nombrePlato || "plato", archivo: pendiente.archivo, tema: pendiente.tema, urlActual: urlGuardada ?? null, guardarOriginal: true });
         setPendiente(null);
         return false;
       }
@@ -115,11 +133,13 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
 
   return useMemo(
     () => ({
+      platoId,
       estado,
       disponible,
       quitar,
       setQuitar,
       generar,
+      cambiarFondo,
       reintentar,
       puedeReintentar: estado.fase === "fallo",
       cancelar,
@@ -130,7 +150,7 @@ export function useVideoPlato(plato?: PlatoDelVideo | null) {
       /** Hay algo que hacer al guardar (vídeo pendiente de un plato nuevo o quitar el guardado). */
       pendiente: !!pendiente || quitar,
     }),
-    [estado, disponible, quitar, generar, reintentar, cancelar, limpiar, guardar, pendiente],
+    [platoId, estado, disponible, quitar, generar, cambiarFondo, reintentar, cancelar, limpiar, guardar, pendiente],
   );
 }
 

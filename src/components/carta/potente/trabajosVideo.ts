@@ -79,6 +79,33 @@ export async function mandarAPotente(opts: { platoId: string; archivo: Blob & { 
   return data as unknown as TrabajoVideo;
 }
 
+/**
+ * Cambio de fondo en un dispositivo potente: copia (en el servidor) el
+ * original guardado a `pendientes/` y crea el trabajo con el tema nuevo. Al
+ * terminar, el dispositivo potente devuelve el bruto a `videos-originales/`.
+ */
+export async function mandarOriginalAPotente(opts: { platoId: string; rutaOriginal: string; tema: string }): Promise<TrabajoVideo> {
+  const { platoId, rutaOriginal, tema } = opts;
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) throw new Error("Vuelve a entrar en el panel para mandar el vídeo.");
+  const ext = extensionBruto({ name: rutaOriginal });
+  const ruta = `pendientes/${uuid()}.${ext}`;
+  const almacen = sb.storage.from(BUCKET_BRUTO);
+  const { error: eCopia } = await almacen.copy(rutaOriginal, ruta);
+  if (eCopia) throw eCopia;
+  const { data, error } = await sb
+    .from("trabajos_video")
+    .insert({ plato_id: platoId, ruta_original: ruta, tema, creado_por: u.user.id, dispositivo_origen: describirDispositivo() })
+    .select(COLUMNAS)
+    .single();
+  if (error) {
+    await almacen.remove([ruta]).catch(() => undefined);
+    if ((error as { code?: string }).code === "23505") throw new Error("Este plato ya tiene un vídeo pendiente.");
+    lanzar(error);
+  }
+  return data as unknown as TrabajoVideo;
+}
+
 /** Cancela un pendiente (no uno que ya se está procesando) y borra su bruto. */
 export async function cancelarTrabajo(t: Pick<TrabajoVideo, "id" | "ruta_original">): Promise<boolean> {
   const { data, error } = await sb.from("trabajos_video").delete().eq("id", t.id).neq("estado", "procesando").select("id");

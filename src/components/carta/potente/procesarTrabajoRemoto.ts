@@ -1,7 +1,9 @@
 /**
  * Procesa en ESTE dispositivo un trabajo de vídeo mandado desde un móvil:
  * reclamar → descargar el bruto → procesar y guardar `video_url` (pipeline
- * del vídeo del plato) → marcar listo → borrar el bruto → avisar por push.
+ * del vídeo del plato) → marcar listo → mover el bruto a
+ * `videos-originales/<platoId>.<ext>` (para poder cambiar el fondo después;
+ * si no se puede mover, se borra) → avisar por push.
  * Si falla: marcar error y avisar igualmente (el móvil ve «no se pudo»).
  *
  * El paso «procesar y guardar» es inyectable (`procesarYGuardar`) para meter
@@ -12,7 +14,6 @@ import type { NombreTema } from "../composicionCarta";
 import type { ProgresoVideo } from "../video/videoPlato";
 import type { TrabajoVideo } from "./colaPendientes";
 import {
-  borrarBruto,
   descargarBruto,
   notificarTrabajo,
   reclamarTrabajo,
@@ -40,7 +41,12 @@ export const procesarYGuardarDirecto: ProcesarYGuardar = async ({ platoId, bruto
   ]);
   const r = await procesarVideoPlato(bruto, { tema, signal, onProgreso });
   const anterior = await videoActualPlato(platoId);
-  return guardarVideoPlato(platoId, r.blob, anterior);
+  return guardarVideoPlato(platoId, r.blob, anterior, tema);
+};
+
+const conservarBrutoDirecto = async (rutaBruto: string, platoId: string) => {
+  const { conservarBrutoComoOriginal } = await import("../video/subirVideoPlato");
+  return conservarBrutoComoOriginal(rutaBruto, platoId);
 };
 
 export interface DependenciasRemoto {
@@ -48,7 +54,8 @@ export interface DependenciasRemoto {
   descargar?: typeof descargarBruto;
   terminar?: typeof terminarTrabajo;
   soltar?: typeof soltarTrabajo;
-  borrar?: typeof borrarBruto;
+  /** Conserva el bruto como original del plato (por defecto: moverlo a videos-originales/). */
+  conservar?: (rutaBruto: string, platoId: string) => Promise<unknown>;
   notificar?: typeof notificarTrabajo;
   procesarYGuardar?: ProcesarYGuardar;
 }
@@ -67,7 +74,7 @@ export async function procesarTrabajoRemoto(
   const descargar = opts.descargar ?? descargarBruto;
   const terminar = opts.terminar ?? terminarTrabajo;
   const soltar = opts.soltar ?? soltarTrabajo;
-  const borrar = opts.borrar ?? borrarBruto;
+  const conservar = opts.conservar ?? conservarBrutoDirecto;
   const notificar = opts.notificar ?? notificarTrabajo;
   const procesarYGuardar = opts.procesarYGuardar ?? procesarYGuardarDirecto;
 
@@ -84,7 +91,7 @@ export async function procesarTrabajoRemoto(
       onProgreso: opts.onProgreso,
     });
     await terminar(mio.id, true);
-    await borrar(mio.ruta_original);
+    await conservar(mio.ruta_original, mio.plato_id);
     await notificar(mio.id);
     return { estado: "listo", url };
   } catch (e) {

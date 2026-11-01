@@ -20,7 +20,7 @@ import {
 import { ColaVideosContext, type ContextoColaVideos } from "./useColaVideos";
 import { mantenerPantallaEncendida, vigilarSegundoPlano } from "./pantallaEncendida";
 import { mostrarNotificacion, pedirPermisoNotificaciones, posterParaNotificacion } from "./notificarVideo";
-import { ErrorMigracionVideo, guardarVideoPlato } from "./subirVideoPlato";
+import { descargarOriginalVideo, ErrorMigracionVideo, guardarOriginalVideo, guardarVideoPlato } from "./subirVideoPlato";
 import { AVISO_PANTALLA_ENCENDIDA } from "./videoPlato";
 
 export const AVISO_VUELTA_SEGUNDO_PLANO =
@@ -111,7 +111,11 @@ export function ColaVideosProvider({ children }: { children: ReactNode }) {
       const ruta = rutaPlatoEnPanel(t.platoId);
       try {
         const { procesarVideoPlato } = await cargarProcesado();
-        const r = await procesarVideoPlato(t.archivo, {
+        // Cambio de fondo sin el archivo en memoria: se rehace desde el original guardado.
+        const archivo = t.archivo ?? (t.rutaOriginal ? await descargarOriginalVideo(t.rutaOriginal) : null);
+        if (!archivo) throw new Error("No hay vídeo que procesar");
+        if (control.signal.aborted) throw new DOMException("Cancelado", "AbortError");
+        const r = await procesarVideoPlato(archivo, {
           tema: t.tema,
           signal: control.signal,
           onProgreso: (p) => actualizar(t.id, { progreso: p }),
@@ -120,7 +124,16 @@ export function ColaVideosProvider({ children }: { children: ReactNode }) {
         actualizar(t.id, { estado: "guardando" });
         // La URL actual más fresca (la ficha pudo cambiar mientras tanto) para borrar el fichero viejo.
         const enCache = queryClient.getQueryData<Plato[]>(["platos"])?.find((p) => p.id === t.platoId);
-        await guardarVideoPlato(t.platoId, r.blob, enCache ? (enCache.video_url ?? null) : t.urlActual);
+        await guardarVideoPlato(t.platoId, r.blob, enCache ? (enCache.video_url ?? null) : t.urlActual, t.tema);
+        // Conservar el original para poder cambiar el fondo luego (si falla, el vídeo ya está guardado).
+        if (t.guardarOriginal) {
+          try {
+            const rutaOriginal = await guardarOriginalVideo(t.platoId, archivo);
+            actualizar(t.id, { rutaOriginal });
+          } catch (e) {
+            console.warn("[video-plato] no se pudo guardar el original", e);
+          }
+        }
         await queryClient.invalidateQueries({ queryKey: ["platos"] });
         const urlVista = URL.createObjectURL(r.blob);
         vistas.current.add(urlVista);

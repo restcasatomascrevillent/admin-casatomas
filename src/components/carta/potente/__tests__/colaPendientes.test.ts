@@ -96,19 +96,19 @@ describe("procesarTrabajoRemoto", () => {
     descargar: vi.fn(async () => new Blob(["v"], { type: "video/mp4" })),
     terminar: vi.fn(async () => undefined),
     soltar: vi.fn(async () => undefined),
-    borrar: vi.fn(async () => undefined),
+    conservar: vi.fn(async () => "videos-originales/p1.mp4"),
     notificar: vi.fn(async () => ({ ok: true })),
     procesarYGuardar: vi.fn(async () => "https://x/p1-video.mp4?t=1"),
   });
 
-  it("camino feliz: reclama, procesa, marca listo, borra el bruto y avisa", async () => {
+  it("camino feliz: reclama, procesa, marca listo, guarda el bruto como original del plato y avisa", async () => {
     const d = deps();
     const r = await procesarTrabajoRemoto(trabajo({}), d);
     expect(r).toEqual({ estado: "listo", url: "https://x/p1-video.mp4?t=1" });
     expect(d.reclamar).toHaveBeenCalledWith("t1");
     expect(d.procesarYGuardar).toHaveBeenCalledWith(expect.objectContaining({ platoId: "p1", tema: "cartulina", nombrePlato: "Arroz meloso" }));
     expect(d.terminar).toHaveBeenCalledWith("t1", true);
-    expect(d.borrar).toHaveBeenCalledWith("pendientes/aaaaaaaa.mp4");
+    expect(d.conservar).toHaveBeenCalledWith("pendientes/aaaaaaaa.mp4", "p1");
     expect(d.notificar).toHaveBeenCalledWith("t1");
   });
 
@@ -126,7 +126,7 @@ describe("procesarTrabajoRemoto", () => {
     expect(r).toEqual({ estado: "error", mensaje: "No se encontró el plato en el vídeo" });
     expect(d.terminar).toHaveBeenCalledWith("t1", false, "No se encontró el plato en el vídeo");
     expect(d.notificar).toHaveBeenCalledWith("t1");
-    expect(d.borrar).not.toHaveBeenCalled();
+    expect(d.conservar).not.toHaveBeenCalled();
   });
 
   it("cancelado aquí: vuelve a pendiente y no avisa", async () => {

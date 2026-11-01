@@ -19,7 +19,12 @@ export interface TrabajoVideo {
   platoId: string;
   /** Nombre del plato para el indicador y la notificación. */
   nombre: string;
-  archivo: File;
+  /** Vídeo a procesar. Si falta, se descarga `rutaOriginal` al empezar (cambio de fondo). */
+  archivo?: File;
+  /** Original guardado en el bucket (`videos-originales/<platoId>.<ext>`) del que rehacer el vídeo. */
+  rutaOriginal?: string;
+  /** true = al terminar, guardar `archivo` como original del plato (vídeo recién elegido). */
+  guardarOriginal?: boolean;
   tema: NombreTema;
   /** video_url que tenía el plato al encolar (por si no está en la caché al guardar). */
   urlActual: string | null;
@@ -32,7 +37,7 @@ export interface TrabajoVideo {
   urlVista?: string;
 }
 
-export type NuevoTrabajoVideo = Pick<TrabajoVideo, "platoId" | "nombre" | "archivo" | "tema" | "urlActual">;
+export type NuevoTrabajoVideo = Pick<TrabajoVideo, "platoId" | "nombre" | "archivo" | "rutaOriginal" | "guardarOriginal" | "tema" | "urlActual">;
 
 const ACTIVOS: ReadonlySet<EstadoTrabajoVideo> = new Set(["esperando", "procesando", "guardando"]);
 export const estaActivo = (t: TrabajoVideo) => ACTIVOS.has(t.estado);
@@ -123,6 +128,29 @@ export function textoIndicador(t: TrabajoVideo): string {
 }
 
 /** Ruta del panel que abre la ficha del plato (Gestión web → Carta → editar). */
+/**
+ * Trabajo para cambiar el fondo de un vídeo ya hecho: reutiliza el archivo
+ * de esta sesión si sigue en memoria; si no, el original guardado. null si
+ * no hay de dónde sacarlo (vídeo anterior a guardar originales).
+ */
+export function trabajoCambioFondo(o: {
+  platoId: string;
+  nombre: string;
+  tema: NombreTema;
+  urlActual: string | null;
+  /** Trabajo terminado de esta sesión (puede tener el archivo en memoria). */
+  previo?: Pick<TrabajoVideo, "archivo" | "rutaOriginal"> | null;
+  /** Original encontrado en el bucket (null/false = no hay). */
+  original?: string | false | null;
+}): NuevoTrabajoVideo | null {
+  const base = { platoId: o.platoId, nombre: o.nombre, tema: o.tema, urlActual: o.urlActual };
+  const original = typeof o.original === "string" ? o.original : o.previo?.rutaOriginal;
+  // Con el archivo en memoria se ahorra la descarga; si el original no llegó a guardarse, se reintenta.
+  if (o.previo?.archivo) return { ...base, archivo: o.previo.archivo, guardarOriginal: !original };
+  if (original) return { ...base, rutaOriginal: original, guardarOriginal: false };
+  return null;
+}
+
 export function rutaPlatoEnPanel(platoId: string): string {
   return `/gestion-web?tab=carta&plato=${encodeURIComponent(platoId)}`;
 }
