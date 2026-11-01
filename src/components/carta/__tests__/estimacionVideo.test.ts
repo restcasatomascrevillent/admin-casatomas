@@ -42,9 +42,9 @@ describe("textoRestante", () => {
 });
 
 describe("misma calidad en móvil y en PC (decisión del dueño 01-11)", () => {
-  it("12 fps y 48 fotogramas en 4 s, sin modo ligero", () => {
-    expect(FPS_VIDEO).toBe(12);
-    expect(tiemposFotogramas(10)).toHaveLength(48);
+  it("30 fps y 120 fotogramas en 4 s, sin modo ligero (antes 12 fps: se veía a saltos)", () => {
+    expect(FPS_VIDEO).toBe(30);
+    expect(tiemposFotogramas(10)).toHaveLength(120);
   });
   it("aviso fijo de pantalla encendida", () => {
     expect(AVISO_PANTALLA_ENCENDIDA).toBe("Deja la pantalla encendida y esta pestaña abierta");

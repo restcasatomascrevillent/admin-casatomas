@@ -1,30 +1,37 @@
 /**
  * Vídeo del plato en el navegador: primeros 4 s de un vídeo → fotogramas a
- * 12 fps → fondo quitado con el MISMO modelo/worker que la foto
+ * 30 fps → fondo quitado con el MISMO modelo/worker que la foto
  * (mascaraModelo) → cada fotograma compuesto sobre el tema de la carta con el
- * mismo encuadre 4:3 que la foto (componerPlatoEnLienzo) → MediaRecorder
- * sobre canvas.captureStream.
+ * mismo encuadre 4:3 que la foto (componerPlatoEnLienzo) → WebCodecs + mp4
+ * (instantes exactos) o, si no hay, MediaRecorder sobre canvas.captureStream.
  *
  * Fases:
- *   A. Modelo en los fotogramas clave (todos con WebGPU; cada 2–4 en CPU).
+ *   A. Modelo en los fotogramas clave: como mucho FPS_MODELO (12) por
+ *      segundo con WebGPU, 6 o 3 en CPU (indicesClaveSalida); el resto de
+ *      los 30 fps usan la máscara interpolada.
  *      Las máscaras se guardan a 512² para no gastar memoria.
  *   B. Por fotograma: máscara interpolada + media exponencial, encuadre
  *      suavizado, composición → JPEG en memoria (~100 KB cada uno).
- *   C. Reproducción de los JPEG en un lienzo a 12 fps mientras graba
- *      MediaRecorder (MediaRecorder graba en tiempo real: por eso se graba al
- *      final, no mientras se procesa).
+ *   C. Codificación: VideoEncoder H.264 + mp4-muxer con el instante exacto
+ *      de cada fotograma (no depende del reloj ni de que la pestaña se vea).
+ *      Sin WebCodecs: reproducción de los JPEG en un lienzo a 30 fps mientras
+ *      graba MediaRecorder (en tiempo real: por eso se graba al final).
  */
 import { crearWorkerRecorteDedicado, mascaraModelo, recorteNavegadorDisponible } from "../recorte/quitarFondoNavegador";
 import { crearMutex, numeroWorkersRecorte, procesarEnPool } from "./paralelo";
 import { LADO_MODELO, postprocesarMascara } from "../recorte/mascaraRecorte";
 import { componerPlatoEnLienzo, FONDO_ACTIVO, PLATO_ALTO, PLATO_ANCHO, TEMAS, type CrearLienzo, type NombreTema } from "../composicionCarta";
+import { codificarConWebCodecs } from "./codificarWebCodecs";
 import {
+  ALFA_CAJA,
+  ALFA_MASCARA,
+  alfaParaFps,
   aUint8,
   BITRATE_VIDEO,
   cajaDeMascara,
   elegirMimeVideo,
   FPS_VIDEO,
-  indicesClave,
+  indicesClaveSalida,
   interpolarMascara,
   LADO_MASCARA_VIDEO,
   estimarRestanteMs,
@@ -349,7 +356,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       deviceMemory: nav.deviceMemory,
       hardwareConcurrency: nav.hardwareConcurrency,
     });
-    const claves = indicesClave(total, pasoInferencia(primero.ms / nWorkers));
+    const claves = indicesClaveSalida(total, pasoInferencia(primero.ms / nWorkers));
     // Tiempo estimado a partir de lo que tardó el primer fotograma (con su búsqueda y lectura).
     const msPorClave = primero.ms + msEntrada;
     const fin = performance.now() + estimarRestanteMs({ msPorClave, clavesPendientes: claves.length - 1, workers: nWorkers, fotogramas: total });
@@ -378,11 +385,13 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     }
     if (nWorkers > 1) console.info("[video-plato] recorte en paralelo", { workers: nWorkers, claves: claves.length });
 
-    // Máscara del fotograma i: interpolada entre claves y suavizada en el tiempo.
+    // Máscara del fotograma i: interpolada entre claves y suavizada en el
+    // tiempo (mismo suavizado por segundo que a 12 fps).
+    const alfaMascara = alfaParaFps(ALFA_MASCARA);
     const mascaraDe = (i: number, previa: Float32Array | null) => {
       const { a, b, t } = vecinosClave(i, claves);
       const base = interpolarMascara(mascaras.get(a)!, mascaras.get(b)!, t);
-      return suavizarMascara(previa, base);
+      return suavizarMascara(previa, base, alfaMascara);
     };
 
     // Encuadre estable para todo el vídeo.
@@ -392,7 +401,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
       previa = mascaraDe(i, previa);
       cajasCrudas.push(cajaDeMascara(previa, L, W, H));
     }
-    const cajas = suavizarCajas(cajasCrudas);
+    const cajas = suavizarCajas(cajasCrudas, alfaParaFps(ALFA_CAJA));
     if (cajas.length === 0) throw new Error("No se encontró el plato en el vídeo");
 
     // --- B. Composición de cada fotograma ----------------------------------
@@ -449,10 +458,28 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     // --- C. Codificación -----------------------------------------------------
     abortado(signal);
     onProgreso?.({ fase: "codificando" });
-    const blob = await grabarConPausa(fotogramas, formato, signal);
+    const tC = performance.now();
+    let blob: Blob | null = null;
+    let formatoFinal: FormatoVideo = formato;
+    try {
+      blob = await codificarConWebCodecs(fotogramas, { ancho: PLATO_ANCHO, alto: PLATO_ALTO, signal });
+    } catch (e) {
+      abortado(signal);
+      console.warn("[video-plato] WebCodecs falló; se graba con MediaRecorder", e);
+    }
+    if (blob) formatoFinal = { mime: "video/mp4", ext: "mp4", contentType: "video/mp4" };
+    else blob = await grabarConPausa(fotogramas, formato, signal);
     const ms = Math.round(performance.now() - t0);
-    console.info("[video-plato]", { fotogramas: total, inferencias: claves.length, ms, formato: formato.mime, kb: Math.round(blob.size / 1024) });
-    return { blob, formato, fotogramas: total, inferencias: claves.length, ms, poster: fotogramas[0] };
+    console.info("[video-plato]", {
+      fotogramas: total,
+      inferencias: claves.length,
+      ms,
+      msCodificacion: Math.round(performance.now() - tC),
+      codificador: blob && formatoFinal !== formato ? "webcodecs" : "mediarecorder",
+      formato: formatoFinal.mime,
+      kb: Math.round(blob.size / 1024),
+    });
+    return { blob, formato: formatoFinal, fotogramas: total, inferencias: claves.length, ms, poster: fotogramas[0] };
   } finally {
     liberar();
     lienzosMascara.src = lienzosMascara.dst = null;
