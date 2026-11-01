@@ -594,7 +594,7 @@ describe("EditorMenuNovedad · ordenar platos", () => {
     expect(within(filaGamba).getByDisplayValue("Cava")).toBeInTheDocument();
     // El foco sigue en el plato, no salta a la bebida.
     await waitFor(() => expect(primero.getByRole("button", { name: "Bajar «Gamba roja»" })).toHaveFocus());
-    expect(json(ultimo).secciones.primero.map((p) => p.maridaje?.nombre ?? null)).toEqual([null, "Cava", null]);
+    expect(json(ultimo).secciones.primero.map((p) => (p.maridaje as { nombre: string } | undefined)?.nombre ?? null)).toEqual([null, "Cava", null]);
   });
 
   it("Bebidas con «Comida + bebidas»: asa, subir y bajar con el foco en la línea", async () => {
@@ -607,6 +607,71 @@ describe("EditorMenuNovedad · ordenar platos", () => {
     fireEvent.click(bajar);
     expect(ids("bebidas")).toEqual(["Vino de la casa", "Agua"]);
     await waitFor(() => expect(seccion.getByRole("button", { name: "Subir bebida 2" })).toHaveFocus());
+  });
+});
+
+// Tarea «Cambiar en el panel el nombre de las secciones».
+describe("EditorMenuNovedad · nombres de las secciones", () => {
+  const conPlatos = (extra: Partial<MenuNovedad> = {}): MenuNovedad => ({
+    ...vacio,
+    secciones: { ...vacio.secciones, primero: [itemLibre("Gamba roja")] },
+    ...extra,
+  });
+  const abrir = () => fireEvent.click(screen.getByRole("button", { name: /Nombres de las secciones/ }));
+  const campo = (seccion: string, idioma: string) =>
+    screen.getByRole("textbox", { name: `Nombre de «${seccion}» en ${idioma}` });
+
+  it("plegado de entrada; un campo por sección y por idioma; Bebidas solo con «Comida + bebidas»", () => {
+    render(<Harness inicial={conPlatos()} />);
+    expect(screen.getByRole("button", { name: /Nombres de las secciones/ })).toHaveAttribute("aria-expanded", "false");
+    abrir();
+    for (const seccion of ["Primero", "Segundo", "Postre"]) {
+      expect(campo(seccion, "español")).toHaveAttribute("placeholder", seccion);
+      expect(campo(seccion, "inglés")).toBeInTheDocument();
+      expect(campo(seccion, "francés")).toBeInTheDocument();
+    }
+    expect(screen.queryByTestId("nombre-seccion-bebidas")).toBeNull();
+    fireEvent.click(screen.getByRole("radio", { name: /Comida \+ bebidas/ }));
+    expect(campo("Bebidas", "español")).toBeInTheDocument();
+  });
+
+  it("al escribir, la cabecera de la sección cambia y se guarda recortado; vacío vuelve al de siempre", () => {
+    render(<Harness inicial={conPlatos()} />);
+    abrir();
+    fireEvent.change(campo("Primero", "español"), { target: { value: "  Del mar " } });
+    fireEvent.change(campo("Primero", "inglés"), { target: { value: "From the sea" } });
+    expect(within(screen.getByTestId("seccion-menu-primero")).getByRole("heading", { name: "Del mar" })).toBeInTheDocument();
+    expect(serializarMenuNovedad(ultimo)).toMatchObject({ titulos: { primero: { es: "Del mar", en: "From the sea" } } });
+    // Los platos no cambian.
+    expect(ultimo.secciones.primero.map((p) => p.nombre)).toEqual(["Gamba roja"]);
+
+    fireEvent.change(campo("Primero", "español"), { target: { value: "   " } });
+    expect(within(screen.getByTestId("seccion-menu-primero")).getByRole("heading", { name: "Primero" })).toBeInTheDocument();
+    expect(serializarMenuNovedad(ultimo)).not.toHaveProperty("titulos");
+  });
+
+  it("si pasa de 40 caracteres avisa junto al campo", () => {
+    render(<Harness inicial={conPlatos()} />);
+    abrir();
+    fireEvent.change(campo("Postre", "francés"), { target: { value: "x".repeat(41) } });
+    const entrada = campo("Postre", "francés");
+    expect(entrada).toHaveAttribute("aria-invalid", "true");
+    expect(entrada).toHaveAccessibleDescription(/Pasa de 40 caracteres \(41\)/);
+    fireEvent.change(entrada, { target: { value: "x".repeat(40) } });
+    expect(campo("Postre", "francés")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("una novedad con nombres se abre desplegada y con ellos; con Maridaje también", () => {
+    render(<Harness inicial={conPlatos({ maridaje: true, titulos: { segundo: { es: "Arroces", fr: "Riz" } } })} />);
+    expect(screen.getByRole("button", { name: /Nombres de las secciones/ })).toHaveAttribute("aria-expanded", "true");
+    expect(campo("Segundo", "español")).toHaveValue("Arroces");
+    expect(campo("Segundo", "francés")).toHaveValue("Riz");
+    expect(within(screen.getByTestId("seccion-menu-segundo")).getByRole("heading", { name: "Arroces" })).toBeInTheDocument();
+  });
+
+  it("con Cata no aparece", () => {
+    render(<Harness inicial={{ ...vacio, tipo: "cata" }} />);
+    expect(screen.queryByTestId("nombres-secciones")).toBeNull();
   });
 });
 
