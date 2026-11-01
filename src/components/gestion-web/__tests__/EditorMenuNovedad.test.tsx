@@ -7,8 +7,8 @@
 // maridaje» con la bebida de cada plato, la cata en orden y la v1 intacta.
 
 import { useState } from "react";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { EditorMenuNovedad } from "@/components/gestion-web/EditorMenuNovedad";
 import { indexarPlatos, type PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
 import { itemLibre } from "@/lib/menu-dia";
@@ -21,6 +21,7 @@ import {
   parseMenuNovedad,
   serializarMenuNovedad,
   type ItemMenuNovedad,
+  type LineaBebidaNovedad,
   type MenuNovedad,
 } from "@/lib/menu-novedad";
 
@@ -410,6 +411,87 @@ describe("EditorMenuNovedad · Cata", () => {
     fireEvent.click(await screen.findByRole("option", { name: /Fondillón/ }));
     expect(ultimo.cata.map((l) => l.nombre)).toEqual(["Fondillón", "Orujo"]);
     expect(ultimo.cata[0]).toMatchObject({ origen: "vino", sulfitos: true });
+  });
+
+  describe("arrastrar para reordenar (tarea «Ordenar la Cata arrastrando»)", () => {
+    const linea = (id: string, nombre: string): LineaBebidaNovedad => ({
+      id,
+      origen: "libre",
+      refId: null,
+      nombre,
+      descripcion: null,
+      sulfitos: false,
+    });
+    const tres: MenuNovedad = {
+      ...vacio,
+      tipo: "cata",
+      cata: [linea("c1", "Cava"), linea("c2", "Fondillón"), linea("c3", "Orujo")],
+    };
+
+    // dnd-kit mide y anuncia en efectos y temporizadores: se le deja un momento entre teclas.
+    const esperarDnd = () => act(() => new Promise<void>((r) => setTimeout(r, 50)));
+
+    // jsdom no mide: cada fila de la lista mide 60 px de alto, una debajo de otra.
+    let medir: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      medir = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+        const fila = this.closest<HTMLElement>("li[data-clave]");
+        const indice = fila ? Array.from(fila.parentElement!.children).indexOf(fila) : 0;
+        const enLista = !!fila || this.tagName === "OL";
+        const top = enLista && fila ? indice * 60 : 0;
+        const height = this.tagName === "OL" ? 180 : enLista ? 50 : 0;
+        return { x: 0, y: top, top, left: 0, width: 300, height, right: 300, bottom: top + height, toJSON: () => ({}) };
+      });
+    });
+    afterEach(() => medir.mockRestore());
+
+    it("cada bebida tiene un asa de arrastre de 44 px, sin quitar subir y bajar", () => {
+      render(<Harness inicial={tres} />);
+      const asa = screen.getByRole("button", { name: "Arrastrar «Fondillón»" });
+      expect(asa).toBeEnabled();
+      expect(asa).toHaveClass("h-11", "w-11", "touch-none");
+      expect(screen.getByRole("button", { name: "Subir «Fondillón»" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Bajar «Fondillón»" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Subir «Cava»" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Bajar «Orujo»" })).toBeDisabled();
+      // Solo el asa bloquea el gesto táctil: el resto de la fila deja desplazar la página.
+      expect(screen.getByRole("list", { name: "Bebidas de la cata, en orden" })).not.toHaveClass("touch-none");
+      for (const fila of screen.getAllByRole("listitem")) expect(fila).not.toHaveClass("touch-none");
+    });
+
+    it("con el teclado: Espacio coge, flecha abajo mueve y Espacio suelta; se guarda en ese orden", async () => {
+      render(<Harness inicial={tres} />);
+      const asa = screen.getByRole("button", { name: "Arrastrar «Cava»" });
+      asa.focus();
+      fireEvent.keyDown(asa, { code: "Space", key: " " });
+      await esperarDnd();
+      fireEvent.keyDown(asa, { code: "ArrowDown", key: "ArrowDown" });
+      await esperarDnd();
+      fireEvent.keyDown(asa, { code: "Space", key: " " });
+      await waitFor(() => expect(ultimo.cata.map((l) => l.id)).toEqual(["c2", "c1", "c3"]));
+      expect(json(ultimo).secciones.cata.map((l) => l.nombre)).toEqual(["Fondillón", "Cava", "Orujo"]);
+      expect(json(ultimo).version).toBe(2);
+    });
+
+    it("Escape cancela el arrastre y la bebida se queda en su sitio", async () => {
+      render(<Harness inicial={tres} />);
+      const asa = screen.getByRole("button", { name: "Arrastrar «Cava»" });
+      asa.focus();
+      fireEvent.keyDown(asa, { code: "Space", key: " " });
+      await esperarDnd();
+      fireEvent.keyDown(asa, { code: "ArrowDown", key: "ArrowDown" });
+      await esperarDnd();
+      fireEvent.keyDown(asa, { code: "Escape", key: "Escape" });
+      await esperarDnd();
+      expect(ultimo.cata.map((l) => l.id)).toEqual(["c1", "c2", "c3"]);
+    });
+
+    it("con una sola bebida no se puede arrastrar ni subir o bajar", () => {
+      render(<Harness inicial={{ ...vacio, tipo: "cata", cata: [linea("c1", "Cava")] }} />);
+      expect(screen.getByRole("button", { name: "Arrastrar «Cava»" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Subir «Cava»" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Bajar «Cava»" })).toBeDisabled();
+    });
   });
 });
 
