@@ -1,5 +1,6 @@
 /**
- * Botón «Foto» de las tarjetas de la carta y el fallo «no deja subir fotos,
+ * Botón «Foto» de las tarjetas de la carta (ventana con la foto actual o «Sin
+ * foto», «Guardar» y «Cambiar/Añadir foto») y el fallo «no deja subir fotos,
  * cuando las subo se me cierra»: el diálogo con la foto elegida no puede
  * cerrarse por un toque «fuera» (el que llega al volver del selector de fotos
  * o de la cámara del móvil, o un toque sobre un aviso).
@@ -89,7 +90,14 @@ async function elegirFoto(input: HTMLInputElement) {
   await act(async () => {
     fireEvent.change(input, { target: { files: [fotoNueva()] } });
   });
-  await waitFor(() => expect(screen.getByRole("button", { name: "Guardar foto" })).toBeEnabled());
+  await waitFor(() => expect(screen.getByRole("button", { name: "Guardar" })).toBeEnabled());
+}
+
+/** Abre «Foto» en la tarjeta y pulsa «Cambiar foto» / «Añadir foto» (abre el selector). */
+function abrirYPedirFoto(boton: "Cambiar foto" | "Añadir foto" = "Cambiar foto") {
+  fireEvent.click(screen.getByRole("button", { name: "Foto" }));
+  fireEvent.click(screen.getByRole("button", { name: boton }));
+  return screen.getByTestId("foto-rapida-input") as HTMLInputElement;
 }
 
 describe("Tarjeta de plato", () => {
@@ -101,18 +109,24 @@ describe("Tarjeta de plato", () => {
     }
   });
 
-  it("«Foto» abre el selector en el mismo clic, sube la foto, guarda imagen_url y borra la antigua", async () => {
+  it("«Foto» enseña la foto actual con «Guardar» y «Cambiar foto»; cambiarla la sube y borra la antigua", async () => {
     render(<ListaPlatos platos={[plato]} />);
     // Las fotos empiezan ocultas en el panel.
     expect(screen.queryByAltText("Croquetas")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Foto" }));
 
+    // Se abre la ventana (sin saltar a la galería) con la foto que tiene ahora.
+    expect(screen.getByRole("dialog", { name: "Foto de Croquetas" })).toBeInTheDocument();
+    expect(screen.getByAltText("Foto actual de Croquetas")).toHaveAttribute("src", URL_ANTIGUA);
+    expect(clicsInput).toEqual([]);
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cambiar foto" }));
     const input = screen.getByTestId("foto-rapida-input") as HTMLInputElement;
     expect(clicsInput).toEqual([input]);
-    expect(screen.getByRole("dialog", { name: "Foto de Croquetas" })).toBeInTheDocument();
 
     await elegirFoto(input);
-    fireEvent.click(screen.getByRole("button", { name: "Guardar foto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
 
     await waitFor(() =>
       expect(mocks.actualizar).toHaveBeenCalledWith({
@@ -127,10 +141,25 @@ describe("Tarjeta de plato", () => {
     expect(screen.getByAltText("Croquetas")).toBeInTheDocument();
   });
 
+  it("sin foto: recuadro «Sin foto» y el botón dice «Añadir foto»", async () => {
+    render(<ListaPlatos platos={[{ ...plato, imagen_url: null } as Plato]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
+    expect(screen.getByRole("img", { name: "Sin foto" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cambiar foto" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Añadir foto" }));
+    await elegirFoto(screen.getByTestId("foto-rapida-input") as HTMLInputElement);
+    // Con una foto ya elegida, el botón pasa a «Cambiar foto».
+    expect(screen.getByRole("button", { name: "Cambiar foto" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalled());
+    expect(mocks.borrar).not.toHaveBeenCalled();
+  });
+
   it("con la foto elegida, un toque fuera del diálogo NO lo cierra ni pierde la foto", async () => {
     render(<ListaPlatos platos={[plato]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
-    await elegirFoto(screen.getByTestId("foto-rapida-input") as HTMLInputElement);
+    await elegirFoto(abrirYPedirFoto());
 
     // Radix registra el listener de «toque fuera» en el siguiente tick.
     await act(async () => new Promise((r) => setTimeout(r, 0)));
@@ -138,29 +167,28 @@ describe("Tarjeta de plato", () => {
     fireEvent.focusIn(document.body);
 
     expect(screen.getByRole("dialog", { name: "Foto de Croquetas" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Guardar foto" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeEnabled();
   });
 
-  it("si se cancela el selector sin elegir foto, el diálogo se cierra solo", async () => {
+  it("si se cancela la galería sin elegir foto, la ventana sigue abierta con la foto actual", async () => {
     render(<ListaPlatos platos={[plato]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    const input = abrirYPedirFoto();
     await act(async () => {
-      screen.getByTestId("foto-rapida-input").dispatchEvent(new Event("cancel"));
+      input.dispatchEvent(new Event("cancel"));
     });
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.getByRole("dialog", { name: "Foto de Croquetas" })).toBeInTheDocument();
+    expect(screen.getByAltText("Foto actual de Croquetas")).toBeInTheDocument();
     expect(mocks.subir).not.toHaveBeenCalled();
   });
 
   it("si la subida falla, el diálogo sigue abierto con la foto para reintentar", async () => {
     mocks.subir.mockRejectedValueOnce(new Error("sin red"));
     render(<ListaPlatos platos={[plato]} />);
-    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
-    await elegirFoto(screen.getByTestId("foto-rapida-input") as HTMLInputElement);
-    fireEvent.click(screen.getByRole("button", { name: "Guardar foto" }));
+    await elegirFoto(abrirYPedirFoto());
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(mocks.subir).toHaveBeenCalled());
     expect(mocks.actualizar).not.toHaveBeenCalled();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar foto" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Guardar" })).toBeEnabled());
     expect(screen.getByRole("dialog", { name: "Foto de Croquetas" })).toBeInTheDocument();
   });
 });

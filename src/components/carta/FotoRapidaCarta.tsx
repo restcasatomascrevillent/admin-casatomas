@@ -1,11 +1,10 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { Camera, ImagePlus, Loader2 } from "lucide-react";
+import { forwardRef, useCallback, useImperativeHandle, useRef, useState } from "react";
+import { ImageOff, ImagePlus, Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -23,7 +22,7 @@ export interface ElementoConFoto {
 }
 
 export interface FotoRapidaHandle {
-  /** Abre el selector de foto/cámara para `elemento` (llamar dentro del clic: el navegador lo exige). */
+  /** Abre la ventana de la foto de `elemento`: la actual (o «Sin foto») y los botones. */
   abrir: (elemento: ElementoConFoto) => void;
 }
 
@@ -44,12 +43,15 @@ interface FotoRapidaCartaProps {
  * (recorte automático → fondo de carta o foto original, `subirFotoCarta`,
  * borrado de la foto anterior si nadie más la usa).
  *
- * El `<input type="file">` vive FUERA del diálogo y siempre montado: el botón
- * de la tarjeta tiene que abrir el selector en el mismo clic (si no, el móvil
- * no lo abre). El diálogo se abre a la vez, detrás del selector: así, mientras
- * se elige la foto, la página tiene un diálogo abierto y el aviso de versión
- * nueva no la recarga sola. Si se cancela el selector sin elegir nada, se
- * cierra solo.
+ * Al pulsar «Foto» se abre la ventana con la foto actual (o un recuadro de
+ * «Sin foto») y debajo dos botones: «Guardar» (activo cuando hay una foto
+ * nueva elegida) y «Cambiar foto» («Añadir foto» si aún no tiene ninguna),
+ * que abre la galería o la cámara (petición del dueño, 01-11-2026).
+ *
+ * El `<input type="file">` vive FUERA del diálogo y siempre montado; se le hace
+ * clic dentro del toque en «Cambiar/Añadir foto» (si no, el móvil no abre el
+ * selector). Mientras se elige la foto el diálogo sigue abierto, así que el
+ * aviso de versión nueva no recarga la página.
  */
 export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps>(function FotoRapidaCarta(
   { tipo, bucket, tabla, guardarUrl, onGuardada },
@@ -60,9 +62,6 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
   const [elemento, setElemento] = useState<ElementoConFoto | null>(null);
   const [guardando, setGuardando] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Para el listener nativo de `cancel` (no ve el estado de React al día).
-  const hayFotoRef = useRef(false);
-  hayFotoRef.current = Boolean(fotoCarta.original);
 
   const elegirFoto = useCallback(() => {
     const input = inputRef.current;
@@ -83,23 +82,10 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
       abrir: (nuevo) => {
         limpiar();
         setElemento(nuevo);
-        elegirFoto();
       },
     }),
-    [limpiar, elegirFoto],
+    [limpiar],
   );
-
-  // Selector cancelado sin elegir foto: fuera el diálogo (Chrome 113+, Safari 16.4+).
-  // React no expone `onCancel` en un <input>, así que va con addEventListener.
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    const alCancelar = () => {
-      if (!hayFotoRef.current) cerrar();
-    };
-    input.addEventListener("cancel", alCancelar);
-    return () => input.removeEventListener("cancel", alCancelar);
-  }, [cerrar]);
 
   const alElegir = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivo = e.target.files?.[0];
@@ -166,42 +152,34 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
             <DialogTitle>Foto de {nombre}</DialogTitle>
             <DialogDescription>
               {fotoCarta.original
-                ? "Elige el fondo o usa la foto original y pulsa «Guardar foto»."
-                : "Elige una foto de la galería o hazla con la cámara."}
+                ? "Elige el fondo o usa la foto original y pulsa «Guardar»."
+                : fotoActual
+                  ? "Esta es la foto que tiene ahora."
+                  : "Todavía no tiene foto."}
             </DialogDescription>
           </DialogHeader>
 
           {fotoCarta.original ? (
             <SelectorFotoCarta recorte={fotoCarta} alt={`Foto nueva de ${nombre}`} />
+          ) : fotoActual ? (
+            <div className="relative mx-auto flex aspect-[4/3] w-full max-w-xs items-center justify-center overflow-hidden rounded-lg border bg-muted/40">
+              <img src={fotoActual} alt={`Foto actual de ${nombre}`} className="h-full w-full object-contain" />
+            </div>
           ) : (
-            <button
-              type="button"
-              onClick={elegirFoto}
-              className="relative mx-auto flex aspect-[4/3] w-full max-w-xs items-center justify-center overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/25 bg-muted/40 transition-colors hover:border-muted-foreground/50"
+            <div
+              role="img"
+              aria-label="Sin foto"
+              className="relative mx-auto flex aspect-[4/3] w-full max-w-xs flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/40 text-sm text-muted-foreground"
             >
-              {fotoActual ? (
-                <img src={fotoActual} alt={`Foto actual de ${nombre}`} className="h-full w-full object-contain" />
-              ) : (
-                <span className="flex flex-col items-center gap-1 text-sm text-muted-foreground">
-                  <Camera className="h-8 w-8 opacity-60" />
-                  Toca para elegir o hacer una foto
-                </span>
-              )}
-            </button>
+              <ImageOff className="h-10 w-10 opacity-60" aria-hidden="true" />
+              Sin foto
+            </div>
           )}
 
-          <Button type="button" variant="outline" className="h-11" onClick={elegirFoto} disabled={guardando}>
-            <ImagePlus className="mr-2 h-4 w-4" />
-            {fotoCarta.original || fotoActual ? "Elegir otra foto" : "Elegir foto"}
-          </Button>
-
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" className="h-11 px-5" onClick={cerrar} disabled={guardando}>
-              Cancelar
-            </Button>
+          <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
-              className="h-11 px-5"
+              className="h-11"
               onClick={guardar}
               disabled={!fotoCarta.original || fotoCarta.trabajando || guardando}
             >
@@ -211,12 +189,22 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
                   Guardando…
                 </>
               ) : fotoCarta.trabajando ? (
-                "Preparando foto…"
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Preparando…
+                </>
               ) : (
-                "Guardar foto"
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Guardar
+                </>
               )}
             </Button>
-          </DialogFooter>
+            <Button type="button" variant="outline" className="h-11" onClick={elegirFoto} disabled={guardando}>
+              <ImagePlus className="mr-2 h-4 w-4" />
+              {fotoCarta.original || fotoActual ? "Cambiar foto" : "Añadir foto"}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
