@@ -605,3 +605,71 @@ describe("EditorNovedadesWeb — maridaje y cata (historia 4093221d)", () => {
     expect(mocks.invoke.mock.calls.filter(([, { body }]) => body.tipo === "menu")).toHaveLength(0);
   });
 });
+
+// Tarea «Ordenar los platos del menú arrastrando» (criterios 2, 5, 6 y 7): el
+// orden nuevo se guarda con cada maridaje junto a su plato, y un guardado
+// fallido no se da por bueno.
+describe("EditorNovedadesWeb — orden de los platos del menú", () => {
+  const dosPrimeros = () => {
+    const menu = structuredClone(MENU_MARIDAJE);
+    const [gamba] = menu.secciones.primero;
+    menu.secciones.primero.push({
+      ...structuredClone(gamba),
+      id: "p1b",
+      nombre: "Tellinas",
+      descripcion: null,
+      traducciones: {
+        en: { nombre: "Wedge clams", descripcion: null },
+        fr: { nombre: "Tellines", descripcion: null },
+      },
+      maridaje: { ...structuredClone(gamba.maridaje), id: "m1b", nombre: "Albariño", descripcion: null, traducciones: undefined },
+    });
+    delete menu.secciones.primero[1].maridaje.traducciones;
+    return menu;
+  };
+  const nombres = (menu: { secciones: { primero: { nombre: string; maridaje?: { nombre: string } }[] } }) =>
+    menu.secciones.primero.map((p) => [p.nombre, p.maridaje?.nombre ?? null]);
+
+  it("bajar un plato y guardar: se guarda en ese orden, cada uno con su bebida, sin cambiar la versión", async () => {
+    const menu = dosPrimeros();
+    mocks.novedades = [novedad("n-3", "Maridaje de otoño", { botones: ["ver_menu"], menu })];
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Maridaje de otoño»" }));
+    const primero = within(screen.getByTestId("seccion-menu-primero"));
+    // Un menú guardado antes se abre con su orden de siempre.
+    expect(primero.getAllByRole("listitem").map((li) => li.getAttribute("data-clave"))).toEqual(["p1", "p1b"]);
+
+    fireEvent.click(primero.getByRole("button", { name: "Bajar «Gamba roja de Santa Pola»" }));
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalledTimes(1));
+    const guardado = mocks.actualizar.mock.calls[0][0].menu;
+    expect(guardado.version).toBe(menu.version);
+    expect(nombres(guardado)).toEqual([
+      ["Tellinas", "Albariño"],
+      ["Gamba roja de Santa Pola", "Cava brut nature"],
+    ]);
+    // Las traducciones van dentro de cada plato: se mueven con él.
+    expect(guardado.secciones.primero[1].traducciones.en.nombre).toBe("Santa Pola red prawn");
+    expect(guardado.secciones.segundo).toEqual(menu.secciones.segundo);
+    expect(guardado.secciones.postre).toEqual(menu.secciones.postre);
+  });
+
+  it("si el guardado falla, avisa del error, no lo da por guardado y deja el orden nuevo en el formulario", async () => {
+    mocks.actualizar.mockRejectedValueOnce(new Error("sin red"));
+    mocks.novedades = [novedad("n-3", "Maridaje de otoño", { botones: ["ver_menu"], menu: dosPrimeros() })];
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Maridaje de otoño»" }));
+    fireEvent.click(
+      within(screen.getByTestId("seccion-menu-primero")).getByRole("button", { name: "Bajar «Gamba roja de Santa Pola»" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No se pudo guardar la novedad/)));
+    expect(toast.success).not.toHaveBeenCalled();
+    // Sigue abierto, con el orden sin guardar, para reintentar.
+    expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeInTheDocument();
+    const filas = within(screen.getByTestId("seccion-menu-primero")).getAllByRole("listitem");
+    expect(filas.map((li) => li.getAttribute("data-clave"))).toEqual(["p1b", "p1"]);
+  });
+});
