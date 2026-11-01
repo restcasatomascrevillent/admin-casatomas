@@ -13,7 +13,7 @@ import {
   type MenuNovedad,
 } from "@/lib/menu-novedad";
 
-const linea = (nombre: string) => ({ ...lineaLibre(), nombre });
+const linea = (nombre: string) => lineaLibre("vino", nombre);
 
 function cata(...nombres: string[]): MenuNovedad {
   return { ...menuNovedadVacio(), tipo: "cata", cata: nombres.map(linea) };
@@ -115,5 +115,17 @@ describe("moverItem · secciones de platos", () => {
     expect(movido.maridajes[movido.secciones.primero[2].id].nombre).toBe("Vino de P0");
     const json = serializarMenuNovedad(movido) as { secciones: { primero: { nombre: string; maridaje?: { nombre: string } }[] } };
     expect(json.secciones.primero.at(-1)).toMatchObject({ nombre: "P0", maridaje: { nombre: "Vino de P0" } });
+  });
+});
+
+describe("moverItem · Bebidas del menú", () => {
+  it("mueve líneas de Bebidas sin tocar los platos", () => {
+    const menu = menuNovedadVacio();
+    menu.secciones.bebidas = ["Agua", "Vino", "Café"].map((nombre) => itemLibre(nombre));
+    menu.secciones.primero = [itemLibre("P0")];
+    const movido = moverItem(menu, "bebidas", 2, 0);
+    expect(movido.secciones.bebidas.map((b) => b.nombre)).toEqual(["Café", "Agua", "Vino"]);
+    expect(movido.secciones.primero).toBe(menu.secciones.primero);
+    expect(menu.secciones.bebidas.map((b) => b.nombre)).toEqual(["Agua", "Vino", "Café"]);
   });
 });

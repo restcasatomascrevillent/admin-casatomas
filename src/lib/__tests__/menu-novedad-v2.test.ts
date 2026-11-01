@@ -27,6 +27,7 @@ import {
   menuNovedadVacio,
   menuPintable,
   menuTieneComida,
+  traduccionOrdinalSeccion,
   parseLineaBebida,
   parseMenuNovedad,
   serializarMenuNovedad,
@@ -885,5 +886,50 @@ describe("secciones extra con nombre libre (31/10/2026)", () => {
     expect(menu.extras[0].traducciones).toEqual({ en: { nombre: "Appetiser" }, fr: { nombre: "Apéritif" } });
     expect(menu.extras[0].items[0].traducciones?.en?.nombre).toBe("Gilda skewer");
     expect(sinTraducir).toBe(0);
+  });
+
+  it("un nombre de sección que es un ordinal se traduce sin la IA («Cuarto» no es «Quarter»)", async () => {
+    const invocar = vi.fn<InvocarTraductorMenu>(async () => respuesta({}, {}));
+    const menu: MenuNovedad = {
+      ...menuNovedadVacio(),
+      extras: [
+        { id: "x3", nombre: "Tercero", posicion: "antes_postre", items: [] },
+        { id: "x4", nombre: " Cuarto ", posicion: "antes_postre", items: [] },
+        { id: "x5", nombre: "Quinto", posicion: "despues_postre", items: [] },
+      ],
+    };
+    const conPlatos: MenuNovedad = {
+      ...menu,
+      extras: menu.extras.map((seccion) => ({ ...seccion, items: [plato(`p-${seccion.id}`, "Plato")] })),
+    };
+    const sinIa = vi.fn<InvocarTraductorMenu>(async ({ datos }) => respuesta({ primero: datos.primero, segundo: datos.segundo }, { primero: datos.primero, segundo: datos.segundo }));
+    const { menu: traducido } = await traducirMenuNovedad(conPlatos, new Map(), sinIa);
+    expect(traducido.extras.map((s) => s.traducciones)).toEqual([
+      { en: { nombre: "Third" }, fr: { nombre: "Troisième" } },
+      { en: { nombre: "Fourth" }, fr: { nombre: "Quatrième" } },
+      { en: { nombre: "Fifth" }, fr: { nombre: "Cinquième" } },
+    ]);
+    // El nombre no va al traductor (solo los platos, en `primero`).
+    for (const [{ datos }] of sinIa.mock.calls) expect(datos.segundo).toBe("");
+    expect(invocar).not.toHaveBeenCalled();
+  });
+
+  it("traduccionOrdinalSeccion: lista cerrada, respeta mayúsculas y «… plato»", () => {
+    expect(traduccionOrdinalSeccion("Cuarto")).toEqual({ en: { nombre: "Fourth" }, fr: { nombre: "Quatrième" } });
+    expect(traduccionOrdinalSeccion("cuarto plato")).toEqual({ en: { nombre: "fourth course" }, fr: { nombre: "quatrième plat" } });
+    expect(traduccionOrdinalSeccion("Séptimo")).toEqual({ en: { nombre: "Seventh" }, fr: { nombre: "Septième" } });
+    expect(traduccionOrdinalSeccion("Primer plato")?.en.nombre).toBe("First course");
+    expect(traduccionOrdinalSeccion("Aperitivo")).toBeNull();
+    expect(traduccionOrdinalSeccion("Cuarto de cordero")).toBeNull();
+  });
+
+  it("una traducción ya guardada del ordinal no se pisa", async () => {
+    const invocar = vi.fn<InvocarTraductorMenu>(async () => respuesta({}, {}));
+    const menu: MenuNovedad = {
+      ...menuNovedadVacio(),
+      extras: [{ id: "x4", nombre: "Cuarto", posicion: "antes_postre", items: [plato("p1", "Plato")], traducciones: { en: { nombre: "Course four" } } }],
+    };
+    const { menu: traducido } = await traducirMenuNovedad(menu, new Map(), invocar);
+    expect(traducido.extras[0].traducciones).toEqual({ en: { nombre: "Course four" }, fr: { nombre: "Quatrième" } });
   });
 });

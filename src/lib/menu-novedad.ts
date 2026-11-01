@@ -27,6 +27,7 @@
 // ya están en producción no notan nada con los menús normales.
 // ---------------------------------------------------------------------------
 
+import { moverEnLista } from "@/lib/mover-en-lista";
 import type { Json } from "@/integrations/supabase/types";
 import { normalizarAlergeno, parseAlergenos } from "@/lib/alergenos";
 import {
@@ -208,6 +209,25 @@ export const seccionExtraVacia = (posicion: PosicionSeccionExtra = "despues_post
   items: [],
 });
 
+// Nombres propios de primero, segundo, postre y bebidas (tarea «Cambiar en el
+// panel el nombre de las secciones»). Contrato fijado en «Mostrar en la web los
+// nombres de sección propios» (web v0.48): `menu.titulos` en la RAÍZ del jsonb,
+// no en `secciones`, opcional y sin subir de versión (se lee en v1 y v2). Una
+// sección sin nombre en español no se escribe: la web pone el de siempre. Si
+// falta inglés o francés, la web enseña el español.
+export const MAX_TITULO_SECCION = 40;
+
+export interface TituloSeccionNovedad {
+  es: string;
+  en?: string;
+  fr?: string;
+}
+
+export type TitulosSeccionesNovedad = Partial<Record<SeccionMenuNovedad, TituloSeccionNovedad>>;
+
+/** Claves de la raíz de `novedades.menu` que entiende el panel. Las demás se guardan tal cual. */
+const CLAVES_RAIZ_MENU = ["version", "tipo", "incluye_bebidas", "maridaje", "secciones", "titulos"];
+
 /**
  * El menú tal y como lo edita el panel (ADR-7). La versión no está aquí: la
  * decide `serializarMenuNovedad` (E1). Mientras se edita se conserva lo del
@@ -226,6 +246,13 @@ export interface MenuNovedad {
   extras: SeccionExtraNovedad[];
   /** Lista ordenada de la cata. */
   cata: LineaBebidaNovedad[];
+  /** Nombres propios de las secciones, tal cual se escriben (sin recortar). */
+  titulos: TitulosSeccionesNovedad;
+  /**
+   * Claves de la raíz que el panel no conoce (de una web o un panel más
+   * nuevos): se vuelven a escribir sin tocarlas para no borrarlas al guardar.
+   */
+  otrasClaves?: { [clave: string]: Json };
 }
 
 export const menuNovedadVacio = (): MenuNovedad => ({
@@ -236,6 +263,7 @@ export const menuNovedadVacio = (): MenuNovedad => ({
   maridajes: {},
   extras: [],
   cata: [],
+  titulos: {},
 });
 
 const texto = (valor: unknown): string => (typeof valor === "string" ? valor.trim() : "");
@@ -355,7 +383,67 @@ export function parseMenuNovedad(valor: unknown): MenuNovedad | null {
   if (menu.tipo === "cata" && Array.isArray(mapa.cata)) {
     menu.cata = mapa.cata.map((linea) => parseLineaBebida(linea)).filter(esLinea);
   }
+  menu.titulos = parseTitulos(crudo.titulos);
+  const otras = Object.entries(crudo).filter(([clave]) => !CLAVES_RAIZ_MENU.includes(clave));
+  if (otras.length > 0) menu.otrasClaves = Object.fromEntries(otras) as { [clave: string]: Json };
   return menu;
+}
+
+/** Lectura tolerante de `titulos`: sin español o con un tipo raro, la sección no tiene nombre propio. */
+function parseTitulos(valor: unknown): TitulosSeccionesNovedad {
+  const titulos: TitulosSeccionesNovedad = {};
+  if (!esObjeto(valor)) return titulos;
+  for (const seccion of SECCIONES_MENU_NOVEDAD) {
+    const crudo = valor[seccion];
+    if (!esObjeto(crudo)) continue;
+    const titulo = limpiarTitulo({ es: crudo.es as string, en: crudo.en as string, fr: crudo.fr as string });
+    if (titulo) titulos[seccion] = titulo;
+  }
+  return titulos;
+}
+
+/** Recorta y quita los idiomas vacíos; sin español, null (vuelve el nombre de siempre). */
+function limpiarTitulo(titulo: TituloSeccionNovedad | undefined): TituloSeccionNovedad | null {
+  const es = texto(titulo?.es);
+  if (!es) return null;
+  const limpio: TituloSeccionNovedad = { es };
+  for (const idioma of IDIOMAS_TRADUCIDOS) {
+    const nombre = texto(titulo?.[idioma]);
+    if (nombre) limpio[idioma] = nombre;
+  }
+  return limpio;
+}
+
+/** Las secciones que pueden llevar nombre propio en este menú (Bebidas solo con «Comida + bebidas»). */
+export const seccionesConTitulo = (menu: MenuNovedad): SeccionMenuNovedad[] =>
+  menu.tipo === "cata" ? [] : SECCIONES_MENU_NOVEDAD.filter((s) => s !== "bebidas" || incluyeBebidas(menu));
+
+/** Los nombres que se guardarían: recortados, sin vacíos y solo de las secciones que se ven. */
+export function limpiarTitulos(menu: MenuNovedad): TitulosSeccionesNovedad {
+  const titulos: TitulosSeccionesNovedad = {};
+  for (const seccion of seccionesConTitulo(menu)) {
+    const titulo = limpiarTitulo(menu.titulos?.[seccion]);
+    if (titulo) titulos[seccion] = titulo;
+  }
+  return titulos;
+}
+
+/** Nombre propio en español de una sección (recortado), o null si no tiene. */
+export const tituloPropio = (menu: MenuNovedad, seccion: SeccionMenuNovedad): string | null =>
+  texto(menu.titulos?.[seccion]?.es) || null;
+
+/** Longitud en caracteres que se ven (una tilde o un emoji cuentan uno). */
+export const largoTitulo = (valor: string | undefined): number => Array.from(texto(valor)).length;
+
+/** Qué nombres pasan de `MAX_TITULO_SECCION` caracteres (después de recortar). */
+export function titulosDemasiadoLargos(menu: MenuNovedad): { seccion: SeccionMenuNovedad; idioma: "es" | IdiomaTraducido }[] {
+  const largos: { seccion: SeccionMenuNovedad; idioma: "es" | IdiomaTraducido }[] = [];
+  for (const seccion of seccionesConTitulo(menu)) {
+    for (const idioma of ["es", ...IDIOMAS_TRADUCIDOS] as const) {
+      if (largoTitulo(menu.titulos?.[seccion]?.[idioma]) > MAX_TITULO_SECCION) largos.push({ seccion, idioma });
+    }
+  }
+  return largos;
 }
 
 function parseTraduccionesNombre(valor: unknown): SeccionExtraNovedad["traducciones"] {
@@ -425,7 +513,12 @@ const incluyeBebidas = (menu: MenuNovedad): boolean => menu.incluye_bebidas && !
 
 export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
   if (menu.tipo === "cata") {
-    return { ...menuNovedadVacio(), tipo: "cata", cata: menu.cata.map(limpiarLinea).filter(esLinea) };
+    return {
+      ...menuNovedadVacio(),
+      tipo: "cata",
+      cata: menu.cata.map(limpiarLinea).filter(esLinea),
+      ...(menu.otrasClaves ? { otrasClaves: menu.otrasClaves } : {}),
+    };
   }
   const extras = limpiarExtras(menu.extras);
   const secciones: SeccionesMenuNovedad = {
@@ -449,6 +542,8 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
     maridajes,
     extras,
     cata: [],
+    titulos: limpiarTitulos(menu),
+    ...(menu.otrasClaves ? { otrasClaves: menu.otrasClaves } : {}),
   };
 }
 
@@ -484,17 +579,12 @@ export type ListaOrdenableMenu = SeccionMenuNovedad | "cata";
  * al elemento sin hacer nada. La versión la decide `serializarMenuNovedad`.
  */
 export function moverItem(menu: MenuNovedad, seccion: ListaOrdenableMenu, desde: number, hasta: number): MenuNovedad {
-  const lista: readonly unknown[] = seccion === "cata" ? menu.cata : menu.secciones[seccion];
-  const valido = (i: number) => Number.isInteger(i) && i >= 0 && i < lista.length;
-  if (!valido(desde) || !valido(hasta) || desde === hasta) return menu;
-  const mover = <T>(items: readonly T[]): T[] => {
-    const copia = [...items];
-    const [elemento] = copia.splice(desde, 1);
-    copia.splice(hasta, 0, elemento);
-    return copia;
-  };
-  if (seccion === "cata") return { ...menu, cata: mover(menu.cata) };
-  return { ...menu, secciones: { ...menu.secciones, [seccion]: mover(menu.secciones[seccion]) } };
+  if (seccion === "cata") {
+    const cata = moverEnLista(menu.cata, desde, hasta);
+    return cata === menu.cata ? menu : { ...menu, cata: [...cata] };
+  }
+  const items = moverEnLista(menu.secciones[seccion], desde, hasta);
+  return items === menu.secciones[seccion] ? menu : { ...menu, secciones: { ...menu.secciones, [seccion]: [...items] } };
 }
 
 /** Las bebidas que se guardarían, en orden: las de cada plato (primero, segundo, postre) o las de la cata. */
@@ -577,8 +667,11 @@ function serializarItem(item: ItemMenuNovedad, maridaje?: LineaBebidaNovedad): {
  */
 export function serializarMenuNovedad(menu: MenuNovedad): Json {
   const limpio = limpiarMenuNovedad(menu);
+  // Lo que el panel no conoce va primero: lo suyo manda si se repite una clave.
+  const otras = limpio.otrasClaves ?? {};
   if (limpio.tipo === "cata") {
     return {
+      ...otras,
       version: 2,
       tipo: "cata",
       incluye_bebidas: false,
@@ -604,8 +697,11 @@ export function serializarMenuNovedad(menu: MenuNovedad): Json {
       return salida;
     });
   }
-  if (!limpio.maridaje) return { version: 1, incluye_bebidas: limpio.incluye_bebidas, secciones };
-  return { version: 2, tipo: "menu", incluye_bebidas: limpio.incluye_bebidas, maridaje: true, secciones };
+  // Solo si hay alguno: un menú sin nombres propios se escribe como siempre.
+  const titulos =
+    Object.keys(limpio.titulos).length > 0 ? { titulos: limpio.titulos as unknown as { [clave: string]: Json } } : {};
+  if (!limpio.maridaje) return { ...otras, version: 1, incluye_bebidas: limpio.incluye_bebidas, secciones, ...titulos };
+  return { ...otras, version: 2, tipo: "menu", incluye_bebidas: limpio.incluye_bebidas, maridaje: true, secciones, ...titulos };
 }
 
 // ---------------------------------------------------------------------------
@@ -779,6 +875,7 @@ export type CodigoErrorBotones =
   | "maridaje_vacio"
   | "cata_vacia"
   | "seccion_sin_nombre"
+  | "titulo_largo"
   | "plato_sin_enlazar"
   | "plato_fuera_de_carta";
 
@@ -823,6 +920,12 @@ export function validarBotonesNovedad({ botones, menu, estadoPlato }: BotonesPar
         errores.push({
           codigo: "menu_sin_platos",
           mensaje: "«Ver menú» necesita al menos un plato.",
+        });
+      }
+      if (titulosDemasiadoLargos(menu).length > 0) {
+        errores.push({
+          codigo: "titulo_largo",
+          mensaje: `El nombre de una sección no puede pasar de ${MAX_TITULO_SECCION} caracteres: acórtalo.`,
         });
       }
       if (limpiarExtras(menu.extras).some((seccion) => seccion.nombre === "")) {
@@ -977,6 +1080,54 @@ export function conservarTraduccionesLinea(
   return { ...sinTraducciones, traducciones: soloNombres };
 }
 
+/**
+ * Nombres de sección que son un ORDINAL («Tercero», «Cuarto plato»…) se
+ * traducen con esta lista cerrada, sin la IA. Motivo (PROD, 01-11-2026): el
+ * nombre de la sección va solo al traductor, sin contexto, y «Cuarto» salió
+ * como «Quarter» / «Quart» (la fracción, no el orden). Igual que un plato de la
+ * carta: gratis y exacto. Cualquier otro nombre sigue yendo al traductor.
+ */
+const ORDINALES_SECCION: Record<string, Record<IdiomaTraducido, string>> = {
+  primero: { en: "First", fr: "Premier" },
+  segundo: { en: "Second", fr: "Deuxième" },
+  tercero: { en: "Third", fr: "Troisième" },
+  cuarto: { en: "Fourth", fr: "Quatrième" },
+  quinto: { en: "Fifth", fr: "Cinquième" },
+  sexto: { en: "Sixth", fr: "Sixième" },
+  septimo: { en: "Seventh", fr: "Septième" },
+  octavo: { en: "Eighth", fr: "Huitième" },
+  noveno: { en: "Ninth", fr: "Neuvième" },
+  decimo: { en: "Tenth", fr: "Dixième" },
+};
+
+/** «Cuarto» → Fourth / Quatrième; «cuarto plato» → fourth course / quatrième plat. Si no es un ordinal, `null`. */
+export function traduccionOrdinalSeccion(nombre: string): Record<IdiomaTraducido, { nombre: string }> | null {
+  const limpio = nombre.replace(/\s+/g, " ").trim();
+  const clave = limpio
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const coincide = /^(primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)( plato)?$/.exec(clave);
+  if (!coincide) return null;
+  const ordinal = ORDINALES_SECCION[coincide[1] === "primer" ? "primero" : coincide[1] === "tercer" ? "tercero" : coincide[1]];
+  const conPlato = !!coincide[2];
+  const mayuscula = limpio[0] !== limpio[0].toLowerCase();
+  const forma = (texto: string) => (mayuscula ? texto : texto.toLowerCase());
+  return {
+    en: { nombre: forma(conPlato ? `${ordinal.en} course` : ordinal.en) },
+    fr: { nombre: forma(conPlato ? `${ordinal.fr} plat` : ordinal.fr) },
+  };
+}
+
+/** Rellena solo los idiomas que le falten a la sección; lo ya guardado se respeta. */
+function conOrdinalTraducido(seccion: SeccionExtraNovedad): Pick<SeccionExtraNovedad, "traducciones"> | Record<string, never> {
+  const ordinal = traduccionOrdinalSeccion(seccion.nombre);
+  if (!ordinal) return {};
+  const traducciones = { ...seccion.traducciones };
+  for (const idioma of IDIOMAS_TRADUCIDOS) if (!traducciones[idioma]?.nombre) traducciones[idioma] = ordinal[idioma];
+  return { traducciones };
+}
+
 /** Cómo se llama a `traducir-contenido` (inyectado para poder probarlo). */
 export type InvocarTraductorMenu = (body: {
   tipo: "menu";
@@ -1124,8 +1275,10 @@ export async function traducirMenuNovedad(
 
   // 5. Secciones extra: una llamada por sección, sus platos pendientes en
   //    `primero` y su nombre (si le falta traducción) solo en `segundo`.
+  //    Un nombre que es un ordinal se completa antes con la lista cerrada.
   const extrasConCarta = limpio.extras.map((seccion) => ({
     ...seccion,
+    ...conOrdinalTraducido(seccion),
     items: seccion.items.map((item) => {
       if (traduccionCompleta(item) || !enLaCarta(item)) return item;
       const deCarta = traduccionesDesdeCarta(platosPorId.get(item.platoId as string) as PlatoConTraducciones);

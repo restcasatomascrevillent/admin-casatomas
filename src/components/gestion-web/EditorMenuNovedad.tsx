@@ -16,7 +16,7 @@
 // mientras se edita y se avisa de que no se guardará (E10).
 // ---------------------------------------------------------------------------
 
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Info, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,7 +34,13 @@ import {
   conservarTraduccionesLinea,
   conservarTraduccionesVigentes,
   ETIQUETA_POSICION_EXTRA,
+  largoTitulo,
+  MAX_TITULO_SECCION,
   moverItem,
+  seccionesConTitulo,
+  titulosDemasiadoLargos,
+  tituloPropio,
+  type SeccionMenuNovedad,
   platosEnOrden,
   POSICIONES_SECCION_EXTRA,
   seccionExtraVacia,
@@ -100,12 +106,12 @@ interface Enfoque {
   selectores: string[];
 }
 
-function useEnfoque<T extends HTMLElement>() {
+function useEnfoque<T extends HTMLElement>(atributo = "data-clave") {
   const ref = useRef<T>(null);
   const [enfoque, setEnfoque] = useState<Enfoque | null>(null);
   useEffect(() => {
     if (!enfoque) return;
-    const fila = ref.current?.querySelector(`[data-clave="${enfoque.clave}"]`);
+    const fila = ref.current?.querySelector(`[${atributo}="${enfoque.clave}"]`);
     for (const selector of enfoque.selectores) {
       const destino = fila?.querySelector<HTMLElement>(selector);
       if (destino) {
@@ -114,7 +120,7 @@ function useEnfoque<T extends HTMLElement>() {
       }
     }
     setEnfoque(null);
-  }, [enfoque]);
+  }, [enfoque, atributo]);
   return { ref, enfocar: setEnfoque };
 }
 
@@ -251,12 +257,14 @@ function EditorMenuPlatos({
   // La bebida recién añadida recibe el foco (el botón «Añadir bebida» sigue en
   // su sitio, pero lo siguiente que se hace es escribirla).
   const [enfocarBebida, setEnfocarBebida] = useState<string | null>(null);
-  const listaBebidasRef = useRef<HTMLUListElement>(null);
+  const listaBebidasRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!enfocarBebida) return;
     listaBebidasRef.current?.querySelector<HTMLInputElement>(`[data-bebida="${enfocarBebida}"]`)?.focus();
     setEnfocarBebida(null);
   }, [enfocarBebida]);
+  // Subir y bajar: el foco sigue a la línea (o pasa a la otra flecha si ya no puede ir más allá).
+  const { ref: refOrdenBebidas, enfocar: enfocarOrdenBebida } = useEnfoque<HTMLDivElement>();
 
   const cambiarComida = (siguientes: Record<SeccionMenu, ItemMenu[]>) =>
     onChange({
@@ -281,9 +289,12 @@ function EditorMenuPlatos({
   const moverBebida = (indice: number, direccion: -1 | 1) => {
     const destino = indice + direccion;
     if (destino < 0 || destino >= bebidas.length) return;
-    const copia = [...bebidas];
-    [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
-    cambiarBebidas(copia);
+    onChange(moverItem(menu, "bebidas", indice, destino));
+    const sentido = direccion === -1 ? "arriba" : "abajo";
+    enfocarOrdenBebida({
+      clave: bebidas[indice].id,
+      selectores: [`[data-mover="${sentido}"]:not([disabled])`, "[data-mover]:not([disabled])"],
+    });
   };
 
   return (
@@ -300,7 +311,9 @@ function EditorMenuPlatos({
       ) : (
         <>
           <EditorSeccionesMenu
+            ordenable
             secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+            titulos={titulosEditor(menu)}
             onChange={cambiarComida}
             platos={platos}
             platosPorId={platosPorId}
@@ -346,7 +359,7 @@ function EditorMenuPlatos({
       {menu.incluye_bebidas && (
         <section data-testid="seccion-menu-bebidas" className="space-y-2.5 rounded-lg border bg-muted/20 p-3">
           <header className="flex items-center justify-between gap-2">
-            <h4 className="text-sm font-semibold">Bebidas</h4>
+            <h4 className="text-sm font-semibold">{tituloPropio(menu, "bebidas") ?? "Bebidas"}</h4>
             <span className="text-xs text-muted-foreground tabular-nums">
               {bebidas.length === 1 ? "1 línea" : `${bebidas.length} líneas`}
             </span>
@@ -357,57 +370,79 @@ function EditorMenuPlatos({
               Sin bebidas todavía. Añade al menos una, por ejemplo «Vino de la casa, agua o refresco».
             </p>
           ) : (
-            <ul ref={listaBebidasRef} className="space-y-2">
-              {bebidas.map((bebida, indice) => (
-                // Como las líneas de comida: si no cabe, los botones bajan a otra línea.
-                <li key={bebida.id} className="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-2">
-                  <Input
-                    data-bebida={bebida.id}
-                    value={bebida.nombre}
-                    onChange={(e) =>
-                      cambiarBebidas(bebidas.map((b) => (b.id === bebida.id ? { ...b, nombre: e.target.value } : b)))
-                    }
-                    placeholder="Ej: Vino de la casa, agua o refresco"
-                    aria-label={`Bebida ${indice + 1}`}
-                    className="h-11 min-w-[11rem] flex-1 text-base md:text-base"
-                  />
-                  <div className="ml-auto flex shrink-0 items-center">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0"
-                      disabled={indice === 0}
-                      onClick={() => moverBebida(indice, -1)}
-                      aria-label={`Subir bebida ${indice + 1}`}
-                    >
-                      <ChevronUp className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0"
-                      disabled={indice === bebidas.length - 1}
-                      onClick={() => moverBebida(indice, 1)}
-                      aria-label={`Bajar bebida ${indice + 1}`}
-                    >
-                      <ChevronDown className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
-                      onClick={() => cambiarBebidas(bebidas.filter((b) => b.id !== bebida.id))}
-                      aria-label={`Quitar bebida ${indice + 1}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div ref={refOrdenBebidas}>
+              <div ref={listaBebidasRef}>
+                <ListaOrdenable
+                  ids={bebidas.map((bebida) => bebida.id)}
+                  nombre={(id) => {
+                    const indice = bebidas.findIndex((bebida) => bebida.id === id);
+                    return bebidas[indice]?.nombre.trim() || `bebida ${indice + 1}`;
+                  }}
+                  onMover={(desde, hasta) => onChange(moverItem(menu, "bebidas", desde, hasta))}
+                  className="space-y-2"
+                  // Como las líneas de comida: si no cabe, los botones bajan a otra línea.
+                  claseElemento="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-2"
+                  aria-label="Bebidas del menú, en orden"
+                >
+                  {(_id, indice, { asa }) => {
+                    const bebida = bebidas[indice];
+                    return (
+                      <>
+                        {asa}
+                        <Input
+                          data-bebida={bebida.id}
+                          value={bebida.nombre}
+                          onChange={(e) =>
+                            cambiarBebidas(
+                              bebidas.map((b) => (b.id === bebida.id ? { ...b, nombre: e.target.value } : b)),
+                            )
+                          }
+                          placeholder="Ej: Vino de la casa, agua o refresco"
+                          aria-label={`Bebida ${indice + 1}`}
+                          className="h-11 min-w-[11rem] flex-1 text-base md:text-base"
+                        />
+                        <div className="ml-auto flex shrink-0 items-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 shrink-0"
+                            data-mover="arriba"
+                            disabled={indice === 0}
+                            onClick={() => moverBebida(indice, -1)}
+                            aria-label={`Subir bebida ${indice + 1}`}
+                          >
+                            <ChevronUp className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 shrink-0"
+                            data-mover="abajo"
+                            disabled={indice === bebidas.length - 1}
+                            onClick={() => moverBebida(indice, 1)}
+                            aria-label={`Bajar bebida ${indice + 1}`}
+                          >
+                            <ChevronDown className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
+                            onClick={() => cambiarBebidas(bebidas.filter((b) => b.id !== bebida.id))}
+                            aria-label={`Quitar bebida ${indice + 1}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    );
+                  }}
+                </ListaOrdenable>
+              </div>
+            </div>
           )}
 
           <Button type="button" variant="ghost" size="sm" className="h-11 px-4" onClick={añadirBebida}>
@@ -418,7 +453,116 @@ function EditorMenuPlatos({
       )}
       </>
       )}
+
+      <NombresSecciones menu={menu} onChange={onChange} />
     </>
+  );
+}
+
+const ETIQUETA_SECCION_NOVEDAD: Record<SeccionMenuNovedad, string> = { ...ETIQUETA_SECCION, bebidas: "Bebidas" };
+const IDIOMAS_TITULO = [
+  { idioma: "es", texto: "Español" },
+  { idioma: "en", texto: "Inglés" },
+  { idioma: "fr", texto: "Francés" },
+] as const;
+
+/** Los rótulos de primero, segundo y postre en el editor: el nombre propio si lo hay. */
+const titulosEditor = (menu: MenuNovedad): Partial<Record<SeccionMenu, string>> =>
+  Object.fromEntries(
+    SECCIONES_MENU.map((seccion) => [seccion, tituloPropio(menu, seccion) ?? undefined]).filter(([, t]) => t),
+  );
+
+/**
+ * Nombres propios de las secciones (tarea «Cambiar en el panel el nombre de
+ * las secciones»): solo de esta novedad, en español y, si se quiere, en inglés
+ * y francés escritos a mano. Vacío = el nombre de siempre. Plegado de entrada
+ * salvo que ya haya alguno.
+ */
+function NombresSecciones({ menu, onChange }: PropsBloque) {
+  const secciones = seccionesConTitulo(menu);
+  const propios = secciones.filter((seccion) => tituloPropio(menu, seccion));
+  const [abierto, setAbierto] = useState(propios.length > 0);
+  const largos = titulosDemasiadoLargos(menu);
+  const idCuerpo = useId();
+
+  const cambiar = (seccion: SeccionMenuNovedad, idioma: "es" | "en" | "fr", valor: string) => {
+    const actual = menu.titulos[seccion] ?? { es: "" };
+    onChange({ ...menu, titulos: { ...menu.titulos, [seccion]: { ...actual, [idioma]: valor } } });
+  };
+
+  return (
+    <section data-testid="nombres-secciones" className="rounded-lg border bg-muted/20 px-3 py-1">
+      <button
+        type="button"
+        aria-expanded={abierto}
+        aria-controls={abierto ? idCuerpo : undefined}
+        onClick={() => setAbierto((valor) => !valor)}
+        className="flex min-h-11 w-full items-center gap-2 rounded-md py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${abierto ? "" : "-rotate-90"}`}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Nombres de las secciones</span>
+          <span className="block text-xs text-muted-foreground">
+            {propios.length === 0
+              ? "Opcional: los de siempre (Primero, Segundo…)"
+              : propios.map((seccion) => tituloPropio(menu, seccion)).join(" · ")}
+          </span>
+        </span>
+      </button>
+      {abierto && (
+        <div id={idCuerpo} className="space-y-3 pb-3 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Solo para esta novedad. Si dejas el español vacío se usa el nombre de siempre. Si no escribes el inglés o el
+            francés, en esos idiomas se verá el nombre en español. Como mucho {MAX_TITULO_SECCION} caracteres.
+          </p>
+          {secciones.map((seccion) => (
+            <fieldset key={seccion} className="min-w-0 space-y-1.5" data-testid={`nombre-seccion-${seccion}`}>
+              <legend className="text-xs font-medium">{ETIQUETA_SECCION_NOVEDAD[seccion]}</legend>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {IDIOMAS_TITULO.map(({ idioma, texto }) => {
+                  const id = `${idCuerpo}-${seccion}-${idioma}`;
+                  const largo = largos.some((l) => l.seccion === seccion && l.idioma === idioma);
+                  const sinEspañol = idioma !== "es" && !tituloPropio(menu, seccion);
+                  return (
+                    <div key={idioma} className="min-w-0 space-y-1">
+                      <Label htmlFor={id} className="text-xs text-muted-foreground">
+                        {texto}
+                        {idioma !== "es" && " (opcional)"}
+                      </Label>
+                      <Input
+                        id={id}
+                        value={menu.titulos[seccion]?.[idioma] ?? ""}
+                        onChange={(e) => cambiar(seccion, idioma, e.target.value)}
+                        placeholder={
+                          idioma === "es" ? ETIQUETA_SECCION_NOVEDAD[seccion] : tituloPropio(menu, seccion) ?? "Como en español"
+                        }
+                        aria-label={`Nombre de «${ETIQUETA_SECCION_NOVEDAD[seccion]}» en ${texto.toLowerCase()}`}
+                        aria-invalid={largo || undefined}
+                        aria-describedby={largo ? `${id}-aviso` : undefined}
+                        className="h-11 text-base md:text-sm"
+                      />
+                      {largo && (
+                        <p id={`${id}-aviso`} className="text-xs text-destructive">
+                          Pasa de {MAX_TITULO_SECCION} caracteres ({largoTitulo(menu.titulos[seccion]?.[idioma])}).
+                        </p>
+                      )}
+                      {sinEspañol && (menu.titulos[seccion]?.[idioma] ?? "").trim() !== "" && (
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                          Sin nombre en español no se guarda: escribe también el español.
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -442,7 +586,9 @@ function PlatosConMaridaje({
   cargandoPlatos: boolean;
 }) {
   const carta = useBebidasParaMenu();
-  const { ref, enfocar } = useEnfoque<HTMLElement>();
+  // La fila del plato (en la lista ordenable) ya lleva `data-clave` con su id:
+  // la bebida usa otro atributo para que el foco no caiga en el plato.
+  const { ref, enfocar } = useEnfoque<HTMLElement>("data-clave-maridaje");
   const [cambiando, setCambiando] = useState<string | null>(null);
   const { secciones } = menu;
 
@@ -477,7 +623,7 @@ function PlatosConMaridaje({
     }
     const linea = menu.maridajes[plato.id];
     return (
-      <div data-clave={plato.id} className="min-w-0 space-y-1.5">
+      <div data-clave-maridaje={plato.id} className="min-w-0 space-y-1.5">
         {linea && cambiando !== plato.id ? (
           <EditorLineaBebida
             linea={linea}
@@ -527,7 +673,9 @@ function PlatosConMaridaje({
       </header>
       <AvisoCartaTruncada truncado={carta.truncado} />
       <EditorSeccionesMenu
+        ordenable
         secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
+        titulos={titulosEditor(menu)}
         onChange={onCambiarComida}
         platos={platos}
         platosPorId={platosPorId}
@@ -586,6 +734,7 @@ function SeccionesExtra({
         const nombre = seccion.nombre.trim() || `sección ${indice + 1}`;
         return (
           <SeccionPlatos
+            ordenable
             key={seccion.id}
             testId={`seccion-extra-${indice + 1}`}
             titulo={
