@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { LIMITES_CARTA, textoObligatorio, textoOpcional } from "@/lib/limites-carta";
 import { Loader2, Camera, X } from "lucide-react";
 import {
   Dialog,
@@ -33,10 +34,10 @@ import { useQueryClient } from "@tanstack/react-query";
 const UNIDADES_MEDIDA = ["cl", "ml", "L"];
 
 const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio"),
-  categoria: z.string().min(1, "La categoría es obligatoria"),
+  nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
+  categoria: textoObligatorio(LIMITES_CARTA.categoria, "La categoría es obligatoria"),
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
-  descripcion: z.string().optional(),
+  descripcion: textoOpcional(LIMITES_CARTA.descripcion),
   cantidad: z.coerce.number().optional(),
   unidad: z.string().optional(),
 });
@@ -94,8 +95,8 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     // La traducción ya no se genera aquí: crearBebida (useBebidas.ts) llama a
     // traducir-contenido internamente al guardar (ver informe, TAREA 2).
     const bebidaData: NuevaBebida = {
-      nombre: values.nombre,
-      categoria: values.categoria,
+      nombre: values.nombre.trim(),
+      categoria: values.categoria.trim(),
       precio_eur: values.precio_eur,
       descripcion: values.descripcion,
       tamano: tamano,

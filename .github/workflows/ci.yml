@@ -46,6 +46,8 @@ jobs:
         run: npm run test:espacios:db
       - name: Trabajos de vídeo para dispositivo potente (PGlite)
         run: npm run test:trabajos-video:db
+      - name: Restricciones de Bebidas y Cocteles (PGlite)
+        run: npm run test:restricciones-carta:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
