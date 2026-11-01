@@ -45,6 +45,8 @@ import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 import { useVideoPlato } from "./video/useVideoPlato";
 import { SeccionVideoPlato } from "./video/SeccionVideoPlato";
+import { BotonMandarPotente } from "./potente/BotonMandarPotente";
+import type { NombreTema } from "./composicionCarta";
 import { ErrorMigracionVideo } from "./video/subirVideoPlato";
 import { columnaVideoDisponible } from "./video/videoPlato";
 import {
@@ -119,10 +121,12 @@ export function EditarPlatoModal({
   const fotoCarta = useFotoCarta("plato");
   const { limpiar: limpiarFoto } = fotoCarta;
   // Vídeo del plato (opcional): se sube aparte, después de guardar el plato.
-  const videoPlato = useVideoPlato();
+  const videoPlato = useVideoPlato(plato);
   const { limpiar: limpiarVideo } = videoPlato;
   const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  // Fondo marcado en «Vídeo del plato» (lo usa «Mandar a un dispositivo potente», no el de la foto).
+  const [temaVideo, setTemaVideo] = useState<NombreTema | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -707,7 +711,11 @@ export function EditarPlatoModal({
                   columnaDisponible={columnaVideoDisponible(plato ? [plato] : null)}
                   temaFoto={fotoCarta.tema}
                   fondoCambiado={!!fotoCarta.original}
+                  onTemaChange={setTemaVideo}
                 />
+                {plato && columnaVideoDisponible([plato]) !== false && (
+                  <BotonMandarPotente platoId={plato.id} tema={temaVideo ?? fotoCarta.tema} ocupado={videoPlato.procesando} />
+                )}
               </div>
             </details>
 
@@ -723,7 +731,7 @@ export function EditarPlatoModal({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando || videoPlato.procesando}
+                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando}
               >
                 {actualizarPlato.isPending || isUploadingImage ? (
                   <>
