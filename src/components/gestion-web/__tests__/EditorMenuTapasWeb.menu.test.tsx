@@ -9,7 +9,7 @@
 // que quita scroll (lista corta, vista previa en un botón).
 
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -62,7 +62,18 @@ type Fila = { fecha: string; idiom: string; menu: Record<string, unknown> };
 const filasGuardadas = (): Fila[] => mocks.upsert.mock.calls.at(-1)![1] as Fila[];
 const seccionesDe = (fila: Fila) => fila.menu.secciones as Record<string, { nombre: string }[]>;
 
+// «Hoy» es un miércoles (04/11/2026, a mediodía): el menú del día solo se sirve
+// de martes a jueves y, en otro día, guardar pregunta antes. Solo se falsea la
+// fecha; los temporizadores siguen siendo reales para `waitFor`.
+const MIERCOLES = new Date(2026, 10, 4, 12, 0, 0);
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(MIERCOLES);
   mocks.filas = [];
   mocks.upsert.mockReset();
   mocks.invoke.mockReset();
@@ -196,5 +207,72 @@ describe("Menú del día — menos scroll", () => {
     expect(within(dialogo).getByTestId("previa-primero")).toHaveTextContent("Primeros");
     expect(within(dialogo).getByTestId("previa-postre")).toHaveTextContent("Postre y café");
     expect(within(dialogo).getByText("Gilda")).toBeInTheDocument();
+  });
+});
+
+describe("Menú del día — aviso fuera de martes a jueves", () => {
+  /** Rellena un primero a mano y pone la fecha. */
+  const rellenar = (fecha: string) => {
+    fireEvent.change(screen.getByLabelText("Día"), { target: { value: fecha } });
+    const primero = screen.getByTestId("seccion-menu-primero");
+    fireEvent.click(within(primero).getByRole("button", { name: /a mano/i }));
+    fireEvent.change(within(primero).getByPlaceholderText("Nombre del plato"), { target: { value: "Sopa" } });
+  };
+
+  beforeEach(() => {
+    mocks.invoke.mockResolvedValue({ data: { ok: false }, error: null });
+  });
+
+  it.each([
+    ["2026-11-03", "martes"],
+    ["2026-11-04", "miércoles"],
+    ["2026-11-05", "jueves"],
+  ])("el %s (%s) se guarda sin preguntar", async (fecha) => {
+    pintar();
+    await screen.findByText("Todavía no hay nada guardado");
+    rellenar(fecha);
+    expect(screen.queryByTestId("aviso-dia-menu")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y publicar" }));
+    await waitFor(() => expect(mocks.upsert).toHaveBeenCalled());
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["2026-11-02", "lunes"],
+    ["2026-11-06", "viernes"],
+    ["2026-11-07", "sábado"],
+    ["2026-11-08", "domingo"],
+  ])("el %s (%s) avisa y guarda solo si se confirma", async (fecha) => {
+    pintar();
+    await screen.findByText("Todavía no hay nada guardado");
+    rellenar(fecha);
+    expect(screen.getByTestId("aviso-dia-menu")).toHaveTextContent("de martes a jueves");
+
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y publicar" }));
+    const dialogo = await screen.findByRole("alertdialog");
+    expect(dialogo).toHaveTextContent("El menú del día solo se sirve de martes a jueves. ¿Guardar igualmente?");
+    expect(mocks.upsert).not.toHaveBeenCalled();
+
+    // «Cambiar la fecha»: no se guarda nada.
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Cambiar la fecha" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
+    expect(mocks.upsert).not.toHaveBeenCalled();
+
+    // Otra vez, y ahora «Guardar igualmente».
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y publicar" }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Guardar igualmente" }));
+    await waitFor(() => expect(mocks.upsert).toHaveBeenCalledTimes(1));
+    expect(filasGuardadas().map((f) => f.fecha)).toEqual([fecha, fecha, fecha]);
+  });
+
+  it("sin platos no pregunta por el día: dice antes lo que falta", async () => {
+    pintar();
+    await screen.findByText("Todavía no hay nada guardado");
+    fireEvent.change(screen.getByLabelText("Día"), { target: { value: "2026-11-07" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar y publicar" }));
+    const { toast } = await import("sonner");
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Añade al menos un plato."));
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
 });

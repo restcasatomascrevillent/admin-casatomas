@@ -485,3 +485,34 @@ export function difiereDeLaCarta(item: ItemMenu, plato: PlatoParaMenu | undefine
     actual.alergenosNotas !== item.alergenosNotas
   );
 }
+
+/**
+ * Días en que se sirve el menú del día, como `Date.getDay()` (0 = domingo):
+ * de martes a jueves. No hay ningún ajuste en la base de datos que los guarde
+ * (ni en `configuracion_web` ni en la web), así que viven aquí, en un único
+ * sitio. QA de salida a producción, 01/11/2026: guardar un menú otro día no
+ * avisaba de nada.
+ */
+export const DIAS_MENU_DEL_DIA: readonly number[] = [2, 3, 4];
+
+/** «de martes a jueves», para los textos del panel. */
+export const RANGO_DIAS_MENU_DEL_DIA = "de martes a jueves";
+
+/**
+ * Día de la semana (0 = domingo) de una fecha `aaaa-mm-dd`, o `null` si no lo
+ * es. La fecha es de CALENDARIO, sin hora: se calcula en UTC para que no
+ * dependa de la zona horaria del navegador (Europe/Madrid u otra).
+ */
+export function diaSemanaDeFecha(fecha: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (d.getUTCMonth() !== Number(m[2]) - 1) return null; // 2026-02-30 y similares
+  return d.getUTCDay();
+}
+
+/** ¿Se sirve el menú del día en esa fecha? Una fecha no válida no avisa. */
+export function seSirveMenuDelDia(fecha: string): boolean {
+  const dia = diaSemanaDeFecha(fecha);
+  return dia === null || DIAS_MENU_DEL_DIA.includes(dia);
+}
