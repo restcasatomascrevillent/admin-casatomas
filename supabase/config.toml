@@ -199,6 +199,11 @@ verify_jwt = true
 [functions.recortar-fondo-vino]
 verify_jwt = true
 
+# Web Push «Vídeo listo» al móvil que mandó el vídeo a un dispositivo potente.
+# Además del JWT exige gestor_carta y ser quien procesó/creó el trabajo.
+[functions.notificar-video]
+verify_jwt = true
+
 # Escribe en `resenas` y `config_google_places` con service role y consume
 # cuota de Google Places. Nunca comprueba `req.method` ni lee el body: un GET
 # pelado a la URL dispara la sincronización entera. Es la más expuesta del lote.

@@ -10,6 +10,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
+import { AvisoTrabajosVideo } from "@/components/carta/potente/AvisoTrabajosVideo";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import Auth from "./pages/Auth";
@@ -96,6 +97,8 @@ const App = () => (
           <TooltipProvider>
             {/* Los toasts viven fuera de la barrera para seguir funcionando si el router falla. */}
             <Toaster />
+            {/* «Hay N vídeo(s) pendiente(s)…»: solo en dispositivos potentes (docs/video-dispositivo-potente.md). */}
+            <AvisoTrabajosVideo />
             <BrowserRouter>
               {/* Cola de subida de facturas en segundo plano: por encima de las rutas
                   para que cambiar de sección no la cancele (05-oct-2026). */}

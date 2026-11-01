@@ -21,6 +21,14 @@ const CACHE = `panel-casa-tomas-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 const PRECACHE = [OFFLINE_URL, "/icon-192.png", "/manifest.webmanifest"];
 
+// Avisos push «Vídeo listo» (Edge Function notificar-video). Si falta el
+// fichero, el SW sigue funcionando sin avisos push.
+try {
+  importScripts("/sw-push.js");
+} catch (_) {
+  /* sin avisos push */
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE).then((cache) =>

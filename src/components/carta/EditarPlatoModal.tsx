@@ -45,6 +45,7 @@ import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 import { useVideoPlato } from "./video/useVideoPlato";
 import { SeccionVideoPlato } from "./video/SeccionVideoPlato";
+import { BotonMandarPotente } from "./potente/BotonMandarPotente";
 import { ErrorMigracionVideo } from "./video/subirVideoPlato";
 import { columnaVideoDisponible } from "./video/videoPlato";
 import {
@@ -708,6 +709,9 @@ export function EditarPlatoModal({
                   temaFoto={fotoCarta.tema}
                   fondoCambiado={!!fotoCarta.original}
                 />
+                {plato && columnaVideoDisponible([plato]) !== false && (
+                  <BotonMandarPotente platoId={plato.id} tema={fotoCarta.tema} ocupado={videoPlato.procesando} />
+                )}
               </div>
             </details>
 
