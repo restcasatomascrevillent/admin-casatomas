@@ -21,6 +21,7 @@ import { AlertTriangle, ChevronDown, ChevronUp, Info, Plus, Trash2 } from "lucid
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ListaOrdenable } from "@/components/ui/lista-ordenable";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { EditorSeccionesMenu, SeccionPlatos } from "./EditorSeccionesMenu";
 import { EditorLineaBebida, ElegirLineaBebida } from "./EditorLineaBebida";
@@ -33,6 +34,7 @@ import {
   conservarTraduccionesLinea,
   conservarTraduccionesVigentes,
   ETIQUETA_POSICION_EXTRA,
+  moverItem,
   platosEnOrden,
   POSICIONES_SECCION_EXTRA,
   seccionExtraVacia,
@@ -646,7 +648,12 @@ function SeccionesExtra({
   );
 }
 
-/** La cata: lista ordenada de bebidas, sin platos, sin «Comida + bebidas» y sin maridaje. */
+const nombreDe = (linea: LineaBebidaNovedad | undefined) => linea?.nombre.trim() || "bebida sin nombre";
+
+/**
+ * La cata: lista ordenada de bebidas, sin platos, sin «Comida + bebidas» y sin
+ * maridaje. Se reordena arrastrando desde el asa o con subir y bajar.
+ */
 function EditorCata({ menu, onChange }: PropsBloque) {
   const carta = useBebidasParaMenu();
   const { ref, enfocar } = useEnfoque<HTMLElement>();
@@ -672,9 +679,7 @@ function EditorCata({ menu, onChange }: PropsBloque) {
   const mover = (indice: number, direccion: "arriba" | "abajo") => {
     const destino = direccion === "arriba" ? indice - 1 : indice + 1;
     if (destino < 0 || destino >= cata.length) return;
-    const copia = [...cata];
-    [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
-    cambiarCata(copia);
+    onChange(moverItem(menu, "cata", indice, destino));
     // El foco sigue a la línea; si ya no puede ir más allá, pasa a la otra flecha.
     enfocar({
       clave: cata[indice].id,
@@ -712,12 +717,21 @@ function EditorCata({ menu, onChange }: PropsBloque) {
           Sin bebidas todavía. Añade la primera de la carta o a mano; se sirven en el orden de la lista.
         </p>
       ) : (
-        <ol className="space-y-2">
-          {cata.map((linea, indice) => {
-            const nombre = linea.nombre.trim() || "bebida sin nombre";
+        <ListaOrdenable
+          ids={cata.map((linea) => linea.id)}
+          nombre={(id) => nombreDe(cata.find((linea) => linea.id === id))}
+          onMover={(desde, hasta) => onChange(moverItem(menu, "cata", desde, hasta))}
+          className="space-y-2"
+          claseElemento="flex min-w-0 items-start gap-1"
+          aria-label="Bebidas de la cata, en orden"
+        >
+          {(_id, indice, { asa }) => {
+            const linea = cata[indice];
+            const nombre = nombreDe(linea);
             return (
-              <li key={linea.id} data-clave={linea.id} className="flex min-w-0 items-start gap-1">
+              <>
                 <div className="flex shrink-0 flex-col" role="group" aria-label={`Orden de «${nombre}»`}>
+                  {asa}
                   <Button
                     type="button"
                     variant="ghost"
@@ -772,10 +786,10 @@ function EditorCata({ menu, onChange }: PropsBloque) {
                     />
                   )}
                 </div>
-              </li>
+              </>
             );
-          })}
-        </ol>
+          }}
+        </ListaOrdenable>
       )}
 
       <div data-clave={CLAVE_AÑADIR_CATA} className="space-y-1.5">
