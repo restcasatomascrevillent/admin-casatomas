@@ -209,6 +209,25 @@ export const seccionExtraVacia = (posicion: PosicionSeccionExtra = "despues_post
   items: [],
 });
 
+// Nombres propios de primero, segundo, postre y bebidas (tarea «Cambiar en el
+// panel el nombre de las secciones»). Contrato fijado en «Mostrar en la web los
+// nombres de sección propios» (web v0.48): `menu.titulos` en la RAÍZ del jsonb,
+// no en `secciones`, opcional y sin subir de versión (se lee en v1 y v2). Una
+// sección sin nombre en español no se escribe: la web pone el de siempre. Si
+// falta inglés o francés, la web enseña el español.
+export const MAX_TITULO_SECCION = 40;
+
+export interface TituloSeccionNovedad {
+  es: string;
+  en?: string;
+  fr?: string;
+}
+
+export type TitulosSeccionesNovedad = Partial<Record<SeccionMenuNovedad, TituloSeccionNovedad>>;
+
+/** Claves de la raíz de `novedades.menu` que entiende el panel. Las demás se guardan tal cual. */
+const CLAVES_RAIZ_MENU = ["version", "tipo", "incluye_bebidas", "maridaje", "secciones", "titulos"];
+
 /**
  * El menú tal y como lo edita el panel (ADR-7). La versión no está aquí: la
  * decide `serializarMenuNovedad` (E1). Mientras se edita se conserva lo del
@@ -227,6 +246,13 @@ export interface MenuNovedad {
   extras: SeccionExtraNovedad[];
   /** Lista ordenada de la cata. */
   cata: LineaBebidaNovedad[];
+  /** Nombres propios de las secciones, tal cual se escriben (sin recortar). */
+  titulos: TitulosSeccionesNovedad;
+  /**
+   * Claves de la raíz que el panel no conoce (de una web o un panel más
+   * nuevos): se vuelven a escribir sin tocarlas para no borrarlas al guardar.
+   */
+  otrasClaves?: { [clave: string]: Json };
 }
 
 export const menuNovedadVacio = (): MenuNovedad => ({
@@ -237,6 +263,7 @@ export const menuNovedadVacio = (): MenuNovedad => ({
   maridajes: {},
   extras: [],
   cata: [],
+  titulos: {},
 });
 
 const texto = (valor: unknown): string => (typeof valor === "string" ? valor.trim() : "");
@@ -356,7 +383,67 @@ export function parseMenuNovedad(valor: unknown): MenuNovedad | null {
   if (menu.tipo === "cata" && Array.isArray(mapa.cata)) {
     menu.cata = mapa.cata.map((linea) => parseLineaBebida(linea)).filter(esLinea);
   }
+  menu.titulos = parseTitulos(crudo.titulos);
+  const otras = Object.entries(crudo).filter(([clave]) => !CLAVES_RAIZ_MENU.includes(clave));
+  if (otras.length > 0) menu.otrasClaves = Object.fromEntries(otras) as { [clave: string]: Json };
   return menu;
+}
+
+/** Lectura tolerante de `titulos`: sin español o con un tipo raro, la sección no tiene nombre propio. */
+function parseTitulos(valor: unknown): TitulosSeccionesNovedad {
+  const titulos: TitulosSeccionesNovedad = {};
+  if (!esObjeto(valor)) return titulos;
+  for (const seccion of SECCIONES_MENU_NOVEDAD) {
+    const crudo = valor[seccion];
+    if (!esObjeto(crudo)) continue;
+    const titulo = limpiarTitulo({ es: crudo.es as string, en: crudo.en as string, fr: crudo.fr as string });
+    if (titulo) titulos[seccion] = titulo;
+  }
+  return titulos;
+}
+
+/** Recorta y quita los idiomas vacíos; sin español, null (vuelve el nombre de siempre). */
+function limpiarTitulo(titulo: TituloSeccionNovedad | undefined): TituloSeccionNovedad | null {
+  const es = texto(titulo?.es);
+  if (!es) return null;
+  const limpio: TituloSeccionNovedad = { es };
+  for (const idioma of IDIOMAS_TRADUCIDOS) {
+    const nombre = texto(titulo?.[idioma]);
+    if (nombre) limpio[idioma] = nombre;
+  }
+  return limpio;
+}
+
+/** Las secciones que pueden llevar nombre propio en este menú (Bebidas solo con «Comida + bebidas»). */
+export const seccionesConTitulo = (menu: MenuNovedad): SeccionMenuNovedad[] =>
+  menu.tipo === "cata" ? [] : SECCIONES_MENU_NOVEDAD.filter((s) => s !== "bebidas" || incluyeBebidas(menu));
+
+/** Los nombres que se guardarían: recortados, sin vacíos y solo de las secciones que se ven. */
+export function limpiarTitulos(menu: MenuNovedad): TitulosSeccionesNovedad {
+  const titulos: TitulosSeccionesNovedad = {};
+  for (const seccion of seccionesConTitulo(menu)) {
+    const titulo = limpiarTitulo(menu.titulos?.[seccion]);
+    if (titulo) titulos[seccion] = titulo;
+  }
+  return titulos;
+}
+
+/** Nombre propio en español de una sección (recortado), o null si no tiene. */
+export const tituloPropio = (menu: MenuNovedad, seccion: SeccionMenuNovedad): string | null =>
+  texto(menu.titulos?.[seccion]?.es) || null;
+
+/** Longitud en caracteres que se ven (una tilde o un emoji cuentan uno). */
+export const largoTitulo = (valor: string | undefined): number => Array.from(texto(valor)).length;
+
+/** Qué nombres pasan de `MAX_TITULO_SECCION` caracteres (después de recortar). */
+export function titulosDemasiadoLargos(menu: MenuNovedad): { seccion: SeccionMenuNovedad; idioma: "es" | IdiomaTraducido }[] {
+  const largos: { seccion: SeccionMenuNovedad; idioma: "es" | IdiomaTraducido }[] = [];
+  for (const seccion of seccionesConTitulo(menu)) {
+    for (const idioma of ["es", ...IDIOMAS_TRADUCIDOS] as const) {
+      if (largoTitulo(menu.titulos?.[seccion]?.[idioma]) > MAX_TITULO_SECCION) largos.push({ seccion, idioma });
+    }
+  }
+  return largos;
 }
 
 function parseTraduccionesNombre(valor: unknown): SeccionExtraNovedad["traducciones"] {
@@ -426,7 +513,12 @@ const incluyeBebidas = (menu: MenuNovedad): boolean => menu.incluye_bebidas && !
 
 export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
   if (menu.tipo === "cata") {
-    return { ...menuNovedadVacio(), tipo: "cata", cata: menu.cata.map(limpiarLinea).filter(esLinea) };
+    return {
+      ...menuNovedadVacio(),
+      tipo: "cata",
+      cata: menu.cata.map(limpiarLinea).filter(esLinea),
+      ...(menu.otrasClaves ? { otrasClaves: menu.otrasClaves } : {}),
+    };
   }
   const extras = limpiarExtras(menu.extras);
   const secciones: SeccionesMenuNovedad = {
@@ -450,6 +542,8 @@ export function limpiarMenuNovedad(menu: MenuNovedad): MenuNovedad {
     maridajes,
     extras,
     cata: [],
+    titulos: limpiarTitulos(menu),
+    ...(menu.otrasClaves ? { otrasClaves: menu.otrasClaves } : {}),
   };
 }
 
@@ -573,8 +667,11 @@ function serializarItem(item: ItemMenuNovedad, maridaje?: LineaBebidaNovedad): {
  */
 export function serializarMenuNovedad(menu: MenuNovedad): Json {
   const limpio = limpiarMenuNovedad(menu);
+  // Lo que el panel no conoce va primero: lo suyo manda si se repite una clave.
+  const otras = limpio.otrasClaves ?? {};
   if (limpio.tipo === "cata") {
     return {
+      ...otras,
       version: 2,
       tipo: "cata",
       incluye_bebidas: false,
@@ -600,8 +697,11 @@ export function serializarMenuNovedad(menu: MenuNovedad): Json {
       return salida;
     });
   }
-  if (!limpio.maridaje) return { version: 1, incluye_bebidas: limpio.incluye_bebidas, secciones };
-  return { version: 2, tipo: "menu", incluye_bebidas: limpio.incluye_bebidas, maridaje: true, secciones };
+  // Solo si hay alguno: un menú sin nombres propios se escribe como siempre.
+  const titulos =
+    Object.keys(limpio.titulos).length > 0 ? { titulos: limpio.titulos as unknown as { [clave: string]: Json } } : {};
+  if (!limpio.maridaje) return { ...otras, version: 1, incluye_bebidas: limpio.incluye_bebidas, secciones, ...titulos };
+  return { ...otras, version: 2, tipo: "menu", incluye_bebidas: limpio.incluye_bebidas, maridaje: true, secciones, ...titulos };
 }
 
 // ---------------------------------------------------------------------------
@@ -775,6 +875,7 @@ export type CodigoErrorBotones =
   | "maridaje_vacio"
   | "cata_vacia"
   | "seccion_sin_nombre"
+  | "titulo_largo"
   | "plato_sin_enlazar"
   | "plato_fuera_de_carta";
 
@@ -819,6 +920,12 @@ export function validarBotonesNovedad({ botones, menu, estadoPlato }: BotonesPar
         errores.push({
           codigo: "menu_sin_platos",
           mensaje: "«Ver menú» necesita al menos un plato.",
+        });
+      }
+      if (titulosDemasiadoLargos(menu).length > 0) {
+        errores.push({
+          codigo: "titulo_largo",
+          mensaje: `El nombre de una sección no puede pasar de ${MAX_TITULO_SECCION} caracteres: acórtalo.`,
         });
       }
       if (limpiarExtras(menu.extras).some((seccion) => seccion.nombre === "")) {

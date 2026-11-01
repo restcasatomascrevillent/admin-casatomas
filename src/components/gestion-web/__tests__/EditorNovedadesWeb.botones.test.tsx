@@ -673,3 +673,52 @@ describe("EditorNovedadesWeb — orden de los platos del menú", () => {
     expect(filas.map((li) => li.getAttribute("data-clave"))).toEqual(["p1b", "p1"]);
   });
 });
+
+// Tarea «Cambiar en el panel el nombre de las secciones»: solo en esa
+// novedad, bloqueo con más de 40 caracteres y guardado fallido.
+describe("EditorNovedadesWeb — nombres de las secciones", () => {
+  const abrirNombres = () => fireEvent.click(screen.getByRole("button", { name: /Nombres de las secciones/ }));
+  const campoPrimero = () => screen.getByRole("textbox", { name: "Nombre de «Primero» en español" });
+
+  it("se guarda en esa novedad, en la raíz de menu, sin tocar los platos", async () => {
+    mocks.novedades = [
+      novedad("n-2", "Menú de Navidad", { botones: ["ver_menu"], menu: MENU_GUARDADO }),
+      novedad("n-4", "Otra", { botones: ["ver_menu"], menu: MENU_GUARDADO }),
+    ];
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Menú de Navidad»" }));
+    abrirNombres();
+    fireEvent.change(campoPrimero(), { target: { value: " Entrantes de la casa " } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalledTimes(1));
+    const payload = mocks.actualizar.mock.calls[0][0];
+    expect(payload.id).toBe("n-2");
+    expect(payload.menu).toEqual({ ...MENU_GUARDADO, titulos: { primero: { es: "Entrantes de la casa" } } });
+  });
+
+  it("con más de 40 caracteres no deja guardar", async () => {
+    mocks.novedades = [novedad("n-2", "Menú de Navidad", { botones: ["ver_menu"], menu: MENU_GUARDADO })];
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Menú de Navidad»" }));
+    abrirNombres();
+    fireEvent.change(campoPrimero(), { target: { value: "x".repeat(41) } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/40 caracteres/), expect.anything()));
+    expect(mocks.actualizar).not.toHaveBeenCalled();
+  });
+
+  it("si el guardado falla, avisa y no lo da por guardado", async () => {
+    mocks.actualizar.mockRejectedValueOnce(new Error("sin red"));
+    mocks.novedades = [novedad("n-2", "Menú de Navidad", { botones: ["ver_menu"], menu: MENU_GUARDADO })];
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "Editar «Menú de Navidad»" }));
+    abrirNombres();
+    fireEvent.change(campoPrimero(), { target: { value: "Entrantes" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/^No se pudo guardar la novedad/)));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(campoPrimero()).toHaveValue("Entrantes");
+  });
+});
+
