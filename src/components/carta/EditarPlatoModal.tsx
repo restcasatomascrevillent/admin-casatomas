@@ -119,7 +119,7 @@ export function EditarPlatoModal({
   const fotoCarta = useFotoCarta("plato");
   const { limpiar: limpiarFoto } = fotoCarta;
   // Vídeo del plato (opcional): se sube aparte, después de guardar el plato.
-  const videoPlato = useVideoPlato();
+  const videoPlato = useVideoPlato(plato);
   const { limpiar: limpiarVideo } = videoPlato;
   const imageFile = fotoCarta.original;
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -721,7 +721,7 @@ export function EditarPlatoModal({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando || videoPlato.procesando}
+                disabled={actualizarPlato.isPending || isUploadingImage || fotoCarta.trabajando}
               >
                 {actualizarPlato.isPending || isUploadingImage ? (
                   <>

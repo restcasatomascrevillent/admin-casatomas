@@ -25,6 +25,8 @@ import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
 import { etiquetaAlergeno, parseAlergenos } from "@/lib/alergenos";
 import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
+import { useInRouterContext } from "react-router-dom";
+import { AbrirPlatoDesdeUrl } from "./video/AbrirPlatoDesdeUrl";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -46,6 +48,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(platos.map(p => p.id)));
   const [posicionPlato, setPosicionPlato] = useState<Plato | null>(null);
   const fotoRapida = useRef<FotoRapidaHandle>(null);
+  const enRouter = useInRouterContext();
 
   // Las fotos empiezan ocultas en el panel; solo se ocultan las tarjetas que
   // aparecen por primera vez (antes, cualquier refresco volvía a ocultarlas
@@ -310,6 +313,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
         guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
       />
 
+      {enRouter && <AbrirPlatoDesdeUrl<Plato> platos={platos} onAbrir={setPlatoAEditar} />}
       <EditarPlatoModal
         open={!!platoAEditar}
         onOpenChange={(open) => {

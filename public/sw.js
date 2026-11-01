@@ -70,6 +70,27 @@ function isCacheableAsset(url) {
   );
 }
 
+// Notificación de «Vídeo listo» (cola de vídeos del plato, sin push): al
+// tocarla se enfoca el panel y se le pide que navegue al plato (mensaje, para
+// no recargar y perder otros vídeos en cola); si no hay ventana, se abre una.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const ruta = (event.notification.data && event.notification.data.url) || "/";
+  const destino = new URL(ruta, self.location.origin);
+  if (destino.origin !== self.location.origin) return;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (ventanas) => {
+      const panel = ventanas.find((v) => new URL(v.url).origin === self.location.origin);
+      if (panel) {
+        await panel.focus().catch(() => {});
+        panel.postMessage({ tipo: "abrir-url", url: destino.pathname + destino.search });
+        return;
+      }
+      await self.clients.openWindow(destino.href);
+    }),
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;

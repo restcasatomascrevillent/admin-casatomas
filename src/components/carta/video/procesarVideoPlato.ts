@@ -38,6 +38,7 @@ import {
   type FormatoVideo,
   type ProgresoVideo,
 } from "./videoPlato";
+import { esperarVisible } from "./pantallaEncendida";
 import {
   ErrorLecturaVideo,
   esErrorLecturaVideo,
@@ -72,6 +73,8 @@ export interface ResultadoVideoPlato {
   /** Fotogramas en los que se pasó el modelo. */
   inferencias: number;
   ms: number;
+  /** Primer fotograma compuesto (JPEG 1200×900), para el póster de la notificación. */
+  poster?: Blob;
 }
 
 export interface OpcionesVideoPlato {
@@ -201,6 +204,7 @@ export async function cargarVideoCompatible(
   let ultimo: unknown = null;
   for (const paso of pasos) {
     abortado(signal);
+    await esperarVisible(signal);
     try {
       return await cargarVideo(await blobParaPaso(paso, archivo, convertir, onProgreso, signal));
     } catch (e) {
@@ -232,11 +236,25 @@ async function blobParaPaso(
   });
 }
 
-async function irA(video: HTMLVideoElement, t: number) {
-  if (Math.abs(video.currentTime - t) < 0.0005 && video.readyState >= 2) return;
-  const listo = esperarEvento(video, "seeked", 8000);
-  video.currentTime = t;
-  await listo;
+/**
+ * Busca el instante t. Con la pestaña oculta el navegador puede no servir
+ * fotogramas: se ESPERA a que vuelva a verse (pausa) y, si la búsqueda se
+ * quedó colgada por ocultarse a medias, se repite al volver.
+ */
+async function irA(video: HTMLVideoElement, t: number, signal?: AbortSignal) {
+  for (let intento = 0; ; intento++) {
+    await esperarVisible(signal);
+    if (Math.abs(video.currentTime - t) < 0.0005 && video.readyState >= 2) return;
+    const listo = esperarEvento(video, "seeked", 8000);
+    video.currentTime = t;
+    try {
+      await listo;
+      return;
+    } catch (e) {
+      if (intento < 3 && esErrorLecturaVideo(e) && document.visibilityState === "hidden") continue;
+      throw e;
+    }
+  }
 }
 
 type Lienzo = ReturnType<typeof lienzo>;
@@ -302,7 +320,7 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     const entrada = (i: number) =>
       enSerie(async () => {
         abortado(signal);
-        await irA(video, tiempos[i]);
+        await irA(video, tiempos[i], signal);
         abortado(signal);
         ent.ctx.drawImage(video, 0, 0, LADO_MODELO, LADO_MODELO);
         return ent.ctx.getImageData(0, 0, LADO_MODELO, LADO_MODELO).data;
@@ -391,9 +409,10 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     try {
     for (let i = 0; i < total; i++) {
       abortado(signal);
+      await esperarVisible(signal);
       reutil.reiniciar();
       previa = mascaraDe(i, previa);
-      await irA(video, tiempos[i]);
+      await irA(video, tiempos[i], signal);
       fr.ctx.clearRect(0, 0, W, H);
       fr.ctx.drawImage(video, 0, 0, W, H);
 
@@ -430,10 +449,10 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
     // --- C. Codificación -----------------------------------------------------
     abortado(signal);
     onProgreso?.({ fase: "codificando" });
-    const blob = await grabar(fotogramas, formato, signal);
+    const blob = await grabarConPausa(fotogramas, formato, signal);
     const ms = Math.round(performance.now() - t0);
     console.info("[video-plato]", { fotogramas: total, inferencias: claves.length, ms, formato: formato.mime, kb: Math.round(blob.size / 1024) });
-    return { blob, formato, fotogramas: total, inferencias: claves.length, ms };
+    return { blob, formato, fotogramas: total, inferencias: claves.length, ms, poster: fotogramas[0] };
   } finally {
     liberar();
     lienzosMascara.src = lienzosMascara.dst = null;
@@ -441,6 +460,25 @@ export async function procesarVideoPlato(archivo: Blob, { tema = FONDO_ACTIVO, o
 }
 
 type PistaLienzo = MediaStreamTrack & { requestFrame?: () => void };
+
+class GrabacionInterrumpida extends Error {}
+
+/**
+ * MediaRecorder graba en tiempo real: si la pestaña se oculta a medias, los
+ * temporizadores se frenan y el vídeo saldría a trompicones. Se descarta esa
+ * grabación, se espera a que la pestaña vuelva y se graba de nuevo (4 s).
+ */
+async function grabarConPausa(fotogramas: Blob[], formato: FormatoVideo, signal?: AbortSignal): Promise<Blob> {
+  for (let intento = 0; ; intento++) {
+    await esperarVisible(signal);
+    try {
+      return await grabar(fotogramas, formato, signal);
+    } catch (e) {
+      if (e instanceof GrabacionInterrumpida && intento < 5) continue;
+      throw e;
+    }
+  }
+}
 
 async function grabar(fotogramas: Blob[], formato: FormatoVideo, signal?: AbortSignal): Promise<Blob> {
   const { c, ctx } = lienzo(PLATO_ANCHO, PLATO_ALTO);
@@ -469,6 +507,11 @@ async function grabar(fotogramas: Blob[], formato: FormatoVideo, signal?: AbortS
     rec.onerror = () => reject(new Error("Error al codificar el vídeo"));
   });
   const intervalo = 1000 / FPS_VIDEO;
+  let ocultada = false;
+  const alOcultar = () => {
+    if (document.visibilityState === "hidden") ocultada = true;
+  };
+  document.addEventListener("visibilitychange", alOcultar);
   try {
     rec.start(1000);
     const inicio = performance.now();
@@ -476,7 +519,10 @@ async function grabar(fotogramas: Blob[], formato: FormatoVideo, signal?: AbortS
     for (let i = 1; i < fotogramas.length; i++) {
       const siguiente = await decodificar(fotogramas[i]);
       await dormir(inicio + i * intervalo - performance.now());
-      if (signal?.aborted) break;
+      if (signal?.aborted || ocultada) {
+        siguiente.close();
+        break;
+      }
       ctx.drawImage(siguiente, 0, 0);
       pedir();
       actual.close();
@@ -485,12 +531,14 @@ async function grabar(fotogramas: Blob[], formato: FormatoVideo, signal?: AbortS
     await dormir(intervalo);
     pedir();
   } finally {
+    document.removeEventListener("visibilitychange", alOcultar);
     actual.close();
     if (rec.state !== "inactive") rec.stop();
     await parado.catch(() => undefined);
     stream.getTracks().forEach((t) => t.stop());
   }
   abortado(signal);
+  if (ocultada) throw new GrabacionInterrumpida("La pestaña se ocultó mientras se grababa");
   const blob = new Blob(trozos, { type: formato.contentType });
   if (blob.size === 0) throw new Error("El navegador no generó el vídeo");
   return blob;

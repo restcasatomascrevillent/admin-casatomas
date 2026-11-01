@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Film, Loader2, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
+import { Check, Film, Loader2, RotateCcw, Smartphone, Trash2, Undo2, Video, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { temasDisponibles, type NombreTema } from "../composicionCarta";
@@ -72,20 +72,30 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
             <div className="space-y-2" aria-live="polite">
               <div className="flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {textoProgresoVideo(estado.progreso)}
+                {estado.enCola ? "En cola: empezará cuando acabe el vídeo anterior…" : textoProgresoVideo(estado.progreso)}
               </div>
               <Progress value={porcentajeProgresoVideo(estado.progreso)} />
               <p className="flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1.5 text-xs font-medium text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                 <Smartphone className="h-3.5 w-3.5 shrink-0" /> {AVISO_PANTALLA_ENCENDIDA}
               </p>
+              <p className="text-xs text-muted-foreground">
+                Puedes cerrar esta ventana y seguir usando el panel: el vídeo se guarda solo al terminar y te avisamos.
+              </p>
               <Button type="button" variant="outline" size="sm" onClick={video.cancelar}>
                 <X className="mr-1 h-4 w-4" /> Cancelar
               </Button>
             </div>
-          ) : estado.fase === "listo" ? (
+          ) : estado.fase === "pendiente" ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <Film className="h-4 w-4" /> «{estado.nombreArchivo}»: el vídeo se generará al guardar el plato.
+              <Button type="button" variant="ghost" size="sm" onClick={video.cancelar}>
+                <X className="mr-1 h-4 w-4" /> Quitar
+              </Button>
+            </div>
+          ) : estado.fase === "listo" && estado.urlVista ? (
             <div className="space-y-2">
               <video
-                src={estado.url}
+                src={estado.urlVista}
                 className="aspect-[4/3] w-full max-w-sm rounded-lg border bg-muted object-cover"
                 autoPlay
                 loop
@@ -93,13 +103,9 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
                 playsInline
                 controls
               />
-              <p className="text-xs text-muted-foreground">
-                Vista previa (fondo {nombreTema(estado.tema)}, {Math.round(estado.r.blob.size / 1024)} KB,{" "}
-                {estado.r.formato.ext.toUpperCase()}). Se guarda al pulsar «Guardar».
+              <p className="flex items-center gap-1 text-xs text-emerald-700 dark:text-emerald-400">
+                <Check className="h-3.5 w-3.5" /> Vídeo nuevo guardado automáticamente en la carta (fondo {nombreTema(estado.trabajo.tema)}).
               </p>
-              <Button type="button" variant="outline" size="sm" onClick={video.cancelar}>
-                <Trash2 className="mr-1 h-4 w-4" /> Descartar vídeo nuevo
-              </Button>
             </div>
           ) : hayGuardado ? (
             <div className="space-y-2">
@@ -129,7 +135,7 @@ export function SeccionVideoPlato({ video, urlGuardada, columnaDisponible, temaF
             </div>
           ) : null}
 
-          {estado.fase === "fallo" && (
+          {estado.fase === "fallo" && !procesando && (
             <div className="space-y-2">
               <p className="text-sm text-destructive">{estado.mensaje}</p>
               {video.puedeReintentar && (
