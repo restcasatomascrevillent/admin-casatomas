@@ -24,7 +24,8 @@
     "test:cubos-fotos:db": "node scripts/test-cubos-fotos.mjs",
     "test:restricciones-carta:db": "node scripts/test-restricciones-carta.mjs",
     "test:restricciones:db": "node scripts/test-restricciones-novedades-espacios.mjs",
-    "test:restricciones-bebidas:db": "node scripts/test-restricciones-bebidas-cocteles.mjs"
+    "test:restricciones-bebidas:db": "node scripts/test-restricciones-bebidas-cocteles.mjs",
+    "test:platos-updated-at:db": "node scripts/test-platos-updated-at.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
