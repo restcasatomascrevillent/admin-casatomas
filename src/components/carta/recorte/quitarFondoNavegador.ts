@@ -145,6 +145,32 @@ export function recorteNavegadorSeguro(nav: Navigator | undefined = typeof navig
   return true;
 }
 
+export interface MascaraModelo {
+  /** Mapa LADO_MODELO² en 0–255 (sin postprocesar). */
+  mascara: Uint8Array;
+  /** Inferencia (ms). */
+  ms: number;
+  desdeCache: boolean;
+  proveedor: Proveedor;
+}
+
+/**
+ * Máscara cruda del modelo para una entrada RGBA LADO_MODELO² (se transfiere:
+ * el buffer queda inservible). La usa también el vídeo del plato.
+ */
+export function mascaraModelo(rgba: Uint8ClampedArray, onProgreso?: (p: ProgresoRecorte) => void): Promise<MascaraModelo> {
+  if (!recorteNavegadorDisponible()) return Promise.reject(new Error("Este navegador no puede recortar"));
+  const id = sigId++;
+  return new Promise<MascaraModelo>((ok, ko) => {
+    pendientes.set(id, { ok, ko, onProgreso });
+    const msg: MensajeAlWorker = { tipo: "recortar", id, rgba };
+    obtenerWorker().postMessage(msg, [rgba.buffer]);
+  }).finally(() => {
+    // Sin más recortes en un rato, fuera el worker (y su memoria).
+    if (pendientes.size === 0) programarLiberacion();
+  });
+}
+
 /** Foto → PNG con la botella sin fondo (máscara binaria con borde suavizado, como rembg). */
 export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: ProgresoRecorte) => void): Promise<Blob> {
   if (!recorteNavegadorDisponible()) throw new Error("Este navegador no puede recortar");
@@ -158,21 +184,13 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
   ent.ctx.drawImage(bmp, 0, 0, LADO_MODELO, LADO_MODELO);
   const rgba = ent.ctx.getImageData(0, 0, LADO_MODELO, LADO_MODELO).data;
 
-  const id = sigId++;
   onProgreso?.({ fase: "cargando" });
-  let res: { mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor };
+  let res: MascaraModelo;
   try {
-    res = await new Promise<{ mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor }>((ok, ko) => {
-      pendientes.set(id, { ok, ko, onProgreso });
-      const msg: MensajeAlWorker = { tipo: "recortar", id, rgba };
-      obtenerWorker().postMessage(msg, [rgba.buffer]);
-    });
+    res = await mascaraModelo(rgba, onProgreso);
   } catch (e) {
     bmp.close();
     throw e;
-  } finally {
-    // Sin más recortes en un rato, fuera el worker (y su memoria).
-    if (pendientes.size === 0) programarLiberacion();
   }
 
   // Máscara 1024² → tamaño de la foto (suavizado del canvas) → post_process.

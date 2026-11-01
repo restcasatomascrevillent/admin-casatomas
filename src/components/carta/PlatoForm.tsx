@@ -1,5 +1,5 @@
 import { guardarUnidadPlato, opcionesUnidadPlato } from "@/lib/unidades-platos";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -36,6 +36,10 @@ import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
+import { useVideoPlato } from "./video/useVideoPlato";
+import { SeccionVideoPlato } from "./video/SeccionVideoPlato";
+import { ErrorMigracionVideo } from "./video/subirVideoPlato";
+import { columnaVideoDisponible } from "./video/videoPlato";
 import { toast } from "sonner";
 import {
   ALERGENOS_OFICIALES,
@@ -85,7 +89,14 @@ export function PlatoForm({
   onOpenChange,
   categoriaInicial,
 }: PlatoFormProps) {
-  const { crearPlato, actualizarPlato, categorias, unidades } = usePlatos();
+  const { platos, crearPlato, actualizarPlato, categorias, unidades, refrescarPlatos } = usePlatos();
+  // Vídeo del plato (opcional): se sube aparte, después de crear el plato.
+  const videoPlato = useVideoPlato();
+  const { limpiar: limpiarVideo } = videoPlato;
+  // Al cerrar el formulario se cancela el vídeo en curso y se descarta el no guardado.
+  useEffect(() => {
+    if (!open) limpiarVideo();
+  }, [open, limpiarVideo]);
   // Foto: recorte automático → sticker → foto con el fondo elegido.
   const fotoCarta = useFotoCarta("plato");
   const imageFile = fotoCarta.original;
@@ -219,6 +230,20 @@ export function PlatoForm({
           toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
         }
       }
+
+      if (nuevoPlato?.id) {
+        try {
+          if (await videoPlato.guardar(nuevoPlato.id, null)) refrescarPlatos?.();
+        } catch (errorVideo) {
+          console.error("Error guardando el vídeo del plato:", errorVideo);
+          toast.error(
+            errorVideo instanceof ErrorMigracionVideo
+              ? errorVideo.message
+              : "Plato creado, pero no se pudo guardar el vídeo",
+          );
+        }
+      }
+      videoPlato.limpiar();
 
       form.reset();
       clearImage();
@@ -574,6 +599,12 @@ export function PlatoForm({
                     />
                   </div>
                 </div>
+
+                <SeccionVideoPlato
+                  video={videoPlato}
+                  columnaDisponible={columnaVideoDisponible(platos)}
+                  temaFoto={fotoCarta.tema}
+                />
               </div>
             </details>
 
@@ -589,7 +620,7 @@ export function PlatoForm({
               <Button
                 type="submit"
                 className="h-11 px-5"
-                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando}
+                disabled={crearPlato.isPending || isUploading || fotoCarta.trabajando || videoPlato.procesando}
               >
                 {crearPlato.isPending || isUploading
                   ? "Guardando..."
