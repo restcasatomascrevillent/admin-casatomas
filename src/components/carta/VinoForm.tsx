@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { nombreCarta, categoriaCarta, descripcionCarta } from "@/lib/limites-carta";
 import { Loader2, Camera, X } from "lucide-react";
 import {
   Dialog,
@@ -27,10 +28,10 @@ import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { urlSegura } from "@/lib/url-segura";
 
 const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio"),
-  categoria: z.string().min(1, "La categoría es obligatoria"),
+  nombre: nombreCarta,
+  categoria: categoriaCarta,
   precio_eur: z.coerce.number().min(0, "El precio debe ser mayor o igual a 0"),
-  descripcion: z.string().optional(),
+  descripcion: descripcionCarta,
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
   ubicacion_pais: z.string().trim().min(1, "El país es obligatorio para el mapa"),
