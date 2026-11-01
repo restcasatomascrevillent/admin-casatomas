@@ -5,6 +5,7 @@ import { CentroNotificaciones } from "@/components/notificaciones/CentroNotifica
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsCompactNav } from "@/hooks/use-mobile";
 import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
+import { PrecargaRecorte } from "@/components/carta/recorte/PrecargaRecorte";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -30,6 +31,8 @@ export function DashboardLayout({ children, fixedHeight = false }: DashboardLayo
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen()}>
       <NavAutoCollapse />
+      {/* Baja en segundo plano el modelo del recorte de fotos de la carta. */}
+      <PrecargaRecorte />
       {/* `h-app`/`min-h-app` (index.css): en iPad/Android el alto de `100vh` incluye la barra del
           navegador y cortaba el pie de la página; `dvh` la descuenta (con `vh` de respaldo). */}
       <div

@@ -282,7 +282,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: GW_CARTA,
       titulo: "Cada plato",
       texto:
-        "Cada tarjeta enseña la foto, el precio, los alérgenos y si se puede hacer sin gluten. Los interruptores «Restaurante» y «Touza» lo enseñan u ocultan en cada web al momento (ocultar no borra). «Editar» abre su ficha; «Eliminar» lo borra del todo (te pide confirmarlo). El ojo enseña u oculta la foto aquí en el panel; «Foto expandida en carta web» la saca en grande en la web, y con el botón de mover eliges qué parte de la foto se ve.",
+        "Cada tarjeta enseña la foto, el precio, los alérgenos y si se puede hacer sin gluten. Los interruptores «Restaurante» y «Touza» lo enseñan u ocultan en cada web al momento (ocultar no borra). «Foto» enseña la foto que tiene (o «Sin foto») y deja cambiarla o añadirla sin abrir la ficha; «Editar» abre su ficha; «Eliminar» lo borra del todo (te pide confirmarlo). El ojo enseña u oculta la foto aquí en el panel; «Foto expandida en carta web» la saca en grande en la web, y con el botón de mover eliges qué parte de la foto se ve.",
       opcional: true,
       lado: "right",
     },

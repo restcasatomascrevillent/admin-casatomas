@@ -495,6 +495,121 @@ describe("EditorMenuNovedad · Cata", () => {
   });
 });
 
+// Tarea «Ordenar los platos del menú arrastrando»: cada plato de primero,
+// segundo y postre (y cada línea de Bebidas) se arrastra o sube y baja dentro
+// de su sección; el maridaje va con su plato.
+describe("EditorMenuNovedad · ordenar platos", () => {
+  // dnd-kit mide y anuncia en efectos y temporizadores: se le deja un momento entre teclas.
+  const esperarDnd = () => act(() => new Promise<void>((r) => setTimeout(r, 50)));
+  // jsdom no mide: cada fila de una lista ordenable mide 60 px de alto, una debajo de otra.
+  let medir: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    medir = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const fila = this.closest<HTMLElement>("li[data-clave]");
+      const indice = fila ? Array.from(fila.parentElement!.children).indexOf(fila) : 0;
+      const top = fila ? indice * 60 : 0;
+      const height = this.tagName === "OL" ? 180 : fila ? 50 : 0;
+      return { x: 0, y: top, top, left: 0, width: 300, height, right: 300, bottom: top + height, toJSON: () => ({}) };
+    });
+  });
+  afterEach(() => medir.mockRestore());
+
+  const gamba = itemLibre("Gamba roja");
+  const tellinas = itemLibre("Tellinas");
+  const pulpo = itemLibre("Pulpo");
+  const arroz = itemLibre("Arroz a banda");
+  const conPlatos = (extra: Partial<MenuNovedad> = {}): MenuNovedad => ({
+    ...vacio,
+    secciones: { ...vacio.secciones, primero: [gamba, tellinas, pulpo], segundo: [arroz] },
+    ...extra,
+  });
+  const ids = (seccion: "primero" | "segundo" | "postre" | "bebidas") => ultimo.secciones[seccion].map((p) => p.nombre);
+
+  it("cada plato tiene asa y subir/bajar a la vista; con un solo plato, todo desactivado", () => {
+    render(<Harness inicial={conPlatos()} />);
+    const primero = within(screen.getByTestId("seccion-menu-primero"));
+    const asa = primero.getByRole("button", { name: "Arrastrar «Tellinas»" });
+    expect(asa).toBeEnabled();
+    expect(asa).toHaveClass("h-11", "w-11", "touch-none");
+    expect(primero.getByRole("button", { name: "Subir «Gamba roja»" })).toBeDisabled();
+    expect(primero.getByRole("button", { name: "Bajar «Pulpo»" })).toBeDisabled();
+    for (const fila of primero.getAllByRole("listitem")) expect(fila).not.toHaveClass("touch-none");
+
+    const segundo = within(screen.getByTestId("seccion-menu-segundo"));
+    expect(segundo.getByRole("button", { name: "Arrastrar «Arroz a banda»" })).toBeDisabled();
+    expect(segundo.getByRole("button", { name: "Subir «Arroz a banda»" })).toBeDisabled();
+    expect(segundo.getByRole("button", { name: "Bajar «Arroz a banda»" })).toBeDisabled();
+  });
+
+  it("subir y bajar mueven el plato en su sección y el foco se queda en él", async () => {
+    render(<Harness inicial={conPlatos()} />);
+    const primero = within(screen.getByTestId("seccion-menu-primero"));
+    const subirPulpo = () => primero.getByRole("button", { name: "Subir «Pulpo»" });
+    subirPulpo().focus();
+    fireEvent.click(subirPulpo());
+    expect(ids("primero")).toEqual(["Gamba roja", "Pulpo", "Tellinas"]);
+    await waitFor(() => expect(subirPulpo()).toHaveFocus());
+    fireEvent.click(subirPulpo());
+    expect(ids("primero")).toEqual(["Pulpo", "Gamba roja", "Tellinas"]);
+    // Arriba del todo «Subir» se desactiva y el foco pasa a «Bajar».
+    await waitFor(() => expect(primero.getByRole("button", { name: "Bajar «Pulpo»" })).toHaveFocus());
+    expect(ids("segundo")).toEqual(["Arroz a banda"]);
+  });
+
+  it("con el teclado se arrastra dentro de la sección, sin pasar a otra; Escape cancela", async () => {
+    render(<Harness inicial={conPlatos()} />);
+    const primero = within(screen.getByTestId("seccion-menu-primero"));
+    const asa = primero.getByRole("button", { name: "Arrastrar «Gamba roja»" });
+    asa.focus();
+    fireEvent.keyDown(asa, { code: "Space", key: " " });
+    await esperarDnd();
+    fireEvent.keyDown(asa, { code: "ArrowDown", key: "ArrowDown" });
+    await esperarDnd();
+    fireEvent.keyDown(asa, { code: "ArrowDown", key: "ArrowDown" });
+    await esperarDnd();
+    fireEvent.keyDown(asa, { code: "Space", key: " " });
+    await waitFor(() => expect(ids("primero")).toEqual(["Tellinas", "Pulpo", "Gamba roja"]));
+    expect(ids("segundo")).toEqual(["Arroz a banda"]);
+
+    const otra = primero.getByRole("button", { name: "Arrastrar «Tellinas»" });
+    otra.focus();
+    fireEvent.keyDown(otra, { code: "Space", key: " " });
+    await esperarDnd();
+    fireEvent.keyDown(otra, { code: "ArrowDown", key: "ArrowDown" });
+    await esperarDnd();
+    fireEvent.keyDown(otra, { code: "Escape", key: "Escape" });
+    await esperarDnd();
+    expect(ids("primero")).toEqual(["Tellinas", "Pulpo", "Gamba roja"]);
+  });
+
+  it("con Maridaje, la bebida va con su plato y sigue debajo de él", async () => {
+    const cava = { id: "m-cava", origen: "libre" as const, refId: null, nombre: "Cava", descripcion: null, sulfitos: true };
+    render(<Harness inicial={conPlatos({ maridaje: true, maridajes: { [gamba.id]: cava } })} />);
+    const primero = within(screen.getByTestId("seccion-menu-primero"));
+    fireEvent.click(primero.getByRole("button", { name: "Bajar «Gamba roja»" }));
+    expect(ids("primero")).toEqual(["Tellinas", "Gamba roja", "Pulpo"]);
+    expect(ultimo.maridajes[gamba.id].nombre).toBe("Cava");
+    const filaGamba = primero.getAllByRole("listitem")[1];
+    expect(filaGamba).toHaveAttribute("data-clave", gamba.id);
+    expect(within(filaGamba).getByDisplayValue("Cava")).toBeInTheDocument();
+    // El foco sigue en el plato, no salta a la bebida.
+    await waitFor(() => expect(primero.getByRole("button", { name: "Bajar «Gamba roja»" })).toHaveFocus());
+    expect(json(ultimo).secciones.primero.map((p) => p.maridaje?.nombre ?? null)).toEqual([null, "Cava", null]);
+  });
+
+  it("Bebidas con «Comida + bebidas»: asa, subir y bajar con el foco en la línea", async () => {
+    const bebidas = [itemLibre("Agua"), itemLibre("Vino de la casa")];
+    render(<Harness inicial={conPlatos({ incluye_bebidas: true, secciones: { ...conPlatos().secciones, bebidas } })} />);
+    const seccion = within(screen.getByTestId("seccion-menu-bebidas"));
+    expect(seccion.getByRole("button", { name: "Arrastrar «Agua»" })).toBeEnabled();
+    const bajar = seccion.getByRole("button", { name: "Bajar bebida 1" });
+    bajar.focus();
+    fireEvent.click(bajar);
+    expect(ids("bebidas")).toEqual(["Vino de la casa", "Agua"]);
+    await waitFor(() => expect(seccion.getByRole("button", { name: "Subir bebida 2" })).toHaveFocus());
+  });
+});
+
 describe("EditorMenuNovedad · una v1 de antes", () => {
   const V1 = {
     version: 1,

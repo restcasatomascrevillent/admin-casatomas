@@ -29,6 +29,7 @@ import {
   ArrowUp,
   Camera,
   ChevronDown,
+  ChevronUp,
   ImageOff,
   ImagePlus,
   Info,
@@ -66,6 +67,8 @@ import {
 } from "@/lib/menu-dia";
 import { ACCEPT_FOTO_MENU, subirFotoMenu, validarFotoMenu } from "@/lib/foto-menu-dia";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
+import { ListaOrdenable } from "@/components/ui/lista-ordenable";
+import { moverEnLista } from "@/lib/mover-en-lista";
 import { posicionImagen } from "./previewConstants";
 import { SelectorPlato } from "./SelectorPlato";
 
@@ -452,9 +455,28 @@ interface LineaMenuProps {
   onMover: (direccion: -1 | 1) => void;
   /** Lo que va debajo de la línea, a todo el ancho (la bebida del maridaje). */
   debajo?: ReactNode;
+  /**
+   * Dentro de una lista ordenable la línea es un `div`: el `li`, el asa y los
+   * botones subir y bajar los pone la lista, así que «Subir» y «Bajar» salen
+   * del menú «⋮».
+   */
+  enListaOrdenable?: boolean;
 }
 
-function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMover, debajo }: LineaMenuProps) {
+const CLASE_LINEA = "flex flex-wrap items-start gap-x-2.5 gap-y-1 rounded-lg border bg-card p-2";
+
+function LineaMenu({
+  item,
+  indice,
+  total,
+  platoActual,
+  onCambiar,
+  onQuitar,
+  onMover,
+  debajo,
+  enListaOrdenable = false,
+}: LineaMenuProps) {
+  const Raiz = enListaOrdenable ? "div" : "li";
   const enlazado = item.origen === "carta" && item.platoId !== null;
   const desaparecido = enlazado && !platoActual;
   const desactualizado = difiereDeLaCarta(item, platoActual);
@@ -476,7 +498,7 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
   };
 
   return (
-    <li className="flex flex-wrap items-start gap-x-2.5 gap-y-1 rounded-lg border bg-card p-2">
+    <Raiz className={enListaOrdenable ? `min-w-0 flex-1 ${CLASE_LINEA}` : CLASE_LINEA}>
       {/* La foto de un plato de la carta ES la de la carta: no se toca aquí. */}
       {item.origen === "libre" ? (
         <FotoPlatoLibre
@@ -587,22 +609,26 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
                   <Pencil className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
                   Alérgenos…
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={indice === 0}
-                  onSelect={() => onMover(-1)}
-                  className="min-h-11 text-base md:text-sm"
-                >
-                  <ArrowUp className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
-                  Subir
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  disabled={indice === total - 1}
-                  onSelect={() => onMover(1)}
-                  className="min-h-11 text-base md:text-sm"
-                >
-                  <ArrowDown className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
-                  Bajar
-                </DropdownMenuItem>
+                {!enListaOrdenable && (
+                  <>
+                    <DropdownMenuItem
+                      disabled={indice === 0}
+                      onSelect={() => onMover(-1)}
+                      className="min-h-11 text-base md:text-sm"
+                    >
+                      <ArrowUp className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+                      Subir
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={indice === total - 1}
+                      onSelect={() => onMover(1)}
+                      className="min-h-11 text-base md:text-sm"
+                    >
+                      <ArrowDown className="h-3.5 w-3.5 mr-2" aria-hidden="true" />
+                      Bajar
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onSelect={onQuitar}
@@ -617,7 +643,7 @@ function LineaMenu({ item, indice, total, platoActual, onCambiar, onQuitar, onMo
         }
       />
       {debajo && <div className="basis-full min-w-0 border-t pt-2">{debajo}</div>}
-    </li>
+    </Raiz>
   );
 }
 
@@ -648,6 +674,11 @@ interface SeccionPlatosProps {
   detalleVacia?: string;
   /** Lo primero de la sección desplegada (p. ej. «¿Qué entra?» del postre). */
   cabecera?: ReactNode;
+  /**
+   * Cada plato se arrastra desde un asa y tiene subir y bajar a la vista
+   * (menú de una novedad). Sin esto, subir y bajar van en el menú «⋮».
+   */
+  ordenable?: boolean;
 }
 
 export function SeccionPlatos({
@@ -664,9 +695,30 @@ export function SeccionPlatos({
   abiertaAlInicio = true,
   detalleVacia = "Sin platos",
   cabecera,
+  ordenable = false,
 }: SeccionPlatosProps) {
   const [abierta, setAbierta] = useState(!plegable || abiertaAlInicio);
   const idCuerpo = useId();
+  const listaRef = useRef<HTMLDivElement>(null);
+  // Tras subir o bajar, el foco sigue al plato; si ya no puede ir más allá, a la otra flecha.
+  const [enfoque, setEnfoque] = useState<{ id: string; direccion: "arriba" | "abajo" } | null>(null);
+  useEffect(() => {
+    if (!enfoque) return;
+    const fila = listaRef.current?.querySelector(`[data-clave="${enfoque.id}"]`);
+    const destino =
+      fila?.querySelector<HTMLElement>(`[data-mover="${enfoque.direccion}"]:not([disabled])`) ??
+      fila?.querySelector<HTMLElement>("[data-mover]:not([disabled])");
+    destino?.focus();
+    setEnfoque(null);
+  }, [enfoque]);
+  const mover = (desde: number, hasta: number) => {
+    const siguientes = moverEnLista(items, desde, hasta);
+    if (siguientes !== items) onChange([...siguientes]);
+  };
+  const subirOBajar = (indice: number, direccion: "arriba" | "abajo") => {
+    mover(indice, direccion === "arriba" ? indice - 1 : indice + 1);
+    setEnfoque({ id: items[indice].id, direccion });
+  };
   const añadirDeCarta = (plato: PlatoDeCarta) => onChange([...items, itemDesdePlato(plato)]);
   const añadirAMano = () => onChange([...items, itemLibre("")]);
 
@@ -688,6 +740,65 @@ export function SeccionPlatos({
           </p>
         )
       ) : (
+        ordenable ? (
+          <div ref={listaRef}>
+            <ListaOrdenable
+              ids={items.map((item) => item.id)}
+              nombre={(id) => items.find((item) => item.id === id)?.nombre.trim() || "plato sin nombre"}
+              onMover={mover}
+              className="space-y-2"
+              claseElemento="flex min-w-0 items-start gap-1"
+              aria-label={typeof titulo === "string" ? `Platos de ${titulo}, en orden` : "Platos, en orden"}
+            >
+              {(_id, indice, { asa }) => {
+                const item = items[indice];
+                const nombre = item.nombre.trim() || "plato sin nombre";
+                return (
+                  <>
+                    <div className="flex shrink-0 flex-col" role="group" aria-label={`Orden de «${nombre}»`}>
+                      {asa}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-11"
+                        data-mover="arriba"
+                        disabled={indice === 0}
+                        onClick={() => subirOBajar(indice, "arriba")}
+                        aria-label={`Subir «${nombre}»`}
+                      >
+                        <ChevronUp className="h-5 w-5" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-11 w-11"
+                        data-mover="abajo"
+                        disabled={indice === items.length - 1}
+                        onClick={() => subirOBajar(indice, "abajo")}
+                        aria-label={`Bajar «${nombre}»`}
+                      >
+                        <ChevronDown className="h-5 w-5" aria-hidden="true" />
+                      </Button>
+                    </div>
+                    <LineaMenu
+                      enListaOrdenable
+                      item={item}
+                      indice={indice}
+                      total={items.length}
+                      platoActual={item.platoId ? platosPorId.get(item.platoId) : undefined}
+                      debajo={debajoDePlato?.(item)}
+                      onCambiar={(nuevo) => onChange(items.map((x) => (x.id === item.id ? nuevo : x)))}
+                      onQuitar={() => onChange(items.filter((x) => x.id !== item.id))}
+                      onMover={(direccion) => mover(indice, indice + direccion)}
+                    />
+                  </>
+                );
+              }}
+            </ListaOrdenable>
+          </div>
+        ) : (
         <ul className="space-y-2">
           {items.map((item, indice) => (
             <LineaMenu
@@ -699,16 +810,11 @@ export function SeccionPlatos({
               debajo={debajoDePlato?.(item)}
               onCambiar={(nuevo) => onChange(items.map((x) => (x.id === item.id ? nuevo : x)))}
               onQuitar={() => onChange(items.filter((x) => x.id !== item.id))}
-              onMover={(direccion) => {
-                const destino = indice + direccion;
-                if (destino < 0 || destino >= items.length) return;
-                const copia = [...items];
-                [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
-                onChange(copia);
-              }}
+              onMover={(direccion) => mover(indice, indice + direccion)}
             />
           ))}
         </ul>
+        )
       )}
 
       <div className="flex flex-wrap gap-2">
@@ -803,6 +909,8 @@ interface EditorSeccionesMenuProps<S extends SeccionMenuDia> {
   detalleVacia?: Partial<Record<S, string>>;
   /** Lo primero de cada sección desplegada. */
   cabeceraDe?: (seccion: S) => ReactNode;
+  /** Platos que se arrastran y con subir y bajar a la vista (ver `SeccionPlatos`). */
+  ordenable?: boolean;
 }
 
 export function EditorSeccionesMenu<S extends SeccionMenuDia = SeccionMenu>({
@@ -818,6 +926,7 @@ export function EditorSeccionesMenu<S extends SeccionMenuDia = SeccionMenu>({
   abiertaAlInicio,
   detalleVacia,
   cabeceraDe,
+  ordenable = false,
 }: EditorSeccionesMenuProps<S>) {
   const actualizarSeccion = (seccion: S, items: ItemMenu[]) =>
     onChange({ ...secciones, [seccion]: items } as Record<S, ItemMenu[]>);
@@ -863,6 +972,7 @@ export function EditorSeccionesMenu<S extends SeccionMenuDia = SeccionMenu>({
                 abiertaAlInicio={abiertaAlInicio ? abiertaAlInicio(seccion, items) : true}
                 detalleVacia={detalleVacia?.[seccion]}
                 cabecera={cabeceraDe?.(seccion)}
+                ordenable={ordenable}
               />
             );
           })}
