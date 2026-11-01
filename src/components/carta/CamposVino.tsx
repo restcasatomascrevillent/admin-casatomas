@@ -4,6 +4,7 @@ import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessa
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
+import { propsCampoPrecio } from "./precioCarta";
 
 /**
  * Longitud máxima recomendada de la descripción (la BD es `text`, sin límite;
@@ -16,7 +17,8 @@ export const DESCRIPCION_RECOMENDADA = 320;
 export interface CamposVinoValores extends FieldValues {
   nombre?: string;
   categoria?: string;
-  precio_eur?: number;
+  /** Texto del campo (admite «4,50»); el esquema lo convierte en número. */
+  precio_eur?: unknown;
   descripcion?: string;
   ingredientes?: string;
   denominacion_origen?: string;
@@ -93,7 +95,7 @@ export function CamposVino<T extends CamposVinoValores>({
             <FormItem>
               <FormLabel>Precio en carta (€)</FormLabel>
               <FormControl>
-                <Input type="number" inputMode="decimal" step="0.01" min="0" placeholder="Ej.: 24,50" {...field} />
+                <Input {...field} {...propsCampoPrecio} value={(field.value as string | number | undefined) ?? ""} placeholder="Ej.: 24,50" />
               </FormControl>
               {bajoPrecio}
               <FormMessage />
