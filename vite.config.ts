@@ -1,7 +1,9 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import fs from "fs";
 import { calcularVersion } from "./scripts/version.mjs";
+import { FICHEROS_FFMPEG, RUTA_FFMPEG, VERSION_FFMPEG_CORE } from "./src/components/carta/video/rutaFfmpeg";
 
 // Identificador del build: versiona la caché del service worker (public/sw.js)
 // para que cada despliegue tire la caché anterior. En Vercel es el commit.
@@ -22,6 +24,34 @@ function versionJson(): Plugin {
   };
 }
 
+// Núcleo de ffmpeg.wasm (conversión de .mov HEVC del móvil, ~32 MB): se sirve
+// desde el propio panel en RUTA_FFMPEG (la CSP solo deja 'self'), copiado de
+// node_modules en el build y servido desde ahí en dev. No se sube al repo.
+function ffmpegCore(): Plugin {
+  const dir = path.resolve(__dirname, "node_modules/@ffmpeg/core/dist/esm");
+  const comprobarVersion = () => {
+    const v = JSON.parse(fs.readFileSync(path.resolve(__dirname, "node_modules/@ffmpeg/core/package.json"), "utf8")).version;
+    if (v !== VERSION_FFMPEG_CORE) throw new Error(`@ffmpeg/core es ${v} y rutaFfmpeg.ts dice ${VERSION_FFMPEG_CORE}: actualiza VERSION_FFMPEG_CORE`);
+  };
+  return {
+    name: "ffmpeg-core",
+    configureServer(server) {
+      server.middlewares.use(RUTA_FFMPEG, (req, res, next) => {
+        const nombre = (req.url ?? "").split("?")[0].replace(/^\//, "");
+        if (!(FICHEROS_FFMPEG as readonly string[]).includes(nombre)) return next();
+        res.setHeader("Content-Type", nombre.endsWith(".wasm") ? "application/wasm" : "text/javascript");
+        fs.createReadStream(path.join(dir, nombre)).pipe(res);
+      });
+    },
+    generateBundle() {
+      comprobarVersion();
+      for (const nombre of FICHEROS_FFMPEG) {
+        this.emitFile({ type: "asset", fileName: `${RUTA_FFMPEG.slice(1)}/${nombre}`, source: fs.readFileSync(path.join(dir, nombre)) });
+      }
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
   if (command === "build") {
@@ -36,11 +66,12 @@ export default defineConfig(({ command }) => {
     __BUILD_ID__: JSON.stringify(BUILD_ID),
     __VERSION_APP__: JSON.stringify(VERSION_APP),
   },
-  plugins: [react(), versionJson()],
+  plugins: [react(), versionJson(), ffmpegCore()],
   // Worker del recorte de fotos de vino (onnxruntime-web): módulo ES, y sin
   // pre-empaquetar en dev para que encuentre su .wasm.
   worker: { format: "es" as const },
-  optimizeDeps: { exclude: ["onnxruntime-web"] },
+  // @ffmpeg/ffmpeg crea su worker con new URL(..., import.meta.url): sin pre-empaquetar.
+  optimizeDeps: { exclude: ["onnxruntime-web", "@ffmpeg/ffmpeg"] },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

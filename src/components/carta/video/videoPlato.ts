@@ -247,6 +247,8 @@ export function columnaVideoDisponible(filas: ReadonlyArray<object> | null | und
 export type ProgresoVideo =
   | { fase: "preparando" }
   | { fase: "descargando"; pct: number }
+  /** Conversión del vídeo del móvil con ffmpeg.wasm; pct -1 = descargando/arrancando el conversor. */
+  | { fase: "convirtiendo"; pct: number }
   | { fase: "recortando"; hecho: number; total: number }
   | { fase: "componiendo"; hecho: number; total: number }
   | { fase: "codificando" };
@@ -255,6 +257,8 @@ export function textoProgresoVideo(p: ProgresoVideo | null): string {
   switch (p?.fase) {
     case "descargando":
       return `Descargando modelo (1ª vez)… ${p.pct} %`;
+    case "convirtiendo":
+      return p.pct < 0 ? "Convirtiendo vídeo del móvil… (preparando conversor)" : `Convirtiendo vídeo del móvil… ${p.pct} %`;
     case "recortando":
       return `Procesando vídeo… quitando fondo ${p.hecho}/${p.total}`;
     case "componiendo":
@@ -270,6 +274,8 @@ export function textoProgresoVideo(p: ProgresoVideo | null): string {
 export function porcentajeProgresoVideo(p: ProgresoVideo | null): number {
   switch (p?.fase) {
     case "descargando":
+      return 0;
+    case "convirtiendo":
       return 0;
     case "recortando":
       return Math.round((p.hecho / Math.max(1, p.total)) * 70);
