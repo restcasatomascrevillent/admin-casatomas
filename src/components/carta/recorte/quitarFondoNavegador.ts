@@ -6,6 +6,18 @@
  *
  * Progreso: { fase: "descargando", pct } solo la 1ª vez (luego sale de Cache
  * Storage), { fase: "cargando" } al preparar el modelo, { fase: "recortando" }.
+ *
+ * MEMORIA (fallo «subo una foto y se me cierra», 2026-11-01): el modelo pesa
+ * 47 MB y recortar a 1024×1024 pide cientos de MB más dentro del worker. En un
+ * móvil o una tablet eso basta para que el sistema mate la pestaña (iOS la
+ * recarga, Android también si va justo de memoria; peor aún al abrir la cámara
+ * con la pestaña en segundo plano): la página se «cierra» sola y la foto se
+ * pierde. Por eso:
+ *   - `recorteNavegadorSeguro()` dice si este dispositivo puede intentarlo
+ *     (escritorio con memoria); en móvil/tablet `quitarFondo` va directo a
+ *     Replicate (fotoCartaVino.ts) y, si no hay, se guarda la foto normal.
+ *   - El worker se TERMINA tras un rato sin uso (`MS_WORKER_INACTIVO`) para
+ *     devolver esa memoria; antes vivía para siempre con el modelo cargado.
  */
 import type { MensajeAlWorker, MensajeDelWorker, Proveedor } from "./recorte.worker";
 import { LADO_MODELO, postprocesarMascara } from "./mascaraRecorte";
@@ -28,13 +40,33 @@ export interface MedidaRecorte {
 export let ultimaMedida: MedidaRecorte | null = null;
 
 let worker: Worker | null = null;
+let temporizadorInactivo: ReturnType<typeof setTimeout> | null = null;
 let sigId = 1;
+
+/** Tras este tiempo sin recortes se termina el worker (libera modelo y memoria del runtime). */
+export const MS_WORKER_INACTIVO = 60_000;
 const pendientes = new Map<
   number,
   { ok: (m: { mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor }) => void; ko: (e: Error) => void; onProgreso?: (p: ProgresoRecorte) => void }
 >();
 
+/** Termina el worker ya (si no hay recortes pendientes) y suelta su memoria. */
+export function liberarWorkerRecorte(): void {
+  if (temporizadorInactivo) clearTimeout(temporizadorInactivo);
+  temporizadorInactivo = null;
+  if (!worker || pendientes.size > 0) return;
+  worker.terminate();
+  worker = null;
+}
+
+function programarLiberacion(): void {
+  if (temporizadorInactivo) clearTimeout(temporizadorInactivo);
+  temporizadorInactivo = setTimeout(liberarWorkerRecorte, MS_WORKER_INACTIVO);
+}
+
 function obtenerWorker(): Worker {
+  if (temporizadorInactivo) clearTimeout(temporizadorInactivo);
+  temporizadorInactivo = null;
   if (worker) return worker;
   const w = new Worker(new URL("./recorte.worker.ts", import.meta.url), { type: "module", name: "recorte-vino" });
   w.onmessage = (ev: MessageEvent<MensajeDelWorker>) => {
@@ -87,6 +119,32 @@ export function recorteNavegadorDisponible(): boolean {
   return typeof Worker !== "undefined" && typeof WebAssembly !== "undefined" && typeof document !== "undefined";
 }
 
+/** Memoria mínima (GB, `navigator.deviceMemory`, solo Chrome) para recortar en el navegador. */
+const MEMORIA_MINIMA_GB = 8;
+
+/**
+ * true si en ESTE dispositivo es seguro recortar en el navegador: no es un
+ * móvil ni una tablet (ni un iPad que se presenta como Mac) y, si el navegador
+ * dice cuánta memoria tiene, tiene al menos 8 GB. En otro caso el recorte va a
+ * Replicate (ver cabecera: en móvil el modelo tumbaba la pestaña).
+ */
+export function recorteNavegadorSeguro(nav: Navigator | undefined = typeof navigator !== "undefined" ? navigator : undefined): boolean {
+  if (!recorteNavegadorDisponible() || !nav) return false;
+  const ua = nav.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(ua)) return false;
+  // iPadOS se identifica como «Macintosh»; se le reconoce por la pantalla táctil.
+  if (/Macintosh/i.test(ua) && (nav.maxTouchPoints ?? 0) > 1) return false;
+  const memoria = (nav as Navigator & { deviceMemory?: number }).deviceMemory;
+  if (typeof memoria === "number" && memoria < MEMORIA_MINIMA_GB) return false;
+  try {
+    // Pantalla táctil sin ratón como puntero principal (tablets con UA de escritorio).
+    if (typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse) and (hover: none)").matches) return false;
+  } catch {
+    /* sin matchMedia: se decide por lo anterior */
+  }
+  return true;
+}
+
 /** Foto → PNG con la botella sin fondo (máscara binaria con borde suavizado, como rembg). */
 export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: ProgresoRecorte) => void): Promise<Blob> {
   if (!recorteNavegadorDisponible()) throw new Error("Este navegador no puede recortar");
@@ -102,11 +160,20 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
 
   const id = sigId++;
   onProgreso?.({ fase: "cargando" });
-  const res = await new Promise<{ mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor }>((ok, ko) => {
-    pendientes.set(id, { ok, ko, onProgreso });
-    const msg: MensajeAlWorker = { tipo: "recortar", id, rgba };
-    obtenerWorker().postMessage(msg, [rgba.buffer]);
-  });
+  let res: { mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor };
+  try {
+    res = await new Promise<{ mascara: Uint8Array; ms: number; desdeCache: boolean; proveedor: Proveedor }>((ok, ko) => {
+      pendientes.set(id, { ok, ko, onProgreso });
+      const msg: MensajeAlWorker = { tipo: "recortar", id, rgba };
+      obtenerWorker().postMessage(msg, [rgba.buffer]);
+    });
+  } catch (e) {
+    bmp.close();
+    throw e;
+  } finally {
+    // Sin más recortes en un rato, fuera el worker (y su memoria).
+    if (pendientes.size === 0) programarLiberacion();
+  }
 
   // Máscara 1024² → tamaño de la foto (suavizado del canvas) → post_process.
   const m = lienzo(LADO_MODELO, LADO_MODELO);

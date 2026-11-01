@@ -4,6 +4,13 @@ import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
+import {
+  cambiosDeOrden,
+  categoriasOrdenadas,
+  consultarSiguienteOrden,
+  guardarOrdenEnTabla,
+  ordenarPorOrden,
+} from "@/lib/orden-carta";
 
 export interface Coctel {
   id: string;
@@ -116,7 +123,7 @@ export function useCocteles() {
         .order("orden", { ascending: true });
 
       if (error) throw error;
-      return data as Coctel[];
+      return ordenarPorOrden(data as Coctel[]);
     },
   });
 
@@ -140,6 +147,13 @@ export function useCocteles() {
         categoria: nuevoCoctel.categoria,
       });
 
+      // Al final de su categoría (mayor orden + 1).
+      const orden = await consultarSiguienteOrden(
+        "Cocteles",
+        nuevoCoctel.categoria,
+        queryClient.getQueryData<Coctel[]>(["cocteles"]),
+      );
+
       const { data, error } = await supabase
         .from("Cocteles")
         .insert([
@@ -154,7 +168,7 @@ export function useCocteles() {
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoCoctel.alergenos_notas || null,
             activado: true,
-            orden: 0,
+            orden,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             ...(traducciones || {}),
@@ -214,6 +228,22 @@ export function useCocteles() {
       const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
       if (saltaRetraduccionSinAnterior) {
         console.warn(`useCocteles.actualizarCoctel: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      // Cambio de categoría: el cóctel pasa al final de la nueva.
+      if (
+        anterior &&
+        "categoria" in cambios &&
+        cambios.categoria &&
+        cambios.categoria !== anterior.categoria &&
+        !("orden" in cambios)
+      ) {
+        cambios.orden = await consultarSiguienteOrden(
+          "Cocteles",
+          cambios.categoria,
+          queryClient.getQueryData<Coctel[]>(["cocteles"]),
+          id,
+        );
       }
 
       const cambiaTraducible = Boolean(
@@ -301,6 +331,28 @@ export function useCocteles() {
     },
   });
 
+  /**
+   * Guarda el orden de una categoría: `idsEnOrden` pasa a ser 1, 2, 3… (solo
+   * se escriben los que cambian) y se republica la web.
+   */
+  const guardarOrden = useMutation({
+    mutationFn: async ({ idsEnOrden }: { categoria: string; idsEnOrden: string[] }) => {
+      const actuales = queryClient.getQueryData<Coctel[]>(["cocteles"]) ?? [];
+      const cambios = cambiosDeOrden(actuales, idsEnOrden);
+      await guardarOrdenEnTabla("Cocteles", cambios);
+      return cambios.length;
+    },
+    onSuccess: (escritos, { categoria }) => {
+      queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+      if (escritos > 0) avisar(`Orden de «${categoria}» guardado`);
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["cocteles"] });
+      toast.error(error instanceof Error ? error.message : "No se ha podido guardar el orden");
+      console.error(error);
+    },
+  });
+
   const toggleActivado = useMutation({
     mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
@@ -362,9 +414,8 @@ export function useCocteles() {
     },
   });
 
-  const categorias = cocteles
-    ? Array.from(new Set(cocteles.map((c) => c.categoria).filter(Boolean)))
-    : [];
+  // Alfabéticas: así no cambian de sitio al reordenar.
+  const categorias = categoriasOrdenadas(cocteles);
 
   return {
     cocteles,
@@ -373,6 +424,7 @@ export function useCocteles() {
     crearCoctel,
     actualizarCoctel,
     eliminarCoctel,
+    guardarOrden,
     toggleActivado,
     toggleRestaurante,
     toggleTouza,

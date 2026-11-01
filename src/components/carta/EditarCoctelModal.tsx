@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
@@ -160,12 +161,10 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
+    // gastaba decenas de MB para una vista previa que no se enseña (la foto
+    // nueva la pinta SelectorFotoCarta).
+    setImagePreview(null);
   };
 
   const clearImage = () => {
@@ -236,7 +235,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Editar Cóctel</DialogTitle>
           <DialogDescription>

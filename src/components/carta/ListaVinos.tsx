@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-import { Wine, Trash2, Pencil, Eye, EyeOff, Move } from "lucide-react";
+import { Wine, Eye, EyeOff, Move } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,13 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarVinoModal } from "./EditarVinoModal";
 import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
+import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -42,17 +43,34 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
     actualizarVino,
   } = useVinos();
   const [vinoAEditar, setVinoAEditar] = useState<Vino | null>(null);
+  const [vinoAEliminar, setVinoAEliminar] = useState<Vino | null>(null);
+  const fotoRapida = useRef<FotoRapidaHandle>(null);
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(vinos.map(v => v.id)));
   const [posicionVino, setPosicionVino] = useState<Vino | null>(null);
 
+  // Las fotos empiezan ocultas en el panel; solo se ocultan las tarjetas que
+  // aparecen por primera vez (antes, cualquier refresco volvía a ocultarlas
+  // todas, también la que se acababa de subir con «Foto»).
+  const idsVistos = useRef(new Set(vinos.map((v) => v.id)));
   useEffect(() => {
+    const nuevos = vinos.filter((v) => !idsVistos.current.has(v.id));
+    if (nuevos.length === 0) return;
+    nuevos.forEach((v) => idsVistos.current.add(v.id));
     setFotosOcultas(prev => {
       const next = new Set(prev);
-      vinos.forEach(v => next.add(v.id));
+      nuevos.forEach((v) => next.add(v.id));
       return next;
     });
   }, [vinos]);
+
+  /** Tras subir una foto con «Foto», se enseña en su tarjeta. */
+  const mostrarFoto = (id: string) =>
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
   const toggleFotoVisible = (id: string) => {
     setFotosOcultas(prev => {
@@ -137,9 +155,10 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
             <CardContent className="p-4 space-y-3">
               {/* Header con nombre y controles de foto */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
-                  {vino.nombre}
-                </h3>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <EtiquetaCategoria categoria={vino.categoria} />
+                  <h3 className="font-semibold text-base leading-tight">{vino.nombre}</h3>
+                </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {vino.imagen_url && (
                     <Button
@@ -244,50 +263,49 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 </p>
               )}
 
-              <div className="pt-2 border-t flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-11 flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  onClick={() => setVinoAEditar(vino)}
-                >
-                  <Pencil className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-11 flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Eliminar
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>¿Eliminar vino?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción eliminará permanentemente "{vino.nombre}" de la carta. Esta acción no se puede deshacer.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={() => eliminarVino.mutate(vino.id)}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                      >
-                        Eliminar
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
+              <AccionesTarjeta
+                nombre={vino.nombre}
+                tieneFoto={Boolean(vino.imagen_url?.trim())}
+                onFoto={() => fotoRapida.current?.abrir(vino)}
+                onEditar={() => setVinoAEditar(vino)}
+                onEliminar={() => setVinoAEliminar(vino)}
+              />
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <AlertDialog open={!!vinoAEliminar} onOpenChange={(open) => !open && setVinoAEliminar(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar vino?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará permanentemente "{vinoAEliminar?.nombre}" de la carta. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (vinoAEliminar) eliminarVino.mutate(vinoAEliminar.id);
+                setVinoAEliminar(null);
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <FotoRapidaCarta
+        ref={fotoRapida}
+        tipo="vino"
+        bucket="vinos"
+        tabla="Vinos"
+        onGuardada={mostrarFoto}
+        guardarUrl={(id, url) => actualizarVino.mutateAsync({ id, imagen_url: url })}
+      />
 
       <EditarVinoModal
         open={!!vinoAEditar}

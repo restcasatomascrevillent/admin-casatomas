@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChefHat, Eye, EyeOff, Move, Pencil, Trash2 } from "lucide-react";
+import { ChefHat, Eye, EyeOff, Move } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
 
@@ -23,6 +23,8 @@ import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarPlatoModal } from "./EditarPlatoModal";
 import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
 import { etiquetaAlergeno, parseAlergenos } from "@/lib/alergenos";
+import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -43,14 +45,30 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
   const [fotoAVisualizar, setFotoAVisualizar] = useState<{ url: string; nombre: string } | null>(null);
   const [fotosOcultas, setFotosOcultas] = useState<Set<string>>(() => new Set(platos.map(p => p.id)));
   const [posicionPlato, setPosicionPlato] = useState<Plato | null>(null);
+  const fotoRapida = useRef<FotoRapidaHandle>(null);
 
+  // Las fotos empiezan ocultas en el panel; solo se ocultan las tarjetas que
+  // aparecen por primera vez (antes, cualquier refresco volvía a ocultarlas
+  // todas, también la que se acababa de subir con «Foto»).
+  const idsVistos = useRef(new Set(platos.map((p) => p.id)));
   useEffect(() => {
+    const nuevos = platos.filter((p) => !idsVistos.current.has(p.id));
+    if (nuevos.length === 0) return;
+    nuevos.forEach((p) => idsVistos.current.add(p.id));
     setFotosOcultas(prev => {
       const next = new Set(prev);
-      platos.forEach(p => next.add(p.id));
+      nuevos.forEach((p) => next.add(p.id));
       return next;
     });
   }, [platos]);
+
+  /** Tras subir una foto con «Foto», se enseña en su tarjeta. */
+  const mostrarFoto = (id: string) =>
+    setFotosOcultas(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
 
 
   const toggleFotoVisible = (id: string) => {
@@ -144,9 +162,10 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
             <CardContent className="p-4 space-y-3">
               {/* Header con nombre y controles de foto */}
               <div className="flex items-start justify-between gap-3">
-                <h3 className="font-semibold text-base leading-tight flex-1 min-w-0">
-                  {plato.nombre}
-                </h3>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <EtiquetaCategoria categoria={plato.categoria} />
+                  <h3 className="font-semibold text-base leading-tight">{plato.nombre}</h3>
+                </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {plato.imagen_url && (
                     <Button
@@ -249,27 +268,13 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 </div>
               )}
 
-              {/* Botón eliminar */}
-              <div className="pt-2 border-t flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-11 flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                  onClick={() => setPlatoAEditar(plato)}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Editar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-11 flex-1 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setPlatoAEliminar(plato)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Eliminar
-                </Button>
-              </div>
+              <AccionesTarjeta
+                nombre={plato.nombre}
+                tieneFoto={Boolean(plato.imagen_url?.trim())}
+                onFoto={() => fotoRapida.current?.abrir(plato)}
+                onEditar={() => setPlatoAEditar(plato)}
+                onEliminar={() => setPlatoAEliminar(plato)}
+              />
             </CardContent>
           </Card>
         ))}
@@ -295,6 +300,15 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <FotoRapidaCarta
+        ref={fotoRapida}
+        tipo="plato"
+        bucket="platos"
+        tabla="Platos"
+        onGuardada={mostrarFoto}
+        guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
+      />
 
       <EditarPlatoModal
         open={!!platoAEditar}

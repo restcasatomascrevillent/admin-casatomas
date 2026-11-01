@@ -47,7 +47,7 @@ describe("Marcador sin gluten al crear y editar platos", () => {
       screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole("button", { name: "Gluten", exact: true }),
+      screen.getByRole("button", { name: "Gluten" }),
     );
     const checkbox = screen.getByRole("checkbox", {
       name: "Se puede hacer sin gluten",
@@ -55,13 +55,13 @@ describe("Marcador sin gluten al crear y editar platos", () => {
     expect(checkbox).not.toBeChecked();
     fireEvent.click(checkbox);
     fireEvent.click(
-      screen.getByRole("button", { name: "Gluten", exact: true }),
+      screen.getByRole("button", { name: "Gluten" }),
     );
     expect(
       screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole("button", { name: "Gluten", exact: true }),
+      screen.getByRole("button", { name: "Gluten" }),
     );
     const checkboxRestablecido = screen.getByRole("checkbox", {
       name: "Se puede hacer sin gluten",
@@ -88,13 +88,13 @@ describe("Marcador sin gluten al crear y editar platos", () => {
     fireEvent.click(checkbox);
     fireEvent.click(checkbox);
     fireEvent.click(
-      screen.getByRole("button", { name: "Gluten", exact: true }),
+      screen.getByRole("button", { name: "Gluten" }),
     );
     expect(
       screen.queryByRole("checkbox", { name: "Se puede hacer sin gluten" }),
     ).not.toBeInTheDocument();
     fireEvent.click(
-      screen.getByRole("button", { name: "Gluten", exact: true }),
+      screen.getByRole("button", { name: "Gluten" }),
     );
     expect(
       screen.getByRole("checkbox", { name: "Se puede hacer sin gluten" }),
@@ -119,9 +119,9 @@ it("ofrece una sola Unidad y guarda el precio por la cantidad de gramos elegida"
   });
   fireEvent.keyDown(screen.getByLabelText("Unidad"), { key: "ArrowDown" });
   expect(
-    screen.getAllByRole("option", { name: "Unidad", exact: true }),
+    screen.getAllByRole("option", { name: "Unidad" }),
   ).toHaveLength(1);
-  fireEvent.click(screen.getByRole("option", { name: "Gramos", exact: true }));
+  fireEvent.click(screen.getByRole("option", { name: "Gramos" }));
   fireEvent.click(
     screen.getByRole("button", { name: "Sin alérgenos declarados" }),
   );
@@ -215,7 +215,7 @@ it("exige una declaración al crear y guarda una confirmación expresa sin alér
     target: { value: "Arroz" },
   });
   expect(
-    screen.getByRole("button", { name: "Gluten", exact: true }),
+    screen.getByRole("button", { name: "Gluten" }),
   ).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Guardar Plato" }));
   expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -251,7 +251,7 @@ it("un plato antiguo sin datos debe confirmarse, y sin alérgenos es excluyente"
   await screen.findByRole("alert");
   expect(mutaciones.actualizar).not.toHaveBeenCalled();
   fireEvent.click(ninguno);
-  fireEvent.click(screen.getByRole("button", { name: "Gluten", exact: true }));
+  fireEvent.click(screen.getByRole("button", { name: "Gluten" }));
   expect(ninguno).toHaveAttribute("aria-pressed", "false");
   fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
   await waitFor(() =>

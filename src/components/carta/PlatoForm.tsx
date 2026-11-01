@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import {
@@ -215,7 +216,7 @@ export function PlatoForm({
           await actualizarPlato.mutateAsync({ id: nuevoPlato.id, imagen_url: url });
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
-          toast.error("Plato creado pero error al subir imagen");
+          toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
         }
       }
 
@@ -235,7 +236,7 @@ export function PlatoForm({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Añadir Plato</DialogTitle>
           <DialogDescription>

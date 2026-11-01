@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
@@ -72,12 +73,11 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
+      // gastaba decenas de MB para una vista previa que no se enseña (la foto
+      // nueva la pinta SelectorFotoCarta).
       fotoCarta.iniciar(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setImagePreview(null);
     }
   };
 
@@ -121,7 +121,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
         queryClient.invalidateQueries({ queryKey: ["bebidas"] });
       } catch (error) {
         console.error('Error uploading image:', error);
-        toast.error("Error al subir la imagen");
+        toast.error("Bebida creada, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
       } finally {
         setIsUploading(false);
       }
@@ -134,7 +134,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Añadir Bebida</DialogTitle>
           <DialogDescription>

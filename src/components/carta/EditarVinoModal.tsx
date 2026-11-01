@@ -23,6 +23,7 @@ import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 
 const formSchema = z.object({
@@ -197,7 +198,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90dvh] overflow-y-auto" onInteractOutside={noCerrarAlTocarFuera}>
         <DialogHeader>
           <DialogTitle>Editar Vino</DialogTitle>
           <DialogDescription>

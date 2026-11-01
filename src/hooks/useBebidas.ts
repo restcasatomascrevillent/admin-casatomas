@@ -3,6 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
+import {
+  cambiosDeOrden,
+  categoriasOrdenadas,
+  consultarSiguienteOrden,
+  guardarOrdenEnTabla,
+  ordenarPorOrden,
+} from "@/lib/orden-carta";
 
 export interface Bebida {
   id: string;
@@ -89,7 +96,7 @@ export function useBebidas() {
         .order("orden", { ascending: true });
 
       if (error) throw error;
-      return data as Bebida[];
+      return ordenarPorOrden(data as Bebida[]);
     },
   });
 
@@ -100,6 +107,15 @@ export function useBebidas() {
         descripcion: nuevaBebida.descripcion || "",
         categoria: nuevaBebida.categoria,
       });
+
+      // Al final de su categoría (mayor orden + 1), salvo que se indique.
+      const orden =
+        nuevaBebida.orden ??
+        (await consultarSiguienteOrden(
+          "Bebidas",
+          nuevaBebida.categoria,
+          queryClient.getQueryData<Bebida[]>(["bebidas"]),
+        ));
 
       const { data, error } = await supabase
         .from("Bebidas")
@@ -113,7 +129,7 @@ export function useBebidas() {
             // nunca: se perdía en cada alta (y la web la muestra).
             descripcion: nuevaBebida.descripcion || null,
             tamano: nuevaBebida.tamano || null,
-            orden: nuevaBebida.orden ?? 0,
+            orden,
             activado: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -162,6 +178,22 @@ export function useBebidas() {
       const saltaRetraduccionSinAnterior = tocaCampoTraducible && !anterior;
       if (saltaRetraduccionSinAnterior) {
         console.warn(`useBebidas.actualizarBebida: se salta la retraducción de "${id}" — sin estado previo en caché.`);
+      }
+
+      // Cambio de categoría: la bebida pasa al final de la nueva.
+      if (
+        anterior &&
+        "categoria" in cambios &&
+        cambios.categoria &&
+        cambios.categoria !== anterior.categoria &&
+        !("orden" in cambios)
+      ) {
+        cambios.orden = await consultarSiguienteOrden(
+          "Bebidas",
+          cambios.categoria,
+          queryClient.getQueryData<Bebida[]>(["bebidas"]),
+          id,
+        );
       }
 
       const cambiaTraducible = Boolean(
@@ -247,6 +279,28 @@ export function useBebidas() {
     },
   });
 
+  /**
+   * Guarda el orden de una categoría: `idsEnOrden` pasa a ser 1, 2, 3… (solo
+   * se escriben los que cambian) y se republica la web.
+   */
+  const guardarOrden = useMutation({
+    mutationFn: async ({ idsEnOrden }: { categoria: string; idsEnOrden: string[] }) => {
+      const actuales = queryClient.getQueryData<Bebida[]>(["bebidas"]) ?? [];
+      const cambios = cambiosDeOrden(actuales, idsEnOrden);
+      await guardarOrdenEnTabla("Bebidas", cambios);
+      return cambios.length;
+    },
+    onSuccess: (escritos, { categoria }) => {
+      queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+      if (escritos > 0) avisar(`Orden de «${categoria}» guardado`);
+    },
+    onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["bebidas"] });
+      toast.error(error instanceof Error ? error.message : "No se ha podido guardar el orden");
+      console.error(error);
+    },
+  });
+
   const toggleActivado = useMutation({
     mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
       const { error } = await supabase
@@ -308,9 +362,8 @@ export function useBebidas() {
     },
   });
 
-  const categorias = bebidas
-    ? Array.from(new Set(bebidas.map((b) => b.categoria).filter(Boolean)))
-    : [];
+  // Alfabéticas: así no cambian de sitio al reordenar.
+  const categorias = categoriasOrdenadas(bebidas);
 
   return {
     bebidas,
@@ -319,6 +372,7 @@ export function useBebidas() {
     crearBebida,
     actualizarBebida,
     eliminarBebida,
+    guardarOrden,
     toggleActivado,
     toggleRestaurante,
     toggleTouza,
