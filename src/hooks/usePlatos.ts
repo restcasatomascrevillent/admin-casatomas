@@ -27,6 +27,11 @@ export interface Plato {
   expanded: boolean | null;
   imagen_url: string | null;
   imagen_posicion_y: number | null;
+  /**
+   * Vídeo del plato (`<id>-video.mp4|webm`). Opcional: antes de aplicar la
+   * migración 20261101120000_platos_video_url la columna no viene en select('*').
+   */
+  video_url?: string | null;
   touza: boolean | null;
   restaurante: boolean | null;
   featured: boolean | null;
@@ -520,5 +525,7 @@ export function usePlatos() {
     contraerTodos,
     toggleRestaurante,
     toggleTouza,
+    /** Vuelve a leer la lista (p. ej. tras guardar el vídeo, que va aparte). */
+    refrescarPlatos: () => queryClient.invalidateQueries({ queryKey: ["platos"] }),
   };
 }
