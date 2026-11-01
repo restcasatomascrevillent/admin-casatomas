@@ -1080,6 +1080,54 @@ export function conservarTraduccionesLinea(
   return { ...sinTraducciones, traducciones: soloNombres };
 }
 
+/**
+ * Nombres de sección que son un ORDINAL («Tercero», «Cuarto plato»…) se
+ * traducen con esta lista cerrada, sin la IA. Motivo (PROD, 01-11-2026): el
+ * nombre de la sección va solo al traductor, sin contexto, y «Cuarto» salió
+ * como «Quarter» / «Quart» (la fracción, no el orden). Igual que un plato de la
+ * carta: gratis y exacto. Cualquier otro nombre sigue yendo al traductor.
+ */
+const ORDINALES_SECCION: Record<string, Record<IdiomaTraducido, string>> = {
+  primero: { en: "First", fr: "Premier" },
+  segundo: { en: "Second", fr: "Deuxième" },
+  tercero: { en: "Third", fr: "Troisième" },
+  cuarto: { en: "Fourth", fr: "Quatrième" },
+  quinto: { en: "Fifth", fr: "Cinquième" },
+  sexto: { en: "Sixth", fr: "Sixième" },
+  septimo: { en: "Seventh", fr: "Septième" },
+  octavo: { en: "Eighth", fr: "Huitième" },
+  noveno: { en: "Ninth", fr: "Neuvième" },
+  decimo: { en: "Tenth", fr: "Dixième" },
+};
+
+/** «Cuarto» → Fourth / Quatrième; «cuarto plato» → fourth course / quatrième plat. Si no es un ordinal, `null`. */
+export function traduccionOrdinalSeccion(nombre: string): Record<IdiomaTraducido, { nombre: string }> | null {
+  const limpio = nombre.replace(/\s+/g, " ").trim();
+  const clave = limpio
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  const coincide = /^(primer|primero|segundo|tercer|tercero|cuarto|quinto|sexto|septimo|octavo|noveno|decimo)( plato)?$/.exec(clave);
+  if (!coincide) return null;
+  const ordinal = ORDINALES_SECCION[coincide[1] === "primer" ? "primero" : coincide[1] === "tercer" ? "tercero" : coincide[1]];
+  const conPlato = !!coincide[2];
+  const mayuscula = limpio[0] !== limpio[0].toLowerCase();
+  const forma = (texto: string) => (mayuscula ? texto : texto.toLowerCase());
+  return {
+    en: { nombre: forma(conPlato ? `${ordinal.en} course` : ordinal.en) },
+    fr: { nombre: forma(conPlato ? `${ordinal.fr} plat` : ordinal.fr) },
+  };
+}
+
+/** Rellena solo los idiomas que le falten a la sección; lo ya guardado se respeta. */
+function conOrdinalTraducido(seccion: SeccionExtraNovedad): Pick<SeccionExtraNovedad, "traducciones"> | Record<string, never> {
+  const ordinal = traduccionOrdinalSeccion(seccion.nombre);
+  if (!ordinal) return {};
+  const traducciones = { ...seccion.traducciones };
+  for (const idioma of IDIOMAS_TRADUCIDOS) if (!traducciones[idioma]?.nombre) traducciones[idioma] = ordinal[idioma];
+  return { traducciones };
+}
+
 /** Cómo se llama a `traducir-contenido` (inyectado para poder probarlo). */
 export type InvocarTraductorMenu = (body: {
   tipo: "menu";
@@ -1227,8 +1275,10 @@ export async function traducirMenuNovedad(
 
   // 5. Secciones extra: una llamada por sección, sus platos pendientes en
   //    `primero` y su nombre (si le falta traducción) solo en `segundo`.
+  //    Un nombre que es un ordinal se completa antes con la lista cerrada.
   const extrasConCarta = limpio.extras.map((seccion) => ({
     ...seccion,
+    ...conOrdinalTraducido(seccion),
     items: seccion.items.map((item) => {
       if (traduccionCompleta(item) || !enLaCarta(item)) return item;
       const deCarta = traduccionesDesdeCarta(platosPorId.get(item.platoId as string) as PlatoConTraducciones);
