@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "mcp__github",
+      "mcp__Vercel",
+      "mcp__Supabase",
+      "mcp__claude-code-remote__add_repo",
+      "mcp__claude-code-remote__register_repo_root",
+      "mcp__claude-code-remote__subscribe_pr_activity",
+      "mcp__claude-code-remote__unsubscribe_pr_activity",
+
+      "Bash(git *)",
+      "Bash(gh *)",
+
+      "Bash(supabase *)",
+      "Bash(npx supabase *)",
+      "Bash(npx -y supabase *)",
+      "Bash(npx --yes supabase *)",
+      "Bash(SUPABASE_ACCESS_TOKEN=* supabase *)",
+      "Bash(SUPABASE_ACCESS_TOKEN=* npx supabase *)",
+      "Bash(SUPABASE_ACCESS_TOKEN=* npx -y supabase *)",
+      "Bash(SUPABASE_ACCESS_TOKEN=* npx --yes supabase *)",
+
+      "Bash(vercel *)",
+      "Bash(npx vercel *)",
+      "Bash(npx -y vercel *)",
+      "Bash(npx --yes vercel *)",
+
+      "Bash(curl *api.github.com*)",
+      "Bash(curl *api.vercel.com*)",
+      "Bash(curl *.vercel.app*)",
+      "Bash(curl *api.supabase.com*)",
+      "Bash(curl *.supabase.co*)",
+
+      "Bash(bash .claude/becarios/scripts/comprobar-accesos.sh*)",
+
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:vercel.com)",
+      "WebFetch(domain:api.vercel.com)",
+      "WebFetch(domain:*.vercel.app)",
+      "WebFetch(domain:supabase.com)",
+      "WebFetch(domain:api.supabase.com)",
+      "WebFetch(domain:*.supabase.co)"
+    ]
+  }
+}
