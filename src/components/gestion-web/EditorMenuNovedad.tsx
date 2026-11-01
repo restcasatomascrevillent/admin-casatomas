@@ -100,12 +100,12 @@ interface Enfoque {
   selectores: string[];
 }
 
-function useEnfoque<T extends HTMLElement>() {
+function useEnfoque<T extends HTMLElement>(atributo = "data-clave") {
   const ref = useRef<T>(null);
   const [enfoque, setEnfoque] = useState<Enfoque | null>(null);
   useEffect(() => {
     if (!enfoque) return;
-    const fila = ref.current?.querySelector(`[data-clave="${enfoque.clave}"]`);
+    const fila = ref.current?.querySelector(`[${atributo}="${enfoque.clave}"]`);
     for (const selector of enfoque.selectores) {
       const destino = fila?.querySelector<HTMLElement>(selector);
       if (destino) {
@@ -114,7 +114,7 @@ function useEnfoque<T extends HTMLElement>() {
       }
     }
     setEnfoque(null);
-  }, [enfoque]);
+  }, [enfoque, atributo]);
   return { ref, enfocar: setEnfoque };
 }
 
@@ -251,12 +251,14 @@ function EditorMenuPlatos({
   // La bebida recién añadida recibe el foco (el botón «Añadir bebida» sigue en
   // su sitio, pero lo siguiente que se hace es escribirla).
   const [enfocarBebida, setEnfocarBebida] = useState<string | null>(null);
-  const listaBebidasRef = useRef<HTMLUListElement>(null);
+  const listaBebidasRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!enfocarBebida) return;
     listaBebidasRef.current?.querySelector<HTMLInputElement>(`[data-bebida="${enfocarBebida}"]`)?.focus();
     setEnfocarBebida(null);
   }, [enfocarBebida]);
+  // Subir y bajar: el foco sigue a la línea (o pasa a la otra flecha si ya no puede ir más allá).
+  const { ref: refOrdenBebidas, enfocar: enfocarOrdenBebida } = useEnfoque<HTMLDivElement>();
 
   const cambiarComida = (siguientes: Record<SeccionMenu, ItemMenu[]>) =>
     onChange({
@@ -281,9 +283,12 @@ function EditorMenuPlatos({
   const moverBebida = (indice: number, direccion: -1 | 1) => {
     const destino = indice + direccion;
     if (destino < 0 || destino >= bebidas.length) return;
-    const copia = [...bebidas];
-    [copia[indice], copia[destino]] = [copia[destino], copia[indice]];
-    cambiarBebidas(copia);
+    onChange(moverItem(menu, "bebidas", indice, destino));
+    const sentido = direccion === -1 ? "arriba" : "abajo";
+    enfocarOrdenBebida({
+      clave: bebidas[indice].id,
+      selectores: [`[data-mover="${sentido}"]:not([disabled])`, "[data-mover]:not([disabled])"],
+    });
   };
 
   return (
@@ -300,6 +305,7 @@ function EditorMenuPlatos({
       ) : (
         <>
           <EditorSeccionesMenu
+            ordenable
             secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
             onChange={cambiarComida}
             platos={platos}
@@ -357,57 +363,79 @@ function EditorMenuPlatos({
               Sin bebidas todavía. Añade al menos una, por ejemplo «Vino de la casa, agua o refresco».
             </p>
           ) : (
-            <ul ref={listaBebidasRef} className="space-y-2">
-              {bebidas.map((bebida, indice) => (
-                // Como las líneas de comida: si no cabe, los botones bajan a otra línea.
-                <li key={bebida.id} className="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-2">
-                  <Input
-                    data-bebida={bebida.id}
-                    value={bebida.nombre}
-                    onChange={(e) =>
-                      cambiarBebidas(bebidas.map((b) => (b.id === bebida.id ? { ...b, nombre: e.target.value } : b)))
-                    }
-                    placeholder="Ej: Vino de la casa, agua o refresco"
-                    aria-label={`Bebida ${indice + 1}`}
-                    className="h-11 min-w-[11rem] flex-1 text-base md:text-base"
-                  />
-                  <div className="ml-auto flex shrink-0 items-center">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0"
-                      disabled={indice === 0}
-                      onClick={() => moverBebida(indice, -1)}
-                      aria-label={`Subir bebida ${indice + 1}`}
-                    >
-                      <ChevronUp className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0"
-                      disabled={indice === bebidas.length - 1}
-                      onClick={() => moverBebida(indice, 1)}
-                      aria-label={`Bajar bebida ${indice + 1}`}
-                    >
-                      <ChevronDown className="h-5 w-5" />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
-                      onClick={() => cambiarBebidas(bebidas.filter((b) => b.id !== bebida.id))}
-                      aria-label={`Quitar bebida ${indice + 1}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div ref={refOrdenBebidas}>
+              <div ref={listaBebidasRef}>
+                <ListaOrdenable
+                  ids={bebidas.map((bebida) => bebida.id)}
+                  nombre={(id) => {
+                    const indice = bebidas.findIndex((bebida) => bebida.id === id);
+                    return bebidas[indice]?.nombre.trim() || `bebida ${indice + 1}`;
+                  }}
+                  onMover={(desde, hasta) => onChange(moverItem(menu, "bebidas", desde, hasta))}
+                  className="space-y-2"
+                  // Como las líneas de comida: si no cabe, los botones bajan a otra línea.
+                  claseElemento="flex flex-wrap items-center gap-1 rounded-lg border bg-card p-2"
+                  aria-label="Bebidas del menú, en orden"
+                >
+                  {(_id, indice, { asa }) => {
+                    const bebida = bebidas[indice];
+                    return (
+                      <>
+                        {asa}
+                        <Input
+                          data-bebida={bebida.id}
+                          value={bebida.nombre}
+                          onChange={(e) =>
+                            cambiarBebidas(
+                              bebidas.map((b) => (b.id === bebida.id ? { ...b, nombre: e.target.value } : b)),
+                            )
+                          }
+                          placeholder="Ej: Vino de la casa, agua o refresco"
+                          aria-label={`Bebida ${indice + 1}`}
+                          className="h-11 min-w-[11rem] flex-1 text-base md:text-base"
+                        />
+                        <div className="ml-auto flex shrink-0 items-center">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 shrink-0"
+                            data-mover="arriba"
+                            disabled={indice === 0}
+                            onClick={() => moverBebida(indice, -1)}
+                            aria-label={`Subir bebida ${indice + 1}`}
+                          >
+                            <ChevronUp className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 shrink-0"
+                            data-mover="abajo"
+                            disabled={indice === bebidas.length - 1}
+                            onClick={() => moverBebida(indice, 1)}
+                            aria-label={`Bajar bebida ${indice + 1}`}
+                          >
+                            <ChevronDown className="h-5 w-5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
+                            onClick={() => cambiarBebidas(bebidas.filter((b) => b.id !== bebida.id))}
+                            aria-label={`Quitar bebida ${indice + 1}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </>
+                    );
+                  }}
+                </ListaOrdenable>
+              </div>
+            </div>
           )}
 
           <Button type="button" variant="ghost" size="sm" className="h-11 px-4" onClick={añadirBebida}>
@@ -442,7 +470,9 @@ function PlatosConMaridaje({
   cargandoPlatos: boolean;
 }) {
   const carta = useBebidasParaMenu();
-  const { ref, enfocar } = useEnfoque<HTMLElement>();
+  // La fila del plato (en la lista ordenable) ya lleva `data-clave` con su id:
+  // la bebida usa otro atributo para que el foco no caiga en el plato.
+  const { ref, enfocar } = useEnfoque<HTMLElement>("data-clave-maridaje");
   const [cambiando, setCambiando] = useState<string | null>(null);
   const { secciones } = menu;
 
@@ -477,7 +507,7 @@ function PlatosConMaridaje({
     }
     const linea = menu.maridajes[plato.id];
     return (
-      <div data-clave={plato.id} className="min-w-0 space-y-1.5">
+      <div data-clave-maridaje={plato.id} className="min-w-0 space-y-1.5">
         {linea && cambiando !== plato.id ? (
           <EditorLineaBebida
             linea={linea}
@@ -527,6 +557,7 @@ function PlatosConMaridaje({
       </header>
       <AvisoCartaTruncada truncado={carta.truncado} />
       <EditorSeccionesMenu
+        ordenable
         secciones={{ primero: secciones.primero, segundo: secciones.segundo, postre: secciones.postre }}
         onChange={onCambiarComida}
         platos={platos}
@@ -586,6 +617,7 @@ function SeccionesExtra({
         const nombre = seccion.nombre.trim() || `sección ${indice + 1}`;
         return (
           <SeccionPlatos
+            ordenable
             key={seccion.id}
             testId={`seccion-extra-${indice + 1}`}
             titulo={

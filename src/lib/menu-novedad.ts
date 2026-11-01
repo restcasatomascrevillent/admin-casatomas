@@ -27,6 +27,7 @@
 // ya están en producción no notan nada con los menús normales.
 // ---------------------------------------------------------------------------
 
+import { moverEnLista } from "@/lib/mover-en-lista";
 import type { Json } from "@/integrations/supabase/types";
 import { normalizarAlergeno, parseAlergenos } from "@/lib/alergenos";
 import {
@@ -484,17 +485,12 @@ export type ListaOrdenableMenu = SeccionMenuNovedad | "cata";
  * al elemento sin hacer nada. La versión la decide `serializarMenuNovedad`.
  */
 export function moverItem(menu: MenuNovedad, seccion: ListaOrdenableMenu, desde: number, hasta: number): MenuNovedad {
-  const lista: readonly unknown[] = seccion === "cata" ? menu.cata : menu.secciones[seccion];
-  const valido = (i: number) => Number.isInteger(i) && i >= 0 && i < lista.length;
-  if (!valido(desde) || !valido(hasta) || desde === hasta) return menu;
-  const mover = <T>(items: readonly T[]): T[] => {
-    const copia = [...items];
-    const [elemento] = copia.splice(desde, 1);
-    copia.splice(hasta, 0, elemento);
-    return copia;
-  };
-  if (seccion === "cata") return { ...menu, cata: mover(menu.cata) };
-  return { ...menu, secciones: { ...menu.secciones, [seccion]: mover(menu.secciones[seccion]) } };
+  if (seccion === "cata") {
+    const cata = moverEnLista(menu.cata, desde, hasta);
+    return cata === menu.cata ? menu : { ...menu, cata: [...cata] };
+  }
+  const items = moverEnLista(menu.secciones[seccion], desde, hasta);
+  return items === menu.secciones[seccion] ? menu : { ...menu, secciones: { ...menu.secciones, [seccion]: [...items] } };
 }
 
 /** Las bebidas que se guardarían, en orden: las de cada plato (primero, segundo, postre) o las de la cata. */
