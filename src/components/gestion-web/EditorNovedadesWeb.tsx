@@ -56,7 +56,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MobilePreview, type NovedadPreview } from "./MobilePreview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
+import { camposSinTraducir, conSiglasRestauradas, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
 import { BloqueBotonesNovedad } from "./BloqueBotonesNovedad";
@@ -688,7 +688,7 @@ export function EditorNovedadesWeb() {
         console.error("Traducción incompleta, se descarta:", faltan);
         return null;
       }
-      return t;
+      return conSiglasRestauradas(datos, t);
     } catch (e) {
       console.error("Error al traducir:", e);
       return null;

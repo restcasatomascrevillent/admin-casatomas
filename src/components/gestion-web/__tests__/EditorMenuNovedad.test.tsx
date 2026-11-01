@@ -646,7 +646,10 @@ describe("EditorMenuNovedad · nombres de las secciones", () => {
     expect(ultimo.secciones.primero.map((p) => p.nombre)).toEqual(["Gamba roja"]);
 
     fireEvent.change(campo("Primero", "español"), { target: { value: "   " } });
-    expect(within(screen.getByTestId("seccion-menu-primero")).getByRole("heading", { name: "Primero" })).toBeInTheDocument();
+    // Vacío vuelve al de siempre, con el rótulo que pone la web (QA-MDN-04).
+    expect(
+      within(screen.getByTestId("seccion-menu-primero")).getByRole("heading", { name: "Primero · en la web: Entrantes" }),
+    ).toBeInTheDocument();
     expect(serializarMenuNovedad(ultimo)).not.toHaveProperty("titulos");
   });
 

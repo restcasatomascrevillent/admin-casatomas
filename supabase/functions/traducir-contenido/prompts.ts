@@ -150,6 +150,7 @@ Reglas obligatorias:
 - Nombres propios: "Casa Tomás", "Touza" y "Crevillent" se escriben siempre tal cual.
 - Nombres de platos: aplica el glosario de abajo. Un plato se llama IGUAL en inglés y en francés (o los dos traducidos o los dos en español); si no tiene una traducción reconocida, deja el nombre español en ambos idiomas.
 - Mayúsculas: en francés, el título va en minúscula salvo la primera palabra y los nombres propios ("Le cocido galicien arrive", nunca "Le Cocido Galicien Arrive"). En inglés puedes usar mayúsculas de título.
+- Siglas y palabras en mayúsculas: las siglas (QA, DJ, IVA, DO...) se copian siempre en mayúsculas, también en francés. Si el original escribe una palabra o el título entero en MAYÚSCULAS, la traducción lo mantiene en MAYÚSCULAS ("QA PRUEBA cata" -> "QA TEST tasting" / "QA TEST dégustation", nunca "Qa test dégustation").
 - En francés, dirígete al cliente de "vous".
 - "bullets" y "tags": devuelve el MISMO número de elementos que la entrada y en el mismo orden, uno traducido por cada uno original.
 - Si un campo de entrada viene vacío, devuélvelo vacío ("" o []).

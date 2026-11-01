@@ -54,6 +54,11 @@ const ICONOS: Record<PestanaGestorWeb, ComponentType<{ className?: string }>> = 
   tapas: CalendarDays,
 };
 
+/** Etiqueta del móvil cuando la normal no cabe en la barra a 390 px. */
+const ETIQUETA_CORTA: Partial<Record<PestanaGestorWeb, string>> = {
+  menus: "Menús",
+};
+
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
  * abierto en el móvil) deja de encoger y vuelve el scroll de página. Con 420 px
@@ -130,9 +135,18 @@ export default function GestorWeb() {
         ) : (
           <Tabs value={pestanaActiva} onValueChange={cambiarPestana} className="shrink-0">
             <PestanasPagina
+              // QA-MDN-03: a 390 px las cuatro pestañas con icono no cabían y «Tapas» quedaba fuera.
+              iconosSoloEscritorio
               pestanas={pestanasVisibles.map((p) => {
                 const Icono = ICONOS[p.id];
-                return { valor: p.id, etiqueta: p.label, icono: <Icono />, tour: `gw-pestana-${p.id}` };
+                return {
+                  valor: p.id,
+                  etiqueta: p.label,
+                  // QA-MDN-03: a 390 px «Menús diarios» se cortaba y «Tapas» quedaba fuera.
+                  etiquetaCorta: ETIQUETA_CORTA[p.id],
+                  icono: <Icono />,
+                  tour: `gw-pestana-${p.id}`,
+                };
               })}
               acciones={
                 // Sin título "Gestor Web" (2026-09-25): ya lo dice la pestaña activa del menú

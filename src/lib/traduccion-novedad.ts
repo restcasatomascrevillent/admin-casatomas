@@ -88,3 +88,62 @@ export function camposSinTraducir(es: EspanolNovedad, t: TraduccionNovedad): str
   }
   return faltan;
 }
+
+// ---------------------------------------------------------------------------
+// Siglas en francés (QA-MDN-02, 01/11/2026)
+// ---------------------------------------------------------------------------
+// La regla francesa del prompt («el título va en minúscula salvo la primera
+// palabra») hacía que el modelo bajase también las siglas: «QA PRUEBA cata»
+// salía como «Qa test dégustation». El prompt ya lo prohíbe, pero esta red no
+// depende del modelo: toda palabra que el español escribe entera en
+// mayúsculas (2+ letras) y que reaparece en el FRANCÉS con otras mayúsculas
+// vuelve a mayúsculas.
+// - Solo el francés: es el único idioma con esa regla de minúsculas. En inglés
+//   «DO» chocaría con «Do» a principio de frase.
+// - Una de 2 letras escrita entera en minúscula se deja: puede ser una palabra
+//   corriente. Se corrige si conserva alguna mayúscula («Qa») o tiene 3+
+//   letras («iva» por «IVA»).
+// Solo toca palabras que ya están en el original: no inventa ni cambia nada
+// que se haya traducido.
+// ---------------------------------------------------------------------------
+
+const PALABRA_MAYUSCULAS = /(?<![\p{L}\p{N}])[\p{Lu}\p{N}]{2,}(?![\p{L}\p{N}])/gu;
+
+/** Palabras del texto que están enteras en mayúsculas (2+ caracteres, con letra). */
+export function siglasDe(...textos: (string | null | undefined)[]): string[] {
+  const vistas = new Set<string>();
+  for (const t of textos) {
+    for (const m of (t ?? "").matchAll(PALABRA_MAYUSCULAS)) {
+      if (/\p{Lu}/u.test(m[0])) vistas.add(m[0]);
+    }
+  }
+  return [...vistas];
+}
+
+const escapar = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** Devuelve a mayúsculas, en `texto`, las siglas dadas que el traductor bajó. */
+export function restaurarSiglas(texto: string, siglas: string[]): string {
+  let r = texto;
+  for (const s of siglas) {
+    r = r.replace(new RegExp(`(?<![\\p{L}\\p{N}])${escapar(s)}(?![\\p{L}\\p{N}])`, "giu"), (m) =>
+      m !== m.toLowerCase() || s.length >= 3 ? s : m,
+    );
+  }
+  return r;
+}
+
+/** Aplica `restaurarSiglas` a los campos en francés de una traducción de novedad. */
+export function conSiglasRestauradas(es: EspanolNovedad, t: TraduccionNovedad): TraduccionNovedad {
+  const siglas = siglasDe(es.titulo, es.descripcion, es.badge_text, ...lista(es.bullets), ...lista(es.tags));
+  if (siglas.length === 0) return t;
+  const fix = (v: string) => restaurarSiglas(v, siglas);
+  return {
+    ...t,
+    titulo_fr: fix(t.titulo_fr),
+    descripcion_fr: fix(t.descripcion_fr),
+    badge_text_fr: fix(t.badge_text_fr),
+    bullets_fr: t.bullets_fr.map(fix),
+    tags_fr: t.tags_fr.map(fix),
+  };
+}

@@ -27,7 +27,7 @@ import { EditorSeccionesMenu, SeccionPlatos } from "./EditorSeccionesMenu";
 import { EditorLineaBebida, ElegirLineaBebida } from "./EditorLineaBebida";
 import { useBebidasParaMenu } from "@/hooks/useBebidasParaMenu";
 import type { PlatoDeCarta } from "@/hooks/usePlatosParaMenu";
-import { ETIQUETA_SECCION, SECCIONES_MENU, itemLibre, type ItemMenu, type SeccionMenu } from "@/lib/menu-dia";
+import { ETIQUETA_SECCION, SECCIONES_MENU, itemLibre, rotuloEnElEditor, type ItemMenu, type SeccionMenu } from "@/lib/menu-dia";
 import {
   AVISO_MARIDAJE_APAGADO,
   avisosMenuNovedad,
@@ -466,10 +466,14 @@ const IDIOMAS_TITULO = [
   { idioma: "fr", texto: "Francés" },
 ] as const;
 
-/** Los rótulos de primero, segundo y postre en el editor: el nombre propio si lo hay. */
+/**
+ * Los rótulos de primero, segundo y postre en el editor: el nombre propio si lo
+ * hay y, si no, el de siempre con el que pondrá la web cuando difiere
+ * («Primero · en la web: Entrantes», QA-MDN-04).
+ */
 const titulosEditor = (menu: MenuNovedad): Partial<Record<SeccionMenu, string>> =>
   Object.fromEntries(
-    SECCIONES_MENU.map((seccion) => [seccion, tituloPropio(menu, seccion) ?? undefined]).filter(([, t]) => t),
+    SECCIONES_MENU.map((seccion) => [seccion, tituloPropio(menu, seccion) ?? rotuloEnElEditor(seccion, menu.secciones, null)]),
   );
 
 /**

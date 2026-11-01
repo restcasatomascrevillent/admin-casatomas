@@ -61,6 +61,7 @@ import {
   difiereDeLaCarta,
   itemDesdePlato,
   itemLibre,
+  MAX_NOMBRE_PLATO,
   type ItemMenu,
   type SeccionMenu,
   type SeccionMenuDia,
@@ -518,6 +519,7 @@ function LineaMenu({
             onChange={(e) => onCambiar({ ...item, nombre: e.target.value })}
             placeholder="Nombre del plato"
             aria-label={`Nombre del plato ${indice + 1}`}
+            maxLength={MAX_NOMBRE_PLATO}
             className="h-11 text-base md:text-base"
           />
         ) : (

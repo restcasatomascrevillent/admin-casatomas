@@ -19,6 +19,11 @@ import { cn } from "@/lib/utils";
 export interface PestanaPagina {
   valor: string;
   etiqueta: ReactNode;
+  /**
+   * Texto por debajo de `sm` si la etiqueta no cabe en el móvil (p. ej. «Menús» por «Menús diarios»).
+   * La larga sigue siendo el nombre accesible.
+   */
+  etiquetaCorta?: ReactNode;
   /** Icono (p. ej. un `<Users />` de lucide; la barra lo fija a 16 px). */
   icono?: ReactNode;
   /** Número a la derecha del texto (no se pinta si es 0 o `undefined`). */
@@ -38,6 +43,8 @@ interface PestanasPaginaProps {
   pestanas: PestanaPagina[];
   /** Botones a la derecha de la barra (no cortan las pestañas: estas hacen scroll en su hueco). */
   acciones?: ReactNode;
+  /** Sin iconos por debajo de `sm`: para barras con muchas pestañas que no caben a 390 px. */
+  iconosSoloEscritorio?: boolean;
   className?: string;
 }
 
@@ -75,7 +82,7 @@ function useBordesScroll() {
   return { ref, bordes };
 }
 
-export function PestanasPagina({ pestanas, acciones, className }: PestanasPaginaProps) {
+export function PestanasPagina({ pestanas, acciones, iconosSoloEscritorio, className }: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-background to-transparent";
   return (
@@ -93,11 +100,26 @@ export function PestanasPagina({ pestanas, acciones, className }: PestanasPagina
           {pestanas.map((p) => (
             <TabsTrigger key={p.valor} value={p.valor} disabled={p.disabled} className={CLASE_PESTANA} data-tour={p.tour}>
               {p.icono && (
-                <span className="inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4",
+                    iconosSoloEscritorio && "hidden sm:inline-flex",
+                  )}
+                  aria-hidden="true"
+                >
                   {p.icono}
                 </span>
               )}
-              <span className="truncate text-xs font-medium sm:text-[15px]">{p.etiqueta}</span>
+              {p.etiquetaCorta ? (
+                <>
+                  <span className="truncate text-xs font-medium sm:hidden" aria-hidden="true">
+                    {p.etiquetaCorta}
+                  </span>
+                  <span className="sr-only sm:not-sr-only sm:truncate sm:text-[15px] sm:font-medium">{p.etiqueta}</span>
+                </>
+              ) : (
+                <span className="truncate text-xs font-medium sm:text-[15px]">{p.etiqueta}</span>
+              )}
               {p.contador != null && p.contador > 0 && (
                 <span
                   aria-label={p.etiquetaContador}

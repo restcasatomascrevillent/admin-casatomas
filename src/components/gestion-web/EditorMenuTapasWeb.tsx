@@ -43,6 +43,7 @@ import {
   emparejarTraduccion,
   esPostreCafe,
   menuEnIdioma,
+  rotuloEnElEditor,
   menuTieneContenido,
   parseMenuDia,
   seccionesMenuDiaVacias,
@@ -188,6 +189,17 @@ const formatearFechaLarga = (iso: string) => {
   return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 };
 
+/**
+ * «mié, 30 dic 2026»: la de la lista en el móvil (QA-MDN-03, 01/11/2026). La
+ * larga («miércoles, 30 de diciembre de 2026») no cabía a 390 px junto a los
+ * botones de editar y borrar y se cortaba en «30 de diciembr…».
+ */
+const formatearFechaCorta = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+};
+
 const parseTapasJson = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value
@@ -317,8 +329,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const postreCafeSugerido =
     registros.find((r) => r.menu?.postreCafe)?.menu?.postreCafe ?? POSTRE_CAFE_POR_DEFECTO;
   const postreCafe = postreCafeElegido ?? postreCafeSugerido;
-  const tituloSeccion = (seccion: SeccionMenuDia) =>
-    seccion === "postre" ? ETIQUETA_POSTRE_CAFE[postreCafe] : ETIQUETA_SECCION[seccion];
+  const tituloSeccion = (seccion: SeccionMenuDia) => rotuloEnElEditor(seccion, seccionesLimpias, postreCafe);
 
   // Lista: de hoy en adelante y los últimos días pasados; el resto, a un toque.
   const registrosALaVista = verAnteriores
@@ -640,7 +651,10 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                           >
                             <p className="text-sm font-medium flex items-center gap-2">
                               <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                              <span className="truncate first-letter:uppercase">{formatearFechaLarga(registro.fecha)}</span>
+                              <span className="truncate first-letter:uppercase sm:hidden" title={formatearFechaLarga(registro.fecha)}>
+                                {formatearFechaCorta(registro.fecha)}
+                              </span>
+                              <span className="hidden truncate first-letter:uppercase sm:inline">{formatearFechaLarga(registro.fecha)}</span>
                               {esHoy && <Badge className="text-[10px] px-1.5 py-0">Hoy</Badge>}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">{detalle || "Sin contenido"}</p>
@@ -772,7 +786,11 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     platosPorId={platosPorId}
                     cargandoPlatos={cargandoPlatos}
                     plegable
-                    titulos={{ postre: tituloSeccion("postre") }}
+                    titulos={{
+                      primero: tituloSeccion("primero"),
+                      segundo: tituloSeccion("segundo"),
+                      postre: tituloSeccion("postre"),
+                    }}
                     abiertaAlInicio={(seccion, items) => seccion !== "entrante" && items.length === 0}
                     detalleVacia={{ entrante: "Opcional" }}
                     cabeceraDe={(seccion) =>
@@ -789,7 +807,9 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        Sin platos en {seccionesVaciasAviso.map((s) => tituloSeccion(s).toLowerCase()).join(" ni ")}. Se
+                        Sin platos en {seccionesVaciasAviso
+                          .map((s) => (s === "postre" ? ETIQUETA_POSTRE_CAFE[postreCafe] : ETIQUETA_SECCION[s]).toLowerCase())
+                          .join(" ni ")}. Se
                         puede guardar igual: esa parte no saldrá en la web.
                       </AlertDescription>
                     </Alert>

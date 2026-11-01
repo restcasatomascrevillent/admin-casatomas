@@ -142,6 +142,11 @@ describe("NOVEDAD_SYSTEM: fidelidad antes que marketing", () => {
     expect(NOVEDAD_SYSTEM).toMatch(/en francés, el título va en minúscula/);
   });
 
+  it("pide conservar siglas y palabras en mayúsculas (QA-MDN-02)", () => {
+    expect(NOVEDAD_SYSTEM).toMatch(/siglas \(QA, DJ, IVA, DO\.\.\.\) se copian siempre en mayúsculas/);
+    expect(NOVEDAD_SYSTEM).toMatch(/nunca "Qa test dégustation"/);
+  });
+
   it("pide el mismo número de bullets y tags", () => {
     expect(NOVEDAD_SYSTEM).toMatch(/MISMO número de elementos/);
   });
