@@ -170,6 +170,37 @@ describe("Tarjeta de plato", () => {
     expect(screen.getByRole("button", { name: "Guardar" })).toBeEnabled();
   });
 
+  it("«Eliminar foto» pide confirmación, quita la foto (y la foto expandida) y borra el fichero", async () => {
+    render(<ListaPlatos platos={[{ ...plato, expanded: true } as Plato]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar foto" }));
+    // Primero confirma: aún no ha tocado nada.
+    expect(mocks.actualizar).not.toHaveBeenCalled();
+    expect(screen.getByText("¿Eliminar la foto? Se quitará de la carta y de la web.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Sí, eliminar" }));
+
+    await waitFor(() => expect(mocks.actualizar).toHaveBeenCalledWith({ id: "p1", imagen_url: null, expanded: false }));
+    await waitFor(() =>
+      expect(mocks.borrar).toHaveBeenCalledWith({ tabla: "Platos", bucket: "platos", ruta: "p1.jpg", excluirId: "p1" }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(mocks.subir).not.toHaveBeenCalled();
+  });
+
+  it("«Cancelar» en la confirmación no borra nada; sin foto no hay «Eliminar foto»", async () => {
+    const { unmount } = render(<ListaPlatos platos={[plato]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Eliminar foto" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.getByRole("button", { name: "Eliminar foto" })).toBeInTheDocument();
+    expect(mocks.actualizar).not.toHaveBeenCalled();
+    unmount();
+
+    render(<ListaPlatos platos={[{ ...plato, imagen_url: null } as Plato]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Foto" }));
+    expect(screen.queryByRole("button", { name: "Eliminar foto" })).not.toBeInTheDocument();
+  });
+
   it("si se cancela la galería sin elegir foto, la ventana sigue abierta con la foto actual", async () => {
     render(<ListaPlatos platos={[plato]} />);
     const input = abrirYPedirFoto();

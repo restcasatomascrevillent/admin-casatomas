@@ -309,6 +309,8 @@ export function EditarPlatoModal({
         unidad: guardarUnidadPlato(values.unidad, values.gramos),
         alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
+        // Sin foto no hay nada que expandir en la web (la BD también lo fuerza).
+        ...(imageUrlUpdate === null ? { expanded: false } : {}),
       });
 
       if (fotoAntigua) {
