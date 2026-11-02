@@ -1,7 +1,7 @@
 // Borra los despliegues de Vercel (equipo casa-tomas) creados ANTES de una
 // fecha (00:00 hora de Madrid) en admin-casatomas, web-casatomas y
 // touza-casatomas, para liberar almacenamiento. Nunca toca el despliegue que
-// está ahora en producción. Lo que se borra ya no sirve para «Instant Rollback».
+// está ahora en producción ni el último de staging (la demo) de cada proyecto. Lo que se borra ya no sirve para «Instant Rollback».
 //
 //   VERCEL_TOKEN=xxx node scripts/vercel/borrar-despliegues.mjs --antes 2026-10-31            → solo lista
 //   VERCEL_TOKEN=xxx node scripts/vercel/borrar-despliegues.mjs --antes 2026-10-31 --borrar   → borra
@@ -56,6 +56,10 @@ for (const [nombre, id] of Object.entries(PROYECTOS)) {
   const proyecto = await api(`/v9/projects/${id}`);
   const enProduccion = proyecto.targets?.production?.id;
   if (!enProduccion) throw new Error(`${nombre}: no se sabe cuál es el despliegue de producción; no se borra nada`);
+  // La demo: el último despliegue de staging que llegó a READY.
+  const recientes = await api(`/v6/deployments?projectId=${id}&state=READY&limit=100`);
+  const enDemo = (recientes.deployments ?? []).find((d) => d.meta?.githubCommitRef === "staging")?.uid;
+  const protegidos = new Set([enProduccion, enDemo].filter(Boolean));
   const lista = [];
   const vistos = new Set();
   let hasta = CORTE;
@@ -63,7 +67,7 @@ for (const [nombre, id] of Object.entries(PROYECTOS)) {
     const pagina = await api(`/v6/deployments?projectId=${id}&until=${hasta}&limit=100`);
     for (const d of pagina.deployments ?? []) {
       if (d.created >= CORTE) continue;
-      if (d.uid === enProduccion) continue; // el que sirve producción ahora: nunca
+      if (protegidos.has(d.uid)) continue; // producción y demo actuales: nunca
       if (["BUILDING", "QUEUED", "INITIALIZING"].includes(d.state)) continue;
       if (vistos.has(d.uid)) continue;
       vistos.add(d.uid);
@@ -72,7 +76,7 @@ for (const [nombre, id] of Object.entries(PROYECTOS)) {
     if (!pagina.pagination?.next) break;
     hasta = pagina.pagination.next;
   }
-  console.log(`\n${nombre}: ${lista.length} despliegues anteriores al ${ANTES} (producción actual ${enProduccion}, se conserva)`);
+  console.log(`\n${nombre}: ${lista.length} despliegues anteriores al ${ANTES} (se conservan producción ${enProduccion} y demo ${enDemo ?? "—"})`);
   for (const d of lista) {
     const linea = `  ${new Date(d.created).toISOString().slice(0, 16)}  ${d.target ?? "preview"}  ${d.meta?.githubCommitRef ?? "-"}  ${d.url}`;
     if (!BORRAR) {
