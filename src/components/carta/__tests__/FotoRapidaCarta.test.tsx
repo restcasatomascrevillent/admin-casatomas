@@ -84,7 +84,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const fotoNueva = () => new File(["foto"], "foto.png", { type: "image/png" });
+/** Con la firma PNG en los primeros bytes (aceptarFoto mira el tipo real). */
+const fotoNueva = () =>
+  new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0])], "foto.png", { type: "image/png" });
 
 async function elegirFoto(input: HTMLInputElement) {
   await act(async () => {
@@ -209,6 +211,27 @@ describe("Tarjeta de plato", () => {
     });
     expect(screen.getByRole("dialog", { name: "Foto de Croquetas" })).toBeInTheDocument();
     expect(screen.getByAltText("Foto actual de Croquetas")).toBeInTheDocument();
+    expect(mocks.subir).not.toHaveBeenCalled();
+  });
+
+  it("un .exe o texto renombrado a .jpg no se acepta: aviso en castellano y no se sube", async () => {
+    const { toast } = await import("sonner");
+    render(<ListaPlatos platos={[plato]} />);
+    const input = abrirYPedirFoto();
+    for (const malo of [
+      new File([new Uint8Array([0x4d, 0x5a, 0x90, 0, 3, 0, 0, 0])], "plato.jpg", { type: "image/jpeg" }),
+      new File(["hola, esto es texto"], "foto.jpg", { type: "image/jpeg" }),
+    ]) {
+      vi.mocked(toast.error).mockClear();
+      await act(async () => {
+        fireEvent.change(input, { target: { files: [malo] } });
+      });
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/no es una foto válida/), expect.anything()),
+      );
+    }
+    const guardar = screen.queryByRole("button", { name: "Guardar" });
+    if (guardar) expect(guardar).toBeDisabled();
     expect(mocks.subir).not.toHaveBeenCalled();
   });
 

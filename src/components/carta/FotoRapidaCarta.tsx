@@ -14,6 +14,8 @@ import { useFotoCarta, type TipoFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
+import { aceptarFoto, avisarFalloSubida } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO } from "@/lib/validarFoto";
 
 export interface ElementoConFoto {
   id: string;
@@ -97,9 +99,10 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
     [limpiar],
   );
 
-  const alElegir = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const archivo = e.target.files?.[0];
-    if (archivo) fotoCarta.iniciar(archivo);
+  const alElegir = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const archivo = input.files?.[0];
+    if (archivo && (await aceptarFoto(archivo, input))) fotoCarta.iniciar(archivo);
   };
 
   const guardar = async () => {
@@ -114,7 +117,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
       });
     } catch (error) {
       console.error("Error subiendo la foto:", error);
-      toast.error("No se ha podido subir la foto. Comprueba la conexión e inténtalo otra vez.");
+      avisarFalloSubida(error, "No se ha podido subir la foto. Comprueba la conexión e inténtalo otra vez.");
       setGuardando(false);
       return;
     }
@@ -161,7 +164,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept={ACCEPT_FOTO}
         className="hidden"
         aria-hidden="true"
         tabIndex={-1}

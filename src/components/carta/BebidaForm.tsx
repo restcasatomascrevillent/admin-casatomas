@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { LIMITES_CARTA, textoObligatorio, textoOpcional } from "@/lib/limites-carta";
 import { Loader2, Camera, X } from "lucide-react";
 import {
   Dialog,
@@ -30,14 +31,16 @@ import { esquemaPrecioCarta, propsCampoPrecio } from "./precioCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const UNIDADES_MEDIDA = ["cl", "ml", "L"];
 
 const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio"),
-  categoria: z.string().min(1, "La categoría es obligatoria"),
+  nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
+  categoria: textoObligatorio(LIMITES_CARTA.categoria, "La categoría es obligatoria"),
   precio_eur: esquemaPrecioCarta,
-  descripcion: z.string().optional(),
+  descripcion: textoOpcional(LIMITES_CARTA.descripcion),
   cantidad: z.coerce.number().optional(),
   unidad: z.string().optional(),
 });
@@ -71,9 +74,10 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) {
       // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
       // gastaba decenas de MB para una vista previa que no se enseña (la foto
       // nueva la pinta SelectorFotoCarta).
@@ -95,8 +99,8 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     // La traducción ya no se genera aquí: crearBebida (useBebidas.ts) llama a
     // traducir-contenido internamente al guardar (ver informe, TAREA 2).
     const bebidaData: NuevaBebida = {
-      nombre: values.nombre,
-      categoria: values.categoria,
+      nombre: values.nombre.trim(),
+      categoria: values.categoria.trim(),
       precio_eur: values.precio_eur,
       descripcion: values.descripcion,
       tamano: tamano,
@@ -122,7 +126,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
         queryClient.invalidateQueries({ queryKey: ["bebidas"] });
       } catch (error) {
         console.error('Error uploading image:', error);
-        toast.error("Bebida creada, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+        toast.error("Bebida creada, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });
       } finally {
         setIsUploading(false);
       }
@@ -191,7 +195,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
               

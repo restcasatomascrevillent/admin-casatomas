@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { LIMITES_CARTA, errorAlergenoPersonalizado, textoObligatorio, textoOpcional } from "@/lib/limites-carta";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -21,15 +22,17 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es requerido"),
-  categoria: z.string().min(1, "La categoría es requerida"),
+  nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
+  categoria: textoObligatorio(LIMITES_CARTA.categoria, "La categoría es obligatoria"),
   precio_eur: z.coerce.number().min(0, "El precio debe ser positivo"),
-  descripcion: z.string().optional(),
-  ingredientes: z.string().optional(),
-  preparacion: z.string().optional(),
-  alergenos_notas: z.string().optional(),
+  descripcion: textoOpcional(LIMITES_CARTA.descripcion),
+  ingredientes: textoOpcional(LIMITES_CARTA.ingredientes),
+  preparacion: textoOpcional(LIMITES_CARTA.preparacion),
+  alergenos_notas: textoOpcional(LIMITES_CARTA.alergenosNotas),
 });
 
 interface CoctelFormProps {
@@ -83,6 +86,11 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
   const addAlergenoPersonalizado = () => {
     const trimmed = nuevoAlergeno.trim();
     if (!trimmed) return;
+    const errorLargo = errorAlergenoPersonalizado(trimmed);
+    if (errorLargo) {
+      toast.error(errorLargo);
+      return;
+    }
 
     // Si lo escrito a mano es en realidad un alérgeno oficial (con o sin
     // acentos, singular o plural), se marca su casilla en vez de crear una
@@ -106,9 +114,10 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) {
       // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
       // gastaba decenas de MB para una vista previa que no se enseña (la foto
       // nueva la pinta SelectorFotoCarta).
@@ -133,8 +142,8 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
       // cóctel guardado sin alérgenos declarados (obligatorios por el
       // Reglamento UE 1169/2011) aunque el usuario creyera que sí.
       const nuevoCoctel = await crearCoctel.mutateAsync({
-        nombre: values.nombre,
-        categoria: values.categoria,
+        nombre: values.nombre.trim(),
+        categoria: values.categoria.trim(),
         precio_eur: values.precio_eur,
         descripcion: values.descripcion,
         ingredientes: values.ingredientes,
@@ -162,7 +171,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
           });
         } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
-          toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+          toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });
         } finally {
           setIsUploading(false);
         }
@@ -329,7 +338,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                   <span className="text-xs text-muted-foreground mt-1">Subir imagen</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={ACCEPT_FOTO}
                     className="hidden"
                     onChange={handleImageChange}
                   />

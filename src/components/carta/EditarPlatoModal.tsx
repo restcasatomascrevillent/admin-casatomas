@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { nombreCarta, categoriaCarta, descripcionCarta, MAX_PRECIO_CARTA, mensajePrecioMaximo } from "@/lib/limites-carta";
 import { Camera, Loader2, X } from "lucide-react";
 import {
   Dialog,
@@ -57,19 +58,22 @@ import {
   normalizarAlergeno,
   separarAlergenos,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
   .object({
-    nombre: z.string().trim().min(1, "El nombre es obligatorio"),
-    categoria: z.string().trim().min(1, "La categoría es obligatoria"),
+    nombre: nombreCarta,
+    categoria: categoriaCarta,
     precio_eur: z.preprocess(
       (v) => (v === "" ? undefined : v),
       z.coerce
         .number({ invalid_type_error: "Indica un precio válido" })
         .finite("Indica un precio válido")
-        .min(0, "El precio debe ser mayor o igual a 0"),
+        .min(0, "El precio debe ser mayor o igual a 0")
+        .max(MAX_PRECIO_CARTA, mensajePrecioMaximo),
     ),
-    descripcion: z.string().optional(),
+    descripcion: descripcionCarta,
     sin_gluten_disponible: z.boolean().default(false),
     ingredientes: z.string().optional(),
     unidad: z.string().default("Unidad"),
@@ -244,9 +248,10 @@ export function EditarPlatoModal({
     );
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !(await aceptarFoto(file, input))) return;
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
@@ -337,7 +342,7 @@ export function EditarPlatoModal({
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating plato:", error);
-      toast.error("No se pudo actualizar el plato");
+      toast.error("No se pudo actualizar el plato", { description: mensajeErrorStorage(error) ?? undefined });
     } finally {
       setIsUploadingImage(false);
     }
@@ -698,7 +703,7 @@ export function EditarPlatoModal({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={ACCEPT_FOTO}
                       onChange={handleImageChange}
                       className="hidden"
                     />

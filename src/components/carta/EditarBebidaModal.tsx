@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { LIMITES_CARTA, textoObligatorio, textoOpcional } from "@/lib/limites-carta";
 import { Camera, Loader2, X } from "lucide-react";
 import {
   Dialog,
@@ -37,13 +38,15 @@ import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { borrarFotoSiNoSeUsa } from "@/lib/storage-carta";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { toast } from "sonner";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio"),
-  categoria: z.string().min(1, "La categoría es obligatoria"),
+  nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
+  categoria: textoObligatorio(LIMITES_CARTA.categoria, "La categoría es obligatoria"),
   precio_eur: esquemaPrecioCarta,
-  descripcion: z.string().optional(),
-  tamano: z.string().optional(),
+  descripcion: textoOpcional(LIMITES_CARTA.descripcion),
+  tamano: textoOpcional(LIMITES_CARTA.tamano),
 });
 
 /**
@@ -108,9 +111,10 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
     }
   }, [open, bebida, form, limpiarFoto]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !(await aceptarFoto(file, input))) return;
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
@@ -159,8 +163,8 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
 
       await actualizarBebida.mutateAsync({
         id: bebida.id,
-        nombre: values.nombre,
-        categoria: values.categoria,
+        nombre: values.nombre.trim(),
+        categoria: values.categoria.trim(),
         precio_eur: values.precio_eur,
         descripcion: values.descripcion?.trim() || null,
         tamano: values.tamano?.trim() || null,
@@ -174,7 +178,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating bebida:", error);
-      toast.error("No se pudo actualizar la bebida");
+      toast.error("No se pudo actualizar la bebida", { description: mensajeErrorStorage(error) ?? undefined });
     } finally {
       setIsUploadingImage(false);
     }
@@ -237,7 +241,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
 

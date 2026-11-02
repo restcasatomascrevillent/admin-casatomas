@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { nombreCarta, categoriaCarta, descripcionCarta } from "@/lib/limites-carta";
 import { Loader2, Camera, X } from "lucide-react";
 import {
   Dialog,
@@ -26,12 +27,14 @@ import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { urlSegura } from "@/lib/url-segura";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
-  nombre: z.string().min(1, "El nombre es obligatorio"),
-  categoria: z.string().min(1, "La categoría es obligatoria"),
+  nombre: nombreCarta,
+  categoria: categoriaCarta,
   precio_eur: esquemaPrecioCarta,
-  descripcion: z.string().optional(),
+  descripcion: descripcionCarta,
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
   ubicacion_pais: z.string().trim().min(1, "El país es obligatorio para el mapa"),
@@ -110,9 +113,10 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   const enTienda = precarga ? precioMercado(precarga.datos) : null;
   const fuentesTienda = precarga ? fuentesMercado(precarga.datos) : [];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) recorte.iniciar(file);
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) recorte.iniciar(file);
   };
 
   const clearImage = () => {
@@ -159,7 +163,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
         queryClient.invalidateQueries({ queryKey: ["vinos"] });
       } catch (error) {
         console.error('Error uploading image:', error);
-        toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+        toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });
       } finally {
         setIsUploading(false);
       }
@@ -191,7 +195,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
               
@@ -264,7 +268,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                     </div>
                     )}
                   {enTienda !== null && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="break-words text-xs text-muted-foreground">
                       En tienda: <span className="font-medium text-foreground">~{formatoEuros(enTienda)}</span>
                       {fuentesTienda.flatMap((f) => { const href = urlSegura(f.url); return href ? [{ ...f, href }] : []; }).map((f) => (
                         <a
@@ -284,7 +288,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               }
             />
 
-            <div className="flex justify-end gap-2">
+            {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
+                iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. */}
+            <div className="flex flex-wrap justify-end gap-2 pointer-coarse:sticky pointer-coarse:bottom-[-1.5625rem] pointer-coarse:z-10 pointer-coarse:-mx-6 pointer-coarse:border-t pointer-coarse:bg-background pointer-coarse:px-6 pointer-coarse:py-3">
               <Button
                 type="button"
                 variant="outline"

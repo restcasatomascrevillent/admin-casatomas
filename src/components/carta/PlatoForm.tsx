@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { nombreCarta, categoriaCarta, descripcionCarta, MAX_PRECIO_CARTA, mensajePrecioMaximo } from "@/lib/limites-carta";
 import { Camera, X, Plus } from "lucide-react";
 import {
   Dialog,
@@ -48,19 +49,22 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
   .object({
-    nombre: z.string().trim().min(1, "El nombre es obligatorio"),
-    categoria: z.string().trim().min(1, "La categoría es obligatoria"),
+    nombre: nombreCarta,
+    categoria: categoriaCarta,
     precio_eur: z.preprocess(
       (v) => (v === "" ? undefined : v),
       z.coerce
         .number({ invalid_type_error: "Indica un precio válido" })
         .finite("Indica un precio válido")
-        .min(0, "El precio debe ser mayor o igual a 0"),
+        .min(0, "El precio debe ser mayor o igual a 0")
+        .max(MAX_PRECIO_CARTA, mensajePrecioMaximo),
     ),
-    descripcion: z.string().optional(),
+    descripcion: descripcionCarta,
     sin_gluten_disponible: z.boolean().default(false),
     ingredientes: z.string().optional(),
     unidad: z.string().default("Unidad"),
@@ -168,9 +172,10 @@ export function PlatoForm({
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) fotoCarta.iniciar(file);
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) fotoCarta.iniciar(file);
   };
 
   const clearImage = () => {
@@ -227,7 +232,7 @@ export function PlatoForm({
           await actualizarPlato.mutateAsync({ id: nuevoPlato.id, imagen_url: url });
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
-          toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+          toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });
         }
       }
 
@@ -593,7 +598,7 @@ export function PlatoForm({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={ACCEPT_FOTO}
                       onChange={handleImageChange}
                       className="hidden"
                     />
