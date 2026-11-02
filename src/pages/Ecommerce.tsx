@@ -82,7 +82,7 @@ export default function Ecommerce() {
             ]}
           />
 
-          <TabsContent value="tpv" className={`${PESTANA_REPARTIDA} overflow-hidden`}>
+          <TabsContent value="tpv" className={`${PESTANA_REPARTIDA} overflow-y-auto overscroll-contain md:overflow-hidden`}>
             <TPVContainer />
           </TabsContent>
 

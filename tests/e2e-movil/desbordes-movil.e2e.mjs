@@ -46,8 +46,6 @@ const DESBORDES = () => {
 
 for (const ruta of RUTAS) {
   test(`sin desborde horizontal · ${ruta}`, async ({ page }) => {
-    // P-03: en Facturas › Cargar la línea del gasto de IA se sale por la izquierda a todos los anchos.
-    conocido("P-03: la línea «Lectura de facturas este mes» se sale de la pantalla (Facturas.tsx)", ruta === "/facturas?tab=cargar");
     const errores = await abrir(page, ruta);
     const r = await page.evaluate(DESBORDES);
     expect(r.scrollW, `la página mide ${r.scrollW}px en un viewport de ${r.vw}px`).toBeLessThanOrEqual(r.vw + 1);
@@ -59,8 +57,7 @@ for (const ruta of RUTAS) {
 // ───────── Defectos conocidos de la auditoría móvil (test.fail = «sigue roto»; si pasa, quita la marca) ─────────
 
 test("Calendario de ocupación: la cifra de comensales no pisa el número del día", async ({ page }) => {
-  // Medido en 320, 360, 375 y 430 px de ancho; a 768 y en apaisado las casillas son anchas y no se pisan.
-  conocido("P-01: casilla de ~46 px con número de día y cifra de 2-3 dígitos en la misma fila (CasillaOcupacion.tsx)", page.viewportSize().width <= 440);
+  // Arreglado (P-01): el número del día y la cifra van en líneas distintas y la cifra se recorta por nº de dígitos. Vigila la regresión.
   await abrir(page, "/reservas?tab=calendario");
   const pisados = await page.evaluate(() => {
     const out = [];
@@ -78,7 +75,6 @@ test("Calendario de ocupación: la cifra de comensales no pisa el número del d�
 });
 
 test("Facturas › Cargar: la línea «Lectura de facturas este mes» cabe en pantalla", async ({ page }) => {
-  conocido("P-03: el contenedor `shrink-0 self-end` crece más que la pantalla y se sale por la izquierda (Facturas.tsx)");
   await abrir(page, "/facturas?tab=cargar");
   const caja = await page.getByTestId("monitor-gasto-ia-ocr").boundingBox();
   expect(caja, "no se pintó el monitor de gasto").not.toBeNull();
@@ -86,8 +82,7 @@ test("Facturas › Cargar: la línea «Lectura de facturas este mes» cabe en pa
 });
 
 test("Costes: la frase de cabecera no queda aplastada en una columna estrecha", async ({ page }) => {
-  // Medido en 360, 375 y 430 px; a 320 el grupo de botones baja de línea y a 768/apaisado hay sitio de sobra.
-  conocido("P-02: `p.flex-1` con basis 0 junto a dos botones `shrink-0` en una fila `flex-wrap` (Costes.tsx)", page.viewportSize().width >= 340 && page.viewportSize().width <= 440);
+  // Arreglado (P-02): el párrafo tiene base de 16rem y los botones bajan de línea. Vigila la regresión.
   await abrir(page, "/super-admin/costes");
   const ancho = await page.evaluate(() => { const p = [...document.querySelectorAll("main p")].find((x) => /Lo que cuesta mantener/.test(x.textContent ?? "")); return p ? p.getBoundingClientRect().width : -1; });
   expect(ancho, "ancho del párrafo de cabecera").toBeGreaterThan(200);

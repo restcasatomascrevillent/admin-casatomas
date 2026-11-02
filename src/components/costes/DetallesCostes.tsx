@@ -71,7 +71,7 @@ export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, cont
       </PopoverTrigger>
       <PopoverContent
         align="end"
-        className="max-h-[70vh] w-[min(34rem,calc(100vw-2rem))] space-y-4 overflow-y-auto overscroll-contain p-4 text-sm"
+        className="max-h-[min(70vh,var(--radix-popover-content-available-height))] w-[min(34rem,calc(100vw-2rem))] space-y-4 overflow-y-auto overscroll-contain p-4 text-sm"
       >
         <Seccion titulo="IA: real frente a estimado">
           {real ? (

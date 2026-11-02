@@ -36,7 +36,7 @@ export function VisorPermisosUsuario({ user, nombre, className }: { user: Manage
           Ver permisos
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-hidden rounded-xl p-4 sm:p-6 [&>button]:h-11 [&>button]:w-11 [&>button]:right-2 [&>button]:top-2">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90dvh] overflow-y-auto rounded-xl p-4 sm:p-6 [&>button]:h-11 [&>button]:w-11 [&>button]:right-2 [&>button]:top-2">
         <DialogHeader className="shrink-0 pr-10 text-left">
           <DialogTitle className="flex min-w-0 items-start gap-2 text-base leading-snug sm:text-lg">
             <Shield className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
@@ -46,7 +46,7 @@ export function VisorPermisosUsuario({ user, nombre, className }: { user: Manage
             Consulta de permisos. Los usuarios, roles y accesos se gestionan desde el superadmin.
           </DialogDescription>
         </DialogHeader>
-        <div className="min-h-0 overflow-y-auto overscroll-contain">
+        <div className="shrink-0">
           {user.access_blocked && <p className="mb-3 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">Acceso bloqueado. Se conservan los permisos indicados.</p>}
           {user.is_super_admin && <p className="mb-3 text-sm text-muted-foreground">Super Admin: acceso completo al panel y al área de superadmin.</p>}
           <div className="rounded-lg border">
