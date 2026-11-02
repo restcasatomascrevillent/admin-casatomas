@@ -14,6 +14,8 @@
 //        { title:null, subtitle:null, body, bullets:[], cta:null, tags:[],
 //          meta:{missing,source:'fallback',...} } si algo falla (nunca 500
 //        puro: el editor no debe romperse porque falle la IA).
+//        400 { error } si el cuerpo no es un objeto JSON, si `texto` falta o
+//        no es una cadena (VAL-05): eso es un error del llamante, no de la IA.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
@@ -180,17 +182,40 @@ serve(conAuditoriaDePeticion("format-novedad", createClientBase, async (req) => 
   const uso = new AcumuladorUso("format-novedad", MODEL, "chat");
   const inicioMs = Date.now();
 
-  let texto = "";
-  try {
-    const { tipo, idioma, tono, texto: textoIn } = await req.json();
-    texto = textoIn ?? "";
+  // Lectura y validación del cuerpo ANTES del try de abajo (VAL-05, QA-T-05):
+  // ese catch responde 200 con un fallback, y un cuerpo roto es un error del
+  // llamante, no un fallo de la IA. Antes, un JSON roto o un `texto` que no
+  // era cadena (`texto.trim` lanzaba) salían como 200. No se llama a OpenAI.
+  const malaPeticion = (error: string) =>
+    new Response(JSON.stringify({ error }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
-    if (!texto || texto.trim() === "") {
-      return new Response(
-        JSON.stringify({ error: "El campo texto es obligatorio" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+  let entrada: unknown;
+  try {
+    entrada = await req.json();
+  } catch {
+    return malaPeticion("JSON no válido");
+  }
+  if (!entrada || typeof entrada !== "object" || Array.isArray(entrada)) {
+    return malaPeticion("JSON no válido");
+  }
+  const { tipo, idioma, tono, texto: textoIn } = entrada as Record<string, unknown>;
+  if (textoIn !== undefined && textoIn !== null && typeof textoIn !== "string") {
+    return malaPeticion("El campo texto debe ser una cadena");
+  }
+  for (const [nombre, valor] of [["tipo", tipo], ["idioma", idioma], ["tono", tono]] as const) {
+    if (valor !== undefined && valor !== null && typeof valor !== "string") {
+      return malaPeticion(`El campo ${nombre} debe ser una cadena`);
     }
+  }
+  const texto = (textoIn as string | null | undefined) ?? "";
+  if (texto.trim() === "") {
+    return malaPeticion("El campo texto es obligatorio");
+  }
+
+  try {
 
     if (!OPENAI_KEY) {
       console.error("[format-novedad] OPENAI_API_KEY no configurada");
@@ -200,9 +225,9 @@ serve(conAuditoriaDePeticion("format-novedad", createClientBase, async (req) => 
       );
     }
 
-    const tipoFinal = tipo || "anuncio";
-    const idiomaFinal = idioma || "es";
-    const tonoFinal = tono || "cercano";
+    const tipoFinal = (tipo as string | null | undefined) || "anuncio";
+    const idiomaFinal = (idioma as string | null | undefined) || "es";
+    const tonoFinal = (tono as string | null | undefined) || "cercano";
 
     console.log("Generando novedad:", { tipo: tipoFinal, idioma: idiomaFinal, tono: tonoFinal });
 

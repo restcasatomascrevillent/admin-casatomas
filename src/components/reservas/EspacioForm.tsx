@@ -26,6 +26,7 @@ import {
 import { useMesas } from "@/hooks/useMesas";
 import { calcularCuadreEspacio, textoEstadoCuadre } from "@/lib/reservas/aforoMesas";
 import { MARCA_POR_DEFECTO, marcaDeEspacio } from "@/lib/reservas/negocios";
+import { MAX_DESCRIPCION, MAX_NOMBRE, miles } from "@/lib/limites-textos";
 import {
   Dialog,
   DialogContent,
@@ -52,8 +53,12 @@ const buildFormSchema = (otrosEspacios: readonly EspacioReserva[], marca: string
       nombre: z
         .string()
         .trim()
-        .min(2, "El nombre debe tener al menos 2 caracteres"),
-      descripcion: z.string().optional(),
+        .min(2, "El nombre debe tener al menos 2 caracteres")
+        .max(MAX_NOMBRE, `El nombre no puede pasar de ${MAX_NOMBRE} caracteres`),
+      descripcion: z
+        .string()
+        .max(MAX_DESCRIPCION, `La descripción no puede pasar de ${miles(MAX_DESCRIPCION)} caracteres`)
+        .optional(),
       capacidad_maxima: z
         .number({ invalid_type_error: "La capacidad debe ser un número" })
         .int("La capacidad debe ser un número entero (sin decimales)")
@@ -254,6 +259,7 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
                   <FormControl>
                     <Input
                       placeholder="Ej: Terraza, Sala Principal"
+                      maxLength={MAX_NOMBRE}
                       disabled={guardando}
                       {...field}
                       ref={(el) => {
@@ -276,6 +282,7 @@ export const EspacioForm = ({ open, onOpenChange, espacio, onEspacioCreado }: Es
                   <FormControl>
                     <Textarea
                       placeholder="Describe las características del espacio"
+                      maxLength={MAX_DESCRIPCION}
                       disabled={guardando}
                       {...field}
                     />

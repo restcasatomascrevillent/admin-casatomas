@@ -76,6 +76,7 @@ import {
   type TipoBoton,
 } from "@/lib/menu-novedad";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { erroresLongitudNovedad, MAX_DESCRIPCION, MAX_ETIQUETA, MAX_NOMBRE } from "@/lib/limites-textos";
 
 // ---------------------------------------------------------------------------
 // Novedades de la web (tabla `novedades`)
@@ -125,7 +126,6 @@ const LOADING_MESSAGES = [
 const SECCION_NOVEDADES = "gestion_web_novedades";
 const BUCKET = "novedades";
 const MAX_IMAGEN_MB = 5;
-const MAX_TITULO = 120;
 
 // Campos opcionales que enriquecen el texto que se manda a la IA.
 const CAMPOS_POR_TIPO: Record<string, { key: string; label: string; placeholder: string; type?: string }[]> = {
@@ -826,6 +826,26 @@ export function EditorNovedadesWeb() {
       }),
     };
 
+    // Mismos máximos que la BD (CHECK de 20261101180000). Se mira después de
+    // traducir: una traducción automática o un texto de la IA pueden pasarse.
+    const erroresLargo = erroresLongitudNovedad(payload);
+    if (erroresLargo.length > 0) {
+      toast.error(`No se puede guardar: ${erroresLargo.join(" ")}`, { duration: 10000 });
+      // La traducción recién hecha se queda en el formulario para poder
+      // acortarla a mano (como «Traducir»), en vez de perderse.
+      if (traducirNovedad && t) {
+        setFormData((prev) => ({ ...prev, ...t }));
+        setHuellaTraducida(huellaEspanol(formData));
+        setTraduccionManual(false);
+      }
+      // Las traducciones están en «Publicación»; el español, en «Contenido».
+      const soloTraducciones = erroresLargo.every((e) => / en (inglés|francés) /.test(e));
+      if (soloTraducciones) setTraduccionesAbiertas(true);
+      setPestanaForm(soloTraducciones ? "publicacion" : "contenido");
+      setIsSaving(false);
+      return;
+    }
+
     try {
       if (editingId) {
         await actualizarNovedad.mutateAsync({ id: editingId, ...payload });
@@ -1230,7 +1250,7 @@ export function EditorNovedadesWeb() {
                     id="nov-titulo"
                     ref={tituloRef}
                     value={formData.titulo}
-                    maxLength={MAX_TITULO}
+                    maxLength={MAX_NOMBRE}
                     onChange={(e) => setCampo("titulo", e.target.value)}
                     placeholder="Ej: Llega el cocido gallego"
                     aria-required
@@ -1241,7 +1261,7 @@ export function EditorNovedadesWeb() {
                   <Input
                     id="nov-badge"
                     value={formData.badge_text}
-                    maxLength={24}
+                    maxLength={MAX_ETIQUETA}
                     onChange={(e) => setCampo("badge_text", e.target.value)}
                     placeholder="Ej: Nuevo, -20%"
                   />
@@ -1271,6 +1291,7 @@ export function EditorNovedadesWeb() {
                 <Textarea
                   id="nov-descripcion"
                   value={formData.descripcion}
+                  maxLength={MAX_DESCRIPCION}
                   onChange={(e) => setCampo("descripcion", e.target.value)}
                   placeholder="Escribe el texto o unas ideas sueltas y pulsa «Redactar con IA» para que lo pula."
                   className="min-h-24 text-base md:text-base"
@@ -1619,6 +1640,7 @@ export function EditorNovedadesWeb() {
                           <Input
                             className="sm:col-span-2 h-11 text-base md:text-base"
                             value={formData[k.titulo]}
+                            maxLength={MAX_NOMBRE}
                             onChange={(e) => setTraduccion(k.titulo, e.target.value)}
                             placeholder={formData.titulo || "Título"}
                             aria-label={`Título (${k.nombre.toLowerCase()})`}
@@ -1626,6 +1648,7 @@ export function EditorNovedadesWeb() {
                           <Input
                             className="h-11 text-base md:text-base"
                             value={formData[k.badge]}
+                            maxLength={MAX_ETIQUETA}
                             onChange={(e) => setTraduccion(k.badge, e.target.value)}
                             placeholder={formData.badge_text || "Etiqueta"}
                             aria-label={`Etiqueta (${k.nombre.toLowerCase()})`}
@@ -1633,6 +1656,7 @@ export function EditorNovedadesWeb() {
                         </div>
                         <Textarea
                           value={formData[k.descripcion]}
+                          maxLength={MAX_DESCRIPCION}
                           onChange={(e) => setTraduccion(k.descripcion, e.target.value)}
                           placeholder={formData.descripcion || "Descripción"}
                           className="min-h-16 text-base md:text-base"
