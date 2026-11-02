@@ -465,7 +465,7 @@ describe("cerrar el mapa", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     await moverA("Berta", /^Reservado/);
-    fireEvent.click(within(await mapaDe("Berta", "Reservado")).getByRole("button", { name: "Close" }));
+    fireEvent.click(within(await mapaDe("Berta", "Reservado")).getByRole("button", { name: "Cerrar ventana" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 
     expect(h.almacen.escrituras).toHaveLength(2);

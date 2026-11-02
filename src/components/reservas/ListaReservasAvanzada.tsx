@@ -1226,7 +1226,7 @@ export function ListaReservasAvanzada({
               </span>{" "}
               de <span className="tabular-nums">{filas.length}</span>
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               <Button
                 variant="outline"
                 size="sm"

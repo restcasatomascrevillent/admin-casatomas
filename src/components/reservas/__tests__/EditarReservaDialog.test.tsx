@@ -256,7 +256,7 @@ describe("EditarReservaDialog · cerrar con cambios sin guardar", () => {
   it("la X de la esquina pide lo mismo", async () => {
     const { onClose } = await conCambios();
 
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cerrar ventana" }));
 
     expect(await screen.findByRole("alertdialog")).toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();

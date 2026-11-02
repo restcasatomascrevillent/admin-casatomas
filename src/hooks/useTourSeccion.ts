@@ -259,6 +259,8 @@ export function useTourSeccion(seccion: SeccionAyuda, { auto = true }: { auto?: 
       prevBtnText: "Anterior",
       doneBtnText: "Entendido",
       popoverClass: "tour-panel",
+      // P-20: driver.js pone «Close» en inglés en el aria-label del botón de cerrar.
+      onPopoverRender: (popover) => popover.closeButton?.setAttribute("aria-label", "Cerrar la guía"),
       overlayColor: "#000",
       overlayOpacity: 0.55,
       stagePadding: 6,
