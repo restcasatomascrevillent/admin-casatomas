@@ -76,6 +76,7 @@ import {
   type TipoBoton,
 } from "@/lib/menu-novedad";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { ACCEPT_FOTO, MAX_FOTO_MB, mensajeErrorStorage, validarFoto } from "@/lib/validarFoto";
 import { erroresLongitudNovedad, MAX_DESCRIPCION, MAX_ETIQUETA, MAX_NOMBRE } from "@/lib/limites-textos";
 
 // ---------------------------------------------------------------------------
@@ -125,7 +126,8 @@ const LOADING_MESSAGES = [
 
 const SECCION_NOVEDADES = "gestion_web_novedades";
 const BUCKET = "novedades";
-const MAX_IMAGEN_MB = 5;
+const MAX_IMAGEN_MB = MAX_FOTO_MB;
+const EXTENSION_IMAGEN = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
 
 // Campos opcionales que enriquecen el texto que se manda a la IA.
 const CAMPOS_POR_TIPO: Record<string, { key: string; label: string; placeholder: string; type?: string }[]> = {
@@ -626,20 +628,19 @@ export function EditorNovedadesWeb() {
     // Permite volver a elegir el mismo fichero después de quitarlo.
     e.target.value = "";
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("El archivo tiene que ser una imagen (JPG, PNG o WebP).");
-      return;
-    }
-    if (file.size > MAX_IMAGEN_MB * 1024 * 1024) {
-      toast.error(`La imagen pesa demasiado (máximo ${MAX_IMAGEN_MB} MB).`);
+    // Tipo real por los primeros bytes (un .exe renombrado a .jpg no pasa) y 5 MB.
+    const validacion = await validarFoto(file);
+    if (!validacion.ok) {
+      toast.error(validacion.mensaje, { duration: 9000 });
       return;
     }
     setUploading(true);
     try {
-      const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+      // La extensión sale del tipo real, no del nombre del archivo.
+      const fileExt = EXTENSION_IMAGEN[validacion.tipo];
       const filePath = `novedades/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from(BUCKET).upload(filePath, file, {
-        contentType: file.type,
+        contentType: validacion.tipo,
       });
       if (uploadError) throw uploadError;
       const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
@@ -649,7 +650,7 @@ export function EditorNovedadesWeb() {
       toast.success("Imagen subida. Ajusta el encuadre si hace falta.");
     } catch (error) {
       console.error("Error uploading image:", error);
-      toast.error("No se pudo subir la imagen.");
+      toast.error(mensajeErrorStorage(error) ?? "No se pudo subir la imagen.", { duration: 9000 });
     } finally {
       setUploading(false);
     }
@@ -1435,7 +1436,7 @@ export function EditorNovedadesWeb() {
                 <input
                   type="file"
                   ref={fileInputRef}
-                  accept="image/jpeg,image/png,image/webp"
+                  accept={ACCEPT_FOTO}
                   onChange={handleImageUpload}
                   className="hidden"
                 />

@@ -9,6 +9,7 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { rutaCartaDesdeOriginal } from "./rutasFotoCarta";
+import { exigirFotoValida } from "@/lib/validarFoto";
 
 export interface RutasSubida {
   original: string;
@@ -48,9 +49,12 @@ export async function subirFotoCarta(
   foto: FotoParaSubir,
 ): Promise<{ url: string; rutas: string[]; rutaPrincipal: string }> {
   if (!foto.original) throw new Error("No hay foto que subir");
+  // Segunda barrera (la primera es aceptarFoto al elegirla): nunca se sube algo
+  // que no sea JPG/PNG/WebP de hasta 5 MB. Lanza ErrorFoto con el motivo.
+  const tipoReal = await exigirFotoValida(foto.original);
   const rutas = rutasSubida(id, foto.original, foto.compuesta);
   const almacen = supabase.storage.from(bucket);
-  const { error: e1 } = await almacen.upload(rutas.original, foto.original, { upsert: true });
+  const { error: e1 } = await almacen.upload(rutas.original, foto.original, { upsert: true, contentType: tipoReal });
   if (e1) throw e1;
   if (rutas.carta && foto.compuesta) {
     const { error: e2 } = await almacen.upload(rutas.carta, foto.compuesta, { upsert: true, contentType: foto.compuesta.type });

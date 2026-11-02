@@ -27,6 +27,8 @@ import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { urlSegura } from "@/lib/url-segura";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
   nombre: nombreCarta,
@@ -111,9 +113,10 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   const enTienda = precarga ? precioMercado(precarga.datos) : null;
   const fuentesTienda = precarga ? fuentesMercado(precarga.datos) : [];
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) recorte.iniciar(file);
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) recorte.iniciar(file);
   };
 
   const clearImage = () => {
@@ -160,7 +163,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
         queryClient.invalidateQueries({ queryKey: ["vinos"] });
       } catch (error) {
         console.error('Error uploading image:', error);
-        toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+        toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });
       } finally {
         setIsUploading(false);
       }
@@ -192,7 +195,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
               

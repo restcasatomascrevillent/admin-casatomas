@@ -27,6 +27,8 @@ import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta, precioParaCampo } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
   nombre: nombreCarta,
@@ -111,9 +113,10 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     }
   }, [open, vino, form, limpiarRecorte]);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !(await aceptarFoto(file, input))) return;
 
     recorte.iniciar(file);
     setRemoveImage(false);
@@ -194,7 +197,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating vino:", error);
-      toast.error("No se pudo actualizar el vino");
+      toast.error("No se pudo actualizar el vino", { description: mensajeErrorStorage(error) ?? undefined });
     } finally {
       setIsUploadingImage(false);
     }
@@ -218,7 +221,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
 

@@ -58,6 +58,8 @@ import {
   normalizarAlergeno,
   separarAlergenos,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
   .object({
@@ -246,9 +248,10 @@ export function EditarPlatoModal({
     );
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !(await aceptarFoto(file, input))) return;
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
@@ -339,7 +342,7 @@ export function EditarPlatoModal({
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating plato:", error);
-      toast.error("No se pudo actualizar el plato");
+      toast.error("No se pudo actualizar el plato", { description: mensajeErrorStorage(error) ?? undefined });
     } finally {
       setIsUploadingImage(false);
     }
@@ -700,7 +703,7 @@ export function EditarPlatoModal({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/*"
+                      accept={ACCEPT_FOTO}
                       onChange={handleImageChange}
                       className="hidden"
                     />
