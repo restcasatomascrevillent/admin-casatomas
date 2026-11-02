@@ -1,21 +1,52 @@
-// Máximos de los textos de la carta (Bebidas y Cocteles).
-// ---------------------------------------------------------------------------
-// Son LOS MISMOS números que los CHECK de la migración
-// supabase/migrations/*_restricciones_bebidas_cocteles.sql. Si cambia uno,
-// hay que cambiar el otro: la prueba `npm run test:restricciones-carta:db`
-// compara esta tabla con la migración y falla si no coinciden.
-//
-// Suposiciones de la tarea (Pablo puede cambiarlas): nombre 150,
-// descripción 2.000, precio 0–9.999,99. El resto se ha elegido con margen
-// sobre lo que hay hoy en la demo (el más largo de cada columna entre
-// paréntesis, 01/11/2026).
-// ---------------------------------------------------------------------------
-import { z } from "zod";
+import * as z from "zod";
 
+/**
+ * Máximos de los textos y del precio de la carta (Platos y Vinos).
+ *
+ * Son LOS MISMOS que imponen las restricciones CHECK de la base de datos
+ * (supabase/migrations/20261101220000_restricciones_platos_vinos.sql). Si se
+ * cambia uno aquí, hay que cambiarlo también allí con otra migración: si el
+ * formulario deja pasar más que la BD, el guardado falla con un error de
+ * Postgres en vez de con el mensaje en castellano junto al campo.
+ */
+export const MAX_NOMBRE_CARTA = 150;
+export const MAX_DESCRIPCION_CARTA = 2000;
+export const MAX_PRECIO_CARTA = 9999.99;
+
+/** Nombre obligatorio: sin espacios a los lados, de 1 a 150 caracteres. */
+export const nombreCarta = z
+  .string()
+  .trim()
+  .min(1, "El nombre es obligatorio")
+  .max(MAX_NOMBRE_CARTA, `El nombre no puede pasar de ${MAX_NOMBRE_CARTA} caracteres`);
+
+/** Categoría obligatoria (no vale solo con espacios). */
+export const categoriaCarta = z.string().trim().min(1, "La categoría es obligatoria");
+
+/** Descripción opcional de hasta 2.000 caracteres. */
+export const descripcionCarta = z
+  .string()
+  .max(
+    MAX_DESCRIPCION_CARTA,
+    `La descripción no puede pasar de ${MAX_DESCRIPCION_CARTA.toLocaleString("es-ES")} caracteres`,
+  )
+  .optional();
+
+export const mensajePrecioMaximo = `El precio no puede pasar de ${MAX_PRECIO_CARTA.toLocaleString("es-ES", {
+  minimumFractionDigits: 2,
+})} €`;
+
+// ---------------------------------------------------------------------------
+// Bebidas y Cocteles (tarea 40b3221d, 2/3)
+// ---------------------------------------------------------------------------
+// Los mismos números que los CHECK de
+// supabase/migrations/20261102120000_restricciones_bebidas_cocteles.sql; la
+// prueba `npm run test:restricciones-bebidas:db` los compara con la migración.
+// Entre paréntesis, el más largo en la demo el 01/11/2026.
 export const LIMITES_CARTA = {
-  nombre: 150, // (45)
+  nombre: MAX_NOMBRE_CARTA, // (45)
   categoria: 100, // (17)
-  descripcion: 2000, // (105)
+  descripcion: MAX_DESCRIPCION_CARTA, // (105)
   tamano: 30, // (4)
   tipo: 100, // (22)
   tag: 50, // (11)
@@ -23,18 +54,14 @@ export const LIMITES_CARTA = {
   ingredientes: 2000, // (91)
   preparacion: 2000, // (vacío)
   alergenosNotas: 500, // (vacío)
-  /** Largo de cada alérgeno de la lista. */
-  alergeno: 60,
-  /** Cuántos alérgenos puede tener una lista. */
-  alergenosMax: 30,
+  /** Largo de cada alérgeno: el de public.alergenos_bien_formados (1/3). */
+  alergeno: 100,
   imagenUrl: 2048,
 } as const;
 
-export const PRECIO_MAXIMO_CARTA = 9999.99;
-
 const maximo = (n: number) => `Como máximo ${n} caracteres`;
 
-/** Texto obligatorio: sin recortar a la vista, pero rechaza vacío o solo espacios. */
+/** Texto obligatorio: rechaza vacío o solo espacios y lo que pase del máximo. */
 export const textoObligatorio = (max: number, obligatorio: string) =>
   z
     .string({ required_error: obligatorio })

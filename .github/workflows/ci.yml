@@ -48,8 +48,10 @@ jobs:
         run: npm run test:trabajos-video:db
       - name: Límites de los cubos de fotos (PGlite)
         run: npm run test:cubos-fotos:db
-      - name: Restricciones de Bebidas y Cocteles (PGlite)
+      - name: Restricciones de Platos y Vinos (PGlite)
         run: npm run test:restricciones-carta:db
+      - name: Restricciones de Bebidas y Cocteles (PGlite)
+        run: npm run test:restricciones-bebidas:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs

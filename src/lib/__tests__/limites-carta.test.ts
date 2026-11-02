@@ -1,39 +1,44 @@
-import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import { describe, it, expect } from "vitest";
+import * as z from "zod";
 import {
-  LIMITES_CARTA,
-  errorAlergenoPersonalizado,
-  textoObligatorio,
-  textoOpcional,
+  MAX_DESCRIPCION_CARTA,
+  MAX_NOMBRE_CARTA,
+  MAX_PRECIO_CARTA,
+  categoriaCarta,
+  descripcionCarta,
+  mensajePrecioMaximo,
+  nombreCarta,
 } from "../limites-carta";
 
-const esquema = z.object({
-  nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
-  descripcion: textoOpcional(LIMITES_CARTA.descripcion),
-});
-const errores = (v: unknown) => {
-  const r = esquema.safeParse(v);
-  return r.success ? [] : r.error.issues.map((i) => i.message);
-};
+const mensaje = (r: z.SafeParseReturnType<unknown, unknown>) =>
+  r.success ? null : r.error.issues[0].message;
 
-describe("limites-carta", () => {
-  it("acepta nombre y descripción en el máximo", () => {
-    expect(errores({ nombre: "n".repeat(150), descripcion: "d".repeat(2000) })).toEqual([]);
-    expect(errores({ nombre: "Mojito" })).toEqual([]);
+describe("límites de la carta (iguales que los CHECK de la BD)", () => {
+  it("mismos máximos que la migración 20261101220000", () => {
+    expect(MAX_NOMBRE_CARTA).toBe(150);
+    expect(MAX_DESCRIPCION_CARTA).toBe(2000);
+    expect(MAX_PRECIO_CARTA).toBe(9999.99);
   });
 
-  it("rechaza nombre vacío o solo espacios con mensaje en castellano", () => {
-    expect(errores({ nombre: "" })).toEqual(["El nombre es obligatorio"]);
-    expect(errores({ nombre: "  \t" })).toEqual(["El nombre es obligatorio"]);
+  it("nombre: obligatorio, recorta espacios y máximo 150 con mensaje en castellano", () => {
+    expect(mensaje(nombreCarta.safeParse("   "))).toBe("El nombre es obligatorio");
+    expect(nombreCarta.parse("  Arroz a banda  ")).toBe("Arroz a banda");
+    expect(nombreCarta.safeParse("a".repeat(150)).success).toBe(true);
+    expect(mensaje(nombreCarta.safeParse("a".repeat(151)))).toBe("El nombre no puede pasar de 150 caracteres");
   });
 
-  it("rechaza pasarse del máximo con mensaje en castellano", () => {
-    expect(errores({ nombre: "n".repeat(151) })).toEqual(["Como máximo 150 caracteres"]);
-    expect(errores({ nombre: "a", descripcion: "d".repeat(2001) })).toEqual(["Como máximo 2000 caracteres"]);
+  it("categoría: no vale solo con espacios", () => {
+    expect(mensaje(categoriaCarta.safeParse("  "))).toBe("La categoría es obligatoria");
+    expect(categoriaCarta.parse(" Tintos ")).toBe("Tintos");
   });
 
-  it("avisa si un alérgeno personalizado es demasiado largo", () => {
-    expect(errorAlergenoPersonalizado("trazas de mango")).toBeNull();
-    expect(errorAlergenoPersonalizado("a".repeat(61))).toBe("Cada alérgeno, como máximo 60 caracteres");
+  it("descripción: opcional, máximo 2.000", () => {
+    expect(descripcionCarta.safeParse(undefined).success).toBe(true);
+    expect(descripcionCarta.safeParse("d".repeat(2000)).success).toBe(true);
+    expect(mensaje(descripcionCarta.safeParse("d".repeat(2001)))).toMatch(/^La descripción no puede pasar de 2\.?000 caracteres$/);
+  });
+
+  it("mensaje del precio máximo en formato español", () => {
+    expect(mensajePrecioMaximo).toMatch(/^El precio no puede pasar de 9\.?999,99 €$/);
   });
 });
