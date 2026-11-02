@@ -1,5 +1,6 @@
 {
   "ignoreCommand": "node scripts/vercel-produccion.mjs",
+  "git": { "deploymentEnabled": { "**": false, "staging": true, "main": true } },
   "framework": "vite",
   "regions": ["fra1"],
   "trailingSlash": false,
