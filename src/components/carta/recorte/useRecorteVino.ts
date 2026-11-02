@@ -5,13 +5,15 @@ import { extensionFoto } from "../composicionVino";
 import { redimensionarFoto } from "../redimensionarFoto";
 import { recorteNavegadorDisponible, recorteNavegadorSeguro } from "./quitarFondoNavegador";
 import { decidirRecorte, dispositivoNoRecorta, olvidarDispositivoNoRecorta, type DestinoRecorte } from "./recorteMovil";
+import { candidataRecortada, detectarFotoRecortada, esStickerRecortado } from "./fotoYaRecortada";
 
 export type { TipoFotoCarta } from "../composicionCarta";
 
 /** Sticker ya recortado (sin componer: el fondo lo elige el usuario). */
 export interface StickerFoto {
   sticker: Blob;
-  metodo: ResultadoFotoCarta["metodo"];
+  /** "recortada": la foto ya venía sin fondo (recorte del iPhone); no se pasó el modelo. */
+  metodo: ResultadoFotoCarta["metodo"] | "recortada";
 }
 
 export type EstadoRecorte =
@@ -83,12 +85,8 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
   const tocado = useRef(false);
   const turno = useRef(0);
 
-  const ejecutar = useCallback((foto: File, previo?: Promise<ResultadoFotoCarta>) => {
-    const yo = ++turno.current;
-    tocado.current = false;
-    setEleccion("carta");
-    setVistaInterna("sticker");
-    setCompuesta(null);
+  /** Camino de siempre: modelo en el ordenador; en el móvil, recorte después de guardar. */
+  const seguirConModelo = useCallback((foto: File, yo: number, previo?: Promise<ResultadoFotoCarta>) => {
     const destino = destinoRecorteActual();
     if (destino !== "formulario") {
       // Móvil: nada de modelo en el formulario (memoria); se recorta tras guardar.
@@ -113,6 +111,32 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
       },
     );
   }, []);
+
+  const ejecutar = useCallback((foto: File, previo?: Promise<ResultadoFotoCarta>) => {
+    const yo = ++turno.current;
+    tocado.current = false;
+    setEleccion("carta");
+    setVistaInterna("sticker");
+    setCompuesta(null);
+    // Foto que ya viene sin fondo (recorte del iPhone, PNG con alfa): su
+    // transparencia es la máscara, sin modelo, en cualquier dispositivo.
+    if (!previo && esStickerRecortado(foto)) {
+      setEstado({ fase: "listo", r: { sticker: foto, metodo: "recortada" } });
+      return;
+    }
+    if (!previo && candidataRecortada(foto) && typeof createImageBitmap === "function") {
+      setEstado({ fase: "trabajando", progreso: null });
+      void detectarFotoRecortada(foto).then((sticker) => {
+        if (turno.current !== yo) return;
+        if (sticker) {
+          setOriginal(sticker);
+          setEstado({ fase: "listo", r: { sticker, metodo: "recortada" } });
+        } else seguirConModelo(foto, yo);
+      });
+      return;
+    }
+    seguirConModelo(foto, yo, previo);
+  }, [seguirConModelo]);
 
   /** Foto nueva (y, si ya se lanzó en el lote, su promesa de recorte). */
   const iniciar = useCallback(

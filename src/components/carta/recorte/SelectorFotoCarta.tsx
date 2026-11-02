@@ -24,6 +24,8 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
   const { estado, eleccion, vista, urls, tema, tipo } = recorte;
   const listo = estado.fase === "listo";
   const diferido = estado.fase === "diferido";
+  /** La foto ya venía sin fondo (recorte del iPhone): no se ha pasado el modelo. */
+  const yaRecortada = listo && estado.r.metodo === "recortada";
   const usaCarta = listo && eleccion === "carta";
   const verSticker = usaCarta && (vista === "sticker" || !urls.carta);
   const src = usaCarta ? (verSticker ? urls.sticker : urls.carta) : urls.original;
@@ -62,6 +64,12 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
         )}
         {superpuesto}
       </div>
+
+      {yaRecortada && (
+        <p className="text-center text-xs text-muted-foreground" data-testid="foto-ya-recortada">
+          Foto ya recortada: se usa su fondo transparente, sin esperar.
+        </p>
+      )}
 
       {usaCarta && (
         <div role="radiogroup" aria-label="Vista de la foto" className="mx-auto grid max-w-xs grid-cols-2 rounded-md border p-0.5 text-sm">
@@ -176,7 +184,7 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
             <ImageIcon className="mr-1.5 h-4 w-4" />
             Usar foto original
           </Button>
-          {!diferido && (
+          {!diferido && !yaRecortada && (
             <Button type="button" size="sm" variant="outline" className="h-10" onClick={recorte.repetir}>
               <RotateCw className="mr-1.5 h-4 w-4" />
               Repetir recorte

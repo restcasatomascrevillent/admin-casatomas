@@ -25,6 +25,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
 import { useFotoCarta } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
@@ -32,7 +34,6 @@ import { esquemaPrecioCarta, propsCampoPrecio } from "./precioCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const UNIDADES_MEDIDA = ["cl", "ml", "L"];
@@ -75,10 +76,12 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     },
   });
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (file && (await aceptarFoto(file, input))) {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (file) {
       // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
       // gastaba decenas de MB para una vista previa que no se enseña (la foto
       // nueva la pinta SelectorFotoCarta).
@@ -200,6 +203,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 accept={ACCEPT_FOTO}
                 className="hidden"
               />
+              <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
               
               {fotoCarta.original ? (
                 <SelectorFotoCarta

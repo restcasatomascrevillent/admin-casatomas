@@ -34,6 +34,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { useFotoCarta } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
@@ -50,7 +52,6 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
@@ -173,10 +174,12 @@ export function PlatoForm({
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (file && (await aceptarFoto(file, input))) fotoCarta.iniciar(file);
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (file) fotoCarta.iniciar(file);
   };
 
   const clearImage = () => {
@@ -604,6 +607,7 @@ export function PlatoForm({
                       onChange={handleImageChange}
                       className="hidden"
                     />
+                    <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
                   </div>
                 </div>
 
