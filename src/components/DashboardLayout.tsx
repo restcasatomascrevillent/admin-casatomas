@@ -55,10 +55,16 @@ export function DashboardLayout({ children, fixedHeight = false }: DashboardLayo
               campana a su pie (AppSidebar.tsx) — "al otro lado", como pidió,
               y sin ocupar alto. En tablet vertical / móvil (< 1024px) sí queda
               esta barra mínima: el sidebar es un Sheet y no hay otra forma de
-              abrirlo. 56px de alto con botones de 44px; respeta el notch. */}
+              abrirlo. 56px de alto con botones de 44px; respeta el notch.
+              En el centro, «Casa Tomás» en todas las secciones (02/11/2026,
+              petición del dueño: el hueco entre el menú y la campana quedaba
+              vacío). */}
           {isCompactNav && (
-            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-border bg-card flex items-center justify-between gap-2 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
+            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-border bg-card grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
               <SidebarTrigger className="shrink-0" />
+              <p className="truncate text-center text-base font-semibold tracking-tight text-foreground" data-testid="cabecera-negocio">
+                Casa Tomás
+              </p>
               <CentroNotificaciones className="shrink-0" />
             </header>
           )}

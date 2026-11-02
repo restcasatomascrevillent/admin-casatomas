@@ -87,20 +87,31 @@ describe("PestanasPagina", () => {
     expect(screen.queryByTestId("degradado-der")).not.toBeInTheDocument();
   });
 
-  it("con accionesArribaEnMovil los botones suben a su fila en el móvil y vuelven a la barra desde sm (F-47)", () => {
-    montar({ acciones: <button type="button">Añadir</button>, accionesArribaEnMovil: true });
+  it("con accionesDebajoEnMovil las pestañas van arriba con su línea y los botones bajan a una fila a todo el ancho; desde sm, una sola fila (F-47)", () => {
+    montar({ acciones: <button type="button">Añadir</button>, accionesDebajoEnMovil: true });
     const barra = screen.getByTestId("pestanas-pagina");
     expect(barra.className).toContain("flex-wrap");
     expect(barra.className).toContain("sm:flex-nowrap");
+    // La línea: bajo las pestañas en el móvil y bajo toda la barra desde sm.
+    expect(barra.className).toContain("border-b-0");
+    expect(barra.className).toContain("sm:border-b");
+    const envoltorioPestanas = screen.getByRole("tablist").parentElement!;
+    expect(envoltorioPestanas.className).toContain("basis-full");
+    expect(envoltorioPestanas.className).toContain("border-b");
+    expect(envoltorioPestanas.className).toContain("sm:border-b-0");
     const acciones = screen.getByRole("button", { name: "Añadir" }).parentElement!;
-    expect(acciones.className).toContain("order-first");
-    expect(acciones.className).toContain("sm:order-none");
-    expect(screen.getByRole("tablist").parentElement!.className).toContain("basis-full");
+    expect(acciones.className).toContain("w-full");
+    expect(acciones.className).toContain("sm:w-auto");
+    expect(acciones.className).not.toContain("order-first");
+    // Los botones, DESPUÉS de las pestañas (orden visual = orden de lectura).
+    expect(envoltorioPestanas.compareDocumentPosition(acciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("sin accionesArribaEnMovil la barra es una sola fila", () => {
+  it("sin accionesDebajoEnMovil la barra es una sola fila", () => {
     montar({ acciones: <button type="button">Añadir</button> });
-    expect(screen.getByTestId("pestanas-pagina").className).not.toContain("flex-wrap");
-    expect(screen.getByRole("button", { name: "Añadir" }).parentElement!.className).not.toContain("order-first");
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra.className).not.toContain("flex-wrap");
+    expect(barra.className).not.toContain("border-b-0");
+    expect(screen.getByRole("button", { name: "Añadir" }).parentElement!.className).not.toContain("w-full");
   });
 });
