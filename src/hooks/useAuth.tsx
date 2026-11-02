@@ -16,6 +16,10 @@ import { z } from "zod";
 import type { QueryClient } from "@tanstack/react-query";
 import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import {
+  limpiarAvisoSesionCaducada,
+  marcarSesionCaducada,
+} from "@/lib/aviso-sesion";
 
 const signUpSchema = z.object({
   email: z.string().email("Email inválido").max(255),
@@ -50,6 +54,25 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+type ErrorAuth = { status?: unknown; code?: unknown; name?: unknown } | null;
+
+/** Código de Auth (GoTrue) cuando el usuario tiene el acceso bloqueado (ban). */
+const CODIGO_BLOQUEO = "user_banned";
+const MENSAJE_BLOQUEO =
+  "Tu acceso al panel ha sido bloqueado. Contacta con el superadmin.";
+
+function esBloqueoExplicito(error: ErrorAuth | undefined): boolean {
+  return !!error && error.code === CODIGO_BLOQUEO;
+}
+
+/** Sin red o Auth caído: no dice nada de la sesión, no hay que cerrarla. */
+function esFalloTransitorio(error: ErrorAuth | undefined): boolean {
+  if (!error) return false;
+  if (error.name === "AuthRetryableFetchError") return true;
+  const status = Number(error.status);
+  return !Number.isFinite(status) || status === 0 || status >= 500;
+}
 
 /**
  * Espera al registro mientras sigue vigente el token. Si falla, el llamador
@@ -158,6 +181,11 @@ export function AuthProvider({
   // usa localStorage para omitir accesos; refrescar el JWT no crea otro login.
   const accesos = useRef(new Map<string, Promise<void>>());
   const usuariosBloqueados = useRef(new Set<string>());
+  // El usuario pulsó «Cerrar sesión»: su SIGNED_OUT no es una sesión caducada.
+  const saliendoAMano = useRef(false);
+  // Mientras se averigua si una sesión muerta es caducidad o bloqueo, el
+  // SIGNED_OUT que emite Auth al fallar la renovación no decide el aviso.
+  const decidiendoCierre = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -167,6 +195,9 @@ export function AuthProvider({
     let ultimaSincronizacion = 0;
 
     const clearLocalSession = async () => {
+      // Sesión guardada que ya no vale (p. ej. al volver al panel horas
+      // después): es caducidad. El bloqueo solo se anuncia con señal explícita.
+      if (!saliendoAMano.current) marcarSesionCaducada();
       cambiarIdentidad(null);
       await supabase.auth.signOut({ scope: "local" });
       if (!isMounted) return;
@@ -183,6 +214,14 @@ export function AuthProvider({
       if (!incomingSession) {
         accesos.current.clear();
         if (!esVigente()) return;
+        // Auth cerró la sesión de quien estaba dentro sin que lo pidiera
+        // (no se pudo renovar el token): vuelve al login avisando.
+        if (
+          idPintado.current !== null &&
+          !saliendoAMano.current &&
+          !decidiendoCierre.current
+        )
+          marcarSesionCaducada();
         cambiarIdentidad(null);
         setSession(null);
         setUser(null);
@@ -200,6 +239,19 @@ export function AuthProvider({
           ? Number((userError as { status?: unknown }).status)
           : null;
 
+      if (esBloqueoExplicito(userError as ErrorAuth)) {
+        // Auth confirma el bloqueo: se dice tal cual, no «sesión caducada».
+        usuariosBloqueados.current.add(incomingSession.user.id);
+        limpiarAvisoSesionCaducada();
+        cambiarIdentidad(null);
+        await supabase.auth.signOut({ scope: "local" });
+        if (!isMounted) return;
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        toast.error(MENSAJE_BLOQUEO);
+        return;
+      }
       if (status === 401 || status === 403 || (!userData.user && !userError)) {
         await clearLocalSession();
         return;
@@ -228,7 +280,12 @@ export function AuthProvider({
 
       const userId = userData.user!.id;
       if (usuariosBloqueados.current.has(userId)) {
-        await clearLocalSession();
+        cambiarIdentidad(null);
+        await supabase.auth.signOut({ scope: "local" });
+        if (!isMounted) return;
+        setSession(null);
+        setUser(null);
+        setLoading(false);
         return;
       }
       if (!accesos.current.has(userId))
@@ -249,6 +306,7 @@ export function AuthProvider({
         return;
       }
       if (!esVigente()) return;
+      saliendoAMano.current = false;
       // Otra cuenta en la misma pestaña: caché fuera ANTES de pintarla.
       cambiarIdentidad(userId);
       setSession(incomingSession);
@@ -288,15 +346,41 @@ export function AuthProvider({
       if (!activo || usuariosBloqueados.current.has(userId)) return;
       usuariosBloqueados.current.add(userId);
       accesos.current.clear();
+      limpiarAvisoSesionCaducada();
       cambiarIdentidad(null);
       // Retira inmediatamente la identidad: las rutas protegidas desmontan
       // el panel antes de esperar la limpieza del almacenamiento de Auth.
       setSession(null);
       setUser(null);
-      toast.error(
-        "Tu acceso al panel ha sido bloqueado. Contacta con el superadmin.",
-      );
+      toast.error(MENSAJE_BLOQUEO);
       await supabase.auth.signOut({ scope: "local" });
+    };
+    const cerrarPorCaducidad = async () => {
+      if (!activo || usuariosBloqueados.current.has(userId)) return;
+      accesos.current.clear();
+      marcarSesionCaducada();
+      cambiarIdentidad(null);
+      setSession(null);
+      setUser(null);
+      await supabase.auth.signOut({ scope: "local" });
+    };
+    /**
+     * Auth ya no acepta el token. Puede ser caducidad (no se renovó, la
+     * sesión se cerró en el servidor) o un bloqueo. Se intenta renovar: si
+     * funciona, la sesión sigue; si Auth responde `user_banned`, es bloqueo;
+     * cualquier otro rechazo es una sesión caducada.
+     */
+    const decidirCierre = async () => {
+      decidiendoCierre.current = true;
+      try {
+        const { data, error } = await supabase.auth.refreshSession();
+        if (!error && data.session) return;
+        if (esBloqueoExplicito(error as ErrorAuth)) await cerrarPorBloqueo();
+        else if (!esFalloTransitorio(error as ErrorAuth))
+          await cerrarPorCaducidad();
+      } finally {
+        decidiendoCierre.current = false;
+      }
     };
     const comprobar = async () => {
       if (!activo || comprobando || document.visibilityState === "hidden")
@@ -304,12 +388,14 @@ export function AuthProvider({
       comprobando = true;
       try {
         const { error, data } = await supabase.auth.getUser();
-        if (
+        if (esBloqueoExplicito(error as ErrorAuth)) {
+          await cerrarPorBloqueo();
+        } else if (
           error?.status === 401 ||
           error?.status === 403 ||
           (!error && !data.user)
         ) {
-          await cerrarPorBloqueo();
+          await decidirCierre();
         } else if (!error) {
           // Sesión válida: reutiliza esta misma comprobación (15 s, foco y
           // visibilidad) para releer rol y permisos (CT-REM-FE-02).
@@ -439,6 +525,7 @@ export function AuthProvider({
             error: new Error("No se pudo registrar el acceso en auditoría"),
           };
         }
+        limpiarAvisoSesionCaducada();
         toast.success("Sesión iniciada correctamente");
         return { data, error: null };
       }
@@ -468,6 +555,7 @@ export function AuthProvider({
       }
       // El servidor ya ha guardado este acceso. Evita que SIGNED_IN lo duplique.
       const data = response.data;
+      limpiarAvisoSesionCaducada();
       usuariosBloqueados.current.delete(data.user.id);
       accesos.current.set(data.user.id, Promise.resolve());
       const { error: sessionError } = await supabase.auth.setSession(
@@ -529,7 +617,11 @@ export function AuthProvider({
       }
     }
 
-    const { error } = await supabase.auth.signOut();
+    // Solo ESTE dispositivo: por defecto Supabase cierra todas las sesiones
+    // del usuario y los demás dispositivos verían su sesión terminada.
+    saliendoAMano.current = true;
+    limpiarAvisoSesionCaducada();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) {
       const status =
         typeof error === "object" && error !== null && "status" in error
@@ -544,6 +636,7 @@ export function AuthProvider({
         return { error: null };
       }
 
+      saliendoAMano.current = false;
       toast.error("Error al cerrar sesión: " + mensajeUsuario(error, "inténtalo de nuevo"));
       return { error };
     }

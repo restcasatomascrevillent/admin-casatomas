@@ -15,7 +15,8 @@
  *   1. GRATIS en el navegador (recorte/quitarFondoNavegador.ts: isnet en un
  *      Web Worker con onnxruntime-web; el modelo se baja una vez y se cachea).
  *   2. Si falla: Edge Function `recortar-fondo-vino` (Replicate, de pago,
- *      opcional; sin token → 503 `sin_token`).
+ *      opcional; sin token → 503 `sin_token`; cada fallo trae un `codigo`
+ *      que avisoSinFondoCarta convierte en un aviso claro).
  *   3. Si también falla: el llamador sigue con la foto encuadrada de siempre
  *      (recorteFoto.ts) y avisa.
  * Las fotos ya subidas sin procesar se pueden homogeneizar con el script
@@ -108,10 +109,21 @@ export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoRecort
   return { foto: new File([compuesta], `botella-carta.${ext}`, { type: compuesta.type }), sticker, metodo };
 }
 
+/** Por qué falló `recortar-fondo-vino`, según el `codigo` que devuelve. */
+const MOTIVO_SIN_FONDO: Record<string, string> = {
+  sin_token: "Quitar el fondo con Replicate no está activado (falta su clave en Supabase)",
+  token_invalido: "La clave de Replicate no es válida",
+  sin_saldo: "La cuenta de Replicate no tiene saldo",
+  timeout: "Quitar el fondo tardó demasiado",
+  demasiado_grande: "La foto es demasiado grande para quitarle el fondo",
+  imagen_invalida: "El formato de la foto no sirve para quitarle el fondo",
+  fallo_replicate: "Replicate no pudo quitar el fondo de esta foto",
+};
+
 /** Mensaje corto para el aviso cuando no se pudo aplicar el fondo de carta. */
 export function avisoSinFondoCarta(e: unknown): string {
   const codigo = (e as { codigo?: string } | null)?.codigo;
-  if (codigo === "sin_token") return "No se pudo quitar el fondo: se guarda la foto normal.";
-  if (codigo === "timeout") return "Quitar el fondo tardó demasiado: se guarda la foto normal.";
+  const motivo = codigo ? MOTIVO_SIN_FONDO[codigo] : undefined;
+  if (motivo) return `${motivo}: se guarda la foto normal.`;
   return "No se pudo poner el fondo de carta: se guarda la foto normal.";
 }

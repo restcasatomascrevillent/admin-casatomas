@@ -48,6 +48,8 @@ jobs:
         run: npm run test:trabajos-video:db
       - name: Límites de los cubos de fotos (PGlite)
         run: npm run test:cubos-fotos:db
+      - name: Restricciones de novedades y espacios_reserva (PGlite)
+        run: npm run test:restricciones:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
