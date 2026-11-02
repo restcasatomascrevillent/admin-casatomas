@@ -46,11 +46,13 @@ interface PestanasPaginaProps {
   /** Sin iconos por debajo de `sm`: para barras con muchas pestañas que no caben a 390 px. */
   iconosSoloEscritorio?: boolean;
   /**
-   * Por debajo de `sm`, `acciones` sube a su propia fila (alineada a la derecha) y las pestañas se quedan
-   * con todo el ancho debajo, pegadas a la línea. Para barras cuyas pestañas no caben junto a los botones
-   * a 390 px (F-47, 01/11/2026). Desde `sm`, todo en una fila como siempre.
+   * Por debajo de `sm`, las pestañas ocupan todo el ancho (con su línea) y `acciones` baja a su propia fila,
+   * debajo y a todo el ancho. Para barras cuyas pestañas no caben junto a los botones a 390 px (F-47,
+   * 01/11/2026). Antes los botones subían ENCIMA de las pestañas, apretados a la derecha y con un hueco vacío
+   * a la izquierda, entre dos barras de pestañas (al dueño no le gustaba, 02/11/2026). Desde `sm`, todo en
+   * una fila como siempre.
    */
-  accionesArribaEnMovil?: boolean;
+  accionesDebajoEnMovil?: boolean;
   className?: string;
 }
 
@@ -92,7 +94,7 @@ export function PestanasPagina({
   pestanas,
   acciones,
   iconosSoloEscritorio,
-  accionesArribaEnMovil,
+  accionesDebajoEnMovil,
   className,
 }: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
@@ -102,11 +104,18 @@ export function PestanasPagina({
       data-testid="pestanas-pagina"
       className={cn(
         "mb-2 flex w-full shrink-0 items-center gap-2 border-b border-border/60",
-        accionesArribaEnMovil && "flex-wrap sm:flex-nowrap",
+        // En el móvil la línea va bajo las pestañas (no bajo la fila de botones de abajo).
+        accionesDebajoEnMovil && "flex-wrap gap-y-3 border-b-0 sm:flex-nowrap sm:border-b",
         className,
       )}
     >
-      <div ref={ref} className={cn("relative min-w-0 flex-1 sm:flex-initial", accionesArribaEnMovil && "basis-full sm:basis-auto")}>
+      <div
+        ref={ref}
+        className={cn(
+          "relative min-w-0 flex-1 sm:flex-initial",
+          accionesDebajoEnMovil && "basis-full border-b border-border/60 sm:basis-auto sm:border-b-0",
+        )}
+      >
         <TabsList
           className={cn(
             "-mb-px flex h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto sm:gap-1 pointer-coarse:min-h-11",
@@ -158,7 +167,7 @@ export function PestanasPagina({
         <div
           className={cn(
             "ml-auto flex shrink-0 items-center gap-2",
-            accionesArribaEnMovil && "order-first w-full justify-end sm:order-none sm:w-auto",
+            accionesDebajoEnMovil && "w-full sm:w-auto",
           )}
         >
           {acciones}
