@@ -82,9 +82,23 @@ function useBordesScroll() {
     el.addEventListener("scroll", medir, { passive: true });
     const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(medir) : null;
     ro?.observe(el);
+    // La pestaña activa siempre a la vista (P-31): si hay más pestañas de las que caben, al cambiar de pestaña (o al
+    // cargar con `?tab=` de una lejana) la tira se desplaza para enseñarla. Solo scroll horizontal de la propia tira.
+    const verActiva = () => {
+      const activa = el.querySelector<HTMLElement>("[role=tab][data-state=active]");
+      if (!activa || el.scrollWidth <= el.clientWidth + 1) return;
+      const izq = activa.offsetLeft - 24;
+      const der = activa.offsetLeft + activa.offsetWidth + 24 - el.clientWidth;
+      if (izq < el.scrollLeft) el.scrollLeft = Math.max(0, izq);
+      else if (der > el.scrollLeft) el.scrollLeft = der;
+    };
+    verActiva();
+    const mo = typeof MutationObserver !== "undefined" ? new MutationObserver(verActiva) : null;
+    mo?.observe(el, { attributes: true, attributeFilter: ["data-state"], subtree: true });
     return () => {
       el.removeEventListener("scroll", medir);
       ro?.disconnect();
+      mo?.disconnect();
     };
   }, [medir]);
   return { ref, bordes };

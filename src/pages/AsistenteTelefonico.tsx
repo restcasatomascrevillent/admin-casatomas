@@ -408,6 +408,7 @@ export default function AsistenteTelefonico() {
                             { valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> },
                         ]}
                         acciones={modeBadge}
+                        accionesDebajoEnMovil
                     />
 
                     {/* ═══════════ RESUMEN ═══════════ */}

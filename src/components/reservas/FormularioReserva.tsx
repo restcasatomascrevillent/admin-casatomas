@@ -1270,12 +1270,12 @@ export const FormularioReserva = ({
           <Collapsible className="space-y-3 rounded-lg border p-3">
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" size="sm" className="group h-8 w-full justify-between px-2 text-sm">
-                <span className="flex items-center gap-1.5">
+                <span className="flex min-w-0 items-center gap-1.5">
                   <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                  Asignación interna (opcional)
-                  <span className="text-muted-foreground">· {nombreSalaElegida}</span>
+                  <span className="shrink-0">Asignación interna (opcional)</span>
+                  <span className="min-w-0 truncate text-muted-foreground">· {nombreSalaElegida}</span>
                 </span>
-                <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
+                <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-data-[state=open]:rotate-180" aria-hidden />
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-3">

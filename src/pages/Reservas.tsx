@@ -258,6 +258,7 @@ export default function Reservas() {
             todo el día. Sin título de página: la pestaña "Reservas" del menú lateral ya dice dónde
             estás. */}
         <PestanasPagina
+          accionesDebajoEnMovil
           pestanas={[
             { valor: "hoy", etiqueta: "Hoy" },
             { valor: "reservas", etiqueta: "Lista" },
