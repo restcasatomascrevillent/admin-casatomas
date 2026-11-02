@@ -2,6 +2,7 @@ import { auditDeniedAccess } from "@/lib/audit-access";
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { AvisoSesionCaducada } from "@/components/AvisoSesionCaducada";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -75,6 +76,8 @@ export default function SuperAdminLogin() {
             Acceso restringido de control del sistema
           </p>
         </div>
+
+        <AvisoSesionCaducada />
 
         {user && !isSuperAdmin ? (
           <Card>

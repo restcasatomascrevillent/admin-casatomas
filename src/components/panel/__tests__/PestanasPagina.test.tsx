@@ -86,4 +86,21 @@ describe("PestanasPagina", () => {
     expect(screen.getByTestId("degradado-izq")).toBeInTheDocument();
     expect(screen.queryByTestId("degradado-der")).not.toBeInTheDocument();
   });
+
+  it("con accionesArribaEnMovil los botones suben a su fila en el móvil y vuelven a la barra desde sm (F-47)", () => {
+    montar({ acciones: <button type="button">Añadir</button>, accionesArribaEnMovil: true });
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra.className).toContain("flex-wrap");
+    expect(barra.className).toContain("sm:flex-nowrap");
+    const acciones = screen.getByRole("button", { name: "Añadir" }).parentElement!;
+    expect(acciones.className).toContain("order-first");
+    expect(acciones.className).toContain("sm:order-none");
+    expect(screen.getByRole("tablist").parentElement!.className).toContain("basis-full");
+  });
+
+  it("sin accionesArribaEnMovil la barra es una sola fila", () => {
+    montar({ acciones: <button type="button">Añadir</button> });
+    expect(screen.getByTestId("pestanas-pagina").className).not.toContain("flex-wrap");
+    expect(screen.getByRole("button", { name: "Añadir" }).parentElement!.className).not.toContain("order-first");
+  });
 });
