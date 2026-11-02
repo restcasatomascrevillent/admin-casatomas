@@ -105,7 +105,7 @@ export function CamposVino<T extends CamposVinoValores>({
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Origen: el país y la región sitúan el vino en el mapa de la carta.</p>
+        <p className="text-sm text-muted-foreground">Origen: el país y la región sitúan el vino en el mapa de la carta. Pon la localidad o la subzona (p. ej. «Val do Salnés, Pontevedra») mejor que solo la comunidad («Galicia»): así el punto cae en su sitio.</p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
           <FormField
             control={control}
@@ -137,7 +137,7 @@ export function CamposVino<T extends CamposVinoValores>({
                     value={field.value || ""}
                     onChange={field.onChange}
                     options={regiones}
-                    placeholder="La Rioja, Castilla y León…"
+                    placeholder="Cambados, Pontevedra · Rioja Alta…"
                     emptyText="No hay regiones"
                   />
                 </FormControl>
