@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
 
-import { avisoSinFondoCarta, quitarFondoRemoto } from "../fotoCartaVino";
+import { avisoSinFondoCarta, olvidarServicioNoDisponible, quitarFondoRemoto } from "../fotoCartaVino";
 
 /** Lo que devuelve supabase-js ante un 4xx/5xx: FunctionsHttpError con la Response en `context`. */
 function errorHttp(status: number, cuerpo: unknown) {
@@ -16,7 +16,10 @@ function errorHttp(status: number, cuerpo: unknown) {
   return { data: null, error: Object.assign(new Error("Edge Function returned a non-2xx status code"), { context }) };
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  olvidarServicioNoDisponible();
+});
 
 describe("quitarFondoRemoto ante un error de la función", () => {
   it("503 sin_token → error con codigo y mensaje del servidor, y aviso claro", async () => {
@@ -27,22 +30,26 @@ describe("quitarFondoRemoto ante un error de la función", () => {
     expect(e).toBeInstanceOf(Error);
     expect(e.codigo).toBe("sin_token");
     expect(e.message).toContain("REPLICATE_API_TOKEN");
-    expect(avisoSinFondoCarta(e)).toBe(
-      "Quitar el fondo con Replicate no está activado (falta su clave en Supabase): se guarda la foto normal.",
+    expect(avisoSinFondoCarta(e, true)).toBe(
+      "El servicio de recorte no está activado (falta la clave de Replicate en Supabase). Se guarda la foto normal. " +
+        "Desde un ordenador sí se puede: abre la ficha y pulsa «Quitar fondo».",
     );
   });
 
   it("402 de Replicate (sin_saldo) y token inválido tienen su propio aviso", () => {
-    expect(avisoSinFondoCarta({ codigo: "sin_saldo" })).toMatch(/^La cuenta de Replicate no tiene saldo/);
-    expect(avisoSinFondoCarta({ codigo: "token_invalido" })).toMatch(/^La clave de Replicate no es válida/);
-    expect(avisoSinFondoCarta({ codigo: "demasiado_grande" })).toMatch(/demasiado grande/);
+    expect(avisoSinFondoCarta({ codigo: "sin_saldo" }, true)).toMatch(/^El servicio de recorte no tiene saldo/);
+    expect(avisoSinFondoCarta({ codigo: "token_invalido" }, true)).toMatch(/^El servicio de recorte no acepta su clave/);
+    expect(avisoSinFondoCarta({ codigo: "demasiado_grande" }, true)).toMatch(/demasiado grande/);
   });
 
   it("sin cuerpo legible o código desconocido → aviso genérico", async () => {
     mocks.invoke.mockResolvedValueOnce({ data: null, error: new Error("Failed to send a request to the Edge Function") });
     const e = await quitarFondoRemoto(new Blob(["foto"], { type: "image/jpeg" })).catch((x) => x);
     expect(e.codigo).toBeUndefined();
-    expect(avisoSinFondoCarta(e)).toBe("No se pudo poner el fondo de carta: se guarda la foto normal.");
-    expect(avisoSinFondoCarta({ codigo: "otro" })).toBe("No se pudo poner el fondo de carta: se guarda la foto normal.");
+    const generico =
+      "No se ha podido poner el fondo de carta. Se guarda la foto normal. " +
+      "Pulsa «Repetir recorte» o, más tarde, abre la ficha y pulsa «Quitar fondo».";
+    expect(avisoSinFondoCarta(e, true)).toBe(generico);
+    expect(avisoSinFondoCarta({ codigo: "otro" }, true)).toBe(generico);
   });
 });

@@ -38,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
@@ -325,6 +326,8 @@ export function EditarPlatoModal({
       if (fotoAntigua) {
         await borrarFotoSiNoSeUsa({ tabla: "Platos", bucket: "platos", ruta: fotoAntigua, excluirId: plato.id });
       }
+
+      avisarGuardadoSinFondo(fotoCarta.estado);
 
       // Vídeo: aparte, para que un fallo (p. ej. migración sin aplicar) no
       // impida guardar el plato.

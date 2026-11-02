@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Check, Image as ImageIcon, Loader2, RotateCw } from "lucide-react";
+import { AlertTriangle, Check, Image as ImageIcon, Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { temasDisponibles } from "../composicionCarta";
@@ -119,7 +119,20 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
         </div>
       )}
 
-      {estado.fase === "fallo" && <p className="text-center text-xs text-muted-foreground">{estado.aviso}</p>}
+      {estado.fase === "fallo" && (
+        // Visible y con el motivo: antes era una línea gris pequeña que nadie leía y el
+        // vino se guardaba sin fondo (iPhone, 02-11-2026).
+        <div
+          role="alert"
+          className="mx-auto flex max-w-xs gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-left text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <div className="space-y-0.5">
+            <p className="font-semibold">No se ha podido quitar el fondo</p>
+            <p>{estado.aviso}</p>
+          </div>
+        </div>
+      )}
 
       {(listo || estado.fase === "fallo") && (
         <div className="flex flex-wrap justify-center gap-2">

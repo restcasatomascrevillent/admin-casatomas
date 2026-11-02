@@ -24,6 +24,7 @@ import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta, precioParaCampo } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
@@ -194,6 +195,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         await borrarFotoSiNoSeUsa({ tabla: "Vinos", bucket: "vinos", ruta: fotoAntigua, excluirId: vino.id });
       }
 
+      avisarGuardadoSinFondo(recorte.estado);
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating vino:", error);

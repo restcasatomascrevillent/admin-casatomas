@@ -35,6 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { useVideoPlato } from "./video/useVideoPlato";
@@ -230,6 +231,7 @@ export function PlatoForm({
           // Supabase): así se invalida la caché y, sobre todo, se dispara la
           // republicación de las webs — sin esto la foto no llegaba nunca.
           await actualizarPlato.mutateAsync({ id: nuevoPlato.id, imagen_url: url });
+          avisarGuardadoSinFondo(fotoCarta.estado);
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
           toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });

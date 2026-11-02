@@ -10,6 +10,11 @@
 //   propia carta: el cliente la muestra, nunca rellena `precio` sola.
 // - categoria: siempre una de las categorías reales de `Vinos` (enum en el
 //   structured output) o null.
+// - ubicacion_region: la web coloca el vino en el mapa con este texto, así que
+//   se pide con el formato de la carta («Localidad o subzona, Provincia»); si la
+//   etiqueta solo da la comunidad («Galicia») y la ficha de la bodega da un sitio
+//   más concreto, gana la ficha (_shared/ubicacion-vino.ts). Si no, queda la
+//   comunidad y la web usa el centro de la D.O. (src/lib/denominaciones-vino.ts).
 // - recorte: caja de la botella en coordenadas 0-1 sobre la imagen recibida.
 // - Modelo: env VINO_FOTO_MODELO (por defecto gpt-4.1), detail "high".
 //   Tres llamadas: visión (lectura) + búsqueda web (Responses API, herramienta
@@ -36,6 +41,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso-marketing.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
+import { ejemplosUbicacion, elegirRegion, type UbicacionCarta } from "../_shared/ubicacion-vino.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -71,7 +77,7 @@ const CAMPOS_TEXTO = [
 
 type Cliente = ReturnType<typeof createClientBase>;
 
-interface VinoCarta {
+interface VinoCarta extends UbicacionCarta {
   nombre: string;
   categoria: string | null;
   denominacion_origen: string | null;
@@ -151,7 +157,7 @@ async function leerCarta(cliente: Cliente): Promise<VinoCarta[]> {
   try {
     const { data, error } = await cliente
       .from("Vinos")
-      .select("nombre, categoria, denominacion_origen, precio_eur, descripcion")
+      .select("nombre, categoria, denominacion_origen, precio_eur, descripcion, ubicacion_region, ubicacion_pais")
       .limit(1000);
     if (error || !Array.isArray(data)) return [];
     return (data as Array<Record<string, unknown>>)
@@ -160,6 +166,8 @@ async function leerCarta(cliente: Cliente): Promise<VinoCarta[]> {
         nombre: String(f.nombre).trim(),
         categoria: typeof f.categoria === "string" && f.categoria.trim() ? f.categoria.trim() : null,
         denominacion_origen: typeof f.denominacion_origen === "string" ? f.denominacion_origen : null,
+        ubicacion_region: typeof f.ubicacion_region === "string" ? f.ubicacion_region : null,
+        ubicacion_pais: typeof f.ubicacion_pais === "string" ? f.ubicacion_pais : null,
         precio_eur: typeof f.precio_eur === "number" ? f.precio_eur : null,
         descripcion: typeof f.descripcion === "string" ? f.descripcion.trim() : null,
       }));
@@ -193,7 +201,7 @@ function resumenCategorias(carta: VinoCarta[], categorias: string[]): string[] {
   });
 }
 
-function buildSystem(categorias: string[], resumenCat: string[], nombres: string[], ejemplos: string[]): string {
+function buildSystem(categorias: string[], resumenCat: string[], nombres: string[], ejemplos: string[], ubicaciones: string[]): string {
   return [
     "Eres un sumiller que lee etiquetas de botellas de vino a partir de una foto para dar de alta el vino en la carta de un restaurante gallego.",
     "Lee con mucha atención TODA la etiqueta (frontal, cápsula, collarín): nombre comercial, bodega, añada, D.O., tipo (blanco/tinto/rosado/espumoso) y variedad de uva.",
@@ -203,7 +211,9 @@ function buildSystem(categorias: string[], resumenCat: string[], nombres: string
     ...(nombres.length ? ["  Ejemplos reales de nombres de esta carta [D.O.]:", ...nombres.map((n) => `  · ${n}`)] : []),
     "- denominacion_origen: con el prefijo que usa la carta: 'D.O. Rías Baixas', 'D.O.Ca. Rioja', 'D.O. Ribera del Duero', 'AOC Champagne', 'IGP Castilla y León'… o null si no se lee ni se deduce con seguridad.",
     "- ingredientes: variedad/es de uva ('Albariño', 'Mencía, Garnacha'). Si la etiqueta no la dice pero el vino concreto o su D.O. y tipo la hacen muy probable, rellénala (Rioja blanco → 'Viura'; Rías Baixas → 'Albariño'; Rueda → 'Verdejo'; Ribera del Duero tinto → 'Tempranillo'). Si no hay certeza razonable: null.",
-    "- ubicacion_region / ubicacion_pais: región y país en español, deducibles de la D.O. ('Galicia', 'España').",
+    "- ubicacion_pais: país en español ('España', 'Francia'…), deducible de la D.O.",
+    "- ubicacion_region: dónde se elabora el vino, con el formato de la carta «Localidad o subzona, Provincia» ('Cambados, Pontevedra', 'Val do Salnés, Pontevedra', 'Peñafiel, Valladolid'). La web lo usa para colocar el vino en el mapa: si la etiqueta da algo más concreto que la comunidad autónoma (dirección de la bodega o del embotellador, municipio, comarca o subzona de la D.O. como Val do Salnés, O Rosal, Condado do Tea o Rioja Alavesa), ponlo. NO adivines un municipio: si no se lee, pon solo la comunidad autónoma ('Galicia') y nada más.",
+    ...(ubicaciones.length ? ["  Ejemplos reales de ubicacion_region de esta carta [D.O.]:", ...ubicaciones.map((u) => `  · ${u}`)] : []),
     "- contiene_sulfitos: true solo si la etiqueta dice 'contiene sulfitos'/'contains sulphites'.",
     "- categoria: OBLIGATORIO elegir una de la lista exacta según tipo + D.O. + uva. Si es un blanco de una D.O. sin categoría propia → la de 'OTRAS DENOMINACIONES' del mismo tipo. Solo null si no es posible saber ni el tipo de vino.",
     ...(categorias.length ? ["  Categorías de la carta:", ...resumenCat] : ["  No hay categorías: categoria = null."]),
@@ -416,6 +426,7 @@ interface FichaMercado {
   descripcion: string | null;
   ingredientes: string | null;
   denominacion_origen: string | null;
+  ubicacion_region: string | null;
 }
 
 const EJEMPLO_DUENO =
@@ -430,12 +441,13 @@ const SCHEMA_FICHA = {
   schema: {
     type: "object",
     additionalProperties: false,
-    required: ["ficha_encontrada", "descripcion", "ingredientes", "denominacion_origen", "ofertas"],
+    required: ["ficha_encontrada", "descripcion", "ingredientes", "denominacion_origen", "ubicacion_region", "ofertas"],
     properties: {
       ficha_encontrada: { type: "boolean" },
       descripcion: { type: ["string", "null"] },
       ingredientes: { type: ["string", "null"] },
       denominacion_origen: { type: ["string", "null"] },
+      ubicacion_region: { type: ["string", "null"] },
       ofertas: {
         type: "array",
         items: {
@@ -473,6 +485,7 @@ function promptBusqueda(ejemplos: string[]): string {
     ...(ejemplos.length ? ["   Ejemplos de tono de la carta actual (solo tono; su longitud y formato NO valen):", ...ejemplos.map((e) => `   - ${e}`)] : []),
     "",
     "3) ingredientes (uva/s, p. ej. 'Viura, Malvasía') y denominacion_origen (con prefijo: 'D.O.Ca. Rioja', 'D.O. Rías Baixas'…): rellénalos SOLO si las fuentes los dan con claridad; si no, null.",
+    "   ubicacion_region: dónde está la bodega o el viñedo según las fuentes, con el formato «Localidad o subzona, Provincia» ('Meaño, Pontevedra', 'Val do Salnés, Pontevedra'). Solo si lo dan con claridad; si no, null. Nunca solo la comunidad autónoma.",
     "",
     "Responde únicamente con el JSON pedido.",
   ].join("\n");
@@ -565,6 +578,7 @@ function limpiarFicha(raw: Record<string, unknown>, hosts: Set<string>): FichaMe
     descripcion: desc && desc.length >= 80 ? desc : null,
     ingredientes: textoONull(raw.ingredientes, 200),
     denominacion_origen: textoONull(raw.denominacion_origen, 200),
+    ubicacion_region: textoONull(raw.ubicacion_region, 200),
   };
 }
 
@@ -599,7 +613,7 @@ async function buscarFichaMercado(
             role: "user",
             content: conFormato
               ? ficha
-              : `${ficha}\n\nDevuelve SOLO un objeto JSON con las claves ficha_encontrada, descripcion, ingredientes, denominacion_origen y ofertas [{tienda,url,precio,formato_cl}].`,
+              : `${ficha}\n\nDevuelve SOLO un objeto JSON con las claves ficha_encontrada, descripcion, ingredientes, denominacion_origen, ubicacion_region y ofertas [{tienda,url,precio,formato_cl}].`,
           },
         ],
       }),
@@ -694,7 +708,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
       messages: [
         {
           role: "system",
-          content: buildSystem(categorias, resumenCategorias(carta, categorias), ejemplosNombre(carta), ejemplosTono(carta)),
+          content: buildSystem(categorias, resumenCategorias(carta, categorias), ejemplosNombre(carta), ejemplosTono(carta), ejemplosUbicacion(carta)),
         },
         {
           role: "user",
@@ -726,6 +740,11 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     if (mercado?.descripcion) vino.descripcion = mercado.descripcion;
     if (mercado?.ingredientes) vino.ingredientes = mercado.ingredientes;
     if (mercado?.denominacion_origen) vino.denominacion_origen = mercado.denominacion_origen;
+    vino.ubicacion_region = elegirRegion(
+      vino.ubicacion_region as string | null,
+      mercado?.ubicacion_region,
+      vino.ubicacion_pais as string | null,
+    );
 
     const precio = await sugerirPrecio(
       vino,
