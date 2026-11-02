@@ -43,8 +43,11 @@ import {
   emparejarTraduccion,
   esPostreCafe,
   menuEnIdioma,
+  rotuloEnElEditor,
   menuTieneContenido,
   parseMenuDia,
+  RANGO_DIAS_MENU_DEL_DIA,
+  seSirveMenuDelDia,
   seccionesMenuDiaVacias,
   serializarMenuDia,
   textoDeSeccion,
@@ -188,6 +191,17 @@ const formatearFechaLarga = (iso: string) => {
   return d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 };
 
+/**
+ * «mié, 30 dic 2026»: la de la lista en el móvil (QA-MDN-03, 01/11/2026). La
+ * larga («miércoles, 30 de diciembre de 2026») no cabía a 390 px junto a los
+ * botones de editar y borrar y se cortaba en «30 de diciembr…».
+ */
+const formatearFechaCorta = (iso: string) => {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("es-ES", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+};
+
 const parseTapasJson = (value: unknown): string[] => {
   if (!Array.isArray(value)) return [];
   return value
@@ -217,6 +231,8 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [registroAEliminar, setRegistroAEliminar] = useState<Registro | null>(null);
+  /** Diálogo «solo se sirve de martes a jueves, ¿guardar igualmente?». */
+  const [avisoDiaAbierto, setAvisoDiaAbierto] = useState(false);
 
   /** Fecha del registro que se está editando (null = nuevo). */
   const [editandoFecha, setEditandoFecha] = useState<string | null>(null);
@@ -308,6 +324,8 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
 
   /** Otro registro (no el que edito) que ya ocupa esa fecha: se sustituirá. */
   const choqueFecha = registros.find((r) => r.fecha === fecha && r.fecha !== editandoFecha);
+  /** Menú en un día en que no se sirve (fuera de martes a jueves): avisa, no bloquea. */
+  const fueraDeDiasMenu = esMenu && !!fecha && !seSirveMenuDelDia(fecha);
   const hoy = hoyLocal();
   const seccionesLimpias = useMemo(() => limpiarSecciones(secciones), [secciones]);
   const hayContenido = esMenu ? menuTieneContenido(seccionesLimpias) : lineas(tapasTexto).length > 0;
@@ -317,8 +335,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const postreCafeSugerido =
     registros.find((r) => r.menu?.postreCafe)?.menu?.postreCafe ?? POSTRE_CAFE_POR_DEFECTO;
   const postreCafe = postreCafeElegido ?? postreCafeSugerido;
-  const tituloSeccion = (seccion: SeccionMenuDia) =>
-    seccion === "postre" ? ETIQUETA_POSTRE_CAFE[postreCafe] : ETIQUETA_SECCION[seccion];
+  const tituloSeccion = (seccion: SeccionMenuDia) => rotuloEnElEditor(seccion, seccionesLimpias, postreCafe);
 
   // Lista: de hoy en adelante y los últimos días pasados; el resto, a un toque.
   const registrosALaVista = verAnteriores
@@ -327,7 +344,11 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
   const anterioresOcultos = registros.length - registrosALaVista.length;
   const hayAnterioresPlegables = registros.filter((r) => r.fecha < hoy).length > PASADOS_A_LA_VISTA;
 
-  const guardar = async () => {
+  /**
+   * `fueraDeDiasConfirmado`: quien guarda ya ha dicho «Guardar igualmente» en
+   * el aviso de fuera de martes a jueves.
+   */
+  const guardar = async (fueraDeDiasConfirmado = false) => {
     if (!fecha) {
       toast.error("Elige la fecha.");
       return;
@@ -345,6 +366,12 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
     }
     if (!esMenu && tapas.length === 0) {
       toast.error("Escribe al menos una tapa.");
+      return;
+    }
+    // Después de las comprobaciones que bloquean: no se pregunta por el día
+    // para luego decir que falta un plato.
+    if (fueraDeDiasMenu && !fueraDeDiasConfirmado) {
+      setAvisoDiaAbierto(true);
       return;
     }
 
@@ -640,7 +667,10 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                           >
                             <p className="text-sm font-medium flex items-center gap-2">
                               <CalendarDays className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                              <span className="truncate first-letter:uppercase">{formatearFechaLarga(registro.fecha)}</span>
+                              <span className="truncate first-letter:uppercase sm:hidden" title={formatearFechaLarga(registro.fecha)}>
+                                {formatearFechaCorta(registro.fecha)}
+                              </span>
+                              <span className="hidden truncate first-letter:uppercase sm:inline">{formatearFechaLarga(registro.fecha)}</span>
                               {esHoy && <Badge className="text-[10px] px-1.5 py-0">Hoy</Badge>}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">{detalle || "Sin contenido"}</p>
@@ -733,6 +763,16 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                 </Alert>
               )}
 
+              {fueraDeDiasMenu && (
+                <Alert data-testid="aviso-dia-menu">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    El menú del día solo se sirve {RANGO_DIAS_MENU_DEL_DIA}. Se puede guardar igualmente para
+                    este día.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {esMenu ? (
                 <div className="space-y-3">
                   {/* Sin la carta el menú SE PUEDE escribir igual (a mano), pero se
@@ -772,7 +812,11 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     platosPorId={platosPorId}
                     cargandoPlatos={cargandoPlatos}
                     plegable
-                    titulos={{ postre: tituloSeccion("postre") }}
+                    titulos={{
+                      primero: tituloSeccion("primero"),
+                      segundo: tituloSeccion("segundo"),
+                      postre: tituloSeccion("postre"),
+                    }}
                     abiertaAlInicio={(seccion, items) => seccion !== "entrante" && items.length === 0}
                     detalleVacia={{ entrante: "Opcional" }}
                     cabeceraDe={(seccion) =>
@@ -789,7 +833,9 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                     <Alert>
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        Sin platos en {seccionesVaciasAviso.map((s) => tituloSeccion(s).toLowerCase()).join(" ni ")}. Se
+                        Sin platos en {seccionesVaciasAviso
+                          .map((s) => (s === "postre" ? ETIQUETA_POSTRE_CAFE[postreCafe] : ETIQUETA_SECCION[s]).toLowerCase())
+                          .join(" ni ")}. Se
                         puede guardar igual: esa parte no saldrá en la web.
                       </AlertDescription>
                     </Alert>
@@ -821,7 +867,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                   <Eye className="w-4 h-4 mr-1.5" />
                   Vista previa
                 </Button>
-                <Button onClick={guardar} disabled={isSaving} className="h-11 min-w-0 flex-1 sm:flex-none sm:min-w-40">
+                <Button onClick={() => void guardar()} disabled={isSaving} className="h-11 min-w-0 flex-1 sm:flex-none sm:min-w-40">
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
@@ -861,6 +907,28 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
           <div className="space-y-3">{vistaPrevia}</div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={avisoDiaAbierto} onOpenChange={setAvisoDiaAbierto}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Guardar el menú del {fecha ? formatearFechaLarga(fecha) : ""}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              El menú del día solo se sirve {RANGO_DIAS_MENU_DEL_DIA}. ¿Guardar igualmente?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cambiar la fecha</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setAvisoDiaAbierto(false);
+                void guardar(true);
+              }}
+            >
+              Guardar igualmente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!registroAEliminar} onOpenChange={(open) => !open && !isDeleting && setRegistroAEliminar(null)}>
         <AlertDialogContent>

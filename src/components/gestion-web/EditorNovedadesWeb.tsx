@@ -56,7 +56,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { MobilePreview, type NovedadPreview } from "./MobilePreview";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { camposSinTraducir, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
+import { camposSinTraducir, conSiglasRestauradas, normalizarTraduccionNovedad } from "@/lib/traduccion-novedad";
 import { ImagePositionSelector } from "./ImagePositionSelector";
 import { NOVEDAD_CARD_IMAGE_ASPECT_RATIO } from "./previewConstants";
 import { BloqueBotonesNovedad } from "./BloqueBotonesNovedad";
@@ -76,6 +76,7 @@ import {
   type TipoBoton,
 } from "@/lib/menu-novedad";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { erroresLongitudNovedad, MAX_DESCRIPCION, MAX_ETIQUETA, MAX_NOMBRE } from "@/lib/limites-textos";
 
 // ---------------------------------------------------------------------------
 // Novedades de la web (tabla `novedades`)
@@ -125,7 +126,6 @@ const LOADING_MESSAGES = [
 const SECCION_NOVEDADES = "gestion_web_novedades";
 const BUCKET = "novedades";
 const MAX_IMAGEN_MB = 5;
-const MAX_TITULO = 120;
 
 // Campos opcionales que enriquecen el texto que se manda a la IA.
 const CAMPOS_POR_TIPO: Record<string, { key: string; label: string; placeholder: string; type?: string }[]> = {
@@ -357,10 +357,11 @@ const CLAVES_IDIOMA = {
 type PestanaFormNovedad = "contenido" | "imagen" | "botones" | "publicacion";
 
 /** Subpestañas del formulario de una novedad, en orden. */
-const PESTANAS_FORM_NOVEDAD: { id: PestanaFormNovedad; label: string }[] = [
+/** `corta`: la que se ve por debajo de `sm` (a 390 px las cuatro largas no caben, F-47). */
+const PESTANAS_FORM_NOVEDAD: { id: PestanaFormNovedad; label: string; corta?: string }[] = [
   { id: "contenido", label: "Texto" },
   { id: "imagen", label: "Imagen" },
-  { id: "botones", label: "Botones y menú" },
+  { id: "botones", label: "Botones y menú", corta: "Botones" },
   { id: "publicacion", label: "Publicación" },
 ];
 
@@ -688,7 +689,7 @@ export function EditorNovedadesWeb() {
         console.error("Traducción incompleta, se descarta:", faltan);
         return null;
       }
-      return t;
+      return conSiglasRestauradas(datos, t);
     } catch (e) {
       console.error("Error al traducir:", e);
       return null;
@@ -824,6 +825,26 @@ export function EditorNovedadesWeb() {
         menu: menuTraducido?.menu ?? datos.menu,
       }),
     };
+
+    // Mismos máximos que la BD (CHECK de 20261101180000). Se mira después de
+    // traducir: una traducción automática o un texto de la IA pueden pasarse.
+    const erroresLargo = erroresLongitudNovedad(payload);
+    if (erroresLargo.length > 0) {
+      toast.error(`No se puede guardar: ${erroresLargo.join(" ")}`, { duration: 10000 });
+      // La traducción recién hecha se queda en el formulario para poder
+      // acortarla a mano (como «Traducir»), en vez de perderse.
+      if (traducirNovedad && t) {
+        setFormData((prev) => ({ ...prev, ...t }));
+        setHuellaTraducida(huellaEspanol(formData));
+        setTraduccionManual(false);
+      }
+      // Las traducciones están en «Publicación»; el español, en «Contenido».
+      const soloTraducciones = erroresLargo.every((e) => / en (inglés|francés) /.test(e));
+      if (soloTraducciones) setTraduccionesAbiertas(true);
+      setPestanaForm(soloTraducciones ? "publicacion" : "contenido");
+      setIsSaving(false);
+      return;
+    }
 
     try {
       if (editingId) {
@@ -1039,14 +1060,16 @@ export function EditorNovedadesWeb() {
                     return (
                       <li
                         key={novedad.id}
-                        className={`flex items-center gap-2 p-2 pr-1 rounded-lg border transition-colors ${
+                        // En el móvil los botones van en una segunda fila: a 390 px no dejaban
+                        // sitio al título ni al estado (F-47). Desde `sm`, todo en una fila.
+                        className={`flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 pr-1 rounded-lg border transition-colors ${
                           esEditada ? "border-primary bg-primary/5" : "bg-card hover:bg-muted/50"
                         }`}
                       >
                         <button
                           type="button"
                           onClick={() => empezarEdicion(novedad)}
-                          className="flex min-h-11 items-center gap-3 flex-1 min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex min-h-11 items-center gap-3 flex-1 basis-full sm:basis-auto min-w-0 text-left rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           aria-label={`Editar «${novedad.titulo}»`}
                         >
                           <div className="h-10 w-14 shrink-0 rounded-md overflow-hidden bg-muted flex items-center justify-center">
@@ -1088,7 +1111,7 @@ export function EditorNovedadesWeb() {
                           </div>
                         </button>
 
-                        <div className="flex items-center gap-0.5 shrink-0">
+                        <div className="ml-auto flex items-center gap-0.5 shrink-0">
                           <label className="flex min-h-11 items-center gap-1.5 px-1.5 cursor-pointer">
                             <Switch
                               checked={!!novedad.activo}
@@ -1195,9 +1218,20 @@ export function EditorNovedadesWeb() {
                       key={p.id}
                       value={p.id}
                       data-tour={p.id === "publicacion" ? "gw-novedades-publicacion" : undefined}
-                      className="gap-1.5"
+                      // Menos relleno en el móvil: con el de siempre «Publicación» quedaba
+                      // fuera a 390 px (F-47). Desde `sm`, el de siempre.
+                      className="gap-1.5 px-2 pointer-coarse:px-2 sm:px-3 sm:pointer-coarse:px-4"
                     >
-                      {p.label}
+                      {p.corta ? (
+                        <>
+                          <span className="sm:hidden" aria-hidden="true">
+                            {p.corta}
+                          </span>
+                          <span className="sr-only sm:not-sr-only">{p.label}</span>
+                        </>
+                      ) : (
+                        p.label
+                      )}
                       {p.id === "botones" && erroresBotones.length > 0 && (
                         <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-label="con errores" />
                       )}
@@ -1216,7 +1250,7 @@ export function EditorNovedadesWeb() {
                     id="nov-titulo"
                     ref={tituloRef}
                     value={formData.titulo}
-                    maxLength={MAX_TITULO}
+                    maxLength={MAX_NOMBRE}
                     onChange={(e) => setCampo("titulo", e.target.value)}
                     placeholder="Ej: Llega el cocido gallego"
                     aria-required
@@ -1227,7 +1261,7 @@ export function EditorNovedadesWeb() {
                   <Input
                     id="nov-badge"
                     value={formData.badge_text}
-                    maxLength={24}
+                    maxLength={MAX_ETIQUETA}
                     onChange={(e) => setCampo("badge_text", e.target.value)}
                     placeholder="Ej: Nuevo, -20%"
                   />
@@ -1257,6 +1291,7 @@ export function EditorNovedadesWeb() {
                 <Textarea
                   id="nov-descripcion"
                   value={formData.descripcion}
+                  maxLength={MAX_DESCRIPCION}
                   onChange={(e) => setCampo("descripcion", e.target.value)}
                   placeholder="Escribe el texto o unas ideas sueltas y pulsa «Redactar con IA» para que lo pula."
                   className="min-h-24 text-base md:text-base"
@@ -1605,6 +1640,7 @@ export function EditorNovedadesWeb() {
                           <Input
                             className="sm:col-span-2 h-11 text-base md:text-base"
                             value={formData[k.titulo]}
+                            maxLength={MAX_NOMBRE}
                             onChange={(e) => setTraduccion(k.titulo, e.target.value)}
                             placeholder={formData.titulo || "Título"}
                             aria-label={`Título (${k.nombre.toLowerCase()})`}
@@ -1612,6 +1648,7 @@ export function EditorNovedadesWeb() {
                           <Input
                             className="h-11 text-base md:text-base"
                             value={formData[k.badge]}
+                            maxLength={MAX_ETIQUETA}
                             onChange={(e) => setTraduccion(k.badge, e.target.value)}
                             placeholder={formData.badge_text || "Etiqueta"}
                             aria-label={`Etiqueta (${k.nombre.toLowerCase()})`}
@@ -1619,6 +1656,7 @@ export function EditorNovedadesWeb() {
                         </div>
                         <Textarea
                           value={formData[k.descripcion]}
+                          maxLength={MAX_DESCRIPCION}
                           onChange={(e) => setTraduccion(k.descripcion, e.target.value)}
                           placeholder={formData.descripcion || "Descripción"}
                           className="min-h-16 text-base md:text-base"

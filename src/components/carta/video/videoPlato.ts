@@ -6,7 +6,8 @@
  *   - pasoInferencia / indicesClave: en qué fotogramas se pasa el modelo
  *     (en CPU es lento: se pasa cada 2–4 fotogramas y se interpola).
  *   - interpolarMascara / suavizarMascara: máscara por fotograma con media
- *     exponencial, para que el borde no tiemble.
+ *     exponencial, para que el borde no tiemble. Las variantes «Nitida» y
+ *     «Movimiento» (las que usa el vídeo) no mezclan donde algo se mueve.
  *   - cajaDeMascara / suavizarCajas: encuadre del plato estable en el tiempo.
  *   - esErrorColumnaVideo: la migración de `video_url` aún no está aplicada.
  */
@@ -23,8 +24,20 @@ export const FPS_VIDEO = 30;
 export const MAX_FOTOGRAMAS = 120;
 /** Ritmo máximo al que se pasa el modelo de recorte (lo que costaba antes por segundo de vídeo). */
 export const FPS_MODELO = 12;
-/** Lado al que se guardan las máscaras entre la fase de modelo y la de composición. */
+/**
+ * Lado al que se guardan las máscaras entre la fase de modelo y la de
+ * composición en MÓVIL/tablet (memoria). En PC se guardan a 1024 (la salida
+ * del modelo, sin reescalar): a 512 una antena de 1–2 px se emborronaba.
+ */
 export const LADO_MASCARA_VIDEO = 512;
+export const LADO_MASCARA_VIDEO_PC = 1024;
+/**
+ * Diferencia (0–255) a partir de la cual dos claves «no están de acuerdo» en
+ * un píxel (algo se ha MOVIDO: una antena, una pinza) o un píxel cambia de
+ * verdad entre fotogramas. Ahí no se mezcla (ver interpolarMascaraNitida y
+ * suavizarMascaraMovimiento).
+ */
+export const UMBRAL_MOVIMIENTO = 96;
 /**
  * Peso del fotograma nuevo en la media exponencial de la máscara (0–1),
  * ajustado a FPS_MODELO (12 fps); a otra fps se usa alfaParaFps.
@@ -190,6 +203,48 @@ export function interpolarMascara(a: ArrayLike<number>, b: ArrayLike<number>, t:
   const out = new Float32Array(a.length);
   const u = Math.min(1, Math.max(0, t));
   for (let i = 0; i < out.length; i++) out[i] = a[i] + (b[i] - a[i]) * u;
+  return out;
+}
+
+/**
+ * Como interpolarMascara, pero donde las dos claves no están de acuerdo
+ * (|a − b| ≥ umbral: algo fino se ha movido) NO se mezclan: se toma la clave
+ * más cercana en el tiempo. Mezclar ahí dejaba dos antenas semitransparentes
+ * (fantasma) que el umbral de antes cortaba a trozos o borraba.
+ */
+export function interpolarMascaraNitida(a: ArrayLike<number>, b: ArrayLike<number>, t: number, umbral = UMBRAL_MOVIMIENTO): Float32Array {
+  const out = new Float32Array(a.length);
+  const u = Math.min(1, Math.max(0, t));
+  const cercana = u < 0.5 ? a : b;
+  for (let i = 0; i < out.length; i++) {
+    const d = b[i] - a[i];
+    out[i] = d >= umbral || d <= -umbral ? cercana[i] : a[i] + d * u;
+  }
+  return out;
+}
+
+/**
+ * Media exponencial que NO arrastra lo que se mueve: donde el fotograma nuevo
+ * cambia mucho respecto a la previa (≥ umbral) se toma el nuevo tal cual (sin
+ * estela ni halo detrás de una pata que se mueve); donde cambia poco (el
+ * temblor del borde) se suaviza como suavizarMascara.
+ */
+export function suavizarMascaraMovimiento(
+  previa: ArrayLike<number> | null,
+  nueva: ArrayLike<number>,
+  alfa = ALFA_MASCARA,
+  umbral = UMBRAL_MOVIMIENTO,
+): Float32Array {
+  const out = new Float32Array(nueva.length);
+  if (!previa || previa.length !== nueva.length) {
+    for (let i = 0; i < out.length; i++) out[i] = nueva[i];
+    return out;
+  }
+  const a = Math.min(1, Math.max(0, alfa));
+  for (let i = 0; i < out.length; i++) {
+    const d = nueva[i] - previa[i];
+    out[i] = d >= umbral || d <= -umbral ? nueva[i] : previa[i] + a * d;
+  }
   return out;
 }
 

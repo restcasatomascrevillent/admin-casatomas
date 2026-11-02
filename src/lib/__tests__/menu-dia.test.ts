@@ -4,6 +4,8 @@ import {
   emparejarTraduccion,
   itemDesdePlato,
   itemLibre,
+  MAX_NOMBRE_PLATO,
+  rotuloEnElEditor,
   menuEnIdioma,
   menuTieneContenido,
   parseMenuDia,
@@ -338,5 +340,33 @@ describe("rotuloEnLaWeb — lo que pinta la web en castellano", () => {
   it("el postre según «¿Qué entra?»", () => {
     expect(rotuloEnLaWeb("postre", base as never, "postre_o_cafe")).toBe("Postre o café");
     expect(rotuloEnLaWeb("postre", base as never, "postre_y_cafe")).toBe("Postre y café");
+  });
+});
+
+describe("MAX_NOMBRE_PLATO (QA-MDN-01)", () => {
+  it("un plato escrito a mano no pasa del máximo", () => {
+    expect(itemLibre("x".repeat(658)).nombre).toHaveLength(MAX_NOMBRE_PLATO);
+    expect(itemLibre("  Codillo asado  ").nombre).toBe("Codillo asado");
+  });
+});
+
+describe("rotuloEnElEditor (QA-MDN-04)", () => {
+  const vacio = { entrante: [], primero: [], segundo: [], postre: [] };
+  const conEntrante = { ...vacio, entrante: [itemLibre("Croquetas")] };
+
+  it("sin entrante avisa de cómo titula la web el primero y el segundo", () => {
+    expect(rotuloEnElEditor("primero", vacio, null)).toBe("Primero · en la web: Entrantes");
+    expect(rotuloEnElEditor("segundo", vacio, null)).toBe("Segundo · en la web: Principales");
+  });
+
+  it("con entrante la web dice lo mismo en plural y no se añade nada", () => {
+    expect(rotuloEnElEditor("primero", conEntrante, null)).toBe("Primero");
+    expect(rotuloEnElEditor("segundo", conEntrante, null)).toBe("Segundo");
+    expect(rotuloEnElEditor("entrante", conEntrante, null)).toBe("Entrante");
+  });
+
+  it("el postre lleva el rótulo elegido", () => {
+    expect(rotuloEnElEditor("postre", vacio, "postre_y_cafe")).toBe("Postre y café");
+    expect(rotuloEnElEditor("postre", vacio, null)).toBe("Postre");
   });
 });

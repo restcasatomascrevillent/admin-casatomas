@@ -19,6 +19,11 @@ import { cn } from "@/lib/utils";
 export interface PestanaPagina {
   valor: string;
   etiqueta: ReactNode;
+  /**
+   * Texto por debajo de `sm` si la etiqueta no cabe en el móvil (p. ej. «Menús» por «Menús diarios»).
+   * La larga sigue siendo el nombre accesible.
+   */
+  etiquetaCorta?: ReactNode;
   /** Icono (p. ej. un `<Users />` de lucide; la barra lo fija a 16 px). */
   icono?: ReactNode;
   /** Número a la derecha del texto (no se pinta si es 0 o `undefined`). */
@@ -38,6 +43,14 @@ interface PestanasPaginaProps {
   pestanas: PestanaPagina[];
   /** Botones a la derecha de la barra (no cortan las pestañas: estas hacen scroll en su hueco). */
   acciones?: ReactNode;
+  /** Sin iconos por debajo de `sm`: para barras con muchas pestañas que no caben a 390 px. */
+  iconosSoloEscritorio?: boolean;
+  /**
+   * Por debajo de `sm`, `acciones` sube a su propia fila (alineada a la derecha) y las pestañas se quedan
+   * con todo el ancho debajo, pegadas a la línea. Para barras cuyas pestañas no caben junto a los botones
+   * a 390 px (F-47, 01/11/2026). Desde `sm`, todo en una fila como siempre.
+   */
+  accionesArribaEnMovil?: boolean;
   className?: string;
 }
 
@@ -75,15 +88,25 @@ function useBordesScroll() {
   return { ref, bordes };
 }
 
-export function PestanasPagina({ pestanas, acciones, className }: PestanasPaginaProps) {
+export function PestanasPagina({
+  pestanas,
+  acciones,
+  iconosSoloEscritorio,
+  accionesArribaEnMovil,
+  className,
+}: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-background to-transparent";
   return (
     <div
       data-testid="pestanas-pagina"
-      className={cn("mb-2 flex w-full shrink-0 items-center gap-2 border-b border-border/60", className)}
+      className={cn(
+        "mb-2 flex w-full shrink-0 items-center gap-2 border-b border-border/60",
+        accionesArribaEnMovil && "flex-wrap sm:flex-nowrap",
+        className,
+      )}
     >
-      <div ref={ref} className="relative min-w-0 flex-1 sm:flex-initial">
+      <div ref={ref} className={cn("relative min-w-0 flex-1 sm:flex-initial", accionesArribaEnMovil && "basis-full sm:basis-auto")}>
         <TabsList
           className={cn(
             "-mb-px flex h-auto w-full justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto sm:gap-1 pointer-coarse:min-h-11",
@@ -93,11 +116,26 @@ export function PestanasPagina({ pestanas, acciones, className }: PestanasPagina
           {pestanas.map((p) => (
             <TabsTrigger key={p.valor} value={p.valor} disabled={p.disabled} className={CLASE_PESTANA} data-tour={p.tour}>
               {p.icono && (
-                <span className="inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">
+                <span
+                  className={cn(
+                    "inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4",
+                    iconosSoloEscritorio && "hidden sm:inline-flex",
+                  )}
+                  aria-hidden="true"
+                >
                   {p.icono}
                 </span>
               )}
-              <span className="truncate text-xs font-medium sm:text-[15px]">{p.etiqueta}</span>
+              {p.etiquetaCorta ? (
+                <>
+                  <span className="truncate text-xs font-medium sm:hidden" aria-hidden="true">
+                    {p.etiquetaCorta}
+                  </span>
+                  <span className="sr-only sm:not-sr-only sm:truncate sm:text-[15px] sm:font-medium">{p.etiqueta}</span>
+                </>
+              ) : (
+                <span className="truncate text-xs font-medium sm:text-[15px]">{p.etiqueta}</span>
+              )}
               {p.contador != null && p.contador > 0 && (
                 <span
                   aria-label={p.etiquetaContador}
@@ -116,7 +154,16 @@ export function PestanasPagina({ pestanas, acciones, className }: PestanasPagina
         {bordes.izq && <span aria-hidden="true" data-testid="degradado-izq" className={cn(degradado, "left-0 bg-gradient-to-r")} />}
         {bordes.der && <span aria-hidden="true" data-testid="degradado-der" className={cn(degradado, "right-0 bg-gradient-to-l")} />}
       </div>
-      {acciones && <div className="ml-auto flex shrink-0 items-center gap-2">{acciones}</div>}
+      {acciones && (
+        <div
+          className={cn(
+            "ml-auto flex shrink-0 items-center gap-2",
+            accionesArribaEnMovil && "order-first w-full justify-end sm:order-none sm:w-auto",
+          )}
+        >
+          {acciones}
+        </div>
+      )}
     </div>
   );
 }

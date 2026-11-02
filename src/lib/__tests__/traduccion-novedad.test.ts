@@ -4,7 +4,7 @@
  * guardarla: antes se guardaba y, al editar, machacaba la traducción buena.
  */
 import { describe, it, expect } from "vitest";
-import { camposSinTraducir, normalizarTraduccionNovedad } from "../traduccion-novedad";
+import { camposSinTraducir, conSiglasRestauradas, normalizarTraduccionNovedad, siglasDe } from "../traduccion-novedad";
 
 const es = {
   titulo: "Llega el cocido gallego",
@@ -65,5 +65,39 @@ describe("normalizarTraduccionNovedad", () => {
 
   it("acepta una respuesta sin translations", () => {
     expect(normalizarTraduccionNovedad(undefined).titulo_en).toBe("");
+  });
+});
+
+describe("siglas en francés (QA-MDN-02)", () => {
+  const base = normalizarTraduccionNovedad({
+    titulo_en: "QA TEST tasting",
+    titulo_fr: "Qa test dégustation",
+    descripcion_en: "Wine with DO. Do come.",
+    descripcion_fr: "Vin AOC, iva compris, de saison",
+  });
+
+  it("detecta las palabras en mayúsculas del español", () => {
+    expect(siglasDe("QA PRUEBA cata", "Vino DO con IVA", "A la carta 2026")).toEqual(["QA", "PRUEBA", "DO", "IVA"]);
+  });
+
+  it("devuelve a mayúsculas en francés la sigla que el traductor bajó", () => {
+    const t = conSiglasRestauradas({ titulo: "QA PRUEBA cata", descripcion: "Vino DO con IVA incluido" }, base);
+    expect(t.titulo_fr).toBe("QA test dégustation");
+    expect(t.descripcion_fr).toBe("Vin AOC, IVA compris, de saison");
+  });
+
+  it("no toca el inglés («Do» a principio de frase frente a «DO»)", () => {
+    const t = conSiglasRestauradas({ titulo: "x", descripcion: "Vino DO" }, base);
+    expect(t.descripcion_en).toBe("Wine with DO. Do come.");
+    expect(t.titulo_en).toBe("QA TEST tasting");
+  });
+
+  it("deja una palabra corriente de 2 letras en minúscula («de» frente a «DE»)", () => {
+    const t = conSiglasRestauradas({ titulo: "MENÚ DE temporada" }, base);
+    expect(t.descripcion_fr).toBe("Vin AOC, iva compris, de saison");
+  });
+
+  it("sin siglas en el español no cambia nada", () => {
+    expect(conSiglasRestauradas({ titulo: "Llega el cocido" }, base)).toEqual(base);
   });
 });

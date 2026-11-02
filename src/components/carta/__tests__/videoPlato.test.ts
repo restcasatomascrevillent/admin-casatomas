@@ -14,11 +14,13 @@ import {
   indicesClave,
   indicesClaveSalida,
   interpolarMascara,
+  interpolarMascaraNitida,
   pasoInferencia,
   porcentajeProgresoVideo,
   rutaVideoPlato,
   suavizarCajas,
   suavizarMascara,
+  suavizarMascaraMovimiento,
   textoProgresoVideo,
   tiempoFotogramaUs,
   tiemposFotogramas,
@@ -257,5 +259,44 @@ describe("codificación con WebCodecs", () => {
         throw new Error("x");
       }),
     ).toBeNull();
+  });
+});
+
+describe("máscaras del vídeo sin fantasmas (antenas que se mueven)", () => {
+  it("interpolarMascaraNitida: mezcla donde las claves coinciden, salta donde algo se movió", () => {
+    // píxel 0: borde que tiembla (200 → 230); píxel 1: la antena estaba (255) y ya no (0).
+    const a = [200, 255, 0];
+    const b = [230, 0, 255];
+    expect(Array.from(interpolarMascaraNitida(a, b, 0.25))).toEqual([207.5, 255, 0]);
+    expect(Array.from(interpolarMascaraNitida(a, b, 0.75))).toEqual([222.5, 0, 255]);
+    // Nunca deja una antena a medias (127) como hacía la mezcla lineal.
+    expect(interpolarMascara(a, b, 0.5)[1]).toBe(127.5);
+    expect([0, 255]).toContain(interpolarMascaraNitida(a, b, 0.5)[1]);
+  });
+
+  it("suavizarMascaraMovimiento: suaviza el temblor pero no deja estela detrás de lo que se mueve", () => {
+    const previa = [200, 255, 0];
+    const nueva = [230, 0, 255];
+    const r = suavizarMascaraMovimiento(previa, nueva, 0.5);
+    expect(r[0]).toBe(215); // temblor: media
+    expect(r[1]).toBe(0); // se fue: sin estela
+    expect(r[2]).toBe(255); // llegó: sin retraso
+    expect(Array.from(suavizarMascaraMovimiento(null, [1, 2]))).toEqual([1, 2]);
+  });
+
+  it("una antena que se desplaza 1 px por fotograma sigue entera en todos los fotogramas", () => {
+    // Fila de 20 px; la antena ocupa 2 px y avanza 3 px entre claves (cada 3 fotogramas).
+    const fila = (pos: number) => Array.from({ length: 20 }, (_, x) => (x >= pos && x < pos + 2 ? 255 : 0));
+    const claves = [0, 3, 6];
+    const mascaras = new Map(claves.map((k) => [k, fila(2 + k)]));
+    let previa: Float32Array | null = null;
+    for (let i = 0; i <= 6; i++) {
+      const { a, b, t } = vecinosClave(i, claves);
+      previa = suavizarMascaraMovimiento(previa, interpolarMascaraNitida(mascaras.get(a)!, mascaras.get(b)!, t), 0.3);
+      const opacos = Array.from(previa).filter((v) => v > 200).length;
+      const medias = Array.from(previa).filter((v) => v > 30 && v <= 200).length;
+      expect(opacos).toBe(2);
+      expect(medias).toBe(0);
+    }
   });
 });

@@ -2,6 +2,11 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider, useAuth } from "../useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import {
+  limpiarAvisoSesionCaducada,
+  sesionCaducada,
+} from "@/lib/aviso-sesion";
 
 const state = vi.hoisted(() => ({
   callback: null as null | ((event: string, session: unknown) => void),
@@ -21,6 +26,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       signInWithPassword: vi.fn(),
       setSession: vi.fn().mockResolvedValue({ error: null }),
       signOut: vi.fn().mockResolvedValue({ error: null }),
+      refreshSession: vi.fn(),
     },
     from: vi.fn(),
     rpc: vi.fn(),
@@ -43,6 +49,11 @@ const session = { user, access_token: "token", refresh_token: "refresh" };
 beforeEach(() => {
   vi.clearAllMocks();
   state.remote = null;
+  limpiarAvisoSesionCaducada();
+  vi.mocked(supabase.auth.refreshSession).mockResolvedValue({
+    data: { session: null, user: null },
+    error: { status: 400, code: "refresh_token_not_found", name: "AuthApiError" },
+  } as never);
   vi.mocked(supabase.auth.getSession).mockResolvedValue({
     data: { session: null },
     error: null,
@@ -243,7 +254,48 @@ it("un bloqueo remoto cierra la sesión abierta y desmonta el acceso", async () 
   expect(result.current.user).toBeNull();
 });
 
-it("comprueba el bloqueo al recuperar el foco si se perdió Realtime", async () => {
+const mensajesError = () => vi.mocked(toast.error).mock.calls.map((c) => String(c[0]));
+
+it("comprueba el bloqueo al recuperar el foco si se perdió Realtime (Auth dice user_banned)", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  const { result } = await mount();
+  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+    data: { user: null },
+    error: { status: 403, code: "user_banned" },
+  } as never);
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(result.current.user).toBeNull();
+  expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(mensajesError().some((m) => /bloqueado/.test(m))).toBe(true);
+  expect(sesionCaducada()).toBe(false);
+});
+
+it("token rechazado y sin renovación posible: «sesión caducada», no «acceso bloqueado»", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  const { result } = await mount();
+  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+    data: { user: null },
+    error: { status: 403, code: "session_not_found" },
+  } as never);
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  await waitFor(() => expect(result.current.user).toBeNull());
+  expect(supabase.auth.refreshSession).toHaveBeenCalled();
+  expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(sesionCaducada()).toBe(true);
+  expect(mensajesError().some((m) => /bloqueado/.test(m))).toBe(false);
+});
+
+it("si la renovación devuelve user_banned, es bloqueo y no caducidad", async () => {
   vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
     data: { session },
     error: null,
@@ -253,11 +305,114 @@ it("comprueba el bloqueo al recuperar el foco si se perdió Realtime", async () 
     data: { user: null },
     error: { status: 403 },
   } as never);
+  vi.mocked(supabase.auth.refreshSession).mockResolvedValueOnce({
+    data: { session: null, user: null },
+    error: { status: 400, code: "user_banned", name: "AuthApiError" },
+  } as never);
   await act(async () => {
     window.dispatchEvent(new Event("focus"));
   });
+  await waitFor(() => expect(result.current.user).toBeNull());
+  expect(sesionCaducada()).toBe(false);
+  expect(mensajesError().some((m) => /bloqueado/.test(m))).toBe(true);
+});
+
+it("si la renovación funciona, la sesión sigue abierta", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  const { result } = await mount();
+  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+    data: { user: null },
+    error: { status: 401 },
+  } as never);
+  vi.mocked(supabase.auth.refreshSession).mockResolvedValueOnce({
+    data: { session, user },
+    error: null,
+  } as never);
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(result.current.user?.id).toBe(user.id);
+  expect(supabase.auth.signOut).not.toHaveBeenCalled();
+  expect(sesionCaducada()).toBe(false);
+});
+
+it("sin red al renovar no cierra la sesión", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  const { result } = await mount();
+  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+    data: { user: null },
+    error: { status: 401 },
+  } as never);
+  vi.mocked(supabase.auth.refreshSession).mockResolvedValueOnce({
+    data: { session: null, user: null },
+    error: { status: 0, name: "AuthRetryableFetchError" },
+  } as never);
+  await act(async () => {
+    window.dispatchEvent(new Event("focus"));
+  });
+  expect(result.current.user?.id).toBe(user.id);
+  expect(supabase.auth.signOut).not.toHaveBeenCalled();
+});
+
+it("Auth cierra la sesión sola (SIGNED_OUT al fallar la renovación): vuelve al login con el aviso", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  const { result } = await mount();
+  await act(async () => {
+    state.callback?.("SIGNED_OUT", null);
+  });
+  await waitFor(() => expect(result.current.user).toBeNull());
+  expect(sesionCaducada()).toBe(true);
+});
+
+it("una sesión guardada que ya no vale al abrir el panel avisa de caducidad", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  vi.mocked(supabase.auth.getUser).mockResolvedValueOnce({
+    data: { user: null },
+    error: { status: 403, code: "session_not_found" },
+  } as never);
+  const { result } = await mount();
   expect(result.current.user).toBeNull();
+  expect(sesionCaducada()).toBe(true);
+});
+
+it("cerrar sesión solo cierra este dispositivo y no muestra «sesión caducada»", async () => {
+  vi.mocked(supabase.auth.getSession).mockResolvedValueOnce({
+    data: { session },
+    error: null,
+  } as never);
+  const { result } = await mount();
+  await act(async () => {
+    await result.current.signOut();
+  });
   expect(supabase.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+  expect(supabase.auth.signOut).not.toHaveBeenCalledWith();
+  await act(async () => {
+    state.callback?.("SIGNED_OUT", null);
+  });
+  await waitFor(() => expect(result.current.user).toBeNull());
+  expect(sesionCaducada()).toBe(false);
+});
+
+it("entrar de nuevo quita el aviso de sesión caducada", async () => {
+  const { result } = await mount();
+  const { marcarSesionCaducada } = await import("@/lib/aviso-sesion");
+  marcarSesionCaducada();
+  await act(async () => {
+    await result.current.signIn("user@test.local", "password");
+  });
+  expect(sesionCaducada()).toBe(false);
 });
 
 it("no cierra una sesión válida por un corte de red y elimina la suscripción al desmontar", async () => {

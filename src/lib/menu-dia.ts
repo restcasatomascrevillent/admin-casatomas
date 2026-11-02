@@ -133,6 +133,25 @@ export function rotuloEnLaWeb(
   }
 }
 
+/**
+ * Rótulo de una sección en el EDITOR: el de siempre y, si la web la titula de
+ * otra manera, también ese («Primero · en la web: Entrantes»). QA-MDN-04,
+ * 01/11/2026: el panel decía Primero/Segundo y la web, sin entrante,
+ * «Entrantes/Principales»; quien edita no sabía cómo se iba a leer. El
+ * singular y el plural de lo mismo («Primero»/«Primeros») no cuentan como
+ * distinto, y el postre ya lleva su rótulo de la web («Postre y café»).
+ */
+export function rotuloEnElEditor(
+  seccion: SeccionMenuDia,
+  secciones: EntradaSeccionesMenu,
+  postreCafe: PostreCafe | null,
+): string {
+  if (seccion === "postre") return postreCafe ? ETIQUETA_POSTRE_CAFE[postreCafe] : ETIQUETA_SECCION.postre;
+  const propio = ETIQUETA_SECCION[seccion];
+  const web = rotuloEnLaWeb(seccion, secciones, postreCafe);
+  return web === propio || web === `${propio}s` ? propio : `${propio} · en la web: ${web}`;
+}
+
 /** Una línea del menú, tal y como se guarda en BD. */
 export interface ItemMenu {
   /** uuid de la línea. El MISMO en las filas es/en/fr: así se emparejan. */
@@ -204,6 +223,13 @@ export const seccionesMenuDiaVacias = (): SeccionesMenuDia => ({
   postre: [],
 });
 
+/**
+ * Largo máximo del nombre de un plato escrito a mano (QA-MDN-01, 01/11/2026:
+ * se guardaba uno de 658 caracteres). El plato más largo de la carta tiene 77;
+ * 120 es el mismo tope que el título de una novedad.
+ */
+export const MAX_NOMBRE_PLATO = 120;
+
 /** Parte un texto de varias líneas en platos. Vacíos fuera. */
 export const lineasDeTexto = (valor: string): string[] =>
   valor
@@ -217,7 +243,7 @@ export function itemLibre(nombre: string, alergenos: string[] = []): ItemMenu {
     id: nuevoIdItem(),
     origen: "libre",
     platoId: null,
-    nombre: nombre.trim(),
+    nombre: nombre.trim().slice(0, MAX_NOMBRE_PLATO),
     descripcion: null,
     imagenUrl: null,
     imagenPosicionY: null,
@@ -458,4 +484,35 @@ export function difiereDeLaCarta(item: ItemMenu, plato: PlatoParaMenu | undefine
     actual.alergenosInferidos.join("|") !== item.alergenosInferidos.join("|") ||
     actual.alergenosNotas !== item.alergenosNotas
   );
+}
+
+/**
+ * Días en que se sirve el menú del día, como `Date.getDay()` (0 = domingo):
+ * de martes a jueves. No hay ningún ajuste en la base de datos que los guarde
+ * (ni en `configuracion_web` ni en la web), así que viven aquí, en un único
+ * sitio. QA de salida a producción, 01/11/2026: guardar un menú otro día no
+ * avisaba de nada.
+ */
+export const DIAS_MENU_DEL_DIA: readonly number[] = [2, 3, 4];
+
+/** «de martes a jueves», para los textos del panel. */
+export const RANGO_DIAS_MENU_DEL_DIA = "de martes a jueves";
+
+/**
+ * Día de la semana (0 = domingo) de una fecha `aaaa-mm-dd`, o `null` si no lo
+ * es. La fecha es de CALENDARIO, sin hora: se calcula en UTC para que no
+ * dependa de la zona horaria del navegador (Europe/Madrid u otra).
+ */
+export function diaSemanaDeFecha(fecha: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fecha);
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (d.getUTCMonth() !== Number(m[2]) - 1) return null; // 2026-02-30 y similares
+  return d.getUTCDay();
+}
+
+/** ¿Se sirve el menú del día en esa fecha? Una fecha no válida no avisa. */
+export function seSirveMenuDelDia(fecha: string): boolean {
+  const dia = diaSemanaDeFecha(fecha);
+  return dia === null || DIAS_MENU_DEL_DIA.includes(dia);
 }

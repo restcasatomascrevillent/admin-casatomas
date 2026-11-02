@@ -8,6 +8,11 @@
  *            tamaño original → apertura (disco radio 1) → gaussiana σ=2 →
  *            umbral 127 (máscara binaria con borde suavizado antes del corte).
  *
+ * Desde el 01-11-2026 el navegador (foto y vídeo) ya NO usa postprocesarMascara:
+ * borraba antenas y patas finas y dejaba el borde binario. Usa
+ * refinarMascara.ts (limpieza + filtro guiado + alfa suave). Se conserva como
+ * referencia del comportamiento de rembg (scripts/fotos-vino/recortar.py).
+ *
  * Funciones puras (sin DOM) para poder probarlas con vitest.
  */
 
