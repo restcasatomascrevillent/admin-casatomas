@@ -95,27 +95,31 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
           className="h-10 w-10 shrink-0 rounded-md border object-cover"
         />
       )}
-      {/* En el móvil solo el icono (como «Ajustar precios» y «Añadir vino»): con el texto la barra
-          de Vinos medía 503 px y ensanchaba la página a 390 px (QA F-05). El texto queda como nombre
-          accesible y vuelve desde `sm`. */}
+      {/* Con su texto también en el móvil (02/11/2026: solo iconos «no eran nada intuitivos»): la
+          barra de Vinos es una rejilla de 2 columnas (TabCarta), así que ya no ensancha la página a
+          390 px (QA F-05). En el móvil el texto corto; desde `sm`, el largo. */}
       <Button
         variant="outline"
+        className="min-w-0 flex-1 px-3 sm:flex-none sm:px-4"
         disabled={leyendo}
         onClick={() => inputRef.current?.click()}
         title={leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}
+        aria-label={leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}
       >
-        {leyendo ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" /> : <Camera className="h-4 w-4 sm:mr-2" />}
-        <span className="sr-only sm:not-sr-only">{leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}</span>
+        {leyendo ? <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" /> : <Camera className="mr-2 h-4 w-4 shrink-0" />}
+        <span className="truncate sm:hidden">{leyendo ? "Leyendo…" : "Desde foto"}</span>
+        <span className="hidden truncate sm:inline">{leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}</span>
       </Button>
       <Button
         variant="outline"
+        className="min-w-0 flex-1 px-3 sm:flex-none sm:px-4"
         disabled={leyendo}
         onClick={() => setLoteAbierto(true)}
         title={enLote ? `Varias botellas (${enLote})` : "Varias botellas"}
       >
-        <Images className="h-4 w-4 sm:mr-2" />
-        <span className="sr-only sm:not-sr-only">{enLote ? "Varias botellas " : "Varias botellas"}</span>
-        {enLote > 0 && <span className="ml-1 tabular-nums sm:ml-0">{`(${enLote})`}</span>}
+        <Images className="mr-2 h-4 w-4 shrink-0" />
+        <span className="truncate">Varias botellas</span>
+        {enLote > 0 && <span className="ml-1 shrink-0 tabular-nums">{`(${enLote})`}</span>}
       </Button>
       <LoteVinosDialog
         open={loteAbierto && filaEnForm === null}

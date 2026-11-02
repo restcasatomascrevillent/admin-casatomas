@@ -240,10 +240,9 @@ export default function TabCarta() {
         {/* Barra: secciones + acciones */}
         <div data-tour="gw-carta-secciones">
           {/* A 390 px las cuatro secciones con su número no caben junto a los botones (F-47): en el
-              móvil las secciones van arriba, a todo el ancho, y los botones en una fila debajo: los
-              secundarios con su icono a la izquierda y «Añadir …», con su texto, ocupando el resto
-              (02/11/2026: antes iban encima, apretados a la derecha y con un hueco vacío). El número
-              de cada sección se ve desde `sm`. */}
+              móvil las secciones van arriba, a todo el ancho, y los botones debajo, con su texto
+              (02/11/2026: antes iban encima, apretados a la derecha, solo con iconos y con un hueco
+              vacío). El número de cada sección se ve desde `sm`. */}
           <PestanasPagina
             accionesDebajoEnMovil
             pestanas={(Object.keys(secciones) as Seccion[]).map((seccion) => ({
@@ -254,13 +253,16 @@ export default function TabCarta() {
               tour: seccion === "vinos" ? "gw-carta-vinos" : undefined,
             }))}
             acciones={
-              <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-wrap" data-tour="gw-carta-acciones">
-                <Button variant="outline" className="shrink-0" onClick={() => setDialogAjustePreciosOpen(true)} title="Ajustar precios">
-                  <Percent className="h-4 w-4 sm:mr-2" />
-                  <span className="sr-only sm:not-sr-only">Ajustar precios</span>
+              // Móvil: rejilla de 2 columnas, todos con su texto (02/11/2026: solo iconos «no eran
+              // nada intuitivos»). En Vinos, fila de arriba «Desde foto · Varias botellas» y abajo
+              // «Ajustar precios · Añadir vino». Desde `sm`, una fila como siempre.
+              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center" data-tour="gw-carta-acciones">
+                <Button variant="outline" className="min-w-0 px-3 sm:px-4" onClick={() => setDialogAjustePreciosOpen(true)} title="Ajustar precios">
+                  <Percent className="mr-2 h-4 w-4 shrink-0" />
+                  <span className="truncate">Ajustar precios</span>
                 </Button>
                 {seccionActiva === "vinos" && (
-                  <div className="flex shrink-0 items-center gap-2 sm:flex-wrap" data-tour="gw-carta-vinos-foto">
+                  <div className="order-first col-span-2 flex min-w-0 items-center gap-2 sm:order-none sm:flex-wrap" data-tour="gw-carta-vinos-foto">
                     <BotonVinoDesdeFoto
                       categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
                       onLeido={(resultado) => {
@@ -270,7 +272,7 @@ export default function TabCarta() {
                     />
                   </div>
                 )}
-                <Button className="min-w-0 flex-1 sm:flex-none" onClick={actual.abrirDialogo} title={actual.añadir}>
+                <Button className="min-w-0 px-3 sm:px-4" onClick={actual.abrirDialogo} title={actual.añadir}>
                   <Plus className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">{actual.añadir}</span>
                 </Button>
