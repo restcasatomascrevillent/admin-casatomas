@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { avisoSinFondoCarta, quitarFondo, type ProgresoRecorte, type ResultadoFotoCarta } from "../fotoCartaVino";
+import { avisoSinFondoCarta, olvidarServicioNoDisponible, quitarFondo, type ProgresoRecorte, type ResultadoFotoCarta } from "../fotoCartaVino";
 import { componerFotoCarta, FONDO_ACTIVO, type NombreTema, type TipoFotoCarta } from "../composicionCarta";
 import { extensionFoto } from "../composicionVino";
 import { redimensionarFoto } from "../redimensionarFoto";
@@ -99,7 +99,10 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
   );
 
   const repetir = useCallback(() => {
-    if (original) ejecutar(original);
+    if (!original) return;
+    // «Repetir recorte» es un intento real: se olvida que el servicio no estaba configurado.
+    olvidarServicioNoDisponible();
+    ejecutar(original);
   }, [original, ejecutar]);
 
   const limpiar = useCallback(() => {

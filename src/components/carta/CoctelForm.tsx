@@ -13,6 +13,7 @@ import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useCocteles } from "@/hooks/useCocteles";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
@@ -169,6 +170,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
             id: nuevoCoctel.id,
             imagen_url: subida.url,
           });
+          avisarGuardadoSinFondo(fotoCarta.estado);
         } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
           toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });

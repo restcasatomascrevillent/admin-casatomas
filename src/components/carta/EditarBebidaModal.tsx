@@ -31,6 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta, precioParaCampo, propsCampoPrecio } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
@@ -175,6 +176,7 @@ export function EditarBebidaModal({ open, onOpenChange, bebida }: EditarBebidaMo
         await borrarFotoSiNoSeUsa({ tabla: "Bebidas", bucket: "bebidas", ruta: fotoAntigua, excluirId: bebida.id });
       }
 
+      avisarGuardadoSinFondo(fotoCarta.estado);
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating bebida:", error);

@@ -19,6 +19,23 @@
  *   - El worker se TERMINA tras un rato sin uso (`MS_WORKER_INACTIVO`) para
  *     devolver esa memoria; antes vivía para siempre con el modelo cargado.
  *
+ * MEDIDAS (02-11-2026; onnxruntime-web 1.30, WASM de 1 hilo, Node 22 en un
+ * servidor de 4 núcleos; el iPhone no se puede medir desde aquí) y por qué el
+ * móvil NO recorta en el navegador aunque sea moderno:
+ *   - El modelo pesa 44,6 MB y su entrada es FIJA, 1×3×1024×1024: a 768, 512 o
+ *     384 ORT responde «invalid dimensions». No hay «resolución de trabajo
+ *     menor» para el móvil sin reexportar el modelo (LADO_TRABAJO_FOTO solo
+ *     afecta a la limpieza de la máscara, que pesa poco).
+ *   - Memoria: 311 MB con la sesión creada y pico de 814 MB tras una
+ *     inferencia, sin contar la página, la foto decodificada ni los 47 MB del
+ *     modelo que guarda el worker. Cerca de 1 GB por pestaña.
+ *   - Tiempo: 17-19 s por foto en un núcleo de servidor.
+ *   Con eso una pestaña de iPhone/iPad puede ser cerrada por el sistema y la
+ *   foto se pierde (pasó el 01-11-2026). Por eso el móvil va a Replicate (~3 s,
+ *   ~0,0033 $ por foto) y, si no se puede, la ficha guarda la foto normal,
+ *   avisa (avisoSinFondoCarta + avisarGuardadoSinFondo) y el recorte se hace
+ *   luego desde un ordenador con «Quitar fondo» (BotonCambiarFondo.tsx).
+ *
  * PRECARGA (petición del dueño, 2026-11-01): `precargarRecorte()` baja el
  * modelo (47 MB, a Cache Storage) y el motor (wasm de onnxruntime, ~27 MB, a la
  * caché HTTP: /assets es inmutable) en segundo plano al entrar al panel, para

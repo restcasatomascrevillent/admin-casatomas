@@ -24,6 +24,7 @@ import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { urlSegura } from "@/lib/url-segura";
@@ -161,6 +162,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
         });
 
         queryClient.invalidateQueries({ queryKey: ["vinos"] });
+        avisarGuardadoSinFondo(recorte.estado);
       } catch (error) {
         console.error('Error uploading image:', error);
         toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });

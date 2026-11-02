@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { borrarFotoSiNoSeUsa, type TablaCarta } from "@/lib/storage-carta";
 import { useFotoCarta, type TipoFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { aceptarFoto, avisarFalloSubida } from "@/lib/aceptarFoto";
@@ -130,6 +131,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
         await borrarFotoSiNoSeUsa({ tabla, bucket, ruta: anterior, excluirId: elemento.id });
       }
       onGuardada?.(elemento.id);
+      avisarGuardadoSinFondo(fotoCarta.estado);
       cerrar();
     } catch (error) {
       // El aviso de error ya lo da la mutación del hook.
