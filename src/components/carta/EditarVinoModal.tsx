@@ -298,7 +298,9 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               paises={paises}
             />
 
-            <div className="flex justify-end gap-2">
+            {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
+                iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. */}
+            <div className="flex flex-wrap justify-end gap-2 pointer-coarse:sticky pointer-coarse:bottom-[-1.5625rem] pointer-coarse:z-10 pointer-coarse:-mx-6 pointer-coarse:border-t pointer-coarse:bg-background pointer-coarse:px-6 pointer-coarse:py-3">
               <Button type="button" variant="outline" className="h-11 px-5" onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>

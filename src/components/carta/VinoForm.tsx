@@ -267,7 +267,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                     </div>
                     )}
                   {enTienda !== null && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="break-words text-xs text-muted-foreground">
                       En tienda: <span className="font-medium text-foreground">~{formatoEuros(enTienda)}</span>
                       {fuentesTienda.flatMap((f) => { const href = urlSegura(f.url); return href ? [{ ...f, href }] : []; }).map((f) => (
                         <a
@@ -287,7 +287,9 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               }
             />
 
-            <div className="flex justify-end gap-2">
+            {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
+                iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. */}
+            <div className="flex flex-wrap justify-end gap-2 pointer-coarse:sticky pointer-coarse:bottom-[-1.5625rem] pointer-coarse:z-10 pointer-coarse:-mx-6 pointer-coarse:border-t pointer-coarse:bg-background pointer-coarse:px-6 pointer-coarse:py-3">
               <Button
                 type="button"
                 variant="outline"
