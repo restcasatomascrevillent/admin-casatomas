@@ -56,7 +56,7 @@ El PR se va actualizando solo mientras siga habiendo subidas a `staging`. Lo que
 
 ### 5. Aceptación (solo el dueño, en GitHub)
 
-1. En GitHub, abre el repo y entra en **Pull requests**. Abre el PR *Producción …*.
+1. En GitHub, **con la cuenta `restcasatomascrevillent`**, abre el repo y entra en **Pull requests**. Abre el PR *Producción …*. No lo aceptes con otra cuenta (por ejemplo `oficiososia`): el plan Hobby de Vercel bloquea los despliegues de usuarios que no son del equipo y producción se queda en *BLOCKED* aunque el PR esté fusionado.
 2. Revisa la descripción y la pestaña **Files changed** si quieres, y marca la lista de comprobación.
 3. Pulsa **Merge pull request** con la opción **Create a merge commit**. **No** uses *Squash and merge* ni *Rebase and merge*: con ellas Vercel **no** publica.
 4. Pulsa **Confirm merge**.
