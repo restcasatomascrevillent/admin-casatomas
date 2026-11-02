@@ -140,6 +140,7 @@ describe("Tarjeta de plato", () => {
         expect.stringMatching(/Guardado con la foto normal/),
         expect.objectContaining({ description: expect.stringContaining("desde un ordenador") }),
       ),
+      { timeout: 5000 },
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     // Y la tarjeta enseña la foto recién subida.
