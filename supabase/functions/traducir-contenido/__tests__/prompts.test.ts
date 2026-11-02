@@ -205,3 +205,16 @@ describe("novedad: una traducción a medias no se da por buena", () => {
     ).toEqual([]);
   });
 });
+
+describe("MENU_TAPAS_SYSTEM: mayúsculas (F-46)", () => {
+  it("pide conservar siglas y palabras en mayúsculas, también en francés", () => {
+    expect(MENU_TAPAS_SYSTEM).toMatch(/siglas \(DO, IGP, IVA\.\.\.\) se copian siempre en mayúsculas, también en francés/);
+    expect(MENU_TAPAS_SYSTEM).toMatch(/la traducción lo mantiene en MAYÚSCULAS/);
+  });
+  it("no convierte en mayúsculas de título lo que el original escribe en minúscula", () => {
+    expect(MENU_TAPAS_SYSTEM).toMatch(/nunca "Riz Aux Légumes"/);
+  });
+  it("el glosario sigue al final del prompt", () => {
+    expect(MENU_TAPAS_SYSTEM.trimEnd().endsWith(GLOSARIO_COCINA)).toBe(true);
+  });
+});

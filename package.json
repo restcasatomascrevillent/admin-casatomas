@@ -23,6 +23,7 @@
     "test:trabajos-video:db": "node scripts/test-trabajos-video.mjs",
     "test:cubos-fotos:db": "node scripts/test-cubos-fotos.mjs",
     "test:restricciones-carta:db": "node scripts/test-restricciones-carta.mjs",
+    "test:restricciones:db": "node scripts/test-restricciones-novedades-espacios.mjs",
     "test:restricciones-bebidas:db": "node scripts/test-restricciones-bebidas-cocteles.mjs"
   },
   "dependencies": {

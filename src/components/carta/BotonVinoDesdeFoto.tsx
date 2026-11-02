@@ -95,13 +95,27 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
           className="h-10 w-10 shrink-0 rounded-md border object-cover"
         />
       )}
-      <Button variant="outline" disabled={leyendo} onClick={() => inputRef.current?.click()}>
-        {leyendo ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Camera className="mr-2 h-4 w-4" />}
-        {leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}
+      {/* En el móvil solo el icono (como «Ajustar precios» y «Añadir vino»): con el texto la barra
+          de Vinos medía 503 px y ensanchaba la página a 390 px (QA F-05). El texto queda como nombre
+          accesible y vuelve desde `sm`. */}
+      <Button
+        variant="outline"
+        disabled={leyendo}
+        onClick={() => inputRef.current?.click()}
+        title={leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}
+      >
+        {leyendo ? <Loader2 className="h-4 w-4 animate-spin sm:mr-2" /> : <Camera className="h-4 w-4 sm:mr-2" />}
+        <span className="sr-only sm:not-sr-only">{leyendo ? "Leyendo etiqueta…" : "Añadir botella con foto"}</span>
       </Button>
-      <Button variant="outline" disabled={leyendo} onClick={() => setLoteAbierto(true)}>
-        <Images className="mr-2 h-4 w-4" />
-        {enLote ? `Varias botellas (${enLote})` : "Varias botellas"}
+      <Button
+        variant="outline"
+        disabled={leyendo}
+        onClick={() => setLoteAbierto(true)}
+        title={enLote ? `Varias botellas (${enLote})` : "Varias botellas"}
+      >
+        <Images className="h-4 w-4 sm:mr-2" />
+        <span className="sr-only sm:not-sr-only">{enLote ? "Varias botellas " : "Varias botellas"}</span>
+        {enLote > 0 && <span className="ml-1 tabular-nums sm:ml-0">{`(${enLote})`}</span>}
       </Button>
       <LoteVinosDialog
         open={loteAbierto && filaEnForm === null}

@@ -31,6 +31,8 @@ import { esquemaPrecioCarta, propsCampoPrecio } from "./precioCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const UNIDADES_MEDIDA = ["cl", "ml", "L"];
 
@@ -72,9 +74,10 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
     },
   });
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) {
       // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
       // gastaba decenas de MB para una vista previa que no se enseña (la foto
       // nueva la pinta SelectorFotoCarta).
@@ -123,7 +126,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
         queryClient.invalidateQueries({ queryKey: ["bebidas"] });
       } catch (error) {
         console.error('Error uploading image:', error);
-        toast.error("Bebida creada, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+        toast.error("Bebida creada, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });
       } finally {
         setIsUploading(false);
       }
@@ -192,7 +195,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
                 type="file"
                 ref={fileInputRef}
                 onChange={handleImageChange}
-                accept="image/*"
+                accept={ACCEPT_FOTO}
                 className="hidden"
               />
               

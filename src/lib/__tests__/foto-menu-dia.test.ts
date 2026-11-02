@@ -14,11 +14,20 @@ import {
   BUCKET_FOTOS_MENU,
   rutaFotoMenu,
   subirFotoMenu,
-  validarFotoMenu,
 } from "@/lib/foto-menu-dia";
 
-const archivo = (tipo: string, bytes = 10, nombre = "FOTO.JPEG") =>
-  new File([new Uint8Array(bytes)], nombre, { type: tipo });
+const FIRMAS: Record<string, number[]> = {
+  "image/jpeg": [0xff, 0xd8, 0xff, 0xe0],
+  "image/png": [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+  "image/webp": [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
+};
+
+/** Archivo con la firma real del tipo (validarFoto mira los primeros bytes). */
+const archivo = (tipo: string, bytes = 16, nombre = "FOTO.JPEG") => {
+  const datos = new Uint8Array(Math.max(bytes, 16));
+  datos.set(FIRMAS[tipo] ?? []);
+  return new File([datos], nombre, { type: tipo });
+};
 
 beforeEach(() => {
   upload.mockReset();
@@ -26,24 +35,8 @@ beforeEach(() => {
   from.mockClear();
 });
 
-describe("validarFotoMenu", () => {
-  it("acepta JPG, PNG y WebP", () => {
-    for (const tipo of ["image/jpeg", "image/png", "image/webp"]) {
-      expect(validarFotoMenu(archivo(tipo))).toBeNull();
-    }
-    expect(ACCEPT_FOTO_MENU).toBe("image/jpeg,image/png,image/webp");
-  });
-
-  it("rechaza lo que el navegador no pinta (HEIC) o no es imagen", () => {
-    expect(validarFotoMenu(archivo("image/heic"))).toMatch(/JPG, PNG o WebP/);
-    expect(validarFotoMenu(archivo("application/pdf"))).toMatch(/JPG, PNG o WebP/);
-    expect(validarFotoMenu(archivo(""))).toMatch(/JPG, PNG o WebP/);
-  });
-
-  it("rechaza más de 5 MB", () => {
-    expect(validarFotoMenu(archivo("image/jpeg", 5 * 1024 * 1024))).toBeNull();
-    expect(validarFotoMenu(archivo("image/jpeg", 5 * 1024 * 1024 + 1))).toMatch(/máximo 5 MB/);
-  });
+it("el accept del input solo ofrece JPG, PNG y WebP", () => {
+  expect(ACCEPT_FOTO_MENU).toBe("image/jpeg,image/png,image/webp");
 });
 
 describe("rutaFotoMenu", () => {
@@ -72,6 +65,22 @@ describe("subirFotoMenu", () => {
     expect(enviado).toBe(file);
     expect(opciones).toEqual({ contentType: "image/png" });
     expect(url).toBe(`https://x/${ruta}`);
+  });
+
+  it("usa el tipo real del archivo, no el que dice el navegador", async () => {
+    upload.mockResolvedValue({ error: null });
+    getPublicUrl.mockImplementation((ruta: string) => ({ data: { publicUrl: `https://x/${ruta}` } }));
+    const pngDisfrazado = new File([new Uint8Array([...FIRMAS["image/png"], 0, 0, 0, 0])], "foto.jpg", { type: "image/jpeg" });
+    await subirFotoMenu(pngDisfrazado);
+    const [ruta, , opciones] = upload.mock.calls[0];
+    expect(ruta).toMatch(/\.png$/);
+    expect(opciones).toEqual({ contentType: "image/png" });
+  });
+
+  it("no sube lo que no es una foto aunque diga image/jpeg", async () => {
+    const texto = new File(["esto es texto"], "foto.jpg", { type: "image/jpeg" });
+    await expect(subirFotoMenu(texto)).rejects.toThrow(/JPG, PNG o WebP/);
+    expect(upload).not.toHaveBeenCalled();
   });
 
   it("propaga el error de Storage", async () => {

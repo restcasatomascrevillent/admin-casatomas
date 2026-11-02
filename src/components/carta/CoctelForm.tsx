@@ -22,6 +22,8 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
   nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
@@ -112,9 +114,10 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (file && (await aceptarFoto(file, input))) {
       // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
       // gastaba decenas de MB para una vista previa que no se enseña (la foto
       // nueva la pinta SelectorFotoCarta).
@@ -168,7 +171,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
           });
         } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
-          toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.");
+          toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });
         } finally {
           setIsUploading(false);
         }
@@ -335,7 +338,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                   <span className="text-xs text-muted-foreground mt-1">Subir imagen</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept={ACCEPT_FOTO}
                     className="hidden"
                     onChange={handleImageChange}
                   />

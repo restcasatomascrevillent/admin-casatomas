@@ -38,6 +38,8 @@ import {
   normalizarAlergeno,
   separarAlergenos,
 } from "@/lib/alergenos";
+import { aceptarFoto } from "@/lib/aceptarFoto";
+import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
   nombre: textoObligatorio(LIMITES_CARTA.nombre, "El nombre es obligatorio"),
@@ -161,9 +163,10 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
     setAlergenosPersonalizados((prev) => prev.filter((item) => item !== alergeno));
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const file = input.files?.[0];
+    if (!file || !(await aceptarFoto(file, input))) return;
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
@@ -231,7 +234,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating coctel:", error);
-      toast.error("No se pudo actualizar el cóctel");
+      toast.error("No se pudo actualizar el cóctel", { description: mensajeErrorStorage(error) ?? undefined });
     } finally {
       setIsUploadingImage(false);
     }
@@ -410,7 +413,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={ACCEPT_FOTO}
                   onChange={handleImageChange}
                   className="hidden"
                 />
