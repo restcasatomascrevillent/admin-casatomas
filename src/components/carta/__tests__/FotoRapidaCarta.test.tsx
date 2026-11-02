@@ -31,13 +31,8 @@ vi.mock("../subirFotoCarta", async (original) => ({
   subirFotoCarta: mocks.subir,
 }));
 vi.mock("@/lib/storage-carta", () => ({ borrarFotoSiNoSeUsa: mocks.borrar }));
-// Sin recorte en jsdom: la foto se queda como «original» (igual que si falla en el móvil).
-vi.mock("../fotoCartaVino", async (original) => ({
-  ...(await original<typeof import("../fotoCartaVino")>()),
-  quitarFondo: vi.fn(async () => {
-    throw Object.assign(new Error("sin token"), { codigo: "sin_token" });
-  }),
-}));
+// jsdom no tiene Worker: es como un móvil que no recorta en el navegador; la
+// foto se guarda como «original» y se avisa (recorteEnSegundoPlano.ts).
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 
@@ -138,11 +133,13 @@ describe("Tarjeta de plato", () => {
     );
     expect(mocks.subir).toHaveBeenCalledWith("platos", "p1", { original: expect.any(File), compuesta: null });
     expect(mocks.borrar).toHaveBeenCalledWith({ tabla: "Platos", bucket: "platos", ruta: "p1.jpg", excluirId: "p1" });
-    // El recorte (simulado) falló: al guardar se avisa de que la ficha se queda sin fondo de carta.
+    // Este «dispositivo» no recorta: al guardar se avisa de que se queda la foto normal.
     const { toast } = await import("sonner");
-    expect(toast.warning).toHaveBeenCalledWith(
-      expect.stringMatching(/sin el fondo de carta/),
-      expect.objectContaining({ description: expect.stringContaining("«Quitar fondo»") }),
+    await waitFor(() =>
+      expect(toast.warning).toHaveBeenCalledWith(
+        expect.stringMatching(/Guardado con la foto normal/),
+        expect.objectContaining({ description: expect.stringContaining("desde un ordenador") }),
+      ),
     );
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     // Y la tarjeta enseña la foto recién subida.

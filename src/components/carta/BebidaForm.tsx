@@ -26,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useBebidas, NuevaBebida } from "@/hooks/useBebidas";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta, propsCampoPrecio } from "./precioCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
@@ -125,7 +125,7 @@ export function BebidaForm({ open, onOpenChange, categoriaInicial }: BebidaFormP
         });
 
         queryClient.invalidateQueries({ queryKey: ["bebidas"] });
-        avisarGuardadoSinFondo(fotoCarta.estado);
+        trasGuardarFotoCarta(fotoCarta, { tabla: "Bebidas", id: nuevaBebida.id, nombre: nuevaBebida.nombre });
       } catch (error) {
         console.error('Error uploading image:', error);
         toast.error("Bebida creada, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });

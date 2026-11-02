@@ -26,7 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
@@ -232,7 +232,7 @@ export function EditarCoctelModal({ open, onOpenChange, coctel }: EditarCoctelMo
         await borrarFotoSiNoSeUsa({ tabla: "Cocteles", bucket: "cocteles", ruta: fotoAntigua, excluirId: coctel.id });
       }
 
-      avisarGuardadoSinFondo(fotoCarta.estado);
+      trasGuardarFotoCarta(fotoCarta, { tabla: "Cocteles", id: coctel.id, nombre: coctel.nombre });
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating coctel:", error);
