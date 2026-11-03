@@ -178,3 +178,20 @@ export async function exigirAdmin(req: Request, deps: DependenciasAutorizacion):
     return denegar(503, MENSAJES_AUTORIZACION.noVerificable, deps.corsHeaders);
   }
 }
+
+/**
+ * SOLO super admin (`is_super_admin`, tabla super_admins): ser admin no basta.
+ * Para lo que vive exclusivamente en Super Admin (p. ej. servicios-uso).
+ */
+export async function exigirSuperAdmin(req: Request, deps: DependenciasAutorizacion): Promise<ResultadoAutorizacion> {
+  const usuario = await exigirUsuario(req, deps);
+  if (!usuario.ok) return usuario;
+  try {
+    const admin = clienteServicio(deps);
+    if (await rpcBooleana(admin, "is_super_admin", { _user_id: usuario.userId })) return usuario;
+    return denegar(403, MENSAJES_AUTORIZACION.sinPermiso, deps.corsHeaders);
+  } catch (error) {
+    console.error("[autorizacion] Error comprobando super admin:", error instanceof Error ? error.message : error);
+    return denegar(503, MENSAJES_AUTORIZACION.noVerificable, deps.corsHeaders);
+  }
+}

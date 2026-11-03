@@ -1,7 +1,7 @@
 // Autorización común (CT-REM-FN-01/02): exigirUsuario / exigirPermiso / exigirAdmin.
 // Sin red: la fábrica de clientes y el entorno se simulan.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { esServiceRole, exigirAdmin, exigirPermiso, exigirUsuario, tokenBearer } from "../autorizacion";
+import { esServiceRole, exigirAdmin, exigirPermiso, exigirSuperAdmin, exigirUsuario, tokenBearer } from "../autorizacion";
 
 const ENV: Record<string, string> = {
   SUPABASE_URL: "https://ejemplo.supabase.co",
@@ -129,6 +129,20 @@ describe("exigirAdmin", () => {
     estado.errorRpc = true;
     expect(await exigirAdmin(peticion("jwt-usuario"), deps)).toMatchObject({ ok: false, status: 503 });
     expect(await exigirAdmin(peticion(ENV.SUPABASE_ANON_KEY), deps)).toMatchObject({ ok: false, status: 401 });
+  });
+});
+
+describe("exigirSuperAdmin", () => {
+  it("staff → 403; admin (sin super admin) → 403; super admin → ok; error → 503; anon → 401", async () => {
+    expect(await exigirSuperAdmin(peticion("jwt-usuario"), deps)).toMatchObject({ ok: false, status: 403 });
+    estado.admin = true;
+    expect(await exigirSuperAdmin(peticion("jwt-usuario"), deps)).toMatchObject({ ok: false, status: 403 });
+    estado.superadmin = true;
+    expect(await exigirSuperAdmin(peticion("jwt-usuario"), deps)).toEqual({ ok: true, userId: USUARIO.id, email: USUARIO.email });
+    expect(estado.llamadas.every((l) => l.fn === "is_super_admin" && l.key === ENV.SUPABASE_SERVICE_ROLE_KEY)).toBe(true);
+    estado.errorRpc = true;
+    expect(await exigirSuperAdmin(peticion("jwt-usuario"), deps)).toMatchObject({ ok: false, status: 503 });
+    expect(await exigirSuperAdmin(peticion(ENV.SUPABASE_ANON_KEY), deps)).toMatchObject({ ok: false, status: 401 });
   });
 });
 
