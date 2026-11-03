@@ -1,0 +1,120 @@
+# Copia de seguridad nocturna de la base de datos de PRODUCCIÓN.
+#
+# Por qué: el plan Free de Supabase no hace copias automáticas (solo Pro y
+# superiores); Supabase recomienda exportar con `supabase db dump` y guardar
+# la copia fuera. Guía completa y cómo restaurar: docs/COPIAS-DE-SEGURIDAD.md.
+#
+# Secrets del repositorio (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN   token personal de la cuenta del restaurante (el
+#                           mismo que usa migracion-supabase.yml). Sin
+#                           contraseñas de base de datos: el CLI pide un rol
+#                           temporal a la Management API.
+#   COPIA_SEGURIDAD_CLAVE   frase larga para cifrar la copia (guárdala también
+#                           en un gestor de contraseñas: sin ella no se puede
+#                           abrir la copia).
+#
+# La copia lleva datos personales (reservas, compradores de cheques…): se sube
+# como artefacto SOLO cifrada (AES-256 con gpg) y se borra a los 14 días. No
+# imprime filas ni secretos. Los ficheros de Storage (fotos, facturas
+# originales) no van en el volcado: solo sus metadatos.
+name: Copia de seguridad de la base de datos
+
+on:
+  schedule:
+    - cron: "37 2 * * *" # todas las noches, 02:37 UTC (03:37 / 04:37 en Madrid)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: copia-seguridad-bd
+  cancel-in-progress: false
+
+jobs:
+  copia:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PROYECTO_REF: haqmmdfdzzatdnrrcgez # casatomas-prod
+    steps:
+      - name: Comprobar secrets
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          CLAVE: ${{ secrets.COPIA_SEGURIDAD_CLAVE }}
+        run: |
+          faltan=""
+          [ -n "$TOKEN" ] || faltan="$faltan SUPABASE_ACCESS_TOKEN"
+          [ -n "$CLAVE" ] || faltan="$faltan COPIA_SEGURIDAD_CLAVE"
+          if [ -n "$faltan" ]; then
+            echo "::error::Faltan los secrets:$faltan. Créalos en Settings → Secrets and variables → Actions (ver docs/COPIAS-DE-SEGURIDAD.md)."
+            exit 1
+          fi
+          if [ "${#CLAVE}" -lt 20 ]; then
+            echo "::error::COPIA_SEGURIDAD_CLAVE es demasiado corta: usa una frase de 20 caracteres o más."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Volcar roles, esquema y datos
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          trabajo="$RUNNER_TEMP/copia"
+          enlace="$RUNNER_TEMP/enlace"
+          mkdir -p "$trabajo" "$enlace/supabase"
+          chmod 700 "$trabajo"
+          printf 'project_id = "%s"\n' "$PROYECTO_REF" > "$enlace/supabase/config.toml"
+          supabase link --project-ref "$PROYECTO_REF" --workdir "$enlace" < /dev/null
+          volcar() { supabase db dump --linked --workdir "$enlace" "$@" < /dev/null; }
+          volcar -f "$trabajo/roles.sql" --role-only
+          volcar -f "$trabajo/esquema.sql"
+          # vault.secrets está cifrado con la clave del proyecto y no sirve en
+          # otro; las colas de cron y pg_net se regeneran solas.
+          volcar -f "$trabajo/datos.sql" --use-copy --data-only \
+            -x vault.secrets -x cron.job_run_details \
+            -x net.http_request_queue -x net._http_response
+          volcar -f "$trabajo/historial_esquema.sql" --schema supabase_migrations
+          volcar -f "$trabajo/historial_datos.sql" --use-copy --data-only --schema supabase_migrations
+          ls -la "$trabajo"
+
+      - name: Comprobar que la copia no está vacía
+        run: |
+          set -euo pipefail
+          trabajo="$RUNNER_TEMP/copia"
+          for f in esquema.sql datos.sql; do
+            [ -s "$trabajo/$f" ] || { echo "::error::$f está vacío"; exit 1; }
+          done
+          # Tablas clave del negocio: tienen que estar en el volcado de datos.
+          for tabla in reservas cheques_regalo Platos user_roles; do
+            grep -Eq "^COPY \"?public\"?\.\"?$tabla\"? " "$trabajo/datos.sql" \
+              || { echo "::error::La tabla public.$tabla no aparece en datos.sql"; exit 1; }
+          done
+          echo "Tamaño sin comprimir: $(du -sh "$trabajo" | cut -f1)"
+
+      - name: Comprimir y cifrar
+        env:
+          CLAVE: ${{ secrets.COPIA_SEGURIDAD_CLAVE }}
+        run: |
+          set -euo pipefail
+          trabajo="$RUNNER_TEMP/copia"
+          nombre="casatomas-prod-$(date -u +%Y%m%d-%H%M)"
+          tar -czf "$RUNNER_TEMP/$nombre.tar.gz" -C "$trabajo" .
+          printf '%s' "$CLAVE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "$RUNNER_TEMP/$nombre.tar.gz.gpg" "$RUNNER_TEMP/$nombre.tar.gz"
+          rm -rf "$trabajo" "$RUNNER_TEMP/$nombre.tar.gz"
+          echo "COPIA=$RUNNER_TEMP/$nombre.tar.gz.gpg" >> "$GITHUB_ENV"
+          echo "COPIA_NOMBRE=$nombre" >> "$GITHUB_ENV"
+          ls -la "$RUNNER_TEMP/$nombre.tar.gz.gpg"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.COPIA_NOMBRE }}
+          path: ${{ env.COPIA }}
+          retention-days: 14
+          if-no-files-found: error
+          compression-level: 0
