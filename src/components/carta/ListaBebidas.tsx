@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-
 import { GlassWater, Eye, EyeOff } from "lucide-react";
 import { Bebida, useBebidas } from "@/hooks/useBebidas";
 import { cn } from "@/lib/utils";
@@ -19,6 +17,7 @@ import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarBebidaModal } from "./EditarBebidaModal";
 import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
+import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 
 interface ListaBebidasProps {
   bebidas: Bebida[];
@@ -79,103 +78,80 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {bebidas.map((bebida) => (
-          <Card
-            key={bebida.id}
-            className={cn(
-              "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
-              !bebida.activado && "opacity-60"
-            )}
-          >
-            {bebida.imagen_url && !fotosOcultas.has(bebida.id) && (
-              <div className="relative h-40 bg-muted">
-                <img
-                  src={bebida.imagen_url}
-                  alt={bebida.nombre || "Bebida"}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+        {bebidas.map((bebida) => {
+          const tieneFoto = Boolean(bebida.imagen_url?.trim());
+          const fotoOculta = fotosOcultas.has(bebida.id);
+          return (
+            <TarjetaCartaLateral
+              key={bebida.id}
+              className={cn(!bebida.activado && "opacity-60")}
+              foto={tieneFoto && !fotoOculta ? { url: bebida.imagen_url!, alt: bebida.nombre || "Bebida" } : null}
+              categoria={<EtiquetaCategoria categoria={bebida.categoria} />}
+              titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{bebida.nombre}</h3>}
+              controlesFoto={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 disabled:opacity-100"
+                  disabled={!tieneFoto}
+                  title={!tieneFoto ? "Esta bebida no tiene foto" : fotoOculta ? "Mostrar foto" : "Ocultar foto"}
+                  aria-label={!tieneFoto ? "Esta bebida no tiene foto" : fotoOculta ? "Mostrar foto" : "Ocultar foto"}
+                  onClick={() => toggleFotoVisible(bebida.id)}
+                >
+                  {fotoOculta ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              }
+              controles={
+                /* Visibilidad Web */
+                <VisibilidadToggles
+                  restaurante={bebida.restaurante ?? false}
+                  touza={bebida.touza ?? false}
+                  onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
+                  onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
+                  isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                  activado={bebida.activado ?? true}
+                  onActivadoChange={(checked) =>
+                    toggleActivado.mutate({
+                      id: bebida.id,
+                      activado: checked,
+                      nombre: bebida.nombre ?? undefined,
+                    })
+                  }
+                  isActivadoPending={toggleActivado.isPending}
+                  compact
                 />
-              </div>
-            )}
+              }
+              info={
+                <>
+                  {bebida.descripcion && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{bebida.descripcion}</p>
+                  )}
 
-            <CardContent className="p-4 space-y-3">
-              {/* Header con nombre y controles de foto */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <EtiquetaCategoria categoria={bebida.categoria} />
-                  <h3 className="font-semibold text-base leading-tight">{bebida.nombre}</h3>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 disabled:opacity-100"
-                    disabled={!bebida.imagen_url?.trim()}
-                    title={!bebida.imagen_url?.trim() ? "Esta bebida no tiene foto" : fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
-                    aria-label={!bebida.imagen_url?.trim() ? "Esta bebida no tiene foto" : fotosOcultas.has(bebida.id) ? "Mostrar foto" : "Ocultar foto"}
-                    onClick={() => toggleFotoVisible(bebida.id)}
-                  >
-                    {fotosOcultas.has(bebida.id) ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              {/* Visibilidad Web */}
-              <VisibilidadToggles
-                restaurante={bebida.restaurante ?? false}
-                touza={bebida.touza ?? false}
-                onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
-                onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
-                isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                activado={bebida.activado ?? true}
-                onActivadoChange={(checked) =>
-                  toggleActivado.mutate({
-                    id: bebida.id,
-                    activado: checked,
-                    nombre: bebida.nombre ?? undefined,
-                  })
-                }
-                isActivadoPending={toggleActivado.isPending}
-                compact
-              />
-              {bebida.descripcion && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {bebida.descripcion}
-                </p>
-              )}
-
-              {/* Precio y tamaño */}
-              <div className="flex items-end justify-between pt-2 border-t">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-primary">
-                    {bebida.precio_eur ? `${bebida.precio_eur.toFixed(2)}` : "—"}
-                  </span>
-                  <span className="text-lg font-medium text-primary">€</span>
-                </div>
-                {bebida.tamano && (
-                  <span className="text-xs text-muted-foreground">
-                    {bebida.tamano}
-                  </span>
-                )}
-              </div>
-
-              <AccionesTarjeta
-                nombre={bebida.nombre}
-                tieneFoto={Boolean(bebida.imagen_url?.trim())}
-                onFoto={() => fotoRapida.current?.abrir(bebida)}
-                onEditar={() => setBebidaAEditar(bebida)}
-                onEliminar={() => setBebidaAEliminar(bebida)}
-              />
-            </CardContent>
-          </Card>
-        ))}
+                  {/* Precio y tamaño */}
+                  <div className="flex items-end justify-between pt-2 border-t">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-primary">
+                        {bebida.precio_eur ? `${bebida.precio_eur.toFixed(2)}` : "—"}
+                      </span>
+                      <span className="text-lg font-medium text-primary">€</span>
+                    </div>
+                    {bebida.tamano && <span className="text-xs text-muted-foreground">{bebida.tamano}</span>}
+                  </div>
+                </>
+              }
+              acciones={
+                <AccionesTarjeta
+                  nombre={bebida.nombre}
+                  tieneFoto={tieneFoto}
+                  onFoto={() => fotoRapida.current?.abrir(bebida)}
+                  onEditar={() => setBebidaAEditar(bebida)}
+                  onEliminar={() => setBebidaAEliminar(bebida)}
+                />
+              }
+            />
+          );
+        })}
       </div>
 
       <AlertDialog open={!!bebidaAEliminar} onOpenChange={(open) => !open && setBebidaAEliminar(null)}>

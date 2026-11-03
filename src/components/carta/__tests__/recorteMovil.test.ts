@@ -2,13 +2,14 @@
  * Fallo «no deja subir fotos, cuando las subo se me cierra» (2026-11-01): en
  * el móvil el recorte en el navegador (modelo de 47 MB + cientos de MB al
  * recortar) hacía que el sistema matara la pestaña y la página se recargaba
- * con la foto perdida. En móvil/tablet no se carga el modelo: va a Replicate.
+ * con la foto perdida. En móvil/tablet el formulario no carga el modelo: se
+ * recorta DESPUÉS de guardar la foto (recorteEnSegundoPlano.ts). Sin Replicate.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   navegador: vi.fn(async () => new Blob(["sticker"], { type: "image/png" })),
-  invoke: vi.fn(async () => ({ data: { ok: true, png: "data:image/png;base64,AAAA" }, error: null })),
+  invoke: vi.fn(),
 }));
 
 vi.mock("../recorte/quitarFondoNavegador", async (original) => {
@@ -62,13 +63,12 @@ describe("¿Se puede recortar en el navegador de este dispositivo?", () => {
   });
 });
 
-describe("quitarFondo", () => {
-  it("en el móvil NO carga el modelo en el navegador: va directo a Replicate", async () => {
+describe("quitarFondo (formulario)", () => {
+  it("en el móvil NO carga el modelo ni llama a ningún servicio: el recorte va después de guardar", async () => {
     vi.stubGlobal("navigator", nav(ANDROID));
-    const r = await quitarFondo(new Blob(["foto"], { type: "image/jpeg" }));
+    await expect(quitarFondo(new Blob(["foto"], { type: "image/jpeg" }))).rejects.toMatchObject({ codigo: "movil" });
     expect(mocks.navegador).not.toHaveBeenCalled();
-    expect(mocks.invoke).toHaveBeenCalledWith("recortar-fondo-vino", expect.anything());
-    expect(r.metodo).toBe("replicate");
+    expect(mocks.invoke).not.toHaveBeenCalled();
   });
 
   it("en el escritorio sigue usando el recorte gratis del navegador", async () => {

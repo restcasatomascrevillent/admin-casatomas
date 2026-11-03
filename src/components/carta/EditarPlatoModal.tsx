@@ -37,7 +37,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useFotoCarta } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
@@ -58,7 +61,6 @@ import {
   normalizarAlergeno,
   separarAlergenos,
 } from "@/lib/alergenos";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
@@ -248,10 +250,12 @@ export function EditarPlatoModal({
     );
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (!file || !(await aceptarFoto(file, input))) return;
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (!file) return;
 
     fotoCarta.iniciar(file);
     setRemoveImage(false);
@@ -325,6 +329,8 @@ export function EditarPlatoModal({
       if (fotoAntigua) {
         await borrarFotoSiNoSeUsa({ tabla: "Platos", bucket: "platos", ruta: fotoAntigua, excluirId: plato.id });
       }
+
+      trasGuardarFotoCarta(fotoCarta, { tabla: "Platos", id: plato.id, nombre: plato.nombre });
 
       // Vídeo: aparte, para que un fallo (p. ej. migración sin aplicar) no
       // impida guardar el plato.
@@ -707,6 +713,7 @@ export function EditarPlatoModal({
                       onChange={handleImageChange}
                       className="hidden"
                     />
+                    <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
                   </div>
                 </div>
 

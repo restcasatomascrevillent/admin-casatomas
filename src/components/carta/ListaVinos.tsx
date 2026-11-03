@@ -1,6 +1,4 @@
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-
 import { Wine, Eye, EyeOff, Move } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
@@ -25,6 +23,7 @@ import { EditarVinoModal } from "./EditarVinoModal";
 import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
 import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
+import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -119,48 +118,29 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {vinos.map((vino) => (
-          <Card 
-            key={vino.id} 
-            className={cn(
-              "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
-              !vino.activado && "opacity-60"
-            )}
-          >
-            {vino.imagen_url && !fotosOcultas.has(vino.id) && (
-              <div
-                className={cn(
-                  "relative bg-muted transition-all duration-300 cursor-pointer",
-                  vino.expanded ? "h-64" : "h-40"
-                )}
-                onClick={() =>
-                  setFotoAVisualizar({
-                    url: vino.imagen_url!,
-                    nombre: vino.nombre || "Vino",
-                  })
-                }
-              >
-                <img 
-                  src={vino.imagen_url} 
-                  alt={vino.nombre || "Vino"} 
-                  className="w-full h-full object-cover"
-                  style={{ objectPosition: `center ${vino.imagen_posicion_y ?? 50}%` }}
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-            
-            <CardContent className="p-4 space-y-3">
-              {/* Header con nombre y controles de foto */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <EtiquetaCategoria categoria={vino.categoria} />
-                  <h3 className="font-semibold text-base leading-tight">{vino.nombre}</h3>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {vino.imagen_url && (
+        {vinos.map((vino) => {
+          const tieneFoto = Boolean(vino.imagen_url?.trim());
+          const fotoOculta = fotosOcultas.has(vino.id);
+          const nombre = vino.nombre || "Vino";
+          const alergenos = parseAlergenos(vino.alergenos_oficiales);
+          return (
+            <TarjetaCartaLateral
+              key={vino.id}
+              className={cn(!vino.activado && "opacity-60")}
+              foto={
+                tieneFoto && !fotoOculta
+                  ? {
+                      url: vino.imagen_url!,
+                      alt: nombre,
+                      onAbrir: () => setFotoAVisualizar({ url: vino.imagen_url!, nombre }),
+                    }
+                  : null
+              }
+              categoria={<EtiquetaCategoria categoria={vino.categoria} />}
+              titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{vino.nombre}</h3>}
+              controlesFoto={
+                <>
+                  {tieneFoto && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -178,101 +158,106 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     variant="ghost"
                     size="icon"
                     className="h-11 w-11 disabled:opacity-100"
-                    disabled={!vino.imagen_url?.trim()}
-                    title={!vino.imagen_url?.trim() ? "Este vino no tiene foto" : fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
-                    aria-label={!vino.imagen_url?.trim() ? "Este vino no tiene foto" : fotosOcultas.has(vino.id) ? "Mostrar foto" : "Ocultar foto"}
+                    disabled={!tieneFoto}
+                    title={!tieneFoto ? "Este vino no tiene foto" : fotoOculta ? "Mostrar foto" : "Ocultar foto"}
+                    aria-label={!tieneFoto ? "Este vino no tiene foto" : fotoOculta ? "Mostrar foto" : "Ocultar foto"}
                     onClick={() => toggleFotoVisible(vino.id)}
                   >
-                    {fotosOcultas.has(vino.id) ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {fotoOculta ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}
                   </Button>
-                </div>
-              </div>
+                </>
+              }
+              controles={
+                <>
+                  {/* Visibilidad Web */}
+                  <VisibilidadToggles
+                    restaurante={vino.restaurante ?? false}
+                    touza={vino.touza ?? false}
+                    onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: vino.id, restaurante: checked })}
+                    onTouzaChange={(checked) => toggleTouza.mutate({ id: vino.id, touza: checked })}
+                    isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                    activado={vino.activado ?? true}
+                    onActivadoChange={(checked) =>
+                      toggleActivado.mutate({
+                        id: vino.id,
+                        activado: checked,
+                        nombre: vino.nombre ?? undefined,
+                      })
+                    }
+                    isActivadoPending={toggleActivado.isPending}
+                    compact
+                  />
+                  <FotoExpandidaToggle
+                    imagenUrl={vino.imagen_url}
+                    nombre={nombre}
+                    expanded={vino.expanded}
+                    isPending={toggleExpanded.isPending}
+                    onChange={(checked) => handleToggleExpanded(vino, checked)}
+                  />
+                </>
+              }
+              info={
+                <>
+                  {vino.descripcion && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{vino.descripcion}</p>
+                  )}
+                  {vino.ingredientes && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      <span className="font-medium text-foreground/80">Ingredientes:</span> {vino.ingredientes}
+                    </p>
+                  )}
 
-              {/* Visibilidad Web */}
-              <VisibilidadToggles
-                restaurante={vino.restaurante ?? false}
-                touza={vino.touza ?? false}
-                onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: vino.id, restaurante: checked })}
-                onTouzaChange={(checked) => toggleTouza.mutate({ id: vino.id, touza: checked })}
-                isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                activado={vino.activado ?? true}
-                onActivadoChange={(checked) =>
-                  toggleActivado.mutate({
-                    id: vino.id,
-                    activado: checked,
-                    nombre: vino.nombre ?? undefined,
-                  })
-                }
-                isActivadoPending={toggleActivado.isPending}
-                compact
-              />
-              <FotoExpandidaToggle
-                imagenUrl={vino.imagen_url}
-                nombre={vino.nombre || "Vino"}
-                expanded={vino.expanded}
-                isPending={toggleExpanded.isPending}
-                onChange={(checked) => handleToggleExpanded(vino, checked)}
-              />
-              {vino.descripcion && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {vino.descripcion}
-                </p>
-              )}
-              {vino.ingredientes && (
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  <span className="font-medium text-foreground/80">Ingredientes:</span> {vino.ingredientes}
-                </p>
-              )}
+                  {/* Origen */}
+                  {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
+                    <p className="text-xs text-muted-foreground">
+                      {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
 
-              {/* Origen */}
-              {(vino.denominacion_origen || vino.ubicacion_region || vino.ubicacion_pais) && (
-                <p className="text-xs text-muted-foreground">
-                  {[vino.denominacion_origen, vino.ubicacion_region, vino.ubicacion_pais]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
+                  {/* Precio */}
+                  <div className="flex items-end justify-between pt-2 border-t">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-primary">
+                        {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}` : "—"}
+                      </span>
+                      <span className="text-lg font-medium text-primary">€</span>
+                    </div>
+                  </div>
+                </>
+              }
+              infoExtra={
+                <>
+                  {alergenos.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-2 border-t">
+                      {alergenos.map((alergeno) => (
+                        <Badge key={alergeno} variant="outline" className="text-xs py-0 px-1.5">
+                          {etiquetaAlergeno(alergeno)}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
 
-              {/* Precio */}
-              <div className="flex items-end justify-between pt-2 border-t">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-primary">
-                    {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}` : "—"}
-                  </span>
-                  <span className="text-lg font-medium text-primary">€</span>
-                </div>
-              </div>
-
-              {parseAlergenos(vino.alergenos_oficiales).length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-2 border-t">
-                  {parseAlergenos(vino.alergenos_oficiales).map((alergeno) => (
-                    <Badge key={alergeno} variant="outline" className="text-xs py-0 px-1.5">
-                      {etiquetaAlergeno(alergeno)}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              {vino.alergenos_notas && (
-                <p className="text-xs text-muted-foreground italic pt-2 border-t">
-                  {vino.alergenos_notas}
-                </p>
-              )}
-
-              <AccionesTarjeta
-                nombre={vino.nombre}
-                tieneFoto={Boolean(vino.imagen_url?.trim())}
-                onFoto={() => fotoRapida.current?.abrir(vino)}
-                onEditar={() => setVinoAEditar(vino)}
-                onEliminar={() => setVinoAEliminar(vino)}
-              />
-            </CardContent>
-          </Card>
-        ))}
+                  {vino.alergenos_notas && (
+                    <p className="text-xs text-muted-foreground italic pt-2 border-t">
+                      {vino.alergenos_notas}
+                    </p>
+                  )}
+                </>
+              }
+              acciones={
+                <AccionesTarjeta
+                  nombre={vino.nombre}
+                  tieneFoto={tieneFoto}
+                  onFoto={() => fotoRapida.current?.abrir(vino)}
+                  onEditar={() => setVinoAEditar(vino)}
+                  onEliminar={() => setVinoAEliminar(vino)}
+                />
+              }
+            />
+          );
+        })}
       </div>
 
       <AlertDialog open={!!vinoAEliminar} onOpenChange={(open) => !open && setVinoAEliminar(null)}>

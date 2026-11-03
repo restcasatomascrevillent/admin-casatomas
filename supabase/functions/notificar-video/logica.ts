@@ -77,3 +77,49 @@ export function construirCarga(t: TrabajoNotificable, plato: PlatoNotificable | 
 export function suscripcionCaducada(statusCode: number | undefined): boolean {
   return statusCode === 404 || statusCode === 410;
 }
+
+// --- Recorte de fotos (tabla trabajos_recorte, cuerpo `{ trabajo_id, tipo: "recorte" }`) ---
+
+export type TipoTrabajo = "video" | "recorte";
+
+/** `tipo` del cuerpo: "recorte" o, por defecto (compatibilidad), "video". null si viene otro valor. */
+export function leerTipo(cuerpo: unknown): TipoTrabajo | null {
+  const tipo = (cuerpo as { tipo?: unknown } | null)?.tipo;
+  if (tipo === undefined || tipo === null || tipo === "video") return "video";
+  if (tipo === "recorte") return "recorte";
+  return null;
+}
+
+export interface TrabajoRecorteNotificable {
+  id: string;
+  tabla: string;
+  registro_id: string;
+  nombre: string | null;
+  estado: string;
+  error: string | null;
+  creado_por: string | null;
+  procesado_por: string | null;
+}
+
+/** Misma regla que los vídeos: solo quien lo procesó o lo creó, y ya terminado. */
+export function autorizarNotificacionRecorte(t: TrabajoRecorteNotificable, userId: string): Autorizacion {
+  return autorizarNotificacion({ ...t, plato_id: t.registro_id }, userId);
+}
+
+export function construirCargaRecorte(t: TrabajoRecorteNotificable, imagenUrl?: string | null): CargaPush {
+  const nombre = t.nombre?.trim() || "la ficha";
+  const listo = t.estado === "listo";
+  const carga: CargaPush = {
+    titulo: listo ? `Foto con fondo lista: ${nombre}` : `No se pudo recortar la foto: ${nombre}`,
+    cuerpo: listo
+      ? "Ya está guardada en la carta con el fondo elegido. Pulsa para verla."
+      : `${(t.error ?? "Error al recortar").slice(0, 140)}. La foto normal sigue guardada.`,
+    url: "/gestion-web?tab=carta",
+    tag: `recorte-${t.tabla}-${t.registro_id}`,
+    trabajo_id: t.id,
+    plato_id: t.registro_id,
+    estado: listo ? "listo" : "error",
+  };
+  if (listo && imagenUrl && /^https:\/\//.test(imagenUrl)) carga.imagen = imagenUrl;
+  return carga;
+}

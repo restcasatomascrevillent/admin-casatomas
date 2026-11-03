@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Wine, Eye, EyeOff } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -20,6 +19,7 @@ import { EditarCoctelModal } from "./EditarCoctelModal";
 import { etiquetaAlergeno } from "@/lib/alergenos";
 import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
+import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 
 interface ListaCoctelesProps {
   cocteles: Coctel[];
@@ -87,104 +87,87 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {cocteles.map((coctel) => (
-          <Card
-            key={coctel.id}
-            className={cn(
-              "overflow-hidden transition-opacity duration-300 hover:shadow-lg",
-              !coctel.activado && "opacity-60"
-            )}
-          >
-            {coctel.imagen_url && !fotosOcultas.has(coctel.id) && (
-              <div className="relative h-40 bg-muted">
-                <img
-                  src={coctel.imagen_url}
-                  alt={coctel.nombre || "Coctel"}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+        {cocteles.map((coctel) => {
+          const tieneFoto = Boolean(coctel.imagen_url?.trim());
+          const fotoOculta = fotosOcultas.has(coctel.id);
+          const alergenos = Array.isArray(coctel.alergenos_oficiales) ? (coctel.alergenos_oficiales as string[]) : [];
+          return (
+            <TarjetaCartaLateral
+              key={coctel.id}
+              className={cn(!coctel.activado && "opacity-60")}
+              foto={tieneFoto && !fotoOculta ? { url: coctel.imagen_url!, alt: coctel.nombre || "Coctel" } : null}
+              categoria={<EtiquetaCategoria categoria={coctel.categoria} />}
+              titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{coctel.nombre}</h3>}
+              controlesFoto={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-11 w-11 disabled:opacity-100"
+                  disabled={!tieneFoto}
+                  title={!tieneFoto ? "Este cóctel no tiene foto" : fotoOculta ? "Mostrar foto" : "Ocultar foto"}
+                  aria-label={!tieneFoto ? "Este cóctel no tiene foto" : fotoOculta ? "Mostrar foto" : "Ocultar foto"}
+                  onClick={() => toggleFotoVisible(coctel.id)}
+                >
+                  {fotoOculta ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              }
+              controles={
+                /* Visibilidad Web */
+                <VisibilidadToggles
+                  restaurante={coctel.restaurante ?? false}
+                  touza={coctel.touza ?? false}
+                  onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: coctel.id, restaurante: checked })}
+                  onTouzaChange={(checked) => toggleTouza.mutate({ id: coctel.id, touza: checked })}
+                  isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                  activado={coctel.activado ?? true}
+                  onActivadoChange={(checked) =>
+                    toggleActivado.mutate({
+                      id: coctel.id,
+                      activado: checked,
+                      nombre: coctel.nombre ?? undefined,
+                    })
+                  }
+                  isActivadoPending={toggleActivado.isPending}
+                  compact
                 />
-              </div>
-            )}
-            <CardContent className="p-4 space-y-3">
-              {/* Header con nombre y controles de foto */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1 space-y-1">
-                  <EtiquetaCategoria categoria={coctel.categoria} />
-                  <h3 className="font-semibold text-base leading-tight">{coctel.nombre}</h3>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-11 w-11 disabled:opacity-100"
-                    disabled={!coctel.imagen_url?.trim()}
-                    title={!coctel.imagen_url?.trim() ? "Este cóctel no tiene foto" : fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
-                    aria-label={!coctel.imagen_url?.trim() ? "Este cóctel no tiene foto" : fotosOcultas.has(coctel.id) ? "Mostrar foto" : "Ocultar foto"}
-                    onClick={() => toggleFotoVisible(coctel.id)}
-                  >
-                    {fotosOcultas.has(coctel.id) ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
+              }
+              info={
+                <>
+                  {/* Alérgenos */}
+                  {alergenos.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-2 border-t">
+                      {alergenos.map((alergeno) => (
+                        <Badge key={alergeno} variant="outline" className="text-[10px] pointer-coarse:text-xs">
+                          {etiquetaAlergeno(alergeno)}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
 
-              {/* Visibilidad Web */}
-              <VisibilidadToggles
-                restaurante={coctel.restaurante ?? false}
-                touza={coctel.touza ?? false}
-                onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: coctel.id, restaurante: checked })}
-                onTouzaChange={(checked) => toggleTouza.mutate({ id: coctel.id, touza: checked })}
-                isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                activado={coctel.activado ?? true}
-                onActivadoChange={(checked) =>
-                  toggleActivado.mutate({
-                    id: coctel.id,
-                    activado: checked,
-                    nombre: coctel.nombre ?? undefined,
-                  })
-                }
-                isActivadoPending={toggleActivado.isPending}
-                compact
-              />
-
-
-              {/* Alérgenos */}
-              {coctel.alergenos_oficiales && Array.isArray(coctel.alergenos_oficiales) && coctel.alergenos_oficiales.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-2 border-t">
-                  {(coctel.alergenos_oficiales as string[]).map((alergeno) => (
-                    <Badge key={alergeno} variant="outline" className="text-[10px] pointer-coarse:text-xs">
-                      {etiquetaAlergeno(alergeno)}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-
-              {/* Precio */}
-              <div className="flex items-end justify-between pt-2 border-t">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold text-primary">
-                    {coctel.precio_eur ? `${coctel.precio_eur.toFixed(2)}` : "—"}
-                  </span>
-                  <span className="text-lg font-medium text-primary">€</span>
-                </div>
-              </div>
-
-              <AccionesTarjeta
-                nombre={coctel.nombre}
-                tieneFoto={Boolean(coctel.imagen_url?.trim())}
-                onFoto={() => fotoRapida.current?.abrir(coctel)}
-                onEditar={() => setCoctelAEditar(coctel)}
-                onEliminar={() => setCoctelAEliminar(coctel)}
-              />
-            </CardContent>
-          </Card>
-        ))}
+                  {/* Precio */}
+                  <div className="flex items-end justify-between pt-2 border-t">
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-2xl font-bold text-primary">
+                        {coctel.precio_eur ? `${coctel.precio_eur.toFixed(2)}` : "—"}
+                      </span>
+                      <span className="text-lg font-medium text-primary">€</span>
+                    </div>
+                  </div>
+                </>
+              }
+              acciones={
+                <AccionesTarjeta
+                  nombre={coctel.nombre}
+                  tieneFoto={tieneFoto}
+                  onFoto={() => fotoRapida.current?.abrir(coctel)}
+                  onEditar={() => setCoctelAEditar(coctel)}
+                  onEliminar={() => setCoctelAEliminar(coctel)}
+                />
+              }
+            />
+          );
+        })}
       </div>
 
       <AlertDialog open={!!coctelAEliminar} onOpenChange={(open) => !open && setCoctelAEliminar(null)}>

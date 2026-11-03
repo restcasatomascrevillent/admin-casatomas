@@ -11,18 +11,19 @@
  *     guardado: no hay nada que deshacer).
  *   Cualquier ruta con `-carta` antes de la extensión cuenta como procesada.
  *
- * Quitar el fondo en el panel, por orden:
- *   1. GRATIS en el navegador (recorte/quitarFondoNavegador.ts: isnet en un
- *      Web Worker con onnxruntime-web; el modelo se baja una vez y se cachea).
- *   2. Si falla: Edge Function `recortar-fondo-vino` (Replicate, de pago,
- *      opcional; sin token → 503 `sin_token`; cada fallo trae un `codigo`
- *      que avisoSinFondoCarta convierte en un aviso claro).
- *   3. Si también falla: el llamador sigue con la foto encuadrada de siempre
- *      (recorteFoto.ts) y avisa.
+ * Quitar el fondo en el panel: GRATIS en el navegador (recorte/
+ * quitarFondoNavegador.ts: isnet en un Web Worker con onnxruntime-web, WebGPU
+ * si hay; el modelo se baja una vez y se cachea). Sin servicios de pago: el
+ * recorte por Replicate se quitó el 02-11-2026 (decisión del dueño).
+ *
+ *   - Ordenador: se recorta en el formulario, antes de guardar.
+ *   - Móvil y tablet: el formulario NO recorta. La ficha se guarda con la foto
+ *     original y después el móvil intenta recortarla en el navegador
+ *     (recorte/recorteMovil.ts y recorte/recorteEnSegundoPlano.ts); si no
+ *     puede, la foto normal se queda guardada y se avisa.
  * Las fotos ya subidas sin procesar se pueden homogeneizar con el script
  * local `scripts/fotos-vino/`.
  */
-import { supabase } from "@/integrations/supabase/client";
 import { componerFotoVino, extensionFoto } from "./composicionVino";
 import { quitarFondoNavegador, recorteNavegadorSeguro, type ProgresoRecorte } from "./recorte/quitarFondoNavegador";
 
@@ -30,39 +31,12 @@ export type { ProgresoRecorte } from "./recorte/quitarFondoNavegador";
 
 export { esFotoCarta, nombreSubida, rutaCartaDesdeOriginal, rutaOriginalDesdeCarta } from "./rutasFotoCarta";
 
-function aDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(blob);
-  });
-}
+type ErrorRecorte = Error & { codigo?: string };
 
-/** Llama a `recortar-fondo-vino` y devuelve el PNG sin fondo. Lanza error (con `codigo` si lo hay). */
-export async function quitarFondoRemoto(foto: Blob): Promise<Blob> {
-  const imagen = await aDataUrl(foto);
-  const { data, error } = await supabase.functions.invoke("recortar-fondo-vino", { body: { imagen } });
-  if (error || !data?.ok || typeof data?.png !== "string") {
-    let codigo: string | undefined = data?.codigo;
-    let mensaje: string | undefined = data?.error;
-    // FunctionsHttpError: el cuerpo (con `codigo`) viene en error.context.
-    const ctx = (error as { context?: Response } | null)?.context;
-    if (!codigo && ctx && typeof ctx.json === "function") {
-      try {
-        const cuerpo = await ctx.json();
-        codigo = cuerpo?.codigo;
-        mensaje = cuerpo?.error ?? mensaje;
-      } catch {
-        /* sin cuerpo */
-      }
-    }
-    const e = new Error(mensaje || error?.message || "No se pudo quitar el fondo") as Error & { codigo?: string };
-    e.codigo = codigo;
-    throw e;
-  }
-  const res = await fetch(data.png);
-  return res.blob();
+function errorRecorte(mensaje: string, codigo?: string): ErrorRecorte {
+  const e = new Error(mensaje) as ErrorRecorte;
+  e.codigo = codigo;
+  return e;
 }
 
 export interface ResultadoFotoCarta {
@@ -70,31 +44,21 @@ export interface ResultadoFotoCarta {
   foto: File;
   /** La botella recortada sin fondo (PNG con transparencia). */
   sticker: Blob;
-  /** Quién quitó el fondo. */
-  metodo: "navegador" | "replicate";
+  /** Quién quitó el fondo (solo queda el navegador). */
+  metodo: "navegador";
 }
 
 /**
- * Quita el fondo: navegador gratis → Replicate. Lanza el error del último intento.
- * En móvil y tablet NO se intenta en el navegador (el modelo tumbaba la pestaña
- * por memoria y la página se recargaba con la foto a medias, ver
- * quitarFondoNavegador.ts): va directo a Replicate.
+ * Quita el fondo en el navegador (solo en el ordenador). En móvil y tablet no
+ * se hace aquí, en el formulario: lanza un error con `codigo: "movil"` sin
+ * cargar nada (ahí el recorte va después de guardar, recorteEnSegundoPlano.ts).
  */
 export async function quitarFondo(
   foto: Blob,
   onProgreso?: (p: ProgresoRecorte) => void,
 ): Promise<{ sticker: Blob; metodo: ResultadoFotoCarta["metodo"] }> {
-  if (recorteNavegadorSeguro()) {
-    try {
-      return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
-    } catch (e) {
-      console.warn("[recorte-navegador] falló, se prueba Replicate", e);
-    }
-  } else {
-    console.info("[recorte] móvil o poca memoria: se recorta con Replicate, no en el navegador");
-  }
-  onProgreso?.({ fase: "recortando" });
-  return { sticker: await quitarFondoRemoto(foto), metodo: "replicate" };
+  if (!recorteNavegadorSeguro()) throw errorRecorte("En el móvil la foto se recorta después de guardar", "movil");
+  return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
 }
 
 /**
@@ -109,21 +73,12 @@ export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoRecort
   return { foto: new File([compuesta], `botella-carta.${ext}`, { type: compuesta.type }), sticker, metodo };
 }
 
-/** Por qué falló `recortar-fondo-vino`, según el `codigo` que devuelve. */
-const MOTIVO_SIN_FONDO: Record<string, string> = {
-  sin_token: "Quitar el fondo con Replicate no está activado (falta su clave en Supabase)",
-  token_invalido: "La clave de Replicate no es válida",
-  sin_saldo: "La cuenta de Replicate no tiene saldo",
-  timeout: "Quitar el fondo tardó demasiado",
-  demasiado_grande: "La foto es demasiado grande para quitarle el fondo",
-  imagen_invalida: "El formato de la foto no sirve para quitarle el fondo",
-  fallo_replicate: "Replicate no pudo quitar el fondo de esta foto",
-};
-
-/** Mensaje corto para el aviso cuando no se pudo aplicar el fondo de carta. */
+/**
+ * Aviso corto cuando no se pudo aplicar el fondo de carta en el formulario
+ * (ordenador): que se guarda la foto normal y qué hacer.
+ */
 export function avisoSinFondoCarta(e: unknown): string {
-  const codigo = (e as { codigo?: string } | null)?.codigo;
-  const motivo = codigo ? MOTIVO_SIN_FONDO[codigo] : undefined;
-  if (motivo) return `${motivo}: se guarda la foto normal.`;
-  return "No se pudo poner el fondo de carta: se guarda la foto normal.";
+  const mensaje = (e as { message?: string } | null)?.message;
+  const motivo = /botella/i.test(mensaje ?? "") ? "No se ha encontrado el producto en la foto" : "No se ha podido poner el fondo de carta";
+  return `${motivo}. Se guarda la foto normal. Pulsa «Repetir recorte» o, más tarde, abre la ficha y pulsa «Quitar fondo».`;
 }
