@@ -1,6 +1,6 @@
 /**
- * Cuando el móvil no puede recortar una foto ya guardada (falla, se queda sin
- * memoria, la pestaña muere o el móvil está marcado), se crea un trabajo para
+ * Cuando el móvil no consigue poner el fondo a una foto ya guardada (el
+ * servidor falla o no responde, o el panel se cierra a medias), se crea un trabajo para
  * que la recorte un ORDENADOR con el panel abierto (trabajos_recorte,
  * potente/AvisoTrabajosRecorte.tsx) y se avisa por push al acabar. Sin la
  * migración aplicada, se avisa como antes («Quitar fondo» desde un ordenador).
@@ -43,7 +43,7 @@ export async function mandarRecorteAOrdenador(d: DatosRecorte, motivo: string): 
   }
   toast.warning(`Guardado con la foto normal${d.nombre ? `: ${d.nombre}` : ""}`, {
     id: ID_TOAST,
-    description: "Se recortará en un ordenador con el panel abierto y te avisaremos.",
+    description: `${motivo} Se recortará en un ordenador con el panel abierto y te avisaremos.`,
     duration: MS_AVISO_SIN_RECORTE,
     action: await accionAvisos(),
   });

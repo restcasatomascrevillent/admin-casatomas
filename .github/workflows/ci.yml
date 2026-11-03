@@ -66,6 +66,12 @@ jobs:
         run: npm run test:cambio-contrasena:db
       - name: Tienda de vinos, escaparate (PGlite)
         run: npm run test:tienda:db
+      - name: Recorte en el servidor, constancia y topes de gasto (PGlite)
+        run: npm run test:recorte-servidor:db
+      - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
+        run: npx vitest run api/
+        env:
+          RECORTE_INFERENCIA: "1"
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs

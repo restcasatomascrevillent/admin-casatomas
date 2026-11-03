@@ -3,6 +3,13 @@
   "git": { "deploymentEnabled": { "**": false, "staging": true, "main": true } },
   "framework": "vite",
   "regions": ["fra1"],
+  "functions": {
+    "api/recortar-foto.ts": {
+      "maxDuration": 120,
+      "includeFiles": "{public/modelos/isnet-general-use-u8.onnx,node_modules/onnxruntime-node/bin/napi-v6/linux/x64/**}",
+      "excludeFiles": "node_modules/onnxruntime-node/bin/napi-v6/{win32,darwin,linux/arm64}/**"
+    }
+  },
   "trailingSlash": false,
   "headers": [
     {
@@ -88,7 +95,7 @@
   ],
   "rewrites": [
     {
-      "source": "/((?!sw\\.js$|version\\.json$|manifest\\.webmanifest$|offline\\.html$).*)",
+      "source": "/((?!api/|sw\\.js$|version\\.json$|manifest\\.webmanifest$|offline\\.html$).*)",
       "destination": "/index.html"
     }
   ]

@@ -18,9 +18,9 @@
  *
  *   - Ordenador: se recorta en el formulario, antes de guardar.
  *   - Móvil y tablet: el formulario NO recorta. La ficha se guarda con la foto
- *     original y después el móvil intenta recortarla en el navegador
- *     (recorte/recorteMovil.ts y recorte/recorteEnSegundoPlano.ts); si no
- *     puede, la foto normal se queda guardada y se avisa.
+ *     original y después el SERVIDOR le quita el fondo (api/recortar-foto.ts,
+ *     recorte/recorteEnSegundoPlano.ts); si falla, la foto normal se queda
+ *     guardada, se avisa y se crea un trabajo para un ordenador.
  * Las fotos ya subidas sin procesar se pueden homogeneizar con el script
  * local `scripts/fotos-vino/`.
  */

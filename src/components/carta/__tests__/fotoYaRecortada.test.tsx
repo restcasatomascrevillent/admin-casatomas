@@ -241,7 +241,7 @@ describe("useFotoCarta con foto ya recortada", () => {
     expect(mocks.componer).toHaveBeenCalledWith(expect.any(Blob), { tipo: "plato", tema: result.current.tema });
     // Se guarda el sticker (pequeño) como original, no el PNG enorme.
     expect(esStickerRecortado(result.current.original)).toBe(true);
-    expect(result.current.recortarTrasGuardar).toBe(false);
+    expect(result.current.estado.fase).not.toBe("diferido");
   });
 
   it("también en el iPhone (no queda «diferido» ni crea trabajo para un ordenador)", async () => {
@@ -249,7 +249,7 @@ describe("useFotoCarta con foto ya recortada", () => {
     const { result } = renderHook(() => useFotoCarta("bebida"));
     act(() => result.current.iniciar(archivo(cabeceraPng(6), "image/png")));
     await waitFor(() => expect(result.current.estado.fase).toBe("listo"));
-    expect(result.current.recortarTrasGuardar).toBe(false);
+    expect(result.current.estado.fase).not.toBe("diferido");
   });
 
   it("un JPEG en el iPhone sigue como antes (diferido)", () => {

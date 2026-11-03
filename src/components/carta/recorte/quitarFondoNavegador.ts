@@ -14,11 +14,9 @@
  * con la pestaña en segundo plano): la página se «cierra» sola y la foto se
  * pierde. Por eso:
  *   - `recorteNavegadorSeguro()` dice si este dispositivo es un ordenador con
- *     memoria (recorta en el formulario). En móvil/tablet el recorte se hace
- *     DESPUÉS de guardar la ficha con la foto original (recorteMovil.ts,
- *     recorteEnSegundoPlano.ts), con la foto reducida antes de decodificarla
- *     y el worker liberado al acabar: si la pestaña muere, la foto ya está
- *     guardada y el dispositivo queda marcado para no volver a intentarlo.
+ *     memoria (recorta en el formulario). En móvil/tablet el modelo NO se
+ *     ejecuta en el navegador: desde el 03-11-2026 el fondo lo quita el
+ *     servidor después de guardar (quitarFondoServidor.ts, api/recortar-foto.ts).
  *   - El worker se TERMINA tras un rato sin uso (`MS_WORKER_INACTIVO`) para
  *     devolver esa memoria; antes vivía para siempre con el modelo cargado.
  *
@@ -34,9 +32,8 @@
  *     modelo que guarda el worker. Cerca de 1 GB por pestaña.
  *   - Tiempo: 17-19 s por foto en un núcleo de servidor.
  *   Con eso una pestaña de iPhone/iPad puede ser cerrada por el sistema (pasó
- *   el 01-11-2026, y la foto se perdía). Desde el 02-11-2026 (sin Replicate)
- *   la foto se guarda ANTES de recortar; si el móvil no puede, se queda la
- *   foto normal y se recorta luego desde un ordenador («Quitar fondo»).
+ *   el 01-11-2026, y la foto se perdía). Por eso el móvil manda la foto al
+ *   servidor (docs/recorte-servidor.md).
  *
  * PRECARGA (petición del dueño, 2026-11-01): `precargarRecorte()` baja el
  * modelo (47 MB, a Cache Storage) y el motor (wasm de onnxruntime, ~27 MB, a la
@@ -51,7 +48,8 @@ import { aplicarCoeficientes, coeficientesGuiado, entradaGuiado, limpiarMascara,
 import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
 
 export type ProgresoRecorte =
-  | { fase: "descargando"; pct: number }
+  /** `recibidos`/`total` en bytes (para «23/47 MB»). */
+  | { fase: "descargando"; pct: number; recibidos?: number; total?: number }
   | { fase: "cargando" }
   | { fase: "recortando" };
 
@@ -106,7 +104,7 @@ function obtenerWorker(): Worker {
     if (m.tipo === "descarga") {
       const pct = m.total > 0 ? Math.min(100, Math.round((m.recibidos / m.total) * 100)) : 0;
       // La descarga es compartida: avisar a todas las peticiones en espera.
-      pendientes.forEach((p) => p.onProgreso?.({ fase: "descargando", pct }));
+      pendientes.forEach((p) => p.onProgreso?.({ fase: "descargando", pct, recibidos: m.recibidos, total: m.total }));
       return;
     }
     if (m.tipo === "precargado") {
@@ -125,7 +123,7 @@ function obtenerWorker(): Worker {
       p.ok({ mascara: m.mascara, ms: m.ms, desdeCache: m.desdeCache, proveedor: m.proveedor });
     } else if (m.tipo === "error") {
       pendientes.delete(m.id);
-      p.ko(new Error(m.mensaje));
+      p.ko(errorDelWorker(m));
     }
   };
   w.onerror = (ev) => {
@@ -138,6 +136,13 @@ function obtenerWorker(): Worker {
   };
   worker = w;
   return w;
+}
+
+/** Error del worker con su `name` original (ErrorDescargaModelo, RangeError…): de ahí sale la causa del fallo. */
+function errorDelWorker(m: { mensaje: string; nombre?: string }): Error {
+  const e = new Error(m.mensaje);
+  if (m.nombre) e.name = m.nombre;
+  return e;
 }
 
 function lienzo(ancho: number, alto: number) {
@@ -357,7 +362,7 @@ export function crearWorkerRecorteDedicado(): WorkerRecorteDedicado {
     if (!p) return;
     espera.delete(m.id);
     if (m.tipo === "mascara") p.ok({ mascara: m.mascara, ms: m.ms, desdeCache: m.desdeCache, proveedor: m.proveedor });
-    else p.ko(new Error(m.mensaje));
+    else p.ko(errorDelWorker(m));
   };
   w.onerror = (ev) => fallarTodo(new Error(ev.message || "Error en el worker de recorte"));
   return {

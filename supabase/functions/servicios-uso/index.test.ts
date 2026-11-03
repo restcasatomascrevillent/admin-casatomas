@@ -80,6 +80,7 @@ type Estado = {
   errorInsertColumna?: boolean;
   errorMetricas: boolean;
   metricasExtra: Record<string, unknown>;
+  usoRecortes?: Record<string, number> | null;
 };
 let estado: Estado;
 
@@ -98,6 +99,8 @@ function crearCliente(_url: string, _key: string) {
       if (fn === "is_admin") return { data: !!u?.admin, error: null };
       if (fn === "servicios_uso_ultimas") return { data: estado.previas, error: null };
       if (fn === "servicios_metricas_supabase") return estado.errorMetricas ? { data: null, error: { message: "no existe" } } : { data: { ...METRICAS_BD, ...estado.metricasExtra }, error: null };
+      if (fn === "recorte_servidor_uso") return estado.usoRecortes ? { data: estado.usoRecortes, error: null } : { data: null, error: { message: "no existe" } };
+      if (fn === "servicios_metricas_supabase") return estado.errorMetricas ? { data: null, error: { message: "no existe" } } : { data: METRICAS_BD, error: null };
       return { data: null, error: { message: `rpc ${fn} no simulada` } };
     },
     from: (tabla: string) => ({
@@ -435,6 +438,18 @@ describe("lectores", () => {
     expect(r.metricas.despliegues_24h.valor).toBe(12);
     expect(r.detalles?.claves_uso).toEqual(["cosa_rara"]);
     expect(String(r.detalles?.avisos)).toContain("formato");
+  });
+
+  it("Vercel: recortes de fotos en el servidor (de nuestra BD) aunque falte el token, y en la nota de la CPU", async () => {
+    estado.usoRecortes = { recortes_mes: 42, recortes_dia: 3, cpu_ms_mes: 252_000, tope_mes: 600, tope_dia: 60, tope_cpu_min: 120 };
+    const sin = await LECTORES.vercel(ctx({}, {}));
+    expect(sin.error).toBe("falta_secreto");
+    expect(sin.metricas.recortes_servidor_mes).toMatchObject({ valor: 42, unidad: "fotos" });
+    expect(sin.metricas.cpu_recortes_mes).toMatchObject({ valor: 4.2, unidad: "minutos" });
+    expect(sin.metricas.recortes_servidor_dia.valor).toBe(3);
+    const con = await LECTORES.vercel(ctx(SECRETOS, rutasCompletas({ "api.vercel.com/v2/usage": () => resp({ data: [{ ...USO_VERCEL.data[0], function_active_cpu_ms: 3_600_000 }] }) })));
+    expect(con.metricas.cpu_activa?.valor).toBe(1);
+    expect(con.metricas.cpu_activa?.nota).toMatch(/42 fotos, 4.2 min/);
   });
 
   it("Vercel: equipo configurable", async () => {
