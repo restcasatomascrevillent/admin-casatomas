@@ -87,6 +87,8 @@ describe("TraficoWeb", () => {
       await screen.findByText("Aún no hay datos: la primera sincronización se ejecuta a las 03:30 UTC"),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /pesos por página/i })).toBeInTheDocument();
+    // El informe mensual se genera desde aquí (diálogo cargado bajo demanda).
+    expect(screen.getByRole("button", { name: /generar informe/i })).toBeInTheDocument();
   });
 
   it("con pocos datos pinta KPIs, aviso de pocos datos, ESTIMACIÓN y 'sin datos' para métricas NULL", async () => {
