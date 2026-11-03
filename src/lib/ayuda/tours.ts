@@ -299,9 +299,9 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     {
       elemento: "gw-carta-vinos-foto",
       pestana: [GW_CARTA, GW_CARTA_VINOS],
-      titulo: "Añadir botella con foto",
+      titulo: "Añadir vino con foto",
       texto:
-        "«Añadir botella con foto» abre la cámara: foto a la etiqueta de delante, de cerca y con luz. Se rellenan el nombre, la categoría, la D.O., la uva, la región y una descripción, y te sugiere un precio. Lo revisas y guardas tú. «Varias botellas» sirve para hacer una foto tras otra y revisarlas después. Cada foto usa la IA.",
+        "En «Añadir vino» pon la foto de la etiqueta de delante (en el móvil, «Hacer foto a la etiqueta»), de cerca y con luz. Mientras se recorta la botella, la IA rellena el nombre, la categoría, la D.O., la uva, la región y una descripción, y te sugiere un precio; lo que ya hayas escrito no lo toca. Lo revisas y guardas tú. «Varias botellas» sirve para hacer una foto tras otra y revisarlas después. Cada foto usa la IA.",
       opcional: true,
       lado: "bottom",
     },

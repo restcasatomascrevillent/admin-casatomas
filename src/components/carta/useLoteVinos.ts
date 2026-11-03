@@ -25,6 +25,8 @@ export interface FilaLote {
   recorte?: EstadoRecorteFila;
   /** Object URL del sticker (botella sin fondo) cuando está listo. */
   sticker?: string;
+  /** Motivo del fallo de la lectura (p. ej. cuenta de OpenAI sin saldo). */
+  motivoError?: string;
 }
 
 let contador = 0;
@@ -142,7 +144,8 @@ export function useLoteVinos(categorias: string[]) {
         .catch((e) => {
           console.error("[extraer-vino-foto] lote", e);
           if (!montado.current) return;
-          setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, estado: "error" } : f)));
+          const motivoError = e instanceof Error && e.message ? e.message : undefined;
+          setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, estado: "error", motivoError } : f)));
         })
         .finally(() => {
           lanzadas.current.delete(fila.id);

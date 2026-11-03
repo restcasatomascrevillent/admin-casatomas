@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { nombreCarta, categoriaCarta, descripcionCarta } from "@/lib/limites-carta";
-import { Camera, Loader2, Undo2, X } from "lucide-react";
+import { Camera, Loader2, Sparkles, Undo2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,8 @@ import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta, precioParaCampo } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
+import { useLecturaEtiquetaVino } from "./lecturaEtiquetaVino";
+import { PistaPrecioVino } from "./PistaPrecioVino";
 
 const formSchema = z.object({
   nombre: nombreCarta,
@@ -92,8 +94,17 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     },
   });
 
+  // Vino ya existente: la IA NO lee sola; botón «Leer etiqueta con IA» que solo
+  // rellena los campos vacíos (lecturaEtiquetaVino.ts).
+  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)));
+  const { limpiar: limpiarLectura } = lectura;
+
   useEffect(() => {
-    if (!open || !vino) return;
+    if (!open) {
+      limpiarLectura();
+      return;
+    }
+    if (!vino) return;
 
     form.reset({
       nombre: vino.nombre ?? "",
@@ -113,7 +124,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  }, [open, vino, form, limpiarRecorte]);
+  }, [open, vino, form, limpiarRecorte, limpiarLectura]);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
@@ -122,6 +133,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
     if (!file) return;
 
+    lectura.cancelar();
     recorte.iniciar(file);
     setRemoveImage(false);
     setUrlRestaurada(null);
@@ -136,7 +148,12 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     setImagePreview(url);
   };
 
+  // Foto que leería la IA: la nueva o, si no, la guardada (mejor su original, sin el fondo de carta).
+  const fotoParaLeer: File | string | null =
+    recorte.original ?? (imagePreview ? rutaOriginalDesdeCarta(imagePreview) ?? imagePreview : null);
+
   const clearImage = () => {
+    lectura.cancelar();
     setUrlRestaurada(null);
     limpiarRecorte();
     setImagePreview(null);
@@ -289,6 +306,18 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                     Volver a la foto original
                   </Button>
                 )}
+                {fotoParaLeer &&
+                  (lectura.leyendo ? (
+                    <span className="inline-flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Leyendo la etiqueta…
+                    </span>
+                  ) : (
+                    <Button type="button" variant="outline" onClick={() => void lectura.leer(fotoParaLeer)}>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Leer etiqueta con IA
+                    </Button>
+                  ))}
                 {(imagePreview || recorte.original) && (
                   <Button type="button" variant="outline" className="text-destructive" onClick={clearImage}>
                     Quitar foto
@@ -303,6 +332,12 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               denominaciones={denominaciones}
               regiones={regiones}
               paises={paises}
+              bajoPrecio={
+                <PistaPrecioVino
+                  datos={lectura.datos}
+                  onUsar={(precio) => form.setValue("precio_eur", precio, { shouldValidate: true, shouldDirty: true })}
+                />
+              }
             />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en

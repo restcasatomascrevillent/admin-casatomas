@@ -45,7 +45,7 @@ function TextoEstado({ fila }: { fila: FilaLote }) {
     case "error":
       return (
         <span className="inline-flex items-center gap-1 text-destructive">
-          <AlertCircle className="h-3.5 w-3.5" /> No se pudo leer
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {fila.motivoError ? `No se pudo leer: ${fila.motivoError}` : "No se pudo leer"}
         </span>
       );
     case "guardado":
