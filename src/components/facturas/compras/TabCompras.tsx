@@ -341,7 +341,7 @@ export function TabCompras({
               type="button"
               aria-pressed={modo === m.valor}
               onClick={() => cambiarModo(m.valor)}
-              className="flex min-h-11 items-center justify-center gap-1.5 rounded-md px-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-primary aria-pressed:shadow-sm sm:px-4"
+              className="flex min-h-11 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-sm font-medium text-muted-foreground min-[420px]:flex-row min-[420px]:gap-1.5 min-[420px]:px-2 transition-colors hover:text-foreground aria-pressed:bg-background aria-pressed:text-primary aria-pressed:shadow-sm sm:px-4"
             >
               {m.etiqueta}
               <span
