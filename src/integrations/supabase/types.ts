@@ -1327,6 +1327,40 @@ export type Database = {
         }
         Relationships: []
       }
+      // Tienda de vinos, escaparate (migración 20261103150000_tienda_vinos). Fila única (id = true).
+      configuracion_tienda: {
+        Row: {
+          activa: boolean
+          aviso: string | null
+          descuento_pct: number
+          id: boolean
+          recogida: string | null
+          updated_at: string
+          updated_by: string | null
+          vinos_excluidos: string[]
+        }
+        Insert: {
+          activa?: boolean
+          aviso?: string | null
+          descuento_pct?: number
+          id?: boolean
+          recogida?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vinos_excluidos?: string[]
+        }
+        Update: {
+          activa?: boolean
+          aviso?: string | null
+          descuento_pct?: number
+          id?: boolean
+          recogida?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vinos_excluidos?: string[]
+        }
+        Relationships: []
+      }
       consultas_chatbot: {
         Row: {
           created_at: string | null
@@ -5058,6 +5092,15 @@ export type Database = {
       configuracion_web_visibilidad_menu_tapas: {
         Args: { p_seccion: string; p_mostrar: boolean }
         Returns: undefined
+      }
+      // Tienda de vinos (migración 20261103150000_tienda_vinos).
+      tienda_precio_venta: {
+        Args: { p_precio_carta: number; p_descuento_pct: number }
+        Returns: number
+      }
+      tienda_marcar_vinos: {
+        Args: { p_vino_ids: string[]; p_a_la_venta: boolean }
+        Returns: string[]
       }
       version_auditoria_panel: { Args: Record<PropertyKey, never>; Returns: number }
       registrar_acceso_panel: { Args: { p_tipo: string; p_ruta?: string }; Returns: string }

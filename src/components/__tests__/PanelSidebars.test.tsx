@@ -96,3 +96,19 @@ describe.each([
     },
   );
 });
+
+describe("menú del panel normal", () => {
+  it("incluye la pestaña Tienda (sección de permisos «tienda»), entre Cheques y Facturas", () => {
+    render(
+      <MemoryRouter>
+        <SidebarProvider>
+          <AppSidebar />
+        </SidebarProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("link", { name: "Tienda" })).toHaveAttribute("href", "/tienda");
+    const nombres = screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"));
+    expect(nombres.indexOf("Tienda")).toBe(nombres.indexOf("Cheques") + 1);
+    expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda") + 1);
+  });
+});

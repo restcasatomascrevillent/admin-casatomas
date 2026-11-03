@@ -97,6 +97,7 @@ const CONFIGURACIONES: Record<string, string> = {
   plantilla_cheques_regalo: "la plantilla de cheques regalo",
   plantilla_factura_cheques: "la plantilla de facturas de cheques",
   plantillas_email_reserva: "la plantilla de correos de reserva",
+  configuracion_tienda: "la tienda de vinos",
 };
 const CAMPOS: Record<string, string> = {
   nombre: "Nombre",

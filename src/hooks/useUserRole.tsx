@@ -30,6 +30,8 @@ export const SECTIONS = [
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
   { key: "marketing", label: "Newsletter" },
   { key: "cheques", label: "Cheques regalo" },
+  // Tienda de vinos de la web (escaparate: se compra en el restaurante), 2026-11-03.
+  { key: "tienda", label: "Tienda" },
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;

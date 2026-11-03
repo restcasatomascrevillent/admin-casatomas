@@ -29,6 +29,7 @@ const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(() => import("./pages/Marketing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(() => import("./pages/Cheques"));
+const Tienda = lazy(() => import("./pages/Tienda"));
 const Facturas = lazy(() => import("./pages/Facturas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
@@ -130,6 +131,7 @@ const App = () => (
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
+                  <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
