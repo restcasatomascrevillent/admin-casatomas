@@ -442,6 +442,7 @@ export function resumenEntrada(entrada: AuditLogEntry): string {
       "admin-delete-user": "eliminar un usuario",
       "admin-set-super-admin": "cambiar el acceso de superadmin",
       "admin-update-user-password": "cambiar la contraseña de un usuario",
+      "cambiar-mi-contrasena": "cambiar su propia contraseña",
       "admin-set-user-access": "cambiar el acceso de un usuario",
       "auditoria-revertir": "revertir un cambio de auditoría",
       "list-users": "consultar la lista de usuarios",

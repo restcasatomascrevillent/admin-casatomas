@@ -245,5 +245,13 @@ verify_jwt = false
 [functions.auditoria-revertir]
 verify_jwt = true
 
+# «Mi cuenta» › Cambiar contraseña: JWT de usuario (solo su propia cuenta).
+# Comprueba la contraseña actual en Auth con un cliente aislado (esa sesión se
+# revoca), con el límite de intentos SQL compartido con el login de la cuenta
+# (20261103170000_cambio_contrasena_propia.sql), y la cambia con el JWT del
+# propio usuario: conserva su sesión y cierra las de sus otros dispositivos.
+[functions.cambiar-mi-contrasena]
+verify_jwt = true
+
 [functions.admin-set-user-access]
 verify_jwt = true

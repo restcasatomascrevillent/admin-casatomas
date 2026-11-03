@@ -133,6 +133,8 @@ describe("acciones comprensibles sin leer el JSON", () => {
     expect(resumenEntrada(entry({ accion: "ejecutar", tabla: "acciones_servidor", detalles: { operacion: "admin-update-user-password", resultado: "fallida" } }))).toBe("No se ha podido cambiar la contraseña de un usuario");
     expect(resumenEntrada(entry({ accion: "ejecutar", tabla: "acciones_servidor", detalles: { operacion: "extraer-vino-foto/analizar", resultado: "completada" } }))).toBe("Ha solicitado leer los datos de un vino desde una foto");
     expect(resumenEntrada(entry({ accion: "ejecutar", tabla: "acciones_servidor", detalles: { operacion: "enviar-newsletter", resultado: "parcial" } }))).toBe("Ha solicitado enviar una newsletter; resultado parcial");
+    expect(resumenEntrada(entry({ accion: "ejecutar", tabla: "acciones_servidor", detalles: { operacion: "cambiar-mi-contrasena", resultado: "fallida", motivo: "contrasena_actual_incorrecta" } }))).toBe("No se ha podido cambiar su propia contraseña");
+    expect(resumenEntrada(entry({ accion: "ejecutar", tabla: "acciones_servidor", detalles: { operacion: "cambiar-mi-contrasena", resultado: "completada" } }))).toBe("Ha solicitado cambiar su propia contraseña");
   });
   it("explica configuraciones, permisos y bajas de superadmin", () => {
     expect(resumenEntrada(entry({ tabla: "configuracion_reservas" }))).toBe("Ha modificado la configuración de las reservas");

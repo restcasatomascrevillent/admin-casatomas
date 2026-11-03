@@ -64,6 +64,8 @@ const SIN_EVENTO_PROPIO = new Set([
   "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "vapi-analytics", "sync-trafico-web",
   // Solo LEE consumo (Super Admin › Servicios): cada visita no es una acción; los fallos sí se registran.
   "servicios-uso",
+  // Registra su propio intento (iniciar/finalizar_cambio_contrasena) y el cambio lo audita el trigger de auth.users.
+  "cambiar-mi-contrasena",
 ]);
 
 // Funciones que pueden ejecutarse SIN usuario ni service role porque tienen
