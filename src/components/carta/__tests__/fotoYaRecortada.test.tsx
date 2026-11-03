@@ -241,22 +241,22 @@ describe("useFotoCarta con foto ya recortada", () => {
     expect(mocks.componer).toHaveBeenCalledWith(expect.any(Blob), { tipo: "plato", tema: result.current.tema });
     // Se guarda el sticker (pequeño) como original, no el PNG enorme.
     expect(esStickerRecortado(result.current.original)).toBe(true);
-    expect(result.current.estado.fase).not.toBe("diferido");
+    expect(mocks.navegador).not.toHaveBeenCalled();
   });
 
-  it("también en el iPhone (no queda «diferido» ni crea trabajo para un ordenador)", async () => {
+  it("también en el iPhone (sin pasar el modelo ni crear trabajo para un ordenador)", async () => {
     ponerNavegador(IPHONE, 5);
     const { result } = renderHook(() => useFotoCarta("bebida"));
     act(() => result.current.iniciar(archivo(cabeceraPng(6), "image/png")));
     await waitFor(() => expect(result.current.estado.fase).toBe("listo"));
-    expect(result.current.estado.fase).not.toBe("diferido");
+    expect(mocks.navegador).not.toHaveBeenCalled();
   });
 
-  it("un JPEG en el iPhone sigue como antes (diferido)", () => {
+  it("un JPEG en el iPhone se recorta en el formulario, como en el ordenador", async () => {
     ponerNavegador(IPHONE, 5);
     const { result } = renderHook(() => useFotoCarta("plato"));
     act(() => result.current.iniciar(archivo(JPEG, "image/jpeg")));
-    expect(result.current.estado.fase).toBe("diferido");
+    expect(result.current.estado.fase).toBe("trabajando");
   });
 
   it("un PNG opaco en el ordenador pasa por el modelo", async () => {

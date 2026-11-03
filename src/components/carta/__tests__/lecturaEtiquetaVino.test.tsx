@@ -91,7 +91,7 @@ const DATOS: DatosVinoFoto = {
 };
 
 function respuesta(datos: DatosVinoFoto = DATOS) {
-  return { datos, encuadrar: vi.fn(async () => new File(["e"], "botella.jpg", { type: "image/jpeg" })) };
+  return { datos };
 }
 
 function envolver(ui: ReactNode) {

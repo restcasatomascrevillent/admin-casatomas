@@ -27,7 +27,6 @@ interface Props {
  * en el ordenador se puede repetir en la ficha.
  */
 export function textoListo(recorte: FilaLote["recorte"]): string {
-  if (recorte === "diferido") return "Listo · el fondo se pone al guardar";
   if (recorte === "fallo") return "Listo · el recorte falló, repítelo al revisar";
   return "Listo";
 }

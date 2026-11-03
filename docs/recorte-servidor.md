@@ -1,29 +1,20 @@
 # Recorte de fotos en el servidor (respaldo del móvil)
 
-Decisión del dueño (03-11-2026, versión final): **el móvil (Android, iPhone y iPad, por el mismo camino) quita el fondo primero en su propio navegador**, con el mismo modelo que el ordenador. El **servidor** es el **respaldo** cuando eso falla (memoria, descarga, error). Si el servidor también falla, no responde o se llega al tope, la foto pasa a un **ordenador**. Un móvil que se queda sin memoria recortando queda marcado y sus siguientes fotos van directas al servidor; desde la ficha se puede volver a probar en el móvil. El ordenador sigue recortando en el formulario, como siempre.
+Decisión del dueño (03-11-2026, versión final): **en el móvil (Android, iPhone y iPad, por el mismo camino) se quita el fondo igual que en el portátil**: en el propio formulario, en cuanto se pone la foto y en paralelo a la lectura de la IA, con el sticker y el fondo a la vista antes de guardar.
 
-Toda foto de cámara (12-48 Mpx) se decodifica **ya reducida** (`medidasFoto.ts`, `createImageBitmap` con `resizeWidth`) antes de cualquier lienzo: Safari limita los lienzos a ~16,7 Mpx.
+## Cómo funciona en el móvil (`src/components/carta/recorte/quitarFondoMovil.ts`)
 
-## Cómo funciona
+1. La foto se reduce a 1200 px leyendo la cabecera, sin decodificarla entera (`medidasFoto.ts`). Safari limita los lienzos a ~16,7 Mpx y las fotos de cámara son de 12-48 Mpx.
+2. **En el navegador del móvil**, con el mismo modelo del ordenador (`quitarFondoNavegador`). La primera vez descarga el modelo (47 MB). Usa WebGPU si existe y suelta el worker al acabar.
+3. Si falla (memoria, descarga, error), se repite **en el servidor**, desde el mismo formulario:
+   - el móvil manda la foto reducida (JPEG ~0,3-0,6 MB) a `POST /api/recortar-foto` con el JWT de la sesión;
+   - la función comprueba la sesión y el permiso de carta, reserva cupo y pasa el mismo modelo (`onnxruntime-node`) con el mismo refinado (`mascaraRecorte.ts` y `refinarMascara.ts`);
+   - devuelve **solo la máscara**: un PNG gris de 1 canal (~50 KB);
+   - el móvil la aplica a su foto y la compone con el fondo elegido. El resultado es el mismo que en el ordenador.
+4. Si el servidor también falla, no responde en 90 s o hay tope, el formulario lo dice con el motivo. Al guardar se guarda la foto normal y se crea un **trabajo para un ordenador** (`trabajos_recorte`). Si el modelo no encuentra el producto, solo se avisa: el ordenador usa el mismo modelo.
+5. Si el móvil se queda sin memoria (un error de memoria, o la pestaña muere recortando con el panel a la vista), queda **marcado** y sus siguientes fotos van directas al servidor. Debajo de la foto sale «Probar otra vez en este móvil» para quitar la marca.
 
-1. En el móvil se elige la foto y el fondo, y se guarda la ficha **con la foto original** (nunca se pierde).
-2. Justo después, el móvil reduce la foto (lado mayor 1200 px) e intenta quitar el fondo él mismo. Sale el aviso «Poniendo el fondo de carta…» con el progreso: descarga del modelo (solo la primera vez) y recorte. Si falla, manda la foto reducida (JPEG ~0,3-0,6 MB) a `POST /api/recortar-foto` con el JWT de su sesión, con las fases *Subiendo…* → *Quitando el fondo en el servidor…* → *Componiendo…*.
-3. La función (`api/recortar-foto.ts`, Vercel Function con runtime Node, en `fra1`) hace esto:
-   - Comprueba la sesión contra el Supabase de su entorno: la demo en Preview y producción en Production. Usa las mismas variables `VITE_SUPABASE_*` del panel.
-   - Llama, **como ese usuario**, a `recorte_servidor_reservar()`, que exige el permiso de carta (`can_write_section('gestor_carta')`) y que quede cupo (ver *Gasto*).
-   - Pasa la foto por `isnet-general-use` cuantizado (`public/modelos/isnet-general-use-u8.onnx`, el mismo fichero que usa el ordenador) con `onnxruntime-node`, y la refina con el mismo código del navegador (`mascaraRecorte.ts` y `refinarMascara.ts`: limpieza, filtro guiado y alfa suave).
-   - Devuelve **solo la máscara**: un PNG gris de 1 canal (~50 KB) al tamaño de la foto.
-4. El móvil aplica la máscara a su foto, la compone con el fondo elegido y la guarda en la ficha. Es el mismo resultado que en el ordenador.
-5. Si algo falla, la ficha se queda con la foto normal, sale un aviso con el motivo y se crea un **trabajo para un ordenador** (`trabajos_recorte`). Los casos son estos:
-   - El servidor no responde en 90 s.
-   - Hay un error del servidor.
-   - La sesión ha caducado.
-   - Se ha alcanzado el tope de gasto.
-   - El panel se cierra a medias.
-
-   Si el modelo no encuentra el producto (422), solo se avisa: el ordenador usa el mismo modelo.
-
-Esto vale para todas las tablas (Platos, Vinos, Bebidas, Cócteles), «Varias botellas», «Foto rápida» y «Quitar fondo» / «Cambiar fondo» en el móvil. Si la foto ya viene sin fondo (por ejemplo, el recorte del iPhone pegado como PNG), no se llama al servidor.
+Esto vale para todas las tablas (Platos, Vinos, Bebidas, Cócteles), «Varias botellas», «Foto rápida» y «Quitar fondo» / «Cambiar fondo». Si la foto ya viene sin fondo (por ejemplo, el recorte del iPhone pegado como PNG), no se pasa el modelo.
 
 ## Límites
 

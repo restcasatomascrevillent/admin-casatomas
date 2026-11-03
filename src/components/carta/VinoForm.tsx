@@ -83,25 +83,11 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     },
   });
 
-  // Lectura de la etiqueta con IA al poner la foto (en paralelo al recorte).
-  // Móvil: el recorte va tras guardar y se guarda la foto tal cual; si la IA da
-  // encuadre, se guarda la botella encuadrada en 3:4 (como hacía la precarga).
-  const recorteRef = useRef(recorte);
-  useEffect(() => {
-    recorteRef.current = recorte;
-  });
-  const alLeer = async ({ datos, fuente, encuadrar }: LecturaHecha) => {
-    const r = recorteRef.current;
-    diag("IA leyó la etiqueta", { encuadre: !!datos.recorte, fase: r.estado.fase, mismaFoto: r.original === fuente });
-    if (!datos.recorte || r.estado.fase !== "diferido" || r.original !== fuente) return;
-    try {
-      const encuadrada = await encuadrar();
-      if (recorteRef.current.original === fuente) recorteRef.current.iniciar(encuadrada);
-    } catch (e) {
-      console.warn("[extraer-vino-foto] encuadre", e);
-    }
-  };
-  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)), (r) => void alLeer(r));
+  // Lectura de la etiqueta con IA al poner la foto (en paralelo al recorte,
+  // que ya se hace aquí también en el móvil).
+  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)), ({ datos, fuente }: LecturaHecha) =>
+    diag("IA leyó la etiqueta", { encuadre: !!datos.recorte, mismaFoto: recorte.original === fuente }),
+  );
   const { cancelar: cancelarLectura, limpiar: limpiarLectura } = lectura;
 
   // Precarga desde la foto de la botella (lote «Varias botellas»). Precio vacío

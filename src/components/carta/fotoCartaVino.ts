@@ -16,49 +16,42 @@
  * si hay; el modelo se baja una vez y se cachea). Sin servicios de pago: el
  * recorte por Replicate se quitó el 02-11-2026 (decisión del dueño).
  *
- *   - Ordenador: se recorta en el formulario, antes de guardar.
- *   - Móvil y tablet: el formulario NO recorta. La ficha se guarda con la foto
- *     original y después el SERVIDOR le quita el fondo (api/recortar-foto.ts,
- *     recorte/recorteEnSegundoPlano.ts); si falla, la foto normal se queda
- *     guardada, se avisa y se crea un trabajo para un ordenador.
+ *   - Ordenador y móvil: se recorta en el formulario, antes de guardar.
+ *   - Móvil y tablet: si el modelo no puede en el navegador, lo hace el
+ *     SERVIDOR (api/recortar-foto.ts, recorte/quitarFondoMovil.ts); si también
+ *     falla, se guarda la foto normal, se avisa y va a un ordenador.
  * Las fotos ya subidas sin procesar se pueden homogeneizar con el script
  * local `scripts/fotos-vino/`.
  */
 import { componerFotoVino, extensionFoto } from "./composicionVino";
-import { quitarFondoNavegador, recorteNavegadorSeguro, type ProgresoRecorte } from "./recorte/quitarFondoNavegador";
+import { quitarFondoNavegador, recorteNavegadorSeguro } from "./recorte/quitarFondoNavegador";
+import type { ProgresoMovil } from "./recorte/quitarFondoMovil";
+import { motivoFallo } from "./recorte/recorteMovil";
 
 export type { ProgresoRecorte } from "./recorte/quitarFondoNavegador";
 
 export { esFotoCarta, nombreSubida, rutaCartaDesdeOriginal, rutaOriginalDesdeCarta } from "./rutasFotoCarta";
-
-type ErrorRecorte = Error & { codigo?: string };
-
-function errorRecorte(mensaje: string, codigo?: string): ErrorRecorte {
-  const e = new Error(mensaje) as ErrorRecorte;
-  e.codigo = codigo;
-  return e;
-}
 
 export interface ResultadoFotoCarta {
   /** Foto de carta (WebP 900×1200, o JPEG en Safari). */
   foto: File;
   /** La botella recortada sin fondo (PNG con transparencia). */
   sticker: Blob;
-  /** Quién quitó el fondo (solo queda el navegador). */
-  metodo: "navegador";
+  /** Quién quitó el fondo: el navegador (ordenador o móvil) o, de respaldo en el móvil, el servidor. */
+  metodo: "navegador" | "servidor";
 }
 
 /**
- * Quita el fondo en el navegador (solo en el ordenador). En móvil y tablet no
- * se hace aquí, en el formulario: lanza un error con `codigo: "movil"` sin
- * cargar nada (ahí el recorte va después de guardar, recorteEnSegundoPlano.ts).
+ * Quita el fondo en el navegador. En el ordenador, con la foto tal cual; en el
+ * móvil (quitarFondoMovil), reducida y, si el modelo no puede, en el servidor.
  */
 export async function quitarFondo(
   foto: Blob,
-  onProgreso?: (p: ProgresoRecorte) => void,
+  onProgreso?: (p: ProgresoMovil) => void,
 ): Promise<{ sticker: Blob; metodo: ResultadoFotoCarta["metodo"] }> {
-  if (!recorteNavegadorSeguro()) throw errorRecorte("En el móvil la foto se recorta después de guardar", "movil");
-  return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
+  if (recorteNavegadorSeguro()) return { sticker: await quitarFondoNavegador(foto, onProgreso), metodo: "navegador" };
+  const { quitarFondoMovil } = await import("./recorte/quitarFondoMovil");
+  return quitarFondoMovil(foto, onProgreso);
 }
 
 /**
@@ -66,7 +59,7 @@ export async function quitarFondo(
  * con nombre `botella-carta.<ext>` (los formularios suben `<id>-carta.<ext>`).
  * Lanza error si no se pudo por ninguna vía.
  */
-export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoRecorte) => void): Promise<ResultadoFotoCarta> {
+export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoMovil) => void): Promise<ResultadoFotoCarta> {
   const { sticker, metodo } = await quitarFondo(foto, onProgreso);
   const compuesta = await componerFotoVino(sticker);
   const ext = extensionFoto(compuesta);
@@ -78,7 +71,11 @@ export async function hacerFotoCarta(foto: Blob, onProgreso?: (p: ProgresoRecort
  * (ordenador): que se guarda la foto normal y qué hacer.
  */
 export function avisoSinFondoCarta(e: unknown): string {
-  const mensaje = (e as { message?: string } | null)?.message;
-  const motivo = /botella/i.test(mensaje ?? "") ? "No se ha encontrado el producto en la foto" : "No se ha podido poner el fondo de carta";
-  return `${motivo}. Se guarda la foto normal. Pulsa «Repetir recorte» o, más tarde, abre la ficha y pulsa «Quitar fondo».`;
+  const err = e as { message?: string; causa?: string } | null;
+  const motivo = err?.causa
+    ? motivoFallo(e)
+    : /botella|producto/i.test(err?.message ?? "")
+      ? "No se ha encontrado el producto en la foto."
+      : "No se ha podido poner el fondo de carta.";
+  return `${motivo} Se guarda la foto normal. Pulsa «Repetir recorte» o, más tarde, abre la ficha y pulsa «Quitar fondo».`;
 }

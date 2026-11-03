@@ -1,12 +1,12 @@
 /**
- * Móvil (Android, iPhone, iPad; mismo camino): después de guardar, el fondo se
- * quita EN EL MÓVIL y, si falla, en el SERVIDOR; si también falla, un ordenador.
- *   - la foto se guarda ANTES; la marca «recorte en curso» (una por ficha)
- *     detecta un panel cerrado a medias y esa foto se retoma en el servidor;
- *   - el toast sale AL MOMENTO (en el iPhone «no pasaba nada»: el Wake Lock
- *     se esperaba antes de enseñar nada y en iOS puede no volver nunca);
- *   - el servidor (fetch simulado): éxito, 401, tope, sin respuesta → trabajo
- *     para un ordenador con el motivo;
+ * Móvil (Android, iPhone, iPad; el mismo camino que el portátil): el fondo se
+ * quita EN EL FORMULARIO al poner la foto (decisión del dueño, 03-11-2026):
+ *   - primero en el navegador del móvil; si falla → el SERVIDOR, también en
+ *     el formulario; si también falla → al guardar, la foto normal va a un
+ *     ordenador con el motivo;
+ *   - un móvil que se queda sin memoria (error o pestaña muerta a la vista)
+ *     queda marcado y va directo al servidor;
+ *   - el servidor (fetch simulado): éxito, 401, tope, sin respuesta;
  *   - y no queda ninguna llamada a la función de pago recortar-fondo-vino.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,37 +14,34 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const mocks = vi.hoisted(() => ({
-  loading: vi.fn(),
-  success: vi.fn(),
   warning: vi.fn(),
-  dismiss: vi.fn(),
+  info: vi.fn(),
+  reducir: vi.fn(async (f: Blob) => f),
 }));
-vi.mock("sonner", () => ({ toast: { loading: mocks.loading, success: mocks.success, warning: mocks.warning, dismiss: mocks.dismiss, error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { loading: vi.fn(), success: vi.fn(), warning: mocks.warning, info: mocks.info, dismiss: vi.fn(), error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
+vi.mock("../recorte/reducirFotoRecorte", async (o) => ({ ...(await o<typeof import("../recorte/reducirFotoRecorte")>()), reducirFotoRecorte: mocks.reducir }));
 
 import {
   CLAVE_EN_CURSO,
   ID_PESTANA,
-  latirMarcasRecorte,
-  leerMarcasRecorte,
+  latirMarcaRecorte,
+  leerMarcaRecorte,
   marcaHuerfana,
   marcarMovilSinLocal,
   marcarRecorteEnCurso,
   movilSinLocal,
   MS_MARCA_MUERTA,
-  motivoFallo,
   type DatosRecorte,
 } from "../recorte/recorteMovil";
-import { configurarAlNoRecortar, recortarEnMovil, recuperarRecorteInterrumpido, type DependenciasMovil } from "../recorte/recorteEnSegundoPlano";
-import { ErrorFichaCambiada, type OpcionesRecorteGuardado } from "../recorte/recortarFotoGuardada";
+import { configurarAlNoRecortar, recuperarRecorteInterrumpido } from "../recorte/recorteEnSegundoPlano";
+import { LADO_RECORTE_MOVIL, quitarFondoMovil } from "../recorte/quitarFondoMovil";
 import { CLAVE_TOPE, ErrorRecorteServidor, finDelTope, pedirMascaraServidor, topeVigente } from "../recorte/quitarFondoServidor";
 import { trasGuardarFotoCarta } from "../recorte/avisoGuardadoSinFondo";
 import { anchoReducido, medidasCabecera } from "../recorte/reducirFotoRecorte";
 
-const DATOS: DatosRecorte = { tabla: "Vinos", registroId: "v1", nombre: "Fondillón", rutaOriginal: "v1.jpeg", tema: "arena" };
-const OTRA: DatosRecorte = { ...DATOS, registroId: "v2", rutaOriginal: "v2.jpeg" };
-const pantalla = async () => () => undefined;
 const FOTO = new Blob(["foto"], { type: "image/jpeg" });
+const STICKER = new Blob(["sticker"], { type: "image/png" });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -55,170 +52,32 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("marcas de recorte en curso (panel cerrado a medias)", () => {
-  it("una marca por ficha; la de ESTA pestaña nunca es huérfana; la de otra sin latido sí", () => {
-    marcarRecorteEnCurso(DATOS, { ahora: 1_000 });
-    marcarRecorteEnCurso(OTRA, { ahora: 1_000 });
-    marcarRecorteEnCurso(DATOS, { ahora: 2_000 }); // la misma ficha no se duplica
-    const marcas = leerMarcasRecorte();
-    expect(marcas.map((m) => m.registroId)).toEqual(["v2", "v1"]);
-    const m = marcas[1];
-    expect(m).toMatchObject({ ...DATOS, pestana: ID_PESTANA, latido: 2_000 });
-    expect(marcaHuerfana(m, 2_000 + MS_MARCA_MUERTA * 10)).toBe(false);
-    const otra = { ...m, pestana: "otra" };
-    expect(marcaHuerfana(otra, 2_000 + MS_MARCA_MUERTA - 1)).toBe(false);
-    expect(marcaHuerfana(otra, 2_000 + MS_MARCA_MUERTA + 1)).toBe(true);
-  });
-
-  it("lee también la marca única del formato anterior", () => {
-    localStorage.setItem(CLAVE_EN_CURSO, JSON.stringify({ ...DATOS, pestana: "vieja", desde: 1, latido: 1 }));
-    expect(leerMarcasRecorte()).toHaveLength(1);
-  });
-
-  it("el latido solo lo refresca la pestaña dueña", () => {
-    marcarRecorteEnCurso(DATOS, { ahora: 1_000, pestana: "otra" });
-    latirMarcasRecorte({ ahora: 9_000 });
-    expect(leerMarcasRecorte()[0].latido).toBe(1_000);
-    latirMarcasRecorte({ ahora: 9_000, pestana: "otra" });
-    expect(leerMarcasRecorte()[0].latido).toBe(9_000);
-  });
-
-  it("al abrir el panel con marcas muertas: las quita y retoma esas fotos en el servidor", () => {
-    marcarRecorteEnCurso(DATOS, { ahora: 1_000, pestana: "pestana-que-murio" });
-    marcarRecorteEnCurso(OTRA, { ahora: 1_000, pestana: "pestana-que-murio" });
-    const detectada = vi.fn();
-    const retomar = vi.fn();
-    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5, alDetectar: detectada, retomar });
-    expect(localStorage.getItem(CLAVE_EN_CURSO)).toBeNull();
-    expect(detectada).toHaveBeenCalledWith(DATOS);
-    expect(retomar).toHaveBeenCalledTimes(2);
-    expect(movilSinLocal()).toBeNull(); // sin fase «local»: no fue la memoria
-  });
-
-  it("si murió recortando EN EL MÓVIL a la vista (memoria), el móvil queda marcado y se retoma en el servidor", () => {
-    const marcas = [
-      { ...DATOS, pestana: "murio", desde: 1_000, latido: 1_000, fase: "local", visible: true },
-      { ...OTRA, pestana: "murio", desde: 1_000, latido: 1_000, fase: "local", visible: false },
-    ];
-    localStorage.setItem(CLAVE_EN_CURSO, JSON.stringify(marcas.slice(1)));
-    const retomar = vi.fn();
-    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5, retomar });
-    expect(movilSinLocal()).toBeNull(); // oculta: el usuario salió, no es memoria
-    localStorage.setItem(CLAVE_EN_CURSO, JSON.stringify(marcas.slice(0, 1)));
-    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5, retomar });
-    expect(movilSinLocal()?.motivo).toMatch(/memoria/);
-    expect(retomar).toHaveBeenCalledTimes(2);
-  });
-
-  it("con la marca aún reciente espera y vuelve a mirar; si la otra pestaña sigue latiendo no hace nada", () => {
-    vi.useFakeTimers();
-    let t = 1_000;
-    marcarRecorteEnCurso(DATOS, { ahora: t, pestana: "viva" });
-    const detectada = vi.fn();
-    recuperarRecorteInterrumpido({ ahora: () => t, alDetectar: detectada });
-    t += MS_MARCA_MUERTA + 2_000;
-    latirMarcasRecorte({ ahora: t, pestana: "viva" });
-    vi.advanceTimersByTime(MS_MARCA_MUERTA + 2_000);
-    expect(detectada).not.toHaveBeenCalled();
-  });
-});
-
-/** Como recortarFotoGuardada, pero solo pasa la foto por `quitar` (sin Storage ni canvas). */
-function recortarFalso() {
-  return vi.fn(async (_d: DatosRecorte, o: OpcionesRecorteGuardado = {}) => {
-    await o.quitar!(FOTO, o.onProgreso);
-    return "https://x/v1-carta-jpeg.webp";
-  });
-}
-
-describe("recortarEnMovil (después de guardar la foto original)", () => {
-  it("el toast sale AL MOMENTO aunque el Wake Lock no conteste nunca (iPhone: «no pasaba nada»)", async () => {
-    const nunca = () => new Promise<() => void>(() => undefined);
-    const recortar = vi.fn(async () => "url");
-    const p = recortarEnMovil(DATOS, FOTO, { recortar, pantalla: nunca });
-    // Antes de cualquier espera.
-    expect(mocks.loading).toHaveBeenCalled();
-    expect(mocks.loading.mock.calls[0][0]).toMatch(/Poniendo el fondo de carta a Fondillón/);
-    expect(await p).toBe(true); // y no se queda colgado esperando al Wake Lock
-    expect(recortar).toHaveBeenCalled();
-  });
-
-  it("deja la marca mientras recorta, la quita al acabar y avisa", async () => {
+describe("quitarFondoMovil: primero en el móvil y, si falla, en el servidor", () => {
+  it("reduce la foto a 1200 y, si el móvil puede, no llama al servidor y suelta la memoria del modelo", async () => {
     let marcaDurante: unknown = null;
-    const recortar = vi.fn(async () => {
-      marcaDurante = leerMarcasRecorte()[0];
-      return "https://x/v1-carta-jpeg.webp";
+    const local = vi.fn(async () => {
+      marcaDurante = leerMarcaRecorte();
+      return STICKER;
     });
-    expect(await recortarEnMovil(DATOS, FOTO, { recortar, pantalla })).toBe(true);
-    expect(marcaDurante).toMatchObject(DATOS);
-    expect(recortar).toHaveBeenCalledWith(DATOS, expect.objectContaining({ original: FOTO, quitar: expect.any(Function) }));
-    expect(localStorage.getItem(CLAVE_EN_CURSO)).toBeNull();
-    expect(mocks.success).toHaveBeenCalled();
-  });
-
-  it("varias fotos a la vez van al servidor de una en una", async () => {
-    const orden: string[] = [];
-    let soltar!: () => void;
-    const primera = new Promise<void>((r) => (soltar = r));
-    const recortar = vi.fn(async (d: DatosRecorte) => {
-      orden.push(`empieza ${d.registroId}`);
-      if (d.registroId === "v1") await primera;
-      orden.push(`acaba ${d.registroId}`);
-      return "url";
-    });
-    const a = recortarEnMovil(DATOS, FOTO, { recortar, pantalla });
-    const b = recortarEnMovil(OTRA, FOTO, { recortar, pantalla });
-    expect(leerMarcasRecorte()).toHaveLength(2);
-    await new Promise((r) => setTimeout(r, 10));
-    soltar();
-    await Promise.all([a, b]);
-    expect(orden).toEqual(["empieza v1", "acaba v1", "empieza v2", "acaba v2"]);
-  });
-
-  it("si la ficha ya tiene otra foto no pisa nada ni avisa de error", async () => {
-    const recortar = vi.fn(async () => {
-      throw new ErrorFichaCambiada();
-    });
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
-    expect(await recortarEnMovil(DATOS, null, { recortar, pantalla })).toBe(false);
-    expect(alNo).not.toHaveBeenCalled();
-    expect(mocks.warning).not.toHaveBeenCalled();
-  });
-
-  it("si el servidor no encuentra el producto avisa, pero no lo manda al ordenador (usa el mismo modelo)", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
-    const recortar = vi.fn(async () => {
-      throw new ErrorRecorteServidor("No se encontró el producto en la foto", "sin-producto", 422);
-    });
-    await recortarEnMovil(DATOS, null, { recortar, pantalla });
-    expect(alNo).not.toHaveBeenCalled();
-    expect(mocks.warning.mock.calls[0][1].description).toMatch(/no encontró el producto/);
-  });
-});
-
-describe("primero en el móvil y, si falla, en el servidor", () => {
-  it("si el móvil puede, no se llama al servidor y se suelta la memoria del modelo", async () => {
-    const local = vi.fn(async () => new Blob(["sticker"]));
     const servidor = vi.fn();
     const liberar = vi.fn();
-    expect(await recortarEnMovil(DATOS, FOTO, { recortar: recortarFalso(), pantalla, local, servidor, liberar })).toBe(true);
-    expect(local).toHaveBeenCalledTimes(1);
+    expect(await quitarFondoMovil(FOTO, undefined, { local, servidor, liberar })).toEqual({ sticker: STICKER, metodo: "navegador" });
+    expect(mocks.reducir).toHaveBeenCalledWith(FOTO, LADO_RECORTE_MOVIL);
+    expect(marcaDurante).toMatchObject({ pestana: ID_PESTANA });
+    expect(leerMarcaRecorte()).toBeNull();
     expect(servidor).not.toHaveBeenCalled();
     expect(liberar).toHaveBeenCalled();
   });
 
-  it("si el móvil se queda sin memoria: servidor, el móvil queda marcado y la siguiente va directa al servidor", async () => {
+  it("sin memoria en el móvil: servidor, el móvil queda marcado y la siguiente va directa al servidor", async () => {
     const local = vi.fn(async () => {
       throw new RangeError("Out of memory");
     });
-    const servidor = vi.fn(async () => new Blob(["sticker"]));
-    const deps: DependenciasMovil = { recortar: recortarFalso(), pantalla, local, servidor, liberar: vi.fn() };
-    expect(await recortarEnMovil(DATOS, FOTO, deps)).toBe(true);
-    expect(servidor).toHaveBeenCalledTimes(1);
+    const servidor = vi.fn(async () => STICKER);
+    const deps = { local, servidor, liberar: vi.fn() };
+    expect((await quitarFondoMovil(FOTO, undefined, deps)).metodo).toBe("servidor");
     expect(movilSinLocal()?.motivo).toMatch(/memoria/);
-    await recortarEnMovil(OTRA, FOTO, deps);
+    await quitarFondoMovil(FOTO, undefined, deps);
     expect(local).toHaveBeenCalledTimes(1);
     expect(servidor).toHaveBeenCalledTimes(2);
   });
@@ -227,71 +86,96 @@ describe("primero en el móvil y, si falla, en el servidor", () => {
     const local = vi.fn(async () => {
       throw new Error("No se pudo descargar el recortador (Load failed)");
     });
-    const servidor = vi.fn(async () => new Blob(["sticker"]));
-    expect(await recortarEnMovil(DATOS, FOTO, { recortar: recortarFalso(), pantalla, local, servidor, liberar: vi.fn() })).toBe(true);
+    const servidor = vi.fn(async () => STICKER);
+    expect((await quitarFondoMovil(FOTO, undefined, { local, servidor, liberar: vi.fn() })).metodo).toBe("servidor");
     expect(movilSinLocal()).toBeNull();
   });
 
-  it("si local y servidor fallan: a un ordenador con el motivo del servidor", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
+  it("si el servidor también falla, lanza su error (el formulario enseña el motivo)", async () => {
     marcarMovilSinLocal("prueba");
     const servidor = vi.fn(async () => {
       throw new ErrorRecorteServidor("caído", "servidor", 500);
     });
-    expect(await recortarEnMovil(DATOS, FOTO, { recortar: recortarFalso(), pantalla, servidor })).toBe(false);
-    expect(alNo).toHaveBeenCalledWith(DATOS, expect.stringMatching(/El servidor no pudo quitar el fondo/));
+    await expect(quitarFondoMovil(FOTO, undefined, { servidor })).rejects.toMatchObject({ causa: "servidor" });
+  });
+});
+
+describe("pestaña muerta recortando en el formulario", () => {
+  it("la marca de ESTA pestaña nunca es huérfana; la de otra sin latido sí", () => {
+    marcarRecorteEnCurso({ ahora: 1_000 });
+    const m = leerMarcaRecorte()!;
+    expect(marcaHuerfana(m, 1_000 + MS_MARCA_MUERTA * 10)).toBe(false);
+    const otra = { ...m, pestana: "otra" };
+    expect(marcaHuerfana(otra, 1_000 + MS_MARCA_MUERTA - 1)).toBe(false);
+    expect(marcaHuerfana(otra, 1_000 + MS_MARCA_MUERTA + 1)).toBe(true);
+  });
+
+  it("el latido solo lo refresca la pestaña dueña", () => {
+    marcarRecorteEnCurso({ ahora: 1_000, pestana: "otra" });
+    latirMarcaRecorte({ ahora: 9_000 });
+    expect(leerMarcaRecorte()!.latido).toBe(1_000);
+    latirMarcaRecorte({ ahora: 9_000, pestana: "otra" });
+    expect(leerMarcaRecorte()!.latido).toBe(9_000);
+  });
+
+  it("murió a la vista (memoria): el móvil queda marcado y se avisa", () => {
+    marcarRecorteEnCurso({ ahora: 1_000, pestana: "murio", visible: true });
+    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5 });
+    expect(localStorage.getItem(CLAVE_EN_CURSO)).toBeNull();
+    expect(movilSinLocal()?.motivo).toMatch(/memoria/);
+    expect(mocks.info).toHaveBeenCalled();
+  });
+
+  it("murió estando oculta (el usuario salió): no se marca", () => {
+    marcarRecorteEnCurso({ ahora: 1_000, pestana: "murio", visible: false });
+    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5 });
+    expect(movilSinLocal()).toBeNull();
+  });
+
+  it("con la marca aún reciente espera; si la otra pestaña sigue latiendo no marca", () => {
+    vi.useFakeTimers();
+    let t = 1_000;
+    marcarRecorteEnCurso({ ahora: t, pestana: "viva" });
+    const detectada = vi.fn();
+    recuperarRecorteInterrumpido({ ahora: () => t, alDetectar: detectada });
+    t += MS_MARCA_MUERTA + 2_000;
+    latirMarcaRecorte({ ahora: t, pestana: "viva" });
+    vi.advanceTimersByTime(MS_MARCA_MUERTA + 2_000);
+    expect(detectada).not.toHaveBeenCalled();
   });
 });
 
 describe("servidor (fetch simulado)", () => {
-  // Móvil ya marcado: va directo al servidor.
-  beforeEach(() => marcarMovilSinLocal("prueba"));
-  const conFetch = (f: typeof fetch, msTiempo = 2_000): DependenciasMovil => ({
-    recortar: recortarFalso(),
-    pantalla,
-    servidor: (foto: Blob, p?: (x: never) => void) => pedirMascaraServidor(foto, { fetch: f, token: "jwt", msTiempo, onProgreso: p }),
-  });
+  const pedir = (f: unknown, msTiempo = 2_000) => pedirMascaraServidor(FOTO, { fetch: f as typeof fetch, token: "jwt", msTiempo });
 
-  it("éxito: manda la foto con el JWT y la ficha queda con fondo", async () => {
+  it("éxito: manda la foto con el JWT y devuelve la máscara", async () => {
     const f = vi.fn(async () => new Response(new Blob(["png"], { type: "image/png" }), { status: 200 }));
-    expect(await recortarEnMovil(DATOS, FOTO, conFetch(f as unknown as typeof fetch))).toBe(true);
+    expect(await pedir(f)).toBeInstanceOf(Blob);
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/recortar-foto");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer jwt");
     expect(init.body).toBe(FOTO);
-    expect(mocks.success).toHaveBeenCalled();
   });
 
-  it("401: la foto se queda y va a un ordenador con el motivo (sesión)", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
+  it("401 → causa «sesión»", async () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ error: "Sesión no válida o caducada" }), { status: 401 }));
-    expect(await recortarEnMovil(DATOS, FOTO, conFetch(f as unknown as typeof fetch))).toBe(false);
-    expect(alNo).toHaveBeenCalledWith(DATOS, expect.stringMatching(/sesión/));
+    await expect(pedir(f)).rejects.toMatchObject({ causa: "sesion", estado: 401 });
   });
 
-  it("sin respuesta a tiempo: se corta y va a un ordenador («tardó demasiado»)", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
+  it("sin respuesta a tiempo → se corta («tiempo»)", async () => {
     const colgado = vi.fn(
       (_u: string, init: RequestInit) =>
         new Promise<Response>((_ok, ko) => init.signal?.addEventListener("abort", () => ko(new DOMException("Aborted", "AbortError")))),
     );
-    expect(await recortarEnMovil(DATOS, FOTO, conFetch(colgado as unknown as typeof fetch, 30))).toBe(false);
-    expect(alNo).toHaveBeenCalledWith(DATOS, expect.stringMatching(/tardó demasiado/));
+    await expect(pedir(colgado, 30)).rejects.toMatchObject({ causa: "tiempo" });
   });
 
-  it("429 (tope de gasto): va a un ordenador con «tope mensual» y no vuelve a llamar este mes", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
+  it("429 (tope de gasto): «tope mensual» y no vuelve a llamar este mes", async () => {
     const f = vi.fn(async () => new Response(JSON.stringify({ error: "x", tope: "mes" }), { status: 429 }));
-    await recortarEnMovil(DATOS, FOTO, conFetch(f as unknown as typeof fetch));
-    expect(alNo.mock.calls[0][1]).toBe("Se ha alcanzado el tope mensual de recortes en el servidor.");
+    await expect(pedir(f)).rejects.toMatchObject({ causa: "tope", message: "Se ha alcanzado el tope mensual de recortes en el servidor" });
     expect(topeVigente()).toBe("mes");
-    await recortarEnMovil(OTRA, FOTO, conFetch(f as unknown as typeof fetch));
-    expect(f).toHaveBeenCalledTimes(1); // la segunda foto ya no llama al servidor
-    expect(alNo).toHaveBeenCalledTimes(2);
+    await expect(pedir(f)).rejects.toMatchObject({ causa: "tope" });
+    expect(f).toHaveBeenCalledTimes(1);
     expect(JSON.parse(localStorage.getItem(CLAVE_TOPE)!).hasta).toBe(finDelTope("mes"));
   });
 
@@ -299,38 +183,48 @@ describe("servidor (fetch simulado)", () => {
     const d = new Date(2026, 10, 3, 18, 0);
     expect(new Date(finDelTope("dia", d))).toEqual(new Date(2026, 10, 4));
     expect(new Date(finDelTope("mes", d))).toEqual(new Date(2026, 11, 1));
-    expect(motivoFallo(new ErrorRecorteServidor("Failed to fetch", "red"))).toMatch(/No se pudo conectar/);
   });
 });
 
-describe("trasGuardarFotoCarta", () => {
+describe("trasGuardarFotoCarta (solo queda el caso del fallo)", () => {
   const original = new File(["x"], "foto.JPEG", { type: "image/jpeg" });
 
-  it("en el ordenador con recorte fallido solo avisa (como antes)", () => {
+  it("móvil (falló en el móvil y en el servidor): la foto normal va a un ordenador con el motivo", async () => {
+    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
+    configurarAlNoRecortar(alNo);
+    trasGuardarFotoCarta(
+      {
+        estado: {
+          fase: "fallo",
+          aviso: "Se ha alcanzado el tope mensual de recortes en el servidor. Al guardar se guarda la foto normal y se recortará en un ordenador.",
+          aOrdenador: true,
+        },
+        original,
+        tema: "carbon",
+        eleccion: "original",
+      },
+      { tabla: "Platos", id: "p9", nombre: " Arroz " },
+    );
+    await vi.waitFor(() => expect(alNo).toHaveBeenCalled());
+    expect(alNo).toHaveBeenCalledWith(
+      { tabla: "Platos", registroId: "p9", nombre: "Arroz", rutaOriginal: "p9.jpeg", tema: "carbon" },
+      "Se ha alcanzado el tope mensual de recortes en el servidor.",
+    );
+  });
+
+  it("ordenador con recorte fallido: solo avisa (como antes)", () => {
     trasGuardarFotoCarta({ estado: { fase: "fallo", aviso: "x" }, original, tema: "arena", eleccion: "original" }, { tabla: "Vinos", id: "v1" });
     expect(mocks.warning).toHaveBeenCalledTimes(1);
   });
 
-  it("móvil: lanza el recorte en el servidor con la ruta original guardada y enseña el progreso al momento", async () => {
+  it("con fondo o «Usar foto original» a propósito: nada que hacer", () => {
     const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
     configurarAlNoRecortar(alNo);
-    trasGuardarFotoCarta({ estado: { fase: "diferido" }, original, tema: "carbon", eleccion: "carta" }, { tabla: "Platos", id: "p9", nombre: " Arroz " });
-    expect(mocks.loading).toHaveBeenCalled(); // síncrono: nada de import() que pueda fallar en silencio
-    expect(leerMarcasRecorte()[0]).toMatchObject({ tabla: "Platos", registroId: "p9", nombre: "Arroz", rutaOriginal: "p9.jpeg", tema: "carbon" });
-    // Sin sesión en la prueba: acaba en el trabajo para un ordenador, con motivo.
-    await vi.waitFor(() => expect(alNo).toHaveBeenCalled());
-  });
-
-  it("«Usar foto original» en el móvil: no hace nada después", async () => {
-    trasGuardarFotoCarta({ estado: { fase: "diferido" }, original, tema: "arena", eleccion: "original" }, { tabla: "Vinos", id: "v1" });
-    await new Promise((r) => setTimeout(r, 20));
-    expect(mocks.loading).not.toHaveBeenCalled();
+    const listo = { fase: "listo" as const, r: { sticker: STICKER, metodo: "navegador" as const } };
+    trasGuardarFotoCarta({ estado: listo, original, tema: "arena", eleccion: "carta" }, { tabla: "Vinos", id: "v1" });
+    trasGuardarFotoCarta({ estado: listo, original, tema: "arena", eleccion: "original" }, { tabla: "Vinos", id: "v1" });
+    expect(alNo).not.toHaveBeenCalled();
     expect(mocks.warning).not.toHaveBeenCalled();
-  });
-
-  it("móvil sin foto original: avisa (nunca en silencio)", () => {
-    trasGuardarFotoCarta({ estado: { fase: "diferido" }, original: null, tema: "arena", eleccion: "carta" }, { tabla: "Vinos", id: "v1" });
-    expect(mocks.warning).toHaveBeenCalledTimes(1);
   });
 });
 

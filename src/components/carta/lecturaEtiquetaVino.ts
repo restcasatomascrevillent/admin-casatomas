@@ -56,8 +56,6 @@ export interface LecturaHecha {
   datos: DatosVinoFoto;
   /** La foto que se leyó (para comprobar que sigue siendo la del formulario). */
   fuente: File | string;
-  /** Foto encuadrada en 3:4 con el encuadre que dio la IA. */
-  encuadrar: () => Promise<File>;
 }
 
 async function archivoDeUrl(url: string): Promise<File> {
@@ -106,7 +104,7 @@ export function useLecturaEtiquetaVino(
       } else {
         toast.success(`Etiqueta leída: ${campos.length === 1 ? "1 campo rellenado" : `${campos.length} campos rellenados`}. Revísalos antes de guardar.`);
       }
-      ultimo.current.alLeer?.({ datos: r.datos, fuente, encuadrar: r.encuadrar });
+      ultimo.current.alLeer?.({ datos: r.datos, fuente });
     } catch (e) {
       if (mio !== turno.current) return;
       console.error("[extraer-vino-foto] formulario", e);

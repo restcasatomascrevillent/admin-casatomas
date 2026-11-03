@@ -1,38 +1,34 @@
 /**
- * Recorte de fotos de la carta en el MÓVIL (incluido iPhone). Lógica pura +
- * localStorage (testeable).
+ * Recorte de fotos de la carta en el MÓVIL (Android, iPhone, iPad). Lógica
+ * pura + localStorage (testeable).
  *
- *   - PC (recorteNavegadorSeguro): como siempre, recorta en el formulario con
- *     el modelo en el navegador.
- *   - Móvil/tablet (Android, iPhone, iPad): la ficha se guarda con la foto
- *     ORIGINAL y, después (recorteEnSegundoPlano.ts):
- *       1. se intenta quitar el fondo EN EL MÓVIL, con el mismo modelo del PC;
- *       2. si falla (memoria, descarga, error) → el SERVIDOR
- *          (`/api/recortar-foto`, mismo modelo, con tope de gasto);
- *       3. si el servidor falla, no responde o hay tope → trabajo para un
- *          ordenador (recorteEnOrdenador.ts), con el motivo.
- *     Un móvil que se queda sin memoria recortando queda marcado
- *     (`movilSinLocal`) y las siguientes fotos van directas al servidor.
+ * Decisión del dueño (03-11-2026): en el móvil se recorta IGUAL que en el
+ * portátil, en el propio formulario, en cuanto se pone la foto (sticker y
+ * fondo a la vista antes de guardar). quitarFondoMovil.ts:
+ *   1. en el navegador del móvil, con el mismo modelo del PC;
+ *   2. si falla (memoria, descarga, error) → en el SERVIDOR
+ *      (`/api/recortar-foto`, mismo modelo, con tope de gasto), también
+ *      desde el formulario;
+ *   3. si el servidor falla o hay tope → se guarda la foto normal y se crea un
+ *      trabajo para un ordenador (recorteEnOrdenador.ts), con el motivo.
  *
- * Mientras un recorte está en marcha queda una marca en localStorage (una por
- * ficha) que la pestaña refresca (latido) con la fase (local / servidor) y si
- * la página se ve. Si el panel se cierra a medias, al volver a abrirlo la marca
- * sigue ahí sin latir: esa foto se manda al servidor (y, si murió recortando
- * en el móvil a la vista, el móvil queda marcado: fue la memoria).
+ * Mientras el móvil recorta queda una marca en localStorage que la pestaña
+ * refresca (latido) con si la página se ve. Si la pestaña muere (el sistema la
+ * cierra por memoria), al volver a abrir el panel la marca sigue ahí sin
+ * latir: el móvil queda marcado (`movilSinLocal`) y las siguientes fotos van
+ * directas al servidor.
  */
 
-export const CLAVE_EN_CURSO = "panel.recorte.enCurso.v1";
-/** Cada cuánto refresca sus marcas la pestaña que está recortando. */
+/** Marca «el móvil está recortando en el formulario». */
+export const CLAVE_EN_CURSO = "panel.recorte.formulario.v1";
+/** Cada cuánto refresca la marca la pestaña que está recortando. */
 export const MS_LATIDO = 4_000;
-/** Sin latido desde hace esto (y de otra pestaña), la pestaña que recortaba ya no está. */
+/** Sin latido desde hace esto (y de otra pestaña), la pestaña que recortaba murió. */
 export const MS_MARCA_MUERTA = 15_000;
-
-/** Evento de ventana cuando una ficha cambia de foto fuera de un formulario (GestorRecortes invalida la caché). */
-export const EVENTO_FOTO_RECORTADA = "carta:foto-recortada";
 
 export type TablaFoto = "Platos" | "Vinos" | "Bebidas" | "Cocteles";
 
-/** Lo necesario para recortar una foto YA guardada en una ficha (y para retomarla). */
+/** Lo necesario para recortar una foto YA guardada en una ficha (trabajo para un ordenador). */
 export interface DatosRecorte {
   tabla: TablaFoto;
   registroId: string;
@@ -43,13 +39,11 @@ export interface DatosRecorte {
   tema: string;
 }
 
-export interface MarcaRecorte extends DatosRecorte {
+export interface MarcaRecorte {
   pestana: string;
   desde: number;
   latido: number;
-  /** Dónde se estaba quitando el fondo en el último latido. */
-  fase?: "local" | "servidor";
-  /** ¿Se veía la página en el último latido? (iOS tira las páginas ocultas sin que sea falta de memoria). */
+  /** ¿Se veía la página en el último latido? (iOS/Android tiran las páginas ocultas sin que sea falta de memoria). */
   visible?: boolean;
 }
 
@@ -72,68 +66,54 @@ export function almacenLocal(): Almacen | null {
   }
 }
 
-/** Id de ESTA carga de página (una pestaña recargada por iOS es otra «pestaña»). */
+/** Id de ESTA carga de página (una pestaña recargada es otra «pestaña»). */
 export const ID_PESTANA = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-type OpcionesMarca = { almacen?: Almacen | null; ahora?: number; pestana?: string };
+type OpcionesMarca = { almacen?: Almacen | null; ahora?: number; pestana?: string; visible?: boolean };
 
-function esMarca(m: unknown): m is MarcaRecorte {
-  const x = m as MarcaRecorte | null;
-  return !!x && typeof x.registroId === "string" && typeof x.rutaOriginal === "string" && typeof x.latido === "number";
-}
-
-/** Marcas de recortes en curso (también lee el formato antiguo de una sola marca). */
-export function leerMarcasRecorte(almacen: Almacen | null = almacenLocal()): MarcaRecorte[] {
+export function marcarRecorteEnCurso(opts: OpcionesMarca = {}): void {
+  const almacen = opts.almacen === undefined ? almacenLocal() : opts.almacen;
+  const ahora = opts.ahora ?? Date.now();
+  const marca: MarcaRecorte = { pestana: opts.pestana ?? ID_PESTANA, desde: ahora, latido: ahora, visible: opts.visible ?? paginaVisible() };
   try {
-    const crudo = almacen?.getItem(CLAVE_EN_CURSO);
-    if (!crudo) return [];
-    const v = JSON.parse(crudo) as unknown;
-    return (Array.isArray(v) ? v : [v]).filter(esMarca);
+    almacen?.setItem(CLAVE_EN_CURSO, JSON.stringify(marca));
   } catch {
-    return [];
+    /* sin almacén: nada */
   }
 }
 
-function guardarMarcas(marcas: MarcaRecorte[], almacen: Almacen | null): boolean {
+export function leerMarcaRecorte(almacen: Almacen | null = almacenLocal()): MarcaRecorte | null {
   try {
-    if (!almacen) return false;
-    if (marcas.length) almacen.setItem(CLAVE_EN_CURSO, JSON.stringify(marcas));
-    else almacen.removeItem(CLAVE_EN_CURSO);
-    return true;
+    const m = JSON.parse(almacen?.getItem(CLAVE_EN_CURSO) ?? "null") as MarcaRecorte | null;
+    return m && typeof m.pestana === "string" && typeof m.latido === "number" ? m : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export function marcarRecorteEnCurso(d: DatosRecorte, opts: OpcionesMarca = {}): boolean {
+/** Refresca el latido (y si la página se ve) si la marca es de esta pestaña. */
+export function latirMarcaRecorte(opts: OpcionesMarca = {}): void {
   const almacen = opts.almacen === undefined ? almacenLocal() : opts.almacen;
-  const ahora = opts.ahora ?? Date.now();
-  const { tabla, registroId, nombre, rutaOriginal, tema } = d;
-  const marca: MarcaRecorte = { tabla, registroId, nombre, rutaOriginal, tema, pestana: opts.pestana ?? ID_PESTANA, desde: ahora, latido: ahora };
-  const resto = leerMarcasRecorte(almacen).filter((m) => !(m.tabla === d.tabla && m.registroId === d.registroId));
-  return guardarMarcas([...resto, marca], almacen);
+  const m = leerMarcaRecorte(almacen);
+  if (!m || m.pestana !== (opts.pestana ?? ID_PESTANA)) return;
+  try {
+    almacen?.setItem(CLAVE_EN_CURSO, JSON.stringify({ ...m, latido: opts.ahora ?? Date.now(), visible: opts.visible ?? paginaVisible() }));
+  } catch {
+    /* nada */
+  }
 }
 
-/** Refresca el latido (y si la página se ve) de las marcas de esta pestaña. */
-export function latirMarcasRecorte(opts: OpcionesMarca & { visible?: boolean } = {}): void {
-  const almacen = opts.almacen === undefined ? almacenLocal() : opts.almacen;
-  const pestana = opts.pestana ?? ID_PESTANA;
-  const marcas = leerMarcasRecorte(almacen);
-  if (!marcas.some((m) => m.pestana === pestana)) return;
-  const ahora = opts.ahora ?? Date.now();
-  const visible = opts.visible ?? paginaVisible();
-  guardarMarcas(
-    marcas.map((m) => (m.pestana === pestana ? { ...m, latido: ahora, visible } : m)),
-    almacen,
-  );
+export function quitarMarcaRecorte(almacen: Almacen | null = almacenLocal()): void {
+  try {
+    almacen?.removeItem(CLAVE_EN_CURSO);
+  } catch {
+    /* nada */
+  }
 }
 
-/** Anota en qué fase está el recorte de esa ficha (local → servidor). */
-export function faseMarcaRecorte(d: Pick<DatosRecorte, "tabla" | "registroId">, fase: "local" | "servidor", almacen: Almacen | null = almacenLocal()): void {
-  guardarMarcas(
-    leerMarcasRecorte(almacen).map((m) => (m.tabla === d.tabla && m.registroId === d.registroId ? { ...m, fase, latido: Date.now(), visible: paginaVisible() } : m)),
-    almacen,
-  );
+/** ¿La pestaña que dejó la marca murió a medias? (otra carga de página, sin latido desde hace MS_MARCA_MUERTA). */
+export function marcaHuerfana(m: MarcaRecorte, ahora = Date.now(), pestana = ID_PESTANA): boolean {
+  return m.pestana !== pestana && ahora - m.latido > MS_MARCA_MUERTA;
 }
 
 /** Móvil que se quedó sin memoria recortando: las fotos van directas al servidor. */
@@ -177,33 +157,9 @@ export function esFaltaDeMemoria(e: unknown): boolean {
   return /out of memory|memory|memoria|allocation|bad_alloc/i.test(err.message ?? "");
 }
 
-export function quitarMarcaRecorte(d: Pick<DatosRecorte, "tabla" | "registroId">, almacen: Almacen | null = almacenLocal()): void {
-  guardarMarcas(
-    leerMarcasRecorte(almacen).filter((m) => !(m.tabla === d.tabla && m.registroId === d.registroId)),
-    almacen,
-  );
-}
-
 /**
- * ¿La pestaña que dejó la marca ya no está? Sí si la marca es de OTRA carga
- * de página y no late desde hace MS_MARCA_MUERTA.
- */
-export function marcaHuerfana(m: MarcaRecorte, ahora = Date.now(), pestana = ID_PESTANA): boolean {
-  return m.pestana !== pestana && ahora - m.latido > MS_MARCA_MUERTA;
-}
-
-/** Datos de la ficha de una marca (sin los campos de control). */
-export function datosDeMarca(m: MarcaRecorte): DatosRecorte {
-  const { tabla, registroId, nombre, rutaOriginal, tema } = m;
-  return { tabla, registroId, nombre, rutaOriginal, tema };
-}
-
-/** Dónde se quita el fondo de la foto que se acaba de elegir: en el formulario (PC) o tras guardar (móvil: local → servidor → ordenador). */
-export type DestinoRecorte = "formulario" | "movil";
-
-/**
- * Por qué no se pudo poner el fondo en el móvil:
- *   sesion: el servidor no aceptó la sesión (401); permiso: sin permiso de carta (403);
+ * Por qué no se pudo quitar el fondo en el servidor:
+ *   sesion: no aceptó la sesión (401); permiso: sin permiso de carta (403);
  *   sin-producto: el modelo no encontró nada (422); tiempo: no respondió a tiempo;
  *   tope: se alcanzó el tope de gasto de recortes en el servidor (429);
  *   red: no se pudo conectar; servidor: error del servidor (5xx/otros); otro: el resto.
@@ -236,7 +192,7 @@ export function motivoFallo(e: unknown): string {
     case "permiso":
       return "Tu usuario no tiene permiso para cambiar fotos de la carta.";
     case "sin-producto":
-      return "El servidor no encontró el producto en la foto.";
+      return "No se encontró el producto en la foto.";
     case "tiempo":
       return "El servidor tardó demasiado en quitar el fondo.";
     case "tope":
@@ -246,7 +202,7 @@ export function motivoFallo(e: unknown): string {
     case "servidor":
       return `El servidor no pudo quitar el fondo${entre}.`;
     default:
-      return `No se pudo poner el fondo de carta${entre}.`;
+      return `No se pudo quitar el fondo${entre}.`;
   }
 }
 

@@ -2,8 +2,7 @@
  * Memoria del recorte (03-11-2026):
  *   - la descarga del modelo (solo ordenador) usa UN solo buffer (antes ~140 MB
  *     transitorios) y guardarlo en Cache Storage no lo copia ni lo neutraliza;
- *   - «Varias botellas» en el móvil no pasa el modelo en el lote: el fondo se
- *     pone al guardar cada botella (trasGuardarFotoCarta, como en la ficha suelta).
+ *   - «Varias botellas» recorta en el lote en cualquier dispositivo.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -15,17 +14,14 @@ const mocks = vi.hoisted(() => ({
   dismiss: vi.fn(),
   leer: vi.fn(),
   hacerFotoCarta: vi.fn(),
-  destino: vi.fn(() => "movil"),
 }));
 vi.mock("sonner", () => ({ toast: { loading: mocks.loading, success: mocks.success, warning: mocks.warning, dismiss: mocks.dismiss, error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("../leerVinoFoto", () => ({ leerVinoDeFoto: mocks.leer }));
 vi.mock("../fotoCartaVino", () => ({ hacerFotoCarta: mocks.hacerFotoCarta }));
-vi.mock("../recorte/useRecorteVino", () => ({ destinoRecorteActual: mocks.destino }));
 
 import { descargarModelo, ErrorDescargaModelo, leerEnUnBuffer, longitudContenido } from "../recorte/descargaModelo";
 import { useLoteVinos } from "../useLoteVinos";
-import { textoListo } from "../LoteVinosFoto";
 
 
 /** Stream que entrega `datos` en trozos de `trozo` bytes. */
@@ -117,25 +113,8 @@ describe("descarga del modelo en un solo buffer", () => {
   });
 });
 
-describe("«Varias botellas» en el móvil", () => {
-  it("no lanza el recorte en el lote (memoria) y la fila queda «el fondo se pone al guardar»", async () => {
-    mocks.destino.mockReturnValue("movil");
-    const foto = new File(["x"], "b.jpg", { type: "image/jpeg" });
-    mocks.leer.mockResolvedValue({ datos: { nombre: "Rioja" }, foto });
-    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() }));
-    const { result } = renderHook(() => useLoteVinos([]));
-    act(() => result.current.añadir([foto]));
-    await waitFor(() => expect(result.current.filas[0]?.estado).toBe("listo"));
-    expect(result.current.filas[0].recorte).toBe("diferido");
-    // Sin promesa de recorte: el formulario pasa a «diferido» y al guardar se recorta (móvil → servidor → ordenador).
-    expect(result.current.filas[0].resultado?.recorte).toBeUndefined();
-    expect(mocks.hacerFotoCarta).not.toHaveBeenCalled();
-    expect(textoListo("diferido")).toBe("Listo · el fondo se pone al guardar");
-    expect(textoListo("fallo")).not.toMatch(/sin recorte/);
-  });
-
-  it("en el ordenador sigue recortando en el lote", async () => {
-    mocks.destino.mockReturnValue("formulario");
+describe("«Varias botellas»", () => {
+  it("recorta en el lote (también en el móvil: quitarFondo decide móvil → servidor)", async () => {
     mocks.hacerFotoCarta.mockResolvedValue({ sticker: new Blob(["s"]) });
     const foto = new File(["x"], "b.jpg", { type: "image/jpeg" });
     mocks.leer.mockResolvedValue({ datos: { nombre: "Rioja" }, foto });

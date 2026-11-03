@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { leerVinoDeFoto, type VinoDesdeFoto } from "./leerVinoFoto";
 import { hacerFotoCarta } from "./fotoCartaVino";
-import { destinoRecorteActual } from "./recorte/useRecorteVino";
 
 /** Lecturas a la vez (cada una es una llamada a la IA). */
 export const CONCURRENCIA_LOTE = 2;
 
 export type EstadoFila = "cola" | "leyendo" | "listo" | "error" | "guardado";
-/**
- * "diferido": móvil/tablet. Aquí no se recorta (memoria); el formulario de
- * cada botella guarda la foto y DESPUÉS el servidor le quita el fondo o, si
- * falla, un ordenador (trasGuardarFotoCarta), como en la ficha suelta.
- */
-export type EstadoRecorteFila = "recortando" | "listo" | "fallo" | "diferido";
+export type EstadoRecorteFila = "recortando" | "listo" | "fallo";
 
 export interface FilaLote {
   id: string;
@@ -111,14 +105,6 @@ export function useLoteVinos(categorias: string[]) {
           if (!montado.current) return;
           // URLs fuera del updater (StrictMode lo llama dos veces).
           const mini = crearUrl(resultado.foto);
-          // Móvil: nada de modelo aquí; el fondo se pone al guardar cada botella.
-          if (destinoRecorteActual() !== "formulario") {
-            setFilas((prev) =>
-              prev.map((f) => (f.id === fila.id ? { ...f, estado: "listo", resultado, miniatura: mini, recorte: "diferido" } : f)),
-            );
-            liberarUrl(fila.miniatura);
-            return;
-          }
           // Recorte en segundo plano (el worker los hace de uno en uno); el
           // formulario espera esta misma promesa si se abre antes de acabar.
           const recorte = hacerFotoCarta(resultado.foto);
