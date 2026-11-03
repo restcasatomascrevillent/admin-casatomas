@@ -15,6 +15,7 @@ import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
+import { maquetasVisibles } from "@/lib/maqueta";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Reservas = lazy(() => import("./pages/Reservas"));
@@ -131,7 +132,8 @@ const App = () => (
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
-                  <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
+                  {/* Maqueta solo en la demo (lib/maqueta.ts): en producción, /tienda cae en el 404. */}
+                  {maquetasVisibles() && <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />}
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}

@@ -16,6 +16,7 @@
  *     user_permissions solo deja escribir a super admins).
  */
 import { SECTIONS } from "@/hooks/useUserRole";
+import { maquetasVisibles } from "@/lib/maqueta";
 import type { ManagedUser } from "@/hooks/useUsersManagement";
 
 export interface PermisoSeccion {
@@ -27,12 +28,17 @@ export interface PermisoSeccion {
 type Seccion = (typeof SECTIONS)[number];
 type SeccionConfigurable = Exclude<Seccion, { key: "usuarios" }>;
 
+/** Secciones que son maquetas (lib/maqueta.ts): en producción no se configuran. */
+const SECCIONES_MAQUETA: ReadonlySet<string> = new Set(["tienda"]);
+
 /**
  * Secciones que se configuran desde Usuarios. «usuarios» no: esa sección va por
- * rol admin, no por permisos (ProtectedRoute / AppSidebar).
+ * rol admin, no por permisos (ProtectedRoute / AppSidebar). Las maquetas, solo
+ * fuera de producción (el entorno no cambia en un mismo build).
  */
 export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
-  (seccion): seccion is SeccionConfigurable => seccion.key !== "usuarios",
+  (seccion): seccion is SeccionConfigurable =>
+    seccion.key !== "usuarios" && (!SECCIONES_MAQUETA.has(seccion.key) || maquetasVisibles()),
 );
 
 /**

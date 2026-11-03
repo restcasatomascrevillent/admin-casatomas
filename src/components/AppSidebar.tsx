@@ -37,6 +37,7 @@ import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
 import { ShoppingBag } from "lucide-react";
+import { maquetasVisibles } from "@/lib/maqueta";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
@@ -51,6 +52,8 @@ const menuItems: {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   sectionKey?: SectionKey | SectionKey[];
   toggleKey?: string;
+  /** Maqueta: solo fuera de producción y con la insignia «Maqueta» (lib/maqueta.ts). */
+  maqueta?: boolean;
 }[] = [
   {
     title: "Dashboard",
@@ -97,6 +100,8 @@ const menuItems: {
     icon: ShoppingBag,
     sectionKey: "tienda",
     toggleKey: "tienda",
+    // Maqueta solo en la demo (dueño, 03/11/2026): en producción no sale.
+    maqueta: true,
   },
   {
     title: "Facturas",
@@ -138,6 +143,7 @@ export function AppSidebar() {
   // Filtrar items según permisos y funcionalidades activadas por el Super Admin
   const visibleItems = menuItems.filter((item) => {
     if (loading || togglesLoading || superAdminLoading) return false;
+    if (item.maqueta && !maquetasVisibles()) return false;
     if (!item.sectionKey) return true;
     if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
     const keys = Array.isArray(item.sectionKey)
@@ -208,14 +214,22 @@ export function AppSidebar() {
                   >
                     <NavLink
                       to={item.url}
-                      aria-label={item.title}
+                      aria-label={item.maqueta ? `${item.title} (maqueta)` : item.title}
                       className="flex items-center gap-3 rounded-lg hover:bg-sidebar-accent"
                     >
                       <item.icon
                         className="h-5 w-5 shrink-0"
                         aria-hidden="true"
                       />
-                      <span>{item.title}</span>
+                      <span className="truncate">{item.title}</span>
+                      {item.maqueta && (
+                        <span
+                          aria-hidden="true"
+                          className="ml-auto shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-amber-900 group-data-[collapsible=icon]:hidden"
+                        >
+                          Maqueta
+                        </span>
+                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
