@@ -50,9 +50,10 @@ interface PestanasPaginaProps {
    * debajo y a todo el ancho. Para barras cuyas pestañas no caben junto a los botones a 390 px (F-47,
    * 01/11/2026). Antes los botones subían ENCIMA de las pestañas, apretados a la derecha y con un hueco vacío
    * a la izquierda, entre dos barras de pestañas (al dueño no le gustaba, 02/11/2026). Desde `sm`, todo en
-   * una fila como siempre.
+   * una fila como siempre. Con `"lg"` se queda debajo hasta 1024 px (Reservas: 6 pestañas + «Nueva reserva» no caben
+   * en 768 ni en apaisado).
    */
-  accionesDebajoEnMovil?: boolean;
+  accionesDebajoEnMovil?: boolean | "lg";
   className?: string;
 }
 
@@ -112,6 +113,7 @@ export function PestanasPagina({
   className,
 }: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
+  const hastaLg = accionesDebajoEnMovil === "lg";
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-background to-transparent";
   return (
     <div
@@ -119,7 +121,7 @@ export function PestanasPagina({
       className={cn(
         "mb-2 flex w-full shrink-0 items-center gap-2 border-b border-border/60",
         // En el móvil la línea va bajo las pestañas (no bajo la fila de botones de abajo).
-        accionesDebajoEnMovil && "flex-wrap gap-y-3 border-b-0 sm:flex-nowrap sm:border-b",
+        accionesDebajoEnMovil && (hastaLg ? "flex-wrap gap-y-3 border-b-0 lg:flex-nowrap lg:border-b" : "flex-wrap gap-y-3 border-b-0 sm:flex-nowrap sm:border-b"),
         className,
       )}
     >
@@ -127,7 +129,7 @@ export function PestanasPagina({
         ref={ref}
         className={cn(
           "relative min-w-0 flex-1 sm:flex-initial",
-          accionesDebajoEnMovil && "basis-full border-b border-border/60 sm:basis-auto sm:border-b-0",
+          accionesDebajoEnMovil && (hastaLg ? "basis-full border-b border-border/60 sm:basis-full lg:basis-auto lg:border-b-0" : "basis-full border-b border-border/60 sm:basis-auto sm:border-b-0"),
         )}
       >
         <TabsList
@@ -181,7 +183,7 @@ export function PestanasPagina({
         <div
           className={cn(
             "ml-auto flex shrink-0 items-center gap-2",
-            accionesDebajoEnMovil && "w-full sm:w-auto",
+            accionesDebajoEnMovil && (hastaLg ? "w-full lg:w-auto" : "w-full sm:w-auto"),
           )}
         >
           {acciones}

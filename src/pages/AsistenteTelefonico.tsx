@@ -556,7 +556,7 @@ export default function AsistenteTelefonico() {
                                                         {rule.ranges.map((r: any) => (
                                                             <div key={r.id} className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-2 rounded-md border ${r.mode === "bot" ? "bg-blue-50/50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/40" : "bg-green-50/50 border-green-100 dark:bg-green-950/20 dark:border-green-900/40"}`}>
                                                                 <Select value={r.mode} onValueChange={(v) => updateRangeRule(dayIndex, r.id, "mode", v)} disabled={!scheduleEnabled}>
-                                                                    <SelectTrigger className="w-full sm:w-[160px] h-11 bg-background"><SelectValue /></SelectTrigger>
+                                                                    <SelectTrigger className="w-full sm:w-[160px] h-11 bg-background" aria-label="Modo del tramo horario"><SelectValue /></SelectTrigger>
                                                                     <SelectContent>
                                                                         <SelectItem value="human">👤 Humano</SelectItem>
                                                                         <SelectItem value="bot">🤖 Bot IA</SelectItem>

@@ -40,7 +40,7 @@ export function SelectorRangoMeses({
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Mostrar</span>
           <Select value={String(rango)} onValueChange={(v) => onRangoChange(Number(v) as RangoMesesAuditoria)}>
-            <SelectTrigger className="w-44">
+            <SelectTrigger className="w-44" aria-label="Meses a mostrar">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

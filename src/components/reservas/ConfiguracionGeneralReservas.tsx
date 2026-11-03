@@ -230,6 +230,7 @@ export function ConfiguracionGeneralReservas() {
                         <div className="flex items-center gap-2">
                           <Input
                             type="number" inputMode="numeric"
+                            aria-label="Máximo de días de antelación"
                             min={1}
                             max={365}
                             className="w-24"
