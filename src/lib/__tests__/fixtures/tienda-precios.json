@@ -1,0 +1,90 @@
+{
+  "_comentario": "Casos del precio de tienda: round(precio_eur * (1 - descuento_pct / 100), 2), redondeo al céntimo hacia arriba en el .5. Los usan src/lib/__tests__/tienda.test.ts (panel) y scripts/test-tienda.mjs (tienda_precio_venta en Postgres): la fórmula tiene que dar lo mismo en los dos sitios.",
+  "casos": [
+    {
+      "precio": 12.5,
+      "descuento": 30,
+      "esperado": 8.75
+    },
+    {
+      "precio": 47.85,
+      "descuento": 30,
+      "esperado": 33.5
+    },
+    {
+      "precio": 9.95,
+      "descuento": 30,
+      "esperado": 6.97
+    },
+    {
+      "precio": 19.99,
+      "descuento": 30,
+      "esperado": 13.99
+    },
+    {
+      "precio": 24,
+      "descuento": 30,
+      "esperado": 16.8
+    },
+    {
+      "precio": 735,
+      "descuento": 30,
+      "esperado": 514.5
+    },
+    {
+      "precio": 10,
+      "descuento": 0,
+      "esperado": 10
+    },
+    {
+      "precio": 10,
+      "descuento": 90,
+      "esperado": 1
+    },
+    {
+      "precio": 0.05,
+      "descuento": 90,
+      "esperado": 0.01
+    },
+    {
+      "precio": 3.35,
+      "descuento": 30,
+      "esperado": 2.35
+    },
+    {
+      "precio": 1.15,
+      "descuento": 50,
+      "esperado": 0.58
+    },
+    {
+      "precio": 18.5,
+      "descuento": 33.33,
+      "esperado": 12.33
+    },
+    {
+      "precio": 27.9,
+      "descuento": 12.5,
+      "esperado": 24.41
+    },
+    {
+      "precio": 45.45,
+      "descuento": 30,
+      "esperado": 31.82
+    },
+    {
+      "precio": 9999.99,
+      "descuento": 30,
+      "esperado": 6999.99
+    },
+    {
+      "precio": 0.01,
+      "descuento": 30,
+      "esperado": 0.01
+    },
+    {
+      "precio": 0.01,
+      "descuento": 90,
+      "esperado": 0
+    }
+  ]
+}

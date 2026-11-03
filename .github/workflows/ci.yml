@@ -62,6 +62,8 @@ jobs:
         run: npm run test:platos-updated-at:db
       - name: Servicios contratados y su consumo, solo super admin (PGlite)
         run: npm run test:servicios:db
+      - name: Tienda de vinos, pedidos y su límite de abuso (PGlite)
+        run: npm run test:tienda:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
