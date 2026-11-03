@@ -5,7 +5,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -14,6 +14,11 @@ const h = vi.hoisted(() => ({
   role: "admin" as string | null,
   isSuperAdmin: true,
 }));
+const entornoMaqueta = vi.hoisted(() => ({ valor: null as null | "produccion" | "demo" | "preview" | "local" }));
+vi.mock("@/lib/maqueta", async (original) => {
+  const real = await original<typeof import("@/lib/maqueta")>();
+  return { ...real, maquetasVisibles: () => (entornoMaqueta.valor ? real.maquetaVisibleEn(entornoMaqueta.valor) : real.maquetasVisibles()) };
+});
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ signOut: vi.fn(), user: h.user }),
 }));
@@ -351,8 +356,11 @@ describe.each([
   });
 });
 
-describe("menú del panel normal", () => {
-  it("incluye la pestaña Tienda (sección de permisos «tienda»), entre Cheques y Facturas", () => {
+describe("menú del panel normal · Tienda (maqueta solo en la demo)", () => {
+  afterEach(() => {
+    entornoMaqueta.valor = null;
+  });
+  const pintarAdmin = () =>
     render(
       <MemoryRouter>
         <SidebarProvider>
@@ -360,9 +368,23 @@ describe("menú del panel normal", () => {
         </SidebarProvider>
       </MemoryRouter>,
     );
-    expect(screen.getByRole("link", { name: "Tienda" })).toHaveAttribute("href", "/tienda");
+
+  it("en la demo sale entre Cheques y Facturas, con la insignia «Maqueta»", () => {
+    entornoMaqueta.valor = "demo";
+    pintarAdmin();
+    const tienda = screen.getByRole("link", { name: "Tienda (maqueta)" });
+    expect(tienda).toHaveAttribute("href", "/tienda");
+    expect(tienda).toHaveTextContent("Maqueta");
     const nombres = screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"));
-    expect(nombres.indexOf("Tienda")).toBe(nombres.indexOf("Cheques") + 1);
-    expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda") + 1);
+    expect(nombres.indexOf("Tienda (maqueta)")).toBe(nombres.indexOf("Cheques") + 1);
+    expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda (maqueta)") + 1);
+  });
+
+  it("en producción no sale (ni para un super admin)", () => {
+    entornoMaqueta.valor = "produccion";
+    pintarAdmin();
+    expect(screen.queryByRole("link", { name: /Tienda/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Cheques" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Facturas" })).toBeInTheDocument();
   });
 });

@@ -58,7 +58,7 @@ describe("qué vinos se venden (mismo criterio que la BD y la web)", () => {
     expect(motivoNoVendible(vino(cambio), config)).toBe(motivo);
   });
   it("como la web, solo mira precio_eur > 0 (aunque rebajado quede en 0 €)", () => {
-    expect(motivoNoVendible(vino({ precio_eur: 0.01 }), { descuento_pct: 90, vinos_excluidos: [] })).toBeNull();
+    expect(motivoNoVendible(vino({ precio_eur: 0.01 }), { vinos_excluidos: [] })).toBeNull();
     expect(precioTienda(0.01, 90)).toBe(0);
   });
   it("el interruptor solo vale para los vendibles y los excluidos", () => {
