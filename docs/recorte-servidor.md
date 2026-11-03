@@ -1,11 +1,13 @@
-# Recorte de fotos en el servidor (móvil y tablet)
+# Recorte de fotos en el servidor (respaldo del móvil)
 
-Decisión del dueño (03-11-2026): el iPhone no tiene memoria para quitar el fondo en el navegador (el modelo pide ~1 GB por pestaña y Safari la cierra). Desde entonces **el móvil manda la foto a un servidor nuestro**, que quita el fondo con el **mismo modelo** que el ordenador y devuelve la máscara. El ordenador sigue recortando en el navegador, como siempre.
+Decisión del dueño (03-11-2026, versión final): **el móvil (Android, iPhone y iPad, por el mismo camino) quita el fondo primero en su propio navegador**, con el mismo modelo que el ordenador. El **servidor** es el **respaldo** cuando eso falla (memoria, descarga, error). Si el servidor también falla, no responde o se llega al tope, la foto pasa a un **ordenador**. Un móvil que se queda sin memoria recortando queda marcado y sus siguientes fotos van directas al servidor; desde la ficha se puede volver a probar en el móvil. El ordenador sigue recortando en el formulario, como siempre.
+
+Toda foto de cámara (12-48 Mpx) se decodifica **ya reducida** (`medidasFoto.ts`, `createImageBitmap` con `resizeWidth`) antes de cualquier lienzo: Safari limita los lienzos a ~16,7 Mpx.
 
 ## Cómo funciona
 
 1. En el móvil se elige la foto y el fondo, y se guarda la ficha **con la foto original** (nunca se pierde).
-2. Justo después, el móvil reduce la foto (lado mayor 1200 px, JPEG ~0,3-0,6 MB) y la manda a `POST /api/recortar-foto` con el JWT de su sesión. Sale el aviso «Poniendo el fondo de carta…» con las fases *Subiendo la foto…* → *Quitando el fondo en el servidor…* → *Componiendo…*.
+2. Justo después, el móvil reduce la foto (lado mayor 1200 px) e intenta quitar el fondo él mismo. Sale el aviso «Poniendo el fondo de carta…» con el progreso: descarga del modelo (solo la primera vez) y recorte. Si falla, manda la foto reducida (JPEG ~0,3-0,6 MB) a `POST /api/recortar-foto` con el JWT de su sesión, con las fases *Subiendo…* → *Quitando el fondo en el servidor…* → *Componiendo…*.
 3. La función (`api/recortar-foto.ts`, Vercel Function con runtime Node, en `fra1`) hace esto:
    - Comprueba la sesión contra el Supabase de su entorno: la demo en Preview y producción en Production. Usa las mismas variables `VITE_SUPABASE_*` del panel.
    - Llama, **como ese usuario**, a `recorte_servidor_reservar()`, que exige el permiso de carta (`can_write_section('gestor_carta')`) y que quede cupo (ver *Gasto*).

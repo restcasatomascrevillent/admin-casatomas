@@ -19,12 +19,16 @@ vi.mock("../recorte/quitarFondoNavegador", async (original) => {
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
 
 import { recorteNavegadorSeguro } from "../recorte/quitarFondoNavegador";
+import { destinoRecorteActual } from "../recorte/useRecorteVino";
+import { navegadorDiag } from "../recorte/diagnostico";
 import { quitarFondo } from "../fotoCartaVino";
 
 const ESCRITORIO = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
 const ANDROID = "Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const IPAD_COMO_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+
+const IPHONE_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1";
 
 const nav = (userAgent: string, extra: Record<string, unknown> = {}) =>
   ({ userAgent, maxTouchPoints: 0, ...extra }) as unknown as Navigator;
@@ -60,6 +64,26 @@ describe("¿Se puede recortar en el navegador de este dispositivo?", () => {
   it("no en una pantalla táctil sin ratón", () => {
     vi.stubGlobal("matchMedia", (q: string) => ({ matches: q.includes("coarse"), media: q }));
     expect(recorteNavegadorSeguro(nav(ESCRITORIO))).toBe(false);
+  });
+});
+
+describe("decisión por dispositivo (el mismo camino en Android y en iPhone)", () => {
+  it.each([
+    ["PC", nav(ESCRITORIO, { deviceMemory: 8 }), "formulario"],
+    ["Android", nav(ANDROID), "movil"],
+    ["iPhone (Safari)", nav(IPHONE, { maxTouchPoints: 5 }), "movil"],
+    ["iPhone (Chrome, CriOS)", nav(IPHONE_CHROME, { maxTouchPoints: 5 }), "movil"],
+    ["iPad que se presenta como Mac", nav(IPAD_COMO_MAC, { maxTouchPoints: 5 }), "movil"],
+  ])("%s → %s", (_n, n, destino) => {
+    vi.stubGlobal("navigator", n);
+    expect(destinoRecorteActual()).toBe(destino);
+  });
+
+  it("el diagnóstico dice el navegador (Chrome iOS no es Safari)", () => {
+    expect(navegadorDiag(nav(IPHONE_CHROME))).toBe("Chrome iOS (iPhone iOS 18.1)");
+    expect(navegadorDiag(nav(IPHONE))).toBe("Safari (iPhone iOS 18.0)");
+    expect(navegadorDiag(nav(IPAD_COMO_MAC, { maxTouchPoints: 5 }))).toMatch(/^Safari \(iPad/);
+    expect(navegadorDiag(nav(ANDROID))).toBe("Chrome Android");
   });
 });
 

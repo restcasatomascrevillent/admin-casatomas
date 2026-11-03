@@ -46,6 +46,7 @@ import type { MensajeAlWorker, MensajeDelWorker, Proveedor } from "./recorte.wor
 import { LADO_MODELO } from "./mascaraRecorte";
 import { aplicarCoeficientes, coeficientesGuiado, entradaGuiado, limpiarMascara, luminancia, medidasTrabajo } from "./refinarMascara";
 import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
+import { diag, memoriaDiag } from "./diagnostico";
 
 export type ProgresoRecorte =
   /** `recibidos`/`total` en bytes (para «23/47 MB»). */
@@ -274,6 +275,7 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
   const t0 = performance.now();
   const bmp = await createImageBitmap(foto);
   const { width: ancho, height: alto } = bmp;
+  diag("recorte local: foto decodificada", { foto, lienzo: `${ancho}x${alto}`, entrada: `${LADO_MODELO}x${LADO_MODELO}`, ...memoriaDiag() });
 
   // Entrada 1024×1024 (la deformación es la misma que hace rembg).
   const ent = lienzo(LADO_MODELO, LADO_MODELO);
@@ -287,8 +289,10 @@ export async function quitarFondoNavegador(foto: Blob, onProgreso?: (p: Progreso
     res = await mascaraModelo(rgba, onProgreso);
   } catch (e) {
     bmp.close();
+    diag("recorte local: fallo del modelo", { nombre: (e as Error)?.name, mensaje: (e as Error)?.message, ...memoriaDiag() });
     throw e;
   }
+  diag("recorte local: modelo hecho", { proveedor: res.proveedor, ms: Math.round(res.ms), desdeCache: res.desdeCache, ...memoriaDiag() });
 
   // Máscara 1024² → resolución de trabajo (≤ LADO_TRABAJO_FOTO) → limpieza +
   // filtro guiado con la propia foto → alfa a resolución completa

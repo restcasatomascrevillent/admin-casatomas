@@ -120,6 +120,44 @@ export function diag(paso: string, datos?: unknown): void {
   }
 }
 
+/** Memoria que el navegador deja ver (Chrome: montón de JS y RAM aproximada; Safari no da nada). */
+export function memoriaDiag(): Record<string, number> {
+  const r: Record<string, number> = {};
+  try {
+    const m = (performance as Performance & { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory;
+    if (m) {
+      r.heapMB = Math.round(m.usedJSHeapSize / 1048576);
+      r.heapMaxMB = Math.round(m.jsHeapSizeLimit / 1048576);
+    }
+    const dm = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+    if (typeof dm === "number") r.ramGB = dm;
+  } catch {
+    /* nada */
+  }
+  return r;
+}
+
+/**
+ * Navegador según el UA (para el diagnóstico): en iOS todos son WebKit, pero
+ * Chrome (CriOS), Firefox (FxiOS) y Edge (EdgiOS) se comportan distinto en
+ * el selector de fotos. iPadOS se presenta como Mac con pantalla táctil.
+ */
+export function navegadorDiag(nav: Pick<Navigator, "userAgent" | "maxTouchPoints"> | undefined = typeof navigator !== "undefined" ? navigator : undefined): string {
+  const ua = nav?.userAgent ?? "";
+  const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && (nav?.maxTouchPoints ?? 0) > 1);
+  if (ios) {
+    const disp = /iPad/i.test(ua) || /Macintosh/i.test(ua) ? "iPad" : "iPhone";
+    const version = /OS (\d+)[_.](\d+)/.exec(ua);
+    const v = version ? ` iOS ${version[1]}.${version[2]}` : "";
+    if (/CriOS/i.test(ua)) return `Chrome iOS (${disp}${v})`;
+    if (/FxiOS/i.test(ua)) return `Firefox iOS (${disp}${v})`;
+    if (/EdgiOS/i.test(ua)) return `Edge iOS (${disp}${v})`;
+    return `Safari (${disp}${v})`;
+  }
+  if (/Android/i.test(ua)) return /Chrome\//.test(ua) ? "Chrome Android" : "Android";
+  return /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "otro";
+}
+
 /** Solo para pruebas. */
 export function _lineasDiag(): string[] {
   return [...lineas];

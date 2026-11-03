@@ -2,8 +2,8 @@
  * Memoria del recorte (03-11-2026):
  *   - la descarga del modelo (solo ordenador) usa UN solo buffer (antes ~140 MB
  *     transitorios) y guardarlo en Cache Storage no lo copia ni lo neutraliza;
- *   - «Varias botellas» en el móvil no pasa el modelo: el fondo lo pone el
- *     servidor al guardar cada botella (trasGuardarFotoCarta, como en la ficha suelta).
+ *   - «Varias botellas» en el móvil no pasa el modelo en el lote: el fondo se
+ *     pone al guardar cada botella (trasGuardarFotoCarta, como en la ficha suelta).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   dismiss: vi.fn(),
   leer: vi.fn(),
   hacerFotoCarta: vi.fn(),
-  destino: vi.fn(() => "servidor"),
+  destino: vi.fn(() => "movil"),
 }));
 vi.mock("sonner", () => ({ toast: { loading: mocks.loading, success: mocks.success, warning: mocks.warning, dismiss: mocks.dismiss, error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
@@ -119,7 +119,7 @@ describe("descarga del modelo en un solo buffer", () => {
 
 describe("«Varias botellas» en el móvil", () => {
   it("no lanza el recorte en el lote (memoria) y la fila queda «el fondo se pone al guardar»", async () => {
-    mocks.destino.mockReturnValue("servidor");
+    mocks.destino.mockReturnValue("movil");
     const foto = new File(["x"], "b.jpg", { type: "image/jpeg" });
     mocks.leer.mockResolvedValue({ datos: { nombre: "Rioja" }, foto });
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() }));
@@ -127,7 +127,7 @@ describe("«Varias botellas» en el móvil", () => {
     act(() => result.current.añadir([foto]));
     await waitFor(() => expect(result.current.filas[0]?.estado).toBe("listo"));
     expect(result.current.filas[0].recorte).toBe("diferido");
-    // Sin promesa de recorte: el formulario pasa a «diferido» y al guardar lanza el recorte en el servidor.
+    // Sin promesa de recorte: el formulario pasa a «diferido» y al guardar se recorta (móvil → servidor → ordenador).
     expect(result.current.filas[0].resultado?.recorte).toBeUndefined();
     expect(mocks.hacerFotoCarta).not.toHaveBeenCalled();
     expect(textoListo("diferido")).toBe("Listo · el fondo se pone al guardar");

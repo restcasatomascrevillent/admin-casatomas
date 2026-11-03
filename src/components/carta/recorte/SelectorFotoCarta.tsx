@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { temasDisponibles } from "../composicionCarta";
 import { ESTILO_DAMERO, textoProgreso, type FotoCarta } from "./useRecorteVino";
+import { movilSinLocal, olvidarMovilSinLocal } from "./recorteMovil";
+import { useState } from "react";
 
 interface Props {
   recorte: FotoCarta;
@@ -29,6 +31,8 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
   const usaCarta = listo && eleccion === "carta";
   const verSticker = usaCarta && (vista === "sticker" || !urls.carta);
   const src = usaCarta ? (verSticker ? urls.sticker : urls.carta) : urls.original;
+  /** Móvil que se quedó sin memoria recortando: usa el servidor (se puede volver a probar). */
+  const [sinLocal, setSinLocal] = useState(() => movilSinLocal());
 
   return (
     <div className="space-y-2">
@@ -97,7 +101,7 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
       )}
 
       {diferido && (
-        // Móvil: aquí no se recorta (memoria). Se guarda la foto y luego el servidor le quita el fondo.
+        // Móvil: aquí no se recorta (memoria). Se guarda la foto y luego se le quita el fondo.
         <div
           role="note"
           className="mx-auto flex max-w-xs gap-2 rounded-md border bg-muted/50 p-2 text-left text-xs"
@@ -106,7 +110,23 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <div className="space-y-1">
             {eleccion === "carta" ? (
-              <p>Al guardar se guarda esta foto y después el servidor le quita el fondo y se le pone el fondo elegido (deja el panel abierto unos segundos).</p>
+              sinLocal ? (
+                <p>
+                  Al guardar se guarda esta foto y el servidor le quita el fondo (este móvil se quedó sin memoria al hacerlo él).{" "}
+                  <button
+                    type="button"
+                    className="font-medium underline underline-offset-2"
+                    onClick={() => {
+                      olvidarMovilSinLocal();
+                      setSinLocal(null);
+                    }}
+                  >
+                    Probar otra vez en este móvil
+                  </button>
+                </p>
+              ) : (
+                <p>Al guardar se guarda esta foto y después se le quita el fondo en este móvil (si no puede, en el servidor). Deja el panel abierto hasta que acabe.</p>
+              )
             ) : (
               <p>Se guardará la foto tal cual, sin fondo de carta.</p>
             )}

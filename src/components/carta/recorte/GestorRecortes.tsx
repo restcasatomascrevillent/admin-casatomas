@@ -4,7 +4,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { CLAVE_CONSULTA_TABLA, EVENTO_FOTO_RECORTADA, type TablaFoto } from "./recorteMovil";
 import { AvisoTrabajosRecorte } from "../potente/AvisoTrabajosRecorte";
-import { diag, diagActivo } from "./diagnostico";
+import { diag, diagActivo, memoriaDiag, navegadorDiag } from "./diagnostico";
 
 /**
  * Recortes de fotos fuera de los formularios (móvil, tras guardar):
@@ -27,7 +27,7 @@ export function GestorRecortes() {
 
   // ?diag=recorte: se activa (y se recuerda en la pestaña) al abrir el panel.
   useEffect(() => {
-    if (diagActivo()) diag("panel abierto", { ua: navigator.userAgent });
+    if (diagActivo()) diag("panel abierto", { navegador: navegadorDiag(), ua: navigator.userAgent, ...memoriaDiag() });
   }, []);
 
   useEffect(() => {

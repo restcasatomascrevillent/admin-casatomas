@@ -15,6 +15,7 @@
  * («Copiar» en Fotos → «Pegar foto recortada» en el panel) y los archivos
  * elegidos desde «Archivos» («Guardar en Archivos» → «Explorar»).
  */
+import { bitmapReducido } from "../medidasFoto";
 import { exigirFotoValida } from "@/lib/validarFoto";
 import { aceptarFoto } from "@/lib/aceptarFoto";
 
@@ -173,7 +174,7 @@ export async function detectarFotoRecortada(foto: Blob): Promise<File | null> {
   let bmp: ImageBitmap | null = null;
   try {
     if (!cabeceraConAlfa(await leerBytes(foto, 64 * 1024))) return null;
-    bmp = await createImageBitmap(foto);
+    bmp = await bitmapReducido(foto, LADO_RECORTADA);
     const escala = Math.min(1, LADO_RECORTADA / Math.max(bmp.width, bmp.height));
     const ancho = Math.max(1, Math.round(bmp.width * escala));
     const alto = Math.max(1, Math.round(bmp.height * escala));

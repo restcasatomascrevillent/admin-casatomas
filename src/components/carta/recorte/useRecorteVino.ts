@@ -6,7 +6,8 @@ import { redimensionarFoto } from "../redimensionarFoto";
 import { recorteNavegadorSeguro } from "./quitarFondoNavegador";
 import type { DestinoRecorte } from "./recorteMovil";
 import { candidataRecortada, detectarFotoRecortada, esStickerRecortado } from "./fotoYaRecortada";
-import { diag } from "./diagnostico";
+import { diag, diagActivo, navegadorDiag } from "./diagnostico";
+import { medidasFoto } from "../medidasFoto";
 
 export type { TipoFotoCarta } from "../composicionCarta";
 
@@ -24,8 +25,9 @@ export type EstadoRecorte =
   | { fase: "fallo"; aviso: string }
   /**
    * Móvil/tablet: no se recorta en el formulario. Al guardar se guarda la
-   * foto original y luego el servidor le quita el fondo y el móvil le pone el
-   * fondo elegido (trasGuardarFotoCarta). Ver recorteMovil.ts.
+   * foto original y luego se le quita el fondo en el móvil (o, si no puede,
+   * en el servidor) y se le pone el fondo elegido (trasGuardarFotoCarta).
+   * Ver recorteMovil.ts.
    */
   | { fase: "diferido" };
 
@@ -54,9 +56,9 @@ async function fotoParaRecorte(f: File): Promise<Blob> {
   return (await redimensionarFoto(f)).blob;
 }
 
-/** Dónde se quita el fondo en este dispositivo: en el formulario (ordenador) o en el servidor tras guardar (móvil/tablet). */
+/** Dónde se quita el fondo en este dispositivo: en el formulario (ordenador) o tras guardar (móvil/tablet). */
 export function destinoRecorteActual(): DestinoRecorte {
-  return recorteNavegadorSeguro() ? "formulario" : "servidor";
+  return recorteNavegadorSeguro() ? "formulario" : "movil";
 }
 
 /** Tiempo que se enseña el sticker antes de pasar solo a «Con fondo». */
@@ -69,7 +71,7 @@ export const MS_VER_STICKER = 1800;
  * `tipo` (vino/bebida = botella 3:4; plato = 4:3 centrado). Cambiar de fondo
  * solo recompone (no vuelve a recortar). «Usar foto original» guarda la foto
  * tal cual. En el móvil no se recorta aquí (fase "diferido"): se elige el
- * fondo y, después de guardar, el servidor quita el fondo (trasGuardarFotoCarta).
+ * fondo y el fondo se quita después de guardar (trasGuardarFotoCarta).
  */
 export function useFotoCarta(tipo: TipoFotoCarta) {
   const [original, setOriginal] = useState<File | null>(null);
@@ -82,12 +84,12 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
   const tocado = useRef(false);
   const turno = useRef(0);
 
-  /** Camino de siempre: modelo en el ordenador; en el móvil, el servidor después de guardar. */
+  /** Camino de siempre: modelo en el ordenador; en el móvil, después de guardar. */
   const seguirConModelo = useCallback((foto: File, yo: number, previo?: Promise<ResultadoFotoCarta>) => {
     const destino = destinoRecorteActual();
     diag("destino del recorte", { destino, lote: !!previo });
     if (destino !== "formulario") {
-      // Móvil: nada de modelo en el formulario (memoria); el fondo lo quita el servidor tras guardar.
+      // Móvil: nada de modelo en el formulario (memoria); el fondo se quita tras guardar.
       void previo?.catch(() => undefined);
       setEstado({ fase: "diferido" });
       return;
@@ -117,7 +119,8 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     setEleccion("carta");
     setVistaInterna("sticker");
     setCompuesta(null);
-    diag("foto elegida", { foto, nombre: foto.name, lote: !!previo });
+    diag("foto elegida", { navegador: navegadorDiag(), foto, nombre: foto.name, tipo: foto.type || "(sin tipo)", lote: !!previo });
+    if (diagActivo()) void medidasFoto(foto).then((m) => diag("medidas de la foto (cabecera)", m ? { ...m, mpx: Math.round((m.ancho * m.alto) / 1e5) / 10 } : "no se reconocen"));
     // Foto que ya viene sin fondo (recorte del iPhone, PNG con alfa): su
     // transparencia es la máscara, sin modelo, en cualquier dispositivo.
     if (!previo && esStickerRecortado(foto)) {
