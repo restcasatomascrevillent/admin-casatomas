@@ -34,6 +34,7 @@ import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
+import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
@@ -111,7 +112,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { isAdmin, permissions, loading } = useUserRole();
+  const { isAdmin, role, permissions, loading } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
@@ -216,6 +217,13 @@ export function AppSidebar() {
           />
         )}
         <SidebarMenu>
+          {/* Quién ha iniciado sesión; abre «Mi cuenta» (datos, permisos y contraseña). */}
+          <BotonUsuarioMenu
+            tono="panel"
+            esSuperAdmin={!superAdminLoading && isSuperAdmin}
+            rol={role ?? null}
+            permisos={permissions ?? []}
+          />
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Cerrar sesión"
