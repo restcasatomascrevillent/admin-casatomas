@@ -717,12 +717,7 @@ it("en superadmin móvil permite editar permisos desde la tarjeta y mantiene las
   expect(within(propia).getByText("Tú")).toBeInTheDocument();
   expect(within(tarjeta).queryByText("Tú")).toBeNull();
   expect(within(propia).queryByRole("button", { name: "Contraseña" })).toBeNull();
-  fireEvent.click(within(propia).getByRole("button", { name: "Mi contraseña" }));
-  const propio = await screen.findByRole("dialog", { name: "Cambiar mi contraseña" });
-  expect(within(propio).getByLabelText("Contraseña actual", { selector: "input" })).toBeInTheDocument();
-  fireEvent.click(within(propio).getByRole("button", { name: "Cancelar" }));
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  expect(vi.mocked(supabase.functions.invoke).mock.calls.some(([n]) => n === "admin-update-user-password")).toBe(false);
+  expect(within(propia).getByRole("button", { name: "Mi contraseña" })).toBeEnabled();
   expect(within(propia).getByRole("button", { name: "Bloquear acceso" })).toBeDisabled();
   const opciones = within(propia).getByText("Más opciones").closest("details")!;
   fireEvent.click(within(opciones).getByText("Más opciones"));
@@ -732,6 +727,19 @@ it("en superadmin móvil permite editar permisos desde la tarjeta y mantiene las
   fireEvent.click(within(acciones).getByText("Más opciones"));
   expect(within(acciones).getByRole("button", { name: "Hacer Super Admin" })).toBeEnabled();
   expect(within(acciones).getByRole("button", { name: "Eliminar a camarero1" })).toHaveTextContent("Eliminar usuario");
+});
+
+it("en superadmin, «Mi contraseña» de la fila propia abre el cambio propio (pide la actual) y nunca la función de admin", async () => {
+  window.innerWidth = 320;
+  render(<ListaUsuarios canManageSuperAdmins />);
+  await screen.findByText("camarero1");
+  const propia = screen.getByText("Dueño").closest("li")!;
+  fireEvent.click(within(propia).getByRole("button", { name: "Mi contraseña" }));
+  const propio = await screen.findByRole("dialog", { name: "Cambiar mi contraseña" });
+  expect(within(propio).getByLabelText("Contraseña actual", { selector: "input" })).toBeInTheDocument();
+  fireEvent.click(within(propio).getByRole("button", { name: "Cancelar" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(vi.mocked(supabase.functions.invoke).mock.calls.some(([n]) => n === "admin-update-user-password")).toBe(false);
 });
 
 it.each([1280, 390])("el cambio de contraseña conserva el diálogo si falla y lo cierra al guardar a %s px", async (ancho) => {
