@@ -1,16 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  type LecturaServicio,
   type ServicioContratado,
+  aEur,
+  avisosConsumo,
   borradorDe,
   cambiosDeBorrador,
   combinarMetricas,
+  cuotaMensual,
   enlaceSecretosSupabase,
   formatearCantidad,
   formatearPorcentaje,
   haceCuanto,
   leerNumero,
+  ordenarServicios,
   peorSemaforo,
+  proximasRenovaciones,
+  resumirCostes,
   semaforo,
+  textoDias,
+  textoImporteConEur,
   textoPrecio,
 } from "../servicios";
 
@@ -32,7 +41,16 @@ const SERVICIO: ServicioContratado = {
   },
   notas: null,
   actualizado_en: "2026-11-03T10:00:00Z",
+  categoria: "base_datos",
+  orden: 20,
+  activo: true,
+  por_confirmar: false,
+  precio_anual: null,
+  fuente_precio: "https://supabase.com/pricing",
 };
+const servicio = (p: Partial<ServicioContratado> & Pick<ServicioContratado, "proveedor" | "nombre">): ServicioContratado => ({
+  ...SERVICIO, limites: {}, ...p,
+});
 
 describe("semáforo (verde < 70 %, ámbar 70–90 %, rojo > 90 %)", () => {
   it.each([[0, "verde"], [69.9, "verde"], [70, "ambar"], [85, "ambar"], [90, "ambar"], [90.1, "rojo"], [140, "rojo"]] as const)("%s %% → %s", (p, s) => {
@@ -139,5 +157,125 @@ describe("edición", () => {
     expect(r.ok).toBe(false);
     if (!("errores" in r)) return;
     expect(Object.keys(r.errores).sort()).toEqual(["limite.almacenamiento", "nombre", "panel_url", "precio"]);
+  });
+});
+
+describe("coste", () => {
+  it("cuota al mes según el ciclo y paso a euros", () => {
+    expect(cuotaMensual({ precio_mensual: 0, moneda: "USD", ciclo: "gratuito" })).toEqual({ importe: 0, moneda: "USD" });
+    expect(cuotaMensual({ precio_mensual: 20, moneda: "USD", ciclo: "mensual" })).toEqual({ importe: 20, moneda: "USD" });
+    expect(cuotaMensual({ precio_mensual: null, precio_anual: 120, moneda: "EUR", ciclo: "anual" })).toEqual({ importe: 10, moneda: "EUR" });
+    expect(cuotaMensual({ precio_mensual: 3, precio_anual: null, moneda: "EUR", ciclo: "anual" })).toEqual({ importe: 3, moneda: "EUR" });
+    expect(cuotaMensual({ precio_mensual: null, moneda: "USD", ciclo: "por_uso" })).toEqual({ importe: 0, moneda: "USD" });
+    expect(cuotaMensual({ precio_mensual: null, moneda: "EUR", ciclo: "mensual" })).toBeNull();
+    expect(aEur(20, "USD", 0.9)).toBe(18);
+    expect(aEur(5, "eur", 0.9)).toBe(5);
+    expect(aEur(5, "GBP", 0.9)).toBeNull();
+    expect(t(textoImporteConEur({ importe: 20, moneda: "USD" }, 0.894))).toBe("20,00 US$ (≈ 17,88 €)");
+    expect(t(textoImporteConEur({ importe: 12, moneda: "EUR" }, 0.894))).toBe("12,00 €");
+  });
+
+  it("precio al año", () => {
+    expect(t(textoPrecio({ precio_mensual: null, precio_anual: 14.99, moneda: "EUR", ciclo: "anual" }))).toBe("14,99 € al año");
+    expect(t(textoPrecio({ precio_mensual: 2, precio_anual: null, moneda: "EUR", ciclo: "anual" }))).toBe("2,00 € al mes (pago anual)");
+  });
+
+  it("resumirCostes: cuotas + uso del mes en euros, sin los que no se usan, y la previsión del año", () => {
+    const servicios = [
+      servicio({ proveedor: "vercel", nombre: "Vercel", precio_mensual: 0, ciclo: "gratuito" }),
+      servicio({ proveedor: "hostinger", nombre: "Hostinger", precio_mensual: null, precio_anual: 120, moneda: "EUR", ciclo: "anual", por_confirmar: true }),
+      servicio({ proveedor: "openai", nombre: "OpenAI", precio_mensual: null, moneda: "USD", ciclo: "por_uso" }),
+      servicio({ proveedor: "pro", nombre: "Pro en dólares", precio_mensual: 20, moneda: "USD", ciclo: "mensual" }),
+      servicio({ proveedor: "loading", nombre: "Loading", precio_mensual: null, moneda: "EUR", ciclo: "anual" }),
+      servicio({ proveedor: "perplexity", nombre: "Perplexity", precio_mensual: 50, moneda: "USD", ciclo: "mensual", activo: false }),
+    ];
+    const lecturas = {
+      openai: { coste_variable: { importe: 3, moneda: "USD", periodo: "mes en curso", origen: "estimado" } },
+      vercel: { coste_variable: null },
+      perplexity: { coste_variable: { importe: 999, moneda: "USD" } },
+    };
+    // 10 de noviembre: han pasado 10 de 30 días.
+    const r = resumirCostes(servicios, lecturas, 0.9, new Date("2026-11-10T12:00:00Z"));
+    expect(r.filas.map((f) => f.proveedor)).toEqual(["pro", "hostinger", "openai", "loading", "vercel"]);
+    expect(r.filas[0]).toMatchObject({ fijoEur: 18, variableEur: 0, totalEur: 18, fijo: { importe: 20, moneda: "USD" } });
+    expect(r.filas[2]).toMatchObject({ fijoEur: 0, variableEur: 2.7, totalEur: 2.7 });
+    expect(r.filas[3]).toMatchObject({ fijoEur: null, totalEur: 0 });
+    expect(r).toMatchObject({ fijoMesEur: 28, variableMesEur: 2.7, totalMesEur: 30.7, fijoAnioEur: 336, hayUsd: true });
+    // (28 + 2,7 × 30/10) × 12 = 433,2
+    expect(r.previsionAnioEur).toBe(433.2);
+    expect(r.sinPrecio).toEqual(["Loading"]);
+    expect(r.porConfirmar).toEqual(["Hostinger"]);
+  });
+});
+
+describe("avisos y renovaciones", () => {
+  const supa = SERVICIO;
+  const lecturas = new Map<string, LecturaServicio>([
+    ["supabase", { proveedor: "supabase", tomado_en: "", error: null, detalles: {}, metricas: {
+      bd_tamano: { valor: 420 * 1024 ** 2, unidad: "bytes" }, almacenamiento: { valor: 0.95 * 1024 ** 3, unidad: "bytes" }, usuarios_activos_mes: { valor: 10, unidad: "usuarios" },
+    } }],
+    ["hostinger", { proveedor: "hostinger", tomado_en: "", error: null, metricas: {}, detalles: {
+      dominios: [{ dominio: "restaurantecasatomascrevillente.es", estado: "active", caduca: "2027-01-15T10:00:00Z" }, { dominio: "viejo.es", estado: "expired", caduca: "2025-01-01T00:00:00Z" }],
+      suscripciones: [{ nombre: "Premium Web Hosting", estado: "active", caduca: "2026-11-20T10:00:00Z", proxima_factura: "2026-11-20T10:00:00Z" }, { nombre: "Email", estado: "cancelled", caduca: "2026-11-05T00:00:00Z" }],
+    } }],
+  ]);
+
+  it("avisosConsumo: desde el 80 %, de mayor a menor, solo de lo que se usa", () => {
+    const avisos = avisosConsumo([supa, { ...supa, proveedor: "otro", nombre: "Otro", activo: false }], new Map([...lecturas, ["otro", { ...lecturas.get("supabase")!, proveedor: "otro" }]]));
+    expect(avisos.map((a) => [a.clave, Math.round(a.porcentaje), a.semaforo])).toEqual([["almacenamiento", 95, "rojo"], ["bd_tamano", 84, "ambar"]]);
+    expect(avisos[0]).toMatchObject({ nombre: "Supabase", textoLimite: "1 GB" });
+  });
+
+  it("proximasRenovaciones: la fecha apuntada y lo que dice la API (dominios y suscripciones activas), en orden", () => {
+    const hostinger = servicio({ proveedor: "hostinger", nombre: "Hostinger", categoria: "dominio" });
+    const loading = servicio({ proveedor: "loading", nombre: "Loading", categoria: "dominio", renovacion: "2026-11-01" });
+    const apagado = servicio({ proveedor: "x", nombre: "X", renovacion: "2026-11-04", activo: false });
+    const r = proximasRenovaciones([hostinger, loading, apagado], lecturas, new Date("2026-11-03T12:00:00Z"));
+    expect(r.map((x) => [x.nombre, x.concepto, x.fecha, x.dias, x.deLaApi])).toEqual([
+      ["Loading", "Renovación (dominio o plan)", "2026-11-01", -2, false],
+      ["Hostinger", "Suscripción Premium Web Hosting", "2026-11-20", 17, true],
+      ["Hostinger", "Dominio restaurantecasatomascrevillente.es", "2027-01-15", 73, true],
+    ]);
+    expect([textoDias(0), textoDias(1), textoDias(17), textoDias(-2)]).toEqual(["hoy", "mañana", "en 17 días", "hace 2 días"]);
+  });
+
+  it("ordenarServicios por orden y nombre", () => {
+    const lista = [servicio({ proveedor: "b", nombre: "B", orden: 50 }), servicio({ proveedor: "a", nombre: "A", orden: 50 }), servicio({ proveedor: "c", nombre: "C", orden: 10 })];
+    expect(ordenarServicios(lista).map((x) => x.proveedor)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("edición de los campos nuevos", () => {
+  it("anual: se edita el precio al año (y el al mes queda vacío); categoría, orden, en uso y fuente", () => {
+    const original = servicio({ proveedor: "loading", nombre: "Loading", ciclo: "anual", precio_mensual: 1.25, precio_anual: null, moneda: "EUR", categoria: "dominio", orden: 96 });
+    const b = borradorDe(original);
+    expect(b).toMatchObject({ precio: "15", categoria: "dominio", orden: "96", activo: true, por_confirmar: false });
+    b.precio = "14,99";
+    b.activo = false;
+    b.fuente_precio = "https://www.loading.es/dominios/";
+    const r = cambiosDeBorrador(b, original);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.cambios).toMatchObject({ precio_mensual: null, precio_anual: 14.99, activo: false, orden: 96, categoria: "dominio", fuente_precio: "https://www.loading.es/dominios/" });
+  });
+
+  it("el límite que pone la lectura (tope de IA) sigue sin «limite» si no se escribe uno", () => {
+    const openai = servicio({ proveedor: "openai", nombre: "OpenAI", limites: { gasto_ia_mes: { orden: 1, unidad: "EUR", limite_desde: "Tope de Costes" } } });
+    const r = cambiosDeBorrador(borradorDe(openai), openai);
+    if (!r.ok) throw new Error("no válido");
+    expect("limite" in r.cambios.limites.gasto_ia_mes).toBe(false);
+    expect(r.cambios.limites.gasto_ia_mes.limite_desde).toBe("Tope de Costes");
+    const b = borradorDe(openai);
+    b.limites.gasto_ia_mes = { limite: "10", unidad: "EUR" };
+    const r2 = cambiosDeBorrador(b, openai);
+    if (!r2.ok) throw new Error("no válido");
+    expect(r2.cambios.limites.gasto_ia_mes.limite).toBe(10);
+  });
+
+  it("rechaza categoría, orden y fuente no válidos", () => {
+    const b = { ...borradorDe(SERVICIO), categoria: "cosas", orden: "1,5", fuente_precio: "http://x.test" };
+    const r = cambiosDeBorrador(b, SERVICIO);
+    if (!("errores" in r)) throw new Error("debería fallar");
+    expect(Object.keys(r.errores).sort()).toEqual(["categoria", "fuente_precio", "orden"]);
   });
 });

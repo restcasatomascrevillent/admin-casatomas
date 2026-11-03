@@ -1,16 +1,22 @@
-import { AlertTriangle, ExternalLink, Loader2, Pencil, RefreshCw } from "lucide-react";
+import { AlertTriangle, ExternalLink, Info, Loader2, Pencil, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   type LecturaServicio,
   type ServicioContratado,
+  TEXTO_CATEGORIA,
   TEXTO_CICLO,
   TEXTO_ERROR,
+  aEur,
   combinarMetricas,
+  costeVariableDe,
+  cuotaMensual,
   fechaCorta,
+  formatearEur,
   haceCuanto,
   peorSemaforo,
+  textoImporteConEur,
   textoPrecio,
 } from "@/lib/servicios";
 import { AvisoClave } from "./AvisoClave";
@@ -21,21 +27,41 @@ interface Props {
   lectura: LecturaServicio | null;
   cargando: boolean;
   actualizando: boolean;
+  /** No hay API razonable: el consumo se mira en el panel del proveedor. */
+  sinLector?: boolean;
+  eurPorUsd: number;
   onActualizar: () => void;
   onEditar: () => void;
 }
 
 const textoLista = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
+const esObjeto = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 
 function textoRenovacion(s: ServicioContratado): string {
   const f = fechaCorta(s.renovacion);
   if (f) return `${f} (${TEXTO_CICLO[s.ciclo] ?? s.ciclo})`;
   if (s.ciclo === "gratuito") return "No hay que renovar (plan gratis)";
-  if (s.ciclo === "por_uso") return "No hay cuota: se paga por cobro";
-  return "Sin fecha";
+  if (s.ciclo === "por_uso") return "No hay cuota: se paga lo que se usa";
+  return "Sin fecha (apúntala en «Editar»)";
 }
 
-export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onActualizar, onEditar }: Props) {
+/** «20,00 US$ al mes (≈ 17,88 €)»: el precio del plan y, si no es en euros, su equivalente. */
+function textoPrecioConEur(s: ServicioContratado, eurPorUsd: number): string {
+  const base = textoPrecio(s);
+  const cuota = cuotaMensual(s);
+  if (!cuota || cuota.importe <= 0 || cuota.moneda.toUpperCase() === "EUR") return base;
+  const importe = s.ciclo === "anual" && s.precio_anual != null ? s.precio_anual : cuota.importe;
+  const eur = aEur(importe, cuota.moneda, eurPorUsd);
+  return eur == null ? base : `${base} (≈ ${formatearEur(eur)})`;
+}
+
+/** Dominios que da la API (Hostinger), con su caducidad. */
+function dominiosDe(detalles: Record<string, unknown>): Array<{ dominio: string; caduca: string | null }> {
+  const lista = Array.isArray(detalles.dominios) ? detalles.dominios : [];
+  return lista.filter(esObjeto).filter((d) => typeof d.dominio === "string").map((d) => ({ dominio: String(d.dominio), caduca: fechaCorta(typeof d.caduca === "string" ? d.caduca : null) }));
+}
+
+export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sinLector = false, eurPorUsd, onActualizar, onEditar }: Props) {
   const idTitulo = `servicio-${servicio.proveedor}`;
   const filas = combinarMetricas(servicio, lectura);
   const peor = peorSemaforo(filas);
@@ -43,22 +69,34 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onA
   const avisos = textoLista(detalles.avisos);
   const modo = typeof detalles.modo === "string" ? detalles.modo : null;
   const planDetectado = typeof detalles.plan_detectado === "string" ? detalles.plan_detectado : null;
+  const costeDetectado = esObjeto(detalles.coste_mensual_detectado) && typeof detalles.coste_mensual_detectado.importe === "number"
+    ? { importe: detalles.coste_mensual_detectado.importe, moneda: String(detalles.coste_mensual_detectado.moneda ?? "EUR") }
+    : null;
+  const dominios = dominiosDe(detalles);
   const secretoOpcional = typeof detalles.secreto_opcional === "string" ? detalles.secreto_opcional : null;
   const faltaClave = lectura?.error === "falta_secreto";
   const otroError = lectura?.error && !faltaClave ? lectura.error : null;
   const fecha = lectura?.tomado_en ? new Date(lectura.tomado_en) : null;
+  const variable = costeVariableDe(lectura);
+  const categoria = TEXTO_CATEGORIA[servicio.categoria] ?? null;
 
   return (
-    <Card className="flex min-w-0 flex-col" aria-labelledby={idTitulo} role="article">
+    <Card id={`tarjeta-${servicio.proveedor}`} className="flex min-w-0 scroll-mt-4 flex-col" aria-labelledby={idTitulo} role="article">
       <CardHeader className="space-y-2 p-4 sm:p-5">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
+            {categoria && <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{categoria}</p>}
             <h2 id={idTitulo} className="text-lg font-semibold leading-tight text-foreground">{servicio.nombre}</h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Plan <span className="font-medium text-foreground">{servicio.plan || "sin dato"}</span> · {textoPrecio(servicio)}
+            <p className="mt-0.5 break-words text-sm text-muted-foreground">
+              Plan <span className="font-medium text-foreground">{servicio.plan || "sin dato"}</span> · {textoPrecioConEur(servicio, eurPorUsd)}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            {servicio.por_confirmar && (
+              <span className="rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-800 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
+                Por confirmar
+              </span>
+            )}
             {modo && (
               <span className={cn("rounded-full border px-2 py-0.5 text-xs font-medium",
                 modo === "real" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-900")}>
@@ -75,16 +113,37 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onA
         <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
           <dt className="text-muted-foreground">Renovación</dt>
           <dd className="min-w-0 break-words">{textoRenovacion(servicio)}</dd>
+          {variable && (
+            <>
+              <dt className="text-muted-foreground">Gasto por uso este mes</dt>
+              <dd className="min-w-0 break-words">
+                <span className="font-medium tabular-nums text-foreground">{textoImporteConEur(variable, eurPorUsd)}</span>
+                {variable.origen === "estimado" && <span className="text-muted-foreground"> · en parte estimado</span>}
+              </dd>
+            </>
+          )}
           {servicio.cuenta && (
             <>
               <dt className="text-muted-foreground">Cuenta</dt>
               <dd className="min-w-0 break-words">{servicio.cuenta}</dd>
             </>
           )}
-          {planDetectado && (
+          {(planDetectado || costeDetectado) && (
             <>
               <dt className="text-muted-foreground">Según la API</dt>
-              <dd className="min-w-0 break-words">plan {planDetectado}</dd>
+              <dd className="min-w-0 break-words">
+                {planDetectado && <>plan {planDetectado}</>}
+                {planDetectado && costeDetectado && " · "}
+                {costeDetectado && <>renovaciones: {textoImporteConEur(costeDetectado, eurPorUsd)} al mes</>}
+              </dd>
+            </>
+          )}
+          {dominios.length > 0 && (
+            <>
+              <dt className="text-muted-foreground">Dominios</dt>
+              <dd className="min-w-0 break-words">
+                {dominios.map((d) => `${d.dominio}${d.caduca ? ` (caduca el ${d.caduca})` : ""}`).join(" · ")}
+              </dd>
             </>
           )}
         </dl>
@@ -98,7 +157,13 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onA
             <span>{TEXTO_ERROR[otroError] ?? "No se pudieron leer los datos."}</span>
           </p>
         )}
-        {cargando && !lectura ? (
+        {sinLector && !lectura && (
+          <p className="flex items-start gap-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>Sin lectura automática: este proveedor no da el consumo por una API sencilla. Míralo en su panel; aquí quedan el plan y sus límites.</span>
+          </p>
+        )}
+        {cargando && !lectura && !sinLector ? (
           <p className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Leyendo el consumo…
           </p>
@@ -108,7 +173,7 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onA
           </ul>
         ) : (
           <p className="py-2 text-sm text-muted-foreground">
-            {faltaClave ? "Sin datos de consumo hasta que se configure la clave." : "Este servicio no tiene límites de uso en su plan."}
+            {faltaClave ? "Sin datos de consumo hasta que se configure la clave." : "No hay límites de uso apuntados para este servicio."}
           </p>
         )}
         {secretoOpcional && <AvisoClave secreto={secretoOpcional} opcional />}
@@ -118,39 +183,57 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onA
           </ul>
         )}
         {servicio.notas && <p className="break-words text-xs text-muted-foreground">{servicio.notas}</p>}
+        {servicio.fuente_precio && (
+          <p className="text-xs text-muted-foreground">
+            <a href={servicio.fuente_precio} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline underline-offset-2">
+              Precios oficiales de {servicio.nombre}
+              <ExternalLink className="h-3 w-3" aria-hidden="true" />
+              <span className="sr-only">(se abre en otra pestaña)</span>
+            </a>
+          </p>
+        )}
       </CardContent>
 
       <CardFooter className="flex min-w-0 flex-col items-stretch gap-2 border-t p-3 sm:p-4">
         <p className="text-xs text-muted-foreground">
-          Última lectura:{" "}
-          {fecha ? (
-            <time dateTime={lectura!.tomado_en} title={fecha.toLocaleString("es-ES")}>{haceCuanto(lectura!.tomado_en)}</time>
+          {sinLector && !lectura ? (
+            "Sin lectura automática"
           ) : (
-            "todavía ninguna"
+            <>
+              Última lectura:{" "}
+              {fecha ? (
+                <time dateTime={lectura!.tomado_en} title={fecha.toLocaleString("es-ES")}>{haceCuanto(lectura!.tomado_en)}</time>
+              ) : (
+                "todavía ninguna"
+              )}
+              {lectura?.desde_cache && " · se renueva cada 15 min"}
+            </>
           )}
-          {lectura?.desde_cache && " · se renueva cada 15 min"}
         </p>
         <div className="flex min-w-0 flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 flex-1 gap-1.5 px-3 sm:flex-none"
-            onClick={onActualizar}
-            disabled={actualizando}
-            aria-label={`Actualizar ahora el consumo de ${servicio.nombre}`}
-          >
-            <RefreshCw className={cn("h-4 w-4", actualizando && "animate-spin")} aria-hidden="true" />
-            Actualizar ahora
-          </Button>
+          {!sinLector && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 flex-1 gap-1.5 px-3 sm:flex-none"
+              onClick={onActualizar}
+              disabled={actualizando}
+              aria-label={`Actualizar ahora el consumo de ${servicio.nombre}`}
+            >
+              <RefreshCw className={cn("h-4 w-4", actualizando && "animate-spin")} aria-hidden="true" />
+              Actualizar ahora
+            </Button>
+          )}
           <Button type="button" variant="outline" className="h-11 flex-1 gap-1.5 px-3 sm:flex-none" onClick={onEditar} aria-label={`Editar el plan de ${servicio.nombre}`}>
             <Pencil className="h-4 w-4" aria-hidden="true" />
             Editar
           </Button>
+          {/* Nombres largos («Loading (dominio, correo y web antigua)»): el botón baja de línea en vez de salirse a 320 px. */}
           {servicio.panel_url && (
-            <Button asChild variant="ghost" className="h-11 w-full gap-1.5 px-3 sm:ml-auto sm:w-auto">
+            <Button asChild variant="ghost" className="h-auto min-h-11 w-full gap-1.5 whitespace-normal px-3 py-2 text-center sm:ml-auto sm:w-auto">
               <a href={servicio.panel_url} target="_blank" rel="noopener noreferrer">
-                Panel de {servicio.nombre}
-                <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                <span className="min-w-0 break-words">Panel de {servicio.nombre}</span>
+                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden="true" />
                 <span className="sr-only">(se abre en otra pestaña)</span>
               </a>
             </Button>
@@ -158,5 +241,24 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, onA
         </div>
       </CardFooter>
     </Card>
+  );
+}
+
+/** Servicio marcado «No lo usamos»: compacto, sin consumo, con «Editar» para volver a activarlo. */
+export function TarjetaServicioInactivo({ servicio, onEditar }: { servicio: ServicioContratado; onEditar: () => void }) {
+  return (
+    <li className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border bg-card p-3">
+      <div className="min-w-0">
+        <p className="break-words text-sm font-medium text-foreground">{servicio.nombre}</p>
+        <p className="break-words text-xs text-muted-foreground">
+          Plan {servicio.plan || "sin dato"} · {textoPrecio(servicio)}
+          {servicio.notas ? ` · ${servicio.notas}` : ""}
+        </p>
+      </div>
+      <Button type="button" variant="outline" className="h-11 gap-1.5 px-3" onClick={onEditar} aria-label={`Editar el plan de ${servicio.nombre}`}>
+        <Pencil className="h-4 w-4" aria-hidden="true" />
+        Editar
+      </Button>
+    </li>
   );
 }

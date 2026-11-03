@@ -92,7 +92,12 @@ test("Costes: la frase de cabecera no queda aplastada en una columna estrecha", 
 test("Servicios: tarjetas sin desbordes, botones de ≥ 44 px con nombre y barras con su %", async ({ page }) => {
   await abrir(page, "/super-admin/servicios");
   await expect(page.getByRole("heading", { level: 1, name: "Servicios" })).toBeVisible();
-  await expect(page.getByRole("article")).toHaveCount(5);
+  // 9 en uso (Perplexity va plegado), con el coste y los avisos arriba.
+  await expect(page.getByRole("article")).toHaveCount(9);
+  await expect(page.getByRole("region", { name: "Coste y renovaciones" })).toBeVisible();
+  await expect(page.getByRole("region", { name: /pasan del 80/ })).toBeVisible();
+  await page.getByRole("button", { name: /Servicios que no usamos ahora/ }).click();
+  await expect(page.getByText(/Hoy no se usa/)).toBeVisible();
   const r = await page.evaluate(() => {
     const main = document.querySelector("main");
     const vw = document.documentElement.clientWidth;

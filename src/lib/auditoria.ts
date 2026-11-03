@@ -69,6 +69,7 @@ const ENTIDADES: Record<string, string> = {
   movimientos_stock: "movimiento de existencias",
   costes_fijos: "coste fijo",
   servicios_contratados: "servicio contratado",
+  servicios_config: "tipo de cambio de Servicios",
   ia_funciones: "función de IA",
   ia_coste_estimado: "estimación de coste de IA",
   profiles: "perfil de usuario",

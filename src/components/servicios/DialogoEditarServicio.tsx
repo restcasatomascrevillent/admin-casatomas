@@ -2,25 +2,28 @@ import { useEffect, useState } from "react";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useGuardarServicio } from "@/hooks/useServicios";
-import { type BorradorServicio, type ServicioContratado, borradorDe, cambiosDeBorrador } from "@/lib/servicios";
+import { type BorradorServicio, CATEGORIAS, type ServicioContratado, borradorDe, cambiosDeBorrador } from "@/lib/servicios";
 
 interface Props {
   servicio: ServicioContratado | null;
   onCerrar: () => void;
+  /** false si falta 20261103160000: no se enseñan los campos nuevos. */
+  costes?: boolean;
 }
 
 function MensajeError({ id, texto }: { id: string; texto?: string }) {
   return texto ? <p id={id} className="text-xs text-destructive">{texto}</p> : null;
 }
 
-/** Edición de plan, precio, renovación, cuenta, enlace, notas y límites del plan. */
-export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
+/** Edición de plan, precio, renovación, cuenta, enlaces, categoría, «lo usamos», notas y límites del plan. */
+export function DialogoEditarServicio({ servicio, onCerrar, costes = true }: Props) {
   const [b, setB] = useState<BorradorServicio | null>(null);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const guardar = useGuardarServicio();
@@ -32,7 +35,8 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
 
   if (!servicio || !b) return null;
   const id = (campo: string) => `servicio-${servicio.proveedor}-${campo}`;
-  const cambiar = (campo: keyof BorradorServicio, valor: string) => setB((x) => (x ? { ...x, [campo]: valor } : x));
+  const cambiar = (campo: keyof BorradorServicio, valor: string | boolean) => setB((x) => (x ? { ...x, [campo]: valor } : x));
+  const anual = b.ciclo === "anual";
   const cambiarLimite = (clave: string, campo: "limite" | "unidad", valor: string) =>
     setB((x) => (x ? { ...x, limites: { ...x.limites, [clave]: { ...x.limites[clave], [campo]: valor } } } : x));
   const limites = Object.entries(servicio.limites ?? {}).sort(([, x], [, y]) => (x.orden ?? 99) - (y.orden ?? 99));
@@ -47,7 +51,7 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
     }
     setErrores({});
     try {
-      await guardar.mutateAsync({ proveedor: servicio.proveedor, cambios: r.cambios });
+      await guardar.mutateAsync({ proveedor: servicio.proveedor, cambios: r.cambios, costes });
       toast.success(`${r.cambios.nombre}: cambios guardados`);
       onCerrar();
     } catch (error) {
@@ -65,6 +69,22 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={enviar} className="flex min-w-0 flex-col gap-4" noValidate>
+          {costes && (
+            <div className="flex min-w-0 flex-col gap-2 rounded-md border p-3">
+              <div className="flex min-h-11 items-center gap-3">
+                <Checkbox id={id("activo")} checked={b.activo} onCheckedChange={(v) => cambiar("activo", v === true)} className="h-5 w-5" />
+                <Label htmlFor={id("activo")} className="cursor-pointer leading-snug">
+                  Lo usamos <span className="font-normal text-muted-foreground">(si no, no se lee ni suma al coste)</span>
+                </Label>
+              </div>
+              <div className="flex min-h-11 items-center gap-3">
+                <Checkbox id={id("por-confirmar")} checked={b.por_confirmar} onCheckedChange={(v) => cambiar("por_confirmar", v === true)} className="h-5 w-5" />
+                <Label htmlFor={id("por-confirmar")} className="cursor-pointer leading-snug">
+                  Plan y precio por confirmar
+                </Label>
+              </div>
+            </div>
+          )}
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <div className="min-w-0 space-y-1">
               <Label htmlFor={id("nombre")}>Nombre</Label>
@@ -76,7 +96,7 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
               <Input id={id("plan")} value={b.plan} maxLength={80} placeholder="Por ejemplo: Hobby, Free, Pro" onChange={(e) => cambiar("plan", e.target.value)} />
             </div>
             <div className="min-w-0 space-y-1">
-              <Label htmlFor={id("precio")}>Precio al mes</Label>
+              <Label htmlFor={id("precio")}>{anual ? "Precio al año" : "Precio al mes"}</Label>
               <Input id={id("precio")} value={b.precio} inputMode="decimal" placeholder="0" onChange={(e) => cambiar("precio", e.target.value)} aria-invalid={!!errores.precio} aria-describedby={errores.precio ? id("precio-error") : undefined} />
               <MensajeError id={id("precio-error")} texto={errores.precio} />
             </div>
@@ -103,10 +123,29 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
               </Select>
             </div>
             <div className="min-w-0 space-y-1">
-              <Label htmlFor={id("renovacion")}>Próxima renovación</Label>
+              <Label htmlFor={id("renovacion")}>Próxima renovación o caducidad</Label>
               <Input id={id("renovacion")} type="date" value={b.renovacion} onChange={(e) => cambiar("renovacion", e.target.value)} aria-invalid={!!errores.renovacion} />
               <MensajeError id={id("renovacion-error")} texto={errores.renovacion} />
             </div>
+            {costes && (
+              <>
+                <div className="min-w-0 space-y-1">
+                  <Label htmlFor={id("categoria")}>Categoría</Label>
+                  <Select value={b.categoria} onValueChange={(v) => cambiar("categoria", v)}>
+                    <SelectTrigger id={id("categoria")} aria-label="Categoría"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIAS.map((c) => <SelectItem key={c.valor} value={c.valor}>{c.texto}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <MensajeError id={id("categoria-error")} texto={errores.categoria} />
+                </div>
+                <div className="min-w-0 space-y-1">
+                  <Label htmlFor={id("orden")}>Posición en la lista</Label>
+                  <Input id={id("orden")} inputMode="numeric" value={b.orden} onChange={(e) => cambiar("orden", e.target.value)} aria-invalid={!!errores.orden} aria-describedby={errores.orden ? id("orden-error") : undefined} />
+                  <MensajeError id={id("orden-error")} texto={errores.orden} />
+                </div>
+              </>
+            )}
           </div>
           <div className="min-w-0 space-y-1">
             <Label htmlFor={id("cuenta")}>Cuenta o equipo</Label>
@@ -117,6 +156,13 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
             <Input id={id("panel")} type="url" inputMode="url" value={b.panel_url} placeholder="https://" onChange={(e) => cambiar("panel_url", e.target.value)} aria-invalid={!!errores.panel_url} aria-describedby={errores.panel_url ? id("panel-error") : undefined} />
             <MensajeError id={id("panel-error")} texto={errores.panel_url} />
           </div>
+          {costes && (
+            <div className="min-w-0 space-y-1">
+              <Label htmlFor={id("fuente-precio")}>Página oficial del precio</Label>
+              <Input id={id("fuente-precio")} type="url" inputMode="url" value={b.fuente_precio} placeholder="https://" onChange={(e) => cambiar("fuente_precio", e.target.value)} aria-invalid={!!errores.fuente_precio} aria-describedby={errores.fuente_precio ? id("fuente-precio-error") : undefined} />
+              <MensajeError id={id("fuente-precio-error")} texto={errores.fuente_precio} />
+            </div>
+          )}
           <div className="min-w-0 space-y-1">
             <Label htmlFor={id("notas")}>Notas</Label>
             <Textarea id={id("notas")} value={b.notas} maxLength={2000} rows={3} onChange={(e) => cambiar("notas", e.target.value)} />
@@ -149,17 +195,22 @@ export function DialogoEditarServicio({ servicio, onCerrar }: Props) {
                         id={id(`limite-${clave}`)}
                         inputMode="decimal"
                         value={b.limites[clave]?.limite ?? ""}
-                        placeholder="sin dato"
+                        placeholder={l.limite_desde && !("limite" in l) ? "automático" : "sin dato"}
                         onChange={(e) => cambiarLimite(clave, "limite", e.target.value)}
                         aria-invalid={!!errores[`limite.${clave}`]}
-                        aria-describedby={errores[`limite.${clave}`] ? id(`limite-${clave}-error`) : undefined}
+                        aria-describedby={errores[`limite.${clave}`] ? id(`limite-${clave}-error`) : l.limite_desde ? id(`limite-${clave}-desde`) : undefined}
                       />
                     </div>
                     <div className="min-w-0 space-y-1">
                       <Label htmlFor={id(`unidad-${clave}`)} className="text-xs">Unidad</Label>
                       <Input id={id(`unidad-${clave}`)} value={b.limites[clave]?.unidad ?? ""} maxLength={30} onChange={(e) => cambiarLimite(clave, "unidad", e.target.value)} />
                     </div>
-                    <div className="col-span-2 sm:col-span-3"><MensajeError id={id(`limite-${clave}-error`)} texto={errores[`limite.${clave}`]} /></div>
+                    <div className="col-span-2 sm:col-span-3">
+                      {l.limite_desde && !("limite" in l) && (
+                        <p id={id(`limite-${clave}-desde`)} className="text-xs text-muted-foreground">Vacío = automático: {l.limite_desde}.</p>
+                      )}
+                      <MensajeError id={id(`limite-${clave}-error`)} texto={errores[`limite.${clave}`]} />
+                    </div>
                   </li>
                 ))}
               </ul>
