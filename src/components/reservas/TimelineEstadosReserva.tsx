@@ -168,7 +168,7 @@ export function TimelineEstadosReserva({ onElegirEstado, estadoActivo, className
           los seis estados sin empujarlos a un scroll). */}
       <h3
         id={idTitulo}
-        className="sr-only shrink-0 whitespace-nowrap text-[11px] font-semibold uppercase tracking-wide text-muted-foreground xl:not-sr-only"
+        className="sr-only shrink-0 whitespace-nowrap text-[11px] pointer-coarse:text-xs font-semibold uppercase tracking-wide text-muted-foreground xl:not-sr-only"
       >
         Cómo avanza una reserva
       </h3>

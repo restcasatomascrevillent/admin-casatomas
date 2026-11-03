@@ -671,7 +671,7 @@ export function EditorMenuTapasWeb({ seccionActiva }: EditorMenuTapasWebProps) {
                                 {formatearFechaCorta(registro.fecha)}
                               </span>
                               <span className="hidden truncate first-letter:uppercase sm:inline">{formatearFechaLarga(registro.fecha)}</span>
-                              {esHoy && <Badge className="text-[10px] px-1.5 py-0">Hoy</Badge>}
+                              {esHoy && <Badge className="text-[10px] pointer-coarse:text-xs px-1.5 py-0">Hoy</Badge>}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">{detalle || "Sin contenido"}</p>
                           </button>

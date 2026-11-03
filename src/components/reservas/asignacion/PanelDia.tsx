@@ -100,7 +100,7 @@ export function PanelDia<T extends ReservaVentana>({
         <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
           {enVentana && (
             <span
-              className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground"
+              className="inline-flex items-center gap-1 rounded-full border bg-muted/40 px-2 py-0.5 text-[11px] pointer-coarse:text-xs text-muted-foreground"
               title={`Dentro de las próximas ${ventanaHoras} h`}
             >
               <Clock className="h-3 w-3" aria-hidden="true" />
@@ -173,7 +173,7 @@ export function PanelDia<T extends ReservaVentana>({
                   <CardContent className="space-y-3 px-3 pb-3 sm:px-4">
                     {grupo.grados.map(({ grado, reservas }) => (
                       <div key={grado} className="space-y-1.5">
-                        <Badge variant="outline" className={cn("text-[11px] font-medium", CLASES_GRADO[grado])}>
+                        <Badge variant="outline" className={cn("text-[11px] pointer-coarse:text-xs font-medium", CLASES_GRADO[grado])}>
                           {ETIQUETA_GRADO[grado]} · {reservas.length}
                         </Badge>
                         <ul className="divide-y rounded-md border">{reservas.map(renderFila)}</ul>

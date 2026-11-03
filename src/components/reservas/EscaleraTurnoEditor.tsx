@@ -209,9 +209,10 @@ export function EscaleraTurnoEditor({
             <div key={index} className="rounded-lg border p-3 space-y-2">
               <div className="flex items-end gap-3 flex-wrap">
                 <div className="space-y-1">
-                  <Label className="text-xs">Cada</Label>
+                  <Label htmlFor={`escalera-cada-${index}`} className="text-xs">Cada</Label>
                   <div className="flex items-center gap-1.5">
                     <Input
+                      id={`escalera-cada-${index}`}
                       type="number" inputMode="numeric"
                       min={1}
                       max={1440}

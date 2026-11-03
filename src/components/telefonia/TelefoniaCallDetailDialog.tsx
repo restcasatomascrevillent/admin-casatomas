@@ -242,7 +242,7 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
                                                     )}
                                                 </div>
                                                 <div className="p-3 border-b border-dashed space-y-1">
-                                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                    <span className="text-[10px] pointer-coarse:text-xs uppercase tracking-wider text-muted-foreground">
                                                         Parámetros
                                                     </span>
                                                     <pre className="font-mono overflow-x-auto">
@@ -250,7 +250,7 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
                                                     </pre>
                                                 </div>
                                                 <div className="p-3 space-y-1">
-                                                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                    <span className="text-[10px] pointer-coarse:text-xs uppercase tracking-wider text-muted-foreground">
                                                         Resultado
                                                     </span>
                                                     <pre className="font-mono overflow-x-auto">

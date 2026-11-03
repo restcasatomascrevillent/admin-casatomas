@@ -372,7 +372,7 @@ export function ModoServicioPlano({ espacioId, espacioNombre, fecha, onBack }: M
                 >
                   <div className="flex w-full items-center justify-between">
                     <span className="font-semibold">{mesa.nombre}</span>
-                    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", badge)}>
+                    <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] pointer-coarse:text-xs font-medium", badge)}>
                       <Icono className="h-3 w-3" aria-hidden="true" />
                       {etiqueta}
                     </span>

@@ -35,7 +35,7 @@ export function KpisTrafico({ actual, anterior, tendencia, dias }: KpisTraficoPr
           {actual.anomalias > 0 && ` · ${actual.anomalias} anomalía${actual.anomalias === 1 ? "" : "s"}`}
         </span>
         {tendencia && !fiable && (
-          <Badge variant="outline" className="gap-1 border-amber-500/60 px-1.5 py-0 text-[10px] text-amber-700 dark:text-amber-400">
+          <Badge variant="outline" className="gap-1 border-amber-500/60 px-1.5 py-0 text-[10px] pointer-coarse:text-xs text-amber-700 dark:text-amber-400">
             <AlertTriangle className="h-3 w-3" aria-hidden />
             poco fiable ({tendencia.n} días)
           </Badge>

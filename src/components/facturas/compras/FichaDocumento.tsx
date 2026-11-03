@@ -208,13 +208,13 @@ export function FichaDocumento({
       </section>
 
       {(doc.procesado_en || doc.created_at) && (
-        <p className="text-[11px] text-muted-foreground/80">
+        <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground/80">
           {doc.procesado_en && <>Procesado {formatDateTime(doc.procesado_en)}</>}
           {doc.procesado_en && doc.created_at && " · "}
           {doc.created_at && <>Creado {formatDateTime(doc.created_at)}</>}
         </p>
       )}
-      <CosteLecturaFactura facturaId={doc.id} className="text-[11px] text-muted-foreground/80" />
+      <CosteLecturaFactura facturaId={doc.id} className="text-[11px] pointer-coarse:text-xs text-muted-foreground/80" />
 
       {/* Al final de la ficha, dentro de su scroll: la foto (o el PDF) del original. */}
       <OriginalIncrustado

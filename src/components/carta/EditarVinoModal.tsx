@@ -23,12 +23,13 @@ import { CamposVino } from "./CamposVino";
 import { rutaOriginalDesdeCarta } from "./fotoCartaVino";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { useRecorteVino } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta, precioParaCampo } from "./precioCarta";
 import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
@@ -114,10 +115,12 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     }
   }, [open, vino, form, limpiarRecorte]);
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (!file || !(await aceptarFoto(file, input))) return;
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (!file) return;
 
     recorte.iniciar(file);
     setRemoveImage(false);
@@ -195,7 +198,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         await borrarFotoSiNoSeUsa({ tabla: "Vinos", bucket: "vinos", ruta: fotoAntigua, excluirId: vino.id });
       }
 
-      avisarGuardadoSinFondo(recorte.estado);
+      trasGuardarFotoCarta(recorte, { tabla: "Vinos", id: vino.id, nombre: vino.nombre });
       onOpenChange(false);
     } catch (error) {
       console.error("Error updating vino:", error);
@@ -226,6 +229,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                 accept={ACCEPT_FOTO}
                 className="hidden"
               />
+              <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
 
               {recorte.original ? (
                 <SelectorFotoCarta

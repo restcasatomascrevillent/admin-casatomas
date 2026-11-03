@@ -70,7 +70,7 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
     cambiar({...catalogo,productos:arrayMove(catalogo.productos,from,to)});
   };
   const producto = (id:string, v:Partial<CatalogoFacturacion["productos"][number]>) => cambiar({...catalogo,productos:catalogo.productos.map(p=>p.id===id?{...p,...v}:p)});
-  const selectClass = "h-10 w-full rounded-md border border-input bg-background px-2 text-sm";
+  const selectClass = "h-10 w-full rounded-md border border-input bg-background px-2 text-base md:text-sm";
   return <><AlertDialog open={!!pendiente} onOpenChange={open=>{if(!open)setEliminarId(null);}}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Eliminar módulo del catálogo</AlertDialogTitle><AlertDialogDescription>Vas a eliminar «{pendiente?.nombre}» del catálogo y de los paquetes que lo incluyan. Las facturas ya creadas conservan sus conceptos. Pulsa «Guardar catálogo y tarifas» después para guardar el cambio.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={busy}>Cancelar</AlertDialogCancel><AlertDialogAction disabled={busy} className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={eliminar}>Eliminar módulo</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   <fieldset disabled={busy} className="min-w-0 space-y-5">
     <Card><CardHeader><CardTitle className="text-base">Tarifas de módulos y servicios</CardTitle>
@@ -94,10 +94,10 @@ export function EditarCatalogo({catalogo,cambiar,busy}: {catalogo:CatalogoFactur
     <Card><CardHeader><CardTitle className="text-base">Paquetes</CardTitle>
       <p className="text-sm text-muted-foreground">Agrupa módulos para añadirlos juntos. Se mantienen sus precios y periodicidades y no se duplican servicios ya incluidos.</p>
     </CardHeader><CardContent className="space-y-3">{catalogo.paquetes.map(p=><details key={p.id} className="rounded-lg border p-3">
-      <summary className="cursor-pointer text-sm font-semibold">{p.nombre} · {p.productoIds.length} servicios</summary>
+      <summary className="cursor-pointer py-2.5 text-sm font-semibold">{p.nombre} · {p.productoIds.length} servicios</summary>
       <label className="mt-3 block text-xs">Nombre del paquete<Input value={p.nombre} maxLength={120} className="mt-1" onChange={e=>cambiar({...catalogo,paquetes:catalogo.paquetes.map(v=>v.id===p.id?{...v,nombre:e.target.value}:v)})} /></label>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{catalogo.productos.map(v=><label key={v.id} className="flex items-center gap-2 text-sm">
-        <input type="checkbox" className="h-4 w-4" checked={p.productoIds.includes(v.id)} onChange={e=>cambiar({...catalogo,paquetes:catalogo.paquetes.map(pack=>pack.id===p.id?{...pack,productoIds:e.target.checked?[...pack.productoIds,v.id]:pack.productoIds.filter(id=>id!==v.id)}:pack)})} />{v.nombre}
+        <input type="checkbox" className="h-6 w-6" checked={p.productoIds.includes(v.id)} onChange={e=>cambiar({...catalogo,paquetes:catalogo.paquetes.map(pack=>pack.id===p.id?{...pack,productoIds:e.target.checked?[...pack.productoIds,v.id]:pack.productoIds.filter(id=>id!==v.id)}:pack)})} />{v.nombre}
       </label>)}</div>
     </details>)}
       <Button type="button" variant="outline" disabled={catalogo.paquetes.length>=30} onClick={()=>cambiar({...catalogo,paquetes:[...catalogo.paquetes,{id:crypto.randomUUID(),nombre:"Nuevo paquete",productoIds:[]}]})}><Plus className="mr-2 h-4 w-4" />Crear paquete</Button>

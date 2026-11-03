@@ -86,3 +86,18 @@ Lo mismo con `--project-ref haqmmdfdzzatdnrrcgez` y la variable de Vercel en el 
 ## Cambiar el fondo de un vídeo ya hecho
 
 El fondo va pintado en los fotogramas, así que se rehace desde el **original** (`platos/videos-originales/<platoId>.<ext>`). Lo guarda la cola de vídeo del panel al terminar un vídeo recién elegido, y el flujo potente al mover el bruto. El fondo con el que se hizo cada vídeo va en su `video_url` (`…?t=…&fondo=<tema>`), sin columnas nuevas. En la ficha, al tocar otro fondo sale **«Cambiar fondo del vídeo a …»** (misma cola global) y, en dispositivos no potentes, **«Mandar a un dispositivo potente»** (copia el original a `pendientes/` y crea el trabajo con el tema nuevo). Los vídeos hechos antes de este cambio no tienen original: hay que elegir el vídeo otra vez. Lógica pura y tests: `src/components/carta/video/originalVideo.ts`. Las políticas del bucket `platos` (20261001150000 / 20261001190000) ya permiten esa carpeta a `gestor_carta`: no hace falta migración.
+
+## Fotos de la carta que el móvil no pudo recortar (02-11-2026)
+
+Mismo esquema que los vídeos, para Platos, Vinos, Bebidas y Cócteles (sin Replicate):
+
+1. **Móvil**: al guardar la ficha se guarda la foto ORIGINAL y el móvil intenta quitarle el fondo en el navegador (`src/components/carta/recorte/recorteEnSegundoPlano.ts`). Si falla, se queda sin memoria, iOS cierra la pestaña a medias (marca `panel.recorte.enCurso.v1` sin latido al volver a abrir el panel) o el móvil ya está marcado (`panel.recorte.noNavegador.v1`), se crea una fila en `trabajos_recorte` (tabla + ficha + ruta de la foto original + fondo elegido) y se avisa: «Guardado con la foto normal; se recortará en un ordenador con el panel abierto y te avisaremos» (con botón «Avisarme» si aún no hay permiso de notificaciones).
+2. **Ordenador** (cualquiera donde el recorte en el navegador es seguro, no hace falta WebGPU): sondeo cada 60 s y aviso «Hay N fotos pendientes de recortar… ¿Recortarlas aquí?» (`potente/AvisoTrabajosRecorte.tsx`). Reclama, baja la original, la recorta con el fondo elegido, sube `<id>-carta-<ext>.webp` y cambia `imagen_url` (solo si la ficha sigue con esa foto), cierra el trabajo y avisa por push con `notificar-video` (`{ trabajo_id, tipo: "recorte" }`).
+
+| Pieza | Dónde |
+|---|---|
+| Tabla, RLS y RPC | `supabase/migrations/20261102160000_trabajos_recorte.sql` (rollback en `supabase/rollbacks/`) |
+| Prueba SQL (PGlite) | `scripts/test-trabajos-recorte.mjs` (`npm run test:trabajos-recorte:db`, en el CI) |
+| Push | `notificar-video` (hay que redesplegarla para `tipo: "recorte"`) |
+
+Sin la migración el panel funciona igual que sin trabajos: la foto se queda normal y el aviso dice «abre la ficha desde un ordenador y pulsa «Quitar fondo»».

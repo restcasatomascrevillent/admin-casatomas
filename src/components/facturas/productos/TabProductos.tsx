@@ -250,7 +250,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
                 <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                 <span>Filtros</span>
                 {filtrosActivos > 0 && (
-                  <span className="rounded-full bg-muted px-1.5 text-[11px] font-semibold leading-5 text-foreground tabular-nums">
+                  <span className="rounded-full bg-muted px-1.5 text-[11px] pointer-coarse:text-xs font-semibold leading-5 text-foreground tabular-nums">
                     {filtrosActivos}
                   </span>
                 )}

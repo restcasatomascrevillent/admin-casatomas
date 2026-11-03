@@ -240,7 +240,7 @@ function FotoPlatoLibre({ item, onFoto }: FotoPlatoLibreProps) {
           ) : (
             <>
               <Camera className="h-4 w-4" aria-hidden="true" />
-              <span className="text-[10px] font-medium leading-none" aria-hidden="true">
+              <span className="text-[10px] pointer-coarse:text-xs font-medium leading-none" aria-hidden="true">
                 Foto
               </span>
             </>
@@ -423,12 +423,12 @@ function EditorAlergenos({ item, onChange, abierto, onAbiertoChange, ancla, alCe
             los ingredientes que pertenecen a la carta, no al menú del día. */}
         {item.alergenosInferidos.length > 0 && (
           <div className="rounded-md bg-muted/50 p-2 space-y-1">
-            <p className="text-[11px] font-medium flex items-center gap-1 text-muted-foreground">
+            <p className="text-[11px] pointer-coarse:text-xs font-medium flex items-center gap-1 text-muted-foreground">
               <Info className="h-3 w-3" aria-hidden="true" />
               Deducidos de los ingredientes
             </p>
             <p className="text-xs">{item.alergenosInferidos.map((a) => etiquetaAlergeno(a)).join(" · ")}</p>
-            <p className="text-[11px] text-muted-foreground">Se arrastran de la carta. Para cambiarlos, edita el plato.</p>
+            <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">Se arrastran de la carta. Para cambiarlos, edita el plato.</p>
           </div>
         )}
 
@@ -527,20 +527,20 @@ function LineaMenu({
         )}
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
             {item.origen === "carta" ? "De la carta" : "A mano"}
           </span>
 
           {item.alergenos.length > 0 ? (
-            <span className="text-[11px] text-muted-foreground truncate">
+            <span className="text-[11px] pointer-coarse:text-xs text-muted-foreground truncate">
               · {item.alergenos.map((a) => etiquetaAlergeno(a)).join(", ")}
             </span>
           ) : (
-            <span className="text-[11px] text-muted-foreground/70">· sin alérgenos</span>
+            <span className="text-[11px] pointer-coarse:text-xs text-muted-foreground/70">· sin alérgenos</span>
           )}
 
           {item.alergenosInferidos.length > 0 && (
-            <span className="text-[11px] text-muted-foreground/70">(+{item.alergenosInferidos.length} deducidos)</span>
+            <span className="text-[11px] pointer-coarse:text-xs text-muted-foreground/70">(+{item.alergenosInferidos.length} deducidos)</span>
           )}
         </div>
 

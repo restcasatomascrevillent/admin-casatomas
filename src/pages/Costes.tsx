@@ -122,11 +122,11 @@ export default function Costes() {
     <SuperAdminLayout>
       <div ref={setRaiz} className="flex flex-col gap-3" style={alto ? { height: alto } : undefined}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+          <p className="min-w-0 flex-[1_1_16rem] text-sm text-muted-foreground">
             Lo que cuesta mantener el sistema este mes: servicios fijos (declarados a mano) e IA (gasto real de
             OpenAI, sin IVA).
           </p>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex flex-wrap gap-2">
             <BotonSincronizar />
             <DetallesCostes
               resumen={resumen}

@@ -210,6 +210,11 @@ const Sidebar = React.forwardRef<
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
+            onCloseAutoFocus={(e) => {
+              // P-21: al cerrar el menú (Escape incluido) el foco vuelve al botón que lo abrió.
+              e.preventDefault();
+              document.querySelector<HTMLElement>('[data-sidebar="trigger"]')?.focus();
+            }}
             data-sidebar="sidebar"
             data-mobile="true"
             className="w-[--sidebar-width] max-w-[calc(100vw-1rem)] [--sidebar-width-icon:4rem] pointer-coarse:[--sidebar-width-icon:4.5rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden motion-reduce:animate-none"
@@ -336,10 +341,10 @@ const SidebarRail = React.forwardRef<
     <button
       ref={ref}
       data-sidebar="rail"
-      aria-label="Toggle Sidebar"
+      aria-label="Mostrar u ocultar el menú"
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title="Mostrar u ocultar el menú"
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] group-data-[side=left]:-right-4 group-data-[side=right]:left-0 hover:after:bg-sidebar-border sm:flex",
         "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",

@@ -138,7 +138,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                   {alergenos.length > 0 && (
                     <div className="flex flex-wrap gap-1 pt-2 border-t">
                       {alergenos.map((alergeno) => (
-                        <Badge key={alergeno} variant="outline" className="text-[10px]">
+                        <Badge key={alergeno} variant="outline" className="text-[10px] pointer-coarse:text-xs">
                           {etiquetaAlergeno(alergeno)}
                         </Badge>
                       ))}

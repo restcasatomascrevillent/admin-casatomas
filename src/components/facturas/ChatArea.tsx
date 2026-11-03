@@ -231,7 +231,7 @@ export function ChatArea({
                           <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>{msg.contenido}</ReactMarkdown>
                         </div>
                       </div>
-                      <p className="px-1 text-[11px] text-muted-foreground/70">
+                      <p className="px-1 text-[11px] pointer-coarse:text-xs text-muted-foreground/70">
                         {sinGuardar}
                         {hora}
                       </p>
@@ -255,7 +255,7 @@ export function ChatArea({
                       ))}
 
                       {/* Acciones y hora bajo la respuesta */}
-                      <div className="-ml-2 flex flex-wrap items-center gap-x-1 text-[11px] text-muted-foreground/70">
+                      <div className="-ml-2 flex flex-wrap items-center gap-x-1 text-[11px] pointer-coarse:text-xs text-muted-foreground/70">
                         <CopyButton text={msg.contenido} />
 
                         {/* Botón regenerar solo en el último mensaje del asistente */}

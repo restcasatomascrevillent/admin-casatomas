@@ -13,7 +13,7 @@ const TONO: Record<EstadoPropuestaVista["tono"], string> = {
 /** Estado de la propuesta al cliente (Borrador / Propuesta enviada dd/mm hh:mm / Aceptada / Rechazada / Caducada). */
 export function EstadoPropuestaBadge({ vista, className }: { vista: EstadoPropuestaVista; className?: string }) {
   return (
-    <Badge variant="outline" className={cn("border-transparent text-[10px] font-medium tabular-nums", TONO[vista.tono], className)}>
+    <Badge variant="outline" className={cn("border-transparent text-[10px] pointer-coarse:text-xs font-medium tabular-nums", TONO[vista.tono], className)}>
       {vista.etiqueta}
     </Badge>
   );

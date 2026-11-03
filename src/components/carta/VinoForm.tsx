@@ -23,12 +23,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import { formatoEuros, fuentesMercado, precioMercado, precioSugerido, type VinoDesdeFoto } from "./leerVinoFoto";
 import { useRecorteVino } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { urlSegura } from "@/lib/url-segura";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
@@ -114,10 +115,12 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   const enTienda = precarga ? precioMercado(precarga.datos) : null;
   const fuentesTienda = precarga ? fuentesMercado(precarga.datos) : [];
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (file && (await aceptarFoto(file, input))) recorte.iniciar(file);
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (file) recorte.iniciar(file);
   };
 
   const clearImage = () => {
@@ -162,7 +165,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
         });
 
         queryClient.invalidateQueries({ queryKey: ["vinos"] });
-        avisarGuardadoSinFondo(recorte.estado);
+        trasGuardarFotoCarta(recorte, { tabla: "Vinos", id: nuevoVino.id, nombre: nuevoVino.nombre });
       } catch (error) {
         console.error('Error uploading image:', error);
         toast.error("Vino creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(error) ?? undefined });
@@ -200,6 +203,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                 accept={ACCEPT_FOTO}
                 className="hidden"
               />
+              <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
               
               {recorte.original ? (
                 <SelectorFotoCarta

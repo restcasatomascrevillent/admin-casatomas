@@ -12,8 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { ComboboxCreatable } from "@/components/ui/combobox-creatable";
 import { useCocteles } from "@/hooks/useCocteles";
 import { useFotoCarta } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { toast } from "sonner";
@@ -23,7 +25,6 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z.object({
@@ -115,10 +116,12 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (file && (await aceptarFoto(file, input))) {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (file) {
       // Sin FileReader: leer la foto entera como data URL (12-50 MP en el móvil)
       // gastaba decenas de MB para una vista previa que no se enseña (la foto
       // nueva la pinta SelectorFotoCarta).
@@ -170,7 +173,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
             id: nuevoCoctel.id,
             imagen_url: subida.url,
           });
-          avisarGuardadoSinFondo(fotoCarta.estado);
+          trasGuardarFotoCarta(fotoCarta, { tabla: "Cocteles", id: nuevoCoctel.id, nombre: nuevoCoctel.nombre });
         } catch (uploadError) {
           console.error('Error subiendo imagen:', uploadError);
           toast.error("Cóctel creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });
@@ -346,6 +349,7 @@ export function CoctelForm({ open, onOpenChange, categoriaInicial }: CoctelFormP
                   />
                 </label>
               )}
+              <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
             </div>
 
             {/* Selector de Alérgenos (ver src/lib/alergenos.ts) */}

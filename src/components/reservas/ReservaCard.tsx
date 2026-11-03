@@ -231,7 +231,7 @@ export function ReservaCard({
               <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
                 {c.title}
                 {c.capacidadMax ? (
-                  <span className="ml-auto text-[10px] text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
+                  <span className="ml-auto text-[10px] pointer-coarse:text-xs text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
                 ) : null}
               </DropdownMenuItem>
             ))
@@ -468,13 +468,13 @@ export function ContenidoTarjeta({
           <Users className="h-3 w-3" aria-hidden="true" />
           {reserva.numero_comensales}
         </span>
-        <Badge className={cn("text-[10px] px-1.5 py-0 h-4 pointer-coarse:h-5 pointer-coarse:text-xs", estado ? estado.insignia : "bg-gray-500 text-white")}>
+        <Badge className={cn("text-[10px] pointer-coarse:text-xs px-1.5 py-0 h-4 pointer-coarse:h-5 pointer-coarse:text-xs", estado ? estado.insignia : "bg-gray-500 text-white")}>
           {estado ? estado.etiqueta : reserva.estado}
         </Badge>
         {textoMesas ? (
           <Badge
             variant="outline"
-            className="gap-0.5 text-[11px] px-1.5 py-0 h-5 font-semibold tabular-nums text-foreground border-primary/40 pointer-coarse:h-6 pointer-coarse:text-xs"
+            className="gap-0.5 text-[11px] pointer-coarse:text-xs px-1.5 py-0 h-5 font-semibold tabular-nums text-foreground border-primary/40 pointer-coarse:h-6 pointer-coarse:text-xs"
             title={mesas && mesas.length > 1 ? "Mesas asignadas a esta reserva" : "Mesa asignada a esta reserva"}
           >
             {textoMesas}
@@ -482,7 +482,7 @@ export function ContenidoTarjeta({
         ) : sinMesa && (
           <Badge
             variant="outline"
-            className="gap-0.5 text-[10px] px-1.5 py-0 h-4 font-normal text-muted-foreground pointer-coarse:h-5 pointer-coarse:text-xs"
+            className="gap-0.5 text-[10px] pointer-coarse:text-xs px-1.5 py-0 h-4 font-normal text-muted-foreground pointer-coarse:h-5 pointer-coarse:text-xs"
             title="Tiene sala pero todavía no tiene mesa: «⋮» → «Dar mesa»"
           >
             <CircleDashed className="h-2.5 w-2.5" aria-hidden="true" />
@@ -514,7 +514,7 @@ export function ContenidoTarjeta({
             {reserva.telefono}
           </a>
         ) : (
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground/70 mt-1.5 pointer-coarse:text-xs">
+          <div className="flex items-center gap-1 text-[10px] pointer-coarse:text-xs text-muted-foreground/70 mt-1.5 pointer-coarse:text-xs">
             <Phone className="h-2.5 w-2.5" aria-hidden="true" />
             {reserva.telefono}
           </div>

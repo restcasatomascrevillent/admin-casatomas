@@ -25,7 +25,7 @@ export function FacturasEmitidas({facturas,borradores=[],editarBorrador,busy,edi
   return <div className="space-y-4">
     <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
       <label className="text-xs text-muted-foreground">Buscar factura o cliente<Input value={busqueda} placeholder="Número, cliente o NIF…" onChange={e=>setBusqueda(e.target.value)} className="mt-1" /></label>
-      <label className="text-xs text-muted-foreground">Estado<select aria-label="Estado" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-sm" value={estado} onChange={e=>setEstado(e.target.value)}><option value="todas">Todas</option><option value="emitida">Emitidas</option><option value="borrador">Borradores</option></select></label>
+      <label className="text-xs text-muted-foreground">Estado<select aria-label="Estado" className="mt-1 h-10 w-full rounded-md border bg-background px-3 text-base md:text-sm" value={estado} onChange={e=>setEstado(e.target.value)}><option value="todas">Todas</option><option value="emitida">Emitidas</option><option value="borrador">Borradores</option></select></label>
       <label className="text-xs text-muted-foreground">Desde<Input type="date" value={desde} onChange={e=>setDesde(e.target.value)} className="mt-1" /></label>
       <label className="text-xs text-muted-foreground">Hasta<Input type="date" value={hasta} onChange={e=>setHasta(e.target.value)} className="mt-1" /></label>
     </div>

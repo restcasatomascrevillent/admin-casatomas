@@ -187,7 +187,7 @@ const Facturas = () => {
             <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="mx-auto flex h-full max-w-3xl flex-col gap-1">
                 {activeTab === "cargar" && (
-                  <div className="shrink-0 self-end" data-tour="facturas-coste-lectura">
+                  <div className="min-w-0 max-w-full shrink-0 self-end" data-tour="facturas-coste-lectura">
                     <MonitorGastoIA modo="ocr" />
                   </div>
                 )}

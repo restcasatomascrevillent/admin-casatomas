@@ -12,10 +12,12 @@ import { Button } from "@/components/ui/button";
 import { borrarFotoSiNoSeUsa, type TablaCarta } from "@/lib/storage-carta";
 import { useFotoCarta, type TipoFotoCarta } from "./recorte/useRecorteVino";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { rutaEnBucket, subirFotoCarta } from "./subirFotoCarta";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
-import { aceptarFoto, avisarFalloSubida } from "@/lib/aceptarFoto";
+import { avisarFalloSubida } from "@/lib/aceptarFoto";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { ACCEPT_FOTO } from "@/lib/validarFoto";
 
 export interface ElementoConFoto {
@@ -100,11 +102,13 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
     [limpiar],
   );
 
-  const alElegir = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const archivo = input.files?.[0];
-    if (archivo && (await aceptarFoto(archivo, input))) fotoCarta.iniciar(archivo);
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const archivo = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (archivo) fotoCarta.iniciar(archivo);
   };
+
+  const alElegir = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
   const guardar = async () => {
     if (!elemento || !fotoCarta.original) return;
@@ -131,7 +135,7 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
         await borrarFotoSiNoSeUsa({ tabla, bucket, ruta: anterior, excluirId: elemento.id });
       }
       onGuardada?.(elemento.id);
-      avisarGuardadoSinFondo(fotoCarta.estado);
+      trasGuardarFotoCarta(fotoCarta, { tabla: tabla, id: elemento.id, nombre: elemento.nombre });
       cerrar();
     } catch (error) {
       // El aviso de error ya lo da la mutación del hook.
@@ -237,6 +241,8 @@ export const FotoRapidaCarta = forwardRef<FotoRapidaHandle, FotoRapidaCartaProps
               {fotoCarta.original || fotoActual ? "Cambiar foto" : "Añadir foto"}
             </Button>
           </div>
+
+          <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} disabled={guardando} className="text-center" />
 
           {fotoActual && !fotoCarta.original && (
             confirmandoBorrado ? (

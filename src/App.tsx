@@ -11,6 +11,7 @@ import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
 import { AvisoTrabajosVideo } from "@/components/carta/potente/AvisoTrabajosVideo";
+import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
@@ -107,6 +108,8 @@ const App = () => (
               {/* «Hay N vídeo(s) pendiente(s)…» de otros dispositivos: solo en los potentes; los
                   mete en la cola de arriba (docs/video-dispositivo-potente.md). */}
               <AvisoTrabajosVideo />
+              {/* Recorte de fotos del móvil tras guardar: pestaña muerta a medias y refresco de la carta. */}
+              <GestorRecortes />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
               <RouteErrorBoundary
                 pantallaCompleta

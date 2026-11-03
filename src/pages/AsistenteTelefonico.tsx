@@ -408,6 +408,7 @@ export default function AsistenteTelefonico() {
                             { valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> },
                         ]}
                         acciones={modeBadge}
+                        accionesDebajoEnMovil
                     />
 
                     {/* ═══════════ RESUMEN ═══════════ */}
@@ -555,16 +556,16 @@ export default function AsistenteTelefonico() {
                                                         {rule.ranges.map((r: any) => (
                                                             <div key={r.id} className={`flex flex-col sm:flex-row gap-3 items-start sm:items-center p-2 rounded-md border ${r.mode === "bot" ? "bg-blue-50/50 border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/40" : "bg-green-50/50 border-green-100 dark:bg-green-950/20 dark:border-green-900/40"}`}>
                                                                 <Select value={r.mode} onValueChange={(v) => updateRangeRule(dayIndex, r.id, "mode", v)} disabled={!scheduleEnabled}>
-                                                                    <SelectTrigger className="w-full sm:w-[160px] h-11 bg-background"><SelectValue /></SelectTrigger>
+                                                                    <SelectTrigger className="w-full sm:w-[160px] h-11 bg-background" aria-label="Modo del tramo horario"><SelectValue /></SelectTrigger>
                                                                     <SelectContent>
                                                                         <SelectItem value="human">👤 Humano</SelectItem>
                                                                         <SelectItem value="bot">🤖 Bot IA</SelectItem>
                                                                     </SelectContent>
                                                                 </Select>
                                                                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                                                                    <Input type="time" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
+                                                                    <Input type="time" aria-label="Desde" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
                                                                     <span className="text-muted-foreground text-sm">a</span>
-                                                                    <Input type="time" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
+                                                                    <Input type="time" aria-label="Hasta" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
                                                                 </div>
                                                                 <Button variant="ghost" size="icon" className="text-destructive h-11 w-11 sm:ml-auto hover:bg-destructive/10" onClick={() => removeRange(dayIndex, r.id)} disabled={!scheduleEnabled} aria-label="Quitar franja">
                                                                     <Trash2 className="w-4 h-4" />

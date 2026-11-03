@@ -191,7 +191,7 @@ function AccionPrincipal({
         title={titulo}
         disabled={deshabilitada}
         onClick={onClick}
-        className={cn("h-6 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-sm [&_svg]:size-3.5 xl:h-7", ANCHO_PRINCIPAL)}
+        className={cn("h-6 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-xs pointer-coarse:text-sm [&_svg]:size-3.5 xl:h-7", ANCHO_PRINCIPAL)}
       >
         {cargando ? <Loader2 className="animate-spin" /> : children}
         {etiqueta}

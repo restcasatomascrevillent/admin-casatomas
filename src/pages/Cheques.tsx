@@ -216,7 +216,7 @@ export default function Cheques() {
                 {puedeEditar && <Button type="submit" disabled={guardando || !cambios || !!errorCarga}>{guardando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Guardar plantilla</Button>}
               </form>
             </CardContent></Card>
-            <div className="space-y-3 min-w-0 xl:sticky xl:top-0"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">Ejemplo · 100 €</span></div>
+            <div className="space-y-3 min-w-0 xl:sticky xl:top-0"><div className="flex justify-between items-center gap-3"><h2 className="text-sm font-medium">Así recibirá su factura el cliente</h2><span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] pointer-coarse:text-xs text-muted-foreground">Ejemplo · 100 €</span></div>
               <VistaFacturaCheque plantilla={plantilla} />
               <Card><CardHeader><CardTitle className="text-base">Mensaje que recibirá el cliente</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap break-words text-sm">{plantilla.email_mensaje}</p><p className="mt-4 text-xs text-muted-foreground">Adjunto: Factura-CT-00000001.pdf</p></CardContent></Card>
             </div>

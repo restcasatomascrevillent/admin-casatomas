@@ -428,7 +428,7 @@ export function ResultadoDocumentos({ datos }: { datos: DatosDocumentos }) {
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span
                   className={cn(
-                    "rounded px-1.5 text-[11px] font-semibold uppercase",
+                    "rounded px-1.5 text-[11px] pointer-coarse:text-xs font-semibold uppercase",
                     d.tipo === "albaran" ? "bg-sky-500/10 text-sky-700 dark:text-sky-300" : "bg-muted text-muted-foreground",
                   )}
                 >

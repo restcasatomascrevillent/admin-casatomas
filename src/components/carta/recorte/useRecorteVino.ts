@@ -1,22 +1,32 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { avisoSinFondoCarta, olvidarServicioNoDisponible, quitarFondo, type ProgresoRecorte, type ResultadoFotoCarta } from "../fotoCartaVino";
+import { avisoSinFondoCarta, quitarFondo, type ProgresoRecorte, type ResultadoFotoCarta } from "../fotoCartaVino";
 import { componerFotoCarta, FONDO_ACTIVO, type NombreTema, type TipoFotoCarta } from "../composicionCarta";
 import { extensionFoto } from "../composicionVino";
 import { redimensionarFoto } from "../redimensionarFoto";
+import { recorteNavegadorDisponible, recorteNavegadorSeguro } from "./quitarFondoNavegador";
+import { decidirRecorte, dispositivoNoRecorta, olvidarDispositivoNoRecorta, type DestinoRecorte } from "./recorteMovil";
+import { candidataRecortada, detectarFotoRecortada, esStickerRecortado } from "./fotoYaRecortada";
 
 export type { TipoFotoCarta } from "../composicionCarta";
 
 /** Sticker ya recortado (sin componer: el fondo lo elige el usuario). */
 export interface StickerFoto {
   sticker: Blob;
-  metodo: ResultadoFotoCarta["metodo"];
+  /** "recortada": la foto ya venía sin fondo (recorte del iPhone); no se pasó el modelo. */
+  metodo: ResultadoFotoCarta["metodo"] | "recortada";
 }
 
 export type EstadoRecorte =
   | { fase: "nada" }
   | { fase: "trabajando"; progreso: ProgresoRecorte | null }
   | { fase: "listo"; r: StickerFoto }
-  | { fase: "fallo"; aviso: string };
+  | { fase: "fallo"; aviso: string }
+  /**
+   * Móvil/tablet: no se recorta en el formulario. Al guardar se guarda la
+   * foto original y luego se recorta en el móvil ("movil") o, si este móvil
+   * no puede, se queda sin recortar ("sin-recorte"). Ver recorteMovil.ts.
+   */
+  | { fase: "diferido"; destino: Exclude<DestinoRecorte, "formulario"> };
 
 export type VistaRecorte = "sticker" | "fondo";
 export type EleccionFoto = "carta" | "original";
@@ -43,16 +53,26 @@ async function fotoParaRecorte(f: File): Promise<Blob> {
   return (await redimensionarFoto(f)).blob;
 }
 
+/** Dónde se recorta en este dispositivo (se mira en cada foto: la marca puede cambiar). */
+export function destinoRecorteActual(): DestinoRecorte {
+  return decidirRecorte({
+    seguro: recorteNavegadorSeguro(),
+    disponible: recorteNavegadorDisponible(),
+    noRecorta: dispositivoNoRecorta() !== null,
+  });
+}
+
 /** Tiempo que se enseña el sticker antes de pasar solo a «Con fondo». */
 export const MS_VER_STICKER = 1800;
 
 /**
  * Estado de la foto de producto en un formulario de la carta: al elegir la
- * foto se recorta SOLA (navegador gratis → Replicate), se enseña el sticker y
+ * foto se recorta SOLA en el navegador (en el ordenador), se enseña el sticker y
  * se compone con el fondo elegido (`tema`, por defecto FONDO_ACTIVO) según el
  * `tipo` (vino/bebida = botella 3:4; plato = 4:3 centrado). Cambiar de fondo
  * solo recompone (no vuelve a recortar). «Usar foto original» guarda la foto
- * tal cual.
+ * tal cual. En el móvil no se recorta aquí (fase "diferido"): se elige el
+ * fondo y el recorte se hace después de guardar (trasGuardarFotoCarta).
  */
 export function useFotoCarta(tipo: TipoFotoCarta) {
   const [original, setOriginal] = useState<File | null>(null);
@@ -65,13 +85,16 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
   const tocado = useRef(false);
   const turno = useRef(0);
 
-  const ejecutar = useCallback((foto: File, previo?: Promise<ResultadoFotoCarta>) => {
-    const yo = ++turno.current;
-    tocado.current = false;
+  /** Camino de siempre: modelo en el ordenador; en el móvil, recorte después de guardar. */
+  const seguirConModelo = useCallback((foto: File, yo: number, previo?: Promise<ResultadoFotoCarta>) => {
+    const destino = destinoRecorteActual();
+    if (destino !== "formulario") {
+      // Móvil: nada de modelo en el formulario (memoria); se recorta tras guardar.
+      void previo?.catch(() => undefined);
+      setEstado({ fase: "diferido", destino });
+      return;
+    }
     setEstado({ fase: "trabajando", progreso: null });
-    setEleccion("carta");
-    setVistaInterna("sticker");
-    setCompuesta(null);
     const onProgreso = (p: ProgresoRecorte) => {
       if (turno.current === yo) setEstado({ fase: "trabajando", progreso: p });
     };
@@ -89,6 +112,32 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     );
   }, []);
 
+  const ejecutar = useCallback((foto: File, previo?: Promise<ResultadoFotoCarta>) => {
+    const yo = ++turno.current;
+    tocado.current = false;
+    setEleccion("carta");
+    setVistaInterna("sticker");
+    setCompuesta(null);
+    // Foto que ya viene sin fondo (recorte del iPhone, PNG con alfa): su
+    // transparencia es la máscara, sin modelo, en cualquier dispositivo.
+    if (!previo && esStickerRecortado(foto)) {
+      setEstado({ fase: "listo", r: { sticker: foto, metodo: "recortada" } });
+      return;
+    }
+    if (!previo && candidataRecortada(foto) && typeof createImageBitmap === "function") {
+      setEstado({ fase: "trabajando", progreso: null });
+      void detectarFotoRecortada(foto).then((sticker) => {
+        if (turno.current !== yo) return;
+        if (sticker) {
+          setOriginal(sticker);
+          setEstado({ fase: "listo", r: { sticker, metodo: "recortada" } });
+        } else seguirConModelo(foto, yo);
+      });
+      return;
+    }
+    seguirConModelo(foto, yo, previo);
+  }, [seguirConModelo]);
+
   /** Foto nueva (y, si ya se lanzó en el lote, su promesa de recorte). */
   const iniciar = useCallback(
     (foto: File, previo?: Promise<ResultadoFotoCarta>) => {
@@ -100,8 +149,6 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
 
   const repetir = useCallback(() => {
     if (!original) return;
-    // «Repetir recorte» es un intento real: se olvida que el servicio no estaba configurado.
-    olvidarServicioNoDisponible();
     ejecutar(original);
   }, [original, ejecutar]);
 
@@ -112,6 +159,13 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     setEleccion("carta");
     setCompuesta(null);
     setTemaInterno(FONDO_ACTIVO);
+  }, []);
+
+  /** Móvil marcado como «no recorta»: probar otra vez a recortar en él (lo pide el usuario). */
+  const reintentarEnMovil = useCallback(() => {
+    olvidarDispositivoNoRecorta();
+    setEstado((e) => (e.fase === "diferido" ? { fase: "diferido", destino: destinoRecorteActual() as "movil" | "sin-recorte" } : e));
+    setEleccion("carta");
   }, []);
 
   const setVista = useCallback((v: VistaRecorte) => {
@@ -201,8 +255,11 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     /** true si al guardar se sube la foto de carta (y el original aparte). */
     usaCarta: eleccion === "carta" && listoCarta,
     trabajando: estado.fase === "trabajando" || componiendo,
+    /** Móvil: al guardar se guarda la original y luego se le pone el fondo (`tema`). */
+    recortarTrasGuardar: estado.fase === "diferido" && eleccion === "carta" && !!original,
     iniciar,
     repetir,
+    reintentarEnMovil,
     limpiar,
   };
 }

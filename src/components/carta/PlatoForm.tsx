@@ -34,8 +34,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { usePlatos, NuevoPlato } from "@/hooks/usePlatos";
 import { useFotoCarta } from "./recorte/useRecorteVino";
+import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
+import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
-import { avisarGuardadoSinFondo } from "./recorte/avisoGuardadoSinFondo";
+import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { subirFotoCarta } from "./subirFotoCarta";
 import { useVideoPlato } from "./video/useVideoPlato";
@@ -50,7 +52,6 @@ import {
   combinarAlergenos,
   normalizarAlergeno,
 } from "@/lib/alergenos";
-import { aceptarFoto } from "@/lib/aceptarFoto";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 const formSchema = z
@@ -173,10 +174,12 @@ export function PlatoForm({
     setAlergenosPersonalizados((prev) => prev.filter((a) => a !== alergeno));
   };
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target;
-    const file = input.files?.[0];
-    if (file && (await aceptarFoto(file, input))) fotoCarta.iniciar(file);
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
+
+  /** Foto elegida o pegada («Pegar foto recortada»): si ya viene sin fondo, no se pasa el modelo. */
+  const usarFoto = async (elegida: File | undefined, input?: HTMLInputElement | null) => {
+    const file = elegida ? await aceptarFotoCarta(elegida, input) : null;
+    if (file) fotoCarta.iniciar(file);
   };
 
   const clearImage = () => {
@@ -231,7 +234,7 @@ export function PlatoForm({
           // Supabase): así se invalida la caché y, sobre todo, se dispara la
           // republicación de las webs — sin esto la foto no llegaba nunca.
           await actualizarPlato.mutateAsync({ id: nuevoPlato.id, imagen_url: url });
-          avisarGuardadoSinFondo(fotoCarta.estado);
+          trasGuardarFotoCarta(fotoCarta, { tabla: "Platos", id: nuevoPlato.id, nombre: nuevoPlato.nombre });
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
           toast.error("Plato creado, pero la foto no se ha podido subir. Súbela con el botón «Foto» de su tarjeta.", { description: mensajeErrorStorage(uploadError) ?? undefined });
@@ -604,6 +607,7 @@ export function PlatoForm({
                       onChange={handleImageChange}
                       className="hidden"
                     />
+                    <PegarFotoRecortada onFoto={(f) => void usarFoto(f)} />
                   </div>
                 </div>
 

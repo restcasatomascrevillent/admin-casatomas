@@ -400,7 +400,7 @@ export function SolicitudGestionPanel({
                   <td className={cn("py-1", fila.cambia && "font-semibold")}>
                     {fila.b}
                     {fila.cambia && (
-                      <Badge variant="outline" className="ml-1.5 h-4 px-1 text-[10px]">
+                      <Badge variant="outline" className="ml-1.5 h-4 px-1 text-[10px] pointer-coarse:text-xs">
                         cambiado
                       </Badge>
                     )}
@@ -458,7 +458,7 @@ export function SolicitudGestionPanel({
               Guardar cambios
             </Button>
           </div>
-          <p className="flex gap-1.5 text-[11px] text-muted-foreground">
+          <p className="flex gap-1.5 text-[11px] pointer-coarse:text-xs text-muted-foreground">
             <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
             <span>
               {persistirSala
@@ -532,12 +532,12 @@ export function SolicitudGestionPanel({
                 )}
               </div>
               {motivoEnvio && tieneEmail && motivoEnvio !== "sin_email" && (
-                <p className="text-[11px] text-muted-foreground">{TEXTO_MOTIVO_NO_ENVIAR[motivoEnvio]}</p>
+                <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">{TEXTO_MOTIVO_NO_ENVIAR[motivoEnvio]}</p>
               )}
             </div>
           )}
           {!conMigracion && abierta && (onEnviarPropuesta || onAceptarTelefono) && (
-            <p className="flex gap-1.5 border-t pt-3 text-[11px] text-muted-foreground">
+            <p className="flex gap-1.5 border-t pt-3 text-[11px] pointer-coarse:text-xs text-muted-foreground">
               <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
               {TEXTO_MOTIVO_NO_ENVIAR.sin_migracion} Mientras tanto, usa "Convertir en reserva".
             </p>
@@ -604,7 +604,7 @@ export function SolicitudGestionPanel({
                     </p>
                   )}
                 </div>
-                <p className="text-[11px] text-muted-foreground sm:col-span-2">
+                <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground sm:col-span-2">
                   Los dos son obligatorios y se guardan en la solicitud y en la reserva.
                 </p>
               </div>
@@ -668,7 +668,7 @@ export function SolicitudGestionPanel({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
                 La sala no se le dice al cliente ni limita la hora: se asigna por dentro.
               </p>
             </div>

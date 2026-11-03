@@ -28,7 +28,7 @@
 // `medirCasilla` en `lib/reservas/alturaCalendario.ts`) y el tamaño de la cifra:
 //   · completa: todo lo de arriba.
 //   · media:    sin «N res.».
-//   · compacta: una línea (número · indicadores · comensales) y la barra fina.
+//   · compacta: número arriba, comensales debajo (una cifra por línea: en una casilla de ~46 px el número del día y una cifra de 3 dígitos no caben juntos, P-01) y la barra fina.
 // La casilla llena su celda (`h-full`, sin alto mínimo) y recorta lo que no
 // quepa (`overflow-hidden`): por eso nunca desborda. Sin `densidad` (jsdom,
 // navegador sin ResizeObserver) conserva el comportamiento responsive de antes.
@@ -139,16 +139,18 @@ export function CasillaOcupacion({
   // La cifra protagonista. Sin `tabular-nums`: en un número grande suelto las
   // cifras de ancho fijo lo abren (121 se ve suelto). Con altura fija su tamaño
   // sale de la casilla medida (px); sin ella, del ancho (`cqw`).
+  // Una cifra de 2-3 dígitos nunca puede ser más ancha que la casilla: el tamaño en px es el techo y `cqw` lo recorta por nº de dígitos (P-01).
+  const digitos = String(resumen?.comensales ?? 0).length;
   const cifra = conReservas ? (
     <span
       data-testid="comensales-casilla"
       aria-hidden="true"
       className={cn(
         "font-bold leading-none",
-        compacta ? "shrink-0" : "text-center",
+        "text-center",
         !fija && "[font-size:clamp(1.125rem,30cqw,2rem)]",
       )}
-      style={fija && fuenteComensales ? { fontSize: `${fuenteComensales}px` } : undefined}
+      style={fija && fuenteComensales ? { fontSize: `min(${fuenteComensales}px, calc(100cqw / ${(digitos * 0.62 + 0.3).toFixed(2)}))` } : undefined}
     >
       {resumen.comensales}
     </span>
@@ -181,14 +183,13 @@ export function CasillaOcupacion({
         seleccionada && "z-10 ring-2 ring-primary ring-offset-1",
       )}
     >
-      {/* Número del día y, si toca, el punto de «sin sala». En la casilla compacta
-          la cifra de comensales comparte esta misma línea. */}
-      <span className={cn("flex gap-1", compacta ? "min-w-0 items-center justify-between" : "items-start justify-between")}>
+      {/* Número del día y, si toca, el punto de «sin sala». La cifra de comensales va siempre en su propia línea. */}
+      <span className="flex items-start justify-between gap-1">
         <span className="flex min-w-0 items-start gap-0.5">
           <span
             className={cn(
               "flex items-center justify-center rounded-full px-1 font-medium leading-none tabular-nums",
-              !fija && "h-5 min-w-5 text-[11px] sm:h-6 sm:min-w-6 sm:text-sm",
+              !fija && "h-5 min-w-5 text-[11px] pointer-coarse:text-xs sm:h-6 sm:min-w-6 sm:text-sm",
               fija && (compacta ? "h-5 min-w-5 text-xs" : "h-6 min-w-6 text-sm"),
               esHoy && cn(estilo.hoy, "font-semibold"),
             )}
@@ -197,18 +198,14 @@ export function CasillaOcupacion({
           </span>
           {compacta && conReservas && resumen.sinSalaEnVentana > 0 && indicadores}
         </span>
-        {compacta ? (
-          conReservas && cifra
-        ) : (
-          <span className="flex shrink-0 items-center gap-0.5">{indicadores}</span>
-        )}
+        {!compacta && <span className="flex shrink-0 items-center gap-0.5">{indicadores}</span>}
       </span>
 
       {textoCierre && (
         <span
           data-testid="cierre-casilla"
           className={cn(
-            "truncate text-[10px] font-semibold uppercase leading-none tracking-wide",
+            "truncate text-[10px] pointer-coarse:text-xs font-semibold uppercase leading-none tracking-wide",
             cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
             compacta && !(cierraComida && cierraCena) && "hidden",
           )}
@@ -218,12 +215,12 @@ export function CasillaOcupacion({
       )}
       {conReservas && (
         <>
-          {!compacta && cifra}
+          {cifra}
           {(verReservas || !fija) && (
             <span
               data-testid="reservas-casilla"
               aria-hidden="true"
-              className={cn("text-center text-[10px] leading-none opacity-80", !fija && "hidden sm:block")}
+              className={cn("text-center text-[10px] pointer-coarse:text-xs leading-none opacity-80", !fija && "hidden sm:block")}
             >
               {resumen.reservas} res.
             </span>
@@ -238,7 +235,7 @@ export function CasillaOcupacion({
               {textoPorcentaje && (!fija || verPorcentaje) && (
                 <span
                   data-testid="porcentaje-casilla"
-                  className={cn("text-center text-[10px] font-semibold leading-none", !fija && "hidden sm:block")}
+                  className={cn("text-center text-[10px] pointer-coarse:text-xs font-semibold leading-none", !fija && "hidden sm:block")}
                 >
                   {textoPorcentaje}
                 </span>

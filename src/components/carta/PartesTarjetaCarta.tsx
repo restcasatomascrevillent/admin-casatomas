@@ -15,7 +15,7 @@ export function EtiquetaCategoria({ categoria, className }: { categoria: string 
       variant="outline"
       title={`Categoría: ${categoria}`}
       className={cn(
-        "max-w-full rounded-md border-muted-foreground/25 px-1.5 py-0 text-[11px] font-medium leading-5 text-muted-foreground",
+        "max-w-full rounded-md border-muted-foreground/25 px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-medium leading-5 text-muted-foreground",
         className,
       )}
     >

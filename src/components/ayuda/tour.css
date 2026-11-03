@@ -13,6 +13,10 @@
   min-width: min(280px, calc(100vw - 24px));
   max-width: min(400px, calc(100vw - 24px));
   padding: 20px;
+  /* P-05: el globo nunca es más alto que la pantalla (320x568 y apaisado): el texto largo hace scroll dentro. */
+  max-height: calc(var(--vv-h, 100dvh) - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .tour-panel .driver-popover-title {
@@ -25,6 +29,21 @@
 .tour-panel .driver-popover-description {
   font-size: 16px;
   line-height: 1.55;
+  max-height: calc(var(--vv-h, 100dvh) - 11.5rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Pantallas pequeñas (móvil estrecho o apaisado): globo más compacto para tapar menos lo que explica. */
+@media (max-width: 480px), (max-height: 500px) {
+  .driver-popover.tour-panel { padding: 14px; }
+  .tour-panel .driver-popover-title { font-size: 16px; padding-right: 40px; }
+  .tour-panel .driver-popover-description { font-size: 14px; line-height: 1.45; }
+  .tour-panel .driver-popover-footer { margin-top: 10px; }
+  .tour-panel .driver-popover-footer-btn { padding: 0 12px; font-size: 14px; }
+}
+@media (max-height: 500px) {
+  .tour-panel .driver-popover-description { max-height: calc(var(--vv-h, 100dvh) - 9rem); }
 }
 
 .tour-panel .driver-popover-footer {

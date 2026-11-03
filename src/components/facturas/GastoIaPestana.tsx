@@ -39,7 +39,7 @@ export function GastoIaPestana({ className = "" }: { className?: string }) {
           data-testid="gasto-ia-pestana"
           data-nivel-tope={estadoTope.nivel}
           aria-label={`Gasto del chatbot este mes${real ? " (real, sin IVA)" : " (estimado)"}: ${corto}.${avisoTexto ? ` ${avisoTexto}` : ""} Ver desglose`}
-          className={`flex min-h-11 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] leading-tight tabular-nums underline-offset-2 transition-colors hover:underline sm:text-xs ${color} ${className}`}
+          className={`flex min-h-11 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] pointer-coarse:text-xs leading-tight tabular-nums underline-offset-2 transition-colors hover:underline sm:text-xs ${color} ${className}`}
         >
           {estadoTope.nivel !== "ok" && <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />}
           <span className="whitespace-nowrap">

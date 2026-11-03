@@ -58,7 +58,7 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.callType ?? "all"}
                 onValueChange={(v) => onChange({ ...value, callType: v as any })}
             >
-                <SelectTrigger className="h-11 w-auto min-w-[150px] text-sm">
+                <SelectTrigger aria-label="Tipo de llamada" className="h-11 w-auto min-w-[150px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -74,7 +74,7 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.intent ?? "all"}
                 onValueChange={(v) => onChange({ ...value, intent: v })}
             >
-                <SelectTrigger className="h-11 w-auto min-w-[180px] text-sm">
+                <SelectTrigger aria-label="Motivo de la llamada" className="h-11 w-auto min-w-[180px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -90,7 +90,7 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.sentiment ?? "all"}
                 onValueChange={(v) => onChange({ ...value, sentiment: v })}
             >
-                <SelectTrigger className="h-11 w-auto min-w-[180px] text-sm">
+                <SelectTrigger aria-label="Sentimiento" className="h-11 w-auto min-w-[180px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -106,7 +106,7 @@ export function TelefoniaFilters({ value, onChange }: Props) {
                 value={value.success ?? "all"}
                 onValueChange={(v) => onChange({ ...value, success: v as any })}
             >
-                <SelectTrigger className="h-11 w-auto min-w-[150px] text-sm">
+                <SelectTrigger aria-label="Resultado de la llamada" className="h-11 w-auto min-w-[150px] text-sm">
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

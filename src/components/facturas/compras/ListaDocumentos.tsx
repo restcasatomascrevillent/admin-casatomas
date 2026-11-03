@@ -120,7 +120,7 @@ export function ListaDocumentos({
               >
                 <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 {/* El total nunca se recorta: si falta sitio, se acorta el texto de antes. */}
-                <span className="min-w-0 truncate">
+                <span className="min-w-0 max-sm:line-clamp-2 max-sm:break-words max-sm:leading-tight sm:truncate">
                   {mes.etiqueta}
                   <span className="font-normal text-muted-foreground"> · {plural(mes.documentos, "documento", "documentos")} · </span>
                 </span>
@@ -225,7 +225,7 @@ function FilaDocumento({
               <span className="font-normal text-muted-foreground"> · {ETIQUETA_TIPO[d.tipo] ?? d.tipo}</span>
             </span>
             {principal && Icono && (
-              <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] font-medium ${principal.clase}`}>
+              <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] pointer-coarse:text-xs font-medium ${principal.clase}`}>
                 <Icono className="h-3 w-3" aria-hidden="true" /> {principal.texto}
                 {marcas.length > 1 && <span className="font-normal text-muted-foreground">+{marcas.length - 1}</span>}
               </span>

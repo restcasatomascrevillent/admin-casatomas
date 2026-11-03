@@ -13,7 +13,9 @@
 //   (mailto:… o https://…). Sin ellos responde 503 y el panel sigue igual
 //   (el vídeo ya está guardado; solo no llega el aviso).
 //
-// Body: { trabajo_id: uuid }
+// Body: { trabajo_id: uuid, tipo?: "video" | "recorte" }
+//   tipo "recorte" (02-11-2026): trabajo de `trabajos_recorte` (foto de la
+//   carta guardada sin recortar desde un móvil y recortada en un ordenador).
 // Respuesta: { ok: true, enviadas, borradas, fallidas } | { ok: false, error }
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -23,11 +25,15 @@ import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso-marketing.ts";
 import {
   autorizarNotificacion,
+  autorizarNotificacionRecorte,
   construirCarga,
+  construirCargaRecorte,
+  leerTipo,
   leerTrabajoId,
   suscripcionCaducada,
   type PlatoNotificable,
   type TrabajoNotificable,
+  type TrabajoRecorteNotificable,
 } from "./logica.ts";
 
 const corsHeaders = {
@@ -83,26 +89,49 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const trabajoId = leerTrabajoId(cuerpo);
   if (!trabajoId) return json({ ok: false, error: "Falta trabajo_id" }, 400);
 
-  const admin = createClientBase(SUPABASE_URL, SERVICE_ROLE, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { data: trabajo, error: eT } = await admin
-    .from("trabajos_video")
-    .select("id, plato_id, estado, error, creado_por, procesado_por")
-    .eq("id", trabajoId)
-    .maybeSingle();
-  if (eT) return json({ ok: false, error: "No se pudo leer el trabajo" }, 500);
-  if (!trabajo) return json({ ok: false, error: "El trabajo no existe" }, 404);
-  const t = trabajo as TrabajoNotificable;
-  const aut = autorizarNotificacion(t, permiso.userId);
-  if (!aut.ok) return json({ ok: false, error: aut.error }, aut.status);
-  if (!t.creado_por) return json({ ok: true, enviadas: 0, borradas: 0, fallidas: 0 });
+  const tipo = leerTipo(cuerpo);
+  if (!tipo) return json({ ok: false, error: "tipo no válido" }, 400);
 
-  const { data: plato } = await admin.from("Platos").select("nombre, imagen_url").eq("id", t.plato_id).maybeSingle();
-  const carga = JSON.stringify(construirCarga(t, (plato ?? null) as PlatoNotificable | null));
+  const admin = createClientBase(SUPABASE_URL, SERVICE_ROLE, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  let destinatario: string | null;
+  let carga: string;
+  if (tipo === "recorte") {
+    const { data: tr, error: eR } = await admin
+      .from("trabajos_recorte")
+      .select("id, tabla, registro_id, nombre, estado, error, creado_por, procesado_por")
+      .eq("id", trabajoId)
+      .maybeSingle();
+    if (eR) return json({ ok: false, error: "No se pudo leer el trabajo" }, 500);
+    if (!tr) return json({ ok: false, error: "El trabajo no existe" }, 404);
+    const r = tr as TrabajoRecorteNotificable;
+    const autR = autorizarNotificacionRecorte(r, permiso.userId);
+    if (!autR.ok) return json({ ok: false, error: autR.error }, autR.status);
+    destinatario = r.creado_por;
+    // tabla viene de la BD (CHECK: Platos/Vinos/Bebidas/Cocteles).
+    const { data: ficha } = await admin.from(r.tabla).select("imagen_url").eq("id", r.registro_id).maybeSingle();
+    carga = JSON.stringify(construirCargaRecorte(r, (ficha as { imagen_url?: string | null } | null)?.imagen_url ?? null));
+  } else {
+    const { data: trabajo, error: eT } = await admin
+      .from("trabajos_video")
+      .select("id, plato_id, estado, error, creado_por, procesado_por")
+      .eq("id", trabajoId)
+      .maybeSingle();
+    if (eT) return json({ ok: false, error: "No se pudo leer el trabajo" }, 500);
+    if (!trabajo) return json({ ok: false, error: "El trabajo no existe" }, 404);
+    const t = trabajo as TrabajoNotificable;
+    const aut = autorizarNotificacion(t, permiso.userId);
+    if (!aut.ok) return json({ ok: false, error: aut.error }, aut.status);
+    destinatario = t.creado_por;
+    const { data: plato } = await admin.from("Platos").select("nombre, imagen_url").eq("id", t.plato_id).maybeSingle();
+    carga = JSON.stringify(construirCarga(t, (plato ?? null) as PlatoNotificable | null));
+  }
+  if (!destinatario) return json({ ok: true, enviadas: 0, borradas: 0, fallidas: 0 });
 
   const { data: subs, error: eS } = await admin
     .from("suscripciones_push")
     .select("id, endpoint, p256dh, auth")
-    .eq("user_id", t.creado_por);
+    .eq("user_id", destinatario);
   if (eS) return json({ ok: false, error: "No se pudieron leer las suscripciones" }, 500);
 
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);

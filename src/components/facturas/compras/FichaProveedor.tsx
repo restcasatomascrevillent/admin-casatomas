@@ -12,7 +12,7 @@ import type { Proveedor } from "@/lib/facturas/proveedores";
 const dato = (etiqueta: string, valor: string | null, titulo?: string) =>
   valor ? (
     <div className="min-w-0">
-      <dt className="truncate text-[11px] font-medium text-muted-foreground" title={titulo ?? etiqueta}>
+      <dt className="truncate text-[11px] pointer-coarse:text-xs font-medium text-muted-foreground" title={titulo ?? etiqueta}>
         {etiqueta}
       </dt>
       <dd className="truncate text-[13px] font-semibold tabular-nums" title={valor}>

@@ -41,7 +41,7 @@ export function EnlaceDocumento({
   );
 }
 
-const CHIP = "inline-flex h-6 shrink-0 items-center rounded px-1.5 text-[11px] font-medium";
+const CHIP = "inline-flex h-6 shrink-0 items-center rounded px-1.5 text-[11px] pointer-coarse:text-xs font-medium";
 const CHIP_CITADO = `${CHIP} bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300`;
 const CHIP_NEUTRO = `${CHIP} bg-muted text-muted-foreground`;
 const CHIP_AVISO = `${CHIP} bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300`;

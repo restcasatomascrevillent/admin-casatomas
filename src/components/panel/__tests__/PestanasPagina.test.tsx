@@ -47,7 +47,7 @@ describe("PestanasPagina", () => {
     expect(screen.getByText("12").className).toContain("hidden sm:inline");
     const c = screen.getByLabelText("3 en curso");
     expect(c.className).not.toContain("hidden");
-    expect(c.className).toContain("text-[hsl(38,59%,45%)]");
+    expect(c.className).toContain("text-[hsl(38,59%,34%)]");
   });
 
   it("icono: se pinta dentro de la pestaña y es decorativo", () => {

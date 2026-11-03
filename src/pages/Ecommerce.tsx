@@ -82,7 +82,7 @@ export default function Ecommerce() {
             ]}
           />
 
-          <TabsContent value="tpv" className={`${PESTANA_REPARTIDA} overflow-hidden`}>
+          <TabsContent value="tpv" className={`${PESTANA_REPARTIDA} overflow-y-auto overscroll-contain [@media(min-width:768px)_and_(min-height:521px)]:overflow-hidden [@media(max-height:520px)]:overflow-visible`}>
             <TPVContainer />
           </TabsContent>
 

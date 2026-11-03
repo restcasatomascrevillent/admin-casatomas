@@ -108,16 +108,16 @@ export function ListaTickets() {
       </CardHeader>
       <CardContent className="p-4 sm:p-5 space-y-3">
         <form role="search" className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,2fr)_repeat(4,minmax(0,1fr))_auto] items-end" onSubmit={e => e.preventDefault()}>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Buscar<Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="h-10" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Estado<select aria-label="Filtrar por estado" value={estado} onChange={e => { setEstado(e.target.value); setPagina(0); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Buscar<Input type="search" aria-label="Buscar tickets por código o comprador" placeholder="Código, comprador, email o teléfono…" value={texto} onChange={e => { setTexto(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11" /></label>
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Estado<select aria-label="Filtrar por estado" value={estado} onChange={e => { setEstado(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
             <option value="todos">Todos</option><option value="disponible">Disponibles</option><option value="canjeado">Canjeados</option><option value="caducado">Caducados</option><option value="cancelado">Cancelados</option>
           </select></label>
           <label className="grid min-w-0 gap-1 text-xs font-medium">Desde<Input aria-label="Fecha desde" type="date" value={desde} max={hasta || undefined} onChange={e => { setDesde(e.target.value); setPagina(0); }} className="h-10 min-w-0" /></label>
           <label className="grid min-w-0 gap-1 text-xs font-medium">Hasta<Input aria-label="Fecha hasta" type="date" value={hasta} min={desde || undefined} onChange={e => { setHasta(e.target.value); setPagina(0); }} className="h-10 min-w-0" /></label>
-          <label className="grid min-w-0 gap-1 text-xs font-medium">Ordenar por<select aria-label="Ordenar tickets" value={orden} onChange={e => { setOrden(e.target.value); setPagina(0); }} className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+          <label className="grid min-w-0 gap-1 text-xs font-medium">Ordenar por<select aria-label="Ordenar tickets" value={orden} onChange={e => { setOrden(e.target.value); setPagina(0); }} className="h-10 pointer-coarse:h-11 w-full rounded-md border border-input bg-background px-3 text-sm">
             <option value="fecha_desc">Más recientes</option><option value="fecha_asc">Más antiguos</option><option value="importe_asc">Importe: menor a mayor</option><option value="importe_desc">Importe: mayor a menor</option><option value="comprador_asc">Comprador: A–Z</option><option value="comprador_desc">Comprador: Z–A</option><option value="caducidad_asc">Caducidad: más próxima</option><option value="caducidad_desc">Caducidad: más lejana</option>
           </select></label>
-          {hayFiltros && <Button type="button" variant="outline" className="h-10" onClick={limpiar}>Limpiar</Button>}
+          {hayFiltros && <Button type="button" variant="outline" className="h-10 pointer-coarse:h-11" onClick={limpiar}>Limpiar</Button>}
         </form>
         {fechasInvalidas && <p role="alert" className="text-sm text-destructive">La fecha inicial no puede ser posterior a la final.</p>}
         {cargando && datos && <span role="status" className="sr-only">Filtrando tickets…</span>}
@@ -136,7 +136,7 @@ export function ListaTickets() {
                   const diasTexto = t.usado || t.estado !== "pagado" ? "—" : estadoCaducidad(t.caduca_el, hoy).texto.replace(/^Quedan? /, "");
                   return <tr key={t.id} onClick={() => setCompraSeleccionada(t.id)} className={`grid grid-cols-2 rounded-xl border-y border-r border-l-4 ${TONOS[tono].borde} [@container(min-width:60rem)]:table-row [@container(min-width:60rem)]:rounded-none [@container(min-width:60rem)]:border-r-0 [@container(min-width:60rem)]:border-b-0 cursor-pointer hover:bg-muted/50`}>
                     <td className={CELDA_CLASE}><span className={ETIQUETA_MOVIL}>Fecha</span>{t.creado_en ? new Date(t.creado_en).toLocaleString("es-ES") : "Sin fecha registrada"}</td>
-                    <td className={CELDA_SIN_SALTO}><span className={ETIQUETA_MOVIL}>Código</span><button type="button" aria-label={`Ver compra ${t.codigo}`} className="rounded font-mono underline underline-offset-4 focus-visible:outline focus-visible:outline-2" onClick={e => { e.stopPropagation(); setCompraSeleccionada(t.id); }}>{t.codigo}</button></td>
+                    <td className={CELDA_SIN_SALTO}><span className={ETIQUETA_MOVIL}>Código</span><button type="button" aria-label={`Ver compra ${t.codigo}`} className="touch-hit rounded font-mono underline underline-offset-4 focus-visible:outline focus-visible:outline-2" onClick={e => { e.stopPropagation(); setCompraSeleccionada(t.id); }}>{t.codigo}</button></td>
                     <td className={CELDA_CLASE}><span className={ETIQUETA_MOVIL}>Comprador</span>{t.comprador_nombre}</td>
                     <td className={CELDA_CLASE}><span className={ETIQUETA_MOVIL}>Teléfono</span>{t.comprador_telefono || "—"}</td>
                     <td className={CELDA_CLASE}><span className={ETIQUETA_MOVIL}>Importe</span>{euro(Number(t.importe_eur))}</td>

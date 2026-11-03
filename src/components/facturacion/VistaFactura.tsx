@@ -32,7 +32,7 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
             <thead className="bg-[#eeece7]"><tr>{["Concepto","Ud.","Precio",...(f.aplicarIva===false || f.ivaGlobal!==undefined ? [] : ["IVA"]),"Base"].map((h,i) => <th key={h} className={"px-2 py-3 font-semibold " + (i ? "text-right" : "")}>{h}</th>)}</tr></thead>
             <tbody>{t.lineas.map(l => <tr key={l.id} className="border-b border-[#dedbd4] align-top">
               <td className="max-w-[210px] break-words px-2 py-3"><p className="font-medium">{l.concepto || "Concepto pendiente"}</p>
-                <p className="mt-1 text-[10px] text-[#666]">{l.categoria} · {l.periodicidad}{l.descuento > 0 ? " · Dto. " + l.descuento + "%" : ""}</p></td>
+                <p className="mt-1 text-[10px] pointer-coarse:text-xs text-[#666]">{l.categoria} · {l.periodicidad}{l.descuento > 0 ? " · Dto. " + l.descuento + "%" : ""}</p></td>
               <td className="px-2 py-3 text-right">{l.cantidad}</td><td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.precio)}</td>
               {f.aplicarIva!==false && f.ivaGlobal===undefined && <td className="px-2 py-3 text-right">{l.iva}%</td>}<td className="whitespace-nowrap px-2 py-3 text-right">{euros(l.baseAntesGlobal)}</td>
             </tr>)}</tbody>
@@ -51,7 +51,7 @@ export function VistaFactura({ factura: f }: { factura: Factura }) {
         {hayDescuento && <p className="text-right text-xs text-[#666]">Los descuentos se aplican antes de los impuestos.</p>}
         {f.pago && <section className="text-xs"><h3 className="mb-2 font-bold uppercase">Forma de pago</h3><p className="whitespace-pre-wrap break-words">{f.pago}</p></section>}
         {f.notas && <section className="text-xs"><h3 className="mb-2 font-bold uppercase">Observaciones</h3><p className="whitespace-pre-wrap break-words">{f.notas}</p></section>}
-        <footer className="border-t border-[#dedbd4] pt-3 text-[10px] text-[#777]">OficiosOsIA · {f.numero || "Borrador"}</footer>
+        <footer className="border-t border-[#dedbd4] pt-3 text-[10px] pointer-coarse:text-xs text-[#777]">OficiosOsIA · {f.numero || "Borrador"}</footer>
       </div>
     </article>
   );

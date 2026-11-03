@@ -768,7 +768,7 @@ function MesaPlano({
           <p className="pointer-events-none truncate text-center text-xs font-semibold leading-tight">
             {unico.asignacion.reservas.nombre}
           </p>
-          <div className="pointer-events-none flex items-center justify-center gap-1.5 text-[11px] opacity-95 tabular-nums">
+          <div className="pointer-events-none flex items-center justify-center gap-1.5 text-[11px] pointer-coarse:text-xs opacity-95 tabular-nums">
             <span>{horaCorta(unico.asignacion.reservas.hora)}</span>
             <span>·</span>
             <span>{unico.asignacion.reservas.numero_comensales} pax</span>
@@ -789,7 +789,7 @@ function MesaPlano({
       {unico && !unico.esPrimeraDelGrupo && (
         <div
           className={cn(
-            "pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[11px] font-semibold text-white shadow",
+            "pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 rounded bg-emerald-600 px-1 py-0.5 text-[11px] pointer-coarse:text-xs font-semibold text-white shadow",
             cartelAtenuado && "opacity-60",
           )}
           style={{ top: -18 }}
@@ -814,7 +814,7 @@ function MesaPlano({
           {ocupantes.map((o) => (
             <div
               key={o.asignacion.reserva_id}
-              className="flex items-center justify-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] font-semibold leading-tight text-white shadow tabular-nums"
+              className="flex items-center justify-center gap-1 rounded bg-emerald-600 px-1.5 py-0.5 text-[11px] pointer-coarse:text-xs font-semibold leading-tight text-white shadow tabular-nums"
               title={`${o.asignacion.reservas.nombre} · ${horaCorta(o.asignacion.reservas.hora)} · ${o.asignacion.reservas.numero_comensales} pax`}
             >
               <span>{horaCorta(o.asignacion.reservas.hora)}</span>
@@ -831,7 +831,7 @@ function MesaPlano({
           className="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2"
           style={{ top: hitAreaPadding + mesaHeight + 4 }}
         >
-          <div className="whitespace-nowrap rounded border border-amber-500 bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 shadow-sm">
+          <div className="whitespace-nowrap rounded border border-amber-500 bg-amber-100 px-1.5 py-0.5 text-[11px] pointer-coarse:text-xs font-medium text-amber-800 shadow-sm">
             {mesaOriginal.etiqueta}
           </div>
         </div>

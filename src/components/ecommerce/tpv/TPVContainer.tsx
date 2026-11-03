@@ -79,18 +79,18 @@ export function TPVContainer() {
   };
 
   return (
-    <div className="h-full min-h-0 flex flex-col overflow-hidden">
+    <div className="flex flex-col [@media(min-width:768px)_and_(min-height:521px)]:h-full [@media(min-width:768px)_and_(min-height:521px)]:min-h-0 [@media(min-width:768px)_and_(min-height:521px)]:overflow-hidden">
       {/* Contenido principal */}
       {/* Por debajo de 1024 px (tablet vertical, con el menú lateral) los dos paneles
           no caben en fila: productos arriba y carrito debajo. */}
-      <div className="flex-1 flex flex-col gap-4 overflow-hidden lg:flex-row">
+      <div className="flex flex-col gap-4 [@media(min-width:768px)_and_(min-height:521px)]:min-h-0 [@media(min-width:768px)_and_(min-height:521px)]:flex-1 [@media(min-width:768px)_and_(min-height:521px)]:overflow-hidden [@media(min-width:1024px)_and_(min-height:521px)]:flex-row">
         {/* Panel izquierdo: Productos */}
-        <div className="min-h-0 flex-1 border rounded-lg overflow-hidden bg-card">
+        <div className="h-[32rem] shrink-0 border rounded-lg overflow-hidden bg-card [@media(min-width:768px)_and_(min-height:521px)]:h-auto [@media(min-width:768px)_and_(min-height:521px)]:min-h-0 [@media(min-width:768px)_and_(min-height:521px)]:flex-1 [@media(min-width:768px)_and_(min-height:521px)]:shrink">
           <ProductoPicker onSelectProducto={addProducto} />
         </div>
 
         {/* Panel derecho: Carrito */}
-        <div className="h-[45%] min-h-0 shrink-0 lg:h-auto lg:w-[400px]">
+        <div className="shrink-0 [@media(min-width:768px)_and_(max-width:1023px)_and_(min-height:521px)]:h-[45%] [@media(min-width:768px)_and_(min-height:521px)]:min-h-0 [@media(min-width:1024px)_and_(min-height:521px)]:h-auto [@media(min-width:1024px)_and_(min-height:521px)]:w-[400px]">
           <CarritoTPV
             lineas={lineas}
             totales={totales}
@@ -104,7 +104,7 @@ export function TPVContainer() {
       </div>
 
       {/* Barra inferior */}
-      <div className="min-h-16 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 bg-card border rounded-lg">
+      <div className="sticky bottom-0 z-10 min-h-16 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 bg-card border rounded-lg min-[360px]:px-4 [@media(min-width:768px)_and_(min-height:521px)]:static">
         <div className="flex items-center gap-2 text-muted-foreground">
           <ShoppingCart className="h-5 w-5" />
           <span>
@@ -112,23 +112,23 @@ export function TPVContainer() {
           </span>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex w-full gap-2 sm:w-auto">
           <Button
             variant="outline"
-            className="h-12 px-5"
+            className="h-12 shrink-0 px-3 min-[360px]:px-5"
             onClick={cancelar}
             disabled={lineas.length === 0 || isProcessing}
           >
-            <X className="mr-2 h-4 w-4" />
+            <X className="mr-2 hidden h-4 w-4 min-[360px]:block" />
             Cancelar
           </Button>
           <Button
             size="lg"
             onClick={handleCobrar}
             disabled={lineas.length === 0 || isProcessing}
-            className="h-12 min-w-[200px]"
+            className="h-12 min-w-0 flex-1 px-3 text-sm min-[360px]:px-8 min-[360px]:text-base sm:min-w-[200px] sm:flex-none"
           >
-            <Receipt className="mr-2 h-5 w-5" />
+            <Receipt className="mr-2 hidden h-5 w-5 min-[360px]:block" />
             Cobrar {new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(totales.total)}
           </Button>
         </div>

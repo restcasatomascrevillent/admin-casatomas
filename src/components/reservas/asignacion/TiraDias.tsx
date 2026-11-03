@@ -205,7 +205,7 @@ function InsigniaDia({ dia }: { dia: ResumenPestana }) {
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums",
+        "inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full px-1.5 text-[11px] pointer-coarse:text-xs font-semibold tabular-nums",
         dia.enVentana
           ? "bg-amber-200 text-amber-950 dark:bg-amber-900/70 dark:text-amber-100"
           : "border border-border bg-background text-foreground",
