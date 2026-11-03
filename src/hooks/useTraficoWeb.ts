@@ -75,30 +75,32 @@ const parsearProyeccion = (json: Json | null): PuntoProyeccion[] => {
 };
 
 // ─── Serie diaria (medias, bandas por día de semana, anomalías) ──────────────
+async function pedirSerie(proyecto: FiltroProyecto, desde: string, hasta: string): Promise<FilaSerie[]> {
+  const { data, error } = await supabase.rpc("trafico_web_serie", {
+    p_proyecto: aParam(proyecto),
+    p_desde: desde,
+    p_hasta: hasta,
+  });
+  if (error) throw error;
+  return (data ?? []).map((f) => ({
+    ...f,
+    visitas: num(f.visitas),
+    visitantes: num(f.visitantes),
+    media_7: num(f.media_7),
+    media_30: num(f.media_30),
+    desv_30: num(f.desv_30),
+    media_dow: num(f.media_dow),
+    desv_dow: num(f.desv_dow),
+    z_dow: num(f.z_dow),
+    desviacion_pct: num(f.desviacion_pct),
+  }));
+}
+
 export function useSerieTrafico(proyecto: FiltroProyecto, desde: string, hasta: string) {
   return useQuery({
     queryKey: [RAIZ, "trafico_web_serie", { proyecto, desde, hasta }],
     staleTime: STALE_TIME,
-    queryFn: async (): Promise<FilaSerie[]> => {
-      const { data, error } = await supabase.rpc("trafico_web_serie", {
-        p_proyecto: aParam(proyecto),
-        p_desde: desde,
-        p_hasta: hasta,
-      });
-      if (error) throw error;
-      return (data ?? []).map((f) => ({
-        ...f,
-        visitas: num(f.visitas),
-        visitantes: num(f.visitantes),
-        media_7: num(f.media_7),
-        media_30: num(f.media_30),
-        desv_30: num(f.desv_30),
-        media_dow: num(f.media_dow),
-        desv_dow: num(f.desv_dow),
-        z_dow: num(f.z_dow),
-        desviacion_pct: num(f.desviacion_pct),
-      }));
-    },
+    queryFn: () => pedirSerie(proyecto, desde, hasta),
   });
 }
 
@@ -152,6 +154,30 @@ export function useFdtMes() {
 }
 
 // ─── Top páginas por visitas o por bytes estimados ───────────────────────────
+async function pedirTopPaginas(
+  proyecto: FiltroProyecto,
+  desde: string,
+  hasta: string,
+  orden: OrdenTopPaginas,
+  limite: number,
+): Promise<FilaTopPagina[]> {
+  const { data, error } = await supabase.rpc("trafico_web_top_paginas", {
+    p_proyecto: aParam(proyecto),
+    p_desde: desde,
+    p_hasta: hasta,
+    p_limite: limite,
+    p_orden: orden,
+  });
+  if (error) throw error;
+  return (data ?? []).map((f) => ({
+    ...f,
+    visitas: num(f.visitas) ?? 0,
+    bytes_estimados: num(f.bytes_estimados),
+    pct_visitas: num(f.pct_visitas),
+    pct_bytes: num(f.pct_bytes),
+  }));
+}
+
 export function useTopPaginas(
   proyecto: FiltroProyecto,
   desde: string,
@@ -162,27 +188,34 @@ export function useTopPaginas(
   return useQuery({
     queryKey: [RAIZ, "trafico_web_top_paginas", { proyecto, desde, hasta, orden, limite }],
     staleTime: STALE_TIME,
-    queryFn: async (): Promise<FilaTopPagina[]> => {
-      const { data, error } = await supabase.rpc("trafico_web_top_paginas", {
-        p_proyecto: aParam(proyecto),
-        p_desde: desde,
-        p_hasta: hasta,
-        p_limite: limite,
-        p_orden: orden,
-      });
-      if (error) throw error;
-      return (data ?? []).map((f) => ({
-        ...f,
-        visitas: num(f.visitas) ?? 0,
-        bytes_estimados: num(f.bytes_estimados),
-        pct_visitas: num(f.pct_visitas),
-        pct_bytes: num(f.pct_bytes),
-      }));
-    },
+    queryFn: () => pedirTopPaginas(proyecto, desde, hasta, orden, limite),
   });
 }
 
 // ─── Desgloses device / country / referrer ───────────────────────────────────
+async function pedirDesglose(
+  proyecto: FiltroProyecto,
+  dimension: DimensionDesglose,
+  desde: string,
+  hasta: string,
+  limite: number,
+): Promise<FilaDesglose[]> {
+  const { data, error } = await supabase.rpc("trafico_web_desglose_resumen", {
+    p_proyecto: aParam(proyecto),
+    p_dimension: dimension,
+    p_desde: desde,
+    p_hasta: hasta,
+    p_limite: limite,
+  });
+  if (error) throw error;
+  return (data ?? []).map((f) => ({
+    ...f,
+    visitas: num(f.visitas) ?? 0,
+    visitantes: num(f.visitantes),
+    pct: num(f.pct),
+  }));
+}
+
 export function useDesgloseTrafico(
   proyecto: FiltroProyecto,
   dimension: DimensionDesglose,
@@ -193,21 +226,68 @@ export function useDesgloseTrafico(
   return useQuery({
     queryKey: [RAIZ, "trafico_web_desglose_resumen", { proyecto, dimension, desde, hasta, limite }],
     staleTime: STALE_TIME,
-    queryFn: async (): Promise<FilaDesglose[]> => {
-      const { data, error } = await supabase.rpc("trafico_web_desglose_resumen", {
-        p_proyecto: aParam(proyecto),
-        p_dimension: dimension,
-        p_desde: desde,
-        p_hasta: hasta,
-        p_limite: limite,
-      });
-      if (error) throw error;
-      return (data ?? []).map((f) => ({
-        ...f,
-        visitas: num(f.visitas) ?? 0,
-        visitantes: num(f.visitantes),
-        pct: num(f.pct),
-      }));
+    queryFn: () => pedirDesglose(proyecto, dimension, desde, hasta, limite),
+  });
+}
+
+// ─── Informe mensual «para el dueño» ─────────────────────────────────────────
+/**
+ * Todo lo que necesita el informe mensual (Generar informe) en una sola
+ * consulta. La forma final (titulares, cifras, conclusiones) la calcula
+ * `construirInforme` en src/components/trafico-web/informe/modelo.ts.
+ */
+export interface DatosInformeTrafico {
+  /** Serie diaria desde el 1 del mes anterior hasta el último día cerrado del mes. */
+  serie: FilaSerie[];
+  /** Todas las páginas del mes (hasta 100), por visitas. */
+  paginas: FilaTopPagina[];
+  dispositivos: FilaDesglose[];
+  paises: FilaDesglose[];
+  procedencias: FilaDesglose[];
+  /**
+   * Primer día con alguna visita en la historia de la web. Los días anteriores
+   * a ese no son "0 visitas" sino "aún no se medía": Vercel devuelve rellenos
+   * con 0 los días previos a activar Web Analytics.
+   */
+  primerDiaConVisitas: string | null;
+}
+
+export interface RangoDatosInforme {
+  desdeAnterior: string;
+  desde: string;
+  hasta: string;
+}
+
+async function pedirPrimerDiaConVisitas(proyecto: FiltroProyecto): Promise<string | null> {
+  let consulta = supabase
+    .from("trafico_web_diario")
+    .select("fecha")
+    .eq("ruta", "*")
+    .gt("visitas", 0);
+  if (proyecto !== "ambos") consulta = consulta.eq("proyecto", proyecto);
+  const { data, error } = await consulta.order("fecha", { ascending: true }).limit(1);
+  if (error) throw error;
+  return data?.[0]?.fecha ?? null;
+}
+
+/** `rango` NULL = el mes no tiene ningún día cerrado todavía: no se consulta nada. */
+export function useDatosInformeTrafico(proyecto: FiltroProyecto, rango: RangoDatosInforme | null) {
+  return useQuery({
+    queryKey: [RAIZ, "informe", { proyecto, ...rango }],
+    enabled: rango !== null,
+    staleTime: STALE_TIME,
+    queryFn: async (): Promise<DatosInformeTrafico> => {
+      if (!rango) throw new Error("Sin rango de fechas para el informe.");
+      const { desdeAnterior, desde, hasta } = rango;
+      const [serie, paginas, dispositivos, paises, procedencias, primerDiaConVisitas] = await Promise.all([
+        pedirSerie(proyecto, desdeAnterior, hasta),
+        pedirTopPaginas(proyecto, desde, hasta, "visitas", 100),
+        pedirDesglose(proyecto, "device", desde, hasta, 10),
+        pedirDesglose(proyecto, "country", desde, hasta, 20),
+        pedirDesglose(proyecto, "referrer", desde, hasta, 30),
+        pedirPrimerDiaConVisitas(proyecto),
+      ]);
+      return { serie, paginas, dispositivos, paises, procedencias, primerDiaConVisitas };
     },
   });
 }
