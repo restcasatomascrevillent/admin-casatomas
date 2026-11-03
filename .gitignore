@@ -35,3 +35,7 @@ supabase/.temp/
 
 # Sesión guardada para grabar los vídeos de ayuda (scripts/videos-ayuda): credenciales, nunca a git
 scripts/videos-ayuda/.sesion.json
+
+# Resultados de Playwright (e2e móvil): artefactos locales, no se versionan
+test-results
+playwright-report
