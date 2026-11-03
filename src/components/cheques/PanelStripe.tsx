@@ -143,7 +143,7 @@ export function PanelStripe() {
                 <FilaEstado ok={estado.detalles_completos}>Datos de la cuenta completos</FilaEstado>
               </div>
             </>}
-          <a href="https://dashboard.stripe.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-[#795440] hover:underline">
+          <a href="https://dashboard.stripe.com" target="_blank" rel="noreferrer" className="touch-hit inline-flex items-center gap-1.5 text-sm text-[#795440] hover:underline">
             Abrir el Dashboard de Stripe <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </CardContent>

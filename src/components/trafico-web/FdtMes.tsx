@@ -45,7 +45,7 @@ function BarraLimite({ acumulado, proyectado, limite }: { acumulado: number | nu
         {/* Marca del 80 % (umbral de alerta R4) */}
         <div className="absolute inset-y-0 w-px bg-foreground/40" style={{ left: "80%" }} aria-hidden />
       </div>
-      <div className="relative h-3 text-[10px] text-muted-foreground" aria-hidden>
+      <div className="relative h-3 text-[10px] pointer-coarse:text-xs text-muted-foreground" aria-hidden>
         <span className="absolute left-0">0</span>
         <span className="absolute -translate-x-1/2" style={{ left: "80%" }}>
           80 GB
@@ -88,7 +88,7 @@ export function FdtMes({ filas, proyectoSeleccionado }: FdtMesProps) {
             href={URL_USO_VERCEL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-0.5 font-medium text-primary underline-offset-2 hover:underline"
+            className="touch-hit inline-flex items-center gap-0.5 font-medium text-primary underline-offset-2 hover:underline"
           >
             ver uso en Vercel <ExternalLink className="h-3 w-3" aria-hidden />
           </a>

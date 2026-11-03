@@ -32,7 +32,7 @@ const ALTURA_MINIMA_GESTOR_GASTO = 560;
 const pestanaClass = "flex min-h-0 flex-1 flex-col pt-3 data-[state=inactive]:hidden";
 const regionClass = "min-h-0 flex-1 overflow-y-auto overscroll-contain";
 
-const selectClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
+const selectClass = "h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 text-base md:text-sm";
 const areaClass = "min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 const accionClass = "h-10 min-w-0 gap-2 whitespace-normal px-3 text-xs sm:text-sm";
 function Campo({ titulo, children }: { titulo: string; children: ReactNode }) {
@@ -273,7 +273,7 @@ export function EditorFacturacion() {
                 <Campo titulo="Precio unitario (€)"><Input type="number" min={0} max={1000000} step="0.01" value={l.precio} onChange={e=>linea(l.id,{precio:Number(e.target.value)})} /></Campo>
                 <p className="pb-2 text-right text-sm font-medium">{euros(total.lineas[i].base)}</p>
               </div>
-              <details className="rounded-md bg-muted/30 p-2"><summary className="cursor-pointer text-xs text-muted-foreground">Tipo y periodicidad · {l.periodicidad}</summary><div className="mt-2 grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
+              <details className="rounded-md bg-muted/30 p-2"><summary className="cursor-pointer py-2.5 text-xs text-muted-foreground">Tipo y periodicidad · {l.periodicidad}</summary><div className="mt-2 grid grid-cols-2 gap-3"><Campo titulo="Tipo"><select aria-label="Tipo" className={selectClass} value={l.categoria} onChange={e => linea(l.id,{categoria:e.target.value as LineaFactura["categoria"]})}>{categorias.map(v => <option key={v}>{v}</option>)}</select></Campo>
                 <Campo titulo="Periodicidad"><select aria-label="Periodicidad" className={selectClass} value={l.periodicidad} onChange={e => linea(l.id,{periodicidad:e.target.value as LineaFactura["periodicidad"]})}>{periodicidades.map(v => <option key={v}>{v}</option>)}</select></Campo></div>
               </details>
             </ConceptoOrdenable>)}
