@@ -60,14 +60,18 @@ export function tablas() {
     configuracion_web: [], configBotWeb: [], chat_web_config: [], phone_system_config: [], newsletter_suscriptores: [], newsletter_envios: [], cheques_regalo: [], plantilla_cheques_regalo: [], plantilla_factura_cheques: [],
     areas_trabajo: [], ajustes_mesa_servicio: [], user_role_presets: [], trabajos_video: [], resenas: [], config_google_places: [], plantillas_email_reserva: [], email_eventos: [], pedidos_ecommerce: [], costes_fijos: [],
     servicios_contratados: serviciosContratados(),
+    servicios_config: [{ id: true, eur_por_usd: 0.9, actualizado_en: ahora }],
+    tipo_cambio_usd_eur: [{ fecha: "2026-10-26", eur_por_usd: 0.893815, fuente: "bce" }],
     audit_log: [], audit_log_visible: [], trafico_web_diario: [], trafico_web_desglose: [], trafico_web_sync_estado: [], ia_funciones: [], ia_coste_estimado: [], peso_paginas: [], call_logs: [],
   };
 }
 
-// Super Admin › Servicios: los 5 proveedores con textos largos y consumo en los tres colores del semáforo.
+// Super Admin › Servicios: proveedores con textos largos, consumo en los tres colores del semáforo, coste en
+// euros y en dólares, renovaciones, uno sin lectura automática y uno que no se usa.
 const FUENTE = "https://vercel.com/docs/plans/hobby";
+const enDias = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 function serviciosContratados() {
-  const s = (proveedor, nombre, extra) => ({ proveedor, nombre, plan: "Free", precio_mensual: 0, moneda: "USD", ciclo: "gratuito", renovacion: null, cuenta: null, panel_url: `https://${proveedor}.sim.casatomas.test/panel`, limites: {}, notas: null, actualizado_en: ahora, ...extra });
+  const s = (proveedor, nombre, extra) => ({ proveedor, nombre, plan: "Free", precio_mensual: 0, precio_anual: null, moneda: "USD", ciclo: "gratuito", renovacion: null, cuenta: null, panel_url: `https://${proveedor}.sim.casatomas.test/panel`, limites: {}, notas: null, actualizado_en: ahora, categoria: "otros", orden: 100, activo: true, por_confirmar: false, fuente_precio: `https://${proveedor}.sim.casatomas.test/precios`, ...extra });
   return [
     s("vercel", "Vercel", { plan: "Hobby", cuenta: "Equipo «Casa tomas» (casa-tomas, team_18KKVg7ueSX0PL4Ycy1QakZj) · proyectos web-casatomas y admin-casatomas", limites: {
       peticiones_cdn: { orden: 1, etiqueta: "Visitas a las webs (peticiones al CDN)", limite: 1000000, unidad: "peticiones", periodo: "últimos 30 días", fuente: FUENTE },
@@ -81,8 +85,14 @@ function serviciosContratados() {
     } }),
     s("github", "GitHub", { cuenta: "Cuenta restcasatomascrevillent · repositorios web-casatomas y admin-casatomas", limites: { actions_computo: { orden: 1, etiqueta: "Pruebas automáticas (GitHub Actions)", limite: 12, unidad: "USD", periodo: "mes en curso" } } }),
     s("resend", "Resend", { plan: "Free (por confirmar)", limites: { correos_mes: { orden: 1, etiqueta: "Correos enviados este mes", limite: 3000, unidad: "correos", periodo: "mes en curso" }, correos_hoy: { orden: 2, etiqueta: "Correos enviados hoy", limite: 100, unidad: "correos", periodo: "hoy (UTC)" } } }),
-    s("stripe", "Stripe", { plan: "Sin cuota (comisión por cobro)", precio_mensual: null, moneda: "EUR", ciclo: "por_uso", cuenta: "Cuenta en MODO PRUEBA (todavía no cobra de verdad)" }),
-  ];
+    s("stripe", "Stripe", { plan: "Sin cuota (comisión por cobro)", precio_mensual: null, moneda: "EUR", ciclo: "por_uso", cuenta: "Cuenta en MODO PRUEBA (todavía no cobra de verdad)", categoria: "pagos", orden: 50 }),
+    s("openai", "OpenAI", { plan: "Pago por uso", precio_mensual: null, ciclo: "por_uso", categoria: "ia", orden: 60, limites: { gasto_ia_mes: { orden: 1, etiqueta: "Gasto de IA este mes", unidad: "EUR", periodo: "mes en curso", limite_desde: "Tope de gasto de IA de Super Admin › Costes" } } }),
+    s("vapi", "Vapi (asistente telefónico)", { plan: "Pago por uso (sin paquete de soporte)", precio_mensual: null, ciclo: "por_uso", categoria: "telefonia", orden: 70, por_confirmar: true, limites: { llamadas_simultaneas: { orden: 4, etiqueta: "Llamadas a la vez", limite: 4, unidad: "llamadas", periodo: "a la vez" } } }),
+    s("hostinger", "Hostinger", { plan: "Premium Web Hosting con un nombre de plan larguísimo", precio_mensual: null, precio_anual: 95.88, moneda: "EUR", ciclo: "anual", categoria: "dominio", orden: 95, por_confirmar: true }),
+    s("loading", "Loading (dominio, correo y web antigua)", { plan: "Por confirmar", precio_mensual: null, moneda: "EUR", ciclo: "anual", categoria: "dominio", orden: 96, por_confirmar: true, renovacion: enDias(12),
+      cuenta: "Dominio restaurantecasatomascrevillente.es: DNS ns1–ns3.controldeservidor.com, correo mx1–mx3.controldeservidor.com y web WordPress antigua (185.47.245.223)" }),
+    s("perplexity", "Perplexity (precios de mercado)", { plan: "Pago por uso (créditos)", precio_mensual: null, ciclo: "por_uso", categoria: "ia", orden: 65, activo: false, notas: "Hoy no se usa: la función buscar-precios-mercado existe, pero nada del panel la llama." }),
+  ].map((x, i) => ({ ...x, orden: x.orden === 100 ? (i + 1) * 10 : x.orden }));
 }
 const lecturasServicios = () => [
   { proveedor: "vercel", tomado_en: ahora, metricas: {}, error: "falta_secreto", secreto: "SERVICIOS_VERCEL_TOKEN", detalles: { secreto: "SERVICIOS_VERCEL_TOKEN" } },
@@ -93,7 +103,17 @@ const lecturasServicios = () => [
   }, detalles: { secreto_opcional: "SERVICIOS_SUPABASE_TOKEN", avisos: ["Sin SERVICIOS_SUPABASE_TOKEN no salen las peticiones a la API ni las ejecuciones de funciones."] } },
   { proveedor: "github", tomado_en: ahora, metricas: {}, error: "falta_secreto", secreto: "SERVICIOS_GITHUB_TOKEN", detalles: { secreto: "SERVICIOS_GITHUB_TOKEN" } },
   { proveedor: "resend", tomado_en: ahora, metricas: { correos_mes: { valor: 2985, unidad: "correos" }, correos_hoy: { valor: 12, unidad: "correos" } }, error: "falta_secreto", secreto: "RESEND_API_KEY", detalles: { secreto: "RESEND_API_KEY" } },
-  { proveedor: "stripe", tomado_en: ahora, metricas: { cobros_mes: { etiqueta: "Cobros este mes", valor: 123, unidad: "cobros" }, importe_cobrado_mes: { etiqueta: "Importe cobrado este mes", valor: 12345.67, unidad: "EUR" } }, error: null, detalles: { modo: "prueba", moneda: "EUR" } },
+  { proveedor: "stripe", tomado_en: ahora, metricas: { cobros_mes: { etiqueta: "Cobros este mes", valor: 123, unidad: "cobros" }, importe_cobrado_mes: { etiqueta: "Importe cobrado este mes", valor: 12345.67, unidad: "EUR" } }, error: null, detalles: { modo: "prueba", moneda: "EUR" },
+    coste_variable: { importe: 185.19, moneda: "EUR", periodo: "mes en curso", origen: "bd" } },
+  { proveedor: "openai", tomado_en: ahora, error: null, detalles: { avisos: ["OpenAI no ha publicado costes reales desde el 22/10/2026: revisa OPENAI_ADMIN_KEY y la sincronización de Super Admin › Costes."] },
+    metricas: { gasto_ia_mes: { etiqueta: "Gasto de IA este mes", valor: 7.4, unidad: "EUR", limite: 8, unidad_limite: "EUR", periodo: "mes en curso" }, gasto_real_usd: { etiqueta: "Ya facturado por OpenAI", valor: 7.9, unidad: "USD", periodo: "mes en curso" } },
+    coste_variable: { importe: 8.22, moneda: "USD", periodo: "mes en curso", origen: "estimado" } },
+  { proveedor: "vapi", tomado_en: ahora, error: null, detalles: { secreto_opcional: "VAPI_API_KEY" },
+    metricas: { llamadas_mes: { etiqueta: "Llamadas este mes", valor: 312, unidad: "llamadas" }, minutos_mes: { etiqueta: "Minutos de llamada este mes", valor: 1180.5, unidad: "minutos" }, coste_llamadas_mes: { etiqueta: "Coste de las llamadas este mes", valor: 141.66, unidad: "USD" } },
+    coste_variable: { importe: 141.66, moneda: "USD", periodo: "mes en curso", origen: "bd" } },
+  { proveedor: "hostinger", tomado_en: ahora, error: null, metricas: { suscripciones_activas: { etiqueta: "Suscripciones activas", valor: 2, unidad: "suscripciones" } },
+    detalles: { plan_detectado: "Premium Web Hosting, .es Domain", coste_mensual_detectado: { importe: 8.99, moneda: "EUR" },
+      dominios: [{ dominio: "restaurantecasatomascrevillente.es", estado: "active", caduca: `${enDias(73)}T10:00:00Z` }, { dominio: "un-dominio-con-un-nombre-muy-largo-de-verdad.es", estado: "active", caduca: `${enDias(300)}T10:00:00Z` }] } },
 ];
 
 const hoyISO = dia(0);
@@ -112,6 +132,6 @@ export const rpcSinteticas = {
   ia_coste_serie: () => [], ia_coste_por_funcion: () => [], ia_coste_por_modelo: () => [], ia_funciones_sin_registro: () => [], proveedores_listado: () => [], productos_resumen: () => [], productos_gasto_por_categoria: () => [],
 };
 export const funcionesSinteticas = {
-  "servicios-uso": () => ({ lecturas: lecturasServicios(), generado_en: ahora }),
+  "servicios-uso": () => ({ lecturas: lecturasServicios(), sin_lector: ["loading"], generado_en: ahora }),
   "list-users": () => ({ users: [{ id: USER_ID, email: EMAIL, display_name: "SIM Usuario e2e", created_at: ahora, access_blocked: false }] }),
 };

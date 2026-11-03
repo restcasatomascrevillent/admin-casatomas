@@ -4002,6 +4002,124 @@ export type Database = {
         }
         Relationships: []
       }
+      // Super Admin › Servicios (migraciones 20261103120000 y 20261103160000).
+      servicios_config: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          eur_por_usd: number
+          id: boolean
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          eur_por_usd?: number
+          id?: boolean
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          eur_por_usd?: number
+          id?: boolean
+        }
+        Relationships: []
+      }
+      servicios_contratados: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          actualizado_por: string | null
+          categoria: string
+          ciclo: string
+          cuenta: string | null
+          fuente_precio: string | null
+          limites: Json
+          moneda: string
+          nombre: string
+          notas: string | null
+          orden: number
+          panel_url: string | null
+          plan: string | null
+          por_confirmar: boolean
+          precio_anual: number | null
+          precio_mensual: number | null
+          proveedor: string
+          renovacion: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          actualizado_por?: string | null
+          categoria?: string
+          ciclo?: string
+          cuenta?: string | null
+          fuente_precio?: string | null
+          limites?: Json
+          moneda?: string
+          nombre: string
+          notas?: string | null
+          orden?: number
+          panel_url?: string | null
+          plan?: string | null
+          por_confirmar?: boolean
+          precio_anual?: number | null
+          precio_mensual?: number | null
+          proveedor: string
+          renovacion?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          actualizado_por?: string | null
+          categoria?: string
+          ciclo?: string
+          cuenta?: string | null
+          fuente_precio?: string | null
+          limites?: Json
+          moneda?: string
+          nombre?: string
+          notas?: string | null
+          orden?: number
+          panel_url?: string | null
+          plan?: string | null
+          por_confirmar?: boolean
+          precio_anual?: number | null
+          precio_mensual?: number | null
+          proveedor?: string
+          renovacion?: string | null
+        }
+        Relationships: []
+      }
+      servicios_uso: {
+        Row: {
+          coste_variable: Json | null
+          detalles: Json
+          error: string | null
+          id: string
+          metricas: Json
+          proveedor: string
+          tomado_en: string
+        }
+        Insert: {
+          coste_variable?: Json | null
+          detalles?: Json
+          error?: string | null
+          id?: string
+          metricas?: Json
+          proveedor: string
+          tomado_en?: string
+        }
+        Update: {
+          coste_variable?: Json | null
+          detalles?: Json
+          error?: string | null
+          id?: string
+          metricas?: Json
+          proveedor?: string
+          tomado_en?: string
+        }
+        Relationships: []
+      }
       solicitudes_pendientes: {
         Row: {
           created_at: string | null
@@ -5613,6 +5731,21 @@ export type Database = {
         Returns: number
       }
       text_to_bytea: { Args: { data: string }; Returns: string }
+      // Super Admin › Servicios: última lectura de cada proveedor (la RLS decide)
+      // y métricas sin token (solo service_role, la usa servicios-uso).
+      servicios_uso_ultimas: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          coste_variable: Json | null
+          detalles: Json
+          error: string | null
+          id: string
+          metricas: Json
+          proveedor: string
+          tomado_en: string
+        }[]
+      }
+      servicios_metricas_supabase: { Args: Record<PropertyKey, never>; Returns: Json }
       trafico_web_desglose_resumen: {
         Args: {
           p_desde?: string
