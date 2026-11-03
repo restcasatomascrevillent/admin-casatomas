@@ -175,6 +175,14 @@ verify_jwt = true
 [functions.stripe-estado-cuenta]
 verify_jwt = true
 
+# Super Admin › Servicios: JWT de usuario + is_super_admin (exigirSuperAdmin).
+# Lee el consumo de Vercel, Supabase, GitHub, Resend y Stripe con sus secretos
+# (SERVICIOS_*_TOKEN, RESEND_API_KEY, STRIPE_SECRET_KEY) y nunca los devuelve.
+# Ver supabase/functions/servicios-uso/servicios.ts y la migración
+# 20261103120000_servicios_contratados.sql.
+[functions.servicios-uso]
+verify_jwt = true
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — SIN autenticación propia: el gateway es lo único delante

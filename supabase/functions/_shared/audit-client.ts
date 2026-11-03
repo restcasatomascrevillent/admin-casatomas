@@ -62,6 +62,8 @@ export function clienteConAuditoria<T extends Fabrica>(fabrica: T, fuente: strin
 const SIN_EVENTO_PROPIO = new Set([
   "admin-create-user", "admin-delete-user", "admin-set-super-admin", "admin-update-user-password", "admin-set-user-access",
   "auditoria-revertir", "list-users", "leer-metricas", "registrar-metrica", "vapi-analytics", "sync-trafico-web",
+  // Solo LEE consumo (Super Admin › Servicios): cada visita no es una acción; los fallos sí se registran.
+  "servicios-uso",
 ]);
 
 // Funciones que pueden ejecutarse SIN usuario ni service role porque tienen

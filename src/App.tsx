@@ -41,6 +41,7 @@ const SuperAdminPanel = lazy(() => import("./pages/SuperAdminPanel"));
 const SuperAdminUsuarios = lazy(() => import("./pages/SuperAdminUsuarios"));
 const SuperAdminBotWeb = lazy(() => import("./pages/SuperAdminBotWeb"));
 const SuperAdminAuditoria = lazy(() => import("./pages/SuperAdminAuditoria"));
+const SuperAdminServicios = lazy(() => import("./pages/SuperAdminServicios"));
 
 const queryClient = new QueryClient();
 
@@ -146,6 +147,7 @@ const App = () => (
                   <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />
                   <Route path="/super-admin/usuarios" element={paginaSuperAdmin(<SuperAdminUsuarios />)} />
                   <Route path="/super-admin/auditoria" element={paginaSuperAdmin(<SuperAdminAuditoria />)} />
+                  <Route path="/super-admin/servicios" element={paginaSuperAdmin(<SuperAdminServicios />)} />
                   <Route path="*" element={bajoDemanda(<NotFound />)} />
                 </Routes>
               </RouteErrorBoundary>
