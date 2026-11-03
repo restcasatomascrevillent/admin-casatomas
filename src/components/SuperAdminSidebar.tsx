@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   ShieldAlert,
   ScrollText,
+  Server,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -59,6 +60,7 @@ const menuItems: {
   { title: "Tráfico web", url: "/super-admin/trafico-web", icon: Activity },
   { title: "Espacios", url: "/super-admin/espacios", icon: MapPin },
   { title: "Bot Web", url: "/super-admin/bot-web", icon: Bot },
+  { title: "Servicios", url: "/super-admin/servicios", icon: Server },
   { title: "Auditoría", url: "/super-admin/auditoria", icon: ScrollText },
 ];
 

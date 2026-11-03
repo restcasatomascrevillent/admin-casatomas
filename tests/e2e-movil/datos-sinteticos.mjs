@@ -59,12 +59,46 @@ export function tablas() {
     facturas: [], productos_factura: [], proveedores: [], categorias_producto: [], ocr_trabajos: [], chat_facturas_conversaciones: [], chat_facturas_mensajes: [],
     configuracion_web: [], configBotWeb: [], chat_web_config: [], phone_system_config: [], newsletter_suscriptores: [], newsletter_envios: [], cheques_regalo: [], plantilla_cheques_regalo: [], plantilla_factura_cheques: [],
     areas_trabajo: [], ajustes_mesa_servicio: [], user_role_presets: [], trabajos_video: [], resenas: [], config_google_places: [], plantillas_email_reserva: [], email_eventos: [], pedidos_ecommerce: [], costes_fijos: [],
+    servicios_contratados: serviciosContratados(),
     audit_log: [], audit_log_visible: [], trafico_web_diario: [], trafico_web_desglose: [], trafico_web_sync_estado: [], ia_funciones: [], ia_coste_estimado: [], peso_paginas: [], call_logs: [],
   };
 }
 
+// Super Admin › Servicios: los 5 proveedores con textos largos y consumo en los tres colores del semáforo.
+const FUENTE = "https://vercel.com/docs/plans/hobby";
+function serviciosContratados() {
+  const s = (proveedor, nombre, extra) => ({ proveedor, nombre, plan: "Free", precio_mensual: 0, moneda: "USD", ciclo: "gratuito", renovacion: null, cuenta: null, panel_url: `https://${proveedor}.sim.casatomas.test/panel`, limites: {}, notas: null, actualizado_en: ahora, ...extra });
+  return [
+    s("vercel", "Vercel", { plan: "Hobby", cuenta: "Equipo «Casa tomas» (casa-tomas, team_18KKVg7ueSX0PL4Ycy1QakZj) · proyectos web-casatomas y admin-casatomas", limites: {
+      peticiones_cdn: { orden: 1, etiqueta: "Visitas a las webs (peticiones al CDN)", limite: 1000000, unidad: "peticiones", periodo: "últimos 30 días", fuente: FUENTE },
+      transferencia_rapida: { orden: 2, etiqueta: "Datos servidos a los visitantes (Fast Data Transfer)", limite: 100, unidad: "GB", periodo: "últimos 30 días", fuente: FUENTE },
+      despliegues_24h: { orden: 7, etiqueta: "Publicaciones (despliegues)", limite: 100, unidad: "despliegues", periodo: "últimas 24 h", fuente: FUENTE },
+    }, notas: "Plan gratuito. Si se pasa de un límite, Vercel pausa ese recurso hasta que pasen 30 días." }),
+    s("supabase", "Supabase", { cuenta: "Organización «Casa Tomas» · proyectos casatomas-prod (haqmmdfdzzatdnrrcgez) y casatomas-staging (sfonaclosuafvlhutkon)", limites: {
+      bd_tamano: { orden: 1, etiqueta: "Tamaño de la base de datos", limite: 500, unidad: "MB", periodo: "ahora" },
+      almacenamiento: { orden: 2, etiqueta: "Fotos y archivos guardados (Storage)", limite: 1, unidad: "GB", periodo: "ahora" },
+      egreso: { orden: 5, etiqueta: "Datos servidos (egress)", limite: 5, unidad: "GB", periodo: "mes en curso", nota: "Supabase no da este dato por API en el plan Free: míralo en su panel (Usage)." },
+    } }),
+    s("github", "GitHub", { cuenta: "Cuenta restcasatomascrevillent · repositorios web-casatomas y admin-casatomas", limites: { actions_computo: { orden: 1, etiqueta: "Pruebas automáticas (GitHub Actions)", limite: 12, unidad: "USD", periodo: "mes en curso" } } }),
+    s("resend", "Resend", { plan: "Free (por confirmar)", limites: { correos_mes: { orden: 1, etiqueta: "Correos enviados este mes", limite: 3000, unidad: "correos", periodo: "mes en curso" }, correos_hoy: { orden: 2, etiqueta: "Correos enviados hoy", limite: 100, unidad: "correos", periodo: "hoy (UTC)" } } }),
+    s("stripe", "Stripe", { plan: "Sin cuota (comisión por cobro)", precio_mensual: null, moneda: "EUR", ciclo: "por_uso", cuenta: "Cuenta en MODO PRUEBA (todavía no cobra de verdad)" }),
+  ];
+}
+const lecturasServicios = () => [
+  { proveedor: "vercel", tomado_en: ahora, metricas: {}, error: "falta_secreto", secreto: "SERVICIOS_VERCEL_TOKEN", detalles: { secreto: "SERVICIOS_VERCEL_TOKEN" } },
+  { proveedor: "supabase", tomado_en: ahora, error: null, desde_cache: true, metricas: {
+    bd_tamano: { etiqueta: "Tamaño de la base de datos", valor: 460 * 1024 ** 2, unidad: "bytes" },
+    almacenamiento: { etiqueta: "Fotos y archivos guardados (Storage)", valor: 0.75 * 1024 ** 3, unidad: "bytes", nota: "501 archivos en este proyecto." },
+    usuarios_activos_mes: { etiqueta: "Usuarios activos este mes", valor: 2, unidad: "usuarios", periodo: "mes en curso" },
+  }, detalles: { secreto_opcional: "SERVICIOS_SUPABASE_TOKEN", avisos: ["Sin SERVICIOS_SUPABASE_TOKEN no salen las peticiones a la API ni las ejecuciones de funciones."] } },
+  { proveedor: "github", tomado_en: ahora, metricas: {}, error: "falta_secreto", secreto: "SERVICIOS_GITHUB_TOKEN", detalles: { secreto: "SERVICIOS_GITHUB_TOKEN" } },
+  { proveedor: "resend", tomado_en: ahora, metricas: { correos_mes: { valor: 2985, unidad: "correos" }, correos_hoy: { valor: 12, unidad: "correos" } }, error: "falta_secreto", secreto: "RESEND_API_KEY", detalles: { secreto: "RESEND_API_KEY" } },
+  { proveedor: "stripe", tomado_en: ahora, metricas: { cobros_mes: { etiqueta: "Cobros este mes", valor: 123, unidad: "cobros" }, importe_cobrado_mes: { etiqueta: "Importe cobrado este mes", valor: 12345.67, unidad: "EUR" } }, error: null, detalles: { modo: "prueba", moneda: "EUR" } },
+];
+
 const hoyISO = dia(0);
 export const rpcSinteticas = {
+  servicios_uso_ultimas: () => lecturasServicios(),
   version_auditoria_panel: () => 2,
   registrar_acceso_panel: () => null,
   listar_tablas_auditoria_panel: () => [{ tabla: "reservas" }],
@@ -78,5 +112,6 @@ export const rpcSinteticas = {
   ia_coste_serie: () => [], ia_coste_por_funcion: () => [], ia_coste_por_modelo: () => [], ia_funciones_sin_registro: () => [], proveedores_listado: () => [], productos_resumen: () => [], productos_gasto_por_categoria: () => [],
 };
 export const funcionesSinteticas = {
+  "servicios-uso": () => ({ lecturas: lecturasServicios(), generado_en: ahora }),
   "list-users": () => ({ users: [{ id: USER_ID, email: EMAIL, display_name: "SIM Usuario e2e", created_at: ahora, access_blocked: false }] }),
 };

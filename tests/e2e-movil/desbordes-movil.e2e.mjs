@@ -16,6 +16,7 @@ const RUTAS = [
   "/gestion-web", "/gestion-web?tab=novedades", "/gestion-web?tab=menus", "/gestion-web?tab=tapas", "/marketing", "/cheques", "/facturas", "/facturas?tab=cargar", "/usuarios", "/ayuda",
   "/super-admin", "/super-admin/ecommerce", "/super-admin/asistente-telefonico", "/super-admin/gestor-gasto", "/super-admin/costes", "/super-admin/resenas",
   "/super-admin/plantillas-email", "/super-admin/trafico-web", "/super-admin/espacios", "/super-admin/bot-web", "/super-admin/usuarios", "/super-admin/auditoria",
+  "/super-admin/servicios",
 ];
 
 test.beforeEach(async ({ context }) => {
@@ -86,4 +87,42 @@ test("Costes: la frase de cabecera no queda aplastada en una columna estrecha", 
   await abrir(page, "/super-admin/costes");
   const ancho = await page.evaluate(() => { const p = [...document.querySelectorAll("main p")].find((x) => /Lo que cuesta mantener/.test(x.textContent ?? "")); return p ? p.getBoundingClientRect().width : -1; });
   expect(ancho, "ancho del párrafo de cabecera").toBeGreaterThan(200);
+});
+
+test("Servicios: tarjetas sin desbordes, botones de ≥ 44 px con nombre y barras con su %", async ({ page }) => {
+  await abrir(page, "/super-admin/servicios");
+  await expect(page.getByRole("heading", { level: 1, name: "Servicios" })).toBeVisible();
+  await expect(page.getByRole("article")).toHaveCount(5);
+  const r = await page.evaluate(() => {
+    const main = document.querySelector("main");
+    const vw = document.documentElement.clientWidth;
+    const fuera = [];
+    for (const el of main.querySelectorAll("*")) {
+      const b = el.getBoundingClientRect();
+      if (b.width && (b.right > vw + 1 || b.left < -1)) fuera.push(`${el.tagName.toLowerCase()} [${Math.round(b.left)}..${Math.round(b.right)}]`);
+    }
+    const pequenos = [];
+    const sinNombre = [];
+    for (const el of main.querySelectorAll("button, a[href]")) {
+      const b = el.getBoundingClientRect();
+      if (!b.width) continue;
+      const nombre = (el.getAttribute("aria-label") || el.textContent || "").trim();
+      if (!nombre) sinNombre.push(el.outerHTML.slice(0, 80));
+      if (b.height < 44 && !el.closest("p")) pequenos.push(`${nombre.slice(0, 40)} (${Math.round(b.height)} px)`);
+    }
+    const barras = [...main.querySelectorAll("[role=progressbar]")].map((b) => ({ nombre: b.getAttribute("aria-label"), texto: b.getAttribute("aria-valuetext") }));
+    return { fuera: fuera.slice(0, 5), pequenos, sinNombre, barras };
+  });
+  expect(r.fuera, "elementos de la pantalla Servicios fuera del viewport").toEqual([]);
+  expect(r.pequenos, "botones o enlaces de menos de 44 px").toEqual([]);
+  expect(r.sinNombre, "botones o enlaces sin nombre accesible").toEqual([]);
+  expect(r.barras.length, "barras de consumo").toBeGreaterThanOrEqual(4);
+  for (const b of r.barras) expect(b.texto, `la barra «${b.nombre}» no dice su % y su estado`).toMatch(/%.*(bien|cerca del límite|al límite)/);
+  // «Falta configurar la clave»: se despliega el cómo, con enlaces de ≥ 44 px.
+  const vercel = page.getByRole("article", { name: "Vercel" });
+  await vercel.getByRole("button", { name: /Cómo hacerlo/ }).click();
+  await expect(vercel.getByRole("link", { name: /tokens de Vercel/ })).toBeVisible();
+  const enlace = await vercel.getByRole("link", { name: /tokens de Vercel/ }).boundingBox();
+  expect(enlace.height).toBeGreaterThanOrEqual(44);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });
