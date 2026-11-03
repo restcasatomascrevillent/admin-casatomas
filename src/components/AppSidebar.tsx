@@ -14,6 +14,7 @@ import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { VersionPanel } from "@/components/panel/VersionPanel";
+import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
@@ -153,9 +154,16 @@ export function AppSidebar() {
           ReservasHoy.tsx) para que el cubierto decorativo pudiera volver:
           con los dos dentro no cabía todo y "Gestión del Restaurante" se
           cortaba a media palabra (11px medidos). */}
-      <SidebarHeader className="h-20 shrink-0 justify-center border-b border-sidebar-border py-2 pl-[calc((var(--sidebar-width-icon)-theme(spacing.11))/2)] pr-3">
-        <div className="flex w-full min-w-0 items-center gap-2">
+      <SidebarHeader
+        className={cn(
+          "h-[5.5rem] shrink-0 justify-center border-b border-sidebar-border py-2 pl-[calc((var(--sidebar-width-icon)-theme(spacing.11))/2)] pr-3",
+          isCollapsed && "px-0",
+        )}
+      >
+        <div className={cn("flex w-full min-w-0 items-center gap-2", isCollapsed && "flex-col gap-1")}>
           <SidebarTrigger className="text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent" />
+          {/* Versión y entorno arriba, bien a la vista (2026-11-03); con el menú plegado, solo el número. */}
+          {isCollapsed && <VersionPanel colapsado />}
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
               <h2 className="flex items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
@@ -171,6 +179,7 @@ export function AppSidebar() {
               >
                 Gestión del Restaurante
               </p>
+              <VersionPanel className="mt-1" />
             </div>
           )}
         </div>
@@ -247,7 +256,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <VersionPanel colapsado={isCollapsed} />
       </SidebarFooter>
     </Sidebar>
   );

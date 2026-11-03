@@ -258,7 +258,9 @@ describe.each([
     expect(within(boton).getByText("Laura Gómez")).toBeInTheDocument();
     expect(within(boton).getByText(rolEsperado)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cerrar sesión" })).toBeInTheDocument();
-    expect(screen.getByTestId("version-panel")).toBeInTheDocument();
+    // La versión ya no va en el pie (2026-11-03): está arriba.
+    const pie = boton.closest('[data-sidebar="footer"]')!;
+    expect(within(pie as HTMLElement).queryByTestId("version-panel")).toBeNull();
   });
 
   it("sin nombre guardado usa el email (o el usuario de @staff.local)", () => {
@@ -307,3 +309,44 @@ describe.each([
   });
 });
 
+// ───────── Versión y entorno en la cabecera del menú (2026-11-03) ─────────
+
+describe.each([
+  ["admin", AppSidebar, "Admin Panel"],
+  ["superadmin", SuperAdminSidebar, "Super Admin"],
+] as const)("versión arriba en el menú %s", (_nombre, Panel, titulo) => {
+  const renderPanel = (defaultOpen = true) =>
+    render(
+      <MemoryRouter>
+        <SidebarProvider defaultOpen={defaultOpen}>
+          <Panel />
+          <SidebarTrigger />
+        </SidebarProvider>
+      </MemoryRouter>,
+    );
+  const cabecera = () => screen.getByRole("heading", { name: titulo }).closest('[data-sidebar="header"]') as HTMLElement;
+
+  it("expandido: en la cabecera, junto al título, con el entorno; no en el pie", () => {
+    renderPanel();
+    const version = within(cabecera()).getByTestId("version-panel");
+    expect(version).toHaveTextContent("Local");
+    expect(version).toHaveAttribute("title", "Local");
+    expect(screen.getAllByTestId("version-panel")).toHaveLength(1);
+  });
+
+  it("en modo iconos queda un indicador compacto en la cabecera", () => {
+    renderPanel(false);
+    const version = screen.getByTestId("version-panel");
+    expect(version.closest('[data-sidebar="header"]')).not.toBeNull();
+    expect(version.closest('[data-sidebar="footer"]')).toBeNull();
+    expect(version).toHaveAttribute("data-entorno", "local");
+  });
+
+  it("en el panel deslizante (390 px) también está arriba", () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    renderPanel(false);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir menú" }));
+    const drawer = screen.getByRole("dialog", { name: "Menú de navegación" });
+    expect(within(drawer).getByTestId("version-panel").closest('[data-sidebar="header"]')).not.toBeNull();
+  });
+});

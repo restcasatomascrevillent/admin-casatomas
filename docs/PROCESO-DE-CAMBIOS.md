@@ -35,7 +35,7 @@ Al subir a `staging`:
 
 - Vercel publica la demo en 1–3 minutos.
 - El CI pasa los tests en GitHub (pestaña *Actions*).
-- La versión de la demo sube; se ve en el pie del menú del panel: `v0.14 · Demo`.
+- La versión de la demo sube; se ve en la parte superior del menú del panel: `v0.14 · Demo`.
 
 ### 3. Comprobación
 
@@ -93,7 +93,7 @@ Consecuencias:
 
 Dónde se ve:
 
-- En el **pie del menú del panel**: `v0.14 · Demo` en ámbar o `v0.14 · Producción` en verde. Al pasar el ratón sale el commit.
+- En la **parte superior del menú del panel** (y en la barra superior en tablet y móvil): `v0.14 · Demo` en ámbar o `v0.14 · Producción` en verde. Al pasar el ratón sale el commit.
 - En **`/version.json`** de la web y del panel, en cada entorno.
 - En el **título del PR** a producción y en las **Releases** de GitHub.
 
