@@ -1148,7 +1148,7 @@ export const FormularioReserva = ({
                   </Select>
                 )}
                 {horaFueraDeFranja && (
-                  <p className="text-[11px] text-muted-foreground">Hora fuera de las franjas del día.</p>
+                  <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">Hora fuera de las franjas del día.</p>
                 )}
                 <FormMessage />
               </FormItem>
@@ -1309,7 +1309,7 @@ export const FormularioReserva = ({
                         )}
                       </SelectContent>
                     </Select>
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
                       No se le dice al cliente ni limita la hora. Se puede dejar sin asignar y ponerla más tarde.
                     </p>
                     <FormMessage />
@@ -1493,7 +1493,7 @@ export const FormularioReserva = ({
               >
                 Avisar al cliente del cambio
               </Label>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
                 {!avisoModificacion.disponible
                   ? avisoModificacion.motivo
                   : avisaraCambio

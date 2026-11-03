@@ -85,7 +85,7 @@ export function ConversacionesList({
                 <span className="min-w-0 flex-1 truncate" title={titulo}>
                   {titulo}
                 </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground group-hover:invisible group-focus-within:invisible pointer-coarse:visible pointer-coarse:group-hover:visible pointer-coarse:group-focus-within:visible">
+                <span className="shrink-0 text-[11px] pointer-coarse:text-xs tabular-nums text-muted-foreground group-hover:invisible group-focus-within:invisible pointer-coarse:visible pointer-coarse:group-hover:visible pointer-coarse:group-focus-within:visible">
                   {fecha}
                 </span>
 

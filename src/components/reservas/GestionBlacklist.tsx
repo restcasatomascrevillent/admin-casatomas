@@ -252,7 +252,7 @@ export function GestionBlacklist() {
                 </div>
                 {entry.motivo && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{entry.motivo}</p>}
                 {entry.aprobada_en && (
-                  <p className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <p className="flex items-center gap-1 text-[11px] pointer-coarse:text-xs text-muted-foreground">
                     <ShieldCheck className="h-3 w-3 shrink-0" />
                     Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
                   </p>
@@ -306,7 +306,7 @@ export function GestionBlacklist() {
                   <TableCell className="max-w-[200px]">
                     <p className="truncate">{entry.motivo || "-"}</p>
                     {entry.aprobada_en && (
-                      <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
+                      <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <ShieldCheck className="h-3 w-3 shrink-0" />
                         Aprobada el {format(new Date(entry.aprobada_en), "dd MMM yyyy", { locale: es })}
                       </p>

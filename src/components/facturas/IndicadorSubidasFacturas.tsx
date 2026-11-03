@@ -52,7 +52,7 @@ function Indicador({ variante, colapsado, className, activos, porDecidir }: Prop
       >
         {icono}
         {colapsado ? (
-          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none tabular-nums text-primary-foreground">
+          <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] pointer-coarse:text-xs leading-none tabular-nums text-primary-foreground">
             {activos + porDecidir}
           </span>
         ) : (

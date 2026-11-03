@@ -485,7 +485,7 @@ function FilaReserva({
         {salaNoUsable && (
           <Badge
             variant="outline"
-            className="gap-1 border-amber-400 text-[11px] text-amber-800 dark:text-amber-200"
+            className="gap-1 border-amber-400 text-[11px] pointer-coarse:text-xs text-amber-800 dark:text-amber-200"
             title="Esta sala está marcada como no usable en Configuración. La reserva sigue en ella hasta que la cambies."
           >
             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
@@ -633,7 +633,7 @@ function OpcionesSala({
                   {actual ? <Check className="h-4 w-4 text-primary" aria-hidden="true" /> : <span className="w-4" />}
                   <span className="truncate">{sala.nombre}</span>
                   {sala.id === sugerida && !actual && (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px] pointer-coarse:text-xs">
                       Sugerida
                     </Badge>
                   )}

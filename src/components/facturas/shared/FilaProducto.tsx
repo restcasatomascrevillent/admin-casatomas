@@ -15,7 +15,7 @@ import { normalizarUnidadFactura } from "./unidad";
 export const EtiquetaCategoria = ({ p }: { p: ProductoFactura }) =>
   p.categoria ? (
     <span
-      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] font-normal leading-none text-muted-foreground"
+      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] pointer-coarse:text-xs font-normal leading-none text-muted-foreground"
       title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}
     >
       {p.categoria.nombre}

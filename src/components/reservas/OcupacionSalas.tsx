@@ -196,7 +196,7 @@ export function OcupacionSalas({
             espacioSel={espacioId}
             onSeleccionar={onSeleccionar}
           />
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
             Las columnas son las horas que el sistema ofrece ese día —con el turno vacío, solo las horas en punto; a
             medida que se llena, se abren las y media y después los cuartos—, más las horas que ya tienen alguna
             reserva y la hora que estés proponiendo.
@@ -210,7 +210,7 @@ export function OcupacionSalas({
             )}
           </p>
           {onSeleccionar && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
               Pulsa una hora de una sala para proponerla. El aforo se cuenta por turno (corte a las 17:00), igual
               que la base de datos.
             </p>
@@ -330,7 +330,7 @@ function EstadoVacio({ children }: { children: ReactNode }) {
 
 function Leyenda({ marcaFueraDeRejilla }: { marcaFueraDeRejilla: boolean }) {
   return (
-    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground" aria-label="Leyenda">
+    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] pointer-coarse:text-xs text-muted-foreground" aria-label="Leyenda">
       {(Object.keys(ETIQUETA_NIVEL) as NivelOcupacion[]).map((n) => (
         <li key={n} className="flex items-center gap-1">
           <span className={cn("h-2 w-2 rounded-full", PUNTO_NIVEL[n])} aria-hidden />
@@ -360,7 +360,7 @@ function AforoTurno({ ocupacion, turno }: { ocupacion: OcupacionSalasDia; turno:
   return (
     <span
       className={cn(
-        "ml-2 rounded px-1.5 py-0.5 text-[11px] font-normal",
+        "ml-2 rounded px-1.5 py-0.5 text-[11px] pointer-coarse:text-xs font-normal",
         a.cabe ? "bg-background text-muted-foreground" : "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-200",
       )}
       title="Aforo total del turno: es lo que valida la base de datos al crear la reserva"
@@ -378,7 +378,7 @@ function CeldaTurnoView({ celda, privada }: { celda: CeldaTurno; privada?: boole
     return (
       <span className="flex items-center gap-1 whitespace-nowrap">
         <span className="font-medium">{ocupada ? "Ocupada" : "Libre"}</span>
-        {ocupada && celda.ocupados > 0 && <span className="text-[10px] opacity-80">{celda.ocupados} pax</span>}
+        {ocupada && celda.ocupados > 0 && <span className="text-[10px] pointer-coarse:text-xs opacity-80">{celda.ocupados} pax</span>}
       </span>
     );
   }
@@ -390,7 +390,7 @@ function CeldaTurnoView({ celda, privada }: { celda: CeldaTurno; privada?: boole
       <span className="font-medium">
         {celda.ocupados}/{celda.capacidad}
       </span>
-      <span className="text-[10px] opacity-80">{ETIQUETA_NIVEL[celda.nivel]}</span>
+      <span className="text-[10px] pointer-coarse:text-xs opacity-80">{ETIQUETA_NIVEL[celda.nivel]}</span>
     </span>
   );
 }
@@ -416,7 +416,7 @@ function FilaRejilla({
           {sala.nombre}
         </span>
         {sala.capacidad != null && (
-          <span className="block text-[10px] font-normal text-muted-foreground">{sala.capacidad} plazas</span>
+          <span className="block text-[10px] pointer-coarse:text-xs font-normal text-muted-foreground">{sala.capacidad} plazas</span>
         )}
       </th>
       {TURNOS.filter((t) => ocupacion.franjas[t].length > 0).map((t) => {

@@ -202,21 +202,21 @@ export function MobilePreview({ novedades, idResaltado, ajustarAlto = false }: M
                           // del restaurante (pulpo / carne / champán) si no hay imagen.
                           <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
                             <ImageIcon className="w-5 h-5" />
-                            <span className="text-[10px]">Sin foto: la web pondrá una genérica</span>
+                            <span className="text-[10px] pointer-coarse:text-xs">Sin foto: la web pondrá una genérica</span>
                           </div>
                         )}
                         {resaltado && (
-                          <Badge className="absolute top-2 left-2 text-[10px] px-1.5 py-0">Editando</Badge>
+                          <Badge className="absolute top-2 left-2 text-[10px] pointer-coarse:text-xs px-1.5 py-0">Editando</Badge>
                         )}
                       </AspectRatio>
                       {resaltado && novedad.avisoVisibilidad && (
-                        <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] px-3 py-1">
+                        <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] pointer-coarse:text-xs px-3 py-1">
                           <EyeOff className="w-3 h-3 shrink-0" />
                           {novedad.avisoVisibilidad}
                         </div>
                       )}
                       {resaltado && botonesOcultos.length > 0 && (
-                        <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] px-3 py-1">
+                        <div className="flex items-center gap-1.5 bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200 text-[10px] pointer-coarse:text-xs px-3 py-1">
                           <EyeOff className="w-3 h-3 shrink-0" />
                           No saldrá en la web: {botonesOcultos.map((b) => `«${ETIQUETA_BOTON[b]}»`).join(" y ")}
                         </div>
@@ -226,7 +226,7 @@ export function MobilePreview({ novedades, idResaltado, ajustarAlto = false }: M
                           <div className="p-2 bg-accent/10 rounded-lg">
                             <IconComponent className="w-5 h-5 text-accent" />
                           </div>
-                          {t.badge && <Badge className="bg-accent hover:bg-accent/90 text-[10px]">{t.badge}</Badge>}
+                          {t.badge && <Badge className="bg-accent hover:bg-accent/90 text-[10px] pointer-coarse:text-xs">{t.badge}</Badge>}
                         </div>
                         <CardTitle className="text-base leading-snug">
                           {t.titulo || <span className="text-muted-foreground italic">Sin título</span>}
@@ -249,7 +249,7 @@ export function MobilePreview({ novedades, idResaltado, ajustarAlto = false }: M
                         {t.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1">
                             {t.tags.map((tag, i) => (
-                              <Badge key={i} variant="secondary" className="text-[10px] px-1.5 py-0">
+                              <Badge key={i} variant="secondary" className="text-[10px] pointer-coarse:text-xs px-1.5 py-0">
                                 {tag}
                               </Badge>
                             ))}

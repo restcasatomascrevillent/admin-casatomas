@@ -61,7 +61,7 @@ const CLASE_PESTANA =
 
 const TONO_CONTADOR = {
   primario: "bg-primary/10 text-primary",
-  dorado: "bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,45%)]",
+  dorado: "bg-[hsl(38,59%,45%)/0.12] text-[hsl(38,59%,34%)]",
 } as const;
 
 /** Degradados de los bordes que avisan de que hay más pestañas fuera de la vista. */
@@ -163,7 +163,7 @@ export function PestanasPagina({
                 <span
                   aria-label={p.etiquetaContador}
                   className={cn(
-                    "ml-1 rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums",
+                    "ml-1 rounded-full px-1.5 py-0.5 text-[11px] pointer-coarse:text-xs font-semibold leading-none tabular-nums",
                     TONO_CONTADOR[p.tonoContador ?? "primario"],
                     !p.contadorEnMovil && "hidden sm:inline",
                   )}

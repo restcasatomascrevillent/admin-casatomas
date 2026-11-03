@@ -136,7 +136,7 @@ export const TicketImprimible = forwardRef<HTMLDivElement, TicketImprimibleProps
         <div className="text-center text-xs mt-4">
           <p>¡Gracias por su compra!</p>
           <p className="mt-1">Conserve este ticket</p>
-          <p className="mt-2 text-[10px] text-gray-500">
+          <p className="mt-2 text-[10px] pointer-coarse:text-xs text-gray-500">
             IVA incluido en los precios
           </p>
         </div>

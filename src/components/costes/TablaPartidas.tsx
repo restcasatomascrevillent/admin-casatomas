@@ -46,7 +46,7 @@ export function TablaPartidas({ partidas }: { partidas: PartidaCoste[] }) {
             <TableRow key={p.clave} data-testid={`partida-${p.clave}`}>
               <TableCell className="py-2">
                 <span className="font-medium">{p.etiqueta}</span>
-                <Badge variant="outline" className="ml-2 px-1.5 py-0 text-[10px] font-normal">
+                <Badge variant="outline" className="ml-2 px-1.5 py-0 text-[10px] pointer-coarse:text-xs font-normal">
                   {p.tipo === "ia" ? "IA" : "fijo"}
                 </Badge>
                 {p.nota && <p className="text-xs text-muted-foreground">{p.nota}</p>}

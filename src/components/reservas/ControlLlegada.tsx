@@ -82,7 +82,7 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
         <span
           className={cn(
             "inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 font-medium",
-            compacto ? "text-[11px] px-1.5 py-0.5" : "text-xs px-2 py-1",
+            compacto ? "text-[11px] pointer-coarse:text-xs px-1.5 py-0.5" : "text-xs px-2 py-1",
           )}
           // En modo icono la etiqueta se reduce a la hora ("14:23"), que es el
           // dato que cambia; el "Llegó" lo dice ya la palomita verde, y el
@@ -119,7 +119,7 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
         <span
           className={cn(
             "inline-flex min-w-0 max-w-full items-center gap-1 overflow-hidden whitespace-nowrap rounded-md bg-muted text-muted-foreground font-medium",
-            compacto ? "text-[11px] px-1.5 py-0.5" : "text-xs px-2 py-1",
+            compacto ? "text-[11px] pointer-coarse:text-xs px-1.5 py-0.5" : "text-xs px-2 py-1",
           )}
           title={etiqueta}
           aria-label={etiqueta}
@@ -158,7 +158,7 @@ export function ControlLlegada({ reserva, acciones, canEdit, compacto, soloIcono
           variant="outline"
           className={cn(
             "min-w-0 max-w-full gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40",
-            compacto ? "h-6 text-[11px]" : "h-7 text-xs",
+            compacto ? "h-6 text-[11px] pointer-coarse:text-xs" : "h-7 text-xs",
             "pointer-coarse:text-sm",
             // Sin texto queda cuadrado (24px de lado en compacto): es la mitad
             // de ancho que con «Ha llegado», y eso es justo lo que permite

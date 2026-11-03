@@ -96,7 +96,7 @@ function BarraTurno({ etiqueta, pax, capacidad }: { etiqueta: string; pax: numbe
   const excedido = pax > capacidad;
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+      <div className="flex items-center justify-between text-[11px] pointer-coarse:text-xs text-muted-foreground">
         <span>{etiqueta}</span>
         <span className={cn("tabular-nums", excedido && "text-destructive font-medium")}>
           {pax}/{capacidad} pax
@@ -187,7 +187,7 @@ function KanbanColumn({
         <div className="p-2 flex flex-col items-center gap-2">
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
           <span className="text-xs font-semibold [writing-mode:vertical-lr] rotate-180 whitespace-nowrap">{title}</span>
-          <Badge variant="secondary" className="text-[10px] px-1.5 tabular-nums">{count}</Badge>
+          <Badge variant="secondary" className="text-[10px] pointer-coarse:text-xs px-1.5 tabular-nums">{count}</Badge>
         </div>
       </button>
     );

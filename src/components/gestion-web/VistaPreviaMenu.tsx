@@ -57,7 +57,7 @@ function LineaPrevia({ item }: { item: ItemMenu }) {
           <p className="text-xs text-muted-foreground leading-snug mt-0.5 line-clamp-2">{item.descripcion}</p>
         )}
         {alergenos.length > 0 && (
-          <p className="text-[11px] text-muted-foreground/80 mt-1">
+          <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground/80 mt-1">
             {alergenos.map((a) => etiquetaAlergeno(a)).join(" · ")}
           </p>
         )}
@@ -93,7 +93,7 @@ export function VistaPreviaMenu({ secciones: entrada, postreCafe = null }: Vista
         return (
           <div key={seccion} className="space-y-2" data-testid={`previa-${seccion}`}>
             <div className="flex items-center gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground shrink-0">
+              <p className="text-[11px] pointer-coarse:text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground shrink-0">
                 {rotuloEnLaWeb(seccion, secciones, postreCafe)}
               </p>
               <span className="h-px flex-1 bg-border" aria-hidden="true" />

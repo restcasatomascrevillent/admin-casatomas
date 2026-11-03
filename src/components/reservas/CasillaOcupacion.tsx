@@ -189,7 +189,7 @@ export function CasillaOcupacion({
           <span
             className={cn(
               "flex items-center justify-center rounded-full px-1 font-medium leading-none tabular-nums",
-              !fija && "h-5 min-w-5 text-[11px] sm:h-6 sm:min-w-6 sm:text-sm",
+              !fija && "h-5 min-w-5 text-[11px] pointer-coarse:text-xs sm:h-6 sm:min-w-6 sm:text-sm",
               fija && (compacta ? "h-5 min-w-5 text-xs" : "h-6 min-w-6 text-sm"),
               esHoy && cn(estilo.hoy, "font-semibold"),
             )}
@@ -205,7 +205,7 @@ export function CasillaOcupacion({
         <span
           data-testid="cierre-casilla"
           className={cn(
-            "truncate text-[10px] font-semibold uppercase leading-none tracking-wide",
+            "truncate text-[10px] pointer-coarse:text-xs font-semibold uppercase leading-none tracking-wide",
             cierraComida && cierraCena ? "text-destructive" : "text-muted-foreground",
             compacta && !(cierraComida && cierraCena) && "hidden",
           )}
@@ -220,7 +220,7 @@ export function CasillaOcupacion({
             <span
               data-testid="reservas-casilla"
               aria-hidden="true"
-              className={cn("text-center text-[10px] leading-none opacity-80", !fija && "hidden sm:block")}
+              className={cn("text-center text-[10px] pointer-coarse:text-xs leading-none opacity-80", !fija && "hidden sm:block")}
             >
               {resumen.reservas} res.
             </span>
@@ -235,7 +235,7 @@ export function CasillaOcupacion({
               {textoPorcentaje && (!fija || verPorcentaje) && (
                 <span
                   data-testid="porcentaje-casilla"
-                  className={cn("text-center text-[10px] font-semibold leading-none", !fija && "hidden sm:block")}
+                  className={cn("text-center text-[10px] pointer-coarse:text-xs font-semibold leading-none", !fija && "hidden sm:block")}
                 >
                   {textoPorcentaje}
                 </span>

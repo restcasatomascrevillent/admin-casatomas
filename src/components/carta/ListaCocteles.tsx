@@ -158,7 +158,7 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
               {coctel.alergenos_oficiales && Array.isArray(coctel.alergenos_oficiales) && coctel.alergenos_oficiales.length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-2 border-t">
                   {(coctel.alergenos_oficiales as string[]).map((alergeno) => (
-                    <Badge key={alergeno} variant="outline" className="text-[10px]">
+                    <Badge key={alergeno} variant="outline" className="text-[10px] pointer-coarse:text-xs">
                       {etiquetaAlergeno(alergeno)}
                     </Badge>
                   ))}

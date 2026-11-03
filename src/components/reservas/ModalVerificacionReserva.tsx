@@ -217,7 +217,7 @@ export function ModalVerificacionReserva({
             <p className="flex items-center gap-1.5 text-muted-foreground">
               <Users className="h-3.5 w-3.5 shrink-0" /> {reserva.numero_comensales} comensales
               {reserva.canal && (
-                <Badge variant="outline" className="ml-1 text-[10px] font-normal">
+                <Badge variant="outline" className="ml-1 text-[10px] pointer-coarse:text-xs font-normal">
                   {reserva.canal}
                 </Badge>
               )}

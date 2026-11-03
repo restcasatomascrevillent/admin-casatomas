@@ -175,9 +175,9 @@ function subirArriba(...contenedores: (Element | null | undefined)[]) {
 // Los `lg:` encogen SOLO en la franja 1024–1279 px, que es donde falta sitio:
 // en las tarjetas de móvil y a partir de 1280 px la insignia queda a 11 px.
 const INSIGNIA =
-  "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
+  "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
 /** Segunda línea del estado (motivo, propuesta): aún más compacta. */
-const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] font-medium";
+const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] pointer-coarse:text-xs font-medium";
 
 /**
  * "Propuesta enviada 24/09 18:44" no cabe en la columna Estado. En la lista
@@ -905,7 +905,7 @@ export function ListaReservasAvanzada({
                 <span
                   data-cifra-por-atender={cuantasPorAtender}
                   className={cn(
-                    "rounded-full px-1.5 text-[11px] font-semibold leading-5 tabular-nums",
+                    "rounded-full px-1.5 text-[11px] pointer-coarse:text-xs font-semibold leading-5 tabular-nums",
                     // Pulsado, en negativo sobre el botón oscuro (también con un 0), como la cifra del timeline.
                     soloPorAtender
                       ? "bg-primary-foreground text-primary"
@@ -1189,7 +1189,7 @@ export function ListaReservasAvanzada({
                               <p className="truncate font-medium leading-tight" title={nombre}>{nombre}</p>
                             </div>
                             {reservation.telefono && (
-                              <p className="truncate text-[11px] leading-tight text-muted-foreground xl:text-xs" title={reservation.telefono}>
+                              <p className="truncate text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground xl:text-xs" title={reservation.telefono}>
                                 {reservation.telefono}
                               </p>
                             )}
@@ -1486,7 +1486,7 @@ function FilaSolicitud({
             <a
               href={`tel:${solicitud.telefono}`}
               title={solicitud.telefono}
-              className="block truncate text-[11px] leading-tight text-muted-foreground hover:underline xl:text-xs"
+              className="block truncate text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground hover:underline xl:text-xs"
             >
               {solicitud.telefono}
             </a>

@@ -80,7 +80,7 @@ export function TopPaginas({ proyecto, desde, hasta }: TopPaginasProps) {
                       <TableCell className="max-w-[260px]">
                         <div className="flex items-center gap-2">
                           {mostrarProyecto && (
-                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px]">
+                            <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-[10px] pointer-coarse:text-xs">
                               {NOMBRE_PROYECTO[f.proyecto as ProyectoTrafico] ?? f.proyecto}
                             </Badge>
                           )}

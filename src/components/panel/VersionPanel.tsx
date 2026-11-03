@@ -18,7 +18,7 @@ export function VersionPanel({ colapsado = false, version = VERSION_APP }: { col
     <p
       data-testid="version-panel"
       title={detalle || undefined}
-      className={cn("flex items-center gap-1.5 px-2 pt-1 text-[11px] leading-none text-muted-foreground", colapsado && "justify-center px-0")}
+      className={cn("flex items-center gap-1.5 px-2 pt-1 text-[11px] pointer-coarse:text-xs leading-none text-muted-foreground", colapsado && "justify-center px-0")}
     >
       <span className="font-mono tabular-nums">v{version.version}</span>
       {!colapsado && <span className={cn("rounded-full px-1.5 py-0.5 font-medium", TONO[version.entorno])}>{NOMBRE_ENTORNO[version.entorno]}</span>}

@@ -477,7 +477,7 @@ function CasillaMesa({
             ? `${estado.nombre || "Sentada"} · ${estado.comensales}`
             : `${horaCorta(estado.hora)} · ${estado.nombre || "Reserva"}`}
       </span>
-      {junta.length > 0 && <span className="text-[11px] text-muted-foreground">+ {junta.join(", ")}</span>}
+      {junta.length > 0 && <span className="text-[11px] pointer-coarse:text-xs text-muted-foreground">+ {junta.join(", ")}</span>}
     </button>
   );
 }

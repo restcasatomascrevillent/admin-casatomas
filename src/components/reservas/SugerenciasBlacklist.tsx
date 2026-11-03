@@ -88,8 +88,8 @@ const CELDA = "px-1.5 py-2 align-middle xl:px-3";
 /** El primitivo `Badge` no trae `whitespace-nowrap` ni alto fijo y es de uso
  * global, así que no se parchea allí: se aplica en cada sitio de llamada. */
 const INSIGNIA =
-  "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
-const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] font-medium";
+  "h-5 shrink-0 gap-1 whitespace-nowrap px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-medium lg:px-1 lg:text-[10px] xl:px-1.5 xl:text-[11px]";
+const INSIGNIA_SECUNDARIA = "h-4 shrink-0 gap-1 whitespace-nowrap px-1 py-0 text-[10px] pointer-coarse:text-xs font-medium";
 
 const ANCHO_ACCIONES = "w-[176px] xl:w-[188px] pointer-coarse:w-[240px] pointer-coarse:xl:w-[240px]";
 const ANCHO_MOTIVO = "w-[128px] xl:w-[152px]";
@@ -187,21 +187,21 @@ function CeldaHistorial({ resumen }: { resumen: HistorialResumen }) {
 
   if (!resumen.presente) {
     return (
-      <span className="text-[11px] italic leading-tight text-muted-foreground" title={titulo}>
+      <span className="text-[11px] pointer-coarse:text-xs italic leading-tight text-muted-foreground" title={titulo}>
         Sin historial
       </span>
     );
   }
   if (resumen.total === 0) {
     return (
-      <span className="text-[11px] leading-tight text-muted-foreground" title={titulo}>
+      <span className="text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground" title={titulo}>
         Sin antecedentes
       </span>
     );
   }
   return (
     <span
-      className="flex items-center gap-1.5 whitespace-nowrap text-[11px] leading-tight xl:gap-2 xl:text-xs"
+      className="flex items-center gap-1.5 whitespace-nowrap text-[11px] pointer-coarse:text-xs leading-tight xl:gap-2 xl:text-xs"
       title={titulo}
     >
       {resumen.noShows > 0 && (
@@ -238,7 +238,7 @@ function Stat({ label, value }: { label: string; value: number | undefined }) {
   return (
     <div className="rounded-md bg-muted/50 py-1.5 px-1 text-center">
       <p className="text-sm font-semibold leading-none tabular-nums">{value ?? "—"}</p>
-      <p className="text-[10px] text-muted-foreground mt-1">{label}</p>
+      <p className="text-[10px] pointer-coarse:text-xs text-muted-foreground mt-1">{label}</p>
     </div>
   );
 }
@@ -281,7 +281,7 @@ function AccionesSugerencia({
           aria-label={tituloRechazar}
           disabled={pendiente}
           onClick={onRechazar}
-          className={cn("h-7 shrink-0 justify-center gap-1 px-1 text-[11px] [&_svg]:size-3.5", ANCHO_BOTON)}
+          className={cn("h-7 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-xs [&_svg]:size-3.5", ANCHO_BOTON)}
         >
           <XCircle />
           Rechazar
@@ -296,8 +296,8 @@ function AccionesSugerencia({
           disabled={pendiente}
           onClick={onAprobar}
           className={cn(
-            "h-7 shrink-0 justify-center gap-1 px-1 text-[11px] [&_svg]:size-3.5",
-            "bg-amber-600 text-white hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500",
+            "h-7 shrink-0 justify-center gap-1 px-1 text-[11px] pointer-coarse:text-xs [&_svg]:size-3.5",
+            "bg-amber-700 text-white hover:bg-amber-800 dark:bg-amber-600 dark:hover:bg-amber-500",
             ANCHO_BOTON,
           )}
         >
@@ -313,7 +313,7 @@ function AccionesSugerencia({
 function SoloLectura() {
   const texto = "Solo lectura: tu usuario no tiene permiso para aprobar o rechazar sugerencias.";
   return (
-    <span className="flex items-center gap-1 text-[11px] text-muted-foreground" title={texto}>
+    <span className="flex items-center gap-1 text-[11px] pointer-coarse:text-xs text-muted-foreground" title={texto}>
       <Lock className="h-3.5 w-3.5 shrink-0" />
       Solo lectura
     </span>
@@ -356,7 +356,7 @@ function BloqueCliente({ sugerencia, reincidente }: { sugerencia: SugerenciaBlac
           </Badge>
         )}
       </div>
-      <div className="flex min-w-0 items-center gap-1.5 text-[11px] leading-tight text-muted-foreground xl:text-xs">
+      <div className="flex min-w-0 items-center gap-1.5 text-[11px] pointer-coarse:text-xs leading-tight text-muted-foreground xl:text-xs">
         {sugerencia.telefono && (
           <span className="flex shrink-0 items-center gap-0.5 tabular-nums" title={sugerencia.telefono}>
             <Phone className="h-3 w-3 shrink-0" />
@@ -673,7 +673,7 @@ export function SugerenciasBlacklist() {
             {/* El historial completo, sin abreviar, en el momento en que se
                 decide: la fila lo resume, aquí están los cuatro números. */}
             <div className="space-y-1.5">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+              <p className="text-[11px] pointer-coarse:text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1">
                 <History className="h-3 w-3" /> Historial de este cliente
               </p>
               {(() => {

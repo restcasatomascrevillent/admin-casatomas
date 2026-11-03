@@ -267,7 +267,7 @@ export function DisponibilidadCuartos({
             </p>
           ))}
           {!compacto && !baldosas && (
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground">
               Todas las horas del turno de 15 en 15 minutos. «Llegan»: comensales que entran en ese cuarto. «En sala»:
               los que están sentados según la estancia estimada del turno. El aforo se cuenta por turno (corte a las
               17:00), igual que la base de datos; las salas se asignan por dentro y no limitan la hora.

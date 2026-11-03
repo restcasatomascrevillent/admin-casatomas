@@ -1089,11 +1089,11 @@ export function EditorNovedadesWeb() {
                           <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium truncate">{novedad.titulo || "Sin título"}</p>
                             <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                              <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${ESTILO_ESTADO[estado.clave]}`}>
+                              <Badge variant="outline" className={`text-[10px] pointer-coarse:text-xs px-1.5 py-0 ${ESTILO_ESTADO[estado.clave]}`}>
                                 {estado.texto}
                               </Badge>
                               {novedad.destacado && (
-                                <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                                <Badge variant="outline" className="text-[10px] pointer-coarse:text-xs px-1.5 py-0">
                                   <Star className="w-2.5 h-2.5 mr-0.5" />
                                   Destacada
                                 </Badge>
@@ -1101,13 +1101,13 @@ export function EditorNovedadesWeb() {
                               {platoRetirado && (
                                 <Badge
                                   variant="outline"
-                                  className="text-[10px] px-1.5 py-0 bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900"
+                                  className="text-[10px] pointer-coarse:text-xs px-1.5 py-0 bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900"
                                 >
                                   <AlertTriangle className="w-2.5 h-2.5 mr-0.5" aria-hidden="true" />
                                   El plato ya no está en la carta
                                 </Badge>
                               )}
-                              {esEditada && <span className="text-[10px] text-primary font-medium">Editando</span>}
+                              {esEditada && <span className="text-[10px] pointer-coarse:text-xs text-primary font-medium">Editando</span>}
                             </div>
                           </div>
                         </button>
@@ -1554,7 +1554,7 @@ export function EditorNovedadesWeb() {
               <div className="rounded-lg border p-4 space-y-4">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">Publicación</p>
-                  <Badge variant="outline" className={`text-[11px] ${ESTILO_ESTADO[estadoBorrador.clave]}`}>
+                  <Badge variant="outline" className={`text-[11px] pointer-coarse:text-xs ${ESTILO_ESTADO[estadoBorrador.clave]}`}>
                     {estadoBorrador.texto}
                   </Badge>
                 </div>
@@ -1612,13 +1612,13 @@ export function EditorNovedadesWeb() {
                     <Languages className="w-4 h-4 shrink-0" />
                     Inglés y francés
                     {espanolCambiado && !traduccionManual ? (
-                      <Badge variant="outline" className="text-[10px] font-normal">Se traducirá al guardar</Badge>
+                      <Badge variant="outline" className="text-[10px] pointer-coarse:text-xs font-normal">Se traducirá al guardar</Badge>
                     ) : espanolCambiado && traduccionManual ? (
-                      <Badge variant="outline" className="text-[10px] font-normal border-amber-300 text-amber-700">Revisar: el español ha cambiado</Badge>
+                      <Badge variant="outline" className="text-[10px] pointer-coarse:text-xs font-normal border-amber-300 text-amber-700">Revisar: el español ha cambiado</Badge>
                     ) : tieneTraducciones ? (
-                      <Badge variant="outline" className="text-[10px] font-normal">Al día</Badge>
+                      <Badge variant="outline" className="text-[10px] pointer-coarse:text-xs font-normal">Al día</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-[10px] font-normal">Sin traducir</Badge>
+                      <Badge variant="outline" className="text-[10px] pointer-coarse:text-xs font-normal">Sin traducir</Badge>
                     )}
                   </CollapsibleTrigger>
                   <Button type="button" variant="outline" size="sm" className="h-11" onClick={handleTranslate} disabled={isTranslating || !formData.titulo.trim()}>

@@ -1471,7 +1471,7 @@ export function PanelLateral({
                             {mesa.nombre}
                           </span>
                           {mesa.isMerged && (
-                            <span className="text-[11px] text-green-700 shrink-0">agrupada</span>
+                            <span className="text-[11px] pointer-coarse:text-xs text-green-700 shrink-0">agrupada</span>
                           )}
                         </div>
                         <Badge variant="outline" className="text-xs py-0 h-5">

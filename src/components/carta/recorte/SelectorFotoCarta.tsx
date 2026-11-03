@@ -100,7 +100,7 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
                   role="radio"
                   aria-checked={activo}
                   onClick={() => recorte.setTema(t.clave)}
-                  className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-md p-1 text-[11px] leading-tight hover:bg-muted"
+                  className="flex w-16 shrink-0 flex-col items-center gap-1 rounded-md p-1 text-[11px] pointer-coarse:text-xs leading-tight hover:bg-muted"
                 >
                   <span
                     className={cn(

@@ -43,7 +43,7 @@ export function ResumenGrupoAuditoria({
         {desglosePorAccion.map(({ accion, cantidad }) => {
           const ui = ACCION_UI[accion] ?? ACCION_UI.actualizar;
           return (
-            <Badge key={accion} variant="outline" className={`gap-1 px-1.5 py-0 text-[11px] font-normal tabular-nums ${ui.className}`}>
+            <Badge key={accion} variant="outline" className={`gap-1 px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-normal tabular-nums ${ui.className}`}>
               {ui.label} · {cantidad}
             </Badge>
           );

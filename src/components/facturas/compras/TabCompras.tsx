@@ -345,7 +345,7 @@ export function TabCompras({
             >
               {m.etiqueta}
               <span
-                className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold leading-5 tabular-nums text-primary"
+                className="rounded-full bg-primary/10 px-1.5 text-[11px] pointer-coarse:text-xs font-semibold leading-5 tabular-nums text-primary"
                 aria-label={`${cuenta(m.valor)} ${cuenta(m.valor) === 1 ? "resultado" : "resultados"}`}
               >
                 {cuenta(m.valor)}

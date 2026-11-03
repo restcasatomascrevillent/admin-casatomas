@@ -20,16 +20,16 @@ All colors MUST be HSL.
     --primary: 206 11% 25%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 25 13% 55%;
+    --secondary: 25 13% 42%;
     --secondary-foreground: 0 0% 100%;
 
     --muted: 25 13% 85%;
-    --muted-foreground: 15 4% 39%;
+    --muted-foreground: 15 4% 32%;
 
-    --accent: 38 59% 45%;
+    --accent: 38 59% 36%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 47%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 25 13% 85%;
@@ -43,7 +43,7 @@ All colors MUST be HSL.
     --status-pending-foreground: 206 11% 25%;
     --status-verified: 210 100% 50%;
     --status-verified-foreground: 0 0% 100%;
-    --status-confirmed: 142 76% 36%;
+    --status-confirmed: 142 76% 28%;
     --status-confirmed-foreground: 0 0% 100%;
 
     /* Series de graficos (paleta categorica validada, slots 1-3 + estado critico) */

@@ -225,7 +225,7 @@ function FilaDocumento({
               <span className="font-normal text-muted-foreground"> · {ETIQUETA_TIPO[d.tipo] ?? d.tipo}</span>
             </span>
             {principal && Icono && (
-              <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] font-medium ${principal.clase}`}>
+              <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] pointer-coarse:text-xs font-medium ${principal.clase}`}>
                 <Icono className="h-3 w-3" aria-hidden="true" /> {principal.texto}
                 {marcas.length > 1 && <span className="font-normal text-muted-foreground">+{marcas.length - 1}</span>}
               </span>
