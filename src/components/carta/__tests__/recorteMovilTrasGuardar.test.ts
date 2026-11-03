@@ -149,9 +149,9 @@ describe("servidor (fetch simulado)", () => {
   const pedir = (f: unknown, msTiempo = 2_000) => pedirMascaraServidor(FOTO, { fetch: f as typeof fetch, token: "jwt", msTiempo });
 
   it("éxito: manda la foto con el JWT y devuelve la máscara", async () => {
-    const f = vi.fn(async () => new Response(new Blob(["png"], { type: "image/png" }), { status: 200 }));
-    // (Blob de undici, no el de jsdom: en Node 22 no es instanceof del Blob global.)
-    expect(typeof (await pedir(f)).arrayBuffer).toBe("function");
+    // Bytes y no un Blob: el Blob de jsdom no vale como cuerpo de Response en Node 22.
+    const f = vi.fn(async () => new Response(new Uint8Array([137, 80, 78, 71]), { status: 200, headers: { "Content-Type": "image/png" } }));
+    expect((await pedir(f)).size).toBe(4);
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/recortar-foto");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer jwt");
