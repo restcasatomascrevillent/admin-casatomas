@@ -56,6 +56,25 @@ El plan Hobby da **4 h de CPU activa cada 30 días** para todo el equipo. Si se 
 
 > **Aviso:** el plan Hobby de Vercel es **solo para uso no comercial**. El panel de un restaurante es uso comercial. Si Vercel lo detecta o se necesitan más recursos, el paso es el plan **Pro** (20 USD por persona y mes; 1.000 h de CPU de funciones incluidas).
 
+## Plan B estudiado: modelo a 512 px para iOS (no se usa)
+
+El ONNX tiene la entrada fija (1×3×1024×1024) y sus 39 `Resize` llevan el tamaño de salida como **constante** de la exportación. Por eso a 512 o a 768 ORT responde «invalid dimensions». `scripts/recorte/modelo-entrada-dinamica.py` (con `onnx`) cambia esas constantes por las medidas reales del tensor con el que se concatena cada `Resize` (o por las de la imagen en las salidas laterales) y deja la entrada dinámica. Los pesos cuantizados son los mismos (45 MB) y no hace falta reexportar desde PyTorch.
+
+Medido en Node (03-11-2026, foto de prueba; «WASM» es onnxruntime-web con 1 hilo, como el navegador sin aislamiento):
+
+| Entrada | Inferencia WASM | Pico de memoria WASM | Inferencia nativa (1 hilo) | Pico nativo |
+|---|---|---|---|---|
+| 1024 (igual que el original: IoU 1,000) | 7,9 s | ~600-800 MB | 3,7 s | 450 MB |
+| 768 | 4,3 s | 418 MB | 2,1 s | 312 MB |
+| 512 | 1,9 s | 315 MB | 0,9 s | 226 MB |
+
+El modelo se entrenó a 1024 y, a otra resolución, **cambia lo que recorta**. Frente a 1024, en 8 fotos de `fotos prueba`:
+
+- a 768, la IoU es 0,84-0,89 en 6 fotos y 0,03-0,07 en 2;
+- a 512, la IoU va de 0 a 0,89.
+
+No es aceptable para la carta, así que no se activa. Si algún día hiciera falta, la vía sería un modelo entrenado a esa resolución, no este.
+
 ## Diagnóstico en el móvil
 
 Abre el panel con `?diag=recorte` en la URL, por ejemplo `https://admin-casatomas-git-staging-casa-tomas.vercel.app/?diag=recorte`. Abajo sale un registro con cada paso del camino de la foto:
