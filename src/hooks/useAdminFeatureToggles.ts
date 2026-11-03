@@ -7,6 +7,8 @@ export interface AdminFeatureToggle {
   section_key: string;
   label: string;
   enabled: boolean;
+  /** Último cambio (Control del Panel lo enseña). */
+  updated_at?: string | null;
 }
 
 export function useAdminFeatureToggles() {
@@ -17,7 +19,7 @@ export function useAdminFeatureToggles() {
     setLoading(true);
     const { data, error } = await supabase
       .from("admin_feature_toggles")
-      .select("section_key, label, enabled")
+      .select("section_key, label, enabled, updated_at")
       .order("label", { ascending: true });
 
     if (!error && data) {
@@ -41,13 +43,14 @@ export function useAdminFeatureToggles() {
 
   const setEnabled = async (sectionKey: string, label: string, enabled: boolean) => {
     const { data: userData } = await supabase.auth.getUser();
+    const updatedAt = new Date().toISOString();
 
     const { error } = await supabase.from("admin_feature_toggles").upsert(
       {
         section_key: sectionKey,
         label,
         enabled,
-        updated_at: new Date().toISOString(),
+        updated_at: updatedAt,
         updated_by: userData.user?.id,
       },
       { onConflict: "section_key" }
@@ -61,9 +64,9 @@ export function useAdminFeatureToggles() {
     setToggles((prev) => {
       const exists = prev.some((t) => t.section_key === sectionKey);
       if (exists) {
-        return prev.map((t) => (t.section_key === sectionKey ? { ...t, enabled } : t));
+        return prev.map((t) => (t.section_key === sectionKey ? { ...t, enabled, updated_at: updatedAt } : t));
       }
-      return [...prev, { section_key: sectionKey, label, enabled }];
+      return [...prev, { section_key: sectionKey, label, enabled, updated_at: updatedAt }];
     });
 
     toast.success(enabled ? "Funcionalidad activada" : "Funcionalidad desactivada");
