@@ -120,7 +120,7 @@ export function ListaDocumentos({
               >
                 <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 {/* El total nunca se recorta: si falta sitio, se acorta el texto de antes. */}
-                <span className="min-w-0 truncate">
+                <span className="min-w-0 max-sm:line-clamp-2 max-sm:break-words max-sm:leading-tight sm:truncate">
                   {mes.etiqueta}
                   <span className="font-normal text-muted-foreground"> · {plural(mes.documentos, "documento", "documentos")} · </span>
                 </span>
