@@ -82,7 +82,7 @@ export function AjustesTienda({ config, puedeEditar }: Props) {
             <Label htmlFor="tienda-activa" className="text-base">Tienda visible en la web</Label>
             <p id="tienda-activa-ayuda" className="text-sm text-muted-foreground">
               {form.activa
-                ? "La web enseña la tienda con los vinos a la venta y sus precios."
+                ? "La web enseña la tienda con los vinos a la venta y su precio de tienda."
                 : "La web no enseña la tienda."}
               {" "}Los vinos se compran en el restaurante: en la web no se paga nada.
             </p>
@@ -102,7 +102,7 @@ export function AjustesTienda({ config, puedeEditar }: Props) {
             className="h-11 max-w-40"
           />
           <p id="tienda-descuento-ayuda" className={errores.descuento ? "text-sm text-destructive" : "text-xs text-muted-foreground"}>
-            {errores.descuento ?? `Entre ${LIMITES_TIENDA.descuentoMin} y ${LIMITES_TIENDA.descuentoMax} %. Por defecto, 30 %.`}
+            {errores.descuento ?? `Entre ${LIMITES_TIENDA.descuentoMin} y ${LIMITES_TIENDA.descuentoMax} %. Por defecto, 30 %. La web enseña solo el precio de tienda; el descuento no se menciona.`}
           </p>
         </div>
 
