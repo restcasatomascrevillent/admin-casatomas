@@ -563,9 +563,9 @@ export default function AsistenteTelefonico() {
                                                                     </SelectContent>
                                                                 </Select>
                                                                 <div className="flex items-center gap-2 w-full sm:w-auto">
-                                                                    <Input type="time" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
+                                                                    <Input type="time" aria-label="Desde" value={r.start} onChange={(e) => updateRangeRule(dayIndex, r.id, "start", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
                                                                     <span className="text-muted-foreground text-sm">a</span>
-                                                                    <Input type="time" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
+                                                                    <Input type="time" aria-label="Hasta" value={r.end} onChange={(e) => updateRangeRule(dayIndex, r.id, "end", e.target.value)} disabled={!scheduleEnabled} className="h-11 w-full text-base md:text-base sm:w-auto bg-background" />
                                                                 </div>
                                                                 <Button variant="ghost" size="icon" className="text-destructive h-11 w-11 sm:ml-auto hover:bg-destructive/10" onClick={() => removeRange(dayIndex, r.id)} disabled={!scheduleEnabled} aria-label="Quitar franja">
                                                                     <Trash2 className="w-4 h-4" />

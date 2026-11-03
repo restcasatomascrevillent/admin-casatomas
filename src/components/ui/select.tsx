@@ -10,12 +10,26 @@ const SelectGroup = SelectPrimitive.Group;
 
 const SelectValue = SelectPrimitive.Value;
 
+/**
+ * P-11: sin una etiqueta asociada, un lector de pantalla anuncia el Select como «cuadro combinado» a secas.
+ * Si quien lo usa no le dio nombre (`aria-label`, `aria-labelledby` o `id` para un `<Label htmlFor>`), se usa el
+ * `title` o el `placeholder` de su `SelectValue`.
+ */
+function nombreAccesible(props: { id?: string; title?: string; [clave: string]: unknown }, children: React.ReactNode): string | undefined {
+  if (props["aria-label"] || props["aria-labelledby"] || props.id) return undefined;
+  const placeholder = React.Children.toArray(children)
+    .map((h) => (React.isValidElement(h) ? (h.props as { placeholder?: unknown }).placeholder : undefined))
+    .find((p): p is string => typeof p === "string");
+  return props.title ?? placeholder;
+}
+
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
 >(({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
+    aria-label={nombreAccesible(props, children)}
     className={cn(
       "flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm pointer-coarse:h-11 ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className,

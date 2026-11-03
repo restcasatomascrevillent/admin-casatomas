@@ -210,6 +210,11 @@ const Sidebar = React.forwardRef<
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
+            onCloseAutoFocus={(e) => {
+              // P-21: al cerrar el menú (Escape incluido) el foco vuelve al botón que lo abrió.
+              e.preventDefault();
+              document.querySelector<HTMLElement>('[data-sidebar="trigger"]')?.focus();
+            }}
             data-sidebar="sidebar"
             data-mobile="true"
             className="w-[--sidebar-width] max-w-[calc(100vw-1rem)] [--sidebar-width-icon:4rem] pointer-coarse:[--sidebar-width-icon:4.5rem] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden motion-reduce:animate-none"

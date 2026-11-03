@@ -319,6 +319,7 @@ export default function TabCarta() {
                 <Select value={actual.categoria} onValueChange={actual.setCategoria} disabled={hayBusqueda}>
                   <SelectTrigger
                     className="w-full sm:w-[220px] bg-background"
+                    aria-label="Categoría"
                     title={hayBusqueda ? "La búsqueda incluye todas las categorías" : undefined}
                   >
                     <SelectValue placeholder="Selecciona categoría" />

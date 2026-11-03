@@ -74,13 +74,13 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
           )}
           aria-label={
             countNoLeidas > 0
-              ? `Notificaciones (${countNoLeidas} sin leer)`
+              ? `${countNoLeidas} notificaciones sin leer`
               : "Notificaciones"
           }
         >
           <Bell className="h-4 w-4" />
           {countNoLeidas > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] animate-in justify-center rounded-full px-1 text-[10px] leading-none tabular-nums zoom-in-50 bg-destructive text-destructive-foreground">
+            <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] animate-in justify-center rounded-full px-1 text-[10px] pointer-coarse:text-xs leading-none tabular-nums zoom-in-50 bg-destructive text-destructive-foreground">
               {countNoLeidas > 99 ? "99+" : countNoLeidas}
             </Badge>
           )}

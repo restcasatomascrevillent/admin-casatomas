@@ -203,6 +203,7 @@ export function ConfiguracionGeneralReservas() {
                       <FormControl>
                         <div className="flex items-center gap-2">
                           <Input
+                            aria-label="Minutos de cierre de reservas antes del servicio"
                             type="number" inputMode="numeric"
                             min={0}
                             max={1440}
