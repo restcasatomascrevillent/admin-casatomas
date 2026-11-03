@@ -13,7 +13,10 @@ import {
 import { ListaUsuarios } from "@/components/usuarios/ListaUsuarios";
 import { InvitarUsuario } from "@/components/usuarios/InvitarUsuario";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { UserPlus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { DialogoCambiarContrasena } from "@/components/cuenta/DialogoCambiarContrasena";
+import { nombreVisible } from "@/lib/usuario-actual";
+import { KeyRound, UserPlus } from "lucide-react";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado abierto en el
@@ -23,6 +26,10 @@ const ALTURA_MINIMA_USUARIOS = 360;
 
 export default function SuperAdminUsuarios() {
   const [addUserOpen, setAddUserOpen] = useState(false);
+  // Su propia contraseña: aquí la lista no se la deja cambiar sin la actual (la
+  // función de admin rechaza las cuentas de super admin), así que va aparte.
+  const [cambioPropioAbierto, setCambioPropioAbierto] = useState(false);
+  const { user } = useAuth();
   // Alto de la pantalla, sin scroll de página (petición del dueño, 2026-10-07): el mismo patrón
   // que Usuarios (`useAlturaDisponible`); la tabla hace scroll por dentro (ListaUsuarios).
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
@@ -31,11 +38,28 @@ export default function SuperAdminUsuarios() {
   return (
     <SuperAdminLayout>
       <div ref={setRaiz} className="flex min-w-0 flex-col gap-3 sm:gap-6" style={alto ? { height: alto } : undefined}>
-        <div className="flex justify-end">
+        {/* En el móvil, los dos botones en una fila (no se come el alto de la lista). */}
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+          <Button
+            variant="outline"
+            className="flex h-11 min-w-0 items-center justify-center gap-2 px-3 sm:px-5"
+            aria-label="Cambiar mi contraseña"
+            onClick={() => setCambioPropioAbierto(true)}
+          >
+            <KeyRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate sm:hidden">Mi contraseña</span>
+            <span className="hidden sm:inline">Cambiar mi contraseña</span>
+          </Button>
+          <DialogoCambiarContrasena
+            open={cambioPropioAbierto}
+            onOpenChange={setCambioPropioAbierto}
+            email={user?.email}
+            nombre={nombreVisible(user)}
+          />
           <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
             <DialogTrigger asChild>
-              <Button className="flex h-11 w-full items-center justify-center gap-2 px-5 sm:w-auto">
-                <UserPlus className="h-4 w-4" />
+              <Button className="flex h-11 w-full min-w-0 items-center justify-center gap-2 px-3 sm:w-auto sm:px-5">
+                <UserPlus className="h-4 w-4 shrink-0" />
                 Añadir Usuario
               </Button>
             </DialogTrigger>

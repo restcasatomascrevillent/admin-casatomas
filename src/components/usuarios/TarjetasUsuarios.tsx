@@ -17,8 +17,26 @@ export interface ResumenUsuario {
 const textoBusqueda = (texto: string) =>
   texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es");
 
+/** Marca la fila o tarjeta de quien ha iniciado sesión. */
+export function MarcaTu() {
+  return (
+    <Badge variant="outline" className="shrink-0 border-primary/30 bg-primary/5 px-2 py-0 text-[11px] font-semibold text-primary" title="Es tu cuenta">
+      Tú
+    </Badge>
+  );
+}
+
 /** Una tarjeta por usuario; la gestión la proporciona el área autorizada. */
-export function TarjetasUsuarios({ usuarios, renderAcciones }: { usuarios: ResumenUsuario[]; renderAcciones?: (user: ManagedUser) => ReactNode }) {
+export function TarjetasUsuarios({
+  usuarios,
+  renderAcciones,
+  idActual,
+}: {
+  usuarios: ResumenUsuario[];
+  renderAcciones?: (user: ManagedUser) => ReactNode;
+  /** Id de quien ha iniciado sesión: su tarjeta lleva «Tú». */
+  idActual?: string;
+}) {
   const [busqueda, setBusqueda] = useState("");
   const consulta = textoBusqueda(busqueda.trim());
   const visibles = usuarios.filter(({ user, nombre }) =>
@@ -72,7 +90,10 @@ export function TarjetasUsuarios({ usuarios, renderAcciones }: { usuarios: Resum
                     {user.is_super_admin ? <ShieldCheck className="h-5 w-5" aria-hidden="true" /> : <User className="h-5 w-5" aria-hidden="true" />}
                   </div>
                   <div className="min-w-0 flex-1 space-y-1.5">
-                    <h4 className="break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{nombre}</h4>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h4 className="min-w-0 break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere]">{nombre}</h4>
+                      {user.id === idActual && <MarcaTu />}
+                    </div>
                     {user.email && user.email !== nombre && !user.email.endsWith("@staff.local") && (
                       <p className="break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">{user.email}</p>
                     )}

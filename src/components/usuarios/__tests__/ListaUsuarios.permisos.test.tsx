@@ -712,7 +712,17 @@ it("en superadmin móvil permite editar permisos desde la tarjeta y mantiene las
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   expect(within(tarjeta).getByText("2 con edición")).toBeInTheDocument();
   const propia = screen.getByText("Dueño").closest("li")!;
-  expect(within(propia).getByRole("button", { name: "Contraseña" })).toBeDisabled();
+  // Su propia tarjeta va marcada y su contraseña NO se cambia con la función de admin:
+  // «Mi contraseña» abre el cambio propio, que pide la actual (2026-11-03).
+  expect(within(propia).getByText("Tú")).toBeInTheDocument();
+  expect(within(tarjeta).queryByText("Tú")).toBeNull();
+  expect(within(propia).queryByRole("button", { name: "Contraseña" })).toBeNull();
+  fireEvent.click(within(propia).getByRole("button", { name: "Mi contraseña" }));
+  const propio = await screen.findByRole("dialog", { name: "Cambiar mi contraseña" });
+  expect(within(propio).getByLabelText("Contraseña actual", { selector: "input" })).toBeInTheDocument();
+  fireEvent.click(within(propio).getByRole("button", { name: "Cancelar" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(vi.mocked(supabase.functions.invoke).mock.calls.some(([n]) => n === "admin-update-user-password")).toBe(false);
   expect(within(propia).getByRole("button", { name: "Bloquear acceso" })).toBeDisabled();
   const opciones = within(propia).getByText("Más opciones").closest("details")!;
   fireEvent.click(within(opciones).getByText("Más opciones"));
@@ -733,6 +743,9 @@ it.each([1280, 390])("el cambio de contraseña conserva el diálogo si falla y l
     : { data: listado, error: null } as never);
   render(<ListaUsuarios canManageSuperAdmins />);
   const fila = (await screen.findByText("camarero1")).closest(ancho < 768 ? "li" : "tr")!;
+  // Solo la fila propia (tabla o tarjeta) lleva «Tú».
+  expect(within(screen.getByText("Dueño").closest(ancho < 768 ? "li" : "tr")!).getByText("Tú")).toBeInTheDocument();
+  expect(screen.getAllByText("Tú")).toHaveLength(1);
   fireEvent.click(within(fila).getByRole("button", { name: "Contraseña" }));
   const dialogo = await screen.findByRole("dialog");
   fireEvent.change(within(dialogo).getByLabelText("Nueva contraseña"), { target: { value: "prueba-123" } });

@@ -46,7 +46,7 @@ import { useUserRolePresets, UserRolePreset } from "@/hooks/useUserRolePresets";
 import { ConfigurarRolesModal } from "@/components/usuarios/ConfigurarRolesModal";
 import { TablaPermisosSecciones } from "@/components/usuarios/TablaPermisosSecciones";
 import { VisorPermisosUsuario } from "@/components/usuarios/VisorPermisosUsuario";
-import { TarjetasUsuarios } from "@/components/usuarios/TarjetasUsuarios";
+import { MarcaTu, TarjetasUsuarios } from "@/components/usuarios/TarjetasUsuarios";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   cambiarEditar,
@@ -59,6 +59,7 @@ import {
 import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { DialogoCambiarContrasena } from "@/components/cuenta/DialogoCambiarContrasena";
 
 interface ListaUsuariosProps {
   /** Activa la gestión solo en el área de Super Admin y para un superadmin autenticado. */
@@ -106,6 +107,8 @@ export function ListaUsuarios({
   const [confirmPassword, setConfirmPassword] = useState("");
   const [updatingPassword, setUpdatingPassword] = useState(false);
   const [accessTarget, setAccessTarget] = useState<ManagedUser | null>(null);
+  // Su propia fila: «Contraseña» abre el cambio de SU contraseña (pide la actual).
+  const [cambioPropioAbierto, setCambioPropioAbierto] = useState(false);
   const [updatingAccess, setUpdatingAccess] = useState(false);
 
   const getUserDisplayName = (user: ManagedUser | null) => {
@@ -569,11 +572,11 @@ export function ListaUsuarios({
           variant="outline"
           size="sm"
           className={isMobile ? "order-2 h-11 w-full min-w-0 gap-1.5 px-2 text-[13px] pointer-coarse:px-2 [&_svg]:mr-0 " + (user.is_super_admin ? "col-span-2" : "") : "h-11 px-4"}
-          disabled={user.id === currentUser?.id}
-          onClick={() => openPasswordDialog(user)}
+          title={user.id === currentUser?.id ? "Cambiar tu contraseña (te pedirá la actual)" : undefined}
+          onClick={() => (user.id === currentUser?.id ? setCambioPropioAbierto(true) : openPasswordDialog(user))}
         >
           <Key className="h-4 w-4 mr-1" />
-          Contraseña
+          {user.id === currentUser?.id ? "Mi contraseña" : "Contraseña"}
         </Button>
       )}
       {isMobile && canManageUsers ? (
@@ -598,7 +601,7 @@ export function ListaUsuarios({
     // controles de gestión se utilizan en ambas; los diálogos globales permanecen.
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {isMobile ? (
-        <TarjetasUsuarios usuarios={usuariosConAccesos} renderAcciones={accionesUsuario} />
+        <TarjetasUsuarios usuarios={usuariosConAccesos} renderAcciones={accionesUsuario} idActual={currentUser?.id} />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col [&>div]:min-h-0 [&>div]:flex-1">
           <Table>
@@ -622,10 +625,11 @@ export function ListaUsuarios({
                         ) : (
                           <User className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <div className="flex flex-col items-start">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">
                             {getUserDisplayName(user)}
                           </span>
+                          {user.id === currentUser?.id && <MarcaTu />}
                         </div>
                       </div>
                     </TableCell>
@@ -705,6 +709,14 @@ export function ListaUsuarios({
           </div>
         </DialogContent>
       </Dialog>
+
+      {canManageUsers && (
+        <DialogoCambiarContrasena
+          open={cambioPropioAbierto}
+          onOpenChange={setCambioPropioAbierto}
+          email={currentUser?.email}
+        />
+      )}
 
       <Dialog
         open={passwordDialogOpen}
