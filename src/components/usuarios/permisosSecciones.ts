@@ -16,6 +16,7 @@
  *     user_permissions solo deja escribir a super admins).
  */
 import { SECTIONS } from "@/hooks/useUserRole";
+import type { ManagedUser } from "@/hooks/useUsersManagement";
 
 export interface PermisoSeccion {
   section_key: string;
@@ -96,3 +97,28 @@ export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArr
   );
 }
 
+export type DatosPermisos = Pick<ManagedUser, "is_super_admin" | "role" | "permissions">;
+
+/** «Ver» y «Editar» de cada sección, más la fila de Usuarios (va por rol, no por permisos). */
+export function seccionesConPermisos(user: DatosPermisos) {
+  const permisos = permisosParaEditar(user.permissions);
+  return [
+    ...SECCIONES_CONFIGURABLES.map((seccion) => {
+      const permiso = permisos.find(p => p.section_key === seccion.key);
+      return {
+        key: seccion.key,
+        label: seccion.label,
+        ayuda: `Editar: ${AYUDA_EDICION[seccion.key]}`,
+        ver: user.is_super_admin || Boolean(permiso?.can_view),
+        editar: user.is_super_admin || Boolean(permiso?.can_edit),
+      };
+    }),
+    {
+      key: "usuarios",
+      label: "Usuarios",
+      ayuda: "Consulta en el admin panel; gestión en el superadmin.",
+      ver: user.is_super_admin || user.role === "admin",
+      editar: user.is_super_admin,
+    },
+  ];
+}
