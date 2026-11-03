@@ -129,7 +129,7 @@ describe("recortarEnMovil (después de guardar la foto original)", () => {
     const blob = new Blob(["foto"], { type: "image/jpeg" });
     expect(await recortarEnMovil(DATOS, blob, { recortar, liberar })).toBe(true);
     expect(marcaDurante).toMatchObject(DATOS);
-    expect(recortar).toHaveBeenCalledWith(DATOS, { original: blob });
+    expect(recortar).toHaveBeenCalledWith(DATOS, expect.objectContaining({ original: blob }));
     expect(localStorage.getItem(CLAVE_EN_CURSO)).toBeNull();
     expect(liberar).toHaveBeenCalled();
     expect(mocks.success).toHaveBeenCalled();

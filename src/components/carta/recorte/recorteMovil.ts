@@ -12,6 +12,13 @@
  *     viejo: este dispositivo queda marcado como «no recorta en el navegador»
  *     (se recuerda) y la foto se queda guardada sin recortar.
  *   - Móvil ya marcado: ni lo intenta; guarda la foto normal.
+ *
+ * Solo se marca por MEMORIA (03-11-2026, iPhone de un amigo del dueño): la
+ * marca guarda si la página estaba VISIBLE en el último latido. Si murió
+ * estando oculta (el usuario salió del panel e iOS la congeló/tiró) no se
+ * marca: solo se manda la foto al ordenador y se avisa «saliste del panel».
+ * Los fallos de red/descarga tampoco marcan. El aviso dice la causa real
+ * (causaFallo/motivoFallo) y queda en console.warn.
  */
 
 export const CLAVE_EN_CURSO = "panel.recorte.enCurso.v1";
@@ -41,6 +48,17 @@ export interface MarcaRecorte extends DatosRecorte {
   pestana: string;
   desde: number;
   latido: number;
+  /** ¿Estaba la página visible en el último latido? (sin el campo: marcas antiguas, se trata como visible). */
+  visible?: boolean;
+}
+
+/** ¿Se ve la página ahora? (sin document: sí). */
+export function paginaVisible(): boolean {
+  try {
+    return typeof document === "undefined" || document.visibilityState !== "hidden";
+  } catch {
+    return true;
+  }
 }
 
 export type Almacen = Pick<Storage, "getItem" | "setItem" | "removeItem">;
@@ -56,10 +74,12 @@ export function almacenLocal(): Almacen | null {
 /** Id de ESTA carga de página (una pestaña recargada por iOS es otra «pestaña»). */
 export const ID_PESTANA = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-export function marcarRecorteEnCurso(d: DatosRecorte, opts: { almacen?: Almacen | null; ahora?: number; pestana?: string } = {}): boolean {
+type OpcionesMarca = { almacen?: Almacen | null; ahora?: number; pestana?: string; visible?: boolean };
+
+export function marcarRecorteEnCurso(d: DatosRecorte, opts: OpcionesMarca = {}): boolean {
   const almacen = opts.almacen === undefined ? almacenLocal() : opts.almacen;
   const ahora = opts.ahora ?? Date.now();
-  const marca: MarcaRecorte = { ...d, pestana: opts.pestana ?? ID_PESTANA, desde: ahora, latido: ahora };
+  const marca: MarcaRecorte = { ...d, pestana: opts.pestana ?? ID_PESTANA, desde: ahora, latido: ahora, visible: opts.visible ?? paginaVisible() };
   try {
     almacen?.setItem(CLAVE_EN_CURSO, JSON.stringify(marca));
     return !!almacen;
@@ -80,13 +100,13 @@ export function leerMarcaRecorte(almacen: Almacen | null = almacenLocal()): Marc
   }
 }
 
-/** Refresca el latido si la marca es de esta pestaña. */
-export function latirMarcaRecorte(opts: { almacen?: Almacen | null; ahora?: number; pestana?: string } = {}): void {
+/** Refresca el latido (y si la página se ve) si la marca es de esta pestaña. */
+export function latirMarcaRecorte(opts: OpcionesMarca = {}): void {
   const almacen = opts.almacen === undefined ? almacenLocal() : opts.almacen;
   const m = leerMarcaRecorte(almacen);
   if (!m || m.pestana !== (opts.pestana ?? ID_PESTANA)) return;
   try {
-    almacen?.setItem(CLAVE_EN_CURSO, JSON.stringify({ ...m, latido: opts.ahora ?? Date.now() }));
+    almacen?.setItem(CLAVE_EN_CURSO, JSON.stringify({ ...m, latido: opts.ahora ?? Date.now(), visible: opts.visible ?? paginaVisible() }));
   } catch {
     /* sin almacén: nada */
   }
@@ -161,6 +181,46 @@ export function esFaltaDeMemoria(e: unknown): boolean {
   if (!err) return false;
   if (err.name === "RangeError") return true;
   return /out of memory|memory|memoria|allocation|bad_alloc|std::bad_alloc/i.test(err.message ?? "");
+}
+
+/** Por qué no se pudo recortar en el móvil. Solo "memoria" marca el dispositivo. */
+export type CausaFallo = "descarga" | "memoria" | "oculta" | "otro";
+
+const RE_RED = /failed to fetch|load failed|networkerror|network connection|fetch(ing)? .*fail|conexi[oó]n|err_internet|err_network/i;
+
+/**
+ * Causa de un fallo del recorte en el móvil. `seOculto`: la página pasó a
+ * segundo plano mientras recortaba (un fallo de memoria entonces no cuenta:
+ * iOS aprieta a las páginas ocultas).
+ */
+export function causaFallo(e: unknown, opts: { seOculto?: boolean } = {}): CausaFallo {
+  const err = e as { name?: string; message?: string } | null;
+  if (err?.name === "ErrorDescargaModelo" || RE_RED.test(err?.message ?? "")) return "descarga";
+  if (esFaltaDeMemoria(e)) return opts.seOculto ? "oculta" : "memoria";
+  return "otro";
+}
+
+/** Mensaje corto (para el aviso). */
+export function mensajeCorto(e: unknown, max = 90): string {
+  const err = e as { name?: string; message?: string } | null;
+  const t = (err?.message || String(e ?? "")).replace(/\s+/g, " ").trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+/** Frase con la causa real para el aviso al usuario (diagnóstico con el iPhone). */
+export function motivoFallo(causa: CausaFallo, e?: unknown): string {
+  const detalle = e === undefined ? "" : mensajeCorto(e);
+  const entre = detalle ? ` (${detalle})` : "";
+  switch (causa) {
+    case "descarga":
+      return `No se pudo descargar el recortador${entre}. Revisa la conexión.`;
+    case "memoria":
+      return `Este móvil se quedó sin memoria al quitar el fondo${entre}.`;
+    case "oculta":
+      return "Saliste del panel mientras le quitaba el fondo.";
+    default:
+      return `No se pudo quitar el fondo${entre}.`;
+  }
 }
 
 /** Tabla → bucket y encuadre de la foto de carta. */

@@ -1,7 +1,7 @@
 import { toast } from "sonner";
 import { rutasSubida } from "../subirFotoCarta";
 import type { EstadoRecorte, FotoCarta } from "./useRecorteVino";
-import type { TablaFoto } from "./recorteMovil";
+import { dispositivoNoRecorta, type TablaFoto } from "./recorteMovil";
 
 /** Cuánto se queda en pantalla el aviso (ms): es lo único que le dice al usuario qué hacer luego. */
 export const MS_AVISO_SIN_FONDO = 12_000;
@@ -61,7 +61,10 @@ export function trasGuardarFotoCarta(foto: Pick<FotoCarta, "estado" | "original"
     const destino = foto.estado.destino;
     void import("./recorteEnSegundoPlano").then(async (m) => {
       if (destino === "movil") await m.recortarEnMovil(datos, original);
-      else await m.noRecortar(datos, "Este móvil no recorta fotos en el navegador.");
+      else {
+        const marca = dispositivoNoRecorta();
+        await m.noRecortar(datos, `Este móvil no recorta fotos en el navegador${marca?.motivo ? ` (${marca.motivo})` : ""}.`);
+      }
     });
   } catch (e) {
     console.warn("[recorte] tras guardar", e);

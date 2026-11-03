@@ -21,6 +21,17 @@ interface Props {
   onAbrirFila: (fila: FilaLote) => void;
 }
 
+/**
+ * Texto de una botella leída. Nunca «sin recorte» como si fuera definitivo
+ * (03-11-2026): en el móvil el fondo se pone al guardar, y si el recorte falló
+ * en el ordenador se puede repetir en la ficha.
+ */
+export function textoListo(recorte: FilaLote["recorte"]): string {
+  if (recorte === "diferido") return "Listo · el fondo se pone al guardar";
+  if (recorte === "fallo") return "Listo · el recorte falló, repítelo al revisar";
+  return "Listo";
+}
+
 function TextoEstado({ fila }: { fila: FilaLote }) {
   switch (fila.estado) {
     case "cola":
@@ -50,11 +61,7 @@ function TextoEstado({ fila }: { fila: FilaLote }) {
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Recortando… · ya puedes revisar
           </span>
         );
-      return (
-        <span className="font-medium text-primary">
-          {fila.recorte === "fallo" ? "Listo (sin recorte)" : "Listo"} · toca para revisar
-        </span>
-      );
+      return <span className="font-medium text-primary">{textoListo(fila.recorte)} · toca para revisar</span>;
   }
 }
 
