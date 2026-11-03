@@ -31,7 +31,7 @@ const de = (permisos: PermisoSeccion[], clave: string) => permisos.find((p) => p
 describe("SECCIONES_CONFIGURABLES", () => {
   it("son las secciones del panel salvo «usuarios» (que va por rol admin, no por permisos)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
-    expect(claves).toEqual(["dashboard", "reservas", "gestor_carta", "gestion_web", "marketing", "cheques", "facturas"]);
+    expect(claves).toEqual(["dashboard", "reservas", "gestor_carta", "gestion_web", "marketing", "cheques", "tienda", "facturas"]);
   });
 });
 

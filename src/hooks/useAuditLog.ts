@@ -505,6 +505,7 @@ export const TABLA_LABEL: Record<string, string> = {
   movimientos_stock: "Movimientos de stock",
   costes_fijos: "Costes fijos",
   servicios_contratados: "Servicios contratados",
+  configuracion_tienda: "Configuración de la tienda",
   ia_funciones: "Funciones de IA",
   ia_coste_estimado: "Estimaciones de IA",
   web_rebuild_state: "Publicación de webs",

@@ -20,6 +20,7 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
+  "/tienda": "tienda",
   "/facturas": "facturas",
   "/usuarios": "usuarios",
 };
@@ -37,6 +38,7 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/gestion-web", secciones: SECCIONES_GESTOR_WEB },
   { ruta: "/marketing", secciones: ["marketing"] },
   { ruta: "/cheques", secciones: ["cheques"] },
+  { ruta: "/tienda", secciones: ["tienda"] },
   { ruta: "/facturas", secciones: ["facturas"] },
 ];
 

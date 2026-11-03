@@ -64,6 +64,8 @@ jobs:
         run: npm run test:servicios:db
       - name: Cambio de la propia contraseña, límite de intentos (PGlite)
         run: npm run test:cambio-contrasena:db
+      - name: Tienda de vinos, escaparate (PGlite)
+        run: npm run test:tienda:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs

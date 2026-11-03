@@ -36,6 +36,7 @@ import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
+import { ShoppingBag } from "lucide-react";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
@@ -89,6 +90,13 @@ const menuItems: {
     icon: Gift,
     sectionKey: "cheques",
     toggleKey: "cheques",
+  },
+  {
+    title: "Tienda",
+    url: "/tienda",
+    icon: ShoppingBag,
+    sectionKey: "tienda",
+    toggleKey: "tienda",
   },
   {
     title: "Facturas",
