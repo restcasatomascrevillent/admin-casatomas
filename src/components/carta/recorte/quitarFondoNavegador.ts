@@ -51,7 +51,8 @@ import { aplicarCoeficientes, coeficientesGuiado, entradaGuiado, limpiarMascara,
 import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
 
 export type ProgresoRecorte =
-  | { fase: "descargando"; pct: number }
+  /** `recibidos`/`total` en bytes (para «23/47 MB»). */
+  | { fase: "descargando"; pct: number; recibidos?: number; total?: number }
   | { fase: "cargando" }
   | { fase: "recortando" };
 
@@ -106,7 +107,7 @@ function obtenerWorker(): Worker {
     if (m.tipo === "descarga") {
       const pct = m.total > 0 ? Math.min(100, Math.round((m.recibidos / m.total) * 100)) : 0;
       // La descarga es compartida: avisar a todas las peticiones en espera.
-      pendientes.forEach((p) => p.onProgreso?.({ fase: "descargando", pct }));
+      pendientes.forEach((p) => p.onProgreso?.({ fase: "descargando", pct, recibidos: m.recibidos, total: m.total }));
       return;
     }
     if (m.tipo === "precargado") {
@@ -125,7 +126,7 @@ function obtenerWorker(): Worker {
       p.ok({ mascara: m.mascara, ms: m.ms, desdeCache: m.desdeCache, proveedor: m.proveedor });
     } else if (m.tipo === "error") {
       pendientes.delete(m.id);
-      p.ko(new Error(m.mensaje));
+      p.ko(errorDelWorker(m));
     }
   };
   w.onerror = (ev) => {
@@ -138,6 +139,13 @@ function obtenerWorker(): Worker {
   };
   worker = w;
   return w;
+}
+
+/** Error del worker con su `name` original (ErrorDescargaModelo, RangeError…): de ahí sale la causa del fallo. */
+function errorDelWorker(m: { mensaje: string; nombre?: string }): Error {
+  const e = new Error(m.mensaje);
+  if (m.nombre) e.name = m.nombre;
+  return e;
 }
 
 function lienzo(ancho: number, alto: number) {
@@ -357,7 +365,7 @@ export function crearWorkerRecorteDedicado(): WorkerRecorteDedicado {
     if (!p) return;
     espera.delete(m.id);
     if (m.tipo === "mascara") p.ok({ mascara: m.mascara, ms: m.ms, desdeCache: m.desdeCache, proveedor: m.proveedor });
-    else p.ko(new Error(m.mensaje));
+    else p.ko(errorDelWorker(m));
   };
   w.onerror = (ev) => fallarTodo(new Error(ev.message || "Error en el worker de recorte"));
   return {

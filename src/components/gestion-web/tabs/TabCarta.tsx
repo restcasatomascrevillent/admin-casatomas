@@ -254,15 +254,16 @@ export default function TabCarta() {
             }))}
             acciones={
               // Móvil: rejilla de 2 columnas, todos con su texto (02/11/2026: solo iconos «no eran
-              // nada intuitivos»). En Vinos, fila de arriba «Desde foto · Varias botellas» y abajo
-              // «Ajustar precios · Añadir vino». Desde `sm`, una fila como siempre.
+              // nada intuitivos»). En Vinos (03/11/2026: un único «Añadir vino», que lee la etiqueta
+              // con IA al poner la foto), arriba «Varias botellas · Ajustar precios» y abajo «Añadir
+              // vino» a todo el ancho. Desde `sm`, una fila como siempre.
               <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center" data-tour="gw-carta-acciones">
                 <Button variant="outline" className="min-w-0 px-3 sm:px-4" onClick={() => setDialogAjustePreciosOpen(true)} title="Ajustar precios">
                   <Percent className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">Ajustar precios</span>
                 </Button>
                 {seccionActiva === "vinos" && (
-                  <div className="order-first col-span-2 flex min-w-0 items-center gap-2 sm:order-none sm:flex-wrap" data-tour="gw-carta-vinos-foto">
+                  <div className="order-first flex min-w-0 items-center gap-2 sm:order-none sm:flex-wrap" data-tour="gw-carta-vinos-foto">
                     <BotonVinoDesdeFoto
                       categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
                       onLeido={(resultado) => {
@@ -272,7 +273,7 @@ export default function TabCarta() {
                     />
                   </div>
                 )}
-                <Button className="min-w-0 px-3 sm:px-4" onClick={actual.abrirDialogo} title={actual.añadir}>
+                <Button className={`min-w-0 px-3 sm:px-4 ${seccionActiva === "vinos" ? "col-span-2 sm:col-span-1" : ""}`} onClick={actual.abrirDialogo} title={actual.añadir}>
                   <Plus className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">{actual.añadir}</span>
                 </Button>

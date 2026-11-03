@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { redimensionarFoto } from "./redimensionarFoto";
 import { recortarFoto, type RecorteNormalizado } from "./recorteFoto";
 import type { ResultadoFotoCarta } from "./fotoCartaVino";
+import { mensajeErrorFuncion } from "@/hooks/useEnviarNewsletter";
 
 export interface FuentePrecioMercado {
   tienda: string;
@@ -83,8 +84,22 @@ export function formatoEuros(n: number): string {
   return `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 }
 
-/** Redimensiona, manda a `extraer-vino-foto` y encuadra la foto. Lanza error si la lectura falla. */
-export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<VinoDesdeFoto> {
+export const MENSAJE_SIN_SALDO_OPENAI =
+  "La cuenta de OpenAI se ha quedado sin saldo: añade crédito en platform.openai.com → Billing";
+
+/**
+ * Motivo legible del fallo de la lectura (03-11-2026: la demo decía «No se pudo
+ * leer la etiqueta» y era la cuenta de OpenAI sin saldo). La función ya manda el
+ * motivo en `error`; aquí se traduce también si llega el texto crudo de OpenAI.
+ */
+export function motivoLecturaVino(mensaje: string | null | undefined): string {
+  const m = (mensaje ?? "").trim();
+  if (/insufficient_quota|credit_balance|no credits|exceeded your current quota|sin saldo/i.test(m)) return MENSAJE_SIN_SALDO_OPENAI;
+  return m || "La IA no ha devuelto datos";
+}
+
+/** Manda la foto (reducida) a `extraer-vino-foto`. Lanza Error con el motivo real si falla. */
+async function invocarExtraccion(file: File, categorias: string[]): Promise<{ datos: DatosVinoFoto; reducida: Blob }> {
   const r = await redimensionarFoto(file);
   const imagen = await aDataUrl(r.blob);
   // Diagnóstico desde el móvil (chrome://inspect): qué se manda realmente a la IA.
@@ -99,9 +114,8 @@ export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<
   const { data, error } = await supabase.functions.invoke("extraer-vino-foto", {
     body: { imagen, categorias: categorias.filter(Boolean) },
   });
-  if (error || !data?.ok || !data?.vino) {
-    throw new Error(data?.error || error?.message || "Respuesta vacía");
-  }
+  if (error) throw new Error(motivoLecturaVino(await mensajeErrorFuncion(error, "Error al llamar a la función")));
+  if (!data?.ok || !data?.vino) throw new Error(motivoLecturaVino(data?.error));
   const datos = data.vino as DatosVinoFoto;
   console.info(
     "[extraer-vino-foto] campos recibidos",
@@ -109,6 +123,28 @@ export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<
       .filter(([, v]) => v !== null && v !== "" && v !== false && v !== undefined)
       .map(([k]) => k),
   );
-  const blob = await recortarFoto(r.blob, datos.recorte);
+  return { datos, reducida: r.blob };
+}
+
+/**
+ * Lectura con IA desde el formulario (VinoForm/EditarVinoModal): datos de la
+ * etiqueta y, si la IA dio encuadre, la foto encuadrada en 3:4 (como hacía la
+ * precarga del lote). Lanza Error con el motivo real si falla.
+ */
+export async function leerDatosVinoDeFoto(
+  file: File,
+  categorias: string[],
+): Promise<{ datos: DatosVinoFoto; encuadrar: () => Promise<File> }> {
+  const { datos, reducida } = await invocarExtraccion(file, categorias);
+  return {
+    datos,
+    encuadrar: async () => new File([await recortarFoto(reducida, datos.recorte)], "botella.jpg", { type: "image/jpeg" }),
+  };
+}
+
+/** Redimensiona, manda a `extraer-vino-foto` y encuadra la foto. Lanza error si la lectura falla. */
+export async function leerVinoDeFoto(file: File, categorias: string[]): Promise<VinoDesdeFoto> {
+  const { datos, reducida } = await invocarExtraccion(file, categorias);
+  const blob = await recortarFoto(reducida, datos.recorte);
   return { datos, foto: new File([blob], "botella.jpg", { type: "image/jpeg" }) };
 }

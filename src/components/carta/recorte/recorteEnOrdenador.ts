@@ -43,7 +43,7 @@ export async function mandarRecorteAOrdenador(d: DatosRecorte, motivo: string): 
   }
   toast.warning(`Guardado con la foto normal${d.nombre ? `: ${d.nombre}` : ""}`, {
     id: ID_TOAST,
-    description: "Se recortará en un ordenador con el panel abierto y te avisaremos.",
+    description: `${motivo} Se recortará en un ordenador con el panel abierto y te avisaremos.`,
     duration: MS_AVISO_SIN_RECORTE,
     action: await accionAvisos(),
   });

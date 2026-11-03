@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { leerVinoDeFoto, type VinoDesdeFoto } from "./leerVinoFoto";
 import { hacerFotoCarta } from "./fotoCartaVino";
+import { destinoRecorteActual } from "./recorte/useRecorteVino";
 
 /** Lecturas a la vez (cada una es una llamada a la IA). */
 export const CONCURRENCIA_LOTE = 2;
 
 export type EstadoFila = "cola" | "leyendo" | "listo" | "error" | "guardado";
-export type EstadoRecorteFila = "recortando" | "listo" | "fallo";
+/**
+ * "diferido": móvil/tablet. Aquí no se recorta (memoria); el formulario de
+ * cada botella guarda la foto y DESPUÉS se le pone el fondo en el móvil o, si
+ * no puede, en un ordenador (trasGuardarFotoCarta), como en la ficha suelta.
+ */
+export type EstadoRecorteFila = "recortando" | "listo" | "fallo" | "diferido";
 
 export interface FilaLote {
   id: string;
@@ -19,6 +25,8 @@ export interface FilaLote {
   recorte?: EstadoRecorteFila;
   /** Object URL del sticker (botella sin fondo) cuando está listo. */
   sticker?: string;
+  /** Motivo del fallo de la lectura (p. ej. cuenta de OpenAI sin saldo). */
+  motivoError?: string;
 }
 
 let contador = 0;
@@ -103,6 +111,14 @@ export function useLoteVinos(categorias: string[]) {
           if (!montado.current) return;
           // URLs fuera del updater (StrictMode lo llama dos veces).
           const mini = crearUrl(resultado.foto);
+          // Móvil: nada de modelo aquí; el fondo se pone al guardar cada botella.
+          if (destinoRecorteActual() !== "formulario") {
+            setFilas((prev) =>
+              prev.map((f) => (f.id === fila.id ? { ...f, estado: "listo", resultado, miniatura: mini, recorte: "diferido" } : f)),
+            );
+            liberarUrl(fila.miniatura);
+            return;
+          }
           // Recorte en segundo plano (el worker los hace de uno en uno); el
           // formulario espera esta misma promesa si se abre antes de acabar.
           const recorte = hacerFotoCarta(resultado.foto);
@@ -128,7 +144,8 @@ export function useLoteVinos(categorias: string[]) {
         .catch((e) => {
           console.error("[extraer-vino-foto] lote", e);
           if (!montado.current) return;
-          setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, estado: "error" } : f)));
+          const motivoError = e instanceof Error && e.message ? e.message : undefined;
+          setFilas((prev) => prev.map((f) => (f.id === fila.id ? { ...f, estado: "error", motivoError } : f)));
         })
         .finally(() => {
           lanzadas.current.delete(fila.id);

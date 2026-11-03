@@ -11,10 +11,13 @@
  *
  * El modelo se guarda en Cache Storage propio (CACHE_MODELO) tras la 1ª
  * descarga; el service worker del panel no lo toca (ni precache ni borrado).
+ * Descarga con un solo buffer y sin retener los bytes tras crear la sesión:
+ * ver descargaModelo.ts (memoria en iPhone, 03-11-2026).
  */
 import * as ort from "onnxruntime-web/webgpu";
 import { LADO_MODELO, minMaxAUint8, normalizarEntrada } from "./mascaraRecorte";
 import { CACHE_MODELO, URL_MODELO } from "./modeloRecorte";
+import { descargarModelo } from "./descargaModelo";
 
 export { CACHE_MODELO, URL_MODELO };
 
@@ -27,7 +30,8 @@ export type MensajeDelWorker =
   | { tipo: "precargado"; ok: boolean; desdeCache: boolean; mensaje?: string }
   | { tipo: "recortando"; id: number }
   | { tipo: "mascara"; id: number; mascara: Uint8Array; ms: number; msCarga: number; desdeCache: boolean; proveedor: Proveedor }
-  | { tipo: "error"; id: number; mensaje: string };
+  /** `nombre`: el `name` del error (ErrorDescargaModelo, RangeError…) para saber la causa. */
+  | { tipo: "error"; id: number; mensaje: string; nombre?: string };
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 const enviar = (m: MensajeDelWorker, transfer: Transferable[] = []) => ctx.postMessage(m, transfer);
@@ -35,55 +39,24 @@ const enviar = (m: MensajeDelWorker, transfer: Transferable[] = []) => ctx.postM
 /** «low» mientras se precarga en segundo plano: no compite con lo que pide la pantalla. */
 let prioridadDescarga: "low" | "auto" = "auto";
 
-async function descargarModelo(): Promise<{ bytes: ArrayBuffer; desdeCache: boolean }> {
-  let cache: Cache | null = null;
-  try {
-    cache = await caches.open(CACHE_MODELO);
-    const guardado = await cache.match(URL_MODELO);
-    if (guardado) return { bytes: await guardado.arrayBuffer(), desdeCache: true };
-  } catch {
-    cache = null; // Sin Cache Storage (modo privado…): se descarga cada vez.
-  }
-  // `priority` (Fetch Priority) aún no está en los tipos de RequestInit de TS.
-  const res = await fetch(URL_MODELO, { priority: prioridadDescarga } as RequestInit);
-  if (!res.ok || !res.body) throw new Error(`No se pudo descargar el modelo (${res.status})`);
-  const total = Number(res.headers.get("Content-Length")) || 46_731_330;
-  const lector = res.body.getReader();
-  const trozos: Uint8Array[] = [];
-  let recibidos = 0;
+/** Descarga (o lee de la caché) con un solo buffer y avisa del progreso cada ~512 KB. */
+function traerModelo() {
   let ultimo = 0;
-  for (;;) {
-    const { done, value } = await lector.read();
-    if (done) break;
-    trozos.push(value);
-    recibidos += value.length;
-    if (recibidos - ultimo > 512 * 1024) {
+  return descargarModelo(URL_MODELO, {
+    abrirCache: () => caches.open(CACHE_MODELO),
+    prioridad: prioridadDescarga,
+    alProgreso: (recibidos, total) => {
+      if (recibidos - ultimo < 512 * 1024 && recibidos < total) return;
       ultimo = recibidos;
       enviar({ tipo: "descarga", recibidos, total });
-    }
-  }
-  enviar({ tipo: "descarga", recibidos, total: recibidos });
-  const bytes = new Uint8Array(recibidos);
-  let o = 0;
-  for (const t of trozos) {
-    bytes.set(t, o);
-    o += t.length;
-  }
-  if (cache) {
-    try {
-      await cache.put(URL_MODELO, new Response(bytes.slice().buffer, { headers: { "Content-Type": "application/octet-stream" } }));
-    } catch {
-      /* cuota llena: se volverá a bajar la próxima vez */
-    }
-  }
-  return { bytes: bytes.buffer, desdeCache: false };
+    },
+  });
 }
 
 export type Proveedor = "webgpu" | "wasm";
 
 let sesion: Promise<{ s: ort.InferenceSession; msCarga: number; desdeCache: boolean; proveedor: Proveedor }> | null = null;
 let sinWebgpu = false;
-let modelo: { bytes: ArrayBuffer; desdeCache: boolean } | null = null;
 
 async function hayWebgpu(): Promise<boolean> {
   if (sinWebgpu) return false;
@@ -102,20 +75,27 @@ function cargarSesion() {
       const t0 = performance.now();
       // Hilos solo con aislamiento cross-origin (el panel no lo tiene: 1 hilo).
       ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
-      modelo ??= await descargarModelo();
-      const { bytes, desdeCache } = modelo;
-      const opciones = { graphOptimizationLevel: "all" as const };
-      if (await hayWebgpu()) {
-        try {
-          const s = await ort.InferenceSession.create(bytes, { ...opciones, executionProviders: ["webgpu"] });
-          return { s, msCarga: performance.now() - t0, desdeCache, proveedor: "webgpu" as const };
-        } catch (e) {
-          console.warn("[recorte] WebGPU no disponible, se usa WASM", e);
-          sinWebgpu = true;
+      // Los bytes del modelo solo viven aquí: en cuanto hay sesión (ORT ya los
+      // copió a su memoria) se sueltan. Para recrearla se vuelven a leer de la
+      // caché (antes quedaban 47 MB vivos para siempre en `modelo`).
+      const modelo: { bytes: Uint8Array | null; desdeCache: boolean } = await traerModelo();
+      const desdeCache = modelo.desdeCache;
+      try {
+        const opciones = { graphOptimizationLevel: "all" as const };
+        if (await hayWebgpu()) {
+          try {
+            const s = await ort.InferenceSession.create(modelo.bytes!, { ...opciones, executionProviders: ["webgpu"] });
+            return { s, msCarga: performance.now() - t0, desdeCache, proveedor: "webgpu" as const };
+          } catch (e) {
+            console.warn("[recorte] WebGPU no disponible, se usa WASM", e);
+            sinWebgpu = true;
+          }
         }
+        const s = await ort.InferenceSession.create(modelo.bytes!, { ...opciones, executionProviders: ["wasm"] });
+        return { s, msCarga: performance.now() - t0, desdeCache, proveedor: "wasm" as const };
+      } finally {
+        modelo.bytes = null;
       }
-      const s = await ort.InferenceSession.create(bytes, { ...opciones, executionProviders: ["wasm"] });
-      return { s, msCarga: performance.now() - t0, desdeCache, proveedor: "wasm" as const };
     })();
     sesion.catch(() => {
       sesion = null; // reintentar en la próxima petición
@@ -166,7 +146,7 @@ ctx.onmessage = (ev: MessageEvent<MensajeAlWorker>) => {
         }
       }
     } catch (e) {
-      enviar({ tipo: "error", id: m.id, mensaje: (e as Error)?.message || String(e) });
+      enviar({ tipo: "error", id: m.id, mensaje: (e as Error)?.message || String(e), nombre: (e as Error)?.name });
     }
   });
 };

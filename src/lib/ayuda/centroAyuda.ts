@@ -207,7 +207,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Vinos con una foto",
         pasos: [
-          "En «Carta», entra en «Vinos» y pulsa «Añadir botella con foto». Hazle la foto a la etiqueta de delante de la botella, de cerca y con luz. En unos segundos se abre la ficha ya rellena: nombre (con la añada si se lee), categoría, D.O., uva, región, país y una descripción. La foto se recorta sola y queda como foto del vino.",
+          "En «Carta», entra en «Vinos» y pulsa «Añadir vino». Pon la foto de la etiqueta de delante de la botella (en el móvil, «Hacer foto a la etiqueta»), de cerca y con luz. Mientras la foto se recorta, la IA rellena en unos segundos los campos vacíos: nombre (con la añada si se lee), categoría, D.O., uva, región, país y una descripción. Lo que ya hayas escrito no lo cambia. Si el vino ya existe, en «Editar» tienes el botón «Leer etiqueta con IA».",
           "El precio no se rellena solo: debajo te sale un precio «Sugerido» (calculado con los precios de tu carta), que puedes poner con «Usar», y lo que cuesta más o menos en tiendas. Revisa todo, corrige lo que haga falta y pulsa guardar. Hasta que no guardas, no se añade nada a la carta.",
           "Si tienes varias botellas, pulsa «Varias botellas» y ve haciendo una foto por botella («Hacer foto» y luego «Otra foto»), o elígelas de la galería. Se leen solas mientras sigues; cuando una pone «Listo · toca para revisar», tócala, revísala y guárdala. Las que ya están pasan a «Guardado».",
         ],

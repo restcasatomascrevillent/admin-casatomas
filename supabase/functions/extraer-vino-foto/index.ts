@@ -42,6 +42,7 @@ import { conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso-marketing.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { ejemplosUbicacion, elegirRegion, type UbicacionCarta } from "../_shared/ubicacion-vino.ts";
+import { motivoErrorOpenAI } from "../_shared/error-openai.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -330,7 +331,17 @@ function basePrecios(carta: VinoCarta[], categoria: string | null, dOrigen: stri
   return out;
 }
 
-async function llamarOpenAI(body: Record<string, unknown>, uso: AcumuladorUso, ms: number): Promise<Record<string, unknown> | null> {
+/** Lo rellena llamarOpenAI cuando OpenAI responde con error (motivo legible para el panel). */
+interface FalloOpenAI {
+  motivo?: string;
+}
+
+async function llamarOpenAI(
+  body: Record<string, unknown>,
+  uso: AcumuladorUso,
+  ms: number,
+  fallo?: FalloOpenAI,
+): Promise<Record<string, unknown> | null> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);
   try {
@@ -344,6 +355,7 @@ async function llamarOpenAI(body: Record<string, unknown>, uso: AcumuladorUso, m
       uso.sumar(null);
       const errText = await res.text();
       console.error(`[${FUNCION}] OpenAI ${res.status}: ${errText.slice(0, 300)}`);
+      if (fallo) fallo.motivo = motivoErrorOpenAI(res.status, errText);
       return null;
     }
     const data = await res.json();
@@ -700,6 +712,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const usoLlamadasBusqueda = new AcumuladorUso(FUNCION, MODELO_LLAMADA_BUSQUEDA, "otro");
   const inicioMs = Date.now();
 
+  const fallo: FalloOpenAI = {};
   try {
     const raw = await llamarOpenAI({
       temperature: 0.3,
@@ -718,11 +731,12 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
           ],
         },
       ],
-    }, uso, 45000);
+    }, uso, 45000, fallo);
 
     if (!raw) {
       uso.marcarError();
-      return json({ ok: false, error: "No se pudo leer la etiqueta" }, 502);
+      // Motivo real (sin saldo, clave mala, límite…) para que el panel lo enseñe.
+      return json({ ok: false, error: fallo.motivo ?? "No se pudo leer la etiqueta: la IA no devolvió datos" }, 502);
     }
 
     const vino: Record<string, unknown> = {};
@@ -761,7 +775,10 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     uso.marcarError();
     const message = error instanceof Error ? error.message : "Error desconocido";
     console.error(`[${FUNCION}]`, message);
-    return json({ ok: false, error: "No se pudo leer la etiqueta" }, 500);
+    const motivo = error instanceof Error && error.name === "AbortError"
+      ? "La IA ha tardado demasiado en responder; prueba otra vez"
+      : `No se pudo leer la etiqueta: ${message.slice(0, 160)}`;
+    return json({ ok: false, error: motivo }, 500);
   } finally {
     await registrarUso([uso, usoBusqueda, usoLlamadasBusqueda], { disparador: `usuario:${permiso.userId}`, duracionMs: Date.now() - inicioMs });
   }

@@ -60,6 +60,8 @@ jobs:
         run: npm run test:restricciones-bebidas:db
       - name: Platos.updated_at cambia al editar (PGlite)
         run: npm run test:platos-updated-at:db
+      - name: Servicios contratados y su consumo, solo super admin (PGlite)
+        run: npm run test:servicios:db
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs
