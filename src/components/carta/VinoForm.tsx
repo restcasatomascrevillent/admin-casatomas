@@ -29,6 +29,7 @@ import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
 import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
+import { diag } from "./recorte/diagnostico";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
@@ -91,6 +92,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
   });
   const alLeer = async ({ datos, fuente, encuadrar }: LecturaHecha) => {
     const r = recorteRef.current;
+    diag("IA leyó la etiqueta", { encuadre: !!datos.recorte, fase: r.estado.fase, mismaFoto: r.original === fuente });
     if (!datos.recorte || r.estado.fase !== "diferido" || r.original !== fuente) return;
     try {
       const encuadrada = await encuadrar();

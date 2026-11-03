@@ -3,14 +3,15 @@
  * foto de carta compuesta con el fondo elegido:
  *
  *   foto original (la del móvil, o bajada del bucket) → reducida antes de
- *   decodificar (reducirFotoRecorte) → modelo + refinado del navegador
- *   (quitarFondoNavegador: WebGPU si hay, si no WASM) → composición con el
- *   tema → `<ruta>-carta-<ext>.webp` en el bucket → `imagen_url` de la ficha.
+ *   decodificar (reducirFotoRecorte) → quitar el fondo (`quitar`: en el
+ *   móvil, el servidor, quitarFondoServidor; en el ordenador, el modelo del
+ *   navegador, quitarFondoNavegador) → composición con el tema →
+ *   `<ruta>-carta-<ext>.webp` en el bucket → `imagen_url` de la ficha.
  *
  * La ficha solo se toca si SIGUE apuntando a esa foto original: si mientras
  * tanto alguien le puso otra, no se pisa (ErrorFichaCambiada).
  * Lo usan el móvil tras guardar (recorteEnSegundoPlano.ts) y el ordenador que
- * recorta fotos pendientes.
+ * recorta fotos pendientes (potente/procesarTrabajoRecorte.ts).
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,10 +23,11 @@ import { rutaCartaDesdeOriginal } from "../rutasFotoCarta";
 import { BUCKET_TABLA, TIPO_TABLA, type DatosRecorte } from "./recorteMovil";
 import { reducirFotoRecorte } from "./reducirFotoRecorte";
 import type { ProgresoRecorte } from "./quitarFondoNavegador";
+import type { ProgresoServidor } from "./quitarFondoServidor";
 
 const sb = supabase as unknown as SupabaseClient;
 
-/** Lado mayor de la foto que entra al recorte en el móvil (la foto de carta sale a 900×1200 o 1200×900). */
+/** Lado mayor de la foto que el móvil manda al servidor (la foto de carta sale a 900×1200 o 1200×900). */
 export const LADO_RECORTE_MOVIL = 1200;
 /** En el ordenador, como en el formulario. */
 export const LADO_RECORTE_PC = 1600;
@@ -49,7 +51,14 @@ export interface OpcionesRecorteGuardado {
   original?: Blob | null;
   /** Lado mayor de la foto que entra al recorte. */
   lado?: number;
-  onProgreso?: (p: ProgresoRecorte) => void;
+  onProgreso?: (p: ProgresoRecorte | ProgresoServidor) => void;
+  /** Quién quita el fondo: foto reducida → sticker PNG. Por defecto, el modelo en el navegador (ordenador). */
+  quitar?: (foto: Blob, onProgreso?: (p: ProgresoRecorte | ProgresoServidor) => void) => Promise<Blob>;
+}
+
+async function quitarEnNavegador(foto: Blob, onProgreso?: (p: ProgresoRecorte) => void): Promise<Blob> {
+  const { quitarFondoNavegador } = await import("./quitarFondoNavegador");
+  return quitarFondoNavegador(foto, onProgreso);
 }
 
 export async function recortarFotoGuardada(d: DatosRecorte, opts: OpcionesRecorteGuardado = {}): Promise<string> {
@@ -63,8 +72,7 @@ export async function recortarFotoGuardada(d: DatosRecorte, opts: OpcionesRecort
   }
   const reducida = await reducirFotoRecorte(original, opts.lado ?? LADO_RECORTE_MOVIL);
   original = null;
-  const { quitarFondoNavegador } = await import("./quitarFondoNavegador");
-  const sticker = await quitarFondoNavegador(reducida, opts.onProgreso);
+  const sticker = await (opts.quitar ?? quitarEnNavegador)(reducida, opts.onProgreso);
   const compuesta = await componerFotoCarta(sticker, { tipo: TIPO_TABLA[d.tabla], tema: d.tema as NombreTema });
   const rutaCarta = rutaCartaDesdeOriginal(d.rutaOriginal, extensionFoto(compuesta));
 

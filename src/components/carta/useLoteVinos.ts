@@ -9,8 +9,8 @@ export const CONCURRENCIA_LOTE = 2;
 export type EstadoFila = "cola" | "leyendo" | "listo" | "error" | "guardado";
 /**
  * "diferido": móvil/tablet. Aquí no se recorta (memoria); el formulario de
- * cada botella guarda la foto y DESPUÉS se le pone el fondo en el móvil o, si
- * no puede, en un ordenador (trasGuardarFotoCarta), como en la ficha suelta.
+ * cada botella guarda la foto y DESPUÉS el servidor le quita el fondo o, si
+ * falla, un ordenador (trasGuardarFotoCarta), como en la ficha suelta.
  */
 export type EstadoRecorteFila = "recortando" | "listo" | "fallo" | "diferido";
 

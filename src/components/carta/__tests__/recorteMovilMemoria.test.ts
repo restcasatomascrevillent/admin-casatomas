@@ -1,12 +1,9 @@
 /**
- * iPhone que no recorta (03-11-2026, producción v0.137):
- *   - la descarga del modelo usa UN solo buffer (antes ~140 MB transitorios) y
- *     guardarlo en Cache Storage no lo copia ni lo neutraliza;
- *   - el móvil solo se marca «no recorta» por MEMORIA con la página a la
- *     vista; ni por fallos de red/descarga ni si murió estando oculta;
- *   - el aviso dice la causa real;
- *   - «Varias botellas» en el móvil no dice «sin recorte»: el fondo se pone al
- *     guardar cada botella (trasGuardarFotoCarta, como en la ficha suelta).
+ * Memoria del recorte (03-11-2026):
+ *   - la descarga del modelo (solo ordenador) usa UN solo buffer (antes ~140 MB
+ *     transitorios) y guardarlo en Cache Storage no lo copia ni lo neutraliza;
+ *   - «Varias botellas» en el móvil no pasa el modelo: el fondo lo pone el
+ *     servidor al guardar cada botella (trasGuardarFotoCarta, como en la ficha suelta).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -18,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   dismiss: vi.fn(),
   leer: vi.fn(),
   hacerFotoCarta: vi.fn(),
-  destino: vi.fn(() => "movil"),
+  destino: vi.fn(() => "servidor"),
 }));
 vi.mock("sonner", () => ({ toast: { loading: mocks.loading, success: mocks.success, warning: mocks.warning, dismiss: mocks.dismiss, error: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
@@ -27,20 +24,9 @@ vi.mock("../fotoCartaVino", () => ({ hacerFotoCarta: mocks.hacerFotoCarta }));
 vi.mock("../recorte/useRecorteVino", () => ({ destinoRecorteActual: mocks.destino }));
 
 import { descargarModelo, ErrorDescargaModelo, leerEnUnBuffer, longitudContenido } from "../recorte/descargaModelo";
-import {
-  CLAVE_EN_CURSO,
-  causaFallo,
-  dispositivoNoRecorta,
-  leerMarcaRecorte,
-  marcarRecorteEnCurso,
-  MS_MARCA_MUERTA,
-  type DatosRecorte,
-} from "../recorte/recorteMovil";
-import { configurarAlNoRecortar, recortarEnMovil, recuperarRecorteInterrumpido, textoProgresoMovil } from "../recorte/recorteEnSegundoPlano";
 import { useLoteVinos } from "../useLoteVinos";
 import { textoListo } from "../LoteVinosFoto";
 
-const DATOS: DatosRecorte = { tabla: "Vinos", registroId: "v1", nombre: "Fondillón", rutaOriginal: "v1.jpeg", tema: "arena" };
 
 /** Stream que entrega `datos` en trozos de `trozo` bytes. */
 function stream(datos: Uint8Array, trozo = 7): ReadableStream<Uint8Array> {
@@ -61,13 +47,8 @@ function datosPrueba(n: number): Uint8Array {
 /** Comparación rápida de buffers grandes (toEqual va byte a byte y tarda). */
 const iguales = (a: Uint8Array, b: Uint8Array) => a.length === b.length && Buffer.compare(Buffer.from(a.buffer, a.byteOffset, a.length), Buffer.from(b.buffer, b.byteOffset, b.length)) === 0;
 
-let visibilidad: DocumentVisibilityState = "visible";
 beforeEach(() => {
   vi.clearAllMocks();
-  localStorage.clear();
-  configurarAlNoRecortar(null);
-  visibilidad = "visible";
-  Object.defineProperty(document, "visibilityState", { configurable: true, get: () => visibilidad });
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -126,94 +107,19 @@ describe("descarga del modelo en un solo buffer", () => {
     expect(fetchFalso).not.toHaveBeenCalled();
   });
 
-  it("un fallo de red o HTTP sale como ErrorDescargaModelo (causa «descarga»)", async () => {
+  it("un fallo de red o HTTP sale como ErrorDescargaModelo", async () => {
     const sinRed = vi.fn(async () => Promise.reject(new TypeError("Load failed")));
     const e1 = await descargarModelo("/m.onnx", { fetch: sinRed as unknown as typeof fetch }).catch((e) => e);
     expect(e1).toBeInstanceOf(ErrorDescargaModelo);
-    expect(causaFallo(e1)).toBe("descarga");
     const http = vi.fn(async () => new Response("x", { status: 503 }));
     const e2 = await descargarModelo("/m.onnx", { fetch: http as unknown as typeof fetch }).catch((e) => e);
     expect(e2.message).toMatch(/503/);
-    // Como llega desde el worker (solo nombre y mensaje):
-    const desdeWorker = Object.assign(new Error("No se pudo descargar el recortador (Load failed)"), { name: "ErrorDescargaModelo" });
-    expect(causaFallo(desdeWorker)).toBe("descarga");
-    expect(causaFallo(new Error("no available backend found. ERR: [wasm] TypeError: Failed to fetch"))).toBe("descarga");
-  });
-});
-
-describe("cuándo se marca el móvil como «no recorta»", () => {
-  const liberar = vi.fn();
-  const pantalla = vi.fn(async () => vi.fn());
-
-  it("fallo de red/descarga: NO marca y el aviso dice que fue la descarga", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
-    const recortar = vi.fn(async () => {
-      throw Object.assign(new Error("Se cortó la descarga del recortador (network connection was lost)"), { name: "ErrorDescargaModelo" });
-    });
-    expect(await recortarEnMovil(DATOS, null, { recortar, liberar, pantalla })).toBe(false);
-    expect(dispositivoNoRecorta()).toBeNull();
-    expect(alNo.mock.calls[0][1]).toMatch(/No se pudo descargar el recortador/);
-  });
-
-  it("sin memoria con la página a la vista: SÍ marca y lo dice", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
-    const recortar = vi.fn(async () => {
-      throw new RangeError("Out of memory");
-    });
-    await recortarEnMovil(DATOS, null, { recortar, liberar, pantalla });
-    expect(dispositivoNoRecorta()?.motivo).toMatch(/memoria/);
-    expect(alNo.mock.calls[0][1]).toMatch(/sin memoria/);
-  });
-
-  it("sin memoria pero la página se ocultó mientras recortaba: NO marca («saliste del panel»)", async () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
-    const recortar = vi.fn(async () => {
-      visibilidad = "hidden";
-      document.dispatchEvent(new Event("visibilitychange"));
-      expect(leerMarcaRecorte()?.visible).toBe(false); // se anota al momento, sin esperar al latido
-      throw new RangeError("Out of memory");
-    });
-    await recortarEnMovil(DATOS, null, { recortar, liberar, pantalla });
-    expect(dispositivoNoRecorta()).toBeNull();
-    expect(alNo.mock.calls[0][1]).toMatch(/Saliste del panel/);
-  });
-
-  it("mantiene la pantalla encendida mientras recorta y enseña el progreso de la descarga en MB", async () => {
-    const soltar = vi.fn();
-    const recortar = vi.fn(async (_d: DatosRecorte, o: { onProgreso?: (p: never) => void }) => {
-      o.onProgreso?.({ fase: "descargando", pct: 50, recibidos: 23 * 1024 * 1024, total: 47 * 1024 * 1024 } as never);
-      return "url";
-    });
-    await recortarEnMovil(DATOS, null, { recortar: recortar as never, liberar, pantalla: async () => soltar });
-    expect(mocks.loading.mock.calls.some((c) => c[0] === "Descargando el recortador: 23/47 MB")).toBe(true);
-    expect(mocks.loading.mock.calls.some((c) => /No salgas del panel/.test(c[1]?.description))).toBe(true);
-    expect(soltar).toHaveBeenCalled();
-    expect(textoProgresoMovil({ fase: "recortando" }, "Rioja").titulo).toBe("Quitando el fondo a Rioja…");
-  });
-
-  it("al reabrir: si la pestaña murió estando OCULTA no marca; solo manda la foto al ordenador", () => {
-    const alNo = vi.fn(async (_d: DatosRecorte, _m: string) => undefined);
-    configurarAlNoRecortar(alNo);
-    marcarRecorteEnCurso(DATOS, { ahora: 1_000, pestana: "murio", visible: false });
-    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5 });
-    expect(localStorage.getItem(CLAVE_EN_CURSO)).toBeNull();
-    expect(dispositivoNoRecorta()).toBeNull();
-    expect(alNo).toHaveBeenCalledWith(DATOS, expect.stringMatching(/Saliste del panel/));
-  });
-
-  it("al reabrir: si murió A LA VISTA (memoria) sí marca", () => {
-    marcarRecorteEnCurso(DATOS, { ahora: 1_000, pestana: "murio", visible: true });
-    recuperarRecorteInterrumpido({ ahora: () => 1_000 + MS_MARCA_MUERTA + 5 });
-    expect(dispositivoNoRecorta()?.motivo).toMatch(/Memoria/);
   });
 });
 
 describe("«Varias botellas» en el móvil", () => {
   it("no lanza el recorte en el lote (memoria) y la fila queda «el fondo se pone al guardar»", async () => {
-    mocks.destino.mockReturnValue("movil");
+    mocks.destino.mockReturnValue("servidor");
     const foto = new File(["x"], "b.jpg", { type: "image/jpeg" });
     mocks.leer.mockResolvedValue({ datos: { nombre: "Rioja" }, foto });
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() }));
@@ -221,7 +127,7 @@ describe("«Varias botellas» en el móvil", () => {
     act(() => result.current.añadir([foto]));
     await waitFor(() => expect(result.current.filas[0]?.estado).toBe("listo"));
     expect(result.current.filas[0].recorte).toBe("diferido");
-    // Sin promesa de recorte: el formulario pasa a «diferido» y al guardar lanza recortarEnMovil / el trabajo del ordenador.
+    // Sin promesa de recorte: el formulario pasa a «diferido» y al guardar lanza el recorte en el servidor.
     expect(result.current.filas[0].resultado?.recorte).toBeUndefined();
     expect(mocks.hacerFotoCarta).not.toHaveBeenCalled();
     expect(textoListo("diferido")).toBe("Listo · el fondo se pone al guardar");

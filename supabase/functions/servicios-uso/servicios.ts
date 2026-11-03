@@ -266,12 +266,34 @@ export function resumirUsoVercel(json: unknown): UsoVercel {
   };
 }
 
+/**
+ * Recortes de fotos en el servidor (api/recortar-foto del panel, migración
+ * 20261103180000): nº de fotos del mes y de hoy y minutos de CPU anotados,
+ * frente a los topes del panel (recortes_servidor_mes/_dia, cpu_recortes_mes
+ * en los límites de Vercel). Sale de nuestra BD: no necesita el token de Vercel.
+ */
+export async function metricasRecorteServidor(ctx: ContextoLector): Promise<Record<string, Metrica>> {
+  const { data, error } = await ctx.admin.rpc("recorte_servidor_uso");
+  if (error || !esObjeto(data)) return {};
+  const n = (k: string) => (typeof data[k] === "number" ? (data[k] as number) : Number(data[k] ?? 0));
+  const minutos = redondear(n("cpu_ms_mes") / 60_000, 1);
+  return {
+    recortes_servidor_mes: {
+      orden: 8, etiqueta: "Recortes de fotos en el servidor (tope del panel)", valor: n("recortes_mes"), unidad: "fotos", periodo: "mes en curso",
+      nota: `${minutos} min de CPU este mes. Al llegar al tope, el móvil deja las fotos para un ordenador.`,
+    },
+    recortes_servidor_dia: { orden: 9, etiqueta: "Recortes de fotos en el servidor hoy (tope del panel)", valor: n("recortes_dia"), unidad: "fotos", periodo: "hoy" },
+    cpu_recortes_mes: { orden: 10, etiqueta: "CPU de los recortes en el servidor (tope del panel)", valor: minutos, unidad: "minutos", periodo: "mes en curso" },
+  };
+}
+
 export const leerVercel: Lector = async (ctx) => {
+  const recortes = await metricasRecorteServidor(ctx);
   const token = secreto(ctx, "SERVICIOS_VERCEL_TOKEN");
-  if (!token) return faltaSecreto("SERVICIOS_VERCEL_TOKEN");
+  if (!token) return faltaSecreto("SERVICIOS_VERCEL_TOKEN", recortes);
   const equipo = secreto(ctx, "SERVICIOS_VERCEL_TEAM_ID") || VERCEL_TEAM_POR_DEFECTO;
   const cab = { Authorization: `Bearer ${token}`, Accept: "application/json" };
-  const metricas: Record<string, Metrica> = {};
+  const metricas: Record<string, Metrica> = { ...recortes };
   const avisos: string[] = [];
   const detalles: Record<string, unknown> = { equipo };
 
@@ -303,7 +325,11 @@ export const leerVercel: Lector = async (ctx) => {
     if (r.bytesServidos != null) metricas.transferencia_rapida = { orden: 2, etiqueta: "Datos servidos a los visitantes (Fast Data Transfer)", valor: Math.round(r.bytesServidos), unidad: "bytes", periodo };
     if (r.bytesOrigen != null) metricas.transferencia_origen = { orden: 3, etiqueta: "Datos desde el servidor (Fast Origin Transfer)", valor: Math.round(r.bytesOrigen), unidad: "bytes", periodo };
     if (r.invocaciones != null) metricas.invocaciones_funciones = { orden: 4, etiqueta: "Ejecuciones de funciones", valor: Math.round(r.invocaciones), unidad: "invocaciones", periodo };
-    if (r.cpuHoras != null) metricas.cpu_activa = { orden: 5, etiqueta: "Tiempo de CPU de las funciones", valor: redondear(r.cpuHoras, 3), unidad: "horas", periodo };
+    if (r.cpuHoras != null) {
+      metricas.cpu_activa = { orden: 5, etiqueta: "Tiempo de CPU de las funciones", valor: redondear(r.cpuHoras, 3), unidad: "horas", periodo };
+      const rec = recortes.recortes_servidor_mes;
+      if (rec) metricas.cpu_activa.nota = `De ellas, recortes de fotos este mes: ${rec.valor} fotos, ${recortes.cpu_recortes_mes?.valor ?? 0} min (este proyecto de Supabase).`;
+    }
     if (r.imagenes != null) metricas.transformaciones_imagen = { orden: 6, etiqueta: "Imágenes optimizadas", valor: Math.round(r.imagenes), unidad: "transformaciones", periodo };
     if (r.peticiones == null && r.bytesServidos == null && r.invocaciones == null) {
       avisos.push("Vercel ha cambiado el formato de su API de uso: no se reconocen las cifras.");
@@ -314,7 +340,7 @@ export const leerVercel: Lector = async (ctx) => {
   }
 
   if (avisos.length) detalles.avisos = avisos;
-  if (Object.keys(metricas).length === 0) return { metricas, error: "error_api", detalles };
+  if (Object.keys(metricas).length === Object.keys(recortes).length) return { metricas, error: "error_api", detalles };
   return { metricas, detalles };
 };
 

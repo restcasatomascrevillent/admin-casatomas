@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { temasDisponibles } from "../composicionCarta";
 import { ESTILO_DAMERO, textoProgreso, type FotoCarta } from "./useRecorteVino";
-import { dispositivoNoRecorta } from "./recorteMovil";
 
 interface Props {
   recorte: FotoCarta;
@@ -30,8 +29,6 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
   const usaCarta = listo && eleccion === "carta";
   const verSticker = usaCarta && (vista === "sticker" || !urls.carta);
   const src = usaCarta ? (verSticker ? urls.sticker : urls.carta) : urls.original;
-  /** Por qué se marcó este móvil como «no recorta» (diagnóstico). */
-  const motivoNoRecorta = diferido && estado.destino === "sin-recorte" ? dispositivoNoRecorta()?.motivo : undefined;
 
   return (
     <div className="space-y-2">
@@ -100,7 +97,7 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
       )}
 
       {diferido && (
-        // Móvil: aquí no se recorta (memoria). Se guarda la foto y luego se le pone el fondo.
+        // Móvil: aquí no se recorta (memoria). Se guarda la foto y luego el servidor le quita el fondo.
         <div
           role="note"
           className="mx-auto flex max-w-xs gap-2 rounded-md border bg-muted/50 p-2 text-left text-xs"
@@ -109,21 +106,9 @@ export function SelectorFotoCarta({ recorte, superpuesto, alt = "Foto del produc
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <div className="space-y-1">
             {eleccion === "carta" ? (
-              estado.destino === "movil" ? (
-                <p>Al guardar se guarda esta foto y después se le pone el fondo elegido en este móvil (deja el panel abierto un momento).</p>
-              ) : (
-                <p>
-                  Este móvil no recorta fotos: al guardar se guarda la foto normal y se le pondrá el fondo desde un ordenador.
-                  {motivoNoRecorta && <span className="block text-muted-foreground">Motivo: {motivoNoRecorta}</span>}
-                </p>
-              )
+              <p>Al guardar se guarda esta foto y después el servidor le quita el fondo y se le pone el fondo elegido (deja el panel abierto unos segundos).</p>
             ) : (
               <p>Se guardará la foto tal cual, sin fondo de carta.</p>
-            )}
-            {eleccion === "carta" && estado.destino === "sin-recorte" && (
-              <button type="button" className="font-medium underline underline-offset-2" onClick={recorte.reintentarEnMovil}>
-                Probar a recortar en este móvil
-              </button>
             )}
           </div>
         </div>
