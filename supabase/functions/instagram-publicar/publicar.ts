@@ -80,6 +80,16 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
     return jsonAuth(auth.estado, auth.motivo);
   }
   const s: Sesion = auth.sesion;
+  return publicarConSesion(s, request, deps);
+}
+
+/**
+ * Núcleo de la publicación con una sesión YA autorizada (lee el cuerpo de la
+ * petición). manejarPublicar lo usa con la sesión del usuario;
+ * instagram-programador (pg_cron, sin usuario), con una sesión de servicio.
+ */
+export async function publicarConSesion(s: Sesion, request: Request, deps: DependenciasPublicar = {}): Promise<Response> {
+  const env = deps.env ?? entornoDeno();
 
   const cuerpo = await leerJson(request, 64 * 1024);
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });

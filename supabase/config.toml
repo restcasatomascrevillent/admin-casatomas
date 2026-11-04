@@ -258,6 +258,19 @@ verify_jwt = false
 [functions.sincronizar-costes-openai]
 verify_jwt = false
 
+# Marketing › Instagram › publicaciones programadas. La llama SOLO pg_cron
+# (job «instagram-programador», cada 5 min, net.http_post) sin usuario ni JWT:
+# con verify_jwt = true la pasarela la cortaría con 401. Autenticación real:
+# cabecera x-webhook-secret == INSTAGRAM_PROGRAMADOR_SECRET (tiempo constante,
+# FALLA CERRADO -> 500 si falta). El valor sale del secreto de Vault
+# 'instagram_programador_secret' y la URL de 'project_url' (mismo patrón que
+# sync-trafico-web). No acepta datos del cuerpo: publica las vencidas de
+# instagram_programaciones con service_role. Ver
+# supabase/functions/instagram-programador/programador.ts y la migración
+# 20261106110000_instagram_programacion.sql.
+[functions.instagram-programador]
+verify_jwt = false
+
 
 [functions.auditoria-revertir]
 verify_jwt = true

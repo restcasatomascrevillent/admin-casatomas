@@ -25,6 +25,7 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "ocr-trabajo": { mecanismo: "x-ocr-secret en tiempo constante, fail-closed", patrones: [/verificarSecreto/] },
   "clasificar-productos": { mecanismo: "x-ocr-secret o usuario con facturas:edit", patrones: [/verificarSecreto/, /autenticar\(req, cfgAuth, "edit"\)/] },
   "sincronizar-costes-openai": { mecanismo: "x-ocr-secret en tiempo constante", patrones: [/verificarSecreto/] },
+  "instagram-programador": { mecanismo: "x-webhook-secret en tiempo constante, fail-closed (solo pg_cron)", patrones: [/x-webhook-secret/, /compararTiempoConstante/] },
 };
 
 function fuentes(dir: string): string {
