@@ -719,14 +719,61 @@ it("en superadmin móvil permite editar permisos desde la tarjeta y mantiene las
   expect(within(propia).queryByRole("button", { name: "Contraseña" })).toBeNull();
   expect(within(propia).getByRole("button", { name: "Mi contraseña" })).toBeEnabled();
   expect(within(propia).getByRole("button", { name: "Bloquear acceso" })).toBeDisabled();
-  const opciones = within(propia).getByText("Más opciones").closest("details")!;
-  fireEvent.click(within(opciones).getByText("Más opciones"));
-  expect(opciones).toHaveAttribute("open");
-  expect(within(opciones).getByRole("button", { name: "Quitar Super Admin" })).toBeDisabled();
-  const acciones = within(tarjeta).getByText("Más opciones").closest("details")!;
-  fireEvent.click(within(acciones).getByText("Más opciones"));
-  expect(within(acciones).getByRole("button", { name: "Hacer Super Admin" })).toBeEnabled();
-  expect(within(acciones).getByRole("button", { name: "Eliminar a camarero1" })).toHaveTextContent("Eliminar usuario");
+  // «Más» (menú, 2026-11-04; antes un desplegable dentro de la tarjeta): super admin y eliminar.
+  fireEvent.keyDown(within(propia).getByRole("button", { name: "Más opciones de Dueño" }), { key: "Enter" });
+  expect(await screen.findByRole("menuitem", { name: "Quitar Super Admin" })).toHaveAttribute("aria-disabled", "true");
+  expect(screen.getByText("No puedes quitarte a ti mismo el acceso de super admin.")).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: /^Eliminar/ })).toBeNull();
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+  await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+  fireEvent.keyDown(within(tarjeta).getByRole("button", { name: "Más opciones de camarero1" }), { key: "Enter" });
+  expect(await screen.findByRole("menuitem", { name: "Hacer Super Admin" })).not.toHaveAttribute("aria-disabled");
+  expect(screen.getByRole("menuitem", { name: "Eliminar a camarero1" })).toHaveTextContent("Eliminar usuario");
+});
+
+it("en escritorio, «Más opciones» de la fila da super admin y elimina (con confirmación); la tabla no lleva papelera suelta", async () => {
+  window.innerWidth = 1280;
+  const confirmar = vi.spyOn(window, "confirm").mockReturnValue(false);
+  render(<ListaUsuarios canManageSuperAdmins />);
+  const fila = (await screen.findByText("camarero1")).closest("tr")!;
+  expect(within(fila).queryByRole("button", { name: /^Eliminar/ })).toBeNull();
+  expect(within(fila).queryByRole("button", { name: /Super Admin/ })).toBeNull();
+  fireEvent.keyDown(within(fila).getByRole("button", { name: "Más opciones de camarero1" }), { key: "Enter" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Eliminar a camarero1" }));
+  expect(confirmar).toHaveBeenCalledWith(expect.stringMatching(/Eliminar este usuario definitivamente/));
+  expect(supabase.functions.invoke).not.toHaveBeenCalledWith("admin-delete-user", expect.anything());
+  fireEvent.keyDown(within(fila).getByRole("button", { name: "Más opciones de camarero1" }), { key: "Enter" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Hacer Super Admin" }));
+  expect(confirmar).toHaveBeenLastCalledWith("¿Dar acceso de super admin a camarero1?");
+  confirmar.mockRestore();
+});
+
+it("cada usuario dice su acceso de un vistazo: super admin, bloqueado, secciones o ninguna", async () => {
+  window.innerWidth = 1280;
+  vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    data: {
+      users: [
+        { id: "u-yo", email: "dueno@example.com", display_name: "Dueño", created_at: "2025-10-03T09:00:00Z", access_blocked: false },
+        { id: CAMARERO, email: "camarero1@staff.local", display_name: "camarero1", access_blocked: false },
+        { id: "u-nuevo", email: "nuevo@example.com", display_name: "Nuevo", access_blocked: false },
+        { id: "u-fuera", email: "fuera@example.com", display_name: "Fuera", access_blocked: true },
+      ],
+    },
+    error: null,
+  } as never);
+  render(<ListaUsuarios canManageSuperAdmins />);
+  const fila = async (nombre: string) => (await screen.findByText(nombre)).closest("tr")!;
+  const dueno = await fila("Dueño");
+  expect(within(dueno).getByText("Super Admin")).toBeInTheDocument();
+  expect(within(dueno).getByText("Acceso completo")).toBeInTheDocument();
+  // El correo y la fecha de alta, bajo el nombre (el correo interno @staff.local no se enseña).
+  expect(within(dueno).getByText("dueno@example.com")).toBeInTheDocument();
+  expect(within(dueno).getByText("Alta: 3 oct 2025")).toBeInTheDocument();
+  expect(within(await fila("camarero1")).queryByText(/@staff\.local/)).toBeNull();
+  expect(within(await fila("camarero1")).getByText("3 secciones")).toBeInTheDocument();
+  expect(within(await fila("Nuevo")).getByText("Sin secciones")).toBeInTheDocument();
+  expect(within(await fila("Fuera")).getByText("Acceso bloqueado")).toBeInTheDocument();
+  expect(screen.getByText("4 usuarios · 1 super admin · 1 con acceso bloqueado")).toBeInTheDocument();
 });
 
 it("en superadmin, «Mi contraseña» de la fila propia abre el cambio propio (pide la actual) y nunca la función de admin", async () => {

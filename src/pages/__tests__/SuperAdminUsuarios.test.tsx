@@ -37,4 +37,13 @@ describe("Super Admin › Usuarios", () => {
     render(<SuperAdminUsuarios />);
     expect(screen.getByRole("button", { name: "Añadir Usuario" })).toBeInTheDocument();
   });
+
+  it("cabecera de la página: título «Usuarios» con sus dos acciones, y la lista debajo", () => {
+    render(<SuperAdminUsuarios />);
+    const cabecera = screen.getByRole("banner");
+    expect(within(cabecera).getByRole("heading", { level: 1, name: "Usuarios" })).toBeInTheDocument();
+    expect(within(cabecera).getByRole("button", { name: "Cambiar mi contraseña" })).toBeInTheDocument();
+    expect(within(cabecera).getByRole("button", { name: "Añadir Usuario" })).toBeInTheDocument();
+    expect(screen.getByText("lista")).toBeInTheDocument();
+  });
 });
