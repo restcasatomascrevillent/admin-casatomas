@@ -7,6 +7,7 @@ import {
   formatCantidadLinea,
   formatNumero,
   tieneAnomaliaPrecio,
+  valorSinDescuento,
 } from "../formatters";
 
 let siguienteId = 1;
@@ -138,5 +139,21 @@ describe("formatCantidadLinea (líneas por peso con sus unidades)", () => {
     expect(formatNumero(111.8)).toBe("111,8");
     expect(formatNumero(7.355)).toBe("7,355");
     expect(formatNumero(24)).toBe("24");
+  });
+});
+
+describe("valorSinDescuento (importación histórica)", () => {
+  const nbsp = (t: string | undefined) => t?.replace(/ /g, " ");
+  it("con descuento: valor antes de descuento y el %", () => {
+    const v = valorSinDescuento({ precio: 24.99, importe_bruto: 35.2, importe_bruto_estimado: false, descuento_pct: 29 });
+    expect(nbsp(v?.texto)).toBe("Valor sin descuento 35,20 € · dto. 29 %");
+  });
+  it("regalo con valor estimado", () => {
+    const v = valorSinDescuento({ precio: 0, importe_bruto: 13.5, importe_bruto_estimado: true, descuento_pct: null });
+    expect(nbsp(v?.texto)).toBe("Valor sin descuento 13,50 € (estimado)");
+  });
+  it("sin bruto, o igual al importe: nada", () => {
+    expect(valorSinDescuento({ precio: 10, importe_bruto: null })).toBeNull();
+    expect(valorSinDescuento({ precio: 10, importe_bruto: 10 })).toBeNull();
   });
 });

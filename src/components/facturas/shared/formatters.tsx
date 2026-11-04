@@ -27,6 +27,26 @@ export const formatCantidadLinea = (
   return `${formatNumero(p.bultos)} ud · ${cantidad}`;
 };
 
+/**
+ * «Valor sin descuento» de una línea con descuento o regalada (importación
+ * histórica, 04/11/2026): el valor antes de descuento si difiere del importe
+ * impreso; null si no hay nada que enseñar.
+ */
+export const valorSinDescuento = (
+  p: Pick<ProductoFactura, "precio" | "importe_bruto" | "importe_bruto_estimado" | "descuento_pct">,
+): { texto: string; titulo: string } | null => {
+  if (p.importe_bruto === null || p.importe_bruto === undefined) return null;
+  if (Math.abs(p.importe_bruto - (p.precio ?? 0)) < 0.005) return null;
+  const estimado = p.importe_bruto_estimado === true;
+  const dto = p.descuento_pct ? ` · dto. ${formatNumero(p.descuento_pct)} %` : "";
+  return {
+    texto: `Valor sin descuento ${formatCurrency(p.importe_bruto)}${estimado ? " (estimado)" : ""}${dto}`,
+    titulo: estimado
+      ? "Calculado con el precio al que este proveedor cobró el artículo en otras facturas: aquí no venía precio."
+      : "Cantidad × precio antes del descuento. El importe de la línea es el impreso.",
+  };
+};
+
 export const formatDate = (dateString: string | null): string => {
   if (!dateString) return "-";
   try {

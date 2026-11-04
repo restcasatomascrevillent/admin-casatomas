@@ -137,6 +137,11 @@ verify_jwt = true
 [functions.procesar-factura]
 verify_jwt = true
 
+# Importación histórica de facturas ya extraídas (Facturas › Importación
+# histórica). JWT de usuario + permiso de edición en facturas + rol admin.
+[functions.importar-factura-historica]
+verify_jwt = true
+
 # Proxy de OpenAI (antes Lovable/Gemini). La autenticación REAL la hace la
 # propia función (usuario autenticado + has_section_permission 'espacios'),
 # mismo patrón que procesar-factura.

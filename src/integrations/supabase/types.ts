@@ -1697,7 +1697,9 @@ export type Database = {
           facturado_origen: string | null
           fecha: string
           id: number
+          import_clave: string | null
           iva: number | null
+          local: string | null
           numero_documento: string
           observaciones: string | null
           ocr_trabajo_id: string | null
@@ -1727,7 +1729,9 @@ export type Database = {
           facturado_origen?: string | null
           fecha: string
           id?: number
+          import_clave?: string | null
           iva?: number | null
+          local?: string | null
           numero_documento: string
           observaciones?: string | null
           ocr_trabajo_id?: string | null
@@ -1757,7 +1761,9 @@ export type Database = {
           facturado_origen?: string | null
           fecha?: string
           id?: number
+          import_clave?: string | null
           iva?: number | null
+          local?: string | null
           numero_documento?: string
           observaciones?: string | null
           ocr_trabajo_id?: string | null
@@ -3531,9 +3537,12 @@ export type Database = {
           contenido_origen: string | null
           contenido_unidad: string | null
           created_at: string | null
+          descuento_pct: number | null
           embedding: string | null
           factura_id: number
           id: number
+          importe_bruto: number | null
+          importe_bruto_estimado: boolean
           iva_pct: number | null
           nombre: string
           nombre_normalizado: string | null
@@ -3552,9 +3561,12 @@ export type Database = {
           contenido_origen?: string | null
           contenido_unidad?: string | null
           created_at?: string | null
+          descuento_pct?: number | null
           embedding?: string | null
           factura_id: number
           id?: number
+          importe_bruto?: number | null
+          importe_bruto_estimado?: boolean
           iva_pct?: number | null
           nombre: string
           nombre_normalizado?: string | null
@@ -3573,9 +3585,12 @@ export type Database = {
           contenido_origen?: string | null
           contenido_unidad?: string | null
           created_at?: string | null
+          descuento_pct?: number | null
           embedding?: string | null
           factura_id?: number
           id?: number
+          importe_bruto?: number | null
+          importe_bruto_estimado?: boolean
           iva_pct?: number | null
           nombre?: string
           nombre_normalizado?: string | null
