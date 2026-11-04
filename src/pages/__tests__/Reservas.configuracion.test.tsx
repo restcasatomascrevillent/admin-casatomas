@@ -5,13 +5,18 @@
  * Configuración tiene ahora dos subpestañas en chips (como Cheques › Configuración): «General» (lo de
  * siempre: reglas, mesas y turnos) y «Plantillas email». Se llega directo a la segunda con
  * `?tab=configuracion&sub=plantillas`, que es adonde redirige la ruta vieja /super-admin/plantillas-email.
- * Quién puede editar las plantillas lo prueba EditorPlantillasEmail.permisos.test.tsx.
+ *
+ * Y desde el mismo día («que haya un permiso para esa pestaña configurable tal y como se hace en gestor
+ * web»), la pestaña se ve con «Ver» en la sección «Reservas · Configuración» (`reservas_configuracion`),
+ * no por ser admin. Lo que se puede editar dentro lo prueban EditorPlantillasEmail.permisos.test.tsx y
+ * ConfiguracionTurnos.permisos.test.tsx.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 
-const h = vi.hoisted(() => ({ rol: "admin" as string | null }));
+/** Permisos del usuario, como «sección:tipo» (p. ej. «reservas_configuracion:view»). */
+const h = vi.hoisted(() => ({ permisos: new Set<string>() }));
 
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -33,8 +38,12 @@ vi.mock("@/components/reservas/PanelAsignacion", () => ({ PanelAsignacion: () =>
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
 vi.mock("@/hooks/useSolicitudesPendientes", () => ({ useSolicitudesPendientes: () => ({ solicitudes: [] }) }));
 vi.mock("@/hooks/useUserRole", () => ({
-  useUserRole: () => ({ role: h.rol }),
-  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+  // Ser admin ya no cuenta para Configuración: aunque el rol sea admin, solo manda el permiso.
+  useUserRole: () => ({ role: "admin", isAdmin: true, permissions: [], loading: false }),
+  useCanAccessSection: (seccion: string, tipo: string = "view") => ({
+    canAccess: h.permisos.has(`${seccion}:${tipo}`),
+    loading: false,
+  }),
 }));
 
 import Reservas from "@/pages/Reservas";
@@ -63,7 +72,7 @@ function pulsar(nombre: string | RegExp) {
 const chip = (nombre: string) => screen.getByRole("tab", { name: nombre });
 
 beforeEach(() => {
-  h.rol = "admin";
+  h.permisos = new Set(["reservas:view", "reservas:edit", "reservas_configuracion:view"]);
 });
 
 describe("Reservas › Configuración · subpestañas", () => {
@@ -124,18 +133,36 @@ describe("Reservas › Configuración · subpestañas", () => {
   });
 });
 
-describe("Reservas › Configuración · solo para admin (como hasta ahora)", () => {
-  it("sin ser admin no hay pestaña Configuración, ni chips, ni plantillas", () => {
-    h.rol = "manager";
+describe("Reservas › Configuración · permiso propio «Reservas · Configuración»", () => {
+  it("con «Ver» en la sección se ve la pestaña con sus dos chips, aunque no se pueda editar", () => {
+    h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
+    montar("/reservas?tab=configuracion");
+
+    expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
+    expect(chip("General")).toBeInTheDocument();
+    expect(chip("Plantillas email")).toBeInTheDocument();
+  });
+
+  it("sin el permiso no hay pestaña Configuración, ni chips, ni plantillas: ni siendo admin ni editando Reservas", () => {
+    h.permisos = new Set(["reservas:view", "reservas:edit"]);
     montar();
 
     expect(screen.queryByRole("tab", { name: "Configuración" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("chips-subnivel")).not.toBeInTheDocument();
     expect(screen.queryByTestId("editor-plantillas")).not.toBeInTheDocument();
+    // El resto de Reservas sigue igual.
+    expect(screen.getByRole("tab", { name: "Blacklist" })).toBeInTheDocument();
   });
 
-  it("si llega por el enlace de las plantillas sin ser admin, cae en «Hoy» en vez de en una pestaña vacía", () => {
-    h.rol = "manager";
+  it("«Puede editar» sin «Ver» no basta para ver la pestaña (la regla de siempre: editar implica ver)", () => {
+    h.permisos = new Set(["reservas:view", "reservas_configuracion:edit"]);
+    montar();
+
+    expect(screen.queryByRole("tab", { name: "Configuración" })).not.toBeInTheDocument();
+  });
+
+  it("si llega por el enlace de las plantillas sin el permiso, cae en «Hoy» en vez de en una pestaña vacía", () => {
+    h.permisos = new Set(["reservas:view"]);
     montar("/reservas?tab=configuracion&sub=plantillas");
 
     expect(screen.getByRole("tab", { name: "Hoy" })).toHaveAttribute("aria-selected", "true");

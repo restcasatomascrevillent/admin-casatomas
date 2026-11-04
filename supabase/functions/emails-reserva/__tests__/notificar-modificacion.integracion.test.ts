@@ -299,6 +299,15 @@ describe("cuándo NO sale", () => {
     expect(db.tabla("notificaciones_dashboard")[0]).toMatchObject({ tipo: "email_fallido", prioridad: "alta" });
   });
 
+  it("con «Puede editar» en Reservas basta (no hace falta el de Configuración): es una acción sobre la reserva", async () => {
+    reserva();
+    estadoPrueba().seccionesPedidas.length = 0;
+    const r = await llamar("notificar-modificacion", { reserva_id: "res-1", antes: ANTES }, { Authorization: "Bearer solo_reservas" });
+    expect(r).toEqual(ENVIADO);
+    expect(estadoPrueba().seccionesPedidas).toEqual(["reservas"]);
+    expect(resend).toHaveLength(1);
+  });
+
   it("sin sesión de usuario: 401; sin permiso de escritura en reservas: 403", async () => {
     reserva();
     const cuerpo = { reserva_id: "res-1", antes: ANTES };
@@ -403,6 +412,17 @@ describe("despliegue en otro orden: falla cerrado", () => {
 });
 
 describe("envío de prueba desde el editor", () => {
+  it("pide «Puede editar» en «Reservas · Configuración» (04/11/2026): con el de Reservas solo, 403 y no sale nada", async () => {
+    estadoPrueba().pruebas.length = 0;
+    estadoPrueba().seccionesPedidas.length = 0;
+    const cuerpo = { tipo: "reserva_modificada", destinatario: "x@y.z", plantilla: PLANTILLA_MODIFICADA };
+    const r = await llamar("enviar-prueba", cuerpo, { Authorization: "Bearer solo_reservas" });
+    expect(r.status).toBe(403);
+    expect(r.cuerpo).toEqual({ ok: false, error: "no_autorizado" });
+    expect(estadoPrueba().seccionesPedidas).toEqual(["reservas_configuracion"]);
+    expect(estadoPrueba().pruebas).toHaveLength(0);
+  });
+
   it("la prueba de «Reserva modificada» enseña el bloque de cambios y botones de relleno, nunca un token", async () => {
     const r = await llamar("enviar-prueba", { tipo: "reserva_modificada", destinatario: "x@y.z", plantilla: PLANTILLA_MODIFICADA });
     expect(r.cuerpo).toEqual({ ok: true });

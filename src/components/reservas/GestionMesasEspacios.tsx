@@ -98,6 +98,7 @@ import { cn } from "@/lib/utils";
 import { useMesas, useActualizarMesa, type Mesa } from "@/hooks/useMesas";
 import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   calcularCuadres,
   calcularCuadreTotal,
@@ -162,9 +163,11 @@ interface FilaMesaProps {
    * dos criterios se irían separando.
    */
   mesasDelEspacio: Mesa[];
+  /** Sin permiso (ver `GestionMesasEspacios`) el número se ve pero no sale el lápiz para cambiarlo. */
+  puedeRenombrar: boolean;
 }
 
-function FilaMesa({ mesa, mesasDelEspacio }: FilaMesaProps) {
+function FilaMesa({ mesa, mesasDelEspacio, puedeRenombrar }: FilaMesaProps) {
   const actualizarMesa = useActualizarMesa();
   const [editando, setEditando] = useState(false);
   const [valor, setValor] = useState("");
@@ -312,7 +315,7 @@ function FilaMesa({ mesa, mesasDelEspacio }: FilaMesaProps) {
                 Sin usar
               </Badge>
             )}
-            {!esUnida && (
+            {!esUnida && puedeRenombrar && (
               <Button
                 type="button"
                 variant="ghost"
@@ -357,6 +360,7 @@ interface BloqueEspacioProps {
   cuadre: CuadreEspacio;
   mesas: Mesa[];
   puedeAbrirPlano: boolean;
+  puedeRenombrar: boolean;
   onAbrirPlano: () => void;
 }
 
@@ -383,7 +387,7 @@ function AvisoCuadre({ cuadre }: { cuadre: CuadreEspacio }) {
   );
 }
 
-function BloqueEspacio({ cuadre, mesas, puedeAbrirPlano, onAbrirPlano }: BloqueEspacioProps) {
+function BloqueEspacio({ cuadre, mesas, puedeAbrirPlano, puedeRenombrar, onAbrirPlano }: BloqueEspacioProps) {
   return (
     <div className="rounded-lg border p-3 space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -427,7 +431,7 @@ function BloqueEspacio({ cuadre, mesas, puedeAbrirPlano, onAbrirPlano }: BloqueE
         <>
           <ul className="divide-y rounded-md border">
             {mesas.map((mesa) => (
-              <FilaMesa key={mesa.id} mesa={mesa} mesasDelEspacio={mesas} />
+              <FilaMesa key={mesa.id} mesa={mesa} mesasDelEspacio={mesas} puedeRenombrar={puedeRenombrar} />
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
@@ -508,6 +512,12 @@ export function GestionMesasEspacios() {
   // y el encargo del dueño es justo que pueda arreglar el número desde aquí sin
   // pasar por Super Admin. Crear y borrar mesas sí sigue siendo solo del plano.
   const { isSuperAdmin, loading: cargandoPermiso } = useSuperAdmin();
+  // Cambiar el número de una mesa (04/11/2026): «Puede editar» en «Reservas · Configuración» (la pestaña)
+  // y también en «Reservas», porque `mesas` la comparten las vistas del servicio (unir mesas, plano) y su
+  // RLS sigue siendo la de la sección «reservas». Sin los dos, el número se ve pero no se toca.
+  const { canAccess: editaConfiguracion } = useCanAccessSection("reservas_configuracion", "edit");
+  const { canAccess: editaReservas } = useCanAccessSection("reservas", "edit");
+  const puedeRenombrar = editaConfiguracion && editaReservas;
 
   // Solo las salas de Casa Tomás (activas o no): las de Touza no se enseñan.
   const espacios = useMemo(
@@ -568,6 +578,7 @@ export function GestionMesasEspacios() {
                   cuadre={cuadre}
                   mesas={mesasDeEspacio(cuadre.espacioId)}
                   puedeAbrirPlano={!cargandoPermiso && isSuperAdmin}
+                  puedeRenombrar={puedeRenombrar}
                   onAbrirPlano={() => abrirPlano(cuadre.espacioId)}
                 />
               ))}

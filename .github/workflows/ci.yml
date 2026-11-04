@@ -72,6 +72,8 @@ jobs:
         run: npm run test:recorte-servidor:db
       - name: Vinos, un interruptor por carta y sin publicar sin origen (PGlite)
         run: npm run test:vinos-publicacion:db
+      - name: Permiso propio de Reservas › Configuración (PGlite)
+        run: npm run test:reservas-configuracion:db
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
         run: npx vitest run api/
         env:

@@ -21,7 +21,7 @@ import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
 import { EditorPlantillasEmail } from "@/components/emails/EditorPlantillasEmail";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useCanAccessSection, useUserRole } from "@/hooks/useUserRole";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import {
   resolverDeepLinkReservas,
@@ -90,8 +90,10 @@ export default function Reservas() {
   const [subConfiguracion, setSubConfiguracion] = useState<SubpestanaConfiguracion>("general");
 
   const { data: espacios } = useEspaciosReserva();
-  const { role } = useUserRole();
-  const isAdmin = role === "admin";
+  // «Configuración» tiene permiso propio, «Reservas · Configuración» (04/11/2026, como las pestañas del
+  // Gestor Web): con «Ver» se entra y con «Puede editar» se cambia (cada parte lo comprueba). El super
+  // admin, siempre; ser admin ya no basta por sí solo (hasta ahora era `role === "admin"`).
+  const { canAccess: puedeVerConfiguracion } = useCanAccessSection("reservas_configuracion");
   // Editar una reserva: cada vista de reservas (Lista, Kanban de Hoy, Asignación,
   // plano, modo servicio…) lleva su propio diálogo de edición.
   const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
@@ -161,9 +163,9 @@ export default function Reservas() {
     if (searchParams.toString()) setSearchParams({});
   };
 
-  // «Configuración» solo existe para los admin: quien llegue sin serlo por un enlace
-  // (`?tab=configuracion`) cae en «Hoy» en vez de en una pestaña vacía.
-  const pestanaVisible = activeTab === "configuracion" && !isAdmin ? "hoy" : activeTab;
+  // Sin permiso de «Configuración», quien llegue por un enlace (`?tab=configuracion`) cae en «Hoy» en
+  // vez de en una pestaña vacía.
+  const pestanaVisible = activeTab === "configuracion" && !puedeVerConfiguracion ? "hoy" : activeTab;
 
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
@@ -287,7 +289,7 @@ export default function Reservas() {
             { valor: "calendario", etiqueta: "Calendario" },
             { valor: "asignacion", etiqueta: "Próximas reservas" },
             { valor: "blacklist", etiqueta: "Blacklist" },
-            ...(isAdmin ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
+            ...(puedeVerConfiguracion ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
           ]}
           acciones={
             /* Crear una reserva exige permiso de EDICIÓN en «reservas», como el resto de acciones
@@ -379,11 +381,11 @@ export default function Reservas() {
           </RegionPestanaLarga>
         </TabsContent>
 
-        {isAdmin && (
+        {puedeVerConfiguracion && (
           <TabsContent value="configuracion" className="mt-4">
             {/* Subpestañas en chips, como Cheques › Configuración. «Plantillas email» llegó del Super Admin
-                el 04/11/2026 (petición del dueño): ver y editar sigue el permiso de la sección «reservas»,
-                igual que la RLS de `plantillas_email_reserva` (EditorPlantillasEmail). Sin
+                el 04/11/2026 (petición del dueño). Las dos se rigen por «Reservas · Configuración», igual que
+                su RLS (20261104111000): con «Ver» se consultan y con «Puede editar» se cambian. Sin
                 `RegionPestanaLarga` en las plantillas: su editor ya mide el alto que le queda y hace
                 scroll por dentro, y envolverlo daría un doble scroll. */}
             <Tabs value={subConfiguracion} onValueChange={cambiarSubConfiguracion} className="space-y-4">

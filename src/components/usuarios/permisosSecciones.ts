@@ -43,13 +43,15 @@ export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
 
 /**
  * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,
- * Cheques y Tienda miran el permiso de edición (`useCanAccessSection(…, "edit")`);
- * en el resto basta con «Ver». Si una sección empieza a exigir edición, cambiar su
- * texto aquí. Se muestra detrás de «Editar: ».
+ * Reservas · Configuración, Cheques y Tienda miran el permiso de edición
+ * (`useCanAccessSection(…, "edit")`); en el resto basta con «Ver». Si una sección empieza
+ * a exigir edición, cambiar su texto aquí. Se muestra detrás de «Editar: ».
  */
 export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   dashboard: "sin efecto aquí; las reservas del día dependen de «Reservas».",
   reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas y mover de sala.",
+  reservas_configuracion:
+    "cambiar las reglas, los turnos y las plantillas de correo de las reservas. Para entrar hace falta también «Ver» en Reservas.",
   gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   marketing: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",

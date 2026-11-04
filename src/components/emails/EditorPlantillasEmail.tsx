@@ -9,20 +9,20 @@
 // /super-admin/plantillas-email, que ahora redirige allí).
 //
 // Lo único que vive aquí (y no en PlantillaTipoEditor) es lo común a todas
-// las pestañas: el permiso de EDICIÓN de la sección 'reservas' y el email del
-// usuario logueado, que se usa como destinatario por defecto del envío de
-// prueba. Se calculan una sola vez aquí y se pasan hacia abajo, en vez de que
-// cada pestaña vuelva a pedir permisos al cambiar de tipo.
+// las pestañas: el permiso de EDICIÓN de la sección 'reservas_configuracion'
+// y el email del usuario logueado, que se usa como destinatario por defecto
+// del envío de prueba. Se calculan una sola vez aquí y se pasan hacia abajo,
+// en vez de que cada pestaña vuelva a pedir permisos al cambiar de tipo.
 //
-// El permiso es `useCanAccessSection("reservas", "edit")`: la MISMA regla que
-// `can_write_section('reservas')` del backend (super admin, o «Puede editar»
-// en Reservas), que exigen la RLS de plantillas_email_reserva,
-// fn_restaurar_version_plantilla y POST /emails-reserva/enviar-prueba (ver
-// 20260920010000_sistema_emails_reserva.sql). Ser «admin» no basta: hasta el
-// 04/11/2026 aquí se aceptaba también `isAdmin`, y a un admin sin «Puede
-// editar» en Reservas le ofrecía guardar cambios que la base de datos
-// rechazaba. Leerlas basta con «Ver» Reservas (la misma RLS), que es lo que
-// ya exige entrar en /reservas.
+// El permiso es `useCanAccessSection("reservas_configuracion", "edit")`: la
+// MISMA regla que `can_write_section('reservas_configuracion')` del backend
+// (super admin, o «Puede editar» en «Reservas · Configuración»), que exigen la
+// RLS de plantillas_email_reserva, fn_restaurar_version_plantilla y POST
+// /emails-reserva/enviar-prueba (migración 20261104111000). Ser «admin» no
+// basta: hasta el 04/11/2026 aquí se aceptaba también `isAdmin`, y a un admin
+// sin permiso de edición le ofrecía guardar cambios que la base de datos
+// rechazaba. Leerlas pide «Ver» en esa sección, que es lo que ya exige ver la
+// pestaña Configuración.
 // ============================================================================
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
@@ -39,7 +39,7 @@ const AYUDA = `Asunto, saludo, cuerpo, botones, pie y colores de los ${TIPOS_PLA
 
 export function EditorPlantillasEmail() {
   const { user } = useAuth();
-  const { canAccess: puedeEditar, loading } = useCanAccessSection("reservas", "edit");
+  const { canAccess: puedeEditar, loading } = useCanAccessSection("reservas_configuracion", "edit");
 
   if (loading) {
     return <div className="p-4 text-sm text-muted-foreground">Comprobando permisos...</div>;
@@ -58,8 +58,8 @@ export function EditorPlantillasEmail() {
           <Lock className="h-4 w-4" />
           <AlertTitle>Solo lectura</AlertTitle>
           <AlertDescription>
-            Puedes ver las plantillas de correo, pero tu usuario no tiene permiso de edición en Reservas: esta
-            pantalla no te ofrece guardar cambios, restaurar versiones ni enviar pruebas.
+            Puedes ver las plantillas de correo, pero tu usuario no tiene «Puede editar» en «Reservas ·
+            Configuración»: esta pantalla no te ofrece guardar cambios, restaurar versiones ni enviar pruebas.
           </AlertDescription>
         </Alert>
       )}

@@ -82,8 +82,12 @@
 // con la sesión del usuario del panel, no un cron ni un servicio interno, así
 // que NO comprueba `x-webhook-secret` — comprueba el JWT de usuario a mano
 // (autenticarUsuarioPanel, mismo patrón que procesar-factura/index.ts) más
-// `can_write_section('reservas')` (misma comprobación que ya hace
-// fn_restaurar_version_plantilla en la migración pendiente). Ir a
+// `can_write_section('reservas_configuracion')` (desde el 04/11/2026: las
+// plantillas son de Reservas › Configuración; la misma comprobación que hace
+// fn_restaurar_version_plantilla, migración 20261104111000). Las otras dos
+// rutas con sesión de usuario (/notificar-modificacion y
+// /enviar-propuesta-solicitud) siguen pidiendo `can_write_section('reservas')`:
+// son acciones sobre una reserva, no configuración. Ir a
 // verify_jwt=true a nivel de función NO serviría como autenticación aquí
 // igualmente (la anon key es un JWT válido y viaja en el bundle público del
 // panel — colaría en cualquier gateway que solo mire "¿hay un JWT?"), y
@@ -1374,8 +1378,9 @@ interface AutenticacionPanelFallo {
 /**
  * Usuario real (no la anon key suelta) + permiso de sección — mismo patrón
  * que procesar-factura/index.ts:autenticar, adaptado a la comprobación que
- * pide el contrato de este endpoint (can_write_section('reservas'), igual
- * que fn_restaurar_version_plantilla). Se llama con el propio cliente
+ * pide cada endpoint: can_write_section(`seccion`), 'reservas' por defecto
+ * (acciones sobre una reserva) y 'reservas_configuracion' en /enviar-prueba
+ * (las plantillas, igual que fn_restaurar_version_plantilla). Se llama con el propio cliente
  * `supabaseUser` (scoped a la cabecera Authorization de la petición) en vez
  * de con la service role + _user_id explícito: can_write_section() no acepta
  * _user_id, resuelve auth.uid() del JWT de la llamada — igual que cuando el
@@ -1383,7 +1388,10 @@ interface AutenticacionPanelFallo {
  * usePlantillasEmail.ts), solo que aquí la invoca el edge function de parte
  * del usuario.
  */
-async function autenticarUsuarioPanel(req: Request): Promise<AutenticacionPanelOk | AutenticacionPanelFallo> {
+async function autenticarUsuarioPanel(
+  req: Request,
+  seccion: "reservas" | "reservas_configuracion" = "reservas",
+): Promise<AutenticacionPanelOk | AutenticacionPanelFallo> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     console.error("[emails-reserva] enviar-prueba: sin cabecera Authorization");
@@ -1402,13 +1410,13 @@ async function autenticarUsuarioPanel(req: Request): Promise<AutenticacionPanelO
     return { status: "error", response: json({ ok: false, error: "no_autorizado" }, 401) };
   }
 
-  const { data: permitido, error: permError } = await supabaseUser.rpc("can_write_section", { _section: "reservas" });
+  const { data: permitido, error: permError } = await supabaseUser.rpc("can_write_section", { _section: seccion });
   if (permError) {
     console.error("[emails-reserva] enviar-prueba: error comprobando permiso:", permError.message);
     return { status: "error", response: json({ ok: false, error: "error_permisos" }, 500) };
   }
   if (!permitido) {
-    console.error("[emails-reserva] enviar-prueba: usuario sin permiso sobre reservas:", user.id);
+    console.error(`[emails-reserva] usuario sin permiso de escritura en ${seccion}:`, user.id);
     return { status: "error", response: json({ ok: false, error: "no_autorizado" }, 403) };
   }
 
@@ -1460,7 +1468,8 @@ async function comprobarLimite(identificador: string, limite: number, ventanaMs:
 }
 
 async function handleEnviarPrueba(req: Request): Promise<Response> {
-  const auth = await autenticarUsuarioPanel(req);
+  // Las plantillas son de Reservas › Configuración (04/11/2026).
+  const auth = await autenticarUsuarioPanel(req, "reservas_configuracion");
   if (auth.status === "error") return auth.response;
 
   const dentroDelLimite = await comprobarLimitePrueba(auth.userId);

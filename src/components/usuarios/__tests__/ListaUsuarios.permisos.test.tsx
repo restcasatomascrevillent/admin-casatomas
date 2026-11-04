@@ -280,6 +280,32 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
     ).toHaveAccessibleDescription(/llegadas/i);
   });
 
+  // 04/11/2026 (petición del dueño): la pestaña Configuración de Reservas tiene su propia sección, como las
+  // pestañas del Gestor Web. Sale en la tabla, justo debajo de Reservas, con «Ver» y «Puede editar».
+  it("«Reservas · Configuración» tiene su fila con «Ver» y «Puede editar», y se concede como cualquier sección", async () => {
+    const dialogo = await abrirPermisosDelCamarero();
+
+    const filas = within(dialogo).getAllByRole("row").map((f) => f.textContent ?? "");
+    const reservas = filas.findIndex((t) => t.startsWith("ReservasEditar"));
+    expect(filas[reservas + 1]).toMatch(/^Reservas · Configuración/);
+    expect(interruptor(dialogo, "Ver Reservas · Configuración")).not.toBeChecked();
+    expect(interruptor(dialogo, "Puede editar Reservas · Configuración")).toBeDisabled();
+    expect(interruptor(dialogo, "Puede editar Reservas · Configuración")).toHaveAccessibleDescription(/plantillas de correo/);
+
+    fireEvent.click(interruptor(dialogo, "Ver Reservas · Configuración"));
+    fireEvent.click(interruptor(dialogo, "Puede editar Reservas · Configuración"));
+    const permiso = await guardar(dialogo);
+
+    expect(permiso("reservas_configuracion")).toEqual({
+      user_id: CAMARERO,
+      section_key: "reservas_configuracion",
+      can_view: true,
+      can_edit: true,
+    });
+    // Reservas sigue como estaba: son permisos independientes.
+    expect(permiso("reservas")).toMatchObject({ can_view: true, can_edit: true });
+  });
+
   it("guardar sin tocar nada no pierde la edición", async () => {
     const dialogo = await abrirPermisosDelCamarero();
 

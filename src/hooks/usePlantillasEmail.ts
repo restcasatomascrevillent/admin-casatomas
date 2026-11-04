@@ -2,16 +2,13 @@
 // usePlantillasEmail — acceso a `plantillas_email_reserva`
 // ============================================================================
 // Contrato de la tabla: supabase/migrations/20260920010000_sistema_emails_
-// reserva.sql (NO aplicada todavía — ver informe final del editor). Esquema
-// y reglas de negocio: supabase/functions/emails-reserva/plantillas.ts
+// reserva.sql; permisos (sección «reservas_configuracion»): 20261104111000.
+// Esquema y reglas de negocio: supabase/functions/emails-reserva/plantillas.ts
 // (cabecera).
 //
-// La tabla todavía no existe en la BD real (migración pendiente de aplicar),
-// así que — igual que useConfiguracionReservas.ts con `configuracion_reservas`
-// antes de que sus tipos estuvieran generados — se usa `.from(TABLA as any)`
-// y se castea el resultado a mano. En cuanto se aplique la migración y se
-// regeneren los tipos (`generate_typescript_types`), estos `as any` se pueden
-// quitar sin tocar el resto del fichero.
+// La tabla no está en los tipos generados (types.ts), así que se usa el
+// cliente sin tipar (`db`, abajo) y se castea el resultado a mano. Si algún
+// día se regeneran los tipos con ella, basta con volver a `supabase`.
 //
 // Versionado (append-only, ver migración): guardar SIEMPRE crea una fila
 // nueva, nunca reescribe una versión ya guardada. "Restaurar" reutiliza la
@@ -20,6 +17,7 @@
 // ============================================================================
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./useAuth";
@@ -83,6 +81,12 @@ export type CamposEditablesPlantilla = Pick<
 
 const TABLA = "plantillas_email_reserva";
 
+/**
+ * La tabla y la función de restaurar no están en los tipos generados (types.ts): se usa el cliente sin
+ * tipar, como PlantillaChequeRegalo, en vez de `as any` en cada llamada. Las filas se castean abajo.
+ */
+const db = supabase as unknown as SupabaseClient;
+
 function claveConsulta(tipo: TipoPlantilla) {
   return ["plantillas-email", tipo] as const;
 }
@@ -117,8 +121,8 @@ export function useVersionesPlantilla(tipo: TipoPlantilla) {
   return useQuery({
     queryKey: claveConsulta(tipo),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from(TABLA as any)
+      const { data, error } = await db
+        .from(TABLA)
         .select("*")
         .eq("tipo", tipo)
         .order("version", { ascending: false });
@@ -163,8 +167,8 @@ export function useGuardarPlantilla(tipo: TipoPlantilla) {
     mutationFn: async ({ campos, notaVersion, versionBase }: GuardarPlantillaInput) => {
       const nuevaVersionNumero = versionBase + 1;
 
-      const { data: nueva, error: errInsert } = await supabase
-        .from(TABLA as any)
+      const { data: nueva, error: errInsert } = await db
+        .from(TABLA)
         .insert({
           tipo,
           version: nuevaVersionNumero,
@@ -189,8 +193,8 @@ export function useGuardarPlantilla(tipo: TipoPlantilla) {
       }
       const nuevaFila = nueva as unknown as PlantillaEmailVersion;
 
-      const { error: errDesactivar } = await supabase
-        .from(TABLA as any)
+      const { error: errDesactivar } = await db
+        .from(TABLA)
         .update({ es_actual: false })
         .eq("tipo", tipo)
         .eq("es_actual", true);
@@ -203,8 +207,8 @@ export function useGuardarPlantilla(tipo: TipoPlantilla) {
         );
       }
 
-      const { data: activada, error: errActivar } = await supabase
-        .from(TABLA as any)
+      const { data: activada, error: errActivar } = await db
+        .from(TABLA)
         .update({ es_actual: true })
         .eq("id", nuevaFila.id)
         .select("*")
@@ -213,7 +217,7 @@ export function useGuardarPlantilla(tipo: TipoPlantilla) {
       if (errActivar || !activada) {
         // Compensación: restaurar la anterior para no dejar el tipo sin
         // plantilla activa (un correo real de este tipo debe poder salir).
-        await supabase.from(TABLA as any).update({ es_actual: true }).eq("tipo", tipo).eq("version", versionBase);
+        await db.from(TABLA).update({ es_actual: true }).eq("tipo", tipo).eq("version", versionBase);
         throw new Error("No se pudo activar la nueva versión; se ha restaurado la anterior. Vuelve a intentarlo.");
       }
 
@@ -235,7 +239,7 @@ export function useRestaurarVersionPlantilla(tipo: TipoPlantilla) {
 
   return useMutation({
     mutationFn: async (versionARestaurar: number) => {
-      const { data, error } = await supabase.rpc("fn_restaurar_version_plantilla" as any, {
+      const { data, error } = await db.rpc("fn_restaurar_version_plantilla", {
         p_tipo: tipo,
         p_version_a_restaurar: versionARestaurar,
       });
@@ -265,8 +269,9 @@ export function useRestaurarVersionPlantilla(tipo: TipoPlantilla) {
 //   POST /functions/v1/emails-reserva/enviar-prueba
 //   Auth: header Authorization con la sesión del usuario del panel (la pone
 //         sola supabase.functions.invoke). El backend debe validar ese JWT y
-//         exigir can_write_section('reservas') para ese usuario — igual
-//         chequeo que ya hace fn_restaurar_version_plantilla. Esta ruta NO
+//         exigir can_write_section('reservas_configuracion') para ese usuario
+//         (desde el 04/11/2026; antes 'reservas') — igual chequeo que ya hace
+//         fn_restaurar_version_plantilla. Esta ruta NO
 //         debe ir protegida por x-webhook-secret: no es un cron ni un
 //         servicio interno, la llama el navegador con sesión de usuario.
 //   Body: {

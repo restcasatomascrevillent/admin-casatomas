@@ -31,7 +31,14 @@ const de = (permisos: PermisoSeccion[], clave: string) => permisos.find((p) => p
 describe("SECCIONES_CONFIGURABLES", () => {
   it("son las secciones del panel salvo «usuarios» (que va por rol admin, no por permisos)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
-    expect(claves).toEqual(["dashboard", "reservas", "gestor_carta", "gestion_web", "marketing", "cheques", "tienda", "facturas"]);
+    expect(claves).toEqual([
+      "dashboard", "reservas", "reservas_configuracion", "gestor_carta", "gestion_web", "marketing", "cheques", "tienda", "facturas",
+    ]);
+  });
+
+  it("«Reservas · Configuración» va justo después de Reservas, como las pestañas del Gestor Web (04/11/2026)", () => {
+    const seccion = SECCIONES_CONFIGURABLES.find((s) => s.key === "reservas_configuracion");
+    expect(seccion?.label).toBe("Reservas · Configuración");
   });
 });
 
@@ -41,6 +48,13 @@ describe("AYUDA_EDICION", () => {
       expect(AYUDA_EDICION[seccion.key], seccion.key).toEqual(expect.any(String));
       expect(AYUDA_EDICION[seccion.key].length, seccion.key).toBeGreaterThan(10);
     }
+  });
+
+  it("en Reservas · Configuración dice qué se edita (reglas, turnos, plantillas) y que hace falta ver Reservas", () => {
+    expect(AYUDA_EDICION.reservas_configuracion).toMatch(/reglas/);
+    expect(AYUDA_EDICION.reservas_configuracion).toMatch(/turnos/);
+    expect(AYUDA_EDICION.reservas_configuracion).toMatch(/plantillas de correo/);
+    expect(AYUDA_EDICION.reservas_configuracion).toMatch(/«Ver» en Reservas/);
   });
 
   it("en Reservas explica lo que de verdad desbloquea: crear/modificar, llegadas y mover de sala", () => {

@@ -245,19 +245,23 @@ export interface EstadoPrueba {
   db: BaseFalsa;
   handler: ((req: Request) => Promise<Response>) | null;
   pruebas: Array<{ to: string[]; subject: string; html: string }>;
+  /** Sección de cada `can_write_section` que ha pedido la función (en orden). */
+  seccionesPedidas: string[];
 }
 
 export function estadoPrueba(): EstadoPrueba {
   const g = globalThis as unknown as Record<string, EstadoPrueba | undefined>;
-  return (g.__emailsReservaPrueba ??= { db: new BaseFalsa(), handler: null, pruebas: [] });
+  return (g.__emailsReservaPrueba ??= { db: new BaseFalsa(), handler: null, pruebas: [], seccionesPedidas: [] });
 }
 
 /** `createClient(url, key, opciones)`: con Authorization de usuario, el cliente
- * de ese usuario (auth + can_write_section); si no, el de la service role. */
+ * de ese usuario (auth + can_write_section); si no, el de la service role.
+ * Usuarios: «valido» escribe en todas las secciones, «solo_reservas» solo en
+ * 'reservas' (no en 'reservas_configuracion') y «sinpermiso» en ninguna. */
 export function crearClienteFalso(_url: string, _key: string, opciones?: { global?: { headers?: Record<string, string> } }) {
   const authHeader = opciones?.global?.headers?.Authorization;
   if (authHeader) {
-    const conUsuario = authHeader === "Bearer valido" || authHeader === "Bearer sinpermiso";
+    const conUsuario = ["Bearer valido", "Bearer sinpermiso", "Bearer solo_reservas"].includes(authHeader);
     return {
       auth: {
         getUser: async () =>
@@ -265,8 +269,13 @@ export function crearClienteFalso(_url: string, _key: string, opciones?: { globa
             ? { data: { user: { id: "usuario-1", email: "personal@correo.test" } }, error: null }
             : { data: { user: null }, error: { message: "invalid JWT" } },
       },
-      rpc: async (fn: string) =>
-        fn === "can_write_section" ? { data: authHeader === "Bearer valido", error: null } : { data: null, error: { message: fn } },
+      rpc: async (fn: string, args?: { _section?: string }) => {
+        if (fn !== "can_write_section") return { data: null, error: { message: fn } };
+        const seccion = args?._section ?? "";
+        estadoPrueba().seccionesPedidas.push(seccion);
+        const permitido = authHeader === "Bearer valido" || (authHeader === "Bearer solo_reservas" && seccion === "reservas");
+        return { data: permitido, error: null };
+      },
     };
   }
   return {
@@ -275,7 +284,7 @@ export function crearClienteFalso(_url: string, _key: string, opciones?: { globa
     // este cliente de servicio y registra la acción con un rpc.
     auth: {
       getUser: async (token: string) =>
-        token === "valido" || token === "sinpermiso"
+        ["valido", "sinpermiso", "solo_reservas"].includes(token)
           ? { data: { user: { id: "usuario-1", email: "personal@correo.test" } }, error: null }
           : { data: { user: null }, error: { message: "invalid JWT" } },
     },
