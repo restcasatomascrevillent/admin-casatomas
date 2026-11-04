@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { AvisoTrabajosRecorte } from "../potente/AvisoTrabajosRecorte";
-import { diag, diagActivo, memoriaDiag, navegadorDiag } from "./diagnostico";
 
 /**
  * Recortes de fotos fuera de los formularios:
@@ -21,9 +20,13 @@ export function GestorRecortes() {
   const { canAccess } = useCanAccessSection("gestor_carta");
   const [ordenador, setOrdenador] = useState(false);
 
-  // ?diag=recorte: se activa (y se recuerda en la pestaña) al abrir el panel.
+  // Limpieza única: el antiguo «Diagnóstico recorte» (?diag=recorte) se retiró; se borra su marca.
   useEffect(() => {
-    if (diagActivo()) diag("panel abierto", { navegador: navegadorDiag(), ua: navigator.userAgent, ...memoriaDiag() });
+    try {
+      sessionStorage.removeItem("panel.diag.recorte");
+    } catch {
+      /* sin sessionStorage */
+    }
   }, []);
 
   useEffect(() => {

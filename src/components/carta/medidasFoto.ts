@@ -8,7 +8,6 @@
  * o el bitmap pueden salir vacíos sin avisar. Por eso toda foto de cámara se
  * decodifica ya a la medida que se va a usar.
  */
-import { diag } from "./recorte/diagnostico";
 
 export interface Medidas {
   ancho: number;
@@ -121,13 +120,11 @@ export async function bitmapReducido(foto: Blob, lado: number): Promise<ImageBit
   if (ancho) {
     try {
       const bmp = await createImageBitmap(foto, { imageOrientation: "from-image", resizeWidth: ancho, resizeQuality: "high" });
-      diag("foto decodificada reducida", { original: medidas, bitmap: `${bmp.width}x${bmp.height}` });
       return bmp;
-    } catch (e) {
-      diag("el navegador no reduce al decodificar", { original: medidas, mensaje: (e as Error)?.message });
+    } catch {
+      /* el navegador no reduce al decodificar: se decodifica entera abajo */
     }
   }
   const bmp = await createImageBitmap(foto, { imageOrientation: "from-image" });
-  if (medidas || bmp.width * bmp.height > 4_000_000) diag("foto decodificada entera", { original: medidas, bitmap: `${bmp.width}x${bmp.height}` });
   return bmp;
 }

@@ -22,14 +22,13 @@ import { subirFotoCarta } from "./subirFotoCarta";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import type { VinoDesdeFoto } from "./leerVinoFoto";
-import { useLecturaEtiquetaVino, valoresDesdeDatosVino, type LecturaHecha } from "./lecturaEtiquetaVino";
+import { useLecturaEtiquetaVino, valoresDesdeDatosVino } from "./lecturaEtiquetaVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
 import { PegarFotoRecortada } from "./recorte/PegarFotoRecortada";
 import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
-import { diag } from "./recorte/diagnostico";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
@@ -85,9 +84,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
   // Lectura de la etiqueta con IA al poner la foto (en paralelo al recorte,
   // que ya se hace aquí también en el móvil).
-  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)), ({ datos, fuente }: LecturaHecha) =>
-    diag("IA leyó la etiqueta", { encuadre: !!datos.recorte, mismaFoto: recorte.original === fuente }),
-  );
+  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)));
   const { cancelar: cancelarLectura, limpiar: limpiarLectura } = lectura;
 
   // Precarga desde la foto de la botella (lote «Varias botellas»). Precio vacío

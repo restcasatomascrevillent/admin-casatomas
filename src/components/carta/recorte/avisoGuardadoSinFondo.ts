@@ -5,7 +5,6 @@ import type { TablaFoto } from "./recorteMovil";
 // Import ESTÁTICO (03-11-2026): con `import()` un chunk que no carga (p. ej. tras
 // publicar otra versión) dejaba la foto sin fondo y sin ningún aviso.
 import { avisarSinRecorte, noRecortar } from "./recorteEnSegundoPlano";
-import { diag } from "./diagnostico";
 
 /** Cuánto se queda en pantalla el aviso (ms): es lo único que le dice al usuario qué hacer luego. */
 export const MS_AVISO_SIN_FONDO = 12_000;
@@ -51,7 +50,6 @@ export interface FichaGuardada {
  */
 export function trasGuardarFotoCarta(foto: Pick<FotoCarta, "estado" | "original" | "tema" | "eleccion">, ficha: FichaGuardada): void {
   const nombre = ficha.nombre?.trim() || null;
-  diag("tras guardar", { tabla: ficha.tabla, id: ficha.id, fase: foto.estado.fase, eleccion: foto.eleccion, original: foto.original ?? null, tema: foto.tema });
   try {
     if (foto.estado.fase !== "fallo") return;
     if (!foto.estado.aOrdenador) {

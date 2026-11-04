@@ -22,7 +22,6 @@ import {
 import type { ProgresoRecorte } from "./quitarFondoNavegador";
 import { quitarFondoServidor, type ProgresoServidor } from "./quitarFondoServidor";
 import { reducirFotoRecorte } from "./reducirFotoRecorte";
-import { diag, memoriaDiag } from "./diagnostico";
 
 /** Lado mayor de la foto que se recorta en el móvil (la foto de carta sale a 900×1200 o 1200×900). */
 export const LADO_RECORTE_MOVIL = 1200;
@@ -59,7 +58,6 @@ export async function quitarFondoMovil(
   const reducida = await reducirFotoRecorte(foto, LADO_RECORTE_MOVIL);
   const sinLocal = movilSinLocal();
   if (!sinLocal) {
-    diag("quitar fondo: en el móvil", { foto: reducida, ...memoriaDiag() });
     marcarRecorteEnCurso();
     const latido = setInterval(() => latirMarcaRecorte(), MS_LATIDO);
     // Al ocultarse la página el sistema congela los temporizadores: anotarlo YA.
@@ -69,12 +67,10 @@ export async function quitarFondoMovil(
     if (typeof window !== "undefined") window.addEventListener("pagehide", alSalir);
     try {
       const sticker = await (deps.local ?? localPorDefecto)(reducida, onProgreso);
-      diag("quitar fondo en el móvil: hecho", memoriaDiag());
       return { sticker, metodo: "navegador" };
     } catch (e) {
       const memoria = esFaltaDeMemoria(e);
       console.warn("[recorte-movil] no se pudo en el móvil; se prueba en el servidor", e);
-      diag("quitar fondo en el móvil: fallo → servidor", { nombre: (e as Error)?.name, mensaje: mensajeCorto(e), memoria, ...memoriaDiag() });
       if (memoria) marcarMovilSinLocal(`Sin memoria al quitar el fondo (${mensajeCorto(e, 60)})`);
     } finally {
       clearInterval(latido);
@@ -83,10 +79,7 @@ export async function quitarFondoMovil(
       quitarMarcaRecorte();
       await (deps.liberar ?? liberarPorDefecto)();
     }
-  } else {
-    diag("quitar fondo: directo al servidor", { motivo: sinLocal.motivo });
   }
   const sticker = await (deps.servidor ?? ((f: Blob, p?: (x: ProgresoMovil) => void) => quitarFondoServidor(f, { onProgreso: p })))(reducida, onProgreso);
-  diag("quitar fondo en el servidor: hecho");
   return { sticker, metodo: "servidor" };
 }

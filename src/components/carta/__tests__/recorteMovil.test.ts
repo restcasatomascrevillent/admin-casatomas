@@ -21,7 +21,6 @@ vi.mock("../recorte/quitarFondoNavegador", async (original) => {
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: mocks.invoke } } }));
 
 import { recorteNavegadorSeguro } from "../recorte/quitarFondoNavegador";
-import { navegadorDiag } from "../recorte/diagnostico";
 import { quitarFondo } from "../fotoCartaVino";
 
 const ESCRITORIO = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
@@ -89,12 +88,6 @@ describe("decisión por dispositivo: todos recortan en el formulario", () => {
     }
   });
 
-  it("el diagnóstico dice el navegador (Chrome iOS no es Safari)", () => {
-    expect(navegadorDiag(nav(IPHONE_CHROME))).toBe("Chrome iOS (iPhone iOS 18.1)");
-    expect(navegadorDiag(nav(IPHONE))).toBe("Safari (iPhone iOS 18.0)");
-    expect(navegadorDiag(nav(IPAD_COMO_MAC, { maxTouchPoints: 5 }))).toMatch(/^Safari \(iPad/);
-    expect(navegadorDiag(nav(ANDROID))).toBe("Chrome Android");
-  });
 });
 
 describe("quitarFondo (formulario)", () => {

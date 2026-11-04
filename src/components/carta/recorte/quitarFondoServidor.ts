@@ -8,7 +8,6 @@
  */
 import { supabase } from "@/integrations/supabase/client";
 import { almacenLocal, type Almacen, type CausaFallo } from "./recorteMovil";
-import { diag } from "./diagnostico";
 
 export const URL_RECORTE_SERVIDOR = "/api/recortar-foto";
 /** Si el servidor no ha contestado en este tiempo, se deja para un ordenador. */
@@ -122,7 +121,6 @@ export async function fotoParaServidor(foto: Blob): Promise<Blob> {
 /** Pide la máscara al servidor. Lanza ErrorRecorteServidor con la causa. */
 export async function pedirMascaraServidor(foto: Blob, opts: OpcionesServidor = {}): Promise<Blob> {
   const vigente = topeVigente();
-  if (vigente) diag("servidor: no se llama, tope recordado", vigente);
   if (vigente) throw new ErrorRecorteServidor(MOTIVO_TOPE[vigente], "tope", 429);
   const token = opts.token === undefined ? await tokenSesion() : opts.token;
   if (!token) throw new ErrorRecorteServidor("No hay sesión", "sesion");
@@ -133,7 +131,6 @@ export async function pedirMascaraServidor(foto: Blob, opts: OpcionesServidor = 
   // La subida de una foto de ~0,5 MB tarda poco: a partir de ahí, lo que se espera es al servidor.
   const avisoServidor = setTimeout(() => opts.onProgreso?.({ fase: "servidor" }), 1500);
   const t0 = Date.now();
-  diag("servidor: petición", { foto });
   try {
     let r: Response;
     try {
@@ -144,11 +141,9 @@ export async function pedirMascaraServidor(foto: Blob, opts: OpcionesServidor = 
         signal: control.signal,
       });
     } catch (e) {
-      diag("servidor: sin respuesta", { ms: Date.now() - t0, abortado: control.signal.aborted, mensaje: (e as Error)?.message });
       if (control.signal.aborted) throw new ErrorRecorteServidor("El servidor no ha respondido a tiempo", "tiempo");
       throw new ErrorRecorteServidor((e as Error)?.message || "Sin conexión", "red");
     }
-    diag("servidor: respuesta", { estado: r.status, ms: Date.now() - t0, tiempos: r.headers.get("server-timing"), medidas: `${r.headers.get("x-recorte-ancho")}x${r.headers.get("x-recorte-alto")}` });
     if (!r.ok) {
       let mensaje = `Respuesta ${r.status}`;
       let tope: TipoTope | null = null;

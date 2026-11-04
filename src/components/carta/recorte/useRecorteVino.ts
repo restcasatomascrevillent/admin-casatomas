@@ -7,7 +7,6 @@ import { recorteNavegadorSeguro } from "./quitarFondoNavegador";
 import type { ProgresoMovil } from "./quitarFondoMovil";
 import { motivoFallo, vaAOrdenador } from "./recorteMovil";
 import { candidataRecortada, detectarFotoRecortada, esStickerRecortado } from "./fotoYaRecortada";
-import { diag, diagActivo, navegadorDiag } from "./diagnostico";
 import { medidasFoto } from "../medidasFoto";
 
 export type { TipoFotoCarta } from "../composicionCarta";
@@ -81,7 +80,6 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
    */
   const seguirConModelo = useCallback((foto: File, yo: number, previo?: Promise<ResultadoFotoCarta>) => {
     const ordenador = recorteNavegadorSeguro();
-    diag("recorte en el formulario", { dispositivo: ordenador ? "ordenador" : "movil", lote: !!previo });
     setEstado({ fase: "trabajando", progreso: null });
     const onProgreso = (p: ProgresoMovil) => {
       if (turno.current === yo) setEstado({ fase: "trabajando", progreso: p });
@@ -94,7 +92,6 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
       },
       (e) => {
         console.warn("[recorte] se usa la foto sin fondo de carta", e);
-        diag("recorte en el formulario: fallo", { mensaje: (e as Error)?.message });
         if (turno.current !== yo) return;
         // Móvil: ya se probó en el servidor. Al guardar, la foto normal va a un ordenador.
         const aOrdenador = !ordenador && vaAOrdenador(e);
@@ -114,17 +111,13 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     setEleccion("carta");
     setVistaInterna("sticker");
     setCompuesta(null);
-    diag("foto elegida", { navegador: navegadorDiag(), foto, nombre: foto.name, tipo: foto.type || "(sin tipo)", lote: !!previo });
-    if (diagActivo()) void medidasFoto(foto).then((m) => diag("medidas de la foto (cabecera)", m ? { ...m, mpx: Math.round((m.ancho * m.alto) / 1e5) / 10 } : "no se reconocen"));
     // Foto que ya viene sin fondo (recorte del iPhone, PNG con alfa): su
     // transparencia es la máscara, sin modelo, en cualquier dispositivo.
     if (!previo && esStickerRecortado(foto)) {
-      diag("rama: foto ya recortada (sticker)");
       setEstado({ fase: "listo", r: { sticker: foto, metodo: "recortada" } });
       return;
     }
     if (!previo && candidataRecortada(foto) && typeof createImageBitmap === "function") {
-      diag("rama: mirar si trae transparencia");
       setEstado({ fase: "trabajando", progreso: null });
       void detectarFotoRecortada(foto)
         .catch((e) => {
@@ -133,7 +126,6 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
           return null;
         })
         .then((sticker) => {
-          diag("transparencia mirada", { recortada: !!sticker, vigente: turno.current === yo });
           if (turno.current !== yo) return;
           if (sticker) {
             setOriginal(sticker);

@@ -9,7 +9,6 @@
  */
 import { toast } from "sonner";
 import { ID_PESTANA, leerMarcaRecorte, marcaHuerfana, marcarMovilSinLocal, MS_MARCA_MUERTA, quitarMarcaRecorte, type DatosRecorte, type MarcaRecorte } from "./recorteMovil";
-import { diag } from "./diagnostico";
 
 const ID_TOAST = "recorte-movil";
 export const MS_AVISO_SIN_RECORTE = 12_000;
@@ -41,7 +40,6 @@ export function avisarSinRecorte(d: Pick<DatosRecorte, "nombre">, motivo: string
 
 /** La foto se queda sin fondo de carta: trabajo para un ordenador (o aviso). Nunca lanza. */
 export function noRecortar(d: DatosRecorte, motivo: string): Promise<void> {
-  diag("foto guardada sin fondo → ordenador", { tabla: d.tabla, id: d.registroId, motivo });
   return alNoRecortar(d, motivo).catch((e) => {
     console.warn("[recorte] fallo al gestionar la foto sin recortar", e);
     avisarSinRecorte(d, motivo);
@@ -69,7 +67,6 @@ export function recuperarRecorteInterrumpido(opts: { ahora?: () => number; alDet
     quitarMarcaRecorte();
     opts.alDetectar?.(m);
     const memoria = m.visible !== false;
-    diag("el panel se cerró recortando en el móvil", { visible: m.visible, memoria });
     if (!memoria) return;
     console.warn("[recorte-movil] el panel se cerró a la vista mientras recortaba (memoria): las fotos irán al servidor", m);
     marcarMovilSinLocal("El panel se cerró solo mientras quitaba el fondo (memoria)");
