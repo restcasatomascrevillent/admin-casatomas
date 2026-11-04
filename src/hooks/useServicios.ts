@@ -197,3 +197,46 @@ export function useGuardarServicio() {
     onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
   });
 }
+
+/** Falta 20261104120000 (sin permiso de alta o de borrado) o no es super admin. */
+function mensajeAltaBaja(error: { code?: string; message?: string }, accion: "añadir" | "borrar"): string {
+  const texto = error.message ?? "";
+  if (/row-level security/i.test(texto)) return `Solo un super admin puede ${accion} servicios.`;
+  if (error.code === "42501" || /permission denied/i.test(texto)) {
+    return `Para ${accion} servicios falta aplicar en Supabase la migración 20261104120000_servicios_configurables.`;
+  }
+  if (error.code === "23505" || /duplicate key/i.test(texto)) return "Ya hay un servicio con ese nombre: ponle otro.";
+  if (/check constraint/i.test(texto)) return "Algún dato no es válido (revisa los enlaces, que empiecen por https://, y los números).";
+  return texto || `No se ha podido ${accion} el servicio.`;
+}
+
+/** Configurar › «Añadir servicio» (solo super admin; 20261104120000). */
+export function useCrearServicio() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (nuevo: CambiosServicio & Pick<ServicioContratado, "proveedor" | "nombre">) => {
+      const { data, error } = await sb.from("servicios_contratados").insert(nuevo).select(COLUMNAS);
+      if (error) throw new Error(mensajeAltaBaja(error, "añadir"));
+      if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede añadir servicios.");
+      return data[0] as unknown as ServicioContratado;
+    },
+    onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
+  });
+}
+
+/**
+ * Configurar › «Borrar del todo»: solo un servicio ya quitado («no lo usamos»);
+ * la base de datos también lo exige y borra sus lecturas (20261104120000).
+ */
+export function useBorrarServicio() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (proveedor: string) => {
+      const { data, error } = await sb.from("servicios_contratados").delete().eq("proveedor", proveedor).eq("activo", false).select("proveedor");
+      if (error) throw new Error(mensajeAltaBaja(error, "borrar"));
+      if (!data || data.length === 0) throw new Error("No se ha borrado: solo se puede borrar un servicio quitado, y solo un super admin.");
+      return proveedor;
+    },
+    onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
+  });
+}

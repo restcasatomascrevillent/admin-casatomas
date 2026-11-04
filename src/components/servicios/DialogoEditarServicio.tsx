@@ -8,25 +8,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useGuardarServicio } from "@/hooks/useServicios";
-import { type BorradorServicio, CATEGORIAS, type ServicioContratado, borradorDe, cambiosDeBorrador } from "@/lib/servicios";
+import { useCrearServicio, useGuardarServicio } from "@/hooks/useServicios";
+import { type BorradorServicio, CATEGORIAS, type ServicioContratado, borradorDe, cambiosDeBorrador, proveedorDeNombre } from "@/lib/servicios";
 
 interface Props {
   servicio: ServicioContratado | null;
   onCerrar: () => void;
   /** false si falta 20261103160000: no se enseñan los campos nuevos. */
   costes?: boolean;
+  /**
+   * Alta (Configurar › «Añadir servicio»): `servicio` es una ficha vacía
+   * (`servicioNuevo`) y al guardar se da de alta con una clave sacada del
+   * nombre que no choque con `existentes`.
+   */
+  nuevo?: boolean;
+  existentes?: string[];
 }
 
 function MensajeError({ id, texto }: { id: string; texto?: string }) {
   return texto ? <p id={id} className="text-xs text-destructive">{texto}</p> : null;
 }
 
-/** Edición de plan, precio, renovación, cuenta, enlaces, categoría, «lo usamos», notas y límites del plan. */
-export function DialogoEditarServicio({ servicio, onCerrar, costes = true }: Props) {
+/**
+ * Edición (o alta, con `nuevo`) de plan, precio, renovación, cuenta, enlaces,
+ * categoría, «lo usamos», notas y límites del plan.
+ */
+export function DialogoEditarServicio({ servicio, onCerrar, costes = true, nuevo = false, existentes = [] }: Props) {
   const [b, setB] = useState<BorradorServicio | null>(null);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const guardar = useGuardarServicio();
+  const crear = useCrearServicio();
+  const ocupado = guardar.isPending || crear.isPending;
 
   useEffect(() => {
     setB(servicio ? borradorDe(servicio) : null);
@@ -51,8 +63,13 @@ export function DialogoEditarServicio({ servicio, onCerrar, costes = true }: Pro
     }
     setErrores({});
     try {
-      await guardar.mutateAsync({ proveedor: servicio.proveedor, cambios: r.cambios, costes });
-      toast.success(`${r.cambios.nombre}: cambios guardados`);
+      if (nuevo) {
+        await crear.mutateAsync({ proveedor: proveedorDeNombre(r.cambios.nombre, existentes), ...r.cambios });
+        toast.success(`${r.cambios.nombre}: añadido`);
+      } else {
+        await guardar.mutateAsync({ proveedor: servicio.proveedor, cambios: r.cambios, costes });
+        toast.success(`${r.cambios.nombre}: cambios guardados`);
+      }
       onCerrar();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "No se pudieron guardar los cambios.");
@@ -63,20 +80,24 @@ export function DialogoEditarServicio({ servicio, onCerrar, costes = true }: Pro
     <Dialog open onOpenChange={(abierto) => { if (!abierto) onCerrar(); }}>
       <DialogContent className="max-w-[calc(100vw-1rem)] p-4 sm:max-w-2xl sm:p-6">
         <DialogHeader>
-          <DialogTitle>Editar {servicio.nombre}</DialogTitle>
+          <DialogTitle>{nuevo ? "Añadir un servicio" : `Editar ${servicio.nombre}`}</DialogTitle>
           <DialogDescription>
-            Plan, precio y límites del plan. Los límites son los que se usan para calcular el % de consumo; déjalos vacíos si no los sabes.
+            {nuevo
+              ? "Lo que sepas del plan: el nombre basta y lo demás se puede completar luego. Su consumo no se lee solo: se mira en el panel del proveedor."
+              : "Plan, precio y límites del plan. Los límites son los que se usan para calcular el % de consumo; déjalos vacíos si no los sabes."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={enviar} className="flex min-w-0 flex-col gap-4" noValidate>
           {costes && (
             <div className="flex min-w-0 flex-col gap-2 rounded-md border p-3">
-              <div className="flex min-h-11 items-center gap-3">
-                <Checkbox id={id("activo")} checked={b.activo} onCheckedChange={(v) => cambiar("activo", v === true)} className="h-5 w-5" />
-                <Label htmlFor={id("activo")} className="cursor-pointer leading-snug">
-                  Lo usamos <span className="font-normal text-muted-foreground">(si no, no se lee ni suma al coste)</span>
-                </Label>
-              </div>
+              {!nuevo && (
+                <div className="flex min-h-11 items-center gap-3">
+                  <Checkbox id={id("activo")} checked={b.activo} onCheckedChange={(v) => cambiar("activo", v === true)} className="h-5 w-5" />
+                  <Label htmlFor={id("activo")} className="cursor-pointer leading-snug">
+                    Lo usamos <span className="font-normal text-muted-foreground">(si no, no se lee ni suma al coste)</span>
+                  </Label>
+                </div>
+              )}
               <div className="flex min-h-11 items-center gap-3">
                 <Checkbox id={id("por-confirmar")} checked={b.por_confirmar} onCheckedChange={(v) => cambiar("por_confirmar", v === true)} className="h-5 w-5" />
                 <Label htmlFor={id("por-confirmar")} className="cursor-pointer leading-snug">
@@ -219,9 +240,9 @@ export function DialogoEditarServicio({ servicio, onCerrar, costes = true }: Pro
 
           <DialogFooter className="gap-2 sm:gap-2">
             <Button type="button" variant="outline" className="h-11" onClick={onCerrar}>Cancelar</Button>
-            <Button type="submit" className="h-11 gap-2" disabled={guardar.isPending}>
-              {guardar.isPending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-              Guardar cambios
+            <Button type="submit" className="h-11 gap-2" disabled={ocupado}>
+              {ocupado && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {nuevo ? "Añadir servicio" : "Guardar cambios"}
             </Button>
           </DialogFooter>
         </form>

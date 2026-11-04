@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   ShoppingCart,
   Wallet,
-  Coins,
   Star,
   Phone,
   Activity,
@@ -39,7 +38,7 @@ import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
 import { MenuMasModulos, type ItemMenu } from "@/components/superadmin/MenuMasModulos";
 
 /**
- * Menú del Super Admin (orden del 2026-11-03, petición del dueño): arriba lo de
+ * Menú del Super Admin (orden del 2026-11-03, petición del dueño; Costes dentro de Servicios el 2026-11-04): arriba lo de
  * uso diario agrupado por tema; abajo del todo, en el desplegable «Más módulos»,
  * Ecommerce, Asistente Tel., Espacios y Bot Web.
  */
@@ -56,7 +55,7 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
     etiqueta: "Costes",
     items: [
       { title: "Gestor Gasto", url: "/super-admin/gestor-gasto", icon: Wallet },
-      { title: "Costes", url: "/super-admin/costes", icon: Coins },
+      // «Costes» es una pestaña de Servicios desde el 04/11/2026 (petición del dueño: «que sean una»).
       { title: "Servicios", url: "/super-admin/servicios", icon: Server },
     ],
   },

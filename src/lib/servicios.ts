@@ -4,8 +4,9 @@
  * Datos: `servicios_contratados` (plan, precio, límites; lo edita el dueño),
  * `servicios_config` (tipo de cambio) y las lecturas de la Edge Function
  * `servicios-uso` (consumo y coste variable; tabla `servicios_uso`). Ver
- * supabase/migrations/20261103120000_servicios_contratados.sql y
- * 20261103160000_servicios_planes_costes.sql.
+ * supabase/migrations/20261103120000_servicios_contratados.sql,
+ * 20261103160000_servicios_planes_costes.sql y
+ * 20261104120000_servicios_configurables.sql (altas y borrado de lo quitado).
  *
  * Semáforo (petición del dueño): verde < 70 %, ámbar de 70 a 90 %, rojo > 90 %.
  * Aviso destacado arriba de la pantalla a partir del 80 %.
@@ -323,6 +324,8 @@ export interface ResumenCostes {
   fijoMesEur: number;
   variableMesEur: number;
   totalMesEur: number;
+  /** Cuotas + el variable al ritmo de los días que van de mes (orientativo). */
+  previsionMesEur: number;
   /** Cuotas × 12 + el variable al ritmo de este mes × 12 (orientativo). */
   previsionAnioEur: number;
   /** Cuotas × 12. */
@@ -387,6 +390,7 @@ export function resumirCostes(
     fijoMesEur,
     variableMesEur,
     totalMesEur: redondear2(fijoMesEur + variableMesEur),
+    previsionMesEur: redondear2(fijoMesEur + variableMesCompleto),
     fijoAnioEur: redondear2(fijoMesEur * 12),
     previsionAnioEur: redondear2((fijoMesEur + variableMesCompleto) * 12),
     sinPrecio,
@@ -504,6 +508,149 @@ export function textoDias(dias: number): string {
   if (dias === 1) return "mañana";
   if (dias === -1) return "ayer";
   return dias > 0 ? `en ${dias.toLocaleString("es-ES")} días` : `hace ${(-dias).toLocaleString("es-ES")} días`;
+}
+
+// ─── Resumen: lo más cerca del límite y lo que requiere atención ────────────
+
+/** Las métricas con % de los servicios en uso, de la más cercana a su límite a la que menos (las `n` primeras). */
+export function masCercaDelLimite(servicios: ServicioContratado[], lecturas: Map<string, LecturaServicio>, n = 5): AvisoConsumo[] {
+  return avisosConsumo(servicios, lecturas, 0).slice(0, n);
+}
+
+/** Con 30 días o menos (o ya pasada) la renovación se marca y pide atención. */
+export const DIAS_RENOVACION_CERCANA = 30;
+
+export type GravedadPendiente = "rojo" | "ambar" | "info";
+
+/** A dónde lleva «Ver» de un pendiente: una pestaña y, si es de un servicio, su tarjeta. */
+export interface DestinoPendiente {
+  pestana: "servicios" | "costes" | "configurar";
+  proveedor?: string;
+}
+
+export interface Pendiente {
+  clave: string;
+  gravedad: GravedadPendiente;
+  titulo: string;
+  detalle: string | null;
+  destino: DestinoPendiente;
+  /** Texto del botón («Ver», «Revisar»…). */
+  accion: string;
+}
+
+const ORDEN_GRAVEDAD: Record<GravedadPendiente, number> = { rojo: 0, ambar: 1, info: 2 };
+
+const nombres = (lista: string[]) => (lista.length <= 3 ? lista.join(", ") : `${lista.slice(0, 3).join(", ")} y ${lista.length - 3} más`);
+
+/**
+ * «Requiere atención» del Resumen: lo que el dueño tiene que hacer algo,
+ * de lo más grave a lo menos. Consumos a partir del 80 %, renovaciones
+ * pasadas o en 30 días, claves que faltan o el proveedor rechaza, avisos de
+ * la IA (funciones que no registran su gasto, modelos sin tarifa) y planes o
+ * precios por confirmar. Solo servicios en uso.
+ */
+export function pendientesServicios(args: {
+  servicios: ServicioContratado[];
+  lecturas: Map<string, LecturaServicio>;
+  renovaciones: Renovacion[];
+  resumen: Pick<ResumenCostes, "sinPrecio" | "porConfirmar">;
+  /** Proveedores sin lectura automática (no se les pide clave). */
+  sinLector?: Set<string>;
+  ia?: { sinRegistro: number; modelosSinTarifa: number } | null;
+}): Pendiente[] {
+  const { servicios, lecturas, renovaciones, resumen, sinLector = new Set<string>(), ia } = args;
+  const enUso = servicios.filter((s) => s.activo !== false);
+  const salida: Pendiente[] = [];
+
+  for (const a of avisosConsumo(enUso, lecturas)) {
+    salida.push({
+      clave: `consumo:${a.proveedor}:${a.clave}`,
+      gravedad: a.semaforo === "rojo" ? "rojo" : "ambar",
+      titulo: `${a.nombre} · ${a.etiqueta}`,
+      detalle: `${formatearPorcentaje(a.porcentaje)} del límite${a.textoValor && a.textoLimite ? ` (${a.textoValor} de ${a.textoLimite})` : ""}`,
+      destino: { pestana: "servicios", proveedor: a.proveedor },
+      accion: "Ver",
+    });
+  }
+
+  for (const r of renovaciones) {
+    if (r.dias > DIAS_RENOVACION_CERCANA) continue;
+    salida.push({
+      clave: `renovacion:${r.proveedor}:${r.concepto}:${r.fecha}`,
+      gravedad: r.dias < 0 ? "rojo" : "ambar",
+      titulo: `${r.nombre} · ${r.concepto}`,
+      detalle: r.dias < 0
+        ? `Pasó ${textoDias(r.dias)} (${fechaCorta(r.fecha)})${r.deLaApi ? "" : ": apunta la nueva fecha"}`
+        : `Se renueva ${textoDias(r.dias)} (${fechaCorta(r.fecha)})`,
+      destino: { pestana: "servicios", proveedor: r.proveedor },
+      accion: "Ver",
+    });
+  }
+
+  // Claves y errores de lectura: uno por tipo, con los servicios afectados.
+  const porError = new Map<string, ServicioContratado[]>();
+  for (const s of enUso) {
+    const e = lecturas.get(s.proveedor)?.error;
+    if (!e || sinLector.has(s.proveedor)) continue;
+    const tipo = e === "falta_secreto" || e === "credencial_rechazada" ? e : "lectura";
+    porError.set(tipo, [...(porError.get(tipo) ?? []), s]);
+  }
+  const TEXTO_PENDIENTE_ERROR: Record<string, { gravedad: GravedadPendiente; uno: string; varios: string; detalle: string }> = {
+    credencial_rechazada: { gravedad: "rojo", uno: "rechaza la clave guardada", varios: "rechazan la clave guardada", detalle: "No es válida, ha caducado o le faltan permisos: hay que crear otra." },
+    falta_secreto: { gravedad: "ambar", uno: "falta configurar la clave", varios: "falta configurar la clave", detalle: "Sin ella no se lee el consumo. En su tarjeta está cómo crearla." },
+    lectura: { gravedad: "ambar", uno: "no se pudieron leer los datos", varios: "no se pudieron leer los datos", detalle: "Se volverá a intentar en la próxima lectura." },
+  };
+  for (const tipo of ["credencial_rechazada", "falta_secreto", "lectura"]) {
+    const lista = porError.get(tipo);
+    if (!lista?.length) continue;
+    const t = TEXTO_PENDIENTE_ERROR[tipo];
+    salida.push({
+      clave: `error:${tipo}`,
+      gravedad: t.gravedad,
+      titulo: lista.length === 1 ? `${lista[0].nombre}: ${t.uno}` : `${nombres(lista.map((s) => s.nombre))}: ${t.varios}`,
+      detalle: t.detalle,
+      destino: { pestana: "servicios", proveedor: lista.length === 1 ? lista[0].proveedor : undefined },
+      accion: "Ver",
+    });
+  }
+
+  if (ia && ia.sinRegistro > 0) {
+    salida.push({
+      clave: "ia:sin-registro",
+      gravedad: "ambar",
+      titulo: ia.sinRegistro === 1 ? "Una función de IA no registra su gasto" : `${ia.sinRegistro} funciones de IA no registran su gasto`,
+      detalle: "El coste de la IA por proceso puede quedarse corto.",
+      destino: { pestana: "costes" },
+      accion: "Ver en Costes",
+    });
+  }
+  if (ia && ia.modelosSinTarifa > 0) {
+    salida.push({
+      clave: "ia:sin-tarifa",
+      gravedad: "ambar",
+      titulo: ia.modelosSinTarifa === 1 ? "Un modelo de IA no tiene tarifa" : `${ia.modelosSinTarifa} modelos de IA no tienen tarifa`,
+      detalle: "Su coste sale como «sin datos» y no suma.",
+      destino: { pestana: "costes" },
+      accion: "Ver en Costes",
+    });
+  }
+
+  const revisar = [...new Set([...resumen.sinPrecio, ...resumen.porConfirmar])];
+  if (revisar.length > 0) {
+    salida.push({
+      clave: "configurar:por-confirmar",
+      gravedad: "info",
+      titulo: revisar.length === 1 ? `${revisar[0]}: plan o precio por confirmar` : `${revisar.length} servicios con el plan o el precio por confirmar`,
+      detalle: revisar.length === 1 ? "Mientras, su coste puede no estar bien sumado." : `${nombres(revisar)}. Mientras, el coste puede no estar bien sumado.`,
+      destino: { pestana: "configurar" },
+      accion: "Revisar",
+    });
+  }
+
+  return salida
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => ORDEN_GRAVEDAD[a.p.gravedad] - ORDEN_GRAVEDAD[b.p.gravedad] || a.i - b.i)
+    .map(({ p }) => p);
 }
 
 // ─── categorías ─────────────────────────────────────────────────────────────
@@ -627,6 +774,49 @@ export const AYUDA_SECRETOS: Record<string, AyudaSecreto> = {
 export function enlaceSecretosSupabase(urlSupabase: string | undefined): string {
   const m = /^https:\/\/([a-z0-9]{20})\.supabase\.(co|in)/i.exec(urlSupabase ?? "");
   return m ? `https://supabase.com/dashboard/project/${m[1]}/functions/secrets` : "https://supabase.com/dashboard/projects";
+}
+
+// ─── alta (Configurar › Añadir servicio) ────────────────────────────────────
+
+/**
+ * Clave de un servicio nuevo a partir de su nombre («Google Analytics» →
+ * «google_analytics»): minúsculas sin tildes, solo [a-z0-9_] (la CHECK de la
+ * tabla admite 2–40). Si ya existe, «_2», «_3»…
+ */
+export function proveedorDeNombre(nombre: string, existentes: Iterable<string>): string {
+  const limpio = nombre.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 34).replace(/_+$/, "");
+  const raiz = limpio.length >= 2 ? limpio : `servicio${limpio ? `_${limpio}` : ""}`;
+  const usados = new Set(existentes);
+  if (!usados.has(raiz)) return raiz;
+  for (let i = 2; ; i++) {
+    const candidata = `${raiz}_${i}`;
+    if (!usados.has(candidata)) return candidata;
+  }
+}
+
+/** Ficha vacía para el diálogo de alta: en uso, pago mensual en euros, al final de la lista. */
+export function servicioNuevo(orden = 100): ServicioContratado {
+  return {
+    proveedor: "nuevo",
+    nombre: "",
+    plan: null,
+    precio_mensual: null,
+    moneda: "EUR",
+    ciclo: "mensual",
+    renovacion: null,
+    cuenta: null,
+    panel_url: null,
+    limites: {},
+    notas: null,
+    actualizado_en: "",
+    categoria: "otros",
+    orden: Math.min(10000, Math.max(0, Math.round(orden))),
+    activo: true,
+    por_confirmar: false,
+    precio_anual: null,
+    fuente_precio: null,
+  };
 }
 
 // ─── edición (diálogo) ──────────────────────────────────────────────────────

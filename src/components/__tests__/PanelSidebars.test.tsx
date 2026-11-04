@@ -147,7 +147,8 @@ describe("menú del Super Admin", () => {
     renderSuperAdmin();
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
       "Control del Panel", "Usuarios", "Auditoría",
-      "Gestor Gasto", "Costes", "Servicios",
+      // «Costes» es una pestaña de Servicios desde el 2026-11-04: ya no tiene entrada propia.
+      "Gestor Gasto", "Servicios",
       "Tráfico web", "Reseñas Google",
     ]);
     // «Plantillas Email» se fue a Reservas › Configuración (04/11/2026).
@@ -174,7 +175,7 @@ describe("menú del Super Admin", () => {
     unmount();
 
     // Otra visita: sigue abierto.
-    const segunda = renderSuperAdmin("/super-admin/costes");
+    const segunda = renderSuperAdmin("/super-admin/servicios");
     expect(botonMasModulos()).toHaveAttribute("aria-expanded", "true");
     fireEvent.click(botonMasModulos());
     expect(botonMasModulos()).toHaveAttribute("aria-expanded", "false");
@@ -192,6 +193,12 @@ describe("menú del Super Admin", () => {
     await waitFor(() => expect(desplazar).toHaveBeenCalledWith(expect.objectContaining({ block: "nearest" })));
     // jsdom no lo tiene: se quita lo que se ha puesto.
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  });
+
+  it("Servicios queda marcado también en sus pestañas (Costes incluida)", () => {
+    renderSuperAdmin("/super-admin/servicios?tab=costes");
+    expect(screen.getByRole("link", { name: "Servicios" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Costes" })).not.toBeInTheDocument();
   });
 
   it("se abre solo si la página actual es uno de sus módulos", () => {

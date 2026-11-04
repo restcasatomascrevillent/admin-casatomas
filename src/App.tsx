@@ -16,6 +16,7 @@ import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
 import { maquetasVisibles } from "@/lib/maqueta";
+import { rutaServicios } from "@/components/servicios/pestanas";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Reservas = lazy(() => import("./pages/Reservas"));
@@ -34,7 +35,6 @@ const Facturas = lazy(() => import("./pages/Facturas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
-const Costes = lazy(() => import("./pages/Costes"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
 const SuperAdminLogin = lazy(() => import("./pages/SuperAdminLogin"));
@@ -143,7 +143,8 @@ const App = () => (
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />
                   <Route path="/super-admin/asistente-telefonico" element={paginaSuperAdmin(<AsistenteTelefonico />)} />
                   <Route path="/super-admin/gestor-gasto" element={paginaSuperAdmin(<GestorGasto />)} />
-                  <Route path="/super-admin/costes" element={paginaSuperAdmin(<Costes />)} />
+                  {/* Costes es una pestaña de Servicios desde el 04/11/2026: la ruta vieja lleva a ella. */}
+                  <Route path="/super-admin/costes" element={<Navigate to={rutaServicios("costes")} replace />} />
                   <Route path="/super-admin/resenas" element={paginaSuperAdmin(<GestionResenas />)} />
                   {/* Plantillas Email vive en Reservas › Configuración desde el 04/11/2026 (petición del dueño).
                       La ruta vieja se conserva para que marcadores y enlaces antiguos lleven allí. */}

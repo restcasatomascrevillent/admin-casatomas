@@ -81,7 +81,14 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
   const categoria = TEXTO_CATEGORIA[servicio.categoria] ?? null;
 
   return (
-    <Card id={`tarjeta-${servicio.proveedor}`} className="flex min-w-0 scroll-mt-4 flex-col" aria-labelledby={idTitulo} role="article">
+    // tabIndex -1: «Ver» del Resumen la enfoca (borde dorado) tras llevar la vista hasta ella.
+    <Card
+      id={`tarjeta-${servicio.proveedor}`}
+      tabIndex={-1}
+      className="flex min-w-0 scroll-mt-4 flex-col outline-none focus:ring-2 focus:ring-[hsl(38,59%,45%)] focus:ring-offset-2 focus:ring-offset-background"
+      aria-labelledby={idTitulo}
+      role="article"
+    >
       <CardHeader className="space-y-2 p-4 sm:p-5">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
@@ -241,24 +248,5 @@ export function TarjetaServicio({ servicio, lectura, cargando, actualizando, sin
         </div>
       </CardFooter>
     </Card>
-  );
-}
-
-/** Servicio marcado «No lo usamos»: compacto, sin consumo, con «Editar» para volver a activarlo. */
-export function TarjetaServicioInactivo({ servicio, onEditar }: { servicio: ServicioContratado; onEditar: () => void }) {
-  return (
-    <li className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border bg-card p-3">
-      <div className="min-w-0">
-        <p className="break-words text-sm font-medium text-foreground">{servicio.nombre}</p>
-        <p className="break-words text-xs text-muted-foreground">
-          Plan {servicio.plan || "sin dato"} · {textoPrecio(servicio)}
-          {servicio.notas ? ` · ${servicio.notas}` : ""}
-        </p>
-      </div>
-      <Button type="button" variant="outline" className="h-11 gap-1.5 px-3" onClick={onEditar} aria-label={`Editar el plan de ${servicio.nombre}`}>
-        <Pencil className="h-4 w-4" aria-hidden="true" />
-        Editar
-      </Button>
-    </li>
   );
 }

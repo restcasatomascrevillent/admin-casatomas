@@ -47,6 +47,10 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
+// Lo que se factura al mes (Facturación): null = sin borrador guardado.
+const facturado = vi.hoisted(() => ({ eur: null as number | null }));
+vi.mock("@/hooks/useFacturacionOficiososia", () => ({ useMensualFacturado: () => facturado.eur }));
+
 vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
@@ -55,17 +59,18 @@ vi.mock("@/hooks/useUserRole", () => ({
   useCanAccessSection: () => ({ canAccess: true, loading: false }),
 }));
 
-import Costes from "@/pages/Costes";
+import { CostesIa } from "@/components/costes/CostesIa";
 
-// `SuperAdminLayout` monta el menú lateral, que usa `useNavigate()`,
-// `useLocation()` y `useAuth()`: hacen falta `<MemoryRouter>` y `<AuthProvider>`.
-const renderPagina = () => {
+// Servicios › Costes › Inteligencia artificial (lo que era la pantalla «Costes»;
+// desde el 04/11/2026, las cuotas de cada servicio están en el desglose por
+// proveedor de la misma pestaña, ver SuperAdminServicios.test.tsx).
+const renderPagina = (previsionTotalEur?: number | null) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <MemoryRouter>
       <QueryClientProvider client={qc}>
         <AuthProvider>
-          <Costes />
+          <CostesIa previsionTotalEur={previsionTotalEur} />
         </AuthProvider>
       </QueryClientProvider>
     </MemoryRouter>,
@@ -121,35 +126,32 @@ beforeEach(() => {
   for (const k of Object.keys(ventanasReal)) delete ventanasReal[Number(k)];
   for (const k of Object.keys(tablaData)) delete tablaData[k];
   llamadas.length = 0;
+  facturado.eur = null;
 });
 
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("Costes · una sola vista del mes", () => {
-  it("fila de tres cifras: Este mes (fijos + IA real), IA contra el tope y Previsión", async () => {
+describe("Costes · la IA del mes", () => {
+  it("dos cifras: IA este mes contra el tope y la previsión de IA a fin de mes", async () => {
     datosConReal();
     renderPagina();
 
-    const este = await screen.findByTestId("kpi-este-mes");
-    // Fijos conocidos 46,50 + IA real (2,2+1+0,5+0,5)*0,5 = 2,10 → 48,60; "≥" porque Resend está sin verificar.
-    expect(este).toHaveTextContent("≥ 48,60 €");
-    expect(este).toHaveTextContent("Fijos 46,50 € + IA 2,10 €");
-    expect(este).toHaveTextContent("1 fijo sin verificar");
-
-    const ia = screen.getByTestId("kpi-ia-mes");
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    // IA real (2,2+1+0,5+0,5)*0,5 = 2,10
     expect(ia).toHaveTextContent("2,10 €");
     expect(ia).toHaveTextContent("42 % del tope de 5,00 €");
     expect(within(ia).getByRole("progressbar")).toHaveAttribute("data-nivel", "ok");
 
-    // IA al ritmo del mes: real cerrado 2,00 € / 8 días * 31 + hoy 0,10 = 7,85 → 46,50 + 7,85 = 54,35
-    const prev = screen.getByTestId("kpi-prevision");
-    expect(prev).toHaveTextContent("≥ 54,35 €");
-    expect(prev).toHaveTextContent("IA al ritmo del mes: 7,85 €");
+    // IA al ritmo del mes: real cerrado 2,00 € / 8 días * 31 + hoy 0,10 = 7,85
+    expect(screen.getByTestId("kpi-prevision-ia")).toHaveTextContent("≈ 7,85 €");
+    // Sin las cifras de «Este mes» con los fijos de antes: el total del mes está en el Resumen de Servicios.
+    expect(screen.queryByTestId("kpi-este-mes")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Inteligencia artificial (OpenAI)" })).toBeInTheDocument();
   });
 
-  it("una tabla única ordenada por gasto, con fijos e IA por proceso y el mes anterior", async () => {
+  it("una tabla de la IA por proceso, ordenada por gasto y con el mes anterior; sin los fijos declarados a mano", async () => {
     datosConReal();
     renderPagina();
     const tabla = await screen.findByTestId("tabla-partidas");
@@ -158,27 +160,24 @@ describe("Costes · una sola vista del mes", () => {
       .getAllByTestId(/^partida-/)
       .map((f) => f.getAttribute("data-testid"));
     expect(claves).toEqual([
-      "partida-fijo:f1", // Supabase 25 €
-      "partida-fijo:f2", // Vercel 20 €
-      "partida-fijo:f3", // Dominio 1,50 €
       "partida-ia:ocr", // Lectura de facturas 1,10 €
       "partida-ia:chat", // Chatbot 0,50 €
       "partida-ia:chatweb", // Chat de la web 0,25 €
       "partida-ia:otros", // Otros 0,25 €
-      "partida-fijo:f4", // Resend, sin verificar, al final
     ]);
+    expect(within(tabla).getByRole("columnheader", { name: "Proceso" })).toBeInTheDocument();
 
     const ocr = within(tabla).getByTestId("partida-ia:ocr");
     expect(ocr).toHaveTextContent("Lectura de facturas");
     expect(ocr).toHaveTextContent("1,10 €"); // este mes: (2 + 0,2) * 0,5
     expect(ocr).toHaveTextContent("≈ 1,50 €"); // mes anterior: (5 - 2) * 0,5, aproximado
-    expect(within(tabla).getByTestId("partida-fijo:f4")).toHaveTextContent("sin datos");
-    expect(within(tabla).getByTestId("partida-fijo:f1")).toHaveTextContent("25,00 €");
+    // Todas son IA: sin la etiqueta «IA»/«fijo» en cada fila.
+    expect(within(ocr).queryByText("IA")).not.toBeInTheDocument();
+    // Los costes fijos (costes_fijos) ya no salen: las cuotas están en el desglose por proveedor.
+    expect(within(tabla).queryByText("Supabase")).not.toBeInTheDocument();
+    expect(within(tabla).queryByTestId("partida-fijo:f1")).not.toBeInTheDocument();
     // Vinos desde foto sin gasto: no ocupa fila.
     expect(within(tabla).queryByText("Vinos desde foto")).not.toBeInTheDocument();
-    // Sin las tarjetas sueltas de antes.
-    expect(screen.queryByText("Costes fijos mensuales (EUR)")).not.toBeInTheDocument();
-    expect(screen.queryByText("Estimación inicial")).not.toBeInTheDocument();
   });
 
   it("la barra del tope pasa a ámbar al 80 % y a rojo al superarlo", async () => {
@@ -219,19 +218,19 @@ describe("Costes · una sola vista del mes", () => {
       },
     ];
     renderPagina();
-    const este = await screen.findByTestId("kpi-este-mes");
-    // 25 + 2 USD * 0,92 = 26,84
-    await waitFor(() => expect(este).toHaveTextContent("26,84 €"));
-    expect(este).toHaveTextContent("(estimada)");
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    // 2 USD * 0,92 = 1,84
+    await waitFor(() => expect(ia).toHaveTextContent("1,84 €"));
+    expect(ia).toHaveTextContent("(estimada)");
     expect(screen.getByTestId("partida-ia:estimado")).toHaveTextContent("IA (OpenAI), estimada");
     expect(screen.queryByTestId("partida-ia:ocr")).not.toBeInTheDocument();
   });
 
   it("sin nada de nada no finge un coste de 0: «sin datos»", async () => {
     renderPagina();
-    const este = await screen.findByTestId("kpi-este-mes");
-    expect(este).toHaveTextContent("sin datos");
-    expect(screen.getByTestId("kpi-prevision")).toHaveTextContent("sin datos");
+    const ia = await screen.findByTestId("kpi-ia-mes");
+    expect(ia).toHaveTextContent("sin datos");
+    expect(screen.getByTestId("kpi-prevision-ia")).toHaveTextContent("sin datos");
     expect(await screen.findByText(/Un coste vacío no significa que no se esté gastando/)).toBeInTheDocument();
   });
 });
@@ -289,10 +288,22 @@ describe("Costes · Detalles", () => {
   it("sin gasto real no hay contraste que hacer", async () => {
     tablaData.costes_fijos = [fijo("f1", "Supabase", 25)];
     renderPagina();
-    await screen.findByTestId("tabla-partidas");
+    // Sin IA no hay filas: la tabla deja paso al «sin datos».
+    await screen.findByText(/Todavía no hay consumo de IA registrado este mes/);
     fireEvent.click(screen.getByTestId("boton-detalles"));
     await screen.findByText(/Todavía no hay gasto real/);
     expect(screen.queryByTestId("contraste-lectura")).not.toBeInTheDocument();
+  });
+
+  it("el margen frente a lo facturado usa la previsión de todos los servicios (no los fijos de antes)", async () => {
+    datosConReal();
+    facturado.eur = 100;
+    renderPagina(40);
+    await screen.findByTestId("tabla-partidas");
+    fireEvent.click(screen.getByTestId("boton-detalles"));
+    const margen = await screen.findByText(/Se factura 100,00 €\/mes/);
+    expect(margen).toHaveTextContent("Con la previsión de coste de 40,00 €, el margen es de 60,00 €");
+    expect(screen.queryByText(/los fijos del mes anterior/)).not.toBeInTheDocument();
   });
 
   it("sin avisos no hay punto", async () => {

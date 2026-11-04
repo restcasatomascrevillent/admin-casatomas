@@ -13,10 +13,14 @@ import {
   formatearPorcentaje,
   haceCuanto,
   leerNumero,
+  masCercaDelLimite,
   ordenarServicios,
+  pendientesServicios,
   peorSemaforo,
+  proveedorDeNombre,
   proximasRenovaciones,
   resumirCostes,
+  servicioNuevo,
   semaforo,
   textoDias,
   textoImporteConEur,
@@ -201,7 +205,8 @@ describe("coste", () => {
     expect(r.filas[2]).toMatchObject({ fijoEur: 0, variableEur: 2.7, totalEur: 2.7 });
     expect(r.filas[3]).toMatchObject({ fijoEur: null, totalEur: 0 });
     expect(r).toMatchObject({ fijoMesEur: 28, variableMesEur: 2.7, totalMesEur: 30.7, fijoAnioEur: 336, hayUsd: true });
-    // (28 + 2,7 × 30/10) × 12 = 433,2
+    // A fin de mes: 28 + 2,7 × 30/10 = 36,1. Al año: 36,1 × 12 = 433,2
+    expect(r.previsionMesEur).toBe(36.1);
     expect(r.previsionAnioEur).toBe(433.2);
     expect(r.sinPrecio).toEqual(["Loading"]);
     expect(r.porConfirmar).toEqual(["Hostinger"]);
@@ -277,5 +282,104 @@ describe("edición de los campos nuevos", () => {
     const r = cambiosDeBorrador(b, SERVICIO);
     if (!("errores" in r)) throw new Error("debería fallar");
     expect(Object.keys(r.errores).sort()).toEqual(["categoria", "fuente_precio", "orden"]);
+  });
+});
+
+describe("Resumen: lo más cerca del límite y lo que requiere atención", () => {
+  const HOY = new Date("2026-11-03T12:00:00Z");
+  const supa = SERVICIO;
+  const resend = servicio({ proveedor: "resend", nombre: "Resend", limites: { correos_mes: { etiqueta: "Correos este mes", limite: 3000, unidad: "correos" } } });
+  const vercel = servicio({ proveedor: "vercel", nombre: "Vercel" });
+  const github = servicio({ proveedor: "github", nombre: "GitHub" });
+  const vapi = servicio({ proveedor: "vapi", nombre: "Vapi" });
+  const loading = servicio({ proveedor: "loading", nombre: "Loading", categoria: "dominio", renovacion: "2026-11-01" });
+  const apagado = servicio({ proveedor: "perplexity", nombre: "Perplexity", activo: false, renovacion: "2026-11-04" });
+  const lectura = (proveedor: string, p: Partial<LecturaServicio>): LecturaServicio => ({ proveedor, tomado_en: "", error: null, detalles: {}, metricas: {}, ...p });
+  const lecturas = new Map<string, LecturaServicio>([
+    ["supabase", lectura("supabase", { metricas: { bd_tamano: { valor: 300 * 1024 ** 2, unidad: "bytes" }, usuarios_activos_mes: { valor: 10, unidad: "usuarios" } } })],
+    ["resend", lectura("resend", { metricas: { correos_mes: { valor: 2950, unidad: "correos" } } })],
+    ["vercel", lectura("vercel", { error: "falta_secreto", secreto: "SERVICIOS_VERCEL_TOKEN" })],
+    ["github", lectura("github", { error: "falta_secreto" })],
+    ["vapi", lectura("vapi", { error: "error_api" })],
+    ["perplexity", lectura("perplexity", { error: "credencial_rechazada" })],
+  ]);
+  const todos = [supa, resend, vercel, github, vapi, loading, apagado];
+
+  it("masCercaDelLimite: las métricas con %, de mayor a menor, solo de lo que se usa", () => {
+    const r = masCercaDelLimite(todos, lecturas, 2);
+    expect(r.map((a) => [a.proveedor, a.clave, Math.round(a.porcentaje)])).toEqual([["resend", "correos_mes", 98], ["supabase", "bd_tamano", 60]]);
+    expect(masCercaDelLimite(todos, lecturas)).toHaveLength(3);
+  });
+
+  it("pendientesServicios: rojo primero; las claves que faltan juntas; renovaciones; IA; por confirmar", () => {
+    const renovaciones = proximasRenovaciones(todos, lecturas, HOY);
+    const r = pendientesServicios({
+      servicios: todos,
+      lecturas,
+      renovaciones,
+      resumen: { sinPrecio: ["Loading"], porConfirmar: ["Resend", "Loading"] },
+      ia: { sinRegistro: 2, modelosSinTarifa: 1 },
+    });
+    expect(r.map((p) => [p.clave, p.gravedad, p.destino])).toEqual([
+      ["consumo:resend:correos_mes", "rojo", { pestana: "servicios", proveedor: "resend" }],
+      ["renovacion:loading:Renovación (dominio o plan):2026-11-01", "rojo", { pestana: "servicios", proveedor: "loading" }],
+      ["error:falta_secreto", "ambar", { pestana: "servicios", proveedor: undefined }],
+      ["error:lectura", "ambar", { pestana: "servicios", proveedor: "vapi" }],
+      ["ia:sin-registro", "ambar", { pestana: "costes" }],
+      ["ia:sin-tarifa", "ambar", { pestana: "costes" }],
+      ["configurar:por-confirmar", "info", { pestana: "configurar" }],
+    ]);
+    const [consumo, renov, claves, lecturaFallida, ia] = r;
+    expect(consumo.titulo).toBe("Resend · Correos este mes");
+    expect(consumo.detalle?.replace(/\u00a0/g, " ")).toBe("98 % del límite (2950 de 3000 correos)");
+    expect(renov.detalle).toBe("Pasó hace 2 días (01/11/2026): apunta la nueva fecha");
+    expect(claves.titulo).toBe("Vercel, GitHub: falta configurar la clave");
+    expect(lecturaFallida.titulo).toBe("Vapi: no se pudieron leer los datos");
+    expect(ia.titulo).toBe("2 funciones de IA no registran su gasto");
+    expect(r.at(-1)).toMatchObject({ titulo: "2 servicios con el plan o el precio por confirmar", accion: "Revisar" });
+    // Lo que no se usa (Perplexity) no pide nada: ni su clave rechazada ni su renovación.
+    expect(r.some((p) => p.titulo.includes("Perplexity"))).toBe(false);
+  });
+
+  it("renovación en 30 días o menos: ámbar; a más de 30, nada; sin lectura automática no se pide clave", () => {
+    const pronto = servicio({ proveedor: "dominio", nombre: "Dominio", renovacion: "2026-11-23" });
+    const lejos = servicio({ proveedor: "lejos", nombre: "Lejos", renovacion: "2026-12-31" });
+    const sinApi = servicio({ proveedor: "sinapi", nombre: "Sin API" });
+    const lect = new Map<string, LecturaServicio>([["sinapi", lectura("sinapi", { error: "falta_secreto" })]]);
+    const r = pendientesServicios({
+      servicios: [pronto, lejos, sinApi],
+      lecturas: lect,
+      renovaciones: proximasRenovaciones([pronto, lejos], lect, HOY),
+      resumen: { sinPrecio: [], porConfirmar: [] },
+      sinLector: new Set(["sinapi"]),
+    });
+    expect(r.map((p) => [p.titulo, p.gravedad, p.detalle])).toEqual([["Dominio · Renovación del plan", "ambar", "Se renueva en 20 días (23/11/2026)"]]);
+    expect(pendientesServicios({ servicios: [], lecturas: new Map(), renovaciones: [], resumen: { sinPrecio: [], porConfirmar: [] } })).toEqual([]);
+  });
+});
+
+describe("alta de servicios", () => {
+  it("proveedorDeNombre: minúsculas sin tildes ni símbolos, válida para la tabla y sin chocar", () => {
+    expect(proveedorDeNombre("Google Analytics", [])).toBe("google_analytics");
+    expect(proveedorDeNombre("  Cámara & Señal (TPV) ", [])).toBe("camara_senal_tpv");
+    expect(proveedorDeNombre("Vercel", ["vercel", "vercel_2"])).toBe("vercel_3");
+    expect(proveedorDeNombre("X", [])).toBe("servicio_x");
+    expect(proveedorDeNombre("¡¡!!", [])).toBe("servicio");
+    const larga = proveedorDeNombre("Un nombre de servicio larguísimo que no cabe en cuarenta letras", []);
+    expect(larga.length).toBeLessThanOrEqual(40);
+    for (const clave of [larga, proveedorDeNombre("Vercel", ["vercel"]), proveedorDeNombre("X", [])]) expect(clave).toMatch(/^[a-z0-9_-]{2,40}$/);
+  });
+
+  it("servicioNuevo: ficha vacía en uso, mensual en euros y que valida solo con el nombre", () => {
+    const nuevo = servicioNuevo(106);
+    expect(nuevo).toMatchObject({ nombre: "", ciclo: "mensual", moneda: "EUR", categoria: "otros", orden: 106, activo: true, limites: {} });
+    expect(servicioNuevo(20000).orden).toBe(10000);
+    const b = borradorDe(nuevo);
+    const vacio = cambiosDeBorrador(b, nuevo);
+    if (!("errores" in vacio)) throw new Error("debería fallar sin nombre");
+    expect(Object.keys(vacio.errores)).toEqual(["nombre"]);
+    const r = cambiosDeBorrador({ ...b, nombre: "n8n" }, nuevo);
+    if (!r.ok) throw new Error("no válido");
+    expect(r.cambios).toMatchObject({ nombre: "n8n", plan: null, precio_mensual: null, precio_anual: null, activo: true, limites: {} });
   });
 });
