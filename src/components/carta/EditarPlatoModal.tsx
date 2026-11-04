@@ -3,6 +3,7 @@ import {
   guardarUnidadPlato,
   opcionesUnidadPlato,
 } from "@/lib/unidades-platos";
+import { cambioVegetariano, esVegetariano } from "@/lib/dietas-plato";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -77,6 +78,7 @@ const formSchema = z
     ),
     descripcion: descripcionCarta,
     sin_gluten_disponible: z.boolean().default(false),
+    vegetariano: z.boolean().default(false),
     ingredientes: z.string().optional(),
     unidad: z.string().default("Unidad"),
     gramos: z.coerce.number().optional(),
@@ -156,6 +158,7 @@ export function EditarPlatoModal({
       precio_eur: 0,
       descripcion: "",
       sin_gluten_disponible: false,
+      vegetariano: false,
       ingredientes: "",
       unidad: "Unidad",
       gramos: 100,
@@ -184,6 +187,7 @@ export function EditarPlatoModal({
       descripcion: plato.descripcion ?? "",
       sin_gluten_disponible:
         oficiales.includes("gluten") && plato.sin_gluten_disponible === true,
+      vegetariano: esVegetariano(plato.etiquetas_dieteticas),
       ingredientes: plato.ingredientes ?? "",
       ...descomponerUnidad(plato.unidad),
     });
@@ -318,6 +322,8 @@ export function EditarPlatoModal({
         descripcion: values.descripcion?.trim() || null,
         sin_gluten_disponible:
           alergenos.includes("gluten") && values.sin_gluten_disponible,
+        // Solo si cambia (ver `cambioVegetariano`).
+        ...cambioVegetariano(plato.etiquetas_dieteticas, values.vegetariano),
         ingredientes: values.ingredientes?.trim() || null,
         unidad: guardarUnidadPlato(values.unidad, values.gramos),
         alergenos_oficiales: alergenos.length > 0 ? alergenos : null,
@@ -604,6 +610,27 @@ export function EditarPlatoModal({
                 )}
               />
             )}
+
+            {/* «Vegetariano» (04/11/2026, dueño: «sí que tienen que haber productos vegetarianos»): la web
+                solo enseña en su filtro «Vegetariano» los platos marcados aquí. */}
+            <FormField
+              control={form.control}
+              name="vegetariano"
+              render={({ field }) => (
+                <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={(value) => field.onChange(value === true)}
+                    />
+                  </FormControl>
+                  <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">
+                    Vegetariano (sin carne, pescado ni marisco)
+                  </FormLabel>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <details className="rounded-lg border p-3">
               <summary className="cursor-pointer font-medium">

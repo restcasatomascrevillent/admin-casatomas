@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { esVegetariano } from "@/lib/dietas-plato";
 import { ChefHat, Eye, EyeOff, Move } from "lucide-react";
 import { Plato, usePlatos } from "@/hooks/usePlatos";
 import { toast } from "sonner";
@@ -260,6 +261,12 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
               {plato.sin_gluten_disponible === true && (
                 <Badge variant="outline" className="border-emerald-600/30 bg-emerald-50 text-emerald-800 whitespace-normal">
                   Se puede hacer sin gluten
+                </Badge>
+              )}
+
+              {esVegetariano(plato.etiquetas_dieteticas) && (
+                <Badge variant="outline" className="border-emerald-600/30 bg-emerald-50 text-emerald-800 whitespace-normal">
+                  Vegetariano
                 </Badge>
               )}
 

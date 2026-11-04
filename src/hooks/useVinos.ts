@@ -220,10 +220,12 @@ export function useVinos() {
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
             orden,
-            copeo: nuevoVino.copeo ?? false,
-            precio_copa_eur: nuevoVino.precio_copa_eur ?? null,
-            puntuacion_parker: nuevoVino.puntuacion_parker ?? null,
-            puntuacion_parker_anada: nuevoVino.puntuacion_parker_anada ?? null,
+            // Copa y Parker solo si vienen (20261104140000): sin ellos el alta sigue
+            // funcionando aunque las columnas aún no existan.
+            ...(nuevoVino.copeo !== undefined ? { copeo: nuevoVino.copeo } : {}),
+            ...(nuevoVino.precio_copa_eur !== undefined ? { precio_copa_eur: nuevoVino.precio_copa_eur } : {}),
+            ...(nuevoVino.puntuacion_parker !== undefined ? { puntuacion_parker: nuevoVino.puntuacion_parker } : {}),
+            ...(nuevoVino.puntuacion_parker_anada !== undefined ? { puntuacion_parker_anada: nuevoVino.puntuacion_parker_anada } : {}),
             // Publicado en las dos cartas (activado = restaurante OR touza; la
             // BD lo recalcula, ver guardarCartas).
             restaurante: true,

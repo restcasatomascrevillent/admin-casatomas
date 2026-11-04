@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as z from "zod";
-import { camposCopaParker, copaParkerParaCampos, copaParkerParaGuardar, exigirPrecioCopa } from "@/components/carta/copaParker";
+import { cambiosCopaParker, camposCopaParker, copaParkerParaCampos, copaParkerParaGuardar, exigirPrecioCopa } from "@/components/carta/copaParker";
 
 const esquema = z.object(camposCopaParker).superRefine(exigirPrecioCopa);
 const errores = (valores: Record<string, unknown>) => {
@@ -33,5 +33,13 @@ describe("copa y puntuación Parker en el formulario de vino", () => {
     // Apagar la copa conserva el precio; sin puntuación no se guarda añada.
     expect(copaParkerParaGuardar({ copeo: false, precio_copa_eur: 6, puntuacion_parker: undefined, puntuacion_parker_anada: 2019 }))
       .toEqual({ copeo: false, precio_copa_eur: 6, puntuacion_parker: null, puntuacion_parker_anada: null });
+  });
+  it("solo manda lo que cambia (el panel sigue guardando aunque falte la migración)", () => {
+    // Vino sin las columnas (migración sin aplicar) y sin tocar copa ni Parker: nada.
+    expect(cambiosCopaParker({ copeo: false })).toEqual({});
+    expect(cambiosCopaParker({ copeo: false }, { copeo: false, precio_copa_eur: 6 })).toEqual({ precio_copa_eur: null });
+    expect(cambiosCopaParker({ copeo: false, precio_copa_eur: 6, puntuacion_parker: 94 }, { copeo: false, precio_copa_eur: 6, puntuacion_parker: 93 }))
+      .toEqual({ puntuacion_parker: 94 });
+    expect(cambiosCopaParker({ copeo: true, precio_copa_eur: 6 })).toEqual({ copeo: true, precio_copa_eur: 6 });
   });
 });

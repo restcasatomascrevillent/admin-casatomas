@@ -33,7 +33,7 @@ import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { CamposCopaParker } from "./CamposCopaParker";
-import { camposCopaParker, copaParkerParaGuardar, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
+import { camposCopaParker, cambiosCopaParker, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 // Origen obligatorio (04/11/2026): país, región y categoría con denominación
@@ -178,7 +178,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
       denominacion_origen: values.denominacion_origen,
       ubicacion_pais: values.ubicacion_pais,
       ubicacion_region: values.ubicacion_region,
-      ...copaParkerParaGuardar(values),
+      // Solo lo que no es el valor por defecto: ver `cambiosCopaParker`.
+      ...cambiosCopaParker(values),
     };
 
     const nuevoVino = await crearVino.mutateAsync(vinoData);

@@ -103,6 +103,28 @@ export function copaParkerParaCampos(vino: {
 }
 
 /**
+ * Solo los campos de copa y Parker que CAMBIAN respecto a lo guardado. Así un
+ * panel desplegado antes de aplicar la migración 20261104140000 (columnas que aún
+ * no existen) puede seguir editando y creando vinos mientras no se toquen estos
+ * campos: no los manda.
+ */
+export function cambiosCopaParker(
+  valores: Parameters<typeof copaParkerParaGuardar>[0],
+  guardado: Parameters<typeof copaParkerParaCampos>[0] = {},
+) {
+  const nuevo = copaParkerParaGuardar(valores);
+  const antes = {
+    copeo: guardado.copeo === true,
+    precio_copa_eur: guardado.precio_copa_eur ?? null,
+    puntuacion_parker: guardado.puntuacion_parker ?? null,
+    puntuacion_parker_anada: guardado.puntuacion_parker_anada ?? null,
+  };
+  return Object.fromEntries(
+    (Object.keys(nuevo) as (keyof typeof nuevo)[]).filter((k) => nuevo[k] !== antes[k]).map((k) => [k, nuevo[k]]),
+  ) as Partial<typeof nuevo>;
+}
+
+/**
  * Lo que se guarda en BD. El precio de la copa se conserva aunque se apague el
  * copeo (al volver a encenderlo ya está puesto); sin puntuación no hay añada.
  */

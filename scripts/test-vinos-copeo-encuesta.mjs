@@ -23,6 +23,8 @@ const ENCUESTA = await leer("supabase/migrations/20261104141000_encuesta_vino_fa
 const HORARIO = await leer("supabase/migrations/20261104142000_horario_menu_tapas.sql");
 const PARKER_DATOS = await leer("supabase/migrations/20261104143000_vinos_puntuacion_parker_datos.sql");
 const PARKER_DATOS_ROLLBACK = await leer("supabase/rollbacks/20261104143000_vinos_puntuacion_parker_datos_ROLLBACK.sql");
+const VEGETARIANOS = await leer("supabase/migrations/20261104151000_platos_vegetarianos.sql");
+const VEGETARIANOS_ROLLBACK = await leer("supabase/rollbacks/20261104151000_platos_vegetarianos_ROLLBACK.sql");
 const ROLLBACKS = [
   await leer("supabase/rollbacks/20261104142000_horario_menu_tapas_ROLLBACK.sql"),
   await leer("supabase/rollbacks/20261104141000_encuesta_vino_favorito_ROLLBACK.sql"),
@@ -234,6 +236,43 @@ igual(tras[1].puntuacion_parker, 80, "no pisa la puesta a mano");
 await db.exec(PARKER_DATOS_ROLLBACK);
 igual((await q(`select puntuacion_parker from public."Vinos" where id = any($1) order by id = $2 desc`, [idReal, idReal[0]])).rows.map((r) => r.puntuacion_parker),
   [null, 80], "su rollback quita solo lo que puso");
+
+// ─── 4b. Platos vegetarianos (20261104151000) ──────────────────────────────
+await db.exec(`create table public."Platos" (id text primary key, nombre text, categoria text, activado boolean);
+  alter table public."Platos" enable row level security;
+  grant select, update on public."Platos" to anon, authenticated;
+  create policy platos_publico on public."Platos" for select using (activado = true);
+  create policy platos_update_seccion on public."Platos" for update to authenticated
+    using ((select public.can_write_section('gestor_carta'))) with check ((select public.can_write_section('gestor_carta')));
+  insert into public."Platos" values
+    ('1c359c37-bf38-44c8-9a5e-9a9d0d8a7b21', 'Fruta', 'POSTRES', true),
+    ('a93f4553-1111-4222-8333-944455556666', 'Arroz con leche', 'POSTRES', true),
+    ('otro', 'Entrecot de ternera nacional', 'CARNES', true);`);
+// Los dos de prueba con el id real de la demo (la migración marca por id exacto).
+const idsReales = [...VEGETARIANOS.matchAll(/\('([0-9a-f-]{36})', '(\[[^']+\])'::jsonb\),?\s+-- (Fruta|Arroz con leche)\b/g)];
+igual(idsReales.length, 2, "la migración trae la Fruta y el Arroz con leche");
+await q(`update public."Platos" set id = $1 where nombre = 'Fruta'`, [idsReales.find((m) => m[3] === "Fruta")[1]]);
+await q(`update public."Platos" set id = $1 where nombre = 'Arroz con leche'`, [idsReales.find((m) => m[3] === "Arroz con leche")[1]]);
+await db.exec(VEGETARIANOS);
+await db.exec(VEGETARIANOS);
+igual((await q(`select nombre, etiquetas_dieteticas from public."Platos" order by nombre`)).rows, [
+  { nombre: "Arroz con leche", etiquetas_dieteticas: ["vegetariano"] },
+  { nombre: "Entrecot de ternera nacional", etiquetas_dieteticas: null },
+  { nombre: "Fruta", etiquetas_dieteticas: ["vegetariano", "vegano"] },
+], "marca los vegetarianos (y la fruta, vegana) y deja la carne sin etiqueta");
+igual((await como("anon", () => q(`select etiquetas_dieteticas from public."Platos" where nombre = 'Fruta'`))).rows,
+  [{ etiquetas_dieteticas: ["vegetariano", "vegano"] }], "la web lee las etiquetas");
+await rechaza(q(`update public."Platos" set etiquetas_dieteticas = '["sin carne"]' where id = 'otro'`), /platos_etiquetas_dieteticas_validas/, "solo vegetariano o vegano");
+await rechaza(q(`update public."Platos" set etiquetas_dieteticas = '"vegetariano"' where id = 'otro'`), /platos_etiquetas_dieteticas_validas/, "tiene que ser un array");
+igual((await como(U.CARTA, () => q(`update public."Platos" set etiquetas_dieteticas = '["vegetariano"]' where id = 'otro' returning id`))).rows.length, 1,
+  "el panel con «Gestor carta» marca un plato");
+await q(`update public."Platos" set etiquetas_dieteticas = '[]' where nombre = 'Arroz con leche'`);
+await db.exec(VEGETARIANOS);
+igual((await q(`select etiquetas_dieteticas from public."Platos" where nombre = 'Arroz con leche'`)).rows, [{ etiquetas_dieteticas: [] }],
+  "volver a aplicarla no pisa lo cambiado en el panel");
+await db.exec(VEGETARIANOS_ROLLBACK);
+igual((await q(`select column_name from information_schema.columns where table_name = 'Platos' and column_name = 'etiquetas_dieteticas'`)).rows, [],
+  "su rollback quita la columna");
 
 // ─── 5. Rollbacks ───────────────────────────────────────────────────────────
 for (const rb of ROLLBACKS) await db.exec(rb);
