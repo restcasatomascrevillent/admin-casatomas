@@ -58,12 +58,46 @@ async function ensureFolder(name: string, parentId: string, token: string): Prom
   return (await create.json()).id;
 }
 
+const MESES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+/**
+ * Carpeta del mes dentro de la del proveedor: «2026-03 Marzo». Lleva el año
+ * delante para que Drive las ordene bien y porque el histórico mezcla años.
+ * Sin fecha válida → «Sin fecha».
+ */
+export function carpetaMes(fecha: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})/.exec(fecha ?? "");
+  const n = m ? Number(m[2]) : 0;
+  if (!m || n < 1 || n > 12) return "Sin fecha";
+  return `${m[1]}-${m[2]} ${MESES[n - 1]}`;
+}
+
+/**
+ * Nombre de la carpeta del proveedor (orden pedido por el dueño, 04-nov-2026:
+ * proveedor → meses). Se usa el nombre canónico de la tabla `proveedores`
+ * cuando lo hay, para que «CETAREA ANGEL MAR S.L.» y «CETAREA ANGELMAR S.L.»
+ * no acaben en dos carpetas. Se quitan barras y espacios sobrantes.
+ */
+export function carpetaProveedor(nombre: string | null | undefined): string {
+  const limpio = (nombre ?? "")
+    .replace(/[\\/]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80)
+    .trim();
+  return limpio || "Sin proveedor";
+}
+
 async function subirADrive(
   cfg: ConfigDrive,
   bytes: Uint8Array,
   fileName: string,
   mimeType: string,
   fecha: string,
+  proveedor: string | null,
 ): Promise<string | null> {
   if (!driveActivo(cfg)) {
     // No es un error: simplemente Drive no esta configurado. Quien llama debe
@@ -71,10 +105,8 @@ async function subirADrive(
     return null;
   }
   const token = await driveToken(cfg);
-  const year = fecha.slice(0, 4);
-  const month = fecha.slice(5, 7);
-  const yearFolder = await ensureFolder(year, cfg.parentFolder, token);
-  const monthFolder = await ensureFolder(month, yearFolder, token);
+  const provFolder = await ensureFolder(carpetaProveedor(proveedor), cfg.parentFolder, token);
+  const monthFolder = await ensureFolder(carpetaMes(fecha), provFolder, token);
 
   // 1) metadata
   const meta = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
@@ -153,6 +185,7 @@ export async function archivarOriginal(
   mimeType: string,
   fecha: string,
   facturaId: number,
+  proveedor: string | null = null,
 ): Promise<{ drive_url: string | null; archivo_path: string | null; error: string | null }> {
   let bytes: Uint8Array;
   try {
@@ -168,7 +201,7 @@ export async function archivarOriginal(
   // 1) Google Drive, si hay secrets.
   if (driveActivo(cfg)) {
     try {
-      const driveUrl = await subirADrive(cfg, bytes, fileName, mimeType, fecha);
+      const driveUrl = await subirADrive(cfg, bytes, fileName, mimeType, fecha, proveedor);
       if (driveUrl) return { drive_url: driveUrl, archivo_path: null, error: null };
     } catch (e) {
       console.error("[Drive] Fallo la subida, se intenta Storage:", e);
@@ -190,6 +223,34 @@ export async function archivarOriginal(
       `[archivo] PERDIDA DEL ORIGINAL de la factura ${facturaId} (${fileName}): ${msg}`,
     );
     return { drive_url: null, archivo_path: null, error: msg };
+  }
+}
+
+/**
+ * Copia a Drive un original que ya está en Storage (camino de documentos
+ * largos: el fichero llega por `pendientes/…` y se mueve dentro del bucket,
+ * así que hasta ahora nunca llegaba a Drive). Storage se queda como copia de
+ * seguridad. Nunca lanza: devuelve el enlace de Drive o null.
+ */
+// deno-lint-ignore no-explicit-any
+export async function copiarADriveDesdeStorage(
+  cfg: ConfigDrive,
+  supabase: any,
+  path: string,
+  fileName: string,
+  fecha: string,
+  proveedor: string | null,
+): Promise<string | null> {
+  if (!driveActivo(cfg)) return null;
+  try {
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).download(path);
+    if (error || !data) throw new Error(error?.message ?? "sin datos");
+    const bytes = new Uint8Array(await data.arrayBuffer());
+    const mime = data.type || (fileName.toLowerCase().endsWith(".pdf") ? "application/pdf" : "application/octet-stream");
+    return await subirADrive(cfg, bytes, fileName, mime, fecha, proveedor);
+  } catch (e) {
+    console.error(`[Drive] No se pudo copiar ${path} a Drive:`, e);
+    return null;
   }
 }
 

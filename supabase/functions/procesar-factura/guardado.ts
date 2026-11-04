@@ -12,7 +12,15 @@ import type { OrigenImporte } from "./esquema.ts";
 import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
-import { archivarOriginal, type ConfigDrive, moverPendiente, rutaDefinitiva, STORAGE_BUCKET } from "./archivo.ts";
+import {
+  archivarOriginal,
+  type ConfigDrive,
+  copiarADriveDesdeStorage,
+  driveActivo,
+  moverPendiente,
+  rutaDefinitiva,
+  STORAGE_BUCKET,
+} from "./archivo.ts";
 import { decidirCoincidencia, leerPagina, type PaginaDocumento } from "./paginasDocumento.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -419,10 +427,13 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     // 8) Validación de cordura
     const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias);
 
-    // 9) Original
+    // 9) Original (Drive: carpeta del proveedor → mes; Storage como respaldo)
+    const proveedorCarpeta = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, facturaId, d.proveedor) : null;
     let archivo = { ok: false, error: null as string | null };
     if (e.original.tipo === "base64") {
-      const a = await archivarOriginal(ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId);
+      const a = await archivarOriginal(
+        ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
+      );
       archivo = { ok: !!(a.drive_url || a.archivo_path), error: a.error };
       if (a.drive_url || a.archivo_path) {
         const { error } = await supabase.from("facturas").update({
@@ -435,7 +446,11 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
       const m = await moverPendiente(supabase, e.original.path, rutaDefinitiva(d.fecha, facturaId, e.original.nombre));
       archivo = { ok: !!m.path, error: m.error };
       if (m.path) {
-        const { error } = await supabase.from("facturas").update({ archivo_path: m.path }).eq("id", facturaId);
+        // Documentos largos: el original vive en Storage; se copia también a Drive.
+        const driveUrl = await copiarADriveDesdeStorage(ctx.drive, supabase, m.path, e.original.nombre, d.fecha, proveedorCarpeta);
+        const { error } = await supabase.from("facturas")
+          .update({ archivo_path: m.path, ...(driveUrl ? { drive_url: driveUrl } : {}) })
+          .eq("id", facturaId);
         if (error) console.error("[archivo] No se pudo guardar la referencia al original:", error.message);
       } else {
         // El original sigue a salvo en pendientes/: se apunta ahí.
@@ -740,4 +755,24 @@ export async function guardarOriginalPendiente(
     console.warn("[duplicado] no se pudo guardar el original pendiente:", e);
     return null;
   }
+}
+
+/**
+ * Nombre del proveedor para la carpeta de Drive. El trigger de `facturas`
+ * resuelve `proveedor_id` al insertar (proveedores_unificados), así que se usa
+ * el nombre canónico de `proveedores`; si no lo hay, el leído del documento.
+ * Nunca lanza.
+ */
+// deno-lint-ignore no-explicit-any
+async function nombreProveedorFactura(supabase: any, facturaId: number, leido: string | null): Promise<string | null> {
+  try {
+    const { data } = await supabase.from("facturas").select("proveedor_id").eq("id", facturaId).single();
+    if (data?.proveedor_id) {
+      const { data: p } = await supabase.from("proveedores").select("nombre").eq("id", data.proveedor_id).single();
+      if (p?.nombre) return p.nombre;
+    }
+  } catch (e) {
+    console.warn("[Drive] No se pudo leer el proveedor canónico; se usa el leído:", e);
+  }
+  return leido ?? null;
 }
