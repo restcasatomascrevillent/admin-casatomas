@@ -27,6 +27,15 @@ export interface ProductoFactura {
   producto_canonico?: string | null;
   /** Id del producto canónico: enlaza la línea con su ficha en Compras › Productos. */
   producto_id?: number | null;
+  /**
+   * Lo que VALE lo recibido aunque venga con descuento o regalado (migración
+   * 20261104170000; de momento solo lo rellena la importación histórica):
+   * cantidad × precio antes de descuento, y si es un cálculo con el precio de
+   * otras facturas del proveedor (`importe_bruto_estimado`).
+   */
+  descuento_pct?: number | null;
+  importe_bruto?: number | null;
+  importe_bruto_estimado?: boolean;
 }
 
 /** Una anomalia de importes detectada por `procesar-factura` al cargar el documento. */
@@ -96,12 +105,14 @@ export interface Factura {
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
 
-const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean) => `
+const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean) => `
       id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,${conFacturado ? " facturado_en_id," : ""}
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada, verificacion_origen,
       productos_factura (
         id, nombre, precio_unitario, cantidad, unidad, total${conBultos ? ", bultos" : ""}${
+          conBruto ? ", descuento_pct, importe_bruto, importe_bruto_estimado" : ""
+        }${
           conProducto ? ", producto_id, productos_catalogo ( nombre, categoria_id )" : ""
         }
       )
@@ -133,10 +144,10 @@ function categoriaDeLinea(
 
 const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
   // Una sola query con JOIN — se evita el N+1 de queries separadas
-  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean) =>
+  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean) =>
     supabase
       .from('facturas')
-      .select(columnasDocumento(conBultos, conProducto, conFacturado))
+      .select(columnasDocumento(conBultos, conProducto, conFacturado, conBruto))
       .eq('tipo', tipo)
       .order('fecha', { ascending: false })
       // Las líneas en el orden impreso: se insertan en ese orden (también las de
@@ -152,8 +163,10 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
   // `facturado_en_id` llega con la migración 20261008120000 (ya aplicada en
   // producción): si faltara, se repite la consulta sin ella.
   let conFacturado = true;
-  let { data, error } = await consultar(conBultos, conProducto, conFacturado);
-  for (let i = 0; i < 3 && error; i++) {
+  // Valor sin descuento: migración 20261104170000 (importación histórica).
+  let conBruto = true;
+  let { data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto);
+  for (let i = 0; i < 4 && error; i++) {
     const msg = error.message ?? '';
     if (conProducto && /producto_id|productos_catalogo|relationship/i.test(msg)) conProducto = false;
     // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
@@ -161,8 +174,9 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     // listado de facturas vacío.
     else if (conBultos && /bultos/i.test(msg)) conBultos = false;
     else if (conFacturado && /facturado_en_id/i.test(msg)) conFacturado = false;
+    else if (conBruto && /importe_bruto|descuento_pct/i.test(msg)) conBruto = false;
     else break;
-    ({ data, error } = await consultar(conBultos, conProducto, conFacturado));
+    ({ data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto));
   }
   const mapaCategorias = new Map((categorias ?? []).map((c) => [c.id, c]));
 
@@ -173,7 +187,8 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
     const productos: ProductoFactura[] = (doc.productos_factura || []).map((p: any) => {
       const precioUnitario = Number(p.precio_unitario) || 0;
       const cantidad = Number(p.cantidad) || 0;
-      const totalProducto = Number(p.total) || precioUnitario * cantidad;
+      // El importe IMPRESO (0 en un regalo); solo si no hay importe se calcula.
+      const totalProducto = p.total != null && p.total !== "" ? Number(p.total) : precioUnitario * cantidad;
       return {
         id: p.id,
         producto_nombre: p.nombre,
@@ -186,6 +201,9 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
         categoria: categoriaDeLinea(mapaCategorias, p.productos_catalogo?.categoria_id),
         producto_canonico: p.productos_catalogo?.nombre ?? null,
         producto_id: p.producto_id ?? null,
+        descuento_pct: p.descuento_pct != null ? Number(p.descuento_pct) : null,
+        importe_bruto: p.importe_bruto != null ? Number(p.importe_bruto) : null,
+        importe_bruto_estimado: p.importe_bruto_estimado === true,
       };
     });
 

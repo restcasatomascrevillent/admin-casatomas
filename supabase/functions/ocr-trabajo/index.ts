@@ -50,10 +50,10 @@ const cfgModelo = configModelo(envModelo, "piezas");
 // configuración del camino síncrono (OCR_MODELO), no los de las piezas.
 const cfgModeloUnico = configModelo(envModelo, "unico");
 const drive = {
-  clientId: Deno.env.get("GOOGLE_CLIENT_ID") ?? "",
-  clientSecret: Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "",
-  refreshToken: Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "",
-  parentFolder: Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "",
+  clientId: (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim(),
+  clientSecret: (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim(),
+  refreshToken: (Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "").trim(),
+  parentFolder: (Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "").trim(),
 };
 
 declare const EdgeRuntime: { waitUntil?: (p: Promise<unknown>) => void } | undefined;

@@ -53,10 +53,10 @@ const cfgAuth: ConfigAuth = {
 // Google Drive (Opción A: OAuth de usuario real con refresh token). Mientras
 // los secrets GOOGLE_* no existan, el original va a Supabase Storage.
 const drive = {
-  clientId: Deno.env.get("GOOGLE_CLIENT_ID") ?? "",
-  clientSecret: Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "",
-  refreshToken: Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "",
-  parentFolder: Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "",
+  clientId: (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim(),
+  clientSecret: (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim(),
+  refreshToken: (Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "").trim(),
+  parentFolder: (Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "").trim(),
 };
 
 // Modelo de visión: secreto opcional OCR_MODELO (ver modelo.ts).

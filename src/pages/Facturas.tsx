@@ -10,7 +10,10 @@ import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
 import { MODOS_COMPRAS, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { FileText, MessageSquare, Upload, BarChart3, Package, Zap, ShoppingCart } from "lucide-react";
+import { FileText, MessageSquare, Upload, BarChart3, Package, Zap, ShoppingCart, History } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
 import type { Sugerencia } from "@/components/facturas/ChatArea";
@@ -62,6 +65,9 @@ const Facturas = () => {
       return p;
     }, { replace: true });
   };
+  // Importación histórica (04/11/2026): solo administradores.
+  const { isAdmin } = useUserRole();
+  const [importacionAbierta, setImportacionAbierta] = useState(false);
   const subidas = useColaSubidaOpcional();
   const activosSubida = subidas?.activos ?? 0;
   // Alto de la pantalla, calculado solo (como Calendario y Newsletter): la
@@ -187,8 +193,15 @@ const Facturas = () => {
             <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="mx-auto flex h-full max-w-3xl flex-col gap-1">
                 {activeTab === "cargar" && (
-                  <div className="min-w-0 max-w-full shrink-0 self-end" data-tour="facturas-coste-lectura">
-                    <MonitorGastoIA modo="ocr" />
+                  <div className="flex min-w-0 max-w-full shrink-0 items-center justify-end gap-2">
+                    {isAdmin && (
+                      <Button variant="outline" size="sm" className="mr-auto" onClick={() => setImportacionAbierta(true)}>
+                        <History className="mr-1.5 h-4 w-4" /> Importación histórica
+                      </Button>
+                    )}
+                    <div className="min-w-0 max-w-full" data-tour="facturas-coste-lectura">
+                      <MonitorGastoIA modo="ocr" />
+                    </div>
                   </div>
                 )}
                 <div className="flex-1 min-h-0">
@@ -200,6 +213,7 @@ const Facturas = () => {
           </div>
         </Tabs>
       </div>
+      {isAdmin && <ImportacionHistoricaDialog open={importacionAbierta} onOpenChange={setImportacionAbierta} />}
     </DashboardLayout>
   );
 };

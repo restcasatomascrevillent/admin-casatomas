@@ -5,7 +5,7 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCantidadLinea, formatCurrency, formatNumero } from "./formatters";
+import { formatCantidadLinea, formatCurrency, formatNumero, valorSinDescuento } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
 
 /**
@@ -124,6 +124,7 @@ export const FilaProducto = ({
 
   // Warning si el precio unitario cambia drásticamente respecto al último histórico (+100%)
   const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
+  const sinDescuento = valorSinDescuento(p);
   const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
 
   if (isMobile) {
@@ -174,6 +175,9 @@ export const FilaProducto = ({
               </>
             )}
           </p>
+          {sinDescuento && (
+            <p className="text-muted-foreground" title={sinDescuento.titulo}>{sinDescuento.texto}</p>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -267,7 +271,12 @@ export const FilaProducto = ({
           <span>{formatCurrency(p.precio_unitario ?? null)}</span>
         </div>
       </TableCell>
-      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">{formatCurrency(p.precio)}</TableCell>
+      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
+        {formatCurrency(p.precio)}
+        {sinDescuento && (
+          <span className="block whitespace-normal text-xs font-normal text-muted-foreground" title={sinDescuento.titulo}>{sinDescuento.texto}</span>
+        )}
+      </TableCell>
     </TableRow>
   );
 };

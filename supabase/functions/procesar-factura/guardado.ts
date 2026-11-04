@@ -47,6 +47,13 @@ export interface EntradaGuardado {
   paginas?: number;
   /** Trabajo de OCR que lo produce (facturas.ocr_trabajo_id, UNIQUE). */
   ocrTrabajoId?: string | null;
+  /**
+   * El documento viene COMPLETO (importación histórica, 04/11/2026): no se
+   * busca «página x/y» en las observaciones para marcarlo como página suelta.
+   */
+  documentoCompleto?: boolean;
+  /** Columnas extra de la cabecera, en el MISMO insert (importación: local, import_clave). */
+  cabeceraExtra?: Record<string, unknown>;
 }
 
 /** Resumen de la factura que ya existe (ocr_factura_existente). */
@@ -203,6 +210,33 @@ function filasProductos(
   conBultos = true,
   conIvaPct = true,
 ) {
+  return igualarColumnasValor(filasProductosSinIgualar(d, embeddings, conColumnas04b, conBultos, conIvaPct));
+}
+
+/**
+ * En un insert por lotes, PostgREST toma la unión de claves de todas las filas
+ * y pone NULL (no el DEFAULT) en las que no la traen. `importe_bruto_estimado`
+ * es NOT NULL: si alguna línea trae el valor sin descuento, todas deben traer
+ * las tres columnas. Si ninguna las trae (OCR), no se añaden.
+ */
+export function igualarColumnasValor<T extends Record<string, unknown>>(filas: T[]): T[] {
+  const alguna = filas.some((f) => "importe_bruto" in f || "descuento_pct" in f);
+  if (!alguna) return filas;
+  return filas.map((f) => ({
+    descuento_pct: null,
+    importe_bruto: null,
+    importe_bruto_estimado: false,
+    ...f,
+  }));
+}
+
+function filasProductosSinIgualar(
+  d: DatosNormalizados,
+  embeddings: number[][],
+  conColumnas04b: boolean,
+  conBultos = true,
+  conIvaPct = true,
+) {
   return d.productos.map((p, i) => ({
     nombre: p.nombre,
     cantidad: p.cantidad,
@@ -218,7 +252,22 @@ function filasProductos(
     // Tipo de IVA impreso en la línea (migración 20261006105000). Igual que
     // `bultos`: solo si hay valor, para no depender de que la columna exista.
     ...(conIvaPct && p.iva_pct !== null && p.iva_pct !== undefined ? { iva_pct: p.iva_pct } : {}),
+    // Valor sin descuento (migración 20261104170000). Solo lo trae la
+    // importación histórica: el OCR no lo rellena y no depende de la columna.
+    ...valorSinDescuento(p),
   }));
+}
+
+/** descuento_pct / importe_bruto / importe_bruto_estimado de la línea, solo si vienen. */
+export function valorSinDescuento(p: unknown): Record<string, number | boolean> {
+  const l = p as { descuento_pct?: unknown; importe_bruto?: unknown; importe_bruto_estimado?: unknown };
+  const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+  return {
+    ...(num(l.descuento_pct) ? { descuento_pct: l.descuento_pct as number } : {}),
+    ...(num(l.importe_bruto)
+      ? { importe_bruto: l.importe_bruto as number, importe_bruto_estimado: l.importe_bruto_estimado === true }
+      : {}),
+  };
 }
 
 /** ¿El error es que falta la columna `bultos` (migración 20261005150000 sin aplicar)? */
@@ -360,7 +409,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   // Página suelta de un documento de varias («Página 2/2»): sus líneas llevan
   // su número de página (así, al llegar las demás, se sabe cuáles faltan) y
   // un aviso de que faltan las otras.
-  const pagSuelta = (e.paginas ?? 1) <= 1 ? leerPagina(d) : null;
+  const pagSuelta = !e.documentoCompleto && (e.paginas ?? 1) <= 1 ? leerPagina(d) : null;
   const alertasPrevias = pagSuelta ? [...e.alertasPrevias, alertaPaginaSuelta(pagSuelta)] : e.alertasPrevias;
   if (pagSuelta) d.productos = d.productos.map((p) => ({ ...p, pagina: pagSuelta.actual }));
 
@@ -386,13 +435,14 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   };
   const extra04b = { paginas: Math.min(20, Math.max(1, e.paginas ?? 1)), ...(e.ocrTrabajoId ? { ocr_trabajo_id: e.ocrTrabajoId } : {}) };
   let conColumnas04b = true;
-  let ins = await supabase.from("facturas").insert({ ...cabecera, ...extra04b }).select("id").single();
+  const extra = e.cabeceraExtra ?? {};
+  let ins = await supabase.from("facturas").insert({ ...cabecera, ...extra04b, ...extra }).select("id").single();
   if (ins.error && esColumnaNueva(ins.error.message) && !e.ocrTrabajoId) {
     // Migración 20261005120000 sin aplicar: el camino de una página sigue
     // funcionando como en v101 (sin pagina/orden).
     console.warn("[procesar-factura] columnas 04b ausentes; se guarda sin ellas:", ins.error.message);
     conColumnas04b = false;
-    ins = await supabase.from("facturas").insert(cabecera).select("id").single();
+    ins = await supabase.from("facturas").insert({ ...cabecera, ...extra }).select("id").single();
   }
   if (ins.error) throw new Error(`insert factura: ${ins.error.message}`);
   const facturaId: number = ins.data.id;

@@ -26,3 +26,11 @@ describe("carpetas de Drive: proveedor → mes", () => {
     expect(carpetaProveedor("x".repeat(200))).toHaveLength(80);
   });
 });
+
+describe("limpiarConfigDrive", () => {
+  it("quita saltos de línea y espacios pegados con los secretos", async () => {
+    const { limpiarConfigDrive } = await import("./archivo.ts");
+    expect(limpiarConfigDrive({ clientId: "id.apps\n", clientSecret: " s ", refreshToken: "1//t\r\n", parentFolder: "carpeta\n" }))
+      .toEqual({ clientId: "id.apps", clientSecret: "s", refreshToken: "1//t", parentFolder: "carpeta" });
+  });
+});

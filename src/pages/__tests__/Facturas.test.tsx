@@ -43,6 +43,12 @@ vi.mock("@/hooks/useGastoIa", () => ({
 
 vi.mock("@/hooks/useEstadisticasLectura", () => ({ useEstadisticasLectura: () => ({ data: null }) }));
 
+const rol = { isAdmin: false };
+vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ role: null, isAdmin: rol.isAdmin, permissions: [], loading: false }) }));
+vi.mock("@/components/facturas/ImportacionHistoricaDialog", () => ({
+  ImportacionHistoricaDialog: ({ open }: { open: boolean }) => (open ? <p>Diálogo de importación histórica</p> : null),
+}));
+
 import Facturas from "@/pages/Facturas";
 
 const fila = (over: Partial<FilaGastoIa>): FilaGastoIa => ({
@@ -68,6 +74,20 @@ afterEach(() => {
   vi.restoreAllMocks();
   Object.defineProperty(window, "innerHeight", { configurable: true, value: original.innerHeight });
   gasto.filas = [];
+  rol.isAdmin = false;
+});
+
+describe("Facturas · importación histórica (solo administradores)", () => {
+  it("un administrador ve el botón en Cargar y abre el diálogo", () => {
+    rol.isAdmin = true;
+    montar("/facturas?tab=cargar");
+    fireEvent.click(screen.getByRole("button", { name: /Importación histórica/ }));
+    expect(screen.getByText("Diálogo de importación histórica")).toBeInTheDocument();
+  });
+  it("quien no es administrador no lo ve", () => {
+    montar("/facturas?tab=cargar");
+    expect(screen.queryByRole("button", { name: /Importación histórica/ })).toBeNull();
+  });
 });
 
 describe("Facturas · pestañas", () => {
