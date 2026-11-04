@@ -200,6 +200,12 @@ verify_jwt = true
 [functions.instagram-estado]
 verify_jwt = true
 
+# Biblioteca de fotos de Instagram en Google Drive (listar, subir, miniatura,
+# preparar copia temporal en el bucket). Mismo permiso (marketing) y mismos
+# secretos de Google que las facturas + GOOGLE_DRIVE_MARKETING_FOLDER_ID.
+[functions.instagram-drive]
+verify_jwt = true
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — SIN autenticación propia: el gateway es lo único delante

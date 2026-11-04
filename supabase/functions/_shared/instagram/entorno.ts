@@ -134,8 +134,17 @@ export function describirVariables(env: Entorno): DescripcionVariable[] {
   });
 }
 
-/** Nombres que leen las funciones de Instagram (secretos de Meta + los de Supabase que inyecta la plataforma). */
-export const NOMBRES_ENTORNO = [...VARIABLES_META.map((v) => v.nombre), "SUPABASE_URL", "SUPABASE_ANON_KEY"] as const;
+/** Nombres que leen las funciones de Instagram (secretos de Meta y de Google + los de Supabase que inyecta la plataforma). */
+export const NOMBRES_ENTORNO = [
+  ...VARIABLES_META.map((v) => v.nombre),
+  "SUPABASE_URL",
+  "SUPABASE_ANON_KEY",
+  // Google Drive (archivo de fotos y piezas publicadas; ver drive.ts).
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_REFRESH_TOKEN",
+  "GOOGLE_DRIVE_MARKETING_FOLDER_ID",
+] as const;
 
 /** Entorno de la Edge Function: solo los nombres que hacen falta (nunca Deno.env entero). */
 export function entornoDeno(): Record<string, string | undefined> {

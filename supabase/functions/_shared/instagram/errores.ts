@@ -241,7 +241,7 @@ export interface ParametrosErrorInstagram {
 }
 
 export class ErrorInstagram extends Error {
-  readonly name = "ErrorInstagram";
+  override readonly name = "ErrorInstagram";
   readonly tipo: TipoErrorInstagram;
   readonly comoArreglarlo: string;
   readonly reintentable: boolean;

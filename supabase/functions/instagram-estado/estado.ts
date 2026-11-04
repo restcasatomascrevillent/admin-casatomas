@@ -13,10 +13,17 @@
  *          cuota: { usadas, total, restantes, ventanaHoras } | null,
  *          metodoVerificacion: "debug_token_app"|"debug_token_propio"|"me_permissions"|"inferencia"|null,
  *          versionApi, tokenEnmascarado, comprobaciones: [{ seccion, nombre, estado, detalle, comoArreglarlo? }],
- *          noVerificado: string[], entornoSupabase: "demo"|"produccion"|"otro" }
+ *          noVerificado: string[], entornoSupabase: "demo"|"produccion"|"otro",
+ *          drive: { ok, alcance: "completo"|"drive.file"|"otro"|null, alcances: string[],
+ *                   carpeta: { nombre, escribible } | null, comprobaciones: [{ nombre, estado, detalle, comoArreglarlo? }], avisos } }
+ *   «drive» es la comprobación de Google Drive (archivo de fotos y piezas
+ *   publicadas): secretos presentes o no (nunca su valor), alcance del token
+ *   (nunca el token) y si la carpeta «marketing» se ve y se puede escribir.
+ *   No cambia «ok», que sigue siendo «se puede publicar en Instagram».
  *   401 sin sesión · 403 sin Marketing.
  */
 import { comprobarEstado } from "../_shared/instagram/comprobacion.ts";
+import { comprobarDrive } from "../_shared/instagram/drive.ts";
 import { entornoDeno } from "../_shared/instagram/entorno.ts";
 import { json, jsonAuth, opciones } from "../_shared/instagram/http.ts";
 import { registro } from "../_shared/instagram/secretos.ts";
@@ -41,9 +48,15 @@ export async function manejarEstado(request: Request, deps: DependenciasEstadoHt
   if ("motivo" in auth) return jsonAuth(auth.estado, auth.motivo);
   try {
     const f = deps.fetch;
-    const r = await comprobarEstado(env, { fetch: f ? (u, i) => f(u, i) : undefined, dormir: deps.dormir });
+    const [r, drive] = await Promise.all([
+      comprobarEstado(env, { fetch: f ? (u, i) => f(u, i) : undefined, dormir: deps.dormir }),
+      comprobarDrive(env, { fetch: f }).catch((e) => {
+        registro("error", "instagram-estado", "Drive", e);
+        return { ok: false, alcance: null, alcances: [], carpeta: null, comprobaciones: [{ nombre: "Google Drive", estado: "falla" as const, detalle: "no se pudo comprobar" }], avisos: [] };
+      }),
+    ]);
     const ref = /^https:\/\/([a-z0-9]+)\.supabase\.co/.exec(auth.sesion.sb.url)?.[1] ?? "";
-    return json(200, { ...r, entornoSupabase: PROYECTOS[ref] ?? "otro" });
+    return json(200, { ...r, entornoSupabase: PROYECTOS[ref] ?? "otro", drive });
   } catch (e) {
     registro("error", "instagram-estado", "fallo", e);
     return json(500, { ok: false, error: "No se pudo comprobar la conexión con Instagram" });

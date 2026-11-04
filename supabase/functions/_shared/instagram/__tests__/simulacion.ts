@@ -14,7 +14,7 @@ export const ENV_META = { ...ENV_SB, IG_ACCESS_TOKEN: TOKEN_META, IG_USER_ID: "1
 export const ID = "3f2b8a52-6c1e-4d7a-9b0f-1a2b3c4d5e6f";
 export const GRAPH = "https://graph.facebook.com/v26.0";
 
-export type Llamada = { url: string; metodo: string; cabeceras: Record<string, string>; cuerpo: string | null };
+export type Llamada = { url: string; metodo: string; cabeceras: Record<string, string>; cuerpo: string | null; bruto?: unknown };
 export type Manejador = (l: Llamada) => Response | Promise<Response> | undefined;
 
 export function resp(estado: number, cuerpo: unknown, cabeceras: Record<string, string> = {}): Response {
@@ -29,6 +29,13 @@ interface Escenario {
   head?: [number, string];
   /** Respuesta del DELETE en bloque de Storage (por defecto, el objeto borrado). */
   borrado?: [number, unknown];
+  /** Google (token, Drive y miniaturas): ver driveFalso(). */
+  drive?: Manejador;
+  /** Objetos de tmp/ que devuelve el listado del bucket. */
+  listado?: Array<{ name: string; created_at: string }>;
+  /** Filas de instagram_fotos (GET) y respuesta al insertar (POST). */
+  fotos?: Array<Record<string, unknown>>;
+  insertarFoto?: [number, unknown];
 }
 
 /** fetch simulado: Supabase (Auth, RPC, instagram_piezas, Storage) + Meta. */
@@ -40,7 +47,7 @@ export function falso(e: Escenario = {}) {
     const metodo = (init.method ?? "GET").toUpperCase();
     const cabeceras = Object.fromEntries(new Headers(init.headers as HeadersInit).entries());
     const cuerpo = typeof init.body === "string" ? init.body : init.body ? "[binario]" : null;
-    const l = { url, metodo, cabeceras, cuerpo };
+    const l = { url, metodo, cabeceras, cuerpo, bruto: init.body };
     llamadas.push(l);
     if (url === `${SB}/auth/v1/user`) return resp(...(e.usuario ?? [200, { id: "usuario-1" }]));
     if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, e.permiso ?? true);
@@ -55,6 +62,18 @@ export function falso(e: Escenario = {}) {
         fila = { ...fila, ...JSON.parse(cuerpo!) };
         return resp(200, [fila]);
       }
+    }
+    if (url.startsWith(`${SB}/rest/v1/instagram_fotos`)) {
+      if (metodo === "GET") return resp(200, e.fotos ?? []);
+      if (metodo === "POST") return resp(...(e.insertarFoto ?? [201, [JSON.parse(cuerpo!)]]));
+    }
+    if (url.startsWith(`${SB}/storage/v1/object/public/instagram/`) && metodo === "GET") {
+      return new Response(JPEG_MINIMO, { status: 200, headers: { "Content-Type": "image/jpeg" } });
+    }
+    if (url === `${SB}/storage/v1/object/list/instagram` && metodo === "POST") return resp(200, e.listado ?? []);
+    if (/^https:\/\/(oauth2\.googleapis\.com|www\.googleapis\.com|[a-z0-9-]+\.googleusercontent\.com)\//.test(url) && e.drive) {
+      const r = await e.drive(l);
+      if (r) return r;
     }
     if (url.startsWith(`${SB}/storage/v1/object/public/instagram/`) && metodo === "HEAD") {
       const [estado, tipo] = e.head ?? [200, "image/jpeg"];
@@ -132,3 +151,113 @@ export function metaPublicacion(o: { usadas?: number; total?: number; estados?: 
 }
 
 export const depsRapidas = { dormir: async () => undefined };
+
+// ── Google Drive simulado ────────────────────────────────────────────────────
+
+/** JPEG mínimo con cabecera SOF0 (lo justo para medidasJpeg). */
+export function jpegDe(ancho: number, alto: number): Uint8Array {
+  return new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, alto >> 8, alto & 255, ancho >> 8, ancho & 255, 0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xd9]);
+}
+export const JPEG_MINIMO = jpegDe(1080, 1350);
+
+export const RAIZ_DRIVE = "1RaizMarketing0000000000001";
+export const TOKEN_GOOGLE = "ya29.tokenDeAccesoDeGoogleSecreto123";
+export const REFRESH_GOOGLE = "1//refreshTokenDeGoogleSuperSecreto";
+export const SECRETO_GOOGLE = "GOCSPX-secretoDelClienteGoogle";
+export const ENV_DRIVE = {
+  // Con salto de línea, como el GOOGLE_CLIENT_ID real del 04-nov-2026.
+  GOOGLE_CLIENT_ID: "123-abc.apps.googleusercontent.com\n",
+  GOOGLE_CLIENT_SECRET: SECRETO_GOOGLE,
+  GOOGLE_REFRESH_TOKEN: `${REFRESH_GOOGLE}\n`,
+  GOOGLE_DRIVE_MARKETING_FOLDER_ID: RAIZ_DRIVE,
+};
+const CARPETA = "application/vnd.google-apps.folder";
+
+export interface FicheroFalso {
+  id: string;
+  name: string;
+  mimeType: string;
+  parents?: string[];
+  size?: string;
+  trashed?: boolean;
+  createdTime?: string;
+  thumbnailLink?: string;
+  imageMediaMetadata?: { width?: number; height?: number; rotation?: number };
+  capabilities?: { canAddChildren?: boolean };
+  bytes?: Uint8Array;
+}
+
+/**
+ * Drive en memoria: token (con el alcance pedido), búsqueda de carpetas,
+ * creación, listado de imágenes, metadatos, descarga, subida multipart y
+ * miniaturas. `raizVisible: false` simula el alcance drive.file con una
+ * carpeta creada a mano (404).
+ */
+export function driveFalso(o: { alcance?: string; raizVisible?: boolean; escribible?: boolean; tokenFalla?: boolean; subidaFalla?: boolean } = {}) {
+  const ficheros = new Map<string, FicheroFalso>();
+  if (o.raizVisible !== false) ficheros.set(RAIZ_DRIVE, { id: RAIZ_DRIVE, name: "marketing", mimeType: CARPETA, capabilities: { canAddChildren: o.escribible ?? true } });
+  let n = 0;
+  const nuevoId = () => `1Drive${String(++n).padStart(22, "0")}`;
+  const peticionesToken: Llamada[] = [];
+  const subidas: Array<{ meta: { name: string; parents: string[] }; bytes: number }> = [];
+
+  const m: Manejador = (l) => {
+    if (l.url === "https://oauth2.googleapis.com/token") {
+      peticionesToken.push(l);
+      if (o.tokenFalla) return resp(400, { error: "invalid_client", error_description: "Unauthorized" });
+      return resp(200, { access_token: TOKEN_GOOGLE, expires_in: 3599, scope: o.alcance ?? "https://www.googleapis.com/auth/drive", token_type: "Bearer" });
+    }
+    if (l.cabeceras.authorization !== `Bearer ${TOKEN_GOOGLE}`) return resp(401, { error: { message: "Invalid Credentials" } });
+    const u = new URL(l.url);
+    if (u.hostname.endsWith("googleusercontent.com")) return new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { "Content-Type": "image/jpeg" } });
+    if (u.pathname === "/upload/drive/v3/files" && l.metodo === "POST") {
+      if (o.subidaFalla) return resp(500, { error: { message: "Backend Error" } });
+      const texto = new TextDecoder("utf-8").decode(l.bruto as Uint8Array);
+      const meta = JSON.parse(texto.split("\r\n\r\n")[1].split("\r\n--")[0]) as { name: string; parents: string[] };
+      const id = nuevoId();
+      subidas.push({ meta, bytes: (l.bruto as Uint8Array).length });
+      ficheros.set(id, { id, name: meta.name, mimeType: "image/jpeg", parents: meta.parents, size: "100", createdTime: "2026-11-05T10:00:00Z" });
+      return resp(200, { id, name: meta.name, mimeType: "image/jpeg", parents: meta.parents });
+    }
+    if (u.pathname === "/drive/v3/files" && l.metodo === "GET") {
+      const q = u.searchParams.get("q") ?? "";
+      const padre = /'([^']+)' in parents/.exec(q)?.[1];
+      const nombre = /name='((?:[^'\\]|\\.)*)'/.exec(q)?.[1];
+      const lista = [...ficheros.values()].filter((f) => f.parents?.includes(padre ?? "") && !f.trashed);
+      if (q.includes(`mimeType='${CARPETA}'`)) return resp(200, { files: lista.filter((f) => f.mimeType === CARPETA && f.name === nombre) });
+      return resp(200, { files: lista.filter((f) => f.mimeType.startsWith("image/")).map(({ bytes: _b, ...f }) => f) });
+    }
+    if (u.pathname === "/drive/v3/files" && l.metodo === "POST") {
+      const meta = JSON.parse(l.cuerpo!) as { name: string; parents: string[]; mimeType: string };
+      if (!ficheros.has(meta.parents[0])) return resp(404, { error: { message: "File not found" } });
+      const id = nuevoId();
+      ficheros.set(id, { id, name: meta.name, mimeType: meta.mimeType, parents: meta.parents });
+      return resp(200, { id });
+    }
+    const ruta = /^\/drive\/v3\/files\/([A-Za-z0-9_-]+)$/.exec(u.pathname);
+    if (ruta && l.metodo === "GET") {
+      const f = ficheros.get(ruta[1]);
+      if (!f) return resp(404, { error: { message: `File not found: ${ruta[1]}.` } });
+      if (u.searchParams.get("alt") === "media") return new Response(f.bytes ?? JPEG_MINIMO, { status: 200, headers: { "Content-Type": f.mimeType } });
+      const { bytes: _b, ...meta } = f;
+      return resp(200, meta);
+    }
+    return undefined;
+  };
+
+  /** Crea (si falta) la carpeta de fotos de una marca y mete ahí un fichero. Devuelve el id de la carpeta. */
+  const ponerFoto = (marca: string, f: Partial<FicheroFalso> & { id: string }) => {
+    const buscar = (nombre: string, padre: string) => {
+      const hay = [...ficheros.values()].find((x) => x.name === nombre && x.parents?.includes(padre));
+      if (hay) return hay.id;
+      const id = nuevoId();
+      ficheros.set(id, { id, name: nombre, mimeType: CARPETA, parents: [padre] });
+      return id;
+    };
+    const carpeta = buscar(marca, buscar("fotos", buscar("instagram", RAIZ_DRIVE)));
+    ficheros.set(f.id, { name: `${f.id}.jpg`, mimeType: "image/jpeg", size: "200000", createdTime: "2026-11-01T10:00:00Z", parents: [carpeta], ...f });
+    return carpeta;
+  };
+
+  return { m, ficheros, subidas, peticionesToken, ponerFoto };
+}

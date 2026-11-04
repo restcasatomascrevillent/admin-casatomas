@@ -189,3 +189,121 @@ export async function borrarJpeg(s: Sesion, ruta: string): Promise<{ borrado: bo
     return { borrado: false, motivo: sanear(`No se pudo borrar el JPEG: ${(e as Error)?.message ?? e}`) };
   }
 }
+
+// ── Escala temporal en el bucket y fotos de Drive (instagram-drive) ──────────
+
+/** Copias temporales de fotos de Drive para la vista previa y el render: tmp/<uuid>.<ext>. */
+export const RE_RUTA_TMP = /^tmp\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp)$/;
+
+export function esRutaTmp(v: unknown): v is string {
+  return typeof v === "string" && RE_RUTA_TMP.test(v);
+}
+
+/** Sube un objeto al bucket con el JWT del usuario (RLS del bucket). */
+export async function subirObjeto(s: Sesion, ruta: string, bytes: Uint8Array, tipo: string): Promise<void> {
+  const r = await s.fetch(`${s.sb.url}/storage/v1/object/${BUCKET}/${ruta.split("/").map(encodeURIComponent).join("/")}`, {
+    method: "POST",
+    headers: cabeceras(s, { "Content-Type": tipo, "Cache-Control": "max-age=3600", "x-upsert": "false" }),
+    body: bytes as Uint8Array<ArrayBuffer>,
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudo subir al bucket (${r.status}): ${await detalle(r)}`, r.status);
+}
+
+export interface ObjetoBucket {
+  name: string;
+  created_at?: string | null;
+}
+
+/** Objetos de una carpeta del bucket (los más antiguos primero). Nunca lanza: [] si falla. */
+export async function listarObjetos(s: Sesion, carpeta: string, limite = 200): Promise<ObjetoBucket[]> {
+  try {
+    const r = await s.fetch(`${s.sb.url}/storage/v1/object/list/${BUCKET}`, {
+      method: "POST",
+      headers: cabeceras(s, { "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefix: carpeta, limit: limite, offset: 0, sortBy: { column: "created_at", order: "asc" } }),
+      signal: AbortSignal.timeout(MS_TIEMPO),
+    });
+    if (!r.ok) return [];
+    const lista = (await r.json().catch(() => [])) as ObjetoBucket[];
+    return Array.isArray(lista) ? lista.filter((o) => typeof o?.name === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Borra objetos del bucket. Devuelve cuántos borró. Nunca lanza. */
+export async function borrarObjetos(s: Sesion, rutas: string[]): Promise<number> {
+  if (!rutas.length) return 0;
+  try {
+    const r = await s.fetch(`${s.sb.url}/storage/v1/object/${BUCKET}`, {
+      method: "DELETE",
+      headers: cabeceras(s, { "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefixes: rutas }),
+      signal: AbortSignal.timeout(MS_TIEMPO),
+    });
+    if (!r.ok) return 0;
+    const lista = (await r.json().catch(() => null)) as unknown[] | null;
+    return Array.isArray(lista) ? lista.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Fila de instagram_fotos (metadatos de una foto de Drive). */
+export interface FilaFotoDrive {
+  id: string;
+  marca: string;
+  drive_id: string | null;
+  ancho: number;
+  alto: number;
+  tipo: string;
+  descripcion: string | null;
+}
+
+const COLUMNAS_FOTO_DRIVE = "id,marca,drive_id,ancho,alto,tipo,descripcion";
+
+/**
+ * Filas de instagram_fotos de una marca con drive_id (RLS del usuario). Si la
+ * migración 20261105150000_instagram_drive aún no está aplicada (no existe
+ * drive_id), devuelve [] y `sinColumna: true` en vez de fallar.
+ */
+export async function leerFotosDrive(s: Sesion, marca: string): Promise<{ filas: FilaFotoDrive[]; sinColumna: boolean }> {
+  const r = await s.fetch(
+    `${s.sb.url}/rest/v1/instagram_fotos?marca=eq.${encodeURIComponent(marca)}&drive_id=not.is.null&select=${COLUMNAS_FOTO_DRIVE}&limit=1000`,
+    { headers: cabeceras(s, { Accept: "application/json" }), signal: AbortSignal.timeout(MS_TIEMPO) },
+  );
+  if (r.status === 400 || r.status === 404) {
+    const texto = await detalle(r);
+    if (/drive_id|instagram_fotos|42703|42P01|PGRST/.test(texto)) return { filas: [], sinColumna: true };
+    throw new ErrorSupabase(`No se pudieron leer las fotos (${r.status}): ${texto}`, r.status);
+  }
+  if (!r.ok) throw new ErrorSupabase(`No se pudieron leer las fotos (${r.status}): ${await detalle(r)}`, r.status);
+  const filas = (await r.json().catch(() => [])) as FilaFotoDrive[];
+  return { filas: Array.isArray(filas) ? filas : [], sinColumna: false };
+}
+
+/** Guarda la fila de una foto subida a Drive. */
+export async function insertarFotoDrive(s: Sesion, fila: Omit<FilaFotoDrive, "drive_id"> & { drive_id: string }): Promise<FilaFotoDrive> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_fotos?select=${COLUMNAS_FOTO_DRIVE}`, {
+    method: "POST",
+    headers: cabeceras(s, { "Content-Type": "application/json", Prefer: "return=representation" }),
+    body: JSON.stringify({ ...fila, ruta: null }),
+    signal: AbortSignal.timeout(MS_TIEMPO),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudo guardar la foto (${r.status}): ${await detalle(r)}`, r.status);
+  const filas = (await r.json()) as FilaFotoDrive[];
+  if (!filas[0]) throw new ErrorSupabase("No se pudo guardar la foto (sin permiso)", 403);
+  return filas[0];
+}
+
+/** Anota el id de Drive del JPEG publicado (columna de 20261105150000_instagram_drive). */
+export async function anotarDrivePieza(s: Sesion, id: string, driveId: string): Promise<void> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: cabeceras(s, { "Content-Type": "application/json", Prefer: "return=minimal" }),
+    body: JSON.stringify({ drive_id: driveId }),
+    signal: AbortSignal.timeout(MS_TIEMPO),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudo anotar el id de Drive (${r.status}): ${await detalle(r)}`, r.status);
+}

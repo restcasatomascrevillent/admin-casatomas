@@ -6,7 +6,8 @@
  *
  *   Petición: POST `${SUPABASE_URL}/functions/v1/instagram-publicar` con
  *             `Authorization: Bearer <JWT de Supabase>` + `apikey` y JSON
- *             { "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "<id para reintentar>" }
+ *             { "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "<id para reintentar>",
+ *               "fotoTmp"?: "tmp/<uuid>.jpg" (copia temporal de la foto de Drive usada; se borra al publicar) }
  *
  *   Flujo: pieza (RLS) → caption (2200 caracteres, 30 #, 20 @) → HEAD de la
  *   URL pública del JPEG (200 + image/jpeg) → cuota (se aborta si usadas ≥
@@ -16,6 +17,7 @@
  *   200: { ok: true, id, dryRun, publicado, estado: "prueba_ok"|"publicada",
  *          contenedor: { id, estado }, urlJpeg, mediaId, permalink,
  *          imagenEnBucket (solo al publicar: false = JPEG borrado del bucket),
+ *          driveId (solo al publicar: id del JPEG en Drive, o null si no se pudo guardar),
  *          cuota: { usadas, total, restantes, ventanaHoras }, caption: { caracteres, hashtags, menciones }, avisos }
  *   202: { ok: true, estado: "en_proceso", id, dryRun, publicado: false, contenedor: { id, estado }, cuota, reintentar: { id, contenedorId, dryRun } }
  *        → Meta aún procesa la imagen: repetir la petición con ese contenedorId.
@@ -28,22 +30,41 @@
  *   La fila se actualiza: dryRun → «prueba_ok» + contenedor_id; real →
  *   «publicada» + media_id + permalink; error de Meta → «error» + mensaje saneado.
  *
- *   Tras una publicación REAL se borra el JPEG del bucket (es solo una escala;
- *   el archivo definitivo vive en Drive) con el JWT del usuario. imagen_ruta
- *   se conserva: «publicada» = el fichero ya no está en el bucket, salvo que
- *   `error` empiece por AVISO_JPEG_NO_BORRADO. La respuesta lleva
- *   `imagenEnBucket`. En prueba (dryRun) NO se borra: el contenedor necesita
- *   la URL hasta que se publique.
+ *   Tras una publicación REAL el JPEG se archiva en Google Drive
+ *   (marketing/instagram/publicadas/AAAA-MM, ver _shared/instagram/drive.ts) y
+ *   su id se guarda en instagram_piezas.drive_id. SOLO si Drive lo tiene se
+ *   borra el JPEG del bucket (es solo una escala) con el JWT del usuario, y
+ *   también la copia tmp/ de la foto usada (`fotoTmp`). Si Drive falla o no
+ *   está configurado, el JPEG se queda en el bucket y `error` empieza por
+ *   AVISO_SIN_DRIVE. imagen_ruta se conserva: «publicada» = el fichero ya no
+ *   está en el bucket, salvo que `error` empiece por AVISO_SIN_DRIVE o por
+ *   AVISO_JPEG_NO_BORRADO. La respuesta lleva `imagenEnBucket` y `driveId`.
+ *   En prueba (dryRun) NO se borra nada: el contenedor necesita la URL hasta
+ *   que se publique.
  *
  *   Todo como el usuario (clave pública + su JWT): nunca service_role.
  */
+import { carpetaPublicadas, leerConfigDrive } from "../_shared/instagram/drive.ts";
 import { ClienteGraph, type FuncionFetch, type InfoContenedor } from "../_shared/instagram/cliente.ts";
 import { cuotaDe, type CuotaPublicacion } from "../_shared/instagram/comprobacion.ts";
 import { entornoDeno, leerConfigMeta } from "../_shared/instagram/entorno.ts";
 import { ErrorInstagram, errorInstagramAJson, estadoHttpDeError } from "../_shared/instagram/errores.ts";
 import { json, jsonAuth, leerJson, opciones } from "../_shared/instagram/http.ts";
 import { registro, sanear } from "../_shared/instagram/secretos.ts";
-import { actualizarPieza, anotarError, autorizarMarketing, borrarJpeg, ErrorSupabase, leerPieza, urlPublica, type FilaPieza, type Sesion } from "../_shared/instagram/supabase.ts";
+import {
+  actualizarPieza,
+  anotarDrivePieza,
+  anotarError,
+  autorizarMarketing,
+  borrarJpeg,
+  borrarObjetos,
+  ErrorSupabase,
+  esRutaTmp,
+  leerPieza,
+  urlPublica,
+  type FilaPieza,
+  type Sesion,
+} from "../_shared/instagram/supabase.ts";
 import { esUuid, MAX_BYTES_IMAGEN, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
 
 const ETIQUETA = "instagram-publicar";
@@ -56,6 +77,8 @@ export const PRESUPUESTO_SONDEO_MS = 55_000;
 export const INTERVALO_SONDEO_MS = 3_000;
 /** Prefijo de `error` en una pieza publicada cuyo JPEG no se pudo borrar del bucket. */
 export const AVISO_JPEG_NO_BORRADO = "Publicada, pero el JPEG no se pudo borrar del bucket «instagram»:";
+/** Prefijo de `error` en una pieza publicada que no se pudo archivar en Drive (el JPEG sigue en el bucket). */
+export const AVISO_SIN_DRIVE = "Publicada, pero no se pudo guardar en Google Drive (el JPEG sigue en el bucket «instagram»):";
 
 export interface DependenciasPublicar {
   env?: Record<string, string | undefined>;
@@ -83,15 +106,19 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
 
   const cuerpo = await leerJson(request, 64 * 1024);
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
-  const entrada = cuerpo.valor as { id?: unknown; caption?: unknown; dryRun?: unknown; contenedorId?: unknown } | null;
+  const entrada = cuerpo.valor as { id?: unknown; caption?: unknown; dryRun?: unknown; contenedorId?: unknown; fotoTmp?: unknown } | null;
   if (!entrada || typeof entrada !== "object" || !esUuid(entrada.id)) return json(400, { ok: false, error: "Falta «id» (UUID de la pieza)" });
   if (typeof entrada.dryRun !== "boolean") return json(400, { ok: false, error: "«dryRun» tiene que ser true o false" });
   if (entrada.caption !== undefined && entrada.caption !== null && typeof entrada.caption !== "string") return json(400, { ok: false, error: "«caption» tiene que ser texto" });
   if (entrada.contenedorId !== undefined && (typeof entrada.contenedorId !== "string" || !/^\d+$/.test(entrada.contenedorId))) {
     return json(400, { ok: false, error: "«contenedorId» no es válido" });
   }
+  if (entrada.fotoTmp !== undefined && entrada.fotoTmp !== null && !esRutaTmp(entrada.fotoTmp)) {
+    return json(400, { ok: false, error: "«fotoTmp» tiene que ser una ruta tmp/<uuid>.jpg del bucket" });
+  }
   const id = entrada.id;
   const dryRun = entrada.dryRun;
+  const fotoTmp = typeof entrada.fotoTmp === "string" ? entrada.fotoTmp : null;
 
   const meta = leerConfigMeta(env);
   if ("problemas" in meta) {
@@ -256,14 +283,24 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
       avisos.push("Publicado, pero no se pudo obtener el enlace (permalink).");
     }
     const cuotaDespues = { ...cuota, usadas: cuota.usadas + 1, restantes: cuota.restantes === null ? null : Math.max(0, cuota.restantes - 1) };
-    // El bucket es solo una escala (el archivo definitivo vive en Drive): ya
-    // publicada, Meta no necesita la URL y el JPEG se borra. imagen_ruta se
-    // conserva; «publicada» implica que el fichero ya no está en el bucket
-    // salvo que `error` diga que no se pudo borrar. En prueba NO se borra.
-    const borrado = await borrarJpeg(s, fila.imagen_ruta);
-    if (!borrado.borrado) {
-      registro("warn", ETIQUETA, "publicada, pero el JPEG sigue en el bucket", { id, motivo: borrado.motivo });
-      avisos.push(`Publicado, pero no se pudo borrar el JPEG del bucket: ${borrado.motivo}`);
+    // El bucket es solo una escala: el archivo definitivo va a Drive. Solo si
+    // Drive lo tiene se borra el JPEG del bucket (y la copia tmp/ de la foto).
+    // En prueba NO se llega aquí.
+    const archivo = await archivarEnDrive(s, env, { ...fila, caption }, urlJpeg, deps);
+    let borrado: { borrado: boolean; motivo?: string } = { borrado: false };
+    let errorFila: string | null = null;
+    if (archivo.driveId) {
+      borrado = await borrarJpeg(s, fila.imagen_ruta);
+      if (!borrado.borrado) {
+        registro("warn", ETIQUETA, "publicada, pero el JPEG sigue en el bucket", { id, motivo: borrado.motivo });
+        avisos.push(`Publicado y guardado en Drive, pero no se pudo borrar el JPEG del bucket: ${borrado.motivo}`);
+        errorFila = `${AVISO_JPEG_NO_BORRADO} ${borrado.motivo ?? ""}`.trim();
+      }
+      if (fotoTmp) await borrarObjetos(s, [fotoTmp]);
+    } else {
+      registro("warn", ETIQUETA, "publicada, pero sin archivar en Drive", { id, motivo: archivo.motivo });
+      avisos.push(`Publicado, pero no se pudo guardar en Google Drive: ${archivo.motivo}. El JPEG se queda en el bucket «instagram» (no se ha borrado).`);
+      errorFila = `${AVISO_SIN_DRIVE} ${archivo.motivo}`.trim();
     }
     try {
       await actualizarPieza(s, id, {
@@ -272,11 +309,19 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
         media_id: mediaId,
         permalink,
         caption,
-        error: borrado.borrado ? null : `${AVISO_JPEG_NO_BORRADO} ${borrado.motivo ?? ""}`.trim(),
+        error: errorFila,
       });
     } catch (e) {
       registro("error", ETIQUETA, "publicada pero no se pudo anotar", e);
       avisos.push("Publicado en Instagram, pero no se pudo guardar el estado en el panel.");
+    }
+    if (archivo.driveId) {
+      try {
+        await anotarDrivePieza(s, id, archivo.driveId);
+      } catch (e) {
+        registro("warn", ETIQUETA, "no se pudo anotar drive_id", e);
+        avisos.push("El JPEG está en Drive, pero no se pudo anotar en la pieza (¿falta la migración 20261105150000_instagram_drive?).");
+      }
     }
     registro("info", ETIQUETA, "publicada", { id, mediaId, usuario: s.usuario });
     return json(200, {
@@ -288,6 +333,7 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
       contenedor: { id: contenedorId, estado: info.estado },
       urlJpeg,
       imagenEnBucket: !borrado.borrado,
+      driveId: archivo.driveId,
       mediaId,
       permalink,
       cuota: cuotaDespues,
@@ -307,5 +353,32 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
     registro("error", ETIQUETA, "fallo", e);
     await anotarError(s, id, (e as Error)?.message ?? String(e));
     return json(500, { ok: false, error: "No se pudo publicar", detalle: sanear((e as Error)?.message ?? e) });
+  }
+}
+
+/**
+ * Guarda el JPEG publicado en Drive (marketing/instagram/publicadas/AAAA-MM).
+ * Nunca lanza: devuelve el id de Drive o el motivo por el que no se pudo.
+ */
+export async function archivarEnDrive(
+  s: Sesion,
+  env: Record<string, string | undefined>,
+  fila: FilaPieza,
+  urlJpeg: string,
+  deps: DependenciasPublicar,
+): Promise<{ driveId: string | null; motivo: string }> {
+  const cfg = leerConfigDrive(env, { fetch: deps.fetch });
+  if ("faltan" in cfg) return { driveId: null, motivo: cfg.problema };
+  try {
+    const r = await (deps.fetch ?? fetch)(urlJpeg, { signal: AbortSignal.timeout(20_000) });
+    if (!r.ok) return { driveId: null, motivo: `no se pudo leer el JPEG del bucket (${r.status})` };
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    const fecha = new Date((deps.ahora ?? Date.now)());
+    const carpeta = await carpetaPublicadas(cfg.config, fecha);
+    const nombre = `${fecha.toISOString().slice(0, 10)}_${fila.marca}_${fila.formato}_${fila.id.slice(0, 8)}.jpg`;
+    const subido = await cfg.config.cliente.subir(carpeta, nombre, "image/jpeg", bytes, fila.caption ? fila.caption.slice(0, 500) : undefined);
+    return { driveId: subido.id, motivo: "" };
+  } catch (e) {
+    return { driveId: null, motivo: sanear((e as Error)?.message ?? String(e)) };
   }
 }

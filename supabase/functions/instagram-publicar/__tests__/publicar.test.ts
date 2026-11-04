@@ -3,15 +3,44 @@
  * Edge Function instagram-publicar (antes api/instagram-publicar.ts de Vercel)
  * sin red: fetch simulado de Supabase y de la Graph API. Autorización
  * (can_write_section('marketing') con el JWT del usuario), dry-run sin
- * media_publish, cuota, 202 «en_proceso», borrado del JPEG, saneado del token
- * y secretos que faltan → mensaje que apunta a los secretos de Supabase.
+ * media_publish, cuota, 202 «en_proceso», archivo en Google Drive y borrado
+ * del JPEG solo si Drive lo tiene, saneado del token y secretos que faltan →
+ * mensaje que apunta a los secretos de Supabase.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { manejarPublicar } from "../publicar.ts";
 import { olvidarSecretos } from "../../_shared/instagram/secretos.ts";
-import { depsRapidas, ENV_META, ENV_SB, falso, FILA_GENERADA, ID, JWT, metaPublicacion, peticion, SB, TOKEN_META } from "../../_shared/instagram/__tests__/simulacion.ts";
+import { olvidarTokenDrive } from "../../_shared/google-drive.ts";
+import { olvidarCarpetasDrive } from "../../_shared/instagram/drive.ts";
+import {
+  depsRapidas,
+  driveFalso,
+  ENV_DRIVE,
+  ENV_META,
+  ENV_SB,
+  falso,
+  FILA_GENERADA,
+  ID,
+  JWT,
+  metaPublicacion,
+  peticion,
+  REFRESH_GOOGLE,
+  SB,
+  SECRETO_GOOGLE,
+  TOKEN_GOOGLE,
+  TOKEN_META,
+} from "../../_shared/instagram/__tests__/simulacion.ts";
 
-beforeEach(() => olvidarSecretos());
+const ENV_CON_DRIVE = { ...ENV_META, ...ENV_DRIVE };
+const TMP = "tmp/0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.jpg";
+/** 5 de noviembre de 2026 a mediodía (UTC). */
+const ahoraFija = () => Date.UTC(2026, 10, 5, 12, 0, 0);
+
+beforeEach(() => {
+  olvidarSecretos();
+  olvidarTokenDrive();
+  olvidarCarpetasDrive();
+});
 afterEach(() => vi.restoreAllMocks());
 
 describe("Edge Function instagram-publicar", () => {
@@ -81,8 +110,8 @@ describe("Edge Function instagram-publicar", () => {
 
   it("publicación real: media_publish solo DESPUÉS de FINISHED, con permalink y fila «publicada»", async () => {
     const { m, orden } = metaPublicacion({ estados: ["IN_PROGRESS", "IN_PROGRESS", "FINISHED"] });
-    const { f, fila } = falso({ fila: FILA_GENERADA, meta: m });
-    const r = await manejarPublicar(peticion({ id: ID, caption: "Nuevo texto", dryRun: false }), { env: ENV_META, fetch: f, ...depsRapidas });
+    const { f, fila } = falso({ fila: FILA_GENERADA, meta: m, drive: driveFalso().m });
+    const r = await manejarPublicar(peticion({ id: ID, caption: "Nuevo texto", dryRun: false }), { env: ENV_CON_DRIVE, fetch: f, ...depsRapidas });
     expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({
       publicado: true,
@@ -95,24 +124,88 @@ describe("Edge Function instagram-publicar", () => {
     expect(fila()).toMatchObject({ estado: "publicada", media_id: "1800000000000009", permalink: "https://www.instagram.com/p/ABC123/", caption: "Nuevo texto", error: null });
   });
 
-  it("tras publicar de verdad borra el JPEG del bucket con el JWT del usuario (y conserva imagen_ruta)", async () => {
+  it("tras publicar de verdad guarda el JPEG en Drive (publicadas/AAAA-MM), anota drive_id y SOLO entonces borra el JPEG y la copia tmp/", async () => {
+    const { m } = metaPublicacion();
+    const drive = driveFalso();
+    const { f, llamadas, fila } = falso({ fila: FILA_GENERADA, meta: m, drive: drive.m });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: false, fotoTmp: TMP }), { env: ENV_CON_DRIVE, fetch: f, ...depsRapidas, ahora: ahoraFija });
+    const j = await r.json();
+    expect(j).toMatchObject({ publicado: true, imagenEnBucket: false });
+    expect(j.driveId).toMatch(/^1Drive/);
+    // Carpetas creadas: marketing/instagram/publicadas/2026-11, y el JPEG dentro.
+    const nombres = (id: string | undefined): string[] => {
+      const f2 = id ? drive.ficheros.get(id) : undefined;
+      return f2 ? [...nombres(f2.parents?.[0]), f2.name] : [];
+    };
+    expect(nombres(j.driveId)).toEqual(["marketing", "instagram", "publicadas", "2026-11", `2026-11-05_casa-tomas_post_${ID.slice(0, 8)}.jpg`]);
+    expect(drive.subidas[0].meta.parents).toHaveLength(1);
+    // Orden: media_publish → subida a Drive → DELETE del JPEG → DELETE de la copia tmp.
+    const iPublish = llamadas.findIndex((l) => l.url.endsWith("/media_publish"));
+    const iDrive = llamadas.findIndex((l) => l.url.startsWith("https://www.googleapis.com/upload/"));
+    const borrados = llamadas.map((l, i) => [l, i] as const).filter(([l]) => l.metodo === "DELETE");
+    expect(iDrive).toBeGreaterThan(iPublish);
+    expect(borrados.map(([, i]) => i).every((i) => i > iDrive)).toBe(true);
+    expect(borrados.map(([l]) => JSON.parse(l.cuerpo!))).toEqual([{ prefixes: [`piezas/2026-11/${ID}.jpg`] }, { prefixes: [TMP] }]);
+    for (const [l] of borrados) {
+      expect(l.url).toBe(`${SB}/storage/v1/object/instagram`);
+      expect(l.cabeceras.authorization).toBe(`Bearer ${JWT}`);
+    }
+    expect(fila()).toMatchObject({ estado: "publicada", imagen_ruta: `piezas/2026-11/${ID}.jpg`, error: null, drive_id: j.driveId });
+    // Los secretos de Google: limpiados (trim) al pedir el token y nunca en la respuesta.
+    const token = new URLSearchParams(String(drive.peticionesToken[0].bruto));
+    expect(token.get("client_id")).toBe("123-abc.apps.googleusercontent.com");
+    expect(token.get("refresh_token")).toBe(REFRESH_GOOGLE);
+    const texto = JSON.stringify(j);
+    for (const secreto of [TOKEN_GOOGLE, REFRESH_GOOGLE, SECRETO_GOOGLE]) expect(texto).not.toContain(secreto);
+  });
+
+  it("sin Drive configurado: publica, NO borra el JPEG del bucket y lo avisa claro", async () => {
     const { m } = metaPublicacion();
     const { f, llamadas, fila } = falso({ fila: FILA_GENERADA, meta: m });
-    const r = await manejarPublicar(peticion({ id: ID, dryRun: false }), { env: ENV_META, fetch: f, ...depsRapidas });
-    expect(await r.json()).toMatchObject({ publicado: true, imagenEnBucket: false });
-    const i = llamadas.findIndex((l) => l.metodo === "DELETE");
-    expect(i).toBeGreaterThan(llamadas.findIndex((l) => l.url.endsWith("/media_publish")));
-    const borrado = llamadas[i];
-    expect(borrado.url).toBe(`${SB}/storage/v1/object/instagram`);
-    expect(JSON.parse(borrado.cuerpo!)).toEqual({ prefixes: [`piezas/2026-11/${ID}.jpg`] });
-    expect(borrado.cabeceras.authorization).toBe(`Bearer ${JWT}`);
-    expect(fila()).toMatchObject({ estado: "publicada", imagen_ruta: `piezas/2026-11/${ID}.jpg`, error: null });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: false, fotoTmp: TMP }), { env: ENV_META, fetch: f, ...depsRapidas });
+    const j = await r.json();
+    expect(r.status).toBe(200);
+    expect(j).toMatchObject({ publicado: true, imagenEnBucket: true, driveId: null });
+    expect(llamadas.some((l) => l.metodo === "DELETE")).toBe(false);
+    expect(j.avisos.join(" ")).toMatch(/no se pudo guardar en Google Drive.*GOOGLE_DRIVE_MARKETING_FOLDER_ID.*se queda en el bucket/);
+    expect(fila()).toMatchObject({ estado: "publicada" });
+    expect(String(fila()!.error)).toMatch(/^Publicada, pero no se pudo guardar en Google Drive/);
+  });
+
+  it("si la subida a Drive falla: publica igual, NO borra nada del bucket y lo anota", async () => {
+    const { m } = metaPublicacion();
+    const drive = driveFalso({ subidaFalla: true });
+    const { f, llamadas, fila } = falso({ fila: FILA_GENERADA, meta: m, drive: drive.m });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: false, fotoTmp: TMP }), { env: ENV_CON_DRIVE, fetch: f, ...depsRapidas });
+    const j = await r.json();
+    expect(j).toMatchObject({ publicado: true, imagenEnBucket: true, driveId: null });
+    expect(llamadas.some((l) => l.metodo === "DELETE")).toBe(false);
+    expect(j.avisos.join(" ")).toMatch(/Google Drive respondió 500/);
+    expect(String(fila()!.error)).toMatch(/^Publicada, pero no se pudo guardar en Google Drive/);
+  });
+
+  it("en prueba (dryRun) no toca Drive ni borra nada", async () => {
+    const { m } = metaPublicacion();
+    const drive = driveFalso();
+    const { f, llamadas } = falso({ fila: FILA_GENERADA, meta: m, drive: drive.m });
+    await manejarPublicar(peticion({ id: ID, dryRun: true, fotoTmp: TMP }), { env: ENV_CON_DRIVE, fetch: f, ...depsRapidas });
+    expect(llamadas.some((l) => l.url.includes("googleapis.com"))).toBe(false);
+    expect(llamadas.some((l) => l.metodo === "DELETE")).toBe(false);
+  });
+
+  it("«fotoTmp» solo admite tmp/<uuid>.jpg (no deja borrar otra cosa del bucket)", async () => {
+    const { f } = falso({ fila: FILA_GENERADA });
+    for (const fotoTmp of ["piezas/2026-11/x.jpg", "tmp/../piezas/x.jpg", "tmp/no-uuid.jpg", ["tmp/x.jpg"]]) {
+      const r = await manejarPublicar(peticion({ id: ID, dryRun: false, fotoTmp }), { env: ENV_META, fetch: f });
+      expect(r.status).toBe(400);
+    }
   });
 
   it("si la RLS no deja borrar el JPEG: sigue publicada, avisa y lo anota en «error»", async () => {
     const { m } = metaPublicacion();
-    const { f, fila } = falso({ fila: FILA_GENERADA, meta: m, borrado: [200, []] });
-    const r = await manejarPublicar(peticion({ id: ID, dryRun: false }), { env: ENV_META, fetch: f, ...depsRapidas });
+    const drive = driveFalso();
+    const { f, fila } = falso({ fila: FILA_GENERADA, meta: m, borrado: [200, []], drive: drive.m });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: false }), { env: ENV_CON_DRIVE, fetch: f, ...depsRapidas });
     const j = await r.json();
     expect(r.status).toBe(200);
     expect(j).toMatchObject({ publicado: true, imagenEnBucket: true });

@@ -15,6 +15,11 @@
 // sección y bloqueados no, anon nada); subida_por no falseable; solo se
 // editan tipo y descripción; CHECK (ruta = fotos/<marca>/subidas/<id>.jpg,
 // tipo, medidas, descripción ≤ 140); auditoría; y su rollback.
+//
+// Y 20261105150000_instagram_drive.sql (archivo en Google Drive): se para si
+// falta instagram_fotos; idempotente; drive_id en fotos (único, formato, no se
+// cambia al editar) y en piezas; ruta opcional pero siempre ruta o drive_id;
+// filas antiguas intactas; RLS igual; y su rollback.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -23,6 +28,8 @@ const MIGRACION = await readFile("supabase/migrations/20261105090000_instagram.s
 const ROLLBACK = await readFile("supabase/rollbacks/20261105090000_instagram_ROLLBACK.sql", "utf8");
 const MIG_FOTOS = await readFile("supabase/migrations/20261105120000_instagram_fotos.sql", "utf8");
 const RB_FOTOS = await readFile("supabase/rollbacks/20261105120000_instagram_fotos_ROLLBACK.sql", "utf8");
+const MIG_DRIVE = await readFile("supabase/migrations/20261105150000_instagram_drive.sql", "utf8");
+const RB_DRIVE = await readFile("supabase/rollbacks/20261105150000_instagram_drive_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -318,6 +325,62 @@ ok((await q("select to_regclass('public.instagram_piezas') t")).rows[0].t !== nu
 igual(await n("select count(*)::int n from storage.buckets where id = 'instagram'"), 1, "el rollback de fotos borró el bucket");
 await db.exec(MIG_FOTOS);
 ok((await q("select to_regclass('public.instagram_fotos') t")).rows[0].t !== null, "reaplicar fotos tras el rollback");
+
+// ─── 7. Archivo en Drive (20261105150000_instagram_drive) ───────────────────
+{
+  // Sin instagram_fotos se para sin cambiar nada.
+  const otra = new PGlite();
+  await otra.exec(ANDAMIAJE);
+  await otra.exec(MIGRACION);
+  await assert.rejects(otra.exec(MIG_DRIVE), /instagram_drive: falta public\.instagram_fotos/, "no se paró sin instagram_fotos"); comprobaciones++;
+  await otra.exec("rollback");
+  igual((await otra.query(`select count(*)::int n from information_schema.columns
+    where table_name = 'instagram_piezas' and column_name = 'drive_id'`)).rows[0].n, 0, "la migración abortada añadió drive_id");
+  await otra.close();
+}
+// Una foto antigua (con ruta en el bucket) antes de migrar: tiene que seguir igual.
+const ANTIGUA = "d0000000-0000-4000-8000-000000000001";
+await subirFoto(U.MKT, filaFoto(ANTIGUA));
+await db.exec(MIG_DRIVE);
+await db.exec(MIG_DRIVE); // idempotente
+comprobaciones++;
+igual((await q("select ruta, drive_id from public.instagram_fotos where id = $1", [ANTIGUA])).rows[0],
+  { ruta: `fotos/casa-tomas/subidas/${ANTIGUA}.jpg`, drive_id: null }, "la foto antigua cambió");
+ok((await q("select relrowsecurity r from pg_class where oid = 'public.instagram_fotos'::regclass")).rows[0].r, "RLS apagada tras drive");
+
+const D1 = "d0000000-0000-4000-8000-000000000002";
+const D2 = "d0000000-0000-4000-8000-000000000003";
+const DRIVE1 = "1AbCdEfGhIjKlMnOpQrStUvWxYz012345";
+const DRIVE2 = "1ZyXwVuTsRqPoNmLkJiHgFeDcBa987654";
+const filaDrive = (id, driveId, extra = {}) => ({ id, marca: "touza", ruta: null, drive_id: driveId, ancho: 1708, alto: 2560, tipo: "coctel", descripcion: "Mojito", ...extra });
+const deDrive = (await subirFoto(U.MKT, filaDrive(D1, DRIVE1))).rows[0];
+igual([deDrive.ruta, deDrive.drive_id, deDrive.subida_por], [null, DRIVE1, U.MKT], "no se pudo guardar una foto de Drive");
+await assert.rejects(subirFoto(U.OTRA, filaDrive(D2, DRIVE2)), /row-level security/, "otra sección guardó una foto de Drive"); comprobaciones++;
+for (const [f, msg] of [
+  [filaDrive(D2, null), "sin ruta ni drive_id"],
+  [filaDrive(D2, "corto"), "drive_id demasiado corto"],
+  [filaDrive(D2, "1AbC/../../etc/passwd'--"), "drive_id con caracteres raros"],
+  [filaDrive(D2, DRIVE2, { ruta: "tmp/x.jpg" }), "ruta fuera de subidas/"],
+]) {
+  await assert.rejects(q(...insertFoto(f)), /violates check constraint/, `${msg} aceptado`); comprobaciones++;
+}
+await assert.rejects(subirFoto(U.SA, filaDrive(D2, DRIVE1)), /duplicate key|unique/, "se repitió el drive_id"); comprobaciones++;
+const editadaD = (await como(U.SA, () => q("update public.instagram_fotos set drive_id = $2, tipo = 'barra' where id = $1 returning *", [D1, DRIVE2]))).rows[0];
+igual([editadaD.drive_id, editadaD.tipo], [DRIVE1, "barra"], "se cambió el drive_id al editar (o no el tipo)");
+
+// instagram_piezas.drive_id
+const piezaD = (await crear(U.MKT)).rows[0];
+igual((await como(U.MKT, () => q("update public.instagram_piezas set drive_id = $2 where id = $1 returning drive_id", [piezaD.id, DRIVE2]))).rows[0].drive_id, DRIVE2, "no se guardó el drive_id de la pieza");
+await assert.rejects(q("update public.instagram_piezas set drive_id = 'x y' where id = $1", [piezaD.id]), /violates check constraint/, "drive_id raro en la pieza"); comprobaciones++;
+
+// Rollback de Drive: borra las filas solo de Drive, deja las antiguas y quita las columnas.
+await db.exec(RB_DRIVE);
+igual((await q("select id from public.instagram_fotos order by id")).rows.map((r) => r.id), [ANTIGUA], "el rollback de Drive no dejó solo las fotos antiguas");
+igual(await n(`select count(*)::int n from information_schema.columns where table_schema = 'public' and column_name = 'drive_id'
+  and table_name in ('instagram_fotos', 'instagram_piezas')`), 0, "el rollback de Drive dejó columnas drive_id");
+await assert.rejects(q(...insertFoto(filaFoto(D2, "casa-tomas", { ruta: null }))), /null value|not-null/, "tras el rollback la ruta no es obligatoria"); comprobaciones++;
+await db.exec(MIG_DRIVE);
+ok((await n(`select count(*)::int n from information_schema.columns where table_name = 'instagram_fotos' and column_name = 'drive_id'`)) === 1, "reaplicar Drive tras el rollback");
 
 await db.close();
 console.log(`test-instagram: ${comprobaciones} comprobaciones OK`);
