@@ -95,7 +95,8 @@ export default function Tienda() {
             </span>
           }
         />
-        <TabsContent value="vinos" className={CONTENIDO_PESTANA}>
+        {/* Columna flexible: la tabla de Vinos se queda con el alto que dejan los filtros y hace scroll por dentro. */}
+        <TabsContent value="vinos" className={cn(CONTENIDO_PESTANA, "flex flex-col")}>
           <VinosTienda config={config} puedeEditar={puedeEditar} />
         </TabsContent>
         <TabsContent value="ajustes" className={CONTENIDO_PESTANA}>

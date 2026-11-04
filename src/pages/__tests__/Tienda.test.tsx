@@ -1,8 +1,9 @@
 /**
  * Panel › Tienda (escaparate: se compra en el restaurante): Vinos (precios de
- * carta y tienda, interruptor «A la venta», buscador, enlace a la web) y
- * Ajustes (validación, vista previa y guardado), con un Supabase falso en
- * memoria que imita la RLS y la RPC de la migración 20261103150000.
+ * carta y tienda, interruptor «A la venta», filtros, contador, enlace a la web;
+ * tabla en escritorio y tarjetas en el móvil) y Ajustes (validación, vista
+ * previa y guardado), con un Supabase falso en memoria que imita la RLS y la
+ * RPC de la migración 20261103150000.
  */
 import type { ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -71,7 +72,10 @@ import Tienda from "../Tienda";
 
 /** La primera carga encadena dos consultas: con el equipo cargado puede pasar de 1 s. */
 const ESPERA = { timeout: 5000 };
-const listaVinos = () => screen.findByRole("list", { name: "Vinos de la tienda" }, ESPERA);
+/** En escritorio (1440 px, el ancho de `beforeEach`) los vinos son una tabla; en el móvil, una lista de tarjetas. */
+const tablaVinos = () => screen.findByRole("table", { name: "Vinos de la tienda" }, ESPERA);
+const filaDe = (contenedor: HTMLElement, nombre: string, rol: "row" | "listitem" = "row") =>
+  within(contenedor).getAllByRole(rol).find((f) => f.textContent?.includes(nombre)) as HTMLElement;
 const campoDescuento = () => screen.findByLabelText("Descuento sobre el precio de carta (%)", {}, ESPERA);
 
 function pintar(ruta = "/tienda") {
@@ -103,7 +107,7 @@ beforeEach(() => {
 describe("Tienda › Vinos", () => {
   it("sin pestaña de pedidos: Vinos y Ajustes, y Vinos es la de entrada", async () => {
     pintar();
-    await listaVinos();
+    await tablaVinos();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vinos", "Ajustes"]);
     expect(screen.getByRole("tab", { name: /Vinos/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Visible · 30 %")).toBeInTheDocument();
@@ -113,12 +117,12 @@ describe("Tienda › Vinos", () => {
 
   it("precio de carta y de tienda, interruptor «A la venta» y vinos que no pueden salir", async () => {
     pintar();
-    const lista = await listaVinos();
+    const lista = await tablaVinos();
     expect(screen.getByText(/1 de 3/)).toBeInTheDocument();
-    const rioja = within(lista).getAllByRole("listitem").find((li) => li.textContent?.includes("Rioja Crianza")) as HTMLElement;
+    const rioja = filaDe(lista, "Rioja Crianza");
     expect(rioja).toHaveTextContent(/24,00\s€/);
     expect(rioja).toHaveTextContent(/16,80\s€/);
-    const albarino = within(lista).getAllByRole("listitem").find((li) => li.textContent?.includes("Albariño")) as HTMLElement;
+    const albarino = filaDe(lista, "Albariño");
     expect(albarino).toHaveTextContent(/13,99\s€/);
     expect(within(lista).getByRole("switch", { name: "A la venta: Rioja Crianza" })).toBeChecked();
     expect(within(lista).getByRole("switch", { name: "A la venta: Albariño" })).not.toBeChecked();
@@ -141,7 +145,7 @@ describe("Tienda › Vinos", () => {
 
   it("el buscador filtra y permite quitar de la venta todos los mostrados (con confirmación)", async () => {
     pintar();
-    await listaVinos();
+    await tablaVinos();
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar vino" }), { target: { value: "rioja" } });
     expect(screen.queryByRole("switch", { name: "A la venta: Albariño" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Quitar de la venta el vino mostrado" }));
@@ -152,7 +156,7 @@ describe("Tienda › Vinos", () => {
 
   it("si falla, el interruptor vuelve a como estaba y se avisa", async () => {
     pintar();
-    const lista = await listaVinos();
+    const lista = await tablaVinos();
     const { supabase } = await import("@/integrations/supabase/client");
     const espia = vi.spyOn(supabase, "rpc").mockResolvedValueOnce({ data: null, error: { code: "42501", message: "No tienes permiso para cambiar los vinos de la tienda" } } as never);
     fireEvent.click(within(lista).getByRole("switch", { name: "A la venta: Rioja Crianza" }));
@@ -164,9 +168,60 @@ describe("Tienda › Vinos", () => {
   it("sin «Puede editar» los interruptores están bloqueados", async () => {
     h.puedeEditar = false;
     pintar();
-    const lista = await listaVinos();
+    const lista = await tablaVinos();
     expect(within(lista).getByRole("switch", { name: "A la venta: Rioja Crianza" })).toBeDisabled();
     expect(screen.getByText(/necesitas el permiso «Puede editar» de Tienda/)).toBeInTheDocument();
+  });
+
+  it("escritorio: tabla con cabeceras, cada vino con su categoría debajo y su estado (a la venta, quitado o no vendible)", async () => {
+    pintar();
+    const tabla = await tablaVinos();
+    expect(within(tabla).getAllByRole("columnheader").map((c) => c.textContent)).toEqual(["Vino", "Precio de carta", "Precio de tienda", "A la venta"]);
+    expect(screen.queryByRole("list", { name: "Vinos de la tienda" })).toBeNull();
+    const rioja = filaDe(tabla, "Rioja Crianza");
+    expect(rioja).toHaveAttribute("data-estado", "venta");
+    expect(within(rioja).getByText("Tintos")).toBeInTheDocument();
+    expect(filaDe(tabla, "Albariño")).toHaveAttribute("data-estado", "excluido");
+    expect(filaDe(tabla, "Vino sin precio")).toHaveAttribute("data-estado", "no-vendible");
+    // El interruptor lleva el estado (y el motivo) como descripción.
+    expect(within(tabla).getByRole("switch", { name: "A la venta: Rioja Crianza" })).toHaveAccessibleDescription("A la venta");
+    expect(within(tabla).getByRole("switch", { name: "A la venta: Albariño" })).toHaveAccessibleDescription("Quitado de la tienda");
+    expect(within(tabla).getByRole("switch", { name: "A la venta: Vino sin precio" })).toHaveAccessibleDescription("Sin precio de carta");
+    expect(screen.getByText(/se arreglan en Gestor Web › Carta/)).toBeInTheDocument();
+  });
+
+  it("móvil (390 px): tarjetas en vez de tabla, con los dos precios y el interruptor", async () => {
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 390 });
+    pintar();
+    const lista = await screen.findByRole("list", { name: "Vinos de la tienda" }, ESPERA);
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(within(lista).getAllByRole("listitem")).toHaveLength(3);
+    const rioja = filaDe(lista, "Rioja Crianza", "listitem");
+    expect(rioja).toHaveTextContent(/Tienda 16,80\s€/);
+    expect(rioja).toHaveTextContent(/Carta 24,00\s€/);
+    expect(filaDe(lista, "Vino sin precio", "listitem")).toHaveTextContent("Sin precio de carta");
+
+    fireEvent.click(within(lista).getByRole("switch", { name: "A la venta: Albariño" }));
+    await waitFor(() => expect(h.rpc).toEqual([{ fn: "tienda_marcar_vinos", args: { p_vino_ids: ["albarino"], p_a_la_venta: true } }]));
+  });
+
+  it("filtro A la venta / Fuera con sus cuentas, contador de resultados y estado vacío que quita los filtros", async () => {
+    pintar();
+    const tabla = await tablaVinos();
+    expect(screen.getByText("vinos", { exact: false, selector: "p[aria-live]" })).toHaveTextContent("3 vinos");
+    fireEvent.click(screen.getByRole("radio", { name: "Fuera 2" }));
+    expect(within(tabla).getAllByRole("row").slice(1).map((f) => f.getAttribute("data-estado"))).toEqual(["excluido", "no-vendible"]);
+    expect(screen.getByText(/Mostrando/)).toHaveTextContent("Mostrando 2 de 3 vinos");
+    // Con el filtro puesto, la acción masiva solo toca los que se pueden conmutar (no el que no tiene precio).
+    expect(screen.getByRole("button", { name: "Poner a la venta el vino mostrado" })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar vino" }), { target: { value: "ribera" } });
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.getByText("Ningún vino coincide con el filtro")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Todos 0" })).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "Quitar filtros" })[0]);
+    expect(within(await tablaVinos()).getAllByRole("row")).toHaveLength(4);
+    expect(screen.getByRole("searchbox", { name: "Buscar vino" })).toHaveValue("");
   });
 });
 
