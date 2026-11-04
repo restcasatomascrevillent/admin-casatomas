@@ -1,43 +1,120 @@
-import { useMemo, useState } from "react";
-import { AlertTriangle, Loader2, RefreshCw, Server } from "lucide-react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
+import { AlertTriangle, LayoutDashboard, Loader2, RefreshCw, Server, Settings2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Button } from "@/components/ui/button";
-import { ChipSemaforo } from "@/components/servicios/BarraConsumo";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { PestanasPagina } from "@/components/panel/PestanasPagina";
+import { calcularAvisosCostes, DIAS_SIN_REGISTRO } from "@/components/costes/calculos";
+import { useVentanaModelos } from "@/components/costes/CostesIa";
 import { DialogoEditarServicio } from "@/components/servicios/DialogoEditarServicio";
-import { TarjetaServicio } from "@/components/servicios/TarjetaServicio";
+import { PestanaConfigurar } from "@/components/servicios/PestanaConfigurar";
+import { PestanaCostes } from "@/components/servicios/PestanaCostes";
+import { PestanaResumen } from "@/components/servicios/PestanaResumen";
+import { PestanaServicios } from "@/components/servicios/PestanaServicios";
+import { PESTANA_POR_DEFECTO, type PestanaServicios as Pestana, pestanaDeUrl } from "@/components/servicios/pestanas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { useActualizarLecturas, useLecturasServicios, useServiciosContratados } from "@/hooks/useServicios";
-import { type LecturaServicio, type ServicioContratado, haceCuanto } from "@/lib/servicios";
+import { useCostePorModelo, useFuncionesSinRegistro } from "@/hooks/useCostes";
+import { useActualizarLecturas, useConfigServicios, useLecturasServicios, useServiciosContratados } from "@/hooks/useServicios";
+import {
+  CAMBIO_POR_DEFECTO,
+  type DestinoPendiente,
+  type LecturaServicio,
+  type ServicioContratado,
+  haceCuanto,
+  masCercaDelLimite,
+  ordenarServicios,
+  pendientesServicios,
+  proximasRenovaciones,
+  resumirCostes,
+  servicioNuevo,
+} from "@/lib/servicios";
 import { cn } from "@/lib/utils";
 
 /** Suelo (px) del alto: por debajo (teclado abierto, ventana muy baja) vuelve el scroll de página. */
 const ALTURA_MINIMA_SERVICIOS = 360;
-const ORDEN = ["vercel", "supabase", "github", "resend", "stripe"];
-const posicion = (p: string) => (ORDEN.includes(p) ? ORDEN.indexOf(p) : ORDEN.length);
 
 /**
- * Super Admin › Servicios: una tarjeta por servicio contratado con su plan,
- * precio, renovación, enlace al panel del proveedor y el consumo frente al
- * límite del plan (barra, % y semáforo). Las lecturas las hace la Edge
- * Function `servicios-uso` (caché de 15 min); «Actualizar» la fuerza.
+ * Contenido de cada pestaña: ocupa el alto que queda bajo la barra y hace scroll por dentro.
+ * `data-[state=inactive]:hidden` imprescindible (como en Tienda/Cheques): una clase `flex` le gana al
+ * atributo `hidden` con el que Radix deja las pestañas inactivas.
+ */
+const CONTENIDO_PESTANA = "mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
+
+/**
+ * Super Admin › Servicios: el sitio único de lo contratado y de lo que cuesta
+ * (desde el 04/11/2026 también la antigua pantalla «Costes»; su ruta redirige
+ * a la pestaña Costes). Cuatro pestañas, en la URL (`?tab=`):
+ *   · Resumen: gasto del mes y del año, lo que requiere atención, lo más cerca
+ *     del límite y las próximas renovaciones.
+ *   · Servicios: una tarjeta por servicio en uso con su consumo.
+ *   · Costes: coste del mes por proveedor y la IA por proceso (tope, mes
+ *     anterior, sincronizar con OpenAI).
+ *   · Configurar: añadir, quitar, borrar y editar servicios; tipo de cambio.
+ * Las lecturas las hace la Edge Function `servicios-uso` (caché de 15 min);
+ * «Actualizar todo ahora» la fuerza.
  */
 export default function SuperAdminServicios() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pestana = pestanaDeUrl(searchParams.get("tab"));
+  const cambiarPestana = useCallback(
+    (v: string) => {
+      setSearchParams(
+        (actual) => {
+          const next = new URLSearchParams(actual);
+          if (v === PESTANA_POR_DEFECTO) next.delete("tab");
+          else next.set("tab", v);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
   const servicios = useServiciosContratados();
   const disponible = servicios.data?.disponible === true;
+  const costes = servicios.data?.disponible === true ? servicios.data.costes : false;
   const lecturas = useLecturasServicios(disponible);
+  const config = useConfigServicios(disponible && costes);
   const actualizar = useActualizarLecturas();
+  // Avisos de la IA para el Resumen (mismas consultas, y misma caché, que la pestaña Costes).
+  const { desde, hasta } = useVentanaModelos();
+  const sinRegistroQ = useFuncionesSinRegistro(DIAS_SIN_REGISTRO);
+  const porModeloQ = useCostePorModelo(desde, hasta);
+
   const [editando, setEditando] = useState<ServicioContratado | null>(null);
+  const [creando, setCreando] = useState<ServicioContratado | null>(null);
   const [actualizando, setActualizando] = useState<string | null>(null);
-  // Alto de la pantalla (regla del dueño, 2026-10-07): la página no hace scroll, el bloque sí.
+  const [foco, setFoco] = useState<string | null>(null);
+  const quitarFoco = useCallback(() => setFoco(null), []);
+  // Alto de la pantalla (regla del dueño, 2026-10-07): la cabecera y las pestañas quedan fijas y cada pestaña
+  // hace scroll por dentro. Sin medida (jsdom, primer pintado) cae al layout con scroll de página.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_SERVICIOS);
 
-  const lista = useMemo(
-    () => (servicios.data?.disponible ? [...servicios.data.servicios].sort((a, b) => posicion(a.proveedor) - posicion(b.proveedor) || a.nombre.localeCompare(b.nombre, "es")) : []),
-    [servicios.data],
+  const todos = useMemo(() => (servicios.data?.disponible ? ordenarServicios(servicios.data.servicios) : []), [servicios.data]);
+  const enUso = useMemo(() => todos.filter((s) => s.activo !== false), [todos]);
+  const quitados = useMemo(
+    () => todos.filter((s) => s.activo === false).sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    [todos],
   );
   const porProveedor = useMemo(() => new Map<string, LecturaServicio>((lecturas.data?.lecturas ?? []).map((l) => [l.proveedor, l])), [lecturas.data]);
+  const sinLector = useMemo(() => new Set(lecturas.data?.sinLector ?? []), [lecturas.data]);
+  const eurPorUsd = config.data?.eurPorUsd ?? CAMBIO_POR_DEFECTO;
+  const resumen = useMemo(() => resumirCostes(enUso, porProveedor, eurPorUsd), [enUso, porProveedor, eurPorUsd]);
+  const renovaciones = useMemo(() => proximasRenovaciones(enUso, porProveedor), [enUso, porProveedor]);
+  const cercanos = useMemo(() => masCercaDelLimite(enUso, porProveedor), [enUso, porProveedor]);
+  const avisosIa = useMemo(() => {
+    const a = calcularAvisosCostes({ sinRegistro: sinRegistroQ.data, modelos: porModeloQ.data, fijos: [], fijosSinVerificarRpc: null });
+    return { sinRegistro: a.sinInstrumentar.length + a.instrumentadasMudas.length, modelosSinTarifa: a.modelosSinTarifa.length };
+  }, [sinRegistroQ.data, porModeloQ.data]);
+  const pendientes = useMemo(
+    () => pendientesServicios({ servicios: enUso, lecturas: porProveedor, renovaciones, resumen, sinLector, ia: avisosIa }),
+    [enUso, porProveedor, renovaciones, resumen, sinLector, avisosIa],
+  );
+  const urgentes = pendientes.filter((p) => p.gravedad === "rojo").length;
   const ultima = useMemo(() => {
     const fechas = (lecturas.data?.lecturas ?? []).map((l) => l.tomado_en).filter(Boolean).sort();
     return fechas.length ? fechas[fechas.length - 1] : null;
@@ -56,25 +133,51 @@ export default function SuperAdminServicios() {
     }
   };
 
+  const irA = (d: DestinoPendiente) => {
+    cambiarPestana(d.pestana);
+    setFoco(d.pestana === "servicios" && d.proveedor ? d.proveedor : null);
+  };
+  const anadir = () => setCreando(servicioNuevo(Math.max(0, ...todos.map((s) => s.orden ?? 0)) + 10));
+
+  // Cargando, error o sin migración: lo dicen las pestañas que dependen de los servicios.
+  let estado: ReactNode = null;
+  if (servicios.isLoading) {
+    estado = (
+      <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground" role="status">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Cargando los servicios…
+      </p>
+    );
+  } else if (servicios.isError) {
+    estado = (
+      <div role="alert" className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+        <p>No se pudieron cargar los servicios: {servicios.error instanceof Error ? servicios.error.message : "error desconocido"}.</p>
+        <Button type="button" variant="outline" className="h-11" onClick={() => void servicios.refetch()}>Reintentar</Button>
+      </div>
+    );
+  } else if (!disponible) {
+    estado = (
+      <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        Falta aplicar en Supabase la migración de Servicios (20261103120000_servicios_contratados). Cuando esté, aquí saldrán los servicios.
+      </p>
+    );
+  }
+
   return (
     <SuperAdminLayout>
-      <div
-        ref={setRaiz}
-        className="flex min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain"
-        style={alto ? { height: alto } : undefined}
-      >
-        <header className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+      <div ref={setRaiz} data-testid="servicios" className="flex min-w-0 flex-col gap-3" style={alto ? { height: alto } : undefined}>
+        <header className="flex min-w-0 shrink-0 flex-wrap items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <Server className="h-6 w-6 shrink-0 text-destructive sm:h-8 sm:w-8" aria-hidden="true" />
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-foreground">Servicios</h1>
-              <p className="text-sm text-muted-foreground">Lo que tenemos contratado y cuánto llevamos gastado de cada plan.</p>
+              <p className="hidden text-sm text-muted-foreground sm:block">Lo contratado, cuánto cuesta y cuánto llevamos gastado de cada plan.</p>
             </div>
           </div>
           {disponible && (
             <div className="flex w-full min-w-0 flex-col gap-1 sm:w-auto sm:items-end">
               <Button
                 type="button"
+                variant="outline"
                 className="h-11 w-full gap-2 sm:w-auto"
                 onClick={() => void pedirActualizacion()}
                 disabled={actualizando !== null || lecturas.isLoading}
@@ -89,15 +192,8 @@ export default function SuperAdminServicios() {
           )}
         </header>
 
-        <p className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <span>Semáforo del consumo:</span>
-          <ChipSemaforo estado="verde">Bien: menos del 70 %</ChipSemaforo>
-          <ChipSemaforo estado="ambar">Cerca del límite: 70–90 %</ChipSemaforo>
-          <ChipSemaforo estado="rojo">Al límite: más del 90 %</ChipSemaforo>
-        </p>
-
         {lecturas.data?.errorFuncion && (
-          <p role="alert" className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <p role="alert" className="flex shrink-0 items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
               {lecturas.data.errorFuncion}
@@ -106,36 +202,66 @@ export default function SuperAdminServicios() {
           </p>
         )}
 
-        {servicios.isLoading ? (
-          <p className="flex items-center gap-2 py-8 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> Cargando los servicios…
-          </p>
-        ) : servicios.isError ? (
-          <div role="alert" className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-            <p>No se pudieron cargar los servicios: {servicios.error instanceof Error ? servicios.error.message : "error desconocido"}.</p>
-            <Button type="button" variant="outline" className="h-11" onClick={() => void servicios.refetch()}>Reintentar</Button>
-          </div>
-        ) : !disponible ? (
-          <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-            Falta aplicar en Supabase la migración de Servicios (20261103120000_servicios_contratados). Cuando esté, aquí saldrán los servicios.
-          </p>
-        ) : (
-          <div className="grid min-w-0 grid-cols-1 gap-4 pb-2 xl:grid-cols-2">
-            {lista.map((s) => (
-              <TarjetaServicio
-                key={s.proveedor}
-                servicio={s}
-                lectura={porProveedor.get(s.proveedor) ?? null}
-                cargando={lecturas.isLoading}
-                actualizando={actualizando === s.proveedor || actualizando === "todos"}
-                onActualizar={() => void pedirActualizacion(s)}
-                onEditar={() => setEditando(s)}
+        <Tabs value={pestana} onValueChange={(v) => cambiarPestana(v as Pestana)} className="flex min-h-0 flex-1 flex-col">
+          {/* Sin iconos en el móvil: así caben las cuatro a 320 px sin hacer scroll. */}
+          <PestanasPagina
+            iconosSoloEscritorio
+            pestanas={[
+              { valor: "resumen", etiqueta: "Resumen", icono: <LayoutDashboard />, contador: urgentes, tonoContador: "dorado", etiquetaContador: `${urgentes} ${urgentes === 1 ? "urgente" : "urgentes"}` },
+              { valor: "servicios", etiqueta: "Servicios", icono: <Server />, contador: disponible ? enUso.length : undefined },
+              { valor: "costes", etiqueta: "Costes", icono: <Wallet /> },
+              { valor: "configurar", etiqueta: "Configurar", icono: <Settings2 /> },
+            ]}
+          />
+          <TabsContent value="resumen" className={CONTENIDO_PESTANA}>
+            {estado ?? (
+              <PestanaResumen
+                resumen={resumen}
+                pendientes={pendientes}
+                cercanos={cercanos}
+                renovaciones={renovaciones}
+                cargandoLecturas={lecturas.isLoading}
+                onIr={irA}
               />
-            ))}
-          </div>
-        )}
+            )}
+          </TabsContent>
+          <TabsContent value="servicios" className={CONTENIDO_PESTANA}>
+            {estado ?? (
+              <PestanaServicios
+                enUso={enUso}
+                quitados={quitados.length}
+                porProveedor={porProveedor}
+                sinLector={sinLector}
+                eurPorUsd={eurPorUsd}
+                cargando={lecturas.isLoading}
+                actualizando={actualizando}
+                onActualizar={(s) => void pedirActualizacion(s)}
+                onEditar={setEditando}
+                foco={foco}
+                onFocoHecho={quitarFoco}
+                onIrConfigurar={() => cambiarPestana("configurar")}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="costes" className={CONTENIDO_PESTANA}>
+            <PestanaCostes resumen={estado ? null : resumen} estadoServicios={estado} eurPorUsd={eurPorUsd} costesDisponibles={costes} />
+          </TabsContent>
+          <TabsContent value="configurar" className={CONTENIDO_PESTANA}>
+            {estado ?? (
+              <PestanaConfigurar
+                enUso={enUso}
+                quitados={quitados}
+                costes={costes}
+                config={config.data ?? null}
+                onEditar={setEditando}
+                onAnadir={anadir}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
-      <DialogoEditarServicio servicio={editando} onCerrar={() => setEditando(null)} />
+      <DialogoEditarServicio servicio={editando} onCerrar={() => setEditando(null)} costes={costes} />
+      <DialogoEditarServicio servicio={creando} onCerrar={() => setCreando(null)} costes={costes} nuevo existentes={todos.map((s) => s.proveedor)} />
     </SuperAdminLayout>
   );
 }

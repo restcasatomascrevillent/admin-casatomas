@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SuperAdminSidebar } from "@/components/SuperAdminSidebar";
 import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsCompactNav } from "@/hooks/use-mobile";
+import { VersionPanel } from "@/components/panel/VersionPanel";
 
 interface SuperAdminLayoutProps {
   children: ReactNode;
@@ -42,12 +43,14 @@ export function SuperAdminLayout({ children }: SuperAdminLayoutProps) {
               barra mínima: el sidebar es un Sheet y no hay otra forma de
               abrirlo. */}
           {isCompactNav && (
-            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-destructive/20 bg-destructive/5 flex items-center gap-3 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
+            <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-destructive/20 bg-destructive/5 flex items-center gap-2 sm:gap-3 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
               <SidebarTrigger className="shrink-0 text-destructive hover:bg-destructive/10" />
-              <span className="flex min-w-0 items-center gap-2 text-base font-semibold text-destructive">
+              <span className="flex min-w-0 flex-1 items-center gap-2 text-base font-semibold text-destructive">
                 <ShieldAlert className="h-5 w-5 shrink-0" aria-hidden="true" />
                 <span className="truncate">Super Admin</span>
               </span>
+              {/* Versión y entorno también aquí: con el menú cerrado no se veían. */}
+              <VersionPanel className="px-1.5 py-0.5 text-[10px] pointer-coarse:text-[10px] sm:px-2 sm:py-1 sm:text-[11px] sm:pointer-coarse:text-xs" />
             </header>
           )}
           <main className="flex-1 min-w-0 p-3 sm:p-6">

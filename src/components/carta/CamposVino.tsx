@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { MapPinOff } from "lucide-react";
 import type { Control, FieldValues, Path } from "react-hook-form";
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,8 @@ interface Props<T extends CamposVinoValores> {
   paises: string[];
   /** Algo a mostrar bajo el precio (p. ej. el precio sugerido de la foto). */
   bajoPrecio?: ReactNode;
+  /** Aviso de origen sin completar (la IA no lo sacó claro, o «Origen pendiente»): no se guarda sin él. */
+  avisoOrigen?: ReactNode;
 }
 
 /**
@@ -50,6 +53,7 @@ export function CamposVino<T extends CamposVinoValores>({
   regiones,
   paises,
   bajoPrecio,
+  avisoOrigen,
 }: Props<T>) {
   const n = (k: keyof CamposVinoValores) => k as Path<T>;
   return (
@@ -105,7 +109,16 @@ export function CamposVino<T extends CamposVinoValores>({
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm text-muted-foreground">Origen: el país y la región sitúan el vino en el mapa de la carta. Pon la localidad o la subzona (p. ej. «Val do Salnés, Pontevedra») mejor que solo la comunidad («Galicia»): así el punto cae en su sitio.</p>
+        <p className="text-sm text-muted-foreground">Origen (obligatorio): el país y la región sitúan el vino en el mapa de la carta, y la categoría dice su denominación. Pon la localidad o la subzona (p. ej. «Val do Salnés, Pontevedra») mejor que solo la comunidad («Galicia»): así el punto cae en su sitio.</p>
+        {avisoOrigen && (
+          <p
+            role="status"
+            className="flex items-start gap-2 rounded-md border border-amber-500/60 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+          >
+            <MapPinOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="min-w-0">{avisoOrigen}</span>
+          </p>
+        )}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 [&>*]:min-w-0">
           <FormField
             control={control}

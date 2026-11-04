@@ -10,19 +10,32 @@ const fmt = (p: PartidaCoste, v: number | null): string => {
   return p.tipo === "ia" ? fmtEurIa(v) : fmtEur(v);
 };
 
+const VACIO_POR_DEFECTO =
+  "Todavía no hay ningún coste declarado ni consumo de IA registrado. Un coste vacío no significa que no se esté gastando.";
+
 /**
- * Una sola tabla de partidas, ordenada por gasto: fijos (Supabase, Vercel,
- * dominio…) e IA por proceso, con los € del mes y los del mes anterior.
+ * Una sola tabla de partidas, ordenada por gasto (en Servicios › Costes, la IA
+ * por proceso), con los € del mes y los del mes anterior. `mostrarTipo`
+ * marca cada fila como «IA» o «fijo» cuando se mezclan.
  */
-export function TablaPartidas({ partidas }: { partidas: PartidaCoste[] }) {
+export function TablaPartidas({
+  partidas,
+  mostrarTipo = true,
+  textoVacio = VACIO_POR_DEFECTO,
+  etiquetaPartida = "Partida",
+}: {
+  partidas: PartidaCoste[];
+  mostrarTipo?: boolean;
+  textoVacio?: string;
+  etiquetaPartida?: string;
+}) {
   const totalMes = totalColumna(partidas, "mesEur");
   const totalAnt = totalColumna(partidas, "anteriorEur");
 
   if (partidas.length === 0) {
     return (
       <p className="rounded-md border py-8 text-center text-sm italic text-muted-foreground">
-        Todavía no hay ningún coste declarado ni consumo de IA registrado. Un coste vacío no significa que no se esté
-        gastando.
+        {textoVacio}
       </p>
     );
   }
@@ -32,11 +45,11 @@ export function TablaPartidas({ partidas }: { partidas: PartidaCoste[] }) {
       <Table data-testid="tabla-partidas">
         <TableHeader className="sticky top-0 z-10 bg-card">
           <TableRow>
-            <TableHead scope="col">Partida</TableHead>
-            <TableHead scope="col" className="text-right">
+            <TableHead scope="col">{etiquetaPartida}</TableHead>
+            <TableHead scope="col" className="whitespace-nowrap text-right">
               Este mes
             </TableHead>
-            <TableHead scope="col" className="text-right">
+            <TableHead scope="col" className="whitespace-nowrap text-right">
               Mes anterior
             </TableHead>
           </TableRow>
@@ -46,16 +59,18 @@ export function TablaPartidas({ partidas }: { partidas: PartidaCoste[] }) {
             <TableRow key={p.clave} data-testid={`partida-${p.clave}`}>
               <TableCell className="py-2">
                 <span className="font-medium">{p.etiqueta}</span>
-                <Badge variant="outline" className="ml-2 px-1.5 py-0 text-[10px] pointer-coarse:text-xs font-normal">
-                  {p.tipo === "ia" ? "IA" : "fijo"}
-                </Badge>
+                {mostrarTipo && (
+                  <Badge variant="outline" className="ml-2 px-1.5 py-0 text-[10px] pointer-coarse:text-xs font-normal">
+                    {p.tipo === "ia" ? "IA" : "fijo"}
+                  </Badge>
+                )}
                 {p.nota && <p className="text-xs text-muted-foreground">{p.nota}</p>}
               </TableCell>
               <TableCell
                 className={
                   esNulo(p.mesEur)
-                    ? "py-2 text-right text-sm italic text-muted-foreground"
-                    : "py-2 text-right font-medium tabular-nums"
+                    ? "whitespace-nowrap py-2 text-right text-sm italic text-muted-foreground"
+                    : "whitespace-nowrap py-2 text-right font-medium tabular-nums"
                 }
               >
                 {fmt(p, p.mesEur)}
@@ -63,8 +78,8 @@ export function TablaPartidas({ partidas }: { partidas: PartidaCoste[] }) {
               <TableCell
                 className={
                   esNulo(p.anteriorEur)
-                    ? "py-2 text-right text-sm italic text-muted-foreground"
-                    : "py-2 text-right tabular-nums text-muted-foreground"
+                    ? "whitespace-nowrap py-2 text-right text-sm italic text-muted-foreground"
+                    : "whitespace-nowrap py-2 text-right tabular-nums text-muted-foreground"
                 }
               >
                 {p.anteriorAprox && !esNulo(p.anteriorEur) && "≈ "}
@@ -76,8 +91,8 @@ export function TablaPartidas({ partidas }: { partidas: PartidaCoste[] }) {
         <TableFooter>
           <TableRow>
             <TableCell className="py-2">Total</TableCell>
-            <TableCell className="py-2 text-right font-semibold tabular-nums">{fmtEur(totalMes)}</TableCell>
-            <TableCell className="py-2 text-right font-semibold tabular-nums">{fmtEur(totalAnt)}</TableCell>
+            <TableCell className="whitespace-nowrap py-2 text-right font-semibold tabular-nums">{fmtEur(totalMes)}</TableCell>
+            <TableCell className="whitespace-nowrap py-2 text-right font-semibold tabular-nums">{fmtEur(totalAnt)}</TableCell>
           </TableRow>
         </TableFooter>
       </Table>

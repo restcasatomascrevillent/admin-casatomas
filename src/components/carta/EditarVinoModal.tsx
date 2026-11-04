@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { nombreCarta, categoriaCarta, descripcionCarta } from "@/lib/limites-carta";
+import { nombreCarta, descripcionCarta } from "@/lib/limites-carta";
+import { categoriasConOrigen, categoriaVino, mensajeFaltaOrigen, origenVinoClaro, paisVino, regionVino } from "@/lib/origen-vino";
 import { Camera, Loader2, Sparkles, Undo2, X } from "lucide-react";
 import {
   Dialog,
@@ -34,15 +35,18 @@ import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 import { useLecturaEtiquetaVino } from "./lecturaEtiquetaVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
 
+// Origen obligatorio también al editar (04/11/2026): país, región y categoría
+// con denominación. Un vino de «… — ORIGEN PENDIENTE» no se guarda hasta
+// elegirle la suya (así se corrigen los que quedan).
 const formSchema = z.object({
   nombre: nombreCarta,
-  categoria: categoriaCarta,
+  categoria: categoriaVino,
   precio_eur: esquemaPrecioCarta,
   descripcion: descripcionCarta,
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
-  ubicacion_pais: z.string().optional(),
-  ubicacion_region: z.string().optional(),
+  ubicacion_pais: paisVino,
+  ubicacion_region: regionVino,
 });
 
 /**
@@ -94,9 +98,23 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
     },
   });
 
+  // Sin las categorías «… — ORIGEN PENDIENTE»: no se puede elegir ninguna.
+  const categoriasValidas = categoriasConOrigen(categorias);
+
   // Vino ya existente: la IA NO lee sola; botón «Leer etiqueta con IA» que solo
   // rellena los campos vacíos (lecturaEtiquetaVino.ts).
-  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)));
+  const lectura = useLecturaEtiquetaVino(form, categoriasValidas);
+
+  // Origen sin completar (p. ej. uno de «… — ORIGEN PENDIENTE»): se dice qué falta.
+  const [categoriaActual, paisActual, regionActual] = useWatch({
+    control: form.control,
+    name: ["categoria", "ubicacion_pais", "ubicacion_region"],
+  });
+  const origenActual = { categoria: categoriaActual, ubicacion_pais: paisActual, ubicacion_region: regionActual };
+  const avisoOrigen =
+    open && vino && !origenVinoClaro(origenActual)
+      ? `Origen por confirmar. ${mensajeFaltaOrigen(origenActual)} Complétalo para poder guardar; después ya se puede publicar.`
+      : null;
   const { limpiar: limpiarLectura } = lectura;
 
   useEffect(() => {
@@ -328,7 +346,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
 
             <CamposVino
               control={form.control}
-              categorias={categorias}
+              categorias={categoriasValidas}
               denominaciones={denominaciones}
               regiones={regiones}
               paises={paises}
@@ -338,6 +356,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
                   onUsar={(precio) => form.setValue("precio_eur", precio, { shouldValidate: true, shouldDirty: true })}
                 />
               }
+              avisoOrigen={avisoOrigen}
             />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en

@@ -12,11 +12,12 @@ const conocido = (motivo, activo = true) => { if (activo && !process.env.E2E_SIN
 const URL_SUPABASE = process.env.E2E_SUPABASE_URL ?? "https://e2e-falso.supabase.co";
 
 const RUTAS = [
-  "/dashboard", "/reservas", "/reservas?tab=reservas", "/reservas?tab=calendario", "/reservas?tab=asignacion", "/reservas?tab=blacklist", "/reservas?tab=configuracion",
+  "/dashboard", "/reservas", "/reservas?tab=reservas", "/reservas?tab=calendario", "/reservas?tab=asignacion", "/reservas?tab=blacklist", "/reservas?tab=configuracion", "/reservas?tab=configuracion&sub=plantillas",
   "/gestion-web", "/gestion-web?tab=novedades", "/gestion-web?tab=menus", "/gestion-web?tab=tapas", "/marketing", "/cheques", "/facturas", "/facturas?tab=cargar", "/usuarios", "/ayuda",
-  "/super-admin", "/super-admin/ecommerce", "/super-admin/asistente-telefonico", "/super-admin/gestor-gasto", "/super-admin/costes", "/super-admin/resenas",
-  "/super-admin/plantillas-email", "/super-admin/trafico-web", "/super-admin/espacios", "/super-admin/bot-web", "/super-admin/usuarios", "/super-admin/auditoria",
-  "/super-admin/servicios",
+  "/super-admin", "/super-admin/ecommerce", "/super-admin/asistente-telefonico", "/super-admin/gestor-gasto", "/super-admin/resenas",
+  "/super-admin/trafico-web", "/super-admin/espacios", "/super-admin/bot-web", "/super-admin/usuarios", "/super-admin/auditoria",
+  // Costes es una pestaña de Servicios desde el 04/11/2026 (/super-admin/costes redirige a ?tab=costes).
+  "/super-admin/servicios", "/super-admin/servicios?tab=servicios", "/super-admin/servicios?tab=costes", "/super-admin/servicios?tab=configurar",
 ];
 
 test.beforeEach(async ({ context }) => {
@@ -82,47 +83,73 @@ test("Facturas › Cargar: la línea «Lectura de facturas este mes» cabe en pa
   expect(caja.x, "el botón empieza fuera de la pantalla por la izquierda").toBeGreaterThanOrEqual(0);
 });
 
-test("Costes: la frase de cabecera no queda aplastada en una columna estrecha", async ({ page }) => {
-  // Arreglado (P-02): el párrafo tiene base de 16rem y los botones bajan de línea. Vigila la regresión.
+test("Costes (pestaña de Servicios): la ruta vieja lleva a ella y la frase de la IA no queda aplastada", async ({ page }) => {
+  // P-02 (frase de cabecera aplastada) se vigila ahora en la descripción de la IA, dentro de Servicios › Costes.
   await abrir(page, "/super-admin/costes");
-  const ancho = await page.evaluate(() => { const p = [...document.querySelectorAll("main p")].find((x) => /Lo que cuesta mantener/.test(x.textContent ?? "")); return p ? p.getBoundingClientRect().width : -1; });
-  expect(ancho, "ancho del párrafo de cabecera").toBeGreaterThan(200);
+  await expect(page).toHaveURL(/\/super-admin\/servicios\?tab=costes$/);
+  await expect(page.getByRole("tab", { name: /^Costes/ })).toHaveAttribute("aria-selected", "true");
+  const ancho = await page.evaluate(() => { const p = [...document.querySelectorAll("main p")].find((x) => /Lo que factura OpenAI por proceso/.test(x.textContent ?? "")); return p ? p.getBoundingClientRect().width : -1; });
+  expect(ancho, "ancho de la descripción de la IA").toBeGreaterThan(200);
 });
 
-test("Servicios: tarjetas sin desbordes, botones de ≥ 44 px con nombre y barras con su %", async ({ page }) => {
+/**
+ * En `main`: lo que se sale por los lados (salvo dentro de una zona con scroll horizontal propio, como la tira de
+ * pestañas a 320 px), botones/enlaces de menos de 44 px y sin nombre, y las barras de %.
+ */
+const REVISAR_MAIN = () => {
+  const main = document.querySelector("main");
+  const vw = document.documentElement.clientWidth;
+  const conScroll = (el) => { for (let p = el.parentElement; p && p !== main; p = p.parentElement) if (/(auto|scroll)/.test(getComputedStyle(p).overflowX)) return true; return false; };
+  const fuera = [];
+  for (const el of main.querySelectorAll("*")) {
+    const b = el.getBoundingClientRect();
+    if (b.width && (b.right > vw + 1 || b.left < -1) && !conScroll(el)) fuera.push(`${el.tagName.toLowerCase()} [${Math.round(b.left)}..${Math.round(b.right)}]`);
+  }
+  const pequenos = [];
+  const sinNombre = [];
+  for (const el of main.querySelectorAll("button, a[href], [role=tab]")) {
+    const b = el.getBoundingClientRect();
+    if (!b.width) continue;
+    const nombre = (el.getAttribute("aria-label") || el.textContent || "").trim();
+    if (!nombre) sinNombre.push(el.outerHTML.slice(0, 80));
+    if (b.height < 44 && !el.closest("p")) pequenos.push(`${nombre.slice(0, 40)} (${Math.round(b.height)} px)`);
+  }
+  const barras = [...main.querySelectorAll("[role=progressbar]")].filter((b) => b.getBoundingClientRect().width).map((b) => ({ nombre: b.getAttribute("aria-label"), texto: b.getAttribute("aria-valuetext") }));
+  return { fuera: fuera.slice(0, 5), pequenos, sinNombre, barras, scroll: document.documentElement.scrollWidth <= vw + 1 };
+};
+
+test("Servicios: cuatro pestañas sin desbordes, botones de ≥ 44 px con nombre y barras con su %", async ({ page }) => {
   await abrir(page, "/super-admin/servicios");
   await expect(page.getByRole("heading", { level: 1, name: "Servicios" })).toBeVisible();
-  await expect(page.getByRole("article")).toHaveCount(5);
-  const r = await page.evaluate(() => {
-    const main = document.querySelector("main");
-    const vw = document.documentElement.clientWidth;
-    const fuera = [];
-    for (const el of main.querySelectorAll("*")) {
-      const b = el.getBoundingClientRect();
-      if (b.width && (b.right > vw + 1 || b.left < -1)) fuera.push(`${el.tagName.toLowerCase()} [${Math.round(b.left)}..${Math.round(b.right)}]`);
-    }
-    const pequenos = [];
-    const sinNombre = [];
-    for (const el of main.querySelectorAll("button, a[href]")) {
-      const b = el.getBoundingClientRect();
-      if (!b.width) continue;
-      const nombre = (el.getAttribute("aria-label") || el.textContent || "").trim();
-      if (!nombre) sinNombre.push(el.outerHTML.slice(0, 80));
-      if (b.height < 44 && !el.closest("p")) pequenos.push(`${nombre.slice(0, 40)} (${Math.round(b.height)} px)`);
-    }
-    const barras = [...main.querySelectorAll("[role=progressbar]")].map((b) => ({ nombre: b.getAttribute("aria-label"), texto: b.getAttribute("aria-valuetext") }));
-    return { fuera: fuera.slice(0, 5), pequenos, sinNombre, barras };
-  });
-  expect(r.fuera, "elementos de la pantalla Servicios fuera del viewport").toEqual([]);
-  expect(r.pequenos, "botones o enlaces de menos de 44 px").toEqual([]);
-  expect(r.sinNombre, "botones o enlaces sin nombre accesible").toEqual([]);
-  expect(r.barras.length, "barras de consumo").toBeGreaterThanOrEqual(4);
-  for (const b of r.barras) expect(b.texto, `la barra «${b.nombre}» no dice su % y su estado`).toMatch(/%.*(bien|cerca del límite|al límite)/);
+  // Resumen: lo esencial (gasto, lo que requiere atención, lo más cerca del límite y las renovaciones).
+  await expect(page.getByTestId("cifra-mes")).toBeVisible();
+  await expect(page.getByRole("region", { name: /Requiere atención/ })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Lo más cerca del límite" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Próximas renovaciones" })).toBeVisible();
+  for (const pestana of ["Resumen", "Servicios", "Costes", "Configurar"]) {
+    await page.getByRole("tab", { name: new RegExp(`^${pestana}`) }).click();
+    await expect(page.getByRole("tab", { name: new RegExp(`^${pestana}`) })).toHaveAttribute("aria-selected", "true");
+    if (pestana === "Servicios") await expect(page.getByRole("article")).toHaveCount(9); // Perplexity está quitado
+    if (pestana === "Costes") await expect(page.getByRole("region", { name: "Coste de este mes por proveedor" })).toBeVisible();
+    if (pestana === "Configurar") await expect(page.getByRole("list", { name: /Quitados \(1\)/ })).toContainText("Perplexity");
+    const r = await page.evaluate(REVISAR_MAIN);
+    expect(r.fuera, `${pestana}: elementos fuera del viewport`).toEqual([]);
+    expect(r.pequenos, `${pestana}: botones o enlaces de menos de 44 px`).toEqual([]);
+    expect(r.sinNombre, `${pestana}: botones o enlaces sin nombre accesible`).toEqual([]);
+    expect(r.scroll, `${pestana}: scroll horizontal`).toBe(true);
+    for (const b of r.barras) expect(b.texto, `${pestana}: la barra «${b.nombre}» no dice su % y su estado`).toMatch(/%.*(bien|cerca del límite|al límite)/);
+    if (pestana === "Servicios") expect(r.barras.length, "barras de consumo").toBeGreaterThanOrEqual(4);
+  }
   // «Falta configurar la clave»: se despliega el cómo, con enlaces de ≥ 44 px.
+  await page.getByRole("tab", { name: /^Servicios/ }).click();
   const vercel = page.getByRole("article", { name: "Vercel" });
   await vercel.getByRole("button", { name: /Cómo hacerlo/ }).click();
   await expect(vercel.getByRole("link", { name: /tokens de Vercel/ })).toBeVisible();
   const enlace = await vercel.getByRole("link", { name: /tokens de Vercel/ }).boundingBox();
   expect(enlace.height).toBeGreaterThanOrEqual(44);
+  // Configurar › Añadir servicio: el diálogo cabe.
+  await page.getByRole("tab", { name: /^Configurar/ }).click();
+  await page.getByRole("button", { name: "Añadir servicio" }).click();
+  await expect(page.getByRole("dialog", { name: "Añadir un servicio" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
 });

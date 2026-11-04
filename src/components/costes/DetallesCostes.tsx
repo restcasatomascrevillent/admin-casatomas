@@ -20,10 +20,12 @@ interface DetallesCostesProps {
   fijos: CosteFijo[] | undefined;
   /** Lectura de facturas: estimado (ia_uso) frente a real (OpenAI), misma ventana. null = no se puede comparar. */
   contrasteLectura?: ContrasteLectura | null;
+  /** Coste previsto del mes con el que se calcula el margen frente a lo facturado (por defecto, el del resumen). */
+  previsionTotalEur?: number | null;
 }
 
 /** Hay algo que avisar (funciones sin instrumentar, modelos sin tarifa, fijos caducados…). */
-export function hayAvisosCostes(p: Omit<DetallesCostesProps, "resumen" | "mes">): boolean {
+export function hayAvisosCostes(p: Omit<DetallesCostesProps, "resumen" | "mes" | "previsionTotalEur">): boolean {
   return calcularAvisosCostes({
     sinRegistro: p.sinRegistro,
     modelos: p.modelos,
@@ -47,8 +49,9 @@ function Seccion({ titulo, children }: { titulo: string; children: React.ReactNo
  * instrumentar, modelos sin tarifa, fijos sin verificar). Antes eran tarjetas
  * sueltas que se comían la pantalla.
  */
-export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, contrasteLectura }: DetallesCostesProps) {
+export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, contrasteLectura, previsionTotalEur }: DetallesCostesProps) {
   const facturado = useMensualFacturado();
+  const prevision = previsionTotalEur === undefined ? resumen.previsionEur : previsionTotalEur;
   const aviso = hayAvisosCostes({ sinRegistro, modelos, fijos });
   const ia = iaUsdMes(mes);
   const real = resumen.real;
@@ -111,8 +114,7 @@ export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, cont
               )}
               {resumen.iaAnteriorEur !== null && (
                 <p className="text-xs text-muted-foreground">
-                  El mes anterior es aproximado (se calcula restando dos ventanas del real); los fijos del mes
-                  anterior se suponen iguales.
+                  El mes anterior es aproximado (se calcula restando dos ventanas del real).
                 </p>
               )}
             </>
@@ -132,12 +134,12 @@ export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, cont
           <Seccion titulo="Frente a lo facturado">
             <p className="text-xs text-muted-foreground">
               Se factura {fmtEur(facturado)}/mes (último borrador guardado, sin impuestos).
-              {!esNulo(resumen.previsionEur) && (
+              {!esNulo(prevision) && (
                 <>
                   {" "}
-                  Con la previsión de coste de {fmtEur(resumen.previsionEur)}, el margen es de{" "}
+                  Con la previsión de coste de {fmtEur(prevision)}, el margen es de{" "}
                   <span className="font-medium tabular-nums text-foreground">
-                    {fmtEur(facturado - resumen.previsionEur)}
+                    {fmtEur(facturado - prevision)}
                   </span>
                   .
                 </>
@@ -155,7 +157,7 @@ export function DetallesCostes({ resumen, mes, sinRegistro, modelos, fijos, cont
               fijosSinVerificarRpc={null}
             />
           ) : (
-            <p className="text-xs text-muted-foreground">Sin avisos: todas las funciones registran y los fijos están verificados.</p>
+            <p className="text-xs text-muted-foreground">Sin avisos: todas las funciones de IA registran su consumo y todos los modelos tienen tarifa.</p>
           )}
         </Seccion>
       </PopoverContent>

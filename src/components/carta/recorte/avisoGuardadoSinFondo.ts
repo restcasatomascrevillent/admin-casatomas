@@ -1,7 +1,10 @@
 import { toast } from "sonner";
 import { rutasSubida } from "../subirFotoCarta";
 import type { EstadoRecorte, FotoCarta } from "./useRecorteVino";
-import { dispositivoNoRecorta, type TablaFoto } from "./recorteMovil";
+import type { TablaFoto } from "./recorteMovil";
+// Import ESTÁTICO (03-11-2026): con `import()` un chunk que no carga (p. ej. tras
+// publicar otra versión) dejaba la foto sin fondo y sin ningún aviso.
+import { avisarSinRecorte, noRecortar } from "./recorteEnSegundoPlano";
 
 /** Cuánto se queda en pantalla el aviso (ms): es lo único que le dice al usuario qué hacer luego. */
 export const MS_AVISO_SIN_FONDO = 12_000;
@@ -38,35 +41,31 @@ export interface FichaGuardada {
 
 /**
  * Llamar justo DESPUÉS de guardar la ficha con su foto (ya subida con
- * subirFotoCarta). En el ordenador solo avisa si el recorte falló. En el
- * móvil la ficha ya tiene la foto ORIGINAL guardada: aquí se lanza (sin
- * esperar) el recorte en el navegador del móvil o, si este móvil no puede,
- * se avisa de que se queda la foto normal. Nunca lanza.
+ * subirFotoCarta). El fondo se quita en el formulario (ordenador y móvil);
+ * aquí solo queda el caso en que FALLÓ:
+ *   - móvil (falló en el móvil y en el servidor): la foto normal ya está
+ *     guardada → trabajo para un ordenador, con el motivo;
+ *   - ordenador: aviso de que se guardó la foto normal.
+ * «Usar foto original» elegido a propósito no avisa. Nunca lanza.
  */
-export function trasGuardarFotoCarta(foto: Pick<FotoCarta, "estado" | "original" | "tema" | "recortarTrasGuardar">, ficha: FichaGuardada): void {
+export function trasGuardarFotoCarta(foto: Pick<FotoCarta, "estado" | "original" | "tema" | "eleccion">, ficha: FichaGuardada): void {
+  const nombre = ficha.nombre?.trim() || null;
   try {
-    if (foto.estado.fase !== "diferido") {
+    if (foto.estado.fase !== "fallo") return;
+    if (!foto.estado.aOrdenador) {
       avisarGuardadoSinFondo(foto.estado);
       return;
     }
-    if (!foto.recortarTrasGuardar || !foto.original) return;
-    const datos = {
-      tabla: ficha.tabla,
-      registroId: ficha.id,
-      nombre: ficha.nombre?.trim() || null,
-      rutaOriginal: rutasSubida(ficha.id, foto.original, null).original,
-      tema: foto.tema,
-    };
-    const original = foto.original;
-    const destino = foto.estado.destino;
-    void import("./recorteEnSegundoPlano").then(async (m) => {
-      if (destino === "movil") await m.recortarEnMovil(datos, original);
-      else {
-        const marca = dispositivoNoRecorta();
-        await m.noRecortar(datos, `Este móvil no recorta fotos en el navegador${marca?.motivo ? ` (${marca.motivo})` : ""}.`);
-      }
-    });
+    if (!foto.original) {
+      avisarSinRecorte({ nombre }, foto.estado.aviso);
+      return;
+    }
+    void noRecortar(
+      { tabla: ficha.tabla, registroId: ficha.id, nombre, rutaOriginal: rutasSubida(ficha.id, foto.original, null).original, tema: foto.tema },
+      foto.estado.aviso.replace(/ Al guardar se guarda la foto normal y se recortará en un ordenador\.$/, ""),
+    );
   } catch (e) {
     console.warn("[recorte] tras guardar", e);
+    avisarSinRecorte({ nombre }, "No se pudo poner el fondo de carta.");
   }
 }

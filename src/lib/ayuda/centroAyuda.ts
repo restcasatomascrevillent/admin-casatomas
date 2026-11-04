@@ -52,7 +52,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         pasos: [
           "Entra en «Cargar» y pulsa «Hacer foto» para usar la cámara, o «Elegir archivos» para escoger un PDF o una imagen. Puedes subir varios a la vez (PDF, JPG, PNG o WEBP, de hasta 10 MB cada uno).",
           "Si un documento tiene varias hojas, haz una foto a cada una, márcalas y pulsa «Unir … fotos como un documento»: se leen como páginas 1, 2, 3… (puedes cambiar el orden o separarlas). Si subes suelta una hoja que pone «página 2 de 3» de una factura que ya está, te ofrece «Añadir como página 2 a la factura…».",
-          "Si subes uno que ya estaba, no se duplica: sale en «Pendientes de decidir» y eliges «Sustituir la existente» (si la de antes estaba mal leída) o «Dejar la que hay».",
+          "Si subes uno que ya estaba, no se duplica: te sale un aviso en pantalla con los datos del que ya estaba y un botón para ver su foto, y además aparece en «Pendientes de decidir» y eliges «Sustituir la existente» (si la de antes estaba mal leída) o «Dejar la que hay».",
         ],
       },
       {
@@ -210,6 +210,8 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
           "En «Carta», entra en «Vinos» y pulsa «Añadir vino». Pon la foto de la etiqueta de delante de la botella (en el móvil, «Hacer foto a la etiqueta»), de cerca y con luz. Mientras la foto se recorta, la IA rellena en unos segundos los campos vacíos: nombre (con la añada si se lee), categoría, D.O., uva, región, país y una descripción. Lo que ya hayas escrito no lo cambia. Si el vino ya existe, en «Editar» tienes el botón «Leer etiqueta con IA».",
           "El precio no se rellena solo: debajo te sale un precio «Sugerido» (calculado con los precios de tu carta), que puedes poner con «Usar», y lo que cuesta más o menos en tiendas. Revisa todo, corrige lo que haga falta y pulsa guardar. Hasta que no guardas, no se añade nada a la carta.",
           "Si tienes varias botellas, pulsa «Varias botellas» y ve haciendo una foto por botella («Hacer foto» y luego «Otra foto»), o elígelas de la galería. Se leen solas mientras sigues; cuando una pone «Listo · toca para revisar», tócala, revísala y guárdala. Las que ya están pasan a «Guardado».",
+          "Un vino no se guarda sin su origen: país, región y la categoría con su denominación (el mapa de la carta lo necesita). Si la IA no lo saca claro, el formulario te avisa de lo que falta y no guarda hasta que lo completes.",
+          "En cada vino, «Restaurante» lo publica en la carta de la web de Casa Tomás y «Touza» en la de Touza; con los dos apagados no sale en ninguna. Los marcados «Origen por confirmar» no se pueden publicar hasta completar su origen: el filtro «Origen por confirmar» los junta para corregirlos con «Editar».",
         ],
       },
       {

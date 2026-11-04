@@ -14,6 +14,7 @@ import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { VersionPanel } from "@/components/panel/VersionPanel";
+import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
@@ -34,6 +35,9 @@ import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
+import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
+import { ShoppingBag } from "lucide-react";
+import { maquetasVisibles } from "@/lib/maqueta";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
 // cualquiera de ellas (el Gestor Web agrupa carta, contenido web y bot).
@@ -48,6 +52,8 @@ const menuItems: {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   sectionKey?: SectionKey | SectionKey[];
   toggleKey?: string;
+  /** Maqueta: solo fuera de producción (lib/maqueta.ts), sin insignia (dueño, 04/11/2026). */
+  maqueta?: boolean;
 }[] = [
   {
     title: "Dashboard",
@@ -64,9 +70,10 @@ const menuItems: {
   },
   // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
   // docs/funcionalidades/10-retirada-seccion-personal.md.
-  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
-  // Email, Tráfico web y Espacios se gestionan exclusivamente desde el
-  // Super Admin y ya no forman parte del Admin Panel normal (ver /super-admin).
+  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
+  // Espacios se gestionan exclusivamente desde el Super Admin y ya no forman
+  // parte del Admin Panel normal (ver /super-admin). Plantillas Email está en
+  // Reservas › Configuración desde el 04/11/2026.
   {
     title: "Gestor Web",
     url: "/gestion-web",
@@ -87,6 +94,15 @@ const menuItems: {
     icon: Gift,
     sectionKey: "cheques",
     toggleKey: "cheques",
+  },
+  {
+    title: "Tienda",
+    url: "/tienda",
+    icon: ShoppingBag,
+    sectionKey: "tienda",
+    toggleKey: "tienda",
+    // Maqueta solo en la demo (dueño, 03/11/2026): en producción no sale.
+    maqueta: true,
   },
   {
     title: "Facturas",
@@ -111,7 +127,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentPath = location.pathname;
-  const { isAdmin, permissions, loading } = useUserRole();
+  const { isAdmin, role, permissions, loading } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
@@ -128,6 +144,7 @@ export function AppSidebar() {
   // Filtrar items según permisos y funcionalidades activadas por el Super Admin
   const visibleItems = menuItems.filter((item) => {
     if (loading || togglesLoading || superAdminLoading) return false;
+    if (item.maqueta && !maquetasVisibles()) return false;
     if (!item.sectionKey) return true;
     if (item.toggleKey && !isEnabled(item.toggleKey)) return false;
     const keys = Array.isArray(item.sectionKey)
@@ -152,18 +169,32 @@ export function AppSidebar() {
           ReservasHoy.tsx) para que el cubierto decorativo pudiera volver:
           con los dos dentro no cabía todo y "Gestión del Restaurante" se
           cortaba a media palabra (11px medidos). */}
-      <SidebarHeader className="h-20 shrink-0 justify-center border-b border-sidebar-border py-2 pl-[calc((var(--sidebar-width-icon)-theme(spacing.11))/2)] pr-3">
-        <div className="flex w-full min-w-0 items-center gap-2">
+      <SidebarHeader
+        className={cn(
+          "h-[5.5rem] shrink-0 justify-center border-b border-sidebar-border py-2 pl-[calc((var(--sidebar-width-icon)-theme(spacing.11))/2)] pr-3",
+          isCollapsed && "px-0",
+        )}
+      >
+        <div className={cn("flex w-full min-w-0 items-center gap-2", isCollapsed && "flex-col gap-1")}>
           <SidebarTrigger className="text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent" />
+          {/* Versión y entorno arriba, bien a la vista (2026-11-03); con el menú plegado, solo el número. */}
+          {isCollapsed && <VersionPanel colapsado />}
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
-              <h2 className="flex items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
-                <UtensilsCrossed
-                  className="h-4 w-4 shrink-0 text-sidebar-primary"
-                  aria-hidden="true"
-                />
-                <span className="truncate">Admin Panel</span>
-              </h2>
+              {/* Versión a la derecha del título, en pequeño (dueño, 04/11/2026): solo el
+                  número, en el color del entorno (ámbar demo, verde producción); el entorno va
+                  en el tooltip y para el lector de pantalla. Con «· Producción» el título se
+                  cortaba en los 16rem del menú. */}
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
+                  <UtensilsCrossed
+                    className="h-4 w-4 shrink-0 text-sidebar-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">Admin Panel</span>
+                </h2>
+                <VersionPanel colapsado className="font-medium" />
+              </div>
               <p
                 className="truncate text-xs text-sidebar-foreground/70"
                 title="Gestión del Restaurante"
@@ -197,7 +228,7 @@ export function AppSidebar() {
                         className="h-5 w-5 shrink-0"
                         aria-hidden="true"
                       />
-                      <span>{item.title}</span>
+                      <span className="truncate">{item.title}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -216,6 +247,13 @@ export function AppSidebar() {
           />
         )}
         <SidebarMenu>
+          {/* Quién ha iniciado sesión; abre «Mi cuenta» (datos, permisos y contraseña). */}
+          <BotonUsuarioMenu
+            tono="panel"
+            esSuperAdmin={!superAdminLoading && isSuperAdmin}
+            rol={role ?? null}
+            permisos={permissions ?? []}
+          />
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Cerrar sesión"
@@ -239,7 +277,6 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <VersionPanel colapsado={isCollapsed} />
       </SidebarFooter>
     </Sidebar>
   );

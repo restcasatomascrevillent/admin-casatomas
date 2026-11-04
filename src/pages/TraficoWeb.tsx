@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { format, subDays } from "date-fns";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, FileBarChart2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SuperAdminLayout } from "@/components/SuperAdminLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +24,9 @@ import { TopPaginas } from "@/components/trafico-web/TopPaginas";
 import { Desgloses } from "@/components/trafico-web/Desgloses";
 import { EditorPesoPaginas } from "@/components/trafico-web/EditorPesoPaginas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+
+// Informe mensual en diapositivas (y su PDF): solo se descarga al abrirlo.
+const InformeTraficoDialog = lazy(() => import("@/components/trafico-web/informe/InformeTraficoDialog"));
 
 const ISO = "yyyy-MM-dd";
 
@@ -62,6 +66,7 @@ function CargandoPagina() {
 export default function TraficoWeb() {
   const [proyecto, setProyecto] = useState<FiltroProyecto>("ambos");
   const [dias, setDias] = useState<RangoDias>(30);
+  const [informeAbierto, setInformeAbierto] = useState(false);
 
   // Fechas en calendario local; la RPC trabaja con días cerrados (< hoy).
   const hoyStr = format(new Date(), ISO);
@@ -109,6 +114,10 @@ export default function TraficoWeb() {
           <FiltrosTrafico proyecto={proyecto} onProyectoChange={setProyecto} dias={dias} onDiasChange={setDias} />
           <div className="flex items-center gap-3">
             <p className="hidden text-xs text-muted-foreground xl:block">Vercel Web Analytics · la transferencia es una estimación</p>
+            <Button variant="outline" className="h-11 gap-2" onClick={() => setInformeAbierto(true)}>
+              <FileBarChart2 className="h-4 w-4" aria-hidden />
+              Generar informe
+            </Button>
             <EditorPesoPaginas />
           </div>
         </div>
@@ -156,6 +165,11 @@ export default function TraficoWeb() {
           )}
         </div>
       </div>
+      {informeAbierto && (
+        <Suspense fallback={null}>
+          <InformeTraficoDialog abierto={informeAbierto} onAbiertoChange={setInformeAbierto} />
+        </Suspense>
+      )}
     </SuperAdminLayout>
   );
 }

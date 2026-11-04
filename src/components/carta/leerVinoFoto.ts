@@ -128,18 +128,12 @@ async function invocarExtraccion(file: File, categorias: string[]): Promise<{ da
 
 /**
  * Lectura con IA desde el formulario (VinoForm/EditarVinoModal): datos de la
- * etiqueta y, si la IA dio encuadre, la foto encuadrada en 3:4 (como hacía la
- * precarga del lote). Lanza Error con el motivo real si falla.
+ * etiqueta. Lanza Error con el motivo real si falla. (La foto la recorta el
+ * propio formulario, también en el móvil: no hace falta encuadrarla.)
  */
-export async function leerDatosVinoDeFoto(
-  file: File,
-  categorias: string[],
-): Promise<{ datos: DatosVinoFoto; encuadrar: () => Promise<File> }> {
-  const { datos, reducida } = await invocarExtraccion(file, categorias);
-  return {
-    datos,
-    encuadrar: async () => new File([await recortarFoto(reducida, datos.recorte)], "botella.jpg", { type: "image/jpeg" }),
-  };
+export async function leerDatosVinoDeFoto(file: File, categorias: string[]): Promise<{ datos: DatosVinoFoto }> {
+  const { datos } = await invocarExtraccion(file, categorias);
+  return { datos };
 }
 
 /** Redimensiona, manda a `extraer-vino-foto` y encuadra la foto. Lanza error si la lectura falla. */

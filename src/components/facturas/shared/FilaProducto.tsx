@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useUpdateProductoFactura, type ProductoFactura, type Factura } from "@/hooks/useFacturas";
+import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura, type Factura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
@@ -59,14 +59,21 @@ export const FilaProducto = ({
   isMobile,
   allDocs,
   onAbrirProducto,
+  nuevaEnFacturaId,
+  onCerrarNueva,
 }: {
   p: ProductoFactura;
   isMobile?: boolean;
   allDocs: Factura[];
   /** Si se pasa, el nombre de la línea enlaza con la ficha de su producto. */
   onAbrirProducto?: (productoId: number) => void;
+  /** Modo «línea nueva»: `p` va vacío, se abre el formulario y Guardar crea la línea en ese documento. */
+  nuevaEnFacturaId?: number;
+  /** En modo «línea nueva»: se llama al guardar o cancelar. */
+  onCerrarNueva?: () => void;
 }) => {
-  const [isEditing, setIsEditing] = useState(false);
+  const esNueva = nuevaEnFacturaId != null;
+  const [isEditing, setIsEditing] = useState(esNueva);
   const [nombre, setNombre] = useState(p.producto_nombre);
   const [cantidad, setCantidad] = useState(String(p.cantidad ?? ""));
   const [unidad, setUnidad] = useState(p.unidad || "");
@@ -74,19 +81,33 @@ export const FilaProducto = ({
   const [total, setTotal] = useState(String(p.precio ?? ""));
 
   const updateMutation = useUpdateProductoFactura();
+  const crearMutation = useCrearProductoFactura();
+  const guardando = updateMutation.isPending || crearMutation.isPending;
+
+  const cancelar = () => {
+    setIsEditing(false);
+    if (esNueva) onCerrarNueva?.();
+  };
 
   const handleSave = async () => {
+    if (esNueva && nombre.trim() === "") return;
     // Misma regla que el OCR y que el trigger de la base (ud / kg / l; lo demás se deja).
     const unidadNormalizada = normalizarUnidadFactura(unidad);
+    const campos = {
+      producto_nombre: nombre,
+      cantidad: cantidad !== "" ? Number(cantidad) : undefined,
+      unidad: unidadNormalizada,
+      precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
+      precio: total !== "" ? Number(total) : undefined,
+    };
     try {
-      await updateMutation.mutateAsync({
-        id: p.id,
-        producto_nombre: nombre,
-        cantidad: cantidad !== "" ? Number(cantidad) : undefined,
-        unidad: unidadNormalizada,
-        precio_unitario: precioUnitario !== "" ? Number(precioUnitario) : undefined,
-        precio: total !== "" ? Number(total) : undefined,
-      });
+      if (esNueva) {
+        await crearMutation.mutateAsync({ factura_id: nuevaEnFacturaId, ...campos });
+        setIsEditing(false);
+        onCerrarNueva?.();
+        return;
+      }
+      await updateMutation.mutateAsync({ id: p.id, ...campos });
       setUnidad(unidadNormalizada);
       setIsEditing(false);
     } catch (err) {
@@ -124,8 +145,8 @@ export const FilaProducto = ({
           </div>
           {showAnomalyWarning && <p className="text-xs text-red-500 font-medium">⚠️ Anomalía: Precio disparado respecto al original</p>}
           <div className="flex gap-2 mt-1 justify-end">
-            <Button size="sm" variant="ghost" className="h-11 px-4 text-sm" onClick={() => setIsEditing(false)}>Cancelar</Button>
-            <Button size="sm" variant="default" className="h-11 px-4 text-sm" onClick={handleSave} disabled={updateMutation.isPending}>Guardar</Button>
+            <Button size="sm" variant="ghost" className="h-11 px-4 text-sm" onClick={cancelar}>Cancelar</Button>
+            <Button size="sm" variant="default" className="h-11 px-4 text-sm" onClick={handleSave} disabled={guardando}>Guardar</Button>
           </div>
         </div>
       );
@@ -204,8 +225,8 @@ export const FilaProducto = ({
               <Input className="h-11 w-28 text-right text-base md:text-base" type="number" inputMode="decimal" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />,
             )}
             <div className="flex gap-1">
-              <Button size="icon" className="h-11 w-11 shrink-0" variant="default" onClick={handleSave} disabled={updateMutation.isPending} aria-label="Guardar producto"><Check className="h-4 w-4" /></Button>
-              <Button size="icon" className="h-11 w-11 shrink-0" variant="ghost" onClick={() => setIsEditing(false)} aria-label="Cancelar edición"><X className="h-4 w-4" /></Button>
+              <Button size="icon" className="h-11 w-11 shrink-0" variant="default" onClick={handleSave} disabled={guardando} aria-label="Guardar producto"><Check className="h-4 w-4" /></Button>
+              <Button size="icon" className="h-11 w-11 shrink-0" variant="ghost" onClick={cancelar} aria-label="Cancelar edición"><X className="h-4 w-4" /></Button>
             </div>
           </div>
           {showAnomalyWarning && <p className="text-xs text-red-500 font-medium mt-1">⚠️ Precio anómalo vs historial</p>}

@@ -33,6 +33,26 @@ export function ChipSemaforo({ estado, children, className }: { estado: Semaforo
   );
 }
 
+/** Barra de % con el color del semáforo; el % y el estado van también en texto (aria-valuetext). */
+export function BarraPorcentaje({ porcentaje, estado, etiqueta, className }: { porcentaje: number; estado: Semaforo; etiqueta: string; className?: string }) {
+  return (
+    <div
+      role="progressbar"
+      aria-label={etiqueta}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={Math.min(100, Math.round(porcentaje))}
+      aria-valuetext={`${formatearPorcentaje(porcentaje)} del límite: ${TEXTO_SEMAFORO[estado].toLowerCase()}`}
+      className={cn("h-2.5 w-full overflow-hidden rounded-full bg-muted", className)}
+    >
+      <div
+        className={cn("h-full rounded-full transition-[width]", COLOR_SEMAFORO[estado].barra)}
+        style={{ width: `${Math.min(100, Math.max(porcentaje, porcentaje > 0 ? 1.5 : 0))}%` }}
+      />
+    </div>
+  );
+}
+
 /** Una métrica: cifra frente al límite, barra con % y semáforo, periodo y nota. */
 export function BarraConsumo({ fila }: { fila: FilaMetrica }) {
   const { porcentaje, semaforo: estado } = fila;
@@ -46,22 +66,7 @@ export function BarraConsumo({ fila }: { fila: FilaMetrica }) {
           {fila.textoLimite && <span className="text-muted-foreground">{sinDato ? ` · límite ${fila.textoLimite}` : ` de ${fila.textoLimite}`}</span>}
         </span>
       </div>
-      {porcentaje != null && estado && (
-        <div
-          role="progressbar"
-          aria-label={fila.etiqueta}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.min(100, Math.round(porcentaje))}
-          aria-valuetext={`${formatearPorcentaje(porcentaje)} del límite: ${TEXTO_SEMAFORO[estado].toLowerCase()}`}
-          className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
-        >
-          <div
-            className={cn("h-full rounded-full transition-[width]", COLOR_SEMAFORO[estado].barra)}
-            style={{ width: `${Math.min(100, Math.max(porcentaje, porcentaje > 0 ? 1.5 : 0))}%` }}
-          />
-        </div>
-      )}
+      {porcentaje != null && estado && <BarraPorcentaje porcentaje={porcentaje} estado={estado} etiqueta={fila.etiqueta} />}
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
         {porcentaje != null && estado && (
           <ChipSemaforo estado={estado}>

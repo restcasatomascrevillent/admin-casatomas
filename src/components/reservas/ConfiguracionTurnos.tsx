@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Clock, TrendingUp, Settings, Layers } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, TrendingUp, Settings, Layers, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   useConfiguracionTurnos,
@@ -34,7 +35,8 @@ import {
   useEliminarConfiguracionTurno,
   ConfiguracionTurno,
 } from "@/hooks/useConfiguracionTurnos";
-import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
+import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { EscaleraTurnoEditor } from "./EscaleraTurnoEditor";
 import { MARCA_POR_DEFECTO, salaAdmiteReservas } from "@/lib/reservas/negocios";
 import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
@@ -112,6 +114,9 @@ export function ConfiguracionTurnos() {
   const crearMutation = useCrearConfiguracionTurno();
   const actualizarMutation = useActualizarConfiguracionTurno();
   const eliminarMutation = useEliminarConfiguracionTurno();
+  // «Reservas · Configuración» (04/11/2026): con «Ver» se consulta todo; crear, editar, activar o borrar
+  // periodos pide «Puede editar», igual que la RLS de configuracion_turnos (20261104111000).
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas_configuracion", "edit");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -142,9 +147,9 @@ export function ConfiguracionTurnos() {
   const capacidadTotalActiva = useMemo(
     () =>
       sumarCapacidadPorMarca(
-        (espacios ?? [])
-          .filter((e: any) => e.activa)
-          .map((e: any) => ({
+        ((espacios ?? []) as EspacioReserva[])
+          .filter((e) => e.activa)
+          .map((e) => ({
             capacidad_maxima: Number(e.capacidad_maxima) || 0,
             marca: e.caracteristicas?.marca,
             // El Reservado (sala privada) está fuera de aforo: no suma.
@@ -154,7 +159,10 @@ export function ConfiguracionTurnos() {
       ),
     [espacios],
   );
-  const salasDeCasaTomas = useMemo(() => (espacios ?? []).filter((e: any) => salaAdmiteReservas(e)), [espacios]);
+  const salasDeCasaTomas = useMemo(
+    () => ((espacios ?? []) as EspacioReserva[]).filter((e) => salaAdmiteReservas(e)),
+    [espacios],
+  );
 
   const openCreateDialog = () => {
     setEditingConfig(null);
@@ -323,6 +331,17 @@ export function ConfiguracionTurnos() {
 
   return (
     <div className="space-y-8">
+      {!puedeEditar && (
+        <Alert>
+          <Lock className="h-4 w-4" />
+          <AlertTitle>Solo lectura</AlertTitle>
+          <AlertDescription>
+            Puedes ver la configuración de reservas, pero tu usuario no tiene «Puede editar» en «Reservas ·
+            Configuración»: aquí no se pueden guardar cambios.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Configuración general de reservas */}
       <ConfiguracionGeneralReservas />
 
@@ -333,276 +352,278 @@ export function ConfiguracionTurnos() {
             Configura los periodos de servicio y el sistema de turnos dinámicos
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={openCreateDialog}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Periodo
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingConfig ? "Editar Periodo" : "Nuevo Periodo de Servicio"}
-              </DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="nombre_periodo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nombre del periodo</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Ej: Comida, Cena..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="grid grid-cols-2 gap-4">
+        {puedeEditar && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={openCreateDialog}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Periodo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingConfig ? "Editar Periodo" : "Nuevo Periodo de Servicio"}
+                </DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="hora_inicio"
+                    name="nombre_periodo"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Hora inicio</FormLabel>
+                        <FormLabel>Nombre del periodo</FormLabel>
                         <FormControl>
-                          <Input type="time" {...field} />
+                          <Input placeholder="Ej: Comida, Cena..." {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="hora_inicio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hora inicio</FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="hora_fin"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Hora fin</FormLabel>
+                          <FormControl>
+                            <Input type="time" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="hora_fin"
+                    name="dias_semana"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Hora fin</FormLabel>
-                        <FormControl>
-                          <Input type="time" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="dias_semana"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Días activos</FormLabel>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {diasSemana.map((dia) => (
-                          <label
-                            key={dia.id}
-                            className={`
-                              flex items-center justify-center w-10 h-10 pointer-coarse:w-11 pointer-coarse:h-11 rounded-full cursor-pointer border-2 text-sm font-medium
-                              ${
-                                field.value.includes(dia.id)
-                                  ? "bg-primary text-primary-foreground border-primary"
-                                  : "border-border hover:border-primary/50"
-                              }
-                            `}
-                          >
-                            <input
-                              type="checkbox"
-                              className="sr-only"
-                              checked={field.value.includes(dia.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  field.onChange([...field.value, dia.id].sort());
-                                } else {
-                                  field.onChange(field.value.filter((d) => d !== dia.id));
+                        <FormLabel>Días activos</FormLabel>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {diasSemana.map((dia) => (
+                            <label
+                              key={dia.id}
+                              className={`
+                                flex items-center justify-center w-10 h-10 pointer-coarse:w-11 pointer-coarse:h-11 rounded-full cursor-pointer border-2 text-sm font-medium
+                                ${
+                                  field.value.includes(dia.id)
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "border-border hover:border-primary/50"
                                 }
-                              }}
-                            />
-                            {dia.label}
-                          </label>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="espacio_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Aplicar a</FormLabel>
-                      <Select
-                        value={field.value || "all"}
-                        onValueChange={(v) => field.onChange(v === "all" ? null : v)}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Todos los espacios" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="all">Todos los espacios (generales)</SelectItem>
-                          {salasDeCasaTomas.map((espacio: any) => (
-                            <SelectItem key={espacio.id} value={espacio.id}>
-                              {espacio.nombre}
-                            </SelectItem>
+                              `}
+                            >
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={field.value.includes(dia.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    field.onChange([...field.value, dia.id].sort());
+                                  } else {
+                                    field.onChange(field.value.filter((d) => d !== dia.id));
+                                  }
+                                }}
+                              />
+                              {dia.label}
+                            </label>
                           ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Los generales valen para todo el restaurante. Un espacio con turnos propios usa los suyos; si no, los generales.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                {/* Escalera de horas: modo simple (2 columnas, como hasta hoy) o
-                    avanzado (lista de niveles, migración 20260921000000). */}
-                <FormField
-                  control={form.control}
-                  name="modo_escalera"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Tabs value={field.value} onValueChange={(v) => field.onChange(v as "legacy" | "avanzado")}>
-                        <TabsList className="grid w-full grid-cols-2">
-                          <TabsTrigger value="legacy">Modo simple</TabsTrigger>
-                          <TabsTrigger value="avanzado">
-                            <Layers className="h-3.5 w-3.5 mr-1.5" />
-                            Escalera avanzada
-                          </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="legacy" className="space-y-4 pt-4">
-                          <FormField
-                            control={form.control}
-                            name="intervalo_base_minutos"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Intervalo base (minutos)</FormLabel>
-                                <Select value={field.value.toString()} onValueChange={(v) => field.onChange(parseInt(v))}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="30">30 minutos</SelectItem>
-                                    <SelectItem value="60">60 minutos</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormDescription>
-                                  Los turnos intermedios (cada 15 min) se abrirán con alta ocupación
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="umbral_apertura_secundario"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Umbral de ocupación para abrir turno intermedio: {field.value}%</FormLabel>
-                                <FormControl>
-                                  <Slider
-                                    value={[field.value]}
-                                    onValueChange={(v) => field.onChange(v[0])}
-                                    min={0}
-                                    max={100}
-                                    step={5}
-                                    className="mt-2"
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  Cuando un turno primario alcance este % de ocupación, se abrirá el turno +15min
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="ocultar_primario_si_secundario"
-                            render={({ field }) => (
-                              <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                                <div className="space-y-0.5">
-                                  <FormLabel>Ocultar turno primario al abrir secundario</FormLabel>
-                                  <FormDescription>
-                                    Si está activo, cuando se abra un turno intermedio (ej: 13:15), el turno primario (13:00) dejará de mostrarse
-                                  </FormDescription>
-                                </div>
-                                <FormControl>
-                                  <Switch checked={field.value} onCheckedChange={field.onChange} />
-                                </FormControl>
-                              </FormItem>
-                            )}
-                          />
-
-                          <p className="text-xs text-muted-foreground">
-                            Solo dos niveles: horas en punto y un intermedio. Para más niveles (por ejemplo, cuartos de
-                            hora), pasa a "Escalera avanzada" — no se pierde nada al cambiar.
-                          </p>
-                        </TabsContent>
-
-                        <TabsContent value="avanzado" className="pt-4">
-                          <EscaleraTurnoEditor
-                            niveles={form.watch("niveles_escalera") as NivelEscalera[]}
-                            onChangeNiveles={(n) => form.setValue("niveles_escalera", n, { shouldDirty: true })}
-                            ocultarNivelAnterior={form.watch("ocultar_nivel_anterior")}
-                            onChangeOcultar={(v) => form.setValue("ocultar_nivel_anterior", v, { shouldDirty: true })}
-                            baseUmbral={form.watch("base_umbral")}
-                            onChangeBaseUmbral={(v) => form.setValue("base_umbral", v, { shouldDirty: true })}
-                            horaInicio={form.watch("hora_inicio")}
-                            horaFin={form.watch("hora_fin")}
-                            espacioId={form.watch("espacio_id")}
-                            capacidadTotal={capacidadTotalActiva}
-                            migradaDeLegacy={origenEscaleraAlAbrir === "legacy"}
-                          />
-                        </TabsContent>
-                      </Tabs>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="activo"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Periodo activo</FormLabel>
+                  <FormField
+                    control={form.control}
+                    name="espacio_id"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Aplicar a</FormLabel>
+                        <Select
+                          value={field.value || "all"}
+                          onValueChange={(v) => field.onChange(v === "all" ? null : v)}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Todos los espacios" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="all">Todos los espacios (generales)</SelectItem>
+                            {salasDeCasaTomas.map((espacio) => (
+                              <SelectItem key={espacio.id} value={espacio.id}>
+                                {espacio.nombre}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormDescription>
-                          Los periodos inactivos no generan turnos
+                          Los generales valen para todo el restaurante. Un espacio con turnos propios usa los suyos; si no, los generales.
                         </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={crearMutation.isPending || actualizarMutation.isPending}>
-                    {editingConfig ? "Guardar" : "Crear"}
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+                  {/* Escalera de horas: modo simple (2 columnas, como hasta hoy) o
+                      avanzado (lista de niveles, migración 20260921000000). */}
+                  <FormField
+                    control={form.control}
+                    name="modo_escalera"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Tabs value={field.value} onValueChange={(v) => field.onChange(v as "legacy" | "avanzado")}>
+                          <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="legacy">Modo simple</TabsTrigger>
+                            <TabsTrigger value="avanzado">
+                              <Layers className="h-3.5 w-3.5 mr-1.5" />
+                              Escalera avanzada
+                            </TabsTrigger>
+                          </TabsList>
+
+                          <TabsContent value="legacy" className="space-y-4 pt-4">
+                            <FormField
+                              control={form.control}
+                              name="intervalo_base_minutos"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Intervalo base (minutos)</FormLabel>
+                                  <Select value={field.value.toString()} onValueChange={(v) => field.onChange(parseInt(v))}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="30">30 minutos</SelectItem>
+                                      <SelectItem value="60">60 minutos</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormDescription>
+                                    Los turnos intermedios (cada 15 min) se abrirán con alta ocupación
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="umbral_apertura_secundario"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Umbral de ocupación para abrir turno intermedio: {field.value}%</FormLabel>
+                                  <FormControl>
+                                    <Slider
+                                      value={[field.value]}
+                                      onValueChange={(v) => field.onChange(v[0])}
+                                      min={0}
+                                      max={100}
+                                      step={5}
+                                      className="mt-2"
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Cuando un turno primario alcance este % de ocupación, se abrirá el turno +15min
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="ocultar_primario_si_secundario"
+                              render={({ field }) => (
+                                <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                                  <div className="space-y-0.5">
+                                    <FormLabel>Ocultar turno primario al abrir secundario</FormLabel>
+                                    <FormDescription>
+                                      Si está activo, cuando se abra un turno intermedio (ej: 13:15), el turno primario (13:00) dejará de mostrarse
+                                    </FormDescription>
+                                  </div>
+                                  <FormControl>
+                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+
+                            <p className="text-xs text-muted-foreground">
+                              Solo dos niveles: horas en punto y un intermedio. Para más niveles (por ejemplo, cuartos de
+                              hora), pasa a "Escalera avanzada" — no se pierde nada al cambiar.
+                            </p>
+                          </TabsContent>
+
+                          <TabsContent value="avanzado" className="pt-4">
+                            <EscaleraTurnoEditor
+                              niveles={form.watch("niveles_escalera") as NivelEscalera[]}
+                              onChangeNiveles={(n) => form.setValue("niveles_escalera", n, { shouldDirty: true })}
+                              ocultarNivelAnterior={form.watch("ocultar_nivel_anterior")}
+                              onChangeOcultar={(v) => form.setValue("ocultar_nivel_anterior", v, { shouldDirty: true })}
+                              baseUmbral={form.watch("base_umbral")}
+                              onChangeBaseUmbral={(v) => form.setValue("base_umbral", v, { shouldDirty: true })}
+                              horaInicio={form.watch("hora_inicio")}
+                              horaFin={form.watch("hora_fin")}
+                              espacioId={form.watch("espacio_id")}
+                              capacidadTotal={capacidadTotalActiva}
+                              migradaDeLegacy={origenEscaleraAlAbrir === "legacy"}
+                            />
+                          </TabsContent>
+                        </Tabs>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="activo"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Periodo activo</FormLabel>
+                          <FormDescription>
+                            Los periodos inactivos no generan turnos
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={crearMutation.isPending || actualizarMutation.isPending}>
+                      {editingConfig ? "Guardar" : "Crear"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Info card */}
@@ -636,24 +657,29 @@ export function ConfiguracionTurnos() {
                   <Switch
                     checked={config.activo}
                     onCheckedChange={() => handleToggleActivo(config)}
+                    disabled={!puedeEditar}
                     aria-label={`Periodo ${config.nombre_periodo} activo`}
                   />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEditDialog(config)}
-                    aria-label={`Editar el periodo ${config.nombre_periodo}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIdAEliminar(config.id)}
-                    aria-label={`Eliminar el periodo ${config.nombre_periodo}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {puedeEditar && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEditDialog(config)}
+                        aria-label={`Editar el periodo ${config.nombre_periodo}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIdAEliminar(config.id)}
+                        aria-label={`Eliminar el periodo ${config.nombre_periodo}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
               <CardDescription className="flex flex-wrap items-center gap-1.5">
@@ -735,7 +761,9 @@ export function ConfiguracionTurnos() {
       {configuraciones?.length === 0 && (
         <Card className="p-8 text-center">
           <p className="text-muted-foreground">
-            No hay periodos de servicio configurados. Crea uno para empezar.
+            {puedeEditar
+              ? "No hay periodos de servicio configurados. Crea uno para empezar."
+              : "No hay periodos de servicio configurados."}
           </p>
         </Card>
       )}

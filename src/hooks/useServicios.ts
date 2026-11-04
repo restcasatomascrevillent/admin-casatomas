@@ -1,45 +1,118 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-import type { LecturaServicio, ServicioContratado } from "@/lib/servicios";
+import { CAMBIO_POR_DEFECTO, type LecturaServicio, type ServicioContratado } from "@/lib/servicios";
 
-// servicios_contratados / servicios_uso aún no están en types.ts (generado).
+// Las consultas van sin tipar: estas tablas cambian de forma con
+// 20261103160000 y la pantalla tiene que funcionar antes y después.
 const sb = supabase as unknown as SupabaseClient;
 
 export const CLAVE_SERVICIOS = ["super-admin", "servicios"] as const;
 export const CLAVE_LECTURAS = ["super-admin", "servicios-uso"] as const;
+export const CLAVE_CONFIG = ["super-admin", "servicios-config"] as const;
 
-const COLUMNAS = "proveedor, nombre, plan, precio_mensual, moneda, ciclo, renovacion, cuenta, panel_url, limites, notas, actualizado_en";
+// `string` a secas: sin tipos generados, el analizador de supabase-js no infiere filas.
+const COLUMNAS_BASE: string = "proveedor, nombre, plan, precio_mensual, moneda, ciclo, renovacion, cuenta, panel_url, limites, notas, actualizado_en";
+/** Columnas de 20261103160000 (planes y coste). */
+const COLUMNAS: string = `${COLUMNAS_BASE}, categoria, orden, activo, por_confirmar, precio_anual, fuente_precio`;
 
-/** Columnas que el super admin puede cambiar (las mismas que concede la migración). */
+/** Columnas que el super admin puede cambiar (las mismas que conceden las migraciones). */
 export type CambiosServicio = Partial<Pick<ServicioContratado,
-  "nombre" | "plan" | "precio_mensual" | "moneda" | "ciclo" | "renovacion" | "cuenta" | "panel_url" | "limites" | "notas">>;
+  "nombre" | "plan" | "precio_mensual" | "moneda" | "ciclo" | "renovacion" | "cuenta" | "panel_url" | "limites" | "notas"
+  | "categoria" | "orden" | "activo" | "por_confirmar" | "precio_anual" | "fuente_precio">>;
 
-export type ResultadoServicios = { disponible: true; servicios: ServicioContratado[] } | { disponible: false };
+/** `costes`: false si falta 20261103160000 (sin categorías, coste variable ni tipo de cambio). */
+export type ResultadoServicios = { disponible: true; costes: boolean; servicios: ServicioContratado[] } | { disponible: false };
+
+/** Columna que no existe (base sin 20261103160000). */
+const esColumnaNueva = (e: { code?: string; message?: string } | null) =>
+  !!e && (e.code === "42703" || /column .* does not exist|could not find the .* column/i.test(e.message ?? ""));
+
+const ORDEN_VIEJO: Record<string, number> = { vercel: 10, supabase: 20, github: 30, resend: 40, stripe: 50 };
 
 export function esSinMigracionServicios(error: unknown): boolean {
   const e = error as { code?: string; message?: string } | null;
   if (!e) return false;
+  // Falta una COLUMNA (base sin 20261103160000), no la tabla: eso lo trata cargarServicios.
+  if (esColumnaNueva(e)) return false;
   return e.code === "42P01" || e.code === "PGRST205" || e.code === "PGRST202" ||
     (/servicios_(contratados|uso)/.test(e.message ?? "") && /does not exist|could not find|schema cache/i.test(e.message ?? ""));
 }
 
 export async function cargarServicios(): Promise<ResultadoServicios> {
-  const { data, error } = await sb.from("servicios_contratados").select(COLUMNAS).order("proveedor");
+  let costes = true;
+  let { data, error } = await sb.from("servicios_contratados").select(COLUMNAS).order("proveedor");
+  if (error && esColumnaNueva(error) && !esSinMigracionServicios(error)) {
+    costes = false;
+    ({ data, error } = await sb.from("servicios_contratados").select(COLUMNAS_BASE).order("proveedor"));
+  }
   if (error) {
     if (esSinMigracionServicios(error)) return { disponible: false };
     throw new Error(error.message || "No se pudieron cargar los servicios.");
   }
-  const servicios = ((data ?? []) as ServicioContratado[]).map((s) => ({
-    ...s,
+  const servicios = ((data ?? []) as unknown as Array<Partial<ServicioContratado> & Pick<ServicioContratado, "proveedor" | "nombre">>).map((s): ServicioContratado => ({
+    ...(s as ServicioContratado),
     precio_mensual: s.precio_mensual == null ? null : Number(s.precio_mensual),
+    precio_anual: s.precio_anual == null ? null : Number(s.precio_anual),
     limites: s.limites && typeof s.limites === "object" ? s.limites : {},
+    categoria: s.categoria ?? "otros",
+    orden: typeof s.orden === "number" ? s.orden : (ORDEN_VIEJO[s.proveedor] ?? 100),
+    activo: s.activo !== false,
+    por_confirmar: s.por_confirmar === true,
+    fuente_precio: s.fuente_precio ?? null,
   }));
-  return { disponible: true, servicios };
+  return { disponible: true, costes, servicios };
+}
+
+export interface ConfigServicios {
+  /** Euros por 1 dólar (editable por el super admin). */
+  eurPorUsd: number;
+  /** false si falta la tabla (sin 20261103160000): se usa 0,92 y no se puede editar. */
+  guardada: boolean;
+  actualizadoEn: string | null;
+  /** Último cambio del BCE que guarda sincronizar-costes-openai (si se puede leer). */
+  bce: { eurPorUsd: number; fecha: string } | null;
+}
+
+export async function cargarConfigServicios(): Promise<ConfigServicios> {
+  const [config, bce] = await Promise.all([
+    sb.from("servicios_config").select("eur_por_usd, actualizado_en").limit(1),
+    sb.from("tipo_cambio_usd_eur").select("fecha, eur_por_usd").order("fecha", { ascending: false }).limit(1),
+  ]);
+  const fila = !config.error && Array.isArray(config.data) ? (config.data[0] as { eur_por_usd?: unknown; actualizado_en?: string } | undefined) : undefined;
+  const cambio = Number(fila?.eur_por_usd);
+  const filaBce = !bce.error && Array.isArray(bce.data) ? (bce.data[0] as { fecha?: string; eur_por_usd?: unknown } | undefined) : undefined;
+  const cambioBce = Number(filaBce?.eur_por_usd);
+  return {
+    eurPorUsd: Number.isFinite(cambio) && cambio > 0 ? cambio : CAMBIO_POR_DEFECTO,
+    guardada: !!fila,
+    actualizadoEn: fila?.actualizado_en ?? null,
+    bce: filaBce?.fecha && Number.isFinite(cambioBce) && cambioBce > 0 ? { eurPorUsd: cambioBce, fecha: filaBce.fecha } : null,
+  };
+}
+
+export function useConfigServicios(habilitado = true) {
+  return useQuery({ queryKey: CLAVE_CONFIG, queryFn: cargarConfigServicios, enabled: habilitado, staleTime: 60_000 });
+}
+
+/** Cambia el tipo de cambio (solo super admin; la RLS lo impide a los demás). */
+export function useGuardarTipoCambio() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (eurPorUsd: number) => {
+      const { data, error } = await sb.from("servicios_config").update({ eur_por_usd: eurPorUsd }).eq("id", true).select("eur_por_usd");
+      if (error) throw new Error(/check constraint/i.test(error.message) ? "El tipo de cambio tiene que estar entre 0,2 y 5 euros por dólar." : error.message);
+      if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede cambiar el tipo de cambio.");
+      return Number((data[0] as { eur_por_usd: unknown }).eur_por_usd);
+    },
+    onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_CONFIG }),
+  });
 }
 
 export interface ResultadoLecturas {
   lecturas: LecturaServicio[];
+  /** Servicios en uso sin lectura automática (no hay API razonable): se miran en su panel. */
+  sinLector: string[];
   generado_en: string | null;
   /** Texto para el dueño si la función no respondió (las lecturas son entonces las guardadas). */
   errorFuncion: string | null;
@@ -63,16 +136,18 @@ async function mensajeDeErrorFuncion(error: unknown): Promise<string> {
  * enseña las últimas lecturas guardadas en la base de datos y lo dice.
  */
 export async function pedirLecturas(forzar: boolean, proveedor?: string): Promise<ResultadoLecturas> {
-  const { data, error } = await supabase.functions.invoke<{ lecturas?: LecturaServicio[]; generado_en?: string }>("servicios-uso", {
+  const { data, error } = await supabase.functions.invoke<{ lecturas?: LecturaServicio[]; sin_lector?: string[]; generado_en?: string }>("servicios-uso", {
     body: proveedor ? { forzar, proveedor } : { forzar },
   });
   if (!error && data && Array.isArray(data.lecturas)) {
-    return { lecturas: data.lecturas, generado_en: data.generado_en ?? null, errorFuncion: null };
+    const sinLector = Array.isArray(data.sin_lector) ? data.sin_lector.filter((p): p is string => typeof p === "string") : [];
+    return { lecturas: data.lecturas, sinLector, generado_en: data.generado_en ?? null, errorFuncion: null };
   }
   const errorFuncion = error ? await mensajeDeErrorFuncion(error) : "La función «servicios-uso» ha devuelto una respuesta inesperada.";
   const guardadas = await sb.rpc("servicios_uso_ultimas");
   return {
     lecturas: guardadas.error || !Array.isArray(guardadas.data) ? [] : (guardadas.data as LecturaServicio[]),
+    sinLector: [],
     generado_en: null,
     errorFuncion,
   };
@@ -105,11 +180,62 @@ export function useActualizarLecturas() {
 export function useGuardarServicio() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async ({ proveedor, cambios }: { proveedor: string; cambios: CambiosServicio }) => {
-      const { data, error } = await sb.from("servicios_contratados").update(cambios).eq("proveedor", proveedor).select(COLUMNAS);
+    mutationFn: async ({ proveedor, cambios, costes = true }: { proveedor: string; cambios: CambiosServicio; costes?: boolean }) => {
+      // Sin 20261103160000 solo existen las columnas de la primera migración.
+      // El precio al año se guarda entonces como precio al mes (pago anual).
+      const enviar: CambiosServicio = costes ? cambios : {
+        ...Object.fromEntries(
+          Object.entries(cambios).filter(([k]) => !["categoria", "orden", "activo", "por_confirmar", "precio_anual", "fuente_precio"].includes(k)),
+        ),
+        ...(cambios.precio_anual != null ? { precio_mensual: Math.round((cambios.precio_anual / 12) * 100) / 100 } : {}),
+      };
+      const { data, error } = await sb.from("servicios_contratados").update(enviar).eq("proveedor", proveedor).select(costes ? COLUMNAS : COLUMNAS_BASE);
       if (error) throw new Error(/check constraint/i.test(error.message) ? "Algún dato no es válido (revisa los enlaces, que empiecen por https://, y los números)." : error.message);
       if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede cambiar los servicios.");
-      return data[0] as ServicioContratado;
+      return data[0] as unknown as ServicioContratado;
+    },
+    onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
+  });
+}
+
+/** Falta 20261104121000 (sin permiso de alta o de borrado) o no es super admin. */
+function mensajeAltaBaja(error: { code?: string; message?: string }, accion: "añadir" | "borrar"): string {
+  const texto = error.message ?? "";
+  if (/row-level security/i.test(texto)) return `Solo un super admin puede ${accion} servicios.`;
+  if (error.code === "42501" || /permission denied/i.test(texto)) {
+    return `Para ${accion} servicios falta aplicar en Supabase la migración 20261104121000_servicios_configurables.`;
+  }
+  if (error.code === "23505" || /duplicate key/i.test(texto)) return "Ya hay un servicio con ese nombre: ponle otro.";
+  if (/check constraint/i.test(texto)) return "Algún dato no es válido (revisa los enlaces, que empiecen por https://, y los números).";
+  return texto || `No se ha podido ${accion} el servicio.`;
+}
+
+/** Configurar › «Añadir servicio» (solo super admin; 20261104121000). */
+export function useCrearServicio() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (nuevo: CambiosServicio & Pick<ServicioContratado, "proveedor" | "nombre">) => {
+      const { data, error } = await sb.from("servicios_contratados").insert(nuevo).select(COLUMNAS);
+      if (error) throw new Error(mensajeAltaBaja(error, "añadir"));
+      if (!data || data.length === 0) throw new Error("No se ha guardado: solo un super admin puede añadir servicios.");
+      return data[0] as unknown as ServicioContratado;
+    },
+    onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
+  });
+}
+
+/**
+ * Configurar › «Borrar del todo»: solo un servicio ya quitado («no lo usamos»);
+ * la base de datos también lo exige y borra sus lecturas (20261104121000).
+ */
+export function useBorrarServicio() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (proveedor: string) => {
+      const { data, error } = await sb.from("servicios_contratados").delete().eq("proveedor", proveedor).eq("activo", false).select("proveedor");
+      if (error) throw new Error(mensajeAltaBaja(error, "borrar"));
+      if (!data || data.length === 0) throw new Error("No se ha borrado: solo se puede borrar un servicio quitado, y solo un super admin.");
+      return proveedor;
     },
     onSuccess: () => cliente.invalidateQueries({ queryKey: CLAVE_SERVICIOS }),
   });

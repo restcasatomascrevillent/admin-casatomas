@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { recorteNavegadorSeguro } from "./quitarFondoNavegador";
-import { dispositivoNoRecorta } from "./recorteMovil";
 import { AVISO_SIN_FOTO, AVISO_SIN_PERMISO, TRUCO_IPHONE, esDispositivoIOS, fotoDeEventoPegar, leerFotoPortapapeles } from "./portapapelesFoto";
 
 /**
@@ -31,10 +30,9 @@ export function PegarFotoRecortada({ onFoto, className, disabled }: Props) {
   const [leyendo, setLeyendo] = useState(false);
   const onFotoRef = useRef(onFoto);
   onFotoRef.current = onFoto;
-  const [{ movil, ios, marcado, puedeLeer }] = useState(() => ({
+  const [{ movil, ios, puedeLeer }] = useState(() => ({
     movil: !recorteNavegadorSeguro(),
     ios: esDispositivoIOS(),
-    marcado: dispositivoNoRecorta() !== null,
     puedeLeer: typeof navigator !== "undefined" && typeof navigator.clipboard?.read === "function",
   }));
 
@@ -85,13 +83,7 @@ export function PegarFotoRecortada({ onFoto, className, disabled }: Props) {
         </Button>
       )}
       {ios && (
-        <p
-          className={cn(
-            "text-xs",
-            marcado ? "rounded-md border border-amber-300 bg-amber-50 p-2 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" : "text-muted-foreground",
-          )}
-          data-testid="truco-iphone"
-        >
+        <p className="text-xs text-muted-foreground" data-testid="truco-iphone">
           {TRUCO_IPHONE}
         </p>
       )}

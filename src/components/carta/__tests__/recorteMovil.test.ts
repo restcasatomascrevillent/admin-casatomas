@@ -2,15 +2,17 @@
  * Fallo «no deja subir fotos, cuando las subo se me cierra» (2026-11-01): en
  * el móvil el recorte en el navegador (modelo de 47 MB + cientos de MB al
  * recortar) hacía que el sistema matara la pestaña y la página se recargaba
- * con la foto perdida. En móvil/tablet el formulario no carga el modelo: se
- * recorta DESPUÉS de guardar la foto (recorteEnSegundoPlano.ts). Sin Replicate.
+ * con la foto perdida. Desde el 03-11-2026 el móvil vuelve a recortar en el
+ * formulario, con la foto reducida y el servidor de respaldo (quitarFondoMovil.ts). Sin Replicate.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   navegador: vi.fn(async () => new Blob(["sticker"], { type: "image/png" })),
+  movil: vi.fn(async () => ({ sticker: new Blob(["sticker"], { type: "image/png" }), metodo: "navegador" as const })),
   invoke: vi.fn(),
 }));
+vi.mock("../recorte/quitarFondoMovil", () => ({ quitarFondoMovil: mocks.movil }));
 
 vi.mock("../recorte/quitarFondoNavegador", async (original) => {
   const real = await original<typeof import("../recorte/quitarFondoNavegador")>();
@@ -25,6 +27,8 @@ const ESCRITORIO = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 const ANDROID = "Mozilla/5.0 (Linux; Android 14; SM-A546B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
 const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const IPAD_COMO_MAC = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+
+const IPHONE_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/131.0.6778.73 Mobile/15E148 Safari/604.1";
 
 const nav = (userAgent: string, extra: Record<string, unknown> = {}) =>
   ({ userAgent, maxTouchPoints: 0, ...extra }) as unknown as Navigator;
@@ -63,19 +67,36 @@ describe("¿Se puede recortar en el navegador de este dispositivo?", () => {
   });
 });
 
-describe("quitarFondo (formulario)", () => {
-  it("en el móvil NO carga el modelo ni llama a ningún servicio: el recorte va después de guardar", async () => {
-    vi.stubGlobal("navigator", nav(ANDROID));
-    await expect(quitarFondo(new Blob(["foto"], { type: "image/jpeg" }))).rejects.toMatchObject({ codigo: "movil" });
-    expect(mocks.navegador).not.toHaveBeenCalled();
-    expect(mocks.invoke).not.toHaveBeenCalled();
+describe("decisión por dispositivo: todos recortan en el formulario", () => {
+  it.each([
+    ["PC", nav(ESCRITORIO, { deviceMemory: 8 }), "ordenador"],
+    ["Android", nav(ANDROID), "movil"],
+    ["iPhone (Safari)", nav(IPHONE, { maxTouchPoints: 5 }), "movil"],
+    ["iPhone (Chrome, CriOS)", nav(IPHONE_CHROME, { maxTouchPoints: 5 }), "movil"],
+    ["iPad que se presenta como Mac", nav(IPAD_COMO_MAC, { maxTouchPoints: 5 }), "movil"],
+  ])("%s → quita el fondo en el formulario (%s)", async (_n, n, camino) => {
+    vi.stubGlobal("navigator", n);
+    const r = await quitarFondo(new Blob(["foto"], { type: "image/jpeg" }));
+    expect(r.sticker).toBeInstanceOf(Blob);
+    if (camino === "ordenador") {
+      expect(mocks.navegador).toHaveBeenCalledTimes(1);
+      expect(mocks.movil).not.toHaveBeenCalled();
+    } else {
+      // Móvil: reducida, en el navegador y, si no puede, en el servidor (quitarFondoMovil).
+      expect(mocks.movil).toHaveBeenCalledTimes(1);
+      expect(mocks.navegador).not.toHaveBeenCalled();
+    }
   });
 
-  it("en el escritorio sigue usando el recorte gratis del navegador", async () => {
+});
+
+describe("quitarFondo (formulario)", () => {
+  it("nunca llama a servicios de pago (Replicate)", async () => {
+    vi.stubGlobal("navigator", nav(ANDROID));
+    await quitarFondo(new Blob(["foto"], { type: "image/jpeg" }));
     vi.stubGlobal("navigator", nav(ESCRITORIO, { deviceMemory: 8 }));
     const r = await quitarFondo(new Blob(["foto"], { type: "image/jpeg" }));
-    expect(mocks.navegador).toHaveBeenCalled();
-    expect(mocks.invoke).not.toHaveBeenCalled();
     expect(r.metodo).toBe("navegador");
+    expect(mocks.invoke).not.toHaveBeenCalled();
   });
 });

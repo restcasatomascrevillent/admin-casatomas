@@ -16,6 +16,8 @@
  *     user_permissions solo deja escribir a super admins).
  */
 import { SECTIONS } from "@/hooks/useUserRole";
+import { maquetasVisibles } from "@/lib/maqueta";
+import type { ManagedUser } from "@/hooks/useUsersManagement";
 
 export interface PermisoSeccion {
   section_key: string;
@@ -26,27 +28,39 @@ export interface PermisoSeccion {
 type Seccion = (typeof SECTIONS)[number];
 type SeccionConfigurable = Exclude<Seccion, { key: "usuarios" }>;
 
-/**
- * Secciones que se configuran desde Usuarios. «usuarios» no: esa sección va por
- * rol admin, no por permisos (ProtectedRoute / AppSidebar).
- */
-export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
-  (seccion): seccion is SeccionConfigurable => seccion.key !== "usuarios",
-);
+/** Secciones que son maquetas (lib/maqueta.ts): en producción no se configuran. */
+const SECCIONES_MAQUETA: ReadonlySet<string> = new Set(["tienda"]);
 
 /**
- * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: solo
- * Reservas mira el permiso de edición (`useCanAccessSection("reservas", "edit")`);
- * en el resto basta con «Ver». Si una sección empieza a exigir edición, cambiar su
- * texto aquí. Se muestra detrás de «Editar: ».
+ * Secciones que se configuran desde Usuarios. «usuarios» no: esa sección va por
+ * rol admin, no por permisos (ProtectedRoute / AppSidebar). Las maquetas, solo
+ * fuera de producción (el entorno no cambia en un mismo build).
+ */
+export const seccionesConfigurables = (conMaquetas: boolean): SeccionConfigurable[] =>
+  SECTIONS.filter(
+    (seccion): seccion is SeccionConfigurable =>
+      seccion.key !== "usuarios" && (!SECCIONES_MAQUETA.has(seccion.key) || conMaquetas),
+  );
+
+/** Las de este build (pura arriba, para probar producción sin simular módulos). */
+export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = seccionesConfigurables(maquetasVisibles());
+
+/**
+ * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,
+ * Reservas · Configuración, Cheques y Tienda miran el permiso de edición
+ * (`useCanAccessSection(…, "edit")`); en el resto basta con «Ver». Si una sección empieza
+ * a exigir edición, cambiar su texto aquí. Se muestra detrás de «Editar: ».
  */
 export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   dashboard: "sin efecto aquí; las reservas del día dependen de «Reservas».",
   reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas y mover de sala.",
+  reservas_configuracion:
+    "cambiar las reglas, los turnos y las plantillas de correo de las reservas. Para entrar hace falta también «Ver» en Reservas.",
   gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   marketing: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   cheques: "canjear cheques regalo y modificar la plantilla de factura.",
+  tienda: "poner o quitar vinos de la tienda y cambiar sus ajustes (visible, descuento y textos).",
   facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
 };
 
@@ -96,3 +110,28 @@ export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArr
   );
 }
 
+export type DatosPermisos = Pick<ManagedUser, "is_super_admin" | "role" | "permissions">;
+
+/** «Ver» y «Editar» de cada sección, más la fila de Usuarios (va por rol, no por permisos). */
+export function seccionesConPermisos(user: DatosPermisos) {
+  const permisos = permisosParaEditar(user.permissions);
+  return [
+    ...SECCIONES_CONFIGURABLES.map((seccion) => {
+      const permiso = permisos.find(p => p.section_key === seccion.key);
+      return {
+        key: seccion.key,
+        label: seccion.label,
+        ayuda: `Editar: ${AYUDA_EDICION[seccion.key]}`,
+        ver: user.is_super_admin || Boolean(permiso?.can_view),
+        editar: user.is_super_admin || Boolean(permiso?.can_edit),
+      };
+    }),
+    {
+      key: "usuarios",
+      label: "Usuarios",
+      ayuda: "Consulta en el admin panel; gestión en el superadmin.",
+      ver: user.is_super_admin || user.role === "admin",
+      editar: user.is_super_admin,
+    },
+  ];
+}

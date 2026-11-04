@@ -23,6 +23,10 @@ export interface UserRoleData {
 export const SECTIONS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "reservas", label: "Reservas" },
+  // Pestaña «Configuración» de Reservas (reglas, mesas, turnos y plantillas de
+  // correo), con permiso propio desde el 04/11/2026, como las pestañas del
+  // Gestor Web. Sin «Ver» en «Reservas» no se llega a ella (está en /reservas).
+  { key: "reservas_configuracion", label: "Reservas · Configuración" },
   // "trabajadores" (Personal) retirada el 2026-09-23 (decisión del dueño).
   // Filas de user_permissions con section_key="trabajadores" que puedan
   // quedar en la BD se ignoran sin más: ningún componente busca ya esa key.
@@ -30,12 +34,16 @@ export const SECTIONS = [
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
   { key: "marketing", label: "Newsletter" },
   { key: "cheques", label: "Cheques regalo" },
+  // Tienda de vinos de la web (escaparate: se compra en el restaurante), 2026-11-03.
+  { key: "tienda", label: "Tienda" },
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
-// Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
-// Email, Tráfico web, Espacios y Bot Web se gestionan exclusivamente desde el
-// Super Admin y ya no forman parte del Admin Panel normal.
+// Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web,
+// Espacios y Bot Web se gestionan exclusivamente desde el Super Admin y ya no
+// forman parte del Admin Panel normal. Plantillas Email volvió al panel el
+// 04/11/2026, dentro de Reservas › Configuración (sección
+// «reservas_configuracion»).
 
 export type SectionKey = typeof SECTIONS[number]["key"];
 

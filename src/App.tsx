@@ -15,10 +15,11 @@ import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
 import { ColaVideosProvider } from "@/components/carta/video/ColaVideosProvider";
+import { maquetasVisibles } from "@/lib/maqueta";
+import { rutaServicios } from "@/components/servicios/pestanas";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Reservas = lazy(() => import("./pages/Reservas"));
-const PlantillasEmail = lazy(() => import("./pages/PlantillasEmail"));
 const Espacios = lazy(() => import("./pages/Espacios"));
 const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 // Gestor Web unifica Carta, Novedades, Menús y Tapas en pestañas (?tab=...).
@@ -29,11 +30,11 @@ const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(() => import("./pages/Marketing"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(() => import("./pages/Cheques"));
+const Tienda = lazy(() => import("./pages/Tienda"));
 const Facturas = lazy(() => import("./pages/Facturas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
-const Costes = lazy(() => import("./pages/Costes"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
 const SuperAdminLogin = lazy(() => import("./pages/SuperAdminLogin"));
@@ -82,9 +83,10 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
   </RouteErrorBoundary>
 );
 
-// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email,
-// Tráfico web, Espacios y Bot Web viven exclusivamente bajo /super-admin/*
-// (ver botón de engranaje en AppSidebar).
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web,
+// Espacios y Bot Web viven exclusivamente bajo /super-admin/* (ver botón de
+// engranaje en AppSidebar). Plantillas Email salió de aquí el 04/11/2026: es
+// una subpestaña de Reservas › Configuración.
 const paginaSuperAdmin = (contenido: ReactNode) => (
   <RouteErrorBoundary>
     <SuperAdminRoute>{bajoDemanda(contenido)}</SuperAdminRoute>
@@ -130,6 +132,8 @@ const App = () => (
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
+                  {/* Maqueta solo en la demo (lib/maqueta.ts): en producción, /tienda cae en el 404. */}
+                  {maquetasVisibles() && <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />}
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
@@ -139,9 +143,12 @@ const App = () => (
                   <Route path="/super-admin/ecommerce" element={paginaSuperAdmin(<Ecommerce />)} />
                   <Route path="/super-admin/asistente-telefonico" element={paginaSuperAdmin(<AsistenteTelefonico />)} />
                   <Route path="/super-admin/gestor-gasto" element={paginaSuperAdmin(<GestorGasto />)} />
-                  <Route path="/super-admin/costes" element={paginaSuperAdmin(<Costes />)} />
+                  {/* Costes es una pestaña de Servicios desde el 04/11/2026: la ruta vieja lleva a ella. */}
+                  <Route path="/super-admin/costes" element={<Navigate to={rutaServicios("costes")} replace />} />
                   <Route path="/super-admin/resenas" element={paginaSuperAdmin(<GestionResenas />)} />
-                  <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
+                  {/* Plantillas Email vive en Reservas › Configuración desde el 04/11/2026 (petición del dueño).
+                      La ruta vieja se conserva para que marcadores y enlaces antiguos lleven allí. */}
+                  <Route path="/super-admin/plantillas-email" element={<Navigate to="/reservas?tab=configuracion&sub=plantillas" replace />} />
                   <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
                   <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
                   <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />

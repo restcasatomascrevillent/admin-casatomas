@@ -1327,6 +1327,40 @@ export type Database = {
         }
         Relationships: []
       }
+      // Tienda de vinos, escaparate (migración 20261103150000_tienda_vinos). Fila única (id = true).
+      configuracion_tienda: {
+        Row: {
+          activa: boolean
+          aviso: string | null
+          descuento_pct: number
+          id: boolean
+          recogida: string | null
+          updated_at: string
+          updated_by: string | null
+          vinos_excluidos: string[]
+        }
+        Insert: {
+          activa?: boolean
+          aviso?: string | null
+          descuento_pct?: number
+          id?: boolean
+          recogida?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vinos_excluidos?: string[]
+        }
+        Update: {
+          activa?: boolean
+          aviso?: string | null
+          descuento_pct?: number
+          id?: boolean
+          recogida?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vinos_excluidos?: string[]
+        }
+        Relationships: []
+      }
       consultas_chatbot: {
         Row: {
           created_at: string | null
@@ -3968,6 +4002,124 @@ export type Database = {
         }
         Relationships: []
       }
+      // Super Admin › Servicios (migraciones 20261103120000 y 20261103160000).
+      servicios_config: {
+        Row: {
+          actualizado_en: string
+          actualizado_por: string | null
+          eur_por_usd: number
+          id: boolean
+        }
+        Insert: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          eur_por_usd?: number
+          id?: boolean
+        }
+        Update: {
+          actualizado_en?: string
+          actualizado_por?: string | null
+          eur_por_usd?: number
+          id?: boolean
+        }
+        Relationships: []
+      }
+      servicios_contratados: {
+        Row: {
+          activo: boolean
+          actualizado_en: string
+          actualizado_por: string | null
+          categoria: string
+          ciclo: string
+          cuenta: string | null
+          fuente_precio: string | null
+          limites: Json
+          moneda: string
+          nombre: string
+          notas: string | null
+          orden: number
+          panel_url: string | null
+          plan: string | null
+          por_confirmar: boolean
+          precio_anual: number | null
+          precio_mensual: number | null
+          proveedor: string
+          renovacion: string | null
+        }
+        Insert: {
+          activo?: boolean
+          actualizado_en?: string
+          actualizado_por?: string | null
+          categoria?: string
+          ciclo?: string
+          cuenta?: string | null
+          fuente_precio?: string | null
+          limites?: Json
+          moneda?: string
+          nombre: string
+          notas?: string | null
+          orden?: number
+          panel_url?: string | null
+          plan?: string | null
+          por_confirmar?: boolean
+          precio_anual?: number | null
+          precio_mensual?: number | null
+          proveedor: string
+          renovacion?: string | null
+        }
+        Update: {
+          activo?: boolean
+          actualizado_en?: string
+          actualizado_por?: string | null
+          categoria?: string
+          ciclo?: string
+          cuenta?: string | null
+          fuente_precio?: string | null
+          limites?: Json
+          moneda?: string
+          nombre?: string
+          notas?: string | null
+          orden?: number
+          panel_url?: string | null
+          plan?: string | null
+          por_confirmar?: boolean
+          precio_anual?: number | null
+          precio_mensual?: number | null
+          proveedor?: string
+          renovacion?: string | null
+        }
+        Relationships: []
+      }
+      servicios_uso: {
+        Row: {
+          coste_variable: Json | null
+          detalles: Json
+          error: string | null
+          id: string
+          metricas: Json
+          proveedor: string
+          tomado_en: string
+        }
+        Insert: {
+          coste_variable?: Json | null
+          detalles?: Json
+          error?: string | null
+          id?: string
+          metricas?: Json
+          proveedor: string
+          tomado_en?: string
+        }
+        Update: {
+          coste_variable?: Json | null
+          detalles?: Json
+          error?: string | null
+          id?: string
+          metricas?: Json
+          proveedor?: string
+          tomado_en?: string
+        }
+        Relationships: []
+      }
       solicitudes_pendientes: {
         Row: {
           created_at: string | null
@@ -5059,6 +5211,15 @@ export type Database = {
         Args: { p_seccion: string; p_mostrar: boolean }
         Returns: undefined
       }
+      // Tienda de vinos (migración 20261103150000_tienda_vinos).
+      tienda_precio_venta: {
+        Args: { p_precio_carta: number; p_descuento_pct: number }
+        Returns: number
+      }
+      tienda_marcar_vinos: {
+        Args: { p_vino_ids: string[]; p_a_la_venta: boolean }
+        Returns: string[]
+      }
       version_auditoria_panel: { Args: Record<PropertyKey, never>; Returns: number }
       registrar_acceso_panel: { Args: { p_tipo: string; p_ruta?: string }; Returns: string }
       auditar_prompt_vapi: { Args: { p_evento?: string; p_resultado?: string }; Returns: string }
@@ -5570,6 +5731,21 @@ export type Database = {
         Returns: number
       }
       text_to_bytea: { Args: { data: string }; Returns: string }
+      // Super Admin › Servicios: última lectura de cada proveedor (la RLS decide)
+      // y métricas sin token (solo service_role, la usa servicios-uso).
+      servicios_uso_ultimas: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          coste_variable: Json | null
+          detalles: Json
+          error: string | null
+          id: string
+          metricas: Json
+          proveedor: string
+          tomado_en: string
+        }[]
+      }
+      servicios_metricas_supabase: { Args: Record<PropertyKey, never>; Returns: Json }
       trafico_web_desglose_resumen: {
         Args: {
           p_desde?: string

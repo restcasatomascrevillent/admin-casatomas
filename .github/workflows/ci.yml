@@ -60,8 +60,24 @@ jobs:
         run: npm run test:restricciones-bebidas:db
       - name: Platos.updated_at cambia al editar (PGlite)
         run: npm run test:platos-updated-at:db
+      - name: Alertas de un documento al añadir o borrar líneas (PGlite)
+        run: npm run test:alertas-lineas:db
       - name: Servicios contratados y su consumo, solo super admin (PGlite)
         run: npm run test:servicios:db
+      - name: Cambio de la propia contraseña, límite de intentos (PGlite)
+        run: npm run test:cambio-contrasena:db
+      - name: Tienda de vinos, escaparate (PGlite)
+        run: npm run test:tienda:db
+      - name: Recorte en el servidor, constancia y topes de gasto (PGlite)
+        run: npm run test:recorte-servidor:db
+      - name: Vinos, un interruptor por carta y sin publicar sin origen (PGlite)
+        run: npm run test:vinos-publicacion:db
+      - name: Permiso propio de Reservas › Configuración (PGlite)
+        run: npm run test:reservas-configuracion:db
+      - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
+        run: npx vitest run api/
+        env:
+          RECORTE_INFERENCIA: "1"
       - name: Reversión de auditoría, bloqueo de usuarios y superadmin (PGlite)
         run: |
           node scripts/verificar-auditoria.mjs

@@ -18,6 +18,7 @@ import {
   useActualizarConfiguracionReservas,
 } from "@/hooks/useConfiguracionReservas";
 import { useEspaciosReserva, type EspacioReserva } from "@/hooks/useEspaciosReserva";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useMesas, type Mesa } from "@/hooks/useMesas";
 import {
   VENTANA_HORAS_MAX,
@@ -64,6 +65,10 @@ const ordenNatural = (a: { nombre: string }, b: { nombre: string }) =>
 export function ConfiguracionGeneralReservas() {
   const { data: config, isLoading } = useConfiguracionReservas();
   const actualizarMutation = useActualizarConfiguracionReservas();
+  // «Reservas · Configuración» (04/11/2026): con «Ver» se consultan las reglas; guardarlas pide «Puede
+  // editar», igual que la RLS de configuracion_reservas (20261104111000). El aviso de «Solo lectura» lo
+  // pone ConfiguracionTurnos, encima de esta tarjeta.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas_configuracion", "edit");
   const { data: espaciosData } = useEspaciosReserva();
   const { data: mesasData } = useMesas();
 
@@ -186,374 +191,381 @@ export function ConfiguracionGeneralReservas() {
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Tiempo de corte */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                Tiempo y disponibilidad
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            {/* `disabled` en el fieldset apaga de una vez todos los campos (inputs, casillas e interruptores
+                son elementos de formulario). `min-w-0`: un fieldset no encoge por debajo de su contenido y
+                desbordaría en el móvil. */}
+            <fieldset disabled={!puedeEditar} className="min-w-0 space-y-6">
+              {/* Tiempo de corte */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  Tiempo y disponibilidad
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                  <FormField
+                    control={form.control}
+                    name="minutos_corte_antes_servicio"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Cierre de reservas antes del servicio</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              aria-label="Minutos de cierre de reservas antes del servicio"
+                              type="number" inputMode="numeric"
+                              min={0}
+                              max={1440}
+                              className="w-24"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            />
+                            <span className="text-sm text-muted-foreground">minutos</span>
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Si el servicio empieza a las 13:00 y pones 60 min, las reservas web cierran a las 12:00
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="dias_max_antelacion"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Máximo de días de antelación</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number" inputMode="numeric"
+                              aria-label="Máximo de días de antelación"
+                              min={1}
+                              max={365}
+                              className="w-24"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                            />
+                            <span className="text-sm text-muted-foreground">días</span>
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Los clientes no podrán reservar con más de esta antelación
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-                <FormField
-                  control={form.control}
-                  name="minutos_corte_antes_servicio"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Cierre de reservas antes del servicio</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center gap-2">
-                          <Input
-                            aria-label="Minutos de cierre de reservas antes del servicio"
-                            type="number" inputMode="numeric"
-                            min={0}
-                            max={1440}
-                            className="w-24"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          />
-                          <span className="text-sm text-muted-foreground">minutos</span>
-                        </div>
-                      </FormControl>
-                      <FormDescription>
-                        Si el servicio empieza a las 13:00 y pones 60 min, las reservas web cierran a las 12:00
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="dias_max_antelacion"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Máximo de días de antelación</FormLabel>
-                      <FormControl>
-                        <div className="flex items-center gap-2">
+
+              <Separator />
+
+              {/* Límites por contacto */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  Límites por contacto y comensales
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                  <FormField
+                    control={form.control}
+                    name="max_reservas_por_telefono_dia"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1.5">
+                          <Phone className="h-3.5 w-3.5" />
+                          Máx. reservas por teléfono/día
+                        </FormLabel>
+                        <FormControl>
                           <Input
                             type="number" inputMode="numeric"
-                            aria-label="Máximo de días de antelación"
                             min={1}
-                            max={365}
+                            max={50}
                             className="w-24"
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                           />
-                          <span className="text-sm text-muted-foreground">días</span>
+                        </FormControl>
+                        <FormDescription>
+                          Un mismo teléfono no podrá hacer más reservas por día
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="max_reservas_por_email_dia"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1.5">
+                          <Mail className="h-3.5 w-3.5" />
+                          Máx. reservas por email/día
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number" inputMode="numeric"
+                            min={1}
+                            max={50}
+                            className="w-24"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Un mismo email no podrá hacer más reservas por día
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="min_comensales_por_reserva"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mínimo de comensales</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number" inputMode="numeric"
+                            min={1}
+                            max={50}
+                            className="w-24"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="max_comensales_por_reserva"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Máximo de comensales</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number" inputMode="numeric"
+                            min={1}
+                            max={100}
+                            className="w-24"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Reservas con más comensales requerirán contacto directo
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Requisitos y comportamiento */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                  Requisitos y comportamiento
+                </div>
+                <div className="space-y-3 pl-6">
+                  <FormField
+                    control={form.control}
+                    name="telefono_obligatorio"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Teléfono obligatorio</FormLabel>
+                          <FormDescription>
+                            Requerir teléfono en la web de reservas (en el panel siempre es obligatorio)
+                          </FormDescription>
                         </div>
-                      </FormControl>
-                      <FormDescription>
-                        Los clientes no podrán reservar con más de esta antelación
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="email_obligatorio"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Email obligatorio</FormLabel>
+                          <FormDescription>
+                            Requerir email en la web de reservas (en el panel es opcional)
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="auto_confirmar"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Auto-confirmar reservas</FormLabel>
+                          <FormDescription>
+                            No afecta a las reservas creadas desde el panel: si tienen email, el cliente recibe un correo para confirmarlas
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-            </div>
 
-            <Separator />
+              <Separator />
 
-            {/* Límites por contacto */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                Límites por contacto y comensales
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-                <FormField
-                  control={form.control}
-                  name="max_reservas_por_telefono_dia"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5" />
-                        Máx. reservas por teléfono/día
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" inputMode="numeric"
-                          min={1}
-                          max={50}
-                          className="w-24"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Un mismo teléfono no podrá hacer más reservas por día
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="max_reservas_por_email_dia"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <Mail className="h-3.5 w-3.5" />
-                        Máx. reservas por email/día
-                      </FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" inputMode="numeric"
-                          min={1}
-                          max={50}
-                          className="w-24"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Un mismo email no podrá hacer más reservas por día
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="min_comensales_por_reserva"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Mínimo de comensales</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" inputMode="numeric"
-                          min={1}
-                          max={50}
-                          className="w-24"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="max_comensales_por_reserva"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Máximo de comensales</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number" inputMode="numeric"
-                          min={1}
-                          max={100}
-                          className="w-24"
-                          {...field}
-                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        Reservas con más comensales requerirán contacto directo
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* Requisitos y comportamiento */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <CalendarDays className="h-4 w-4 text-muted-foreground" />
-                Requisitos y comportamiento
-              </div>
-              <div className="space-y-3 pl-6">
-                <FormField
-                  control={form.control}
-                  name="telefono_obligatorio"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Teléfono obligatorio</FormLabel>
+              {/* Tiempo de ocupación de mesa (05/10/2026). Son las mismas columnas que
+                  la «estancia estimada» del modo servicio (estancia_comida_minutos /
+                  estancia_cena_minutos): una reserva ocupa su mesa de su hora a hora +
+                  este tiempo, y la mesa se puede dar a otra reserva fuera de esa franja
+                  (lo comprueba la base de datos, migración 20261005130000). */}
+              <div className="space-y-4" data-testid="ajuste-ocupacion-mesa">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Timer className="h-4 w-4 text-muted-foreground" />
+                    Tiempo de ocupación de mesa
+                  </div>
+                  <p className="pl-6 text-sm text-muted-foreground">
+                    Cuánto ocupa la mesa cada reserva desde su hora. Una misma mesa se puede dar a varias reservas del
+                    día si no se pisan: con 120 min, la de las 14:00 la deja libre a las 16:00. También marca en el
+                    modo servicio cuándo una mesa está «por liberar».
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                  <FormField
+                    control={form.control}
+                    name="estancia_comida_minutos"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1.5">
+                          <UtensilsCrossed className="h-3.5 w-3.5" />
+                          Ocupación de mesa · Comida
+                        </FormLabel>
+                        {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input
+                              type="number" inputMode="numeric"
+                              min={15}
+                              max={480}
+                              className="w-24"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
+                            />
+                          </FormControl>
+                          <span className="text-sm text-muted-foreground">minutos</span>
+                        </div>
                         <FormDescription>
-                          Requerir teléfono en la web de reservas (en el panel siempre es obligatorio)
+                          Reservas antes de las 17:00. Por defecto, 105 minutos
                         </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email_obligatorio"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Email obligatorio</FormLabel>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="estancia_cena_minutos"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1.5">
+                          <UtensilsCrossed className="h-3.5 w-3.5" />
+                          Ocupación de mesa · Cena
+                        </FormLabel>
+                        {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input
+                              type="number" inputMode="numeric"
+                              min={15}
+                              max={480}
+                              className="w-24"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
+                            />
+                          </FormControl>
+                          <span className="text-sm text-muted-foreground">minutos</span>
+                        </div>
                         <FormDescription>
-                          Requerir email en la web de reservas (en el panel es opcional)
+                          Desde las 17:00. Las cenas suelen alargarse más: por defecto, 120 minutos
                         </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="auto_confirmar"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center justify-between rounded-lg border p-3">
-                      <div className="space-y-0.5">
-                        <FormLabel>Auto-confirmar reservas</FormLabel>
-                        <FormDescription>
-                          No afecta a las reservas creadas desde el panel: si tienen email, el cliente recibe un correo para confirmarlas
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-            </div>
 
-            <Separator />
+              <Separator />
 
-            {/* Tiempo de ocupación de mesa (05/10/2026). Son las mismas columnas que
-                la «estancia estimada» del modo servicio (estancia_comida_minutos /
-                estancia_cena_minutos): una reserva ocupa su mesa de su hora a hora +
-                este tiempo, y la mesa se puede dar a otra reserva fuera de esa franja
-                (lo comprueba la base de datos, migración 20261005130000). */}
-            <div className="space-y-4" data-testid="ajuste-ocupacion-mesa">
-              <div className="space-y-1">
+              {/* Modo servicio (Fase 4): umbral de retraso del plano en vivo */}
+              <div className="space-y-4">
                 <div className="flex items-center gap-2 text-sm font-medium">
                   <Timer className="h-4 w-4 text-muted-foreground" />
-                  Tiempo de ocupación de mesa
+                  Modo servicio (plano en vivo)
                 </div>
-                <p className="pl-6 text-sm text-muted-foreground">
-                  Cuánto ocupa la mesa cada reserva desde su hora. Una misma mesa se puede dar a varias reservas del
-                  día si no se pisan: con 120 min, la de las 14:00 la deja libre a las 16:00. También marca en el
-                  modo servicio cuándo una mesa está «por liberar».
-                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                  <FormField
+                    control={form.control}
+                    name="retraso_gracia_minutos"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5" />
+                          Margen antes de marcar retraso
+                        </FormLabel>
+                        {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input
+                              type="number" inputMode="numeric"
+                              min={0}
+                              max={180}
+                              className="w-24"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            />
+                          </FormControl>
+                          <span className="text-sm text-muted-foreground">minutos</span>
+                        </div>
+                        <FormDescription>
+                          Minutos tras la hora de la reserva antes de que el plano la pinte "retrasada". No cancela ni modifica la reserva.
+                        </FormDescription>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-                <FormField
-                  control={form.control}
-                  name="estancia_comida_minutos"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <UtensilsCrossed className="h-3.5 w-3.5" />
-                        Ocupación de mesa · Comida
-                      </FormLabel>
-                      {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <Input
-                            type="number" inputMode="numeric"
-                            min={15}
-                            max={480}
-                            className="w-24"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
-                          />
-                        </FormControl>
-                        <span className="text-sm text-muted-foreground">minutos</span>
-                      </div>
-                      <FormDescription>
-                        Reservas antes de las 17:00. Por defecto, 105 minutos
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="estancia_cena_minutos"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <UtensilsCrossed className="h-3.5 w-3.5" />
-                        Ocupación de mesa · Cena
-                      </FormLabel>
-                      {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <Input
-                            type="number" inputMode="numeric"
-                            min={15}
-                            max={480}
-                            className="w-24"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 15)}
-                          />
-                        </FormControl>
-                        <span className="text-sm text-muted-foreground">minutos</span>
-                      </div>
-                      <FormDescription>
-                        Desde las 17:00. Las cenas suelen alargarse más: por defecto, 120 minutos
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
 
-            <Separator />
+              <Separator />
 
-            {/* Modo servicio (Fase 4): umbral de retraso del plano en vivo */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <Timer className="h-4 w-4 text-muted-foreground" />
-                Modo servicio (plano en vivo)
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
-                <FormField
-                  control={form.control}
-                  name="retraso_gracia_minutos"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5" />
-                        Margen antes de marcar retraso
-                      </FormLabel>
-                      {/* FormControl directo sobre el Input: así la etiqueta queda asociada al campo. */}
-                      <div className="flex items-center gap-2">
-                        <FormControl>
-                          <Input
-                            type="number" inputMode="numeric"
-                            min={0}
-                            max={180}
-                            className="w-24"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <span className="text-sm text-muted-foreground">minutos</span>
-                      </div>
-                      <FormDescription>
-                        Minutos tras la hora de la reserva antes de que el plano la pinte "retrasada". No cancela ni modifica la reserva.
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
+              {/* Asignación interna (reservas-sin-salas, Fase B) */}
+              <SeccionAsignacion form={form} espacios={espaciosActivos} mesas={mesas} />
 
-            <Separator />
-
-            {/* Asignación interna (reservas-sin-salas, Fase B) */}
-            <SeccionAsignacion form={form} espacios={espaciosActivos} mesas={mesas} />
-
-            <div className="flex justify-end pt-2">
-              <Button type="submit" disabled={actualizarMutation.isPending}>
-                {actualizarMutation.isPending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Guardando...
-                  </>
-                ) : (
-                  "Guardar configuración"
-                )}
-              </Button>
-            </div>
+              {puedeEditar && (
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" disabled={actualizarMutation.isPending}>
+                    {actualizarMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      "Guardar configuración"
+                    )}
+                  </Button>
+                </div>
+              )}
+            </fieldset>
           </form>
         </Form>
       </CardContent>

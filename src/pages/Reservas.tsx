@@ -3,11 +3,12 @@ import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Settings } from "lucide-react";
+import { Mail, Plus, Settings, SlidersHorizontal } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
+import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
 import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanzada";
 import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
@@ -18,10 +19,16 @@ import { LayoutGrid, Utensils } from "lucide-react";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
+import { EditorPlantillasEmail } from "@/components/emails/EditorPlantillasEmail";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
-import { useCanAccessSection, useUserRole } from "@/hooks/useUserRole";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
-import { resolverDeepLinkReservas, TABS_RESERVAS } from "@/lib/reservas/vistaUnificada";
+import {
+  resolverDeepLinkReservas,
+  resolverSubpestanaConfiguracion,
+  TABS_RESERVAS,
+  type SubpestanaConfiguracion,
+} from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { toast } from "sonner";
@@ -79,10 +86,14 @@ export default function Reservas() {
   // como siempre. Ver `src/lib/reservas/saltoAsignacion.ts`.
   const [saltoAsignacion, setSaltoAsignacion] = useState<Omit<DestinoAsignacion, "espacioId"> | null>(null);
   const [activeTab, setActiveTab] = useState<string>("hoy");
+  // Subpestaña de «Configuración» (04/11/2026): «General» o «Plantillas email».
+  const [subConfiguracion, setSubConfiguracion] = useState<SubpestanaConfiguracion>("general");
 
   const { data: espacios } = useEspaciosReserva();
-  const { role } = useUserRole();
-  const isAdmin = role === "admin";
+  // «Configuración» tiene permiso propio, «Reservas · Configuración» (04/11/2026, como las pestañas del
+  // Gestor Web): con «Ver» se entra y con «Puede editar» se cambia (cada parte lo comprueba). El super
+  // admin, siempre; ser admin ya no basta por sí solo (hasta ahora era `role === "admin"`).
+  const { canAccess: puedeVerConfiguracion } = useCanAccessSection("reservas_configuracion");
   // Editar una reserva: cada vista de reservas (Lista, Kanban de Hoy, Asignación,
   // plano, modo servicio…) lleva su propio diálogo de edición.
   const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
@@ -110,6 +121,7 @@ export default function Reservas() {
     status: searchParams.get("status"),
     date: searchParams.get("date"),
   });
+  const subFromUrl = searchParams.get("sub");
   const statusFromUrl = destino.status;
   const dateFromUrl = destino.date;
   const hayPresetLista = !!(statusFromUrl || dateFromUrl);
@@ -117,6 +129,8 @@ export default function Reservas() {
   useEffect(() => {
     if (!tabFromUrl) return;
     setActiveTab(destino.tab);
+    // `?tab=configuracion&sub=plantillas` (la ruta vieja del Super Admin redirige aquí).
+    if (destino.tab === "configuracion") setSubConfiguracion(resolverSubpestanaConfiguracion(subFromUrl));
     // Normalizar la URL de una pestaña antigua sin perder los filtros.
     if (!(TABS_RESERVAS as readonly string[]).includes(tabFromUrl)) {
       const params: Record<string, string> = { tab: destino.tab };
@@ -125,7 +139,7 @@ export default function Reservas() {
       setSearchParams(params, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabFromUrl, destino.tab, destino.status, destino.date]);
+  }, [tabFromUrl, destino.tab, destino.status, destino.date, subFromUrl]);
 
   // Si se llega con un filtro preestablecido (campana, widget del dashboard),
   // lo que interesa es la lista, que está debajo de "Reservas de hoy".
@@ -142,6 +156,16 @@ export default function Reservas() {
     // Limpiar parámetros de URL cuando se cambia de tab manualmente
     setSearchParams({});
   };
+
+  // Igual con los chips de Configuración: el enlace ya se aplicó, la URL vuelve a quedar limpia.
+  const cambiarSubConfiguracion = (value: string) => {
+    setSubConfiguracion(resolverSubpestanaConfiguracion(value));
+    if (searchParams.toString()) setSearchParams({});
+  };
+
+  // Sin permiso de «Configuración», quien llegue por un enlace (`?tab=configuracion`) cae en «Hoy» en
+  // vez de en una pestaña vacía.
+  const pestanaVisible = activeTab === "configuracion" && !puedeVerConfiguracion ? "hoy" : activeTab;
 
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
@@ -246,7 +270,7 @@ export default function Reservas() {
 
   return (
     <DashboardLayout>
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+      <Tabs value={pestanaVisible} onValueChange={handleTabChange} className="w-full">
         {/* Pestañas y «Nueva Reserva» en la MISMA línea (2026-09-25, petición del dueño): "Nueva
             Reserva" tenía su propia banda encima, que solo servía para alinear un botón a la derecha
             y se comía ~64px de alto (botón + separación). Ahora comparte fila con las pestañas vía
@@ -265,7 +289,7 @@ export default function Reservas() {
             { valor: "calendario", etiqueta: "Calendario" },
             { valor: "asignacion", etiqueta: "Próximas reservas" },
             { valor: "blacklist", etiqueta: "Blacklist" },
-            ...(isAdmin ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
+            ...(puedeVerConfiguracion ? [{ valor: "configuracion", etiqueta: "Configuración", icono: <Settings /> }] : []),
           ]}
           acciones={
             /* Crear una reserva exige permiso de EDICIÓN en «reservas», como el resto de acciones
@@ -357,11 +381,29 @@ export default function Reservas() {
           </RegionPestanaLarga>
         </TabsContent>
 
-        {isAdmin && (
-          <TabsContent value="configuracion" className="space-y-6 mt-6">
-            <RegionPestanaLarga>
-              <ConfiguracionTurnos />
-            </RegionPestanaLarga>
+        {puedeVerConfiguracion && (
+          <TabsContent value="configuracion" className="mt-4">
+            {/* Subpestañas en chips, como Cheques › Configuración. «Plantillas email» llegó del Super Admin
+                el 04/11/2026 (petición del dueño). Las dos se rigen por «Reservas · Configuración», igual que
+                su RLS (20261104111000): con «Ver» se consultan y con «Puede editar» se cambian. Sin
+                `RegionPestanaLarga` en las plantillas: su editor ya mide el alto que le queda y hace
+                scroll por dentro, y envolverlo daría un doble scroll. */}
+            <Tabs value={subConfiguracion} onValueChange={cambiarSubConfiguracion} className="space-y-4">
+              <ChipsSubnivel
+                chips={[
+                  { valor: "general", etiqueta: "General", icono: <SlidersHorizontal /> },
+                  { valor: "plantillas", etiqueta: "Plantillas email", icono: <Mail /> },
+                ]}
+              />
+              <TabsContent value="general" className="mt-0">
+                <RegionPestanaLarga>
+                  <ConfiguracionTurnos />
+                </RegionPestanaLarga>
+              </TabsContent>
+              <TabsContent value="plantillas" className="mt-0">
+                <EditorPlantillasEmail />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
       </Tabs>

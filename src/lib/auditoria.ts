@@ -69,6 +69,7 @@ const ENTIDADES: Record<string, string> = {
   movimientos_stock: "movimiento de existencias",
   costes_fijos: "coste fijo",
   servicios_contratados: "servicio contratado",
+  servicios_config: "tipo de cambio de Servicios",
   ia_funciones: "función de IA",
   ia_coste_estimado: "estimación de coste de IA",
   profiles: "perfil de usuario",
@@ -97,6 +98,7 @@ const CONFIGURACIONES: Record<string, string> = {
   plantilla_cheques_regalo: "la plantilla de cheques regalo",
   plantilla_factura_cheques: "la plantilla de facturas de cheques",
   plantillas_email_reserva: "la plantilla de correos de reserva",
+  configuracion_tienda: "la tienda de vinos",
 };
 const CAMPOS: Record<string, string> = {
   nombre: "Nombre",
@@ -442,6 +444,7 @@ export function resumenEntrada(entrada: AuditLogEntry): string {
       "admin-delete-user": "eliminar un usuario",
       "admin-set-super-admin": "cambiar el acceso de superadmin",
       "admin-update-user-password": "cambiar la contraseña de un usuario",
+      "cambiar-mi-contrasena": "cambiar su propia contraseña",
       "admin-set-user-access": "cambiar el acceso de un usuario",
       "auditoria-revertir": "revertir un cambio de auditoría",
       "list-users": "consultar la lista de usuarios",

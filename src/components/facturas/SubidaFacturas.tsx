@@ -23,6 +23,7 @@ import {
   tipoDocumento,
 } from "@/lib/facturas/resultadosCarga";
 import { cn } from "@/lib/utils";
+import { FotoExistente } from "./AvisoDuplicadoDialog";
 import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
 import { type DecisionDuplicado, SustituirFacturaDialog } from "./SustituirFacturaDialog";
 
@@ -472,6 +473,11 @@ function SeccionPendientes({
                   Sustituir la existente
                 </Button>
               )}
+              {p.sustituible?.existente?.id ? (
+                <div className="min-w-0">
+                  <FotoExistente id={p.sustituible.existente.id} />
+                </div>
+              ) : null}
               <Button type="button" variant="ghost" className="h-11 text-muted-foreground hover:text-foreground" onClick={() => onDescartar(p)}>
                 Dejar la que hay
               </Button>

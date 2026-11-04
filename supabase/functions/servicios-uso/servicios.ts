@@ -4,10 +4,14 @@
 //  Quién: SOLO un super admin (exigirSuperAdmin → is_super_admin). Ser admin no
 //  basta. verify_jwt = true en config.toml (prefiltro), autorización aquí.
 //
-//  Qué hace: para cada proveedor sembrado en `servicios_contratados` (Vercel,
-//  Supabase, GitHub, Resend y Stripe) lee su consumo por API con su secreto,
-//  le pone el límite del plan (de `servicios_contratados.limites`), guarda una
-//  fila en `servicios_uso` y devuelve la última lectura de cada uno.
+//  Qué hace: para cada proveedor EN USO (`activo`) de `servicios_contratados`
+//  que tenga lector (Vercel, Supabase, GitHub, Resend, Stripe, OpenAI, Vapi y
+//  Hostinger) lee su consumo (por API con su secreto o de nuestra base de
+//  datos), le pone el límite del plan (de `servicios_contratados.limites`),
+//  calcula lo gastado por uso este mes (`coste_variable`) cuando se puede,
+//  guarda una fila en `servicios_uso` y devuelve la última lectura de cada uno.
+//  Los proveedores sin API razonable (Google, Mapbox, Loading…) salen en
+//  `sin_lector`: la pantalla dice que se miren en su panel.
 //    · Caché: si la última lectura tiene < 15 min, no llama a la API salvo
 //      `?forzar=1` (o cuerpo { "forzar": true }); aun forzando, nunca más de
 //      una lectura por minuto y proveedor. Con { "proveedor": "vercel" } solo
@@ -16,6 +20,9 @@
 //      "NOMBRE" } para él, sin romper el resto.
 //    · Supabase mide BD, Storage y usuarios activos con la clave de servicio
 //      (RPC servicios_metricas_supabase) aunque falte SERVICIOS_SUPABASE_TOKEN.
+//      De la misma RPC salen, sin ningún secreto: el gasto de IA del mes
+//      (OpenAI real + estimado) frente al tope, las comisiones de Stripe de
+//      los cheques regalo y las llamadas del asistente (call_logs).
 //    · NUNCA devuelve ni guarda una clave: solo códigos y textos propios (los
 //      mensajes de error de los proveedores no se reenvían) y, por si acaso,
 //      cualquier valor de un secreto se borra de la respuesta.
@@ -26,6 +33,8 @@
 //    SERVICIOS_GITHUB_TOKEN  (+ SERVICIOS_GITHUB_OWNER, por defecto restcasatomascrevillent)
 //    RESEND_API_KEY          (ya existe en producción)
 //    STRIPE_SECRET_KEY       (ya existe en producción; el modo sale del prefijo)
+//    VAPI_API_KEY            (opcional; la usa vapi-analytics: coste de Vapi del mes)
+//    SERVICIOS_HOSTINGER_TOKEN (suscripciones y dominios con su caducidad)
 // ============================================================================
 import { exigirSuperAdmin, respuestaJson, type FabricaCliente } from "../_shared/autorizacion.ts";
 
@@ -50,6 +59,8 @@ export const SECRETOS = [
   "SERVICIOS_GITHUB_TOKEN",
   "RESEND_API_KEY",
   "STRIPE_SECRET_KEY",
+  "VAPI_API_KEY",
+  "SERVICIOS_HOSTINGER_TOKEN",
   "SUPABASE_SERVICE_ROLE_KEY",
   "SUPABASE_ANON_KEY",
 ] as const;
@@ -69,10 +80,21 @@ export interface Metrica {
   orden?: number;
 }
 
+/** Lo gastado por uso en el periodo (IA, llamadas, comisiones…), en su moneda original. */
+export interface CosteVariable {
+  importe: number;
+  moneda: string;
+  periodo: string;
+  /** api = dato del proveedor; bd = de nuestras tablas; estimado = cálculo aproximado. */
+  origen: "api" | "bd" | "estimado";
+  nota?: string;
+}
+
 export interface ResultadoLector {
   metricas: Record<string, Metrica>;
   error?: CodigoError | null;
   detalles?: Record<string, unknown>;
+  coste_variable?: CosteVariable | null;
 }
 
 type Respuesta = { data: unknown; error: { message?: string; code?: string } | null };
@@ -97,6 +119,7 @@ export interface LecturaGuardada {
   metricas: Record<string, Metrica>;
   error: string | null;
   detalles: Record<string, unknown>;
+  coste_variable?: CosteVariable | null;
 }
 
 export interface LecturaRespuesta extends LecturaGuardada {
@@ -139,9 +162,14 @@ interface Http {
   headers: Headers;
 }
 
-/** GET con tiempo límite. No lanza por códigos HTTP; sí por red o tiempo agotado. */
-async function pedir(ctx: ContextoLector, url: string, cabeceras: Record<string, string>): Promise<Http> {
-  const res = await ctx.fetch(url, { method: "GET", headers: cabeceras, signal: AbortSignal.timeout(TIMEOUT_MS) });
+/** GET (o POST con `cuerpo`) con tiempo límite. No lanza por códigos HTTP; sí por red o tiempo agotado. */
+async function pedir(ctx: ContextoLector, url: string, cabeceras: Record<string, string>, cuerpo?: unknown): Promise<Http> {
+  const res = await ctx.fetch(url, {
+    method: cuerpo === undefined ? "GET" : "POST",
+    headers: cuerpo === undefined ? cabeceras : { ...cabeceras, "Content-Type": "application/json" },
+    ...(cuerpo === undefined ? {} : { body: JSON.stringify(cuerpo) }),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
   const texto = await res.text().catch(() => "");
   let json: unknown = null;
   try {
@@ -151,6 +179,35 @@ async function pedir(ctx: ContextoLector, url: string, cabeceras: Record<string,
   }
   return { ok: res.ok, status: res.status, json, headers: res.headers };
 }
+
+// Varias tarjetas leen la misma RPC (Supabase, Resend, OpenAI, Stripe, Vapi):
+// una sola llamada por petición.
+const cacheMetricasBd = new WeakMap<ContextoLector, Promise<Record<string, unknown> | null>>();
+
+/** `servicios_metricas_supabase()` (clave de servicio), una vez por petición; null si falla. */
+export function metricasBd(ctx: ContextoLector): Promise<Record<string, unknown> | null> {
+  let p = cacheMetricasBd.get(ctx);
+  if (!p) {
+    p = Promise.resolve(ctx.admin.rpc("servicios_metricas_supabase"))
+      .then(({ data, error }) => (error || !esObjeto(data) ? null : data))
+      .catch(() => null);
+    cacheMetricasBd.set(ctx, p);
+  }
+  return p;
+}
+
+/** Euros por dólar de la pantalla (servicios_config) o 0,92 si no hay. */
+export const CAMBIO_POR_DEFECTO = 0.92;
+const cambioDe = (d: Record<string, unknown> | null) => {
+  const n = d ? numero(d.eur_por_usd) : null;
+  return n != null && n > 0.2 && n < 5 ? n : CAMBIO_POR_DEFECTO;
+};
+const fmtNum = (n: number, decimales = 2) => n.toLocaleString("es-ES", { minimumFractionDigits: decimales, maximumFractionDigits: decimales });
+/** «2026-11-01» → «01/11/2026». */
+const fechaEs = (iso: unknown) => {
+  const m = typeof iso === "string" ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : null;
+};
 
 /** Ref del proyecto desde SUPABASE_URL (https://<ref>.supabase.co). */
 export function refDeUrl(url: string | undefined): string | null {
@@ -266,12 +323,34 @@ export function resumirUsoVercel(json: unknown): UsoVercel {
   };
 }
 
+/**
+ * Recortes de fotos en el servidor (api/recortar-foto del panel, migración
+ * 20261103180000): nº de fotos del mes y de hoy y minutos de CPU anotados,
+ * frente a los topes del panel (recortes_servidor_mes/_dia, cpu_recortes_mes
+ * en los límites de Vercel). Sale de nuestra BD: no necesita el token de Vercel.
+ */
+export async function metricasRecorteServidor(ctx: ContextoLector): Promise<Record<string, Metrica>> {
+  const { data, error } = await ctx.admin.rpc("recorte_servidor_uso");
+  if (error || !esObjeto(data)) return {};
+  const n = (k: string) => (typeof data[k] === "number" ? (data[k] as number) : Number(data[k] ?? 0));
+  const minutos = redondear(n("cpu_ms_mes") / 60_000, 1);
+  return {
+    recortes_servidor_mes: {
+      orden: 8, etiqueta: "Recortes de fotos en el servidor (tope del panel)", valor: n("recortes_mes"), unidad: "fotos", periodo: "mes en curso",
+      nota: `${minutos} min de CPU este mes. Al llegar al tope, el móvil deja las fotos para un ordenador.`,
+    },
+    recortes_servidor_dia: { orden: 9, etiqueta: "Recortes de fotos en el servidor hoy (tope del panel)", valor: n("recortes_dia"), unidad: "fotos", periodo: "hoy" },
+    cpu_recortes_mes: { orden: 10, etiqueta: "CPU de los recortes en el servidor (tope del panel)", valor: minutos, unidad: "minutos", periodo: "mes en curso" },
+  };
+}
+
 export const leerVercel: Lector = async (ctx) => {
+  const recortes = await metricasRecorteServidor(ctx);
   const token = secreto(ctx, "SERVICIOS_VERCEL_TOKEN");
-  if (!token) return faltaSecreto("SERVICIOS_VERCEL_TOKEN");
+  if (!token) return faltaSecreto("SERVICIOS_VERCEL_TOKEN", recortes);
   const equipo = secreto(ctx, "SERVICIOS_VERCEL_TEAM_ID") || VERCEL_TEAM_POR_DEFECTO;
   const cab = { Authorization: `Bearer ${token}`, Accept: "application/json" };
-  const metricas: Record<string, Metrica> = {};
+  const metricas: Record<string, Metrica> = { ...recortes };
   const avisos: string[] = [];
   const detalles: Record<string, unknown> = { equipo };
 
@@ -303,7 +382,11 @@ export const leerVercel: Lector = async (ctx) => {
     if (r.bytesServidos != null) metricas.transferencia_rapida = { orden: 2, etiqueta: "Datos servidos a los visitantes (Fast Data Transfer)", valor: Math.round(r.bytesServidos), unidad: "bytes", periodo };
     if (r.bytesOrigen != null) metricas.transferencia_origen = { orden: 3, etiqueta: "Datos desde el servidor (Fast Origin Transfer)", valor: Math.round(r.bytesOrigen), unidad: "bytes", periodo };
     if (r.invocaciones != null) metricas.invocaciones_funciones = { orden: 4, etiqueta: "Ejecuciones de funciones", valor: Math.round(r.invocaciones), unidad: "invocaciones", periodo };
-    if (r.cpuHoras != null) metricas.cpu_activa = { orden: 5, etiqueta: "Tiempo de CPU de las funciones", valor: redondear(r.cpuHoras, 3), unidad: "horas", periodo };
+    if (r.cpuHoras != null) {
+      metricas.cpu_activa = { orden: 5, etiqueta: "Tiempo de CPU de las funciones", valor: redondear(r.cpuHoras, 3), unidad: "horas", periodo };
+      const rec = recortes.recortes_servidor_mes;
+      if (rec) metricas.cpu_activa.nota = `De ellas, recortes de fotos este mes: ${rec.valor} fotos, ${recortes.cpu_recortes_mes?.valor ?? 0} min (este proyecto de Supabase).`;
+    }
     if (r.imagenes != null) metricas.transformaciones_imagen = { orden: 6, etiqueta: "Imágenes optimizadas", valor: Math.round(r.imagenes), unidad: "transformaciones", periodo };
     if (r.peticiones == null && r.bytesServidos == null && r.invocaciones == null) {
       avisos.push("Vercel ha cambiado el formato de su API de uso: no se reconocen las cifras.");
@@ -314,7 +397,7 @@ export const leerVercel: Lector = async (ctx) => {
   }
 
   if (avisos.length) detalles.avisos = avisos;
-  if (Object.keys(metricas).length === 0) return { metricas, error: "error_api", detalles };
+  if (Object.keys(metricas).length === Object.keys(recortes).length) return { metricas, error: "error_api", detalles };
   return { metricas, detalles };
 };
 
@@ -326,8 +409,8 @@ export const leerSupabase: Lector = async (ctx) => {
   const detalles: Record<string, unknown> = { proyecto: ctx.refProyecto };
 
   // 1. Con la clave de servicio (siempre): BD, Storage y usuarios activos.
-  const { data, error } = await ctx.admin.rpc("servicios_metricas_supabase");
-  if (error || !esObjeto(data)) {
+  const data = await metricasBd(ctx);
+  if (!data) {
     avisos.push("No se pudo medir la base de datos (falta la migración de Servicios o no responde).");
   } else {
     const bd = numero(data.bd_bytes);
@@ -411,16 +494,20 @@ export interface UsoGithub {
   computoUsd: number;
   minutos: number;
   almacenamientoGbHoras: number;
+  /** Lo que de verdad se factura (netAmount, tras descontar lo incluido); null si el informe no lo trae. */
+  netoUsd: number | null;
 }
 
 /** Suma los `usageItems` del informe de facturación (resumen o detalle). */
 export function resumirUsoGithub(json: unknown): UsoGithub {
   const items = esObjeto(json) && Array.isArray(json.usageItems) ? json.usageItems.filter(esObjeto) : [];
-  const r: UsoGithub = { computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0 };
+  const r: UsoGithub = { computoUsd: 0, minutos: 0, almacenamientoGbHoras: 0, netoUsd: null };
   for (const it of items) {
     const producto = String(it.product ?? "");
     const unidad = String(it.unitType ?? "");
     const cantidad = numero(it.grossQuantity) ?? numero(it.quantity) ?? 0;
+    const neto = numero(it.netAmount);
+    if (neto != null) r.netoUsd = (r.netoUsd ?? 0) + neto;
     if (/actions/i.test(producto) && /minute/i.test(unidad)) {
       r.minutos += cantidad;
       r.computoUsd += numero(it.grossAmount) ?? cantidad * (numero(it.pricePerUnit) ?? 0);
@@ -465,15 +552,19 @@ export const leerGithub: Lector = async (ctx) => {
   const yo = await pedir(ctx, "https://api.github.com/user", cab).catch(() => null);
   const plan = yo?.ok && esObjeto(yo.json) && esObjeto(yo.json.plan) ? yo.json.plan.name : null;
   if (typeof plan === "string" && plan) detalles.plan_detectado = plan;
-  return { metricas, detalles };
+  const coste_variable: CosteVariable | null = uso.netoUsd == null ? null : {
+    importe: redondear(Math.max(0, uso.netoUsd), 4), moneda: "USD", periodo: "mes en curso", origen: "api",
+    nota: "Lo que GitHub factura este mes por encima de lo incluido en el plan.",
+  };
+  return { metricas, detalles, coste_variable };
 };
 
 // ─── Resend ─────────────────────────────────────────────────────────────────
 
 /** Estimación con nuestras tablas (correos de reservas + newsletter transaccional y contactos). */
 async function estimacionResend(ctx: ContextoLector): Promise<Record<string, Metrica>> {
-  const { data, error } = await ctx.admin.rpc("servicios_metricas_supabase");
-  if (error || !esObjeto(data)) return {};
+  const data = await metricasBd(ctx);
+  if (!data) return {};
   const nota = "Estimación con nuestras tablas (reservas y newsletter): Resend no ha dado el dato.";
   const metricas: Record<string, Metrica> = {};
   const mes = (numero(data.correos_reservas_mes) ?? 0) + (numero(data.correos_newsletter_mes) ?? 0);
@@ -544,14 +635,40 @@ export function modoStripe(clave: string): "real" | "prueba" | "desconocido" {
 
 const MAX_PAGINAS_STRIPE = 5;
 
+/**
+ * Cheques regalo cobrados por Stripe este mes y su comisión, de nuestra base
+ * de datos (sin clave): la comisión real que guarda el webhook o, si falta, la
+ * estimada (1,5 % + 0,25 €), como metricas_cheques_regalo.
+ */
+async function chequesDeBd(ctx: ContextoLector): Promise<{ metricas: Record<string, Metrica>; coste: CosteVariable | null }> {
+  const d = await metricasBd(ctx);
+  const n = d ? numero(d.cheques_stripe_mes) : null;
+  if (!d || n == null) return { metricas: {}, coste: null };
+  const comision = numero(d.cheques_stripe_comision_mes) ?? 0;
+  const estimadas = numero(d.cheques_stripe_comision_estimadas) ?? 0;
+  const nota = estimadas > 0
+    ? `Según nuestra base de datos. ${estimadas} sin comisión guardada: se estima con la tarifa estándar (1,5 % + 0,25 €).`
+    : "Según nuestra base de datos (comisión que guarda el webhook de Stripe).";
+  const periodo = "mes en curso";
+  return {
+    metricas: {
+      cheques_mes: { orden: 6, etiqueta: "Cheques regalo cobrados por Stripe este mes", valor: n, unidad: "cheques", periodo },
+      importe_cheques_mes: { orden: 7, etiqueta: "Importe de esos cheques", valor: redondear(numero(d.cheques_stripe_importe_mes) ?? 0), unidad: "EUR", periodo },
+      comision_cheques_mes: { orden: 8, etiqueta: "Comisión de Stripe de esos cheques", valor: redondear(comision), unidad: "EUR", periodo, nota },
+    },
+    coste: { importe: redondear(comision), moneda: "EUR", periodo, origen: estimadas > 0 ? "estimado" : "bd", nota },
+  };
+}
+
 export const leerStripe: Lector = async (ctx) => {
+  const bd = await chequesDeBd(ctx);
   const clave = secreto(ctx, "STRIPE_SECRET_KEY");
-  if (!clave) return faltaSecreto("STRIPE_SECRET_KEY");
+  if (!clave) return { ...faltaSecreto("STRIPE_SECRET_KEY", bd.metricas), coste_variable: bd.coste };
   const modo = modoStripe(clave);
   const cab = { Authorization: `Bearer ${clave}` };
 
   const b = await pedir(ctx, "https://api.stripe.com/v1/balance", cab);
-  if (!b.ok) return rechazoHttp(b.status, { modo });
+  if (!b.ok) return { ...rechazoHttp(b.status, { modo }), metricas: bd.metricas, coste_variable: bd.coste };
   const saldo = (lista: unknown, moneda: string) =>
     (Array.isArray(lista) ? lista.filter(esObjeto) : []).filter((x) => x.currency === moneda).reduce((t, x) => t + (numero(x.amount) ?? 0), 0);
   const disponibles = esObjeto(b.json) && Array.isArray(b.json.available) ? b.json.available.filter(esObjeto) : [];
@@ -567,7 +684,9 @@ export const leerStripe: Lector = async (ctx) => {
   for (let pagina = 0; pagina < MAX_PAGINAS_STRIPE; pagina++) {
     const url = `https://api.stripe.com/v1/balance_transactions?limit=100&created%5Bgte%5D=${desde}${despues ? `&starting_after=${encodeURIComponent(despues)}` : ""}`;
     const t = await pedir(ctx, url, cab);
-    if (!t.ok || !esObjeto(t.json) || !Array.isArray(t.json.data)) return rechazoHttp(t.status === 200 ? 502 : t.status, { modo });
+    if (!t.ok || !esObjeto(t.json) || !Array.isArray(t.json.data)) {
+      return { ...rechazoHttp(t.status === 200 ? 502 : t.status, { modo }), metricas: bd.metricas, coste_variable: bd.coste };
+    }
     const filas = t.json.data.filter(esObjeto);
     for (const x of filas) {
       if (x.currency !== moneda) continue;
@@ -596,8 +715,226 @@ export const leerStripe: Lector = async (ctx) => {
     saldo_disponible: { orden: 4, etiqueta: "Saldo disponible", valor: saldo(esObjeto(b.json) ? b.json.available : null, moneda) / 100, unidad, periodo: "ahora" },
     saldo_pendiente: { orden: 5, etiqueta: "Saldo pendiente de liberar", valor: saldo(esObjeto(b.json) ? b.json.pending : null, moneda) / 100, unidad, periodo: "ahora" },
   };
+  Object.assign(metricas, bd.metricas);
   const detalles: Record<string, unknown> = { modo, moneda: unidad };
   if (truncado) detalles.avisos = [`Más de ${MAX_PAGINAS_STRIPE * 100} movimientos este mes: las cifras del mes son parciales.`];
+  const coste_variable: CosteVariable = {
+    importe: redondear(comisiones / 100), moneda: unidad, periodo, origen: "api",
+    nota: modo === "real" ? "Comisiones que Stripe ha cobrado este mes." : "Comisiones del modo prueba (no son dinero real).",
+  };
+  return { metricas, detalles, coste_variable: modo === "real" ? coste_variable : { ...coste_variable, importe: 0 } };
+};
+
+// ─── OpenAI (de nuestra base de datos, sin secreto nuevo) ──────────────────
+// El gasto REAL lo trae sincronizar-costes-openai a `openai_costes_diarios`
+// (cron de 6 h, OPENAI_ADMIN_KEY); lo que OpenAI aún no ha publicado sale de la
+// estimación de `ia_uso`. El límite es el tope de Super Admin › Costes.
+
+/** Días sin coste real a partir de los cuales se avisa de que la sincronización no va. */
+export const DIAS_AVISO_SIN_REAL = 3;
+
+export const leerOpenai: Lector = async (ctx) => {
+  const d = await metricasBd(ctx);
+  const real = d ? numero(d.openai_usd_mes_real) : null;
+  const estimadoMes = d ? numero(d.ia_usd_mes_estimado) : null;
+  if (!d || (real == null && estimadoMes == null)) {
+    return { metricas: {}, error: "error_api", detalles: { avisos: ["No se pudo leer el gasto de IA de la base de datos (openai_costes_diarios / ia_uso)."] } };
+  }
+  const sinReal = real == null ? (estimadoMes ?? 0) : (numero(d.ia_usd_estimado_sin_real) ?? 0);
+  const usd = (real ?? 0) + sinReal;
+  const cambio = cambioDe(d);
+  const tope = numero(d.tope_ia_mes_eur);
+  const ultimo = typeof d.openai_ultimo_dia_real === "string" ? d.openai_ultimo_dia_real : null;
+  const periodo = "mes en curso";
+  const avisos: string[] = [];
+  const metricas: Record<string, Metrica> = {
+    gasto_ia_mes: {
+      orden: 1, etiqueta: "Gasto de IA este mes", valor: redondear(usd * cambio), unidad: "EUR", periodo,
+      ...(tope != null ? { limite: tope, unidad_limite: "EUR" } : {}),
+      nota: `${fmtNum(usd, 4)} US$ a ${fmtNum(cambio, 4)} € por dólar. El límite es el tope de gasto de IA de Super Admin › Costes.`,
+    },
+    gasto_real_usd: {
+      orden: 2, etiqueta: "Ya facturado por OpenAI", valor: redondear(real ?? 0, 4), unidad: "USD", periodo,
+      nota: ultimo ? `Días cerrados, hasta el ${fechaEs(ultimo)}.` : "OpenAI todavía no ha publicado ningún día.",
+    },
+    gasto_estimado_usd: {
+      orden: 3, etiqueta: "Estimado, aún sin facturar", valor: redondear(sinReal, 4), unidad: "USD", periodo,
+      nota: "Lo que calculamos con ia_uso para los días que OpenAI aún no ha publicado.",
+    },
+  };
+  const diasSinReal = ultimo ? Math.floor((ctx.ahora.getTime() - Date.parse(`${ultimo}T00:00:00Z`)) / 86_400_000) - 1 : null;
+  if (diasSinReal == null) avisos.push("No hay ningún coste real de OpenAI guardado: revisa OPENAI_ADMIN_KEY y la sincronización de Super Admin › Costes.");
+  else if (diasSinReal > DIAS_AVISO_SIN_REAL) avisos.push(`OpenAI no ha publicado costes reales desde el ${fechaEs(ultimo)}: revisa OPENAI_ADMIN_KEY y la sincronización de Super Admin › Costes.`);
+  const detalles: Record<string, unknown> = { eur_por_usd: cambio, ...(ultimo ? { ultimo_dia_real: ultimo } : {}) };
+  if (avisos.length) detalles.avisos = avisos;
+  return {
+    metricas,
+    detalles,
+    coste_variable: { importe: redondear(usd, 4), moneda: "USD", periodo, origen: sinReal > 0 ? "estimado" : "bd", nota: "Real de OpenAI + estimación de lo aún no publicado." },
+  };
+};
+
+// ─── Vapi (asistente telefónico) ───────────────────────────────────────────
+// De call_logs (lo que guarda el asistente de cada llamada) siempre; con
+// VAPI_API_KEY (la de vapi-analytics, opcional), el coste que da Vapi.
+
+/** Suma de `sumCost` / `countId` de la respuesta de POST /analytics (lista de { name, result: [...] }). */
+export function resumirAnaliticaVapi(json: unknown): { coste: number | null; llamadas: number | null } {
+  const consultas = Array.isArray(json) ? json.filter(esObjeto) : esObjeto(json) && Array.isArray(json.results) ? json.results.filter(esObjeto) : [];
+  const q = consultas.find((c) => c.name === "servicios_mes") ?? consultas[0];
+  const filas = q && Array.isArray(q.result) ? q.result.filter(esObjeto) : [];
+  let coste: number | null = null;
+  let llamadas: number | null = null;
+  for (const f of filas) {
+    for (const [k, v] of Object.entries(f)) {
+      const n = numero(v);
+      if (n == null) continue;
+      if (/^sum.*cost$/i.test(k)) coste = (coste ?? 0) + n;
+      else if (/^count/i.test(k)) llamadas = (llamadas ?? 0) + n;
+    }
+  }
+  return { coste, llamadas };
+}
+
+export const leerVapi: Lector = async (ctx) => {
+  const d = await metricasBd(ctx);
+  const periodo = "mes en curso";
+  const metricas: Record<string, Metrica> = {};
+  const detalles: Record<string, unknown> = {};
+  const avisos: string[] = [];
+  let coste: CosteVariable | null = null;
+
+  const llamadasBd = d ? numero(d.llamadas_mes) : null;
+  if (llamadasBd != null) {
+    const nota = "Según call_logs (lo que guarda el asistente de cada llamada).";
+    metricas.llamadas_mes = { orden: 1, etiqueta: "Llamadas este mes", valor: llamadasBd, unidad: "llamadas", periodo, nota };
+    metricas.minutos_mes = { orden: 2, etiqueta: "Minutos de llamada este mes", valor: redondear((numero(d?.llamadas_segundos_mes) ?? 0) / 60, 1), unidad: "minutos", periodo, nota };
+    const usd = numero(d?.llamadas_usd_mes);
+    const eur = numero(d?.llamadas_eur_mes);
+    if (usd != null) {
+      metricas.coste_llamadas_mes = { orden: 3, etiqueta: "Coste de las llamadas este mes", valor: redondear(usd, 4), unidad: "USD", periodo, nota };
+      coste = { importe: redondear(usd, 4), moneda: "USD", periodo, origen: "bd", nota };
+    } else if (eur != null) {
+      metricas.coste_llamadas_mes = { orden: 3, etiqueta: "Coste de las llamadas este mes", valor: redondear(eur, 4), unidad: "EUR", periodo, nota };
+      coste = { importe: redondear(eur, 4), moneda: "EUR", periodo, origen: "bd", nota };
+    } else {
+      coste = { importe: 0, moneda: "USD", periodo, origen: "bd", nota };
+    }
+  }
+
+  const clave = secreto(ctx, "VAPI_API_KEY");
+  if (!clave) {
+    if (llamadasBd == null) return faltaSecreto("VAPI_API_KEY");
+    detalles.secreto_opcional = "VAPI_API_KEY";
+  } else {
+    const r = await pedir(ctx, "https://api.vapi.ai/analytics", { Authorization: `Bearer ${clave}`, Accept: "application/json" }, {
+      queries: [{
+        table: "call", name: "servicios_mes",
+        timeRange: { start: inicioMesUtc(ctx.ahora).toISOString(), end: ctx.ahora.toISOString(), timezone: "UTC" },
+        operations: [{ operation: "sum", column: "cost" }, { operation: "count", column: "id" }],
+      }],
+    });
+    if (r.status === 401 || r.status === 403) {
+      if (llamadasBd == null) return rechazoHttp(r.status);
+      detalles.token_rechazado = true;
+      avisos.push("Vapi ha rechazado VAPI_API_KEY: se muestran solo los datos de call_logs.");
+    } else if (r.ok) {
+      const a = resumirAnaliticaVapi(r.json);
+      const nota = "Dato de Vapi (todas las llamadas de la organización).";
+      if (a.llamadas != null) metricas.llamadas_mes = { orden: 1, etiqueta: "Llamadas este mes", valor: a.llamadas, unidad: "llamadas", periodo, nota };
+      if (a.coste != null) {
+        metricas.coste_llamadas_mes = { orden: 3, etiqueta: "Coste de las llamadas este mes", valor: redondear(a.coste, 4), unidad: "USD", periodo, nota };
+        coste = { importe: redondear(a.coste, 4), moneda: "USD", periodo, origen: "api", nota };
+      }
+      if (a.coste == null && a.llamadas == null) avisos.push("Vapi ha cambiado el formato de su API de analítica: no se reconocen las cifras.");
+    } else {
+      avisos.push(`Vapi respondió ${r.status} al pedir el coste del mes.`);
+    }
+  }
+  if (avisos.length) detalles.avisos = avisos;
+  if (Object.keys(metricas).length === 0) return { metricas, error: "error_api", detalles };
+  return { metricas, detalles, coste_variable: coste };
+};
+
+// ─── Hostinger (suscripciones y dominios) ──────────────────────────────────
+// API pública (https://developers.hostinger.com, 90 peticiones/min). El token
+// hereda los permisos de quien lo crea: no hay tokens de solo lectura.
+
+export interface SuscripcionHostinger {
+  nombre: string;
+  estado: string;
+  /** Precio de renovación en la moneda de la suscripción (la API da céntimos). */
+  precio_renovacion: number | null;
+  moneda: string;
+  periodo: string;
+  caduca: string | null;
+  proxima_factura: string | null;
+  renovacion_automatica: boolean;
+  /** Renovación pasada a meses (para sumar el coste al mes). */
+  meses: number | null;
+}
+
+const MESES_POR_UNIDAD: Record<string, number> = { day: 1 / 30, days: 1 / 30, month: 1, months: 1, year: 12, years: 12 };
+const listaDe = (json: unknown): Record<string, unknown>[] =>
+  Array.isArray(json) ? json.filter(esObjeto) : esObjeto(json) && Array.isArray(json.data) ? json.data.filter(esObjeto) : [];
+
+export function resumirSuscripcionesHostinger(json: unknown): SuscripcionHostinger[] {
+  return listaDe(json).map((x) => {
+    const n = numero(x.billing_period);
+    const f = MESES_POR_UNIDAD[String(x.billing_period_unit ?? "").toLowerCase()];
+    const precio = numero(x.renewal_price) ?? numero(x.total_price);
+    return {
+      nombre: String(x.name ?? "Suscripción").slice(0, 120),
+      estado: String(x.status ?? "desconocido").slice(0, 40),
+      precio_renovacion: precio == null ? null : precio / 100,
+      moneda: /^[A-Z]{3}$/.test(String(x.currency_code ?? "")) ? String(x.currency_code) : "EUR",
+      periodo: n != null && x.billing_period_unit ? `${n} ${String(x.billing_period_unit)}` : "",
+      caduca: typeof x.expires_at === "string" ? x.expires_at : null,
+      proxima_factura: typeof x.next_billing_at === "string" ? x.next_billing_at : null,
+      renovacion_automatica: x.is_auto_renewed === true,
+      meses: n != null && f ? n * f : null,
+    };
+  });
+}
+
+export const leerHostinger: Lector = async (ctx) => {
+  const token = secreto(ctx, "SERVICIOS_HOSTINGER_TOKEN");
+  if (!token) return faltaSecreto("SERVICIOS_HOSTINGER_TOKEN");
+  const cab = { Authorization: `Bearer ${token}`, Accept: "application/json" };
+  const s = await pedir(ctx, "https://developers.hostinger.com/api/billing/v1/subscriptions", cab);
+  if (!s.ok) return rechazoHttp(s.status);
+  const subs = resumirSuscripcionesHostinger(s.json);
+  const activas = subs.filter((x) => x.estado === "active");
+  const metricas: Record<string, Metrica> = {
+    suscripciones_activas: { orden: 1, etiqueta: "Suscripciones activas", valor: activas.length, unidad: "suscripciones", periodo: "ahora" },
+  };
+  const detalles: Record<string, unknown> = { suscripciones: subs.slice(0, 20) };
+  if (activas.length) detalles.plan_detectado = activas.map((x) => x.nombre).join(", ").slice(0, 200);
+  const avisos: string[] = [];
+
+  const p = await pedir(ctx, "https://developers.hostinger.com/api/domains/v1/portfolio", cab);
+  if (p.ok) {
+    const dominios = listaDe(p.json)
+      .filter((x) => typeof x.domain === "string" && x.domain)
+      .map((x) => ({ dominio: String(x.domain).slice(0, 120), estado: String(x.status ?? "").slice(0, 40), caduca: typeof x.expires_at === "string" ? x.expires_at : null }));
+    detalles.dominios = dominios.slice(0, 20);
+    const proximo = dominios.filter((x) => x.estado === "active" && x.caduca).sort((a, b) => String(a.caduca).localeCompare(String(b.caduca)))[0];
+    metricas.dominios = {
+      orden: 2, etiqueta: "Dominios en la cuenta", valor: dominios.length, unidad: "dominios", periodo: "ahora",
+      ...(proximo ? { nota: `El primero en caducar: ${proximo.dominio}, el ${fechaEs(proximo.caduca)}.` } : {}),
+    };
+  } else {
+    avisos.push(`Hostinger respondió ${p.status} al pedir los dominios.`);
+  }
+
+  // Coste al mes de lo que se renueva (solo si todas van en la misma moneda).
+  const conPrecio = activas.filter((x) => x.precio_renovacion != null && x.meses);
+  const monedas = new Set(conPrecio.map((x) => x.moneda));
+  if (conPrecio.length && monedas.size === 1) {
+    const alMes = conPrecio.reduce((t, x) => t + (x.precio_renovacion ?? 0) / (x.meses ?? 1), 0);
+    detalles.coste_mensual_detectado = { importe: redondear(alMes), moneda: [...monedas][0] };
+  }
+  if (avisos.length) detalles.avisos = avisos;
   return { metricas, detalles };
 };
 
@@ -607,6 +944,9 @@ export const LECTORES: Record<string, Lector> = {
   github: leerGithub,
   resend: leerResend,
   stripe: leerStripe,
+  openai: leerOpenai,
+  vapi: leerVapi,
+  hostinger: leerHostinger,
 };
 
 // ─── manejador HTTP ─────────────────────────────────────────────────────────
@@ -649,6 +989,7 @@ function aRespuesta(fila: LecturaGuardada, desdeCache: boolean, guardada: boolea
     error: fila.error ?? null,
     ...(fila.error === "falta_secreto" && typeof detalles.secreto === "string" ? { secreto: detalles.secreto } : {}),
     detalles,
+    coste_variable: esObjeto(fila.coste_variable) ? fila.coste_variable : null,
     desde_cache: desdeCache,
     guardada,
   };
@@ -669,7 +1010,8 @@ export function crearManejador(deps: DependenciasServicios): (req: Request) => P
       auth: { persistSession: false, autoRefreshToken: false },
     }) as ClienteAdmin;
 
-    const servicios = await admin.from("servicios_contratados").select("proveedor, limites");
+    // «*»: sirve antes y después de 20261103160000 (sin `activo`, todos en uso).
+    const servicios = await admin.from("servicios_contratados").select("*");
     if (servicios.error) {
       console.error("[servicios-uso] servicios_contratados:", servicios.error.message);
       return esSinMigracion(servicios.error) ? json({ error: "sin_migracion" }, 503) : json({ error: "error_bd" }, 500);
@@ -681,13 +1023,19 @@ export function crearManejador(deps: DependenciasServicios): (req: Request) => P
     }
 
     const limites = new Map<string, unknown>();
-    for (const s of (Array.isArray(servicios.data) ? servicios.data : []).filter(esObjeto)) limites.set(String(s.proveedor), s.limites);
+    const enUso: string[] = [];
+    for (const s of (Array.isArray(servicios.data) ? servicios.data : []).filter(esObjeto)) {
+      if (s.activo === false) continue; // «no lo usamos»: ni se lee ni se cuenta
+      limites.set(String(s.proveedor), s.limites);
+      enUso.push(String(s.proveedor));
+    }
     const previas = new Map<string, LecturaGuardada>();
     for (const u of (Array.isArray(ultimas.data) ? ultimas.data : []).filter(esObjeto)) previas.set(String(u.proveedor), u as unknown as LecturaGuardada);
 
     const ahora = (deps.ahora ?? (() => new Date()))();
     const ctx: ContextoLector = { env, fetch: deps.fetch ?? fetch, ahora, admin, refProyecto: refDeUrl(env("SUPABASE_URL")) };
     const proveedores = Object.keys(lectores).filter((p) => limites.has(p));
+    const sinLector = enUso.filter((p) => !(p in lectores)).sort();
 
     const lecturas = await Promise.all(proveedores.map(async (p): Promise<LecturaRespuesta> => {
       const previa = previas.get(p);
@@ -709,8 +1057,14 @@ export function crearManejador(deps: DependenciasServicios): (req: Request) => P
         metricas: aplicarLimites(r.metricas, limites.get(p)),
         error: r.error ?? null,
         detalles: r.detalles ?? {},
+        coste_variable: r.coste_variable ?? null,
       }, env);
-      const { error } = await admin.from("servicios_uso").insert(fila);
+      let { error } = await admin.from("servicios_uso").insert(fila);
+      if (error && /coste_variable/.test(error.message ?? "")) {
+        // Base sin 20261103160000: se guarda sin la columna nueva.
+        const { coste_variable: _sinColumna, ...vieja } = fila;
+        ({ error } = await admin.from("servicios_uso").insert(vieja));
+      }
       if (error) console.error(`[servicios-uso] no se guardó la lectura de ${p}:`, error.message);
       return aRespuesta(fila, false, !error);
     }));
@@ -721,6 +1075,6 @@ export function crearManejador(deps: DependenciasServicios): (req: Request) => P
       if (error) console.error("[servicios-uso] limpieza del histórico:", error.message);
     }
 
-    return json(ocultarSecretos({ lecturas, forzado: forzar, proveedor: solo, generado_en: ahora.toISOString() }, env));
+    return json(ocultarSecretos({ lecturas, sin_lector: sinLector, forzado: forzar, proveedor: solo, generado_en: ahora.toISOString() }, env));
   };
 }

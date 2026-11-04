@@ -1,3 +1,4 @@
+import { useId, type ReactNode } from "react";
 import { Switch } from "@/components/ui/switch";
 import { EyeOff, UtensilsCrossed, Wine } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,13 @@ interface VisibilidadTogglesProps {
   activado?: boolean;
   onActivadoChange?: (checked: boolean) => void;
   isActivadoPending?: boolean;
+  /**
+   * Línea bajo «Restaurante» y «Touza» (Vinos: qué hace cada uno o por qué no se
+   * puede publicar). Describe a los dos interruptores (aria-describedby).
+   */
+  nota?: ReactNode;
+  /** No se puede publicar (Vinos sin origen claro): un interruptor apagado no se puede encender; uno encendido sí se apaga. */
+  bloquearEncender?: boolean;
 }
 
 export function VisibilidadToggles({
@@ -28,8 +36,12 @@ export function VisibilidadToggles({
   activado,
   onActivadoChange,
   isActivadoPending = false,
+  nota,
+  bloquearEncender = false,
 }: VisibilidadTogglesProps) {
   const estaActivado = activado ?? true;
+  const idNota = useId();
+  const describe = nota ? idNota : undefined;
 
   return (
     <div className="space-y-1.5">
@@ -41,13 +53,14 @@ export function VisibilidadToggles({
           )}
         >
           {onRestauranteChange && (
-            <label className="flex min-h-11 cursor-pointer items-center gap-2">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 has-[button:disabled]:cursor-not-allowed">
               <UtensilsCrossed className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
               <span className={cn("text-muted-foreground", "text-sm")}>Restaurante</span>
               <Switch
                 checked={restaurante}
                 onCheckedChange={onRestauranteChange}
-                disabled={isPending}
+                disabled={isPending || (bloquearEncender && !restaurante)}
+                aria-describedby={describe}
                 className={cn(
                   "data-[state=checked]:bg-amber-600"
                 )}
@@ -55,19 +68,26 @@ export function VisibilidadToggles({
             </label>
           )}
           {onTouzaChange && (
-            <label className="flex min-h-11 cursor-pointer items-center gap-2">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 has-[button:disabled]:cursor-not-allowed">
               <Wine className={cn("text-muted-foreground", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
               <span className={cn("text-muted-foreground", "text-sm")}>Touza</span>
               <Switch
                 checked={touza}
                 onCheckedChange={onTouzaChange}
-                disabled={isPending}
+                disabled={isPending || (bloquearEncender && !touza)}
+                aria-describedby={describe}
                 className={cn(
                   "data-[state=checked]:bg-purple-600"
                 )}
               />
             </label>
           )}
+        </div>
+      )}
+
+      {nota && (
+        <div id={idNota} className={cn("px-1 text-xs leading-snug", compact && "px-0.5")}>
+          {nota}
         </div>
       )}
 

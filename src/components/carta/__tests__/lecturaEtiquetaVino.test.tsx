@@ -13,6 +13,8 @@ import type { DatosVinoFoto } from "../leerVinoFoto";
 
 const m = vi.hoisted(() => ({
   leer: vi.fn(),
+  crear: vi.fn(),
+  actualizar: vi.fn(),
   toastWarning: vi.fn(),
   toastSuccess: vi.fn(),
   toastInfo: vi.fn(),
@@ -20,9 +22,9 @@ const m = vi.hoisted(() => ({
 
 vi.mock("@/hooks/useVinos", () => ({
   useVinos: () => ({
-    crearVino: { mutateAsync: vi.fn(), isPending: false },
-    actualizarVino: { mutateAsync: vi.fn(), isPending: false },
-    categorias: ["TINTOS", "BLANCOS"],
+    crearVino: { mutateAsync: m.crear, isPending: false },
+    actualizarVino: { mutateAsync: m.actualizar, isPending: false },
+    categorias: ["TINTOS", "BLANCOS", "VINOS TINTOS — ORIGEN PENDIENTE"],
     denominaciones: [],
     regiones: [],
     paises: [],
@@ -66,7 +68,8 @@ vi.mock("../recorte/useRecorteVino", async () => {
 
 import { VinoForm } from "../VinoForm";
 import { EditarVinoModal } from "../EditarVinoModal";
-import { camposVaciosARellenar } from "../lecturaEtiquetaVino";
+import { camposVaciosARellenar, valoresDesdeDatosVino } from "../lecturaEtiquetaVino";
+import { MENSAJE_CATEGORIA_PENDIENTE } from "@/lib/origen-vino";
 import { MENSAJE_SIN_SALDO_OPENAI, motivoLecturaVino } from "../leerVinoFoto";
 
 beforeAll(() => {
@@ -91,7 +94,7 @@ const DATOS: DatosVinoFoto = {
 };
 
 function respuesta(datos: DatosVinoFoto = DATOS) {
-  return { datos, encuadrar: vi.fn(async () => new File(["e"], "botella.jpg", { type: "image/jpeg" })) };
+  return { datos };
 }
 
 function envolver(ui: ReactNode) {
@@ -251,5 +254,74 @@ describe("EditarVinoModal: vino existente", () => {
     await waitFor(() => expect(m.toastInfo).toHaveBeenCalled());
     expect(valor("Nombre del vino")).toBe("Pomal");
     expect(screen.getByDisplayValue("Garnacha")).toBeInTheDocument();
+  });
+});
+
+// Origen obligatorio (04/11/2026, dueño: «deja de subir vinos si el origen no
+// está claro»): si la IA no lo saca claro, el formulario lo pide y no guarda.
+describe("Origen obligatorio al guardar un vino", () => {
+  const DUDOSO: DatosVinoFoto = {
+    ...DATOS,
+    categoria: "VINOS TINTOS — ORIGEN PENDIENTE",
+    denominacion_origen: null,
+    ubicacion_pais: null,
+    ubicacion_region: null,
+  };
+
+  it("la categoría «ORIGEN PENDIENTE» de la IA no se rellena", () => {
+    expect(valoresDesdeDatosVino(DUDOSO).categoria).toBe("");
+    expect(valoresDesdeDatosVino(DATOS).categoria).toBe("TINTOS");
+    expect(camposVaciosARellenar({ categoria: "" }, DUDOSO).categoria).toBeUndefined();
+  });
+
+  it("alta con IA sin origen claro: lo pide y no guarda hasta completarlo", async () => {
+    m.leer.mockResolvedValue(respuesta(DUDOSO));
+    envolver(<VinoForm open onOpenChange={vi.fn()} />);
+    ponerFoto();
+    await waitFor(() => expect(valor("Nombre del vino")).toBe("Viña Pomal Crianza 2020"));
+    expect(
+      await screen.findByText(
+        "La IA no ha sacado claro el origen de este vino. Falta el país, la región y la categoría con su denominación (no vale «Origen pendiente»): sin el origen claro el mapa de la carta no sabe dónde poner el vino. Complétalo para poder guardarlo.",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/Precio en carta/), { target: { value: "24" } });
+    fireEvent.click(screen.getByRole("button", { name: "Guardar Vino" }));
+    expect(await screen.findByText(/El país es obligatorio: sin él el vino no sale en el mapa/)).toBeInTheDocument();
+    expect(screen.getByText(/La región es obligatoria: sin ella el vino no sale en el mapa/)).toBeInTheDocument();
+    expect(screen.getByText("La categoría es obligatoria")).toBeInTheDocument();
+    expect(m.crear).not.toHaveBeenCalled();
+  });
+
+  it("lote: una botella con origen pendiente llega al formulario con la categoría vacía y el aviso", async () => {
+    envolver(<VinoForm open onOpenChange={vi.fn()} precarga={{ datos: { ...DUDOSO, ubicacion_pais: "España", ubicacion_region: "Haro" }, foto: foto() }} />);
+    await waitFor(() => expect(valor("Nombre del vino")).toBe("Viña Pomal Crianza 2020"));
+    expect(screen.getByRole("status")).toHaveTextContent(/Falta la categoría con su denominación/);
+    fireEvent.click(screen.getByRole("button", { name: "Guardar Vino" }));
+    expect(await screen.findByText("La categoría es obligatoria")).toBeInTheDocument();
+    expect(m.crear).not.toHaveBeenCalled();
+  });
+
+  it("editar un vino de «ORIGEN PENDIENTE»: lo marca y no guarda sin elegir su denominación", async () => {
+    const pendiente = {
+      id: "v9", nombre: "Burbujas", categoria: "VINOS TINTOS — ORIGEN PENDIENTE", precio_eur: 40, descripcion: null,
+      ingredientes: null, denominacion_origen: null, ubicacion_pais: "Francia", ubicacion_region: "Champagne", imagen_url: null,
+    } as unknown as Vino;
+    envolver(<EditarVinoModal open onOpenChange={vi.fn()} vino={pendiente} />);
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /^Origen por confirmar\. Falta la categoría con su denominación .* Complétalo para poder guardar; después ya se puede publicar\.$/,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Guardar cambios/ }));
+    expect(await screen.findByText(MENSAJE_CATEGORIA_PENDIENTE)).toBeInTheDocument();
+    expect(m.actualizar).not.toHaveBeenCalled();
+  });
+
+  it("editar un vino con origen claro no avisa", async () => {
+    const bueno = {
+      id: "v8", nombre: "Pomal", categoria: "TINTOS", precio_eur: 20, ubicacion_pais: "España", ubicacion_region: "Haro", imagen_url: null,
+    } as unknown as Vino;
+    envolver(<EditarVinoModal open onOpenChange={vi.fn()} vino={bueno} />);
+    await waitFor(() => expect(valor("Nombre del vino")).toBe("Pomal"));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 });

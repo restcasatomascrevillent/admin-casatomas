@@ -29,12 +29,25 @@ import { ListaCocteles } from "@/components/carta/ListaCocteles";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 import { BotonVinoDesdeFoto, type VinoDesdeFoto } from "@/components/carta/BotonVinoDesdeFoto";
 import { OrdenarCategoria } from "@/components/carta/OrdenarCategoria";
+import { FiltrosVinos } from "@/components/carta/FiltrosVinos";
+import {
+  categoriaDelFiltro,
+  FILTRO_TODOS,
+  filtrarVinos,
+  filtroCategoria,
+  ordenarVinosPorCategoria,
+  type FiltroVinos,
+} from "@/components/carta/filtroVinos";
+import { esCategoriaOrigenPendiente } from "@/lib/tipos-vino";
+import { categoriasConOrigen } from "@/lib/origen-vino";
 
 type Seccion = "platos" | "bebidas" | "vinos" | "cocteles";
 type FiltroEstado = "todos" | "activos" | "inactivos_rest" | "activos_touza" | "inactivos_touza";
 
+// Cerrado, el desplegable dice qué filtra (como en Reservas, «Estado»): en Vinos
+// tenía al lado la píldora «Todos» del tipo y se confundían.
 const ETIQUETAS_FILTRO_ESTADO: Record<FiltroEstado, string> = {
-  todos: "Todos",
+  todos: "Visibilidad",
   activos: "Casa Tomás · visibles",
   inactivos_rest: "Casa Tomás · ocultos",
   activos_touza: "Touza · visibles",
@@ -61,7 +74,9 @@ export default function TabCarta() {
   const [seccionActiva, setSeccionActiva] = useState<Seccion>("platos");
   const [categoriaPlatos, setCategoriaPlatos] = useState<string>("");
   const [categoriaBebidas, setCategoriaBebidas] = useState<string>("");
-  const [categoriaVinos, setCategoriaVinos] = useState<string>("");
+  // Vinos: píldoras por tipo y denominación como en la carta de la web (04/11/2026); empieza en «Todos».
+  const [filtroVinos, setFiltroVinos] = useState<FiltroVinos>(FILTRO_TODOS);
+  const categoriaVinos = categoriaDelFiltro(filtroVinos) ?? "";
   const [categoriaCocteles, setCategoriaCocteles] = useState<string>("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("todos");
   const [precargaVino, setPrecargaVino] = useState<VinoDesdeFoto | null>(null);
@@ -85,17 +100,14 @@ export default function TabCarta() {
     if (categoriasBebidas.length > 0 && !categoriaBebidas) setCategoriaBebidas(categoriasBebidas[0] || "");
   }, [categoriasBebidas, categoriaBebidas]);
   useEffect(() => {
-    if (categoriasVinos.length > 0 && !categoriaVinos) setCategoriaVinos(categoriasVinos[0] || "");
-  }, [categoriasVinos, categoriaVinos]);
-  useEffect(() => {
     if (categoriasCocteles.length > 0 && !categoriaCocteles) setCategoriaCocteles(categoriasCocteles[0] || "");
   }, [categoriasCocteles, categoriaCocteles]);
 
   const termino = busqueda.toLowerCase().trim();
   const hayBusqueda = termino.length > 0;
 
-  // Estado + búsqueda; sin búsqueda se limita además a la categoría seleccionada
-  const filtrarSeccion = <T extends ItemCarta>(items: T[] | undefined, categoria: string): T[] => {
+  // Estado + búsqueda (sin categoría).
+  const filtrarEstadoYBusqueda = <T extends ItemCarta>(items: T[] | undefined): T[] => {
     let resultado = items || [];
     if (filtroEstado === "activos") resultado = resultado.filter((i) => i.restaurante === true);
     else if (filtroEstado === "inactivos_rest") resultado = resultado.filter((i) => i.restaurante !== true);
@@ -107,12 +119,21 @@ export default function TabCarta() {
         (i) => i.nombre?.toLowerCase().includes(termino) || i.descripcion?.toLowerCase().includes(termino)
       );
     }
-    return resultado.filter((i) => i.categoria === categoria);
+    return resultado;
+  };
+
+  // Estado + búsqueda; sin búsqueda se limita además a la categoría seleccionada
+  const filtrarSeccion = <T extends ItemCarta>(items: T[] | undefined, categoria: string): T[] => {
+    const resultado = filtrarEstadoYBusqueda(items);
+    return hayBusqueda ? resultado : resultado.filter((i) => i.categoria === categoria);
   };
 
   const platosFiltrados = filtrarSeccion(platos, categoriaPlatos);
   const bebidasFiltradas = filtrarSeccion(bebidas, categoriaBebidas);
-  const vinosFiltrados = filtrarSeccion(vinos, categoriaVinos);
+  // Vinos: la búsqueda se suma a las píldoras (como en la web) y los contadores
+  // cuentan lo que deja la visibilidad y la búsqueda.
+  const vinosParaFiltros = filtrarEstadoYBusqueda(vinos);
+  const vinosFiltrados = ordenarVinosPorCategoria(filtrarVinos(vinosParaFiltros, filtroVinos));
   const coctelesFiltrados = filtrarSeccion(cocteles, categoriaCocteles);
 
   const secciones: Record<
@@ -168,7 +189,7 @@ export default function TabCarta() {
       filtrados: vinosFiltrados.length,
       categorias: categoriasVinos,
       categoria: categoriaVinos,
-      setCategoria: setCategoriaVinos,
+      setCategoria: (categoria) => setFiltroVinos(filtroCategoria(categoria)),
       abrirDialogo: () => {
         setPrecargaVino(null);
         setDialogVinoOpen(true);
@@ -193,6 +214,7 @@ export default function TabCarta() {
   // Se ordena la categoría entera, sin el filtro de visibilidad: si no, al
   // numerar solo los visibles chocarían con los ocultos.
   const elementosCategoria = actual.categoria ? actual.todos.filter((i) => i.categoria === actual.categoria) : [];
+  // (En Vinos, con una denominación elegida en las píldoras.)
   const puedeOrdenar = !hayBusqueda && Boolean(actual.categoria) && elementosCategoria.length > 1;
   const enModoOrdenar = ordenando && puedeOrdenar;
   // Si deja de poder ordenarse (p. ej. la categoría se queda con un solo
@@ -265,7 +287,7 @@ export default function TabCarta() {
                 {seccionActiva === "vinos" && (
                   <div className="order-first flex min-w-0 items-center gap-2 sm:order-none sm:flex-wrap" data-tour="gw-carta-vinos-foto">
                     <BotonVinoDesdeFoto
-                      categorias={categoriasVinos.filter((c): c is string => Boolean(c))}
+                      categorias={categoriasConOrigen(categoriasVinos)}
                       onLeido={(resultado) => {
                         setPrecargaVino(resultado);
                         setDialogVinoOpen(true);
@@ -316,7 +338,7 @@ export default function TabCarta() {
                 )}
               </div>
 
-              {actual.categorias.length > 0 && (
+              {seccionActiva !== "vinos" && actual.categorias.length > 0 && (
                 <Select value={actual.categoria} onValueChange={actual.setCategoria} disabled={hayBusqueda}>
                   <SelectTrigger
                     className="w-full sm:w-[220px] bg-background"
@@ -340,7 +362,7 @@ export default function TabCarta() {
                   <SelectValue>{ETIQUETAS_FILTRO_ESTADO[filtroEstado]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="todos">Visibles y ocultos</SelectItem>
                   <SelectSeparator />
                   <SelectGroup>
                     <SelectLabel>Casa Tomás</SelectLabel>
@@ -371,6 +393,11 @@ export default function TabCarta() {
                   <ArrowUpDown className="mr-2 h-4 w-4" />
                   Ordenar
                 </Button>
+              )}
+
+              {/* Vinos: las píldoras de la carta de la web en vez del desplegable de categorías. */}
+              {seccionActiva === "vinos" && actual.categorias.length > 0 && (
+                <FiltrosVinos vinos={vinosParaFiltros} valor={filtroVinos} onChange={setFiltroVinos} />
               )}
             </div>
 
@@ -406,7 +433,7 @@ export default function TabCarta() {
           setDialogVinoOpen(abierto);
           if (!abierto) setPrecargaVino(null);
         }}
-        categoriaInicial={categoriaVinos}
+        categoriaInicial={esCategoriaOrigenPendiente(categoriaVinos) ? "" : categoriaVinos}
         precarga={precargaVino}
       />
       <CoctelForm

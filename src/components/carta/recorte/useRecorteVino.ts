@@ -3,9 +3,11 @@ import { avisoSinFondoCarta, quitarFondo, type ProgresoRecorte, type ResultadoFo
 import { componerFotoCarta, FONDO_ACTIVO, type NombreTema, type TipoFotoCarta } from "../composicionCarta";
 import { extensionFoto } from "../composicionVino";
 import { redimensionarFoto } from "../redimensionarFoto";
-import { recorteNavegadorDisponible, recorteNavegadorSeguro } from "./quitarFondoNavegador";
-import { decidirRecorte, dispositivoNoRecorta, olvidarDispositivoNoRecorta, type DestinoRecorte } from "./recorteMovil";
+import { recorteNavegadorSeguro } from "./quitarFondoNavegador";
+import type { ProgresoMovil } from "./quitarFondoMovil";
+import { motivoFallo, vaAOrdenador } from "./recorteMovil";
 import { candidataRecortada, detectarFotoRecortada, esStickerRecortado } from "./fotoYaRecortada";
+import { medidasFoto } from "../medidasFoto";
 
 export type { TipoFotoCarta } from "../composicionCarta";
 
@@ -18,15 +20,11 @@ export interface StickerFoto {
 
 export type EstadoRecorte =
   | { fase: "nada" }
-  | { fase: "trabajando"; progreso: ProgresoRecorte | null }
+  | { fase: "trabajando"; progreso: ProgresoMovil | null }
   | { fase: "listo"; r: StickerFoto }
-  | { fase: "fallo"; aviso: string }
-  /**
-   * Móvil/tablet: no se recorta en el formulario. Al guardar se guarda la
-   * foto original y luego se recorta en el móvil ("movil") o, si este móvil
-   * no puede, se queda sin recortar ("sin-recorte"). Ver recorteMovil.ts.
-   */
-  | { fase: "diferido"; destino: Exclude<DestinoRecorte, "formulario"> };
+  /** `aOrdenador`: móvil cuyo recorte falló también en el servidor: al guardar, la foto normal va a un ordenador. */
+  | { fase: "fallo"; aviso: string; aOrdenador?: boolean }
+
 
 export type VistaRecorte = "sticker" | "fondo";
 export type EleccionFoto = "carta" | "original";
@@ -53,26 +51,16 @@ async function fotoParaRecorte(f: File): Promise<Blob> {
   return (await redimensionarFoto(f)).blob;
 }
 
-/** Dónde se recorta en este dispositivo (se mira en cada foto: la marca puede cambiar). */
-export function destinoRecorteActual(): DestinoRecorte {
-  return decidirRecorte({
-    seguro: recorteNavegadorSeguro(),
-    disponible: recorteNavegadorDisponible(),
-    noRecorta: dispositivoNoRecorta() !== null,
-  });
-}
-
 /** Tiempo que se enseña el sticker antes de pasar solo a «Con fondo». */
 export const MS_VER_STICKER = 1800;
 
 /**
  * Estado de la foto de producto en un formulario de la carta: al elegir la
- * foto se recorta SOLA en el navegador (en el ordenador), se enseña el sticker y
+ * foto se recorta SOLA en el navegador (ordenador y móvil), se enseña el sticker y
  * se compone con el fondo elegido (`tema`, por defecto FONDO_ACTIVO) según el
  * `tipo` (vino/bebida = botella 3:4; plato = 4:3 centrado). Cambiar de fondo
  * solo recompone (no vuelve a recortar). «Usar foto original» guarda la foto
- * tal cual. En el móvil no se recorta aquí (fase "diferido"): se elige el
- * fondo y el recorte se hace después de guardar (trasGuardarFotoCarta).
+ * tal cual. En el móvil igual (si el modelo no puede, lo hace el servidor).
  */
 export function useFotoCarta(tipo: TipoFotoCarta) {
   const [original, setOriginal] = useState<File | null>(null);
@@ -85,20 +73,19 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
   const tocado = useRef(false);
   const turno = useRef(0);
 
-  /** Camino de siempre: modelo en el ordenador; en el móvil, recorte después de guardar. */
+  /**
+   * El modelo, en el propio formulario, en cualquier dispositivo (decisión del
+   * dueño, 03-11-2026). En el móvil, si falla, el servidor (quitarFondoMovil);
+   * la foto se reduce allí a 1200 px leyendo la cabecera, sin decodificarla entera.
+   */
   const seguirConModelo = useCallback((foto: File, yo: number, previo?: Promise<ResultadoFotoCarta>) => {
-    const destino = destinoRecorteActual();
-    if (destino !== "formulario") {
-      // Móvil: nada de modelo en el formulario (memoria); se recorta tras guardar.
-      void previo?.catch(() => undefined);
-      setEstado({ fase: "diferido", destino });
-      return;
-    }
+    const ordenador = recorteNavegadorSeguro();
     setEstado({ fase: "trabajando", progreso: null });
-    const onProgreso = (p: ProgresoRecorte) => {
+    const onProgreso = (p: ProgresoMovil) => {
       if (turno.current === yo) setEstado({ fase: "trabajando", progreso: p });
     };
-    const promesa: Promise<StickerFoto> = previo ?? fotoParaRecorte(foto).then((b) => quitarFondo(b, onProgreso));
+    const promesa: Promise<StickerFoto> =
+      previo ?? (ordenador ? fotoParaRecorte(foto).then((b) => quitarFondo(b, onProgreso)) : quitarFondo(foto, onProgreso));
     promesa.then(
       (r) => {
         if (turno.current === yo) setEstado({ fase: "listo", r: { sticker: r.sticker, metodo: r.metodo } });
@@ -106,7 +93,13 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
       (e) => {
         console.warn("[recorte] se usa la foto sin fondo de carta", e);
         if (turno.current !== yo) return;
-        setEstado({ fase: "fallo", aviso: avisoSinFondoCarta(e) });
+        // Móvil: ya se probó en el servidor. Al guardar, la foto normal va a un ordenador.
+        const aOrdenador = !ordenador && vaAOrdenador(e);
+        setEstado(
+          aOrdenador
+            ? { fase: "fallo", aviso: `${motivoFallo(e)} Al guardar se guarda la foto normal y se recortará en un ordenador.`, aOrdenador }
+            : { fase: "fallo", aviso: avisoSinFondoCarta(e) },
+        );
         setEleccion("original");
       },
     );
@@ -126,13 +119,19 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     }
     if (!previo && candidataRecortada(foto) && typeof createImageBitmap === "function") {
       setEstado({ fase: "trabajando", progreso: null });
-      void detectarFotoRecortada(foto).then((sticker) => {
-        if (turno.current !== yo) return;
-        if (sticker) {
-          setOriginal(sticker);
-          setEstado({ fase: "listo", r: { sticker, metodo: "recortada" } });
-        } else seguirConModelo(foto, yo);
-      });
+      void detectarFotoRecortada(foto)
+        .catch((e) => {
+          // No debería lanzar; si lo hace, que la foto siga su camino (antes se quedaba en «trabajando»).
+          console.warn("[recorte] no se pudo mirar la transparencia", e);
+          return null;
+        })
+        .then((sticker) => {
+          if (turno.current !== yo) return;
+          if (sticker) {
+            setOriginal(sticker);
+            setEstado({ fase: "listo", r: { sticker, metodo: "recortada" } });
+          } else seguirConModelo(foto, yo);
+        });
       return;
     }
     seguirConModelo(foto, yo, previo);
@@ -159,13 +158,6 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     setEleccion("carta");
     setCompuesta(null);
     setTemaInterno(FONDO_ACTIVO);
-  }, []);
-
-  /** Móvil marcado como «no recorta»: probar otra vez a recortar en él (lo pide el usuario). */
-  const reintentarEnMovil = useCallback(() => {
-    olvidarDispositivoNoRecorta();
-    setEstado((e) => (e.fase === "diferido" ? { fase: "diferido", destino: destinoRecorteActual() as "movil" | "sin-recorte" } : e));
-    setEleccion("carta");
   }, []);
 
   const setVista = useCallback((v: VistaRecorte) => {
@@ -255,11 +247,8 @@ export function useFotoCarta(tipo: TipoFotoCarta) {
     /** true si al guardar se sube la foto de carta (y el original aparte). */
     usaCarta: eleccion === "carta" && listoCarta,
     trabajando: estado.fase === "trabajando" || componiendo,
-    /** Móvil: al guardar se guarda la original y luego se le pone el fondo (`tema`). */
-    recortarTrasGuardar: estado.fase === "diferido" && eleccion === "carta" && !!original,
     iniciar,
     repetir,
-    reintentarEnMovil,
     limpiar,
   };
 }
@@ -270,11 +259,24 @@ export type FotoCarta = ReturnType<typeof useFotoCarta>;
 export const useRecorteVino = () => useFotoCarta("vino");
 export type RecorteVino = FotoCarta;
 
-/** Texto del progreso: «Descargando modelo (1ª vez)… 42 %», «Recortando…». */
-export function textoProgreso(p: ProgresoRecorte | null): string {
-  if (p?.fase === "descargando") return `Descargando modelo (1ª vez)… ${p.pct} %`;
-  if (p?.fase === "recortando") return "Recortando…";
-  return "Preparando recorte…";
+/** Texto del progreso: «Descargando modelo (1ª vez)… 42 %», «Recortando…», «Quitando el fondo en el servidor…». */
+export function textoProgreso(p: ProgresoMovil | null): string {
+  switch (p?.fase) {
+    case "descargando":
+      return p.recibidos !== undefined && p.total
+        ? `Descargando el recortador (1ª vez)… ${Math.round(p.recibidos / 1048576)}/${Math.max(1, Math.round(p.total / 1048576))} MB`
+        : `Descargando modelo (1ª vez)… ${p.pct} %`;
+    case "recortando":
+      return "Recortando…";
+    case "subiendo":
+      return "Subiendo la foto al servidor…";
+    case "servidor":
+      return "Quitando el fondo en el servidor…";
+    case "componiendo":
+      return "Componiendo…";
+    default:
+      return "Preparando recorte…";
+  }
 }
 
 /** Damero de «transparente» detrás del sticker. */

@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { nombreCarta, categoriaCarta, descripcionCarta } from "@/lib/limites-carta";
+import { nombreCarta, descripcionCarta } from "@/lib/limites-carta";
+import { categoriasConOrigen, categoriaVino, mensajeFaltaOrigen, origenVinoClaro, paisVino, regionVino } from "@/lib/origen-vino";
 import { Loader2, Camera, X, Sparkles, ImagePlus } from "lucide-react";
 import {
   Dialog,
@@ -22,7 +23,7 @@ import { subirFotoCarta } from "./subirFotoCarta";
 import { useQueryClient } from "@tanstack/react-query";
 import { CamposVino } from "./CamposVino";
 import type { VinoDesdeFoto } from "./leerVinoFoto";
-import { useLecturaEtiquetaVino, valoresDesdeDatosVino, type LecturaHecha } from "./lecturaEtiquetaVino";
+import { useLecturaEtiquetaVino, valoresDesdeDatosVino } from "./lecturaEtiquetaVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
 import { useRecorteVino } from "./recorte/useRecorteVino";
 import { aceptarFotoCarta } from "./recorte/fotoYaRecortada";
@@ -33,15 +34,17 @@ import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
+// Origen obligatorio (04/11/2026): país, región y categoría con denominación
+// (no «… — ORIGEN PENDIENTE»). Sin él no se guarda, tampoco si lo rellena la IA.
 const formSchema = z.object({
   nombre: nombreCarta,
-  categoria: categoriaCarta,
+  categoria: categoriaVino,
   precio_eur: esquemaPrecioCarta,
   descripcion: descripcionCarta,
   ingredientes: z.string().optional(),
   denominacion_origen: z.string().optional(),
-  ubicacion_pais: z.string().trim().min(1, "El país es obligatorio para el mapa"),
-  ubicacion_region: z.string().trim().min(1, "La región es obligatoria para el mapa"),
+  ubicacion_pais: paisVino,
+  ubicacion_region: regionVino,
 });
 
 interface VinoFormProps {
@@ -82,24 +85,12 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     },
   });
 
-  // Lectura de la etiqueta con IA al poner la foto (en paralelo al recorte).
-  // Móvil: el recorte va tras guardar y se guarda la foto tal cual; si la IA da
-  // encuadre, se guarda la botella encuadrada en 3:4 (como hacía la precarga).
-  const recorteRef = useRef(recorte);
-  useEffect(() => {
-    recorteRef.current = recorte;
-  });
-  const alLeer = async ({ datos, fuente, encuadrar }: LecturaHecha) => {
-    const r = recorteRef.current;
-    if (!datos.recorte || r.estado.fase !== "diferido" || r.original !== fuente) return;
-    try {
-      const encuadrada = await encuadrar();
-      if (recorteRef.current.original === fuente) recorteRef.current.iniciar(encuadrada);
-    } catch (e) {
-      console.warn("[extraer-vino-foto] encuadre", e);
-    }
-  };
-  const lectura = useLecturaEtiquetaVino(form, categorias.filter((c): c is string => Boolean(c)), (r) => void alLeer(r));
+  // Sin las categorías «… — ORIGEN PENDIENTE»: no se puede elegir ninguna.
+  const categoriasValidas = categoriasConOrigen(categorias);
+
+  // Lectura de la etiqueta con IA al poner la foto (en paralelo al recorte,
+  // que ya se hace aquí también en el móvil).
+  const lectura = useLecturaEtiquetaVino(form, categoriasValidas);
   const { cancelar: cancelarLectura, limpiar: limpiarLectura } = lectura;
 
   // Precarga desde la foto de la botella (lote «Varias botellas»). Precio vacío
@@ -135,6 +126,17 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
   /** Datos de la etiqueta para el precio sugerido y las tiendas. */
   const datosEtiqueta = precarga?.datos ?? lectura.datos;
+
+  // Si la IA no ha sacado claro el origen, se pide completarlo (no se guarda sin él).
+  const [categoriaActual, paisActual, regionActual] = useWatch({
+    control: form.control,
+    name: ["categoria", "ubicacion_pais", "ubicacion_region"],
+  });
+  const origenActual = { categoria: categoriaActual, ubicacion_pais: paisActual, ubicacion_region: regionActual };
+  const avisoOrigen =
+    datosEtiqueta && !origenVinoClaro(origenActual)
+      ? `La IA no ha sacado claro el origen de este vino. ${mensajeFaltaOrigen(origenActual)} Complétalo para poder guardarlo.`
+      : null;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => void usarFoto(e.target.files?.[0], e.target);
 
@@ -321,7 +323,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
 
             <CamposVino
               control={form.control}
-              categorias={categorias}
+              categorias={categoriasValidas}
               denominaciones={denominaciones}
               regiones={regiones}
               paises={paises}
@@ -331,6 +333,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
                   onUsar={(precio) => form.setValue("precio_eur", precio, { shouldValidate: true, shouldDirty: true })}
                 />
               }
+              avisoOrigen={avisoOrigen}
             />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en

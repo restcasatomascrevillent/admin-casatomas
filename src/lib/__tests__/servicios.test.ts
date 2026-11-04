@@ -1,16 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
+  type LecturaServicio,
   type ServicioContratado,
+  aEur,
+  avisosConsumo,
   borradorDe,
   cambiosDeBorrador,
   combinarMetricas,
+  cuotaMensual,
   enlaceSecretosSupabase,
   formatearCantidad,
   formatearPorcentaje,
   haceCuanto,
   leerNumero,
+  masCercaDelLimite,
+  ordenarServicios,
+  pendientesServicios,
   peorSemaforo,
+  proveedorDeNombre,
+  proximasRenovaciones,
+  resumirCostes,
+  servicioNuevo,
   semaforo,
+  textoDias,
+  textoImporteConEur,
   textoPrecio,
 } from "../servicios";
 
@@ -32,7 +45,16 @@ const SERVICIO: ServicioContratado = {
   },
   notas: null,
   actualizado_en: "2026-11-03T10:00:00Z",
+  categoria: "base_datos",
+  orden: 20,
+  activo: true,
+  por_confirmar: false,
+  precio_anual: null,
+  fuente_precio: "https://supabase.com/pricing",
 };
+const servicio = (p: Partial<ServicioContratado> & Pick<ServicioContratado, "proveedor" | "nombre">): ServicioContratado => ({
+  ...SERVICIO, limites: {}, ...p,
+});
 
 describe("semáforo (verde < 70 %, ámbar 70–90 %, rojo > 90 %)", () => {
   it.each([[0, "verde"], [69.9, "verde"], [70, "ambar"], [85, "ambar"], [90, "ambar"], [90.1, "rojo"], [140, "rojo"]] as const)("%s %% → %s", (p, s) => {
@@ -139,5 +161,225 @@ describe("edición", () => {
     expect(r.ok).toBe(false);
     if (!("errores" in r)) return;
     expect(Object.keys(r.errores).sort()).toEqual(["limite.almacenamiento", "nombre", "panel_url", "precio"]);
+  });
+});
+
+describe("coste", () => {
+  it("cuota al mes según el ciclo y paso a euros", () => {
+    expect(cuotaMensual({ precio_mensual: 0, moneda: "USD", ciclo: "gratuito" })).toEqual({ importe: 0, moneda: "USD" });
+    expect(cuotaMensual({ precio_mensual: 20, moneda: "USD", ciclo: "mensual" })).toEqual({ importe: 20, moneda: "USD" });
+    expect(cuotaMensual({ precio_mensual: null, precio_anual: 120, moneda: "EUR", ciclo: "anual" })).toEqual({ importe: 10, moneda: "EUR" });
+    expect(cuotaMensual({ precio_mensual: 3, precio_anual: null, moneda: "EUR", ciclo: "anual" })).toEqual({ importe: 3, moneda: "EUR" });
+    expect(cuotaMensual({ precio_mensual: null, moneda: "USD", ciclo: "por_uso" })).toEqual({ importe: 0, moneda: "USD" });
+    expect(cuotaMensual({ precio_mensual: null, moneda: "EUR", ciclo: "mensual" })).toBeNull();
+    expect(aEur(20, "USD", 0.9)).toBe(18);
+    expect(aEur(5, "eur", 0.9)).toBe(5);
+    expect(aEur(5, "GBP", 0.9)).toBeNull();
+    expect(t(textoImporteConEur({ importe: 20, moneda: "USD" }, 0.894))).toBe("20,00 US$ (≈ 17,88 €)");
+    expect(t(textoImporteConEur({ importe: 12, moneda: "EUR" }, 0.894))).toBe("12,00 €");
+  });
+
+  it("precio al año", () => {
+    expect(t(textoPrecio({ precio_mensual: null, precio_anual: 14.99, moneda: "EUR", ciclo: "anual" }))).toBe("14,99 € al año");
+    expect(t(textoPrecio({ precio_mensual: 2, precio_anual: null, moneda: "EUR", ciclo: "anual" }))).toBe("2,00 € al mes (pago anual)");
+  });
+
+  it("resumirCostes: cuotas + uso del mes en euros, sin los que no se usan, y la previsión del año", () => {
+    const servicios = [
+      servicio({ proveedor: "vercel", nombre: "Vercel", precio_mensual: 0, ciclo: "gratuito" }),
+      servicio({ proveedor: "hostinger", nombre: "Hostinger", precio_mensual: null, precio_anual: 120, moneda: "EUR", ciclo: "anual", por_confirmar: true }),
+      servicio({ proveedor: "openai", nombre: "OpenAI", precio_mensual: null, moneda: "USD", ciclo: "por_uso" }),
+      servicio({ proveedor: "pro", nombre: "Pro en dólares", precio_mensual: 20, moneda: "USD", ciclo: "mensual" }),
+      servicio({ proveedor: "loading", nombre: "Loading", precio_mensual: null, moneda: "EUR", ciclo: "anual" }),
+      servicio({ proveedor: "perplexity", nombre: "Perplexity", precio_mensual: 50, moneda: "USD", ciclo: "mensual", activo: false }),
+    ];
+    const lecturas = {
+      openai: { coste_variable: { importe: 3, moneda: "USD", periodo: "mes en curso", origen: "estimado" } },
+      vercel: { coste_variable: null },
+      perplexity: { coste_variable: { importe: 999, moneda: "USD" } },
+    };
+    // 10 de noviembre: han pasado 10 de 30 días.
+    const r = resumirCostes(servicios, lecturas, 0.9, new Date("2026-11-10T12:00:00Z"));
+    expect(r.filas.map((f) => f.proveedor)).toEqual(["pro", "hostinger", "openai", "loading", "vercel"]);
+    expect(r.filas[0]).toMatchObject({ fijoEur: 18, variableEur: 0, totalEur: 18, fijo: { importe: 20, moneda: "USD" } });
+    expect(r.filas[2]).toMatchObject({ fijoEur: 0, variableEur: 2.7, totalEur: 2.7 });
+    expect(r.filas[3]).toMatchObject({ fijoEur: null, totalEur: 0 });
+    expect(r).toMatchObject({ fijoMesEur: 28, variableMesEur: 2.7, totalMesEur: 30.7, fijoAnioEur: 336, hayUsd: true });
+    // A fin de mes: 28 + 2,7 × 30/10 = 36,1. Al año: 36,1 × 12 = 433,2
+    expect(r.previsionMesEur).toBe(36.1);
+    expect(r.previsionAnioEur).toBe(433.2);
+    expect(r.sinPrecio).toEqual(["Loading"]);
+    expect(r.porConfirmar).toEqual(["Hostinger"]);
+  });
+});
+
+describe("avisos y renovaciones", () => {
+  const supa = SERVICIO;
+  const lecturas = new Map<string, LecturaServicio>([
+    ["supabase", { proveedor: "supabase", tomado_en: "", error: null, detalles: {}, metricas: {
+      bd_tamano: { valor: 420 * 1024 ** 2, unidad: "bytes" }, almacenamiento: { valor: 0.95 * 1024 ** 3, unidad: "bytes" }, usuarios_activos_mes: { valor: 10, unidad: "usuarios" },
+    } }],
+    ["hostinger", { proveedor: "hostinger", tomado_en: "", error: null, metricas: {}, detalles: {
+      dominios: [{ dominio: "restaurantecasatomascrevillente.es", estado: "active", caduca: "2027-01-15T10:00:00Z" }, { dominio: "viejo.es", estado: "expired", caduca: "2025-01-01T00:00:00Z" }],
+      suscripciones: [{ nombre: "Premium Web Hosting", estado: "active", caduca: "2026-11-20T10:00:00Z", proxima_factura: "2026-11-20T10:00:00Z" }, { nombre: "Email", estado: "cancelled", caduca: "2026-11-05T00:00:00Z" }],
+    } }],
+  ]);
+
+  it("avisosConsumo: desde el 80 %, de mayor a menor, solo de lo que se usa", () => {
+    const avisos = avisosConsumo([supa, { ...supa, proveedor: "otro", nombre: "Otro", activo: false }], new Map([...lecturas, ["otro", { ...lecturas.get("supabase")!, proveedor: "otro" }]]));
+    expect(avisos.map((a) => [a.clave, Math.round(a.porcentaje), a.semaforo])).toEqual([["almacenamiento", 95, "rojo"], ["bd_tamano", 84, "ambar"]]);
+    expect(avisos[0]).toMatchObject({ nombre: "Supabase", textoLimite: "1 GB" });
+  });
+
+  it("proximasRenovaciones: la fecha apuntada y lo que dice la API (dominios y suscripciones activas), en orden", () => {
+    const hostinger = servicio({ proveedor: "hostinger", nombre: "Hostinger", categoria: "dominio" });
+    const loading = servicio({ proveedor: "loading", nombre: "Loading", categoria: "dominio", renovacion: "2026-11-01" });
+    const apagado = servicio({ proveedor: "x", nombre: "X", renovacion: "2026-11-04", activo: false });
+    const r = proximasRenovaciones([hostinger, loading, apagado], lecturas, new Date("2026-11-03T12:00:00Z"));
+    expect(r.map((x) => [x.nombre, x.concepto, x.fecha, x.dias, x.deLaApi])).toEqual([
+      ["Loading", "Renovación (dominio o plan)", "2026-11-01", -2, false],
+      ["Hostinger", "Suscripción Premium Web Hosting", "2026-11-20", 17, true],
+      ["Hostinger", "Dominio restaurantecasatomascrevillente.es", "2027-01-15", 73, true],
+    ]);
+    expect([textoDias(0), textoDias(1), textoDias(17), textoDias(-2)]).toEqual(["hoy", "mañana", "en 17 días", "hace 2 días"]);
+  });
+
+  it("ordenarServicios por orden y nombre", () => {
+    const lista = [servicio({ proveedor: "b", nombre: "B", orden: 50 }), servicio({ proveedor: "a", nombre: "A", orden: 50 }), servicio({ proveedor: "c", nombre: "C", orden: 10 })];
+    expect(ordenarServicios(lista).map((x) => x.proveedor)).toEqual(["c", "a", "b"]);
+  });
+});
+
+describe("edición de los campos nuevos", () => {
+  it("anual: se edita el precio al año (y el al mes queda vacío); categoría, orden, en uso y fuente", () => {
+    const original = servicio({ proveedor: "loading", nombre: "Loading", ciclo: "anual", precio_mensual: 1.25, precio_anual: null, moneda: "EUR", categoria: "dominio", orden: 96 });
+    const b = borradorDe(original);
+    expect(b).toMatchObject({ precio: "15", categoria: "dominio", orden: "96", activo: true, por_confirmar: false });
+    b.precio = "14,99";
+    b.activo = false;
+    b.fuente_precio = "https://www.loading.es/dominios/";
+    const r = cambiosDeBorrador(b, original);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.cambios).toMatchObject({ precio_mensual: null, precio_anual: 14.99, activo: false, orden: 96, categoria: "dominio", fuente_precio: "https://www.loading.es/dominios/" });
+  });
+
+  it("el límite que pone la lectura (tope de IA) sigue sin «limite» si no se escribe uno", () => {
+    const openai = servicio({ proveedor: "openai", nombre: "OpenAI", limites: { gasto_ia_mes: { orden: 1, unidad: "EUR", limite_desde: "Tope de Costes" } } });
+    const r = cambiosDeBorrador(borradorDe(openai), openai);
+    if (!r.ok) throw new Error("no válido");
+    expect("limite" in r.cambios.limites.gasto_ia_mes).toBe(false);
+    expect(r.cambios.limites.gasto_ia_mes.limite_desde).toBe("Tope de Costes");
+    const b = borradorDe(openai);
+    b.limites.gasto_ia_mes = { limite: "10", unidad: "EUR" };
+    const r2 = cambiosDeBorrador(b, openai);
+    if (!r2.ok) throw new Error("no válido");
+    expect(r2.cambios.limites.gasto_ia_mes.limite).toBe(10);
+  });
+
+  it("rechaza categoría, orden y fuente no válidos", () => {
+    const b = { ...borradorDe(SERVICIO), categoria: "cosas", orden: "1,5", fuente_precio: "http://x.test" };
+    const r = cambiosDeBorrador(b, SERVICIO);
+    if (!("errores" in r)) throw new Error("debería fallar");
+    expect(Object.keys(r.errores).sort()).toEqual(["categoria", "fuente_precio", "orden"]);
+  });
+});
+
+describe("Resumen: lo más cerca del límite y lo que requiere atención", () => {
+  const HOY = new Date("2026-11-03T12:00:00Z");
+  const supa = SERVICIO;
+  const resend = servicio({ proveedor: "resend", nombre: "Resend", limites: { correos_mes: { etiqueta: "Correos este mes", limite: 3000, unidad: "correos" } } });
+  const vercel = servicio({ proveedor: "vercel", nombre: "Vercel" });
+  const github = servicio({ proveedor: "github", nombre: "GitHub" });
+  const vapi = servicio({ proveedor: "vapi", nombre: "Vapi" });
+  const loading = servicio({ proveedor: "loading", nombre: "Loading", categoria: "dominio", renovacion: "2026-11-01" });
+  const apagado = servicio({ proveedor: "perplexity", nombre: "Perplexity", activo: false, renovacion: "2026-11-04" });
+  const lectura = (proveedor: string, p: Partial<LecturaServicio>): LecturaServicio => ({ proveedor, tomado_en: "", error: null, detalles: {}, metricas: {}, ...p });
+  const lecturas = new Map<string, LecturaServicio>([
+    ["supabase", lectura("supabase", { metricas: { bd_tamano: { valor: 300 * 1024 ** 2, unidad: "bytes" }, usuarios_activos_mes: { valor: 10, unidad: "usuarios" } } })],
+    ["resend", lectura("resend", { metricas: { correos_mes: { valor: 2950, unidad: "correos" } } })],
+    ["vercel", lectura("vercel", { error: "falta_secreto", secreto: "SERVICIOS_VERCEL_TOKEN" })],
+    ["github", lectura("github", { error: "falta_secreto" })],
+    ["vapi", lectura("vapi", { error: "error_api" })],
+    ["perplexity", lectura("perplexity", { error: "credencial_rechazada" })],
+  ]);
+  const todos = [supa, resend, vercel, github, vapi, loading, apagado];
+
+  it("masCercaDelLimite: las métricas con %, de mayor a menor, solo de lo que se usa", () => {
+    const r = masCercaDelLimite(todos, lecturas, 2);
+    expect(r.map((a) => [a.proveedor, a.clave, Math.round(a.porcentaje)])).toEqual([["resend", "correos_mes", 98], ["supabase", "bd_tamano", 60]]);
+    expect(masCercaDelLimite(todos, lecturas)).toHaveLength(3);
+  });
+
+  it("pendientesServicios: rojo primero; las claves que faltan juntas; renovaciones; IA; por confirmar", () => {
+    const renovaciones = proximasRenovaciones(todos, lecturas, HOY);
+    const r = pendientesServicios({
+      servicios: todos,
+      lecturas,
+      renovaciones,
+      resumen: { sinPrecio: ["Loading"], porConfirmar: ["Resend", "Loading"] },
+      ia: { sinRegistro: 2, modelosSinTarifa: 1 },
+    });
+    expect(r.map((p) => [p.clave, p.gravedad, p.destino])).toEqual([
+      ["consumo:resend:correos_mes", "rojo", { pestana: "servicios", proveedor: "resend" }],
+      ["renovacion:loading:Renovación (dominio o plan):2026-11-01", "rojo", { pestana: "servicios", proveedor: "loading" }],
+      ["error:falta_secreto", "ambar", { pestana: "servicios", proveedor: undefined }],
+      ["error:lectura", "ambar", { pestana: "servicios", proveedor: "vapi" }],
+      ["ia:sin-registro", "ambar", { pestana: "costes" }],
+      ["ia:sin-tarifa", "ambar", { pestana: "costes" }],
+      ["configurar:por-confirmar", "info", { pestana: "configurar" }],
+    ]);
+    const [consumo, renov, claves, lecturaFallida, ia] = r;
+    expect(consumo.titulo).toBe("Resend · Correos este mes");
+    expect(consumo.detalle?.replace(/\u00a0/g, " ")).toBe("98 % del límite (2950 de 3000 correos)");
+    expect(renov.detalle).toBe("Pasó hace 2 días (01/11/2026): apunta la nueva fecha");
+    expect(claves.titulo).toBe("Vercel, GitHub: falta configurar la clave");
+    expect(lecturaFallida.titulo).toBe("Vapi: no se pudieron leer los datos");
+    expect(ia.titulo).toBe("2 funciones de IA no registran su gasto");
+    expect(r.at(-1)).toMatchObject({ titulo: "2 servicios con el plan o el precio por confirmar", accion: "Revisar" });
+    // Lo que no se usa (Perplexity) no pide nada: ni su clave rechazada ni su renovación.
+    expect(r.some((p) => p.titulo.includes("Perplexity"))).toBe(false);
+  });
+
+  it("renovación en 30 días o menos: ámbar; a más de 30, nada; sin lectura automática no se pide clave", () => {
+    const pronto = servicio({ proveedor: "dominio", nombre: "Dominio", renovacion: "2026-11-23" });
+    const lejos = servicio({ proveedor: "lejos", nombre: "Lejos", renovacion: "2026-12-31" });
+    const sinApi = servicio({ proveedor: "sinapi", nombre: "Sin API" });
+    const lect = new Map<string, LecturaServicio>([["sinapi", lectura("sinapi", { error: "falta_secreto" })]]);
+    const r = pendientesServicios({
+      servicios: [pronto, lejos, sinApi],
+      lecturas: lect,
+      renovaciones: proximasRenovaciones([pronto, lejos], lect, HOY),
+      resumen: { sinPrecio: [], porConfirmar: [] },
+      sinLector: new Set(["sinapi"]),
+    });
+    expect(r.map((p) => [p.titulo, p.gravedad, p.detalle])).toEqual([["Dominio · Renovación del plan", "ambar", "Se renueva en 20 días (23/11/2026)"]]);
+    expect(pendientesServicios({ servicios: [], lecturas: new Map(), renovaciones: [], resumen: { sinPrecio: [], porConfirmar: [] } })).toEqual([]);
+  });
+});
+
+describe("alta de servicios", () => {
+  it("proveedorDeNombre: minúsculas sin tildes ni símbolos, válida para la tabla y sin chocar", () => {
+    expect(proveedorDeNombre("Google Analytics", [])).toBe("google_analytics");
+    expect(proveedorDeNombre("  Cámara & Señal (TPV) ", [])).toBe("camara_senal_tpv");
+    expect(proveedorDeNombre("Vercel", ["vercel", "vercel_2"])).toBe("vercel_3");
+    expect(proveedorDeNombre("X", [])).toBe("servicio_x");
+    expect(proveedorDeNombre("¡¡!!", [])).toBe("servicio");
+    const larga = proveedorDeNombre("Un nombre de servicio larguísimo que no cabe en cuarenta letras", []);
+    expect(larga.length).toBeLessThanOrEqual(40);
+    for (const clave of [larga, proveedorDeNombre("Vercel", ["vercel"]), proveedorDeNombre("X", [])]) expect(clave).toMatch(/^[a-z0-9_-]{2,40}$/);
+  });
+
+  it("servicioNuevo: ficha vacía en uso, mensual en euros y que valida solo con el nombre", () => {
+    const nuevo = servicioNuevo(106);
+    expect(nuevo).toMatchObject({ nombre: "", ciclo: "mensual", moneda: "EUR", categoria: "otros", orden: 106, activo: true, limites: {} });
+    expect(servicioNuevo(20000).orden).toBe(10000);
+    const b = borradorDe(nuevo);
+    const vacio = cambiosDeBorrador(b, nuevo);
+    if (!("errores" in vacio)) throw new Error("debería fallar sin nombre");
+    expect(Object.keys(vacio.errores)).toEqual(["nombre"]);
+    const r = cambiosDeBorrador({ ...b, nombre: "n8n" }, nuevo);
+    if (!r.ok) throw new Error("no válido");
+    expect(r.cambios).toMatchObject({ nombre: "n8n", plan: null, precio_mensual: null, precio_anual: null, activo: true, limites: {} });
   });
 });

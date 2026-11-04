@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { email: "dueno@ejemplo.com" } }) }));
-vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ isAdmin: true, permissions: [], loading: false }) }));
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
 // Cada pestaña monta su editor (con consultas a la BD): aquí basta saber qué pestañas hay.
 vi.mock("../PlantillaTipoEditor", () => ({ PlantillaTipoEditor: ({ tipo }: { tipo: string }) => <div>editor {tipo}</div> }));
 

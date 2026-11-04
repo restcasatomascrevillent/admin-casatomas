@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CalendarClock, Pencil, Receipt, Sparkles } from "lucide-react";
+import { CalendarClock, Pencil, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useFijarTopeIa } from "@/hooks/useGastoIa";
 import { evaluarTope, fmtEurIa } from "@/lib/facturas/gastoIa";
-import { esNulo, fmtEur, SIN_DATOS } from "./formato";
+import { esNulo, SIN_DATOS } from "./formato";
 import type { ResumenCostesMes } from "./resumenMes";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
@@ -109,34 +109,22 @@ function EditorTope({ topeEur }: { topeEur: number }) {
 }
 
 /**
- * Una sola fila de cifras: lo que llevamos este mes (fijos + IA real), la IA
- * del mes contra el tope y la previsión a fin de mes.
+ * Cifras de la IA en Servicios › Costes: lo que llevamos este mes (real de
+ * OpenAI + hoy estimado) contra el tope, y la previsión a fin de mes. El coste
+ * de todo lo demás (cuotas y otros usos) está en el desglose por proveedor.
  */
-export function ResumenCostesMesFila({ resumen, topeEur }: { resumen: ResumenCostesMes; topeEur: number }) {
+export function ResumenIaFila({ resumen, topeEur }: { resumen: ResumenCostesMes; topeEur: number }) {
   const tope = evaluarTope(resumen.iaEur, topeEur);
   const barra = tope.nivel === "superado" ? "bg-destructive" : tope.nivel === "aviso" ? "bg-amber-500" : "bg-primary";
-  const aprox = resumen.fijosSinVerificar > 0;
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-      <Kpi
-        testId="kpi-este-mes"
-        titulo="Este mes"
-        icono={Receipt}
-        valor={esNulo(resumen.totalEur) ? SIN_DATOS : `${aprox ? "≥ " : ""}${fmtEur(resumen.totalEur)}`}
-        pie={
-          <>
-            Fijos {fmtEur(resumen.fijosEur)} + IA {fmtEurIa(resumen.iaEur)}
-            {resumen.origenIa === "estimado" && " (estimada)"}
-            {aprox && ` · ${resumen.fijosSinVerificar} fijo${resumen.fijosSinVerificar === 1 ? "" : "s"} sin verificar`}
-          </>
-        }
-      />
-
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <Card data-testid="kpi-ia-mes">
         <CardContent className="p-3 sm:p-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-muted-foreground sm:text-sm">IA este mes</p>
+            <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+              IA este mes{resumen.origenIa === "estimado" && " (estimada)"}
+            </p>
             <EditorTope topeEur={topeEur} />
           </div>
           <p
@@ -170,14 +158,14 @@ export function ResumenCostesMesFila({ resumen, topeEur }: { resumen: ResumenCos
       </Card>
 
       <Kpi
-        testId="kpi-prevision"
-        titulo="Previsión fin de mes"
+        testId="kpi-prevision-ia"
+        titulo="IA a fin de mes (previsión)"
         icono={CalendarClock}
-        valor={esNulo(resumen.previsionEur) ? SIN_DATOS : `${aprox ? "≥ " : "≈ "}${fmtEur(resumen.previsionEur)}`}
+        valor={esNulo(resumen.iaPrevisionEur) ? SIN_DATOS : `≈ ${fmtEurIa(resumen.iaPrevisionEur)}`}
         pie={
           <span className="inline-flex items-center gap-1">
             <Sparkles className="h-3 w-3" aria-hidden />
-            IA al ritmo del mes: {fmtEurIa(resumen.iaPrevisionEur)}
+            Al ritmo de los días que van de mes.
           </span>
         }
       />

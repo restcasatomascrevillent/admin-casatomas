@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { leerDatosVinoDeFoto, type DatosVinoFoto } from "./leerVinoFoto";
+import { esCategoriaOrigenPendiente } from "@/lib/tipos-vino";
 
 /**
  * Lectura de la etiqueta con IA DENTRO del formulario de vino (03-11-2026,
@@ -21,13 +22,19 @@ export const CAMPOS_TEXTO_VINO = [
 ] as const;
 export type CampoTextoVino = (typeof CAMPOS_TEXTO_VINO)[number];
 
-/** Datos de la IA → valores del formulario ("" si la IA no lo sabe). Lo usa también la precarga del lote. */
+/**
+ * Datos de la IA → valores del formulario ("" si la IA no lo sabe). Lo usa
+ * también la precarga del lote. Una categoría «… — ORIGEN PENDIENTE» (la IA la
+ * elige si no saca la denominación) se deja vacía: el formulario pide elegir
+ * la buena y no guarda sin ella (04/11/2026).
+ */
 export function valoresDesdeDatosVino(d: DatosVinoFoto): Record<CampoTextoVino, string> {
   const v = {} as Record<CampoTextoVino, string>;
   for (const campo of CAMPOS_TEXTO_VINO) {
     const x = d[campo];
     v[campo] = typeof x === "string" ? x.trim() : "";
   }
+  if (esCategoriaOrigenPendiente(v.categoria)) v.categoria = "";
   return v;
 }
 
@@ -56,8 +63,6 @@ export interface LecturaHecha {
   datos: DatosVinoFoto;
   /** La foto que se leyó (para comprobar que sigue siendo la del formulario). */
   fuente: File | string;
-  /** Foto encuadrada en 3:4 con el encuadre que dio la IA. */
-  encuadrar: () => Promise<File>;
 }
 
 async function archivoDeUrl(url: string): Promise<File> {
@@ -106,7 +111,7 @@ export function useLecturaEtiquetaVino(
       } else {
         toast.success(`Etiqueta leída: ${campos.length === 1 ? "1 campo rellenado" : `${campos.length} campos rellenados`}. Revísalos antes de guardar.`);
       }
-      ultimo.current.alLeer?.({ datos: r.datos, fuente, encuadrar: r.encuadrar });
+      ultimo.current.alLeer?.({ datos: r.datos, fuente });
     } catch (e) {
       if (mio !== turno.current) return;
       console.error("[extraer-vino-foto] formulario", e);

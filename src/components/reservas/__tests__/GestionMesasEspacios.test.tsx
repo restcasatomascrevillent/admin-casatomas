@@ -33,6 +33,14 @@ vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
 vi.mock("@/hooks/useSuperAdmin");
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+/** Permisos de edición del usuario («reservas», «reservas_configuracion»): los dos, salvo que el test diga otra cosa. */
+const permisos = vi.hoisted(() => ({ edita: new Set(["reservas", "reservas_configuracion"]) }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (seccion: string, tipo: string = "view") => ({
+    canAccess: tipo === "view" || permisos.edita.has(seccion),
+    loading: false,
+  }),
+}));
 
 const navigateMock = vi.fn();
 vi.mock("react-router-dom", async () => {
@@ -192,6 +200,7 @@ describe("GestionMesasEspacios", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mutateAsyncMock.mockResolvedValue({});
+    permisos.edita = new Set(["reservas", "reservas_configuracion"]);
   });
 
   // ── Carga y estructura ─────────────────────────────────────────────────────
@@ -586,6 +595,20 @@ describe("GestionMesasEspacios", () => {
     expect(
       screen.getAllByRole("button", { name: /^Cambiar el número de la mesa/ }).length,
     ).toBeGreaterThan(0);
+  });
+
+  // 04/11/2026: la pestaña Configuración tiene permiso propio. Cambiar el número pide «Puede editar» en
+  // «Reservas · Configuración» y también en «Reservas»: la tabla `mesas` la comparten el plano y el servicio,
+  // y su RLS sigue siendo la de «reservas».
+  it.each([
+    ["solo «Ver» en Configuración", ["reservas"]],
+    ["sin «Puede editar» en Reservas", ["reservas_configuracion"]],
+    ["sin ninguno", []],
+  ])("sin los dos permisos de edición (%s) los números se ven pero no hay lápiz", (_caso, edita) => {
+    permisos.edita = new Set(edita);
+    montar();
+    expect(screen.getAllByText("Salón 1").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /^Cambiar el número de la mesa/ })).not.toBeInTheDocument();
   });
 
   it("no ofrece el botón mientras se resuelve el permiso de super admin", () => {

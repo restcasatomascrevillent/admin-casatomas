@@ -12,6 +12,8 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 const h = vi.hoisted(() => ({
   config: null as Record<string, unknown> | null,
   guardar: vi.fn(),
+  /** «Puede editar» en «Reservas · Configuración» (04/11/2026). */
+  puedeEditar: true,
 }));
 
 vi.mock("@/hooks/useConfiguracionReservas", () => ({
@@ -22,6 +24,12 @@ vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data
 vi.mock("@/hooks/useMesas", () => ({ useMesas: () => ({ data: [] }) }));
 vi.mock("@/components/reservas/GestionMesasEspacios", () => ({ GestionMesasEspacios: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (seccion: string, tipo: string = "view") => ({
+    canAccess: seccion === "reservas_configuracion" && (tipo === "view" || h.puedeEditar),
+    loading: false,
+  }),
+}));
 
 import { ConfiguracionGeneralReservas } from "@/components/reservas/ConfiguracionGeneralReservas";
 
@@ -46,6 +54,7 @@ const CONFIG = {
 };
 
 beforeEach(() => {
+  h.puedeEditar = true;
   h.config = { ...CONFIG };
   h.guardar.mockReset();
   h.guardar.mockImplementation(async (valores: Record<string, unknown>) => valores);
@@ -92,5 +101,29 @@ describe("Configuración · Tiempo de ocupación de mesa", () => {
 
     await new Promise((r) => setTimeout(r, 50));
     expect(h.guardar).not.toHaveBeenCalled();
+  });
+});
+
+// 04/11/2026: la pestaña Configuración tiene permiso propio («Reservas · Configuración»). Con «Ver» se
+// consultan las reglas; guardarlas pide «Puede editar», igual que la RLS de configuracion_reservas.
+describe("Configuración · reglas en solo lectura sin «Puede editar»", () => {
+  it("con solo «Ver»: se ven los valores, los campos están apagados y no hay botón de guardar", () => {
+    h.puedeEditar = false;
+    render(<ConfiguracionGeneralReservas />);
+
+    const comida = within(seccion()).getByLabelText(/Ocupación de mesa · Comida/);
+    expect(comida).toHaveValue(105);
+    expect(comida).toBeDisabled();
+    expect(screen.getByLabelText(/Máximo de días de antelación/)).toBeDisabled();
+    for (const interruptor of screen.getAllByRole("switch")) expect(interruptor).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /guardar/i })).not.toBeInTheDocument();
+  });
+
+  it("con «Puede editar»: campos activos y botón de guardar", () => {
+    render(<ConfiguracionGeneralReservas />);
+
+    expect(within(seccion()).getByLabelText(/Ocupación de mesa · Comida/)).toBeEnabled();
+    expect(screen.getAllByRole("switch").every((s) => !(s as HTMLButtonElement).disabled)).toBe(true);
+    expect(screen.getByRole("button", { name: /guardar/i })).toBeEnabled();
   });
 });

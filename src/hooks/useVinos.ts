@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { toast } from "sonner";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { combinarAlergenos, parseAlergenos } from "@/lib/alergenos";
@@ -11,6 +12,9 @@ import {
   guardarOrdenEnTabla,
   ordenarPorOrden,
 } from "@/lib/orden-carta";
+import { MENSAJE_CATEGORIA_PENDIENTE, mensajeNoPublicarSinOrigen, origenVinoClaro } from "@/lib/origen-vino";
+import { esCategoriaOrigenPendiente } from "@/lib/tipos-vino";
+import { vinoPublicado, type CartasVino } from "@/components/carta/publicacionVino";
 
 export interface Vino {
   id: string;
@@ -22,8 +26,8 @@ export interface Vino {
   denominacion_origen: string | null;
   ubicacion_pais: string | null;
   ubicacion_region: string | null;
-  alergenos_oficiales: any;
-  alergenos_inferidos: any;
+  alergenos_oficiales: unknown;
+  alergenos_inferidos: unknown;
   alergenos_notas: string | null;
   /** Posición dentro de la categoría (1, 2, 3…). Texto en BD hasta la migración
    * 20261101090000_carta_orden_entero; el panel lo trata siempre como número. */
@@ -48,7 +52,7 @@ export interface NuevoVino {
   denominacion_origen?: string;
   ubicacion_pais?: string;
   ubicacion_region?: string;
-  alergenos_oficiales?: any;
+  alergenos_oficiales?: unknown;
   alergenos_notas?: string;
   /** Si no se indica, el vino va al final de su categoría. */
   orden?: number;
@@ -110,6 +114,18 @@ function avisar(mensajeBase: string) {
   notificarGuardadoYPublicacion("vino", mensajeBase);
 }
 
+/**
+ * Aviso de un fallo al guardar: si es la regla del origen (la del panel o la
+ * del trigger de la BD, ambas en castellano), su mensaje tal cual, que dice qué
+ * falta; si no, el genérico.
+ */
+function avisarFallo(error: unknown, generico: string) {
+  const mensaje =
+    error && typeof error === "object" && "message" in error ? String((error as { message: unknown }).message) : "";
+  toast.error(/origen|denominación|el país y la región/i.test(mensaje) ? mensaje : generico);
+  console.error(error);
+}
+
 /** Deriva la ruta del objeto dentro del bucket "vinos" a partir de la
  * imagen_url pública (formato de Supabase Storage: `.../object/public/<bucket>/<ruta>`,
  * posiblemente con `?t=` de cache-busting detrás, ver `EditarVinoModal.tsx`).
@@ -153,6 +169,10 @@ export function useVinos() {
       if (!pais || !region) {
         throw new Error("Indica el país y la región para situar el vino en el mapa");
       }
+      // Origen claro también en la categoría (04/11/2026): nada de «… — ORIGEN PENDIENTE».
+      if (esCategoriaOrigenPendiente(nuevoVino.categoria)) {
+        throw new Error(MENSAJE_CATEGORIA_PENDIENTE);
+      }
       const alergenosArray = normalizarAlergenos(nuevoVino.alergenos_oficiales);
 
       // 1. Traducir primero (columnas ya filtradas a lo que existe en Vinos).
@@ -190,12 +210,16 @@ export function useVinos() {
             alergenos_oficiales: alergenosArray.length > 0 ? alergenosArray : null,
             alergenos_notas: nuevoVino.alergenos_notas || null,
             orden,
-            activado: true,
+            // Publicado en las dos cartas (activado = restaurante OR touza; la
+            // BD lo recalcula, ver guardarCartas).
             restaurante: true,
+            touza: true,
+            activado: true,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             ...(traducciones || {}),
-          } as any,
+            // `orden` es entero en BD; los tipos generados aún dicen texto.
+          } as unknown as TablesInsert<"Vinos">,
         ])
         .select()
         .single();
@@ -212,10 +236,7 @@ export function useVinos() {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
       avisar("Vino añadido");
     },
-    onError: (error) => {
-      toast.error("Error al añadir el vino");
-      console.error(error);
-    },
+    onError: (error) => avisarFallo(error, "Error al añadir el vino"),
   });
 
   const actualizarVino = useMutation({
@@ -302,7 +323,7 @@ export function useVinos() {
 
       const { data, error } = await supabase
         .from("Vinos")
-        .update({ ...cambios, ...(traducciones || {}) } as any)
+        .update({ ...cambios, ...(traducciones || {}) } as unknown as TablesUpdate<"Vinos">)
         .eq("id", id)
         .select()
         .single();
@@ -323,10 +344,7 @@ export function useVinos() {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
       avisar("Vino actualizado");
     },
-    onError: (error) => {
-      toast.error("Error al actualizar el vino");
-      console.error(error);
-    },
+    onError: (error) => avisarFallo(error, "Error al actualizar el vino"),
   });
 
   const eliminarVino = useMutation({
@@ -388,34 +406,11 @@ export function useVinos() {
     },
   });
 
-  const toggleActivado = useMutation({
-    mutationFn: async ({ id, activado }: { id: string; activado: boolean; nombre?: string }) => {
-      const { error } = await supabase
-        .from("Vinos")
-        .update({ activado })
-        .eq("id", id);
-
-      if (error) throw error;
-    },
-    onSuccess: (_data, { activado, nombre }) => {
-      queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      avisar(
-        activado
-          ? `${nombre || "Vino"} vuelve a estar activo`
-          : `${nombre || "Vino"} despublicado: deja de verse en la web`,
-      );
-    },
-    onError: (error) => {
-      toast.error("Error al cambiar el estado");
-      console.error(error);
-    },
-  });
-
   const toggleExpanded = useMutation({
     mutationFn: async ({ id, expanded }: { id: string; expanded: boolean; nombre?: string }) => {
       const { error } = await supabase
         .from("Vinos")
-        .update({ expanded } as any)
+        .update({ expanded })
         .eq("id", id);
 
       if (error) throw error;
@@ -434,42 +429,47 @@ export function useVinos() {
     },
   });
 
-  const toggleRestaurante = useMutation({
-    mutationFn: async ({ id, restaurante }: { id: string; restaurante: boolean }) => {
-      const { error } = await supabase
-        .from("Vinos")
-        .update({ restaurante })
-        .eq("id", id);
+  /**
+   * «Restaurante» y «Touza» son los únicos interruptores de publicación de un
+   * vino (04/11/2026): se guardan los dos como se ven en la tarjeta y
+   * `activado` = restaurante OR touza. La BD lo recalcula igual (trigger de la
+   * migración 20261104100000); se manda también para que el panel funcione
+   * aunque la BD aún no tenga la migración. Para encender una carta hace falta
+   * el origen claro (país, región y denominación; la BD también lo exige).
+   */
+  const guardarCartas = async (id: string, cartas: CartasVino, enciende: boolean) => {
+    const anterior = queryClient.getQueryData<Vino[]>(["vinos"])?.find((v) => v.id === id);
+    if (enciende && anterior && !origenVinoClaro(anterior)) {
+      throw new Error(mensajeNoPublicarSinOrigen(anterior));
+    }
+    const { error } = await supabase
+      .from("Vinos")
+      .update({ ...cartas, activado: vinoPublicado(cartas) })
+      .eq("id", id);
 
-      if (error) throw error;
-    },
-    onSuccess: () => {
+    if (error) throw error;
+  };
+
+  const toggleRestaurante = useMutation({
+    /** `touza`: cómo está la otra carta en la tarjeta (se guarda tal cual). */
+    mutationFn: async ({ id, restaurante, touza }: { id: string; restaurante: boolean; touza: boolean }) =>
+      guardarCartas(id, { restaurante, touza }, restaurante),
+    onSuccess: (_data, { restaurante }) => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      avisar("Visibilidad en Restaurante actualizada");
+      avisar(restaurante ? "Publicado en la carta de Casa Tomás" : "Quitado de la carta de Casa Tomás");
     },
-    onError: (error) => {
-      toast.error("Error al cambiar visibilidad Restaurante");
-      console.error(error);
-    },
+    onError: (error) => avisarFallo(error, "Error al cambiar la carta de Casa Tomás"),
   });
 
   const toggleTouza = useMutation({
-    mutationFn: async ({ id, touza }: { id: string; touza: boolean }) => {
-      const { error } = await supabase
-        .from("Vinos")
-        .update({ touza })
-        .eq("id", id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
+    /** `restaurante`: cómo está la otra carta en la tarjeta (se guarda tal cual). */
+    mutationFn: async ({ id, touza, restaurante }: { id: string; touza: boolean; restaurante: boolean }) =>
+      guardarCartas(id, { restaurante, touza }, touza),
+    onSuccess: (_data, { touza }) => {
       queryClient.invalidateQueries({ queryKey: ["vinos"] });
-      avisar("Visibilidad en Touza actualizada");
+      avisar(touza ? "Publicado en la carta de Touza" : "Quitado de la carta de Touza");
     },
-    onError: (error) => {
-      toast.error("Error al cambiar visibilidad Touza");
-      console.error(error);
-    },
+    onError: (error) => avisarFallo(error, "Error al cambiar la carta de Touza"),
   });
 
   // Alfabéticas: así no cambian de sitio al reordenar.
@@ -498,7 +498,6 @@ export function useVinos() {
     actualizarVino,
     eliminarVino,
     guardarOrden,
-    toggleActivado,
     toggleExpanded,
     toggleRestaurante,
     toggleTouza,

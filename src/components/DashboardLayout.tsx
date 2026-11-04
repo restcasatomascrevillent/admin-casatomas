@@ -6,6 +6,7 @@ import { RouteErrorBoundary } from "@/components/ErrorBoundary";
 import { useIsCompactNav } from "@/hooks/use-mobile";
 import { NavAutoCollapse, defaultSidebarOpen } from "@/components/NavAutoCollapse";
 import { PrecargaRecorte } from "@/components/carta/recorte/PrecargaRecorte";
+import { VersionPanel } from "@/components/panel/VersionPanel";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -62,9 +63,14 @@ export function DashboardLayout({ children, fixedHeight = false }: DashboardLayo
           {isCompactNav && (
             <header className="lg:hidden h-[calc(3.5rem+env(safe-area-inset-top))] border-b border-border bg-card grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 pt-[env(safe-area-inset-top)] sticky top-0 z-40 w-full shrink-0">
               <SidebarTrigger className="shrink-0" />
-              <p className="truncate text-center text-base font-semibold tracking-tight text-foreground" data-testid="cabecera-negocio">
-                Casa Tomás
-              </p>
+              {/* Debajo del nombre, la versión y el entorno (2026-11-03): con el menú
+                  cerrado no se veían. Dos líneas para que quepa a 320 px. */}
+              <div className="flex min-w-0 flex-col items-center gap-0.5">
+                <p className="max-w-full truncate text-center text-base font-semibold leading-tight tracking-tight text-foreground" data-testid="cabecera-negocio">
+                  Casa Tomás
+                </p>
+                <VersionPanel className="px-1.5 py-0.5 text-[10px] pointer-coarse:text-[10px]" />
+              </div>
               <CentroNotificaciones className="shrink-0" />
             </header>
           )}

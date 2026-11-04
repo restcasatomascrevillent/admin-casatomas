@@ -7,6 +7,7 @@ import {
   estaPorAtender,
   filtrarFilasUnificadas,
   resolverDeepLinkReservas,
+  resolverSubpestanaConfiguracion,
   unificarReservasYSolicitudes,
   type ReservaListable,
 } from "@/lib/reservas/vistaUnificada";
@@ -200,5 +201,19 @@ describe("resolverDeepLinkReservas", () => {
     expect(resolverDeepLinkReservas({ tab: "asignacion" }).tab).toBe("asignacion");
     expect(resolverDeepLinkReservas({ tab: "inventada" }).tab).toBe("reservas");
     expect(resolverDeepLinkReservas({}).tab).toBe("reservas");
+  });
+});
+
+describe("resolverSubpestanaConfiguracion", () => {
+  it("?sub=plantillas abre «Plantillas email» (destino de /super-admin/plantillas-email)", () => {
+    expect(resolverSubpestanaConfiguracion("plantillas")).toBe("plantillas");
+    expect(resolverSubpestanaConfiguracion("general")).toBe("general");
+  });
+
+  it("sin ?sub o con uno desconocido, «General»", () => {
+    expect(resolverSubpestanaConfiguracion(null)).toBe("general");
+    expect(resolverSubpestanaConfiguracion(undefined)).toBe("general");
+    expect(resolverSubpestanaConfiguracion("")).toBe("general");
+    expect(resolverSubpestanaConfiguracion("plantillas-email")).toBe("general");
   });
 });

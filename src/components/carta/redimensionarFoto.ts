@@ -7,6 +7,7 @@
  * mismos tokens) y la IA no lee nada. Por eso aquí se comprueba que la imagen
  * resultante no está vacía y, si lo está, se reintenta con otro decodificador.
  */
+import { bitmapReducido } from "./medidasFoto";
 
 /** Lado mayor de la foto enviada. ~1400px cabe en el máximo de gpt-4.1-mini y deja leer letra pequeña. */
 export const LADO_MAX = 1400;
@@ -42,8 +43,9 @@ interface Fuente {
 }
 
 async function conBitmap(file: Blob): Promise<Fuente> {
-  // from-image: respeta la orientación EXIF (foto vertical del móvil).
-  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  // Ya reducida al decodificar (fotos de 12-48 Mpx: memoria y límite de lienzo
+  // de iOS) y respetando la orientación EXIF (foto vertical del móvil).
+  const bmp = await bitmapReducido(file, LADO_MAX);
   return { imagen: bmp, ancho: bmp.width, alto: bmp.height, liberar: () => bmp.close() };
 }
 
