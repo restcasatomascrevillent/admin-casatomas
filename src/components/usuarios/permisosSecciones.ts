@@ -36,10 +36,14 @@ const SECCIONES_MAQUETA: ReadonlySet<string> = new Set(["tienda"]);
  * rol admin, no por permisos (ProtectedRoute / AppSidebar). Las maquetas, solo
  * fuera de producción (el entorno no cambia en un mismo build).
  */
-export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
-  (seccion): seccion is SeccionConfigurable =>
-    seccion.key !== "usuarios" && (!SECCIONES_MAQUETA.has(seccion.key) || maquetasVisibles()),
-);
+export const seccionesConfigurables = (conMaquetas: boolean): SeccionConfigurable[] =>
+  SECTIONS.filter(
+    (seccion): seccion is SeccionConfigurable =>
+      seccion.key !== "usuarios" && (!SECCIONES_MAQUETA.has(seccion.key) || conMaquetas),
+  );
+
+/** Las de este build (pura arriba, para probar producción sin simular módulos). */
+export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = seccionesConfigurables(maquetasVisibles());
 
 /**
  * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,

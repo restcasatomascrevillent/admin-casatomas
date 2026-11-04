@@ -11,5 +11,9 @@ import { VERSION_APP, type VersionApp } from "@/lib/version";
  */
 export const maquetaVisibleEn = (entorno: VersionApp["entorno"]): boolean => entorno !== "produccion";
 
-/** ¿Se ven las maquetas en este panel? Se lee al usarla (los tests cambian el entorno). */
-export const maquetasVisibles = (): boolean => maquetaVisibleEn(VERSION_APP.entorno);
+/**
+ * ¿Se ven las maquetas en este panel? Por defecto, con el entorno de este build (se lee al
+ * usarla). `version` solo para probar otro entorno sin simular módulos.
+ */
+export const maquetasVisibles = (version: Pick<VersionApp, "entorno"> = VERSION_APP): boolean =>
+  maquetaVisibleEn(version.entorno);
