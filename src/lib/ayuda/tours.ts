@@ -273,7 +273,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: GW_CARTA,
       titulo: "Buscar y filtrar",
       texto:
-        "Busca por nombre o descripción, elige una categoría o filtra por lo que se ve u oculta en cada web.",
+        "Busca por nombre o descripción, elige una categoría (en Vinos, el tipo y la denominación, como en la carta de la web) o filtra por lo que se ve u oculta en cada web.",
       opcional: true,
       lado: "bottom",
     },
