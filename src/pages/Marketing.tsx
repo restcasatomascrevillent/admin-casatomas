@@ -6,8 +6,9 @@ import { CreadorNewsletter } from "@/components/marketing/CreadorNewsletter";
 import { GestionCorreos } from "@/components/marketing/GestionCorreos";
 import { EstadisticasNewsletter } from "@/components/marketing/EstadisticasNewsletter";
 import { HistorialEnvios } from "@/components/marketing/HistorialEnvios";
+import { EditorInstagram } from "@/components/marketing/instagram/EditorInstagram";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { Send, Users, BarChart3 } from "lucide-react";
+import { Send, Users, BarChart3, Instagram } from "lucide-react";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
@@ -22,6 +23,8 @@ const ALTURA_MINIMA_NEWSLETTER = 360;
  * contenedor de las pestañas inactivas con el atributo `hidden`, y un `lg:flex` le gana a ese
  * atributo — la pestaña oculta seguiría ocupando la mitad del alto.
  */
+const PESTANAS = ["crear", "suscriptores", "estadisticas", "instagram"] as const;
+
 const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 export default function Marketing() {
@@ -34,18 +37,25 @@ export default function Marketing() {
   // layout de siempre, con scroll de página.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_NEWSLETTER);
+  // `?tab=instagram` abre directamente esa pestaña (enlaces y capturas). Se lee
+  // una vez de la URL, sin depender del router (los tests pintan la página suelta).
+  const [pestana, setPestana] = useState(() => {
+    const pedida = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+    return PESTANAS.includes(pedida as (typeof PESTANAS)[number]) ? (pedida as string) : "crear";
+  });
 
   return (
     <DashboardLayout>
       {/* Sin título de página (2026-09-25): la pestaña "Newsletter" activa
           en el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
-        <Tabs defaultValue="crear" className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
+        <Tabs value={pestana} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
             pestanas={[
-              { valor: "crear", etiqueta: "Enviar Newsletter", icono: <Send /> },
+              { valor: "crear", etiqueta: "Enviar Newsletter", etiquetaCorta: "Enviar", icono: <Send /> },
               { valor: "suscriptores", etiqueta: "Suscriptores", icono: <Users /> },
               { valor: "estadisticas", etiqueta: "Estadísticas", icono: <BarChart3 /> },
+              { valor: "instagram", etiqueta: "Instagram", icono: <Instagram /> },
             ]}
           />
 
@@ -64,6 +74,12 @@ export default function Marketing() {
               pestaña y el historial va junto a la gráfica (EstadisticasNewsletter). */}
           <TabsContent value="estadisticas" className={CONTENIDO_PESTANA}>
             <EstadisticasNewsletter historial={<HistorialEnvios />} />
+          </TabsContent>
+
+          {/* Instagram (04/11/2026): formulario, vista previa y publicar en tres columnas
+              desde `lg`, cada una con su scroll (EditorInstagram); apiladas por debajo. */}
+          <TabsContent value="instagram" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`}>
+            <EditorInstagram />
           </TabsContent>
         </Tabs>
       </div>
