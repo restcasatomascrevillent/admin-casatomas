@@ -7,7 +7,9 @@ import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-
 import type { MensajeChat } from "@/hooks/useChatFacturas";
 import type { ResultadoRapido } from "@/hooks/usePreguntasRapidas";
 import { GraficoSeriePrecio } from "./GraficoSeriePrecio";
-import { esSerieSinDatos } from "@/lib/facturas/seriePrecio";
+import { esSerieSinDatos, type DocumentoCitado } from "@/lib/facturas/seriePrecio";
+import { BotonOriginal } from "./shared/BotonOriginal";
+import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
 
 export interface Sugerencia {
   icon: React.ElementType;
@@ -38,6 +40,37 @@ interface ChatAreaProps {
   renderResultadoRapido?: (r: ResultadoRapido) => ReactNode;
   /** Botón «Al instante» de preguntas rápidas, encima de la caja de texto. */
   barraRapida?: ReactNode;
+}
+
+/** Tablas y textos largos de la respuesta: que no ensanchen la página en móvil. */
+const CLASES_PROSA =
+  "break-words [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto [&_ul]:my-1 [&_ol]:my-1";
+
+/** Referencias de la respuesta: proveedor · nº · fecha y enlace a la foto del original. */
+function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
+  return (
+    <details className="group rounded-lg border border-border/60 text-sm" open={documentos.length <= 4}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+        <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Documentos citados ({documentos.length})
+      </summary>
+      <ul className="divide-y divide-border/40 px-3 pb-1">
+        {documentos.map((d) => (
+          <li key={d.id} className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 py-1.5 text-xs leading-snug">
+              <span className="font-medium">
+                {d.tipo === "albaran" ? "Albarán" : "Factura"} {d.numero ?? "sin número"}
+              </span>
+              <span className="block truncate text-muted-foreground" title={d.proveedor ?? undefined}>
+                {[d.proveedor, d.fecha ? formatFechaEs(d.fecha) : null].filter(Boolean).join(" · ")}
+              </span>
+            </p>
+            <BotonOriginal driveUrl={d.drive_url} archivoPath={d.archivo_path} variant="desktop" />
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function TypingDots() {
@@ -157,7 +190,7 @@ export function ChatArea({
             <div>
               <p className="text-base font-semibold text-foreground">¿En qué puedo ayudarte?</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                Pregunta sobre tus facturas, albaranes o proveedores
+                Facturas, albaranes y proveedores
               </p>
             </div>
           </div>
@@ -206,9 +239,10 @@ export function ChatArea({
               const isUser = msg.rol === "user";
               const isLastAssistant = !isUser && index === lastAssistantIndex;
               // Gráficas de la respuesta; las «sin datos» ya las explica el texto.
-              const graficas = (msg.adjuntos ?? []).filter(
-                (a) => a.tipo === "serie_precio" && !esSerieSinDatos(a.datos),
+              const graficas = (msg.adjuntos ?? []).flatMap((a) =>
+                a.tipo === "serie_precio" && !esSerieSinDatos(a.datos) ? [a] : [],
               );
+              const documentos = (msg.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
               const hora = new Date(msg.created_at).toLocaleTimeString("es-ES", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -217,7 +251,7 @@ export function ChatArea({
               // Se avisa aquí para que no parezca que el hilo quedó grabado.
               const sinGuardar = msg.persistido === false && (
                 <span className="mr-1.5 font-medium text-destructive">
-                  sin guardar (no se pudo guardar en el historial: se perderá al recargar) ·
+                  Sin guardar: se perderá al recargar ·
                 </span>
               );
 
@@ -227,7 +261,7 @@ export function ChatArea({
                   {isUser ? (
                     <div className="flex animate-in fade-in slide-in-from-bottom-2 flex-col items-end gap-0.5 duration-300">
                       <div className="max-w-[85%] rounded-2xl rounded-br-md bg-[hsl(38,59%,45%)] px-3.5 py-2 text-white sm:max-w-[75%]">
-                        <div className="prose prose-sm prose-invert max-w-none prose-p:my-0">
+                        <div className="prose prose-sm prose-invert max-w-none break-words prose-p:my-0">
                           <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>{msg.contenido}</ReactMarkdown>
                         </div>
                       </div>
@@ -243,9 +277,11 @@ export function ChatArea({
                         graficas.length === 0 && "max-w-[44rem]",
                       )}
                     >
-                      <div className="prose prose-sm max-w-none text-foreground dark:prose-invert">
+                      <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert")}>
                         <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>{msg.contenido}</ReactMarkdown>
                       </div>
+
+                      {documentos.length > 0 && <DocumentosCitados documentos={documentos} />}
 
                       {/* Gráficas adjuntas (evolución de precio) */}
                       {graficas.map((a, i) => (
@@ -315,15 +351,20 @@ interface InputBarProps {
 function InputBar({ input, setInput, isSending, onSend, onKeyDown }: InputBarProps) {
   const hayTexto = input.trim().length > 0;
   return (
-    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-3 pt-1 sm:px-4">
+    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1 sm:px-4">
       {/* Una sola caja redondeada; el botón de enviar va dentro, a la derecha. */}
       <div className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-[hsl(38,59%,45%)]" data-tour="facturas-ia-pregunta">
         <Textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Escribe tu pregunta…"
+          placeholder="Pregunta…"
           enterKeyHint="send"
+          onFocus={(e) => {
+            // Móvil: al salir el teclado, que la caja siga a la vista.
+            const el = e.currentTarget;
+            setTimeout(() => el.scrollIntoView?.({ block: "nearest", behavior: "smooth" }), 300);
+          }}
           aria-label="Pregunta para el asistente"
           disabled={isSending}
           className="max-h-40 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base"

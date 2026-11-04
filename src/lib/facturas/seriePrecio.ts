@@ -26,9 +26,37 @@ export interface SerieSinDatos {
 
 export type DatosSeriePrecio = SeriePrecio | SerieSinDatos;
 
-export interface AdjuntoChat {
-  tipo: "serie_precio";
-  datos: DatosSeriePrecio;
+export interface DocumentoCitado {
+  id: number;
+  tipo: string | null;
+  numero: string | null;
+  proveedor: string | null;
+  fecha: string | null;
+  drive_url: string | null;
+  archivo_path: string | null;
+}
+
+export type AdjuntoChat =
+  | { tipo: "serie_precio"; datos: DatosSeriePrecio }
+  | { tipo: "documentos"; datos: DocumentoCitado[] };
+
+const textoOnulo = (v: unknown): string | null => (typeof v === "string" && v ? v : null);
+
+/** Valida la lista de documentos citados (de la respuesta o de la BD). */
+export function normalizarDocumentos(entrada: unknown): DocumentoCitado[] {
+  if (!Array.isArray(entrada)) return [];
+  const salida: DocumentoCitado[] = [];
+  for (const d of entrada) {
+    if (!d || typeof d !== "object") continue;
+    const r = d as Record<string, unknown>;
+    if (typeof r.id !== "number" || !Number.isFinite(r.id)) continue;
+    const doc = {
+      id: r.id, tipo: textoOnulo(r.tipo), numero: textoOnulo(r.numero), proveedor: textoOnulo(r.proveedor),
+      fecha: textoOnulo(r.fecha), drive_url: textoOnulo(r.drive_url), archivo_path: textoOnulo(r.archivo_path),
+    };
+    salida.push(doc);
+  }
+  return salida;
 }
 
 export const esSerieSinDatos = (d: DatosSeriePrecio): d is SerieSinDatos =>
@@ -80,6 +108,11 @@ export function normalizarAdjuntos(entrada: unknown): AdjuntoChat[] {
   for (const a of entrada) {
     if (!a || typeof a !== "object") continue;
     const { tipo, datos } = a as { tipo?: unknown; datos?: unknown };
+    if (tipo === "documentos") {
+      const docs = normalizarDocumentos(datos);
+      if (docs.length > 0) salida.push({ tipo: "documentos", datos: docs });
+      continue;
+    }
     if (tipo !== "serie_precio") continue;
     const serie = normalizarSerie(datos);
     if (serie) salida.push({ tipo: "serie_precio", datos: serie });

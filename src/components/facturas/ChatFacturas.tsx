@@ -76,7 +76,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                  className="gap-1.5 text-sm text-muted-foreground hover:text-foreground pointer-coarse:min-h-11"
                   data-tour="facturas-ia-historial"
                 >
                   <History className="h-4 w-4" />
@@ -88,9 +88,9 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-0">
+              <SheetContent side="left" className="w-[85vw] max-w-72 p-0">
                 <SheetHeader className="px-4 py-3 border-b border-border/50">
-                  <SheetTitle className="text-sm">Historial de conversaciones</SheetTitle>
+                  <SheetTitle className="text-sm">Historial</SheetTitle>
                 </SheetHeader>
                 <ConversacionesList
                   conversaciones={conversaciones}
