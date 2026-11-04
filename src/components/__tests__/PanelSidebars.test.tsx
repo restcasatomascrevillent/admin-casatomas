@@ -148,8 +148,10 @@ describe("menú del Super Admin", () => {
     expect(screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"))).toEqual([
       "Control del Panel", "Usuarios", "Auditoría",
       "Gestor Gasto", "Costes", "Servicios",
-      "Tráfico web", "Reseñas Google", "Plantillas Email",
+      "Tráfico web", "Reseñas Google",
     ]);
+    // «Plantillas Email» se fue a Reservas › Configuración (04/11/2026).
+    expect(screen.queryByRole("link", { name: /Plantillas/i })).not.toBeInTheDocument();
     for (const grupo of ["Administración", "Costes", "Web y clientes"]) {
       expect(screen.getByRole("list", { name: grupo })).toBeInTheDocument();
     }
@@ -158,7 +160,7 @@ describe("menú del Super Admin", () => {
     expect(boton).toHaveAccessibleName("Más módulos");
     expect(boton).toHaveAttribute("aria-expanded", "false");
     // Después de todos los enlaces de arriba.
-    const ultimo = screen.getByRole("link", { name: "Plantillas Email" });
+    const ultimo = screen.getByRole("link", { name: "Reseñas Google" });
     expect(ultimo.compareDocumentPosition(boton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 

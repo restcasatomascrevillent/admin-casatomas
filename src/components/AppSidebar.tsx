@@ -70,9 +70,10 @@ const menuItems: {
   },
   // Sección "Personal" retirada el 2026-09-23 (decisión del dueño). Ver
   // docs/funcionalidades/10-retirada-seccion-personal.md.
-  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
-  // Email, Tráfico web y Espacios se gestionan exclusivamente desde el
-  // Super Admin y ya no forman parte del Admin Panel normal (ver /super-admin).
+  // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
+  // Espacios se gestionan exclusivamente desde el Super Admin y ya no forman
+  // parte del Admin Panel normal (ver /super-admin). Plantillas Email está en
+  // Reservas › Configuración desde el 04/11/2026.
   {
     title: "Gestor Web",
     url: "/gestion-web",

@@ -19,7 +19,6 @@ import { maquetasVisibles } from "@/lib/maqueta";
 import Auth from "./pages/Auth";
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Reservas = lazy(() => import("./pages/Reservas"));
-const PlantillasEmail = lazy(() => import("./pages/PlantillasEmail"));
 const Espacios = lazy(() => import("./pages/Espacios"));
 const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 // Gestor Web unifica Carta, Novedades, Menús y Tapas en pestañas (?tab=...).
@@ -84,9 +83,10 @@ const pagina = (contenido: ReactNode, requiredSection?: SectionKey | SectionKey[
   </RouteErrorBoundary>
 );
 
-// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email,
-// Tráfico web, Espacios y Bot Web viven exclusivamente bajo /super-admin/*
-// (ver botón de engranaje en AppSidebar).
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web,
+// Espacios y Bot Web viven exclusivamente bajo /super-admin/* (ver botón de
+// engranaje en AppSidebar). Plantillas Email salió de aquí el 04/11/2026: es
+// una subpestaña de Reservas › Configuración.
 const paginaSuperAdmin = (contenido: ReactNode) => (
   <RouteErrorBoundary>
     <SuperAdminRoute>{bajoDemanda(contenido)}</SuperAdminRoute>
@@ -145,7 +145,9 @@ const App = () => (
                   <Route path="/super-admin/gestor-gasto" element={paginaSuperAdmin(<GestorGasto />)} />
                   <Route path="/super-admin/costes" element={paginaSuperAdmin(<Costes />)} />
                   <Route path="/super-admin/resenas" element={paginaSuperAdmin(<GestionResenas />)} />
-                  <Route path="/super-admin/plantillas-email" element={paginaSuperAdmin(<PlantillasEmail />)} />
+                  {/* Plantillas Email vive en Reservas › Configuración desde el 04/11/2026 (petición del dueño).
+                      La ruta vieja se conserva para que marcadores y enlaces antiguos lleven allí. */}
+                  <Route path="/super-admin/plantillas-email" element={<Navigate to="/reservas?tab=configuracion&sub=plantillas" replace />} />
                   <Route path="/super-admin/trafico-web" element={paginaSuperAdmin(<TraficoWeb />)} />
                   <Route path="/super-admin/espacios" element={paginaSuperAdmin(<Espacios />)} />
                   <Route path="/super-admin/bot-web" element={paginaSuperAdmin(<SuperAdminBotWeb />)} />

@@ -267,3 +267,21 @@ export function resolverDeepLinkReservas(params: {
         : { tab: "reservas", status, date };
   }
 }
+
+// ----------------------------------------------------------------------------
+// Subpestañas de «Configuración»: /reservas?tab=configuracion&sub=plantillas
+// ----------------------------------------------------------------------------
+// «General» es lo de siempre (reglas, mesas y turnos); «Plantillas email» son
+// los correos de reserva, que hasta el 04/11/2026 vivían en el Super Admin
+// (/super-admin/plantillas-email, que ahora redirige aquí). Como las pestañas
+// de arriba, la URL solo se lee al llegar por un enlace: al cambiar de chip
+// a mano se limpia.
+export const SUBPESTANAS_CONFIGURACION = ["general", "plantillas"] as const;
+export type SubpestanaConfiguracion = (typeof SUBPESTANAS_CONFIGURACION)[number];
+
+/** `?sub=` → subpestaña de Configuración; sin ella, o desconocida, «General». */
+export function resolverSubpestanaConfiguracion(sub?: string | null): SubpestanaConfiguracion {
+  return (SUBPESTANAS_CONFIGURACION as readonly string[]).includes(sub ?? "")
+    ? (sub as SubpestanaConfiguracion)
+    : "general";
+}

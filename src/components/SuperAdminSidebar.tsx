@@ -5,7 +5,6 @@ import {
   Coins,
   Star,
   Phone,
-  Mail,
   Activity,
   MapPin,
   Bot,
@@ -66,7 +65,7 @@ const gruposMenuSuperAdmin: { etiqueta: string; items: ItemMenu[] }[] = [
     items: [
       { title: "Tráfico web", url: "/super-admin/trafico-web", icon: Activity },
       { title: "Reseñas Google", url: "/super-admin/resenas", icon: Star },
-      { title: "Plantillas Email", url: "/super-admin/plantillas-email", icon: Mail },
+      // «Plantillas Email» se fue a Reservas › Configuración (04/11/2026, petición del dueño).
     ],
   },
 ];

@@ -12,10 +12,10 @@ const conocido = (motivo, activo = true) => { if (activo && !process.env.E2E_SIN
 const URL_SUPABASE = process.env.E2E_SUPABASE_URL ?? "https://e2e-falso.supabase.co";
 
 const RUTAS = [
-  "/dashboard", "/reservas", "/reservas?tab=reservas", "/reservas?tab=calendario", "/reservas?tab=asignacion", "/reservas?tab=blacklist", "/reservas?tab=configuracion",
+  "/dashboard", "/reservas", "/reservas?tab=reservas", "/reservas?tab=calendario", "/reservas?tab=asignacion", "/reservas?tab=blacklist", "/reservas?tab=configuracion", "/reservas?tab=configuracion&sub=plantillas",
   "/gestion-web", "/gestion-web?tab=novedades", "/gestion-web?tab=menus", "/gestion-web?tab=tapas", "/marketing", "/cheques", "/facturas", "/facturas?tab=cargar", "/usuarios", "/ayuda",
   "/super-admin", "/super-admin/ecommerce", "/super-admin/asistente-telefonico", "/super-admin/gestor-gasto", "/super-admin/costes", "/super-admin/resenas",
-  "/super-admin/plantillas-email", "/super-admin/trafico-web", "/super-admin/espacios", "/super-admin/bot-web", "/super-admin/usuarios", "/super-admin/auditoria",
+  "/super-admin/trafico-web", "/super-admin/espacios", "/super-admin/bot-web", "/super-admin/usuarios", "/super-admin/auditoria",
   "/super-admin/servicios",
 ];
 

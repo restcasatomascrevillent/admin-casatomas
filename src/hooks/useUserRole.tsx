@@ -35,9 +35,10 @@ export const SECTIONS = [
   { key: "facturas", label: "Facturas" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
-// Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas
-// Email, Tráfico web, Espacios y Bot Web se gestionan exclusivamente desde el
-// Super Admin y ya no forman parte del Admin Panel normal.
+// Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web,
+// Espacios y Bot Web se gestionan exclusivamente desde el Super Admin y ya no
+// forman parte del Admin Panel normal. Plantillas Email volvió al panel el
+// 04/11/2026, dentro de Reservas › Configuración (sección «reservas»).
 
 export type SectionKey = typeof SECTIONS[number]["key"];
 

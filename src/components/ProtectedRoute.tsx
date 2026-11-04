@@ -25,9 +25,10 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/facturas": "facturas",
   "/usuarios": "usuarios",
 };
-// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Plantillas Email,
-// Tráfico web y Espacios ya no tienen ruta aquí: viven bajo /super-admin/*
-// protegidas por SuperAdminRoute.
+// Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
+// Espacios ya no tienen ruta aquí: viven bajo /super-admin/* protegidas por
+// SuperAdminRoute. Plantillas Email es desde el 04/11/2026 una subpestaña de
+// Reservas › Configuración (sección «reservas»).
 
 // Destino al rechazar: la primera sección que el usuario sí puede ver, en el
 // orden del menú. Antes se mandaba siempre a /dashboard, y quien no tenía
