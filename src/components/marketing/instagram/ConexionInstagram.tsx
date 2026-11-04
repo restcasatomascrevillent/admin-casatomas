@@ -2,12 +2,15 @@ import { useState, type ReactNode } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { comprobarConexion, ErrorInstagram, textoError, type Cuota, type RespuestaEstado } from "./api";
+import { comprobarConexion, ErrorInstagram, textoError, type Cuota, type EstadoDrive, type RespuestaEstado } from "./api";
 
 /**
  * «Conexión con Instagram»: llama a la Edge Function instagram-estado y enseña ✔/✖/⚠ por
- * variable, la cuenta y el cupo, con «Cómo arreglarlo». La función nunca
- * devuelve valores secretos: aquí solo se pintan nombre, estado y detalle.
+ * variable, la cuenta y el cupo, con «Cómo arreglarlo». Debajo, Google Drive
+ * (donde se archivan las fotos y las piezas publicadas): secretos, permiso
+ * (alcance) del token y si la carpeta «marketing» se ve y se puede escribir.
+ * La función nunca devuelve valores secretos: aquí solo se pintan nombre,
+ * estado y detalle.
  */
 export function iconoEstado(estado: string) {
   if (estado === "ok") return { Icono: CheckCircle2, clase: "text-emerald-600", texto: "Correcto" };
@@ -33,6 +36,49 @@ function Linea({ estado, children }: { estado: string; children: ReactNode }) {
       <Icono className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", clase)} aria-label={texto} role="img" />
       <span className="min-w-0">{children}</span>
     </li>
+  );
+}
+
+/** Bloque «Google Drive» del resultado de Comprobar. */
+export function BloqueDrive({ drive }: { drive: EstadoDrive | null }) {
+  if (!drive) {
+    return (
+      <p className="text-muted-foreground" data-testid="drive-conexion">
+        Google Drive: la función desplegada aún no lo comprueba (despliega instagram-estado de nuevo).
+      </p>
+    );
+  }
+  const pasos = [...new Set(drive.comprobaciones.filter((c) => c.estado !== "ok" && c.comoArreglarlo).map((c) => c.comoArreglarlo as string))];
+  return (
+    <div className="space-y-1 border-t pt-2" data-testid="drive-conexion">
+      <p className={cn("font-medium", drive.ok ? "text-emerald-700" : "text-destructive")}>
+        {drive.ok
+          ? `Google Drive listo${drive.carpeta ? `: carpeta «${drive.carpeta.nombre}»` : ""}.`
+          : "Google Drive no está listo: las fotos y las piezas publicadas no se pueden archivar."}
+      </p>
+      <ul className="space-y-1">
+        {drive.comprobaciones.map((c) => (
+          <Linea key={c.nombre} estado={c.estado}>
+            <span className="break-words">Drive · {c.nombre}</span>
+            {c.detalle && <span className="text-muted-foreground"> · {c.detalle}</span>}
+          </Linea>
+        ))}
+      </ul>
+      {drive.avisos.map((a) => (
+        <p key={a} className="flex items-start gap-1.5 text-amber-700">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {a}
+        </p>
+      ))}
+      {pasos.length > 0 && (
+        <div>
+          <p className="font-medium">Cómo arreglar Drive</p>
+          <ol className="list-decimal space-y-0.5 pl-5 text-muted-foreground">
+            {pasos.map((p) => <li key={p}>{p}</li>)}
+          </ol>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -138,6 +184,7 @@ export function ConexionInstagram({ onEstado, className }: Props) {
                 </ol>
               </div>
             )}
+            <BloqueDrive drive={estado.drive} />
           </>
         )}
       </div>

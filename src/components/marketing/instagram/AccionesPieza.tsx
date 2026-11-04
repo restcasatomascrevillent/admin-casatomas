@@ -24,6 +24,7 @@ import {
   publicar,
   textoError,
   type Cuota,
+  type FotoPreparada,
 } from "./api";
 import { MAX_CAPTION, MAX_HASHTAGS, MAX_MENCIONES, resumenCaption } from "./contadores";
 import { textoCuota } from "./ConexionInstagram";
@@ -80,6 +81,12 @@ interface Props {
   onCuenta: (c: string | null) => void;
   /** Tras guardar algo en el servidor (para refrescar el historial). */
   onCambioServidor?: () => void;
+  /** Foto de Drive ya copiada al bucket (la necesita el render). */
+  fotoPreparada?: FotoPreparada | null;
+  /** Copia tmp/ de esa foto: la función la borra al publicar de verdad. */
+  fotoTmp?: string | null;
+  /** Tras una publicación real. */
+  onPublicada?: () => void;
 }
 
 type Accion = "generar" | "probar" | "publicar" | null;
@@ -114,6 +121,9 @@ export function AccionesPieza({
   cuenta,
   onCuenta,
   onCambioServidor,
+  fotoPreparada,
+  fotoTmp,
+  onPublicada,
 }: Props) {
   const [accion, setAccion] = useState<Accion>(null);
   const [error, setError] = useState<ErrorVisible | null>(null);
@@ -144,7 +154,7 @@ export function AccionesPieza({
     setError(null);
     try {
       // Una pieza ya publicada no se toca: lo editado se guarda como pieza nueva.
-      const r = await generarImagen(pieza, publicada ? null : servidor.id);
+      const r = await generarImagen(pieza, publicada ? null : servidor.id, undefined, fotoPreparada);
       onServidor({ ...SERVIDOR_VACIO, id: r.id, estado: "generada", urlJpeg: r.urlJpeg, firma, avisos: r.avisos ?? [] });
       toast.success("Imagen generada y guardada");
       onCambioServidor?.();
@@ -160,7 +170,7 @@ export function AccionesPieza({
     setAccion(dryRun ? "probar" : "publicar");
     setError(null);
     try {
-      const r = await publicar({ id: servidor.id, caption: captionEnvio, dryRun, contenedorId });
+      const r = await publicar({ id: servidor.id, caption: captionEnvio, dryRun, contenedorId, fotoTmp: dryRun ? null : fotoTmp });
       onServidor((s) => ({
         ...s,
         estado: r.estado === "en_proceso" ? s.estado : (r.estado as ServidorPieza["estado"]),
@@ -175,7 +185,10 @@ export function AccionesPieza({
       }));
       if (r.estado === "en_proceso") toast.info("Instagram aún está procesando la imagen", { description: "Pulsa «Reintentar» en unos segundos." });
       else if (r.estado === "prueba_ok") toast.success("Prueba correcta: no se ha publicado nada");
-      else if (r.estado === "publicada") toast.success("Publicada en Instagram");
+      else if (r.estado === "publicada") {
+        toast.success("Publicada en Instagram");
+        onPublicada?.();
+      }
       onCambioServidor?.();
     } catch (e) {
       fallo(e, dryRun ? "La prueba ha fallado" : "No se pudo publicar");

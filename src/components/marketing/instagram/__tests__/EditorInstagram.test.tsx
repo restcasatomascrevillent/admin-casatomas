@@ -30,9 +30,10 @@ vi.mock("../VistaPreviaPieza", () => ({
 }));
 
 import { EditorInstagram } from "../EditorInstagram";
+import { ConexionInstagram } from "../ConexionInstagram";
 import { FormularioPieza } from "../FormularioPieza";
 import { borradorVacio } from "../pieza";
-import { MENSAJE_SIN_SERVIDOR, URL_ESTADO, URL_PUBLICAR, normalizarEstado } from "../api";
+import { MENSAJE_SIN_SERVIDOR, URL_DRIVE, URL_ESTADO, URL_PUBLICAR, normalizarEstado } from "../api";
 import { obtenerPlantilla } from "@/lib/instagram";
 
 function pintar(nodo: ReactNode) {
@@ -40,13 +41,47 @@ function pintar(nodo: ReactNode) {
   return render(<QueryClientProvider client={qc}>{nodo}</QueryClientProvider>);
 }
 
+// Cada recorrido espera a Drive simulado (listar, miniaturas, preparar): margen para máquinas lentas.
+vi.setConfig({ testTimeout: 20_000 });
+
 const respuestaJson = (cuerpo: unknown, estado = 200) =>
   new Response(JSON.stringify(cuerpo), { status: estado, headers: { "content-type": "application/json" } });
 
 const ID = "44444444-4444-4444-8444-444444444444";
+/** Biblioteca de Drive simulada (instagram-drive): una foto que vale y una apaisada. */
+const APTA = "1FotoSalonDrive000000001";
+const APAISADA = "1FotoCarneDrive000000002";
+const TMP = "tmp/0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.jpg";
+const URL_TMP = `http://127.0.0.1:54321/storage/v1/object/public/instagram/${TMP}`;
+const FOTOS_DRIVE = [
+  { driveId: APTA, nombre: "salon.jpg", ancho: 1050, alto: 1400, tipo: "sala", descripcion: "Salón", filaId: "f1", creada: null, problema: null },
+  { driveId: APAISADA, nombre: "carne.jpg", ancho: 1920, alto: 1080, tipo: "plato", descripcion: "Chuleta", filaId: "f2", creada: null, problema: null },
+];
+
+/** Respuestas de instagram-drive (listar, preparar, miniatura); null si la URL no es de Drive. */
+function respuestaDrive(url: string, init?: RequestInit): Response | null {
+  if (!url.startsWith(URL_DRIVE)) return null;
+  if (url.includes("accion=miniatura")) return new Response(new Blob([new Uint8Array([1])], { type: "image/jpeg" }), { status: 200, headers: { "content-type": "image/jpeg" } });
+  const cuerpo = JSON.parse(String(init?.body ?? "{}"));
+  if (cuerpo.accion === "listar") return respuestaJson({ ok: true, marca: cuerpo.marca, alcance: "completo", avisos: [], fotos: cuerpo.marca === "casa-tomas" ? FOTOS_DRIVE : [] });
+  if (cuerpo.accion === "preparar") return respuestaJson({ ok: true, ruta: TMP, url: URL_TMP, ancho: 1050, alto: 1400 });
+  return respuestaJson({ ok: false, error: "acción" }, 400);
+}
+
+/** fetch que contesta Drive y, el resto, con `f`. */
+function conDrive(f: (url: string, init?: RequestInit) => Promise<Response>) {
+  return vi.fn(async (url: string, init?: RequestInit) => respuestaDrive(url, init) ?? f(url, init));
+}
+
+/** Elige la foto de Drive que vale (y espera a que esté preparada). */
+async function elegirFoto() {
+  fireEvent.click(await screen.findByTestId(`foto-drive:${APTA}`, undefined, { timeout: 3000 }));
+}
 
 function fetchFalso() {
   return vi.fn(async (url: string, init?: RequestInit) => {
+    const drive = respuestaDrive(url, init);
+    if (drive) return drive;
     const cuerpo = init?.body ? JSON.parse(String(init.body)) : null;
     if (url === "/api/instagram-render") return respuestaJson({ ok: true, id: ID, estado: "generada", urlJpeg: "https://x.supabase.co/storage/v1/object/public/instagram/piezas/a.jpg?v=1", ancho: 1080, alto: 1350, avisos: [] });
     if (url === URL_ESTADO) return respuestaJson({ ok: true, variables: [], identidad: { igUserId: "1", username: "casatomascrevillent" }, cuota: { usadas: 1, total: 100 }, comprobaciones: [] });
@@ -126,21 +161,21 @@ describe("FormularioPieza", () => {
     expect(onCambio).toHaveBeenCalledWith({ lista: b.lista.slice(1) });
   });
 
-  it("las fotos que no valen para el formato salen deshabilitadas y explican por qué", () => {
+  it("las fotos que no valen para el formato salen deshabilitadas y explican por qué", async () => {
     const ct = obtenerPlantilla("ct-foto-titular")!;
     const onCambio = vi.fn();
     pintar(
       <FormularioPieza borrador={borradorVacio("casa-tomas", "ct-foto-titular", "post")} plantilla={ct} onCambio={onCambio} onMarca={() => {}} onPlantilla={() => {}} hayEjemplos conProblema={new Set()} baseFotos="https://x" />,
     );
-    const apaisada = screen.getByTestId("foto-ct-carne-plato");
+    const apaisada = await screen.findByTestId(`foto-drive:${APAISADA}`, undefined, { timeout: 3000 });
     expect(apaisada).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(apaisada);
     expect(onCambio).not.toHaveBeenCalled();
     expect(screen.getByRole("status")).toHaveTextContent(/apaisada.*ampliarla/i);
     // Una que sí vale se puede elegir.
-    expect(screen.getByTestId("foto-ct-salon-1")).not.toHaveAttribute("aria-disabled");
-    fireEvent.click(screen.getByTestId("foto-ct-salon-1"));
-    expect(onCambio).toHaveBeenCalledWith({ foto: "ct-salon-1" });
+    expect(screen.getByTestId(`foto-drive:${APTA}`)).not.toHaveAttribute("aria-disabled");
+    fireEvent.click(screen.getByTestId(`foto-drive:${APTA}`));
+    expect(onCambio).toHaveBeenCalledWith({ foto: `drive:${APTA}` });
   });
 });
 
@@ -161,6 +196,9 @@ describe("EditorInstagram", () => {
   it("«Publicar» está desactivado hasta que la prueba sale bien", async () => {
     pintar(<EditorInstagram />);
     expect(screen.getByRole("button", { name: /Publicar en Instagram/ })).toBeDisabled();
+    // Sin foto (los ejemplos ya no traen foto: la biblioteca es de Drive) no se puede generar.
+    expect(screen.getByRole("button", { name: /Generar imagen/ })).toBeDisabled();
+    await elegirFoto();
     expect(screen.getByRole("button", { name: /Prueba sin publicar/ })).toBeDisabled();
     await waitFor(() => expect(screen.getByRole("button", { name: /Generar imagen/ })).toBeEnabled());
   });
@@ -168,6 +206,7 @@ describe("EditorInstagram", () => {
   it("generar → probar → confirmar → publicar, con el JWT y el cuerpo correctos", async () => {
     const f = fetch as unknown as ReturnType<typeof vi.fn>;
     pintar(<EditorInstagram />);
+    await elegirFoto();
     const generar = await screen.findByRole("button", { name: /Generar imagen/ });
     await waitFor(() => expect(generar).toBeEnabled());
     fireEvent.click(generar);
@@ -180,6 +219,11 @@ describe("EditorInstagram", () => {
     expect(cuerpoRender.id).toBeUndefined();
     expect(cuerpoRender.pieza).toMatchObject({ marca: "casa-tomas", plantilla: "ct-foto-titular", formato: "post" });
     expect(cuerpoRender.pieza.titular).toBeTruthy();
+    // La foto de Drive va preparada: el render recibe la URL de su copia tmp/ en el bucket.
+    expect(cuerpoRender.pieza.foto).toBe(`drive:${APTA}`);
+    expect(cuerpoRender.fotoPreparada).toEqual({ id: `drive:${APTA}`, url: URL_TMP, ancho: 1050, alto: 1400, tipo: "sala", marca: "casa-tomas" });
+    const preparar = f.mock.calls.find(([u, i]) => u === URL_DRIVE && JSON.parse(String(i?.body)).accion === "preparar")!;
+    expect(JSON.parse(String(preparar[1].body))).toEqual({ accion: "preparar", marca: "casa-tomas", id: APTA });
 
     fireEvent.change(screen.getByLabelText("2. Texto de la publicación"), { target: { value: "Hola #casatomas @amigo" } });
     expect(screen.getByText(/Hashtags/)).toHaveTextContent("1/30");
@@ -202,11 +246,13 @@ describe("EditorInstagram", () => {
 
     const enlace = await screen.findByRole("link", { name: /Ver la publicación/ });
     expect(enlace).toHaveAttribute("href", "https://www.instagram.com/p/abc/");
-    expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: false });
+    // Al publicar de verdad se manda la copia tmp/ para que la función la borre.
+    expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: false, fotoTmp: TMP });
   });
 
   it("si cambias el texto tras la prueba, hay que volver a probar", async () => {
     pintar(<EditorInstagram />);
+    await elegirFoto();
     const generar = await screen.findByRole("button", { name: /Generar imagen/ });
     await waitFor(() => expect(generar).toBeEnabled());
     fireEvent.click(generar);
@@ -230,6 +276,7 @@ describe("EditorInstagram", () => {
     });
     vi.stubGlobal("fetch", f);
     pintar(<EditorInstagram />);
+    await elegirFoto();
     const generar = await screen.findByRole("button", { name: /Generar imagen/ });
     await waitFor(() => expect(generar).toBeEnabled());
     fireEvent.click(generar);
@@ -242,8 +289,9 @@ describe("EditorInstagram", () => {
   });
 
   it("en local (Vite contesta HTML) lo dice claro en vez de fallar en silencio", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("<!doctype html><html></html>", { status: 200, headers: { "content-type": "text/html" } })));
+    vi.stubGlobal("fetch", conDrive(async () => new Response("<!doctype html><html></html>", { status: 200, headers: { "content-type": "text/html" } })));
     pintar(<EditorInstagram />);
+    await elegirFoto();
     const generar = await screen.findByRole("button", { name: /Generar imagen/ });
     await waitFor(() => expect(generar).toBeEnabled());
     fireEvent.click(generar);
@@ -253,9 +301,10 @@ describe("EditorInstagram", () => {
   it("un 422 del render enseña los problemas con los nombres del formulario", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => respuestaJson({ ok: false, error: "La pieza no es válida", problemas: ["El campo «cta» se desborda (12 px de ancho): acórtalo"] }, 422)),
+      conDrive(async () => respuestaJson({ ok: false, error: "La pieza no es válida", problemas: ["El campo «cta» se desborda (12 px de ancho): acórtalo"] }, 422)),
     );
     pintar(<EditorInstagram />);
+    await elegirFoto();
     const generar = await screen.findByRole("button", { name: /Generar imagen/ });
     await waitFor(() => expect(generar).toBeEnabled());
     fireEvent.click(generar);
@@ -281,5 +330,57 @@ describe("normalizarEstado", () => {
     expect(r.cuenta).toEqual({ id: "17", username: "casatomascrevillent" });
     expect(r.comoArreglarlo).toEqual(["Añade META_ACCESS_TOKEN en Vercel.", "Regenera el token."]);
     expect(r.cuota).toEqual({ usadas: 2, total: 100, ventanaHoras: 24 });
+    // Sin bloque «drive» (función antigua desplegada): null, no se inventa nada.
+    expect(r.drive).toBeNull();
+  });
+
+  it("normaliza el bloque de Google Drive (alcance, carpeta, comprobaciones y avisos)", () => {
+    const r = normalizarEstado({
+      ok: true,
+      drive: {
+        ok: false,
+        alcance: "drive.file",
+        alcances: ["drive.file"],
+        carpeta: null,
+        comprobaciones: [{ nombre: "Carpeta «marketing»", estado: "falla", detalle: "no existe o el token no la ve", comoArreglarlo: "Volver a autorizar con el permiso completo." }],
+        avisos: ["Solo se ven las fotos subidas desde el panel."],
+      },
+    });
+    expect(r.drive).toEqual({
+      ok: false,
+      alcance: "drive.file",
+      alcances: ["drive.file"],
+      carpeta: null,
+      comprobaciones: [{ nombre: "Carpeta «marketing»", estado: "falla", detalle: "no existe o el token no la ve", comoArreglarlo: "Volver a autorizar con el permiso completo." }],
+      avisos: ["Solo se ven las fotos subidas desde el panel."],
+    });
+  });
+
+  it("la pestaña Conexión enseña el bloque de Drive con su «cómo arreglarlo»", async () => {
+    vi.stubGlobal(
+      "fetch",
+      conDrive(async () =>
+        respuestaJson({
+          ok: true,
+          variables: [],
+          identidad: { igUserId: "1", username: "casatomascrevillent" },
+          comprobaciones: [],
+          drive: {
+            ok: false,
+            alcance: "drive.file",
+            alcances: ["drive.file"],
+            carpeta: null,
+            comprobaciones: [{ nombre: "Carpeta «marketing»", estado: "falla", detalle: "no existe o el token no la ve", comoArreglarlo: "Volver a autorizar con el permiso completo." }],
+            avisos: [],
+          },
+        }),
+      ),
+    );
+    pintar(<ConexionInstagram />);
+    fireEvent.click(screen.getByRole("button", { name: "Comprobar" }));
+    const bloque = await screen.findByTestId("drive-conexion");
+    expect(bloque).toHaveTextContent("Google Drive no está listo");
+    expect(bloque).toHaveTextContent("Drive · Carpeta «marketing» · no existe o el token no la ve");
+    expect(bloque).toHaveTextContent("Volver a autorizar con el permiso completo.");
   });
 });

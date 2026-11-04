@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { MARCAS_IDS, MAX_DESCRIPCION_FOTO, NOMBRE_TIPO_FOTO, TIPOS_FOTO, type Foto, type MarcaId, type TipoFoto } from "@/lib/instagram";
 import { ACEPTA_FOTO, ErrorFoto, aptitudFoto, convertirFoto, type FotoConvertida } from "./convertirFoto";
 import { subirFotoBiblioteca } from "./fotosSubidas";
-import { CLAVE_FOTOS } from "./useFotosInstagram";
+import { claveFotosDrive, type BibliotecaDrive } from "./useFotosInstagram";
 import { NOMBRE_MARCA_CORTO } from "./HistorialPiezas";
 
 interface Props {
@@ -37,7 +37,8 @@ function Apto({ si, texto }: { si: boolean; texto: string }) {
 /**
  * «Subir foto» a la biblioteca: el navegador la prepara (orientación, ≤ 2560 px,
  * JPEG sRGB, ≤ 8 MB), enseña la vista previa con sus medidas y para qué
- * formatos sirve, y la sube con la sesión del usuario.
+ * formatos sirve, y la sube a Google Drive (carpeta de la marca) con la sesión
+ * del usuario, a través de la Edge Function instagram-drive.
  */
 export function SubirFotoDialog({ abierto, onAbierto, marca: marcaInicial, tipoInicial = "plato", onSubida }: Props) {
   const qc = useQueryClient();
@@ -92,11 +93,16 @@ export function SubirFotoDialog({ abierto, onAbierto, marca: marcaInicial, tipoI
     setSubiendo(true);
     const aviso = toast.loading("Subiendo la foto…");
     try {
-      const nueva = await subirFotoBiblioteca({ blob: foto.blob, marca, tipo, descripcion, ancho: foto.ancho, alto: foto.alto });
-      // Aparece ya en el selector (antes de volver a leer la tabla) y queda elegida.
-      qc.setQueryData<Foto[]>(CLAVE_FOTOS, (antes) => [nueva, ...(antes ?? []).filter((f) => f.id !== nueva.id)]);
-      void qc.invalidateQueries({ queryKey: CLAVE_FOTOS });
-      toast.success(marca === marcaInicial ? "Foto subida y elegida" : `Foto subida a la biblioteca de ${NOMBRE_MARCA_CORTO[marca]}`, { id: aviso });
+      const { foto: nueva, avisos } = await subirFotoBiblioteca({ blob: foto.blob, marca, tipo, descripcion, ancho: foto.ancho, alto: foto.alto });
+      // Aparece ya en el selector (antes de volver a leer Drive) y queda elegida.
+      qc.setQueryData<BibliotecaDrive>(claveFotosDrive(marca), (antes) => ({
+        alcance: antes?.alcance ?? null,
+        avisos: antes?.avisos ?? [],
+        fotos: [nueva, ...(antes?.fotos ?? []).filter((f) => f.id !== nueva.id)],
+      }));
+      void qc.invalidateQueries({ queryKey: claveFotosDrive(marca) });
+      toast.success(marca === marcaInicial ? "Foto subida a Drive y elegida" : `Foto subida a la biblioteca de ${NOMBRE_MARCA_CORTO[marca]} en Drive`, { id: aviso });
+      for (const a of avisos) toast.warning("Aviso de Drive", { description: a });
       onSubida(nueva);
       onAbierto(false);
     } catch (e) {
@@ -114,7 +120,10 @@ export function SubirFotoDialog({ abierto, onAbierto, marca: marcaInicial, tipoI
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Subir foto a la biblioteca</DialogTitle>
-          <DialogDescription>JPEG, PNG o WebP (HEIC si tu navegador lo abre). Se prepara aquí: se endereza, se deja en 2560 px como mucho y se guarda en JPEG.</DialogDescription>
+          <DialogDescription>
+            JPEG, PNG o WebP (HEIC si tu navegador lo abre). Se prepara aquí: se endereza, se deja en 2560 px como mucho y se guarda en JPEG en
+            Google Drive (marketing › instagram › fotos › marca).
+          </DialogDescription>
         </DialogHeader>
 
         <input

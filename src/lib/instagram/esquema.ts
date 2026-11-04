@@ -201,7 +201,8 @@ export function problemasDePieza(d: EntradaPieza, plantilla: Plantilla | undefin
       if (foto.marca !== d.marca) {
         p.push(`La foto «${foto.id}» es de ${MARCAS[foto.marca].nombre}; una pieza solo puede usar fotos de su marca (${MARCAS[d.marca].nombre})`);
       }
-      if (plantilla?.tiposFoto && !plantilla.tiposFoto.includes(foto.tipo)) {
+      // Sin tipo (foto de Drive sin clasificar): vale para cualquier plantilla.
+      if (plantilla?.tiposFoto && foto.tipo && !plantilla.tiposFoto.includes(foto.tipo)) {
         p.push(`La foto «${foto.id}» es de tipo «${foto.tipo}» y la plantilla «${plantilla.id}» solo admite: ${plantilla.tiposFoto.join(", ")}`);
       }
       const f = FORMATOS[d.formato as FormatoId];

@@ -9,7 +9,11 @@ import {
   buscarFoto,
   combinarCatalogo,
   construirDocumento,
+  driveIdDeFoto,
+  fotoDesdeDrive,
   fotoDesdeFila,
+  idFotoDrive,
+  rutaTmpDeUrl,
   fotosDe,
   rutaFotoSubida,
   urlFoto,
@@ -90,5 +94,45 @@ describe("validarPieza con una foto subida", () => {
     const r = validarPieza(pieza, { fotos: cat });
     const html = construirDocumento(r.datos!, { baseRecursos: "/instagram", baseFotos: BASE, fotos: cat });
     expect(html).toContain(`${BASE}/fotos/casa-tomas/subidas/${ID}.jpg`);
+  });
+});
+
+describe("fotos de Google Drive", () => {
+  const DRIVE = "1FotoDeDrive0000000000001";
+  const base = { driveId: DRIVE, nombre: "a.jpg", ancho: 1708, alto: 2560, tipo: "coctel", descripcion: " Mojito ", filaId: null, creada: null, problema: null };
+
+  it("id «drive:<id>» y vuelta, solo con ids válidos", () => {
+    expect(idFotoDrive(DRIVE)).toBe(`drive:${DRIVE}`);
+    expect(driveIdDeFoto(`drive:${DRIVE}`)).toBe(DRIVE);
+    expect(driveIdDeFoto("drive:../x")).toBeNull();
+    expect(driveIdDeFoto("ct-salon-1")).toBeNull();
+  });
+
+  it("fotoDesdeDrive: aptitud por medidas, tipo null si no tiene fila, sin medidas o con problema no es apta", () => {
+    expect(fotoDesdeDrive(base, "touza", "tmp/x.jpg")).toMatchObject({ id: `drive:${DRIVE}`, marca: "touza", ruta: "tmp/x.jpg", tipo: "coctel", aptaPost: true, aptaStory: true, descripcion: "Mojito", driveId: DRIVE });
+    expect(fotoDesdeDrive({ ...base, tipo: null }, "touza")?.tipo).toBeNull();
+    expect(fotoDesdeDrive({ ...base, tipo: "postre" }, "touza")?.tipo).toBeNull();
+    expect(fotoDesdeDrive({ ...base, ancho: null, alto: null }, "touza")).toMatchObject({ ancho: 0, alto: 0, aptaPost: false, aptaStory: false });
+    expect(fotoDesdeDrive({ ...base, problema: "HEIC" }, "touza")).toMatchObject({ aptaPost: false, aptaStory: false });
+    expect(fotoDesdeDrive({ ...base, driveId: "x" }, "touza")).toBeNull();
+  });
+
+  it("validarPieza: una foto de Drive sin tipo vale para cualquier plantilla", () => {
+    const pieza = { ...EJEMPLOS.find((e) => e.id === "ct-foto-titular-post")!.json, foto: `drive:${DRIVE}` };
+    const foto = fotoDesdeDrive({ ...base, tipo: null }, "casa-tomas", "tmp/x.jpg")!;
+    expect(validarPieza(pieza, { fotos: [foto] }).ok).toBe(true);
+    const deCoctel = fotoDesdeDrive(base, "casa-tomas", "tmp/x.jpg")!;
+    expect(validarPieza(pieza, { fotos: [deCoctel] }).problemas?.join(" ")).toMatch(/solo admite/);
+  });
+
+  it("rutaTmpDeUrl solo acepta tmp/<uuid> del bucket instagram del MISMO Supabase", () => {
+    const SBX = "https://sfonaclosuafvlhutkon.supabase.co";
+    const T = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    expect(rutaTmpDeUrl(`${SBX}/storage/v1/object/public/instagram/tmp/${T}.jpg?v=1`, SBX)).toBe(`tmp/${T}.jpg`);
+    expect(rutaTmpDeUrl(`${SBX}/storage/v1/object/public/instagram/tmp/${T}.png`, `${SBX}/`)).toBe(`tmp/${T}.png`);
+    expect(rutaTmpDeUrl(`http://127.0.0.1:54321/storage/v1/object/public/instagram/tmp/${T}.jpg`, "http://127.0.0.1:54321")).toBe(`tmp/${T}.jpg`);
+    for (const mala of [`https://otro.supabase.co/storage/v1/object/public/instagram/tmp/${T}.jpg`, `${SBX}/storage/v1/object/public/instagram/fotos/a.jpg`, "javascript:alert(1)", ""]) {
+      expect(rutaTmpDeUrl(mala, SBX)).toBeNull();
+    }
   });
 });

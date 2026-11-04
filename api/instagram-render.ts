@@ -4,7 +4,8 @@
  * @sparticuz/chromium) y lo guarda en el bucket «instagram». Ver docs/instagram.md.
  *
  *   Petición: `Authorization: Bearer <JWT de Supabase>` y JSON
- *             { "pieza": { …JSON de la pieza… }, "id"?: "<uuid para regenerar>", "caption"?: "…" }
+ *             { "pieza": { …JSON de la pieza… }, "id"?: "<uuid para regenerar>", "caption"?: "…",
+ *               "fotoPreparada"?: { id: "drive:<id>", url, ancho, alto, tipo, marca } }
  *   200: { ok: true, id, urlJpeg, imagenRuta, ancho, alto, bytes, calidad, avisos: string[], estado: "generada" }
  *   Errores (JSON { ok: false, error, problemas? }):
  *     400 cuerpo no válido · 401 sin sesión · 403 sin permiso de Marketing ·
@@ -15,9 +16,12 @@
  * Todo con el JWT del usuario (clave pública + Authorization): la RLS de
  * instagram_piezas y del bucket decide. Nunca service_role.
  *
- * Fotos: si «pieza.foto» no está en el catálogo estático (FOTOS), se busca en
- * instagram_fotos (fotos subidas desde el panel) con el mismo JWT y se añade
- * al catálogo con el que se valida y se construye el HTML (URL por su ruta).
+ * Fotos: las de Google Drive («drive:<id>») llegan ya copiadas al bucket
+ * (instagram-drive → preparar) en `fotoPreparada`; su URL solo se acepta si es
+ * tmp/ del bucket «instagram» de NUESTRO Supabase (400 si no: sin SSRF) y se
+ * reconstruye desde la ruta. Si «pieza.foto» es un uuid, se busca en
+ * instagram_fotos (subidas antes de Drive) con el mismo JWT. El catálogo
+ * estático (FOTOS) queda de respaldo.
  *
  * GET /api/instagram-render (con sesión de Marketing) — diagnóstico: arranca
  * Chromium y renderiza un lienzo de prueba (sin guardar nada).
@@ -38,7 +42,7 @@ import {
   validarPieza,
 } from "./_lib/instagram/nucleo.js";
 import { crearRenderizador, ErrorRender, type Renderizador } from "./_lib/instagram/render.js";
-import { catalogoParaPieza } from "./_lib/instagram/fotos.js";
+import { catalogoParaPieza, ErrorFotoPreparada } from "./_lib/instagram/fotos.js";
 import { registro, sanear } from "./_lib/instagram/secretos.js";
 import {
   autorizarMarketing,
@@ -76,7 +80,7 @@ export async function manejarRender(request: Request, deps: DependenciasRender =
 
   const cuerpo = await leerJson(request);
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
-  const entrada = cuerpo.valor as { pieza?: unknown; id?: unknown; caption?: unknown } | null;
+  const entrada = cuerpo.valor as { pieza?: unknown; id?: unknown; caption?: unknown; fotoPreparada?: unknown } | null;
   if (!entrada || typeof entrada !== "object" || entrada.pieza === undefined) {
     return json(400, { ok: false, error: "Falta «pieza» en el cuerpo" });
   }
@@ -86,8 +90,9 @@ export async function manejarRender(request: Request, deps: DependenciasRender =
   // Foto subida desde el panel: se busca en instagram_fotos (RLS del usuario).
   let fotos: Awaited<ReturnType<typeof catalogoParaPieza>>;
   try {
-    fotos = await catalogoParaPieza(s, entrada.pieza);
+    fotos = await catalogoParaPieza(s, entrada.pieza, entrada.fotoPreparada);
   } catch (e) {
+    if (e instanceof ErrorFotoPreparada) return json(400, { ok: false, error: e.message });
     registro("error", ETIQUETA, "leer foto subida", e);
     return json(502, { ok: false, error: sanear((e as Error).message) });
   }

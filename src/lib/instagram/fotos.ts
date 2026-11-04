@@ -6,10 +6,16 @@
  * scripts/instagram/subir-recursos.mjs con las medidas REALES de lo subido;
  * los textos (tipo, descripción) salen de instagram-studio/assets/fotos/fotos.json.
  *
- * Además del catálogo estático están las fotos que suben los usuarios desde el
- * panel (tabla public.instagram_fotos, fichero fotos/<marca>/subidas/<uuid>.jpg;
- * ver docs/instagram-fotos.md). Su id es el uuid de la fila. Las funciones
- * que reciben `fotos` aceptan el catálogo combinado (combinarCatalogo).
+ * Desde el 05/11/2026 la biblioteca VISIBLE del panel sale de Google Drive
+ * (marketing/instagram/fotos/<marca>, Edge Function instagram-drive; ver
+ * docs/instagram-fotos.md). Su id en las piezas es «drive:<id de Drive>» y su
+ * `ruta` es la copia temporal tmp/<uuid>.<ext> del bucket que hace «preparar»
+ * (vacía hasta entonces). Este catálogo estático ya no se enseña (sus rutas no
+ * existen en la demo): queda como respaldo del render para piezas antiguas.
+ *
+ * También quedan, por compatibilidad, las fotos subidas al bucket antes de Drive
+ * (tabla public.instagram_fotos con ruta fotos/<marca>/subidas/<uuid>.jpg).
+ * Las funciones que reciben `fotos` aceptan cualquier catálogo (combinarCatalogo).
  */
 import { FORMATOS, MARCAS, type FormatoId, type MarcaId } from "./tokens.js";
 
@@ -23,7 +29,8 @@ export interface Foto {
   ruta: string;
   ancho: number;
   alto: number;
-  tipo: TipoFoto;
+  /** null = foto de Drive sin clasificar (sin fila en instagram_fotos): vale para cualquier plantilla. */
+  tipo: TipoFoto | null;
   /** Criterio del prototipo: vertical con lado corto ≥ 1080, o cubre 1080×1350 ampliando ≤ 5 %. */
   aptaPost: boolean;
   /** Cubre 1080×1920 ampliando ≤ 5 %. */
@@ -31,6 +38,10 @@ export interface Foto {
   descripcion: string;
   /** true si la subió un usuario desde el panel (tabla instagram_fotos). */
   subida?: boolean;
+  /** Id del fichero en Google Drive (fotos de la biblioteca de Drive). */
+  driveId?: string;
+  /** Por qué no se puede usar aunque las medidas valgan (formato HEIC, más de 8 MB…). */
+  problema?: string | null;
 }
 
 // <catalogo> — generado por scripts/instagram/subir-recursos.mjs: no editar a mano.
@@ -150,4 +161,96 @@ export function fotoDesdeFila(fila: FilaFotoSubida): Foto | null {
 export function combinarCatalogo(subidas: readonly Foto[]): Foto[] {
   const ids = new Set(FOTOS.map((f) => f.id));
   return [...FOTOS, ...subidas.filter((f) => !ids.has(f.id) && (ids.add(f.id), true))];
+}
+
+// ── Fotos de Google Drive (Edge Function instagram-drive) ────────────────────
+
+/** Prefijo del id de las fotos de Drive en las piezas: «drive:<id de Drive>». */
+export const PREFIJO_FOTO_DRIVE = "drive:";
+const RE_ID_DRIVE = /^[A-Za-z0-9_-]{10,200}$/;
+
+export function esIdDriveValido(v: unknown): v is string {
+  return typeof v === "string" && RE_ID_DRIVE.test(v);
+}
+
+/** «drive:<id>» a partir del id de Drive. */
+export function idFotoDrive(driveId: string): string {
+  return `${PREFIJO_FOTO_DRIVE}${driveId}`;
+}
+
+/** Id de Drive de un id de foto «drive:<id>» (null si no es de Drive o no es válido). */
+export function driveIdDeFoto(id: unknown): string | null {
+  if (typeof id !== "string" || !id.startsWith(PREFIJO_FOTO_DRIVE)) return null;
+  const d = id.slice(PREFIJO_FOTO_DRIVE.length);
+  return esIdDriveValido(d) ? d : null;
+}
+
+/** Lo que devuelve instagram-drive (listar) por cada foto. */
+export interface FotoDrive {
+  driveId: string;
+  nombre: string;
+  ancho: number | null;
+  alto: number | null;
+  tipo: string | null;
+  descripcion: string;
+  filaId: string | null;
+  creada: string | null;
+  problema: string | null;
+}
+
+/**
+ * Foto de Drive → Foto del catálogo. Sin medidas (Drive aún no las sabe) sale
+ * con 0×0 y no es apta. Sin tipo (no tiene fila) → tipo null. `ruta` es la
+ * copia temporal del bucket si ya se ha preparado («» si no).
+ */
+export function fotoDesdeDrive(f: FotoDrive, marca: MarcaId, ruta = ""): Foto | null {
+  if (!f || !esIdDriveValido(f.driveId)) return null;
+  const ancho = Number.isInteger(f.ancho) && (f.ancho as number) > 0 ? (f.ancho as number) : 0;
+  const alto = Number.isInteger(f.alto) && (f.alto as number) > 0 ? (f.alto as number) : 0;
+  const tipo = (TIPOS_FOTO as readonly string[]).includes(f.tipo ?? "") ? (f.tipo as TipoFoto) : null;
+  const medidas = { ancho, alto };
+  const apta = (formato: FormatoId) => ancho > 0 && alto > 0 && !f.problema && esAptaPara(medidas, formato);
+  return {
+    id: idFotoDrive(f.driveId),
+    marca,
+    ruta,
+    ancho,
+    alto,
+    tipo,
+    aptaPost: apta("post"),
+    aptaStory: apta("story"),
+    descripcion: (f.descripcion ?? "").trim(),
+    subida: true,
+    driveId: f.driveId,
+    problema: f.problema ?? null,
+  };
+}
+
+/** Copias temporales del bucket que hace «preparar»: tmp/<uuid>.<jpg|png|webp>. */
+export const RE_RUTA_TMP = /^tmp\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(jpg|png|webp)$/;
+
+/**
+ * Ruta tmp/<uuid>.<ext> de una URL pública del bucket «instagram» de NUESTRO
+ * Supabase (`supabaseUrl`), o null si la URL apunta a cualquier otro sitio
+ * (otro host, otro puerto, otro bucket, otra carpeta, credenciales, rutas con
+ * «..» o caracteres codificados). Es lo que impide que el render (Chromium en
+ * el servidor) descargue URLs arbitrarias (SSRF): el render construye la URL de
+ * nuevo a partir de esta ruta, nunca usa la que llega.
+ */
+export function rutaTmpDeUrl(url: unknown, supabaseUrl: string): string | null {
+  if (typeof url !== "string" || url.length > 500 || !supabaseUrl) return null;
+  let u: URL;
+  let base: URL;
+  try {
+    u = new URL(url);
+    base = new URL(supabaseUrl);
+  } catch {
+    return null;
+  }
+  if (u.protocol !== "https:" && !(u.protocol === "http:" && base.protocol === "http:")) return null;
+  if (u.origin !== base.origin || u.username || u.password) return null;
+  const prefijo = "/storage/v1/object/public/instagram/";
+  if (!u.pathname.startsWith(prefijo)) return null;
+  const ruta = u.pathname.slice(prefijo.length);
+  return RE_RUTA_TMP.test(ruta) ? ruta : null;
 }

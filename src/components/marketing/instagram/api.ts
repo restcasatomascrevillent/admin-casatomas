@@ -10,8 +10,11 @@
  *    (`instagram-publicar` e `instagram-estado`), donde viven los secretos de
  *    Meta. Funcionan también en local: van al Supabase de VITE_SUPABASE_URL
  *    con la clave pública (`apikey`) y el JWT, como el resto de funciones.
+ *  - Biblioteca de fotos en Google Drive: Edge Function `instagram-drive`
+ *    (listar, subir, miniatura y preparar la copia temporal en el bucket).
  */
 import { supabase } from "@/integrations/supabase/client";
+import type { FotoDrive, MarcaId } from "@/lib/instagram";
 import { auditDeviceId } from "@/lib/audit-device";
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -20,6 +23,7 @@ const CLAVE_PUBLICA = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || im
 export const URL_RENDER = "/api/instagram-render";
 export const URL_PUBLICAR = `${SUPABASE_URL}/functions/v1/instagram-publicar`;
 export const URL_ESTADO = `${SUPABASE_URL}/functions/v1/instagram-estado`;
+export const URL_DRIVE = `${SUPABASE_URL}/functions/v1/instagram-drive`;
 
 export const MENSAJE_SIN_SERVIDOR =
   "La imagen definitiva solo se genera en la demo de Vercel: en local (npm run dev) no existe la función /api/instagram-render.";
@@ -81,6 +85,17 @@ export interface Comprobacion {
   comoArreglarlo?: string;
 }
 
+/** Bloque «drive» de instagram-estado: Google Drive (archivo de fotos y publicadas). */
+export interface EstadoDrive {
+  ok: boolean;
+  /** «completo», «drive.file», «otro» o null si no se pudo saber. */
+  alcance: string | null;
+  alcances: string[];
+  carpeta: { nombre: string; escribible: boolean } | null;
+  comprobaciones: Comprobacion[];
+  avisos: string[];
+}
+
 /** Respuesta de instagram-estado, ya normalizada. Nunca trae valores secretos. */
 export interface RespuestaEstado {
   ok: boolean;
@@ -91,6 +106,8 @@ export interface RespuestaEstado {
   avisos: string[];
   comoArreglarlo: string[];
   entornoSupabase?: string;
+  /** null si la función desplegada aún no comprueba Drive. */
+  drive: EstadoDrive | null;
 }
 
 export interface OpcionesLlamada {
@@ -125,7 +142,8 @@ async function llamar<T>(url: string, init: RequestInit, opts: OpcionesLlamada =
   try {
     r = await f(url, {
       ...init,
-      headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...extra, Authorization: `Bearer ${token}` },
+      // FormData lleva su propio Content-Type (multipart con frontera): no se pisa.
+      headers: { ...(typeof init.body === "string" ? { "Content-Type": "application/json" } : {}), ...extra, Authorization: `Bearer ${token}` },
     });
   } catch (e) {
     throw new ErrorInstagram((e as Error)?.message || "Sin conexión", "red");
@@ -154,7 +172,7 @@ async function llamar<T>(url: string, init: RequestInit, opts: OpcionesLlamada =
         "La función de Instagram no está desplegada en este Supabase.",
         "servidor",
         404,
-        "Despliégala desde la raíz del repo: npx supabase functions deploy instagram-publicar instagram-estado --project-ref <ref del proyecto> (docs/instagram.md).",
+        "Despliégala desde la raíz del repo: npx supabase functions deploy instagram-drive instagram-publicar instagram-estado --project-ref <ref del proyecto> (docs/instagram.md).",
       );
     }
     const tipo: TipoErrorInstagram = r.status === 401 || r.status === 403 ? "sesion" : "servidor";
@@ -213,27 +231,119 @@ export function normalizarEstado(r: Crudo): RespuestaEstado {
     avisos: [...(Array.isArray(r.avisos) ? r.avisos : []), ...(Array.isArray(r.noVerificado) ? r.noVerificado : [])].map(String),
     comoArreglarlo: [...pasos],
     entornoSupabase: r.entornoSupabase,
+    drive: normalizarDrive(r.drive),
   };
 }
 
-/** Genera el JPEG definitivo y guarda (o actualiza, con `id`) la pieza. */
-export function generarImagen(pieza: unknown, id?: string | null, opts?: OpcionesLlamada) {
-  return llamar<RespuestaRender>(URL_RENDER, { method: "POST", body: JSON.stringify(id ? { pieza, id } : { pieza }) }, opts);
+function normalizarDrive(d: unknown): EstadoDrive | null {
+  if (!d || typeof d !== "object") return null;
+  const o = d as Crudo;
+  return {
+    ok: o.ok === true,
+    alcance: typeof o.alcance === "string" ? o.alcance : null,
+    alcances: Array.isArray(o.alcances) ? o.alcances.map(String) : [],
+    carpeta: o.carpeta && typeof o.carpeta.nombre === "string" ? { nombre: o.carpeta.nombre, escribible: o.carpeta.escribible === true } : null,
+    comprobaciones: Array.isArray(o.comprobaciones)
+      ? o.comprobaciones.map((x: Crudo) => ({
+          nombre: String(x.nombre ?? ""),
+          estado: normalizarEstadoComprobacion(x.estado),
+          detalle: x.detalle ?? undefined,
+          comoArreglarlo: x.comoArreglarlo ?? undefined,
+        }))
+      : [],
+    avisos: Array.isArray(o.avisos) ? o.avisos.map(String) : [],
+  };
 }
 
-/** Prueba (dryRun) o publicación real. `contenedorId` para reintentar uno «en_proceso». */
+/** Foto de Drive ya copiada al bucket, tal como la necesita el render. */
+export interface FotoPreparada {
+  id: string;
+  url: string;
+  ancho: number;
+  alto: number;
+  tipo: string | null;
+  marca: MarcaId;
+}
+
+/** Genera el JPEG definitivo y guarda (o actualiza, con `id`) la pieza. */
+export function generarImagen(pieza: unknown, id?: string | null, opts?: OpcionesLlamada, fotoPreparada?: FotoPreparada | null) {
+  const cuerpo: Record<string, unknown> = { pieza };
+  if (id) cuerpo.id = id;
+  if (fotoPreparada) cuerpo.fotoPreparada = fotoPreparada;
+  return llamar<RespuestaRender>(URL_RENDER, { method: "POST", body: JSON.stringify(cuerpo) }, opts);
+}
+
+/**
+ * Prueba (dryRun) o publicación real. `contenedorId` para reintentar uno
+ * «en_proceso». `fotoTmp`: copia temporal de la foto de Drive (se borra al publicar).
+ */
 export function publicar(
-  args: { id: string; caption: string; dryRun: boolean; contenedorId?: string | null },
+  args: { id: string; caption: string; dryRun: boolean; contenedorId?: string | null; fotoTmp?: string | null },
   opts?: OpcionesLlamada,
 ) {
   const cuerpo: Record<string, unknown> = { id: args.id, caption: args.caption, dryRun: args.dryRun };
   if (args.contenedorId) cuerpo.contenedorId = args.contenedorId;
+  if (args.fotoTmp) cuerpo.fotoTmp = args.fotoTmp;
   return llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts, cabecerasEdge()).then(normalizarPublicar);
 }
 
 /** Estado de la conexión (variables, cuenta y cupo). Nunca devuelve valores secretos. */
 export function comprobarConexion(opts?: OpcionesLlamada) {
   return llamar<Crudo>(URL_ESTADO, { method: "GET" }, opts, cabecerasEdge()).then(normalizarEstado);
+}
+
+// ── Biblioteca de fotos en Google Drive (Edge Function instagram-drive) ─────
+
+export interface RespuestaListarDrive {
+  fotos: FotoDrive[];
+  /** «completo», «drive.file» u «otro». */
+  alcance: string | null;
+  avisos: string[];
+}
+
+/** Fotos de la carpeta de Drive de la marca, con sus metadatos. */
+export async function listarFotosDrive(marca: MarcaId, opts?: OpcionesLlamada): Promise<RespuestaListarDrive> {
+  const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "listar", marca }) }, opts, cabecerasEdge());
+  return {
+    fotos: Array.isArray(r.fotos) ? (r.fotos as FotoDrive[]) : [],
+    alcance: typeof r.alcance === "string" ? r.alcance : null,
+    avisos: Array.isArray(r.avisos) ? r.avisos.map(String) : [],
+  };
+}
+
+/** Sube un JPEG ya preparado a la carpeta de Drive de la marca y guarda su tipo y descripción. */
+export async function subirFotoDrive(
+  n: { blob: Blob; marca: MarcaId; tipo: string; descripcion: string },
+  opts?: OpcionesLlamada,
+): Promise<{ foto: FotoDrive; avisos: string[] }> {
+  const form = new FormData();
+  form.set("marca", n.marca);
+  form.set("tipo", n.tipo);
+  form.set("descripcion", n.descripcion.trim());
+  form.set("archivo", n.blob, "foto.jpg");
+  const r = await llamar<Crudo>(`${URL_DRIVE}?accion=subir`, { method: "POST", body: form }, opts, cabecerasEdge());
+  return { foto: r.foto as FotoDrive, avisos: Array.isArray(r.avisos) ? r.avisos.map(String) : [] };
+}
+
+/** Copia la foto de Drive al bucket (tmp/) y devuelve su URL pública, para la vista previa y el render. */
+export async function prepararFotoDrive(
+  marca: MarcaId,
+  driveId: string,
+  opts?: OpcionesLlamada,
+): Promise<{ ruta: string; url: string; ancho: number | null; alto: number | null }> {
+  const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "preparar", marca, id: driveId }) }, opts, cabecerasEdge());
+  return { ruta: String(r.ruta ?? ""), url: String(r.url ?? ""), ancho: typeof r.ancho === "number" ? r.ancho : null, alto: typeof r.alto === "number" ? r.alto : null };
+}
+
+/** Miniatura de una foto de Drive (bytes, pedidos con la sesión). null si Drive no la tiene. */
+export async function miniaturaDrive(marca: MarcaId, driveId: string, opts: OpcionesLlamada = {}): Promise<Blob | null> {
+  const token = opts.token === undefined ? await tokenSesion() : opts.token;
+  if (!token) throw new ErrorInstagram("No hay sesión: vuelve a entrar en el panel.", "sesion", 401);
+  const url = `${URL_DRIVE}?accion=miniatura&marca=${encodeURIComponent(marca)}&id=${encodeURIComponent(driveId)}`;
+  const r = await (opts.fetch ?? fetch)(url, { headers: { ...cabecerasEdge(), Authorization: `Bearer ${token}` } });
+  if (r.status === 404) return null;
+  if (!r.ok || !(r.headers.get("content-type") ?? "").startsWith("image/")) throw new ErrorInstagram(`La miniatura respondió ${r.status}`, "servidor", r.status);
+  return await r.blob();
 }
 
 /** Texto para el usuario a partir de cualquier error de estas llamadas. */

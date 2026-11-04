@@ -102,3 +102,67 @@ describe("POST /api/instagram-render con una foto subida", () => {
     expect(f.mock.calls.some(([u]) => String(u).includes("instagram_fotos"))).toBe(false);
   });
 });
+
+describe("POST /api/instagram-render con una foto de Google Drive (fotoPreparada)", () => {
+  const DRIVE = "1FotoDeDrive0000000000001";
+  const TMP = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const URL_TMP = `${SB}/storage/v1/object/public/instagram/tmp/${TMP}.jpg`;
+  const piezaDrive = { ...PIEZA, foto: `drive:${DRIVE}` };
+  const preparada = (extra: Record<string, unknown> = {}) => ({ id: `drive:${DRIVE}`, url: URL_TMP, ancho: 1708, alto: 2560, tipo: "plato", marca: "casa-tomas", ...extra });
+
+  it("pinta la copia tmp/ de NUESTRO bucket, sin consultar instagram_fotos", async () => {
+    const f = falso([]);
+    const renderizar = vi.fn(jpgFalso);
+    const r = await manejarRender(peticion({ pieza: piezaDrive, fotoPreparada: preparada() }), { env: ENV_SB, fetch: f, renderizar });
+    expect(r.status).toBe(200);
+    expect(renderizar.mock.calls[0][0].html).toContain(URL_TMP);
+    expect(f.mock.calls.some(([u]) => String(u).includes("instagram_fotos"))).toBe(false);
+  });
+
+  it("una foto de Drive sin clasificar (tipo null) vale para cualquier plantilla; si es pequeña, 422", async () => {
+    expect((await manejarRender(peticion({ pieza: piezaDrive, fotoPreparada: preparada({ tipo: null }) }), { env: ENV_SB, fetch: falso([]), renderizar: jpgFalso })).status).toBe(200);
+    const r = await manejarRender(peticion({ pieza: piezaDrive, fotoPreparada: preparada({ ancho: 500, alto: 500 }) }), { env: ENV_SB, fetch: falso([]), renderizar: jpgFalso });
+    expect(r.status).toBe(422);
+  });
+
+  it("sin fotoPreparada, la foto de Drive no está en el catálogo (422)", async () => {
+    const r = await manejarRender(peticion({ pieza: piezaDrive }), { env: ENV_SB, fetch: falso([]), renderizar: jpgFalso });
+    expect(r.status).toBe(422);
+    expect((await r.json()).problemas).toContain(`La foto «drive:${DRIVE}» no está en el catálogo de fotos`);
+  });
+
+  it("SSRF: rechaza (400, sin renderizar) cualquier URL que no sea tmp/ del bucket «instagram» de este Supabase", async () => {
+    const malas = [
+      "https://evil.example.com/storage/v1/object/public/instagram/tmp/0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d.jpg",
+      "http://169.254.169.254/latest/meta-data/",
+      "http://localhost:3000/admin",
+      "file:///etc/passwd",
+      `${SB.replace("https:", "http:")}/storage/v1/object/public/instagram/tmp/${TMP}.jpg`,
+      `${SB}:8443/storage/v1/object/public/instagram/tmp/${TMP}.jpg`,
+      `https://user:pw@sfonaclosuafvlhutkon.supabase.co/storage/v1/object/public/instagram/tmp/${TMP}.jpg`,
+      `https://haqmmdfdzzatdnrrcgez.supabase.co/storage/v1/object/public/instagram/tmp/${TMP}.jpg`,
+      `https://sfonaclosuafvlhutkon.supabase.co.evil.com/storage/v1/object/public/instagram/tmp/${TMP}.jpg`,
+      `${SB}/storage/v1/object/public/platos/tmp/${TMP}.jpg`,
+      `${SB}/storage/v1/object/public/instagram/piezas/2026-11/${TMP}.jpg`,
+      `${SB}/storage/v1/object/public/instagram/tmp/../piezas/${TMP}.jpg`,
+      `${SB}/storage/v1/object/public/instagram/tmp/%2e%2e/${TMP}.jpg`,
+      `${SB}/storage/v1/object/public/instagram/tmp/${TMP}.svg`,
+      `${SB}/storage/v1/object/sign/instagram/tmp/${TMP}.jpg`,
+      `${SB}/rest/v1/instagram_piezas?select=*`,
+      42,
+    ];
+    for (const url of malas) {
+      const renderizar = vi.fn(jpgFalso);
+      const r = await manejarRender(peticion({ pieza: piezaDrive, fotoPreparada: preparada({ url }) }), { env: ENV_SB, fetch: falso([]), renderizar });
+      expect(r.status, String(url)).toBe(400);
+      expect(renderizar).not.toHaveBeenCalled();
+    }
+  });
+
+  it("rechaza (400) una fotoPreparada que no es la foto de la pieza o con datos raros", async () => {
+    for (const extra of [{ id: "drive:1OtraFoto000000000000002" }, { marca: "otra" }, { ancho: 0 }, { alto: 1.5 }, { tipo: "postre" }]) {
+      const r = await manejarRender(peticion({ pieza: piezaDrive, fotoPreparada: preparada(extra) }), { env: ENV_SB, fetch: falso([]), renderizar: jpgFalso });
+      expect(r.status, JSON.stringify(extra)).toBe(400);
+    }
+  });
+});

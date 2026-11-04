@@ -46,7 +46,7 @@ interface Texto {
 }
 
 const REGENERAR_TOKEN =
-  "Genera un token nuevo en Meta Business Suite → Configuración del negocio → Usuarios → Usuarios del sistema → (tu usuario) → «Generar token»: elige la app, marca instagram_basic e instagram_content_publish y caducidad «Nunca». Cámbialo en los secretos de Supabase: `npx supabase secrets set IG_ACCESS_TOKEN=… --project-ref <demo sfonaclosuafvlhutkon / producción haqmmdfdzzatdnrrcgez>` (desde la raíz del repo) o Dashboard → Edge Functions → Secrets (no hace falta volver a desplegar) y pulsa «Comprobar conexión» en Marketing → Instagram. Detalle en docs/instagram.md.";
+  "Genera un token nuevo en Meta Business Suite → Configuración del negocio → Usuarios → Usuarios del sistema → (tu usuario) → «Generar token»: elige la app, marca instagram_basic e instagram_content_publish y caducidad «Nunca». Cámbialo en los secretos de Supabase: `npx supabase secrets set IG_ACCESS_TOKEN=… --project-ref <demo sfonaclosuafvlhutkon / producción haqmmdfdzzatdnrrcgez>` (desde la raíz del repo) o Dashboard → Edge Functions → Secrets (no hace falta volver a desplegar) y pulsa «Comprobar» en Instagram → Conexión. Detalle en docs/instagram.md.";
 
 const TEXTOS: Record<TipoErrorInstagram, Texto> = {
   token: {

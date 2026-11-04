@@ -1,8 +1,10 @@
 /**
- * Biblioteca de fotos de Instagram con fotos subidas desde el panel: el hook
- * que junta catálogo estático + instagram_fotos, la subida (Storage + insert,
- * con la foto elegida al acabar) y el borrado con confirmación. Supabase y la
- * conversión del navegador (jsdom no decodifica imágenes) van simulados.
+ * Biblioteca de fotos de Instagram en Google Drive (Edge Function
+ * instagram-drive simulada con un fetch falso): el hook que lista las fotos de
+ * la marca, las miniaturas pedidas con la sesión, las fotos sin clasificar, los
+ * avisos (alcance drive.file) y «Subir foto» (FormData a Drive, con la foto
+ * elegida al acabar). La conversión del navegador va simulada (jsdom no
+ * decodifica imágenes).
  */
 import type { ReactNode } from "react";
 import { useState } from "react";
@@ -10,48 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-const sbFalso = vi.hoisted(() => {
-  const estado = {
-    filas: [] as Array<Record<string, unknown>>,
-    usos: 0,
-    upload: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
-    remove: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
-    insert: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
-    borrar: null as unknown as ReturnType<typeof import("vitest").vi.fn>,
-  };
-  return estado;
-});
-
-vi.mock("@/integrations/supabase/client", () => {
-  const from = (tabla: string) => {
-    if (tabla === "instagram_fotos") {
-      const consulta = {
-        select: () => consulta,
-        order: () => consulta,
-        limit: () => Promise.resolve({ data: sbFalso.filas, error: null }),
-      };
-      return {
-        ...consulta,
-        insert: (fila: unknown) => sbFalso.insert(fila),
-        delete: () => ({ eq: (_c: string, id: string) => ({ select: () => sbFalso.borrar(id) }) }),
-      };
-    }
-    // instagram_piezas: cuántas piezas usan la foto.
-    const piezas = {
-      select: () => piezas,
-      order: () => piezas,
-      limit: () => Promise.resolve({ data: [], error: null }),
-      eq: () => Promise.resolve({ count: sbFalso.usos, error: null }),
-    };
-    return piezas;
-  };
-  return {
-    supabase: {
-      from,
-      storage: { from: () => ({ upload: (...a: unknown[]) => sbFalso.upload(...a), remove: (...a: unknown[]) => sbFalso.remove(...a) }) },
-    },
-  };
-});
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: { auth: { getSession: () => Promise.resolve({ data: { session: { access_token: "jwt-de-prueba" } } }) } },
+}));
 
 vi.mock("../convertirFoto", async (original) => {
   const real = await original<typeof import("../convertirFoto")>();
@@ -68,16 +31,41 @@ vi.mock("../convertirFoto", async (original) => {
   };
 });
 
-import { FOTOS, obtenerPlantilla, rutaFotoSubida, type FormatoId, type MarcaId } from "@/lib/instagram";
+import { obtenerPlantilla, type FotoDrive, type FormatoId, type MarcaId } from "@/lib/instagram";
 import { SelectorFoto } from "../SelectorFoto";
 import { useFotosInstagram } from "../useFotosInstagram";
 import { convertirFoto } from "../convertirFoto";
+import { URL_DRIVE } from "../api";
 
-const ID = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
-const SUBIDA = { id: "11111111-2222-4333-8444-555555555555", marca: "casa-tomas", ruta: "", ancho: 1708, alto: 2560, tipo: "plato", descripcion: "Chuleta" };
-SUBIDA.ruta = rutaFotoSubida("casa-tomas", SUBIDA.id);
-const DE_TOUZA = { id: "99999999-2222-4333-8444-555555555555", marca: "touza", ruta: "", ancho: 1708, alto: 2560, tipo: "coctel", descripcion: "Mojito" };
-DE_TOUZA.ruta = rutaFotoSubida("touza", DE_TOUZA.id);
+const CHULETA: FotoDrive = { driveId: "1FotoChuleta0000000000001", nombre: "a.jpg", ancho: 1708, alto: 2560, tipo: "plato", descripcion: "Chuleta", filaId: "f1", creada: null, problema: null };
+const SIN_FILA: FotoDrive = { driveId: "1FotoSinFila0000000000002", nombre: "b.jpg", ancho: 1708, alto: 2560, tipo: null, descripcion: "", filaId: null, creada: null, problema: null };
+const PEQUENA: FotoDrive = { ...CHULETA, driveId: "1FotoPequena000000000003", ancho: 500, alto: 500 };
+const HEIC: FotoDrive = { ...CHULETA, driveId: "1FotoHeic000000000000004", problema: "Formato HEIC: súbela desde el panel («Subir foto») para que se convierta a JPEG." };
+const NUEVA = "1FotoNueva00000000000005";
+
+// Cada recorrido espera a Drive simulado (listar, miniaturas, preparar): margen para máquinas lentas.
+vi.setConfig({ testTimeout: 20_000 });
+
+const json = (cuerpo: unknown, estado = 200) => new Response(JSON.stringify(cuerpo), { status: estado, headers: { "content-type": "application/json" } });
+
+const estado = {
+  fotos: [] as FotoDrive[],
+  avisos: [] as string[],
+  alcance: "completo",
+  subida: null as null | ((form: FormData) => Response),
+};
+
+function fetchFalso() {
+  return vi.fn(async (url: string, init: RequestInit = {}) => {
+    if (url.startsWith(`${URL_DRIVE}?accion=miniatura`)) return new Response(new Blob([new Uint8Array([1, 2, 3])], { type: "image/jpeg" }), { status: 200, headers: { "content-type": "image/jpeg" } });
+    if (url === `${URL_DRIVE}?accion=subir`) return estado.subida!(init.body as FormData);
+    if (url === URL_DRIVE) {
+      const cuerpo = JSON.parse(String(init.body));
+      if (cuerpo.accion === "listar") return json({ ok: true, marca: cuerpo.marca, alcance: estado.alcance, avisos: estado.avisos, fotos: estado.fotos });
+    }
+    return new Response("no", { status: 404 });
+  });
+}
 
 function cliente() {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -105,19 +93,15 @@ function Selector({ marca = "casa-tomas", formato = "post", onCambio }: { marca?
 }
 
 beforeEach(() => {
-  sbFalso.filas = [];
-  sbFalso.usos = 0;
-  sbFalso.upload = vi.fn(async () => ({ data: { path: "x" }, error: null }));
-  sbFalso.remove = vi.fn(async () => ({ data: [], error: null }));
-  // La «tabla» cambia de verdad: al volver a leerla tras invalidar, sale lo subido / no sale lo borrado.
-  sbFalso.insert = vi.fn(async (fila: Record<string, unknown>) => {
-    sbFalso.filas = [fila, ...sbFalso.filas];
-    return { error: null };
-  });
-  sbFalso.borrar = vi.fn(async (id: string) => {
-    sbFalso.filas = sbFalso.filas.filter((f) => f.id !== id);
-    return { data: [{ id }], error: null };
-  });
+  estado.fotos = [];
+  estado.avisos = [];
+  estado.alcance = "completo";
+  estado.subida = (form) => {
+    const foto: FotoDrive = { driveId: NUEVA, nombre: "n.jpg", ancho: 1708, alto: 2560, tipo: String(form.get("tipo")), descripcion: String(form.get("descripcion")), filaId: "f9", creada: null, problema: null };
+    estado.fotos = [foto, ...estado.fotos];
+    return json({ ok: true, foto, avisos: [] });
+  };
+  vi.stubGlobal("fetch", fetchFalso());
   vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:vista"), revokeObjectURL: vi.fn() }));
 });
 afterEach(() => {
@@ -125,35 +109,68 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("useFotosInstagram", () => {
-  it("junta el catálogo estático y las filas de instagram_fotos con la misma forma", async () => {
-    sbFalso.filas = [SUBIDA, DE_TOUZA, { ...SUBIDA, id: "rara", tipo: "postre" }];
+const llamadas = () => (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls as Array<[string, RequestInit]>;
+
+describe("useFotosInstagram (Drive)", () => {
+  it("lista las fotos de Drive de la marca con la forma del catálogo; sin fila → tipo null", async () => {
+    estado.fotos = [CHULETA, SIN_FILA];
     const qc = cliente();
-    const { result } = renderHook(() => useFotosInstagram("casa-tomas"), {
-      wrapper: ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>,
-    });
-    await waitFor(() => expect(result.current.catalogo).toHaveLength(FOTOS.length + 2));
-    const ids = result.current.fotos.map((f) => f.id);
-    expect(ids).toEqual([...FOTOS.filter((f) => f.marca === "casa-tomas").map((f) => f.id), SUBIDA.id]);
-    expect(result.current.fotos.at(-1)).toMatchObject({ subida: true, aptaPost: true, aptaStory: true, descripcion: "Chuleta" });
-    expect(result.current.catalogo.map((f) => f.id)).toContain(DE_TOUZA.id);
-    expect(result.current.catalogo.map((f) => f.id)).not.toContain("rara");
+    const { result } = renderHook(() => useFotosInstagram("casa-tomas"), { wrapper: ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(result.current.catalogo).toHaveLength(2));
+    expect(result.current.fotos[0]).toMatchObject({ id: `drive:${CHULETA.driveId}`, driveId: CHULETA.driveId, tipo: "plato", aptaPost: true, aptaStory: true, descripcion: "Chuleta", ruta: "" });
+    expect(result.current.fotos[1].tipo).toBeNull();
+    const [url, init] = llamadas()[0];
+    expect(url).toBe(URL_DRIVE);
+    expect(JSON.parse(String(init.body))).toEqual({ accion: "listar", marca: "casa-tomas" });
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer jwt-de-prueba");
   });
 
   it("con formato, solo las aptas", async () => {
-    sbFalso.filas = [SUBIDA, { ...SUBIDA, id: "22222222-2222-4333-8444-555555555555", ancho: 500, alto: 500 }];
+    estado.fotos = [CHULETA, PEQUENA];
     const qc = cliente();
-    const { result } = renderHook(() => useFotosInstagram("casa-tomas", "story"), {
-      wrapper: ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider>,
-    });
-    await waitFor(() => expect(result.current.fotos.map((f) => f.id)).toContain(SUBIDA.id));
-    expect(result.current.fotos.map((f) => f.id)).not.toContain("22222222-2222-4333-8444-555555555555");
+    const { result } = renderHook(() => useFotosInstagram("casa-tomas", "story"), { wrapper: ({ children }) => <QueryClientProvider client={qc}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(result.current.fotos.map((f) => f.driveId)).toEqual([CHULETA.driveId]));
   });
 });
 
-describe("Subir foto", () => {
-  it("prepara la foto, enseña medidas y aptitud, la sube con RLS, guarda la fila y la deja elegida", async () => {
-    vi.spyOn(crypto, "randomUUID").mockReturnValue(ID);
+describe("SelectorFoto (Drive)", () => {
+  it("pinta las miniaturas pedidas con la sesión, marca las sin clasificar y explica las que no valen", async () => {
+    estado.fotos = [CHULETA, SIN_FILA, HEIC];
+    const onCambio = vi.fn();
+    pintar(<Selector onCambio={onCambio} />);
+    const chuleta = await screen.findByTestId(`foto-drive:${CHULETA.driveId}`);
+    await waitFor(() => expect(chuleta.querySelector("img")).toHaveAttribute("src", "blob:vista"));
+    const mini = llamadas().find(([u]) => u.includes("accion=miniatura"))!;
+    expect(mini[0]).toBe(`${URL_DRIVE}?accion=miniatura&marca=casa-tomas&id=${CHULETA.driveId}`);
+    expect((mini[1].headers as Record<string, string>).Authorization).toBe("Bearer jwt-de-prueba");
+
+    expect(within(screen.getByTestId(`foto-drive:${SIN_FILA.driveId}`)).getByText("Sin clasificar")).toBeInTheDocument();
+    // La foto sin tipo vale para la plantilla; la HEIC no, y explica por qué.
+    fireEvent.click(screen.getByTestId(`foto-drive:${SIN_FILA.driveId}`));
+    expect(onCambio).toHaveBeenCalledWith(`drive:${SIN_FILA.driveId}`);
+    const heic = screen.getByTestId(`foto-drive:${HEIC.driveId}`);
+    expect(heic).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(heic);
+    expect(screen.getByRole("status")).toHaveTextContent(/HEIC/);
+    // Ya no se borra desde el panel: Drive es el archivo.
+    expect(screen.queryByRole("button", { name: /Borrar/ })).toBeNull();
+  });
+
+  it("enseña el aviso de drive.file y el error si Drive falla", async () => {
+    estado.avisos = ["El token de Google tiene el permiso «drive.file»: el panel solo ve las fotos que se suben desde aquí."];
+    pintar(<Selector />);
+    expect(await screen.findByTestId("aviso-biblioteca")).toHaveTextContent(/drive\.file/);
+  });
+
+  it("si la función de Drive responde error, lo dice y apunta a «Conexión»", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => json({ ok: false, error: "Google Drive: respondió 404" }, 502)));
+    pintar(<Selector />);
+    expect(await screen.findByTestId("error-biblioteca", undefined, { timeout: 4000 })).toHaveTextContent(/No se pueden cargar las fotos de Drive: Google Drive: respondió 404.*Conexión/);
+  });
+});
+
+describe("Subir foto (a Drive)", () => {
+  it("prepara la foto, enseña medidas y aptitud, la sube a Drive en un FormData y la deja elegida", async () => {
     const onCambio = vi.fn();
     pintar(<Selector onCambio={onCambio} />);
 
@@ -166,25 +183,25 @@ describe("Subir foto", () => {
     expect(convertirFoto).toHaveBeenCalledWith(fichero);
     expect(within(dialogo).getByText(/Post 1080×1350: sirve/)).toBeInTheDocument();
     expect(within(dialogo).getByText(/Story 1080×1920: sirve/)).toBeInTheDocument();
-    expect(within(dialogo).getByRole("img", { name: "Vista previa de la foto" })).toHaveAttribute("src", "blob:vista");
 
     fireEvent.change(within(dialogo).getByLabelText("Descripción corta"), { target: { value: "  Pulpo a la brasa " } });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Subir" }));
 
-    await waitFor(() => expect(onCambio).toHaveBeenCalledWith(ID));
-    const ruta = `fotos/casa-tomas/subidas/${ID}.jpg`;
-    expect(sbFalso.upload).toHaveBeenCalledWith(ruta, expect.any(Blob), expect.objectContaining({ contentType: "image/jpeg", upsert: false }));
-    expect(sbFalso.insert).toHaveBeenCalledWith({ id: ID, marca: "casa-tomas", ruta, ancho: 1708, alto: 2560, tipo: "plato", descripcion: "Pulpo a la brasa" });
-    // La nueva foto ya está en la cuadrícula, marcada como subida y elegida.
-    const nueva = await screen.findByTestId(`foto-${ID}`);
+    await waitFor(() => expect(onCambio).toHaveBeenCalledWith(`drive:${NUEVA}`));
+    const [, init] = llamadas().find(([u]) => u === `${URL_DRIVE}?accion=subir`)!;
+    const form = init.body as FormData;
+    expect(form).toBeInstanceOf(FormData);
+    expect([form.get("marca"), form.get("tipo"), form.get("descripcion")]).toEqual(["casa-tomas", "plato", "Pulpo a la brasa"]);
+    expect(form.get("archivo")).toBeInstanceOf(Blob);
+    // El navegador pone el Content-Type multipart: no se fuerza JSON.
+    expect((init.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+    const nueva = await screen.findByTestId(`foto-drive:${NUEVA}`);
     expect(nueva).toHaveAttribute("aria-checked", "true");
-    expect(nueva).toHaveAccessibleName(/^Subida\. Pulpo a la brasa/);
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("si la fila no se puede guardar, borra el fichero subido y no elige nada", async () => {
-    vi.spyOn(crypto, "randomUUID").mockReturnValue(ID);
-    sbFalso.insert = vi.fn(async () => ({ error: { message: "new row violates row-level security policy" } }));
+  it("si Drive falla, lo dice y no elige nada", async () => {
+    estado.subida = () => json({ ok: false, error: "Google Drive: respondió 403", comoArreglarlo: "…" }, 502);
     const onCambio = vi.fn();
     pintar(<Selector onCambio={onCambio} />);
     fireEvent.click(screen.getByRole("button", { name: /Subir foto/ }));
@@ -192,7 +209,7 @@ describe("Subir foto", () => {
     fireEvent.change(within(dialogo).getByTestId("entrada-foto"), { target: { files: [new File(["x"], "a.jpg", { type: "image/jpeg" })] } });
     await within(dialogo).findByTestId("medidas-foto");
     fireEvent.click(within(dialogo).getByRole("button", { name: "Subir" }));
-    await waitFor(() => expect(sbFalso.remove).toHaveBeenCalledWith([`fotos/casa-tomas/subidas/${ID}.jpg`]));
+    await waitFor(() => expect(llamadas().some(([u]) => u === `${URL_DRIVE}?accion=subir`)).toBe(true));
     expect(onCambio).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
@@ -216,33 +233,6 @@ describe("Subir foto", () => {
     fireEvent.change(within(dialogo).getByTestId("entrada-foto"), { target: { files: [new File(["x"], "a.heic", { type: "image/heic" })] } });
     expect(await within(dialogo).findByRole("alert")).toHaveTextContent("Este formato no se puede leer en este navegador; expórtala como JPEG");
     expect(within(dialogo).getByRole("button", { name: "Subir" })).toBeDisabled();
-    expect(sbFalso.upload).not.toHaveBeenCalled();
-  });
-});
-
-describe("Borrar una foto subida", () => {
-  it("pide confirmación (avisando si la usa alguna pieza) y borra fila y fichero solo al confirmar", async () => {
-    sbFalso.filas = [SUBIDA];
-    sbFalso.usos = 2;
-    pintar(<Selector />);
-    const borrar = await screen.findByRole("button", { name: "Borrar la foto subida «Chuleta»" });
-    // Las del catálogo estático no se pueden borrar.
-    expect(screen.getAllByRole("button", { name: /Borrar la foto subida/ })).toHaveLength(1);
-
-    fireEvent.click(borrar);
-    const alerta = await screen.findByRole("alertdialog");
-    expect(within(alerta).getByText("¿Borrar esta foto?")).toBeInTheDocument();
-    expect(await within(alerta).findByTestId("aviso-foto-en-uso")).toHaveTextContent("La usan 2 piezas guardadas");
-    expect(sbFalso.borrar).not.toHaveBeenCalled();
-
-    fireEvent.click(within(alerta).getByRole("button", { name: "Cancelar" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(sbFalso.borrar).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: "Borrar la foto subida «Chuleta»" }));
-    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Borrar foto" }));
-    await waitFor(() => expect(sbFalso.remove).toHaveBeenCalledWith([SUBIDA.ruta]));
-    expect(sbFalso.borrar).toHaveBeenCalledWith(SUBIDA.id);
-    await waitFor(() => expect(screen.queryByTestId(`foto-${SUBIDA.id}`)).toBeNull());
+    expect(llamadas().some(([u]) => u === `${URL_DRIVE}?accion=subir`)).toBe(false);
   });
 });

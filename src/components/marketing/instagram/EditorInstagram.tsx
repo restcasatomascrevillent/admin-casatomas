@@ -10,6 +10,7 @@ import {
   baseFotosPublica,
   baseRecursosPanel,
   construirDocumento,
+  driveIdDeFoto,
   obtenerPlantilla,
   plantillasDe,
   validarPieza,
@@ -24,7 +25,7 @@ import { FormularioPieza, NOMBRE_FORMATO } from "./FormularioPieza";
 import { HistorialPiezas, urlImagenPieza } from "./HistorialPiezas";
 import { borradorDesdeDatos, borradorVacio, camposConProblemas, humanizarProblema, piezaDesdeBorrador, type Borrador } from "./pieza";
 import { CLAVE_PIEZAS, type PiezaInstagram } from "./usePiezasInstagram";
-import { useFotosInstagram } from "./useFotosInstagram";
+import { clavePreparada, useFotoPreparada, useFotosInstagram } from "./useFotosInstagram";
 import { VistaPreviaPieza, type ResultadoMaquetacion } from "./VistaPreviaPieza";
 
 /** Espera entre teclear y repintar la vista previa (ms). */
@@ -32,7 +33,7 @@ export const ESPERA_VISTA_PREVIA = 250;
 
 /** Fuentes y logos: public/instagram del propio panel (relativa: vale en el iframe srcdoc). */
 const BASE_RECURSOS = baseRecursosPanel();
-/** Fotos de la biblioteca y JPEG generados: bucket público «instagram» de Supabase. */
+/** Copias temporales de las fotos de Drive y JPEG generados: bucket público «instagram» de Supabase. */
 const BASE_FOTOS = baseFotosPublica(import.meta.env.VITE_SUPABASE_URL ?? "");
 
 function useDiferido<T>(valor: T, ms: number): T {
@@ -50,12 +51,20 @@ function ejemplosPara(plantilla: string, formato: FormatoId) {
   return [...todos.filter((e) => e.json.formato === formato), ...todos.filter((e) => e.json.formato !== formato)];
 }
 
+/**
+ * Los ejemplos traen fotos del catálogo estático, que ya no está en la
+ * biblioteca (las fotos salen de Drive): se cargan sin foto y se elige una.
+ */
+function datosEjemplo(json: unknown): never {
+  return { ...(json as Record<string, unknown>), foto: undefined } as never;
+}
+
 function borradorInicial(): Borrador {
   const marca: MarcaId = "casa-tomas";
   const plantilla = plantillasDe(marca)[0];
   const base = borradorVacio(marca, plantilla?.id ?? "", plantilla?.formatos[0] ?? "post");
   const ejemplo = plantilla ? ejemplosPara(plantilla.id, base.formato)[0] : undefined;
-  return ejemplo ? borradorDesdeDatos(ejemplo.json as never, base) : base;
+  return ejemplo ? borradorDesdeDatos(datosEjemplo(ejemplo.json), base) : base;
 }
 
 /**
@@ -79,14 +88,26 @@ export function EditorInstagram() {
   const firma = useMemo(() => JSON.stringify(pieza), [pieza]);
   const firmaDiferida = useDiferido(firma, ESPERA_VISTA_PREVIA);
 
-  // Catálogo de fotos = estáticas + subidas desde el panel (instagram_fotos).
-  const { catalogo } = useFotosInstagram(borrador.marca);
+  // Biblioteca de Drive de la marca; la foto elegida se copia al bucket (preparar) para pintarla.
+  const { catalogo: catalogoDrive, cargando: cargandoFotos } = useFotosInstagram(borrador.marca);
+  const preparacion = useFotoPreparada(borrador.marca, borrador.foto, catalogoDrive);
+  const catalogo = useMemo(
+    () => (preparacion.lista ? catalogoDrive.map((f) => (f.id === preparacion.lista!.foto.id ? preparacion.lista!.foto : f)) : catalogoDrive),
+    [catalogoDrive, preparacion.lista],
+  );
   const validacion = useMemo(() => validarPieza(JSON.parse(firmaDiferida), { fotos: catalogo }), [firmaDiferida, catalogo]);
 
   // El documento se pinta aunque la pieza tenga problemas (titular largo, foto que no
-  // vale…): así se ve el desborde. Solo si no se puede construir (falta la foto) no hay vista.
+  // vale…): así se ve el desborde. Solo si no se puede construir (falta la foto, o
+  // la de Drive aún no está copiada al bucket) no hay vista.
   const { documento, motivoSinVista } = useMemo(() => {
     const p = JSON.parse(firmaDiferida) as Partial<DatosPieza>;
+    if (driveIdDeFoto(p.foto) && !preparacion.lista) {
+      if (preparacion.error) return { documento: null, motivoSinVista: `No se ha podido preparar la foto de Drive: ${preparacion.error.message}` };
+      // Mientras se carga la biblioteca o se copia la foto al bucket. Si la foto ya no está en Drive,
+      // la validación de abajo lo dice («no está en el catálogo»).
+      if (preparacion.preparando || cargandoFotos) return { documento: null, motivoSinVista: "Preparando la foto de Drive…" };
+    }
     const datos = "datos" in validacion ? validacion.datos : ({ ...p, titular: p.titular ?? "" } as DatosPieza);
     try {
       return { documento: construirDocumento(datos, { baseRecursos: BASE_RECURSOS, baseFotos: BASE_FOTOS, fotos: catalogo }), motivoSinVista: null };
@@ -94,7 +115,7 @@ export function EditorInstagram() {
       const falta = (obtenerPlantilla(String(p.plantilla))?.obligatorios ?? []).includes("foto") && !p.foto;
       return { documento: null, motivoSinVista: falta ? "Elige una foto para ver la pieza." : (e as Error).message };
     }
-  }, [firmaDiferida, validacion, catalogo]);
+  }, [firmaDiferida, validacion, catalogo, preparacion.lista, preparacion.error, preparacion.preparando, cargandoFotos]);
 
   const alMaquetar = useCallback((r: ResultadoMaquetacion) => setMaquetacion(documento ? { ...r, documento } : null), [documento]);
   const maquetacionAlDia = maquetacion && maquetacion.documento === documento ? maquetacion : null;
@@ -133,7 +154,7 @@ export function EditorInstagram() {
   const cargarEjemplo = () => {
     if (!ejemplos.length) return;
     const e = ejemplos[indiceEjemplo % ejemplos.length];
-    setBorrador((b) => borradorDesdeDatos(e.json as never, b));
+    setBorrador((b) => ({ ...borradorDesdeDatos(datosEjemplo(e.json), b), foto: b.foto }));
     setIndiceEjemplo((i) => i + 1);
   };
 
@@ -251,6 +272,13 @@ export function EditorInstagram() {
             cuenta={cuenta}
             onCuenta={setCuenta}
             onCambioServidor={() => void qc.invalidateQueries({ queryKey: CLAVE_PIEZAS })}
+            fotoPreparada={preparacion.lista?.preparada ?? null}
+            fotoTmp={preparacion.lista?.ruta ?? null}
+            onPublicada={() => {
+              // La función borra la copia tmp/ al publicar: la próxima vez se vuelve a preparar.
+              const d = driveIdDeFoto(borrador.foto);
+              if (d) qc.removeQueries({ queryKey: clavePreparada(d) });
+            }}
           />
         </TabsContent>
         <TabsContent value="historial" className={CONTENIDO_LADO}>
