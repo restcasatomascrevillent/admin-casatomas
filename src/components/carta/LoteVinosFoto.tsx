@@ -13,6 +13,9 @@ import { formatoEuros, precioMercado, precioSugerido } from "./leerVinoFoto";
 import type { FilaLote, LoteVinos } from "./useLoteVinos";
 import { ESTILO_DAMERO } from "./recorte/useRecorteVino";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
+import { valoresDesdeDatosVino } from "./lecturaEtiquetaVino";
+import { origenVinoClaro } from "@/lib/origen-vino";
+import { ETIQUETA_ORIGEN_POR_CONFIRMAR } from "@/lib/tipos-vino";
 
 interface Props {
   open: boolean;
@@ -116,6 +119,8 @@ export function LoteVinosDialog({ open, onOpenChange, lote, onAbrirFila }: Props
             const precio = precioSugerido(d);
             const tienda = precioMercado(d);
             const abrible = fila.estado === "listo";
+            // La IA no sacó claro el origen: el formulario lo pedirá antes de guardar.
+            const sinOrigen = fila.estado === "listo" && d && !origenVinoClaro(valoresDesdeDatosVino(d));
             return (
               <li key={fila.id} className="flex items-center gap-2 rounded-lg border bg-card p-2">
                 <button
@@ -154,6 +159,11 @@ export function LoteVinosDialog({ open, onOpenChange, lote, onAbrirFila }: Props
                     <span className="block text-xs">
                       <TextoEstado fila={fila} />
                     </span>
+                    {sinOrigen && (
+                      <span className="block text-xs font-medium text-amber-700 dark:text-amber-400">
+                        {ETIQUETA_ORIGEN_POR_CONFIRMAR}: complétalo al revisar
+                      </span>
+                    )}
                   </span>
                   {abrible && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
                 </button>
