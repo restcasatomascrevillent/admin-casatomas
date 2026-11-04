@@ -210,6 +210,33 @@ function filasProductos(
   conBultos = true,
   conIvaPct = true,
 ) {
+  return igualarColumnasValor(filasProductosSinIgualar(d, embeddings, conColumnas04b, conBultos, conIvaPct));
+}
+
+/**
+ * En un insert por lotes, PostgREST toma la unión de claves de todas las filas
+ * y pone NULL (no el DEFAULT) en las que no la traen. `importe_bruto_estimado`
+ * es NOT NULL: si alguna línea trae el valor sin descuento, todas deben traer
+ * las tres columnas. Si ninguna las trae (OCR), no se añaden.
+ */
+export function igualarColumnasValor<T extends Record<string, unknown>>(filas: T[]): T[] {
+  const alguna = filas.some((f) => "importe_bruto" in f || "descuento_pct" in f);
+  if (!alguna) return filas;
+  return filas.map((f) => ({
+    descuento_pct: null,
+    importe_bruto: null,
+    importe_bruto_estimado: false,
+    ...f,
+  }));
+}
+
+function filasProductosSinIgualar(
+  d: DatosNormalizados,
+  embeddings: number[][],
+  conColumnas04b: boolean,
+  conBultos = true,
+  conIvaPct = true,
+) {
   return d.productos.map((p, i) => ({
     nombre: p.nombre,
     cantidad: p.cantidad,

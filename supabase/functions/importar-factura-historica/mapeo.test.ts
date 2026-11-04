@@ -280,3 +280,19 @@ describe("validarEntrada", () => {
     if (!v.ok) expect(v.error).toMatch(error);
   });
 });
+
+describe("igualarColumnasValor (insert por lotes con columnas mezcladas)", () => {
+  it("si alguna línea trae valor sin descuento, todas llevan las tres columnas sin NULL en el booleano", async () => {
+    const { igualarColumnasValor } = await import("../procesar-factura/guardado.ts");
+    const filas = igualarColumnasValor([
+      { nombre: "a", total: 10 },
+      { nombre: "b", total: 0, importe_bruto: 5, importe_bruto_estimado: true },
+    ] as Record<string, unknown>[]);
+    expect(filas[0]).toMatchObject({ importe_bruto: null, importe_bruto_estimado: false, descuento_pct: null });
+    expect(filas[1]).toMatchObject({ importe_bruto: 5, importe_bruto_estimado: true });
+  });
+  it("si ninguna las trae (OCR), no se añaden", async () => {
+    const { igualarColumnasValor } = await import("../procesar-factura/guardado.ts");
+    expect(igualarColumnasValor([{ nombre: "a" }] as Record<string, unknown>[])[0]).toEqual({ nombre: "a" });
+  });
+});

@@ -18,12 +18,24 @@ export interface ConfigDrive {
   parentFolder: string;
 }
 
+/** Los secretos pegados en el panel de Supabase pueden arrastrar un salto de
+ *  línea final (pasó el 04-nov-2026: Google respondía «invalid_client»). */
+export function limpiarConfigDrive(cfg: ConfigDrive): ConfigDrive {
+  return {
+    clientId: (cfg.clientId ?? "").trim(),
+    clientSecret: (cfg.clientSecret ?? "").trim(),
+    refreshToken: (cfg.refreshToken ?? "").trim(),
+    parentFolder: (cfg.parentFolder ?? "").trim(),
+  };
+}
+
 export function driveActivo(cfg: ConfigDrive): boolean {
   return !!(cfg.clientId && cfg.clientSecret && cfg.refreshToken && cfg.parentFolder);
 }
 
 // ─── Google Drive (OAuth refresh token) ──────────────────────────────────────
-async function driveToken(cfg: ConfigDrive): Promise<string> {
+async function driveToken(cfgCruda: ConfigDrive): Promise<string> {
+  const cfg = limpiarConfigDrive(cfgCruda);
   const body = new URLSearchParams({
     client_id: cfg.clientId,
     client_secret: cfg.clientSecret,
@@ -105,7 +117,7 @@ async function subirADrive(
     return null;
   }
   const token = await driveToken(cfg);
-  const provFolder = await ensureFolder(carpetaProveedor(proveedor), cfg.parentFolder, token);
+  const provFolder = await ensureFolder(carpetaProveedor(proveedor), cfg.parentFolder.trim(), token);
   const monthFolder = await ensureFolder(carpetaMes(fecha), provFolder, token);
 
   // 1) metadata
