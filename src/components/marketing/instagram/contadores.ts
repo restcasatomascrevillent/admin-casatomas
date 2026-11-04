@@ -16,7 +16,7 @@ export function contarPalabras(texto: string): number {
 }
 
 export function contarHashtags(texto: string): number {
-  // Misma expresión que el servidor (api/_lib/instagram/validacion.ts).
+  // Misma expresión que el servidor (supabase/functions/_shared/instagram/validacion.ts).
   return (texto.match(/(?:^|[^\p{L}\p{N}_&#])#[\p{L}\p{N}_]+/gu) ?? []).length;
 }
 

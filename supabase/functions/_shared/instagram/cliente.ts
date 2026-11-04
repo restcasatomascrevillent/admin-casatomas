@@ -10,9 +10,9 @@
  *  - Reintentos con espera creciente solo para errores transitorios.
  *  - `fetch`, `dormir` y `ahora` se inyectan para poder probar sin red.
  */
-import { sanear, sanearUrl, mensajeSaneado, registrarSecreto } from "./secretos.js";
-import { VERSION_API_POR_DEFECTO } from "./entorno.js";
-import { ErrorInstagram, mapearErrorGraph, tipoDesdeTextoEstado, textoDeTipo } from "./errores.js";
+import { sanear, sanearUrl, mensajeSaneado, registrarSecreto } from "./secretos.ts";
+import { VERSION_API_POR_DEFECTO } from "./entorno.ts";
+import { ErrorInstagram, mapearErrorGraph, tipoDesdeTextoEstado, textoDeTipo } from "./errores.ts";
 
 export const HOST_GRAPH = "https://graph.facebook.com";
 

@@ -8,6 +8,7 @@
  */
 import { FORMATOS, MARGEN, generarCss, type FormatoId, type MarcaId } from "./tokens.js";
 import { urlFoto, urlLogo } from "./recursos.js";
+import type { Foto } from "./fotos.js";
 import { obtenerPlantilla } from "./plantillas/index.js";
 import { esc, type ContextoPlantilla, type DatosPieza, type Plantilla } from "./tipos.js";
 
@@ -20,12 +21,14 @@ export interface OpcionesDocumento {
   baseRecursos: string;
   /** Base de las FOTOS (bucket público «instagram»): baseFotosPublica(supabaseUrl). */
   baseFotos: string;
+  /** Catálogo de fotos (por defecto, el estático FOTOS; con las subidas, combinarCatalogo). */
+  fotos?: readonly Foto[];
   /** Plantilla a usar en lugar de buscarla en el registro (tests). */
   plantilla?: Plantilla;
 }
 
 /** Contexto que recibe la plantilla. */
-export function crearContexto(marca: MarcaId, formato: FormatoId, bases: Pick<OpcionesDocumento, "baseRecursos" | "baseFotos">): ContextoPlantilla {
+export function crearContexto(marca: MarcaId, formato: FormatoId, bases: Pick<OpcionesDocumento, "baseRecursos" | "baseFotos" | "fotos">): ContextoPlantilla {
   const f = FORMATOS[formato];
   const zona = "zonaSegura" in f ? f.zonaSegura : { arriba: 0, abajo: 0 };
   return {
@@ -33,7 +36,7 @@ export function crearContexto(marca: MarcaId, formato: FormatoId, bases: Pick<Op
     alto: f.alto,
     zonaSegura: { arriba: zona.arriba, abajo: zona.abajo },
     margen: MARGEN,
-    urlFoto: (id) => urlFoto(bases.baseFotos, id),
+    urlFoto: (id) => urlFoto(bases.baseFotos, id, bases.fotos),
     urlLogo: (pieza, color) => urlLogo(bases.baseRecursos, marca, pieza, color),
   };
 }

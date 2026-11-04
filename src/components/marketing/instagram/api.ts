@@ -1,19 +1,28 @@
 /**
- * Llamadas a las funciones de Vercel de Instagram (`api/instagram-*.ts`) con el
- * JWT de la sesión, igual que `/api/recortar-foto` (quitarFondoServidor.ts).
+ * Llamadas de Marketing › Instagram con el JWT de la sesión:
  *
- * En local (`vite`) esas funciones NO existen: Vite contesta con el index.html
- * (200, text/html) o con un 404. En vez de fallar en silencio o con un «Unexpected
- * token <», se lanza un ErrorInstagram de tipo «sin-servidor» con un texto claro.
+ *  - Render (JPEG): función de Vercel `/api/instagram-render` (necesita
+ *    Chromium; no usa secretos de Meta). En local (`vite`) NO existe: Vite
+ *    contesta con el index.html (200, text/html) o con un 404, y en vez de
+ *    fallar con un «Unexpected token <» se lanza un ErrorInstagram de tipo
+ *    «sin-servidor» con un texto claro.
+ *  - Publicar y comprobar la conexión: Edge Functions de Supabase
+ *    (`instagram-publicar` e `instagram-estado`), donde viven los secretos de
+ *    Meta. Funcionan también en local: van al Supabase de VITE_SUPABASE_URL
+ *    con la clave pública (`apikey`) y el JWT, como el resto de funciones.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { auditDeviceId } from "@/lib/audit-device";
+
+const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
+const CLAVE_PUBLICA = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "");
 
 export const URL_RENDER = "/api/instagram-render";
-export const URL_PUBLICAR = "/api/instagram-publicar";
-export const URL_ESTADO = "/api/instagram-estado";
+export const URL_PUBLICAR = `${SUPABASE_URL}/functions/v1/instagram-publicar`;
+export const URL_ESTADO = `${SUPABASE_URL}/functions/v1/instagram-estado`;
 
 export const MENSAJE_SIN_SERVIDOR =
-  "Esto solo funciona en la demo de Vercel: en local (npm run dev) no existen las funciones /api de Instagram.";
+  "La imagen definitiva solo se genera en la demo de Vercel: en local (npm run dev) no existe la función /api/instagram-render.";
 
 export type TipoErrorInstagram = "sin-servidor" | "sesion" | "validacion" | "servidor" | "red";
 
@@ -90,6 +99,11 @@ export interface OpcionesLlamada {
   token?: string | null;
 }
 
+/** Cabeceras extra de las Edge Functions: clave pública + identificador del panel (auditoría). */
+function cabecerasEdge(): Record<string, string> {
+  return { apikey: CLAVE_PUBLICA, "x-client-info": `adminpanel/${auditDeviceId()}/${crypto.randomUUID()}` };
+}
+
 async function tokenSesion(): Promise<string | null> {
   try {
     const { data } = await supabase.auth.getSession();
@@ -103,7 +117,7 @@ function esJson(r: Response): boolean {
   return (r.headers.get("content-type") ?? "").includes("application/json");
 }
 
-async function llamar<T>(url: string, init: RequestInit, opts: OpcionesLlamada = {}): Promise<T> {
+async function llamar<T>(url: string, init: RequestInit, opts: OpcionesLlamada = {}, extra: Record<string, string> = {}): Promise<T> {
   const token = opts.token === undefined ? await tokenSesion() : opts.token;
   if (!token) throw new ErrorInstagram("No hay sesión: vuelve a entrar en el panel.", "sesion", 401);
   const f = opts.fetch ?? fetch;
@@ -111,14 +125,14 @@ async function llamar<T>(url: string, init: RequestInit, opts: OpcionesLlamada =
   try {
     r = await f(url, {
       ...init,
-      headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), Authorization: `Bearer ${token}` },
+      headers: { ...(init.body ? { "Content-Type": "application/json" } : {}), ...extra, Authorization: `Bearer ${token}` },
     });
   } catch (e) {
     throw new ErrorInstagram((e as Error)?.message || "Sin conexión", "red");
   }
-  // En local, Vite responde con HTML (o 404 vacío): no hay función detrás.
+  // En local, Vite responde con HTML (o 404 vacío): no hay función de Vercel detrás.
   if (!esJson(r)) {
-    if (r.status === 404 || r.ok || (r.headers.get("content-type") ?? "").includes("text/html")) {
+    if (url === URL_RENDER && (r.status === 404 || r.ok || (r.headers.get("content-type") ?? "").includes("text/html"))) {
       throw new ErrorInstagram(MENSAJE_SIN_SERVIDOR, "sin-servidor", r.status);
     }
     throw new ErrorInstagram(`El servidor respondió ${r.status}`, "servidor", r.status);
@@ -130,12 +144,21 @@ async function llamar<T>(url: string, init: RequestInit, opts: OpcionesLlamada =
     throw new ErrorInstagram(`Respuesta no válida del servidor (${r.status})`, "servidor", r.status);
   }
   if (!r.ok) {
-    const c = (cuerpo ?? {}) as { error?: string; comoArreglarlo?: string | string[]; problemas?: string[] };
+    const c = (cuerpo ?? {}) as { error?: string; message?: string; comoArreglarlo?: string | string[]; problemas?: string[] };
     if (r.status === 422 && Array.isArray(c.problemas)) {
       throw new ErrorInstagram(c.error ?? "La pieza tiene problemas", "validacion", 422, c.comoArreglarlo, c.problemas);
     }
+    // La pasarela de Supabase contesta 404 { message } si la Edge Function no está desplegada.
+    if (r.status === 404 && !c.error && url !== URL_RENDER) {
+      throw new ErrorInstagram(
+        "La función de Instagram no está desplegada en este Supabase.",
+        "servidor",
+        404,
+        "Despliégala desde la raíz del repo: npx supabase functions deploy instagram-publicar instagram-estado --project-ref <ref del proyecto> (docs/instagram.md).",
+      );
+    }
     const tipo: TipoErrorInstagram = r.status === 401 || r.status === 403 ? "sesion" : "servidor";
-    throw new ErrorInstagram(c.error ?? `El servidor respondió ${r.status}`, tipo, r.status, c.comoArreglarlo);
+    throw new ErrorInstagram(c.error ?? c.message ?? `El servidor respondió ${r.status}`, tipo, r.status, c.comoArreglarlo);
   }
   return cuerpo as T;
 }
@@ -205,12 +228,12 @@ export function publicar(
 ) {
   const cuerpo: Record<string, unknown> = { id: args.id, caption: args.caption, dryRun: args.dryRun };
   if (args.contenedorId) cuerpo.contenedorId = args.contenedorId;
-  return llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts).then(normalizarPublicar);
+  return llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts, cabecerasEdge()).then(normalizarPublicar);
 }
 
 /** Estado de la conexión (variables, cuenta y cupo). Nunca devuelve valores secretos. */
 export function comprobarConexion(opts?: OpcionesLlamada) {
-  return llamar<Crudo>(URL_ESTADO, { method: "GET" }, opts).then(normalizarEstado);
+  return llamar<Crudo>(URL_ESTADO, { method: "GET" }, opts, cabecerasEdge()).then(normalizarEstado);
 }
 
 /** Texto para el usuario a partir de cualquier error de estas llamadas. */

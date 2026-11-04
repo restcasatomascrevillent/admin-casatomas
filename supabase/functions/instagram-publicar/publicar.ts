@@ -1,8 +1,11 @@
 /**
- * POST /api/instagram-publicar — publica (o prueba) una pieza ya generada en
- * Instagram con la Content Publishing API de Meta. Ver docs/instagram.md.
+ * Edge Function instagram-publicar — publica (o prueba) una pieza ya generada
+ * en Instagram con la Content Publishing API de Meta. Ver docs/instagram.md.
+ * Antes era la función de Vercel api/instagram-publicar.ts; se movió aquí para
+ * que los secretos de Meta vivan SOLO en Supabase (Edge Functions → Secrets).
  *
- *   Petición: `Authorization: Bearer <JWT de Supabase>` y JSON
+ *   Petición: POST `${SUPABASE_URL}/functions/v1/instagram-publicar` con
+ *             `Authorization: Bearer <JWT de Supabase>` + `apikey` y JSON
  *             { "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "<id para reintentar>" }
  *
  *   Flujo: pieza (RLS) → caption (2200 caracteres, 30 #, 20 @) → HEAD de la
@@ -17,10 +20,10 @@
  *   202: { ok: true, estado: "en_proceso", id, dryRun, publicado: false, contenedor: { id, estado }, cuota, reintentar: { id, contenedorId, dryRun } }
  *        → Meta aún procesa la imagen: repetir la petición con ese contenedorId.
  *   Errores (JSON { ok: false, error, comoArreglarlo?, tipo?, problemas?, cuota? }):
- *     400 cuerpo · 401 sesión · 403 sin Marketing · 404 pieza · 409 sin JPEG,
- *     ya publicada o contenedor que no es el de la pieza · 422 caption o imagen
- *     no válida · 429 cuota agotada / límites de Meta · 502/503 error de Meta ·
- *     503 faltan variables de Meta en Vercel.
+ *     400 cuerpo · 401 sesión · 403 sin Marketing · 404 pieza · 405 método ·
+ *     409 sin JPEG, ya publicada o contenedor que no es el de la pieza · 422
+ *     caption o imagen no válida · 429 cuota agotada / límites de Meta ·
+ *     502/503 error de Meta · 503 faltan secretos de Meta en Supabase.
  *
  *   La fila se actualiza: dryRun → «prueba_ok» + contenedor_id; real →
  *   «publicada» + media_id + permalink; error de Meta → «error» + mensaje saneado.
@@ -31,19 +34,24 @@
  *   `error` empiece por AVISO_JPEG_NO_BORRADO. La respuesta lleva
  *   `imagenEnBucket`. En prueba (dryRun) NO se borra: el contenedor necesita
  *   la URL hasta que se publique.
+ *
+ *   Todo como el usuario (clave pública + su JWT): nunca service_role.
  */
-import { ClienteGraph, type FuncionFetch, type InfoContenedor } from "./_lib/instagram/cliente.js";
-import { cuotaDe, type CuotaPublicacion } from "./_lib/instagram/comprobacion.js";
-import { leerConfigMeta } from "./_lib/instagram/entorno.js";
-import { ErrorInstagram, errorInstagramAJson, estadoHttpDeError } from "./_lib/instagram/errores.js";
-import { json, jsonAuth, leerJson } from "./_lib/instagram/http.js";
-import { registro, sanear } from "./_lib/instagram/secretos.js";
-import { actualizarPieza, anotarError, autorizarMarketing, borrarJpeg, ErrorSupabase, leerPieza, urlPublica, type FilaPieza, type Sesion } from "./_lib/instagram/supabase.js";
-import { esUuid, MAX_BYTES_IMAGEN, validarCaption, type TipoPublicacion } from "./_lib/instagram/validacion.js";
+import { ClienteGraph, type FuncionFetch, type InfoContenedor } from "../_shared/instagram/cliente.ts";
+import { cuotaDe, type CuotaPublicacion } from "../_shared/instagram/comprobacion.ts";
+import { entornoDeno, leerConfigMeta } from "../_shared/instagram/entorno.ts";
+import { ErrorInstagram, errorInstagramAJson, estadoHttpDeError } from "../_shared/instagram/errores.ts";
+import { json, jsonAuth, leerJson, opciones } from "../_shared/instagram/http.ts";
+import { registro, sanear } from "../_shared/instagram/secretos.ts";
+import { actualizarPieza, anotarError, autorizarMarketing, borrarJpeg, ErrorSupabase, leerPieza, urlPublica, type FilaPieza, type Sesion } from "../_shared/instagram/supabase.ts";
+import { esUuid, MAX_BYTES_IMAGEN, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
 
 const ETIQUETA = "instagram-publicar";
 
-/** Tiempo total que la función dedica a esperar FINISHED (maxDuration = 90 s). */
+/**
+ * Tiempo que la función dedica a esperar FINISHED. La Edge Function tiene
+ * ~150 s de reloj; se deja margen y, si no llega, responde 202 «en_proceso».
+ */
 export const PRESUPUESTO_SONDEO_MS = 55_000;
 export const INTERVALO_SONDEO_MS = 3_000;
 /** Prefijo de `error` en una pieza publicada cuyo JPEG no se pudo borrar del bucket. */
@@ -63,7 +71,9 @@ function errorMeta(e: ErrorInstagram, extra: Record<string, unknown> = {}): Resp
 }
 
 export async function manejarPublicar(request: Request, deps: DependenciasPublicar = {}): Promise<Response> {
-  const env = deps.env ?? process.env;
+  if (request.method === "OPTIONS") return opciones();
+  if (request.method !== "POST") return json(405, { ok: false, error: "Método no permitido: usa POST" });
+  const env = deps.env ?? entornoDeno();
   const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch });
   if ("motivo" in auth) {
     if (auth.estado >= 500) registro("error", ETIQUETA, "autorización", { motivo: auth.motivo });
@@ -87,7 +97,7 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
   if ("problemas" in meta) {
     return json(503, {
       ok: false,
-      error: `Falta configurar Instagram en Vercel: ${meta.problemas.map((p) => `${p.variable} (${p.problema})`).join(", ")}`,
+      error: `Falta configurar Instagram en los secretos de Supabase: ${meta.problemas.map((p) => `${p.variable} (${p.problema})`).join(", ")}`,
       faltan: meta.problemas.map((p) => p.variable),
       comoArreglarlo: meta.problemas.map((p) => p.comoArreglarlo).join(" "),
     });
@@ -298,8 +308,4 @@ export async function manejarPublicar(request: Request, deps: DependenciasPublic
     await anotarError(s, id, (e as Error)?.message ?? String(e));
     return json(500, { ok: false, error: "No se pudo publicar", detalle: sanear((e as Error)?.message ?? e) });
   }
-}
-
-export async function POST(request: Request): Promise<Response> {
-  return manejarPublicar(request);
 }

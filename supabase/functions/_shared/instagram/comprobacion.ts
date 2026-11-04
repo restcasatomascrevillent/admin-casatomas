@@ -1,7 +1,7 @@
 /**
  * «Comprobar conexión» del panel: el equivalente de `npm run meta:check` de
- * instagram-studio (src/instagram/comprobacion.ts) para la función
- * GET /api/instagram-estado. Comprueba variables, identidad, token y cuota
+ * instagram-studio (src/instagram/comprobacion.ts) para la Edge Function
+ * instagram-estado. Comprueba variables, identidad, token y cuota
  * SIN publicar nada y SIN devolver secretos (como mucho «…abcd» del token).
  *
  * Verificación del token, de más a menos completa:
@@ -11,10 +11,10 @@
  *   4. Inferencia: si responden perfil y content_publishing_limit, el token
  *      es válido y tiene, como mínimo, los permisos que esas llamadas piden.
  */
-import { ClienteGraph, type CuentaIg, type DatosDepuracion, type FuncionFetch, type LimitePublicacion, type PaginaConCuenta, type PerfilIg } from "./cliente.js";
-import { describirVariables, problemasVariables, VERSION_API_POR_DEFECTO, type Entorno } from "./entorno.js";
-import { ErrorInstagram } from "./errores.js";
-import { mensajeSaneado, registrarSecreto, sanear, sanearProfundo } from "./secretos.js";
+import { ClienteGraph, type CuentaIg, type DatosDepuracion, type FuncionFetch, type LimitePublicacion, type PaginaConCuenta, type PerfilIg } from "./cliente.ts";
+import { arregloVariable, describirVariables, dondeSecreto, problemasVariables, VERSION_API_POR_DEFECTO, type Entorno } from "./entorno.ts";
+import { ErrorInstagram } from "./errores.ts";
+import { mensajeSaneado, registrarSecreto, sanear, sanearProfundo } from "./secretos.ts";
 
 export type EstadoComprobacion = "ok" | "falla" | "aviso";
 
@@ -106,7 +106,7 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
   const variables = describirVariables(env).map((v) => {
     const p = problemas.find((x) => x.variable === v.nombre);
     const estado: EstadoComprobacion = p ? "falla" : !v.presente && v.nombre === "META_APP_SECRET" ? "aviso" : "ok";
-    const comoArreglarlo = p?.comoArreglarlo ?? (estado === "aviso" ? "Opcional. Con META_APP_SECRET la comprobación del token usa el método documentado (debug_token con token de app). Créala como Sensitive en Vercel." : undefined);
+    const comoArreglarlo = p?.comoArreglarlo ?? (estado === "aviso" ? arregloVariable("META_APP_SECRET", env) : undefined);
     const detalle = p ? `${v.detalle} — ${p.problema}` : v.detalle;
     agregar({ seccion: "Variables", nombre: v.nombre, estado, detalle, comoArreglarlo });
     return { ...v, detalle, estado, ...(comoArreglarlo ? { comoArreglarlo } : {}) };
@@ -191,7 +191,7 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
       nombre: "IG_USER_ID",
       estado: "falla",
       detalle: cuentasVistas.length ? `el token ve: ${cuentasVistas.map(describirCuenta).join(", ")}` : "el token no ve ninguna cuenta",
-      comoArreglarlo: cuentasVistas.length ? "Copia el ID numérico de la cuenta correcta en IG_USER_ID (Vercel)." : "Asigna la cuenta de Instagram al usuario del sistema y regenera el token.",
+      comoArreglarlo: cuentasVistas.length ? `Copia el ID numérico de la cuenta correcta en IG_USER_ID: ${dondeSecreto("IG_USER_ID", env)}.` : "Asigna la cuenta de Instagram al usuario del sistema y regenera el token.",
     });
   } else if (encontrada) {
     agregar({ seccion: "Identidad", nombre: "IG_USER_ID entre las cuentas del token", estado: "ok", detalle: `encontrada: ${describirCuenta(encontrada)}` });
@@ -209,7 +209,7 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
       nombre: "IG_USER_ID entre las cuentas del token",
       estado: "falla",
       detalle: cuentasVistas.length ? `${igValido} no coincide; el token ve: ${cuentasVistas.map(describirCuenta).join(", ")}` : `${igValido} no aparece y el token no ve ninguna cuenta`,
-      comoArreglarlo: cuentasVistas.length ? "Pon en IG_USER_ID (Vercel) uno de los IDs que ve el token." : "Asigna la cuenta de Instagram como activo al usuario del sistema (control total) y regenera el token.",
+      comoArreglarlo: cuentasVistas.length ? `Pon en IG_USER_ID uno de los IDs que ve el token: ${dondeSecreto("IG_USER_ID", env)}.` : "Asigna la cuenta de Instagram como activo al usuario del sistema (control total) y regenera el token.",
     });
   }
   if (perfil) {
@@ -276,7 +276,7 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
     nombre: "Método de verificación",
     estado: metodo === "debug_token_app" ? "ok" : "aviso",
     detalle: nombreMetodo[metodo] + (fallos.length && metodo !== "debug_token_app" ? `. Intentos fallidos: ${fallos.join(" | ")}` : ""),
-    comoArreglarlo: metodo === "debug_token_app" ? undefined : "Para una verificación completa, añade META_APP_SECRET (Sensitive) en Vercel.",
+    comoArreglarlo: metodo === "debug_token_app" ? undefined : `Para una verificación completa, añade META_APP_SECRET: ${dondeSecreto("META_APP_SECRET", env)}.`,
   });
 
   const evaluarPermisos = (lista: string[]) => {

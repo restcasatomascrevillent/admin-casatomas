@@ -9,12 +9,20 @@
 // instagram_piezas (marketing lee y escribe, otra sección no, anon nada,
 // sesión bloqueada no); CHECK; trigger (updated_at, creado_por no falseable);
 // índice; auditoría; y el rollback.
+//
+// Y 20261105120000_instagram_fotos.sql (fotos subidas desde el panel): se
+// para sin el bucket; idempotente; RLS (marketing lee/sube/borra, otra
+// sección y bloqueados no, anon nada); subida_por no falseable; solo se
+// editan tipo y descripción; CHECK (ruta = fotos/<marca>/subidas/<id>.jpg,
+// tipo, medidas, descripción ≤ 140); auditoría; y su rollback.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 
 const MIGRACION = await readFile("supabase/migrations/20261105090000_instagram.sql", "utf8");
 const ROLLBACK = await readFile("supabase/rollbacks/20261105090000_instagram_ROLLBACK.sql", "utf8");
+const MIG_FOTOS = await readFile("supabase/migrations/20261105120000_instagram_fotos.sql", "utf8");
+const RB_FOTOS = await readFile("supabase/rollbacks/20261105120000_instagram_fotos_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -227,6 +235,89 @@ igual(await n("select count(*)::int n from pg_proc where proname = 'instagram_pi
 igual(await n("select count(*)::int n from storage.buckets where id = 'instagram'"), 1, "el rollback borró el bucket (debe conservarlo)");
 await db.exec(MIGRACION); // se puede volver a aplicar
 ok((await q("select to_regclass('public.instagram_piezas') t")).rows[0].t !== null, "reaplicar tras el rollback");
+
+// ─── 6. Fotos subidas (20261105120000_instagram_fotos) ──────────────────────
+{
+  // Sin el bucket «instagram» se para sin crear nada.
+  const otra = new PGlite();
+  await otra.exec(ANDAMIAJE);
+  await assert.rejects(otra.exec(MIG_FOTOS), /instagram_fotos: falta el bucket instagram/, "no se paró sin el bucket"); comprobaciones++;
+  await otra.exec("rollback");
+  igual((await otra.query("select to_regclass('public.instagram_fotos') t")).rows[0].t, null, "la migración abortada dejó la tabla");
+  await otra.close();
+}
+await db.exec(MIG_FOTOS);
+await db.exec(MIG_FOTOS); // idempotente
+comprobaciones++;
+
+const colsFotos = (await q(`select column_name c from information_schema.columns
+  where table_schema = 'public' and table_name = 'instagram_fotos' order by ordinal_position`)).rows.map((r) => r.c);
+igual(colsFotos, ["id", "marca", "ruta", "ancho", "alto", "tipo", "descripcion", "subida_por", "created_at"], "columnas de instagram_fotos");
+igual(await n("select count(*)::int n from pg_trigger where tgrelid = 'public.instagram_fotos'::regclass and tgname = 'trg_auditoria'"), 1, "instagram_fotos sin auditoría (o duplicada)");
+ok((await q("select relrowsecurity r from pg_class where oid = 'public.instagram_fotos'::regclass")).rows[0].r, "RLS apagada en instagram_fotos");
+
+const F1 = "c0000000-0000-4000-8000-000000000001";
+const F2 = "c0000000-0000-4000-8000-000000000002";
+const filaFoto = (id, marca = "casa-tomas", extra = {}) => ({
+  id, marca, ruta: `fotos/${marca}/subidas/${id}.jpg`, ancho: 1708, alto: 2560, tipo: "plato", descripcion: "Chuleta", ...extra,
+});
+const insertFoto = (f) => [
+  `insert into public.instagram_fotos (${Object.keys(f).join(", ")}) values (${Object.keys(f).map((_, i) => `$${i + 1}`).join(", ")}) returning *`,
+  Object.values(f),
+];
+const subirFoto = (u, f) => como(u, () => q(...insertFoto(f)));
+
+const subida = (await subirFoto(U.MKT, filaFoto(F1, "casa-tomas", { subida_por: U.SA }))).rows[0];
+igual(subida.subida_por, U.MKT, "subida_por falseado");
+igual(await n(`select count(*)::int n from public.audit_log where tabla = 'instagram_fotos' and actor = '${U.MKT}'`), 1, "la subida no se auditó");
+for (const [u, msg] of [[U.OTRA, "otra sección subió una foto"], [U.BLOQ, "un usuario bloqueado subió una foto"]]) {
+  await assert.rejects(subirFoto(u, filaFoto(F2)), /row-level security/, msg); comprobaciones++;
+}
+await assert.rejects(como(null, () => q("select * from public.instagram_fotos"), "anon"), /permission denied/, "anon leyó fotos"); comprobaciones++;
+await assert.rejects(como(null, () => q(...insertFoto(filaFoto(F2))), "anon"), /permission denied/, "anon subió una foto"); comprobaciones++;
+igual((await como(U.OTRA, () => q("select id from public.instagram_fotos"))).rows, [], "otra sección leyó fotos");
+igual((await como(U.BLOQ, () => q("select id from public.instagram_fotos"))).rows, [], "un usuario bloqueado leyó fotos");
+igual((await como(U.MKT, () => q("select id from public.instagram_fotos"))).rows.map((r) => r.id), [F1], "marketing no lee las fotos");
+
+// Al editar solo cambian tipo y descripción.
+const editadaF = (await como(U.SA, () => q(`update public.instagram_fotos set tipo = 'sala', descripcion = 'Otra', ancho = 10, alto = 10,
+  ruta = 'piezas/x.jpg', marca = 'touza', subida_por = '${U.SA}', created_at = now() - interval '1 year' where id = $1 returning *`, [F1]))).rows[0];
+igual([editadaF.tipo, editadaF.descripcion], ["sala", "Otra"], "no se pudo editar tipo y descripción");
+igual([editadaF.ancho, editadaF.alto, editadaF.ruta, editadaF.marca, editadaF.subida_por, editadaF.created_at.getTime()],
+  [1708, 2560, subida.ruta, "casa-tomas", U.MKT, subida.created_at.getTime()], "se cambió algo que no es tipo ni descripción");
+igual((await como(U.OTRA, () => q("update public.instagram_fotos set descripcion = 'x' returning id"))).rows.length, 0, "otra sección editó una foto");
+igual((await como(U.OTRA, () => q("delete from public.instagram_fotos returning id"))).rows.length, 0, "otra sección borró una foto");
+await assert.rejects(como(U.MKT, () => q("truncate public.instagram_fotos")), /permission denied/, "authenticated hizo TRUNCATE en fotos"); comprobaciones++;
+
+// CHECK
+for (const [f, msg] of [
+  [filaFoto(F2, "casa-tomas", { ruta: `fotos/casa-tomas/${F2}.jpg` }), "ruta fuera de subidas/"],
+  [filaFoto(F2, "casa-tomas", { ruta: `fotos/touza/subidas/${F2}.jpg` }), "ruta de otra marca"],
+  [filaFoto(F2, "casa-tomas", { ruta: `fotos/casa-tomas/subidas/${F1}.jpg` }), "ruta con otro id"],
+  [filaFoto(F2, "casa-tomas", { ruta: "piezas/2026-11/x.jpg" }), "ruta a una pieza"],
+  [filaFoto(F2, "otra"), "marca desconocida"],
+  [filaFoto(F2, "casa-tomas", { tipo: "postre" }), "tipo desconocido"],
+  [filaFoto(F2, "casa-tomas", { ancho: 4000 }), "lado mayor de más de 2560"],
+  [filaFoto(F2, "casa-tomas", { alto: 0 }), "alto 0"],
+  [filaFoto(F2, "casa-tomas", { descripcion: "x".repeat(141) }), "descripción de más de 140"],
+]) {
+  await assert.rejects(q(...insertFoto(f)), /violates check constraint/, `${msg} aceptado`); comprobaciones++;
+}
+for (const tipo of ["plato", "sala", "bebida", "ambiente", "barra", "coctel", "interior"]) {
+  await q("update public.instagram_fotos set tipo = $2 where id = $1", [F1, tipo]); comprobaciones++;
+}
+igual((await subirFoto(U.SA, filaFoto(F2, "touza", { descripcion: "x".repeat(140) }))).rows.length, 1, "no admite 140 caracteres o Touza");
+await assert.rejects(subirFoto(U.SA, filaFoto(F2, "touza")), /duplicate key|unique/, "se repitió la foto"); comprobaciones++;
+igual((await como(U.MKT, () => q("delete from public.instagram_fotos where id = $1 returning id", [F2]))).rows.length, 1, "marketing no pudo borrar una foto");
+
+// Rollback de las fotos: no toca instagram_piezas ni el bucket.
+await db.exec(RB_FOTOS);
+igual((await q("select to_regclass('public.instagram_fotos') t")).rows[0].t, null, "el rollback no borró instagram_fotos");
+igual(await n("select count(*)::int n from pg_proc where proname = 'instagram_fotos_al_editar'"), 0, "el rollback dejó la función de fotos");
+ok((await q("select to_regclass('public.instagram_piezas') t")).rows[0].t !== null, "el rollback de fotos borró instagram_piezas");
+igual(await n("select count(*)::int n from storage.buckets where id = 'instagram'"), 1, "el rollback de fotos borró el bucket");
+await db.exec(MIG_FOTOS);
+ok((await q("select to_regclass('public.instagram_fotos') t")).rows[0].t !== null, "reaplicar fotos tras el rollback");
 
 await db.close();
 console.log(`test-instagram: ${comprobaciones} comprobaciones OK`);

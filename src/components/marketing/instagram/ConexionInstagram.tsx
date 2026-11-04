@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { comprobarConexion, ErrorInstagram, textoError, type Cuota, type RespuestaEstado } from "./api";
 
 /**
- * «Conexión con Instagram»: llama a /api/instagram-estado y enseña ✔/✖/⚠ por
+ * «Conexión con Instagram»: llama a la Edge Function instagram-estado y enseña ✔/✖/⚠ por
  * variable, la cuenta y el cupo, con «Cómo arreglarlo». La función nunca
  * devuelve valores secretos: aquí solo se pintan nombre, estado y detalle.
  */

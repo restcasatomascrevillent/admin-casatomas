@@ -145,15 +145,6 @@ export async function actualizarPieza(s: Sesion, id: string, cambios: Partial<Fi
   return filas[0];
 }
 
-/** Igual que actualizarPieza pero nunca lanza (para anotar errores). */
-export async function anotarError(s: Sesion, id: string, mensaje: string): Promise<void> {
-  try {
-    await actualizarPieza(s, id, { estado: "error", error: sanear(mensaje).slice(0, 1000) });
-  } catch {
-    /* sin consecuencias: la respuesta ya lleva el error */
-  }
-}
-
 /** Ruta dentro del bucket: piezas/AAAA-MM/<id>.jpg */
 export function rutaJpeg(id: string, ahora: Date = new Date()): string {
   return `piezas/${ahora.toISOString().slice(0, 7)}/${id}.jpg`;
@@ -162,30 +153,6 @@ export function rutaJpeg(id: string, ahora: Date = new Date()): string {
 /** URL pública del objeto (bucket público). */
 export function urlPublica(sb: EntornoSupabase, ruta: string): string {
   return `${sb.url}/storage/v1/object/public/${BUCKET}/${ruta.split("/").map(encodeURIComponent).join("/")}`;
-}
-
-/**
- * Borra el JPEG del bucket con el JWT del usuario (DELETE en bloque de
- * Storage, que devuelve los objetos borrados). Si la RLS no deja borrar,
- * Storage no da error: devuelve una lista vacía. Nunca lanza.
- */
-export async function borrarJpeg(s: Sesion, ruta: string): Promise<{ borrado: boolean; motivo?: string }> {
-  try {
-    const r = await s.fetch(`${s.sb.url}/storage/v1/object/${BUCKET}`, {
-      method: "DELETE",
-      headers: cabeceras(s, { "Content-Type": "application/json" }),
-      body: JSON.stringify({ prefixes: [ruta] }),
-      signal: AbortSignal.timeout(MS_TIEMPO),
-    });
-    if (!r.ok) return { borrado: false, motivo: `Storage respondió ${r.status}: ${await detalle(r)}` };
-    const lista = (await r.json().catch(() => null)) as Array<{ name?: string }> | null;
-    if (!Array.isArray(lista) || lista.length === 0) {
-      return { borrado: false, motivo: "Storage no borró nada (el fichero ya no estaba o la RLS del bucket no deja borrar a este usuario)" };
-    }
-    return { borrado: true };
-  } catch (e) {
-    return { borrado: false, motivo: sanear(`No se pudo borrar el JPEG: ${(e as Error)?.message ?? e}`) };
-  }
 }
 
 /** Sube (o sustituye) el JPEG con el JWT del usuario. */

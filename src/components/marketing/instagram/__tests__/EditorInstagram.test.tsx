@@ -32,7 +32,7 @@ vi.mock("../VistaPreviaPieza", () => ({
 import { EditorInstagram } from "../EditorInstagram";
 import { FormularioPieza } from "../FormularioPieza";
 import { borradorVacio } from "../pieza";
-import { MENSAJE_SIN_SERVIDOR, normalizarEstado } from "../api";
+import { MENSAJE_SIN_SERVIDOR, URL_ESTADO, URL_PUBLICAR, normalizarEstado } from "../api";
 import { obtenerPlantilla } from "@/lib/instagram";
 
 function pintar(nodo: ReactNode) {
@@ -49,8 +49,8 @@ function fetchFalso() {
   return vi.fn(async (url: string, init?: RequestInit) => {
     const cuerpo = init?.body ? JSON.parse(String(init.body)) : null;
     if (url === "/api/instagram-render") return respuestaJson({ ok: true, id: ID, estado: "generada", urlJpeg: "https://x.supabase.co/storage/v1/object/public/instagram/piezas/a.jpg?v=1", ancho: 1080, alto: 1350, avisos: [] });
-    if (url === "/api/instagram-estado") return respuestaJson({ ok: true, variables: [], identidad: { igUserId: "1", username: "casatomascrevillent" }, cuota: { usadas: 1, total: 100 }, comprobaciones: [] });
-    if (url === "/api/instagram-publicar") {
+    if (url === URL_ESTADO) return respuestaJson({ ok: true, variables: [], identidad: { igUserId: "1", username: "casatomascrevillent" }, cuota: { usadas: 1, total: 100 }, comprobaciones: [] });
+    if (url === URL_PUBLICAR) {
       return cuerpo.dryRun
         ? respuestaJson({ ok: true, estado: "prueba_ok", contenedor: { id: "C1", estado: "FINISHED" }, cuota: { usadas: 3, total: 100, ventanaHoras: 24 }, urlJpeg: "https://x/a.jpg", avisos: [] })
         : respuestaJson({ ok: true, estado: "publicada", contenedor: { id: "C2", estado: "FINISHED" }, permalink: "https://www.instagram.com/p/abc/", avisos: [] });
@@ -185,8 +185,11 @@ describe("EditorInstagram", () => {
     expect(screen.getByText(/Hashtags/)).toHaveTextContent("1/30");
     fireEvent.click(screen.getByRole("button", { name: /Prueba sin publicar/ }));
     await screen.findByText("3 de 100 en 24 h");
-    const [, initPrueba] = llamadasA(f, "/api/instagram-publicar")[0];
+    const [, initPrueba] = llamadasA(f, URL_PUBLICAR)[0];
     expect(initPrueba.headers.Authorization).toBe("Bearer jwt-de-prueba");
+    // Publicar va a la Edge Function de Supabase (secretos de Meta en Supabase), con la clave pública.
+    expect(URL_PUBLICAR).toBe("http://127.0.0.1:54321/functions/v1/instagram-publicar");
+    expect(initPrueba.headers.apikey).toBe("clave-anon-de-pruebas");
     expect(JSON.parse(initPrueba.body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: true });
 
     const publicar = screen.getByRole("button", { name: /Publicar en Instagram/ });
@@ -194,12 +197,12 @@ describe("EditorInstagram", () => {
     fireEvent.click(publicar);
     const dialogo = await screen.findByRole("alertdialog");
     await within(dialogo).findByText("Se publicará en la cuenta @casatomascrevillent. No se puede deshacer desde aquí.");
-    expect(llamadasA(f, "/api/instagram-estado")).toHaveLength(1);
+    expect(llamadasA(f, URL_ESTADO)).toHaveLength(1);
     fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
 
     const enlace = await screen.findByRole("link", { name: /Ver la publicación/ });
     expect(enlace).toHaveAttribute("href", "https://www.instagram.com/p/abc/");
-    expect(JSON.parse(llamadasA(f, "/api/instagram-publicar")[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: false });
+    expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: false });
   });
 
   it("si cambias el texto tras la prueba, hay que volver a probar", async () => {
@@ -219,7 +222,7 @@ describe("EditorInstagram", () => {
     const base = fetchFalso();
     let primera = true;
     const f = vi.fn(async (url: string, init?: RequestInit) => {
-      if (url === "/api/instagram-publicar" && primera) {
+      if (url === URL_PUBLICAR && primera) {
         primera = false;
         return respuestaJson({ ok: true, estado: "en_proceso", contenedor: { id: "C9", estado: "IN_PROGRESS" }, cuota: { usadas: 1, total: 100 }, reintentar: { contenedorId: "C9" } }, 202);
       }
@@ -233,8 +236,8 @@ describe("EditorInstagram", () => {
     await screen.findByText(/Imagen guardada/);
     fireEvent.click(screen.getByRole("button", { name: /Prueba sin publicar/ }));
     fireEvent.click(await screen.findByRole("button", { name: /Reintentar/ }));
-    await waitFor(() => expect(llamadasA(f, "/api/instagram-publicar")).toHaveLength(2));
-    expect(JSON.parse(llamadasA(f, "/api/instagram-publicar")[1][1].body)).toMatchObject({ id: ID, dryRun: true, contenedorId: "C9" });
+    await waitFor(() => expect(llamadasA(f, URL_PUBLICAR)).toHaveLength(2));
+    expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toMatchObject({ id: ID, dryRun: true, contenedorId: "C9" });
     await waitFor(() => expect(screen.getByRole("button", { name: /Publicar en Instagram/ })).toBeEnabled());
   });
 

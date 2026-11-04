@@ -183,6 +183,18 @@ verify_jwt = true
 [functions.servicios-uso]
 verify_jwt = true
 
+# Marketing › Instagram (antes funciones de Vercel api/instagram-*). JWT de
+# usuario + can_write_section('marketing'), todo COMO EL USUARIO (clave pública
+# + su JWT; nunca service_role): la RLS de instagram_piezas y del bucket
+# «instagram» decide. Leen IG_ACCESS_TOKEN, IG_USER_ID, META_APP_ID y, si
+# están, META_API_VERSION y META_APP_SECRET de los secretos de Supabase, y
+# nunca los devuelven ni los registran. Ver docs/instagram.md.
+[functions.instagram-publicar]
+verify_jwt = true
+
+[functions.instagram-estado]
+verify_jwt = true
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — SIN autenticación propia: el gateway es lo único delante

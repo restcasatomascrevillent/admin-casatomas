@@ -7,7 +7,7 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
 ## Arquitectura
 
 ```
- Panel (navegador)                     Vercel (funciones Node)                 Supabase                     Meta
+ Panel (navegador)                     Vercel (función Node)                   Supabase                     Meta
  ───────────────────                   ─────────────────────────               ─────────────                ─────────────────────
  editor + vista previa  ── JWT ──►  POST /api/instagram-render
  (mismo HTML que el                    validarPieza + construirDocumento
@@ -17,16 +17,26 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
                                                                            piezas/AAAA-MM/<id>.jpg
                                                                        ──►  instagram_piezas (estado
                                                                             «generada», RLS Marketing)
-                       ── JWT ──►  POST /api/instagram-publicar
+
+                       ── JWT + apikey ──►  Edge Function instagram-publicar (Supabase, Deno)
                                        caption · HEAD de la URL pública · cuota
                                        contenedor ─────────────────────────────────────────────────►  POST /{ig}/media
                                        sondeo hasta FINISHED ──────────────────────────────────────►  GET /{contenedor}
                                        (solo si no es prueba) media_publish + permalink ───────────►  POST /{ig}/media_publish
                                                                        ──►  instagram_piezas («prueba_ok»
                                                                             o «publicada» + permalink)
-                       ── JWT ──►  GET /api/instagram-estado  (comprobar conexión) ────────────────►  identidad, token, cuota
+                       ── JWT + apikey ──►  Edge Function instagram-estado (comprobar conexión) ───►  identidad, token, cuota
 ```
 
+- **Secretos de Meta SOLO en Supabase** (decisión del dueño, 04/11/2026):
+  como el resto del panel (facturas, Drive…), `IG_ACCESS_TOKEN` y compañía
+  viven en **Supabase → Edge Functions → Secrets**, sin duplicarlos en
+  Vercel. Por eso publicar y comprobar la conexión son **Edge Functions**
+  (`supabase/functions/instagram-publicar` e `instagram-estado`). El render
+  sigue en Vercel porque necesita Chromium y **no usa ningún secreto de Meta**.
+  Al estar en Supabase, publicar y comprobar también funcionan con
+  `npm run dev` (el panel llama a `${VITE_SUPABASE_URL}/functions/v1/…`); solo
+  «Generar imagen» necesita la demo de Vercel.
 - **Un solo núcleo** (`src/lib/instagram/`): las plantillas, la validación, el
   HTML y las comprobaciones de maquetación son el mismo código en la vista
   previa del panel y en el servidor. Lo que se ve es lo que se publica.
@@ -52,53 +62,81 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
 - **Siempre como el usuario**: las funciones usan la clave pública de Supabase
   y el JWT de quien pulsa el botón, así que la RLS de `instagram_piezas` y del
   bucket decide (escritura solo con permiso de **Marketing**,
-  `can_write_section('marketing')`). Nunca `service_role`.
-- **Secretos solo en el servidor**: el token de Meta vive en variables de
-  Vercel sin prefijo `VITE_` y nunca sale en respuestas, errores ni registros
-  (todo pasa por `api/_lib/instagram/secretos.ts`; hay tests que capturan la
-  consola y lo comprueban).
+  `can_write_section('marketing')`). Nunca `service_role` (el envoltorio de
+  auditoría común de las Edge Functions solo lo usa para saber quién llama).
+- **Secretos solo en el servidor**: el token de Meta nunca sale en
+  respuestas, errores ni registros (todo pasa por
+  `supabase/functions/_shared/instagram/secretos.ts`; hay tests que capturan
+  la consola y lo comprueban).
 
-Código: `api/instagram-render.ts`, `api/instagram-publicar.ts`,
-`api/instagram-estado.ts` y `api/_lib/instagram/` (cliente de la Graph API,
-errores en castellano, saneado, arranque de Chromium, render). Tests:
-`api/_lib/__tests__/instagram.test.ts` (sin red ni Chromium).
+Código:
+- Edge Functions: `supabase/functions/instagram-publicar/` y
+  `supabase/functions/instagram-estado/` (`index.ts` solo engancha;
+  la lógica en `publicar.ts` / `estado.ts`) y
+  `supabase/functions/_shared/instagram/` (cliente de la Graph API, errores
+  en castellano, saneado, comprobación, secretos, acceso a Supabase como el
+  usuario). Tests en sus `__tests__/` (sin red).
+- Vercel: `api/instagram-render.ts` y `api/_lib/instagram/` (arranque de
+  Chromium, render, saneado, acceso a Supabase). Tests:
+  `api/_lib/__tests__/instagram.test.ts` (sin red ni Chromium).
+- Panel: `src/components/marketing/instagram/api.ts`.
 
-## Variables de Vercel
+## Secretos de Supabase
 
-Proyecto **admin-casatomas → Settings → Environment Variables**. Todas en
-**Production** y **Preview** (la demo es Preview). Después de crearlas o
-cambiarlas hay que **volver a desplegar** (Deployments → ⋯ → Redeploy) para que
-las funciones las lean.
+Van en **Supabase → Edge Functions → Secrets** del proyecto (demo
+`sfonaclosuafvlhutkon` primero; producción `haqmmdfdzzatdnrrcgez` solo cuando
+el dueño lo diga). **Nada en Vercel**. Los cambios se aplican sin volver a
+desplegar la función.
 
-| Variable | Obligatoria | Sensitive | Qué es |
-|---|---|---|---|
-| `IG_ACCESS_TOKEN` | sí | **sí** | Token del **usuario del sistema** de Meta (no caduca). Permisos `instagram_basic` + `instagram_content_publish`. |
-| `IG_USER_ID` | sí | no | ID **numérico** de la cuenta profesional de Instagram (no el @usuario). «Comprobar conexión» lista los que ve el token. |
-| `META_APP_ID` | sí | no | developers.facebook.com → Mis apps → (app) → Configuración → Básica. |
-| `META_API_VERSION` | no | no | `vNN.N`; por defecto `v26.0`. |
-| `META_APP_SECRET` | no | **sí** | Opcional. Con ella la comprobación del token usa `debug_token` con token de app (método documentado: caducidad, app y permisos). |
+| Secreto | Obligatorio | Qué es |
+|---|---|---|
+| `IG_ACCESS_TOKEN` | sí | Token del **usuario del sistema** de Meta (no caduca). Permisos `instagram_basic` + `instagram_content_publish`. |
+| `IG_USER_ID` | sí | ID **numérico** de la cuenta profesional de Instagram (no el @usuario). «Comprobar conexión» lista los que ve el token. |
+| `META_APP_ID` | sí | developers.facebook.com → Mis apps → (app) → Configuración → Básica. |
+| `META_API_VERSION` | no | `vNN.N`; por defecto `v26.0`. |
+| `META_APP_SECRET` | no | Opcional. Con él la comprobación del token usa `debug_token` con token de app (método documentado: caducidad, app y permisos). |
 
-Las funciones usan además las de Supabase que ya tiene el panel
-(`VITE_SUPABASE_URL` y `VITE_SUPABASE_PUBLISHABLE_KEY`, o `SUPABASE_URL` /
-`SUPABASE_ANON_KEY`): en Preview apuntan a la demo y en Production a
-producción, y de ahí sale también la URL pública de los recursos.
+Por línea de comandos, desde la raíz del repo (`admin-casatomas/`):
+
+```
+npx supabase secrets set IG_ACCESS_TOKEN=… IG_USER_ID=… META_APP_ID=… --project-ref sfonaclosuafvlhutkon
+```
+
+o en el Dashboard: **Edge Functions → Secrets → Add new secret**.
+`SUPABASE_URL` y `SUPABASE_ANON_KEY` los pone la plataforma en todas las
+funciones; de ahí sale la URL pública del JPEG.
 
 **Nunca** pongas el token con prefijo `VITE_` (acabaría dentro del JavaScript
 del navegador) ni lo pegues en chats, capturas o el repositorio.
 
 Cómo conseguir el token, el usuario del sistema y el ID de la cuenta: igual
 que en el prototipo (`instagram-studio/docs/meta-setup.md`, pasos 1-5),
-cambiando «.env» por las variables de Vercel. Resumen: Meta Business Suite →
+cambiando «.env» por los secretos de Supabase. Resumen: Meta Business Suite →
 Configuración del negocio → Usuarios del sistema → (usuario) → Asignar activos
 (cuenta de Instagram con control total + la app) → Generar token (la app,
 caducidad «Nunca», `instagram_basic` e `instagram_content_publish`).
 
+## Desplegar las Edge Functions
+
+Desde la raíz del repo (`admin-casatomas/`):
+
+```
+npx supabase functions deploy instagram-publicar instagram-estado --project-ref sfonaclosuafvlhutkon
+```
+
+**Sin `--no-verify-jwt`**: en `supabase/config.toml` las dos tienen
+`verify_jwt = true` (como el resto de funciones que llama el panel con
+sesión; la CLI lo lee de ahí). La autorización de verdad la hace cada
+función (sesión + `can_write_section('marketing')`). Producción
+(`haqmmdfdzzatdnrrcgez`) solo después de aceptar el PR y con el «sí» del
+dueño, y con sus propios secretos.
+
 ## Probar la conexión desde el panel
 
 1. Entra en la demo con un usuario que tenga **Marketing**.
-2. **Marketing → Instagram → Comprobar conexión** (llama a
-   `GET /api/instagram-estado`). Muestra:
-   - las variables (presentes o no; del token, como mucho `…abcd`);
+2. **Marketing → Instagram → Comprobar conexión** (llama a la Edge
+   Function `instagram-estado`). Muestra:
+   - los secretos (presentes o no; del token, como mucho `…abcd`);
    - la cuenta (`@usuario` e id) y si coincide con `IG_USER_ID`;
    - la cuota de publicación (usadas / total en 24 h);
    - con qué método se ha verificado el token y qué no se ha podido verificar;
@@ -114,8 +152,8 @@ plataforma y los tiempos.
 
 ## Contratos de las funciones
 
-Todas: `Authorization: Bearer <JWT de Supabase>`. 401 sin sesión, 403 sin
-Marketing. Respuestas JSON con `ok`; los errores llevan `error` y, cuando
+Todas: `Authorization: Bearer <JWT de Supabase>` (las Edge Functions,
+además, `apikey: <clave pública>`). 401 sin sesión, 403 sin Marketing. Respuestas JSON con `ok`; los errores llevan `error` y, cuando
 aplica, `problemas: string[]` y `comoArreglarlo`.
 
 **POST /api/instagram-render** — cuerpo `{ "pieza": {…}, "id"?: "<uuid>", "caption"?: "…" }`
@@ -124,7 +162,7 @@ aplica, `problemas: string[]` y `comoArreglarlo`.
 no pasa la maquetación (desbordes, márgenes, zona segura del story, campos
 vacíos). 404 si el `id` no existe; 409 si esa pieza ya está publicada.
 
-**POST /api/instagram-publicar** — cuerpo `{ "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "…" }`
+**POST `${SUPABASE_URL}/functions/v1/instagram-publicar`** — cuerpo `{ "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "…" }`
 → 200 `{ ok, id, dryRun, publicado, estado: "prueba_ok"|"publicada", contenedor: { id, estado }, urlJpeg, mediaId, permalink, cuota: { usadas, total, restantes, ventanaHoras }, caption: { caracteres, hashtags, menciones }, avisos }`.
 Al publicar de verdad la respuesta añade `imagenEnBucket` (`false` = el JPEG
 ya se borró del bucket).
@@ -132,7 +170,7 @@ ya se borró del bucket).
 si Meta no ha terminado de procesar la imagen dentro del tiempo de la función:
 repetir la misma petición con ese `contenedorId` (no crea otro contenedor).
 
-**GET /api/instagram-estado** → 200 `{ ok, variables, faltan, identidad, cuota, metodoVerificacion, versionApi, tokenEnmascarado, comprobaciones, noVerificado, entornoSupabase }`.
+**GET `${SUPABASE_URL}/functions/v1/instagram-estado`** → 200 `{ ok, variables, faltan, identidad, cuota, metodoVerificacion, versionApi, tokenEnmascarado, comprobaciones, noVerificado, entornoSupabase }`.
 
 ## Límites
 
@@ -143,7 +181,9 @@ repetir la misma petición con ese `contenedorId` (no crea otro contenedor).
 - **Cuota**: Meta limita las publicaciones por cuenta en 24 h; el total lo da
   Meta (`config.quota_total`) y la función **no publica si está agotada**.
 - **Contenedores**: caducan a las 24 h. Una prueba no gasta cuota.
-- **Tiempo**: render ≤ 60 s y publicación ≤ 90 s (`vercel.json`). El primer
+- **Tiempo**: render ≤ 60 s (`vercel.json`). La publicación espera
+  FINISHED unos 55 s (la Edge Function tiene ~150 s de reloj) y, si Meta no
+  ha terminado, responde 202 «en_proceso» para reintentar. El primer
   render de cada instancia descomprime Chromium en `/tmp` (1-3 s más).
 - **Memoria**: Chromium necesita ~1,5 GB. Con Fluid Compute la memoria se
   configura en el panel de Vercel (Settings → Functions), no en
@@ -167,12 +207,13 @@ ejemplo `imagen_borrada_at timestamptz`) en lugar de deducirlo del estado.
 
 | Qué dice | Por qué | Qué hacer |
 |---|---|---|
-| «El token de acceso no es válido» (190) | Token caducado, revocado o la app/cuenta se desasignó | Regenerar el token del usuario del sistema y cambiar `IG_ACCESS_TOKEN` en Vercel; redesplegar |
+| «El token de acceso no es válido» (190) | Token caducado, revocado o la app/cuenta se desasignó | Regenerar el token del usuario del sistema y cambiar el secreto `IG_ACCESS_TOKEN` en Supabase |
 | «Al token le faltan permisos» (10, 200-299) | Falta `instagram_content_publish` o la cuenta no está asignada | Regenerar el token con los dos permisos; asignar la cuenta con control total |
 | «Se ha alcanzado el límite de publicaciones» (2207042) | Cuota de 24 h agotada | Esperar; «Comprobar conexión» muestra el uso |
 | «Meta no ha podido descargar la imagen» (9004 / 2207052) | La URL pública no responde o no es JPEG | Comprobar que el bucket «instagram» es público y regenerar la pieza |
 | «Instagram no ha podido procesar la imagen (ERROR)» | Formato/medidas no admitidos | Regenerar; revisar que es JPEG 1080×1350 o 1080×1920 |
-| «Falta configurar Instagram en Vercel: …» (503) | Faltan variables | Crearlas (tabla de arriba) y redesplegar |
+| «Falta configurar Instagram en los secretos de Supabase: …» (503) | Faltan secretos | Crearlos (tabla de arriba) con `npx supabase secrets set …` o en el Dashboard |
+| «La función de Instagram no está desplegada en este Supabase» (404) | No se han desplegado las Edge Functions | `npx supabase functions deploy instagram-publicar instagram-estado --project-ref …` |
 | 422 «Hay recursos de la pieza que no cargan» | Fotos no subidas al bucket de ese entorno (o falta algo en `public/instagram/`) | Ejecutar `scripts/instagram/subir-recursos.mjs` contra ese Supabase; la lista dice qué URL falla |
 
 Los mensajes de Meta se guardan, saneados, en `instagram_piezas.error` y la
@@ -180,8 +221,12 @@ pieza pasa a «error»; se puede regenerar y volver a intentar.
 
 ## Probar en local
 
+Publicar y «Comprobar conexión» funcionan con `npm run dev` tal cual (van a
+las Edge Functions del Supabase de `VITE_SUPABASE_URL`). El render no: con
+`vite` no existe `/api/instagram-render`.
+
 `@sparticuz/chromium` solo funciona en Linux (Vercel). Fuera de Vercel
-(Windows/macOS, o Linux sin `VERCEL`) las funciones usan el Chromium que
+(Windows/macOS, o Linux sin `VERCEL`) la función de render usa el Chromium que
 instala Playwright (`npx playwright install chromium`; versión emparejada con
 `playwright-core` 1.63). `INSTAGRAM_CHROMIUM_PATH` permite usar otro
 ejecutable. Las versiones van juntas: `playwright-core` 1.63 ↔ Chromium 153 ↔

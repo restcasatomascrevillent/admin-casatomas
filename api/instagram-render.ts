@@ -15,6 +15,10 @@
  * Todo con el JWT del usuario (clave pública + Authorization): la RLS de
  * instagram_piezas y del bucket decide. Nunca service_role.
  *
+ * Fotos: si «pieza.foto» no está en el catálogo estático (FOTOS), se busca en
+ * instagram_fotos (fotos subidas desde el panel) con el mismo JWT y se añade
+ * al catálogo con el que se valida y se construye el HTML (URL por su ruta).
+ *
  * GET /api/instagram-render (con sesión de Marketing) — diagnóstico: arranca
  * Chromium y renderiza un lienzo de prueba (sin guardar nada).
  */
@@ -34,6 +38,7 @@ import {
   validarPieza,
 } from "./_lib/instagram/nucleo.js";
 import { crearRenderizador, ErrorRender, type Renderizador } from "./_lib/instagram/render.js";
+import { catalogoParaPieza } from "./_lib/instagram/fotos.js";
 import { registro, sanear } from "./_lib/instagram/secretos.js";
 import {
   autorizarMarketing,
@@ -78,7 +83,15 @@ export async function manejarRender(request: Request, deps: DependenciasRender =
   if (entrada.id !== undefined && entrada.id !== null && !esUuid(entrada.id)) return json(400, { ok: false, error: "«id» no es un UUID" });
   if (entrada.caption !== undefined && typeof entrada.caption !== "string") return json(400, { ok: false, error: "«caption» tiene que ser texto" });
 
-  const v = validarPieza(entrada.pieza);
+  // Foto subida desde el panel: se busca en instagram_fotos (RLS del usuario).
+  let fotos: Awaited<ReturnType<typeof catalogoParaPieza>>;
+  try {
+    fotos = await catalogoParaPieza(s, entrada.pieza);
+  } catch (e) {
+    registro("error", ETIQUETA, "leer foto subida", e);
+    return json(502, { ok: false, error: sanear((e as Error).message) });
+  }
+  const v = validarPieza(entrada.pieza, { fotos });
   if ("problemas" in v) return json(422, { ok: false, error: "La pieza no es válida", problemas: v.problemas });
   const datos = v.datos;
 
@@ -101,7 +114,7 @@ export async function manejarRender(request: Request, deps: DependenciasRender =
   // Fuentes y logos: los del panel (public/instagram, dentro del bundle de la
   // función y servidos desde disco a Chromium); fotos: bucket «instagram».
   const origen = new URL(request.url).origin;
-  const html = construirDocumento(datos, { baseRecursos: baseRecursosPanel(origen), baseFotos: baseFotosPublica(s.sb.url) });
+  const html = construirDocumento(datos, { baseRecursos: baseRecursosPanel(origen), baseFotos: baseFotosPublica(s.sb.url), fotos });
   const recursosLocales = { origen, prefijo: RUTA_RECURSOS_PANEL, dir: deps.dirRecursos ?? path.join(process.cwd(), "public", "instagram") };
   const renderizar = deps.renderizar ?? crearRenderizador(lanzarNavegador);
   let r: Awaited<ReturnType<Renderizador>>;

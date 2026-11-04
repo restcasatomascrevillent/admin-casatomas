@@ -24,6 +24,7 @@ import { FormularioPieza, NOMBRE_FORMATO } from "./FormularioPieza";
 import { HistorialPiezas, urlImagenPieza } from "./HistorialPiezas";
 import { borradorDesdeDatos, borradorVacio, camposConProblemas, humanizarProblema, piezaDesdeBorrador, type Borrador } from "./pieza";
 import { CLAVE_PIEZAS, type PiezaInstagram } from "./usePiezasInstagram";
+import { useFotosInstagram } from "./useFotosInstagram";
 import { VistaPreviaPieza, type ResultadoMaquetacion } from "./VistaPreviaPieza";
 
 /** Espera entre teclear y repintar la vista previa (ms). */
@@ -78,7 +79,9 @@ export function EditorInstagram() {
   const firma = useMemo(() => JSON.stringify(pieza), [pieza]);
   const firmaDiferida = useDiferido(firma, ESPERA_VISTA_PREVIA);
 
-  const validacion = useMemo(() => validarPieza(JSON.parse(firmaDiferida)), [firmaDiferida]);
+  // Catálogo de fotos = estáticas + subidas desde el panel (instagram_fotos).
+  const { catalogo } = useFotosInstagram(borrador.marca);
+  const validacion = useMemo(() => validarPieza(JSON.parse(firmaDiferida), { fotos: catalogo }), [firmaDiferida, catalogo]);
 
   // El documento se pinta aunque la pieza tenga problemas (titular largo, foto que no
   // vale…): así se ve el desborde. Solo si no se puede construir (falta la foto) no hay vista.
@@ -86,12 +89,12 @@ export function EditorInstagram() {
     const p = JSON.parse(firmaDiferida) as Partial<DatosPieza>;
     const datos = "datos" in validacion ? validacion.datos : ({ ...p, titular: p.titular ?? "" } as DatosPieza);
     try {
-      return { documento: construirDocumento(datos, { baseRecursos: BASE_RECURSOS, baseFotos: BASE_FOTOS }), motivoSinVista: null };
+      return { documento: construirDocumento(datos, { baseRecursos: BASE_RECURSOS, baseFotos: BASE_FOTOS, fotos: catalogo }), motivoSinVista: null };
     } catch (e) {
       const falta = (obtenerPlantilla(String(p.plantilla))?.obligatorios ?? []).includes("foto") && !p.foto;
       return { documento: null, motivoSinVista: falta ? "Elige una foto para ver la pieza." : (e as Error).message };
     }
-  }, [firmaDiferida, validacion]);
+  }, [firmaDiferida, validacion, catalogo]);
 
   const alMaquetar = useCallback((r: ResultadoMaquetacion) => setMaquetacion(documento ? { ...r, documento } : null), [documento]);
   const maquetacionAlDia = maquetacion && maquetacion.documento === documento ? maquetacion : null;

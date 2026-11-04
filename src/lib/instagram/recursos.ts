@@ -56,9 +56,13 @@ export function urlRecurso(base: string, ruta: string): string {
   return `${sinBarraFinal(base)}/${codificarRuta(ruta)}`;
 }
 
-/** URL de una foto del catálogo (por id o por el objeto) en el bucket. Lanza si el id no existe. */
-export function urlFoto(baseFotos: string, foto: string | Foto): string {
-  const f = typeof foto === "string" ? FOTOS.find((x) => x.id === foto) : foto;
+/**
+ * URL de una foto del catálogo (por id o por el objeto) en el bucket, según su
+ * `ruta` (las subidas viven en fotos/<marca>/subidas/<uuid>.jpg). Con un id,
+ * se busca en `fotos` (por defecto, el catálogo estático). Lanza si no existe.
+ */
+export function urlFoto(baseFotos: string, foto: string | Foto, fotos: readonly Foto[] = FOTOS): string {
+  const f = typeof foto === "string" ? fotos.find((x) => x.id === foto) : foto;
   if (!f) throw new Error(`La foto «${String(foto)}» no está en el catálogo de fotos`);
   return urlRecurso(baseFotos, f.ruta);
 }

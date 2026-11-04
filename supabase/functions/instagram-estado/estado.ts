@@ -1,11 +1,13 @@
 /**
- * GET /api/instagram-estado — «Comprobar conexión» de Marketing → Instagram:
- * variables de Meta en Vercel (presentes o no, NUNCA su valor; del token como
- * mucho «…abcd»), identidad de la cuenta (username e id, ¿coincide con
- * IG_USER_ID?), cuota de publicación, método con el que se verificó el token
- * y qué falta, con «cómo arreglarlo». No publica nada.
+ * Edge Function instagram-estado — «Comprobar conexión» de Marketing →
+ * Instagram: secretos de Meta en Supabase (presentes o no, NUNCA su valor;
+ * del token como mucho «…abcd»), identidad de la cuenta (username e id,
+ * ¿coincide con IG_USER_ID?), cuota de publicación, método con el que se
+ * verificó el token y qué falta, con «cómo arreglarlo». No publica nada.
+ * Antes era la función de Vercel api/instagram-estado.ts.
  *
- *   Petición: `Authorization: Bearer <JWT de Supabase>` (usuario con Marketing).
+ *   Petición: GET (o POST) `${SUPABASE_URL}/functions/v1/instagram-estado`
+ *             con `Authorization: Bearer <JWT de Supabase>` (usuario con Marketing).
  *   200: { ok, variables: [{ nombre, presente, obligatoria, detalle, estado, comoArreglarlo? }],
  *          faltan: string[], identidad: { igUserId, username, nombre, publicaciones, coincide, cuentasVistas } | null,
  *          cuota: { usadas, total, restantes, ventanaHoras } | null,
@@ -14,10 +16,11 @@
  *          noVerificado: string[], entornoSupabase: "demo"|"produccion"|"otro" }
  *   401 sin sesión · 403 sin Marketing.
  */
-import { comprobarEstado } from "./_lib/instagram/comprobacion.js";
-import { json, jsonAuth } from "./_lib/instagram/http.js";
-import { registro } from "./_lib/instagram/secretos.js";
-import { autorizarMarketing } from "./_lib/instagram/supabase.js";
+import { comprobarEstado } from "../_shared/instagram/comprobacion.ts";
+import { entornoDeno } from "../_shared/instagram/entorno.ts";
+import { json, jsonAuth, opciones } from "../_shared/instagram/http.ts";
+import { registro } from "../_shared/instagram/secretos.ts";
+import { autorizarMarketing } from "../_shared/instagram/supabase.ts";
 
 const PROYECTOS: Record<string, "demo" | "produccion"> = {
   sfonaclosuafvlhutkon: "demo",
@@ -31,7 +34,9 @@ export interface DependenciasEstadoHttp {
 }
 
 export async function manejarEstado(request: Request, deps: DependenciasEstadoHttp = {}): Promise<Response> {
-  const env = deps.env ?? process.env;
+  if (request.method === "OPTIONS") return opciones();
+  if (request.method !== "GET" && request.method !== "POST") return json(405, { ok: false, error: "Método no permitido" });
+  const env = deps.env ?? entornoDeno();
   const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch });
   if ("motivo" in auth) return jsonAuth(auth.estado, auth.motivo);
   try {
@@ -43,8 +48,4 @@ export async function manejarEstado(request: Request, deps: DependenciasEstadoHt
     registro("error", "instagram-estado", "fallo", e);
     return json(500, { ok: false, error: "No se pudo comprobar la conexión con Instagram" });
   }
-}
-
-export async function GET(request: Request): Promise<Response> {
-  return manejarEstado(request);
 }
