@@ -10,7 +10,7 @@ import type { Coctel } from "@/hooks/useCocteles";
 const mutacion = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false });
 vi.mock("@/hooks/useVinos", () => ({
   useVinos: () => ({
-    eliminarVino: mutacion(), toggleExpanded: mutacion(), toggleActivado: mutacion(),
+    eliminarVino: mutacion(), toggleExpanded: mutacion(),
     toggleRestaurante: mutacion(), toggleTouza: mutacion(), actualizarVino: mutacion(), categorias: [],
   }),
 }));
@@ -38,7 +38,7 @@ beforeAll(() => {
 const carta = "https://x.supabase.co/storage/v1/object/public/vinos/a-carta-webp.webp";
 const antigua = "https://x.supabase.co/storage/v1/object/public/vinos/b.jpg";
 const vino = (p: Partial<Vino>) =>
-  ({ id: "v", nombre: "Albariño", categoria: "Blancos", precio_eur: 24, activado: true, expanded: true, restaurante: true, touza: false, imagen_url: null, imagen_posicion_y: 50, alergenos_oficiales: [], ...p }) as Vino;
+  ({ id: "v", nombre: "Albariño", categoria: "Blancos", precio_eur: 24, activado: true, expanded: true, restaurante: true, touza: false, imagen_url: null, imagen_posicion_y: 50, alergenos_oficiales: [], ubicacion_pais: "España", ubicacion_region: "Cambados, Pontevedra", ...p }) as Vino;
 
 describe("Tarjetas de la carta con la foto en el lateral", () => {
   it("vinos: las fotos empiezan ocultas y el ojo las enseña en la columna lateral", () => {
@@ -51,8 +51,9 @@ describe("Tarjetas de la carta con la foto en el lateral", () => {
     expect(img).toHaveAttribute("loading", "lazy");
     expect(img).toHaveAttribute("decoding", "async");
     expect(img).toHaveAttribute("width", "900");
-    // Los controles de siempre siguen ahí, con su texto.
-    expect(screen.getAllByText("Activo (se publica en la web)")).toHaveLength(2);
+    // Los controles de siempre siguen ahí, con su texto (en vinos, sin «Activo»: un interruptor por carta).
+    expect(screen.queryByText("Activo (se publica en la web)")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("switch", { name: "Restaurante" })).toHaveLength(2);
     expect(screen.getAllByRole("switch", { name: /Foto expandida en carta web/ })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: "Ajustar posición de imagen" })).toHaveLength(2);
     // Ocultar de nuevo quita la columna.

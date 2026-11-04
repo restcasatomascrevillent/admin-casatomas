@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Wine, Eye, EyeOff, Move } from "lucide-react";
+import { Wine, Eye, EyeOff, Move, Info, MapPinOff } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,9 @@ import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
 import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
+import { cartasVino, EXPLICACION_CARTAS_VINO, textoPublicacionVino, vinoPublicado } from "./publicacionVino";
+import { avisoTarjetaSinOrigen, mensajeFaltaOrigen, origenVinoClaro } from "@/lib/origen-vino";
+import { ETIQUETA_ORIGEN_POR_CONFIRMAR } from "@/lib/tipos-vino";
 
 // Aspect ratio de la tarjeta (ancho/alto) para el modo colapsado h-40
 const CARTA_CARD_ASPECT_RATIO = 300 / 160;
@@ -32,11 +35,27 @@ interface ListaVinosProps {
   vinos: Vino[];
 }
 
+/**
+ * Vino sin origen claro (sin país o región, o con la categoría «… — ORIGEN
+ * PENDIENTE»): no se puede publicar hasta completarlo (04/11/2026).
+ */
+function EtiquetaOrigenPorConfirmar({ titulo }: { titulo: string }) {
+  return (
+    <Badge
+      variant="outline"
+      title={titulo}
+      className="max-w-full gap-1 rounded-md border-amber-500/60 bg-amber-50 px-1.5 py-0 text-[11px] pointer-coarse:text-xs font-semibold leading-5 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+    >
+      <MapPinOff className="h-3 w-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">{ETIQUETA_ORIGEN_POR_CONFIRMAR}</span>
+    </Badge>
+  );
+}
+
 export function ListaVinos({ vinos }: ListaVinosProps) {
   const {
     eliminarVino,
     toggleExpanded,
-    toggleActivado,
     toggleRestaurante,
     toggleTouza,
     actualizarVino,
@@ -117,16 +136,26 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
 
   return (
     <>
+      {/* Qué hace cada interruptor (04/11/2026, dueño: «pon una explicación breve»). */}
+      <p className="mb-3 flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>{EXPLICACION_CARTAS_VINO}</span>
+      </p>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {vinos.map((vino) => {
           const tieneFoto = Boolean(vino.imagen_url?.trim());
           const fotoOculta = fotosOcultas.has(vino.id);
           const nombre = vino.nombre || "Vino";
           const alergenos = parseAlergenos(vino.alergenos_oficiales);
+          const cartas = cartasVino(vino);
+          const publicado = vinoPublicado(cartas);
+          const origenClaro = origenVinoClaro(vino);
+          const faltaOrigen = mensajeFaltaOrigen(vino);
           return (
             <TarjetaCartaLateral
               key={vino.id}
-              className={cn(!vino.activado && "opacity-60")}
+              // Sin origen claro no se atenúa: el aviso ámbar tiene que leerse bien.
+              className={cn(!publicado && origenClaro && "opacity-60", !origenClaro && "border-amber-500/60")}
               foto={
                 tieneFoto && !fotoOculta
                   ? {
@@ -136,7 +165,16 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     }
                   : null
               }
-              categoria={<EtiquetaCategoria categoria={vino.categoria} />}
+              categoria={
+                origenClaro ? (
+                  <EtiquetaCategoria categoria={vino.categoria} />
+                ) : (
+                  <div className="flex min-w-0 flex-wrap items-center gap-1">
+                    <EtiquetaOrigenPorConfirmar titulo={faltaOrigen} />
+                    <EtiquetaCategoria categoria={vino.categoria} />
+                  </div>
+                )
+              }
               titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{vino.nombre}</h3>}
               controlesFoto={
                 <>
@@ -169,22 +207,30 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
               }
               controles={
                 <>
-                  {/* Visibilidad Web */}
+                  {/* Publicación: un interruptor por carta; sin origen claro no se enciende. */}
                   <VisibilidadToggles
-                    restaurante={vino.restaurante ?? false}
-                    touza={vino.touza ?? false}
-                    onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: vino.id, restaurante: checked })}
-                    onTouzaChange={(checked) => toggleTouza.mutate({ id: vino.id, touza: checked })}
-                    isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                    activado={vino.activado ?? true}
-                    onActivadoChange={(checked) =>
-                      toggleActivado.mutate({
-                        id: vino.id,
-                        activado: checked,
-                        nombre: vino.nombre ?? undefined,
-                      })
+                    restaurante={cartas.restaurante}
+                    touza={cartas.touza}
+                    onRestauranteChange={(checked) =>
+                      toggleRestaurante.mutate({ id: vino.id, restaurante: checked, touza: cartas.touza })
                     }
-                    isActivadoPending={toggleActivado.isPending}
+                    onTouzaChange={(checked) =>
+                      toggleTouza.mutate({ id: vino.id, touza: checked, restaurante: cartas.restaurante })
+                    }
+                    isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                    bloquearEncender={!origenClaro}
+                    nota={
+                      origenClaro ? (
+                        <span className={publicado ? "text-muted-foreground" : "font-medium text-destructive"}>
+                          {textoPublicacionVino(cartas)}
+                        </span>
+                      ) : (
+                        <span className="font-medium text-amber-800 dark:text-amber-300">
+                          {publicado && `${textoPublicacionVino(cartas)} `}
+                          {avisoTarjetaSinOrigen(vino)}
+                        </span>
+                      )
+                    }
                     compact
                   />
                   <FotoExpandidaToggle

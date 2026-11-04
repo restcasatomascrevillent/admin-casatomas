@@ -31,7 +31,8 @@
     "test:servicios:db": "node scripts/test-servicios-contratados.mjs",
     "test:cambio-contrasena:db": "node scripts/test-cambio-contrasena.mjs",
     "test:tienda:db": "node scripts/test-tienda.mjs",
-    "test:recorte-servidor:db": "node scripts/test-recorte-servidor-cupo.mjs"
+    "test:recorte-servidor:db": "node scripts/test-recorte-servidor-cupo.mjs",
+    "test:vinos-publicacion:db": "node scripts/test-vinos-publicacion.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",
