@@ -1,3 +1,4 @@
+import { AptoParaPlato } from "./AptoParaPlato";
 import { cambioVegetariano } from "@/lib/dietas-plato";
 import { guardarUnidadPlato, opcionesUnidadPlato } from "@/lib/unidades-platos";
 import { useState, useRef, useEffect } from "react";
@@ -511,48 +512,11 @@ export function PlatoForm({
               )}
             </div>
 
-            {tieneGluten && (
-              <FormField
-                control={form.control}
-                name="sin_gluten_disponible"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(value) =>
-                          field.onChange(value === true)
-                        }
-                      />
-                    </FormControl>
-                    <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">
-                      Se puede hacer sin gluten
-                    </FormLabel>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* «Vegetariano» (04/11/2026, dueño: «sí que tienen que haber productos vegetarianos»): la web
-                solo enseña en su filtro «Vegetariano» los platos marcados aquí. */}
-            <FormField
+            {/* «Apto para» (04/11/2026, dueño): celíacos, vegetarianos y sin lactosa, con su motivo y las
+                casillas «Se puede hacer sin gluten» y «Vegetariano». Mismas reglas que los filtros de la web. */}
+            <AptoParaPlato
               control={form.control}
-              name="vegetariano"
-              render={({ field }) => (
-                <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={(value) => field.onChange(value === true)}
-                    />
-                  </FormControl>
-                  <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">
-                    Vegetariano (sin carne, pescado ni marisco)
-                  </FormLabel>
-                  <FormMessage />
-                </FormItem>
-              )}
+              alergenos={sinAlergenos ? [SIN_ALERGENOS_DECLARADOS] : combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados)}
             />
 
             <details className="rounded-lg border p-3">
