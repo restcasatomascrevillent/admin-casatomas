@@ -119,12 +119,16 @@ export function ListaDocumentos({
                 className="flex min-h-11 w-full items-center gap-2 px-2 py-1 text-left font-semibold transition-colors hover:bg-muted/40"
               >
                 <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                {/* El total nunca se recorta: si falta sitio, se acorta el texto de antes. */}
-                <span className="min-w-0 max-sm:line-clamp-2 max-sm:break-words max-sm:leading-tight sm:truncate">
-                  {mes.etiqueta}
-                  <span className="font-normal text-muted-foreground"> · {plural(mes.documentos, "documento", "documentos")} · </span>
+                {/* Mes arriba, nº de documentos debajo en pequeño; el total a la derecha, alineado. */}
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="truncate">{mes.etiqueta}</span>
+                  <span className="truncate text-xs font-normal text-muted-foreground">
+                    <span className="sr-only"> · </span>
+                    {plural(mes.documentos, "documento", "documentos")}
+                    <span className="sr-only"> · </span>
+                  </span>
                 </span>
-                <span className="-ml-1 shrink-0 tabular-nums">{formatCurrency(mes.total)}</span>
+                <span className="shrink-0 text-right tabular-nums">{formatCurrency(mes.total)}</span>
               </button>
             </h3>
             {abierto &&
@@ -142,11 +146,15 @@ export function ListaDocumentos({
                         className="flex min-h-11 w-full items-center gap-2 px-2 py-1 text-left font-medium transition-colors hover:bg-muted/50"
                       >
                         <ChevronProv className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        <span className="min-w-0 truncate">
-                          {prov.nombre}
-                          <span className="font-normal text-muted-foreground"> · {plural(prov.documentos.length, "doc", "docs")} · </span>
+                        <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                          <span className="truncate">{prov.nombre}</span>
+                          <span className="truncate text-[11px] font-normal text-muted-foreground">
+                            <span className="sr-only"> · </span>
+                            {plural(prov.documentos.length, "doc", "docs")}
+                            <span className="sr-only"> · </span>
+                          </span>
                         </span>
-                        <span className="-ml-1 shrink-0 tabular-nums">{formatCurrency(prov.total)}</span>
+                        <span className="shrink-0 text-right tabular-nums">{formatCurrency(prov.total)}</span>
                       </button>
                     </h4>
                     {provAbierto && (

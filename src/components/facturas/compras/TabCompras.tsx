@@ -53,8 +53,8 @@ interface Origen {
 // Chip de filtro: 32 px a la vista, 44 de zona táctil (el contenedor mide 44 y el
 // `before:` amplía el toque, ver `barraChips`).
 const chipClase =
-  "relative inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-muted-foreground transition-colors before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:bg-muted/50 hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground";
-const barraChips = "flex h-11 shrink-0 items-center gap-1 overflow-x-auto no-scrollbar";
+  "relative inline-flex h-8 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] font-medium text-muted-foreground transition-colors before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:bg-muted/50 hover:text-foreground aria-pressed:bg-muted aria-pressed:text-foreground";
+const barraChips = "flex h-11 shrink-0 snap-x items-center gap-1 overflow-x-auto overscroll-x-contain no-scrollbar";
 
 /**
  * Facturas › Compras (rediseño del 08/10/2026): UN buscador, tres formas de
@@ -319,7 +319,7 @@ export function TabCompras({
           <Input
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            placeholder="Busca un producto, un proveedor o un documento…"
+            placeholder="Producto, proveedor o documento…"
             aria-label="Buscar en compras"
             className="h-11 border-border/60 bg-background pl-9 pr-11 shadow-sm"
           />
@@ -392,7 +392,7 @@ export function TabCompras({
                   />
                 )}
               </div>
-              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{docsVisibles.length} documento(s)</p>
+              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{docsVisibles.length} docs</p>
             </>
           )}
 

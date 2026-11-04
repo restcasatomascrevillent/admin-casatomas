@@ -147,7 +147,7 @@ describe("ListaDocumentos agrupada", () => {
 
   it("se puede plegar un proveedor sin tocar el resto", () => {
     pintar();
-    fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*· 1 doc/));
+    fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/));
     expect(screen.queryByText("F-0004")).toBeNull();
     expect(screen.getByText("ALB-0003")).toBeTruthy();
   });
@@ -186,7 +186,7 @@ describe("ListaDocumentos agrupada", () => {
     rerender(<ListaDocumentos {...props} seleccionadoId={4} />);
     expect(screen.getByText("F-0004").closest("button")!.getAttribute("aria-current")).toBe("true");
     // El usuario lo pliega a mano estando seleccionado: se respeta.
-    fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*· 1 doc/));
+    fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/));
     expect(screen.queryByText("F-0004")).toBeNull();
   });
 
@@ -213,7 +213,7 @@ describe("ListaDocumentos agrupada", () => {
   it("cabeceras y filas con zona táctil de 44 px como mínimo", () => {
     pintar();
     expect(cabeceraMes(/^Octubre 2026/).className).toMatch(/min-h-11/);
-    expect(cabeceraProveedor("Octubre 2026", /^Makro\s*· 1 doc/).className).toMatch(/min-h-11/);
+    expect(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/).className).toMatch(/min-h-11/);
   });
   it("tabula los tres niveles: mes a ras, proveedor con sangría y documentos con guía vertical", () => {
     const { container } = pintar();
