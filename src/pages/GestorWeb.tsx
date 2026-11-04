@@ -127,7 +127,10 @@ export default function GestorWeb() {
 
   return (
     <DashboardLayout>
-      <div ref={setRaiz} className="flex flex-col space-y-6" style={alto ? { height: alto } : undefined}>
+      {/* Sin `space-y-6` (dueño, 04/11/2026: «arregla el hueco»): entre la barra de pestañas y
+          las subpestañas de cada sección sumaba 8 + 24 + 8 px. Queda el `mb-2` de la barra y el
+          `pt-2` de la sección, 16 px, como en el resto de páginas con pestañas. */}
+      <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
         {loading ? (
           <Cargando />
         ) : !pestanaActiva ? (
