@@ -73,6 +73,8 @@ describe("Cargar · diseño plano", () => {
     elegir(["albaran-ok.pdf", "factura-ok.pdf", "duplicado.pdf", "aviso.pdf", "fallido.pdf"]);
     fireEvent.click(screen.getByRole("button", { name: /Enviar 5 documentos/ }));
 
+    // El duplicado abre el pop-up modal (oculta el resto a los lectores): se cierra antes de mirar la lista.
+    fireEvent.click(await screen.findByRole("button", { name: "Cerrar" }));
     const seccion = await screen.findByRole("region", { name: "Documentos enviados" });
     await waitFor(() => expect(seccion.querySelectorAll("li[data-nivel='ok']")).toHaveLength(2));
     const filas = Array.from(seccion.querySelectorAll("li"));

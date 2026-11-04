@@ -52,7 +52,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         pasos: [
           "Entra en «Cargar» y pulsa «Hacer foto» para usar la cámara, o «Elegir archivos» para escoger un PDF o una imagen. Puedes subir varios a la vez (PDF, JPG, PNG o WEBP, de hasta 10 MB cada uno).",
           "Si un documento tiene varias hojas, haz una foto a cada una, márcalas y pulsa «Unir … fotos como un documento»: se leen como páginas 1, 2, 3… (puedes cambiar el orden o separarlas). Si subes suelta una hoja que pone «página 2 de 3» de una factura que ya está, te ofrece «Añadir como página 2 a la factura…».",
-          "Si subes uno que ya estaba, no se duplica: sale en «Pendientes de decidir» y eliges «Sustituir la existente» (si la de antes estaba mal leída) o «Dejar la que hay».",
+          "Si subes uno que ya estaba, no se duplica: te sale un aviso en pantalla con los datos del que ya estaba y un botón para ver su foto, y además aparece en «Pendientes de decidir» y eliges «Sustituir la existente» (si la de antes estaba mal leída) o «Dejar la que hay».",
         ],
       },
       {

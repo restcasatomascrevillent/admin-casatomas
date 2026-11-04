@@ -34,6 +34,8 @@ import {
   leerPendientesDecidir,
 } from "@/lib/facturas/pendientesDecidir";
 
+import { AvisoDuplicadoDialog, type AvisoDuplicado } from "@/components/facturas/AvisoDuplicadoDialog";
+
 export const CLAVE_PENDIENTES = "ocr_pendientes_decidir";
 
 interface Props {
@@ -68,6 +70,10 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   const ubicacionRef = useRef(location);
   ubicacionRef.current = location;
 
+  // Avisos de «ya estaba subido»: uno detrás de otro, el primero es el que se ve.
+  const [avisos, setAvisos] = useState<AvisoDuplicado[]>([]);
+  const encolarAviso = (a: AvisoDuplicado) => setAvisos((prev) => [...prev, a]);
+
   const [cola] = useState(() => {
     const ver = { label: "Ver", onClick: () => navegarRef.current(RUTA_CARGAR) };
     const alTerminar = (e: ElementoCola) => {
@@ -101,15 +107,19 @@ export function ColaSubidaProvider({ children, deps }: Props) {
           break;
         case "pendiente":
           queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
-          toast(r?.anadible ? `${e.nombre}: es otra página de ${r.anadible.existente.numero_documento}` : `${e.nombre}: ya existía`, {
-            description: r?.anadible
-              ? "Queda en «Pendientes de decidir» para añadirla a la factura que ya existe."
-              : "Queda en «Pendientes de decidir» por si quieres sustituir la que hay.",
-            action: { label: "Decidir", onClick: () => navegarRef.current(RUTA_CARGAR) },
-          });
+          if (r?.anadible) {
+            // Otra página de una factura que ya existe: no es un duplicado, basta el toast.
+            toast(`${e.nombre}: es otra página de ${r.anadible.existente.numero_documento}`, {
+              description: "Queda en «Pendientes de decidir» para añadirla a la factura que ya existe.",
+              action: { label: "Decidir", onClick: () => navegarRef.current(RUTA_CARGAR) },
+            });
+          } else {
+            // El mismo documento: pop-up con enlace a la foto del existente (sin toast, para no avisar dos veces).
+            encolarAviso({ nombre: e.nombre, facturaId: r?.facturaId, tipo, pendiente: true });
+          }
           break;
         case "duplicada":
-          toast(`${e.nombre}: ya existía`, { description: "No se ha creado otra." });
+          encolarAviso({ nombre: e.nombre, facturaId: r?.facturaId, tipo, pendiente: false });
           break;
         default:
           toast.error(`No se ha podido leer ${e.nombre}`, { description: r?.error, action: ver });
@@ -218,5 +228,26 @@ export function ColaSubidaProvider({ children, deps }: Props) {
     [cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina],
   );
 
-  return <ColaSubidaContext.Provider value={valor}>{children}</ColaSubidaContext.Provider>;
+  const aviso = avisos[0];
+  return (
+    <ColaSubidaContext.Provider value={valor}>
+      {children}
+      {aviso && (
+        <AvisoDuplicadoDialog
+          key={`${avisos.length}-${aviso.nombre}-${aviso.facturaId ?? ""}`}
+          aviso={aviso}
+          restantes={avisos.length - 1}
+          onCerrar={() => setAvisos((prev) => prev.slice(1))}
+          onVerFicha={(id) => {
+            setAvisos((prev) => prev.slice(1));
+            navigate(`/facturas?tab=compras&modo=documentos&doc=${id}`);
+          }}
+          onDecidir={() => {
+            setAvisos((prev) => prev.slice(1));
+            navigate(RUTA_CARGAR);
+          }}
+        />
+      )}
+    </ColaSubidaContext.Provider>
+  );
 }

@@ -53,6 +53,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     });
     montarSubida();
     await enviarUno("ML101511.pdf");
+    fireEvent.click(await screen.findByRole("button", { name: "Cerrar" })); // pop-up de «ya estaba subido»
 
     const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
     expect(within(seccion).getByText(/Ya existe la factura ML\/101511 \(8 líneas\)/)).toBeTruthy();
@@ -114,6 +115,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     );
     montarSubida();
     await enviarUno("ML101511.pdf");
+    fireEvent.click(await screen.findByRole("button", { name: "Cerrar" })); // pop-up de «ya estaba subido»
     const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
     expect(within(seccion).getByText(/Ya existe la factura ML\/101511 \(8 líneas\)/)).toBeTruthy();
     expect(invoke).toHaveBeenCalledTimes(1);
