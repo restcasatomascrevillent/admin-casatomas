@@ -12,6 +12,8 @@
 // editó, la última lectura por proveedor con su coste variable, el tipo de
 // cambio editable, las métricas sin token (BD, IA, Stripe, llamadas) solo para
 // service_role, la semilla de los proveedores nuevos y los dos rollbacks.
+// Y 20261104120000 (Configurar): altas y borrado de lo quitado, solo super
+// admin, con sus lecturas, y su rollback.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -20,6 +22,8 @@ const MIGRACION = await readFile("supabase/migrations/20261103120000_servicios_c
 const ROLLBACK = await readFile("supabase/rollbacks/20261103120000_servicios_contratados_ROLLBACK.sql", "utf8");
 const MIGRACION_2 = await readFile("supabase/migrations/20261103160000_servicios_planes_costes.sql", "utf8");
 const ROLLBACK_2 = await readFile("supabase/rollbacks/20261103160000_servicios_planes_costes_ROLLBACK.sql", "utf8");
+const MIGRACION_3 = await readFile("supabase/migrations/20261104120000_servicios_configurables.sql", "utf8");
+const ROLLBACK_3 = await readFile("supabase/rollbacks/20261104120000_servicios_configurables_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -334,6 +338,59 @@ igual((await q("select plan, categoria, orden, por_confirmar from public.servici
 igual((await q("select activo, orden from public.servicios_contratados where proveedor = 'loading'")).rows[0], { activo: false, orden: 5 }, "reaplicar la semilla pisó un proveedor nuevo editado");
 igual(Number((await q("select eur_por_usd from public.servicios_config")).rows[0].eur_por_usd), 0.9, "reaplicar pisó el tipo de cambio");
 
+// 8b. Configurar (20261104120000): el super admin da de alta y borra lo quitado.
+await db.exec(MIGRACION_3);
+await db.exec(MIGRACION_3); // idempotente
+comprobaciones++;
+igual(await triggers("servicios_contratados"), 1, "la tercera migración duplicó el trigger de auditoría");
+const TEXTO_TOPE = "Tope de gasto de IA de Super Admin › Servicios › Costes";
+const limiteIa = async () => (await q("select limites->'gasto_ia_mes'->>'limite_desde' t from public.servicios_contratados where proveedor = 'openai'")).rows[0].t;
+igual(await limiteIa(), TEXTO_TOPE, "el texto del límite automático de OpenAI no apunta a Servicios › Costes");
+const ALTA = `insert into public.servicios_contratados (proveedor, nombre, plan, precio_mensual, moneda, ciclo, categoria, orden, activo, por_confirmar, notas, panel_url)
+  values ('n8n', 'n8n (automatizaciones)', 'Servidor propio', 5, 'EUR', 'mensual', 'otros', 110, true, true, 'Traducciones de la carta', 'https://n8n.example/panel')`;
+const antesAlta = (await q("select count(*)::int n from public.audit_log where tabla = 'servicios_contratados' and accion = 'insert'")).rows[0].n;
+await rechaza(U.STAFF, ALTA, /row-level security/, "un usuario normal dio de alta un servicio");
+await rechaza(U.SA_BLOQ, ALTA, /row-level security/, "un super admin bloqueado dio de alta un servicio");
+await rechaza(null, ALTA, /permission denied/, "anon dio de alta un servicio", "anon");
+const alta = await como(U.SA, () => q(`${ALTA} returning proveedor, actualizado_por, limites, activo`));
+igual(alta.rows[0], { proveedor: "n8n", actualizado_por: U.SA, limites: {}, activo: true }, "el super admin no pudo dar de alta un servicio");
+igual((await q("select count(*)::int n from public.audit_log where tabla = 'servicios_contratados' and accion = 'insert'")).rows[0].n, antesAlta + 1, "el alta no quedó auditada");
+igual((await como(U.SA, () => q("select count(*)::int n from public.servicios_contratados"))).rows[0].n, 14, "el super admin no ve el servicio nuevo");
+await rechaza(U.SA, ALTA, /duplicate key|unique/, "se dio de alta dos veces el mismo proveedor");
+await rechaza(U.SA, "insert into public.servicios_contratados (proveedor, nombre, actualizado_por) values ('otro', 'Otro', null)", /permission denied/, "se falseó quién dio de alta");
+await rechaza(U.SA, "insert into public.servicios_contratados (proveedor, nombre, actualizado_en) values ('otro', 'Otro', now() - interval '1 year')", /permission denied/, "se falseó cuándo se dio de alta");
+await rechaza(U.SA, "insert into public.servicios_contratados (proveedor, nombre) values ('Con Espacios', 'X')", /violates check constraint/, "clave de proveedor inválida aceptada");
+await rechaza(U.SA, "insert into public.servicios_contratados (proveedor, nombre, categoria) values ('otro', 'X', 'cosas')", /violates check constraint/, "categoría desconocida aceptada en un alta");
+await rechaza(U.SA, "insert into public.servicios_contratados (proveedor, nombre, panel_url) values ('otro', 'X', 'http://inseguro.test')", /violates check constraint/, "enlace sin https aceptado en un alta");
+await rechaza(U.SA, "insert into public.servicios_contratados (proveedor, nombre, limites) values ('otro', 'X', '{\"x\": {\"limite\": -1}}')", /violates check constraint/, "límite negativo aceptado en un alta");
+// Borrar: solo lo quitado (activo = false), solo super admin, y con sus lecturas.
+await como(null, () => q(`insert into public.servicios_uso (proveedor, metricas) values ('n8n', '{}'), ('n8n', '{}'), ('perplexity', '{}')`), "service_role");
+const BORRAR = "delete from public.servicios_contratados where proveedor = 'n8n' returning proveedor";
+igual((await como(U.SA, () => q(BORRAR))).rows.length, 0, "se borró un servicio en uso");
+await como(U.SA, () => q("update public.servicios_contratados set activo = false where proveedor = 'n8n'"));
+igual((await como(U.STAFF, () => q(BORRAR))).rows.length, 0, "un usuario normal borró un servicio");
+igual((await como(U.SA_BLOQ, () => q(BORRAR))).rows.length, 0, "un super admin bloqueado borró un servicio");
+await rechaza(null, BORRAR, /permission denied/, "anon borró un servicio", "anon");
+const antesBaja = (await q("select count(*)::int n from public.audit_log where tabla = 'servicios_contratados' and accion = 'delete'")).rows[0].n;
+igual((await como(U.SA, () => q(BORRAR))).rows.map((r) => r.proveedor), ["n8n"], "el super admin no pudo borrar un servicio quitado");
+igual((await q("select count(*)::int n from public.servicios_uso where proveedor = 'n8n'")).rows[0].n, 0, "las lecturas del servicio borrado se quedaron");
+igual((await q("select count(*)::int n from public.servicios_uso where proveedor = 'perplexity'")).rows[0].n, 1, "se borraron lecturas de otro servicio");
+igual((await q("select count(*)::int n from public.audit_log where tabla = 'servicios_contratados' and accion = 'delete'")).rows[0].n, antesBaja + 1, "el borrado no quedó auditado");
+await rechaza(U.SA, "truncate public.servicios_contratados", /permission denied/, "el super admin vació la tabla");
+// Rollback de la tercera: ya no se puede dar de alta ni borrar; lo añadido se queda.
+await como(U.SA, () => q("insert into public.servicios_contratados (proveedor, nombre) values ('prueba_alta', 'Prueba')"));
+await db.exec(ROLLBACK_3);
+await rechaza(U.SA, ALTA, /permission denied/, "tras el rollback se puede dar de alta");
+await rechaza(U.SA, "delete from public.servicios_contratados where proveedor = 'perplexity'", /permission denied/, "tras el rollback se puede borrar");
+igual((await q("select count(*)::int n from public.servicios_contratados where proveedor = 'prueba_alta'")).rows[0].n, 1, "el rollback borró un servicio añadido por el dueño");
+igual((await q("select to_regprocedure('public.servicios_contratados_al_borrar()') f")).rows[0].f, null, "el rollback deja el trigger de borrado");
+ok(/Super Admin › Costes$/.test(await limiteIa()), "el rollback no devuelve el texto del límite de OpenAI");
+igual((await como(U.SA, () => q("update public.servicios_contratados set plan = 'Pro' where proveedor = 'prueba_alta' returning 1"))).rows.length, 1, "tras el rollback ya no se puede editar");
+await db.exec(MIGRACION_3); // se puede reaplicar
+igual(await limiteIa(), TEXTO_TOPE, "no se pudo reaplicar la tercera tras su rollback");
+await db.exec(ROLLBACK_3);
+await q("delete from public.servicios_contratados where proveedor = 'prueba_alta'");
+
 // 9. Rollback de la segunda: vuelve a como dejó la primera (y se puede reaplicar).
 await db.exec(ROLLBACK_2);
 igual((await q("select proveedor from public.servicios_contratados order by proveedor")).rows.map((r) => r.proveedor), ["github", "resend", "stripe", "supabase", "vercel"], "el rollback deja proveedores nuevos");
@@ -375,10 +432,13 @@ const limpia = new PGlite();
 await limpia.exec(ANDAMIAJE);
 await limpia.exec("drop table public.openai_costes_diarios, public.ia_uso, public.configuracion_facturas, public.tipo_cambio_usd_eur, public.cheques_regalo, public.call_logs");
 await limpia.exec(MIGRACION);
+await assert.rejects(limpia.exec(MIGRACION_3), /falta 20261103160000/, "la tercera se aplicó sin la segunda"); comprobaciones++;
+await limpia.exec("rollback"); // el `begin` de la migración queda abortado
 await limpia.exec(MIGRACION_2);
+await limpia.exec(MIGRACION_3);
 igual(Number((await limpia.query("select eur_por_usd from public.servicios_config")).rows[0].eur_por_usd), 0.92, "sin BCE, el tipo de cambio no nace en 0,92");
 const mLimpia = (await limpia.query("select public.servicios_metricas_supabase() m")).rows[0].m;
 ok(mLimpia.bd_bytes > 0 && mLimpia.eur_por_usd === 0.92 && !("openai_usd_mes_real" in mLimpia) && !("llamadas_mes" in mLimpia) && !("cheques_stripe_mes" in mLimpia),
   "sin las tablas opcionales, servicios_metricas_supabase() falla o se inventa cifras");
 
-console.log(`servicios_contratados + planes_costes (PGlite): ${comprobaciones} comprobaciones OK`);
+console.log(`servicios_contratados + planes_costes + configurables (PGlite): ${comprobaciones} comprobaciones OK`);
