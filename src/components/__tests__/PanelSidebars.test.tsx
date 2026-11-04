@@ -14,10 +14,17 @@ const h = vi.hoisted(() => ({
   role: "admin" as string | null,
   isSuperAdmin: true,
 }));
-const entornoMaqueta = vi.hoisted(() => ({ valor: null as null | "produccion" | "demo" | "preview" | "local" }));
-vi.mock("@/lib/maqueta", async (original) => {
-  const real = await original<typeof import("@/lib/maqueta")>();
-  return { ...real, maquetasVisibles: () => (entornoMaqueta.valor ? real.maquetaVisibleEn(entornoMaqueta.valor) : real.maquetasVisibles()) };
+// Entorno del build (VERSION_APP): sin tocar, el de los tests («local»); un test lo pone en
+// «produccion» para comprobar que la Tienda sale también allí. Getter: se lee al usarlo.
+const entorno = vi.hoisted(() => ({ valor: null as null | "produccion" | "demo" | "preview" | "local" }));
+vi.mock("@/lib/version", async (original) => {
+  const real = await original<typeof import("@/lib/version")>();
+  return {
+    ...real,
+    get VERSION_APP() {
+      return entorno.valor ? { ...real.VERSION_APP, entorno: entorno.valor } : real.VERSION_APP;
+    },
+  };
 });
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ signOut: vi.fn(), user: h.user }),
@@ -365,9 +372,9 @@ describe.each([
   });
 });
 
-describe("menú del panel normal · Tienda (maqueta solo en la demo)", () => {
+describe("menú del panel normal · Tienda (publicada también en producción, dueño 04/11/2026)", () => {
   afterEach(() => {
-    entornoMaqueta.valor = null;
+    entorno.valor = null;
   });
   const pintarAdmin = () =>
     render(
@@ -378,22 +385,15 @@ describe("menú del panel normal · Tienda (maqueta solo en la demo)", () => {
       </MemoryRouter>,
     );
 
-  it("en la demo sale entre Cheques y Facturas, sin insignia «Maqueta» (dueño, 04/11/2026)", () => {
-    entornoMaqueta.valor = "demo";
+  it.each(["produccion", "demo"] as const)("en %s sale entre Cheques y Facturas, sin insignia «Maqueta»", (valor) => {
+    entorno.valor = valor;
     pintarAdmin();
+    expect(screen.getByTestId("version-panel")).toHaveAttribute("data-entorno", valor);
     const tienda = screen.getByRole("link", { name: "Tienda" });
     expect(tienda).toHaveAttribute("href", "/tienda");
     expect(tienda).not.toHaveTextContent(/maqueta/i);
     const nombres = screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"));
     expect(nombres.indexOf("Tienda")).toBe(nombres.indexOf("Cheques") + 1);
     expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda") + 1);
-  });
-
-  it("en producción no sale (ni para un super admin)", () => {
-    entornoMaqueta.valor = "produccion";
-    pintarAdmin();
-    expect(screen.queryByRole("link", { name: /Tienda/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Cheques" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Facturas" })).toBeInTheDocument();
   });
 });

@@ -29,6 +29,7 @@ const permiso = (section_key: string, can_view: boolean, can_edit: boolean): Per
 const de = (permisos: PermisoSeccion[], clave: string) => permisos.find((p) => p.section_key === clave);
 
 describe("SECCIONES_CONFIGURABLES", () => {
+  // Tienda incluida en todos los entornos, también en producción: ya no es maqueta (dueño, 04/11/2026).
   it("son las secciones del panel salvo «usuarios» (que va por rol admin, no por permisos)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
     expect(claves).toEqual([

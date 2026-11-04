@@ -16,7 +16,6 @@
  *     user_permissions solo deja escribir a super admins).
  */
 import { SECTIONS } from "@/hooks/useUserRole";
-import { maquetasVisibles } from "@/lib/maqueta";
 import type { ManagedUser } from "@/hooks/useUsersManagement";
 
 export interface PermisoSeccion {
@@ -28,22 +27,13 @@ export interface PermisoSeccion {
 type Seccion = (typeof SECTIONS)[number];
 type SeccionConfigurable = Exclude<Seccion, { key: "usuarios" }>;
 
-/** Secciones que son maquetas (lib/maqueta.ts): en producción no se configuran. */
-const SECCIONES_MAQUETA: ReadonlySet<string> = new Set(["tienda"]);
-
 /**
  * Secciones que se configuran desde Usuarios. «usuarios» no: esa sección va por
- * rol admin, no por permisos (ProtectedRoute / AppSidebar). Las maquetas, solo
- * fuera de producción (el entorno no cambia en un mismo build).
+ * rol admin, no por permisos (ProtectedRoute / AppSidebar).
  */
-export const seccionesConfigurables = (conMaquetas: boolean): SeccionConfigurable[] =>
-  SECTIONS.filter(
-    (seccion): seccion is SeccionConfigurable =>
-      seccion.key !== "usuarios" && (!SECCIONES_MAQUETA.has(seccion.key) || conMaquetas),
-  );
-
-/** Las de este build (pura arriba, para probar producción sin simular módulos). */
-export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = seccionesConfigurables(maquetasVisibles());
+export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
+  (seccion): seccion is SeccionConfigurable => seccion.key !== "usuarios",
+);
 
 /**
  * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,
