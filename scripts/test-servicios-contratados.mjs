@@ -12,7 +12,7 @@
 // editó, la última lectura por proveedor con su coste variable, el tipo de
 // cambio editable, las métricas sin token (BD, IA, Stripe, llamadas) solo para
 // service_role, la semilla de los proveedores nuevos y los dos rollbacks.
-// Y 20261104120000 (Configurar): altas y borrado de lo quitado, solo super
+// Y 20261104121000 (Configurar): altas y borrado de lo quitado, solo super
 // admin, con sus lecturas, y su rollback.
 import { PGlite } from "@electric-sql/pglite";
 import { readFile } from "node:fs/promises";
@@ -338,7 +338,7 @@ igual((await q("select plan, categoria, orden, por_confirmar from public.servici
 igual((await q("select activo, orden from public.servicios_contratados where proveedor = 'loading'")).rows[0], { activo: false, orden: 5 }, "reaplicar la semilla pisó un proveedor nuevo editado");
 igual(Number((await q("select eur_por_usd from public.servicios_config")).rows[0].eur_por_usd), 0.9, "reaplicar pisó el tipo de cambio");
 
-// 8b. Configurar (20261104120000): el super admin da de alta y borra lo quitado.
+// 8b. Configurar (20261104121000): el super admin da de alta y borra lo quitado.
 await db.exec(MIGRACION_3);
 await db.exec(MIGRACION_3); // idempotente
 comprobaciones++;

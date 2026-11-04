@@ -95,7 +95,7 @@ create trigger servicios_contratados_al_borrar
 comment on table public.servicios_contratados is
   'Servicios contratados (Super Admin › Servicios): plan, precio, renovación, cuenta, enlace al panel y LÍMITES del plan '
   '({ métrica: { etiqueta, limite, unidad, periodo, fuente, nota, orden } }; limite null = sin dato). Solo super admin: '
-  'lee, edita, da de alta y borra (solo lo quitado, activo = false; 20261104120000). '
+  'lee, edita, da de alta y borra (solo lo quitado, activo = false; 20261104121000). '
   'El consumo lo lee la Edge Function servicios-uso y lo guarda en servicios_uso.';
 
 -- ─── 4. Texto del límite automático de OpenAI (solo si es el de la semilla) ─

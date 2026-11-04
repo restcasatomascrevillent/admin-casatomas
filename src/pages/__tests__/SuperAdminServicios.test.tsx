@@ -14,7 +14,7 @@ const h = vi.hoisted(() => ({
   errorSelect: null as { code?: string; message: string } | null,
   /** Base sin 20261103160000: la primera consulta (con las columnas nuevas) falla. */
   sinColumnasNuevas: false,
-  /** Base sin 20261104120000: el alta y el borrado dan «permission denied». */
+  /** Base sin 20261104121000: el alta y el borrado dan «permission denied». */
   errorAltaBaja: null as { code?: string; message: string } | null,
   config: { eur_por_usd: 0.9, actualizado_en: "2026-11-03T10:00:00Z" } as Record<string, unknown> | null,
   invoke: vi.fn(),
@@ -561,7 +561,7 @@ describe("Super Admin › Servicios › Configurar", () => {
     await waitFor(() => expect(h.inserts[0]).toMatchObject({ proveedor: "vercel_2", nombre: "Vercel" }));
   });
 
-  it("sin la migración 20261104120000, explica que falta al añadir", async () => {
+  it("sin la migración 20261104121000, explica que falta al añadir", async () => {
     h.errorAltaBaja = { code: "42501", message: "permission denied for table servicios_contratados" };
     pintar("/super-admin/servicios?tab=configurar");
     fireEvent.click(await screen.findByRole("button", { name: "Añadir servicio" }));

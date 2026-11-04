@@ -198,7 +198,7 @@ export function useGuardarServicio() {
   });
 }
 
-/** Falta 20261104120000 (sin permiso de alta o de borrado) o no es super admin. */
+/** Falta 20261104121000 (sin permiso de alta o de borrado) o no es super admin. */
 function mensajeAltaBaja(error: { code?: string; message?: string }, accion: "añadir" | "borrar"): string {
   const texto = error.message ?? "";
   if (/row-level security/i.test(texto)) return `Solo un super admin puede ${accion} servicios.`;
@@ -210,7 +210,7 @@ function mensajeAltaBaja(error: { code?: string; message?: string }, accion: "a�
   return texto || `No se ha podido ${accion} el servicio.`;
 }
 
-/** Configurar › «Añadir servicio» (solo super admin; 20261104120000). */
+/** Configurar › «Añadir servicio» (solo super admin; 20261104121000). */
 export function useCrearServicio() {
   const cliente = useQueryClient();
   return useMutation({
@@ -226,7 +226,7 @@ export function useCrearServicio() {
 
 /**
  * Configurar › «Borrar del todo»: solo un servicio ya quitado («no lo usamos»);
- * la base de datos también lo exige y borra sus lecturas (20261104120000).
+ * la base de datos también lo exige y borra sus lecturas (20261104121000).
  */
 export function useBorrarServicio() {
   const cliente = useQueryClient();
