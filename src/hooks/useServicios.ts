@@ -203,7 +203,7 @@ function mensajeAltaBaja(error: { code?: string; message?: string }, accion: "a�
   const texto = error.message ?? "";
   if (/row-level security/i.test(texto)) return `Solo un super admin puede ${accion} servicios.`;
   if (error.code === "42501" || /permission denied/i.test(texto)) {
-    return `Para ${accion} servicios falta aplicar en Supabase la migración 20261104120000_servicios_configurables.`;
+    return `Para ${accion} servicios falta aplicar en Supabase la migración 20261104121000_servicios_configurables.`;
   }
   if (error.code === "23505" || /duplicate key/i.test(texto)) return "Ya hay un servicio con ese nombre: ponle otro.";
   if (/check constraint/i.test(texto)) return "Algún dato no es válido (revisa los enlaces, que empiecen por https://, y los números).";

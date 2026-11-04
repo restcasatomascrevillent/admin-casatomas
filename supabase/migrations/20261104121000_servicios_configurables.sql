@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261104120000_servicios_configurables — Super Admin › Servicios ›
+-- 20261104121000_servicios_configurables — Super Admin › Servicios ›
 -- Configurar: añadir y borrar servicios (04/11/2026)
 -- ===========================================================================
 -- Petición del dueño: «configurar para quitar elementos o añadir… que la
@@ -33,7 +33,7 @@ set client_encoding = 'UTF8';
 -- 20261103160000. Demo primero (sfonaclosuafvlhutkon), producción
 -- (haqmmdfdzzatdnrrcgez) solo tras aceptar el PR y con el «sí» del dueño.
 -- Idempotente. Termina en «servicios_configurables: aplicada».
--- Deshacer: supabase/rollbacks/20261104120000_servicios_configurables_ROLLBACK.sql
+-- Deshacer: supabase/rollbacks/20261104121000_servicios_configurables_ROLLBACK.sql
 -- (ANTES que el rollback de 20261103160000 si se quieren deshacer los dos).
 -- Pruebas: npm run test:servicios:db (PGlite).
 -- ===========================================================================

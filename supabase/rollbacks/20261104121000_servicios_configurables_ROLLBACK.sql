@@ -1,4 +1,4 @@
--- ROLLBACK de 20261104120000_servicios_configurables.sql (Super Admin › Servicios ›
+-- ROLLBACK de 20261104121000_servicios_configurables.sql (Super Admin › Servicios ›
 -- Configurar: añadir y borrar servicios).
 -- Aplicar a mano SOLO si hay que deshacerlo, y ANTES del rollback de
 -- 20261103160000 si se quieren deshacer los dos (la política de borrado usa la

@@ -6,7 +6,7 @@
  * `servicios-uso` (consumo y coste variable; tabla `servicios_uso`). Ver
  * supabase/migrations/20261103120000_servicios_contratados.sql,
  * 20261103160000_servicios_planes_costes.sql y
- * 20261104120000_servicios_configurables.sql (altas y borrado de lo quitado).
+ * 20261104121000_servicios_configurables.sql (altas y borrado de lo quitado).
  *
  * Semáforo (petición del dueño): verde < 70 %, ámbar de 70 a 90 %, rojo > 90 %.
  * Aviso destacado arriba de la pantalla a partir del 80 %.

@@ -568,7 +568,7 @@ describe("Super Admin › Servicios › Configurar", () => {
     const dialogo = await screen.findByRole("dialog", { name: "Añadir un servicio" });
     fireEvent.change(within(dialogo).getByLabelText("Nombre"), { target: { value: "n8n" } });
     fireEvent.click(within(dialogo).getByRole("button", { name: "Añadir servicio" }));
-    await waitFor(() => expect(h.toast.error).toHaveBeenCalledWith("Para añadir servicios falta aplicar en Supabase la migración 20261104120000_servicios_configurables."));
+    await waitFor(() => expect(h.toast.error).toHaveBeenCalledWith("Para añadir servicios falta aplicar en Supabase la migración 20261104121000_servicios_configurables."));
     expect(screen.getByRole("dialog", { name: "Añadir un servicio" })).toBeInTheDocument();
   });
 

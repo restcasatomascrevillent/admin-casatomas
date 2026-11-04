@@ -22,8 +22,8 @@ const MIGRACION = await readFile("supabase/migrations/20261103120000_servicios_c
 const ROLLBACK = await readFile("supabase/rollbacks/20261103120000_servicios_contratados_ROLLBACK.sql", "utf8");
 const MIGRACION_2 = await readFile("supabase/migrations/20261103160000_servicios_planes_costes.sql", "utf8");
 const ROLLBACK_2 = await readFile("supabase/rollbacks/20261103160000_servicios_planes_costes_ROLLBACK.sql", "utf8");
-const MIGRACION_3 = await readFile("supabase/migrations/20261104120000_servicios_configurables.sql", "utf8");
-const ROLLBACK_3 = await readFile("supabase/rollbacks/20261104120000_servicios_configurables_ROLLBACK.sql", "utf8");
+const MIGRACION_3 = await readFile("supabase/migrations/20261104121000_servicios_configurables.sql", "utf8");
+const ROLLBACK_3 = await readFile("supabase/rollbacks/20261104121000_servicios_configurables_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
