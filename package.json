@@ -28,6 +28,7 @@
     "test:restricciones-bebidas:db": "node scripts/test-restricciones-bebidas-cocteles.mjs",
     "test:platos-updated-at:db": "node scripts/test-platos-updated-at.mjs",
     "test:alertas-lineas:db": "node scripts/test-alertas-lineas-factura.mjs",
+    "test:proveedores-notas-ia:db": "node scripts/test-proveedores-notas-ia.mjs",
     "test:servicios:db": "node scripts/test-servicios-contratados.mjs",
     "test:cambio-contrasena:db": "node scripts/test-cambio-contrasena.mjs",
     "test:tienda:db": "node scripts/test-tienda.mjs",

@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { formatCurrency, formatDateCorta } from "@/components/facturas/shared/formatters";
-import { useEditarProveedor, useFusionarProveedores, useProveedores } from "@/hooks/useProveedores";
+import { useEditarProveedor, useFusionarProveedores, useGuardarNotasIaProveedor, useNotasIaProveedores, useProveedores } from "@/hooks/useProveedores";
 import {
   cifsDistintos,
   destinoFusionProveedorSugerido,
@@ -65,6 +66,7 @@ export function EditorProveedor({ p, onCerrar }: { p: Proveedor; onCerrar: () =>
         <Label htmlFor={`prov-cif-${p.id}`}>CIF</Label>
         <Input id={`prov-cif-${p.id}`} value={cif} maxLength={20} placeholder="Opcional" onChange={(e) => setCif(e.target.value)} />
       </div>
+      <IndicacionesIa p={p} />
       <div className="flex flex-wrap justify-end gap-2 sm:col-span-3">
         <Button type="button" variant="ghost" onClick={onCerrar}>
           Cancelar
@@ -74,6 +76,41 @@ export function EditorProveedor({ p, onCerrar }: { p: Proveedor; onCerrar: () =>
         </Button>
       </div>
     </form>
+  );
+}
+
+/** «Indicaciones para la IA»: texto que procesar-factura añade al prompt de lectura. */
+function IndicacionesIa({ p }: { p: Proveedor }) {
+  const notas = useNotasIaProveedores();
+  const guardar = useGuardarNotasIaProveedor();
+  const actual = notas.data?.[p.id] ?? "";
+  const [texto, setTexto] = useState<string | null>(null);
+  const valor = texto ?? actual;
+  const sinCambios = limpiar(valor) === limpiar(actual);
+  return (
+    <div className="grid gap-1 sm:col-span-3">
+      <Label htmlFor={`prov-ia-${p.id}`}>Indicaciones para la IA</Label>
+      <Textarea
+        id={`prov-ia-${p.id}`}
+        value={valor}
+        maxLength={500}
+        rows={2}
+        placeholder="Ej.: Los mejillones de este proveedor son LATAS (unidades), no kg."
+        onChange={(e) => setTexto(e.target.value)}
+      />
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-muted-foreground">Se usan al leer sus facturas nuevas. {valor.length}/500</span>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={sinCambios || guardar.isPending}
+          onClick={() => guardar.mutate({ id: p.id, notas: valor }, { onSuccess: () => setTexto(null) })}
+        >
+          {guardar.isPending ? "Guardando…" : "Guardar indicaciones"}
+        </Button>
+      </div>
+    </div>
   );
 }
 
