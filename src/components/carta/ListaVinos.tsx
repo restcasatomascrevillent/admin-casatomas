@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Wine, Eye, EyeOff, Move, Info, MapPinOff } from "lucide-react";
+import { Award, Wine, Eye, EyeOff, Move, Info, MapPinOff } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -262,14 +262,34 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     </p>
                   )}
 
-                  {/* Precio */}
-                  <div className="flex items-end justify-between pt-2 border-t">
+                  {/* Precio, y la copa y la puntuación Parker si las tiene (04/11/2026) */}
+                  <div className="flex flex-wrap items-end justify-between gap-2 pt-2 border-t">
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-bold text-primary">
                         {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}` : "—"}
                       </span>
                       <span className="text-lg font-medium text-primary">€</span>
                     </div>
+                    {(vino.copeo || vino.puntuacion_parker) && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {vino.copeo && (
+                          <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-xs" title="Se sirve por copas">
+                            <Wine className="h-3 w-3" aria-hidden="true" />
+                            {vino.precio_copa_eur ? `Copa ${vino.precio_copa_eur.toFixed(2)} €` : "Copa"}
+                          </Badge>
+                        )}
+                        {vino.puntuacion_parker ? (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 px-1.5 py-0 text-xs"
+                            title={`Puntuación Parker${vino.puntuacion_parker_anada ? ` (añada ${vino.puntuacion_parker_anada})` : ""}`}
+                          >
+                            <Award className="h-3 w-3" aria-hidden="true" />
+                            {vino.puntuacion_parker} RP
+                          </Badge>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 </>
               }

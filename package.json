@@ -33,7 +33,8 @@
     "test:tienda:db": "node scripts/test-tienda.mjs",
     "test:recorte-servidor:db": "node scripts/test-recorte-servidor-cupo.mjs",
     "test:vinos-publicacion:db": "node scripts/test-vinos-publicacion.mjs",
-    "test:reservas-configuracion:db": "node scripts/test-permiso-reservas-configuracion.mjs"
+    "test:reservas-configuracion:db": "node scripts/test-permiso-reservas-configuracion.mjs",
+    "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

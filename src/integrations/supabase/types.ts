@@ -1299,6 +1299,9 @@ export type Database = {
       }
       configuracion_web: {
         Row: {
+          encuesta_vinos_activa: boolean
+          horario_menu_dia_casa_tomas: Json | null
+          horario_tapas_casa_tomas: Json | null
           id: boolean
           mostrar_fotos_platos_casa_tomas: boolean
           mostrar_fotos_platos_touza: boolean
@@ -1308,6 +1311,9 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          encuesta_vinos_activa?: boolean
+          horario_menu_dia_casa_tomas?: Json | null
+          horario_tapas_casa_tomas?: Json | null
           id?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
@@ -1317,6 +1323,9 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          encuesta_vinos_activa?: boolean
+          horario_menu_dia_casa_tomas?: Json | null
+          horario_tapas_casa_tomas?: Json | null
           id?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
@@ -1324,6 +1333,44 @@ export type Database = {
           mostrar_tapas_casa_tomas?: boolean
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      // «Vota tu vino favorito» (migración 20261104141000_encuesta_vino_favorito). La web vota con
+      // la RPC votar_vino_favorito; el panel con «Gestor carta» lee y vacía.
+      votos_vino_favorito: {
+        Row: {
+          acepta_bases: boolean
+          contacto: string
+          contacto_normalizado: string
+          created_at: string
+          id: string
+          idioma: string
+          nombre: string
+          vino_id: string | null
+          vino_nombre: string
+        }
+        Insert: {
+          acepta_bases: boolean
+          contacto: string
+          contacto_normalizado: string
+          created_at?: string
+          id?: string
+          idioma?: string
+          nombre: string
+          vino_id?: string | null
+          vino_nombre: string
+        }
+        Update: {
+          acepta_bases?: boolean
+          contacto?: string
+          contacto_normalizado?: string
+          created_at?: string
+          id?: string
+          idioma?: string
+          nombre?: string
+          vino_id?: string | null
+          vino_nombre?: string
         }
         Relationships: []
       }
@@ -4635,7 +4682,11 @@ export type Database = {
           expanded: boolean | null
           featured: boolean | null
           id: string
+          copeo: boolean
           imagen_posicion_y: number | null
+          precio_copa_eur: number | null
+          puntuacion_parker: number | null
+          puntuacion_parker_anada: number | null
           imagen_url: string | null
           ingredientes: string | null
           nombre: string | null
@@ -4670,7 +4721,11 @@ export type Database = {
           expanded?: boolean | null
           featured?: boolean | null
           id: string
+          copeo?: boolean
           imagen_posicion_y?: number | null
+          precio_copa_eur?: number | null
+          puntuacion_parker?: number | null
+          puntuacion_parker_anada?: number | null
           imagen_url?: string | null
           ingredientes?: string | null
           nombre?: string | null
@@ -4705,7 +4760,11 @@ export type Database = {
           expanded?: boolean | null
           featured?: boolean | null
           id?: string
+          copeo?: boolean
           imagen_posicion_y?: number | null
+          precio_copa_eur?: number | null
+          puntuacion_parker?: number | null
+          puntuacion_parker_anada?: number | null
           imagen_url?: string | null
           ingredientes?: string | null
           nombre?: string | null
@@ -5210,6 +5269,16 @@ export type Database = {
       configuracion_web_visibilidad_menu_tapas: {
         Args: { p_seccion: string; p_mostrar: boolean }
         Returns: undefined
+      }
+      // Días y horas de «Menú del día» y «Tapas» (migración 20261104142000_horario_menu_tapas).
+      configuracion_web_horario_menu_tapas: {
+        Args: { p_seccion: string; p_horario: Json | null }
+        Returns: undefined
+      }
+      // «Vota tu vino favorito» (migración 20261104141000_encuesta_vino_favorito).
+      votar_vino_favorito: {
+        Args: { p_vino_id: string; p_nombre: string; p_contacto: string; p_acepta_bases: boolean; p_idioma?: string }
+        Returns: Json
       }
       // Tienda de vinos (migración 20261103150000_tienda_vinos).
       tienda_precio_venta: {

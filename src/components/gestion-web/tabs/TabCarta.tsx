@@ -25,6 +25,7 @@ import { CoctelForm } from "@/components/carta/CoctelForm";
 import { ListaPlatos } from "@/components/carta/ListaPlatos";
 import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
+import { EncuestaVinoFavorito } from "@/components/carta/EncuestaVinoFavorito";
 import { ListaCocteles } from "@/components/carta/ListaCocteles";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 import { BotonVinoDesdeFoto, type VinoDesdeFoto } from "@/components/carta/BotonVinoDesdeFoto";
@@ -407,7 +408,9 @@ export default function TabCarta() {
             <TabsContent value="bebidas" className="mt-0">
               {renderContenido("bebidas", <ListaBebidas bebidas={bebidasFiltradas} />)}
             </TabsContent>
-            <TabsContent value="vinos" className="mt-0">
+            <TabsContent value="vinos" className="mt-0 space-y-4">
+              {/* Votación del vino favorito (04/11/2026): una franja, encima de la lista. */}
+              <EncuestaVinoFavorito />
               {renderContenido("vinos", <ListaVinos vinos={vinosFiltrados} />)}
             </TabsContent>
             <TabsContent value="cocteles" className="mt-0">
