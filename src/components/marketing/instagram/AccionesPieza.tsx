@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { ExternalLink, FlaskConical, ImageIcon, Loader2, RotateCw, Send } from "lucide-react";
+import { CalendarClock, ExternalLink, FlaskConical, ImageIcon, Loader2, RotateCw, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { ProgramarPiezaDialog } from "@/components/instagram/programar";
 import type { FormatoId } from "@/lib/instagram";
 import {
   ErrorInstagram,
@@ -129,6 +130,7 @@ export function AccionesPieza({
   const [error, setError] = useState<ErrorVisible | null>(null);
   const [confirmar, setConfirmar] = useState(false);
   const [buscandoCuenta, setBuscandoCuenta] = useState(false);
+  const [programando, setProgramando] = useState(false);
 
   const story = formato === "story";
   // Las stories no llevan texto por la API: se manda vacío.
@@ -369,7 +371,23 @@ export function AccionesPieza({
               {accion === "publicar" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" /> : <Send className="mr-2 h-4 w-4" aria-hidden="true" />}
               {accion === "publicar" ? "Publicando…" : "Publicar en Instagram"}
             </Button>
-            {!pruebaVigente && <p className="text-xs text-muted-foreground">Se activa cuando la prueba sin publicar sale bien.</p>}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full pointer-coarse:min-h-11"
+              onClick={() => setProgramando(true)}
+              disabled={!puedePublicar || !servidor.id}
+            >
+              <CalendarClock className="mr-2 h-4 w-4" aria-hidden="true" />
+              Programar…
+            </Button>
+            {!pruebaVigente && <p className="text-xs text-muted-foreground">Publicar y Programar se activan cuando la prueba sin publicar sale bien (así queda guardado el texto).</p>}
+            <ProgramarPiezaDialog
+              piezaId={servidor.id ?? null}
+              open={programando}
+              onOpenChange={setProgramando}
+              onHecho={() => onCambioServidor?.()}
+            />
           </>
         )}
       </section>
