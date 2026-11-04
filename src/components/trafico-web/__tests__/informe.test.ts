@@ -2,18 +2,28 @@ import { describe, expect, it } from "vitest";
 import type { DatosInformeTrafico, FilaSerie } from "@/hooks/useTraficoWeb";
 import {
   construirInforme,
+  construirInformeMensual,
   describirDias,
   mesesSeleccionables,
   mesPorDefecto,
   rangoDatos,
   rangoInforme,
+  type ApartadoTouzaConDatos,
+  type ApartadoTouzaSinDatos,
+  type DatosInformeMensual,
   type InformeTrafico,
   type InformeVacio,
   type OpcionesInforme,
 } from "../informe/modelo";
 import { fmtCifra, fmtCuota, fmtEntero, fmtMedia, fmtVariacion, unirLista } from "../informe/formatoInforme";
-import { idiomaDeRuta, nombrePagina, nombreProcedencia, nombreWeb } from "../informe/nombres";
-import { DATOS_DEMO_OCTUBRE_2026, datosMesCompleto, filaSerie } from "./fixtures/informeDemo";
+import { esRutaTouza, idiomaDeRuta, nombrePagina, nombreProcedencia, nombreWeb } from "../informe/nombres";
+import {
+  DATOS_DEMO_OCTUBRE_2026,
+  DATOS_DEMO_TOUZA_OCTUBRE_2026,
+  DATOS_TOUZA_SIN_VISITAS,
+  datosMesCompleto,
+  filaSerie,
+} from "./fixtures/informeDemo";
 
 /** Los «%» del informe llevan espacio de no separación; en las aserciones se escribe normal. */
 const t = (s: string) => s.replace(/\u00A0/g, " ");
@@ -109,7 +119,15 @@ describe("nombres comprensibles", () => {
 
   it("nombre de la web del informe", () => {
     expect(nombreWeb("casa-tomas-story")).toBe("la web de Casa Tomás");
+    expect(nombreWeb("touza-restaurant-website")).toBe("la web de Touza");
     expect(nombreWeb("ambos")).toBe("las webs de Casa Tomás y Touza");
+  });
+
+  it("la página «Touza» dentro de la web de Casa Tomás, en cualquier idioma", () => {
+    expect(esRutaTouza("/touza")).toBe(true);
+    expect(esRutaTouza("/en/touza/")).toBe(true);
+    expect(esRutaTouza("/touza-algo")).toBe(false);
+    expect(esRutaTouza("/")).toBe(false);
   });
 });
 
@@ -348,5 +366,129 @@ describe("construirInforme: meses sin datos", () => {
     const inf = informe({ ...DATOS_DEMO_OCTUBRE_2026, serie });
     expect(inf.mes.diasConDato).toBe(9);
     expect(inf.diasSemana).toBeNull();
+  });
+});
+
+// ─── Informe mensual: la web principal y Touza al final ──────────────────────
+describe("construirInformeMensual: énfasis en la web principal y Touza al final", () => {
+  const MES = { mes: "2026-10", hoy: "2026-11-03" };
+  const DEMO: DatosInformeMensual = { principal: DATOS_DEMO_OCTUBRE_2026, touza: DATOS_DEMO_TOUZA_OCTUBRE_2026 };
+
+  function mensual(datos: DatosInformeMensual, op: Partial<typeof MES> = {}): InformeTrafico {
+    const r = construirInformeMensual(datos, { ...MES, ...op });
+    if (r.vacio === true) throw new Error(`Informe vacío: ${r.motivo}`);
+    return r;
+  }
+  const conTouza = (inf: InformeTrafico): ApartadoTouzaConDatos => {
+    if (inf.touza?.conDatos !== true) throw new Error("Touza sin datos");
+    return inf.touza;
+  };
+
+  it("todo el informe principal es de Casa Tomás, con sus datos solos (Touza no se suma)", () => {
+    const inf = mensual(DEMO);
+    expect(inf.proyecto).toBe("casa-tomas-story");
+    expect(inf.titulo).toBe("Tráfico de la web de Casa Tomás: octubre 2026");
+    expect(inf.nombreArchivo).toBe("Trafico-de-la-web-de-Casa-Tomas-octubre-2026.pdf");
+    // 442 de Casa Tomás, no 470 (442 + 28 de Touza).
+    expect(inf.resumen.paginasVistas.valor).toBe(442);
+    expect(inf.resumen.visitantes.valor).toBe(91);
+    // Portada, resumen, gráficas y conclusiones: exactamente el informe de Casa Tomás.
+    expect({ ...inf, touza: null }).toEqual(construirInforme(DATOS_DEMO_OCTUBRE_2026, { ...MES, proyecto: "casa-tomas-story" }));
+    expect(inf.paginas!.items.map((i) => i.nombre).join(" ")).not.toMatch(/Touza|Galería|Reservado/);
+  });
+
+  it("apartado de Touza con los datos reales de la demo", () => {
+    const touza = conTouza(mensual(DEMO));
+    const ti = touza.informe;
+    expect(ti.proyecto).toBe("touza-restaurant-website");
+    expect(ti.resumen.paginasVistas.valor).toBe(28);
+    expect(ti.resumen.visitantes.valor).toBe(14);
+    expect(ti.mes.diasConDato).toBe(19);
+    expect(ti.resumen.comparable).toBe(false);
+    expect(touza.titular).toBe("Touza cierra octubre con 28 páginas vistas de 14 visitantes");
+    expect(touza.titularDetalle).toBe("Lo más visto en Touza: Inicio y Carta");
+    // Sus páginas con nombre propio, sin «Touza · » delante (ya lo dice la diapositiva).
+    expect(ti.paginas!.items.map((i) => i.nombre)).toEqual(["Inicio", "Carta", "Galería", "Reservado"]);
+    expect(ti.paginas!.visitasReservas).toBeNull();
+    expect(ti.procedencias!.principal).toMatchObject({ nombre: "Directo", grupo: "directo" });
+    expect(ti.evolucion.huecos).toEqual([
+      { desde: 9, hasta: 9 },
+      { desde: 15, hasta: 18 },
+      { desde: 25, hasta: 31 },
+    ]);
+    // Peso de Touza con la media por día (28/19 frente a 442/26): los huecos no cuentan.
+    expect(touza.cuotaSobreAmbas).toBeCloseTo((100 * (28 / 19)) / (28 / 19 + 17), 5);
+    expect(t(fmtCuota(touza.cuotaSobreAmbas!))).toBe("8,0 %");
+    expect(touza.visitasPaginaTouzaEnCasaTomas).toBeNull();
+    expect(touza.visitasDesdeCasaTomas).toBeNull();
+    expect(touza.notas).toEqual([
+      "Touza empezó a registrar visitas el 23 de septiembre; antes no hay datos.",
+      "Sin datos el 9 de octubre, del 15 al 18 de octubre y del 25 al 31 de octubre: esos días no se pudieron copiar.",
+    ]);
+  });
+
+  it("Touza sin visitas en el mes: el apartado se queda y explica por qué", () => {
+    const inf = mensual({ ...DEMO, touza: DATOS_TOUZA_SIN_VISITAS });
+    expect(inf.resumen.paginasVistas.valor).toBe(442);
+    const touza = inf.touza as ApartadoTouzaSinDatos;
+    expect(touza).toEqual({
+      conDatos: false,
+      titular: "Touza: sin visitas que mostrar en octubre",
+      motivo: "En octubre 2026 todavía no se medían las visitas de la web de Touza.",
+    });
+    const sinCopiar = DATOS_DEMO_TOUZA_OCTUBRE_2026.serie.map((f) => (f.fecha.startsWith("2026-10") ? { ...f, visitas: null, visitantes: null } : f));
+    expect(mensual({ ...DEMO, touza: { ...DATOS_DEMO_TOUZA_OCTUBRE_2026, serie: sinCopiar } }).touza).toMatchObject({
+      conDatos: false,
+      motivo: "No hay visitas registradas de la web de Touza en octubre 2026.",
+    });
+  });
+
+  it("sin datos de la web principal el informe sale vacío aunque Touza tenga", () => {
+    const r = construirInformeMensual({ principal: DATOS_TOUZA_SIN_VISITAS, touza: DATOS_DEMO_TOUZA_OCTUBRE_2026 }, MES) as InformeVacio;
+    expect(r).toMatchObject({ vacio: true, motivo: "En octubre 2026 todavía no se medían las visitas de la web de Casa Tomás." });
+  });
+
+  it("titulares de Touza con comparación, media por día y mes en curso", () => {
+    const completo = datosMesCompleto();
+    const touzaCompleto = { ...completo, paginas: completo.paginas.map((p) => ({ ...p, proyecto: "touza-restaurant-website" })) };
+    const touza = conTouza(mensual({ principal: completo, touza: touzaCompleto }));
+    expect(t(touza.titular)).toBe("Touza cierra octubre con 1.620 páginas vistas, un 33,2 % más que septiembre");
+    // Mitad de tráfico que la principal cada día: un tercio de las dos webs.
+    const mitad = { ...touzaCompleto, serie: touzaCompleto.serie.map((f) => ({ ...f, visitas: f.visitas === null ? null : f.visitas / 2 })) };
+    expect(conTouza(mensual({ principal: completo, touza: mitad })).cuotaSobreAmbas).toBeCloseTo(100 / 3, 5);
+
+    const conHueco = touzaCompleto.serie.map((f) => (["2026-10-05", "2026-10-06"].includes(f.fecha) ? { ...f, visitas: null, visitantes: null } : f));
+    expect(t(conTouza(mensual({ principal: completo, touza: { ...touzaCompleto, serie: conHueco } })).titular)).toMatch(
+      /^Touza: [\d,]+ páginas vistas al día en octubre, un [\d,]+ % más que en septiembre$/,
+    );
+
+    // Octubre aún en curso (hoy, 27): datos hasta el 26.
+    const enCurso = conTouza(mensual(DEMO, { hoy: "2026-10-27" }));
+    expect(enCurso.titular).toBe("Touza lleva 28 páginas vistas en octubre de 14 visitantes");
+    expect(enCurso.notas.join(" ")).not.toContain("Mes en curso"); // ya lo dicen las notas de Casa Tomás
+  });
+
+  it("enlaces entre las dos webs: la página «Touza» de Casa Tomás y las visitas que llegan desde ella", () => {
+    const principal = {
+      ...DATOS_DEMO_OCTUBRE_2026,
+      paginas: [...DATOS_DEMO_OCTUBRE_2026.paginas, { ...DATOS_DEMO_OCTUBRE_2026.paginas[0], ruta: "/touza", visitas: 12 }, { ...DATOS_DEMO_OCTUBRE_2026.paginas[0], ruta: "/en/touza", visitas: 3 }],
+    };
+    const touza = {
+      ...DATOS_DEMO_TOUZA_OCTUBRE_2026,
+      procedencias: [...DATOS_DEMO_TOUZA_OCTUBRE_2026.procedencias.slice(0, 2), { valor: "casa-tomas-story.vercel.app", visitas: 5, visitantes: 3, pct: 15 }],
+    };
+    const apartado = conTouza(mensual({ principal, touza }));
+    expect(apartado.visitasPaginaTouzaEnCasaTomas).toBe(15);
+    expect(apartado.visitasDesdeCasaTomas).toBe(5);
+  });
+
+  it("sin desgloses de Touza solo queda su diapositiva de resumen", () => {
+    const touza = conTouza(mensual({ ...DEMO, touza: { ...DATOS_DEMO_TOUZA_OCTUBRE_2026, paginas: [], dispositivos: [], paises: [], procedencias: [] } }));
+    expect(touza.titularDetalle).toBeNull();
+    expect(touza.titular).toBe("Touza cierra octubre con 28 páginas vistas de 14 visitantes");
+  });
+
+  it("el informe de una sola web no lleva apartado de Touza", () => {
+    expect(informe(DATOS_DEMO_OCTUBRE_2026).touza).toBeNull();
   });
 });

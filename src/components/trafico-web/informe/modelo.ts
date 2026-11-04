@@ -15,7 +15,7 @@
  *     cualquiera de los dos no se compara.
  */
 import { addDays, differenceInCalendarDays, endOfMonth, format, getISODay, parseISO, startOfMonth, subDays, subMonths } from "date-fns";
-import type { DatosInformeTrafico, FilaSerie, FiltroProyecto, RangoDatosInforme } from "@/hooks/useTraficoWeb";
+import type { DatosInformeTrafico, FilaSerie, FiltroProyecto, ProyectoTrafico, RangoDatosInforme } from "@/hooks/useTraficoWeb";
 import { resumirSerie } from "../calculos";
 import {
   fmtCuota,
@@ -35,6 +35,7 @@ import {
   DIAS_SEMANA,
   esRutaCarta,
   esRutaReservas,
+  esRutaTouza,
   idiomaDeRuta,
   NOMBRE_DISPOSITIVO,
   NOMBRE_IDIOMA,
@@ -242,7 +243,40 @@ export interface InformeTrafico {
   } | null;
   conclusiones: string[];
   notas: string[];
+  /**
+   * Apartado final con la web de Touza (informe mensual: `construirInformeMensual`).
+   * NULL en el informe de una sola web (`construirInforme`).
+   */
+  touza: ApartadoTouza | null;
 }
+
+// ─── Apartado de Touza ───────────────────────────────────────────────────────
+export interface ApartadoTouzaConDatos {
+  conDatos: true;
+  /** El informe de la web de Touza con las mismas reglas, solo con sus datos. */
+  informe: InformeTrafico;
+  /** «Touza cierra octubre con 28 páginas vistas de 14 visitantes». */
+  titular: string;
+  /** Titular de la segunda diapositiva (qué se mira y cómo llega); NULL si no hay desgloses: no se pinta. */
+  titularDetalle: string | null;
+  /** % del tráfico de las dos webs que es de Touza, con la media por día (los huecos no cuentan). */
+  cuotaSobreAmbas: number | null;
+  /** Veces que se abrió la página «Touza» dentro de la web de Casa Tomás. */
+  visitasPaginaTouzaEnCasaTomas: number | null;
+  /** Páginas vistas de Touza que llegan desde un enlace de la web de Casa Tomás. */
+  visitasDesdeCasaTomas: number | null;
+  /** Notas al pie propias de Touza (primer día medido, días sin datos, mes en curso). */
+  notas: string[];
+}
+
+export interface ApartadoTouzaSinDatos {
+  conDatos: false;
+  titular: string;
+  /** Por qué no hay nada que contar (aún no se medía, días sin copiar…). */
+  motivo: string;
+}
+
+export type ApartadoTouza = ApartadoTouzaConDatos | ApartadoTouzaSinDatos;
 
 export interface OpcionesInforme {
   proyecto: FiltroProyecto;
@@ -708,5 +742,106 @@ export function construirInforme(datos: DatosInformeTrafico, op: OpcionesInforme
     diasSemana,
     conclusiones: conclusiones.slice(0, MAX_CONCLUSIONES),
     notas,
+    touza: null,
+  };
+}
+
+// ─── Informe mensual: la web principal y, al final, Touza ────────────────────
+/** La web principal del informe: portada, resumen y todas las diapositivas principales. */
+export const PROYECTO_PRINCIPAL: ProyectoTrafico = "casa-tomas-story";
+/** Touza (el bar) va en un apartado propio al final, sin mezclarse con la principal. */
+export const PROYECTO_TOUZA: ProyectoTrafico = "touza-restaurant-website";
+
+export interface DatosInformeMensual {
+  principal: DatosInformeTrafico;
+  touza: DatosInformeTrafico;
+}
+
+/**
+ * El informe del botón «Generar informe» (encargo del dueño, 04-11-2026: «mirar
+ * y enfatizar en la web principal, pero que haya alguna diapositiva para
+ * Touza»). Todo el informe es de la web de Casa Tomás, con sus datos solos (sin
+ * sumar Touza); Touza va al final en una o dos diapositivas propias. Si la web
+ * principal no tiene datos del mes, el informe sale vacío aunque Touza tenga.
+ */
+export function construirInformeMensual(datos: DatosInformeMensual, op: Omit<OpcionesInforme, "proyecto">): InformeTrafico | InformeVacio {
+  const principal = construirInforme(datos.principal, { ...op, proyecto: PROYECTO_PRINCIPAL });
+  if (principal.vacio === true) return principal;
+  return { ...principal, touza: construirApartadoTouza(datos, principal, op) };
+}
+
+const paginasVistas = (n: number): string => `${fmtEntero(n)} ${n === 1 ? "página vista" : "páginas vistas"}`;
+
+function construirApartadoTouza(datos: DatosInformeMensual, principal: InformeTrafico, op: Omit<OpcionesInforme, "proyecto">): ApartadoTouza {
+  const t = construirInforme(datos.touza, { ...op, proyecto: PROYECTO_TOUZA });
+  if (t.vacio === true) {
+    return { conDatos: false, titular: `Touza: sin visitas que mostrar en ${principal.mes.nombre}`, motivo: t.motivo };
+  }
+
+  // ── Titular del resumen: el sujeto es Touza (el mes ya lo dice la portada) ──
+  const { resumen, mes, mesAnterior } = t;
+  const vp = resumen.paginasVistas.variacion;
+  const total = resumen.paginasVistas.valor ?? 0;
+  let titular: string;
+  if (vp) {
+    const masMenos = vp.valor > 0 ? "más" : "menos";
+    const cabeza =
+      vp.base === "total"
+        ? `Touza ${mes.enCurso ? "lleva" : "cierra"} ${mes.nombre} con ${paginasVistas(total)}`
+        : `Touza: ${fmtMedia(resumen.mediaDiaria.valor ?? 0)} páginas vistas al día en ${mes.nombre}`;
+    titular =
+      Math.abs(vp.valor) < UMBRAL_ESTABLE_PCT
+        ? `${cabeza}, en la línea de ${mesAnterior.nombre}`
+        : `${cabeza}, un ${fmtVariacionAbs(vp.valor)} ${masMenos} que ${vp.base === "total" ? mesAnterior.nombre : `en ${mesAnterior.nombre}`}`;
+  } else {
+    const visitantes = resumen.visitantes.valor;
+    titular = `Touza ${mes.enCurso ? `lleva ${paginasVistas(total)} en ${mes.nombre}` : `cierra ${mes.nombre} con ${paginasVistas(total)}`}${
+      visitantes ? ` de ${fmtEntero(visitantes)} ${visitantes === 1 ? "visitante" : "visitantes"}` : ""
+    }`;
+  }
+
+  // ── Titular de la segunda diapositiva: qué se mira y cómo llega ──
+  let titularDetalle: string | null = null;
+  if (t.paginas) {
+    const { items, cuotaCarta } = t.paginas;
+    titularDetalle =
+      cuotaCarta !== null && cuotaCarta >= 35
+        ? `En Touza, la carta reúne el ${fmtCuota(cuotaCarta)} de lo que se mira`
+        : items.length >= 2
+          ? `Lo más visto en Touza: ${items[0].nombre} y ${items[1].nombre}`
+          : `Lo más visto en Touza: ${items[0].nombre}`;
+  } else if (t.procedencias) {
+    const p = t.procedencias.principal;
+    titularDetalle =
+      p.grupo === "directo" ? `En Touza, el ${fmtCuota(p.pct)} llega directamente` : `${p.nombre} trae a Touza el ${fmtCuota(p.pct)} de las visitas`;
+  } else if (t.audiencia?.principal) {
+    const d = t.audiencia.principal;
+    titularDetalle = `En Touza, el ${fmtCuota(d.pct)} entra desde ${d.clave === "tablet" ? "la tablet" : `el ${d.nombre.toLowerCase()}`}`;
+  }
+
+  // ── Touza frente a la web principal (media por día: un hueco no resta) ──
+  const mediaT = t.resumen.mediaDiaria.valor;
+  const mediaP = principal.resumen.mediaDiaria.valor;
+  const cuotaSobreAmbas = mediaT !== null && mediaP !== null && mediaT + mediaP > 0 ? pctDe(mediaT, mediaT + mediaP) : null;
+
+  // ── Enlaces entre las dos webs ──
+  const enCasaTomas = datos.principal.paginas.filter((p) => esRutaTouza(p.ruta)).reduce((s, p) => s + p.visitas, 0);
+  const desdeCasaTomas = datos.touza.procedencias
+    .filter((p) => nombreProcedencia(p.valor).nombre === "Web de Casa Tomás")
+    .reduce((s, p) => s + p.visitas, 0);
+
+  return {
+    conDatos: true,
+    informe: t,
+    titular,
+    titularDetalle,
+    cuotaSobreAmbas,
+    visitasPaginaTouzaEnCasaTomas: enCasaTomas > 0 ? enCasaTomas : null,
+    visitasDesdeCasaTomas: desdeCasaTomas > 0 ? desdeCasaTomas : null,
+    // La primera nota (de dónde salen los datos) ya va en las conclusiones de Casa Tomás.
+    notas: t.notas
+      .slice(1)
+      .filter((n) => !n.startsWith("Mes en curso"))
+      .map((n) => n.replace(/^La web empezó/, "Touza empezó")),
   };
 }

@@ -178,3 +178,72 @@ export function datosMesCompleto(): DatosInformeTrafico {
     primerDiaConVisitas: "2026-03-01",
   };
 }
+
+// ─── Touza ───────────────────────────────────────────────────────────────────
+/**
+ * Datos reales de la demo para la web de Touza (mismas RPC, consultados el
+ * 04-11-2026), octubre de 2026 comparado con septiembre: muy pocas visitas,
+ * medida desde el 23 de septiembre como Casa Tomás y más días sin copiar
+ * (el 9, del 15 al 18 y del 25 al 31 de octubre).
+ */
+const SERIE_TOUZA: FilaCompacta[] = [
+  ...Array.from({ length: 22 }, (_, i): FilaCompacta => [`2026-09-${String(i + 1).padStart(2, "0")}`, 0, 0, null, null]),
+  ["2026-09-23", 1, 1, null, null],
+  ["2026-09-24", 0, 0, null, null],
+  ["2026-09-25", 13, 4, null, null],
+  ["2026-09-26", 0, 0, null, null],
+  ["2026-09-27", 0, 0, null, null],
+  ["2026-09-28", 0, 0, null, null],
+  ["2026-09-29", 4, 2, null, null],
+  ["2026-09-30", 1, 1, 1.789, false],
+  ["2026-10-01", 11, 4, null, null],
+  ["2026-10-02", 1, 1, -0.275, false],
+  ["2026-10-03", 5, 2, null, null],
+  ["2026-10-04", 1, 1, null, null],
+  ["2026-10-05", 1, 1, null, null],
+  ["2026-10-06", 6, 2, 3.266, true],
+  ["2026-10-07", 0, 0, -0.645, false],
+  ["2026-10-08", 0, 0, -0.408, false],
+  ["2026-10-09", null, null, null, null],
+  ["2026-10-10", 0, 0, -0.408, false],
+  ["2026-10-11", 0, 0, -0.408, false],
+  ["2026-10-12", 1, 1, 2.041, true],
+  ["2026-10-13", 0, 0, -0.57, false],
+  ["2026-10-14", 0, 0, -0.586, false],
+  ...["15", "16", "17", "18"].map((d): FilaCompacta => [`2026-10-${d}`, null, null, null, null]),
+  ["2026-10-19", 0, 0, -0.586, false],
+  ["2026-10-20", 0, 0, -0.526, false],
+  ["2026-10-21", 1, 1, 1.62, false],
+  ["2026-10-22", 1, 1, -0.137, false],
+  ["2026-10-23", 0, 0, -0.445, false],
+  ["2026-10-24", 0, 0, -0.378, false],
+  ...["25", "26", "27", "28", "29", "30", "31"].map((d): FilaCompacta => [`2026-10-${d}`, null, null, null, null]),
+];
+
+const paginaTouza = (ruta: string, visitas: number) => ({ ...pagina(ruta, visitas), proyecto: "touza-restaurant-website" });
+
+export const DATOS_DEMO_TOUZA_OCTUBRE_2026: DatosInformeTrafico = {
+  serie: SERIE_TOUZA.map(filaSerie),
+  paginas: [paginaTouza("/", 18), paginaTouza("/carta", 8), paginaTouza("/galeria", 1), paginaTouza("/reservado", 1)],
+  dispositivos: [
+    { valor: "desktop", visitas: 14, visitantes: 6, pct: 50 },
+    { valor: "mobile", visitas: 14, visitantes: 8, pct: 50 },
+  ],
+  paises: [{ valor: "ES", visitas: 28, visitantes: 14, pct: 100 }],
+  procedencias: [
+    { valor: "(directo)", visitas: 26, visitantes: 14, pct: 92.86 },
+    { valor: "vercel.com", visitas: 2, visitantes: 2, pct: 7.14 },
+    { valor: "casa-tomas-story.vercel.app", visitas: 0, visitantes: 0, pct: 0 },
+  ],
+  primerDiaConVisitas: "2026-09-23",
+};
+
+/** Touza sin ninguna visita registrada (p. ej. un mes en que aún no se medía). */
+export const DATOS_TOUZA_SIN_VISITAS: DatosInformeTrafico = {
+  serie: [],
+  paginas: [],
+  dispositivos: [],
+  paises: [],
+  procedencias: [],
+  primerDiaConVisitas: null,
+};

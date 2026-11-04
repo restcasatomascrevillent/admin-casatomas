@@ -109,6 +109,9 @@ export const esRutaCarta = (ruta: string): boolean => /^\/carta(\/|$)/.test(idio
 /** ¿La ruta es la página de reservas de Casa Tomás (cualquier idioma)? */
 export const esRutaReservas = (ruta: string): boolean => idiomaDeRuta(ruta).ruta === "/reservas";
 
+/** ¿La ruta es la página «Touza» de la web de Casa Tomás (cualquier idioma)? */
+export const esRutaTouza = (ruta: string): boolean => idiomaDeRuta(ruta).ruta === "/touza";
+
 // ─── Procedencia (referrer) ──────────────────────────────────────────────────
 export type GrupoProcedencia = "directo" | "buscador" | "redes" | "pago" | "interno" | "web";
 

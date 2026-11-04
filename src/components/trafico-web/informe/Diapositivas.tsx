@@ -10,16 +10,27 @@
  * la captura igual que se ve.
  */
 import type { ComponentType, CSSProperties, ReactNode } from "react";
-import type { InformeTrafico, ItemBarra, ParteDispositivo } from "./modelo";
-import { fmtCuota, fmtEntero, fmtMedia, fmtVariacion, mayusculaInicial } from "./formatoInforme";
+import { PROYECTO_TOUZA, type InformeTrafico, type ItemBarra, type ParteDispositivo } from "./modelo";
+import { fmtCuota, fmtEntero, fmtMedia, fmtVariacion, mayusculaInicial, unirLista } from "./formatoInforme";
 import { GraficoBarras, GraficoEvolucion, GraficoSemana } from "./graficos";
-import { DIAS_SEMANA } from "./nombres";
+import { DIAS_SEMANA, nombreWeb, type GrupoProcedencia } from "./nombres";
 import { ALTO_DIAPOSITIVA, ANCHO_DIAPOSITIVA, COLOR, PILA_FUENTES, PILA_TITULOS } from "./tema";
 
 const MARGEN_X = 72;
 
+/** «la web de Casa Tomás» → «Web de Casa Tomás»: la marca de la web al pie de cada diapositiva. */
+const marcaWeb = (web: string): string => mayusculaInicial(web.replace(/^las? /, ""));
+const MARCA_TOUZA = marcaWeb(nombreWeb(PROYECTO_TOUZA));
+/** Barras como mucho en la gráfica de páginas de Touza (su diapositiva lleva antetítulo y notas). */
+const MAX_BARRAS_TOUZA = 5;
+
 // ─── Piezas comunes ──────────────────────────────────────────────────────────
-function Lienzo({ numero, titulo, children }: { numero?: number; titulo: string; children: ReactNode }) {
+/**
+ * Lienzo de una diapositiva. `web` pone al pie, abajo a la izquierda, de qué
+ * web son los datos («Web de Casa Tomás» / «Web de Touza»): el informe tiene
+ * las dos y cada diapositiva tiene que decir a cuál se refiere.
+ */
+function Lienzo({ numero, titulo, web, children }: { numero?: number; titulo: string; web?: string; children: ReactNode }) {
   return (
     <section
       data-diapositiva={numero ?? 1}
@@ -40,6 +51,28 @@ function Lienzo({ numero, titulo, children }: { numero?: number; titulo: string;
       }}
     >
       {children}
+      {web && (
+        <span
+          data-web-diapositiva={web}
+          style={{
+            position: "absolute",
+            left: MARGEN_X,
+            bottom: 22,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            lineHeight: "18px",
+            fontWeight: 600,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: COLOR.tenue,
+          }}
+        >
+          <span aria-hidden style={{ display: "block", width: 14, height: 2, borderRadius: 1, background: COLOR.oro }} />
+          {web}
+        </span>
+      )}
       {numero !== undefined && (
         <span style={{ position: "absolute", right: 28, bottom: 22, fontSize: 15, color: COLOR.pizarra }}>{numero}</span>
       )}
@@ -52,9 +85,15 @@ function Filete({ ancho = 48, style }: { ancho?: number; style?: CSSProperties }
   return <span aria-hidden style={{ display: "block", width: ancho, height: 3, borderRadius: 2, background: COLOR.oro, ...style }} />;
 }
 
-function Titular({ children, ancho = 1040 }: { children: ReactNode; ancho?: number }) {
+/** Titular con su filete de oro. `antetitulo` (en oro, encima): la web de las diapositivas de Touza. */
+function Titular({ children, ancho = 1040, antetitulo }: { children: ReactNode; ancho?: number; antetitulo?: string }) {
   return (
     <>
+      {antetitulo && (
+        <Etiqueta color={COLOR.oro} style={{ fontWeight: 600, marginBottom: 12 }}>
+          {antetitulo}
+        </Etiqueta>
+      )}
       <Filete style={{ marginBottom: 16 }} />
       <h2
         style={{
@@ -209,6 +248,9 @@ function Portada({ informe }: { informe: InformeTrafico }) {
           Quién entra en la web, qué mira y desde dónde llega.
         </p>
         <p style={{ margin: "8px 0 0", fontSize: 17, color: COLOR.tenue }}>{informe.periodo}</p>
+        {informe.touza && (
+          <p style={{ margin: "4px 0 0", fontSize: 17, color: COLOR.tenue }}>Al final, un apartado para la web de Touza.</p>
+        )}
       </div>
     </Lienzo>
   );
@@ -270,7 +312,7 @@ function Resumen({ informe, numero }: { informe: InformeTrafico; numero: number 
   const { resumen, mesAnterior } = informe;
   const ant = mesAnterior.nombre;
   return (
-    <Lienzo numero={numero} titulo={resumen.titular}>
+    <Lienzo numero={numero} titulo={resumen.titular} web={marcaWeb(informe.web)}>
       <Titular ancho={1000}>{resumen.titular}</Titular>
       <div style={{ display: "flex", gap: 40, marginTop: 30, alignItems: "flex-start" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -307,7 +349,7 @@ function Resumen({ informe, numero }: { informe: InformeTrafico; numero: number 
 function Evolucion({ informe, numero }: { informe: InformeTrafico; numero: number }) {
   const { evolucion, resumen, mes, mesAnterior } = informe;
   return (
-    <Lienzo numero={numero} titulo={evolucion.titular}>
+    <Lienzo numero={numero} titulo={evolucion.titular} web={marcaWeb(informe.web)}>
       <Titular ancho={1060}>{evolucion.titular}</Titular>
       <div style={{ display: "flex", gap: 36, marginTop: 30, flex: 1, minHeight: 0 }}>
         <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column" }}>
@@ -358,7 +400,7 @@ function Paginas({ informe, numero }: { informe: InformeTrafico; numero: number 
   const altoGrafico = Math.max(140, paginas.items.length * 44);
   const lider = paginas.items[0];
   return (
-    <Lienzo numero={numero} titulo={paginas.titular}>
+    <Lienzo numero={numero} titulo={paginas.titular} web={marcaWeb(informe.web)}>
       <Titular ancho={1060}>{paginas.titular}</Titular>
       <div style={{ display: "flex", gap: 40, marginTop: 34, flex: 1, minHeight: 0, alignItems: "flex-start" }}>
         <div style={{ width: 330, flexShrink: 0, display: "flex", flexDirection: "column", gap: 34 }}>
@@ -403,12 +445,20 @@ const ETIQUETA_GRUPO: Record<string, (nombre: string) => string> = {
   redes: (n) => `Llega desde ${n}`,
 };
 
+/** «Llega de forma directa», «Llega desde Google», «Llega desde «tripadvisor.es»». */
+const etiquetaProcedencia = (p: { nombre: string; grupo: GrupoProcedencia }): string =>
+  (ETIQUETA_GRUPO[p.grupo] ?? ((n: string) => `Llega desde «${n}»`))(p.nombre);
+
+/** «Entra desde el móvil», «Entra desde la tablet». */
+const etiquetaDispositivo = (d: ParteDispositivo): string =>
+  `Entra desde ${d.clave === "tablet" ? "la tablet" : `el ${d.nombre.toLowerCase()}`}`;
+
 function Procedencias({ informe, numero }: { informe: InformeTrafico; numero: number }) {
   const p = informe.procedencias;
   if (!p) return null;
-  const etiqueta = (ETIQUETA_GRUPO[p.principal.grupo] ?? ((n: string) => `Llega desde «${n}»`))(p.principal.nombre);
+  const etiqueta = etiquetaProcedencia(p.principal);
   return (
-    <Lienzo numero={numero} titulo={p.titular}>
+    <Lienzo numero={numero} titulo={p.titular} web={marcaWeb(informe.web)}>
       <Titular ancho={1060}>{p.titular}</Titular>
       <div style={{ display: "flex", gap: 40, marginTop: 34, flex: 1, minHeight: 0 }}>
         <div style={{ width: 330, flexShrink: 0 }}>
@@ -518,16 +568,14 @@ function Audiencia({ informe, numero }: { informe: InformeTrafico; numero: numbe
   if (!a) return null;
   const idiomas = informe.paginas?.idiomas ?? null;
   return (
-    <Lienzo numero={numero} titulo={a.titular}>
+    <Lienzo numero={numero} titulo={a.titular} web={marcaWeb(informe.web)}>
       <Titular ancho={1060}>{a.titular}</Titular>
       <div style={{ display: "flex", gap: 48, marginTop: 34, flex: 1, minHeight: 0, alignItems: "flex-start" }}>
         <div style={{ width: 540, flexShrink: 0 }}>
           {a.principal && a.dispositivos ? (
             <>
               <Cifra tamano={130}>{fmtCuota(a.principal.pct)}</Cifra>
-              <Etiqueta style={{ marginTop: 14 }}>
-                Entra desde {a.principal.clave === "tablet" ? "la tablet" : `el ${a.principal.nombre.toLowerCase()}`}
-              </Etiqueta>
+              <Etiqueta style={{ marginTop: 14 }}>{etiquetaDispositivo(a.principal)}</Etiqueta>
               <Explicacion style={{ marginTop: 6, marginBottom: 34 }}>Páginas vistas según el aparato desde el que se abre la web.</Explicacion>
               <BarraSegmentada partes={a.dispositivos} ancho={540} />
             </>
@@ -563,7 +611,7 @@ function DiasSemana({ informe, numero }: { informe: InformeTrafico; numero: numb
   const d = informe.diasSemana;
   if (!d) return null;
   return (
-    <Lienzo numero={numero} titulo={d.titular}>
+    <Lienzo numero={numero} titulo={d.titular} web={marcaWeb(informe.web)}>
       <Titular ancho={1060}>{d.titular}</Titular>
       <div style={{ display: "flex", gap: 40, marginTop: 34, flex: 1, minHeight: 0 }}>
         <div style={{ width: 330, flexShrink: 0, display: "flex", flexDirection: "column", gap: 30 }}>
@@ -601,7 +649,7 @@ function DiasSemana({ informe, numero }: { informe: InformeTrafico; numero: numb
 function Conclusiones({ informe, numero }: { informe: InformeTrafico; numero: number }) {
   const titular = `Qué nos dice ${informe.mes.nombre}`;
   return (
-    <Lienzo numero={numero} titulo={titular}>
+    <Lienzo numero={numero} titulo={titular} web={marcaWeb(informe.web)}>
       <Titular>{titular}</Titular>
       <Tarjeta style={{ marginTop: 30, padding: "30px 40px" }}>
         <ol style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 16 }}>
@@ -640,6 +688,179 @@ function Conclusiones({ informe, numero }: { informe: InformeTrafico; numero: nu
   );
 }
 
+// ─── 9. Touza: resumen del mes ───────────────────────────────────────────────
+/**
+ * Apartado final de Touza (encargo del dueño, 04-11-2026: el informe enfatiza
+ * la web principal, «pero que haya alguna diapositiva para Touza»). Mismo
+ * estilo que el resto, con «Web de Touza» en oro sobre el titular y al pie.
+ */
+function TouzaResumen({ informe, numero }: { informe: InformeTrafico; numero: number }) {
+  const a = informe.touza;
+  if (!a?.conDatos) return null;
+  const { resumen, evolucion, mes, mesAnterior } = a.informe;
+  return (
+    <Lienzo numero={numero} titulo={a.titular} web={MARCA_TOUZA}>
+      <Titular antetitulo={MARCA_TOUZA} ancho={1060}>
+        {a.titular}
+      </Titular>
+      <div style={{ display: "flex", gap: 36, marginTop: 28, flex: 1, minHeight: 0 }}>
+        <div style={{ width: 300, flexShrink: 0, display: "flex", flexDirection: "column" }}>
+          <Cifra tamano={96}>{fmtEntero(resumen.paginasVistas.valor ?? 0)}</Cifra>
+          <Etiqueta style={{ marginTop: 14 }}>Páginas vistas</Etiqueta>
+          {resumen.paginasVistas.variacion ? (
+            <LineaVariacion variacion={resumen.paginasVistas.variacion} mesAnterior={mesAnterior.nombre} />
+          ) : (
+            <Explicacion style={{ marginTop: 6 }}>{mayusculaInicial(resumen.comparacion)}.</Explicacion>
+          )}
+          <div style={{ display: "flex", gap: 32, marginTop: 26 }}>
+            <div>
+              <Cifra tamano={52}>{resumen.visitantes.valor === null ? "—" : fmtEntero(resumen.visitantes.valor)}</Cifra>
+              <Etiqueta style={{ marginTop: 10 }}>Visitantes</Etiqueta>
+            </div>
+            <div>
+              <Cifra tamano={52}>{resumen.mediaDiaria.valor === null ? "—" : fmtMedia(resumen.mediaDiaria.valor)}</Cifra>
+              <Etiqueta style={{ marginTop: 10 }}>Al día de media</Etiqueta>
+            </div>
+          </div>
+          <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 10, fontSize: 17 }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Muestra color={COLOR.oro} /> {mayusculaInicial(mes.nombre)}, día a día
+            </span>
+            {evolucion.hayAnterior && (
+              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Muestra color={COLOR.piedra} /> {mayusculaInicial(mesAnterior.nombre)}, mismo día del mes
+              </span>
+            )}
+            {evolucion.huecos.length > 0 && <Explicacion>La zona gris son días sin datos: no se pudieron copiar.</Explicacion>}
+          </div>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <GraficoEvolucion
+            puntos={evolucion.puntos}
+            mejorDia={evolucion.mejorDia}
+            hayAnterior={evolucion.hayAnterior}
+            huecos={evolucion.huecos}
+            ancho={800}
+            alto={420}
+          />
+        </div>
+      </div>
+    </Lienzo>
+  );
+}
+
+// ─── 10. Touza: qué se mira y cómo llega ─────────────────────────────────────
+function TouzaDetalle({ informe, numero }: { informe: InformeTrafico; numero: number }) {
+  const a = informe.touza;
+  if (!a?.conDatos || !a.titularDetalle) return null;
+  const t = a.informe;
+  const barras = t.paginas
+    ? {
+        titulo: "Páginas más vistas",
+        subtitulo: `Páginas vistas en ${t.mes.nombre} y % del total`,
+        items: t.paginas.items.slice(0, MAX_BARRAS_TOUZA),
+        restantes: t.paginas.restantes + Math.max(0, t.paginas.items.length - MAX_BARRAS_TOUZA),
+      }
+    : t.procedencias
+      ? { titulo: "Por dónde entra la gente", subtitulo: "Páginas vistas y % del total", items: t.procedencias.items.slice(0, MAX_BARRAS_TOUZA), restantes: 0 }
+      : null;
+  const procedencia = t.procedencias?.principal ?? null;
+  const dispositivo = t.audiencia?.principal ?? null;
+  // Con pocas visitas es fácil un empate (14 y 14): «entra desde el móvil» sería engañoso.
+  const empatados = dispositivo ? (t.audiencia?.dispositivos ?? []).filter((d) => d.visitas === dispositivo.visitas) : [];
+  const etiquetaAparato =
+    empatados.length > 1 ? `A partes iguales: ${unirLista(empatados.map((d) => d.nombre.toLowerCase()))}` : dispositivo ? etiquetaDispositivo(dispositivo) : "";
+  const enlaces: string[] = [];
+  if (a.visitasPaginaTouzaEnCasaTomas !== null) {
+    const n = a.visitasPaginaTouzaEnCasaTomas;
+    enlaces.push(`En la web de Casa Tomás, la página de Touza se abrió ${fmtEntero(n)} ${n === 1 ? "vez" : "veces"}.`);
+  }
+  if (a.visitasDesdeCasaTomas !== null) {
+    const n = a.visitasDesdeCasaTomas;
+    enlaces.push(`${fmtEntero(n)} ${n === 1 ? "página vista llegó" : "páginas vistas llegaron"} a Touza desde un enlace de la web de Casa Tomás.`);
+  }
+  return (
+    <Lienzo numero={numero} titulo={a.titularDetalle} web={MARCA_TOUZA}>
+      <Titular antetitulo={MARCA_TOUZA} ancho={1060}>
+        {a.titularDetalle}
+      </Titular>
+      <div style={{ display: "flex", gap: 40, marginTop: 30, flex: 1, minHeight: 0, alignItems: "flex-start" }}>
+        <div style={{ width: 330, flexShrink: 0, display: "flex", flexDirection: "column", gap: 28 }}>
+          {a.cuotaSobreAmbas !== null && (
+            <div>
+              <Cifra tamano={96}>{fmtCuota(a.cuotaSobreAmbas)}</Cifra>
+              <Etiqueta style={{ marginTop: 14 }}>Del tráfico de las dos webs</Etiqueta>
+              <Explicacion style={{ marginTop: 6 }}>Páginas vistas al día de Touza frente a las de Casa Tomás.</Explicacion>
+            </div>
+          )}
+          {(procedencia || dispositivo) && (
+            <div style={{ display: "flex", gap: 28 }}>
+              {procedencia && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Cifra tamano={52}>{fmtCuota(procedencia.pct)}</Cifra>
+                  <Etiqueta style={{ marginTop: 10 }}>{etiquetaProcedencia(procedencia)}</Etiqueta>
+                </div>
+              )}
+              {dispositivo && (
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Cifra tamano={52}>{fmtCuota(dispositivo.pct)}</Cifra>
+                  <Etiqueta style={{ marginTop: 10 }}>{etiquetaAparato}</Etiqueta>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {barras && (
+          <Tarjeta style={{ flex: 1, minWidth: 0, padding: "28px 32px" }}>
+            <p style={{ margin: 0, fontFamily: PILA_TITULOS, fontSize: 22, fontWeight: 700 }}>{barras.titulo}</p>
+            <p style={{ margin: "4px 0 14px", fontSize: 15, color: COLOR.tenueSobrePizarra }}>{barras.subtitulo}</p>
+            <GraficoBarras items={barras.items} ancho={690} alto={Math.max(140, barras.items.length * 44)} sobrePizarra anchoNombres={270} />
+            {barras.restantes > 0 && (
+              <p style={{ margin: "8px 0 0", fontSize: 15, color: COLOR.tenueSobrePizarra }}>
+                Y {barras.restantes} {barras.restantes === 1 ? "página más" : "páginas más"} con menos visitas.
+              </p>
+            )}
+          </Tarjeta>
+        )}
+      </div>
+      {(enlaces.length > 0 || a.notas.length > 0) && (
+        <div style={{ marginTop: 18, paddingRight: 40, display: "flex", flexDirection: "column", gap: 2 }}>
+          {enlaces.map((e) => (
+            <Explicacion key={e}>{e}</Explicacion>
+          ))}
+          {a.notas.map((n) => (
+            <Explicacion key={n} style={{ fontSize: 14 }}>
+              {n}
+            </Explicacion>
+          ))}
+        </div>
+      )}
+    </Lienzo>
+  );
+}
+
+// ─── Touza sin datos en el mes ───────────────────────────────────────────────
+/**
+ * Si Touza no tiene visitas del mes, la diapositiva se queda y lo explica (no
+ * se omite): así el dueño ve que Touza no se ha olvidado y por qué no hay cifras.
+ */
+function TouzaSinDatos({ informe, numero }: { informe: InformeTrafico; numero: number }) {
+  const a = informe.touza;
+  if (a?.conDatos !== false) return null;
+  return (
+    <Lienzo numero={numero} titulo={a.titular} web={MARCA_TOUZA}>
+      <Titular antetitulo={MARCA_TOUZA}>{a.titular}</Titular>
+      <Tarjeta style={{ marginTop: 34, width: 820 }}>
+        <Etiqueta color={COLOR.tenueSobrePizarra}>Por qué no hay cifras</Etiqueta>
+        <p style={{ margin: "14px 0 0", fontFamily: PILA_TITULOS, fontSize: 28, lineHeight: 1.3, fontWeight: 700 }}>{a.motivo}</p>
+        <Explicacion color={COLOR.tenueSobrePizarra} style={{ marginTop: 14 }}>
+          Las cifras de las diapositivas anteriores son solo de la web de Casa Tomás: Touza no se suma a ellas.
+        </Explicacion>
+      </Tarjeta>
+    </Lienzo>
+  );
+}
+
 // ─── Conjunto ────────────────────────────────────────────────────────────────
 type Pieza = ComponentType<{ informe: InformeTrafico; numero: number }>;
 
@@ -659,6 +880,13 @@ export function DiapositivasInforme({ informe, Envoltorio }: DiapositivasInforme
   if (informe.audiencia) piezas.push({ clave: "audiencia", Pieza: Audiencia });
   if (informe.diasSemana) piezas.push({ clave: "dias", Pieza: DiasSemana });
   if (informe.conclusiones.length > 0) piezas.push({ clave: "conclusiones", Pieza: Conclusiones });
+  // Touza, siempre al final y aparte: una o dos diapositivas con sus datos, o una que explica que no hay.
+  if (informe.touza?.conDatos) {
+    piezas.push({ clave: "touza-resumen", Pieza: TouzaResumen });
+    if (informe.touza.titularDetalle) piezas.push({ clave: "touza-detalle", Pieza: TouzaDetalle });
+  } else if (informe.touza) {
+    piezas.push({ clave: "touza-sin-datos", Pieza: TouzaSinDatos });
+  }
 
   const diapositivas: { clave: string; nodo: ReactNode }[] = [
     { clave: "portada", nodo: <Portada informe={informe} /> },

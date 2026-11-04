@@ -3,6 +3,10 @@
  * diapositivas para el dueño, con vista previa (escala al ancho de la
  * pantalla: ordenador, tablet o móvil) y descarga en PDF.
  *
+ * El informe es de la web principal (Casa Tomás), con sus datos solos, y lleva
+ * al final un apartado de Touza (una o dos diapositivas): no depende de la web
+ * elegida en la página ni tiene selector de web.
+ *
  * Se carga con `lazy()` desde la página: ni las diapositivas ni la fuente
  * entran en el bundle de Tráfico web hasta que se abre el informe, y
  * html2canvas/jsPDF solo al pulsar «Descargar PDF».
@@ -17,14 +21,24 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
-import { useDatosInformeTrafico, type FiltroProyecto } from "@/hooks/useTraficoWeb";
+import { useDatosInformeTrafico, type DatosInformeTrafico } from "@/hooks/useTraficoWeb";
 import { DiapositivasInforme } from "./Diapositivas";
-import { construirInforme, mesesSeleccionables, mesPorDefecto, rangoDatos, rangoInforme, type InformeTrafico } from "./modelo";
+import {
+  construirInformeMensual,
+  mesesSeleccionables,
+  mesPorDefecto,
+  PROYECTO_PRINCIPAL,
+  PROYECTO_TOUZA,
+  rangoDatos,
+  rangoInforme,
+  type InformeTrafico,
+} from "./modelo";
 import { prepararFuenteInforme } from "./fuente";
 import { descargarPdfInforme } from "./pdf";
 import { ALTO_DIAPOSITIVA, ANCHO_DIAPOSITIVA } from "./tema";
 
 const ISO = "yyyy-MM-dd";
+const SIN_DATOS: DatosInformeTrafico = { serie: [], paginas: [], dispositivos: [], paises: [], procedencias: [], primerDiaConVisitas: null };
 
 /** Escala una diapositiva de 1280 × 720 al ancho disponible, manteniendo el 16:9. */
 function DiapositivaEscalada({ children, indice }: { children: ReactNode; indice: number }) {
@@ -59,30 +73,29 @@ function DiapositivaEscalada({ children, indice }: { children: ReactNode; indice
 interface InformeTraficoDialogProps {
   abierto: boolean;
   onAbiertoChange: (abierto: boolean) => void;
-  /** Web elegida en la página; con «Ambas webs» el informe empieza por la de Casa Tomás. */
-  proyectoInicial: FiltroProyecto;
 }
 
-export default function InformeTraficoDialog({ abierto, onAbiertoChange, proyectoInicial }: InformeTraficoDialogProps) {
+export default function InformeTraficoDialog({ abierto, onAbiertoChange }: InformeTraficoDialogProps) {
   const hoy = format(new Date(), ISO);
   const meses = useMemo(() => mesesSeleccionables(hoy), [hoy]);
   const [mes, setMes] = useState(() => mesPorDefecto(hoy));
-  const [proyecto, setProyecto] = useState<FiltroProyecto>(proyectoInicial === "ambos" ? "casa-tomas-story" : proyectoInicial);
   const [fuenteLista, setFuenteLista] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [progreso, setProgreso] = useState<{ hechas: number; total: number } | null>(null);
   const [contenedorExport, setContenedorExport] = useState<HTMLDivElement | null>(null);
 
   const rango = useMemo(() => rangoInforme(mes, hoy), [mes, hoy]);
-  const datosQ = useDatosInformeTrafico(proyecto, rangoDatos(rango));
+  // Cada web por separado: la principal no lleva sumadas las visitas de Touza.
+  const principalQ = useDatosInformeTrafico(PROYECTO_PRINCIPAL, rangoDatos(rango));
+  const touzaQ = useDatosInformeTrafico(PROYECTO_TOUZA, rangoDatos(rango));
   const informe = useMemo(
     () =>
       rango.diasCerrados === 0
-        ? construirInforme({ serie: [], paginas: [], dispositivos: [], paises: [], procedencias: [], primerDiaConVisitas: null }, { proyecto, mes, hoy })
-        : datosQ.data
-          ? construirInforme(datosQ.data, { proyecto, mes, hoy })
+        ? construirInformeMensual({ principal: SIN_DATOS, touza: SIN_DATOS }, { mes, hoy })
+        : principalQ.data && touzaQ.data
+          ? construirInformeMensual({ principal: principalQ.data, touza: touzaQ.data }, { mes, hoy })
           : null,
-    [datosQ.data, rango.diasCerrados, proyecto, mes, hoy],
+    [principalQ.data, touzaQ.data, rango.diasCerrados, mes, hoy],
   );
   const informeListo: InformeTrafico | null = informe && informe.vacio === false ? informe : null;
   const motivoVacio = informe && informe.vacio === true ? informe.motivo : null;
@@ -127,7 +140,12 @@ export default function InformeTraficoDialog({ abierto, onAbiertoChange, proyect
     };
   }, [exportando, contenedorExport, informeListo]);
 
-  const cargando = rango.diasCerrados > 0 && datosQ.isLoading;
+  const cargando = rango.diasCerrados > 0 && (principalQ.isLoading || touzaQ.isLoading);
+  const errorCarga = principalQ.error ?? touzaQ.error;
+  const reintentar = () => {
+    if (principalQ.isError) principalQ.refetch();
+    if (touzaQ.isError) touzaQ.refetch();
+  };
 
   return (
     <Dialog open={abierto} onOpenChange={(o) => !exportando && onAbiertoChange(o)}>
@@ -142,7 +160,8 @@ export default function InformeTraficoDialog({ abierto, onAbiertoChange, proyect
               Informe mensual de tráfico web
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Para el dueño: cifras clave, gráficas y conclusiones del mes, comparado con el anterior.
+              Para el dueño: la web de Casa Tomás (cifras clave, gráficas y conclusiones del mes, comparado con el anterior) y, al
+              final, un apartado para Touza.
             </DialogDescription>
           </div>
           <Select value={mes} onValueChange={setMes} disabled={exportando}>
@@ -157,16 +176,6 @@ export default function InformeTraficoDialog({ abierto, onAbiertoChange, proyect
               ))}
             </SelectContent>
           </Select>
-          <Select value={proyecto} onValueChange={(v) => setProyecto(v as FiltroProyecto)} disabled={exportando}>
-            <SelectTrigger aria-label="Web del informe" className="h-11 w-full sm:w-[190px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="casa-tomas-story">Casa Tomás</SelectItem>
-              <SelectItem value="touza-restaurant-website">Touza</SelectItem>
-              <SelectItem value="ambos">Ambas webs</SelectItem>
-            </SelectContent>
-          </Select>
           <Button
             className="h-11 w-full gap-2 sm:w-auto"
             disabled={!informeListo || exportando}
@@ -179,8 +188,8 @@ export default function InformeTraficoDialog({ abierto, onAbiertoChange, proyect
 
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-muted/60 px-3 py-4 sm:px-6 sm:py-6">
           <div className="mx-auto flex max-w-[1100px] flex-col gap-4 sm:gap-6" data-fuente-lista={fuenteLista || undefined}>
-            {datosQ.isError ? (
-              <EstadoErrorCarga titulo="los datos del informe" error={datosQ.error} onReintentar={() => datosQ.refetch()} />
+            {errorCarga ? (
+              <EstadoErrorCarga titulo="los datos del informe" error={errorCarga} onReintentar={reintentar} />
             ) : cargando || !informe ? (
               Array.from({ length: 3 }, (_, i) => <Skeleton key={i} className="aspect-video w-full rounded-md" />)
             ) : informeListo ? (
@@ -189,7 +198,7 @@ export default function InformeTraficoDialog({ abierto, onAbiertoChange, proyect
               <div className="flex flex-col items-center gap-3 rounded-md border bg-background px-6 py-14 text-center">
                 <FileBarChart2 className="h-8 w-8 text-muted-foreground" aria-hidden />
                 <p className="font-medium">No hay datos para este informe</p>
-                <p className="max-w-md text-sm text-muted-foreground">{motivoVacio} Prueba con otro mes u otra web.</p>
+                <p className="max-w-md text-sm text-muted-foreground">{motivoVacio} Prueba con otro mes.</p>
               </div>
             )}
           </div>

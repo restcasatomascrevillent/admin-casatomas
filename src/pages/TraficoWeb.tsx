@@ -167,7 +167,7 @@ export default function TraficoWeb() {
       </div>
       {informeAbierto && (
         <Suspense fallback={null}>
-          <InformeTraficoDialog abierto={informeAbierto} onAbiertoChange={setInformeAbierto} proyectoInicial={proyecto} />
+          <InformeTraficoDialog abierto={informeAbierto} onAbiertoChange={setInformeAbierto} />
         </Suspense>
       )}
     </SuperAdminLayout>
