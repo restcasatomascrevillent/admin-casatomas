@@ -9,6 +9,7 @@ import {
   Shield,
   Settings,
   HelpCircle,
+  Bell,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -113,6 +114,7 @@ const menuItems: {
     sectionKey: "usuarios",
     toggleKey: "usuarios",
   },
+  { title: "Avisos", url: "/avisos", icon: Bell },
   { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
 ];
 

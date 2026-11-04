@@ -33,6 +33,7 @@ const Tienda = lazy(() => import("./pages/Tienda"));
 const Facturas = lazy(() => import("./pages/Facturas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
+const Avisos = lazy(() => import("./pages/Avisos"));
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
@@ -135,6 +136,8 @@ const App = () => (
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
+                  {/* Historial de avisos (campana): para todos los roles. */}
+                  <Route path="/avisos" element={pagina(<Avisos />)} />
                   <Route path="/ayuda" element={pagina(<Ayuda />)} />
                   <Route path="/super-admin/login" element={bajoDemanda(<SuperAdminLogin />)} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />
