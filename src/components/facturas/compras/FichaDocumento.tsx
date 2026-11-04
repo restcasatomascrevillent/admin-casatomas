@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Package, Pencil, Sparkles, Truck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Package, Pencil, Plus, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { AlertaValidacion, Factura } from "@/hooks/useFacturas";
+import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { formatCurrency, formatDate, formatDateTime } from "@/components/facturas/shared/formatters";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
@@ -11,6 +12,9 @@ import { esAlbaranSinFactura } from "@/lib/facturas/compras";
 import { AlbaranesDeFactura } from "./AlbaranesDeFactura";
 import { FacturaDelAlbaran } from "./FacturaDelAlbaran";
 import { CosteLecturaFactura } from "@/components/facturas/CosteLecturaDocumento";
+
+/** Línea vacía para «Añadir línea». */
+const LINEA_VACIA: ProductoFactura = { id: 0, producto_nombre: "", precio: 0, proveedor: null };
 
 /** Observaciones: dos líneas como mucho; el resto, tras «ver más». */
 function Observaciones({ texto }: { texto: string }) {
@@ -72,6 +76,10 @@ export function FichaDocumento({
   onAbrirProveedor: (nombre: string) => void;
   onAbrirDocumento: (id: number) => void;
 }) {
+  const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
+  const [añadiendo, setAñadiendo] = useState(false);
+  // Al cambiar de documento se cierra el formulario de línea nueva.
+  useEffect(() => setAñadiendo(false), [doc.id]);
   const esAlbaran = doc.tipo === "albaran";
   const hayImportes = doc.subtotal != null || doc.iva != null || doc.total != null;
   return (
@@ -197,7 +205,7 @@ export function FichaDocumento({
           <Package className="h-3.5 w-3.5" aria-hidden="true" /> Líneas ({doc.productos.length})
         </h3>
         {doc.productos.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Este documento no tiene líneas.</p>
+          !añadiendo && <p className="text-sm text-muted-foreground">Este documento no tiene líneas.</p>
         ) : (
           <div>
             {doc.productos.map((p) => (
@@ -205,6 +213,21 @@ export function FichaDocumento({
             ))}
           </div>
         )}
+        {puedeEditar &&
+          (añadiendo ? (
+            <FilaProducto
+              key={`nueva-${doc.id}`}
+              p={LINEA_VACIA}
+              isMobile
+              allDocs={mismoTipo}
+              nuevaEnFacturaId={doc.id}
+              onCerrarNueva={() => setAñadiendo(false)}
+            />
+          ) : (
+            <Button variant="outline" className="h-11 gap-1.5 text-sm" onClick={() => setAñadiendo(true)}>
+              <Plus className="h-4 w-4" aria-hidden="true" /> Añadir línea
+            </Button>
+          ))}
       </section>
 
       {(doc.procesado_en || doc.created_at) && (

@@ -290,6 +290,59 @@ export const useUpdateFactura = () => {
   });
 };
 
+/** Añade a mano una línea a un documento (la IA no la detectó). */
+export const useCrearProductoFactura = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      factura_id,
+      producto_nombre,
+      cantidad,
+      unidad,
+      precio_unitario,
+      precio,
+    }: {
+      factura_id: number;
+      producto_nombre: string;
+      cantidad?: number;
+      unidad?: string;
+      precio_unitario?: number;
+      precio?: number;
+    }) => {
+      const fila = {
+        factura_id,
+        nombre: producto_nombre.trim(),
+        cantidad,
+        unidad,
+        precio_unitario,
+        total: precio,
+      };
+      Object.keys(fila).forEach((key) => {
+        if (fila[key as keyof typeof fila] === undefined) delete fila[key as keyof typeof fila];
+      });
+
+      const { data, error } = await supabase
+        .from('productos_factura')
+        .insert(fila as typeof fila & { nombre: string; factura_id: number })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['facturas'] });
+      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+      toast.success("Línea añadida");
+    },
+    onError: (error) => {
+      console.error("Error creando producto_factura:", error);
+      toast.error("No se ha podido añadir la línea");
+    }
+  });
+};
+
 export const useUpdateProductoFactura = () => {
   const queryClient = useQueryClient();
 
