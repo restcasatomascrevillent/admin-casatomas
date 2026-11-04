@@ -16,8 +16,9 @@ const TONO: Record<VersionApp["entorno"], string> = {
  * versión tiene cada una (la demo va igual o por delante). Al pasar el ratón: versión,
  * entorno, commit y, si falta el número (`v0.?`), el motivo.
  *
- * `colapsado` (menú plegado a iconos): solo el número, en el color del entorno; el
- * entorno sigue en el tooltip y para el lector de pantalla.
+ * `colapsado` (menú plegado a iconos, y junto al título del menú desplegado): solo el
+ * número, en el color del entorno; el entorno sigue en el tooltip y para el lector de
+ * pantalla.
  */
 export function VersionPanel({
   colapsado = false,

@@ -180,20 +180,26 @@ export function AppSidebar() {
           {isCollapsed && <VersionPanel colapsado />}
           {!isCollapsed && (
             <div className="min-w-0 flex-1">
-              <h2 className="flex items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
-                <UtensilsCrossed
-                  className="h-4 w-4 shrink-0 text-sidebar-primary"
-                  aria-hidden="true"
-                />
-                <span className="truncate">Admin Panel</span>
-              </h2>
+              {/* Versión a la derecha del título, en pequeño (dueño, 04/11/2026): solo el
+                  número, en el color del entorno (ámbar demo, verde producción); el entorno va
+                  en el tooltip y para el lector de pantalla. Con «· Producción» el título se
+                  cortaba en los 16rem del menú. */}
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-sidebar-foreground">
+                  <UtensilsCrossed
+                    className="h-4 w-4 shrink-0 text-sidebar-primary"
+                    aria-hidden="true"
+                  />
+                  <span className="truncate">Admin Panel</span>
+                </h2>
+                <VersionPanel colapsado className="font-medium" />
+              </div>
               <p
                 className="truncate text-xs text-sidebar-foreground/70"
                 title="Gestión del Restaurante"
               >
                 Gestión del Restaurante
               </p>
-              <VersionPanel className="mt-1" />
             </div>
           )}
         </div>
