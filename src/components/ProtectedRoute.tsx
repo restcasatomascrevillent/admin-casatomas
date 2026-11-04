@@ -6,7 +6,6 @@ import { useUserRole, SectionKey } from "@/hooks/useUserRole";
 import { useSuperAdmin } from "@/hooks/useSuperAdmin";
 import { Loader2 } from "lucide-react";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
-import { maquetasVisibles } from "@/lib/maqueta";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -34,13 +33,13 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
 // orden del menú. Antes se mandaba siempre a /dashboard, y quien no tenía
 // permiso de dashboard (p. ej. solo carta y facturas) entraba en un bucle de
 // redirecciones infinito y no podía entrar al panel (10/10/2026).
-const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[]; maqueta?: boolean }[] = [
+const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/dashboard", secciones: ["dashboard"] },
   { ruta: "/reservas", secciones: ["reservas"] },
   { ruta: "/gestion-web", secciones: SECCIONES_GESTOR_WEB },
   { ruta: "/marketing", secciones: ["marketing"] },
   { ruta: "/cheques", secciones: ["cheques"] },
-  { ruta: "/tienda", secciones: ["tienda"], maqueta: true },
+  { ruta: "/tienda", secciones: ["tienda"] },
   { ruta: "/facturas", secciones: ["facturas"] },
 ];
 
@@ -82,7 +81,6 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
       }
       const destino = DESTINOS_RECHAZO.find(
         (d) => d.ruta !== location.pathname
-          && (!d.maqueta || maquetasVisibles())
           && d.secciones.some((key) => permissions.find((p) => p.section_key === key)?.can_view),
       )?.ruta ?? "/ayuda"; // /ayuda no exige permisos: nunca rebota
       navigate(destino, { replace: true });

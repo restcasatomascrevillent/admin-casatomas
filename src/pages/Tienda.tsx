@@ -28,9 +28,6 @@ type Pestana = (typeof PESTANAS)[number];
 const pestanaDeUrl = (v: string | null): Pestana => (PESTANAS as readonly string[]).includes(v ?? "") ? (v as Pestana) : "vinos";
 
 /**
- * SOLO EN LA DEMO (dueño, 03/11/2026): en producción no hay ruta ni menú
- * (lib/maqueta.ts). Sin aviso de «Maqueta» en pantalla (dueño, 04/11/2026).
- *
  * Tienda (petición del dueño, 03/11/2026): los vinos de la carta en la web con
  * un descuento sobre el precio de carta. Es un ESCAPARATE («no puede permitir
  * pago por internet, solo vista»): se compran en el restaurante. Vinos (cuáles
