@@ -20,6 +20,8 @@ const ROUTE_TO_SECTION: Record<string, SectionKey> = {
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
+  // Instagram: sección propia del menú, mismo permiso que Newsletter.
+  "/instagram": "marketing",
   "/tienda": "tienda",
   "/facturas": "facturas",
   "/usuarios": "usuarios",

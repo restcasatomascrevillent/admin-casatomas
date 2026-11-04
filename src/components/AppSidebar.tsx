@@ -10,6 +10,7 @@ import {
   Settings,
   HelpCircle,
   Bell,
+  Instagram,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -83,6 +84,15 @@ const menuItems: {
     title: "Newsletter",
     url: "/marketing",
     icon: Megaphone,
+    sectionKey: "marketing",
+    toggleKey: "marketing",
+  },
+  // Instagram (05/11/2026): sección propia, antes era una pestaña de Newsletter.
+  // Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
+  {
+    title: "Instagram",
+    url: "/instagram",
+    icon: Instagram,
     sectionKey: "marketing",
     toggleKey: "marketing",
   },

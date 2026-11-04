@@ -1,8 +1,18 @@
 # Instagram en el panel: generar y publicar piezas
 
-Sección **Marketing → Instagram**. El panel monta la pieza (plantilla + textos
-+ foto), el servidor la convierte en un JPEG exacto y la publica en Instagram
-con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
+Sección **Instagram** del menú lateral (ruta `/instagram`, justo debajo de
+Newsletter; desde el 05/11/2026 ya no es una pestaña de Newsletter). Mismo
+permiso que Newsletter: la sección `marketing` (y el mismo interruptor del
+Super Admin). El panel monta la pieza (plantilla + textos + foto), el servidor
+la convierte en un JPEG exacto y la publica en Instagram con la API oficial de
+Meta. Cuenta de pruebas: **@oficiososia**. La página no hace scroll vertical:
+mide el alto de la pantalla (`useAlturaDisponible`) y cada columna del editor
+hace su propio scroll (`src/pages/Instagram.tsx`).
+
+El **archivo** (fotos de la biblioteca y JPEG publicados) vive en **Google
+Drive**, en la carpeta «marketing» del secreto
+`GOOGLE_DRIVE_MARKETING_FOLDER_ID`; el bucket «instagram» es solo una escala
+temporal. Detalle en [instagram-fotos.md](instagram-fotos.md).
 
 ## Arquitectura
 
@@ -26,6 +36,13 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
                                                                        ──►  instagram_piezas («prueba_ok»
                                                                             o «publicada» + permalink)
                        ── JWT + apikey ──►  Edge Function instagram-estado (comprobar conexión) ───►  identidad, token, cuota
+                                                                                                      + Google Drive (secretos, alcance, carpeta)
+
+ Biblioteca de fotos   ── JWT + apikey ──►  Edge Function instagram-drive   ◄──►  Google Drive marketing/instagram/fotos/<marca>
+ (listar, subir,                       preparar: copia la foto elegida  ──►  bucket «instagram» tmp/<uuid>.jpg
+  miniatura, preparar)                 (la URL que usan vista previa y render; se borran a las 24 h)
+
+ Tras publicar:  instagram-publicar ──► Drive marketing/instagram/publicadas/AAAA-MM  (y SOLO entonces borra el JPEG del bucket)
 ```
 
 - **Secretos de Meta SOLO en Supabase** (decisión del dueño, 04/11/2026):
@@ -40,15 +57,20 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
 - **Un solo núcleo** (`src/lib/instagram/`): las plantillas, la validación, el
   HTML y las comprobaciones de maquetación son el mismo código en la vista
   previa del panel y en el servidor. Lo que se ve es lo que se publica.
-- **El bucket es solo una escala** (decisión del dueño, 04/11/2026): el
-  archivo definitivo de las piezas vive en Drive. Tras una publicación REAL,
-  `instagram-publicar` borra el JPEG del bucket (con el JWT del usuario; la
+- **El bucket es solo una escala** (decisión del dueño, 04-05/11/2026): el
+  archivo definitivo vive en **Google Drive**. Tras una publicación REAL,
+  `instagram-publicar` sube el JPEG a `marketing/instagram/publicadas/AAAA-MM/`,
+  guarda su id en `instagram_piezas.drive_id` y **solo entonces** borra el JPEG
+  del bucket y la copia `tmp/` de la foto usada (con el JWT del usuario; la
   RLS `instagram_objetos_delete_seccion` lo permite a quien tiene Marketing).
-  `imagen_ruta` se conserva en la fila: una pieza «publicada» ya no tiene el
-  fichero en el bucket, salvo que su `error` empiece por «Publicada, pero el
-  JPEG no se pudo borrar…». La respuesta lo dice en `imagenEnBucket`. En una
-  **prueba** (dryRun) **no** se borra: el contenedor necesita la URL hasta
-  que se publique.
+  **Si Drive falla o no está configurado, no se borra nada** y la respuesta y
+  la fila lo avisan (`error` empieza por «Publicada, pero no se pudo guardar
+  en Google Drive…»). `imagen_ruta` se conserva en la fila: una pieza
+  «publicada» con `drive_id` ya no tiene el fichero en el bucket, salvo que su
+  `error` empiece por «Publicada, pero el JPEG no se pudo borrar…». La
+  respuesta lo dice en `imagenEnBucket` y `driveId`. En una **prueba**
+  (dryRun) **no** se toca nada: el contenedor necesita la URL hasta que se
+  publique.
 - **Recursos**: las **fuentes y logos** van en el propio panel
   (`public/instagram/`, ~1 MB). La función de render los lleva dentro de su
   bundle (`vercel.json` → `includeFiles`) y se los sirve a Chromium desde
@@ -56,9 +78,13 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
   `<origen del panel>/__pieza-instagram.html` y las peticiones a
   `<origen>/instagram/…` se contestan con esos ficheros (mismo origen, así
   las @font-face no necesitan CORS). Las **fotos** de la biblioteca están en
-  el bucket público «instagram» (`fotos/<marca>/…`, migración
-  `20261105090000_instagram.sql`; las sube `scripts/instagram/subir-recursos.mjs`)
-  y Chromium las descarga por su URL pública.
+  Google Drive; la elegida se copia al bucket (`tmp/<uuid>.jpg`, Edge Function
+  `instagram-drive` → `preparar`) y Chromium la descarga por esa URL pública.
+  El render **solo** acepta URLs `tmp/` del bucket «instagram» de su propio
+  Supabase y la reconstruye desde la ruta (sin SSRF; ver
+  [instagram-fotos.md](instagram-fotos.md)). El catálogo estático
+  (`fotos/<marca>/…`, `scripts/instagram/subir-recursos.mjs`) ya no se enseña
+  en el panel: queda de respaldo en el render para piezas antiguas.
 - **Siempre como el usuario**: las funciones usan la clave pública de Supabase
   y el JWT de quien pulsa el botón, así que la RLS de `instagram_piezas` y del
   bucket decide (escritura solo con permiso de **Marketing**,
@@ -70,16 +96,19 @@ con la API oficial de Meta. Cuenta de pruebas: **@oficiososia**.
   la consola y lo comprueban).
 
 Código:
-- Edge Functions: `supabase/functions/instagram-publicar/` y
-  `supabase/functions/instagram-estado/` (`index.ts` solo engancha;
-  la lógica en `publicar.ts` / `estado.ts`) y
+- Edge Functions: `supabase/functions/instagram-publicar/`,
+  `supabase/functions/instagram-estado/` y `supabase/functions/instagram-drive/`
+  (`index.ts` solo engancha; la lógica en `publicar.ts` / `estado.ts` /
+  `drive.ts`), el cliente de Drive `supabase/functions/_shared/google-drive.ts` y
   `supabase/functions/_shared/instagram/` (cliente de la Graph API, errores
   en castellano, saneado, comprobación, secretos, acceso a Supabase como el
   usuario). Tests en sus `__tests__/` (sin red).
 - Vercel: `api/instagram-render.ts` y `api/_lib/instagram/` (arranque de
   Chromium, render, saneado, acceso a Supabase). Tests:
   `api/_lib/__tests__/instagram.test.ts` (sin red ni Chromium).
-- Panel: `src/components/marketing/instagram/api.ts`.
+- Panel: `src/pages/Instagram.tsx` (página y ruta `/instagram`, entrada en
+  `src/components/AppSidebar.tsx`) y `src/components/marketing/instagram/`
+  (`api.ts`, `EditorInstagram.tsx`, `useFotosInstagram.ts`…).
 
 ## Secretos de Supabase
 
@@ -95,6 +124,8 @@ desplegar la función.
 | `META_APP_ID` | sí | developers.facebook.com → Mis apps → (app) → Configuración → Básica. |
 | `META_API_VERSION` | no | `vNN.N`; por defecto `v26.0`. |
 | `META_APP_SECRET` | no | Opcional. Con él la comprobación del token usa `debug_token` con token de app (método documentado: caducidad, app y permisos). |
+| `GOOGLE_DRIVE_MARKETING_FOLDER_ID` | sí, para el archivo | Id de la carpeta «marketing» de Drive (lo que va tras `/folders/` en su enlace). Sin él, la biblioteca de fotos no carga y al publicar el JPEG se queda en el bucket. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` | sí, para el archivo | Los **mismos** de las facturas (ya están). Ojo con el alcance del token: ver «TRAMPA: el alcance drive.file» en [instagram-fotos.md](instagram-fotos.md). |
 
 Por línea de comandos, desde la raíz del repo (`admin-casatomas/`):
 
@@ -121,10 +152,16 @@ caducidad «Nunca», `instagram_basic` e `instagram_content_publish`).
 Desde la raíz del repo (`admin-casatomas/`):
 
 ```
-npx supabase functions deploy instagram-publicar instagram-estado --project-ref sfonaclosuafvlhutkon
+npx supabase functions deploy instagram-drive instagram-publicar instagram-estado --project-ref sfonaclosuafvlhutkon
 ```
 
-**Sin `--no-verify-jwt`**: en `supabase/config.toml` las dos tienen
+Antes, la migración de Drive en la demo (una sola vez, nunca `db push`):
+
+```
+npx supabase db query --linked -f supabase/migrations/20261105150000_instagram_drive.sql
+```
+
+**Sin `--no-verify-jwt`**: en `supabase/config.toml` las tres tienen
 `verify_jwt = true` (como el resto de funciones que llama el panel con
 sesión; la CLI lo lee de ahí). La autorización de verdad la hace cada
 función (sesión + `can_write_section('marketing')`). Producción
@@ -134,13 +171,17 @@ dueño, y con sus propios secretos.
 ## Probar la conexión desde el panel
 
 1. Entra en la demo con un usuario que tenga **Marketing**.
-2. **Marketing → Instagram → Comprobar conexión** (llama a la Edge
-   Function `instagram-estado`). Muestra:
+2. **Instagram** (menú lateral) **→ pestaña Conexión → Comprobar** (llama a
+   la Edge Function `instagram-estado`). Muestra:
    - los secretos (presentes o no; del token, como mucho `…abcd`);
    - la cuenta (`@usuario` e id) y si coincide con `IG_USER_ID`;
    - la cuota de publicación (usadas / total en 24 h);
    - con qué método se ha verificado el token y qué no se ha podido verificar;
-   - para cada fallo, **cómo arreglarlo**.
+   - para cada fallo, **cómo arreglarlo**;
+   - debajo, **Google Drive**: si están los secretos (nunca su valor), el
+     permiso (alcance) del token (nunca el token), si la carpeta «marketing»
+     se ve y si se puede escribir en ella. Con `drive.file` y la carpeta
+     creada a mano, explica qué hacer.
 3. Genera una pieza y pulsa **Probar publicación** (`dryRun: true`): crea el
    contenedor en Meta y espera a FINISHED **sin publicar**. Si sale bien, la
    pieza queda en «prueba_ok».
@@ -156,21 +197,30 @@ Todas: `Authorization: Bearer <JWT de Supabase>` (las Edge Functions,
 además, `apikey: <clave pública>`). 401 sin sesión, 403 sin Marketing. Respuestas JSON con `ok`; los errores llevan `error` y, cuando
 aplica, `problemas: string[]` y `comoArreglarlo`.
 
-**POST /api/instagram-render** — cuerpo `{ "pieza": {…}, "id"?: "<uuid>", "caption"?: "…" }`
+**POST /api/instagram-render** — cuerpo `{ "pieza": {…}, "id"?: "<uuid>", "caption"?: "…", "fotoPreparada"?: { id: "drive:<id>", url, ancho, alto, tipo, marca } }`
+(`fotoPreparada.url` solo puede ser `tmp/<uuid>.(jpg|png|webp)` del bucket «instagram» de ese Supabase: si no, 400)
 → 200 `{ ok, id, estado: "generada", urlJpeg, imagenRuta, ancho, alto, bytes, calidad, avisos }`.
 422 si la pieza no es válida, si no carga un recurso (fuente, logo, foto) o si
 no pasa la maquetación (desbordes, márgenes, zona segura del story, campos
 vacíos). 404 si el `id` no existe; 409 si esa pieza ya está publicada.
 
-**POST `${SUPABASE_URL}/functions/v1/instagram-publicar`** — cuerpo `{ "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "…" }`
+**POST `${SUPABASE_URL}/functions/v1/instagram-publicar`** — cuerpo `{ "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "…", "fotoTmp"?: "tmp/<uuid>.jpg" }`
 → 200 `{ ok, id, dryRun, publicado, estado: "prueba_ok"|"publicada", contenedor: { id, estado }, urlJpeg, mediaId, permalink, cuota: { usadas, total, restantes, ventanaHoras }, caption: { caracteres, hashtags, menciones }, avisos }`.
-Al publicar de verdad la respuesta añade `imagenEnBucket` (`false` = el JPEG
-ya se borró del bucket).
+Al publicar de verdad la respuesta añade `driveId` (id del JPEG en Drive, o
+`null` si no se pudo guardar) e `imagenEnBucket` (`false` = el JPEG ya se
+borró del bucket; nunca se borra sin `driveId`).
 → 202 `{ ok, estado: "en_proceso", contenedor, reintentar: { id, contenedorId, dryRun } }`
 si Meta no ha terminado de procesar la imagen dentro del tiempo de la función:
 repetir la misma petición con ese `contenedorId` (no crea otro contenedor).
 
-**GET `${SUPABASE_URL}/functions/v1/instagram-estado`** → 200 `{ ok, variables, faltan, identidad, cuota, metodoVerificacion, versionApi, tokenEnmascarado, comprobaciones, noVerificado, entornoSupabase }`.
+**GET `${SUPABASE_URL}/functions/v1/instagram-estado`** → 200 `{ ok, variables, faltan, identidad, cuota, metodoVerificacion, versionApi, tokenEnmascarado, comprobaciones, noVerificado, entornoSupabase, drive: { ok, alcance, alcances, carpeta, comprobaciones, avisos } }`.
+`ok` sigue siendo «se puede publicar en Instagram»; Drive va aparte en `drive.ok`.
+
+**`${SUPABASE_URL}/functions/v1/instagram-drive`** — `POST { accion: "listar", marca }`,
+`POST ?accion=subir` (multipart: `archivo`, `marca`, `tipo`, `descripcion`),
+`GET ?accion=miniatura&marca=…&id=…` (bytes) y `POST { accion: "preparar", marca, id }`
+→ `{ ruta: "tmp/<uuid>.jpg", url, ancho, alto }`. 503 si faltan los secretos de
+Google; 502 si Drive falla (con `comoArreglarlo`). Detalle en [instagram-fotos.md](instagram-fotos.md).
 
 ## Límites
 
@@ -213,8 +263,10 @@ ejemplo `imagen_borrada_at timestamptz`) en lugar de deducirlo del estado.
 | «Meta no ha podido descargar la imagen» (9004 / 2207052) | La URL pública no responde o no es JPEG | Comprobar que el bucket «instagram» es público y regenerar la pieza |
 | «Instagram no ha podido procesar la imagen (ERROR)» | Formato/medidas no admitidos | Regenerar; revisar que es JPEG 1080×1350 o 1080×1920 |
 | «Falta configurar Instagram en los secretos de Supabase: …» (503) | Faltan secretos | Crearlos (tabla de arriba) con `npx supabase secrets set …` o en el Dashboard |
-| «La función de Instagram no está desplegada en este Supabase» (404) | No se han desplegado las Edge Functions | `npx supabase functions deploy instagram-publicar instagram-estado --project-ref …` |
-| 422 «Hay recursos de la pieza que no cargan» | Fotos no subidas al bucket de ese entorno (o falta algo en `public/instagram/`) | Ejecutar `scripts/instagram/subir-recursos.mjs` contra ese Supabase; la lista dice qué URL falla |
+| «La función de Instagram no está desplegada en este Supabase» (404) | No se han desplegado las Edge Functions | `npx supabase functions deploy instagram-drive instagram-publicar instagram-estado --project-ref …` |
+| 422 «Hay recursos de la pieza que no cargan» | La copia `tmp/` de la foto ya se borró (más de 24 h) o falta algo en `public/instagram/` | Volver a elegir la foto (se prepara otra copia) y regenerar; la lista dice qué URL falla |
+| «No se pueden cargar las fotos de Drive» / «Google Drive: …» | Faltan secretos de Google, el token no ve la carpeta (`drive.file`) o no puede escribir | Pestaña Conexión → Comprobar: el bloque «Google Drive» dice qué falla y cómo arreglarlo |
+| «Publicada, pero no se pudo guardar en Google Drive…» | Drive falló al publicar | La publicación está hecha; el JPEG sigue en el bucket. Arreglar Drive (Comprobar) |
 
 Los mensajes de Meta se guardan, saneados, en `instagram_piezas.error` y la
 pieza pasa a «error»; se puede regenerar y volver a intentar.
