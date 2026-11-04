@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Mail, Plus, Settings, SlidersHorizontal } from "lucide-react";
+import { Clock, Mail, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -18,12 +18,16 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LayoutGrid, Utensils } from "lucide-react";
 import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
+import { ConfiguracionGeneralReservas } from "@/components/reservas/ConfiguracionGeneralReservas";
+import { GestionMesasEspacios } from "@/components/reservas/GestionMesasEspacios";
+import { AvisoSoloLecturaConfiguracion } from "@/components/reservas/AvisoSoloLecturaConfiguracion";
 import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
 import { EditorPlantillasEmail } from "@/components/emails/EditorPlantillasEmail";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
 import {
+  ETIQUETAS_SUBPESTANA_CONFIGURACION,
   resolverDeepLinkReservas,
   resolverSubpestanaConfiguracion,
   TABS_RESERVAS,
@@ -68,6 +72,24 @@ function RegionPestanaLarga({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Un chip de Reservas › Configuración (menos «Plantillas email», que lleva su propio aviso y su propio
+ * scroll): región de pestaña larga con el aviso de «Solo lectura» arriba. El aviso lo ponía
+ * ConfiguracionTurnos encima de todo cuando era un solo chip; al repartirlo (04/11/2026, petición del
+ * dueño: «el scroll es eterno») tiene que salir en cada uno. Dentro de la región y no fijo encima, para
+ * no restar alto al contenido.
+ */
+function ChipConfiguracion({ children }: { children: ReactNode }) {
+  return (
+    <RegionPestanaLarga>
+      <div className="space-y-6">
+        <AvisoSoloLecturaConfiguracion />
+        {children}
+      </div>
+    </RegionPestanaLarga>
+  );
+}
+
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [openDialog, setOpenDialog] = useState(false);
@@ -86,8 +108,8 @@ export default function Reservas() {
   // como siempre. Ver `src/lib/reservas/saltoAsignacion.ts`.
   const [saltoAsignacion, setSaltoAsignacion] = useState<Omit<DestinoAsignacion, "espacioId"> | null>(null);
   const [activeTab, setActiveTab] = useState<string>("hoy");
-  // Subpestaña de «Configuración» (04/11/2026): «General» o «Plantillas email».
-  const [subConfiguracion, setSubConfiguracion] = useState<SubpestanaConfiguracion>("general");
+  // Subpestaña de «Configuración» (04/11/2026): «Reglas», «Servicio», «Mesas», «Turnos» o «Plantillas email».
+  const [subConfiguracion, setSubConfiguracion] = useState<SubpestanaConfiguracion>("reglas");
 
   const { data: espacios } = useEspaciosReserva();
   // «Configuración» tiene permiso propio, «Reservas · Configuración» (04/11/2026, como las pestañas del
@@ -129,7 +151,8 @@ export default function Reservas() {
   useEffect(() => {
     if (!tabFromUrl) return;
     setActiveTab(destino.tab);
-    // `?tab=configuracion&sub=plantillas` (la ruta vieja del Super Admin redirige aquí).
+    // `?tab=configuracion&sub=plantillas` (la ruta vieja del Super Admin redirige aquí). `sub=general`, el
+    // chip único de antes del reparto, abre «Reglas» (`resolverSubpestanaConfiguracion`).
     if (destino.tab === "configuracion") setSubConfiguracion(resolverSubpestanaConfiguracion(subFromUrl));
     // Normalizar la URL de una pestaña antigua sin perder los filtros.
     if (!(TABS_RESERVAS as readonly string[]).includes(tabFromUrl)) {
@@ -384,21 +407,46 @@ export default function Reservas() {
         {puedeVerConfiguracion && (
           <TabsContent value="configuracion" className="mt-4">
             {/* Subpestañas en chips, como Cheques › Configuración. «Plantillas email» llegó del Super Admin
-                el 04/11/2026 (petición del dueño). Las dos se rigen por «Reservas · Configuración», igual que
+                el 04/11/2026 (petición del dueño). Todas se rigen por «Reservas · Configuración», igual que
                 su RLS (20261104111000): con «Ver» se consultan y con «Puede editar» se cambian. Sin
                 `RegionPestanaLarga` en las plantillas: su editor ya mide el alto que le queda y hace
-                scroll por dentro, y envolverlo daría un doble scroll. */}
+                scroll por dentro, y envolverlo daría un doble scroll.
+
+                El mismo día, el antiguo chip «General» (reglas, mesas y turnos, todo seguido) se repartió
+                en cuatro porque «el scroll es eterno» (petición del dueño). «Reglas» y «Servicio» son dos
+                partes del MISMO formulario (`ConfiguracionGeneralReservas`, una fila que se guarda entera):
+                como Radix desmonta el chip que no se ve, solo hay uno montado cada vez. `flex-wrap`: con
+                cinco chips no caben en una fila del móvil (390 px) y bajan a una segunda, como en Cheques. */}
             <Tabs value={subConfiguracion} onValueChange={cambiarSubConfiguracion} className="space-y-4">
               <ChipsSubnivel
+                className="flex-wrap"
                 chips={[
-                  { valor: "general", etiqueta: "General", icono: <SlidersHorizontal /> },
-                  { valor: "plantillas", etiqueta: "Plantillas email", icono: <Mail /> },
+                  { valor: "reglas", etiqueta: ETIQUETAS_SUBPESTANA_CONFIGURACION.reglas, icono: <SlidersHorizontal /> },
+                  { valor: "servicio", etiqueta: ETIQUETAS_SUBPESTANA_CONFIGURACION.servicio, icono: <Timer /> },
+                  { valor: "mesas", etiqueta: ETIQUETAS_SUBPESTANA_CONFIGURACION.mesas, icono: <LayoutGrid /> },
+                  { valor: "turnos", etiqueta: ETIQUETAS_SUBPESTANA_CONFIGURACION.turnos, icono: <Clock /> },
+                  { valor: "plantillas", etiqueta: ETIQUETAS_SUBPESTANA_CONFIGURACION.plantillas, icono: <Mail /> },
                 ]}
               />
-              <TabsContent value="general" className="mt-0">
-                <RegionPestanaLarga>
+              <TabsContent value="reglas" className="mt-0">
+                <ChipConfiguracion>
+                  <ConfiguracionGeneralReservas parte="reglas" />
+                </ChipConfiguracion>
+              </TabsContent>
+              <TabsContent value="servicio" className="mt-0">
+                <ChipConfiguracion>
+                  <ConfiguracionGeneralReservas parte="servicio" />
+                </ChipConfiguracion>
+              </TabsContent>
+              <TabsContent value="mesas" className="mt-0">
+                <ChipConfiguracion>
+                  <GestionMesasEspacios />
+                </ChipConfiguracion>
+              </TabsContent>
+              <TabsContent value="turnos" className="mt-0">
+                <ChipConfiguracion>
                   <ConfiguracionTurnos />
-                </RegionPestanaLarga>
+                </ChipConfiguracion>
               </TabsContent>
               <TabsContent value="plantillas" className="mt-0">
                 <EditorPlantillasEmail />
