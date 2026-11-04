@@ -78,7 +78,7 @@ const SIN_EVENTO_PROPIO = new Set([
 export const ADMITE_INTEGRACION: ReadonlySet<string> = new Set([
   "chat-web", "newsletter-baja", "resend-webhook", "reservas-web", "emails-reserva",
   "newsletter-sync-resend", "sync-trafico-web", "ocr-trabajo", "clasificar-productos",
-  "sincronizar-costes-openai",
+  "sincronizar-costes-openai", "instagram-metricas",
 ]);
 
 /** La autenticación y autorización de negocio siguen en cada handler. */
