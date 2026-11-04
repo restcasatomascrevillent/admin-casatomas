@@ -206,6 +206,17 @@ verify_jwt = true
 [functions.instagram-drive]
 verify_jwt = true
 
+# Marketing › Instagram › Métricas (docs/instagram-metricas.md). verify_jwt =
+# false porque la llama pg_cron (net.http_post, tarea instagram-metricas-diarias)
+# SIN usuario ni JWT, igual que sync-trafico-web. Autenticación real dentro:
+# · cron: x-webhook-secret == INSTAGRAM_METRICAS_CRON_SECRET (Vault
+#   'instagram_metricas_cron_secret'), en tiempo constante y FALLANDO CERRADO;
+# · panel: JWT de usuario + can_read_section('marketing') para leer y
+#   can_write_section('marketing') para «Actualizar ahora».
+# Escribe las métricas con la clave de servicio (solo service_role puede).
+[functions.instagram-metricas]
+verify_jwt = false
+
 
 # ----------------------------------------------------------------------------
 # verify_jwt = true — SIN autenticación propia: el gateway es lo único delante
