@@ -107,7 +107,8 @@ describe("Tienda › Vinos", () => {
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vinos", "Ajustes"]);
     expect(screen.getByRole("tab", { name: /Vinos/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Visible · 30 %")).toBeInTheDocument();
-    expect(screen.getByRole("note")).toHaveTextContent("Maqueta · solo en la demo: no se publica en producción");
+    // Sin aviso de «Maqueta» (dueño, 04/11/2026).
+    expect(screen.queryByText(/maqueta/i)).toBeNull();
   });
 
   it("precio de carta y de tienda, interruptor «A la venta» y vinos que no pueden salir", async () => {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { AlertTriangle, FlaskConical, Loader2, Settings2, Wine } from "lucide-react";
+import { AlertTriangle, Loader2, Settings2, Wine } from "lucide-react";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useConfiguracionTienda } from "@/hooks/useTienda";
 import { porcentaje } from "@/lib/tienda";
-import { TEXTO_MAQUETA_DEMO } from "@/lib/maqueta";
 import { cn } from "@/lib/utils";
 
 /** Suelo (px) del alto: por debajo (teclado abierto, ventana muy baja) vuelve el scroll de página. */
@@ -29,7 +28,8 @@ type Pestana = (typeof PESTANAS)[number];
 const pestanaDeUrl = (v: string | null): Pestana => (PESTANAS as readonly string[]).includes(v ?? "") ? (v as Pestana) : "vinos";
 
 /**
- * MAQUETA SOLO EN LA DEMO (dueño, 03/11/2026): en producción no hay ruta ni menú.
+ * SOLO EN LA DEMO (dueño, 03/11/2026): en producción no hay ruta ni menú
+ * (lib/maqueta.ts). Sin aviso de «Maqueta» en pantalla (dueño, 04/11/2026).
  *
  * Tienda (petición del dueño, 03/11/2026): los vinos de la carta en la web con
  * un descuento sobre el precio de carta. Es un ESCAPARATE («no puede permitir
@@ -108,14 +108,6 @@ export default function Tienda() {
   return (
     <DashboardLayout>
       <div ref={setRaiz} data-testid="tienda" className="flex min-w-0 flex-col" style={alto ? { height: alto } : undefined}>
-        {/* Maqueta solo en la demo (dueño, 03/11/2026): la ruta no existe en producción (lib/maqueta.ts). */}
-        <p
-          role="note"
-          className="mb-2 flex shrink-0 items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-950"
-        >
-          <FlaskConical className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="min-w-0 break-words">{TEXTO_MAQUETA_DEMO}</span>
-        </p>
         {contenido}
       </div>
     </DashboardLayout>

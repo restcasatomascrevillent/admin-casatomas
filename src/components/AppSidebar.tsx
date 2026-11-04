@@ -52,7 +52,7 @@ const menuItems: {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   sectionKey?: SectionKey | SectionKey[];
   toggleKey?: string;
-  /** Maqueta: solo fuera de producción y con la insignia «Maqueta» (lib/maqueta.ts). */
+  /** Maqueta: solo fuera de producción (lib/maqueta.ts), sin insignia (dueño, 04/11/2026). */
   maqueta?: boolean;
 }[] = [
   {
@@ -214,7 +214,7 @@ export function AppSidebar() {
                   >
                     <NavLink
                       to={item.url}
-                      aria-label={item.maqueta ? `${item.title} (maqueta)` : item.title}
+                      aria-label={item.title}
                       className="flex items-center gap-3 rounded-lg hover:bg-sidebar-accent"
                     >
                       <item.icon
@@ -222,14 +222,6 @@ export function AppSidebar() {
                         aria-hidden="true"
                       />
                       <span className="truncate">{item.title}</span>
-                      {item.maqueta && (
-                        <span
-                          aria-hidden="true"
-                          className="ml-auto shrink-0 rounded-full border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-amber-900 group-data-[collapsible=icon]:hidden"
-                        >
-                          Maqueta
-                        </span>
-                      )}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

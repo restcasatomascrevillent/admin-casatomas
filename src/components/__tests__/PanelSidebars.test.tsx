@@ -369,15 +369,15 @@ describe("menú del panel normal · Tienda (maqueta solo en la demo)", () => {
       </MemoryRouter>,
     );
 
-  it("en la demo sale entre Cheques y Facturas, con la insignia «Maqueta»", () => {
+  it("en la demo sale entre Cheques y Facturas, sin insignia «Maqueta» (dueño, 04/11/2026)", () => {
     entornoMaqueta.valor = "demo";
     pintarAdmin();
-    const tienda = screen.getByRole("link", { name: "Tienda (maqueta)" });
+    const tienda = screen.getByRole("link", { name: "Tienda" });
     expect(tienda).toHaveAttribute("href", "/tienda");
-    expect(tienda).toHaveTextContent("Maqueta");
+    expect(tienda).not.toHaveTextContent(/maqueta/i);
     const nombres = screen.getAllByRole("link").map((l) => l.getAttribute("aria-label"));
-    expect(nombres.indexOf("Tienda (maqueta)")).toBe(nombres.indexOf("Cheques") + 1);
-    expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda (maqueta)") + 1);
+    expect(nombres.indexOf("Tienda")).toBe(nombres.indexOf("Cheques") + 1);
+    expect(nombres.indexOf("Facturas")).toBe(nombres.indexOf("Tienda") + 1);
   });
 
   it("en producción no sale (ni para un super admin)", () => {

@@ -46,6 +46,13 @@ describe("qué vinos se venden (mismo criterio que la BD y la web)", () => {
   it("activo, de la carta de Casa Tomás, con precio y no excluido", () => {
     expect(motivoNoVendible(vino({}), config)).toBeNull();
   });
+  it("un vino recién añadido a la carta sale a la venta solo, con el descuento configurado (dueño, 04/11/2026)", () => {
+    // «Añadir vino» lo crea activado y en la carta del restaurante (useVinos.mapa.test.tsx)
+    // y la tienda solo guarda los EXCLUIDOS: nadie tiene que ponerlo a la venta.
+    const nuevo = vino({ id: "recien-anadido", precio_eur: 40 });
+    expect(motivoNoVendible(nuevo, { vinos_excluidos: ["otro", "excluido"] })).toBeNull();
+    expect(precioTienda(nuevo.precio_eur, 25)).toBe(30);
+  });
   it.each([
     [{ activado: false }, "desactivado"],
     [{ activado: null }, "desactivado"],
