@@ -44,6 +44,8 @@ vi.mock("@/hooks/useFacturas", () => ({
   useAlbaranes: () => ({ data: [{ id: 3, proveedor: "Marta" }] }),
 }));
 vi.mock("@/hooks/useChatFacturas", () => ({ useChatFacturas: () => ({ conversaciones: [] }) }));
+// El contador de la pestaña Compras es un `count` de cabeceras (no descarga la lista): 2 facturas + 1 albarán.
+vi.mock("@/hooks/useContadorDocumentos", () => ({ useContadorDocumentos: () => ({ data: 3 }) }));
 
 const gasto: { filas: FilaGastoIa[] } = { filas: [] };
 vi.mock("@/hooks/useGastoIa", () => ({

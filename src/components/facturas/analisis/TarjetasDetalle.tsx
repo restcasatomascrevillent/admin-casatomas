@@ -1,33 +1,29 @@
-// Fila 3 del tablero: «Lo que más ha subido», «Precio de un producto»,
-// «Gasto por familia», «Gastos fijos al mes», «Abonos por proveedor» y
-// «Casa Tomás y Touza».
-import { forwardRef, useDeferredValue, useState } from "react";
-import { ArrowUp, Loader2, Search, Sparkles, X } from "lucide-react";
+// Tarjetas de detalle del tablero: «Lo que más ha subido», «Gasto por
+// familia», «Gastos fijos al mes», «Abonos por proveedor» y «Casa Tomás y
+// Touza». Cada fila abre un menú (ver sus documentos, Compras, explorador).
+// «Precio de un producto» ya no es tarjeta: es un preset del explorador.
+import { useState } from "react";
+import { ArrowUp, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 import { formatCurrency, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
-import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
-import { useBuscarProductosComprados, useSeriePrecioProducto } from "@/hooks/useTableroCompras";
 import {
   nombreCorto,
   textoPct,
   textoTramos,
   type AbonoProveedor,
+  type Familia,
+  type GastoFijo,
+  type Subida,
   type TableroCompras,
 } from "@/lib/facturas/tableroCompras";
-import { COLOR_CASA_TOMAS, COLOR_TOUZA, FOCO, SinDatos, Tarjeta } from "./piezas";
+import { COLOR_CASA_TOMAS, COLOR_TOUZA, FilaConMenu, FOCO, SinDatos, Tarjeta, type AccionMenu } from "./piezas";
 
 const FILA = cn("flex min-h-11 w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent", FOCO);
+const FILA_BARRA = cn("flex min-h-11 w-full flex-col justify-center gap-1 rounded-md px-1.5 py-1 text-left hover:bg-muted/50", FOCO);
 
 // ─── Lo que más ha subido ───────────────────────────────────────────────────
 
-export function LoQueMasHaSubido({
-  subidas,
-  onProducto,
-}: {
-  subidas: TableroCompras["subidas"];
-  onProducto: (producto: string) => void;
-}) {
+export function LoQueMasHaSubido({ subidas, acciones }: { subidas: TableroCompras["subidas"]; acciones: (s: Subida) => AccionMenu[] }) {
   const productos = subidas.productos.slice(0, 5);
   return (
     <Tarjeta
@@ -50,11 +46,10 @@ export function LoQueMasHaSubido({
         <ol className="space-y-0.5" aria-label="Productos que más han subido">
           {productos.map((p) => (
             <li key={`${p.proveedor_id}-${p.nombre_normalizado}-${p.unidad}`}>
-              <button
-                type="button"
+              <FilaConMenu
                 className={FILA}
-                onClick={() => onProducto(p.producto)}
-                aria-label={`${p.producto} (${p.proveedor}): de ${formatCurrency(p.precio_inicio)} a ${formatCurrency(p.precio_fin)} el ${p.unidad}, ${textoPct(p.variacion_pct)}. Ver su precio`}
+                acciones={acciones(p)}
+                nombre={`${p.producto} (${p.proveedor}): de ${formatCurrency(p.precio_inicio)} a ${formatCurrency(p.precio_fin)} el ${p.unidad}, ${textoPct(p.variacion_pct)}. Opciones`}
               >
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{p.producto}</span>
@@ -66,7 +61,7 @@ export function LoQueMasHaSubido({
                   <ArrowUp className="h-3.5 w-3.5" aria-hidden />
                   {textoPct(p.variacion_pct, false)}
                 </span>
-              </button>
+              </FilaConMenu>
             </li>
           ))}
         </ol>
@@ -75,97 +70,20 @@ export function LoQueMasHaSubido({
   );
 }
 
-// ─── Precio de un producto ──────────────────────────────────────────────────
-
-export const PrecioDeUnProducto = forwardRef<
-  HTMLInputElement,
-  { producto: string | null; onProducto: (p: string | null) => void }
->(function PrecioDeUnProducto({ producto, onProducto }, ref) {
-  const [texto, setTexto] = useState("");
-  const diferido = useDeferredValue(texto);
-  const buscando = !producto && diferido.trim().length >= 2;
-  const resultados = useBuscarProductosComprados(buscando ? diferido : "");
-  const serie = useSeriePrecioProducto(producto);
-
-  return (
-    <Tarjeta
-      titulo="Precio de un producto"
-      subtitulo="Precio unitario sin IVA, una línea por proveedor"
-      testId="tarjeta-precio-producto"
-      className="md:row-span-1"
-    >
-      {producto ? (
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="flex items-center gap-1">
-            <p className="min-w-0 flex-1 truncate text-sm font-medium" title={producto}>
-              {producto}
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                onProducto(null);
-                setTexto("");
-              }}
-              className={cn("inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground", FOCO)}
-            >
-              <X className="h-3.5 w-3.5" aria-hidden /> Otro producto
-            </button>
-          </div>
-          {serie.isLoading ? (
-            <div className="h-40 animate-pulse rounded-md bg-muted/60" role="status" aria-label="Cargando el precio" />
-          ) : serie.isError ? (
-            <p className="text-sm text-destructive" role="alert">
-              No se ha podido leer el precio.{" "}
-              <button type="button" className={cn("min-h-11 underline", FOCO)} onClick={() => void serie.refetch()}>
-                Reintentar
-              </button>
-            </p>
-          ) : (
-            <GraficoSeriePrecio datos={serie.data} compacto alto={170} />
-          )}
-        </div>
-      ) : (
-        <div className="flex min-w-0 flex-col gap-1">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-            <Input
-              ref={ref}
-              value={texto}
-              onChange={(e) => setTexto(e.target.value)}
-              placeholder="Busca un producto: gamba, tomate, aceite…"
-              aria-label="Buscar producto para ver su precio"
-              className="h-11 pl-9 text-base"
-            />
-          </div>
-          {buscando && (
-            <ul className="max-h-48 overflow-y-auto" aria-label="Productos comprados">
-              {resultados.isLoading && (
-                <li className="flex items-center gap-2 px-2 py-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Buscando…
-                </li>
-              )}
-              {resultados.isError && <li className="px-2 py-2 text-sm text-destructive">No se ha podido buscar.</li>}
-              {resultados.data?.length === 0 && <li className="px-2 py-2 text-sm text-muted-foreground">Ningún producto comprado se llama así.</li>}
-              {resultados.data?.map((nombre) => (
-                <li key={nombre}>
-                  <button type="button" className={cn(FILA, "text-sm")} onClick={() => onProducto(nombre)}>
-                    <span className="min-w-0 truncate">{nombre}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!buscando && <p className="py-2 text-xs text-muted-foreground">Escribe al menos 2 letras o toca un producto de «Lo que más ha subido».</p>}
-        </div>
-      )}
-    </Tarjeta>
-  );
-});
-
 // ─── Gasto por familia ──────────────────────────────────────────────────────
 
-export function GastoPorFamilia({ familias, onClasificar }: { familias: TableroCompras["familias"]; onClasificar: () => void }) {
+export function GastoPorFamilia({
+  familias,
+  onClasificar,
+  acciones,
+}: {
+  familias: TableroCompras["familias"];
+  onClasificar: () => void;
+  acciones: (f: Familia) => AccionMenu[];
+}) {
   const { sinClasificar, importeTotal } = familias;
+  const [todas, setTodas] = useState(false);
+  const visibles = todas ? familias.familias : familias.familias.slice(0, 6);
   const max = Math.max(1, ...familias.familias.map((f) => f.importe));
   const pctSin = importeTotal > 0 ? (sinClasificar.importe / importeTotal) * 100 : 0;
   return (
@@ -180,8 +98,8 @@ export function GastoPorFamilia({ familias, onClasificar }: { familias: TableroC
       testId="tarjeta-familias"
     >
       {sinClasificar.lineas > 0 && (
-        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-sm text-amber-900 dark:text-amber-200" role="note">
-          <span className="min-w-0 flex-1">
+        <div className="mb-2 flex flex-col items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-2 text-sm text-amber-900 dark:text-amber-200" role="note">
+          <span className="min-w-0">
             <strong className="font-medium">{plural(sinClasificar.lineas, "línea sin clasificar", "líneas sin clasificar")}</strong>{" "}
             <span className="text-xs">
               ({formatCurrency(sinClasificar.importe)}, {textoPct(pctSin, false)} del gasto): no cuentan en ninguna familia.
@@ -199,19 +117,34 @@ export function GastoPorFamilia({ familias, onClasificar }: { familias: TableroC
       {familias.familias.length === 0 ? (
         <SinDatos>Ninguna línea de este periodo tiene familia todavía.</SinDatos>
       ) : (
-        <ul className="space-y-1.5">
-          {familias.familias.map((f) => (
+        <>
+        <ul className="space-y-0.5" id="lista-familias">
+          {visibles.map((f) => (
             <li key={f.id ?? f.familia} className="text-sm">
-              <span className="flex items-baseline gap-2">
-                <span className="min-w-0 flex-1 truncate">{f.familia}</span>
-                <span className="shrink-0 tabular-nums">{formatCurrency(f.importe)}</span>
-              </span>
-              <span className="mt-0.5 block h-1.5 w-full rounded-full bg-muted/60" aria-hidden>
-                <span className={cn("block h-full rounded-full", COLOR_CASA_TOMAS)} style={{ width: `${(f.importe / max) * 100}%` }} />
-              </span>
+              <FilaConMenu nombre={`${f.familia}: ${formatCurrency(f.importe)} sin IVA. Opciones`} acciones={acciones(f)} className={FILA_BARRA}>
+                <span className="flex w-full items-baseline gap-2">
+                  <span className="min-w-0 flex-1 truncate">{f.familia}</span>
+                  <span className="shrink-0 tabular-nums">{formatCurrency(f.importe)}</span>
+                </span>
+                <span className="block h-1.5 w-full rounded-full bg-muted/60" aria-hidden>
+                  <span className={cn("block h-full rounded-full", COLOR_CASA_TOMAS)} style={{ width: `${(f.importe / max) * 100}%` }} />
+                </span>
+              </FilaConMenu>
             </li>
           ))}
         </ul>
+        {familias.familias.length > 6 && (
+          <button
+            type="button"
+            onClick={() => setTodas((v) => !v)}
+            aria-expanded={todas}
+            aria-controls="lista-familias"
+            className={cn("mt-1 inline-flex min-h-11 items-center self-start rounded-md px-1.5 text-sm font-medium text-primary hover:underline", FOCO)}
+          >
+            {todas ? "Ver solo 6" : `Ver las ${familias.familias.length}`}
+          </button>
+        )}
+        </>
       )}
     </Tarjeta>
   );
@@ -219,7 +152,7 @@ export function GastoPorFamilia({ familias, onClasificar }: { familias: TableroC
 
 // ─── Gastos fijos al mes ────────────────────────────────────────────────────
 
-export function GastosFijos({ fijos, onProveedor }: { fijos: TableroCompras["fijos"]; onProveedor: (id: number) => void }) {
+export function GastosFijos({ fijos, acciones }: { fijos: TableroCompras["fijos"]; acciones: (f: GastoFijo) => AccionMenu[] }) {
   const lista = fijos.proveedores;
   const visibles = lista.slice(0, 6);
   return (
@@ -244,18 +177,16 @@ export function GastosFijos({ fijos, onProveedor }: { fijos: TableroCompras["fij
           <ul className="space-y-0.5">
             {visibles.map((f) => (
               <li key={f.id ?? f.nombre}>
-                <button
-                  type="button"
+                <FilaConMenu
                   className={FILA}
-                  disabled={f.id === null}
-                  onClick={() => f.id !== null && onProveedor(f.id)}
+                  acciones={acciones(f)}
                   title={f.nombre}
-                  aria-label={`${f.nombre}: ${formatCurrency(f.medio_mes)} al mes de media, ${f.meses} de ${f.meses_con_datos} meses. Ver en Compras`}
+                  nombre={`${f.nombre}: ${formatCurrency(f.medio_mes)} al mes de media, ${f.meses} de ${f.meses_con_datos} meses. Opciones`}
                 >
                   <span className="min-w-0 flex-1 truncate text-sm">{nombreCorto(f.nombre)}</span>
                   <span className="shrink-0 text-sm tabular-nums">{formatCurrency(f.medio_mes)}</span>
                   <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">/mes</span>
-                </button>
+                </FilaConMenu>
               </li>
             ))}
           </ul>
@@ -272,7 +203,7 @@ export function GastosFijos({ fijos, onProveedor }: { fijos: TableroCompras["fij
 
 // ─── Abonos por proveedor ───────────────────────────────────────────────────
 
-export function AbonosPorProveedor({ abonos, onProveedor }: { abonos: AbonoProveedor[]; onProveedor: (id: number) => void }) {
+export function AbonosPorProveedor({ abonos, acciones }: { abonos: AbonoProveedor[]; acciones: (a: AbonoProveedor) => AccionMenu[] }) {
   const total = abonos.reduce((s, a) => s + a.importe, 0);
   return (
     <Tarjeta
@@ -287,18 +218,16 @@ export function AbonosPorProveedor({ abonos, onProveedor }: { abonos: AbonoProve
         <ul className="space-y-0.5">
           {abonos.map((a) => (
             <li key={a.id ?? a.nombre}>
-              <button
-                type="button"
+              <FilaConMenu
                 className={FILA}
-                disabled={a.id === null}
-                onClick={() => a.id !== null && onProveedor(a.id)}
+                acciones={acciones(a)}
                 title={a.nombre}
-                aria-label={`${a.nombre}: ${formatImporte(a.importe)} en ${plural(a.documentos, "abono", "abonos")}. Ver en Compras`}
+                nombre={`${a.nombre}: ${formatImporte(a.importe)} en ${plural(a.documentos, "abono", "abonos")}. Opciones`}
               >
                 <span className="min-w-0 flex-1 truncate text-sm">{nombreCorto(a.nombre)}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{plural(a.documentos, "doc.", "docs.")}</span>
                 <span className="w-24 shrink-0 text-right text-sm tabular-nums">{formatImporte(a.importe)}</span>
-              </button>
+              </FilaConMenu>
             </li>
           ))}
           {abonos.length > 1 && (
@@ -315,12 +244,22 @@ export function AbonosPorProveedor({ abonos, onProveedor }: { abonos: AbonoProve
 
 // ─── Casa Tomás y Touza ─────────────────────────────────────────────────────
 
-export function CasaTomasYTouza({ locales }: { locales: TableroCompras["locales"] }) {
+export function CasaTomasYTouza({
+  locales,
+  onVer,
+}: {
+  locales: TableroCompras["locales"];
+  onVer: (local: "casa_tomas" | "touza", gasto: number) => void;
+}) {
   const ct = locales.casaTomas.gasto;
   const tz = locales.touza.gasto;
   const total = ct + tz;
   const pctTz = total > 0 ? (Math.max(0, tz) / total) * 100 : 0;
   const pctCt = total > 0 ? 100 - pctTz : 0;
+  const bloques = [
+    { clave: "casa_tomas" as const, nombre: "Casa Tomás", gasto: ct, pct: pctCt, docs: locales.casaTomas.documentos, color: COLOR_CASA_TOMAS },
+    { clave: "touza" as const, nombre: "Touza", gasto: tz, pct: pctTz, docs: locales.touza.documentos, color: COLOR_TOUZA },
+  ];
   return (
     <Tarjeta
       titulo="Casa Tomás y Touza"
@@ -336,26 +275,23 @@ export function CasaTomasYTouza({ locales }: { locales: TableroCompras["locales"
             <span className={COLOR_CASA_TOMAS} style={{ width: `${pctCt}%` }} />
             <span className={COLOR_TOUZA} style={{ width: `${pctTz}%` }} />
           </div>
-          <dl className="grid grid-cols-2 gap-2 text-sm">
-            <div>
-              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={cn("h-2.5 w-2.5 rounded-sm", COLOR_CASA_TOMAS)} aria-hidden /> Casa Tomás
-              </dt>
-              <dd className="font-medium tabular-nums">{formatCurrency(ct)}</dd>
-              <dd className="text-xs text-muted-foreground">
-                {textoPct(pctCt, false)} · {plural(locales.casaTomas.documentos, "documento", "documentos")}
-              </dd>
-            </div>
-            <div>
-              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className={cn("h-2.5 w-2.5 rounded-sm", COLOR_TOUZA)} aria-hidden /> Touza
-              </dt>
-              <dd className="font-medium tabular-nums">{formatCurrency(tz)}</dd>
-              <dd className="text-xs text-muted-foreground">
-                {textoPct(pctTz, false)} · {plural(locales.touza.documentos, "documento", "documentos")}
-              </dd>
-            </div>
-          </dl>
+          <ul className="grid grid-cols-2 gap-2 text-sm">
+            {bloques.map((b) => (
+              <li key={b.clave}>
+                <button type="button" onClick={() => onVer(b.clave, b.gasto)} className={cn("group flex min-h-11 w-full flex-col rounded-md px-1.5 py-1 text-left hover:bg-muted/50", FOCO)}>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn("h-2.5 w-2.5 rounded-sm", b.color)} aria-hidden /> {b.nombre}
+                    <ChevronRight className="h-3 w-3 opacity-60" aria-hidden />
+                  </span>
+                  <span className="font-medium tabular-nums">{formatCurrency(b.gasto)}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {textoPct(b.pct, false)} · {plural(b.docs, "documento", "documentos")}
+                  </span>
+                  <span className="sr-only">. Ver documentos</span>
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </Tarjeta>

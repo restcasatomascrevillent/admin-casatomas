@@ -41,6 +41,8 @@ interface Props {
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
+  /** «Abrir en el explorador»: la misma gráfica, pero en el explorador del tablero. */
+  onExplorar?: (g: GraficaIa) => void;
 }
 
 /** Tablas y textos largos de la respuesta: que no ensanchen el panel (estrecho). */
@@ -111,7 +113,7 @@ function BotonCopiar({ texto }: { texto: string }) {
   );
 }
 
-export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onEnviar, onRegenerar, fijadas, onFijar, onQuitarFijada }: Props) {
+export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onEnviar, onRegenerar, fijadas, onFijar, onQuitarFijada, onExplorar }: Props) {
   const [input, setInput] = useState("");
   const finRef = useRef<HTMLDivElement>(null);
   const cajaRef = useRef<HTMLTextAreaElement>(null);
@@ -200,6 +202,7 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
                     fijadas={fijadas}
                     onFijar={onFijar}
                     onQuitarFijada={onQuitarFijada}
+                    onExplorar={onExplorar}
                     onRegenerar={i === ultimoAsistente && !isSending ? onRegenerar : undefined}
                   />
                 )}
@@ -292,12 +295,14 @@ function MensajeAsistente({
   onFijar,
   onQuitarFijada,
   onRegenerar,
+  onExplorar,
 }: {
   mensaje: MensajeChat;
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
   onRegenerar?: () => void;
+  onExplorar?: (g: GraficaIa) => void;
 }) {
   const documentos = (mensaje.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
   const graficas = graficasDeMensaje(mensaje);
@@ -313,15 +318,22 @@ function MensajeAsistente({
         return (
           <div key={g.id} className="rounded-xl border border-border/70 p-2">
             <GraficoSeriePrecio datos={g.serie} alto={180} />
-            <button
-              type="button"
-              onClick={() => (fijada ? onQuitarFijada(g.id) : onFijar(g))}
-              aria-pressed={fijada}
-              className={cn(BOTON_PIE, "mt-1", fijada && "text-primary")}
-            >
-              {fijada ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
-              {fijada ? "Fijada en el tablero · quitar" : "Fijar en el tablero"}
-            </button>
+            <div className="mt-1 flex flex-wrap items-center gap-x-1">
+              <button
+                type="button"
+                onClick={() => (fijada ? onQuitarFijada(g.id) : onFijar(g))}
+                aria-pressed={fijada}
+                className={cn(BOTON_PIE, fijada && "text-primary")}
+              >
+                {fijada ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
+                {fijada ? "Fijada en el tablero · quitar" : "Fijar en el tablero"}
+              </button>
+              {onExplorar && (
+                <button type="button" onClick={() => onExplorar(g)} className={BOTON_PIE}>
+                  <LineChart className="h-3.5 w-3.5" aria-hidden /> Abrir en el explorador
+                </button>
+              )}
+            </div>
           </div>
         );
       })}

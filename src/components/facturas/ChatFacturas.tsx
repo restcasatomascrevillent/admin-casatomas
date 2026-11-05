@@ -1,38 +1,47 @@
-// Pestaña «Análisis» de Facturas (rediseño del 05/11/2026): TABLERO DE
-// GRÁFICAS FIJAS que sale hecho al abrirla, con el copiloto de IA PLEGADO.
+// Pestaña «Análisis» de Facturas: TABLERO que sale hecho al abrirla, un
+// EXPLORADOR para cambiar la gráfica al instante sin la IA, «Ver documentos»
+// desde cualquier cifra y el copiloto de IA PLEGADO en un panel lateral.
 //
-//   · Barra: periodo [Mes · Trimestre · Año · Todo] (por defecto, el año),
-//     local [Todos · Casa Tomás · Touza] y un único «Pregúntale a la IA».
-//   · Tablero (lo único que hace scroll): indicadores, gasto por mes,
-//     proveedores, lo que más ha subido, precio de un producto, familias,
-//     gastos fijos, abonos y Casa Tomás frente a Touza. Datos: UNA llamada a
-//     la RPC `tablero_compras` (useTableroCompras).
-//   · Tocar un mes o un proveedor abre Compras filtrado (`onIrA`); tocar un
-//     producto que sube lo abre en «Precio de un producto».
-//   · Copiloto: panel lateral (CopilotoLateral) con el historial dentro; sus
-//     gráficas se pueden fijar al final del tablero.
+//   · Barra: periodo [Mes · Trimestre · Año · Todo · Personalizado] y local
+//     [Todos · Casa Tomás · Touza]; los dos van a la URL
+//     (`?tab=chat&desde=…&hasta=…&local=…`) para volver o compartir.
+//   · Tablero (lo único que hace scroll): indicadores, «Explorar», tarjetas de
+//     detalle y gráficas fijadas. Datos: `tablero_compras` (una llamada) y
+//     `explorar_compras` (la gráfica del explorador).
+//   · Cualquier cifra → «Ver documentos» (DocumentosDeCifra) → su PDF.
+//   · Copiloto: panel lateral con el historial dentro; sus gráficas se pueden
+//     fijar en el tablero o abrir en el explorador.
 //
 // Se sigue llamando ChatFacturas y expone `enviarConsulta`: el «Preguntar a la
 // IA» de una factura en Compras abre el panel y pregunta.
-import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { CalendarSearch, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useChatFacturas, type Conversacion } from "@/hooks/useChatFacturas";
-import { useTableroCompras } from "@/hooks/useTableroCompras";
+import { consultaTablero, useTableroCompras } from "@/hooks/useTableroCompras";
 import { useGraficasFijadas } from "@/hooks/useGraficasFijadas";
-import { FILTROS_LOCAL, textoPeriodo, type FiltroLocal } from "@/lib/facturas/resumenCompras";
+import { useExploracionesFijadas } from "@/hooks/useExplorarCompras";
+import { FILTROS_LOCAL, type FiltroLocal } from "@/lib/facturas/resumenCompras";
+import { fechasPeriodo, localRpc, sugerenciasDeTablero, type PeriodoAnalisis } from "@/lib/facturas/tableroCompras";
 import {
-  ENLACE_PRODUCTOS_COMPRAS,
-  enlaceMesCompras,
-  enlaceProveedorCompras,
-  fechasPeriodo,
-  localRpc,
-  PERIODO_ANALISIS_POR_DEFECTO,
-  periodosAnalisis,
-  sugerenciasDeTablero,
-  type PeriodoAnalisis,
-} from "@/lib/facturas/tableroCompras";
+  escribirAnalisisEnUrl,
+  fechasSeleccion,
+  leerAnalisisDeUrl,
+  mismaSeleccion,
+  SELECCION_POR_DEFECTO,
+  textoRango,
+  type SeleccionPeriodo,
+} from "@/lib/facturas/periodoAnalisis";
+import { ajustarConfig, CONFIG_POR_DEFECTO, FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
+import type { PeticionDocumentos } from "@/lib/facturas/documentosCifra";
+import type { GraficaIa } from "@/lib/facturas/graficasCopiloto";
+import { EstadoVacio } from "@/components/facturas/compras/estilo";
 import { TableroCompras } from "./analisis/TableroCompras";
+import { Explorador } from "./analisis/Explorador";
+import { SelectorPeriodo } from "./analisis/SelectorPeriodo";
+import { DocumentosDeCifra } from "./analisis/DocumentosDeCifra";
 import { ErrorTablero, EsqueletoTablero, Segmentado } from "./analisis/piezas";
 import { CopilotoLateral } from "./copiloto/CopilotoLateral";
 
@@ -45,26 +54,61 @@ interface ChatFacturasProps {
   onIrA?: (enlace: string) => void;
 }
 
-const PRESET_TEXTO: Record<PeriodoAnalisis, "este_mes" | "trimestre" | "anio" | "todo"> = {
-  mes: "este_mes",
-  trimestre: "trimestre",
-  anio: "anio",
-  todo: "todo",
-};
+const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
+
+/** «este año», «1 mar – 15 abr 2026», «el histórico». */
+function textoSeleccion(sel: SeleccionPeriodo, hoy: Date): string {
+  if (sel.tipo === "personalizado") return textoRango(sel.desde, sel.hasta);
+  if (sel.tipo === "todo") return "Todo el histórico";
+  const f = fechasPeriodo(sel.tipo, hoy);
+  return f.desde && f.hasta ? textoRango(f.desde, f.hasta) : NOMBRE_PERIODO[sel.tipo];
+}
 
 export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA }, ref) => {
   const [hoy] = useState(() => new Date());
-  const [periodo, setPeriodo] = useState<PeriodoAnalisis>(PERIODO_ANALISIS_POR_DEFECTO);
-  const [local, setLocal] = useState<FiltroLocal>("todos");
-  const [producto, setProducto] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const qc = useQueryClient();
+  const deUrl = useMemo(() => leerAnalisisDeUrl(params, hoy), [params, hoy]);
+  const [seleccion, setSeleccion] = useState<SeleccionPeriodo>(() => deUrl.periodo ?? SELECCION_POR_DEFECTO);
+  const [local, setLocal] = useState<FiltroLocal>(() => deUrl.local ?? "todos");
+  const [config, setConfig] = useState<ConfigExplorador>(CONFIG_POR_DEFECTO);
+  const [peticionDocs, setPeticionDocs] = useState<PeticionDocumentos | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [verHistorial, setVerHistorial] = useState(false);
-  const buscadorRef = useRef<HTMLInputElement>(null);
 
-  const fechas = useMemo(() => fechasPeriodo(periodo, hoy), [periodo, hoy]);
-  const tablero = useTableroCompras(fechas.desde, fechas.hasta, localRpc(local));
+  // URL → estado (Atrás/Adelante, un enlace compartido).
+  useEffect(() => {
+    if (deUrl.periodo) setSeleccion((s) => (mismaSeleccion(s, deUrl.periodo as SeleccionPeriodo) ? s : (deUrl.periodo as SeleccionPeriodo)));
+    if (deUrl.local) setLocal(deUrl.local);
+  }, [deUrl]);
+  // Estado → URL (sin apilar historial).
+  useEffect(() => {
+    setParams((prev) => {
+      const sig = escribirAnalisisEnUrl(prev, seleccion, local, hoy);
+      return sig.toString() === prev.toString() ? prev : sig;
+    }, { replace: true });
+  }, [seleccion, local, hoy, setParams]);
+
+  const fechas = useMemo(() => fechasSeleccion(seleccion, hoy), [seleccion, hoy]);
+  const lrpc = localRpc(local);
+  const tablero = useTableroCompras(fechas.desde, fechas.hasta, lrpc);
+
+  // Precarga de lo más probable tras el primer tablero: el mes y el trimestre en curso.
+  useEffect(() => {
+    if (!tablero.isSuccess) return;
+    const t = setTimeout(() => {
+      for (const p of ["mes", "trimestre"] as PeriodoAnalisis[]) {
+        const f = fechasPeriodo(p, hoy);
+        void qc.prefetchQuery(consultaTablero(f.desde, f.hasta, lrpc));
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [tablero.isSuccess, qc, hoy, lrpc]);
+
   const { fijadas, fijar, quitar } = useGraficasFijadas();
   const idsFijadas = useMemo(() => new Set(fijadas.map((g) => g.id)), [fijadas]);
+  const exploraciones = useExploracionesFijadas();
+  const idsExploraciones = useMemo(() => new Set(exploraciones.fijadas.map((g) => g.id)), [exploraciones.fijadas]);
 
   const {
     conversaciones,
@@ -79,7 +123,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     eliminarConversacion,
   } = useChatFacturas();
 
-  const sugerencias = useMemo(() => sugerenciasDeTablero(tablero.data, periodo), [tablero.data, periodo]);
+  const periodoSugerencias: PeriodoAnalisis = seleccion.tipo === "personalizado" ? "todo" : seleccion.tipo;
+  const sugerencias = useMemo(() => sugerenciasDeTablero(tablero.data, periodoSugerencias), [tablero.data, periodoSugerencias]);
 
   useImperativeHandle(ref, () => ({
     enviarConsulta: (texto: string) => {
@@ -89,13 +134,19 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     },
   }));
 
-  const elegirProducto = (p: string | null) => {
-    setProducto(p);
-    // Desde «Lo que más ha subido»: llevar la vista a «Precio de un producto».
-    requestAnimationFrame(() => {
-      const tarjeta = document.querySelector<HTMLElement>("[data-testid='tarjeta-precio-producto']");
-      tarjeta?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
-      if (!p) buscadorRef.current?.focus();
+  const verExplorador = () =>
+    requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-testid='explorador']")?.scrollIntoView?.({ block: "start", behavior: "smooth" }));
+  const explorar = useCallback((parcial: Partial<ConfigExplorador>) => {
+    setConfig((c) => ajustarConfig({ ...c, ...parcial }).config);
+    verExplorador();
+  }, []);
+  const explorarGraficaIa = (g: GraficaIa) => {
+    explorar({
+      medida: "precio",
+      agrupar: "mes",
+      desglose: "proveedor",
+      grafica: "auto",
+      filtros: { ...FILTROS_VACIOS, productos: [g.serie.producto], unidad: g.serie.unidad ? g.serie.unidad.toLowerCase() : null },
     });
   };
   const abrirConversacion = (c: Conversacion) => {
@@ -106,6 +157,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     setVerHistorial(false);
     return nuevaConversacion();
   };
+  const irA = (enlace: string) => onIrA?.(enlace);
+  const textoPeriodo = textoSeleccion(seleccion, hoy);
 
   const datos = tablero.data;
   let cuerpo;
@@ -114,38 +167,51 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     cuerpo = <ErrorTablero mensaje={(tablero.error as Error)?.message ?? ""} onReintentar={() => void tablero.refetch()} />;
   else if (!datos || datos.sinDatos)
     cuerpo = (
-      <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border p-6" role="status">
-        <p className="text-sm text-muted-foreground">
-          No hay documentos en {periodo === "todo" ? "el histórico" : textoPeriodo({ tipo: PRESET_TEXTO[periodo] }, hoy).toLowerCase()}
-          {local !== "todos" ? ` de ${local === "touza" ? "Touza" : "Casa Tomás"}` : ""}.
-        </p>
-        {periodo !== "todo" && (
-          <Button type="button" variant="outline" className="h-11" onClick={() => setPeriodo("todo")}>
-            Ver todo el histórico
-          </Button>
-        )}
+      <div className="rounded-xl border border-dashed border-border">
+        <EstadoVacio
+          icono={<CalendarSearch />}
+          titulo={`No hay documentos en ${seleccion.tipo === "personalizado" ? textoPeriodo : NOMBRE_PERIODO[seleccion.tipo]}${local !== "todos" ? ` de ${local === "touza" ? "Touza" : "Casa Tomás"}` : ""}.`}
+          texto="Prueba con otro periodo o con los dos locales."
+          accion={seleccion.tipo !== "todo" ? { etiqueta: "Ver todo el histórico", onClick: () => setSeleccion({ tipo: "todo" }) } : undefined}
+        />
       </div>
     );
   else
     cuerpo = (
       <TableroCompras
-        ref={buscadorRef}
         datos={datos}
-        apilado={local === "todos"}
-        producto={producto}
-        onProducto={elegirProducto}
-        onMes={(mes) => onIrA?.(enlaceMesCompras(mes))}
-        onProveedor={(id) => onIrA?.(enlaceProveedorCompras(id))}
-        onClasificar={() => onIrA?.(ENLACE_PRODUCTOS_COMPRAS)}
-        fijadas={fijadas}
-        onQuitarFijada={quitar}
+        periodo={fechas}
+        local={lrpc}
+        onDocumentos={setPeticionDocs}
+        onIrA={irA}
+        onExplorar={explorar}
+        fijadasIa={fijadas}
+        onQuitarFijadaIa={quitar}
+        fijadasExplorador={exploraciones.fijadas}
+        onQuitarFijadaExplorador={exploraciones.quitar}
+        explorador={
+          <Explorador
+            config={config}
+            onConfig={setConfig}
+            periodo={fechas}
+            textoPeriodo={textoPeriodo}
+            local={lrpc}
+            onLocal={setLocal}
+            onTramo={(desde, hasta) => setSeleccion({ tipo: "personalizado", desde, hasta })}
+            onDocumentos={setPeticionDocs}
+            onIrA={irA}
+            fijadas={idsExploraciones}
+            onFijar={exploraciones.fijar}
+            onQuitarFijada={exploraciones.quitar}
+          />
+        }
       />
     );
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col gap-2">
       <div className="flex shrink-0 flex-wrap items-center gap-2" data-tour="facturas-analisis-barra">
-        <Segmentado<PeriodoAnalisis> etiqueta="Periodo" opciones={periodosAnalisis(hoy)} valor={periodo} onCambio={setPeriodo} />
+        <SelectorPeriodo valor={seleccion} onCambio={setSeleccion} hoy={hoy} />
         <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} />
         {tablero.isFetching && !tablero.isLoading && (
           <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
@@ -163,9 +229,11 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           aria-expanded={abierto}
           aria-controls={abierto ? "copiloto-lateral" : undefined}
           data-tour="facturas-ia-abrir"
+          aria-label="Pregúntale a la IA"
         >
           <Sparkles className="h-4 w-4" aria-hidden />
-          Pregúntale a la IA
+          {/* En tablet vertical la barra no cabe entera: «IA» a secas (el nombre accesible sigue entero). */}
+          <span className="hidden lg:inline">Pregúntale a la</span> IA
         </Button>
       </div>
 
@@ -178,6 +246,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       >
         {cuerpo}
       </div>
+
+      <DocumentosDeCifra peticion={peticionDocs} onCerrar={() => setPeticionDocs(null)} onIrA={onIrA} />
 
       <CopilotoLateral
         abierto={abierto}
@@ -198,6 +268,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         fijadas={idsFijadas}
         onFijar={fijar}
         onQuitarFijada={quitar}
+        onExplorar={explorarGraficaIa}
       />
     </div>
   );
