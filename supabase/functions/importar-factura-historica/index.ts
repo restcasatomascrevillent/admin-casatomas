@@ -37,7 +37,8 @@ const createClient = clienteConAuditoria(createClientBase, "importar-factura-his
 //    4. guardarDocumento (procesar-factura/guardado.ts): duplicado por
 //       número, cabecera (con local e import_clave en el mismo insert),
 //       líneas con embeddings, alertas de cordura y el PDF a Drive
-//       (Proveedor → «2026-03 Marzo»; Storage si Drive falla).
+//       (Proveedor → «2026-03 Marzo»; si Drive falla, copia TEMPORAL en
+//       Storage que el cron facturas-originales-drive sube después).
 //  Solo usa OpenAI para los embeddings (céntimos), no la visión.
 // ============================================================================
 
@@ -148,7 +149,9 @@ serve(conAuditoriaDePeticion("importar-factura-historica", createClientBase, asy
         facturaId: g.facturaId,
         mensaje: `${d.numero_documento} · ${d.productos.length} línea(s)` +
           (r.alertas.length > 0 ? ` · ${r.alertas.length} aviso(s)` : "") +
-          (r.archivo_guardado ? "" : ` · PDF sin guardar: ${r.archivo_error ?? "error"}`),
+          (r.archivo_guardado
+            ? (r.archivo_error ? ` · ${r.archivo_error}` : "")
+            : ` · PDF sin guardar: ${r.archivo_error ?? "error"}`),
         alertas: r.alertas.length,
         archivo_guardado: r.archivo_guardado,
         abono: prep.esAbono,

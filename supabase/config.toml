@@ -97,6 +97,11 @@ verify_jwt = false
 [functions.ocr-trabajo]
 verify_jwt = false
 
+# facturas-originales-drive: la llama el cron «facturas-originales-drive» por
+# pg_net (sin JWT, con x-ocr-secret) o un admin con su JWT (lo comprueba ella).
+[functions.facturas-originales-drive]
+verify_jwt = false
+
 # clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
 # JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
 # mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con

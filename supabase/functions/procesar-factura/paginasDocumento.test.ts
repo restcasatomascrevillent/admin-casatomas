@@ -151,7 +151,7 @@ describe("sustituirFactura", () => {
     const iMove = sb.orden.findIndex((x) => x.startsWith("move:"));
     expect(iRpc).toBeGreaterThanOrEqual(0);
     expect(iMove).toBeGreaterThan(iRpc);
-    expect(sb.rpcs.find((r) => r.nombre === "ocr_sustituir_factura")!.args.p_archivo_path).toMatch(/^2026\/10\/352-sust-t1-/);
+    expect(sb.rpcs.find((r) => r.nombre === "ocr_sustituir_factura")!.args.p_archivo_path).toMatch(/^temporal\/352-sust-t1-/);
   });
 
   it("si la RPC aborta no mueve nada y el mensaje es claro", async () => {
