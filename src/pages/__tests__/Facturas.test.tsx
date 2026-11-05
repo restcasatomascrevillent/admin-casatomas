@@ -111,8 +111,8 @@ describe("Facturas · pestañas", () => {
     expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Análisis", "Compras", "Cargar"]);
     expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
-    // Compras sigue montada por detrás (sin enlace pedido).
-    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
+    // Compras no se monta hasta que se visita: entrar por Análisis no descarga su lista.
+    expect(screen.queryByTestId("compras")).not.toBeInTheDocument();
     for (const p of pestanas) expect(p.className).toContain("min-h-11");
   });
 
