@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const estados: string[] = [];
 const invoke = vi.fn();
 const upload = vi.fn();
+const rpc = vi.fn();
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
+    rpc: (...a: unknown[]) => rpc(...a),
     from: () => ({
       select: () => ({
         eq: () => ({
@@ -22,21 +24,32 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import {
+  descartarTrabajo,
+  describirParado,
   describirProgreso,
+  errorSubida,
   esperarTrabajo,
   esTerminal,
   iniciarDocumentoUnico,
   anadirComoPagina,
   FacturaCambiada,
+  leerErrorFuncion,
+  mensajePorEstado,
   motivoBloqueo,
   planificarGrupo,
+  reintentarTrabajo,
+  rpcNoExiste,
+  SesionOPermiso,
+  SigueEnServidor,
   SinDocumentosLargos,
   sustituirExistente,
+  trabajoParado,
 } from "../documentoLargo";
 
 beforeEach(() => {
   estados.length = 0;
   invoke.mockReset();
+  rpc.mockReset();
   upload.mockReset();
   upload.mockResolvedValue({ data: {}, error: null });
 });
@@ -49,9 +62,34 @@ describe("esperarTrabajo", () => {
     expect(t.estado).toBe("completado");
     expect(vistos).toEqual(["pagina1", "paginas", "consolidando", "completado"]);
   });
-  it("se rinde con un mensaje claro si pasa del tiempo máximo (el trabajo sigue en segundo plano)", async () => {
-    estados.push(...Array(50).fill("paginas"));
-    await expect(esperarTrabajo("t1", undefined, { dormir: async () => {}, esperaMaxMs: -1 })).rejects.toThrow(/segundo plano/);
+  it("UI-1: pasado el tiempo normal NO falla: avisa «lento» y sigue mirando EL MISMO trabajo, más despacio", async () => {
+    estados.push("paginas", "paginas", "paginas", "completado");
+    const esperas: number[] = [];
+    const lentos: boolean[] = [];
+    const t = await esperarTrabajo("t1", (_x, info) => lentos.push(info.lento), {
+      dormir: async (ms) => { esperas.push(ms); },
+      esperaMaxMs: -1,
+      sondeoLentoMs: 30_000,
+    });
+    expect(t.estado).toBe("completado");
+    expect(lentos).toEqual([true, true, true, true]);
+    expect(esperas).toEqual([30_000, 30_000, 30_000]);
+  });
+  it("UI-1: solo tras la espera total lanza SigueEnServidor (no es un fallo, el trabajo sigue)", async () => {
+    estados.push(...Array(5).fill("paginas"));
+    const err = await esperarTrabajo("t1", undefined, { dormir: async () => {}, esperaMaxMs: -1, esperaTotalMs: -1 }).catch((e) => e);
+    expect(err).toBeInstanceOf(SigueEnServidor);
+    expect(err.message).toMatch(/Sigue en el servidor/);
+    expect(err.trabajo?.estado).toBe("paginas");
+  });
+  it("UI-9: un trabajo activo que pasó su límite (o sin movimiento) está PARADO; uno reciente, no", () => {
+    const ahora = Date.parse("2026-11-05T12:00:00Z");
+    expect(trabajoParado({ estado: "pagina1", limite_at: "2026-11-05T11:00:00Z" }, ahora)).toBe(true);
+    expect(trabajoParado({ estado: "pagina1", limite_at: "2026-11-05T11:58:00Z" }, ahora)).toBe(false); // dentro del margen
+    expect(trabajoParado({ estado: "pagina1", updated_at: "2026-11-04T16:00:00Z" }, ahora)).toBe(true); // 20 h sin moverse
+    expect(trabajoParado({ estado: "paginas", updated_at: "2026-11-05T11:59:00Z" }, ahora)).toBe(false);
+    expect(trabajoParado({ estado: "fallido", updated_at: "2026-11-01T00:00:00Z" }, ahora)).toBe(false);
+    expect(describirParado({ updated_at: "2026-11-04T16:00:00Z" }, new Date(ahora))).toMatch(/^Parado en el servidor: no avanza desde el 04\/11/);
   });
   it("describirProgreso y esTerminal", () => {
     expect(esTerminal("duplicado")).toBe(true);
@@ -97,12 +135,79 @@ describe("iniciarDocumentoUnico (una página en segundo plano)", () => {
     await expect(iniciarDocumentoUnico(foto())).rejects.toBeInstanceOf(SinDocumentosLargos);
     invoke.mockResolvedValue({ data: { success: false, error: "No se recibió ningún archivo" }, error: null });
     await expect(iniciarDocumentoUnico(foto())).rejects.toBeInstanceOf(SinDocumentosLargos);
-    upload.mockResolvedValue({ data: null, error: { message: "new row violates row-level security policy" } });
-    await expect(iniciarDocumentoUnico(foto())).rejects.toBeInstanceOf(SinDocumentosLargos);
+  });
+  it("UI-5: un 403/RLS o JWT caducado de Storage es sesión caducada o sin permiso, NO «servidor antiguo»", async () => {
+    upload.mockResolvedValue({ data: null, error: { message: "new row violates row-level security policy", statusCode: "403" } });
+    const rls = await iniciarDocumentoUnico(foto()).catch((e) => e);
+    expect(rls).toBeInstanceOf(SesionOPermiso);
+    expect(rls).not.toBeInstanceOf(SinDocumentosLargos);
+    expect(rls.message).toMatch(/sesión ha caducado o no tienes permiso/);
+    upload.mockResolvedValue({ data: null, error: { message: "jwt expired", statusCode: "400" } });
+    const jwt = await iniciarDocumentoUnico(foto()).catch((e) => e);
+    expect(jwt).toBeInstanceOf(SesionOPermiso);
+    expect(jwt.message).toMatch(/Tu sesión ha caducado/);
+    expect(invoke).not.toHaveBeenCalled(); // no se crea trabajo ni se cae al síncrono
+  });
+  it("UI-12: Storage 413 en español, sin el texto en inglés", async () => {
+    upload.mockResolvedValue({ data: null, error: { message: "The object exceeded the maximum allowed size", statusCode: "413" } });
+    const e = await iniciarDocumentoUnico(foto()).catch((x) => x);
+    expect(e.message).toMatch(/foto\.jpg pesa demasiado para subirlo \(máximo 10 MB\)/);
+    expect(e.message).not.toMatch(/exceeded|maximum allowed/);
   });
   it("otros errores del servidor se propagan tal cual", async () => {
     invoke.mockResolvedValue({ data: { success: false, error: "No se encuentra en Storage: x" }, error: null });
     await expect(iniciarDocumentoUnico(foto())).rejects.toThrow("No se encuentra en Storage: x");
+  });
+  it("UI-3: FunctionsHttpError → el motivo del servidor (cuerpo JSON) o un texto en español por código", async () => {
+    const httpError = (status: number, cuerpo: string) => ({
+      name: "FunctionsHttpError",
+      message: "Edge Function returned a non-2xx status code",
+      context: new Response(cuerpo, { status }),
+    });
+    invoke.mockResolvedValue({ data: null, error: httpError(403, JSON.stringify({ success: false, error: "Sin permisos sobre facturas" })) });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toThrow("Sin permisos sobre facturas");
+    invoke.mockResolvedValue({ data: null, error: httpError(401, "<html>no</html>") });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toThrow(/Tu sesión ha caducado/);
+    invoke.mockResolvedValue({ data: null, error: httpError(500, "<html>Internal Server Error</html>") });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toThrow(/El servidor ha fallado/);
+    invoke.mockResolvedValue({ data: null, error: { name: "FunctionsFetchError", message: "Failed to send a request to the Edge Function" } });
+    await expect(iniciarDocumentoUnico(foto())).rejects.toThrow(/No se ha podido conectar con el servidor/);
+  });
+});
+
+describe("leerErrorFuncion y mensajes en español", () => {
+  it("nunca deja pasar «Edge Function returned a non-2xx status code»", async () => {
+    const m = await leerErrorFuncion({ message: "Edge Function returned a non-2xx status code" }, "No se pudo");
+    expect(m).toBe("No se pudo");
+    expect(mensajePorEstado(403, "x")).toMatch(/No tienes permiso/);
+    expect(mensajePorEstado(502, "x")).toMatch(/El servidor ha fallado/);
+  });
+  it("errorSubida: red y 5xx en español", () => {
+    expect(errorSubida({ message: "Failed to fetch" }, "a.pdf").message).toMatch(/No se ha podido conectar/);
+    expect(errorSubida({ message: "Bad Gateway", status: 502 }, "a.pdf").message).toMatch(/El servidor ha fallado/);
+    expect(errorSubida({ message: "Something odd" }, "a.pdf").message).toBe("No se pudo subir a.pdf. Inténtalo de nuevo.");
+  });
+});
+
+describe("RPC ocr_descartar_trabajo / ocr_reintentar_trabajo", () => {
+  it("con la RPC: devuelve ok/estado/motivo", async () => {
+    rpc.mockResolvedValueOnce({ data: { ok: true, estado: "reanudado" }, error: null });
+    expect(await reintentarTrabajo("t1")).toEqual({ disponible: true, ok: true, estado: "reanudado" });
+    expect(rpc).toHaveBeenCalledWith("ocr_reintentar_trabajo", { p_trabajo_id: "t1" });
+    rpc.mockResolvedValueOnce({ data: { ok: false, motivo: "Ya está consolidando" }, error: null });
+    expect(await descartarTrabajo("t2")).toEqual({ disponible: true, ok: false, motivo: "Ya está consolidando" });
+    expect(rpc).toHaveBeenLastCalledWith("ocr_descartar_trabajo", { p_trabajo_id: "t2" });
+  });
+  it("sin la RPC (PGRST202 / 404 / «Could not find the function») → disponible:false (se cae a lo de antes)", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST202", message: "Could not find the function public.ocr_descartar_trabajo" } });
+    expect((await descartarTrabajo("t")).disponible).toBe(false);
+    rpc.mockResolvedValueOnce({ data: null, error: { status: 404, message: "Not Found" } });
+    expect((await reintentarTrabajo("t")).disponible).toBe(false);
+    expect(rpcNoExiste({ message: "Could not find the function x in the schema cache" })).toBe(true);
+  });
+  it("otro error: motivo en español", async () => {
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "PGRST301", message: "JWT expired" } });
+    expect(await descartarTrabajo("t")).toEqual({ disponible: true, ok: false, motivo: expect.stringMatching(/Tu sesión ha caducado/) });
   });
 });
 

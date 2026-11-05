@@ -5,8 +5,13 @@ import { RUTA_CARGAR, useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { textoIndicador } from "@/lib/facturas/colaSubida";
 
 interface Props {
-  /** `menu`: pie del menú lateral (≥ 1024 px). `cabecera`: barra superior de tablet vertical / móvil. */
-  variante: "menu" | "cabecera";
+  /**
+   * `menu`: pie del menú lateral (≥ 1024 px, AppSidebar). `flotante`: píldora
+   * abajo a la izquierda que pinta <ColaSubidaProvider> por debajo de 1024 px
+   * (menú en panel deslizante) mientras haya algo en marcha fuera de «Cargar».
+   * `cabecera`: para una barra superior (hoy sin uso en la app; lo usan los tests).
+   */
+  variante: "menu" | "cabecera" | "flotante";
   /** Menú lateral plegado a iconos: solo el icono con el número. */
   colapsado?: boolean;
   className?: string;
@@ -14,8 +19,10 @@ interface Props {
 
 /**
  * Indicador global discreto de la subida de facturas en segundo plano
- * («Facturas: 2 procesando · 1 por decidir»), visible desde cualquier sección.
- * Al tocarlo lleva a Facturas → Cargar. No pinta nada si no hay nada en marcha
+ * («Facturas: 2 procesando · 1 por decidir»). Desde 1024 px va en el pie del
+ * menú lateral; por debajo, <ColaSubidaProvider> lo pinta flotante mientras
+ * haya documentos en marcha (con «por decidir» solo, no: saldría días). Al
+ * tocarlo lleva a Facturas → Cargar. No pinta nada si no hay nada en marcha
  * ni pendiente, ni fuera de <ColaSubidaProvider>.
  */
 export function IndicadorSubidasFacturas(props: Props) {
@@ -46,7 +53,9 @@ function Indicador({ variante, colapsado, className, activos, porDecidir }: Prop
           "relative flex min-h-11 min-w-11 items-center gap-2 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           variante === "menu"
             ? "w-full text-sidebar-foreground hover:bg-sidebar-accent active:bg-sidebar-accent"
-            : "max-w-full border border-border bg-muted/50 px-3 text-foreground hover:bg-muted active:bg-muted",
+            : variante === "flotante"
+              ? "max-w-full rounded-full border border-border bg-background px-4 text-foreground shadow-lg hover:bg-muted active:bg-muted"
+              : "max-w-full border border-border bg-muted/50 px-3 text-foreground hover:bg-muted active:bg-muted",
           variante === "menu" && (colapsado ? "justify-center" : "px-3"),
         )}
       >

@@ -96,12 +96,14 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
   const { data: existente, isLoading } = useExistente(aviso.facturaId);
 
   const esAlbaran = (existente?.tipo ?? aviso.tipo ?? "").toString().toLowerCase().startsWith("albar");
-  const titulo =
-    aviso.tipo === null && !existente
-      ? "Este documento ya estaba subido"
-      : esAlbaran
-      ? "Este albarán ya estaba subido"
-      : "Esta factura ya estaba subida";
+  const sinTipo = aviso.tipo === null && !existente;
+  const titulo = sinTipo
+    ? "Este documento ya estaba subido"
+    : esAlbaran
+    ? "Este albarán ya estaba subido"
+    : "Esta factura ya estaba subida";
+  // Concordancia con el título: «la factura … guardada / otra», «el albarán … guardado / otro».
+  const fem = !sinTipo && !esAlbaran;
 
   const datos: [string, string][] = existente
     ? ([
@@ -118,8 +120,9 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
         <DialogHeader>
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
-            Has subido «{aviso.nombre}», pero ya estaba guardado. No se ha creado otro.
-            {s ? " ¿Quieres reemplazar el que hay por el nuevo?" : ""}
+            Has subido «{aviso.nombre}», pero ya estaba {fem ? "guardada" : "guardado"}. No se ha creado{" "}
+            {fem ? "otra" : "otro"}.
+            {s ? (fem ? " ¿Quieres reemplazar la que hay por la nueva?" : " ¿Quieres reemplazar el que hay por el nuevo?") : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -155,44 +158,56 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
           </p>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-2">
-          <div className="min-w-0 sm:w-auto">
-            <BotonOriginal
-              driveUrl={existente?.drive_url ?? null}
-              archivoPath={existente?.archivo_path ?? null}
-              variant="mobile"
-              label="Ver la foto del que ya está"
-            />
+        {/* Dos filas que se parten solas (hasta 5 botones): nada se sale de la
+            pantalla a 1180, 820 ni 390 px. Arriba, comprobar el que ya está;
+            abajo, la decisión. */}
+        <DialogFooter className="flex-col gap-2 sm:flex-col sm:justify-start sm:space-x-0">
+          <div className="flex flex-wrap gap-2">
+            <div className="min-w-0 flex-1 basis-40">
+              <BotonOriginal
+                driveUrl={existente?.drive_url ?? null}
+                archivoPath={existente?.archivo_path ?? null}
+                variant="mobile"
+                label="Ver la foto del que ya está"
+              />
+            </div>
+            {aviso.facturaId ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 flex-1 basis-32"
+                onClick={() => onVerFicha(aviso.facturaId!)}
+              >
+                Ver ficha
+              </Button>
+            ) : null}
           </div>
-          {aviso.facturaId ? (
-            <Button type="button" variant="outline" className="h-11" onClick={() => onVerFicha(aviso.facturaId!)}>
-              Ver ficha
-            </Button>
-          ) : null}
-          {s ? (
-            <>
-              <Button type="button" variant="ghost" className="h-11 text-muted-foreground" onClick={onCerrar}>
-                Decidir luego
-              </Button>
-              <Button type="button" variant="outline" className="h-11" onClick={() => onDejar?.(s)}>
-                Dejar la que hay
-              </Button>
-              <Button type="button" className="h-11" onClick={() => onSustituir?.(s)}>
-                Sustituir por la nueva
-              </Button>
-            </>
-          ) : (
-            <>
-              {aviso.pendiente && (
-                <Button type="button" variant="outline" className="h-11" onClick={onDecidir}>
-                  Decidir
+          <div className="flex flex-wrap justify-end gap-2">
+            {s ? (
+              <>
+                <Button type="button" variant="ghost" className="h-11 flex-1 basis-28 text-muted-foreground sm:flex-none" onClick={onCerrar}>
+                  Decidir luego
                 </Button>
-              )}
-              <Button type="button" className="h-11" onClick={onCerrar}>
-                Cerrar
-              </Button>
-            </>
-          )}
+                <Button type="button" variant="outline" className="h-11 flex-1 basis-36 sm:flex-none" onClick={() => onDejar?.(s)}>
+                  Dejar la que hay
+                </Button>
+                <Button type="button" className="h-11 flex-1 basis-40 sm:flex-none" onClick={() => onSustituir?.(s)}>
+                  Sustituir por la nueva
+                </Button>
+              </>
+            ) : (
+              <>
+                {aviso.pendiente && (
+                  <Button type="button" variant="outline" className="h-11 flex-1 basis-28 sm:flex-none" onClick={onDecidir}>
+                    Decidir
+                  </Button>
+                )}
+                <Button type="button" className="h-11 flex-1 basis-28 sm:flex-none" onClick={onCerrar}>
+                  Cerrar
+                </Button>
+              </>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

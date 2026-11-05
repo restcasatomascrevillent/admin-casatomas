@@ -19,6 +19,16 @@
 //  subiendo y enviando. «procesando» ya está en el servidor y sigue aunque se
 //  cierre la pestaña (al volver se ADOPTA desde ocr_trabajos).
 //
+//  05/11/2026 (QA de «Cargar»):
+//    · un trabajo que tarda más de lo normal NO es un fallo: «Sigue en el
+//      servidor» y se sigue mirando EL MISMO; «Reintentar» de una fila con
+//      trabajo llama a ocr_reintentar_trabajo (nunca crea otro ni vuelve a
+//      pagar la lectura); solo si ya no están sus ficheros, «Volver a subir»;
+//    · al adoptar, los trabajos PARADOS (pasaron su límite) salen como tales;
+//    · `cancelar` corta lo que está en cola/subiendo antes de crear el trabajo
+//      y descarta en el servidor (ocr_descartar_trabajo) lo que se está leyendo;
+//    · los ficheros de 0 bytes se rechazan al añadirlos.
+//
 //  Las dependencias (Supabase, troceado) se inyectan: los tests la manejan
 //  sin red ni React.
 // ============================================================================
@@ -27,20 +37,30 @@ import type { AlertaValidacion } from "@/hooks/useFacturas";
 import { supabase } from "@/integrations/supabase/client";
 import { costeDeRespuesta } from "./costeLectura";
 import {
+  descartarTrabajo,
+  describirParado,
   describirProgreso,
   esperarTrabajo,
+  esTerminal,
   type Anadible,
   type EstadoTrabajo,
+  type InfoSondeo,
   iniciarDocumentoLargo,
   iniciarDocumentoUnico,
   type InicioDocumentoLargo,
+  leerErrorFuncion,
   MAX_PAGINAS_UNIDAS,
   MIMES_UNIBLES,
   type PlanDocumento,
   planificarDocumento,
   planificarGrupo,
+  reintentarTrabajo,
+  type RespuestaRpcTrabajo,
+  SigueEnServidor,
   SinDocumentosLargos,
   type Sustituible,
+  TEXTO_SIGUE_EN_SERVIDOR,
+  trabajoParado,
 } from "./documentoLargo";
 
 export interface ResultadoProcesamiento {
@@ -57,6 +77,20 @@ export interface ResultadoProcesamiento {
    * datos y el usuario tiene que verlo, no solo los logs de la función.
    */
   archivoGuardado?: boolean;
+  /**
+   * Dónde quedó el original (`archivo_estado` del servidor, 05/11/2026):
+   * `drive`; `temporal` = Drive falló y espera en una copia temporal que se
+   * subirá a Drive sola; `perdido` = no hay original.
+   */
+  archivoEstado?: EstadoArchivo;
+  /** Se dejó de mirar un trabajo que seguía en el servidor: NO es un fallo. */
+  sigueEnServidor?: boolean;
+  /** Trabajo adoptado que lleva parado en el servidor (pasó su límite). */
+  parado?: boolean;
+  /** El servidor ya no tiene los ficheros del trabajo: hay que volver a subirlo. */
+  ficherosAusentes?: boolean;
+  /** Duplicado que el usuario decidió no usar («Dejar la que hay»). */
+  descartado?: boolean;
   /**
    * `true` = `procesar-factura` reconoció el documento como ya existente
    * (mismo número+proveedor+fecha+total) y NO lo volvió a insertar.
@@ -82,6 +116,22 @@ export interface ResultadoProcesamiento {
 
 export type TipoDocumento = "factura" | "albaran";
 
+export type EstadoArchivo = "drive" | "temporal" | "perdido";
+
+/**
+ * Dónde quedó el original. Con `archivo_estado` del servidor, ese; si no (versión
+ * anterior): `archivo_guardado:false` → perdido, y `archivo_error` con el
+ * original guardado → copia temporal pendiente de Drive.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- cuerpo JSON de la función
+export function estadoArchivo(data: any): EstadoArchivo | undefined {
+  const e = data?.archivo_estado;
+  if (e === "drive" || e === "temporal" || e === "perdido") return e;
+  if (data?.archivo_guardado === false) return "perdido";
+  if (typeof data?.archivo_error === "string" && data.archivo_error.trim()) return "temporal";
+  return undefined;
+}
+
 /** «Albarán», «ALBARAN », «albaran» → "albaran"; «Factura» → "factura"; otra cosa → null. */
 export function normalizarTipo(v: unknown): TipoDocumento | null {
   if (typeof v !== "string") return null;
@@ -104,7 +154,8 @@ export function aResultado(nombre: string, data: any, piezas?: number, facturaId
     // Normalizado («Albarán» / «albaran» → "albaran"); si no se reconoce, tal cual.
     tipo: normalizarTipo(data.webhookResponse?.tipo) ?? normalizarTipo(data.tipo) ?? (data.webhookResponse?.tipo || data.tipo),
     alertas: Array.isArray(data.alertas) ? data.alertas : [],
-    archivoGuardado: data.duplicado === true ? undefined : data.archivo_guardado !== false,
+    archivoGuardado: data.duplicado === true ? undefined : estadoArchivo(data) !== "perdido",
+    ...(data.duplicado !== true && estadoArchivo(data) ? { archivoEstado: estadoArchivo(data) } : {}),
     duplicado: data.duplicado === true,
     sustituible: data.sustituible ?? null,
     anadible: data.anadible ?? null,
@@ -130,10 +181,19 @@ function idDocumento(data: any, facturaIdTrabajo?: number | null): number | unde
   return id as number | undefined;
 }
 
-export type ClaseResultado = "guardada" | "avisos" | "sin_original" | "duplicada" | "pendiente" | "sustituida" | "fallida";
+export type ClaseResultado =
+  | "guardada"
+  | "avisos"
+  | "sin_original"
+  | "duplicada"
+  | "pendiente"
+  | "sustituida"
+  | "en_servidor"
+  | "fallida";
 
 /** Cómo se cuenta un resultado (toast, indicador y resumen de la campana). */
 export function clasificarResultado(r: ResultadoProcesamiento | undefined): ClaseResultado {
+  if (r && !r.success && (r.sigueEnServidor || r.parado)) return "en_servidor";
   if (!r || !r.success) return "fallida";
   if (r.sustituida || r.paginaAnadida) return "sustituida";
   if (r.duplicado) return r.sustituible || r.anadible ? "pendiente" : "duplicada";
@@ -170,6 +230,8 @@ export interface ElementoCola {
   tanda: number;
   trabajoId?: string;
   piezas?: number;
+  /** El trabajo tarda más de lo normal y se sigue mirando más despacio («Sigue en el servidor»). */
+  lento?: boolean;
   resultado?: ResultadoProcesamiento;
   /**
    * Fotos unidas como UN documento (páginas 1..n, en este orden). `file` es la
@@ -206,7 +268,17 @@ export interface DepsCola {
   iniciarUnico?: (file: File, onProgreso: (subidas: number, total: number) => void) => Promise<InicioDocumentoLargo>;
   /** Fotos unidas como un documento → plan de documento largo (una página por foto). */
   planificarGrupo?: (fotos: File[]) => Promise<Extract<PlanDocumento, { camino: "largo" }>>;
-  esperar: (trabajoId: string, onCambio: (t: EstadoTrabajo | null) => void) => Promise<EstadoTrabajo>;
+  /** Sondea hasta un estado terminal; `info.lento` = ya tarda más de lo normal (sigue mirando). */
+  esperar: (trabajoId: string, onCambio: (t: EstadoTrabajo | null, info?: InfoSondeo) => void) => Promise<EstadoTrabajo>;
+  /**
+   * ocr_reintentar_trabajo: reanuda EL MISMO trabajo (nunca crea otro).
+   * Sin ella (o `disponible:false`) se cae al comportamiento anterior.
+   */
+  reintentarTrabajo?: (trabajoId: string) => Promise<RespuestaRpcTrabajo>;
+  /** ocr_descartar_trabajo: cancela un trabajo en cola/leyéndose. */
+  descartarTrabajo?: (trabajoId: string) => Promise<RespuestaRpcTrabajo>;
+  /** Reloj (tests): para saber si un trabajo adoptado está parado. */
+  ahora?: () => number;
   /** Camino síncrono de una página (respaldo): lee el fichero y llama a procesar-factura. */
   procesarUnico: (file: File, nombre: string) => Promise<ResultadoProcesamiento>;
   /** Cada documento que termina (toast, invalidar listas…). */
@@ -227,8 +299,36 @@ export interface DepsCola {
 
 export const TIPOS_PERMITIDOS = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
 export const MAX_BYTES_ARCHIVO = 10 * 1024 * 1024;
+/**
+ * Los avisos (toasts) de la subida salen ARRIBA: abajo tapaban la lista y el
+ * botón «Limpiar terminados» de la pestaña «Cargar» (y los botones del pie en móvil).
+ */
+export const POSICION_AVISOS = "top-center" as const;
+
+/** Por qué no se admite un fichero al añadirlo (cada causa, su aviso). */
+export type CausaRechazo = "tipo" | "tamano" | "vacio";
 
 const mensajeError = (err: unknown) => (err instanceof Error ? err.message : String(err ?? "Error desconocido"));
+
+/** El usuario canceló el documento: se corta en el siguiente punto seguro (antes de crear el trabajo). */
+class Cancelado extends Error {}
+
+/** Resultado de cancelar: `ok:false` con el motivo para avisar. */
+export type ResultadoCancelar = { ok: true } | { ok: false; motivo: string };
+
+/** ¿Se puede reintentar esta fila? (fallida, o «sigue en el servidor» / parada, con fichero o con trabajo). */
+export function puedeReintentar(e: ElementoCola): boolean {
+  const r = e.resultado;
+  if (e.fase !== "terminado" || !r || r.success) return false;
+  if (r.ficherosAusentes) return false; // hay que volver a subirlo (otro botón)
+  return !!e.file || !!e.trabajoId;
+}
+
+/** ¿Se ofrece «Volver a subir»? El servidor ya no tiene sus ficheros y aún está el fichero aquí. */
+export const puedeVolverASubir = (e: ElementoCola) => e.fase === "terminado" && !!e.resultado?.ficherosAusentes && !!e.file;
+
+/** ¿Se puede cancelar/quitar desde la lista? (todo menos lo que ya se manda por el camino síncrono). */
+export const puedeCancelar = (e: ElementoCola) => e.fase !== "enviando";
 
 /**
  * La cámara del iPad/móvil llama "image.jpg" a TODAS las fotos y la cola
@@ -285,14 +385,21 @@ export function crearColaSubida(deps: DepsCola) {
     tandaAvisada = estado.tanda;
     if (deLaTanda.length === 0) return;
     const porClase: Record<ClaseResultado, number> = {
-      guardada: 0, avisos: 0, sin_original: 0, duplicada: 0, pendiente: 0, sustituida: 0, fallida: 0,
+      guardada: 0, avisos: 0, sin_original: 0, duplicada: 0, pendiente: 0, sustituida: 0, en_servidor: 0, fallida: 0,
     };
     deLaTanda.forEach((e) => { porClase[clasificarResultado(e.resultado)] += 1; });
     deps.alAcabarTanda?.({ tanda: estado.tanda, total: deLaTanda.length, porClase });
   };
 
+  /** Documentos cancelados por el usuario (ya fuera de la lista): su proceso se corta y no se avisa. */
+  const cancelados = new Set<string>();
+  const comprobarCancelado = (id: string) => {
+    if (cancelados.has(id)) throw new Cancelado();
+  };
+
   const terminar = (id: string, resultado: ResultadoProcesamiento) => {
-    actualizar(id, { fase: "terminado", resultado, progreso: "" });
+    if (cancelados.has(id)) return;
+    actualizar(id, { fase: "terminado", resultado, progreso: "", lento: false });
     const e = buscar(id);
     if (e) {
       try {
@@ -303,10 +410,25 @@ export function crearColaSubida(deps: DepsCola) {
     }
   };
 
+  /**
+   * Sigue EL trabajo hasta que termine. Si tarda más de lo normal NO es un
+   * fallo: «Sigue en el servidor» y se sigue mirando (más despacio); si aun así
+   * no termina, la fila queda «sigue en el servidor» y su reintento vuelve a
+   * mirar ESTE trabajo (nunca crea otro ni vuelve a pagar la lectura).
+   */
   const seguirTrabajo = async (id: string, nombre: string, trabajoId: string, piezas?: number): Promise<ResultadoProcesamiento> => {
-    const fin = await deps.esperar(trabajoId, (t) => {
-      if (t) actualizar(id, { progreso: describirProgreso(t) });
-    });
+    let fin: EstadoTrabajo;
+    try {
+      fin = await deps.esperar(trabajoId, (t, info) => {
+        if (!t) return;
+        if (info?.lento && !esTerminal(t.estado)) actualizar(id, { progreso: TEXTO_SIGUE_EN_SERVIDOR, lento: true });
+        else actualizar(id, { progreso: describirProgreso(t), lento: false });
+      });
+    } catch (err) {
+      if (!(err instanceof SigueEnServidor)) throw err;
+      const n = piezas && piezas > 1 ? piezas : undefined;
+      return { nombre, success: false, sigueEnServidor: true, error: TEXTO_SIGUE_EN_SERVIDOR, piezas: n };
+    }
     // Solo los documentos largos hablan de «trozos»; uno de una página, no.
     const total = piezas ?? fin.num_paginas;
     const n = total > 1 ? total : undefined;
@@ -314,6 +436,54 @@ export function crearColaSubida(deps: DepsCola) {
       return { nombre, success: false, error: fin.error || "No se pudo leer el documento", piezas: n };
     }
     return aResultado(nombre, fin.resultado, n, fin.factura_id);
+  };
+
+  /**
+   * «Reintentar» de una fila que YA tiene trabajo en el servidor: llama a
+   * ocr_reintentar_trabajo y sigue EL MISMO trabajo (reanudado o aún en
+   * marcha). Solo si el servidor no tiene ya sus ficheros se pide volver a
+   * subirlo. Sin la RPC (servidor anterior), un trabajo que FALLÓ se vuelve a
+   * subir como antes; uno que seguía en marcha solo se vuelve a mirar.
+   */
+  const reanudar = async (id: string) => {
+    const e = buscar(id);
+    if (!e?.trabajoId) return;
+    const { nombre, trabajoId, piezas, file } = e;
+    const eraFallo = !e.resultado?.sigueEnServidor && !e.resultado?.parado;
+    const n = piezas && piezas > 1 ? piezas : undefined;
+    const tanda = tandaParaNuevos();
+    fijar({
+      tanda,
+      elementos: estado.elementos.map((x) =>
+        x.id === id ? { ...x, fase: "procesando" as const, progreso: "Comprobando en el servidor…", tanda, resultado: undefined, lento: false } : x,
+      ),
+    });
+    let resultado: ResultadoProcesamiento;
+    try {
+      const rpc: RespuestaRpcTrabajo = deps.reintentarTrabajo
+        ? await deps.reintentarTrabajo(trabajoId)
+        : { disponible: false, ok: false };
+      comprobarCancelado(id);
+      if (!rpc.disponible && eraFallo && file) {
+        // Servidor sin la RPC: lo de antes (se vuelve a subir: trabajo nuevo).
+        ponerEnCola((x) => x.id === id);
+        return;
+      }
+      if (rpc.disponible && !rpc.ok) {
+        resultado = {
+          nombre, success: false, ficherosAusentes: true, piezas: n,
+          error: rpc.motivo || "El servidor ya no tiene el documento: vuelve a subirlo.",
+        };
+      } else {
+        if (rpc.estado === "reanudado") actualizar(id, { progreso: "Reanudado en el servidor…" });
+        resultado = await seguirTrabajo(id, nombre, trabajoId, piezas);
+      }
+    } catch (err) {
+      if (err instanceof Cancelado) return;
+      resultado = { nombre, success: false, error: mensajeError(err), piezas: n };
+    }
+    terminar(id, resultado);
+    comprobarFinTanda();
   };
 
   const procesar = async (id: string, liberarHueco: () => void) => {
@@ -326,6 +496,7 @@ export function crearColaSubida(deps: DepsCola) {
       try {
         resultado = await procesarGrupo(id, nombre, e.fotos, liberarHueco);
       } catch (err) {
+        if (err instanceof Cancelado) return;
         resultado = {
           nombre,
           success: false,
@@ -347,12 +518,15 @@ export function crearColaSubida(deps: DepsCola) {
       } catch (err) {
         console.warn("[cola-subida] no se pudo trocear, se envía entero:", err);
       }
+      comprobarCancelado(id);
       if (plan.camino === "largo") {
         try {
           actualizar(id, { fase: "subiendo", progreso: "Subiendo…", piezas: plan.piezas.length });
-          const inicio = await deps.iniciarLargo(file, plan, (n, t) =>
-            actualizar(id, { progreso: `Subiendo trozo ${n} de ${t}…` }),
-          );
+          const inicio = await deps.iniciarLargo(file, plan, (n, t) => {
+            comprobarCancelado(id);
+            actualizar(id, { progreso: `Subiendo trozo ${n} de ${t}…` });
+          });
+          await alCrearTrabajo(id, inicio.trabajoId);
           actualizar(id, { fase: "procesando", trabajoId: inicio.trabajoId, piezas: inicio.numPiezas, progreso: "En cola…" });
           liberarHueco();
           resultado = await seguirTrabajo(id, nombre, inicio.trabajoId, inicio.numPiezas);
@@ -365,7 +539,8 @@ export function crearColaSubida(deps: DepsCola) {
         // Storage depende del navegador; luego se puede cerrar la pestaña.
         try {
           actualizar(id, { fase: "subiendo", progreso: "Subiendo…", piezas: undefined });
-          const inicio = await deps.iniciarUnico(file, () => undefined);
+          const inicio = await deps.iniciarUnico(file, () => comprobarCancelado(id));
+          await alCrearTrabajo(id, inicio.trabajoId);
           actualizar(id, { fase: "procesando", trabajoId: inicio.trabajoId, progreso: "En cola…" });
           liberarHueco();
           resultado = await seguirTrabajo(id, nombre, inicio.trabajoId, 1);
@@ -375,20 +550,41 @@ export function crearColaSubida(deps: DepsCola) {
         }
       }
       if (!resultado) {
+        comprobarCancelado(id);
         actualizar(id, { fase: "enviando", progreso: "Leyendo el documento…", piezas: undefined });
         resultado = await deps.procesarUnico(file, nombre);
       }
     } catch (err) {
+      if (err instanceof Cancelado) return;
       resultado = { nombre, success: false, error: mensajeError(err) };
     }
     terminar(id, resultado);
+  };
+
+  /**
+   * El trabajo ya existe en el servidor. Si el usuario canceló mientras se
+   * creaba, se descarta en el servidor (no se lee ni se paga) y se corta.
+   */
+  const alCrearTrabajo = async (id: string, trabajoId: string) => {
+    if (!cancelados.has(id)) return;
+    try {
+      await deps.descartarTrabajo?.(trabajoId);
+    } catch (err) {
+      console.warn("[cola-subida] no se pudo descartar el trabajo cancelado:", err);
+    }
+    throw new Cancelado();
   };
 
   /** Fotos unidas: un documento largo con una página por foto. */
   const procesarGrupo = async (id: string, nombre: string, fotos: File[], liberarHueco: () => void) => {
     const plan = await (deps.planificarGrupo ?? ((f: File[]) => planificarGrupo(f)))(fotos);
     actualizar(id, { fase: "subiendo", progreso: "Subiendo…", piezas: plan.piezas.length });
-    const inicio = await deps.iniciarLargo(fotos[0], plan, (n, t) => actualizar(id, { progreso: `Subiendo ${n} de ${t}…` }));
+    comprobarCancelado(id);
+    const inicio = await deps.iniciarLargo(fotos[0], plan, (n, t) => {
+      comprobarCancelado(id);
+      actualizar(id, { progreso: `Subiendo ${n} de ${t}…` });
+    });
+    await alCrearTrabajo(id, inicio.trabajoId);
     actualizar(id, { fase: "procesando", trabajoId: inicio.trabajoId, piezas: inicio.numPiezas, progreso: "En cola…" });
     liberarHueco();
     return seguirTrabajo(id, nombre, inicio.trabajoId, inicio.numPiezas);
@@ -441,18 +637,22 @@ export function crearColaSubida(deps: DepsCola) {
       };
     },
 
-    /** Añade a «seleccionados». Devuelve los rechazados (tipo o tamaño) para avisar. */
-    añadirArchivos(files: File[]): { añadidos: number; rechazados: { nombre: string; motivo: string }[] } {
+    /** Añade a «seleccionados». Devuelve los rechazados (tipo, tamaño o vacío) para avisar. */
+    añadirArchivos(files: File[]): { añadidos: number; rechazados: { nombre: string; motivo: string; causa: CausaRechazo }[] } {
       const usados = new Set(estado.elementos.map((e) => e.nombre));
-      const rechazados: { nombre: string; motivo: string }[] = [];
+      const rechazados: { nombre: string; motivo: string; causa: CausaRechazo }[] = [];
       const nuevos: ElementoCola[] = [];
       for (const file of files) {
         if (!TIPOS_PERMITIDOS.includes(file.type)) {
-          rechazados.push({ nombre: file.name, motivo: "no es un PDF o imagen válida" });
+          rechazados.push({ nombre: file.name, motivo: "no es un PDF o imagen válida", causa: "tipo" });
+          continue;
+        }
+        if (file.size === 0) {
+          rechazados.push({ nombre: file.name, motivo: "está vacío (0 bytes): vuelve a hacer la foto o a exportarlo", causa: "vacio" });
           continue;
         }
         if (file.size > MAX_BYTES_ARCHIVO) {
-          rechazados.push({ nombre: file.name, motivo: "supera los 10MB" });
+          rechazados.push({ nombre: file.name, motivo: "supera los 10MB", causa: "tamano" });
           continue;
         }
         const nombre = nombreUnico(file, usados);
@@ -466,12 +666,52 @@ export function crearColaSubida(deps: DepsCola) {
       return { añadidos: nuevos.length, rechazados };
     },
 
-    /** Quita un seleccionado o un terminado (los que están en marcha no se pueden quitar). */
+    /** Quita un seleccionado o un terminado (para los que están en marcha, `cancelar`). */
     quitar(id: string) {
       const e = buscar(id);
       if (!e || (e.fase !== "seleccionado" && e.fase !== "terminado")) return;
       (e.previews ?? [e.preview]).forEach(revocarPreview);
       fijar({ ...estado, elementos: estado.elementos.filter((x) => x.id !== id) });
+    },
+
+    /**
+     * Cancela un documento enviado y lo quita de la lista:
+     *  · en cola / preparando / subiendo: se corta antes de crear el trabajo
+     *    (si el trabajo llegó a crearse, se descarta en el servidor);
+     *  · leyéndose en el servidor (o parado / «sigue en el servidor»):
+     *    ocr_descartar_trabajo; si el servidor no lo permite (ya consolidando o
+     *    terminado, o sin la RPC) se dice por qué y la fila sigue.
+     * Lo que va por el camino síncrono («enviando») no se puede cancelar.
+     */
+    async cancelar(id: string): Promise<ResultadoCancelar> {
+      const e = buscar(id);
+      if (!e) return { ok: true };
+      const fuera = () => {
+        cancelados.add(id);
+        (e.previews ?? [e.preview]).forEach(revocarPreview);
+        fijar({ ...estado, elementos: estado.elementos.filter((x) => x.id !== id) });
+        comprobarFinTanda();
+        return { ok: true } as const;
+      };
+      if (e.fase === "seleccionado" || e.fase === "en_cola" || e.fase === "preparando" || e.fase === "subiendo") return fuera();
+      if (e.fase === "enviando") {
+        return { ok: false, motivo: "Ya se está leyendo y no se puede cancelar: espera a que termine." };
+      }
+      const enServidor = e.fase === "procesando" || (e.fase === "terminado" && (e.resultado?.parado || e.resultado?.sigueEnServidor));
+      if (!enServidor || !e.trabajoId) {
+        if (e.fase === "terminado") return fuera();
+        return { ok: false, motivo: "No se puede cancelar ahora." };
+      }
+      const r: RespuestaRpcTrabajo = deps.descartarTrabajo
+        ? await deps.descartarTrabajo(e.trabajoId)
+        : { disponible: false, ok: false };
+      if (r.disponible && r.ok) return fuera();
+      if (!r.disponible) {
+        // Sin la RPC: una fila ya terminada se puede quitar de la vista; una en marcha, no.
+        if (e.fase === "terminado") return fuera();
+        return { ok: false, motivo: "Ya se está leyendo en el servidor y desde aquí no se puede cancelar." };
+      }
+      return { ok: false, motivo: r.motivo || "El servidor no deja cancelarlo ahora." };
     },
 
     /**
@@ -536,9 +776,30 @@ export function crearColaSubida(deps: DepsCola) {
     /** Envía TODOS los seleccionados. Se puede llamar con otros aún en marcha. */
     enviar: () => ponerEnCola((e) => e.fase === "seleccionado"),
 
-    /** Vuelve a enviar los fallidos (o uno) que aún tienen el fichero en memoria. */
-    reintentar: (id?: string) =>
-      ponerEnCola((e) => e.fase === "terminado" && !e.resultado?.success && !!e.file && (id === undefined || e.id === id)),
+    /**
+     * Reintenta los fallidos (o uno). Una fila que YA tiene trabajo en el
+     * servidor reanuda ESE trabajo (ocr_reintentar_trabajo): nunca crea otro ni
+     * vuelve a pagar la lectura. Las que fallaron antes de llegar al servidor
+     * (sin trabajo) se vuelven a subir con el fichero que hay en memoria.
+     */
+    reintentar(id?: string) {
+      const candidatos = estado.elementos.filter((e) => puedeReintentar(e) && (id === undefined || e.id === id));
+      const subirDeNuevo: string[] = [];
+      let n = 0;
+      for (const e of candidatos) {
+        if (e.trabajoId) {
+          n += 1;
+          void reanudar(e.id);
+        } else if (e.file) {
+          subirDeNuevo.push(e.id);
+        }
+      }
+      if (subirDeNuevo.length > 0) n += ponerEnCola((e) => subirDeNuevo.includes(e.id));
+      return n;
+    },
+
+    /** El servidor ya no tiene los ficheros: se vuelve a subir el fichero (trabajo nuevo). */
+    volverASubir: (id: string) => ponerEnCola((e) => e.id === id && puedeVolverASubir(e)),
 
     /** Quita de la lista los terminados (los pendientes de decidir siguen en su lista, que sale de la BD). */
     limpiarTerminados() {
@@ -552,17 +813,37 @@ export function crearColaSubida(deps: DepsCola) {
      * están en la cola (se subieron antes de recargar la página): se siguen
      * igual que los propios.
      */
-    adoptar(trabajos: Pick<EstadoTrabajo, "id" | "nombre_original" | "num_paginas" | "estado">[]) {
+    adoptar(
+      trabajos: (Pick<EstadoTrabajo, "id" | "nombre_original" | "num_paginas" | "estado"> &
+        Partial<Pick<EstadoTrabajo, "updated_at" | "created_at" | "limite_at">>)[],
+    ) {
       const conocidos = new Set(estado.elementos.map((e) => e.trabajoId).filter(Boolean));
       const nuevos = trabajos.filter((t) => !conocidos.has(t.id));
       if (nuevos.length === 0) return 0;
-      const tanda = tandaParaNuevos();
-      const elementos: ElementoCola[] = nuevos.map((t) => ({
+      // Un trabajo que pasó su límite (p. ej. colgado desde ayer) NO se adopta
+      // como «Leyendo…» ni cuenta como «procesando»: se enseña su estado real.
+      const ahora = deps.ahora?.() ?? Date.now();
+      const parados = nuevos.filter((t) => trabajoParado(t, ahora));
+      const vivos = nuevos.filter((t) => !parados.includes(t));
+      const tanda = vivos.length > 0 ? tandaParaNuevos() : estado.tanda;
+      const elementos: ElementoCola[] = vivos.map((t) => ({
         id: generarId(), nombre: t.nombre_original, file: null, preview: "", tamano: 0,
         fase: "procesando", progreso: describirProgreso(t as EstadoTrabajo), tanda, trabajoId: t.id,
         piezas: t.num_paginas > 1 ? t.num_paginas : undefined,
       }));
-      fijar({ tanda, elementos: [...estado.elementos, ...elementos] });
+      const filasParadas: ElementoCola[] = parados.map((t) => {
+        const piezas = t.num_paginas > 1 ? t.num_paginas : undefined;
+        return {
+          id: generarId(), nombre: t.nombre_original, file: null, preview: "", tamano: 0,
+          // Tanda 0: no entra en la barra ni en el resumen de la tanda en curso.
+          fase: "terminado", progreso: "", tanda: 0, trabajoId: t.id, piezas,
+          resultado: {
+            nombre: t.nombre_original, success: false, parado: true, piezas,
+            error: describirParado(t, new Date(ahora)),
+          },
+        };
+      });
+      fijar({ tanda, elementos: [...estado.elementos, ...elementos, ...filasParadas] });
       for (const e of elementos) {
         void seguirTrabajo(e.id, e.nombre, e.trabajoId!, e.piezas)
           .catch((err): ResultadoProcesamiento => ({ nombre: e.nombre, success: false, error: mensajeError(err), piezas: e.piezas }))
@@ -571,7 +852,19 @@ export function crearColaSubida(deps: DepsCola) {
             comprobarFinTanda();
           });
       }
-      return elementos.length;
+      return elementos.length + filasParadas.length;
+    },
+
+    /** «Dejar la que hay»: la fila del duplicado deja de ofrecer sustituir/añadir. */
+    marcarDescartado(trabajoId: string) {
+      fijar({
+        ...estado,
+        elementos: estado.elementos.map((e) =>
+          e.resultado?.sustituible?.trabajo_id === trabajoId || e.resultado?.anadible?.trabajo_id === trabajoId
+            ? { ...e, resultado: { ...e.resultado, sustituible: null, anadible: null, descartado: true } }
+            : e,
+        ),
+      });
     },
 
     /** La fila del documento que se ha añadido como página a una factura existente. */
@@ -630,6 +923,7 @@ export function textoResumenTanda(r: ResumenTanda): string {
   if (c.sin_original > 0) partes.push(`${c.sin_original} sin original archivado`);
   if (c.pendiente > 0) partes.push(`${c.pendiente} por decidir (ya existían)`);
   if (c.duplicada > 0) partes.push(`${c.duplicada} ya existían`);
+  if (c.en_servidor > 0) partes.push(`${c.en_servidor} siguen en el servidor`);
   if (c.fallida > 0) partes.push(`${c.fallida} fallida${c.fallida === 1 ? "" : "s"}`);
   return partes.join(" · ");
 }
@@ -665,22 +959,30 @@ export async function procesarDocumentoUnico(file: File, nombre: string): Promis
       fecha: new Date().toISOString(),
     },
   });
-  if (error || !data?.success) {
-    return { nombre, success: false, error: error?.message || data?.error || "Error desconocido" };
-  }
+  if (error) return { nombre, success: false, error: await leerErrorFuncion(error, "No se pudo leer el documento") };
+  if (!data?.success) return { nombre, success: false, error: data?.error || "No se pudo leer el documento" };
   return aResultado(nombre, data);
 }
 
 export function depsSupabase(): Pick<
   DepsCola,
-  "planificar" | "planificarGrupo" | "iniciarLargo" | "iniciarUnico" | "esperar" | "procesarUnico"
+  | "planificar"
+  | "planificarGrupo"
+  | "iniciarLargo"
+  | "iniciarUnico"
+  | "esperar"
+  | "procesarUnico"
+  | "reintentarTrabajo"
+  | "descartarTrabajo"
 > {
   return {
     planificar: planificarDocumento,
     planificarGrupo: (fotos) => planificarGrupo(fotos),
     iniciarLargo: iniciarDocumentoLargo,
-    iniciarUnico: (file) => iniciarDocumentoUnico(file),
+    iniciarUnico: (file, onProgreso) => iniciarDocumentoUnico(file, onProgreso),
     esperar: (id, onCambio) => esperarTrabajo(id, onCambio),
     procesarUnico: procesarDocumentoUnico,
+    reintentarTrabajo,
+    descartarTrabajo,
   };
 }

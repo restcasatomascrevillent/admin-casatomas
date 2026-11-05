@@ -36,6 +36,9 @@ export function nivelFila(e: ElementoCola): NivelFila {
   switch (clasificarResultado(e.resultado)) {
     case "fallida":
       return "fallido";
+    case "en_servidor":
+      // Sigue (o se quedó parado) en el servidor: no es un fallo, no va en rojo.
+      return "aviso";
     case "avisos":
     case "sin_original":
       return "aviso";
@@ -90,10 +93,13 @@ export function lineaEstado(e: ElementoCola): LineaEstado {
     return { nivel, texto: piezas > 1 ? `${base} · Documento largo: se lee en ${piezas} trozos en el servidor.` : base };
   }
   if (nivel === "fallido") return { nivel, texto: r?.error || "No se pudo leer el documento." };
+  if (r && !r.success && (r.sigueEnServidor || r.parado)) return { nivel, texto: r.error || "Sigue en el servidor." };
   if (nivel === "duplicado") {
     return {
       nivel,
-      texto: r?.anadible
+      texto: r?.descartado
+        ? "Ya existía: has decidido dejar la que había. No se ha creado otra."
+        : r?.anadible
         ? `Es la página ${r.anadible.pagina.actual} de ${r.anadible.pagina.total} de la factura ${r.anadible.existente.numero_documento}: ` +
           "puedes añadirla arriba, en «Pendientes de decidir»."
         : r?.sustituible
@@ -103,19 +109,24 @@ export function lineaEstado(e: ElementoCola): LineaEstado {
     };
   }
   const partes: string[] = [];
+  const guardado = tipoDocumento(r) === "factura" ? "Guardada" : "Guardado";
   if (nivel === "aviso") {
     const n = r?.alertas?.length ?? 0;
+    if (r?.archivoGuardado === false) {
+      partes.push(`${guardado} · sin original: el fichero no se ha podido archivar; guarda una copia a mano.`);
+    }
     if (n > 0) partes.push(`${n} aviso${n > 1 ? "s" : ""}: ${r!.alertas!.map((a) => a.mensaje).join(" · ")}`);
-    if (r?.archivoGuardado === false) partes.push("Guardado, pero el fichero original no se ha podido archivar.");
   } else {
     partes.push(
       r?.paginaAnadida
         ? "Añadido como página a la factura que ya existía."
         : r?.sustituida
           ? "Factura existente sustituida por este documento."
-          : "Guardado",
+          : guardado,
     );
   }
+  // Drive falló: el original espera en una copia temporal y se sube solo.
+  if (r?.archivoEstado === "temporal") partes.push("original pendiente de subir a Drive (se subirá solo)");
   if (piezas > 1) partes.push(`Leído en ${piezas} trozos y unido.`);
   return { nivel, texto: partes.join(" · ") };
 }

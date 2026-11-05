@@ -48,6 +48,15 @@ export interface HuerfanoPorPasar {
   proveedor: string | null;
   /** La factura no tiene original y este fichero es el suyo: se le pone como drive_url. */
   es_su_original?: boolean | null;
+  /**
+   * Fichero de pendientes/ de un trabajo de OCR (20261106200000): el original
+   * de una factura que se quedó sin él (rescate, QA S-1) o el de un duplicado
+   * que caducó sin decidir (QA S-5). Tras subirlo, el trabajo duplicado pasa a
+   * «cancelado».
+   */
+  trabajo_id?: string | null;
+  /** Nombre con el que va a Drive (el del fichero que subió el usuario). */
+  nombre?: string | null;
 }
 
 export interface PorPasar {
@@ -107,10 +116,18 @@ export async function pasarFactura(
       const { bytes, mime } = await descargar(supabase, path);
       const url = await subirADrive(drive, bytes, nombreEnDrive(path), mime, f.fecha, f.proveedor);
       if (!f.drive_url) {
-        const { error } = await supabase.from("facturas")
-          .update({ drive_url: url, drive_intentos: 0, drive_error: null, drive_intento_at: null })
-          .eq("id", f.id).eq("archivo_path", path);
-        if (error) throw new Error(`update factura ${f.id}: ${error.message}`);
+        // Ya está en Drive: si el UPDATE falla por un corte, se reintenta aquí
+        // en vez de volver a subir otra copia en la próxima pasada.
+        let ultimo: string | null = null;
+        for (let i = 0; i < 3; i++) {
+          if (i > 0) await new Promise((r) => setTimeout(r, 400 * i));
+          const { error } = await supabase.from("facturas")
+            .update({ drive_url: url, drive_intentos: 0, drive_error: null, drive_intento_at: null })
+            .eq("id", f.id).eq("archivo_path", path);
+          ultimo = error ? (error.message ?? String(error)) : null;
+          if (!ultimo) break;
+        }
+        if (ultimo) throw new Error(`update factura ${f.id} (el original YA está en Drive: ${url}): ${ultimo}`);
       }
     } catch (e) {
       await marcarPendienteDrive(supabase, f.id, msg(e));
@@ -133,15 +150,28 @@ export async function pasarFactura(
  */
 export async function pasarHuerfano(supabase: Supa, drive: ConfigDrive, h: HuerfanoPorPasar): Promise<void> {
   const { bytes, mime } = await descargar(supabase, h.name);
-  const base = nombreEnDrive(h.name);
+  const base = nombreSeguroDrive(h.nombre) ?? nombreEnDrive(h.name);
   const nombre = h.name.startsWith("temporal/") || h.es_su_original ? base : `anterior-${base}`;
-  const url = await subirADrive(drive, bytes, nombre, mime, h.fecha, h.proveedor);
+  const url = await subirADrive(drive, bytes, nombre, mimeDeNombre(nombre, mime), h.fecha, h.proveedor);
   if (h.es_su_original && h.factura_id) {
-    const { error } = await supabase.from("facturas").update({ drive_url: url })
+    const { error } = await supabase.from("facturas").update({ drive_url: url, drive_intentos: 0, drive_error: null })
       .eq("id", h.factura_id).is("drive_url", null).is("archivo_path", null);
     if (error) throw new Error(`update factura ${h.factura_id}: ${error.message}`);
   }
+  if (h.trabajo_id) {
+    // Duplicado que caducó sin decidir: su original ya está a salvo en Drive.
+    const { error } = await supabase.from("ocr_trabajos")
+      .update({ estado: "cancelado", error: "Caducado sin decidir: el original se ha guardado en Drive como «anterior-…»" })
+      .eq("id", h.trabajo_id).eq("estado", "duplicado");
+    if (error) throw new Error(`update trabajo ${h.trabajo_id}: ${error.message}`);
+  }
   await borrar(supabase, [h.name]);
+}
+
+/** Nombre de fichero para Drive a partir del original del usuario (sin barras). */
+function nombreSeguroDrive(n: string | null | undefined): string | null {
+  const limpio = String(n ?? "").replace(/[\\/]+/g, "-").trim().slice(0, 150);
+  return limpio || null;
 }
 
 export interface OpcionesLote {

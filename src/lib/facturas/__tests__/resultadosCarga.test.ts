@@ -124,9 +124,43 @@ describe("lineaEstado: una sola línea por documento", () => {
     expect(lineaEstado(el("d", ok({ duplicado: true }))).texto).toMatch(/mismo número y proveedor/);
     expect(lineaEstado(el("p", ok({ duplicado: true, sustituible: {} as never }))).texto).toMatch(/«Pendientes de decidir»/);
     expect(lineaEstado(el("x", ok({ sustituida: true }))).texto).toMatch(/sustituida/);
-    expect(lineaEstado(el("g", ok()))).toEqual({ nivel: "ok", texto: "Guardado" });
+    // Concordancia: «Guardada» para una factura, «Guardado» para un albarán.
+    expect(lineaEstado(el("g", ok()))).toEqual({ nivel: "ok", texto: "Guardada" });
+    expect(lineaEstado(el("a", ok({ tipo: "albaran" })))).toEqual({ nivel: "ok", texto: "Guardado" });
     expect(lineaEstado(el("m", undefined, { progreso: "Subiendo…" }))).toEqual({ nivel: "marcha", texto: "Subiendo…" });
     expect(lineaEstado(el("l", undefined, { progreso: "Leyendo", piezas: 4 })).texto).toMatch(/Documento largo: se lee en 4 trozos/);
+  });
+
+  it("Drive caído: «Guardada · original pendiente de subir a Drive» visible (no solo en un tooltip)", () => {
+    const r = aResultado("d.pdf", {
+      success: true, tipo: "factura", archivo_guardado: true, archivo_estado: "temporal", webhookResponse: { tipo: "factura" },
+    });
+    expect(r.archivoEstado).toBe("temporal");
+    const l = lineaEstado(el("d", r));
+    expect(l.nivel).toBe("ok");
+    expect(l.texto).toBe("Guardada · original pendiente de subir a Drive (se subirá solo)");
+    // Servidor anterior (sin archivo_estado): archivo_error con el original guardado = copia temporal.
+    expect(aResultado("x", { success: true, archivo_guardado: true, archivo_error: "Drive: invalid_grant" }).archivoEstado).toBe("temporal");
+  });
+
+  it("original perdido: «sin original» y cuenta como sin_original", () => {
+    const r = aResultado("p.pdf", { success: true, tipo: "factura", archivo_estado: "perdido", webhookResponse: { tipo: "factura" } });
+    expect(r.archivoGuardado).toBe(false);
+    expect(lineaEstado(el("p", r)).texto).toMatch(/^Guardada · sin original/);
+  });
+
+  it("sigue en el servidor / parado: aviso (no rojo) con su estado real", () => {
+    const sigue = lineaEstado(el("s", { nombre: "s", success: false, sigueEnServidor: true, error: "Sigue en el servidor: tarda" }));
+    expect(sigue).toEqual({ nivel: "aviso", texto: "Sigue en el servidor: tarda" });
+    const parado = lineaEstado(el("p", { nombre: "p", success: false, parado: true, error: "Parado en el servidor: no avanza" }));
+    expect(parado.nivel).toBe("aviso");
+    expect(parado.texto).toMatch(/^Parado en el servidor/);
+  });
+
+  it("duplicado descartado («Dejar la que hay»): ya no remite a «Pendientes de decidir»", () => {
+    const l = lineaEstado(el("d", ok({ duplicado: true, descartado: true })));
+    expect(l.nivel).toBe("duplicado");
+    expect(l.texto).toMatch(/has decidido dejar la que había/);
   });
 });
 

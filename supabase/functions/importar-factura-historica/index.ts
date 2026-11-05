@@ -7,9 +7,10 @@ import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "../proce
 import { configModelo } from "../procesar-factura/modelo.ts";
 import { crearClienteOpenAI } from "../procesar-factura/openai.ts";
 import { crearRegistroUso } from "../procesar-factura/registroUso.ts";
-import { normalizarDatos } from "../procesar-factura/extraccion.ts";
-import { guardarDocumento } from "../procesar-factura/guardado.ts";
-import { aplicarExtras, mismaFacturaPorImporte, prepararImportacion, validarEntrada } from "./mapeo.ts";
+import { fechaIso, normalizarDatos } from "../procesar-factura/extraccion.ts";
+import { archivarOriginal } from "../procesar-factura/archivo.ts";
+import { apuntarOriginal, guardarDocumento } from "../procesar-factura/guardado.ts";
+import { aplicarExtras, esPdf, mismaFacturaPorImporte, prepararImportacion, validarEntrada } from "./mapeo.ts";
 const createClient = clienteConAuditoria(createClientBase, "importar-factura-historica");
 
 // ============================================================================
@@ -86,11 +87,43 @@ serve(conAuditoriaDePeticion("importar-factura-historica", createClientBase, asy
     clave = v.clave;
     const supabase = createClient(cfgAuth.supabaseUrl, cfgAuth.serviceKey);
 
-    // 1) ¿Ya importada?
-    const { data: ya, error: yaErr } = await supabase.from("facturas").select("id").eq("import_clave", clave).maybeSingle();
+    // 0) El fichero tiene que ser un PDF de verdad (cabecera «%PDF-»), y la
+    //    fecha, un día que exista (QA 05/11/2026).
+    if (!esPdf(v.pdfB64)) {
+      return responder({ estado: "error", facturaId: null, mensaje: `«${v.nombrePdf}» no es un PDF válido` });
+    }
+    const fechaJson = String(v.datos.fecha ?? "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaJson) || fechaIso(fechaJson) !== fechaJson) {
+      return responder({
+        estado: "error",
+        facturaId: null,
+        mensaje: `Fecha no válida en el JSON: «${fechaJson}» (tiene que ser un día que exista, en formato AAAA-MM-DD)`,
+      });
+    }
+
+    // 1) ¿Ya importada? Si se importó pero se quedó SIN original (Drive y
+    //    Storage fallaron), se archiva ahora el PDF que llega.
+    const { data: ya, error: yaErr } = await supabase.from("facturas")
+      .select("id, fecha, proveedor, drive_url, archivo_path").eq("import_clave", clave).maybeSingle();
     if (yaErr) throw new Error(`No se pudo comprobar la clave: ${yaErr.message}`);
     if (ya?.id) {
-      return responder({ estado: "ya_importada", facturaId: ya.id, mensaje: `Ya importada (factura ${ya.id})` });
+      if (ya.drive_url || ya.archivo_path) {
+        return responder({ estado: "ya_importada", facturaId: ya.id, mensaje: `Ya importada (factura ${ya.id})` });
+      }
+      const a = await archivarOriginal(
+        drive, supabase, v.pdfB64, v.nombrePdf, "application/pdf", ya.fecha ?? fechaJson, ya.id, ya.proveedor ?? null,
+      );
+      const archivo = await apuntarOriginal(supabase, ya.id, a);
+      return responder({
+        estado: "ya_importada",
+        facturaId: ya.id,
+        mensaje: archivo.ok
+          ? `Ya importada (factura ${ya.id}); estaba sin PDF y se ha guardado ahora` +
+            (archivo.estado === "temporal" ? " (pendiente de subir a Drive)" : "")
+          : `Ya importada (factura ${ya.id}), pero sigue sin PDF: ${archivo.error ?? "error"}`,
+        archivo_guardado: archivo.ok,
+        archivo_estado: archivo.estado,
+      });
     }
 
     // 2) Mapeo + normalización del OCR
@@ -98,9 +131,6 @@ serve(conAuditoriaDePeticion("importar-factura-historica", createClientBase, asy
     const d = normalizarDatos(prep.crudo);
     d.productos = aplicarExtras(d.productos, prep.extras);
     d.observaciones = prep.observaciones;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(v.datos.fecha ?? ""))) {
-      return responder({ estado: "error", facturaId: null, mensaje: `Fecha no válida en el JSON: «${v.datos.fecha ?? ""}»` });
-    }
 
     // 3) Duplicado por importe (mismo proveedor, fecha y total)
     if (d.total !== null) {
@@ -154,6 +184,7 @@ serve(conAuditoriaDePeticion("importar-factura-historica", createClientBase, asy
             : ` · PDF sin guardar: ${r.archivo_error ?? "error"}`),
         alertas: r.alertas.length,
         archivo_guardado: r.archivo_guardado,
+        archivo_estado: r.archivo_estado,
         abono: prep.esAbono,
       });
     } finally {

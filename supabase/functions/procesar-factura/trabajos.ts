@@ -23,7 +23,7 @@ import { type ContextoGuardado, type DocumentoPendiente, guardarDocumento, ofert
 import { bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import type { MotivoRelectura, PaginaCerrada } from "./pagina.ts";
 import { leerPieza } from "./pieza.ts";
-import { limpiarPendientesTrabajo, STORAGE_BUCKET } from "./archivo.ts";
+import { archivarDesdeStorage, limpiarPendientesTrabajo, mimeDeNombre, rutaTemporal, STORAGE_BUCKET } from "./archivo.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes, sumarGastoTrabajo } from "./costeLectura.ts";
 import { guardarLecturaUnica, pendienteUnico } from "./unico.ts";
 
@@ -459,15 +459,27 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
     }
 
     const listo = prepararDocumentoConsolidado(c);
+    // Sin original (fotos unidas sin PDF): el original son TODAS las piezas.
+    // La 1 va como original de la factura y el resto, como «pagN-…» (QA
+    // 05/11/2026, S-10: antes solo se archivaba la 1, y con mime jpeg fijo).
+    const piezasArchivo = ((filas ?? []) as PiezaArchivo[]).filter((f) => typeof f?.storage_path === "string");
     const original = trabajo.original_path
-      ? { tipo: "storage" as const, path: trabajo.original_path, mime: trabajo.original_mime ?? "image/jpeg", nombre: trabajo.nombre_original }
-      : { tipo: "storage" as const, path: (filas ?? [])[0]?.storage_path, mime: "image/jpeg", nombre: trabajo.nombre_original };
+      ? { tipo: "storage" as const, path: trabajo.original_path, mime: trabajo.original_mime ?? mimeDeNombre(trabajo.original_path), nombre: trabajo.nombre_original }
+      : {
+        tipo: "storage" as const,
+        path: piezasArchivo[0]?.storage_path,
+        mime: piezasArchivo[0]?.mime ?? mimeDeNombre(piezasArchivo[0]?.storage_path ?? ""),
+        nombre: nombrePieza(trabajo.nombre_original, piezasArchivo[0], piezasArchivo.length),
+      };
     const g = await guardarDocumento(ctx, {
       ...listo,
       original,
       paginas: c.paginasDocumento,
       ocrTrabajoId: trabajo.id,
     });
+    if (g.estado === "guardado" && !trabajo.original_path && piezasArchivo.length > 1) {
+      await archivarPiezasExtra(ctx, g.facturaId, listo.datos, trabajo.nombre_original, piezasArchivo.slice(1), piezasArchivo.length);
+    }
 
     // deno-lint-ignore no-explicit-any
     const infoPaginas = (filas ?? []).map((f: any) => ({
@@ -517,6 +529,53 @@ export async function procesarConsolidacion(ctx: ContextoGuardado, trabajo: any)
   }
 }
 
+/** Nombre en Drive de una pieza cuando no hay original: «foto-pag2.jpg», «foto-pag1-franja2.jpg». */
+/** Lo que hace falta de una pieza para archivarla cuando no hay original. */
+export interface PiezaArchivo {
+  numero: number;
+  storage_path: string;
+  mime?: string | null;
+  pieza?: string | null;
+  pagina_doc?: number | null;
+  franja?: number | null;
+}
+
+export function nombrePieza(nombreOriginal: string, pieza: PiezaArchivo | undefined, total: number): string {
+  const base = String(nombreOriginal || "documento").replace(/\.[^.]+$/, "");
+  if (!pieza || total <= 1) return nombreOriginal;
+  const ext = String(pieza.storage_path ?? "").split(".").pop() || "jpg";
+  const franja = pieza.pieza === "franja" && pieza.franja ? `-franja${pieza.franja}` : "";
+  return `${base}-pag${pieza.pagina_doc ?? pieza.numero}${franja}.${ext}`;
+}
+
+/**
+ * Fotos unidas sin PDF: las piezas 2..N también son el original. Cada una va
+ * a Drive (misma carpeta proveedor → mes); si Drive falla, se mueven a
+ * temporal/{factura}-pagN-… y el cron facturas-originales-drive las sube.
+ * Nunca lanza.
+ */
+async function archivarPiezasExtra(
+  ctx: ContextoGuardado,
+  facturaId: number,
+  datos: { fecha?: string | null; proveedor?: string | null },
+  nombreOriginal: string,
+  piezas: PiezaArchivo[],
+  total: number,
+): Promise<void> {
+  for (const p of piezas) {
+    const nombre = nombrePieza(nombreOriginal, p, total);
+    try {
+      const r = await archivarDesdeStorage(
+        ctx.drive, ctx.supabase, p.storage_path, nombre, p.mime ?? null, datos?.fecha ?? null, facturaId, datos?.proveedor ?? null,
+        rutaTemporal(facturaId, `pag${p.pagina_doc ?? p.numero}-${nombre}`),
+      );
+      if (!r.drive_url) console.warn(`[ocr-trabajo] pieza ${p.numero} de la factura ${facturaId} pendiente de Drive: ${r.drive_error}`);
+    } catch (e) {
+      console.error(`[ocr-trabajo] no se pudo archivar la pieza ${p.numero} de la factura ${facturaId}:`, e);
+    }
+  }
+}
+
 /** Apunta el error de una consolidación que se reintentará y suelta su lease ya (nunca lanza). */
 export async function soltarConsolidacion(supabase: Supa, trabajoId: string, msg: string): Promise<void> {
   try {
@@ -547,8 +606,11 @@ async function terminar(
     p_documento_pendiente: pendiente,
   });
   if (e) console.error("[ocr-trabajo] ocr_terminar_trabajo:", e.message);
-  // Storage es solo almacén temporal: al terminar o fallar, las piezas y el
+  // Storage es solo almacén temporal: al terminar bien, las piezas y el
   // original de pendientes/ sobran (el original ya está en Drive o en
-  // temporal/). Un «duplicado» los conserva hasta que se decida.
-  if (!e && estado !== "duplicado") await limpiarPendientesTrabajo(supabase, id);
+  // temporal/). Un «duplicado» los conserva hasta que se decida (o caduque)
+  // y un «fallido» 24 h, para que «Reintentar» reanude el MISMO trabajo sin
+  // volver a subir ni a leer nada (ocr_reintentar_trabajo); después los borra
+  // el cron facturas-originales-drive.
+  if (!e && estado === "completado") await limpiarPendientesTrabajo(supabase, id);
 }

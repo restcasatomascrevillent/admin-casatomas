@@ -3,7 +3,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { clienteConAuditoria, conAuditoriaDePeticion } from "../_shared/audit-client.ts";
 import { exigirAdmin } from "../_shared/autorizacion.ts";
 import { corsHeaders, jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
-import { driveActivo } from "../procesar-factura/archivo.ts";
+import { buscarEnDrive, driveActivo } from "../procesar-factura/archivo.ts";
 import { pasarLote, type PorPasar } from "../procesar-factura/originalesDrive.ts";
 const createClient = clienteConAuditoria(createClientBase, "facturas-originales-drive");
 
@@ -23,6 +23,9 @@ const createClient = clienteConAuditoria(createClientBase, "facturas-originales-
 //
 //   POST { accion: "pasar", limite? }  → { ok, informe, queda }
 //   POST { accion: "informe" }         → { ok, queda } (no cambia nada)
+//   POST { accion: "buscar_original", factura_id, nombre, enlazar? }
+//        → { ok, encontrados, enlazado }: rescate a mano de una factura sin
+//        original cuyo fichero está en Drive (20261106200000, QA S-1).
 //
 //  Idempotente: llamar otra vez sigue donde se quedó. verify_jwt = false
 //  (pg_net no lleva JWT): la autenticación es el secreto o el rol admin.
@@ -75,6 +78,37 @@ serve(conAuditoriaDePeticion("facturas-originales-drive", createClientBase, asyn
   try {
     if (body.accion === "informe") {
       return jsonResponse({ ok: true, drive_configurado: driveActivo(drive), queda: await queda(supabase) });
+    }
+    if (body.accion === "buscar_original") {
+      // Rescate a mano (QA 05/11/2026): una factura sin original cuyo fichero
+      // sí llegó a Drive (p. ej. como «anterior-…»). Busca por nombre exacto y,
+      // con enlazar:true y UNA sola coincidencia, se lo pone como drive_url
+      // (solo si la factura sigue sin ninguno).
+      const facturaId = Number(body.factura_id);
+      const nombre = typeof body.nombre === "string" ? body.nombre.trim().slice(0, 300) : "";
+      if (!Number.isInteger(facturaId) || facturaId <= 0 || !nombre) {
+        return jsonResponse({ ok: false, error: "Faltan factura_id o nombre" }, 400);
+      }
+      const { data: f, error: eF } = await supabase.from("facturas")
+        .select("id, drive_url, archivo_path").eq("id", facturaId).maybeSingle();
+      if (eF) throw new Error(eF.message);
+      if (!f) return jsonResponse({ ok: false, error: `No existe la factura ${facturaId}` }, 404);
+      const encontrados = await buscarEnDrive(drive, nombre);
+      let enlazado = false;
+      if (body.enlazar === true && encontrados.length === 1 && !f.drive_url && !f.archivo_path) {
+        const { data: upd, error: eU } = await supabase.from("facturas")
+          .update({ drive_url: encontrados[0].webViewLink, drive_intentos: 0, drive_error: null })
+          .eq("id", facturaId).is("drive_url", null).is("archivo_path", null).select("id");
+        if (eU) throw new Error(eU.message);
+        enlazado = Array.isArray(upd) && upd.length === 1;
+      }
+      console.log(`[facturas-originales-drive] buscar_original factura ${facturaId}: ${encontrados.length} coincidencia(s), enlazado=${enlazado}`);
+      return jsonResponse({
+        ok: true,
+        factura: { id: f.id, tenia_drive: !!f.drive_url, tenia_copia: !!f.archivo_path },
+        encontrados,
+        enlazado,
+      });
     }
     const limite = Math.min(50, Math.max(1, Number(body.limite) || 15));
     const informe = await pasarLote({ supabase, drive, limite });

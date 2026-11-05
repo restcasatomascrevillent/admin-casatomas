@@ -285,6 +285,20 @@ export function mismaFacturaPorImporte<F extends { cif?: string | null; proveedo
   return null;
 }
 
+/**
+ * ¿El base64 es un PDF? Mira los bytes mágicos «%PDF-» al principio (se
+ * admite algo de basura antes, como hacen los lectores: hasta 1 KB).
+ */
+export function esPdf(b64: string): boolean {
+  try {
+    const trozo = b64.slice(0, 1400).replace(/[^A-Za-z0-9+/=]/g, "");
+    const bin = atob(trozo.slice(0, trozo.length - (trozo.length % 4)));
+    return bin.slice(0, 1024).includes("%PDF-");
+  } catch {
+    return false;
+  }
+}
+
 /** Validación de la petición. */
 export function validarEntrada(b: Json):
   | { ok: true; clave: string; datos: Json; pdfB64: string; nombrePdf: string; local: unknown; paginas?: number }

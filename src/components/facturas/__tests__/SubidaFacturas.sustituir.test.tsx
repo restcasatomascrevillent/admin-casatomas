@@ -28,6 +28,10 @@ beforeEach(() => {
   window.localStorage.clear();
 });
 
+/** El botón de confirmar se habilita cuando termina la relectura de la existente. */
+const esperarHabilitado = (nombre: RegExp) =>
+  waitFor(() => expect((screen.getByRole("button", { name: nombre }) as HTMLButtonElement).disabled).toBe(false), { timeout: 5000 });
+
 const enviarUno = async (nombre: string) => {
   fireEvent.change(screen.getByLabelText("Elegir facturas o albaranes (PDF o imágenes)"), {
     target: { files: [new File(["x"], nombre, { type: "application/pdf" })] },
@@ -63,9 +67,15 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     expect(await screen.findByText(/¿Sustituir la factura ML\/101511\?/)).toBeTruthy();
     expect(screen.getByText("Ahora (factura 54)")).toBeTruthy();
     expect(screen.getByText(/1 graves/)).toBeTruthy();
+    // Fechas en formato es-ES, no ISO.
+    expect(screen.getAllByText(/31\/12\/2025/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/2025-12-31/)).toBeNull();
+    // Inestable antes: el clic llegaba mientras el diálogo aún RELEÍA la existente
+    // (botón deshabilitado) y no pasaba nada. Se espera a que esté habilitado.
+    await esperarHabilitado(/Sí, sustituir/);
     fireEvent.click(screen.getByRole("button", { name: /Sí, sustituir/ }));
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3), { timeout: 5000 });
     expect(invoke.mock.calls[0][1].body.modo).toBe("iniciar");
     expect(invoke.mock.calls[1][1].body.archivo.nombre).toBe("ML101511.pdf");
     expect(invoke.mock.calls[2][1].body).toEqual({
@@ -97,6 +107,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     fireEvent.click(within(popup).getByRole("button", { name: "Sustituir por la nueva" }));
     expect(await screen.findByText(/¿Sustituir la factura ML\/101511\?/)).toBeTruthy();
     expect(invoke.mock.calls.filter((c) => c[1]?.body?.modo === "sustituir")).toHaveLength(0); // aún no: falta confirmar
+    await esperarHabilitado(/Sí, sustituir/);
     fireEvent.click(screen.getByRole("button", { name: /Sí, sustituir/ }));
     await waitFor(() => expect(invoke.mock.calls.some((c) => c[1]?.body?.modo === "sustituir")).toBe(true));
     const llamada = invoke.mock.calls.find((c) => c[1]?.body?.modo === "sustituir")!;
@@ -114,8 +125,42 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     fireEvent.click(await screen.findByRole("button", { name: "Dejar la que hay" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull();
-    expect(window.localStorage.getItem(CLAVE_DESCARTADOS)).toContain(sustituible.trabajo_id);
+    // Servidor sin la RPC ocr_descartar_trabajo (el doble no contesta): respaldo en este navegador.
+    await waitFor(() => expect(window.localStorage.getItem(CLAVE_DESCARTADOS)).toContain(sustituible.trabajo_id));
     expect(invoke.mock.calls.some((c) => c[1]?.body?.modo === "sustituir")).toBe(false);
+  });
+
+  it("UI-4: en la confirmación, «No, dejar la que hay» DESCARTA en el servidor (ocr_descartar_trabajo) y quita el pendiente", async () => {
+    respuestaDuplicado();
+    doble.fijarRpc((nombre) =>
+      nombre === "ocr_descartar_trabajo" ? { ok: true, estado: "cancelado" } : nombre === "ocr_resumen_factura" ? null : null,
+    );
+    montarSubida();
+    await enviarUno("ML101511.pdf");
+    fireEvent.click(await screen.findByRole("button", { name: "Sustituir por la nueva" }));
+    expect(await screen.findByText(/¿Sustituir la factura ML\/101511\?/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "No, dejar la que hay" }));
+    await waitFor(() =>
+      expect(doble.rpcs).toContainEqual({ nombre: "ocr_descartar_trabajo", args: { p_trabajo_id: sustituible.trabajo_id } }),
+    );
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull();
+    // Con la RPC no hace falta el respaldo local.
+    expect(window.localStorage.getItem(CLAVE_DESCARTADOS) ?? "").not.toContain(sustituible.trabajo_id);
+    // La fila ya no remite a «Pendientes de decidir».
+    expect(await screen.findByText(/has decidido dejar la que había/)).toBeTruthy();
+    expect(invoke.mock.calls.some((c) => c[1]?.body?.modo === "sustituir")).toBe(false);
+  });
+
+  it("UI-4: «Decidir luego» en la confirmación solo cierra (sigue pendiente)", async () => {
+    respuestaDuplicado();
+    montarSubida();
+    await enviarUno("ML101511.pdf");
+    fireEvent.click(await screen.findByRole("button", { name: "Sustituir por la nueva" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Decidir luego" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(await screen.findByRole("region", { name: "Pendientes de decidir" })).toBeTruthy();
+    expect(doble.rpcs.some((r) => r.nombre === "ocr_descartar_trabajo")).toBe(false);
   });
 
   it("un duplicado sin `sustituible` (servidor antiguo) se pinta como siempre, sin botón", async () => {
@@ -177,7 +222,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     expect(within(seccion).getByText("ML101511.pdf")).toBeTruthy();
     fireEvent.click(within(seccion).getByRole("button", { name: "Dejar la que hay" }));
     await waitFor(() => expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull());
-    expect(window.localStorage.getItem(CLAVE_DESCARTADOS)).toContain(sustituible.trabajo_id);
+    await waitFor(() => expect(window.localStorage.getItem(CLAVE_DESCARTADOS)).toContain(sustituible.trabajo_id));
   });
 });
 
@@ -232,8 +277,9 @@ describe("SubidaFacturas · páginas sueltas, relectura de la existente y unir f
     expect(await screen.findByText(/no tiene líneas todavía/)).toBeTruthy();
     expect((screen.getByRole("button", { name: /Sí, sustituir/ }) as HTMLButtonElement).disabled).toBe(true);
 
-    // Se cierra y se vuelve a abrir cuando ya tiene líneas; el servidor aborta porque cambió otra vez.
-    fireEvent.click(screen.getByRole("button", { name: /No, dejar la que hay/ }));
+    // Se cierra SIN decidir y se vuelve a abrir cuando ya tiene líneas; el servidor aborta porque cambió otra vez.
+    fireEvent.click(screen.getByRole("button", { name: "Decidir luego" }));
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
     lineas = 8;
     invoke.mockResolvedValue({
       data: { success: false, error: "No se ha sustituido nada: la factura 54 ha cambiado desde que la viste (ahora tiene 9 líneas; tú viste 8). Revisa y confirma de nuevo." },

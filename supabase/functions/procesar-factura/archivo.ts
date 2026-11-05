@@ -67,6 +67,13 @@ export function _olvidarTokenDrive(): void {
   carpetasCache.clear();
 }
 
+/** Fallo de Drive con su código HTTP (para invalidar las cachés ante 401/404). */
+export class ErrorDrive extends Error {
+  constructor(mensaje: string, readonly status: number) {
+    super(mensaje);
+  }
+}
+
 async function driveToken(cfgCruda: ConfigDrive): Promise<string> {
   const cfg = limpiarConfigDrive(cfgCruda);
   const clave = `${cfg.clientId}|${cfg.refreshToken}`;
@@ -82,40 +89,81 @@ async function driveToken(cfgCruda: ConfigDrive): Promise<string> {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });
-  if (!res.ok) throw new Error(`Drive token ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new ErrorDrive(`Drive token ${res.status}: ${await res.text()}`, res.status);
   const j = await res.json();
   const segundos = Number(j.expires_in) > 0 ? Number(j.expires_in) : 3600;
   tokenCache = { clave, token: j.access_token, hasta: Date.now() + (segundos - 300) * 1000 };
   return j.access_token;
 }
 
+// Búsquedas/creaciones de carpeta en curso en ESTA instancia (padre|nombre →
+// promesa): dos subidas a la vez para un proveedor nuevo esperan a la misma
+// en vez de crear dos carpetas iguales (QA 05/11/2026, S-11).
+const carpetasEnCurso = new Map<string, Promise<string>>();
+
 async function ensureFolder(name: string, parentId: string, token: string): Promise<string> {
   const clave = `${parentId}|${name}`;
   const enCache = carpetasCache.get(clave);
   if (enCache && enCache.hasta > Date.now()) return enCache.id;
-  const id = await buscarOCrearCarpeta(name, parentId, token);
-  carpetasCache.set(clave, { id, hasta: Date.now() + CARPETAS_MS });
-  return id;
+  const enCurso = carpetasEnCurso.get(clave);
+  if (enCurso) return enCurso;
+  const p = buscarOCrearCarpeta(name, parentId, token)
+    .then((id) => {
+      carpetasCache.set(clave, { id, hasta: Date.now() + CARPETAS_MS });
+      return id;
+    })
+    .finally(() => carpetasEnCurso.delete(clave));
+  carpetasEnCurso.set(clave, p);
+  return p;
+}
+
+async function listarCarpetas(name: string, parentId: string, token: string): Promise<{ id: string }[]> {
+  const q = encodeURIComponent(
+    `name='${name.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+  );
+  // La más antigua primero: si otra instancia creó una igual a la vez, todas
+  // acaban usando la misma.
+  const list = await fetch(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,createdTime)&orderBy=createdTime&spaces=drive`,
+    { headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!list.ok) throw new ErrorDrive(`Drive buscar carpeta ${list.status}: ${await list.text()}`, list.status);
+  return (((await list.json()).files ?? []) as { id: string }[]).filter((c) => !!c?.id);
 }
 
 async function buscarOCrearCarpeta(name: string, parentId: string, token: string): Promise<string> {
-  const q = encodeURIComponent(
-    `name='${name.replace(/'/g, "\\'")}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-  );
-  const list = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)&spaces=drive`,
-    { headers: { Authorization: `Bearer ${token}` } },
-  );
-  if (!list.ok) throw new Error(`Drive buscar carpeta ${list.status}: ${await list.text()}`);
-  const found = (await list.json()).files?.[0];
+  const found = (await listarCarpetas(name, parentId, token))[0];
   if (found) return found.id;
   const create = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", parents: [parentId] }),
   });
-  if (!create.ok) throw new Error(`Drive crear carpeta ${create.status}: ${await create.text()}`);
-  return (await create.json()).id;
+  if (!create.ok) throw new ErrorDrive(`Drive crear carpeta ${create.status}: ${await create.text()}`, create.status);
+  const creada: string = (await create.json()).id;
+  // Carrera con otra instancia: si ya hay una más antigua con el mismo nombre,
+  // se usa esa y se borra la recién creada (está vacía).
+  try {
+    const todas = await listarCarpetas(name, parentId, token);
+    const primera = todas[0]?.id;
+    if (primera && primera !== creada && todas.some((c) => c.id === creada)) {
+      await fetch(`https://www.googleapis.com/drive/v3/files/${creada}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => undefined);
+      return primera;
+    }
+  } catch {
+    // Si no se puede comprobar, se usa la creada.
+  }
+  return creada;
+}
+
+/** Ante 401 (token caducado o revocado) o 404 (carpeta borrada) se olvidan las cachés. */
+function olvidarSiCaduca(e: unknown): void {
+  const status = e instanceof ErrorDrive ? e.status : 0;
+  if (status === 401 || status === 403) tokenCache = null;
+  if (status === 404 || status === 401) carpetasCache.clear();
 }
 
 const MESES = [
@@ -164,26 +212,73 @@ export async function subirADrive(
   proveedor: string | null,
 ): Promise<string> {
   if (!driveActivo(cfg)) throw new Error(DRIVE_NO_CONFIGURADO);
-  const token = await driveToken(cfg);
-  const provFolder = await ensureFolder(carpetaProveedor(proveedor), cfg.parentFolder.trim(), token);
-  const monthFolder = await ensureFolder(carpetaMes(fecha), provFolder, token);
+  try {
+    const token = await driveToken(cfg);
+    const provFolder = await ensureFolder(carpetaProveedor(proveedor), cfg.parentFolder.trim(), token);
+    const monthFolder = await ensureFolder(carpetaMes(fecha), provFolder, token);
 
-  // 1) metadata
-  const meta = await fetch("https://www.googleapis.com/drive/v3/files?fields=id", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ name: fileName, parents: [monthFolder] }),
-  });
-  if (!meta.ok) throw new Error(`Drive metadata ${meta.status}: ${await meta.text()}`);
-  const fileId = (await meta.json()).id;
+    // Metadatos y contenido en UNA sola llamada (multipart): si Drive falla
+    // no queda un fichero vacío, y un reintento no deja otro (QA, S-8).
+    const limite = `casatomas${crypto.randomUUID().replace(/-/g, "")}`;
+    const enc = new TextEncoder();
+    const cabecera = enc.encode(
+      `--${limite}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+        JSON.stringify({ name: fileName, parents: [monthFolder] }) +
+        `\r\n--${limite}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    );
+    const pie = enc.encode(`\r\n--${limite}--`);
+    const cuerpo = new Uint8Array(cabecera.length + bytes.length + pie.length);
+    cuerpo.set(cabecera, 0);
+    cuerpo.set(bytes, cabecera.length);
+    cuerpo.set(pie, cabecera.length + bytes.length);
+    const up = await fetch(
+      "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": `multipart/related; boundary=${limite}` },
+        body: cuerpo,
+      },
+    );
+    if (!up.ok) throw new ErrorDrive(`Drive upload ${up.status}: ${await up.text()}`, up.status);
+    const j = await up.json();
+    return j.webViewLink ?? `https://drive.google.com/file/d/${j.id}/view`;
+  } catch (e) {
+    olvidarSiCaduca(e);
+    throw e;
+  }
+}
 
-  // 2) media
-  const up = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media&fields=id,webViewLink`,
-    { method: "PATCH", headers: { Authorization: `Bearer ${token}`, "Content-Type": mimeType }, body: bytes },
-  );
-  if (!up.ok) throw new Error(`Drive upload ${up.status}: ${await up.text()}`);
-  return (await up.json()).webViewLink ?? `https://drive.google.com/file/d/${fileId}/view`;
+/**
+ * Busca en Drive ficheros (no carpetas, no en la papelera) con ese nombre
+ * exacto. Lo usa el rescate a mano de facturas sin original
+ * (facturas-originales-drive {accion:"buscar_original"}). LANZA si Drive falla.
+ */
+export async function buscarEnDrive(
+  cfg: ConfigDrive,
+  nombre: string,
+): Promise<{ id: string; name: string; webViewLink: string; createdTime?: string }[]> {
+  if (!driveActivo(cfg)) throw new Error(DRIVE_NO_CONFIGURADO);
+  try {
+    const token = await driveToken(cfg);
+    const q = encodeURIComponent(
+      `name='${nombre.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}' and mimeType!='application/vnd.google-apps.folder' and trashed=false`,
+    );
+    const r = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,webViewLink,createdTime)&orderBy=createdTime&spaces=drive&pageSize=20`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (!r.ok) throw new ErrorDrive(`Drive buscar fichero ${r.status}: ${await r.text()}`, r.status);
+    type FicheroDrive = { id: string; name: string; webViewLink?: string; createdTime?: string };
+    return (((await r.json()).files ?? []) as FicheroDrive[]).map((f) => ({
+      id: f.id,
+      name: f.name,
+      webViewLink: f.webViewLink ?? `https://drive.google.com/file/d/${f.id}/view`,
+      createdTime: f.createdTime,
+    }));
+  } catch (e) {
+    olvidarSiCaduca(e);
+    throw e;
+  }
 }
 
 // ─── Supabase Storage: solo almacén temporal ─────────────────────────────────
@@ -425,10 +520,23 @@ export async function marcarPendienteDrive(supabase: any, facturaId: number, err
 // deno-lint-ignore no-explicit-any
 export async function limpiarPendientesTrabajo(supabase: any, trabajoId: string): Promise<number> {
   try {
-    const [{ data: t }, { data: piezas }] = await Promise.all([
+    const [{ data: t }, { data: piezas }, { data: facturas, error: eFacturas }] = await Promise.all([
       supabase.from("ocr_trabajos").select("original_path").eq("id", trabajoId).maybeSingle(),
       supabase.from("ocr_trabajo_paginas").select("storage_path").eq("trabajo_id", trabajoId),
+      supabase.from("facturas").select("id, drive_url, archivo_path").eq("ocr_trabajo_id", trabajoId),
     ]);
+    if (eFacturas) throw new Error(eFacturas.message);
+    // QA 05/11/2026 (S-1): si la factura de este trabajo no tiene original (ni
+    // Drive ni copia temporal), lo de pendientes/ es lo ÚNICO que queda: no se
+    // borra nada (el rescate de facturas-originales-drive se lo devuelve).
+    type FacturaOriginal = { id: number; drive_url: string | null; archivo_path: string | null };
+    const sinOriginal = ((facturas ?? []) as FacturaOriginal[]).filter((f) => f && !f.drive_url && !f.archivo_path);
+    if (sinOriginal.length > 0) {
+      console.warn(
+        `[archivo] el trabajo ${trabajoId} tiene la factura ${sinOriginal.map((f) => f.id).join(", ")} sin original: no se borra pendientes/`,
+      );
+      return 0;
+    }
     const rutas = [...new Set(
       // deno-lint-ignore no-explicit-any
       [t?.original_path, ...((piezas ?? []) as any[]).map((p) => p?.storage_path)]
