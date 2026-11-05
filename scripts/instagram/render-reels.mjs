@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // Trabajador de render de reels de Instagram (fase 6, docs/instagram-video.md).
 //
 // Lee la cola instagram_trabajos_render de Supabase, reclama un trabajo
