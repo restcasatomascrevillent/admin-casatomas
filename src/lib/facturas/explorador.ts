@@ -354,9 +354,14 @@ const DEC_2_4 = DEC(2, 4);
 const miles = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 const menos = (s: string) => s.replace(/^-/, "−");
 
-/** Cifra exacta: «1.234,56 €» · «152» · «24,5 kg» · «2,3333 €/kg». */
+/**
+ * Cifra exacta: «1.234,56 €» · «152» · «24,5 kg» · «2,3333 €/kg».
+ * Los ABONOS salen siempre con «−» (la RPC los da en positivo y el tablero en
+ * negativo): el mismo signo en todo Análisis (QA 05/11/2026).
+ */
 export function formatoValor(n: number | null, medida: Medida, unidad?: string | null): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return "—";
+  if (medida === "abonos") n = -Math.abs(n);
   switch (infoMedida(medida).formato) {
     case "entero":
       return menos(miles(n));
@@ -408,8 +413,24 @@ export function etiquetasClave(agrupar: Agrupar, clave: string, etiqueta: string
   return { corta: etiqueta, larga: etiqueta };
 }
 
-/** Desde–hasta del tramo de tiempo de una clave (para «filtrar a este tramo»). */
-export function rangoDeClave(agrupar: Agrupar, clave: string): { desde: string; hasta: string } | null {
+/**
+ * Desde–hasta del tramo de tiempo de una clave (para «filtrar a este tramo»).
+ * Con `limite` (el periodo de la gráfica) se recorta a él: la semana del 29 dic
+ * en un periodo que empieza el 1 ene se queda en 1–4 ene (QA 05/11/2026).
+ */
+export function rangoDeClave(
+  agrupar: Agrupar,
+  clave: string,
+  limite?: { desde: string | null; hasta: string | null },
+): { desde: string; hasta: string } | null {
+  const r = rangoSinRecortar(agrupar, clave);
+  if (!r || !limite) return r;
+  const desde = limite.desde && limite.desde > r.desde ? limite.desde : r.desde;
+  const hasta = limite.hasta && limite.hasta < r.hasta ? limite.hasta : r.hasta;
+  return desde <= hasta ? { desde, hasta } : r;
+}
+
+function rangoSinRecortar(agrupar: Agrupar, clave: string): { desde: string; hasta: string } | null {
   if (agrupar === "dia" && /^\d{4}-\d{2}-\d{2}$/.test(clave)) return { desde: clave, hasta: clave };
   if (agrupar === "semana" && /^\d{4}-\d{2}-\d{2}$/.test(clave)) return { desde: clave, hasta: sumarDiasIso(clave, 6) };
   if (agrupar === "mes" && /^\d{4}-\d{2}$/.test(clave)) return { desde: `${clave}-01`, hasta: finDeMes(clave) };
@@ -430,9 +451,11 @@ export const ejeAlAcercar = (a: Agrupar): Agrupar => (a === "trimestre" ? "mes" 
 /** Paleta categórica (contraste ≥ 3:1 sobre blanco y sobre el gris oscuro del tema). */
 export const PALETA = ["#0369a1", "#ea580c", "#15803d", "#7c3aed", "#be123c", "#0f766e", "#a16207", "#4338ca", "#c026d3", "#4d7c0f", "#b45309", "#0e7490"];
 export const COLOR_OTROS = "#64748b";
-export const COLOR_SIN_CLASIFICAR = "#a8a29e";
+/** stone-500 (no stone-400): contraste ≥ 3:1 sobre blanco. */
+export const COLOR_SIN_CLASIFICAR = "#78716c";
 export const COLOR_UNICO = PALETA[0];
-const COLOR_LOCAL: Record<string, string> = { casa_tomas: "#0369a1", touza: "#f97316" };
+/** Touza en orange-600: el #f97316 de antes no llegaba a 3:1 sobre blanco (QA 05/11/2026). */
+const COLOR_LOCAL: Record<string, string> = { casa_tomas: "#0369a1", touza: "#ea580c" };
 const COLOR_TIPO: Record<string, string> = { factura: "#0369a1", albaran: "#d97706", abono: "#e11d48" };
 
 /**
@@ -474,15 +497,22 @@ export interface SerieGrafica {
   valor: number | null;
 }
 
+/** Medidas que se SUMAN (un tramo sin compras vale 0); el precio medio no. */
+export const esSumable = (m: Medida): boolean => m !== "precio";
+
 /**
  * Puntos y series para recharts. «Sin clasificar» (familia) sale aparte cuando
  * aplasta al resto: el 80 % de las líneas aún no tiene familia.
+ * En ejes de tiempo con medidas sumables, un tramo sin compras de una serie
+ * vale 0 (no un hueco): si no, la línea de Touza (pocos días con compras) no
+ * se veía (QA 05/11/2026).
  */
 export function datosGrafica(
   ex: Exploracion,
   opciones: { apartarSinClasificar?: boolean } = {},
 ): { filas: FilaGrafica[]; series: SerieGrafica[]; apartado: PuntoExploracion | null } {
-  const { agrupar, desglose } = ex.parametros;
+  const { agrupar, desglose, medida } = ex.parametros;
+  const rellenar = esTiempo(agrupar) && esSumable(medida);
   const variosAnios = esTiempo(agrupar) && new Set(ex.puntos.map((p) => p.clave.slice(0, 4))).size > 1;
   let puntos = ex.puntos;
   let apartado: PuntoExploracion | null = null;
@@ -501,8 +531,8 @@ export function datosGrafica(
     : [];
   const filas = puntos.map((p) => {
     const e = etiquetasClave(agrupar, p.clave, p.etiqueta, variosAnios);
-    const fila: FilaGrafica = { clave: p.clave, corta: e.corta, larga: e.larga, valor: p.valor, documentos: p.documentos, id: p.id };
-    for (const s of series) fila[s.dato] = p.desglose?.[s.clave] ?? null;
+    const fila: FilaGrafica = { clave: p.clave, corta: e.corta, larga: e.larga, valor: p.valor ?? (rellenar ? 0 : null), documentos: p.documentos, id: p.id };
+    for (const s of series) fila[s.dato] = p.desglose?.[s.clave] ?? (rellenar ? 0 : null);
     return fila;
   });
   return { filas, series, apartado };
@@ -522,14 +552,23 @@ export function resumenExploracion(ex: Exploracion): string {
 
 // ─── CSV ────────────────────────────────────────────────────────────────────
 
-const celda = (s: string) => (/[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s);
-const numeroCsv = (n: number | null) => (n === null ? "" : String(n).replace(".", ","));
+/**
+ * Celda de texto del CSV. Lo que empieza por = + - @ (o tabulador/retorno)
+ * va con «'» delante: Excel no lo ejecuta como fórmula (inyección CSV).
+ */
+const celda = (texto: string) => {
+  const s = /^[=+\-@\t\r]/.test(texto) ? `'${texto}` : texto;
+  return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+const numeroCsvCrudo = (n: number | null) => (n === null ? "" : String(n).replace(".", ","));
 
 /** CSV para Excel en español: `;` y coma decimal, con BOM. */
 export function csvExploracion(ex: Exploracion, titulo: string): string {
   const { agrupar, medida, unidad } = ex.parametros;
   const { filas, series } = datosGrafica(ex);
   const m = infoMedida(medida);
+  // Abonos con «−», como en el resto de Análisis.
+  const numeroCsv = (n: number | null) => numeroCsvCrudo(medida === "abonos" && n !== null ? -Math.abs(n) : n);
   const nombreMedida = `${m.etiqueta}${m.iva ? ` ${m.iva}` : ""}${unidad && (m.formato === "cantidad" || m.formato === "precio") ? ` (${unidad})` : ""}`;
   const cab = [etiquetaAgrupar(agrupar), ...series.map((s) => `${s.etiqueta}`), nombreMedida, "Documentos"];
   const lineas = [`# ${titulo}`, cab.map(celda).join(";")];
@@ -580,11 +619,18 @@ export type AccionPunto =
   | { tipo: "filtro"; filtros: FiltrosExplorador; etiqueta: string }
   | { tipo: "local"; local: "casa_tomas" | "touza" };
 
-/** Lo que hace «Filtrar a esto» según el eje (null si no hay nada que filtrar). */
-export function accionDePunto(c: ConfigExplorador, p: Pick<PuntoExploracion, "clave" | "etiqueta" | "id">): AccionPunto | null {
+/**
+ * Lo que hace «Filtrar a esto» según el eje (null si no hay nada que filtrar).
+ * `limite`: el periodo de la gráfica (el tramo no se sale de él).
+ */
+export function accionDePunto(
+  c: ConfigExplorador,
+  p: Pick<PuntoExploracion, "clave" | "etiqueta" | "id">,
+  limite?: { desde: string | null; hasta: string | null },
+): AccionPunto | null {
   const f = c.filtros;
   if (esTiempo(c.agrupar)) {
-    const r = rangoDeClave(c.agrupar, p.clave);
+    const r = rangoDeClave(c.agrupar, p.clave, limite);
     return r ? { tipo: "tramo", ...r, eje: ejeAlAcercar(c.agrupar) } : null;
   }
   if (p.clave === "__otros__") return null;

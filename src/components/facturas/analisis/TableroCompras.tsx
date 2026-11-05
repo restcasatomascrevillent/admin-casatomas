@@ -8,6 +8,9 @@
 //      documentos, abrirlo en Compras o llevarlo al explorador.
 //   4. Las gráficas fijadas (del explorador y de la IA).
 // Solo este bloque hace scroll (la página no): lo pone quien lo usa.
+// `pendiente`: las cifras son las del periodo ANTERIOR mientras llega el nuevo
+// (placeholderData): se atenúan y no se pueden tocar (sus documentos serían
+// de otro periodo).
 import type { ReactNode } from "react";
 import { BarChart3, FileText, LineChart, Pin, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,6 +45,8 @@ interface Props {
   onQuitarFijadaIa: (id: string) => void;
   fijadasExplorador: ExploracionFijada[];
   onQuitarFijadaExplorador: (id: string) => void;
+  /** Se ven las cifras del periodo anterior mientras llega el nuevo. */
+  pendiente?: boolean;
 }
 
 const ICONO = "h-4 w-4 text-muted-foreground";
@@ -58,6 +63,7 @@ export function TableroCompras({
   onQuitarFijadaIa,
   fijadasExplorador,
   onQuitarFijadaExplorador,
+  pendiente = false,
 }: Props) {
   const i = datos.indicadores;
   const variacion = textoVariacion(datos);
@@ -91,6 +97,9 @@ export function TableroCompras({
       }),
     );
 
+  const atenuar = cn("transition-opacity", pendiente && "opacity-60");
+  /** Mientras carga otro periodo, nada se puede tocar (las filas quedan desactivadas). */
+  const siListo = <T,>(f: (x: T) => AccionMenu[]) => (x: T): AccionMenu[] => (pendiente ? [] : f(x));
   const verDocs = (onClick: () => void): AccionMenu => ({ etiqueta: "Ver documentos", icono: <FileText className={ICONO} aria-hidden />, onClick });
   const enCompras = (id: number | null): AccionMenu[] =>
     id === null ? [] : [{ etiqueta: "Abrir en Compras", icono: <ShoppingCart className={ICONO} aria-hidden />, onClick: () => onIrA(enlaceProveedorCompras(id)) }];
@@ -103,11 +112,17 @@ export function TableroCompras({
   return (
     <div className="space-y-4 pb-4">
       {/* 1 · Indicadores */}
-      <ul className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4" aria-label="Indicadores del periodo" data-tour="facturas-analisis-indicadores">
+      {/* 2 columnas hasta 1024 px: a 4 no caben las cifras ni las notas en 768/1024 (QA 05/11/2026). */}
+      <ul
+        className={cn("grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4", atenuar)}
+        aria-label="Indicadores del periodo"
+        aria-busy={pendiente || undefined}
+        data-tour="facturas-analisis-indicadores"
+      >
         <Indicador
           etiqueta="Gasto con IVA"
           valor={formatCurrency(i.gasto)}
-          onVer={() => docs("Gasto con IVA", "gasto", { cifra: i.gasto })}
+          onVer={pendiente ? undefined : () => docs("Gasto con IVA", "gasto", { cifra: i.gasto })}
           nota={
             <>
               {textoRangoMeses(datos.meses)}
@@ -123,12 +138,12 @@ export function TableroCompras({
           etiqueta="Abonos"
           valor={formatImporte(i.abonos)}
           nota={plural(i.abonosN, "documento", "documentos")}
-          onVer={() => docs("Abonos", "abonos", { cifra: -i.abonos, detalle: "Importe devuelto, en positivo" })}
+          onVer={pendiente ? undefined : () => docs("Abonos", "abonos", { cifra: -i.abonos, detalle: "Importe devuelto" })}
         />
         <Indicador
           etiqueta="Regalado y descuentos"
           valor={formatCurrency(i.regalado)}
-          onVer={() => docs("Regalado y descuentos", "regalado", { cifra: i.regalado, detalle: "Lo que valía menos lo que se pagó" })}
+          onVer={pendiente ? undefined : () => docs("Regalado y descuentos", "regalado", { cifra: i.regalado, detalle: "Lo que valía menos lo que se pagó" })}
           nota={
             <>
               lo que valía {formatCurrency(i.regaladoValia)}
@@ -140,8 +155,11 @@ export function TableroCompras({
           etiqueta="Por revisar"
           valor={formatEntero(i.albaranesSinFactura)}
           nota={i.albaranesSinFactura === 1 ? "albarán sin factura" : "albaranes sin factura"}
-          claseNota={i.albaranesSinFactura > 0 ? "font-medium text-amber-700 dark:text-amber-400" : undefined}
-          onVer={() =>
+          claseNota={i.albaranesSinFactura > 0 ? "font-medium text-amber-800 dark:text-amber-400" : undefined}
+          onVer={
+            pendiente
+              ? undefined
+              : () =>
             docs("Albaranes sin factura", "gasto", {
               filtros: { tipos: ["albaran"] },
               cifra: i.albaranesSinFacturaImporte,
@@ -155,10 +173,10 @@ export function TableroCompras({
       {explorador}
 
       {/* 3 · Detalle */}
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className={cn("grid gap-3 md:grid-cols-2 xl:grid-cols-3", atenuar)} aria-busy={pendiente || undefined}>
         <ProveedoresTop
           proveedores={datos.proveedores}
-          acciones={(p) =>
+          acciones={siListo((p: Datos["proveedores"][number]) =>
             p.id === null
               ? []
               : [
@@ -170,12 +188,12 @@ export function TableroCompras({
                     desglose: null,
                     filtros: { ...FILTROS_VACIOS, proveedores: [{ id: p.id, nombre: nombreCorto(p.nombre) }] },
                   }),
-                ]
-          }
+                ],
+          )}
         />
         <LoQueMasHaSubido
           subidas={datos.subidas}
-          acciones={(s) => [
+          acciones={siListo((s: Datos["subidas"]["productos"][number]) => [
             {
               etiqueta: "Ver su precio en el explorador",
               icono: <LineChart className={ICONO} aria-hidden />,
@@ -198,12 +216,12 @@ export function TableroCompras({
                   ...enCompras(s.proveedor_id),
                 ]
               : []),
-          ]}
+          ])}
         />
         <GastoPorFamilia
           familias={datos.familias}
           onClasificar={() => onIrA(ENLACE_PRODUCTOS_COMPRAS)}
-          acciones={(f) =>
+          acciones={siListo((f: Datos["familias"]["familias"][number]) =>
             f.id === null
               ? []
               : [
@@ -214,38 +232,39 @@ export function TableroCompras({
                     desglose: null,
                     filtros: { ...FILTROS_VACIOS, familias: [{ id: f.id as number, nombre: f.familia }] },
                   }),
-                ]
-          }
+                ],
+          )}
         />
         <GastosFijos
           fijos={datos.fijos}
-          acciones={(f) =>
+          acciones={siListo((f: Datos["fijos"]["proveedores"][number]) =>
             f.id === null
               ? []
               : [
                   verDocs(() =>
                     docs(nombreCorto(f.nombre), "gasto", {
                       filtros: { proveedores: [f.id], tipos: ["factura"] },
-                      desde: datos.fijos.ventana?.desde ?? periodo.desde,
-                      hasta: datos.fijos.ventana?.hasta ?? periodo.hasta,
-                      detalle: `Sus facturas; de media ${formatCurrency(f.medio_mes)} al mes`,
+                      // Los meses de SU media (si la RPC los da): ni uno más (QA 05/11/2026).
+                      desde: f.desdeMedia ?? datos.fijos.ventana?.desde ?? periodo.desde,
+                      hasta: f.hastaMedia ?? datos.fijos.ventana?.hasta ?? periodo.hasta,
+                      detalle: `Sus facturas · media de ${plural(f.meses, "mes", "meses")}: ${formatCurrency(f.medio_mes)} al mes`,
                     }),
                   ),
                   ...enCompras(f.id),
-                ]
-          }
+                ],
+          )}
         />
         <AbonosPorProveedor
           abonos={datos.abonos}
-          acciones={(a) =>
+          acciones={siListo((a: Datos["abonos"][number]) =>
             a.id === null
               ? []
-              : [verDocs(() => docs(`Abonos de ${nombreCorto(a.nombre)}`, "abonos", { agrupar: "proveedor", clave: String(a.id), cifra: -a.importe })), ...enCompras(a.id)]
-          }
+              : [verDocs(() => docs(`Abonos de ${nombreCorto(a.nombre)}`, "abonos", { agrupar: "proveedor", clave: String(a.id), cifra: -a.importe })), ...enCompras(a.id)],
+          )}
         />
         <CasaTomasYTouza
           locales={datos.locales}
-          onVer={(l, gasto) => docs(l === "touza" ? "Touza" : "Casa Tomás", "gasto", { agrupar: "local", clave: l, cifra: gasto, sinLocal: true })}
+          onVer={pendiente ? undefined : (l, gasto) => docs(l === "touza" ? "Touza" : "Casa Tomás", "gasto", { agrupar: "local", clave: l, cifra: gasto, sinLocal: true })}
         />
       </div>
 

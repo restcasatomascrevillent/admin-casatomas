@@ -46,7 +46,7 @@ export function ProveedoresTop({
                   className={cn("flex min-h-11 w-full flex-col justify-center gap-1 rounded-md px-1.5 py-1 text-left hover:bg-muted/50 disabled:cursor-default", FOCO)}
                 >
                   <span className="flex w-full items-baseline gap-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{nombreCorto(p.nombre)}</span>
+                    <span className="line-clamp-2 min-w-0 flex-1 break-words">{nombreCorto(p.nombre)}</span>
                     <span className="shrink-0 tabular-nums">{formatCurrency(p.gasto)}</span>
                     {p.pct !== null && <span className="w-12 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{textoPct(p.pct, false)}</span>}
                   </span>

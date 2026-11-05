@@ -20,6 +20,7 @@ import { urlSegura } from "@/lib/url-segura";
 import { fechaCorta } from "@/lib/facturas/tableroCompras";
 import { ETIQUETA_LOCAL, ETIQUETA_TIPO, enlaceDocumentoCompras, esPdf, vistaPreviaDrive, type DocumentoCifra } from "@/lib/facturas/documentosCifra";
 import { FOCO } from "./piezas";
+import { useFocoAlCerrar } from "./desplazar";
 
 const BUCKET = "facturas-originales";
 const SEGUNDOS_FIRMA = 600;
@@ -99,6 +100,8 @@ export function VisorDocumento({
   const enlaceExterno = drive ?? firmada.data ?? null;
   const hayAnterior = indice !== null && indice > 0;
   const haySiguiente = indice !== null && indice < documentos.length - 1;
+  // Al cerrar, el foco vuelve al documento de la lista que lo abrió.
+  const focoAlCerrar = useFocoAlCerrar(abierto);
   const titulo = doc ? `${ETIQUETA_TIPO[doc.tipo]} ${doc.numero ?? "sin número"} · ${doc.proveedor}` : "";
 
   const teclas = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -116,6 +119,7 @@ export function VisorDocumento({
     <Dialog open={abierto} onOpenChange={(o) => !o && onCerrar()}>
       <DialogContent
         onKeyDown={teclas}
+        onCloseAutoFocus={focoAlCerrar}
         className="h-[100dvh] max-h-[100dvh] w-screen max-w-none gap-0 overflow-hidden rounded-none p-0 sm:h-[94dvh] sm:max-h-[94dvh] sm:w-[96vw] sm:max-w-6xl sm:rounded-xl pointer-coarse:max-h-[100dvh] sm:pointer-coarse:max-h-[94dvh]"
         data-testid="visor-documento"
       >
@@ -135,14 +139,14 @@ export function VisorDocumento({
                 </DialogDescription>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <button type="button" className={cn(ACCION, FOCO, "px-2")} onClick={() => onIndice((indice as number) - 1)} disabled={!hayAnterior} aria-label="Documento anterior">
+                <button type="button" className={cn(ACCION, FOCO, "min-w-11 px-2")} onClick={() => onIndice((indice as number) - 1)} disabled={!hayAnterior} aria-label="Documento anterior">
                   <ChevronLeft className="h-4 w-4" aria-hidden />
                   <span className="hidden sm:inline">Anterior</span>
                 </button>
                 <span className="min-w-[4.5rem] text-center text-xs tabular-nums text-muted-foreground" aria-live="polite">
                   {(indice as number) + 1} de {formatEntero(total)}
                 </span>
-                <button type="button" className={cn(ACCION, FOCO, "px-2")} onClick={() => onIndice((indice as number) + 1)} disabled={!haySiguiente} aria-label="Documento siguiente">
+                <button type="button" className={cn(ACCION, FOCO, "min-w-11 px-2")} onClick={() => onIndice((indice as number) + 1)} disabled={!haySiguiente} aria-label="Documento siguiente">
                   <span className="hidden sm:inline">Siguiente</span>
                   <ChevronRight className="h-4 w-4" aria-hidden />
                 </button>

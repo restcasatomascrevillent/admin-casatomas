@@ -6,6 +6,8 @@
 // respuesta, con «Fijar en el tablero» para dejarlas al final del tablero.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
+// GFM: la IA contesta con TABLAS markdown (`| a | b |`) y sin esto salían en crudo (QA 05/11/2026).
+import remarkGfm from "remark-gfm";
 import { ArrowUp, Check, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -16,6 +18,9 @@ import type { DocumentoCitado } from "@/lib/facturas/seriePrecio";
 import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
 import { BotonOriginal } from "../shared/BotonOriginal";
 import { GraficoSeriePrecio } from "../GraficoSeriePrecio";
+import { desplazarA } from "../analisis/desplazar";
+
+const PLUGINS_MARKDOWN = [remarkGfm];
 
 export interface Sugerencia {
   texto: string;
@@ -64,7 +69,7 @@ function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
               <span className="font-medium">
                 {d.tipo === "albaran" ? "Albarán" : "Factura"} {d.numero ?? "sin número"}
               </span>
-              <span className="block truncate text-muted-foreground" title={d.proveedor ?? undefined}>
+              <span className="line-clamp-2 break-words text-muted-foreground">
                 {[d.proveedor, d.fecha ? formatFechaEs(d.fecha) : null].filter(Boolean).join(" · ")}
               </span>
             </p>
@@ -115,13 +120,15 @@ function BotonCopiar({ texto }: { texto: string }) {
 
 export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onEnviar, onRegenerar, fijadas, onFijar, onQuitarFijada, onExplorar }: Props) {
   const [input, setInput] = useState("");
-  const finRef = useRef<HTMLDivElement>(null);
+  const hiloRef = useRef<HTMLDivElement>(null);
   const cajaRef = useRef<HTMLTextAreaElement>(null);
   const lista: Sugerencia[] = [...sugerencias.map((texto) => ({ texto })), SUGERENCIA_GRAFICA];
   const ultimoAsistente = mensajes.reduce((u, m, i) => (m.rol === "assistant" ? i : u), -1);
 
+  // Al final del hilo moviendo SOLO el hilo (scrollIntoView movía también la página).
   useEffect(() => {
-    finRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
+    const hilo = hiloRef.current;
+    if (hilo) desplazarA(hilo, hilo.scrollHeight);
   }, [mensajes, isSending]);
 
   const enviar = () => {
@@ -151,12 +158,13 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
     onEnviar(s.texto);
   };
 
-  const vacio = mensajes.length === 0 && !isSending;
+  // Mientras se carga una conversación del historial no se enseñan las sugerencias.
+  const vacio = mensajes.length === 0 && !isSending && !isLoading;
   const hayTexto = input.trim().length > 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+      <div ref={hiloRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
         {vacio ? (
           <div className="space-y-2 py-3">
             <p className="text-sm text-muted-foreground">
@@ -215,7 +223,6 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
             )}
           </ol>
         )}
-        <div ref={finRef} />
       </div>
 
       <div className="shrink-0 border-t border-border/60 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
@@ -227,11 +234,6 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
             onKeyDown={alPulsar}
             placeholder="Escribe tu pregunta…"
             enterKeyHint="send"
-            onFocus={(e) => {
-              // Móvil: al salir el teclado, que la caja siga a la vista.
-              const el = e.currentTarget;
-              setTimeout(() => el.scrollIntoView?.({ block: "nearest", behavior: "smooth" }), 300);
-            }}
             aria-label="Pregunta para el asistente"
             disabled={isSending}
             rows={1}
@@ -269,14 +271,14 @@ function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       {contexto && (
-        <span className="inline-flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground">
-          <Crosshair className="h-3 w-3 shrink-0" aria-hidden />
-          <span className="truncate">sobre {asuntoDeContexto(contexto)}</span>
+        <span className="inline-flex max-w-full items-start gap-1 text-xs text-muted-foreground">
+          <Crosshair className="mt-0.5 h-3 w-3 shrink-0" aria-hidden />
+          <span className="line-clamp-2 break-words">sobre {asuntoDeContexto(contexto)}</span>
         </span>
       )}
       <div className="max-w-[90%] rounded-2xl rounded-br-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
         <div className="prose prose-sm prose-invert max-w-none break-words prose-p:my-0">
-          <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
+          <ReactMarkdown remarkPlugins={PLUGINS_MARKDOWN} components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
             {pregunta}
           </ReactMarkdown>
         </div>
@@ -309,7 +311,7 @@ function MensajeAsistente({
   return (
     <div className="flex flex-col gap-1">
       <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1")}>
-        <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
+        <ReactMarkdown remarkPlugins={PLUGINS_MARKDOWN} components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
           {mensaje.contenido}
         </ReactMarkdown>
       </div>

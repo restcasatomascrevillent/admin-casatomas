@@ -37,8 +37,10 @@ import {
   type TipoGrafica,
 } from "@/lib/facturas/explorador";
 import { FOCO } from "./piezas";
+import { esTactil } from "./desplazar";
 
-const EJE = { fontSize: 11, fill: "hsl(var(--muted-foreground))" };
+// 12 px como mínimo (texto < 12 px, QA 05/11/2026).
+const EJE = { fontSize: 12, fill: "hsl(var(--muted-foreground))" };
 const REJILLA = "hsl(var(--border))";
 
 interface PropsGrafica {
@@ -60,7 +62,7 @@ function Leyenda({ series }: { series: SerieGrafica[] }) {
       {series.map((s) => (
         <li key={s.clave} className="flex min-w-0 items-center gap-1.5">
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden />
-          <span className="max-w-[12rem] truncate" title={s.etiqueta}>
+          <span className="line-clamp-2 max-w-[12rem] break-words">
             {s.etiqueta}
           </span>
         </li>
@@ -85,11 +87,12 @@ function Globo({
       {series.length > 0 && (
         <ul className="mb-1 space-y-0.5">
           {series
-            .filter((s) => (fila[s.dato] ?? null) !== null)
+            // Sin las series a 0 (los tramos sin compras se rellenan con 0 para dibujar la línea).
+            .filter((s) => (fila[s.dato] ?? 0) !== 0)
             .map((s) => (
               <li key={s.clave} className="flex items-center gap-2">
                 <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{s.etiqueta}</span>
+                <span className="min-w-0 flex-1 break-words">{s.etiqueta}</span>
                 <span className="tabular-nums">{formatoValor(fila[s.dato] ?? null, medida, unidad)}</span>
               </li>
             ))}
@@ -113,7 +116,18 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
     if (fila && onSeleccion) onSeleccion(fila.clave);
   };
   const opacidad = (clave: string) => (seleccion && seleccion !== clave ? 0.35 : 1);
-  const globo = <Tooltip content={<Globo series={series} medida={medida} unidad={unidad} />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.5 }} />;
+  // Con el dedo el globo se queda pegado y tapa la tira «Punto elegido»: con un
+  // punto elegido, se oculta (con ratón sigue al pasar por encima).
+  const sinGlobo = !!seleccion && esTactil();
+  const globo = (
+    <Tooltip
+      content={<Globo series={series} medida={medida} unidad={unidad} />}
+      cursor={{ fill: "hsl(var(--muted))", opacity: 0.5 }}
+      {...(sinGlobo ? { active: false } : {})}
+    />
+  );
+  // Abonos con «−» también en la cifra de cada barra.
+  const cifraBarra = (v: number) => formatoEje(medida === "abonos" ? -Math.abs(v) : v, medida, unidad);
   const margen = { top: 8, right: 12, bottom: 0, left: 0 };
   const anchoEjeY = compacta ? 52 : 64;
 
@@ -133,7 +147,7 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
                 <Cell key={f.clave} fillOpacity={opacidad(f.clave)} cursor="pointer" />
               ))}
               {/* En tablet no hay «pasar el ratón»: la cifra, al final de cada barra. */}
-              <LabelList dataKey="valor" position="right" formatter={(v: number) => formatoEje(v, medida, unidad)} className="fill-foreground text-[11px] tabular-nums" />
+              <LabelList dataKey="valor" position="right" formatter={cifraBarra} className="fill-foreground text-xs tabular-nums" />
             </Bar>
           ) : (
             series.map((s, i) => (
@@ -305,7 +319,8 @@ export function TablaExploracion({
               </th>
               {series.map((s) => (
                 <td key={s.clave} className="px-1 py-0 text-right">
-                  {onCelda && (f[s.dato] ?? null) !== null ? (
+                  {/* Un 0 (tramo sin compras de esa serie) no tiene documentos que ver. */}
+                  {onCelda && (f[s.dato] ?? 0) !== 0 ? (
                     <button
                       type="button"
                       onClick={() => onCelda(f.clave, s.clave)}

@@ -14,11 +14,17 @@
 //
 // Se sigue llamando ChatFacturas y expone `enviarConsulta`: el «Preguntar a la
 // IA» de una factura en Compras abre el panel y pregunta.
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from "react";
+//
+// Facturas la deja MONTADA al ir a otra pestaña (`activa = false`): al volver
+// siguen el explorador, la conversación y el copiloto como estaban. Por eso la
+// URL solo se escribe cuando cambia el periodo o el local AQUÍ (no al montar ni
+// al navegar a Compras), y el copiloto se esconde mientras no se ve Análisis.
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarSearch, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useChatFacturas, type Conversacion } from "@/hooks/useChatFacturas";
 import { consultaTablero, useTableroCompras } from "@/hooks/useTableroCompras";
 import { useGraficasFijadas } from "@/hooks/useGraficasFijadas";
@@ -28,6 +34,7 @@ import { fechasPeriodo, localRpc, sugerenciasDeTablero, type PeriodoAnalisis } f
 import {
   escribirAnalisisEnUrl,
   fechasSeleccion,
+  isoLocal,
   leerAnalisisDeUrl,
   mismaSeleccion,
   SELECCION_POR_DEFECTO,
@@ -44,6 +51,7 @@ import { SelectorPeriodo } from "./analisis/SelectorPeriodo";
 import { DocumentosDeCifra } from "./analisis/DocumentosDeCifra";
 import { ErrorTablero, EsqueletoTablero, Segmentado } from "./analisis/piezas";
 import { CopilotoLateral } from "./copiloto/CopilotoLateral";
+import { desplazarDentro, esMovil } from "./analisis/desplazar";
 
 export interface ChatFacturasRef {
   enviarConsulta: (texto: string) => void;
@@ -52,9 +60,45 @@ export interface ChatFacturasRef {
 interface ChatFacturasProps {
   /** Abre otra vista del panel con estos parámetros de URL (`?tab=compras&…`). */
   onIrA?: (enlace: string) => void;
+  /** ¿Se está viendo la pestaña? (sigue montada aunque no). Por defecto, sí. */
+  activa?: boolean;
 }
 
 const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
+
+/** Para «Volver …» tras «Ver solo este tramo»: «al año 2026», «a este mes», «a 1 mar – 15 abr 2026». */
+function textoVolver(sel: SeleccionPeriodo, hoy: Date): string {
+  if (sel.tipo === "personalizado") return `a ${textoRango(sel.desde, sel.hasta)}`;
+  if (sel.tipo === "anio") return `al año ${hoy.getFullYear()}`;
+  return sel.tipo === "todo" ? "a todo el histórico" : `a ${NOMBRE_PERIODO[sel.tipo]}`;
+}
+
+/** «Ver solo este tramo» se puede deshacer: el periodo y el eje de antes. */
+interface TramoAnterior {
+  seleccion: SeleccionPeriodo;
+  agrupar: ConfigExplorador["agrupar"];
+}
+
+/** «Hoy», que cambia si la tablet se queda encendida pasada la medianoche (cada minuto y al volver a la pestaña). */
+function useHoy(): Date {
+  const [hoy, setHoy] = useState(() => new Date());
+  useEffect(() => {
+    const mirar = () => {
+      const ahora = new Date();
+      setHoy((h) => (isoLocal(h) === isoLocal(ahora) ? h : ahora));
+    };
+    const id = window.setInterval(mirar, 60_000);
+    const alVolver = () => {
+      if (document.visibilityState === "visible") mirar();
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, []);
+  return hoy;
+}
 
 /** «este año», «1 mar – 15 abr 2026», «el histórico». */
 function textoSeleccion(sel: SeleccionPeriodo, hoy: Date): string {
@@ -64,30 +108,57 @@ function textoSeleccion(sel: SeleccionPeriodo, hoy: Date): string {
   return f.desde && f.hasta ? textoRango(f.desde, f.hasta) : NOMBRE_PERIODO[sel.tipo];
 }
 
-export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA }, ref) => {
-  const [hoy] = useState(() => new Date());
+export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true }, ref) => {
+  const hoy = useHoy();
+  const hoyRef = useRef(hoy);
+  hoyRef.current = hoy;
   const [params, setParams] = useSearchParams();
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
   const qc = useQueryClient();
-  const deUrl = useMemo(() => leerAnalisisDeUrl(params, hoy), [params, hoy]);
+  // Solo depende de la URL: que cambie «hoy» no reinterpreta las fechas que ya hay en ella.
+  const deUrl = useMemo(() => leerAnalisisDeUrl(params, hoyRef.current), [params]);
   const [seleccion, setSeleccion] = useState<SeleccionPeriodo>(() => deUrl.periodo ?? SELECCION_POR_DEFECTO);
   const [local, setLocal] = useState<FiltroLocal>(() => deUrl.local ?? "todos");
   const [config, setConfig] = useState<ConfigExplorador>(CONFIG_POR_DEFECTO);
   const [peticionDocs, setPeticionDocs] = useState<PeticionDocumentos | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [verHistorial, setVerHistorial] = useState(false);
+  const [tramos, setTramos] = useState<TramoAnterior[]>([]);
+  // Lo último que hay (o se ha escrito) en la URL: solo se escribe lo que CAMBIA aquí.
+  const escrito = useRef({ seleccion, local, dia: isoLocal(hoy) });
 
   // URL → estado (Atrás/Adelante, un enlace compartido).
   useEffect(() => {
-    if (deUrl.periodo) setSeleccion((s) => (mismaSeleccion(s, deUrl.periodo as SeleccionPeriodo) ? s : (deUrl.periodo as SeleccionPeriodo)));
-    if (deUrl.local) setLocal(deUrl.local);
+    const p = deUrl.periodo;
+    const l = deUrl.local;
+    if (p) {
+      setSeleccion((s) => (mismaSeleccion(s, p) ? s : p));
+      if (!mismaSeleccion(escrito.current.seleccion, p)) setTramos([]);
+    }
+    if (l) setLocal(l);
+    escrito.current = { ...escrito.current, ...(p ? { seleccion: p } : {}), ...(l ? { local: l } : {}) };
   }, [deUrl]);
-  // Estado → URL (sin apilar historial).
+  // Estado → URL (sin apilar historial). Solo cuando el periodo o el local
+  // cambian AQUÍ (o cambia el día y la URL lleva las fechas de Análisis): si
+  // no, al estar montada en Compras le reescribía el periodo (F21, QA 05/11/2026).
   useEffect(() => {
-    setParams((prev) => {
-      const sig = escribirAnalisisEnUrl(prev, seleccion, local, hoy);
-      return sig.toString() === prev.toString() ? prev : sig;
-    }, { replace: true });
+    const e = escrito.current;
+    const dia = isoLocal(hoy);
+    const cambio = !mismaSeleccion(e.seleccion, seleccion) || e.local !== local;
+    const nuevoDia = e.dia !== dia;
+    escrito.current = { seleccion, local, dia };
+    const prev = paramsRef.current;
+    if (!cambio && !(nuevoDia && (prev.has("desde") || prev.has("periodo")))) return;
+    const sig = escribirAnalisisEnUrl(prev, seleccion, local, hoy);
+    if (sig.toString() !== prev.toString()) setParams(sig, { replace: true });
   }, [seleccion, local, hoy, setParams]);
+
+  /** El periodo que elige el dueño (barra, «Ver todo el histórico»): olvida los tramos. */
+  const elegirPeriodo = useCallback((s: SeleccionPeriodo) => {
+    setTramos([]);
+    setSeleccion(s);
+  }, []);
 
   const fechas = useMemo(() => fechasSeleccion(seleccion, hoy), [seleccion, hoy]);
   const lrpc = localRpc(local);
@@ -134,13 +205,15 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     },
   }));
 
-  const verExplorador = () =>
-    requestAnimationFrame(() => document.querySelector<HTMLElement>("[data-testid='explorador']")?.scrollIntoView?.({ block: "start", behavior: "smooth" }));
+  // Enseña el explorador desplazando SOLO el tablero (scrollIntoView movía también la página).
+  const verExplorador = () => requestAnimationFrame(() => desplazarDentro(document.querySelector<HTMLElement>("[data-testid='explorador']"), "start"));
   const explorar = useCallback((parcial: Partial<ConfigExplorador>) => {
     setConfig((c) => ajustarConfig({ ...c, ...parcial }).config);
     verExplorador();
   }, []);
   const explorarGraficaIa = (g: GraficaIa) => {
+    // En el móvil el copiloto ocupa toda la pantalla: se cierra para ver el explorador.
+    if (esMovil()) setAbierto(false);
     explorar({
       medida: "precio",
       agrupar: "mes",
@@ -159,6 +232,22 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   };
   const irA = (enlace: string) => onIrA?.(enlace);
   const textoPeriodo = textoSeleccion(seleccion, hoy);
+  // «Ver solo este tramo»: se apunta el periodo y el eje de antes para poder volver.
+  const verTramo = (desde: string, hasta: string) => {
+    setTramos((t) => [...t, { seleccion, agrupar: config.agrupar }]);
+    setSeleccion({ tipo: "personalizado", desde, hasta });
+  };
+  const ultimoTramo = tramos[tramos.length - 1];
+  const volverTramo = ultimoTramo
+    ? {
+        texto: textoVolver(ultimoTramo.seleccion, hoy),
+        volver: () => {
+          setTramos((t) => t.slice(0, -1));
+          setSeleccion(ultimoTramo.seleccion);
+          setConfig((c) => ajustarConfig({ ...c, agrupar: ultimoTramo.agrupar }).config);
+        },
+      }
+    : null;
 
   const datos = tablero.data;
   let cuerpo;
@@ -172,7 +261,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           icono={<CalendarSearch />}
           titulo={`No hay documentos en ${seleccion.tipo === "personalizado" ? textoPeriodo : NOMBRE_PERIODO[seleccion.tipo]}${local !== "todos" ? ` de ${local === "touza" ? "Touza" : "Casa Tomás"}` : ""}.`}
           texto="Prueba con otro periodo o con los dos locales."
-          accion={seleccion.tipo !== "todo" ? { etiqueta: "Ver todo el histórico", onClick: () => setSeleccion({ tipo: "todo" }) } : undefined}
+          accion={seleccion.tipo !== "todo" ? { etiqueta: "Ver todo el histórico", onClick: () => elegirPeriodo({ tipo: "todo" }) } : undefined}
         />
       </div>
     );
@@ -182,6 +271,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         datos={datos}
         periodo={fechas}
         local={lrpc}
+        pendiente={tablero.isPlaceholderData}
         onDocumentos={setPeticionDocs}
         onIrA={irA}
         onExplorar={explorar}
@@ -197,7 +287,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
             textoPeriodo={textoPeriodo}
             local={lrpc}
             onLocal={setLocal}
-            onTramo={(desde, hasta) => setSeleccion({ tipo: "personalizado", desde, hasta })}
+            onTramo={verTramo}
+            volverTramo={volverTramo}
             onDocumentos={setPeticionDocs}
             onIrA={irA}
             fijadas={idsExploraciones}
@@ -208,37 +299,46 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       />
     );
 
+  const copilotoVisible = abierto && activa;
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-2">
+    // Con el copiloto abierto (360 px, no modal) el contenido deja su hueco a la
+    // derecha en ≥ sm: si no, el panel tapaba el botón y la franja derecha (QA 05/11/2026).
+    <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "sm:pr-[360px]")}>
       <div className="flex shrink-0 flex-wrap items-center gap-2" data-tour="facturas-analisis-barra">
-        <SelectorPeriodo valor={seleccion} onCambio={setSeleccion} hoy={hoy} />
-        <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} />
-        {tablero.isFetching && !tablero.isLoading && (
-          <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
-            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Actualizando…
-          </span>
-        )}
-        <Button
-          type="button"
-          className="ml-auto h-11 gap-1.5"
-          // Abre y cierra el panel (no es modal: el botón sigue a mano con él abierto).
-          onClick={() => {
-            setVerHistorial(false);
-            setAbierto((v) => !v);
-          }}
-          aria-expanded={abierto}
-          aria-controls={abierto ? "copiloto-lateral" : undefined}
-          data-tour="facturas-ia-abrir"
-          aria-label="Pregúntale a la IA"
-        >
-          <Sparkles className="h-4 w-4" aria-hidden />
-          {/* En tablet vertical la barra no cabe entera: «IA» a secas (el nombre accesible sigue entero). */}
-          <span className="hidden lg:inline">Pregúntale a la</span> IA
-        </Button>
+        <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} />
+        {/* Local, «Actualizando…» y la IA van juntos: si la barra no cabe (tablet en
+            vertical), bajan juntos a la segunda fila y el botón no se queda solo. */}
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} />
+          {tablero.isFetching && !tablero.isLoading && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Actualizando…
+            </span>
+          )}
+          <Button
+            type="button"
+            className="ml-auto h-11 gap-1.5"
+            // Abre y cierra el panel (no es modal: el botón sigue a mano con él abierto).
+            onClick={() => {
+              setVerHistorial(false);
+              setAbierto((v) => !v);
+            }}
+            aria-expanded={copilotoVisible}
+            aria-controls={copilotoVisible ? "copiloto-lateral" : undefined}
+            data-tour="facturas-ia-abrir"
+            aria-label="Pregúntale a la IA"
+          >
+            <Sparkles className="h-4 w-4" aria-hidden />
+            {/* En tablet vertical la barra no cabe entera: «IA» a secas (el nombre accesible sigue entero). */}
+            <span className="hidden lg:inline">Pregúntale a la</span> IA
+          </Button>
+        </div>
       </div>
 
+      {/* `relative`: los `sr-only` (absolute) de dentro se quedan en el tablero y no
+          alargan la PÁGINA (scroll de 1063 px a 1180×820, QA 05/11/2026). */}
       <div
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
         role="region"
         aria-label="Tablero de compras"
         data-testid="tablero-analisis"
@@ -250,7 +350,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       <DocumentosDeCifra peticion={peticionDocs} onCerrar={() => setPeticionDocs(null)} onIrA={onIrA} />
 
       <CopilotoLateral
-        abierto={abierto}
+        abierto={copilotoVisible}
         onAbiertoCambia={setAbierto}
         verHistorial={verHistorial}
         onVerHistorial={setVerHistorial}

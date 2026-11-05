@@ -52,11 +52,21 @@ export function SelectorPeriodo({ valor, onCambio, hoy }: { valor: SeleccionPeri
             {personalizado ? <span className="tabular-nums">{textoRango(personalizado.desde, personalizado.hasta)}</span> : "Personalizado"}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-auto max-w-[min(40rem,calc(100vw-1rem))] p-0" aria-label="Elegir fechas">
+        {/* En el móvil no cabía (QA 05/11/2026): se ajusta al alto que queda (sin pegarse al borde),
+            los atajos van en una fila que se desliza y «Aplicar» queda fijo abajo aunque haya que desplazar. */}
+        <PopoverContent
+          align="start"
+          collisionPadding={8}
+          className="w-auto max-w-[min(40rem,calc(100vw-1rem))] p-0"
+          aria-label="Elegir fechas"
+        >
           <div className="flex flex-col sm:flex-row">
-            <ul className="flex flex-wrap gap-1 border-b border-border/60 p-2 sm:w-44 sm:flex-col sm:flex-nowrap sm:border-b-0 sm:border-r" aria-label="Atajos">
+            <ul
+              className="flex gap-1 overflow-x-auto border-b border-border/60 p-2 [scrollbar-width:none] sm:w-44 sm:flex-col sm:overflow-visible sm:border-b-0 sm:border-r [&::-webkit-scrollbar]:hidden"
+              aria-label="Atajos"
+            >
               {atajosPeriodo(hoy).map((a) => (
-                <li key={a.id}>
+                <li key={a.id} className="shrink-0">
                   <button
                     type="button"
                     onClick={() => aplicar(a.desde, a.hasta)}
@@ -77,8 +87,8 @@ export function SelectorPeriodo({ valor, onCambio, hoy }: { valor: SeleccionPeri
                 disabled={{ after: new Date(hoy.getFullYear() + 1, 11, 31) }}
                 initialFocus
               />
-              <div className="flex items-center gap-2 border-t border-border/60 p-2">
-                <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground tabular-nums" aria-live="polite">
+              <div className="sticky bottom-0 flex items-center gap-2 border-t border-border/60 bg-popover p-2">
+                <p className="line-clamp-2 min-w-0 flex-1 break-words text-xs text-muted-foreground tabular-nums" aria-live="polite">
                   {rango?.from
                     ? rango.to
                       ? textoRango(isoLocal(rango.from), isoLocal(rango.to))

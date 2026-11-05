@@ -14,6 +14,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
+  ArrowLeft,
   BarChart3,
   ChevronDown,
   Filter,
@@ -48,6 +49,7 @@ import {
   GRAFICAS,
   graficaEfectiva,
   infoMedida,
+  MAX_EXPLORACIONES_FIJADAS,
   MEDIDAS,
   motivoMedidaNoDisponible,
   parametrosExplorar,
@@ -68,6 +70,7 @@ import type { FiltroLocal } from "@/lib/facturas/resumenCompras";
 import { EstadoError, EstadoVacio } from "@/components/facturas/compras/estilo";
 import { GraficaExplorador, TablaExploracion } from "./GraficaExplorador";
 import { FOCO } from "./piezas";
+import { desplazarDentro, esTactil } from "./desplazar";
 
 export interface PropsExplorador {
   config: ConfigExplorador;
@@ -86,9 +89,11 @@ export interface PropsExplorador {
   onQuitarFijada: (id: string) => void;
   /** Abrir el buscador de producto (desde el preset «Precio de un producto» o la IA). */
   pedirProducto?: number;
+  /** Tras «Ver solo este tramo»: a qué se vuelve («al año 2026») y cómo. */
+  volverTramo?: { texto: string; volver: () => void } | null;
 }
 
-const ETIQUETA = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground";
+const ETIQUETA = "mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground";
 const CHIP =
   "inline-flex min-h-11 max-w-full items-center gap-1 rounded-full border border-border bg-background pl-3 pr-1 text-sm hover:bg-muted/50";
 const ACCION =
@@ -134,6 +139,13 @@ function AnadirFiltro({
   const productos = useBuscarProductosComprados(abierto && pestana === "producto" ? texto : "");
   const f = config.filtros;
   const t = texto.trim().toLowerCase();
+  const tactil = esTactil();
+  const disparador = useRef<HTMLButtonElement>(null);
+  // Abierto con el botón en la parte de abajo del tablero, la lista salía pegada
+  // al borde y con 3 filas (QA 05/11/2026): se sube el botón y la lista cabe.
+  useEffect(() => {
+    if (abierto) desplazarDentro(disparador.current, "start");
+  }, [abierto]);
 
   useEffect(() => setTexto(""), [pestana, abierto]);
 
@@ -150,6 +162,7 @@ function AnadirFiltro({
     <Popover open={abierto} onOpenChange={onAbierto}>
       <PopoverTrigger asChild>
         <button
+          ref={disparador}
           type="button"
           className={cn("inline-flex h-11 w-full items-center gap-1.5 whitespace-nowrap rounded-md border border-dashed border-input bg-background px-3 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground", FOCO)}
           data-testid="explorador-anadir-filtro"
@@ -157,7 +170,16 @@ function AnadirFiltro({
           <Plus className="h-4 w-4" aria-hidden /> Añadir filtro
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-80 p-2" aria-label="Añadir filtro">
+      {/* Sin pegarse al borde de la pantalla y, con el dedo, sin abrir el teclado al abrirse (QA 05/11/2026). */}
+      <PopoverContent
+        align="start"
+        className="w-80 p-2"
+        aria-label="Añadir filtro"
+        collisionPadding={12}
+        onOpenAutoFocus={(e) => {
+          if (tactil) e.preventDefault();
+        }}
+      >
         <div role="group" aria-label="Filtrar por" className="mb-2 grid grid-cols-4 gap-1 rounded-lg bg-muted/40 p-1">
           {(["proveedor", "familia", "producto", "tipo"] as PestanaFiltro[]).map((p) => (
             <button
@@ -178,7 +200,7 @@ function AnadirFiltro({
           <div className="relative mb-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
             <Input
-              autoFocus
+              autoFocus={!tactil}
               value={texto}
               onChange={(e) => setTexto(e.target.value)}
               placeholder={pestana === "proveedor" ? "Busca un proveedor…" : "Busca un producto: gamba, aceite…"}
@@ -280,15 +302,28 @@ function AnadirFiltro({
 
 // ─── Totales ────────────────────────────────────────────────────────────────
 
-function Totales({ ex, config, onVerDocumentos }: { ex: Exploracion; config: ConfigExplorador; onVerDocumentos: () => void }) {
+function Totales({
+  ex,
+  config,
+  onVerDocumentos,
+  sinClasificarAparte,
+}: {
+  ex: Exploracion;
+  config: ConfigExplorador;
+  /** Sin él (cargando otra consulta), «Ver los N documentos» queda desactivado. */
+  onVerDocumentos?: () => void;
+  /** «Sin clasificar» va aparte, fuera de la gráfica: no cuenta como punto. */
+  sinClasificarAparte: boolean;
+}) {
   const m = infoMedida(ex.parametros.medida);
   const unidad = ex.parametros.unidad;
   const var_ = ex.total.variacionPct;
   const ant = ex.anterior;
   const conDatos = ex.puntos.filter((p) => p.documentos > 0).length;
+  const enGrafica = sinClasificarAparte ? ex.puntos.filter((p) => p.clave !== "0").length : ex.puntos.length;
   const entidades = esTiempo(config.agrupar)
     ? `${formatEntero(conDatos)} de ${formatEntero(ex.puntos.length)} ${ex.puntos.length === 1 ? "tramo" : "tramos"} con datos`
-    : `${formatEntero(ex.puntos.length)}${ex.resto ? ` de ${formatEntero(ex.puntos.length + ex.resto.entidades)}` : ""} en la gráfica`;
+    : `${formatEntero(enGrafica)}${ex.resto ? ` de ${formatEntero(enGrafica + ex.resto.entidades)}` : ""} en la gráfica`;
   return (
     <dl className="flex flex-wrap items-end gap-x-6 gap-y-2">
       <div className="min-w-0">
@@ -325,7 +360,7 @@ function Totales({ ex, config, onVerDocumentos }: { ex: Exploracion; config: Con
         <dd className="text-sm font-semibold tabular-nums">{entidades}</dd>
       </div>
       <div className="ml-auto">
-        <button type="button" className={cn(ACCION, "text-primary", FOCO)} onClick={onVerDocumentos} disabled={ex.total.documentos === 0}>
+        <button type="button" className={cn(ACCION, "text-primary", FOCO)} onClick={onVerDocumentos} disabled={!onVerDocumentos || ex.total.documentos === 0}>
           Ver los {formatEntero(ex.total.documentos)} documentos
         </button>
       </div>
@@ -349,6 +384,7 @@ export function Explorador({
   onFijar,
   onQuitarFijada,
   pedirProducto,
+  volverTramo,
 }: PropsExplorador) {
   const idTitulo = useId();
   const [aviso, setAviso] = useState<string | null>(null);
@@ -368,6 +404,9 @@ export function Explorador({
   const idFijada = claveConfig(config);
   const fijada = fijadas.has(idFijada);
   const actualizando = q.isFetching && !q.isLoading;
+  // Se ve la gráfica de la consulta ANTERIOR (o la nueva aún no ha salido): sus
+  // cifras no se tocan, porque sus documentos serían de otra consulta (QA 05/11/2026).
+  const listo = q.alDia;
   // Mientras llega la respuesta nueva se ve la anterior: para leerla se usan SUS parámetros.
   const exConfig: ConfigExplorador = ex ? { ...config, agrupar: ex.parametros.agrupar, medida: ex.parametros.medida, desglose: ex.parametros.desglose } : config;
   const apartar = exConfig.agrupar === "familia" && !verSinClasificar && !config.filtros.familias.some((f) => f.id === 0);
@@ -375,15 +414,16 @@ export function Explorador({
 
   useEffect(() => setSeleccion(null), [params]);
   // En tablet la tira del punto elegido puede quedar por debajo: que se vea.
+  // Se desplaza SOLO el tablero (scrollIntoView movía también la página).
   useEffect(() => {
-    if (seleccion) tiraPunto.current?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+    if (seleccion) desplazarDentro(tiraPunto.current, "nearest");
   }, [seleccion]);
   useEffect(() => {
     if (!pedirProducto) return;
     setPestanaFiltro("producto");
     setFiltroAbierto(true);
     setPrecioPendiente(true);
-    raiz.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    desplazarDentro(raiz.current, "start");
   }, [pedirProducto]);
 
   const cambiar = (parcial: Partial<ConfigExplorador>) => {
@@ -418,10 +458,11 @@ export function Explorador({
     const e = etiquetasClave(exConfig.agrupar, p.clave, p.etiqueta);
     return exConfig.agrupar === "proveedor" ? e.corta : e.larga;
   };
-  const accion = punto ? accionDePunto(exConfig, punto) : null;
+  // El tramo no se sale del periodo de la gráfica (la semana del 29 dic en un año que empieza el 1 ene).
+  const accion = punto && ex ? accionDePunto(exConfig, punto, { desde: ex.parametros.desde, hasta: ex.parametros.hasta }) : null;
   const enlaceCompras = punto
     ? exConfig.agrupar === "mes"
-      ? enlaceMesCompras(punto.clave)
+      ? enlaceMesCompras(punto.clave, local)
       : exConfig.agrupar === "proveedor" && punto.id
         ? enlaceProveedorCompras(punto.id)
         : null
@@ -494,8 +535,8 @@ export function Explorador({
           <TablaExploracion
             exploracion={ex}
             seleccion={seleccion}
-            onSeleccion={(c) => setSeleccion((s) => (s === c ? null : c))}
-            onCelda={(clave, serie) => {
+            onSeleccion={listo ? (c) => setSeleccion((s) => (s === c ? null : c)) : undefined}
+            onCelda={!listo ? undefined : (clave, serie) => {
               const p = ex.puntos.find((x) => x.clave === clave);
               const s = ex.series.find((x) => x.clave === serie);
               if (p && s) onDocumentos(peticion(clave, serie, `${etiquetaPunto(p)} · ${s.etiqueta}`, p.desglose?.[serie] ?? null));
@@ -507,7 +548,7 @@ export function Explorador({
             exploracion={ex}
             tipo={tipo}
             seleccion={seleccion}
-            onSeleccion={(c) => setSeleccion((s) => (s === c ? null : c))}
+            onSeleccion={listo ? (c) => setSeleccion((s) => (s === c ? null : c)) : undefined}
             apartarSinClasificar={apartar}
             descripcion={descripcion}
           />
@@ -523,6 +564,7 @@ export function Explorador({
             <button
               type="button"
               className={cn(ACCION, "px-1.5 text-xs text-primary", FOCO)}
+              disabled={!listo}
               onClick={() => onDocumentos(peticion("__otros__", null, `Otros (${formatEntero(ex.resto?.entidades ?? 0)})`, ex.resto?.valor ?? null))}
             >
               Ver sus documentos
@@ -559,9 +601,14 @@ export function Explorador({
             Explorar
             {actualizando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Actualizando" />}
           </h3>
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+          <p className="mt-0.5 line-clamp-2 break-words text-sm text-muted-foreground">
             {tituloConfig(config)} · {textoPeriodo}
           </p>
+          {volverTramo && (
+            <button type="button" className={cn(ACCION, "-ml-2.5 text-primary", FOCO)} onClick={volverTramo.volver}>
+              <ArrowLeft className="h-4 w-4" aria-hidden /> Volver {volverTramo.texto}
+            </button>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-0.5">
           <button type="button" className={cn(ACCION, FOCO)} aria-pressed={verTabla || tipo === "tabla"} onClick={() => setVerTabla((v) => !v)} disabled={tipo === "tabla"}>
@@ -576,7 +623,16 @@ export function Explorador({
             type="button"
             className={cn(ACCION, FOCO, fijada && "text-primary")}
             aria-pressed={fijada}
-            onClick={() => (fijada ? onQuitarFijada(idFijada) : onFijar(config))}
+            onClick={() => {
+              if (fijada) return onQuitarFijada(idFijada);
+              // Caben 8: la 9.ª quita la más antigua, y se avisa (QA 05/11/2026).
+              setAviso(
+                fijadas.size >= MAX_EXPLORACIONES_FIJADAS
+                  ? `Caben ${MAX_EXPLORACIONES_FIJADAS} gráficas fijadas: para dejar esta se ha quitado la más antigua.`
+                  : null,
+              );
+              onFijar(config);
+            }}
           >
             {fijada ? <PinOff className="h-4 w-4" aria-hidden /> : <Pin className="h-4 w-4" aria-hidden />}
             {fijada ? "Fijada" : "Fijar en el tablero"}
@@ -726,9 +782,7 @@ export function Explorador({
         <Filter className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
         {chipsFiltro.map((c) => (
           <span key={c.clave} className={cn(CHIP, "bg-muted/40")}>
-            <span className="max-w-[14rem] truncate" title={c.texto}>
-              {c.texto}
-            </span>
+            <span className="line-clamp-2 max-w-[14rem] break-words py-1">{c.texto}</span>
             <button
               type="button"
               onClick={c.quitar}
@@ -771,19 +825,27 @@ export function Explorador({
         <p className="text-xs text-muted-foreground">Solo productos: sin portes, servicios, envases ni energía.</p>
       )}
 
-      {ex && !ex.sinDatos && <Totales ex={ex} config={exConfig} onVerDocumentos={() => onDocumentos(peticion(null, null, `${tituloConfig(exConfig)}`, ex.total.valor))} />}
+      {ex && !ex.sinDatos && (
+        <Totales
+          ex={ex}
+          config={exConfig}
+          sinClasificarAparte={!!apartado}
+          onVerDocumentos={listo ? () => onDocumentos(peticion(null, null, `${tituloConfig(exConfig)}`, ex.total.valor)) : undefined}
+        />
+      )}
 
       {cuerpo}
 
       {/* Punto elegido */}
-      {punto && ex && (
+      {/* La cifra en su línea y los botones debajo: en el móvil se pisaban (QA 05/11/2026). */}
+      {punto && ex && listo && (
         <div
           ref={tiraPunto}
-          className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5"
+          className="flex flex-wrap items-center gap-x-1 gap-y-0.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5"
           role="region"
           aria-label="Punto elegido"
         >
-          <p className="min-w-0 flex-1 text-sm">
+          <p className="min-w-0 basis-full break-words pt-1 text-sm">
             <span className="font-medium">{etiquetaPunto(punto)}</span>
             <span className="ml-2 tabular-nums">{formatoValor(punto.valor, ex.parametros.medida, ex.parametros.unidad)}</span>
             <span className="ml-2 text-xs text-muted-foreground">{formatEntero(punto.documentos)} docs.</span>
@@ -818,7 +880,7 @@ export function Explorador({
               Abrir en Compras
             </button>
           )}
-          <button type="button" className={cn(ACCION, "px-2", FOCO)} onClick={() => setSeleccion(null)} aria-label="Quitar la selección">
+          <button type="button" className={cn(ACCION, "ml-auto px-2", FOCO)} onClick={() => setSeleccion(null)} aria-label="Quitar la selección">
             <X className="h-4 w-4" aria-hidden />
           </button>
         </div>

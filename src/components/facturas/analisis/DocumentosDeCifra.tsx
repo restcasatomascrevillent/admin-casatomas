@@ -21,6 +21,7 @@ import { cuadra, ETIQUETA_LOCAL, ETIQUETA_TIPO, type PeticionDocumentos } from "
 import { EstadoError, EstadoVacio, Marca } from "@/components/facturas/compras/estilo";
 import { VisorDocumento } from "./VisorDocumento";
 import { FOCO } from "./piezas";
+import { useFocoAlCerrar } from "./desplazar";
 
 // Las marcas de Compras (compras/estilo.tsx): mismo lenguaje visual en las dos pestañas.
 const TONO_TIPO = { factura: "neutro", albaran: "sinFactura", abono: "abono" } as const;
@@ -44,6 +45,10 @@ export function DocumentosDeCifra({
   const ok = peticion && primera ? cuadra(peticion.cifra, primera.cifra) : null;
   const rotulo = medida ? `${medida.etiqueta}${medida.iva ? ` ${medida.iva}` : ""}` : "";
   const porLineas = primera?.porLineas ?? false;
+  // Se abre por código (sin Trigger): al cerrar, el foco vuelve a la cifra tocada.
+  const focoAlCerrar = useFocoAlCerrar(!!peticion);
+  // Abonos con «−», como en el resto de Análisis (la RPC los da en positivo).
+  const importe = (n: number) => formatImporte(peticion?.medida === "abonos" ? -Math.abs(n) : n);
 
   const cerrar = (o: boolean) => {
     if (!o) {
@@ -55,7 +60,7 @@ export function DocumentosDeCifra({
   return (
     <>
       <Sheet open={!!peticion} onOpenChange={cerrar}>
-        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl" data-testid="documentos-de-cifra">
+        <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-xl" data-testid="documentos-de-cifra" onCloseAutoFocus={focoAlCerrar}>
           <SheetHeader className="shrink-0 space-y-1 border-b border-border/70 px-4 pb-3 pt-4">
             <SheetTitle className="text-base sm:text-lg">{peticion?.titulo ?? "Documentos"}</SheetTitle>
             <SheetDescription className="text-xs sm:text-sm">
@@ -116,14 +121,13 @@ export function DocumentosDeCifra({
                       type="button"
                       onClick={() => setVisor(i)}
                       className={cn("flex min-h-14 w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left hover:bg-muted/60", FOCO)}
-                      aria-label={`${ETIQUETA_TIPO[d.tipo]} ${d.numero ?? "sin número"} de ${d.proveedor}, ${d.fecha ? fechaCorta(d.fecha) : "sin fecha"}, ${ETIQUETA_LOCAL[d.local]}: aporta ${formatImporte(d.aporta)}. Ver el original`}
+                      aria-label={`${ETIQUETA_TIPO[d.tipo]} ${d.numero ?? "sin número"} de ${d.proveedor}, ${d.fecha ? fechaCorta(d.fecha) : "sin fecha"}, ${ETIQUETA_LOCAL[d.local]}: aporta ${importe(d.aporta)}. Ver el original`}
                     >
                       <FileText className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                       <span className="w-[4.5rem] shrink-0 text-xs tabular-nums text-muted-foreground">{d.fecha ? fechaCorta(d.fecha) : "—"}</span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium" title={d.proveedor}>
-                          {nombreCorto(d.proveedor)}
-                        </span>
+                        {/* Dos líneas en vez de cortar: en táctil no hay `title` (QA 05/11/2026). */}
+                        <span className="line-clamp-2 break-words text-sm font-medium">{nombreCorto(d.proveedor)}</span>
                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Marca tono={TONO_TIPO[d.tipo]}>{ETIQUETA_TIPO[d.tipo]}</Marca>
                           {d.local === "touza" && <Marca tono="touza">Touza</Marca>}
@@ -132,9 +136,9 @@ export function DocumentosDeCifra({
                         </span>
                       </span>
                       <span className="shrink-0 text-right">
-                        <span className="block text-sm font-semibold tabular-nums">{formatImporte(d.aporta)}</span>
+                        <span className="block text-sm font-semibold tabular-nums">{importe(d.aporta)}</span>
                         {porLineas && d.total !== null && (
-                          <span className="block text-[11px] tabular-nums text-muted-foreground">de {formatImporte(d.total)}</span>
+                          <span className="block text-xs tabular-nums text-muted-foreground">de {formatImporte(d.total)}</span>
                         )}
                       </span>
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
