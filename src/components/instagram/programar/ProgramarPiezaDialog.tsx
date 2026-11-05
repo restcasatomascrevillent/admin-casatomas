@@ -22,6 +22,8 @@ export interface ProgramarPiezaDialogProps {
   /** Instante inicial. Por defecto: el de la programación pendiente o mañana a las 13:00 de Madrid. */
   inicial?: Date | string | null;
   onHecho?: (programacion: ProgramacionInstagram) => void;
+  /** Por qué se propone la hora inicial (p. ej. «Según «Qué funciona»…»); se oculta al tocar la fecha. */
+  motivoInicial?: string | null;
 }
 
 /**
@@ -30,7 +32,7 @@ export interface ProgramarPiezaDialogProps {
  * inexistente por el cambio de hora) y el servidor vuelve a validar. Si en ±30
  * min ya hay otra programada de la misma marca, avisa y pide confirmación.
  */
-export function ProgramarPiezaDialog({ piezaId, open, onOpenChange, programacionId, inicial, onHecho }: ProgramarPiezaDialogProps) {
+export function ProgramarPiezaDialog({ piezaId, open, onOpenChange, programacionId, inicial, onHecho, motivoInicial }: ProgramarPiezaDialogProps) {
   const { data: vigente } = useProgramacionDePieza(open && !programacionId ? piezaId : null);
   const { programar } = useAccionesProgramacion();
   const [fecha, setFecha] = useState("");
@@ -118,6 +120,11 @@ export function ProgramarPiezaDialog({ piezaId, open, onOpenChange, programacion
             </div>
           </div>
 
+          {motivoInicial && !tocado && !pendiente && !programacionId && (
+            <p className="text-sm text-muted-foreground" data-testid="motivo-hueco">
+              {motivoInicial}
+            </p>
+          )}
           {pendiente && !programacionId && (
             <p className="text-sm text-muted-foreground">Ya estaba programada para el {textoInstante(pendiente.programada_para)}; se moverá.</p>
           )}
