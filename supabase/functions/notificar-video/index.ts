@@ -19,9 +19,12 @@
 //   de Instagram). Vale con Marketing o con Instagram · Agencia; solo lo pide
 //   el autor del evento en los 15 min siguientes, y avisa a la otra parte
 //   (RPC instagram_encargo_destinatarios). Ver docs/instagram-encargos.md.
+//   Desde 20261111000000 el aviso de un encargo sale UNA sola vez por evento
+//   (instagram_encargo_eventos.notificado_at).
 //   tipo "reel" (09-11-2026): trabajo de `instagram_trabajos_render` (reel de
-//   Instagram generado por el trabajador de render); exige la sección
-//   «marketing» en vez de «gestor_carta». Ver docs/instagram-video.md.
+//   Instagram generado por el trabajador de render); exige «Editar» en la
+//   sección del trabajador («instagram_render») o en «marketing», en vez de
+//   «gestor_carta». Ver docs/instagram-video.md.
 //   tipo "recorte" (02-11-2026): trabajo de `trabajos_recorte` (foto de la
 //   carta guardada sin recortar desde un móvil y recortada en un ordenador).
 // Respuesta: { ok: true, enviadas, borradas, fallidas } | { ok: false, error }
@@ -42,9 +45,11 @@ import {
   construirCargaReel,
   leerEventoId,
   leerTipo,
+  modoPermisoDeTipo,
+  reclamarAvisoEncargo,
+  seccionesDeTipo,
+  type ClienteAviso,
   leerTrabajoId,
-  SECCIONES_ENCARGO,
-  seccionDeTipo,
   suscripcionCaducada,
   type EncargoNotificable,
   type EventoEncargoNotificable,
@@ -100,13 +105,13 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   // Carta para vídeos y recortes; Marketing para los reels de Instagram;
   // Marketing o Instagram · Agencia para los encargos.
   let permiso: Awaited<ReturnType<typeof comprobarPermisoSeccion>> | null = null;
-  for (const seccion of tipo === "encargo" ? SECCIONES_ENCARGO : [seccionDeTipo(tipo)]) {
+  for (const seccion of seccionesDeTipo(tipo)) {
     permiso = await comprobarPermisoSeccion(
       supabaseUser as unknown as ClientePermiso,
       seccion,
-      "escribir",
-      tipo === "encargo" ? "No tienes permiso para los encargos de Instagram"
-        : seccion === "marketing" ? "No tienes permiso de Marketing" : "No tienes permiso para editar la carta",
+      modoPermisoDeTipo(tipo),
+      tipo === "encargo" ? "No tienes permiso para editar los encargos de Instagram"
+        : tipo === "reel" ? "No tienes permiso de trabajador de render ni para editar Marketing" : "No tienes permiso para editar la carta",
     );
     if (permiso.ok || permiso.status !== 403) break;
   }
@@ -132,6 +137,10 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     const evento = ev as EventoEncargoNotificable;
     const autE = autorizarNotificacionEncargo(evento, permiso.userId);
     if (!autE.ok) return json({ ok: false, error: autE.error }, autE.status);
+    // Una sola vez por evento: la primera llamada lo marca; las demás no mandan nada.
+    if ((await reclamarAvisoEncargo(admin as unknown as ClienteAviso, evento.id)) === "ya_avisado") {
+      return json({ ok: true, enviadas: 0, borradas: 0, fallidas: 0, yaAvisado: true });
+    }
     const { data: enc } = await admin.from("instagram_encargos").select("id, numero, titulo").eq("id", evento.encargo_id).maybeSingle();
     const { data: quienes, error: eQ } = await admin.rpc("instagram_encargo_destinatarios", { p_evento_id: evento.id });
     if (eQ) return json({ ok: false, error: "No se pudieron calcular los destinatarios" }, 500);

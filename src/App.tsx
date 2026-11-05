@@ -28,6 +28,7 @@ const GestionWeb = lazy(() => import("./pages/GestorWeb"));
 const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(() => import("./pages/Marketing"));
 const Instagram = lazy(() => import("./pages/Instagram"));
+const InstagramRapido = lazy(() => import("./pages/InstagramRapido"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(() => import("./pages/Cheques"));
 const Tienda = lazy(() => import("./pages/Tienda"));
@@ -134,6 +135,8 @@ const App = () => (
                   <Route path="/marketing" element={pagina(<Marketing />)} />
                   {/* Instagram: sección propia desde el 05/11/2026 (antes, pestaña de Newsletter). Sección de permisos «marketing». */}
                   <Route path="/instagram" element={pagina(<Instagram />)} />
+                  {/* Acceso directo para la pantalla de inicio del móvil: asistente rápido a pantalla completa (docs/instagram-movil.md). */}
+                  <Route path="/instagram/rapido" element={pagina(<InstagramRapido />, "marketing")} />
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                   <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />

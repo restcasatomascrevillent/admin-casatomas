@@ -26,7 +26,7 @@ const JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c3VhcmlvLTEifQ.firmaSecretaDelUsua
 const CLAVE = "sk-clave-de-openai-de-pruebas-0123456789";
 const IG = "17841400000000001";
 const IG_TOUZA = "17841400000000009";
-const ENV = { SUPABASE_URL: SB, SUPABASE_ANON_KEY: "clave-publica", OPENAI_API_KEY: CLAVE, IG_USER_ID: IG, IG_USER_ID_TOUZA: IG_TOUZA };
+const ENV = { SUPABASE_URL: SB, SUPABASE_ANON_KEY: "clave-publica", OPENAI_API_KEY: CLAVE, IG_USER_ID: IG, IG_USER_ID_TOUZA: IG_TOUZA, INSTAGRAM_ENTORNO: "demo" };
 const AHORA = new Date("2026-11-05T10:00:00Z");
 const MARTES = "Los martes funcionan mejor: 9 % de interacción en 4 publicaciones, frente al 5,5 % de media.";
 
@@ -132,7 +132,8 @@ function falso(o: { qf?: [number, unknown]; openai: Response[] }) {
     const cuerpo = typeof init.body === "string" ? init.body : null;
     llamadas.push({ url, metodo, cuerpo });
     if (url === `${SB}/auth/v1/user`) return resp(200, { id: "11111111-1111-4111-8111-111111111111" });
-    if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, true);
+    if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, true);
+    if (url === `${SB}/rest/v1/rpc/instagram_ia_reservar_cupo`) return resp(200, { ok: true, usadas: 1, cupo: 100 });
     if (url.startsWith(`${SB}/rest/v1/instagram_sugerencias_ia`) && metodo === "HEAD") return new Response(null, { status: 200, headers: { "content-range": "*/0" } });
     if (url.startsWith(`${SB}/rest/v1/instagram_sugerencias_ia`) && metodo === "POST") return resp(201, [{ id: "99999999-9999-4999-8999-999999999999" }]);
     if (url.startsWith(`${SB}/rest/v1/instagram_guias_marca`)) return resp(200, [GUIA]);

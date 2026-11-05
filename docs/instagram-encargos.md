@@ -45,8 +45,11 @@ campos obligatorios, y deja una fila en `instagram_encargo_eventos`.
 | — | Los dos | `instagram_encargo_comentar(id, texto, lado?)` | Hilo de comentarios; no cambia el estado. |
 
 «Restaurante» = permiso de **Marketing**; «agencia» = permiso
-**Instagram · Agencia (Oficiosos)** (`instagram_agencia`). El super admin es
-las dos cosas (como en todo el panel). Las dos exigen la sesión de panel viva.
+**Instagram · Agencia (Oficiosos)** (`instagram_agencia`). Para **actuar**
+hace falta **«Editar»** en esa sección (`can_edit_section`, desde la
+migración `20261111000000_instagram_seguridad`); con solo «Ver» se consultan.
+El super admin es las dos cosas (como en todo el panel). Las dos exigen la
+sesión de panel viva.
 
 ## Quién ve qué (RLS)
 
@@ -94,7 +97,20 @@ públicos, porque Meta necesita una URL pública para publicar:
 | Vídeo (reel) | `instagram-video` | `reels/AAAA-MM/<encargo>-<8 hex>.mp4` (+ `.jpg` de portada opcional) | MP4, 50 MB, 3-90 s |
 
 La agencia solo puede **subir** (INSERT) en esos prefijos (políticas
-`ig_encargos_*`); no puede borrar ni sobrescribir. La RPC comprueba que el
+`ig_encargos_*`); no puede borrar ni sobrescribir. Desde `20261111000000`
+(A7 de la evaluación) la subida está **atada a sus encargos**
+(`instagram_agencia_puede_subir`):
+
+- la ruta tiene que llevar el id de un encargo «Oficiosos» en estado
+  **aceptado, en curso o con cambios pedidos** (para entregar la versión
+  siguiente), y el cubo de su formato (vídeo → `instagram-video`);
+- como mucho **20 ficheros** por encargo y cubo, y **100 MB** (imágenes) o
+  **400 MB** (vídeo) en total por encargo, además del límite por fichero de
+  cada cubo;
+- hace falta «Editar» en Instagram · Agencia.
+
+Y **solo lee** (`instagram_agencia_puede_leer`) los ficheros de encargos
+«Oficiosos» ya enviados: nunca los reels ni las piezas del restaurante. La RPC comprueba que el
 fichero existe y que no se entregó antes. Los JPEG de `encargos/` no los
 borra la limpieza diaria (solo mira `piezas/`). Al publicar una pieza de
 imagen, `instagram-publicar` la archiva en Drive y la borra del cubo, como
@@ -160,9 +176,9 @@ este Supabase» y el calendario sigue como antes.
 
 1. Crea el usuario (Usuarios → Invitar) o elige uno que ya exista.
 2. Usuarios → **Permisos** del usuario (solo lo puede guardar un super
-   admin) → marca **«Ver»** en **«Instagram · Agencia (Oficiosos)»**. Hoy
-   «Ver» basta para actuar (`can_write_section` aún no exige «Puede
-   editar»); márcalo también para cuando lo exija.
+   admin) → marca **«Ver»** y **«Puede editar»** en **«Instagram · Agencia
+   (Oficiosos)»**. Desde la migración `20261111000000` sin «Puede editar»
+   solo puede mirar: no acepta, ni entrega, ni comenta.
 3. No le des «Newsletter» (Marketing) si solo debe ver los encargos: con
    Marketing también sería «restaurante» y vería Crear, Campañas, etc.
 4. Que entre en el panel, abra **Instagram → Encargos** y pulse

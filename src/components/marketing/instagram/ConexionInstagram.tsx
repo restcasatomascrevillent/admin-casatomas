@@ -1,17 +1,15 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { MARCAS } from "@/lib/instagram";
-import { comprobarConexion, ErrorInstagram, textoError, type Cuota, type EstadoDrive, type RespuestaEstado } from "./api";
+import { ErrorInstagram, textoError, type Cuota, type EstadoDrive, type RespuestaEstado } from "./api";
+import { useConexionInstagram } from "./useConexionInstagram";
+import { ParaOficiosos } from "@/components/instagram/ParaOficiosos";
 
 /**
- * «Conexión con Instagram»: llama a la Edge Function instagram-estado y enseña ✔/✖/⚠ por
- * variable, la cuenta (y en qué cuenta publica cada marca: la suya si tiene
- * IG_USER_ID_<MARCA>, si no la general) y el cupo, con «Cómo arreglarlo». Debajo, Google Drive
- * (donde se archivan las fotos y las piezas publicadas): secretos, permiso
- * (alcance) del token y si la carpeta «marketing» se ve y se puede escribir.
- * La función nunca devuelve valores secretos: aquí solo se pintan nombre,
+ * Piezas de «Conexión con Instagram» (Edge Function instagram-estado). La
+ * función nunca devuelve valores secretos: aquí solo se pintan nombre,
  * estado y detalle.
  */
 export function iconoEstado(estado: string) {
@@ -88,117 +86,149 @@ interface Props {
   /** Avisa al editor de la cuenta (para el diálogo de publicar). */
   onEstado?: (estado: RespuestaEstado) => void;
   className?: string;
+  /** Sin el título (dentro de un diálogo que ya lo lleva). */
+  sinTitulo?: boolean;
 }
 
-export function ConexionInstagram({ onEstado, className }: Props) {
-  const [cargando, setCargando] = useState(false);
-  const [estado, setEstado] = useState<RespuestaEstado | null>(null);
-  const [error, setError] = useState<{ texto: string; pasos: string[] } | null>(null);
+/**
+ * «Conexión con Instagram» en llano (evaluación de diseño C6): si está todo
+ * listo, en qué cuenta publica cada marca, cuántas publicaciones quedan hoy y
+ * si las fotos de Drive están disponibles. Lo técnico (secretos IG_USER_ID…,
+ * comprobaciones, alcance del token de Drive) va plegado en «Para Oficiosos».
+ * Usa la misma consulta que el indicador «● @cuenta» de la barra.
+ */
+export function ConexionInstagram({ onEstado, className, sinTitulo }: Props) {
+  const conexion = useConexionInstagram();
+  const { estado, error: errorConsulta, comprobando } = conexion;
 
-  const comprobar = async () => {
-    setCargando(true);
-    setError(null);
-    try {
-      const r = await comprobarConexion();
-      setEstado(r);
-      onEstado?.(r);
-    } catch (e) {
-      const pasos = e instanceof ErrorInstagram && e.comoArreglarlo ? [e.comoArreglarlo].flat() : [];
-      setError({ texto: textoError(e), pasos });
-      setEstado(null);
-    } finally {
-      setCargando(false);
-    }
-  };
+  useEffect(() => {
+    if (estado) onEstado?.(estado);
+  }, [estado, onEstado]);
 
+  const error = errorConsulta
+    ? {
+        texto: textoError(errorConsulta),
+        pasos: errorConsulta instanceof ErrorInstagram && errorConsulta.comoArreglarlo ? [errorConsulta.comoArreglarlo].flat() : [],
+      }
+    : null;
   const pasos = estado?.comoArreglarlo ?? [];
+  const cuentas: Array<{ marca: string; username: string | null; estado: string }> = estado
+    ? estado.cuentasPorMarca.length
+      ? estado.cuentasPorMarca.map((c) => ({ marca: c.marca, username: c.username, estado: c.estado }))
+      : ["casa-tomas", "touza"].map((m) => ({ marca: m, username: estado.cuenta?.username ?? null, estado: estado.cuenta ? "ok" : "falla" }))
+    : [];
 
   return (
-    <section aria-labelledby="titulo-conexion-ig" className={cn("rounded-lg border bg-card p-3", className)}>
+    <section
+      aria-labelledby={sinTitulo ? undefined : "titulo-conexion-ig"}
+      aria-label={sinTitulo ? "Conexión con Instagram" : undefined}
+      className={cn("rounded-lg border bg-card p-3", className)}
+    >
       <div className="flex items-center justify-between gap-2">
-        <h3 id="titulo-conexion-ig" className="flex items-center gap-2 text-sm font-medium">
-          <PlugZap className="h-4 w-4 text-primary" aria-hidden="true" />
-          Conexión con Instagram
-        </h3>
-        <Button type="button" size="sm" variant="outline" onClick={comprobar} disabled={cargando} className="pointer-coarse:min-h-11">
-          {cargando && <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />}
+        {!sinTitulo && (
+          <h3 id="titulo-conexion-ig" className="flex items-center gap-2 text-sm font-medium">
+            <PlugZap className="h-4 w-4 text-primary" aria-hidden="true" />
+            Conexión con Instagram
+          </h3>
+        )}
+        <Button type="button" size="sm" variant="outline" onClick={() => void conexion.comprobar()} disabled={comprobando} className="ml-auto pointer-coarse:min-h-11">
+          {comprobando && <Loader2 className="mr-1 h-4 w-4 animate-spin" aria-hidden="true" />}
           Comprobar
         </Button>
       </div>
 
-      <div aria-live="polite" className="mt-2 space-y-2 text-xs">
-        {!estado && !error && !cargando && (
-          <p className="text-muted-foreground">Pulsa «Comprobar» para ver si la cuenta está bien enlazada.</p>
-        )}
-        {error && (
+      <div aria-live="polite" className="mt-2 space-y-2 text-sm">
+        {comprobando && !estado && <p className="text-muted-foreground">Comprobando la conexión…</p>}
+        {error && !comprobando && (
           <div className="space-y-1">
             <p className="flex items-start gap-1.5 text-destructive">
-              <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-              {error.texto}
+              <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              No hemos podido comprobar la conexión con Instagram.
             </p>
-            {error.pasos.length > 0 && (
-              <ul className="list-disc space-y-0.5 pl-5 text-muted-foreground">
-                {error.pasos.map((p) => <li key={p}>{p}</li>)}
-              </ul>
-            )}
+            <p className="text-xs text-muted-foreground">Vuelve a pulsar «Comprobar» en un rato. Si sigue igual, avisa a Oficiosos.</p>
+            <ParaOficiosos>
+              <p>{error.texto}</p>
+              {error.pasos.length > 0 && (
+                <ul className="list-disc space-y-0.5 pl-5">
+                  {error.pasos.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              )}
+            </ParaOficiosos>
           </div>
         )}
         {estado && (
           <>
-            <p className={cn("font-medium", estado.ok ? "text-emerald-700" : "text-destructive")}>
-              {estado.ok ? "Todo listo para publicar." : "Falta algo para poder publicar."}
+            <p className={cn("flex items-start gap-1.5 font-medium", estado.ok ? "text-[#117e39]" : "text-destructive")}>
+              {estado.ok ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> : <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+              {estado.ok ? "Todo listo para publicar." : "Falta algo para poder publicar. Avisa a Oficiosos."}
             </p>
-            <ul className="space-y-1" data-testid="variables-conexion">
-              <Linea estado={estado.cuenta ? "ok" : "falla"}>
-                Cuenta: {estado.cuenta ? <strong>@{estado.cuenta.username}</strong> : <span className="text-muted-foreground">sin identificar</span>}
-              </Linea>
-              {estado.cuentasPorMarca.map((c) => (
+            <ul className="space-y-1" data-testid="cuentas-conexion">
+              {cuentas.map((c) => (
                 <Linea key={c.marca} estado={c.estado}>
                   <span data-testid={`cuenta-marca-${c.marca}`}>
-                    {MARCAS[c.marca]?.nombre ?? c.marca} publica en{" "}
+                    {MARCAS[c.marca as keyof typeof MARCAS]?.nombre ?? c.marca} publica en{" "}
                     {c.username ? <strong>@{c.username}</strong> : <span className="text-muted-foreground">una cuenta sin identificar</span>}
-                    <span className="text-muted-foreground">
-                      {" "}
-                      · {c.propia ? `cuenta propia (${c.variableIgUserId})` : "cuenta general (IG_USER_ID)"}
-                    </span>
                   </span>
                 </Linea>
               ))}
               {estado.cuota && (
-                <Linea estado={estadoCuota(estado.cuota.usadas, estado.cuota.total)}>
-                  Publicaciones: {textoCuota(estado.cuota)}
-                </Linea>
+                <Linea estado={estadoCuota(estado.cuota.usadas, estado.cuota.total)}>Publicaciones: {textoCuota(estado.cuota)}</Linea>
               )}
-              {[...estado.variables, ...estado.comprobaciones.filter((c) => c.estado !== "ok")].map((v) => (
-                <Linea key={`${v.seccion ?? "var"}-${v.nombre}`} estado={v.estado}>
-                  <span className="break-words">{v.seccion ? `${v.seccion} · ` : ""}{v.nombre}</span>
-                  {v.detalle && <span className="text-muted-foreground"> · {v.detalle}</span>}
-                </Linea>
-              ))}
-              {estado.comprobaciones.some((c) => c.estado === "ok") && (
-                <Linea estado="ok">
-                  {(() => {
-                    const n = estado.comprobaciones.filter((c) => c.estado === "ok").length;
-                    return n === 1 ? "1 comprobación más, bien" : `${n} comprobaciones más, todas bien`;
-                  })()}
+              {estado.drive && (
+                <Linea estado={estado.drive.ok ? "ok" : "aviso"}>
+                  {estado.drive.ok ? "Fotos de Google Drive disponibles" : "Las fotos de Google Drive no están disponibles"}
                 </Linea>
               )}
             </ul>
-            {estado.avisos.map((a) => (
-              <p key={a} className="flex items-start gap-1.5 text-amber-700">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                {a}
-              </p>
-            ))}
-            {pasos.length > 0 && (
-              <div>
-                <p className="font-medium">Cómo arreglarlo</p>
-                <ol className="list-decimal space-y-0.5 pl-5 text-muted-foreground">
-                  {pasos.map((p) => <li key={p}>{p}</li>)}
-                </ol>
-              </div>
-            )}
-            <BloqueDrive drive={estado.drive} />
+            <ParaOficiosos>
+              <ul className="space-y-1" data-testid="variables-conexion">
+                <Linea estado={estado.cuenta ? "ok" : "falla"}>
+                  Cuenta general: {estado.cuenta ? <strong>@{estado.cuenta.username}</strong> : "sin identificar"}
+                </Linea>
+                {estado.cuentasPorMarca.map((c) => (
+                  <Linea key={c.marca} estado={c.estado}>
+                    {MARCAS[c.marca]?.nombre ?? c.marca}: {c.propia ? `cuenta propia (${c.variableIgUserId})` : "cuenta general (IG_USER_ID)"}
+                    {c.detalle ? ` · ${c.detalle}` : ""}
+                  </Linea>
+                ))}
+                {[...estado.variables, ...estado.comprobaciones.filter((c) => c.estado !== "ok")].map((v) => (
+                  <Linea key={`${v.seccion ?? "var"}-${v.nombre}`} estado={v.estado}>
+                    <span className="break-words">
+                      {v.seccion ? `${v.seccion} · ` : ""}
+                      {v.nombre}
+                    </span>
+                    {v.detalle && <span> · {v.detalle}</span>}
+                  </Linea>
+                ))}
+                {estado.comprobaciones.some((c) => c.estado === "ok") && (
+                  <Linea estado="ok">
+                    {(() => {
+                      const n = estado.comprobaciones.filter((c) => c.estado === "ok").length;
+                      return n === 1 ? "1 comprobación más, bien" : `${n} comprobaciones más, todas bien`;
+                    })()}
+                  </Linea>
+                )}
+              </ul>
+              {estado.avisos.map((a) => (
+                <p key={a} className="flex items-start gap-1.5 text-amber-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {a}
+                </p>
+              ))}
+              {pasos.length > 0 && (
+                <div>
+                  <p className="font-medium text-foreground">Cómo arreglarlo</p>
+                  <ol className="list-decimal space-y-0.5 pl-5">
+                    {pasos.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              <BloqueDrive drive={estado.drive} />
+            </ParaOficiosos>
           </>
         )}
       </div>

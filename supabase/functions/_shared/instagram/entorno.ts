@@ -19,6 +19,18 @@
  *   IG_USER_ID_TOUZA      / IG_ACCESS_TOKEN_TOUZA
  * El token propio solo hace falta si la cuenta de esa marca no la ve el token
  * general (otro usuario del sistema u otro portfolio).
+ *
+ * PRODUCCIÓN (A3 de la evaluación, 20261111000000): cada marca EXIGE sus dos
+ * secretos (IG_USER_ID_<MARCA> e IG_ACCESS_TOKEN_<MARCA>) y nunca cae en los
+ * generales: si falta IG_USER_ID_TOUZA, Touza no publica (503) en vez de
+ * publicar en la cuenta de Casa Tomás. En la demo sigue cayendo en los
+ * generales. Qué es producción (entornoInstagram), de más a menos fuerte:
+ *   1. SUPABASE_URL del proyecto de producción (haqmmdfdzzatdnrrcgez):
+ *      producción SIEMPRE, diga lo que diga INSTAGRAM_ENTORNO.
+ *   2. INSTAGRAM_ENTORNO = «demo» o «produccion» (secreto opcional).
+ *   3. SUPABASE_URL de la demo (sfonaclosuafvlhutkon): demo.
+ *   4. Cualquier otro proyecto (o sin SUPABASE_URL): producción. Falla
+ *      cerrado: un proyecto nuevo no publica con la cuenta general por error.
  */
 import { enmascarar, registrarSecreto } from "./secretos.ts";
 
@@ -33,6 +45,25 @@ export interface ConfigMeta {
   versionApi: string;
   appSecret: string | undefined;
 }
+
+export const REF_DEMO = "sfonaclosuafvlhutkon";
+export const REF_PRODUCCION = "haqmmdfdzzatdnrrcgez";
+
+export type EntornoInstagram = "demo" | "produccion";
+
+/** ¿Demo o producción? Con el motivo, para «Comprobar». Ver la cabecera. */
+export function entornoInstagram(env: Entorno): { entorno: EntornoInstagram; motivo: string } {
+  const ref = refProyecto(env);
+  const explicito = (env.INSTAGRAM_ENTORNO ?? "").trim().toLowerCase();
+  if (ref === REF_PRODUCCION) return { entorno: "produccion", motivo: "proyecto de Supabase de producción" };
+  if (explicito === "produccion" || explicito === "demo") {
+    return { entorno: explicito, motivo: `INSTAGRAM_ENTORNO=${explicito}` };
+  }
+  if (ref === REF_DEMO) return { entorno: "demo", motivo: "proyecto de Supabase de la demo" };
+  return { entorno: "produccion", motivo: "proyecto de Supabase que no es la demo (por seguridad se trata como producción)" };
+}
+
+export const esProduccion = (env: Entorno): boolean => entornoInstagram(env).entorno === "produccion";
 
 /** Marcas que pueden tener cuenta propia (las de instagram_piezas.marca). */
 export const MARCAS_CUENTA = ["casa-tomas", "touza"] as const;
@@ -111,6 +142,8 @@ export const VARIABLES_META = [
   { nombre: "IG_ACCESS_TOKEN_CASA_TOMAS", obligatoria: false, secreta: true },
   { nombre: "IG_USER_ID_TOUZA", obligatoria: false, secreta: false },
   { nombre: "IG_ACCESS_TOKEN_TOUZA", obligatoria: false, secreta: true },
+  // «demo» o «produccion»; casi nunca hace falta (ver entornoInstagram).
+  { nombre: "INSTAGRAM_ENTORNO", obligatoria: false, secreta: false },
 ] as const;
 
 /** Variable general en la que cae una de marca si no existe. */
@@ -128,15 +161,19 @@ function valor(env: Entorno, nombre: string): string | undefined {
 /** Problemas de las variables (faltan o tienen mal formato). */
 export function problemasVariables(env: Entorno): ProblemaVariable[] {
   const p: ProblemaVariable[] = [];
+  const produccion = esProduccion(env);
   const token = valor(env, "IG_ACCESS_TOKEN");
   const ig = valor(env, "IG_USER_ID");
   const app = valor(env, "META_APP_ID");
   const version = valor(env, "META_API_VERSION");
-  if (!token) p.push({ variable: "IG_ACCESS_TOKEN", problema: "falta", comoArreglarlo: arregloVariable("IG_ACCESS_TOKEN", env) });
-  else if (token.length < 20 || /\s/.test(token))
+  // En producción los generales no se usan para publicar: solo se comprueba su formato si están.
+  if (!token) {
+    if (!produccion) p.push({ variable: "IG_ACCESS_TOKEN", problema: "falta", comoArreglarlo: arregloVariable("IG_ACCESS_TOKEN", env) });
+  } else if (token.length < 20 || /\s/.test(token))
     p.push({ variable: "IG_ACCESS_TOKEN", problema: "parece incompleto o tiene espacios/saltos de línea", comoArreglarlo: `Cópialo de nuevo, sin espacios, en ${dondeSecreto("IG_ACCESS_TOKEN", env)}.` });
-  if (!ig) p.push({ variable: "IG_USER_ID", problema: "falta", comoArreglarlo: arregloVariable("IG_USER_ID", env) });
-  else if (!/^\d+$/.test(ig)) p.push({ variable: "IG_USER_ID", problema: "debe ser solo dígitos (el ID, no el @usuario)", comoArreglarlo: arregloVariable("IG_USER_ID", env) });
+  if (!ig) {
+    if (!produccion) p.push({ variable: "IG_USER_ID", problema: "falta", comoArreglarlo: arregloVariable("IG_USER_ID", env) });
+  } else if (!/^\d+$/.test(ig)) p.push({ variable: "IG_USER_ID", problema: "debe ser solo dígitos (el ID, no el @usuario)", comoArreglarlo: arregloVariable("IG_USER_ID", env) });
   if (!app) p.push({ variable: "META_APP_ID", problema: "falta", comoArreglarlo: arregloVariable("META_APP_ID", env) });
   else if (!/^\d+$/.test(app)) p.push({ variable: "META_APP_ID", problema: "debe ser solo dígitos", comoArreglarlo: arregloVariable("META_APP_ID", env) });
   if (version && !/^v\d+\.\d+$/.test(version))
@@ -146,6 +183,12 @@ export function problemasVariables(env: Entorno): ProblemaVariable[] {
     const n = secretosDeMarca(marca);
     const igMarca = valor(env, n.igUserId);
     const tokenMarca = valor(env, n.token);
+    if (produccion && !igMarca) {
+      p.push({ variable: n.igUserId, problema: `falta (en producción cada marca necesita su cuenta; ${marca} no usa IG_USER_ID)`, comoArreglarlo: `Crea ${n.igUserId} con el ID numérico de la cuenta de Instagram de ${marca} en ${dondeSecreto(n.igUserId, env)}.` });
+    }
+    if (produccion && !tokenMarca) {
+      p.push({ variable: n.token, problema: `falta (en producción cada marca necesita su token; ${marca} no usa IG_ACCESS_TOKEN)`, comoArreglarlo: `Crea ${n.token} con el token del usuario del sistema que ve la cuenta de ${marca} (puede ser el mismo para las dos marcas) en ${dondeSecreto(n.token, env)}.` });
+    }
     if (igMarca && !/^\d+$/.test(igMarca)) {
       p.push({ variable: n.igUserId, problema: "debe ser solo dígitos (el ID, no el @usuario)", comoArreglarlo: `Corrígelo (o bórralo: sin él, ${marca} usa IG_USER_ID) en ${dondeSecreto(n.igUserId, env)}.` });
     }
@@ -160,9 +203,12 @@ export function problemasVariables(env: Entorno): ProblemaVariable[] {
 export function problemasDeMarca(env: Entorno, marca: MarcaCuenta): ProblemaVariable[] {
   const n = secretosDeMarca(marca);
   const otras = new Set(MARCAS_CUENTA.filter((m) => m !== marca).flatMap((m) => Object.values(secretosDeMarca(m))));
+  const produccion = esProduccion(env);
   const tieneId = Boolean(valor(env, n.igUserId));
   const tieneToken = Boolean(valor(env, n.token));
   return problemasVariables(env).filter((x) => {
+    // En producción la marca nunca usa los generales: sus problemas no le afectan.
+    if (produccion && (x.variable === "IG_USER_ID" || x.variable === "IG_ACCESS_TOKEN")) return false;
     if (otras.has(x.variable)) return false;
     // Si la marca tiene su ID (o su token), el general no le hace falta.
     if (x.variable === "IG_USER_ID" && tieneId) return false;
@@ -174,8 +220,10 @@ export function problemasDeMarca(env: Entorno, marca: MarcaCuenta): ProblemaVari
 /** De qué secretos sale la cuenta de una marca (sin leer valores secretos). */
 export function origenCuenta(env: Entorno, marca: MarcaCuenta): OrigenCuenta {
   const n = secretosDeMarca(marca);
-  const idPropio = Boolean(valor(env, n.igUserId));
-  const tokenPropio = Boolean(valor(env, n.token));
+  // En producción, siempre los de la marca (aunque falten: lo dice problemasDeMarca).
+  const produccion = esProduccion(env);
+  const idPropio = produccion || Boolean(valor(env, n.igUserId));
+  const tokenPropio = produccion || Boolean(valor(env, n.token));
   return {
     marca,
     variableIgUserId: idPropio ? n.igUserId : "IG_USER_ID",
@@ -259,12 +307,20 @@ export function describirVariables(env: Entorno): DescripcionVariable[] {
     const v = valor(env, nombre);
     let detalle: string;
     const general = generalDe(nombre);
-    if (!v) detalle = nombre === "META_API_VERSION" ? `no definida (se usa ${VERSION_API_POR_DEFECTO})` : general ? `no definida (se usa ${general})` : "no definida";
+    if (!v) {
+      detalle = nombre === "META_API_VERSION" ? `no definida (se usa ${VERSION_API_POR_DEFECTO})`
+        : general ? (esProduccion(env) ? "no definida (en producción es obligatoria: no se usa la general)" : `no definida (se usa ${general})`)
+        : nombre === "INSTAGRAM_ENTORNO" ? `no definida (${entornoInstagram(env).entorno}: ${entornoInstagram(env).motivo})`
+        : "no definida";
+    }
     else if (secreta) {
       registrarSecreto(v);
       detalle = nombre.startsWith("IG_ACCESS_TOKEN") ? `${enmascarar(v)} (${v.length} caracteres)` : `definida (${v.length} caracteres)`;
     } else detalle = v;
-    return { nombre, presente: Boolean(v), obligatoria, detalle };
+    // En producción: obligatorias las de cada marca; las generales, no.
+    const produccion = esProduccion(env);
+    const generalPublicar = nombre === "IG_ACCESS_TOKEN" || nombre === "IG_USER_ID";
+    return { nombre, presente: Boolean(v), obligatoria: produccion ? general !== null || (obligatoria && !generalPublicar) : obligatoria, detalle };
   });
 }
 

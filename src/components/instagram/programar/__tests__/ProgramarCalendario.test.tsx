@@ -110,7 +110,7 @@ describe("CalendarioInstagram", () => {
   });
 
   it("pinta la semana con programadas, errores y publicadas en su día de Madrid", async () => {
-    envolver(<CalendarioInstagram />);
+    envolver(<CalendarioInstagram vistaInicial="semana" />);
     expect(screen.getByText("9–15 nov 2026")).toBeInTheDocument();
     const eventos = await screen.findAllByTestId("evento-instagram");
     expect(eventos.map((e) => e.getAttribute("data-estado"))).toEqual(["publicada", "programada", "error"]);
@@ -120,7 +120,7 @@ describe("CalendarioInstagram", () => {
   });
 
   it("filtra por marca y cambia a la vista de mes", async () => {
-    envolver(<CalendarioInstagram marca="touza" />);
+    envolver(<CalendarioInstagram vistaInicial="semana" marca="touza" />);
     await waitFor(() => expect(screen.getAllByTestId("evento-instagram")).toHaveLength(1));
     fireEvent.click(screen.getByRole("radio", { name: "Mes" }));
     expect(await screen.findByText("noviembre de 2026")).toBeInTheDocument();
@@ -128,12 +128,14 @@ describe("CalendarioInstagram", () => {
 
   it("ver el error y cancelar desde el menú de la pieza", async () => {
     sbFalso.rpc.mockResolvedValue({ data: { ok: true, programacion: { id: "a", estado: "cancelada" } }, error: null });
-    envolver(<CalendarioInstagram />);
+    envolver(<CalendarioInstagram vistaInicial="semana" />);
     const [, programada, conError] = await screen.findAllByTestId("evento-instagram");
 
     fireEvent.keyDown(conError, { key: "Enter" });
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Ver error" }));
-    expect(await screen.findByText("Al token le faltan permisos")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Ver qué ha pasado" }));
+    // En llano arriba; el texto de Meta, plegado en «Para Oficiosos».
+    expect(await screen.findByText("Instagram no nos deja publicar en esa cuenta.")).toBeInTheDocument();
+    expect(screen.getByText("Al token le faltan permisos").closest("details")).not.toBeNull();
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
     fireEvent.keyDown(programada, { key: "Enter" });

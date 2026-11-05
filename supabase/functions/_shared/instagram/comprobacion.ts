@@ -13,13 +13,16 @@
  *
  * Cuentas por marca: `cuentasPorMarca` dice en qué cuenta publica cada marca
  * y de qué secretos sale (los suyos, IG_USER_ID_TOUZA…, o los generales).
- * Si una marca tiene cuenta propia, se pide su perfil con su token.
+ * Si una marca tiene cuenta propia, se pide su perfil con su token. En
+ * PRODUCCIÓN (entorno.ts, entornoInstagram) cada marca exige su cuenta y su
+ * token, sin caer en los generales: lo explica la comprobación «Entorno».
  */
 import { ClienteGraph, type CuentaIg, type DatosDepuracion, type FuncionFetch, type LimitePublicacion, type PaginaConCuenta, type PerfilIg } from "./cliente.ts";
 import {
   arregloVariable,
   describirVariables,
   dondeSecreto,
+  entornoInstagram,
   leerConfigMetaMarca,
   MARCAS_CUENTA,
   origenCuenta,
@@ -28,7 +31,7 @@ import {
   type Entorno,
   type MarcaCuenta,
 } from "./entorno.ts";
-import { ErrorInstagram } from "./errores.ts";
+import { ErrorInstagram, esAppBloqueada, textoDeTipo } from "./errores.ts";
 import { mensajeSaneado, registrarSecreto, sanear, sanearProfundo } from "./secretos.ts";
 
 export type EstadoComprobacion = "ok" | "falla" | "aviso";
@@ -118,10 +121,19 @@ function fecha(segundos: number): string {
   return new Date(segundos * 1000).toISOString().replace("T", " ").slice(0, 16) + " UTC";
 }
 
-export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {}): Promise<ResultadoEstado> {
+export async function comprobarEstado(env: Entorno, depsEntrada: DependenciasEstado = {}): Promise<ResultadoEstado> {
   const c: Comprobacion[] = [];
   const noVerificado: string[] = [];
   const agregar = (x: Comprobacion) => c.push({ ...x, detalle: sanear(x.detalle), ...(x.comoArreglarlo ? { comoArreglarlo: sanear(x.comoArreglarlo) } : {}) });
+  // Si alguna llamada a Meta responde «API access blocked.» (OAuthException
+  // 200), la app entera está bloqueada: se dice así, no «faltan permisos».
+  const vigia = vigilarBloqueoApp(depsEntrada.fetch);
+  const deps: DependenciasEstado = { ...depsEntrada, fetch: vigia.fetch };
+  const anotarBloqueo = () => {
+    if (!vigia.bloqueada()) return;
+    const t = textoDeTipo("app_bloqueada");
+    agregar({ seccion: "Token", nombre: "App de Meta bloqueada", estado: "falla", detalle: `${t.mensaje} (OAuthException 200 «API access blocked.»). No es un permiso que falte en el token.`, comoArreglarlo: t.comoArreglarlo });
+  };
 
   const token = env.IG_ACCESS_TOKEN?.trim() || undefined;
   const igUserId = env.IG_USER_ID?.trim() || undefined;
@@ -142,6 +154,15 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
     return { ...v, detalle, estado, ...(comoArreglarlo ? { comoArreglarlo } : {}) };
   });
   const faltan = problemas.map((p) => p.variable);
+  const ent = entornoInstagram(env);
+  agregar({
+    seccion: "Variables",
+    nombre: "Entorno",
+    estado: "ok",
+    detalle: ent.entorno === "produccion"
+      ? `producción (${ent.motivo}): cada marca publica SOLO con su cuenta y su token (IG_USER_ID_<MARCA> + IG_ACCESS_TOKEN_<MARCA>); si le falta uno, esa marca no publica (nunca en la cuenta general ni en la de la otra marca)`
+      : `demo (${ent.motivo}): una marca sin cuenta propia publica en la general (IG_USER_ID / IG_ACCESS_TOKEN)`,
+  });
 
   const base = (): ResultadoEstado => ({
     ok: false,
@@ -160,7 +181,10 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
   if (!token || faltan.includes("IG_ACCESS_TOKEN") || faltan.includes("META_API_VERSION")) {
     agregar({ seccion: "Identidad", nombre: "Llamadas a Meta", estado: "falla", detalle: "no se hacen: falta un token utilizable o la versión de la API no es válida" });
     noVerificado.push("identidad, token y cuota (no se llamó a Meta)");
-    return sanearProfundo(base());
+    const r0 = base();
+    if (ent.entorno === "produccion" && !token) r0.cuentasPorMarca = await comprobarMarcas(env, deps, versionApi, null, agregar);
+    anotarBloqueo();
+    return sanearProfundo(r0);
   }
 
   const igValido = igUserId && /^\d+$/.test(igUserId) ? igUserId : undefined;
@@ -399,18 +423,69 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
   }
 
   // ── 5. Cuenta de cada marca ──────────────────────────────────────────────
+  const cuentasPorMarca = await comprobarMarcas(env, deps, versionApi, { igUserId: igValido ?? null, username: perfil?.username ?? encontrada?.username ?? null, perfilOk: !!perfil }, agregar);
+
+  const r = base();
+  r.cuentasPorMarca = cuentasPorMarca;
+  r.metodoVerificacion = metodo;
+  r.cuota = cuota ? cuotaDe(cuota) : null;
+  r.identidad = {
+    igUserId: igValido ?? null,
+    username: perfil?.username ?? encontrada?.username ?? null,
+    nombre: perfil?.name ?? null,
+    publicaciones: perfil?.mediaCount ?? null,
+    coincide: igValido ? (encontrada ? true : cuentasVistas.length ? false : null) : false,
+    cuentasVistas,
+  };
+  anotarBloqueo();
+  r.ok = !c.some((x) => x.estado === "falla");
+  return sanearProfundo(r);
+}
+
+/**
+ * fetch que mira cada respuesta de error de Meta (sin consumirla) y recuerda
+ * si alguna fue el bloqueo de la app (OAuthException 200 «API access blocked.»).
+ */
+export function vigilarBloqueoApp(f: FuncionFetch | undefined): { fetch: FuncionFetch; bloqueada: () => boolean } {
+  let bloqueada = false;
+  const base: FuncionFetch = f ?? ((u, i) => globalThis.fetch(u, i));
+  return {
+    bloqueada: () => bloqueada,
+    fetch: async (url, init) => {
+      const r = await base(url, init);
+      if (!r.ok && !bloqueada) {
+        try {
+          const e = ((await r.clone().json()) as { error?: { code?: number; message?: string } })?.error;
+          if (esAppBloqueada(typeof e?.code === "number" ? e.code : null, String(e?.message ?? ""))) bloqueada = true;
+        } catch {
+          /* no es JSON: no es el bloqueo */
+        }
+      }
+      return r;
+    },
+  };
+}
+
+/** Cuenta de cada marca: la general (solo en la demo) o la suya, con su perfil. */
+async function comprobarMarcas(
+  env: Entorno,
+  deps: DependenciasEstado,
+  versionApi: string,
+  general: { igUserId: string | null; username: string | null; perfilOk: boolean } | null,
+  agregar: (x: Comprobacion) => void,
+): Promise<CuentaDeMarca[]> {
   const cuentasPorMarca: CuentaDeMarca[] = [];
+  const produccion = entornoInstagram(env).entorno === "produccion";
   for (const marca of MARCAS_CUENTA) {
     const o = origenCuenta(env, marca);
     const comun = { marca, propia: o.propia, variableIgUserId: o.variableIgUserId, variableToken: o.variableToken };
     if (!o.propia) {
-      const username = perfil?.username ?? encontrada?.username ?? null;
       cuentasPorMarca.push({
         ...comun,
-        igUserId: igValido ?? null,
-        username,
-        estado: perfil ? "ok" : "falla",
-        detalle: `publica en la cuenta general (IG_USER_ID)${username ? `: @${username}` : ""}`,
+        igUserId: general?.igUserId ?? null,
+        username: general?.username ?? null,
+        estado: general?.perfilOk ? "ok" : "falla",
+        detalle: `publica en la cuenta general (IG_USER_ID)${general?.username ? `: @${general.username}` : ""}`,
       });
       continue;
     }
@@ -433,24 +508,12 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
       nombre: `Cuenta de ${x.marca === "touza" ? "Touza" : "Casa Tomás"}`,
       estado: x.estado,
       detalle: x.detalle,
-      comoArreglarlo: x.estado === "ok" ? undefined : x.propia
-        ? `Revisa ${x.variableIgUserId}${x.variableToken !== "IG_ACCESS_TOKEN" ? ` y ${x.variableToken}` : ""} (o bórralos para usar la cuenta general): ${dondeSecreto(x.variableIgUserId, env)}.`
-        : undefined,
+      comoArreglarlo: x.estado === "ok" ? undefined : produccion
+        ? `En producción esta marca necesita ${x.variableIgUserId} y ${x.variableToken}: ${dondeSecreto(x.variableIgUserId, env)}.`
+        : x.propia
+          ? `Revisa ${x.variableIgUserId}${x.variableToken !== "IG_ACCESS_TOKEN" ? ` y ${x.variableToken}` : ""} (o bórralos para usar la cuenta general): ${dondeSecreto(x.variableIgUserId, env)}.`
+          : undefined,
     });
   }
-
-  const r = base();
-  r.cuentasPorMarca = cuentasPorMarca;
-  r.metodoVerificacion = metodo;
-  r.cuota = cuota ? cuotaDe(cuota) : null;
-  r.identidad = {
-    igUserId: igValido ?? null,
-    username: perfil?.username ?? encontrada?.username ?? null,
-    nombre: perfil?.name ?? null,
-    publicaciones: perfil?.mediaCount ?? null,
-    coincide: igValido ? (encontrada ? true : cuentasVistas.length ? false : null) : false,
-    cuentasVistas,
-  };
-  r.ok = !c.some((x) => x.estado === "falla");
-  return sanearProfundo(r);
+  return cuentasPorMarca;
 }

@@ -265,7 +265,7 @@ describe("Avisos y calendario", () => {
     const hueco = await screen.findByTestId("hueco-encargo");
     expect(hueco.getAttribute("aria-label")).toMatch(/Hueco de encargo ENC-0001: Navidad/);
     expect(hueco.className).toMatch(/border-dashed/);
-    expect(hueco.className).toMatch(/border-blue-500/);
+    expect(hueco.className).toContain("border-[#1b6fc2]"); // azul «encargo» de la paleta común (estados.ts)
     fireEvent.click(hueco);
     expect(abrir).toHaveBeenCalledWith(ID_ENV);
   });

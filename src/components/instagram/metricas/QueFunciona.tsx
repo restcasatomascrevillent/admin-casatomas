@@ -34,7 +34,7 @@ function Eje({ v }: { v: EjeVista }) {
               <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-2">
                 <span className="truncate" title={g.etiqueta}>
                   {g.etiqueta}
-                  {!g.suficiente && <span className="ml-1 text-[10px]">(pocos datos)</span>}
+                  {!g.suficiente && <span className="ml-1 text-xs">(pocos datos)</span>}
                   {g.mejor && <span className="sr-only"> (el mejor)</span>}
                 </span>
                 <b className="font-semibold tabular-nums">{formatearPorcentaje(g.tasa)}</b>
@@ -96,7 +96,7 @@ export function QueFunciona({ datos, className }: QueFuncionaProps) {
               <Eje key={v.eje} v={v} />
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-xs text-muted-foreground">
             Tasa = interacciones ÷ alcance. Un grupo cuenta con {datos.minimo} publicaciones o más. Es lo mismo que lee la IA al proponer textos y campañas.
           </p>
         </div>

@@ -89,8 +89,17 @@ la práctica qué hace Instagram con un MP4 sin pista de audio.
 Una vez:
 
 1. **Usuario del trabajador**: en el panel (Super Admin → Usuarios), crear un
-   usuario `render@…` con **solo la sección Marketing** (ver y editar). El
-   trabajador entra con él: **nunca** con la clave `service_role`.
+   usuario `render@…` con **solo la sección «Instagram · Render (equipo de
+   vídeo)»** (`instagram_render`), con **Ver y Editar**, y **sin Marketing**
+   (desde la migración `20261111000000_instagram_seguridad`). El trabajador
+   entra con él: **nunca** con la clave `service_role`. Si ya existía con
+   Marketing: dale «Instagram · Render» y quítale Marketing. Por SQL:
+   ```sql
+   insert into public.user_permissions (user_id, section_key, can_view, can_edit)
+   values ('<uuid de render@…>', 'instagram_render', true, true)
+   on conflict (user_id, section_key) do update set can_view = true, can_edit = true;
+   delete from public.user_permissions where user_id = '<uuid de render@…>' and section_key = 'marketing';
+   ```
 2. **Programas**: Node 22, Git y ffmpeg (incluye ffprobe):
    ```powershell
    winget install OpenJS.NodeJS.LTS Git.Git Gyan.FFmpeg
@@ -139,7 +148,7 @@ compilar, o usar `RENDER_PAGINA` con la URL del panel publicado).
 |---|---|---|
 | `RENDER_SUPABASE_URL` | sí (o `VITE_SUPABASE_URL`) | `https://<ref>.supabase.co` del entorno (demo o producción) |
 | `RENDER_SUPABASE_ANON_KEY` | sí (o `VITE_SUPABASE_PUBLISHABLE_KEY`) | Clave **pública** del proyecto |
-| `RENDER_EMAIL`, `RENDER_PASSWORD` | sí | Usuario del panel con Marketing |
+| `RENDER_EMAIL`, `RENDER_PASSWORD` | sí | Usuario del panel con «Editar» en Instagram · Render (sin Marketing) |
 | `RENDER_PAGINA` | no | `dist` (por defecto si existe `dist/`), `vite` (sin compilar; usa las devDependencies) o la URL del panel publicado |
 | `RENDER_DISPOSITIVO` | no | Nombre que se ve en el panel («Renderizando en …»); por defecto el nombre del equipo |
 | `RENDER_INTERVALO_S` | no | Cada cuánto mira la cola (30) |
@@ -165,13 +174,33 @@ y un servicio de systemd (`Restart=always`) que ejecute
 ## Seguridad del trabajador (por qué así)
 
 - **Sin `service_role`** en el ordenador: si alguien se lo lleva, solo tiene
-  un usuario del panel con Marketing, que se puede bloquear o cambiar de
-  contraseña desde el panel (la sesión deja de valer:
+  un usuario del panel con la sección **Instagram · Render**, que se puede
+  bloquear o cambiar de contraseña desde el panel (la sesión deja de valer:
   `private.sesion_panel_permitida`).
-- La base de datos solo le deja **reclamar** trabajos, marcar su **progreso**
-  y **cerrar los suyos** (`procesado_por = auth.uid()`), y escribir en el cubo
-  `instagram-video` (RLS de Marketing). Para cerrar uno como listo, el MP4 y
-  la portada tienen que estar ya en el cubo con la ruta de **esa** pieza.
+- **Sección propia, sin Marketing** (A6 de la evaluación del 05/11/2026,
+  migración `20261111000000`). Con «Editar» en `instagram_render` la base de
+  datos solo le deja:
+  - leer la cola (trabajos pendientes y en curso) y **reclamar** uno
+    (`instagram_render_reclamar`), marcar su **progreso**, **soltarlo** y
+    **cerrar los suyos** (`procesado_por = auth.uid()`;
+    `instagram_render_permiso_trabajador`);
+  - leer la pista de audio de un trabajo suyo;
+  - **subir** al cubo `instagram-video` solo `reels/AAAA-MM/<pieza>-<8 hex del
+    trabajo>.mp4|.jpg` de un trabajo que tiene reclamado
+    (`instagram_render_puede_subir`);
+  - **borrar** solo vídeos viejos de piezas que ha renderizado y que ya no usa
+    ninguna pieza ni entrega (`instagram_render_puede_borrar`).
+
+  No puede ver piezas, métricas, campañas ni encargos, ni publicar,
+  programar, usar la IA o Drive. Para cerrar uno como listo, el MP4 y la
+  portada tienen que estar ya en el cubo con la ruta de **esa** pieza.
+- **Vídeo anterior**: al terminar, `instagram_render_terminar` devuelve en
+  `anteriores` los MP4 y portadas de renders anteriores de la misma pieza que
+  ya no usa nadie, y el trabajador los borra (`borrarAnteriores`). Lo que no
+  se pueda borrar lo recoge la limpieza diaria.
+- Una pieza **programada** (o publicándose) no cambia de vídeo: el panel no
+  deja volver a generarlo y, si un render termina entonces, la pieza no se
+  toca (`piezaAlDia: false`).
 - Se eligió esto frente a un «secreto de trabajador» porque reutiliza la
   autenticación, el bloqueo y la auditoría del panel (como `trabajos_video`) y
   no añade otro secreto que rotar.
@@ -260,8 +289,15 @@ Producción (`haqmmdfdzzatdnrrcgez`) solo después de aceptar el PR y con el
 - **Archivo en Drive de los MP4**: no se hace todavía (la subida simple de
   Drive es para ficheros pequeños; hace falta la reanudable, «por trozos»).
   Los MP4 y portadas **se quedan en el cubo** `instagram-video` tras
-  publicar; tampoco hay limpieza automática del cubo. Con ~20 MB por reel,
-  vigilar el espacio de Storage.
+  publicar, pero la **limpieza diaria** (cron `instagram-limpieza-bucket`,
+  acción «limpiar» de `instagram-programador`, migración `20261111000000`)
+  borra:
+  - los de reels publicados hace más de **30 días** (secreto opcional
+    `INSTAGRAM_DIAS_VIDEO_PUBLICADO`, 1-365; marca `video_borrado_at`);
+  - los que ya no usa ninguna pieza ni entrega de encargo (regenerados,
+    sustituidos, piezas borradas, subidas a medias) con más de 24 h.
+  Las pistas `audio/` no se tocan. Con ~20 MB por reel, vigilar igualmente el
+  espacio de Storage.
 - La programación crea el contenedor a la hora: un reel puede salir unos
   minutos tarde (la propuesta sugería crearlo 30 min antes).
 - Stories de vídeo y carruseles: no (fase 7).

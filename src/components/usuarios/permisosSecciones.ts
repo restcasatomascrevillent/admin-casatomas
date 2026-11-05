@@ -48,9 +48,11 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "cambiar las reglas, los turnos y las plantillas de correo de las reservas. Para entrar hace falta también «Ver» en Reservas.",
   gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
-  marketing: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
-  instagram_agencia:
-    "aún no se usa; con «Ver» ya acepta, entrega y comenta los encargos de Instagram como la agencia (Oficiosos).",
+  marketing:
+    "en Instagram: crear y cambiar piezas, subir fotos, usar la IA, publicar, programar, pedir encargos y generar vídeos. Con solo «Ver» se consulta. En el newsletter, aún no se usa.",
+  instagram_agencia: "aceptar, entregar y comentar los encargos de Instagram como la agencia (Oficiosos). Con solo «Ver», los consulta.",
+  instagram_render:
+    "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",
   cheques: "canjear cheques regalo y modificar la plantilla de factura.",
   tienda: "poner o quitar vinos de la tienda y cambiar sus ajustes (visible, descuento y textos).",
   facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",

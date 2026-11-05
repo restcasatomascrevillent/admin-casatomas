@@ -1,7 +1,7 @@
 /**
  * Facturas › Compras (rediseño a todo el ancho del 05/11/2026): UN buscador,
  * selector Documentos · Productos · Proveedores con contador por modo, local y
- * periodo, resumen, chips por modo, lista a todo el ancho, ficha a pantalla
+ * periodo, chips por modo, lista a todo el ancho, ficha a pantalla
  * completa con «Volver a la lista», proveedores en acordeón y saltos entre
  * fichas (producto → documento → producto).
  *
@@ -494,17 +494,16 @@ describe("Compras · filas a todo el ancho", () => {
   });
 });
 
-describe("Compras · local, periodo y resumen", () => {
+describe("Compras · local y periodo", () => {
   const grupo = (nombre: string) => screen.getByRole("group", { name: nombre });
 
-  it("Local «Touza» deja solo sus documentos (y sus proveedores) en listas, contadores y resumen", async () => {
+  it("Local «Touza» deja solo sus documentos (y sus proveedores) en listas y contadores", async () => {
     montar();
     await screen.findByText("F-100");
     fireEvent.click(within(grupo("Local")).getByRole("button", { name: "Touza" }));
     await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
     expect(numerosVisibles()).toEqual(["F-101"]);
     expect(cuenta(/^Proveedores/)).toBe("1");
-    expect(within(screen.getByRole("region", { name: /Resumen/ })).getByRole("heading", { level: 2 })).toHaveTextContent("Touza");
     fireEvent.click(within(grupo("Local")).getByRole("button", { name: "Casa Tomás" }));
     await waitFor(() => expect(cuenta(/^Documentos/)).toBe("4"));
   });
@@ -517,56 +516,6 @@ describe("Compras · local, periodo y resumen", () => {
     expect(within(listaDocs()).getByRole("button", { name: /^Septiembre 2026/ })).toHaveAttribute("aria-expanded", "true");
     expect(within(listaDocs()).queryByText("A-1")).not.toBeInTheDocument();
     expect(cuenta(/^Proveedores/)).toBe("2"); // Hielos del Norte no tiene nada en septiembre
-    expect(screen.getByRole("heading", { level: 2, name: /Septiembre 2026/ })).toBeInTheDocument();
-  });
-
-  it("resumen: gasto neto, documentos, gráfica de 12 meses y top de proveedores; tocar un mes lo filtra", async () => {
-    montar();
-    await screen.findByText("F-100");
-    const resumen = screen.getByRole("region", { name: /Resumen/ });
-    // 99 (F-100) + 99 (F-101) + 99 (A-1, sin factura); A-2 y A-3 ya están facturados.
-    const cifras = within(resumen).getByLabelText("Cifras del periodo");
-    expect(cifras).toHaveTextContent(/Gasto neto con IVA297,00\s€/);
-    expect(cifras).toHaveTextContent(/Documentos5/);
-    const meses = within(resumen).getByRole("group", { name: /Meses/ });
-    expect(within(meses).getAllByRole("button")).toHaveLength(12);
-    const top = within(resumen).getByRole("list", { name: "Top 10 proveedores por gasto" });
-    expect(within(top).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      expect.stringContaining("Pescados Marta S.L."),
-      expect.stringContaining("Bodega Campoluz"),
-    ]);
-
-    fireEvent.click(within(meses).getByRole("button", { name: /^Agosto 2026/ }));
-    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
-    expect(screen.getByRole("button", { name: "Solo Agosto 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
-    expect(within(listaDocs()).getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
-    // Otro toque en el mismo mes lo quita.
-    fireEvent.click(within(meses).getByRole("button", { name: /^Agosto 2026/ }));
-    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("5"));
-  });
-
-  it("el resumen se pliega y se recuerda", async () => {
-    montar();
-    await screen.findByText("F-100");
-    const cabecera = () => screen.getByRole("button", { name: /^Resumen/ });
-    expect(cabecera()).toHaveAttribute("aria-expanded", "true");
-    fireEvent.click(cabecera());
-    expect(cabecera()).toHaveAttribute("aria-expanded", "false");
-    expect(cabecera()).toHaveTextContent(/297,00\s€ con IVA · 5 documentos/);
-    cleanup();
-    montar();
-    await screen.findByText("F-100");
-    expect(cabecera()).toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("tocar un proveedor del top lo abre desplegado en Proveedores", async () => {
-    montar();
-    await screen.findByText("F-100");
-    const top = screen.getByRole("list", { name: "Top 10 proveedores por gasto" });
-    fireEvent.click(within(top).getByRole("button", { name: /Bodega Campoluz/ }));
-    expect(modo(/^Proveedores/)).toHaveAttribute("aria-pressed", "true");
-    const provs = await screen.findByTestId("lista-proveedores-compras");
-    expect(within(provs).getByRole("button", { name: /^Bodega Campoluz/ })).toHaveAttribute("aria-expanded", "true");
   });
 
   it("abonos: chip «Abonos», signo menos y título «Abono» en la ficha", async () => {

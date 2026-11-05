@@ -16,12 +16,28 @@
  * «carta:<id del plato>» y tipo «plato». Sus medidas reales se apuntan al
  * cargar la miniatura (naturalWidth/naturalHeight, anotarMedidasCarta) y se
  * preparan igual (instagram-drive → preparar con origen «carta»).
+ *
+ * Vinos de la carta (desde el 05/11/2026): los vinos activos con foto de la
+ * marca (tabla "Vinos", bucket «vinos») salen con id «vino:<id del vino>» y
+ * tipo «bebida»; sus medidas se apuntan con la clave «vino:<id>» y se preparan
+ * con origen «vino».
  */
 import { useMemo } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { fotoDesdeDrive, fotoPreparable, fotosDe, fotosDesdePlatos, type FilaPlatoFoto, type FormatoId, type Foto, type MarcaId } from "@/lib/instagram";
-import { listarFotosDrive, prepararFotoCarta, prepararFotoDrive, type FotoPreparada } from "./api";
+import {
+  fotoDesdeDrive,
+  fotoPreparable,
+  fotosDe,
+  fotosDesdePlatos,
+  fotosDesdeVinos,
+  type FilaPlatoFoto,
+  type FilaVinoFoto,
+  type FormatoId,
+  type Foto,
+  type MarcaId,
+} from "@/lib/instagram";
+import { listarFotosDrive, prepararFotoOrigen, type FotoPreparada } from "./api";
 
 /** Prefijo de las claves de React Query de la biblioteca de Drive. */
 export const CLAVE_FOTOS = ["instagram_drive_fotos"] as const;
@@ -30,6 +46,7 @@ export const CLAVE_PREPARADA = ["instagram_drive_preparada"] as const;
 /** Clave de la copia preparada: el id de la foto («drive:…» o «carta:…»). */
 export const clavePreparada = (idFoto: string) => [...CLAVE_PREPARADA, idFoto] as const;
 export const claveFotosCarta = (marca: MarcaId) => ["instagram_carta_fotos", marca] as const;
+export const claveFotosVinos = (marca: MarcaId) => ["instagram_vinos_fotos", marca] as const;
 /** Medidas reales de las fotos de la carta ya vistas (por id de plato). */
 export const CLAVE_MEDIDAS_CARTA = ["instagram_carta_medidas"] as const;
 type MedidasCarta = Record<string, { ancho: number; alto: number }>;
@@ -58,6 +75,27 @@ export function usePlatosConFoto(marca: MarcaId) {
         .limit(500);
       if (error) throw error;
       return (data ?? []) as FilaPlatoFoto[];
+    },
+    staleTime: 5 * 60_000,
+    retry: 1,
+  });
+}
+
+/** Vinos activos con foto de la marca (tabla "Vinos", como el usuario: decide la RLS). */
+export function useVinosConFoto(marca: MarcaId) {
+  return useQuery({
+    queryKey: claveFotosVinos(marca),
+    queryFn: async (): Promise<FilaVinoFoto[]> => {
+      const { data, error } = await supabase
+        .from("Vinos")
+        .select("id,nombre,denominacion_origen,imagen_url,activado,restaurante,touza")
+        .eq("activado", true)
+        .eq(marca === "touza" ? "touza" : "restaurante", true)
+        .not("imagen_url", "is", null)
+        .order("nombre", { ascending: true })
+        .limit(500);
+      if (error) throw error;
+      return (data ?? []) as FilaVinoFoto[];
     },
     staleTime: 5 * 60_000,
     retry: 1,
@@ -105,8 +143,10 @@ export function useFotosInstagram(marca: MarcaId, formato?: FormatoId) {
   const consulta = useFotosDrive(marca);
   const platos = usePlatosConFoto(marca);
   const medidas = useMedidasCarta();
+  const vinos = useVinosConFoto(marca);
   const carta = useMemo(() => fotosDesdePlatos(platos.data ?? [], marca, medidas), [platos.data, marca, medidas]);
-  const catalogo = useMemo(() => [...(consulta.data?.fotos ?? []), ...carta], [consulta.data, carta]);
+  const deVinos = useMemo(() => fotosDesdeVinos(vinos.data ?? [], marca, medidas), [vinos.data, marca, medidas]);
+  const catalogo = useMemo(() => [...(consulta.data?.fotos ?? []), ...carta, ...deVinos], [consulta.data, carta, deVinos]);
   const fotos = useMemo(() => fotosDe(marca, formato, catalogo), [marca, formato, catalogo]);
   return {
     fotos,
@@ -116,8 +156,8 @@ export function useFotosInstagram(marca: MarcaId, formato?: FormatoId) {
     cargando: consulta.isLoading,
     /** Error de Google Drive. */
     error: consulta.error as Error | null,
-    cargandoCarta: platos.isLoading,
-    errorCarta: platos.error as Error | null,
+    cargandoCarta: platos.isLoading || vinos.isLoading,
+    errorCarta: (platos.error ?? vinos.error) as Error | null,
   };
 }
 
@@ -141,7 +181,7 @@ export function useFotoPreparada(marca: MarcaId, idFoto: string, catalogo: reado
   const base = catalogo.find((f) => f.id === idFoto) ?? null;
   const consulta = useQuery({
     queryKey: clavePreparada(idPreparable ?? ""),
-    queryFn: () => (origen?.origen === "carta" ? prepararFotoCarta(marca, origen.id) : prepararFotoDrive(marca, origen!.id)),
+    queryFn: () => prepararFotoOrigen(marca, origen!),
     enabled: !!origen && !!base && !base.problema,
     staleTime: VIDA_PREPARADA_MS,
     gcTime: VIDA_PREPARADA_MS,
@@ -154,5 +194,5 @@ export function useFotoPreparada(marca: MarcaId, idFoto: string, catalogo: reado
     const foto: Foto = { ...base, ruta: consulta.data.ruta, ancho, alto };
     return { foto, ruta: consulta.data.ruta, preparada: { id: base.id, url: consulta.data.url, ancho, alto, tipo: base.tipo, marca: base.marca } };
   }, [idPreparable, base, consulta.data]);
-  return { esDrive: origen?.origen === "drive", esCarta: origen?.origen === "carta", lista, preparando: !!idPreparable && consulta.isLoading, error: consulta.error as Error | null };
+  return { esDrive: origen?.origen === "drive", esCarta: origen?.origen === "carta", esVino: origen?.origen === "vino", lista, preparando: !!idPreparable && consulta.isLoading, error: consulta.error as Error | null };
 }

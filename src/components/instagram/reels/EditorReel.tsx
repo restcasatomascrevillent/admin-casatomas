@@ -389,7 +389,7 @@ function Campo({ id, etiqueta, children, ayuda }: { id: string; etiqueta: string
         {etiqueta}
       </Label>
       {children}
-      {ayuda && <span className="text-[11px] text-muted-foreground">{ayuda}</span>}
+      {ayuda && <span className="text-xs text-muted-foreground">{ayuda}</span>}
     </div>
   );
 }

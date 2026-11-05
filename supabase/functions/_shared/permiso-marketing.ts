@@ -23,7 +23,12 @@ export type ResultadoPermiso =
 
 export const SECCION_MARKETING = "marketing";
 
-export type ModoPermiso = "leer" | "escribir";
+/**
+ * «escribir» = can_write_section (hoy mira «Ver», a propósito, en todo el
+ * panel); «editar» = can_edit_section («Editar» de verdad: Instagram desde
+ * 20261111000000); «leer» = can_read_section.
+ */
+export type ModoPermiso = "leer" | "escribir" | "editar";
 
 export async function comprobarPermisoSeccion(
   cliente: ClientePermiso,
@@ -35,7 +40,7 @@ export async function comprobarPermisoSeccion(
   const user = data?.user ?? null;
   if (errorUsuario || !user) return { ok: false, status: 401, error: "Unauthorized" };
 
-  const fn = modo === "escribir" ? "can_write_section" : "can_read_section";
+  const fn = modo === "editar" ? "can_edit_section" : modo === "escribir" ? "can_write_section" : "can_read_section";
   const { data: permitido, error } = await cliente.rpc(fn, { _section: seccion });
   if (error) return { ok: false, status: 500, error: "No se pudo comprobar el permiso" };
   if (permitido !== true) return { ok: false, status: 403, error: mensajeSinPermiso };

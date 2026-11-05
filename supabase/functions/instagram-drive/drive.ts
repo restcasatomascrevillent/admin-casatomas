@@ -2,8 +2,9 @@
  * Edge Function instagram-drive — biblioteca de fotos de Marketing › Instagram
  * en Google Drive (marketing/instagram/fotos/<marca>). Ver docs/instagram-fotos.md.
  *
- * Autorización: JWT de Supabase + can_write_section('marketing') (igual que
- * instagram-publicar e instagram-estado). Supabase (tabla instagram_fotos y
+ * Autorización: JWT de Supabase + «Ver» en Marketing (can_read_section) para
+ * listar y ver miniaturas; «Editar» (can_edit_section) para preparar y subir
+ * (403 si no, desde 20261111000000). Supabase (tabla instagram_fotos y
  * bucket «instagram») se usa COMO EL USUARIO: clave pública + su JWT; nunca
  * service_role. Drive, con los secretos de Google (ver _shared/instagram/drive.ts).
  *
@@ -37,6 +38,10 @@
  *     (no se descarga la que hay en la fila) y no se siguen redirecciones.
  *     No necesita los secretos de Google.
  *
+ *   POST { "accion": "preparar", "origen": "vino", "marca": …, "vinoId": "<id>" }
+ *     Igual que «carta», pero con la foto de un vino de la carta (tabla
+ *     "Vinos", bucket público «vinos» de ESTE Supabase).
+ *
  *   Seguridad: solo se leen ficheros que estén DENTRO de la carpeta de la
  *   marca (por `parents`), aunque el token pueda ver más (facturas, etc.).
  *
@@ -62,6 +67,8 @@ import { CORS, json, jsonAuth, leerJson, opciones } from "../_shared/instagram/h
 import { registro, sanear } from "../_shared/instagram/secretos.ts";
 import {
   autorizarMarketing,
+  puedeEditarMarketing,
+  SIN_PERMISO_EDITAR,
   borrarObjetos,
   ErrorSupabase,
   insertarFotoDrive,
@@ -162,7 +169,9 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
   if (request.method === "OPTIONS") return opciones();
   if (request.method !== "GET" && request.method !== "POST") return json(405, { ok: false, error: "Método no permitido" });
   const env = deps.env ?? entornoDeno();
-  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch });
+  // Ver fotos (listar, miniatura) basta con «Ver»; copiarlas al cubo
+  // (preparar) o subirlas a Drive exige «Editar» (20261111000000).
+  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "leer" });
   if ("motivo" in auth) {
     if (auth.estado >= 500) registro("error", ETIQUETA, "autorización", { motivo: auth.motivo });
     return jsonAuth(auth.estado, auth.motivo);
@@ -181,10 +190,16 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
     if (typeof cuerpo.accion === "string") accion = cuerpo.accion;
   }
 
-  // La foto de la carta no pasa por Google Drive: funciona aunque falten sus secretos.
-  if (request.method === "POST" && accion === "preparar" && cuerpo.origen === "carta") {
+  if (request.method === "POST" && (accion === "preparar" || accion === "subir") && !(await puedeEditarMarketing(s))) {
+    return jsonAuth(403, SIN_PERMISO_EDITAR);
+  }
+
+  // La foto de la carta (platos o vinos) no pasa por Google Drive: funciona aunque falten sus secretos.
+  if (request.method === "POST" && accion === "preparar" && (cuerpo.origen === "carta" || cuerpo.origen === "vino")) {
     try {
-      return await prepararCarta(s, cuerpo.marca, cuerpo.platoId, deps);
+      return cuerpo.origen === "vino"
+        ? await prepararCarta(s, cuerpo.marca, cuerpo.vinoId, deps, CARTA_VINOS)
+        : await prepararCarta(s, cuerpo.marca, cuerpo.platoId, deps);
     } catch (e) {
       if (e instanceof ErrorSupabase) {
         registro("error", ETIQUETA, "Supabase (carta)", e);
@@ -273,7 +288,6 @@ async function preparar(s: Sesion, c: ConfigDriveInstagram, marca: unknown, id: 
 }
 
 const RE_ID_PLATO = /^[A-Za-z0-9_-]{1,100}$/;
-const PREFIJO_PLATOS = "/storage/v1/object/public/platos/";
 
 /**
  * Ruta en el bucket público «platos» de una URL de NUESTRO Supabase, o null
@@ -281,6 +295,12 @@ const PREFIJO_PLATOS = "/storage/v1/object/public/platos/";
  * Es la misma regla que rutaPlatoDeUrl de src/lib/instagram/fotos.ts.
  */
 export function rutaPlatoDeUrl(url: unknown, supabaseUrl: string): string | null {
+  return rutaBucketDeUrl(url, supabaseUrl, "platos");
+}
+
+/** Igual que rutaPlatoDeUrl, pero para cualquier bucket público («platos», «vinos»). */
+export function rutaBucketDeUrl(url: unknown, supabaseUrl: string, bucket: string): string | null {
+  const prefijo = `/storage/v1/object/public/${bucket}/`;
   if (typeof url !== "string" || url.length > 1000 || !supabaseUrl) return null;
   let u: URL;
   let base: URL;
@@ -291,8 +311,8 @@ export function rutaPlatoDeUrl(url: unknown, supabaseUrl: string): string | null
     return null;
   }
   if (u.origin !== base.origin || u.username || u.password) return null;
-  if (!u.pathname.startsWith(PREFIJO_PLATOS)) return null;
-  const ruta = u.pathname.slice(PREFIJO_PLATOS.length);
+  if (!u.pathname.startsWith(prefijo)) return null;
+  const ruta = u.pathname.slice(prefijo.length);
   if (!ruta || ruta.includes("..") || ruta.includes("%") || ruta.includes("//") || !/^[A-Za-z0-9_./ -]+$/.test(ruta)) return null;
   return ruta;
 }
@@ -329,34 +349,44 @@ interface FilaPlato {
   touza: boolean | null;
 }
 
-/** Copia la foto de un plato de la carta a tmp/ (ver la cabecera). */
-async function prepararCarta(s: Sesion, marca: unknown, platoId: unknown, deps: DependenciasDrive): Promise<Response> {
-  if (!esMarcaDrive(marca) || typeof platoId !== "string" || !RE_ID_PLATO.test(platoId)) {
-    return json(400, { ok: false, error: "Faltan «marca» o «platoId» válidos" });
+/** De dónde sale la foto de la carta: tabla, bucket público y cómo se llama en los mensajes. */
+interface OrigenCarta {
+  tabla: "Platos" | "Vinos";
+  bucket: "platos" | "vinos";
+  campo: "platoId" | "vinoId";
+  nombre: "plato" | "vino";
+}
+const CARTA_PLATOS: OrigenCarta = { tabla: "Platos", bucket: "platos", campo: "platoId", nombre: "plato" };
+const CARTA_VINOS: OrigenCarta = { tabla: "Vinos", bucket: "vinos", campo: "vinoId", nombre: "vino" };
+
+/** Copia la foto de un plato (o de un vino) de la carta a tmp/ (ver la cabecera). */
+async function prepararCarta(s: Sesion, marca: unknown, id: unknown, deps: DependenciasDrive, o: OrigenCarta = CARTA_PLATOS): Promise<Response> {
+  if (!esMarcaDrive(marca) || typeof id !== "string" || !RE_ID_PLATO.test(id)) {
+    return json(400, { ok: false, error: `Faltan «marca» o «${o.campo}» válidos` });
   }
-  // Con el JWT del usuario: decide la RLS de "Platos".
-  const r = await s.fetch(`${s.sb.url}/rest/v1/Platos?id=eq.${encodeURIComponent(platoId)}&select=id,imagen_url,activado,restaurante,touza`, {
+  // Con el JWT del usuario: decide la RLS de la tabla.
+  const r = await s.fetch(`${s.sb.url}/rest/v1/${o.tabla}?id=eq.${encodeURIComponent(id)}&select=id,imagen_url,activado,restaurante,touza`, {
     headers: { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json" },
     signal: AbortSignal.timeout(15_000),
   });
-  if (!r.ok) throw new ErrorSupabase(`No se pudo leer el plato (${r.status})`, r.status);
+  if (!r.ok) throw new ErrorSupabase(`No se pudo leer el ${o.nombre} (${r.status})`, r.status);
   const filas = (await r.json().catch(() => [])) as FilaPlato[];
   const plato = Array.isArray(filas) ? filas[0] : undefined;
-  if (!plato) return json(404, { ok: false, error: "Ese plato no existe (o no tienes permiso para verlo)" });
+  if (!plato) return json(404, { ok: false, error: `Ese ${o.nombre} no existe (o no tienes permiso para verlo)` });
   const deMarca = marca === "touza" ? plato.touza === true : plato.restaurante === true;
-  if (!deMarca || plato.activado !== true) return json(404, { ok: false, error: "Ese plato no está activo en la carta de esta marca" });
-  const ruta = rutaPlatoDeUrl(plato.imagen_url, s.sb.url);
-  if (!ruta) return json(400, { ok: false, error: "La foto de ese plato no está en el bucket «platos» de este Supabase" });
+  if (!deMarca || plato.activado !== true) return json(404, { ok: false, error: `Ese ${o.nombre} no está activo en la carta de esta marca` });
+  const ruta = rutaBucketDeUrl(plato.imagen_url, s.sb.url, o.bucket);
+  if (!ruta) return json(400, { ok: false, error: `La foto de ese ${o.nombre} no está en el bucket «${o.bucket}» de este Supabase` });
 
   // Se reconstruye la URL (nunca la de la fila) y no se siguen redirecciones.
-  const origenUrl = `${s.sb.url}${PREFIJO_PLATOS}${ruta.split("/").map(encodeURIComponent).join("/")}`;
+  const origenUrl = `${s.sb.url}/storage/v1/object/public/${o.bucket}/${ruta.split("/").map(encodeURIComponent).join("/")}`;
   const d = await s.fetch(origenUrl, { redirect: "error", signal: AbortSignal.timeout(20_000) });
-  if (!d.ok) return json(502, { ok: false, error: `No se pudo descargar la foto del plato (${d.status})` });
+  if (!d.ok) return json(502, { ok: false, error: `No se pudo descargar la foto del ${o.nombre} (${d.status})` });
   const tipo = (d.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-  if (!TIPOS_IMAGEN[tipo]) return json(422, { ok: false, error: `La foto del plato es ${tipo || "de un tipo desconocido"}; solo valen JPEG, PNG o WebP` });
-  if (Number(d.headers.get("content-length") ?? "0") > MAX_BYTES_FOTO) return json(422, { ok: false, error: "La foto del plato pesa más de 8 MB" });
+  if (!TIPOS_IMAGEN[tipo]) return json(422, { ok: false, error: `La foto del ${o.nombre} es ${tipo || "de un tipo desconocido"}; solo valen JPEG, PNG o WebP` });
+  if (Number(d.headers.get("content-length") ?? "0") > MAX_BYTES_FOTO) return json(422, { ok: false, error: `La foto del ${o.nombre} pesa más de 8 MB` });
   const bytes = new Uint8Array(await d.arrayBuffer());
-  if (bytes.byteLength > MAX_BYTES_FOTO) return json(422, { ok: false, error: "La foto del plato pesa más de 8 MB" });
+  if (bytes.byteLength > MAX_BYTES_FOTO) return json(422, { ok: false, error: `La foto del ${o.nombre} pesa más de 8 MB` });
 
   const destino = `tmp/${(deps.nuevoId ?? (() => crypto.randomUUID()))()}.${TIPOS_IMAGEN[tipo]}`;
   await subirObjeto(s, destino, bytes, tipo);

@@ -51,7 +51,7 @@ function falso(e: Escenario = {}) {
     const l = { url, metodo, cabeceras, cuerpo };
     llamadas.push(l);
     if (url === `${SB}/auth/v1/user`) return resp(...(e.usuario ?? [200, { id: "usuario-1" }]));
-    if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, e.permiso ?? true);
+    if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, e.permiso ?? true);
     if (url.startsWith(`${SB}/rest/v1/instagram_piezas`)) {
       if (metodo === "GET") return resp(200, fila ? [fila] : []);
       if (metodo === "POST") {
@@ -181,13 +181,13 @@ describe("POST /api/instagram-render", () => {
     expect((await manejarRender(peticion({ pieza: PIEZA }), { env: ENV_SB, fetch: f, renderizar: jpgFalso })).status).toBe(401);
   });
 
-  it("403 sin permiso de Marketing (can_write_section('marketing') = false)", async () => {
+  it("403 sin permiso de Marketing (can_edit_section('marketing') = false)", async () => {
     const { f, llamadas } = falso({ permiso: false });
     const renderizar = vi.fn(jpgFalso);
     const r = await manejarRender(peticion({ pieza: PIEZA }), { env: ENV_SB, fetch: f, renderizar });
     expect(r.status).toBe(403);
     expect(renderizar).not.toHaveBeenCalled();
-    const permiso = llamadas.find((l) => l.url.endsWith("can_write_section"))!;
+    const permiso = llamadas.find((l) => l.url.endsWith("can_edit_section"))!;
     expect(JSON.parse(permiso.cuerpo!)).toEqual({ _section: "marketing" });
     expect(permiso.cabeceras.authorization).toBe(`Bearer ${JWT}`);
   });

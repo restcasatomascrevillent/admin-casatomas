@@ -5,6 +5,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { manejarEstado } from "../estado.ts";
+import { mapearErrorGraph } from "../../_shared/instagram/errores.ts";
 import { olvidarSecretos } from "../../_shared/instagram/secretos.ts";
 import { olvidarTokenDrive } from "../../_shared/google-drive.ts";
 import { olvidarCarpetasDrive } from "../../_shared/instagram/drive.ts";
@@ -168,5 +169,41 @@ describe("Edge Function instagram-estado", () => {
       expect(nombre(j, "Token de Google")).toMatchObject({ estado: "falla", detalle: expect.stringMatching(/invalid_client/) });
       expect(texto).not.toContain(SECRETO_GOOGLE);
     });
+  });
+});
+
+describe("Meta bloquea la app entera (OAuthException 200 «API access blocked.»)", () => {
+  const ARREGLO =
+    "Meta ha bloqueado el acceso de la app a la API. Revisa en developers.facebook.com las Acciones requeridas, las alertas y tu cuenta de desarrollador; si sigue, crea una app nueva y cambia META_APP_ID, META_APP_SECRET e IG_ACCESS_TOKEN";
+  const bloqueo = () => resp(400, { error: { message: "API access blocked.", type: "OAuthException", code: 200, fbtrace_id: "AbC" } });
+
+  it("el mapeo lo clasifica como «app bloqueada», no reintentable, y no como permisos", () => {
+    const e = mapearErrorGraph({ estadoHttp: 400, cuerpo: { error: { message: "API access blocked.", type: "OAuthException", code: 200 } } });
+    expect(e.tipo).toBe("app_bloqueada");
+    expect(e.reintentable).toBe(false);
+    expect(e.comoArreglarlo).toBe(ARREGLO);
+    expect(e.message).toMatch(/^Meta ha bloqueado el acceso de la app a la API/);
+    expect(e.message).not.toMatch(/faltan permisos/);
+    // Otro error 200 sigue siendo de permisos.
+    expect(mapearErrorGraph({ estadoHttp: 403, cuerpo: { error: { message: "Permissions error", code: 200 } } }).tipo).toBe("permisos");
+  });
+
+  it("«Comprobar» lo detecta y lo dice así (sin hablar de permisos que faltan)", async () => {
+    const s = falso({ meta: () => bloqueo() });
+    const r = await manejarEstado(peticion(null, `Bearer ${JWT}`, "GET"), { env: { ...ENV_META, META_APP_SECRET: SECRETO_APP }, fetch: s.f, ...depsRapidas });
+    const b = await r.json();
+    expect(r.status).toBe(200);
+    expect(b.ok).toBe(false);
+    const app = b.comprobaciones.find((x: { nombre: string }) => x.nombre === "App de Meta bloqueada");
+    expect(app).toMatchObject({ estado: "falla", comoArreglarlo: ARREGLO });
+    expect(app.detalle).toMatch(/API access blocked/);
+    expect(JSON.stringify(b.comprobaciones)).not.toMatch(/Al token le faltan permisos/);
+  });
+
+  it("sin el bloqueo, no aparece", async () => {
+    const s = falso({ meta: (l) => (l.url.includes("/me/assigned_instagram_accounts") ? resp(200, { data: [] }) : resp(400, { error: { message: "Invalid", code: 100 } })) });
+    const r = await manejarEstado(peticion(null, `Bearer ${JWT}`, "GET"), { env: ENV_META, fetch: s.f, ...depsRapidas });
+    const b = await r.json();
+    expect(b.comprobaciones.some((x: { nombre: string }) => x.nombre === "App de Meta bloqueada")).toBe(false);
   });
 });

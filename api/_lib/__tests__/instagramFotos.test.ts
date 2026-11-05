@@ -24,7 +24,7 @@ function falso(filasFoto: unknown[] | [number, unknown]) {
     const url = String(entrada);
     const metodo = (init.method ?? "GET").toUpperCase();
     if (url === `${SB}/auth/v1/user`) return resp(200, { id: "usuario-1" });
-    if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, true);
+    if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, true);
     if (url.startsWith(`${SB}/rest/v1/instagram_fotos`)) {
       return typeof filasFoto[0] === "number" ? resp(filasFoto[0] as number, filasFoto[1]) : resp(200, filasFoto);
     }

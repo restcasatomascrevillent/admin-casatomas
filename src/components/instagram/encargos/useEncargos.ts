@@ -8,7 +8,11 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
 import { CLAVE_AJUSTES, CLAVE_ENCARGOS, claveDetalle, claveHuecos, leerAjustes, leerDetalle, leerHuecos, listarEncargos } from "./api";
 import { huecosPorDia, hoyMadrid, pendientes, type Roles } from "./logica";
 
-/** Quién es el usuario para los encargos (misma regla que can_write_section: hoy basta «Ver»). */
+/**
+ * Quién es el usuario para los encargos (qué lado VE). Actuar (enviar, aceptar,
+ * entregar, comentar…) exige además «Editar» en su sección desde 20261111000000:
+ * si falta, la RPC responde con un mensaje que lo dice.
+ */
 export function useRolesEncargos(): Roles & { cargando: boolean } {
   const r = useCanAccessSection("marketing");
   const a = useCanAccessSection("instagram_agencia");

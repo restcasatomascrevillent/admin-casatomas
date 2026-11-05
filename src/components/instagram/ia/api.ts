@@ -7,6 +7,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { auditDeviceId } from "@/lib/audit-device";
 import type { FormatoId, MarcaId } from "@/lib/instagram";
+import type { PeticionMontar, RespuestaMontar } from "@/lib/instagram/montar";
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
 const CLAVE_PUBLICA = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "");
@@ -29,8 +30,13 @@ export interface ContextoPiezaIA {
   formato: FormatoId;
   /** id de la plantilla (p. ej. «ct-foto-titular»). */
   plantilla: string;
-  /** id de la foto; si es «carta:<id>», la IA usa ese plato de la carta. */
+  /** id de la foto; si es «carta:<id>» o «vino:<id>», la IA usa ese plato o vino de la carta. */
   foto?: string | null;
+  /**
+   * URL de la copia ya preparada de la foto (tmp/<uuid> del bucket «instagram»,
+   * `fotoPreparada.url`): la IA VE la foto. El servidor rechaza cualquier otra.
+   */
+  fotoUrl?: string | null;
   /** id del plato de la tabla "Platos" (si no viene, se saca de la foto «carta:<id>»). */
   platoId?: string | null;
   /** id de la pieza en instagram_piezas, si ya está guardada (para el registro). */
@@ -53,10 +59,27 @@ export interface VarianteRotulosIA extends RotulosIA {
   avisos: string[];
 }
 
+/** Qué ha visto la IA en la foto. */
+export interface FotoVistaIA {
+  tipo: string;
+  queSeVe: string;
+  textoLegible: string;
+  altText: string;
+}
+
+/** Los rótulos de la pieza son de un ejemplo o no casan con la foto: aviso y, si los hay, unos propuestos. */
+export interface RotulosAvisoIA {
+  aviso: string;
+  propuestos: RotulosIA | null;
+}
+
 interface RespuestaBase {
   sugerenciaId: string | null;
   modelo: string;
   plato: { id: string; nombre: string } | null;
+  vino: { id: string; nombre: string } | null;
+  foto: FotoVistaIA | null;
+  rotulos: RotulosAvisoIA | null;
   descartadas: Array<{ motivos: string[] }>;
   avisos: string[];
 }
@@ -106,12 +129,30 @@ async function tokenSesion(): Promise<string | null> {
 const textos = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 const texto = (v: unknown): string => (typeof v === "string" ? v : "");
 
+const CAMPOS_ROTULO: CampoRotuloIA[] = ["antetitulo", "titular", "cita", "cta", "pie"];
+
+function rotulosDe(v: unknown): RotulosIA {
+  const o = (v ?? {}) as Record<string, unknown>;
+  const r: RotulosIA = {};
+  for (const k of CAMPOS_ROTULO) if (typeof o[k] === "string" && o[k]) r[k] = o[k] as string;
+  return r;
+}
+
 function normalizarBase(c: Record<string, unknown>): RespuestaBase {
   const plato = c.plato as { id?: unknown; nombre?: unknown } | null;
+  const vino = c.vino as { id?: unknown; nombre?: unknown } | null;
+  const foto = c.foto as Record<string, unknown> | null;
+  const rotulos = c.rotulos as { aviso?: unknown; propuestos?: unknown } | null;
   return {
     sugerenciaId: typeof c.sugerenciaId === "string" ? c.sugerenciaId : null,
     modelo: texto(c.modelo),
     plato: plato && typeof plato.id === "string" ? { id: plato.id, nombre: texto(plato.nombre) } : null,
+    vino: vino && typeof vino.id === "string" ? { id: vino.id, nombre: texto(vino.nombre) } : null,
+    foto: foto && typeof foto === "object" ? { tipo: texto(foto.tipo), queSeVe: texto(foto.queSeVe), textoLegible: texto(foto.textoLegible), altText: texto(foto.altText) } : null,
+    rotulos:
+      rotulos && typeof rotulos.aviso === "string"
+        ? { aviso: rotulos.aviso, propuestos: rotulos.propuestos && typeof rotulos.propuestos === "object" ? rotulosDe(rotulos.propuestos) : null }
+        : null,
     descartadas: Array.isArray(c.descartadas) ? c.descartadas.map((d) => ({ motivos: textos((d as { motivos?: unknown })?.motivos) })) : [],
     avisos: textos(c.avisos),
   };
@@ -162,6 +203,7 @@ function cuerpoComun(ctx: ContextoPiezaIA, p: PeticionIA): Record<string, unknow
     formato: ctx.formato,
     plantilla: ctx.plantilla,
     foto: ctx.foto ?? undefined,
+    fotoUrl: ctx.fotoUrl || undefined,
     platoId: ctx.platoId ?? undefined,
     piezaId: ctx.piezaId ?? undefined,
     textos: ctx.textos ?? {},
@@ -190,14 +232,51 @@ export async function sugerirTexto(ctx: ContextoPiezaIA, p: PeticionIA, opts?: O
 /** Rótulos cortos para la plantilla (solo los campos que usa), ya validados en el servidor. */
 export async function sugerirRotulos(ctx: ContextoPiezaIA, p: PeticionIA, opts?: OpcionesLlamada): Promise<RespuestaRotulosIA> {
   const c = await llamar({ accion: "sugerir_rotulos", ...cuerpoComun(ctx, p) }, opts);
-  const campos: CampoRotuloIA[] = ["antetitulo", "titular", "cita", "cta", "pie"];
-  const variantes = (Array.isArray(c.variantes) ? c.variantes : []).map((v) => {
-    const o = (v ?? {}) as Record<string, unknown>;
-    const r: VarianteRotulosIA = { avisos: textos(o.avisos) };
-    for (const k of campos) if (typeof o[k] === "string" && o[k]) r[k] = o[k] as string;
-    return r;
-  });
+  const variantes = (Array.isArray(c.variantes) ? c.variantes : []).map((v): VarianteRotulosIA => ({
+    ...rotulosDe(v),
+    avisos: textos((v as { avisos?: unknown } | null)?.avisos),
+  }));
   return { ...normalizarBase(c), variantes };
+}
+
+/** Respuesta de «Montar con IA» (contrato en src/lib/instagram/montar.ts) más el registro de la sugerencia. */
+export interface RespuestaMontarIA extends RespuestaMontar {
+  sugerenciaId: string | null;
+  modelo: string;
+  descartadas: Array<{ motivos: string[] }>;
+}
+
+/**
+ * «Montar con IA»: de 1 a 10 fotos ya preparadas (URL tmp/ de nuestro bucket,
+ * o de los buckets «platos» / «vinos») → publicación montada: formato, orden,
+ * plantilla, rótulos y texto alternativo de cada imagen, caption, hashtags,
+ * hora sugerida, resumen y avisos. Solo propone.
+ */
+export async function montarPieza(p: Omit<PeticionMontar, "accion">, opts?: OpcionesLlamada): Promise<RespuestaMontarIA> {
+  const c = await llamar({ accion: "montar_pieza", ...p, indicacion: p.indicacion?.trim() || undefined }, opts);
+  const diapositivas = (Array.isArray(c.diapositivas) ? c.diapositivas : []).map((d) => {
+    const o = (d ?? {}) as Record<string, unknown>;
+    return {
+      foto: texto(o.foto),
+      plantilla: texto(o.plantilla),
+      datos: o.datos && typeof o.datos === "object" ? (o.datos as Record<string, unknown>) : {},
+      altText: texto(o.altText),
+    };
+  });
+  const formato = c.formato === "carrusel" || c.formato === "story" ? c.formato : "post";
+  return {
+    ok: true,
+    formato,
+    diapositivas,
+    caption: texto(c.caption),
+    hashtags: textos(c.hashtags),
+    horaSugerida: typeof c.horaSugerida === "string" ? c.horaSugerida : null,
+    resumen: texto(c.resumen),
+    avisos: textos(c.avisos),
+    sugerenciaId: typeof c.sugerenciaId === "string" ? c.sugerenciaId : null,
+    modelo: texto(c.modelo),
+    descartadas: normalizarBase(c).descartadas,
+  };
 }
 
 // La tabla es nueva (20261108000000_instagram_ia.sql) y aún no está en
