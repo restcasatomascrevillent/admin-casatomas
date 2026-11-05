@@ -22,7 +22,7 @@ import { CABECERA_COLUMNAS, EstadoVacio, FOCO, FONDO_CABECERA, Hueso, Marca, fil
 
 const SIN_ESTADO: EstadoPlegado = {};
 
-/** Alto de reserva de un mes fuera de pantalla (`content-visibility: auto`): cabecera 49 px, documento 53 (dos líneas) o 45 (una, ≥1024 px). */
+/** Alto de reserva de un mes fuera de pantalla (`content-visibility: auto`): cabecera 49 px, documento 53 (dos líneas) o 49 (una, ≥1024 px). */
 function altoEstimadoMes(mes: GrupoMes, abierto: boolean): number {
   return abierto ? 49 + mes.documentos.length * 53 : 49;
 }
@@ -36,8 +36,10 @@ function altoEstimadoMes(mes: GrupoMes, abierto: boolean): number {
  *
  * Cada fila: fecha · proveedor · nº de documento · marcas (Albarán / Abono,
  * Touza, avisos, sin revisar, sin factura: todas a la vista, sin tooltip) ·
- * importe. Desde 1024 px en columnas; por debajo (tablet en vertical) en dos
- * líneas: proveedor e importe arriba, fecha · número · marcas debajo.
+ * importe · original (icono PDF/foto que lo abre sin entrar en la ficha).
+ * Desde 1024 px en columnas, con cabecera de columnas fija encima de las de
+ * mes; por debajo (tablet en vertical) en dos líneas: proveedor e importe
+ * arriba, fecha · número · marcas debajo. Estilos comunes en `estilo.tsx`.
  *
  * Plegado: mes actual y anterior desplegados, el resto plegados (o el único
  * mes, si solo hay uno); lo que el usuario pliega o despliega se recuerda
