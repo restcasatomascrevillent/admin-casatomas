@@ -109,5 +109,26 @@ describe("Cargar · diseño plano", () => {
     expect(screen.getByRole("button", { name: "Limpiar terminados" })).toBeTruthy();
     // El toast también dice «Albarán» (y bien conjugado).
     expect(toastMock.warning).toHaveBeenCalledWith("Albarán guardado con 1 aviso", expect.anything());
+    // UI-16: los avisos salen arriba (abajo tapaban la lista y «Limpiar terminados»).
+    expect(toastMock.warning).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ position: "top-center" }));
+  });
+
+  it("UI-10: un fichero de 0 bytes se rechaza con aviso en español y no entra en la cola", () => {
+    montarSubida();
+    fireEvent.change(screen.getByLabelText("Elegir facturas o albaranes (PDF o imágenes)"), {
+      target: { files: [new File([], "vacio.png", { type: "image/png" })] },
+    });
+    expect(toastMock.error).toHaveBeenCalledWith("Archivo vacío", expect.objectContaining({ description: expect.stringMatching(/vacio\.png está vacío/) }));
+    expect(screen.queryByRole("region", { name: "Archivos seleccionados" })).toBeNull();
+  });
+
+  it("UI-11: un documento subiendo se puede cancelar desde su fila", async () => {
+    const nunca = new Promise<never>(() => {});
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: () => nunca } });
+    elegir(["lento.pdf"]);
+    fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
+    const cancelar = await screen.findByRole("button", { name: "Cancelar lento.pdf" });
+    fireEvent.click(cancelar);
+    await waitFor(() => expect(screen.queryByText("lento.pdf")).toBeNull());
   });
 });

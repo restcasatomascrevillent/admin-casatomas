@@ -18,6 +18,28 @@
 // ============================================================================
 
 import { supabase } from "@/integrations/supabase/client";
+import { leerErrorFuncion, MENSAJE_SIN_CONEXION, RE_TECNICO_INGLES } from "./documentoLargo";
+
+/**
+ * JSON.parse con el error en español («manifest.json no es un JSON válido…»)
+ * en vez del técnico en inglés («Expected property name or '}'…»).
+ */
+export function parsearJson(texto: string, nombre: string): unknown {
+  try {
+    return JSON.parse(texto);
+  } catch {
+    throw new Error(
+      `${nombre} no es un JSON válido: revisa que no le falten comillas, comas o corchetes (ábrelo con un editor de texto).`,
+    );
+  }
+}
+
+/** Mensaje de un fallo inesperado: el suyo si está en español; si no, uno genérico. */
+const mensajeEs = (e: unknown, porDefecto: string) => {
+  const m = e instanceof Error ? e.message : String(e ?? "");
+  if (/failed to fetch|networkerror|load failed/i.test(m)) return MENSAJE_SIN_CONEXION;
+  return m && !RE_TECNICO_INGLES.test(m) ? m : porDefecto;
+};
 
 export interface PaginasManifiesto {
   pdf: string;
@@ -74,7 +96,19 @@ export function indexarCarpeta(ficheros: ArrayLike<File>): { manifiesto: File | 
 }
 
 const texto = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
-const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v.trim() && Number.isFinite(Number(v)) ? Number(v) : null);
+/**
+ * Importe del manifiesto: número, o texto con punto («88.10») o con coma
+ * decimal española («88,10», «1.234,56»).
+ */
+export function num(v: unknown): number | null {
+  if (typeof v === "number") return Number.isFinite(v) ? v : null;
+  if (typeof v !== "string") return null;
+  let t = v.trim().replace(/\s|€/g, "");
+  if (!t) return null;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
 
 /** Valida el manifest.json. Lanza con la primera entrada mal formada. */
 export function leerManifiesto(json: unknown): EntradaManifiesto[] {
@@ -183,18 +217,9 @@ export async function enviarFactura(cuerpo: {
   try {
     const { data, error } = await supabase.functions.invoke("importar-factura-historica", { body: cuerpo });
     if (error) {
-      // FunctionsHttpError: el cuerpo trae { error } (401/403) o { mensaje }.
-      let detalle = error.message;
-      const ctx = (error as { context?: Response }).context;
-      if (ctx && typeof ctx.json === "function") {
-        try {
-          const b = await ctx.json();
-          detalle = b?.mensaje ?? b?.error ?? detalle;
-        } catch {
-          // Cuerpo no JSON: queda el mensaje del cliente.
-        }
-      }
-      return { estado: "error", facturaId: null, mensaje: detalle };
+      // FunctionsHttpError: el cuerpo trae { error } (401/403) o { mensaje }; si
+      // no es JSON (p. ej. un 500/502 en HTML), un texto en español por código.
+      return { estado: "error", facturaId: null, mensaje: await leerErrorFuncion(error, "No se pudo importar la factura") };
     }
     const estado = data?.estado;
     if (estado === "importada" || estado === "ya_importada" || estado === "duplicado" || estado === "error") {
@@ -202,7 +227,7 @@ export async function enviarFactura(cuerpo: {
     }
     return { estado: "error", facturaId: null, mensaje: "Respuesta inesperada del servidor" };
   } catch (e) {
-    return { estado: "error", facturaId: null, mensaje: e instanceof Error ? e.message : String(e) };
+    return { estado: "error", facturaId: null, mensaje: mensajeEs(e, "No se pudo importar la factura") };
   }
 }
 
@@ -235,7 +260,7 @@ export async function importarEntrada(
   // Los PDF de origen se reutilizan entre entradas seguidas, sin acumular todos.
   if (cachePdf.size > 8 && !entrada.paginas.every((p) => cachePdf.has(p.pdf))) cachePdf.clear();
   try {
-    const factura = elegirFactura(JSON.parse(await lector.texto(entrada.json)), entrada);
+    const factura = elegirFactura(parsearJson(await lector.texto(entrada.json), entrada.json), entrada);
     const pdf = await construirPdf(entrada.paginas, lector.bytes, cachePdf);
     cuerpo = {
       clave: entrada.clave,
@@ -246,7 +271,8 @@ export async function importarEntrada(
       paginas: pdf.numPaginas,
     };
   } catch (e) {
-    return { estado: "error", facturaId: null, mensaje: e instanceof Error ? e.message : String(e) };
+    // PDF dañado o cifrado (pdf-lib lanza en inglés): se dice en español.
+    return { estado: "error", facturaId: null, mensaje: mensajeEs(e, "No se pudo preparar el PDF de esta factura (¿está dañado o protegido?)") };
   }
   return enviar(cuerpo);
 }

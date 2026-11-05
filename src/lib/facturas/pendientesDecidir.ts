@@ -7,13 +7,15 @@
 //  el largo). Al sustituir, el trabajo pasa a 'completado' y deja de salir.
 //  Así la lista sobrevive a navegar y a RECARGAR la página: se lee de la BD.
 //
-//  «Dejar la existente» no puede escribir en ocr_trabajos (solo escribe el
-//  service role): se recuerda EN ESTE NAVEGADOR (localStorage). Solo se miran
-//  los últimos 7 días y los documentos que subió el propio usuario.
+//  «Dejar la existente» (05/11/2026): llama a la RPC ocr_descartar_trabajo,
+//  que pasa el trabajo a «cancelado» (deja de salir en todos los navegadores y
+//  el servidor borra sus ficheros temporales). Solo si la RPC aún no existe se
+//  recuerda EN ESTE NAVEGADOR (localStorage), como antes. Solo se miran los
+//  últimos 7 días y los documentos que subió el propio usuario.
 // ============================================================================
 
 import { supabase } from "@/integrations/supabase/client";
-import type { Anadible, Sustituible } from "./documentoLargo";
+import { type Anadible, descartarTrabajo, type Sustituible } from "./documentoLargo";
 import type { ElementoCola } from "./colaSubida";
 
 export const DIAS_PENDIENTES = 7;
@@ -103,6 +105,30 @@ export function fusionarPendientes(
   }
   deBd.forEach(meter);
   return out;
+}
+
+/**
+ * Cómo quedó un «Dejar la que hay»:
+ *  · `servidor`: descartado en el servidor (ocr_descartar_trabajo);
+ *  · `local`: la RPC aún no existe → solo se oculta en este navegador;
+ *  · `error`: el servidor no lo ha permitido (con el motivo).
+ */
+export type ResultadoDescartar = { como: "servidor" | "local" } | { como: "error"; motivo: string };
+
+export async function descartarPendienteServidor(
+  trabajoId: string,
+  rpc: typeof descartarTrabajo = descartarTrabajo,
+): Promise<ResultadoDescartar> {
+  try {
+    const r = await rpc(trabajoId);
+    if (!r.disponible) return { como: "local" };
+    if (r.ok) return { como: "servidor" };
+    // Ya cancelado/terminado desde otro sitio: no hay nada que decidir.
+    if (r.estado === "cancelado" || r.estado === "completado") return { como: "servidor" };
+    return { como: "error", motivo: r.motivo || "El servidor no ha dejado descartarlo ahora." };
+  } catch {
+    return { como: "local" };
+  }
 }
 
 export function leerDescartados(): Set<string> {

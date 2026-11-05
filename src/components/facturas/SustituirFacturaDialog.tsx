@@ -23,6 +23,10 @@ import {
 const eur = (n: number | null | undefined) =>
   n === null || n === undefined ? "sin total" : `${n.toLocaleString("es-ES", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
 
+/** «2026-10-01» → «01/10/2026» (lo demás, tal cual). */
+const fechaEs =(f: string | null | undefined) =>
+  f && /^\d{4}-\d{2}-\d{2}/.test(f) ? f.slice(0, 10).split("-").reverse().join("/") : f ?? null;
+
 /** Qué se va a hacer con el documento nuevo. */
 export type DecisionDuplicado = { tipo: "sustituir"; s: Sustituible } | { tipo: "anadir"; a: Anadible };
 
@@ -30,7 +34,13 @@ interface Props {
   /** Compatibilidad: solo «Sustituir». */
   sustituible?: Sustituible | null;
   decision?: DecisionDuplicado | null;
+  /** Cerrar sin decidir («Decidir luego», Escape): sigue pendiente. */
   onCancelar: () => void;
+  /**
+   * «No, dejar la que hay» / «No añadirla»: decide NO usar el documento nuevo
+   * (lo descarta). Sin esta prop, el botón solo cierra (compatibilidad).
+   */
+  onDejar?: () => void;
   /** Confirmado con lo que el usuario ve AHORA (`esperado`). Lanza FacturaCambiada si la factura cambió. */
   onConfirmar: (esperado: Esperado) => Promise<void>;
   /** Relectura de la existente (tests). */
@@ -45,7 +55,14 @@ interface Props {
  * existente aún se está guardando o no tiene líneas; si el servidor aborta
  * porque la factura cambió, lo dice, la vuelve a leer y deja confirmar de nuevo.
  */
-export function SustituirFacturaDialog({ sustituible, decision: decisionProp, onCancelar, onConfirmar, leerResumen = leerResumenFactura }: Props) {
+export function SustituirFacturaDialog({
+  sustituible,
+  decision: decisionProp,
+  onCancelar,
+  onDejar,
+  onConfirmar,
+  leerResumen = leerResumenFactura,
+}: Props) {
   const decision: DecisionDuplicado | null = decisionProp ?? (sustituible ? { tipo: "sustituir", s: sustituible } : null);
   const oferta = decision ? (decision.tipo === "sustituir" ? decision.s : decision.a) : null;
   const [enviando, setEnviando] = useState(false);
@@ -101,7 +118,7 @@ export function SustituirFacturaDialog({ sustituible, decision: decisionProp, on
           <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div className="rounded-md border p-3" aria-busy={cargando}>
               <p className="mb-1 font-medium">Ahora (factura {e.id})</p>
-              <p>{e.proveedor ?? "Proveedor sin leer"} · {e.fecha ?? "sin fecha"}</p>
+              <p>{e.proveedor ?? "Proveedor sin leer"} · {fechaEs(e.fecha) ?? "sin fecha"}</p>
               <p>Total: <strong>{eur(e.total)}</strong>{e.total_origen === "deducido" ? " (calculado)" : ""}</p>
               <p>Líneas: <strong>{e.lineas}</strong></p>
               <p>
@@ -111,7 +128,7 @@ export function SustituirFacturaDialog({ sustituible, decision: decisionProp, on
             </div>
             <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
               <p className="mb-1 font-medium">{pagina ? `Página ${pagina.actual} nueva` : "Documento nuevo"}</p>
-              <p>{n.proveedor ?? "Proveedor sin leer"} · {n.fecha}</p>
+              <p>{n.proveedor ?? "Proveedor sin leer"} · {fechaEs(n.fecha) ?? "sin fecha"}</p>
               <p>Total: <strong>{eur(n.total)}</strong>{n.total_origen === "deducido" ? " (calculado)" : ""}</p>
               <p>Líneas: <strong>{n.lineas}</strong></p>
               <p>Avisos: <strong>{n.alertas}</strong></p>
@@ -123,9 +140,17 @@ export function SustituirFacturaDialog({ sustituible, decision: decisionProp, on
             {aviso ?? bloqueo}
           </p>
         )}
-        <AlertDialogFooter className="gap-2">
-          <AlertDialogCancel className="h-11 pointer-coarse:h-12" disabled={enviando}>
-            No, dejar la que hay
+        <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:space-x-0">
+          {/* Cerrar sin decidir: sigue en «Pendientes de decidir». */}
+          <AlertDialogCancel
+            className="mt-0 h-11 border-transparent text-muted-foreground shadow-none pointer-coarse:h-12 sm:mr-auto"
+            disabled={enviando}
+          >
+            Decidir luego
+          </AlertDialogCancel>
+          {/* Decidir que NO: se descarta el documento nuevo (deja de estar pendiente). */}
+          <AlertDialogCancel className="mt-0 h-11 pointer-coarse:h-12" disabled={enviando} onClick={() => onDejar?.()}>
+            {pagina ? "No añadirla" : "No, dejar la que hay"}
           </AlertDialogCancel>
           <AlertDialogAction
             className="h-11 pointer-coarse:h-12"

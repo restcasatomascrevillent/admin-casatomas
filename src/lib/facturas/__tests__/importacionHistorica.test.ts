@@ -7,13 +7,16 @@ import {
   bytesABase64,
   construirPdf,
   elegirFactura,
-  type enviarFactura,
+  enviarFactura,
   importarEntrada,
   indexarCarpeta,
   lectorCarpeta,
   leerManifiesto,
   nombrePdf,
+  num,
+  parsearJson,
 } from "../importacionHistorica";
+import { supabase } from "@/integrations/supabase/client";
 
 /** PDF de `n` páginas; cada una con un ancho distinto (100 + i) para reconocerla. */
 async function pdfDe(n: number): Promise<Uint8Array> {
@@ -134,5 +137,41 @@ describe("importarEntrada", () => {
     expect(r.estado).toBe("error");
     expect(r.mensaje).toMatch(/No está en la carpeta: json\/R1.json/);
     expect(enviar).not.toHaveBeenCalled();
+  });
+  it("UI-12: JSON roto → aviso en español, no «Expected property name…»", async () => {
+    const enviar = vi.fn();
+    const r = await importarEntrada(ENTRADA, lectorCarpeta(new Map([["json/R1.json", fichero("json/R1.json", "{ roto")]])), new Map(), enviar);
+    expect(r.mensaje).toMatch(/^json\/R1\.json no es un JSON válido/);
+    expect(() => parsearJson("[{ clave: 'x', }", "manifest.json")).toThrow(/^manifest\.json no es un JSON válido/);
+  });
+});
+
+describe("UI-12 / mejoras: errores del servidor en español e importes con coma", () => {
+  it("un 500 con cuerpo HTML no enseña «Edge Function returned a non-2xx…»", async () => {
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", message: "Edge Function returned a non-2xx status code", context: new Response("<html>502 Bad Gateway</html>", { status: 500 }) },
+    } as never);
+    const r = await enviarFactura({ clave: "k", datos: {}, pdf_b64: "", nombre_pdf: "a.pdf", local: null, paginas: 1 });
+    expect(r.estado).toBe("error");
+    expect(r.mensaje).toMatch(/El servidor ha fallado/);
+    expect(r.mensaje).not.toMatch(/Edge Function|non-2xx/);
+  });
+  it("401 con { error } JSON: el motivo del servidor", async () => {
+    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+      data: null,
+      error: { name: "FunctionsHttpError", message: "x", context: new Response(JSON.stringify({ error: "No autorizado: entra de nuevo" }), { status: 401 }) },
+    } as never);
+    const r = await enviarFactura({ clave: "k", datos: {}, pdf_b64: "", nombre_pdf: "a.pdf", local: null, paginas: 1 });
+    expect(r.mensaje).toBe("No autorizado: entra de nuevo");
+  });
+  it("el total del manifiesto admite coma decimal española", () => {
+    expect(num("88,10")).toBe(88.1);
+    expect(num("1.234,56")).toBe(1234.56);
+    expect(num("88.10")).toBe(88.1);
+    expect(num(12)).toBe(12);
+    expect(num("abc")).toBeNull();
+    const [e] = leerManifiesto([{ clave: "a", json: "j.json", paginas: [{ pdf: "p.pdf", pages: [1] }], total: "88,10" }]);
+    expect(e.total).toBe(88.1);
   });
 });

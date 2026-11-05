@@ -156,6 +156,8 @@ describe("ColaSubidaProvider · pop-up de documento ya subido", () => {
     const dialogo = await screen.findByRole("dialog");
     expect(dialogo.textContent).toContain("Este albarán ya estaba subido");
     expect(dialogo.textContent).toContain("dup.pdf");
+    // UI-13: concordancia con el título.
+    expect(dialogo.textContent).toContain("ya estaba guardado. No se ha creado otro.");
     expect(await screen.findByText("A-123")).toBeTruthy();
     expect(screen.getByText("Pescados Mari")).toBeTruthy();
     const foto = screen.getByRole("link", { name: /Ver la foto del que ya está|Ver documento original/ });
@@ -179,6 +181,17 @@ describe("ColaSubidaProvider · pop-up de documento ya subido", () => {
     // «Sustituir por la nueva» abre la confirmación (relectura).
     fireEvent.click(screen.getByRole("button", { name: "Sustituir por la nueva" }));
     expect(await screen.findByText(/¿Sustituir la factura A-123\?/)).toBeTruthy();
+  });
+
+  it("UI-13: una factura duplicada dice «guardada» y «otra» (concordancia con «Esta factura»)", async () => {
+    doble.fijarRespuestas((tabla) => (tabla === "facturas" ? { ...existente, tipo: "factura" } : []));
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: servidorAntiguo, procesarUnico: async () => duplicada("f.pdf", { tipo: "factura" }) } });
+    elegir("f.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
+    const dialogo = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialogo.textContent).toContain("Esta factura ya estaba subida"));
+    expect(dialogo.textContent).toContain("ya estaba guardada. No se ha creado otra.");
+    expect(dialogo.textContent).not.toContain("ya estaba guardado.");
   });
 
   it("no aparece para una página añadible ni para un documento guardado", async () => {
