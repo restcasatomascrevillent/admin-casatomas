@@ -254,7 +254,7 @@ const barra = () => {
 const boton = (nombre: RegExp) => within(barra()).getByRole("button", { name: nombre });
 
 beforeEach(() => {
-  // jsdom no implementa scrollIntoView (ChatArea baja al último mensaje).
+  // jsdom no implementa scrollIntoView (el copiloto baja al último mensaje).
   Element.prototype.scrollIntoView = vi.fn();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(AHORA);
@@ -570,7 +570,7 @@ describe("pintado del resultado", () => {
     montar();
     fireEvent.click(boton(/top proveedores/i));
     const tarjeta = await screen.findByRole("region", { name: /top proveedores/i });
-    fireEvent.click(within(tarjeta).getByRole("button", { name: /quitar esta respuesta/i }));
+    fireEvent.click(within(tarjeta).getByRole("button", { name: /quitar esta tarjeta/i }));
     expect(screen.queryByRole("region", { name: /top proveedores/i })).not.toBeInTheDocument();
   });
 });
@@ -585,7 +585,9 @@ describe("no gasta IA", () => {
     await waitFor(() => expect(screen.queryAllByRole("status")).toHaveLength(0));
     expect(doble.invoke).not.toHaveBeenCalled();
     expect(doble.inserts).toEqual([]);
-  });
+    // Pinta las 9 tarjetas del tablero (gráficas, tablas y chips): con la
+    // máquina cargada pasa de los 5 s por defecto.
+  }, 15_000);
 
   it("la siguiente pregunta libre a la IA no lleva los datos de la respuesta rápida", async () => {
     montar();

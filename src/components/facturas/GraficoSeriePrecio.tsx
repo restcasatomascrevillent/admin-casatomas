@@ -1,6 +1,6 @@
 // Gráfica de la evolución del precio de un producto, una línea por proveedor.
-// Se usa en dos sitios: bajo la burbuja del chat (adjunto `serie_precio` de la
-// Edge Function) y en la pregunta rápida «Evolución de precio».
+// Se usa en las tarjetas del tablero del copiloto (adjunto `serie_precio` de la
+// Edge Function y pregunta rápida «Evolución de precio») y en la ficha de producto.
 //
 // Alto fijo (no depende de la pantalla): vive dentro del hilo del chat, que ya
 // tiene su propio scroll, así que no añade scroll de página.
@@ -176,11 +176,14 @@ export function GraficoSeriePrecio({
   datos,
   className,
   compacto = false,
+  alto,
 }: {
   datos: unknown;
   className?: string;
   /** En la ficha de producto: sin título repetido y gráfica más baja. */
   compacto?: boolean;
+  /** Alto de la gráfica en px (el tablero del copiloto la quiere más grande). */
+  alto?: number;
 }) {
   const serie = useMemo(() => normalizarSerie(datos), [datos]);
 
@@ -249,7 +252,7 @@ export function GraficoSeriePrecio({
         </p>
       )}
 
-      <Grafico serie={serie} alto={compacto ? ALTO_GRAFICO_COMPACTO : ALTO_GRAFICO} />
+      <Grafico serie={serie} alto={alto ?? (compacto ? ALTO_GRAFICO_COMPACTO : ALTO_GRAFICO)} />
     </figure>
   );
 }

@@ -99,7 +99,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Preguntar a la IA",
         pasos: [
-          "Para preguntas como «¿cuánto gastamos en carne este mes?», ve a «IA». Puedes tocar una pregunta de ejemplo o escribirla con tus palabras y pulsar la flecha.",
+          "Para preguntas como «¿cuánto gastamos en carne este mes?», ve a «Análisis». Puedes tocar una pregunta de ejemplo o escribirla con tus palabras y pulsar la flecha. Las gráficas se quedan en el tablero; toca una para preguntar sobre ella.",
           "Para lo más habitual, despliega «Al instante»: gasto de este mes, gasto por mes, mejores proveedores, productos más comprados, por revisar, con avisos, sin total, gasto por categoría, qué ha subido de precio y la evolución del precio de un producto. Salen al momento y no gastan IA.",
           "A la izquierda (en la tablet, en «Historial») quedan tus conversaciones anteriores. Arriba a la derecha ves lo que ha costado la IA este mes; si se acerca al tope, se pone en naranja o rojo.",
         ],
@@ -154,7 +154,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cómo veo si un producto ha subido de precio?",
         respuesta:
-          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. También puedes usar «Qué ha subido de precio» o «Evolución de precio» en «Al instante», en la pestaña «IA».",
+          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. También puedes usar «Qué ha subido de precio» o «Evolución de precio» en «Al instante», en la pestaña «Análisis».",
       },
       {
         pregunta: "¿Dónde veo el papel original?",
@@ -169,7 +169,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cuánto cuesta usar la IA?",
         respuesta:
-          "Poco: cada pregunta al chatbot y cada documento leído cuestan céntimos. Lo ves arriba a la derecha (en «IA», lo del chatbot; en «Cargar», lo de leer documentos) y al tocarlo sale el detalle. Los botones de «Al instante» no gastan nada: leen tus datos directamente.",
+          "Poco: cada pregunta al chatbot y cada documento leído cuestan céntimos. Lo ves arriba a la derecha (en «Análisis», lo del chatbot; en «Cargar», lo de leer documentos) y al tocarlo sale el detalle. Los botones de «Al instante» no gastan nada: leen tus datos directamente.",
       },
     ],
   },

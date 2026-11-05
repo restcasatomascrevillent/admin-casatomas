@@ -10,13 +10,13 @@ import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
 import { MODOS_COMPRAS, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { FileText, MessageSquare, Upload, BarChart3, Package, Zap, ShoppingCart, History } from "lucide-react";
+import { FileText, Upload, BarChart3, Package, Zap, ShoppingCart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
 import { useChatFacturas } from "@/hooks/useChatFacturas";
-import type { Sugerencia } from "@/components/facturas/ChatArea";
+import type { Sugerencia } from "@/components/facturas/ChatFacturas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
@@ -153,7 +153,7 @@ const Facturas = () => {
           <PestanasPagina
             pestanas={[
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
-              { valor: "chat", etiqueta: "IA", icono: <MessageSquare />, contador: totalConversaciones, tonoContador: "dorado", tour: "facturas-pestana-ia" },
+              { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, contador: totalConversaciones, tonoContador: "dorado", tour: "facturas-pestana-ia" },
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ]}
             acciones={

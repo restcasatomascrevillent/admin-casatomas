@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
+import { componerMensaje } from "@/lib/facturas/tableroGraficas";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -179,8 +180,13 @@ export function useChatFacturas() {
   }, [cargarConversaciones]);
 
   // ─── Enviar mensaje al chatbot (Edge Function `chat-facturas`) ───────────────
-  const enviarMensaje = useCallback(async (texto: string) => {
-    if (!texto.trim() || isSending) return;
+  // `contexto`: la gráfica seleccionada en el tablero (ver tableroGraficas.ts).
+  // Viaja al final del texto del mensaje: se guarda y se manda tal cual, así
+  // que el modelo la ve sin cambiar la Edge Function. El título de la
+  // conversación sale solo de la pregunta.
+  const enviarMensaje = useCallback(async (pregunta: string, opciones?: { contexto?: string | null }) => {
+    if (!pregunta.trim() || isSending) return;
+    const texto = componerMensaje(pregunta, opciones?.contexto);
 
     let conv = conversacionActiva;
 
@@ -206,7 +212,7 @@ export function useChatFacturas() {
 
     // Actualizar título si es el primer mensaje
     if (mensajes.length === 0) {
-      await actualizarTitulo(conv.id, texto);
+      await actualizarTitulo(conv.id, pregunta.trim());
     }
 
     try {

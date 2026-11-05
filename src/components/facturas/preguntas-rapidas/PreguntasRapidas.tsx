@@ -16,6 +16,8 @@ interface BarraProps {
   cargando: (preguntaId: string) => boolean;
   /** La RPC aún no existe en la BD (migración sin aplicar). */
   noDisponible?: (preguntaId: string) => boolean;
+  /** Sustituye el contenedor por defecto (centrado, ancho de chat). */
+  className?: string;
 }
 
 /**
@@ -24,14 +26,14 @@ interface BarraProps {
  * Cerrado ocupa una sola línea: la pestaña IA tiene altura calculada y sin
  * scroll de página. Al lanzar una pregunta se vuelve a plegar.
  */
-export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDisponible = () => false }: BarraProps) {
+export function BarraPreguntasRapidas({ catalogo, onPreguntar, cargando, noDisponible = () => false, className }: BarraProps) {
   const [abierta, setAbierta] = useState(false);
   const lanzar = (id: string, parametros?: unknown) => {
     onPreguntar(id, parametros);
     setAbierta(false);
   };
   return (
-    <div className="mx-auto w-full max-w-3xl shrink-0 px-3 sm:px-4" data-tour="facturas-ia-al-instante">
+    <div className={className ?? "mx-auto w-full max-w-3xl shrink-0 px-3 sm:px-4"} data-tour="facturas-ia-al-instante">
       <button
         type="button"
         onClick={() => setAbierta((v) => !v)}

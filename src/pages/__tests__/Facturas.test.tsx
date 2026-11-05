@@ -91,10 +91,10 @@ describe("Facturas · importación histórica (solo administradores)", () => {
 });
 
 describe("Facturas · pestañas", () => {
-  it("son tres: Compras · IA · Cargar (ya no hay Documentos ni Productos)", () => {
+  it("son tres: Compras · Análisis · Cargar (ya no hay Documentos ni Productos)", () => {
     montar();
     const pestanas = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Compras", "IA", "Cargar"]);
+    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Compras", "Análisis", "Cargar"]);
     expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
     for (const p of pestanas) expect(p.className).toContain("min-h-11");
@@ -129,10 +129,10 @@ describe("Facturas · pestañas", () => {
     expect(screen.getByTestId("monitor-gasto-ia-ocr")).toBeInTheDocument();
   });
 
-  it("Compras sigue montada al ir a IA (la búsqueda y la ficha abierta no se pierden)", () => {
+  it("Compras sigue montada al ir a Análisis (la búsqueda y la ficha abierta no se pierden)", () => {
     montar();
-    fireEvent.mouseDown(screen.getByRole("tab", { name: /^IA/ }), { button: 0 });
-    expect(screen.getByRole("tab", { name: /^IA/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Análisis/ }), { button: 0 });
+    expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
     expect(screen.getByTestId("compras")).toBeInTheDocument();
   });
