@@ -40,11 +40,45 @@ const ETIQUETAS_ALERTA: Record<string, string> = {
   total_documento_irrisorio: "Total ínfimo",
   total_ausente: "Sin total",
   subtotal_ausente: "Sin base",
+  // QA 05/11/2026 (C-16): los que salían con el código en crudo.
+  extraccion_historica: "Aviso de importación",
+  numero_ausente: "Sin número",
+  linea_sin_importe: "Línea sin importe",
+  total_deducido: "Total calculado",
+  cliente_ajeno: "Otro cliente",
 };
 
-/** Codigo desconocido: se enseña el codigo en limpio antes que un numero suelto. */
-export const etiquetaAlerta = (codigo: string): string =>
-  ETIQUETAS_ALERTA[codigo] ?? codigo.replace(/_/g, " ");
+/** Codigo desconocido: se enseña el codigo en limpio (con mayúscula) antes que un numero suelto. */
+export const etiquetaAlerta = (codigo: string): string => {
+  if (ETIQUETAS_ALERTA[codigo]) return ETIQUETAS_ALERTA[codigo];
+  const limpio = codigo.replace(/_/g, " ").trim();
+  return limpio ? limpio.charAt(0).toUpperCase() + limpio.slice(1) : "Aviso";
+};
+
+export interface GrupoAlertas {
+  etiqueta: string;
+  /** Cuántos avisos con esa etiqueta. */
+  n: number;
+  severidad: "alta" | "media" | string;
+}
+
+/**
+ * Agrupa los avisos repetidos por su etiqueta («Línea mal ×2» y no dos
+ * insignias iguales). Orden: el de la primera aparición; la severidad del
+ * grupo es la más grave.
+ */
+export function agruparAlertas(alertas: Pick<AlertaValidacion, "codigo" | "severidad">[]): GrupoAlertas[] {
+  const grupos = new Map<string, GrupoAlertas>();
+  for (const a of alertas) {
+    const etiqueta = etiquetaAlerta(a.codigo);
+    const g = grupos.get(etiqueta);
+    if (g) {
+      g.n += 1;
+      if (a.severidad === "alta") g.severidad = "alta";
+    } else grupos.set(etiqueta, { etiqueta, n: 1, severidad: a.severidad });
+  }
+  return [...grupos.values()];
+}
 
 interface EstadoDocumentoProps {
   alertas: AlertaValidacion[];
@@ -55,8 +89,11 @@ interface EstadoDocumentoProps {
    * mirado nadie. Se pinta distinta de la revision humana.
    */
   origen?: "auto" | "manual" | null;
-  /** Abre el dialogo de edicion, que es donde se marca como verificada. */
-  onRevisar: () => void;
+  /**
+   * Abre el dialogo de edicion, que es donde se marca como verificada. Sin
+   * él (quien no tiene permiso de edición), «Sin revisar» es solo una marca.
+   */
+  onRevisar?: () => void;
   /** En las tarjetas hay sitio de sobra: se pintan todas las alertas. */
   compacto?: boolean;
   /** En una fila (cabecera de la ficha): las insignias una al lado de otra, no apiladas. */
@@ -67,14 +104,16 @@ interface EstadoDocumentoProps {
  * Insignias tocables: el texto mide 12 px y la caja 28 px, pero un `::before`
  * agranda la zona sensible hasta 44 px de alto sin mover nada del diseño.
  */
-const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']`;
+const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']`;
 
 export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar, compacto = true, enLinea = false }: EstadoDocumentoProps) {
   const lista = alertas ?? [];
   const graves = lista.filter((a) => a.severidad === "alta");
-  // En la tabla solo cabe una insignia de aviso; el resto se resume en "+N".
-  const visibles = compacto ? lista.slice(0, 1) : lista;
-  const ocultas = lista.length - visibles.length;
+  // Repetidos juntos («Línea mal ×2»). En la tabla solo cabe una insignia de
+  // aviso; el resto se resume en "+N".
+  const grupos = agruparAlertas(lista);
+  const visibles = compacto ? grupos.slice(0, 1) : grupos;
+  const ocultas = lista.length - visibles.reduce((n, g) => n + g.n, 0);
 
   return (
     <div className={enLinea ? "flex flex-wrap items-center gap-1.5" : "flex flex-col items-start gap-1"}>
@@ -91,11 +130,12 @@ export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar,
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
-                aria-label={`${etiquetaAlerta(a.codigo)}: ver el aviso completo`}
+                aria-label={`${a.etiqueta}${a.n > 1 ? ` (${a.n})` : ""}: ver el aviso completo`}
                 className={`${INSIGNIA_TACTIL} ${color}`}
               >
                 <AlertTriangle className="h-3 w-3 shrink-0" />
-                {etiquetaAlerta(a.codigo)}
+                {a.etiqueta}
+                {a.n > 1 && <span className="tabular-nums">×{a.n}</span>}
                 {ocultas > 0 && i === visibles.length - 1 && <span className="opacity-70">+{ocultas}</span>}
               </button>
             </PopoverTrigger>
@@ -143,6 +183,11 @@ export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar,
         <span className={`${INSIGNIA} h-7 text-xs border-emerald-200 bg-emerald-50 text-emerald-700`}>
           <CheckCircle2 className="h-3 w-3 shrink-0" />
           Revisada
+        </span>
+      ) : !onRevisar ? (
+        <span className={`${INSIGNIA} h-7 text-xs border-slate-200 bg-slate-50 text-slate-600`}>
+          <EyeOff className="h-3 w-3 shrink-0" />
+          Sin revisar
         </span>
       ) : (
         <button

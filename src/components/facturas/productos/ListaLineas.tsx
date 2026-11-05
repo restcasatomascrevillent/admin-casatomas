@@ -1,5 +1,5 @@
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatCurrency, formatDateCorta, formatNumero } from "@/components/facturas/shared/formatters";
+import { formatImporte, formatDateCorta, formatNumero } from "@/components/facturas/shared/formatters";
 import type { LineaProducto } from "@/hooks/useProductosCatalogo";
 
 /** Líneas de factura con su documento; con casillas si se pueden mover. */
@@ -35,10 +35,10 @@ export function ListaLineas({
             </p>
           </div>
           <div className="shrink-0 text-right tabular-nums">
-            <p className="font-semibold">{l.total === null ? "—" : formatCurrency(l.total)}</p>
+            <p className="font-semibold">{l.total === null ? "—" : formatImporte(l.total)}</p>
             <p className="text-xs text-muted-foreground">
               {l.cantidad === null ? "—" : formatNumero(l.cantidad)} {l.unidad ?? ""}
-              {l.precio_unitario !== null && ` × ${formatCurrency(l.precio_unitario)}`}
+              {l.precio_unitario !== null && ` × ${formatImporte(l.precio_unitario)}`}
             </p>
           </div>
         </li>

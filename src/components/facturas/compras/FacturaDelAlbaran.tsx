@@ -10,7 +10,7 @@ import {
   useFacturasCandidatas,
   useVincularAlbaran,
 } from "@/hooks/useCotejoAlbaranes";
-import { formatCurrency, formatDate } from "@/components/facturas/shared/formatters";
+import { formatImporte, formatDate } from "@/components/facturas/shared/formatters";
 import { tonoDiferencia } from "@/lib/facturas/cotejo";
 import { EnlaceDocumento } from "./AlbaranesDeFactura";
 import { ResumenImportes, TablaCotejo } from "./TablaCotejo";
@@ -49,7 +49,7 @@ function AsociarFactura({ albaranId }: { albaranId: number }) {
               >
                 <span className="font-medium">Factura {f.numero_documento}</span>
                 <span className="text-xs text-muted-foreground">{formatDate(f.fecha)}</span>
-                <span className="ml-auto tabular-nums">{formatCurrency(f.base)}</span>
+                <span className="ml-auto tabular-nums">{formatImporte(f.base)}</span>
                 {f.cita_albaran && (
                   <span className="inline-flex h-6 w-full items-center text-xs font-medium text-emerald-700 dark:text-emerald-300">
                     Cita este albarán

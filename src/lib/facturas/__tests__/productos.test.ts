@@ -12,6 +12,7 @@ import {
   proveedoresDe,
   rangoPeriodo,
   rutaCategoria,
+  serieDesdeLineas,
   totalesPorRaiz,
   type CategoriaProducto,
   type ResumenProducto,
@@ -93,6 +94,46 @@ describe("filtrarProductos", () => {
     expect(filtrarProductos(lista, { ...base, busqueda: "marisco" }, MAPA).map((p) => p.producto_id)).toEqual([3]);
     expect(filtrarProductos(lista, { ...base, proveedor: claveProveedor("Grupo Insula Roma SL") }, MAPA).map((p) => p.producto_id)).toEqual([1]);
     expect(filtrarProductos(lista, { ...base, soloConCompras: true }, MAPA)).toHaveLength(4);
+  });
+
+  it("palabra a palabra, no la frase entera (QA C-05)", () => {
+    const aceites = [prod(10, "Aceite de oliva virgen extra", null), prod(11, "Aceite de girasol", null), prod(12, "Aceitunas", null)];
+    expect(filtrarProductos(aceites, { ...base, busqueda: "aceite oliva" }, MAPA).map((p) => p.producto_id)).toEqual([10]);
+    expect(filtrarProductos(aceites, { ...base, busqueda: "oliva   ACEITE" }, MAPA).map((p) => p.producto_id)).toEqual([10]);
+    // Una palabra en el nombre y otra en la categoría también vale.
+    expect(filtrarProductos(lista, { ...base, busqueda: "centolla marisco" }, MAPA).map((p) => p.producto_id)).toEqual([3]);
+  });
+});
+
+describe("serieDesdeLineas (gráfica de la ficha de producto, QA C-04)", () => {
+  const l = (fecha: string, proveedor: string, precio: number | null, extra: Record<string, unknown> = {}) => ({
+    fecha, proveedor, cantidad: 2, unidad: "kg", precio_unitario: precio, total: precio === null ? null : precio * 2, tipo: "factura", facturado_en_id: null, ...extra,
+  });
+
+  it("un punto por fecha y proveedor, media ponderada, sin precios a 0 ni albaranes facturados", () => {
+    const s = serieDesdeLineas("Merluza", [
+      l("2026-09-01", "Marta", 10, { cantidad: 1 }),
+      l("2026-09-01", "Marta", 13, { cantidad: 3 }),
+      l("2026-09-10", "Marta", 0),
+      l("2026-09-12", "Marta", 99, { tipo: "albaran", facturado_en_id: 4 }),
+      l("2026-10-01", "Marta", 14),
+    ]);
+    expect(s).toMatchObject({ producto: "Merluza", unidad: "kg", proveedores: ["Marta"], n: 2, min: 12.25, max: 14, ultimo: 14 });
+    if ("puntos" in s) expect(s.puntos).toEqual([["2026-09-01", 12.25, 0], ["2026-10-01", 14, 0]]);
+    if ("variacion_pct" in s) expect(s.variacion_pct).toBe(14.3);
+  });
+
+  it("una sola unidad (la más comprada) y sin variación entre proveedores", () => {
+    const s = serieDesdeLineas("Limón", [
+      l("2026-09-01", "A", 2),
+      l("2026-09-02", "B", 3),
+      l("2026-09-03", "A", 20, { unidad: "caja" }),
+    ]);
+    expect(s).toMatchObject({ unidad: "kg", proveedores: ["A", "B"], n: 2, variacion_pct: null });
+  });
+
+  it("sin líneas válidas: sin datos", () => {
+    expect(serieDesdeLineas("Nada", [l("2026-09-01", "A", null)])).toEqual({ sin_datos: true, buscado: "Nada" });
   });
 });
 

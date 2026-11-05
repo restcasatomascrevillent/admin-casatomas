@@ -3,12 +3,14 @@ import { Merge, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Factura } from "@/hooks/useFacturas";
 import { useFichaProveedor } from "@/hooks/useCompras";
-import { formatCurrency, formatDate, formatImporte, plural } from "@/components/facturas/shared/formatters";
+import { formatDate, formatImporte, plural } from "@/components/facturas/shared/formatters";
+import { detalleError } from "@/lib/facturas/listaCompras";
 import { EditorProveedor, ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
 import { textoFrecuencia } from "@/lib/facturas/compras";
 import type { Proveedor, ResolverProveedor } from "@/lib/facturas/proveedores";
 import type { AgregadoProveedor } from "@/lib/facturas/resumenCompras";
 import { ListaDocumentos, type DocumentoFila } from "./ListaDocumentos";
+import { DetalleTecnico } from "./estilo";
 
 /** Cuántos productos de «Qué le compras» se enseñan en el despliegue. */
 const PRODUCTOS_RESUMIDOS = 5;
@@ -42,6 +44,7 @@ export function FichaProveedor({
   onAbrirDocumento,
   onPrecargarDocumento,
   onAbrirProducto,
+  hoy,
 }: {
   proveedor: Proveedor;
   /** Lo suyo con el local y el periodo elegidos (undefined = ningún documento). */
@@ -57,8 +60,10 @@ export function FichaProveedor({
   onAbrirDocumento: (id: number) => void;
   /** Pide la ficha de un documento por adelantado. */
   onPrecargarDocumento?: (id: number) => void;
-  /** Abre ese producto (por su nombre). */
+  /** Abre ese producto (por su nombre, el que da «Qué le compras»: puede ser el de la línea). */
   onAbrirProducto: (nombre: string) => void;
+  /** Para pruebas y capturas: el «hoy» de la lista de documentos. */
+  hoy?: Date;
 }) {
   const fichaQ = useFichaProveedor(proveedor.nombre);
   const [editando, setEditando] = useState(false);
@@ -81,7 +86,7 @@ export function FichaProveedor({
           {ultimo && <Dato etiqueta="Último pedido">{formatDate(ultimo)}</Dato>}
           {agregado && agregado.regalado > 0 && (
             <Dato etiqueta="Regalado / descuentos">
-              {formatCurrency(agregado.regalado)}
+              {formatImporte(agregado.regalado)}
               <span className="font-normal text-muted-foreground"> sin IVA{agregado.regaladoEstimado ? " · estimado" : ""}</span>
             </Dato>
           )}
@@ -99,9 +104,13 @@ export function FichaProveedor({
           </p>
         )}
         {fichaQ.isError && (
-          <p className="text-sm text-muted-foreground" role="status">
-            No se ha podido leer qué le compras: {(fichaQ.error as { message?: string })?.message ?? "error desconocido"}.
-          </p>
+          <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground" role="status">
+            <span>No se ha podido leer qué le compras.</span>
+            <Button variant="ghost" className="h-11 px-3 text-sm" onClick={() => void fichaQ.refetch()}>
+              Reintentar
+            </Button>
+            <DetalleTecnico detalle={detalleError(fichaQ.error)} />
+          </div>
         )}
         {ficha && ficha.top_productos.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qué le compras">
@@ -112,12 +121,12 @@ export function FichaProveedor({
                 type="button"
                 onClick={() => onAbrirProducto(t.producto)}
                 aria-label={`Ver el producto ${t.producto}`}
-                className="relative inline-flex h-9 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-[13px] transition-colors before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:border-border hover:bg-muted/40 active:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none"
+                className="relative inline-flex h-9 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-[13px] transition-colors before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:border-border hover:bg-muted/40 active:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none"
               >
                 <span className="font-medium">{t.producto}</span>
                 {t.ultimo_precio !== null && (
                   <span className="text-xs tabular-nums text-muted-foreground">
-                    {formatCurrency(t.ultimo_precio)}
+                    {formatImporte(t.ultimo_precio)}
                     {t.unidad ? `/${t.unidad}` : ""}
                   </span>
                 )}
@@ -161,6 +170,7 @@ export function FichaProveedor({
           hayFiltros={hayFiltros}
           onAbrir={onAbrirDocumento}
           onPrecargar={onPrecargarDocumento}
+          hoy={hoy}
           conProveedor={false}
           recordar={false}
           cabecerasFijas={false}

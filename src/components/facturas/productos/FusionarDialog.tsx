@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { formatCurrency } from "@/components/facturas/shared/formatters";
+import { formatImporte, plural } from "@/components/facturas/shared/formatters";
 import { useFusionarProductos } from "@/hooks/useProductosCatalogo";
 import { destinoFusionSugerido, type ResumenProducto } from "@/lib/facturas/productos";
 
@@ -53,7 +53,7 @@ export function FusionarDialog({
               <RadioGroupItem id={`fusion-${p.producto_id}`} value={String(p.producto_id)} />
               <span className="min-w-0 flex-1 truncate font-medium">{p.nombre}</span>
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {p.compras} compra(s) · {formatCurrency(p.gasto)}
+                {plural(p.compras, "compra", "compras")} · {formatImporte(p.gasto)}
               </span>
             </Label>
           ))}

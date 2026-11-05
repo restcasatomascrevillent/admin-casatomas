@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Factura, ProductoFactura } from "@/hooks/useFacturas";
 import {
+  detalleError,
+  errorDefinitivo,
+  reintentarConsulta,
   avisosCabecera,
   avisosFicha,
   crearResolverDeLista,
@@ -135,5 +138,22 @@ describe("copia de la lista en el dispositivo", () => {
     expect(leerCopiaLista("u1")).toBeNull();
     expect(leerCopiaLista("u2")).toBeNull();
     expect(window.localStorage.getItem("otra-cosa")).toBe("1");
+  });
+});
+
+describe("reintentos de Compras (QA: no reintentar lo que no se va a arreglar)", () => {
+  it("sin permiso, 4xx o PostgREST: definitivo; red o 5xx: se reintenta (hasta 2 veces)", () => {
+    expect(errorDefinitivo({ code: "42501", message: "permission denied" })).toBe(true);
+    expect(errorDefinitivo({ code: "PGRST116" })).toBe(true);
+    expect(errorDefinitivo({ status: 403 })).toBe(true);
+    expect(errorDefinitivo({ code: "XX000", status: 500 })).toBe(false);
+    expect(errorDefinitivo(new Error("Failed to fetch"))).toBe(false);
+    expect(reintentarConsulta(0, new Error("Failed to fetch"))).toBe(true);
+    expect(reintentarConsulta(2, new Error("Failed to fetch"))).toBe(false);
+    expect(reintentarConsulta(0, { code: "42501" })).toBe(false);
+  });
+  it("el detalle técnico lleva el mensaje y el código", () => {
+    expect(detalleError({ message: "fallo", code: "XX000" })).toBe("fallo (XX000)");
+    expect(detalleError(null)).toBe("error desconocido");
   });
 });

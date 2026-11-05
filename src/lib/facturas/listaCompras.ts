@@ -189,6 +189,30 @@ export function crearResolverDeLista(cabeceras: CabeceraDocumento[], base: Resol
   return (t) => porTexto.get(t) ?? base(t);
 }
 
+/**
+ * ¿Merece la pena reintentar? No si el error es definitivo (QA 05/11/2026):
+ * sin permiso (42501), petición mal hecha o recurso inexistente (HTTP 4xx,
+ * códigos `PGRST…`, errores de datos `22…`/`23…`). Sí los de red o 5xx.
+ */
+export function errorDefinitivo(error: unknown): boolean {
+  const e = error as { code?: unknown; status?: unknown } | null;
+  if (!e || typeof e !== "object") return false;
+  const code = typeof e.code === "string" ? e.code : "";
+  if (code === "42501" || /^PGRST/.test(code) || /^2[23]/.test(code) || code === "42883" || code === "42P01") return true;
+  const status = typeof e.status === "number" ? e.status : null;
+  return status !== null && status >= 400 && status < 500;
+}
+
+/** `retry` de react-query para Compras: hasta 2 reintentos, nunca con un error definitivo. */
+export const reintentarConsulta = (fallos: number, error: unknown): boolean => fallos < 2 && !errorDefinitivo(error);
+
+/** El texto técnico de un error (para el «Detalle» plegado; nunca como mensaje principal). */
+export function detalleError(error: unknown): string {
+  const e = error as { message?: unknown; code?: unknown } | null;
+  const msg = typeof e?.message === "string" && e.message ? e.message : "error desconocido";
+  return typeof e?.code === "string" && e.code ? `${msg} (${e.code})` : msg;
+}
+
 /** ¿El error es que falta la función (migración 20261105190000 sin aplicar)? */
 export function faltaFuncionCompras(error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) return false;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { formatCurrency } from "@/components/facturas/shared/formatters";
+import { formatImporte } from "@/components/facturas/shared/formatters";
 import {
   CLASE_TONO,
   ETIQUETA_ESTADO,
@@ -41,14 +41,14 @@ export function ResumenImportes({
   return (
     <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm tabular-nums">
       <span className="text-muted-foreground">{etiquetaAlbaranes}</span>
-      <span className="font-medium">{formatCurrency(sumaAlbaranes)}</span>
+      <span className="font-medium">{formatImporte(sumaAlbaranes)}</span>
       <span aria-hidden="true" className="text-muted-foreground">·</span>
       <span className="text-muted-foreground">{etiquetaFactura}</span>
-      <span className="font-medium">{formatCurrency(baseFactura)}</span>
+      <span className="font-medium">{formatImporte(baseFactura)}</span>
       <span aria-hidden="true" className="text-muted-foreground">·</span>
       <span className="text-muted-foreground">Diferencia</span>
       <span className={`font-semibold ${tono ? CLASE_TONO[tono] : ""}`} data-tono={tono ?? undefined}>
-        {diferencia === null ? "—" : `${signo}${formatCurrency(diferencia)}`}
+        {diferencia === null ? "—" : `${signo}${formatImporte(diferencia)}`}
       </span>
     </p>
   );
@@ -68,7 +68,7 @@ function Fila({ p, apagada }: { p: ProductoCotejo; apagada?: boolean }) {
         {!apagada && p.diferencia_importe !== null && p.diferencia_importe !== 0 && (
           <span className={`block text-xs font-normal tabular-nums ${CLASE_TONO[tonoDiferencia(p.diferencia_importe, p.en_albaranes?.importe ?? null)]}`}>
             {p.diferencia_importe > 0 ? "+" : ""}
-            {formatCurrency(p.diferencia_importe)}
+            {formatImporte(p.diferencia_importe)}
           </span>
         )}
       </td>

@@ -10,8 +10,9 @@
  * 3 productos sacados de la misma compra de merluza.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 
 const base = vi.hoisted(() => {
   type Filtro = { metodo: string; args: unknown[] };
@@ -49,6 +50,8 @@ const base = vi.hoisted(() => {
     supabase: { rpc, from, functions: { invoke: vi.fn() }, storage: { from: () => ({ createSignedUrl: async () => ({ data: null, error: null }) }) } },
     rpc,
     rpcs,
+    /** Permiso de edición de Facturas (QA C-09). */
+    permiso: { editar: true },
     fijarTablas(f: typeof tablas) {
       tablas = f;
     },
@@ -61,7 +64,7 @@ const base = vi.hoisted(() => {
 vi.mock("@/integrations/supabase/client", () => ({ supabase: base.supabase }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } }));
 vi.mock("@/hooks/useUserRole", () => ({
-  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+  useCanAccessSection: (_s: string, tipo?: string) => ({ canAccess: tipo === "edit" ? base.permiso.editar : true, loading: false }),
 }));
 
 import { TabCompras } from "../compras/TabCompras";
@@ -156,17 +159,38 @@ function prepararBase() {
   });
 }
 
+/** El router de la prueba: URL actual y `navigate` (para el «Atrás» del navegador). */
+const sonda: { nav: NavigateFunction | null; qc: QueryClient | null } = { nav: null, qc: null };
+function Sonda() {
+  const loc = useLocation();
+  sonda.nav = useNavigate();
+  return <output data-testid="url">{loc.search}</output>;
+}
+const urlActual = () => screen.getByTestId("url").textContent ?? "";
+const atrasNavegador = () => act(() => sonda.nav?.(-1));
+
 function montar(
   onPreguntarIA = vi.fn(),
-  modoPedido?: { modo: "documentos" | "productos" | "proveedores"; clave: string; doc?: number; mes?: string; prov?: number },
+  modoPedido?: {
+    modo: "documentos" | "productos" | "proveedores";
+    clave: string;
+    doc?: number;
+    mes?: string;
+    prov?: number;
+    local?: "casa_tomas" | "touza";
+  },
 ) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
+  sonda.qc = qc;
   render(
-    <QueryClientProvider client={qc}>
-      <div style={{ height: 800 }}>
-        <TabCompras onPreguntarIA={onPreguntarIA} modoPedido={modoPedido} />
-      </div>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={["/facturas?tab=compras"]}>
+      <Sonda />
+      <QueryClientProvider client={qc}>
+        <div style={{ height: 800 }}>
+          <TabCompras onPreguntarIA={onPreguntarIA} modoPedido={modoPedido} />
+        </div>
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
   return onPreguntarIA;
 }
@@ -182,6 +206,7 @@ const numerosVisibles = () => filasDocs().map((b) => b.querySelector("[data-nume
 
 beforeEach(() => {
   prepararBase();
+  base.permiso.editar = true;
   // Qué meses salen desplegados depende de «hoy»: se fija para que el dato de prueba no caduque.
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 9, 10, 12, 0, 0));
@@ -405,7 +430,8 @@ describe("Compras · ficha a pantalla completa", () => {
     const ficha = await screen.findByTestId("ficha-compras");
     expect(await within(ficha).findByRole("heading", { name: /Merluza de pincho/ })).toBeInTheDocument();
     expect(await within(ficha).findByRole("figure", { name: /evolución del precio de merluza de pincho/i })).toBeInTheDocument();
-    expect(base.rpc).toHaveBeenCalledWith("serie_precios_agente", expect.objectContaining({ p_texto: "Merluza de pincho" }));
+    // La gráfica sale de las líneas de ESTE producto (QA C-04), no de la RPC por texto que mezclaba parecidos.
+    expect(base.rpc).not.toHaveBeenCalledWith("serie_precios_agente", expect.anything());
     expect(within(ficha).getByRole("button", { name: /Editar producto/ })).toBeInTheDocument();
 
     fireEvent.click(await within(ficha).findByRole("button", { name: "Abrir la factura F-100" }));
@@ -457,6 +483,14 @@ describe("Compras · enlaces desde Análisis (?mes= y ?prov=)", () => {
     await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
     expect(screen.getByRole("button", { name: "Solo Agosto 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
     expect(within(listaDocs()).getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("?mes=2026-09&local=touza abre Documentos con ese mes y ese local", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k-mes-local", mes: "2026-09", local: "touza" });
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
+    expect(within(screen.getByRole("group", { name: "Local" })).getByRole("button", { name: "Touza" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Solo Septiembre 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
+    expect(numerosVisibles()).toEqual(["F-101"]);
   });
 
   it("?prov=2 abre Proveedores con ese proveedor desplegado", async () => {
@@ -754,5 +788,209 @@ describe("Compras · lista ligera (documentos_lista, documento_compras, buscar_d
     fireEvent.click(fila);
     expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
     expect(llamadas("documento_compras")).toHaveLength(1);
+  });
+});
+
+// ─── QA del 05/11/2026 ───────────────────────────────────────────────────────
+describe("Compras · QA 05/11/2026", () => {
+  it("C-12: cada ficha es una entrada del historial; «Atrás» del navegador retrocede una ficha y luego a la lista", async () => {
+    montar();
+    fireEvent.click(modo(/^Productos/));
+    fireEvent.click(await within(await screen.findByTestId("lista-productos")).findByText("Merluza de pincho"));
+    await screen.findByRole("heading", { name: /Merluza de pincho/ });
+    expect(urlActual()).toBe("?tab=compras&producto=10");
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir la factura F-100" }));
+    expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
+    expect(urlActual()).toBe("?tab=compras&doc=1");
+    // Tercer nivel: de la línea al producto otra vez → «Volver a» la factura y la pila sigue.
+    fireEvent.click(await screen.findByRole("button", { name: "Ver el producto Merluza de pincho" }));
+    expect(await screen.findByRole("button", { name: "Volver a «factura F-100»" })).toBeInTheDocument();
+
+    await atrasNavegador();
+    expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Volver a «Merluza de pincho»" })).toBeInTheDocument();
+    await atrasNavegador();
+    expect(await screen.findByRole("heading", { name: /Merluza de pincho/ })).toBeInTheDocument();
+    await atrasNavegador();
+    expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument();
+    expect(listaVisible()).toBe(true);
+    expect(urlActual()).toBe("?tab=compras");
+    expect(modo(/^Productos/)).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("C-12: «Volver a la lista» desde el tercer nivel vuelve de una vez a la lista", async () => {
+    montar();
+    fireEvent.click(await screen.findByText("A-2"));
+    fireEvent.click(await screen.findByRole("link", { name: "Ver la factura F-101" }));
+    await screen.findByRole("heading", { name: "Factura F-101" });
+    fireEvent.click(volverALista());
+    expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument();
+    expect(urlActual()).toBe("?tab=compras");
+  });
+
+  it("C-01: «Qué le compras» con el nombre de la LÍNEA abre la ficha de su producto del catálogo", async () => {
+    base.rpcs.ficha_proveedor_agente = () => ({
+      proveedor: "Pescados Marta S.L.", docs: 3, top_productos: [
+        { producto: "MERLUZA PINCHO 3KG", unidad: "kg", ultimo_precio: 30, ultima_fecha: "2026-10-01" },
+        { producto: "Cosa rara", unidad: "ud", ultimo_precio: 1, ultima_fecha: "2026-10-01" },
+      ],
+    });
+    const normal = base.tablas;
+    base.fijarTablas((tabla, f) => {
+      const eq = (col: string) => f.find((x) => x.metodo === "eq" && x.args[0] === col)?.args[1];
+      if (tabla === "productos_factura" && eq("nombre") === "MERLUZA PINCHO 3KG") return [{ producto_id: 10 }];
+      if (tabla === "productos_factura" && (eq("nombre") !== undefined || f.some((x) => x.metodo === "ilike"))) return [];
+      return normal(tabla, f);
+    });
+    montar();
+    fireEvent.click(modo(/^Proveedores/));
+    const provs = await screen.findByTestId("lista-proveedores-compras");
+    fireEvent.click(within(provs).getByRole("button", { name: /^Pescados Marta S\.L\./ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver el producto MERLUZA PINCHO 3KG" }));
+    expect(await screen.findByRole("heading", { name: /Merluza de pincho/ })).toBeInTheDocument();
+
+    // Sin producto con ese nombre: Documentos con ese texto (la búsqueda mira en las líneas).
+    fireEvent.click(volverALista());
+    fireEvent.click(await screen.findByRole("button", { name: "Ver el producto Cosa rara" }));
+    await waitFor(() => expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true"));
+    expect(buscador()).toHaveValue("Cosa rara");
+  });
+
+  it("C-09: sin permiso de edición no hay «Editar» y «Sin revisar» no es un botón", async () => {
+    base.permiso.editar = false;
+    montar();
+    fireEvent.click(await screen.findByText("F-100"));
+    const ficha = await screen.findByTestId("ficha-compras");
+    await within(ficha).findByRole("heading", { name: "Factura F-100" });
+    expect(within(ficha).queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+    expect(within(ficha).getByText("Sin revisar")).toBeInTheDocument();
+    expect(within(ficha).queryByRole("button", { name: /Sin revisar/ })).not.toBeInTheDocument();
+    expect(within(ficha).queryByRole("button", { name: /Añadir línea/ })).not.toBeInTheDocument();
+  });
+
+  it("C-10: si fallan las líneas del producto no dice «0 documentos»", async () => {
+    const normal = base.tablas;
+    base.fijarTablas((tabla, f) => {
+      if (tabla === "productos_factura") throw new Error("sin conexión");
+      return normal(tabla, f);
+    });
+    montar();
+    fireEvent.click(modo(/^Productos/));
+    fireEvent.click(await within(await screen.findByTestId("lista-productos")).findByText("Merluza de pincho"));
+    const ficha = await screen.findByTestId("ficha-compras");
+    expect(await within(ficha).findByText("No se han podido leer los documentos de este producto")).toBeInTheDocument();
+    expect(within(ficha).queryByText(/Aparece en 0/)).not.toBeInTheDocument();
+    expect(within(ficha).getByRole("button", { name: "Reintentar" })).toBeInTheDocument();
+  });
+
+  it("C-08: con la lista de documentos caída, Proveedores no enseña 0 € sino el error con Reintentar", async () => {
+    const normal = base.tablas;
+    base.fijarTablas((tabla, f) => {
+      if (tabla === "facturas") throw new Error("sin conexión");
+      return normal(tabla, f);
+    });
+    montar();
+    fireEvent.click(modo(/^Proveedores/));
+    expect(await screen.findByText("No se han podido cargar los importes de los proveedores")).toBeInTheDocument();
+    expect(screen.queryByText(/0,00/)).not.toBeInTheDocument();
+    expect(cuenta(/^Proveedores/)).toBe("…");
+  });
+
+  it("C-17/C-18: contadores con punto de miles", async () => {
+    montar();
+    await screen.findByText("F-100");
+    const barra = screen.getByRole("toolbar", { name: "Filtrar documentos" });
+    expect(within(barra).getByRole("button", { name: /^Todo/ }).textContent).toMatch(/5$/);
+  });
+
+  it("C-14: tocar en cualquier punto del hueco de 44 px de la casilla la marca", async () => {
+    montar();
+    fireEvent.click(modo(/^Productos/));
+    const lista = await screen.findByTestId("lista-productos");
+    await within(lista).findByText("Merluza de pincho");
+    const hueco = within(lista).getAllByTestId("hueco-casilla")[0];
+    expect(hueco.tagName).toBe("LABEL");
+    expect(hueco.className).toContain("h-11");
+    expect(hueco.className).toContain("w-11");
+    fireEvent.click(hueco);
+    expect(await screen.findByText("1 seleccionado")).toBeInTheDocument();
+  });
+
+  it("Productos no pierde sus filtros al cambiar de modo y volver", async () => {
+    montar();
+    fireEvent.click(modo(/^Productos/));
+    await screen.findByTestId("lista-productos");
+    fireEvent.click(await screen.findByRole("button", { name: /Subieron de precio/ }));
+    expect(screen.getByRole("button", { name: /Subieron de precio/ })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(modo(/^Documentos/));
+    fireEvent.click(modo(/^Productos/));
+    expect(screen.getByRole("button", { name: /Subieron de precio/ })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("Compras · QA 05/11/2026 con la lista ligera", () => {
+  beforeEach(() => {
+    base.rpcs.documentos_lista = listaServidor;
+    base.rpcs.documento_compras = fichaServidor;
+    base.rpcs.buscar_documentos_compras = buscarServidor;
+  });
+
+  it("C-03: si falla el refresco con la lista a la vista, franja de aviso y la lista sigue", async () => {
+    montar();
+    await screen.findByText("F-100");
+    base.rpcs.documentos_lista = () => {
+      throw new Error("sin conexión");
+    };
+    await act(async () => {
+      await sonda.qc?.refetchQueries({ queryKey: ["facturas", "lista"] });
+    });
+    const aviso = await screen.findByTestId("aviso-refresco");
+    expect(aviso).toHaveTextContent("No se ha podido actualizar la lista");
+    expect(screen.getByText("F-100")).toBeInTheDocument();
+    expect(screen.queryByText("No se han podido cargar los documentos")).not.toBeInTheDocument();
+    base.rpcs.documentos_lista = listaServidor;
+    fireEvent.click(within(aviso).getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(screen.queryByTestId("aviso-refresco")).not.toBeInTheDocument());
+  });
+
+  it("C-02: si falla la búsqueda en las líneas se avisa (con Reintentar) y queda lo que casa en la cabecera", async () => {
+    montar();
+    await screen.findByText("F-100");
+    base.rpcs.buscar_documentos_compras = () => {
+      throw new Error("timeout");
+    };
+    fireEvent.change(buscador(), { target: { value: "F-10" } });
+    const aviso = await screen.findByTestId("aviso-busqueda");
+    expect(aviso).toHaveTextContent("No se ha podido buscar dentro de las líneas");
+    expect(numerosVisibles()).toEqual(["F-101", "F-100"]);
+    base.rpcs.buscar_documentos_compras = buscarServidor;
+    fireEvent.click(within(aviso).getByRole("button", { name: "Reintentar" }));
+    await waitFor(() => expect(screen.queryByTestId("aviso-busqueda")).not.toBeInTheDocument());
+  });
+
+  it("C-07: mientras se busca en las líneas no dice «Ningún documento coincide» y los contadores esperan", async () => {
+    let soltar: (v: unknown) => void = () => {};
+    const pendiente = new Promise((r) => (soltar = r));
+    const original = base.rpc.getMockImplementation();
+    base.rpc.mockImplementation(async (fn: string, args: Record<string, unknown> = {}) => {
+      if (fn === "buscar_documentos_compras") {
+        await pendiente;
+        return { data: buscarServidor(args), error: null };
+      }
+      return original!(fn, args);
+    });
+    try {
+      montar();
+      await screen.findByText("F-100");
+      fireEvent.change(buscador(), { target: { value: "merluza" } });
+      expect(await screen.findByTestId("buscando-en-lineas")).toHaveTextContent("Buscando en las líneas");
+      expect(screen.queryByText("Ningún documento coincide")).not.toBeInTheDocument();
+      expect(cuenta(/^Documentos/)).toBe("…");
+      soltar(null);
+      await waitFor(() => expect(cuenta(/^Documentos/)).toBe("3"));
+      expect(screen.queryByTestId("buscando-en-lineas")).not.toBeInTheDocument();
+    } finally {
+      base.rpc.mockImplementation(original!);
+    }
   });
 });

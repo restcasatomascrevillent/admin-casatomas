@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { formatCurrency, formatDateCorta, plural } from "@/components/facturas/shared/formatters";
+import { formatImporte, formatDateCorta, plural } from "@/components/facturas/shared/formatters";
 import { useEditarProveedor, useFusionarProveedores, useGuardarNotasIaProveedor, useNotasIaProveedores, useProveedores } from "@/hooks/useProveedores";
 import {
   cifsDistintos,
@@ -21,9 +21,9 @@ const limpiar = (s: string) => s.replace(/\s+/g, " ").trim();
 
 function resumenDocumentos(p: Proveedor): string {
   const partes: string[] = [];
-  if (p.facturas) partes.push(`${plural(p.facturas, "factura", "facturas")} · ${formatCurrency(p.total_facturas)}`);
+  if (p.facturas) partes.push(`${plural(p.facturas, "factura", "facturas")} · ${formatImporte(p.total_facturas)}`);
   // total_albaranes = solo los albaranes SIN factura (los facturados ya cuentan en su factura).
-  if (p.albaranes) partes.push(`${plural(p.albaranes, "albarán", "albaranes")}${p.total_albaranes ? ` · ${formatCurrency(p.total_albaranes)} sin factura` : ""}`);
+  if (p.albaranes) partes.push(`${plural(p.albaranes, "albarán", "albaranes")}${p.total_albaranes ? ` · ${formatImporte(p.total_albaranes)} sin factura` : ""}`);
   if (!partes.length) partes.push("Sin documentos");
   if (p.ultima_fecha) partes.push(`último ${formatDateCorta(p.ultima_fecha)}`);
   return partes.join(" · ");

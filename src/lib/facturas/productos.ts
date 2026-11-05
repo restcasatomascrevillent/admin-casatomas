@@ -166,7 +166,9 @@ export function filtrarProductos(
   mapa: MapaCategorias,
   resolver: ResolverProveedor = resolverPorTexto,
 ): ResumenProducto[] {
-  const q = normalizarBusqueda(f.busqueda);
+  // Cada palabra por separado (QA 05/11/2026, C-05): «aceite oliva» encuentra
+  // «Aceite de oliva virgen extra»; antes se buscaba la frase entera.
+  const palabras = palabrasProducto(f.busqueda);
   return lista.filter((p) => {
     if (f.soloConCompras && p.compras === 0) return false;
     if (f.categoria === "sin" && p.categoria_id !== null) return false;
@@ -174,12 +176,130 @@ export function filtrarProductos(
       return false;
     }
     if (f.proveedor && !(p.proveedores ?? []).some((n) => resolver(n).clave === f.proveedor)) return false;
-    if (q && !normalizarBusqueda(p.nombre).includes(q) && !normalizarBusqueda(rutaCategoria(mapa, p.categoria_id)).includes(q)) {
-      return false;
+    if (palabras.length > 0) {
+      const pajar = `${normalizarBusqueda(p.nombre)} ${normalizarBusqueda(rutaCategoria(mapa, p.categoria_id))}`;
+      if (!palabras.every((w) => pajar.includes(w))) return false;
     }
     return true;
   });
 }
+
+/** Palabras de la búsqueda (sin tildes ni mayúsculas); [] = sin búsqueda. */
+export const palabrasProducto = (texto: string | null | undefined): string[] => {
+  const q = normalizarBusqueda(texto);
+  return q ? q.split(" ") : [];
+};
+
+// ─── Evolución del precio de UN producto, desde sus líneas ───────────────────
+
+/** Lo que hace falta de una línea para la gráfica (`useLineasProducto`). */
+export interface LineaSerie {
+  fecha: string | null;
+  proveedor: string | null;
+  cantidad: number | null;
+  unidad: string | null;
+  precio_unitario: number | null;
+  total: number | null;
+  tipo?: string | null;
+  /** Albarán ya recogido en una factura: su precio ya cuenta en la factura. */
+  facturado_en_id?: number | null;
+}
+
+/** Máximo de puntos de la gráfica (los más recientes), como `serie_precios_agente`. */
+export const MAX_PUNTOS_SERIE = 60;
+
+const unidadSerie = (u: string | null | undefined) => (u ?? "").trim().toLowerCase() || "ud";
+
+/**
+ * Serie de precio de un producto del catálogo con SUS líneas (QA 05/11/2026,
+ * C-04): la RPC `serie_precios_agente` busca por texto y mezclaba productos
+ * parecidos («Merluza» con «Merluza del Cantábrico»), así que la gráfica no
+ * cuadraba con la cabecera. Mismo contrato que la RPC (`PuntoSerie`): un punto
+ * por fecha y proveedor (media ponderada por cantidad, sin IVA), una sola
+ * unidad (la más comprada), sin precios a 0 ni albaranes ya facturados, máx.
+ * 60 puntos. `nombreProveedor` unifica el texto del proveedor (opcional).
+ */
+export function serieDesdeLineas(
+  producto: string,
+  lineas: LineaSerie[],
+  nombreProveedor: (texto: string | null) => string = (t) => (t ?? "").trim() || "Sin proveedor",
+): DatosSerieProducto {
+  const validas = lineas
+    .map((l) => {
+      const precio = l.precio_unitario ?? (l.total !== null && l.cantidad ? l.total / l.cantidad : null);
+      return { l, precio };
+    })
+    .filter(
+      (x): x is { l: LineaSerie; precio: number } =>
+        x.precio !== null &&
+        Number.isFinite(x.precio) &&
+        x.precio > 0 &&
+        !!x.l.fecha &&
+        /^\d{4}-\d{2}-\d{2}/.test(x.l.fecha) &&
+        !(x.l.tipo === "albaran" && x.l.facturado_en_id != null),
+    );
+  if (validas.length === 0) return { sin_datos: true, buscado: producto };
+
+  // La unidad más comprada (a igualdad, la primera por orden alfabético).
+  const cuentaUnidad = new Map<string, number>();
+  for (const { l } of validas) cuentaUnidad.set(unidadSerie(l.unidad), (cuentaUnidad.get(unidadSerie(l.unidad)) ?? 0) + 1);
+  const unidad = [...cuentaUnidad].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0];
+
+  // Un punto por fecha y proveedor.
+  const grupos = new Map<string, { fecha: string; prov: string; suma: number; cant: number; precios: number[] }>();
+  for (const { l, precio } of validas) {
+    if (unidadSerie(l.unidad) !== unidad) continue;
+    const fecha = (l.fecha as string).slice(0, 10);
+    const prov = nombreProveedor(l.proveedor);
+    const k = `${fecha}\u0000${prov}`;
+    const g = grupos.get(k) ?? { fecha, prov, suma: 0, cant: 0, precios: [] };
+    if (l.cantidad !== null && l.cantidad > 0) {
+      g.suma += precio * l.cantidad;
+      g.cant += l.cantidad;
+    }
+    g.precios.push(precio);
+    grupos.set(k, g);
+  }
+  const todos = [...grupos.values()]
+    .map((g) => ({ fecha: g.fecha, prov: g.prov, precio: g.cant > 0 ? g.suma / g.cant : g.precios.reduce((a, b) => a + b, 0) / g.precios.length }))
+    .sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.prov.localeCompare(b.prov)));
+  const ultimos = todos.slice(-MAX_PUNTOS_SERIE);
+  // Proveedores por orden de primera aparición (como la RPC).
+  const proveedores: string[] = [];
+  for (const p of ultimos) if (!proveedores.includes(p.prov)) proveedores.push(p.prov);
+  const redondeo = (n: number) => Math.round(n * 10_000) / 10_000;
+  const puntos: [string, number, number][] = ultimos.map((p) => [p.fecha, redondeo(p.precio), proveedores.indexOf(p.prov)]);
+  const precios = puntos.map((p) => p[1]);
+  const primero = precios[0];
+  const ultimo = precios[precios.length - 1];
+  return {
+    producto,
+    unidad,
+    proveedores,
+    puntos,
+    n: puntos.length,
+    min: Math.min(...precios),
+    max: Math.max(...precios),
+    ultimo,
+    // Solo con un proveedor: entre proveedores es una comparativa, no una evolución.
+    variacion_pct: puntos.length >= 2 && proveedores.length === 1 && primero > 0 ? Math.round((ultimo / primero - 1) * 1000) / 10 : null,
+  };
+}
+
+/** Lo que devuelve `serieDesdeLineas` (el contrato de `serie_precios_agente`). */
+export type DatosSerieProducto =
+  | {
+      producto: string;
+      unidad: string | null;
+      proveedores: string[];
+      puntos: [string, number, number][];
+      n: number;
+      min: number | null;
+      max: number | null;
+      ultimo: number | null;
+      variacion_pct: number | null;
+    }
+  | { sin_datos: true; buscado: string };
 
 export interface TotalCategoria {
   /** id de la categoría raíz; "sin" = productos sin categoría; "pendiente" = líneas sin producto. */
