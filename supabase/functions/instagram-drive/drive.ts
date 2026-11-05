@@ -28,6 +28,15 @@
  *     Chromium necesitan una URL pública directa. De paso borra las copias
  *     tmp/ de más de 24 h (limpieza oportunista).
  *
+ *   POST { "accion": "preparar", "origen": "carta", "marca": …, "platoId": "<id>" }
+ *     200 { ok, ruta: "tmp/<uuid>.<jpg|png|webp>", url, ancho, alto }. Igual,
+ *     pero con la foto de un plato de la carta (tabla "Platos", leída con el
+ *     JWT del usuario). Solo si el plato es de la marca (restaurante/touza),
+ *     está activo y su imagen_url es del bucket público «platos» de ESTE
+ *     Supabase (SUPABASE_URL); si no, 400. La URL se reconstruye desde la ruta
+ *     (no se descarga la que hay en la fila) y no se siguen redirecciones.
+ *     No necesita los secretos de Google.
+ *
  *   Seguridad: solo se leen ficheros que estén DENTRO de la carpeta de la
  *   marca (por `parents`), aunque el token pueda ver más (facturas, etc.).
  *
@@ -172,6 +181,20 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
     if (typeof cuerpo.accion === "string") accion = cuerpo.accion;
   }
 
+  // La foto de la carta no pasa por Google Drive: funciona aunque falten sus secretos.
+  if (request.method === "POST" && accion === "preparar" && cuerpo.origen === "carta") {
+    try {
+      return await prepararCarta(s, cuerpo.marca, cuerpo.platoId, deps);
+    } catch (e) {
+      if (e instanceof ErrorSupabase) {
+        registro("error", ETIQUETA, "Supabase (carta)", e);
+        return json(e.estado === 401 || e.estado === 403 ? 403 : 500, { ok: false, error: e.message });
+      }
+      registro("error", ETIQUETA, "fallo (carta)", e);
+      return json(502, { ok: false, error: "No se pudo copiar la foto de la carta", detalle: sanear((e as Error)?.message ?? e) });
+    }
+  }
+
   const cfg = leerConfigDrive(env, { fetch: deps.fetch, ahora: deps.ahora });
   if ("faltan" in cfg) return sinConfig(cfg.faltan, cfg.problema, env);
   const c = cfg.config;
@@ -247,6 +270,99 @@ async function preparar(s: Sesion, c: ConfigDriveInstagram, marca: unknown, id: 
   const m = medidasDrive(f) ?? (tipo === "image/jpeg" ? medidasJpeg(bytes) : null);
   await limpiarTmp(s, deps.ahora ?? Date.now, ruta);
   return json(200, { ok: true, ruta, url: urlPublica(s.sb, ruta), ancho: m?.ancho ?? null, alto: m?.alto ?? null });
+}
+
+const RE_ID_PLATO = /^[A-Za-z0-9_-]{1,100}$/;
+const PREFIJO_PLATOS = "/storage/v1/object/public/platos/";
+
+/**
+ * Ruta en el bucket público «platos» de una URL de NUESTRO Supabase, o null
+ * (otro host/puerto/esquema, credenciales, otro bucket, «..», %-codificados).
+ * Es la misma regla que rutaPlatoDeUrl de src/lib/instagram/fotos.ts.
+ */
+export function rutaPlatoDeUrl(url: unknown, supabaseUrl: string): string | null {
+  if (typeof url !== "string" || url.length > 1000 || !supabaseUrl) return null;
+  let u: URL;
+  let base: URL;
+  try {
+    u = new URL(url);
+    base = new URL(supabaseUrl);
+  } catch {
+    return null;
+  }
+  if (u.origin !== base.origin || u.username || u.password) return null;
+  if (!u.pathname.startsWith(PREFIJO_PLATOS)) return null;
+  const ruta = u.pathname.slice(PREFIJO_PLATOS.length);
+  if (!ruta || ruta.includes("..") || ruta.includes("%") || ruta.includes("//") || !/^[A-Za-z0-9_./ -]+$/.test(ruta)) return null;
+  return ruta;
+}
+
+/** Medidas de un PNG (IHDR) o WebP (VP8 / VP8L / VP8X); JPEG con medidasJpeg. null si no se sabe. */
+export function medidasImagen(b: Uint8Array, tipo: string): { ancho: number; alto: number } | null {
+  if (tipo === "image/jpeg") return medidasJpeg(b);
+  const u32be = (i: number) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
+  const txt = (i: number, n: number) => String.fromCharCode(...b.subarray(i, i + n));
+  if (tipo === "image/png" && b.length >= 24 && b[0] === 0x89 && txt(12, 4) === "IHDR") {
+    return { ancho: u32be(16), alto: u32be(20) };
+  }
+  if (tipo === "image/webp" && b.length >= 30 && txt(0, 4) === "RIFF" && txt(8, 4) === "WEBP") {
+    const trozo = txt(12, 4);
+    if (trozo === "VP8 " && b[23] === 0x9d && b[24] === 0x01 && b[25] === 0x2a) {
+      return { ancho: (b[26] | (b[27] << 8)) & 0x3fff, alto: (b[28] | (b[29] << 8)) & 0x3fff };
+    }
+    if (trozo === "VP8L" && b[20] === 0x2f) {
+      const v = b[21] | (b[22] << 8) | (b[23] << 16) | (b[24] << 24);
+      return { ancho: (v & 0x3fff) + 1, alto: ((v >>> 14) & 0x3fff) + 1 };
+    }
+    if (trozo === "VP8X") {
+      return { ancho: 1 + (b[24] | (b[25] << 8) | (b[26] << 16)), alto: 1 + (b[27] | (b[28] << 8) | (b[29] << 16)) };
+    }
+  }
+  return null;
+}
+
+interface FilaPlato {
+  id: string;
+  imagen_url: string | null;
+  activado: boolean | null;
+  restaurante: boolean | null;
+  touza: boolean | null;
+}
+
+/** Copia la foto de un plato de la carta a tmp/ (ver la cabecera). */
+async function prepararCarta(s: Sesion, marca: unknown, platoId: unknown, deps: DependenciasDrive): Promise<Response> {
+  if (!esMarcaDrive(marca) || typeof platoId !== "string" || !RE_ID_PLATO.test(platoId)) {
+    return json(400, { ok: false, error: "Faltan «marca» o «platoId» válidos" });
+  }
+  // Con el JWT del usuario: decide la RLS de "Platos".
+  const r = await s.fetch(`${s.sb.url}/rest/v1/Platos?id=eq.${encodeURIComponent(platoId)}&select=id,imagen_url,activado,restaurante,touza`, {
+    headers: { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudo leer el plato (${r.status})`, r.status);
+  const filas = (await r.json().catch(() => [])) as FilaPlato[];
+  const plato = Array.isArray(filas) ? filas[0] : undefined;
+  if (!plato) return json(404, { ok: false, error: "Ese plato no existe (o no tienes permiso para verlo)" });
+  const deMarca = marca === "touza" ? plato.touza === true : plato.restaurante === true;
+  if (!deMarca || plato.activado !== true) return json(404, { ok: false, error: "Ese plato no está activo en la carta de esta marca" });
+  const ruta = rutaPlatoDeUrl(plato.imagen_url, s.sb.url);
+  if (!ruta) return json(400, { ok: false, error: "La foto de ese plato no está en el bucket «platos» de este Supabase" });
+
+  // Se reconstruye la URL (nunca la de la fila) y no se siguen redirecciones.
+  const origenUrl = `${s.sb.url}${PREFIJO_PLATOS}${ruta.split("/").map(encodeURIComponent).join("/")}`;
+  const d = await s.fetch(origenUrl, { redirect: "error", signal: AbortSignal.timeout(20_000) });
+  if (!d.ok) return json(502, { ok: false, error: `No se pudo descargar la foto del plato (${d.status})` });
+  const tipo = (d.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  if (!TIPOS_IMAGEN[tipo]) return json(422, { ok: false, error: `La foto del plato es ${tipo || "de un tipo desconocido"}; solo valen JPEG, PNG o WebP` });
+  if (Number(d.headers.get("content-length") ?? "0") > MAX_BYTES_FOTO) return json(422, { ok: false, error: "La foto del plato pesa más de 8 MB" });
+  const bytes = new Uint8Array(await d.arrayBuffer());
+  if (bytes.byteLength > MAX_BYTES_FOTO) return json(422, { ok: false, error: "La foto del plato pesa más de 8 MB" });
+
+  const destino = `tmp/${(deps.nuevoId ?? (() => crypto.randomUUID()))()}.${TIPOS_IMAGEN[tipo]}`;
+  await subirObjeto(s, destino, bytes, tipo);
+  const m = medidasImagen(bytes, tipo);
+  await limpiarTmp(s, deps.ahora ?? Date.now, destino);
+  return json(200, { ok: true, ruta: destino, url: urlPublica(s.sb, destino), ancho: m?.ancho ?? null, alto: m?.alto ?? null });
 }
 
 /** Borra las copias tmp/ de más de 24 h. Oportunista: nunca falla la petición. */

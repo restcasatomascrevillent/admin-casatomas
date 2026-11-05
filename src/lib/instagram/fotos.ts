@@ -42,6 +42,10 @@ export interface Foto {
   driveId?: string;
   /** Por qué no se puede usar aunque las medidas valgan (formato HEIC, más de 8 MB…). */
   problema?: string | null;
+  /** Id del plato (fotos de la carta, «carta:<id>»). */
+  platoId?: string;
+  /** URL pública de la foto en la carta (bucket «platos»): solo para la miniatura. */
+  urlCarta?: string;
 }
 
 // <catalogo> — generado por scripts/instagram/subir-recursos.mjs: no editar a mano.
@@ -253,4 +257,118 @@ export function rutaTmpDeUrl(url: unknown, supabaseUrl: string): string | null {
   if (!u.pathname.startsWith(prefijo)) return null;
   const ruta = u.pathname.slice(prefijo.length);
   return RE_RUTA_TMP.test(ruta) ? ruta : null;
+}
+
+// ── Fotos de la carta (tabla "Platos", bucket público «platos») ──────────────
+
+/** Prefijo del id de las fotos de la carta en las piezas: «carta:<id del plato>». */
+export const PREFIJO_FOTO_CARTA = "carta:";
+const RE_ID_PLATO = /^[A-Za-z0-9_-]{1,100}$/;
+
+export function esIdPlatoValido(v: unknown): v is string {
+  return typeof v === "string" && RE_ID_PLATO.test(v);
+}
+
+/** «carta:<id>» a partir del id del plato. */
+export function idFotoCarta(platoId: string): string {
+  return `${PREFIJO_FOTO_CARTA}${platoId}`;
+}
+
+/** Id del plato de un id de foto «carta:<id>» (null si no es de la carta o no es válido). */
+export function platoIdDeFoto(id: unknown): string | null {
+  if (typeof id !== "string" || !id.startsWith(PREFIJO_FOTO_CARTA)) return null;
+  const p = id.slice(PREFIJO_FOTO_CARTA.length);
+  return esIdPlatoValido(p) ? p : null;
+}
+
+/** Origen de una foto que hay que «preparar» (copiar a tmp/) antes de pintarla. */
+export type FotoPreparable = { origen: "drive"; id: string } | { origen: "carta"; id: string };
+
+/** Drive («drive:<id>») o carta («carta:<id>»); null para el resto (catálogo estático, subidas antiguas). */
+export function fotoPreparable(id: unknown): FotoPreparable | null {
+  const d = driveIdDeFoto(id);
+  if (d) return { origen: "drive", id: d };
+  const p = platoIdDeFoto(id);
+  return p ? { origen: "carta", id: p } : null;
+}
+
+/** Ruta dentro del bucket público «platos» de una URL de NUESTRO Supabase (null si es de otro sitio). */
+export function rutaPlatoDeUrl(url: unknown, supabaseUrl: string): string | null {
+  if (typeof url !== "string" || url.length > 1000 || !supabaseUrl) return null;
+  let u: URL;
+  let base: URL;
+  try {
+    u = new URL(url);
+    base = new URL(supabaseUrl);
+  } catch {
+    return null;
+  }
+  if (u.origin !== base.origin || u.username || u.password) return null;
+  const prefijo = "/storage/v1/object/public/platos/";
+  if (!u.pathname.startsWith(prefijo)) return null;
+  const ruta = u.pathname.slice(prefijo.length);
+  if (!ruta || ruta.includes("..") || ruta.includes("%") || ruta.includes("//") || !/^[A-Za-z0-9_./ -]+$/.test(ruta)) return null;
+  return ruta;
+}
+
+/** Lo que hace falta de una fila de "Platos". */
+export interface FilaPlatoFoto {
+  id: string;
+  nombre: string | null;
+  categoria: string | null;
+  imagen_url: string | null;
+  activado?: boolean | null;
+  restaurante?: boolean | null;
+  touza?: boolean | null;
+}
+
+/** ¿El plato es de la marca? restaurante=true → Casa Tomás; touza=true → Touza. */
+export function platoEsDeMarca(fila: Pick<FilaPlatoFoto, "restaurante" | "touza">, marca: MarcaId): boolean {
+  return marca === "touza" ? fila.touza === true : fila.restaurante === true;
+}
+
+/**
+ * Plato → Foto del catálogo (tipo «plato», descripción = nombre · categoría).
+ * `medidas` son las reales de la imagen (naturalWidth/naturalHeight al cargar
+ * la miniatura); sin ellas sale 0×0 y NO se bloquea en el selector: las
+ * medidas buenas llegan al cargar o al preparar. `url` es la pública de la
+ * carta (miniatura); `ruta`, la copia tmp/ del bucket «instagram» una vez preparada.
+ */
+export function fotoDesdePlato(fila: FilaPlatoFoto, marca: MarcaId, medidas?: { ancho: number; alto: number } | null, ruta = ""): Foto | null {
+  if (!fila || !esIdPlatoValido(fila.id) || typeof fila.imagen_url !== "string" || !fila.imagen_url.trim()) return null;
+  const ancho = medidas && Number.isInteger(medidas.ancho) && medidas.ancho > 0 ? medidas.ancho : 0;
+  const alto = medidas && Number.isInteger(medidas.alto) && medidas.alto > 0 ? medidas.alto : 0;
+  const nombre = (fila.nombre ?? "").trim();
+  const categoria = (fila.categoria ?? "").trim();
+  const apta = (formato: FormatoId) => ancho > 0 && alto > 0 && esAptaPara({ ancho, alto }, formato);
+  return {
+    id: idFotoCarta(fila.id),
+    marca,
+    ruta,
+    ancho,
+    alto,
+    tipo: "plato",
+    aptaPost: apta("post"),
+    aptaStory: apta("story"),
+    descripcion: [nombre, categoria].filter(Boolean).join(" · ") || "Plato de la carta",
+    platoId: fila.id,
+    urlCarta: fila.imagen_url.trim(),
+  };
+}
+
+/**
+ * Platos de la carta de una marca → fotos: solo activos, con foto y de la
+ * marca (restaurante/touza). `medidas` por id de plato (las que ya se sepan).
+ */
+export function fotosDesdePlatos(filas: readonly FilaPlatoFoto[], marca: MarcaId, medidas: Readonly<Record<string, { ancho: number; alto: number }>> = {}): Foto[] {
+  const vistos = new Set<string>();
+  const fotos: Foto[] = [];
+  for (const fila of filas ?? []) {
+    if (!fila || fila.activado !== true || !platoEsDeMarca(fila, marca) || vistos.has(fila.id)) continue;
+    const foto = fotoDesdePlato(fila, marca, medidas[fila.id]);
+    if (!foto) continue;
+    vistos.add(fila.id);
+    fotos.push(foto);
+  }
+  return fotos;
 }

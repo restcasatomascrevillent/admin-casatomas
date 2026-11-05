@@ -166,3 +166,32 @@ describe("POST /api/instagram-render con una foto de Google Drive (fotoPreparada
     }
   });
 });
+
+describe("POST /api/instagram-render con una foto de la carta (fotoPreparada «carta:<id>»)", () => {
+  const PLATO = "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const TMP = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const URL_TMP = `${SB}/storage/v1/object/public/instagram/tmp/${TMP}.webp`;
+  const piezaCarta = { ...PIEZA, foto: `carta:${PLATO}` };
+  const preparada = (extra: Record<string, unknown> = {}) => ({ id: `carta:${PLATO}`, url: URL_TMP, ancho: 1080, alto: 1440, tipo: "plato", marca: "casa-tomas", ...extra });
+
+  it("pinta la copia tmp/ (webp) de NUESTRO bucket; el tipo es siempre «plato»", async () => {
+    const renderizar = vi.fn(jpgFalso);
+    const r = await manejarRender(peticion({ pieza: piezaCarta, fotoPreparada: preparada({ tipo: null }) }), { env: ENV_SB, fetch: falso([]), renderizar });
+    expect(r.status).toBe(200);
+    expect(renderizar.mock.calls[0][0].html).toContain(URL_TMP);
+  });
+
+  it("la URL tiene que ser tmp/ del bucket «instagram»: la de la carta (bucket «platos») u otra → 400", async () => {
+    for (const url of [`${SB}/storage/v1/object/public/platos/platos/chuleta.webp`, "https://evil.example.com/x.webp"]) {
+      const renderizar = vi.fn(jpgFalso);
+      const r = await manejarRender(peticion({ pieza: piezaCarta, fotoPreparada: preparada({ url }) }), { env: ENV_SB, fetch: falso([]), renderizar });
+      expect(r.status, url).toBe(400);
+      expect(renderizar).not.toHaveBeenCalled();
+    }
+  });
+
+  it("fotoPreparada de otra foto → 400; sin fotoPreparada → 422", async () => {
+    expect((await manejarRender(peticion({ pieza: piezaCarta, fotoPreparada: preparada({ id: "carta:otro" }) }), { env: ENV_SB, fetch: falso([]), renderizar: jpgFalso })).status).toBe(400);
+    expect((await manejarRender(peticion({ pieza: piezaCarta }), { env: ENV_SB, fetch: falso([]), renderizar: jpgFalso })).status).toBe(422);
+  });
+});

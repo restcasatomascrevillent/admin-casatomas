@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, ImageOff, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ import {
 } from "@/lib/instagram";
 import { miniaturaDrive, textoError } from "./api";
 import { SubirFotoDialog } from "./SubirFotoDialog";
-import { useFotosInstagram } from "./useFotosInstagram";
+import { anotarMedidasCarta, useFotosInstagram } from "./useFotosInstagram";
 
 const NOMBRE_FORMATO: Record<FormatoId, string> = { post: "un post", story: "una story" };
 
@@ -28,6 +28,9 @@ export function motivoNoApta(foto: Foto, formato: FormatoId, plantilla?: Pick<Pl
   if (foto.tipo && plantilla?.tiposFoto?.length && !plantilla.tiposFoto.includes(foto.tipo)) {
     return `Esta plantilla no usa fotos de tipo «${foto.tipo}».`;
   }
+  // Foto de la carta cuyas medidas aún no se saben (no ha cargado la miniatura): no se bloquea;
+  // al cargar o al prepararla llegan las reales y la validación de la pieza manda.
+  if ((!foto.ancho || !foto.alto) && foto.platoId) return null;
   if (!foto.ancho || !foto.alto) return "Drive todavía no sabe las medidas de esta foto: vuelve a abrir la biblioteca en un rato.";
   if (!esAptaPara(foto, formato)) {
     const f = FORMATOS[formato];
@@ -69,6 +72,38 @@ function MiniaturaDrive({ marca, driveId }: { marca: MarcaId; driveId: string })
   );
 }
 
+/** Miniatura de una foto de la carta: URL pública del bucket «platos»; al cargar apunta sus medidas reales. */
+function MiniaturaCarta({ platoId, url }: { platoId: string; url: string }) {
+  const qc = useQueryClient();
+  const [rota, setRota] = useState(false);
+  if (rota) {
+    return (
+      <span className="flex h-full w-full items-center justify-center text-muted-foreground">
+        <ImageOff className="h-4 w-4" aria-hidden="true" />
+        <span className="sr-only">Sin miniatura</span>
+      </span>
+    );
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="h-full w-full object-cover"
+      onLoad={(e) => anotarMedidasCarta(qc, platoId, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+      onError={() => setRota(true)}
+    />
+  );
+}
+
+type FiltroOrigen = "todas" | "drive" | "carta";
+const FILTROS: ReadonlyArray<{ id: FiltroOrigen; nombre: string }> = [
+  { id: "todas", nombre: "Todas" },
+  { id: "drive", nombre: "Drive" },
+  { id: "carta", nombre: "Carta" },
+];
+
 interface Props {
   marca: MarcaId;
   formato: FormatoId;
@@ -82,7 +117,15 @@ interface Props {
 
 export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseFotos, conProblema }: Props) {
   // Biblioteca de la marca en Google Drive (Edge Function instagram-drive).
-  const { fotos, avisos, cargando, error } = useFotosInstagram(marca);
+  // Más los platos de la carta con foto (tipo «plato», id «carta:<id>»).
+  const { fotos: todas, avisos, cargando, error, cargandoCarta, errorCarta } = useFotosInstagram(marca);
+  const [filtro, setFiltro] = useState<FiltroOrigen>("todas");
+  const cuantas: Record<FiltroOrigen, number> = {
+    todas: todas.length,
+    drive: todas.filter((f) => !f.platoId).length,
+    carta: todas.filter((f) => !!f.platoId).length,
+  };
+  const fotos = filtro === "todas" ? todas : todas.filter((f) => (filtro === "carta" ? !!f.platoId : !f.platoId));
   // En el móvil no hay «title» al pasar el ratón: al tocar una foto que no vale se explica debajo.
   const [aviso, setAviso] = useState<string | null>(null);
   const [subir, setSubir] = useState(false);
@@ -92,13 +135,29 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
       <legend className="text-sm font-medium">Foto</legend>
       <div className="mb-2 flex items-start justify-between gap-2">
         <p id="ayuda-foto" className="text-xs text-muted-foreground">
-          Fotos de la carpeta de Google Drive de la marca. Las que salen en gris no sirven para este formato o plantilla: tócalas para ver por qué.
-          Para quitar una, bórrala en Drive.
+          Fotos de la carpeta de Google Drive de la marca y de los platos de la carta (marcadas «Carta»). Las que salen en gris no sirven para este formato o plantilla: tócalas para ver por qué.
+          Para quitar una de Drive, bórrala en Drive.
         </p>
         <Button type="button" variant="outline" size="sm" onClick={() => setSubir(true)} className="h-7 shrink-0 px-2 pointer-coarse:min-h-11">
           <ImagePlus className="mr-1 h-4 w-4" aria-hidden="true" />
           Subir foto
         </Button>
+      </div>
+      <div role="group" aria-label="Origen de las fotos" className="mb-2 flex flex-wrap gap-1">
+        {FILTROS.map((f) => (
+          <Button
+            key={f.id}
+            type="button"
+            size="sm"
+            variant={filtro === f.id ? "secondary" : "ghost"}
+            aria-pressed={filtro === f.id}
+            data-testid={`filtro-origen-${f.id}`}
+            onClick={() => setFiltro(f.id)}
+            className="h-7 px-2 text-xs pointer-coarse:min-h-11"
+          >
+            {f.nombre} ({cuantas[f.id]})
+          </Button>
+        ))}
       </div>
       {avisos.map((a) => (
         <p key={a} className="mb-2 flex items-start gap-1.5 text-xs text-amber-700" data-testid="aviso-biblioteca">
@@ -117,8 +176,16 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
           No se pueden cargar las fotos de Drive: {textoError(error)} Mira la pestaña «Conexión» → Comprobar.
         </p>
       )}
-      {!cargando && !error && fotos.length === 0 && (
+      {errorCarta && filtro !== "drive" && (
+        <p role="alert" className="mb-2 text-xs text-destructive" data-testid="error-carta">
+          No se pueden cargar las fotos de la carta: {textoError(errorCarta)}
+        </p>
+      )}
+      {!cargando && !error && filtro !== "carta" && cuantas.drive === 0 && (
         <p className="text-xs text-muted-foreground">Aún no hay fotos en la carpeta de Drive de esta marca: sube la primera con «Subir foto».</p>
+      )}
+      {!cargandoCarta && !errorCarta && filtro === "carta" && cuantas.carta === 0 && (
+        <p className="text-xs text-muted-foreground">No hay platos activos con foto en la carta de esta marca.</p>
       )}
       <div role="radiogroup" aria-label="Foto" className="grid grid-cols-4 gap-1.5 sm:grid-cols-5 lg:grid-cols-3 xl:grid-cols-4">
         {fotos.map((foto) => {
@@ -133,7 +200,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
                 aria-checked={elegida}
                 aria-disabled={motivo ? true : undefined}
                 title={motivo ?? descripcion}
-                aria-label={`${descripcion}${motivo ? ` No disponible: ${motivo}` : ""}`}
+                aria-label={`${foto.platoId ? "Carta: " : ""}${descripcion}${motivo ? ` No disponible: ${motivo}` : ""}`}
                 data-testid={`foto-${foto.id}`}
                 // aria-disabled (no `disabled`): sigue siendo enfocable y el lector de pantalla lee el motivo.
                 onClick={() => {
@@ -147,10 +214,17 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
                   motivo && "cursor-not-allowed opacity-40 grayscale",
                 )}
               >
-                {foto.driveId ? (
+                {foto.platoId && foto.urlCarta ? (
+                  <MiniaturaCarta platoId={foto.platoId} url={foto.urlCarta} />
+                ) : foto.driveId ? (
                   <MiniaturaDrive marca={foto.marca} driveId={foto.driveId} />
                 ) : (
                   <img src={urlRecurso(baseFotos, foto.ruta)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                )}
+                {foto.platoId && (
+                  <span className="absolute bottom-1 left-1 rounded bg-primary/90 px-1 text-[10px] font-medium leading-4 text-primary-foreground" aria-hidden="true">
+                    Carta
+                  </span>
                 )}
                 {!foto.tipo && (
                   <span className="absolute bottom-1 left-1 rounded bg-background/90 px-1 text-[10px] font-medium leading-4 text-foreground" aria-hidden="true">
@@ -173,7 +247,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
         </p>
       )}
       {valor && (() => {
-        const elegida = fotos.find((f) => f.id === valor);
+        const elegida = todas.find((f) => f.id === valor);
         const motivo = elegida ? motivoNoApta(elegida, formato, plantilla) : null;
         return motivo ? <p className="mt-1 text-xs text-destructive">La foto elegida no vale: {motivo}</p> : null;
       })()}

@@ -222,3 +222,95 @@ describe("Edge Function instagram-drive", () => {
     expect((await manejarDrive(new Request(`${SB}/functions/v1/instagram-drive`, { method: "OPTIONS" }), { env: ENV, fetch: f })).status).toBe(204);
   });
 });
+
+describe("instagram-drive · preparar una foto de la carta (origen «carta»)", () => {
+  const PLATO = "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+  const URL_PLATO = `${SB}/storage/v1/object/public/platos/platos/chuleta.webp`;
+
+  /** WebP mínimo (cabecera VP8X) de ancho×alto. */
+  function webpDe(ancho: number, alto: number): Uint8Array {
+    const b = new Uint8Array(40);
+    b.set([..."RIFF"].map((c) => c.charCodeAt(0)), 0);
+    b.set([..."WEBPVP8X"].map((c) => c.charCodeAt(0)), 8);
+    b[16] = 10;
+    const a = ancho - 1;
+    const h = alto - 1;
+    b.set([a & 0xff, (a >> 8) & 0xff, (a >> 16) & 0xff, h & 0xff, (h >> 8) & 0xff, (h >> 16) & 0xff], 24);
+    return b;
+  }
+
+  /** Supabase simulado + tabla "Platos" + bucket «platos». */
+  function conCarta(fila: Record<string, unknown> | null, o: { tipo?: string; listado?: unknown[] } = {}) {
+    const base = falso({ listado: o.listado ?? [] });
+    const f = vi.fn(async (entrada: string | URL | Request, init: RequestInit = {}) => {
+      const url = String(entrada);
+      if (url.startsWith(`${SB}/rest/v1/Platos?`)) {
+        base.llamadas.push({ url, metodo: "GET", cabeceras: Object.fromEntries(new Headers(init.headers as HeadersInit).entries()), cuerpo: null, bruto: null } as never);
+        return new Response(JSON.stringify(fila ? [fila] : []), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith(`${SB}/storage/v1/object/public/platos/`)) {
+        base.llamadas.push({ url, metodo: "GET", cabeceras: {}, cuerpo: null, bruto: init } as never);
+        return new Response(webpDe(1080, 1440) as Uint8Array<ArrayBuffer>, { status: 200, headers: { "Content-Type": o.tipo ?? "image/webp" } });
+      }
+      return base.f(entrada, init);
+    });
+    return { f, llamadas: base.llamadas };
+  }
+  const filaPlato = (o: Record<string, unknown> = {}) => ({ id: PLATO, imagen_url: URL_PLATO, activado: true, restaurante: true, touza: false, ...o });
+
+  it("válido: lee el plato con el JWT, copia su WebP a tmp/<uuid>.webp y devuelve URL y medidas, sin secretos de Google", async () => {
+    const vieja = new Date(AHORA - 25 * 3600 * 1000).toISOString();
+    const { f, llamadas } = conCarta(filaPlato(), { listado: [{ name: "vieja.jpg", created_at: vieja }] });
+    // Solo Supabase: la foto de la carta no pasa por Google Drive.
+    const r = await manejarDrive(pedir({ accion: "preparar", origen: "carta", marca: "casa-tomas", platoId: PLATO }), { env: ENV_SB, fetch: f, ...deps });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({
+      ok: true,
+      ruta: `tmp/${UUID}.webp`,
+      url: `${SB}/storage/v1/object/public/instagram/tmp/${UUID}.webp`,
+      ancho: 1080,
+      alto: 1440,
+    });
+    const lectura = llamadas.find((l) => l.url.startsWith(`${SB}/rest/v1/Platos?`))!;
+    expect(lectura.url).toContain(`id=eq.${PLATO}`);
+    expect(lectura.cabeceras.authorization).toBe(`Bearer ${JWT}`);
+    const descarga = llamadas.find((l) => l.url.startsWith(`${SB}/storage/v1/object/public/platos/`))!;
+    expect(descarga.url).toBe(URL_PLATO);
+    expect((descarga.bruto as RequestInit).redirect).toBe("error");
+    const subida = llamadas.find((l) => l.url === `${SB}/storage/v1/object/instagram/tmp/${UUID}.webp`)!;
+    expect(subida.cabeceras["content-type"]).toBe("image/webp");
+    expect(subida.cabeceras.authorization).toBe(`Bearer ${JWT}`);
+    // La limpieza de tmp/ de más de 24 h también corre aquí.
+    expect(JSON.parse(llamadas.find((l) => l.metodo === "DELETE")!.cuerpo!)).toEqual({ prefixes: ["tmp/vieja.jpg"] });
+  });
+
+  it("URL ajena (otro host, otro proyecto, otro bucket, «..») → 400 sin descargar nada", async () => {
+    for (const imagen_url of [
+      "https://evil.example.com/storage/v1/object/public/platos/a.webp",
+      "https://haqmmdfdzzatdnrrcgez.supabase.co/storage/v1/object/public/platos/a.webp",
+      `${SB}.evil.com/storage/v1/object/public/platos/a.webp`,
+      `${SB}/storage/v1/object/public/instagram/tmp/a.webp`,
+      `${SB}/storage/v1/object/public/platos/%2e%2e/instagram/a.webp`,
+      "http://169.254.169.254/latest/meta-data/",
+    ]) {
+      const { f, llamadas } = conCarta(filaPlato({ imagen_url }));
+      const r = await manejarDrive(pedir({ accion: "preparar", origen: "carta", marca: "casa-tomas", platoId: PLATO }), { env: ENV_SB, fetch: f, ...deps });
+      expect(r.status, imagen_url).toBe(400);
+      expect(llamadas.some((l) => !l.url.startsWith(SB) || l.url.includes("/object/public/") || l.url.includes("/object/instagram/")), imagen_url).toBe(false);
+    }
+  });
+
+  it("plato de otra marca, inactivo o inexistente → 404; id o marca raros → 400; tipo no imagen → 422", async () => {
+    const pedirCarta = (cuerpo: Record<string, unknown>, fila: Record<string, unknown> | null, tipo?: string) => {
+      const { f } = conCarta(fila, { tipo });
+      return manejarDrive(pedir({ accion: "preparar", origen: "carta", marca: "casa-tomas", platoId: PLATO, ...cuerpo }), { env: ENV_SB, fetch: f, ...deps }).then((r) => r.status);
+    };
+    expect(await pedirCarta({}, filaPlato({ restaurante: false, touza: true }))).toBe(404);
+    expect(await pedirCarta({ marca: "touza" }, filaPlato())).toBe(404);
+    expect(await pedirCarta({}, filaPlato({ activado: false }))).toBe(404);
+    expect(await pedirCarta({}, null)).toBe(404);
+    expect(await pedirCarta({ platoId: "a&select=*" }, filaPlato())).toBe(400);
+    expect(await pedirCarta({ marca: "otra" }, filaPlato())).toBe(400);
+    expect(await pedirCarta({}, filaPlato(), "image/svg+xml")).toBe(422);
+  });
+});

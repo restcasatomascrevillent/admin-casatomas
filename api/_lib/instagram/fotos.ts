@@ -6,6 +6,9 @@
  *    `fotoPreparada` su URL pública, medidas y tipo. La URL SOLO se acepta si
  *    es del bucket «instagram» de NUESTRO Supabase y de tmp/ (rutaTmpDeUrl):
  *    el render nunca carga una URL que venga del cliente (sin SSRF).
+ *  - Fotos de la carta («carta:<id del plato>»): igual que las de Drive
+ *    (instagram-drive → preparar con origen «carta» → tmp/<uuid>.webp); su
+ *    tipo es siempre «plato».
  *  - Fotos subidas al bucket antes de Drive (tabla public.instagram_fotos):
  *    fetch a PostgREST con la clave pública + el JWT del usuario, así que
  *    decide la RLS (can_read_section('marketing')). Nunca service_role.
@@ -14,8 +17,8 @@
 import {
   FOTOS,
   TIPOS_FOTO,
-  driveIdDeFoto,
   esAptaPara,
+  fotoPreparable,
   fotoDesdeFila,
   rutaTmpDeUrl,
   type FilaFotoSubida,
@@ -53,7 +56,7 @@ const LADO_MAXIMO_FOTO = 20_000;
 
 /**
  * `fotoPreparada` del cuerpo → Foto del catálogo, validada:
- *   { id: "drive:<id>" (= pieza.foto), url: <URL pública de tmp/ en NUESTRO bucket>,
+ *   { id: "drive:<id>" | "carta:<id>" (= pieza.foto), url: <URL pública de tmp/ en NUESTRO bucket>,
  *     ancho, alto (enteros), tipo: TipoFoto | null, marca }
  * Lanza ErrorFotoPreparada si algo no cuadra. La ruta sale de la URL y la URL
  * final se vuelve a construir con la base de nuestro Supabase.
@@ -61,8 +64,8 @@ const LADO_MAXIMO_FOTO = 20_000;
 export function fotoDesdePreparada(entrada: unknown, idPieza: string, supabaseUrl: string): Foto {
   if (!entrada || typeof entrada !== "object") throw new ErrorFotoPreparada("«fotoPreparada» tiene que ser un objeto");
   const e = entrada as Record<string, unknown>;
-  const driveId = driveIdDeFoto(e.id);
-  if (!driveId || e.id !== idPieza) throw new ErrorFotoPreparada("«fotoPreparada.id» no es la foto de Drive de la pieza");
+  const origen = fotoPreparable(e.id);
+  if (!origen || e.id !== idPieza) throw new ErrorFotoPreparada("«fotoPreparada.id» no es la foto (de Drive o de la carta) de la pieza");
   const ruta = rutaTmpDeUrl(e.url, supabaseUrl);
   if (!ruta) throw new ErrorFotoPreparada("«fotoPreparada.url» tiene que ser una copia tmp/ del bucket «instagram» de este Supabase");
   if (typeof e.marca !== "string" || !(e.marca in MARCAS)) throw new ErrorFotoPreparada("«fotoPreparada.marca» no es válida");
@@ -80,18 +83,19 @@ export function fotoDesdePreparada(entrada: unknown, idPieza: string, supabaseUr
     ruta,
     ancho,
     alto,
-    tipo: (e.tipo as TipoFoto | null | undefined) ?? null,
+    // Las de la carta son siempre platos (no se fía del tipo que llega).
+    tipo: origen.origen === "carta" ? "plato" : ((e.tipo as TipoFoto | null | undefined) ?? null),
     aptaPost: esAptaPara(medidas, "post"),
     aptaStory: esAptaPara(medidas, "story"),
     descripcion: "",
     subida: true,
-    driveId,
+    ...(origen.origen === "drive" ? { driveId: origen.id } : { platoId: origen.id }),
   };
 }
 
 /**
  * Catálogo para validar y construir una pieza: el estático y, si la pieza
- * pide una foto que no está en él, la foto de Drive preparada (`fotoPreparada`)
+ * pide una foto que no está en él, la foto de Drive o de la carta preparada (`fotoPreparada`)
  * o esa foto de instagram_fotos (si existe). Lanza ErrorFotoPreparada si
  * `fotoPreparada` no es válida.
  */
@@ -100,7 +104,7 @@ export async function catalogoParaPieza(s: Sesion, pieza: unknown, fotoPreparada
   if (typeof idFoto !== "string") return FOTOS;
   const id = idFoto.trim();
   if (!id || FOTOS.some((f) => f.id === id)) return FOTOS;
-  if (driveIdDeFoto(id)) {
+  if (fotoPreparable(id)) {
     // Sin fotoPreparada la validación dirá que la foto no está en el catálogo.
     if (fotoPreparada === undefined || fotoPreparada === null) return FOTOS;
     return [...FOTOS, fotoDesdePreparada(fotoPreparada, id, s.sb.url)];

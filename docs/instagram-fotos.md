@@ -59,7 +59,50 @@ descripción también va en la descripción del fichero de Drive); las publicada
 
 Para **quitar** una foto de la biblioteca se borra en Drive: el panel no borra nada de Drive.
 
-En las piezas, el id de una foto de Drive es `drive:<id de Drive>` (lo que guarda `datos.foto`).
+En las piezas, el id de una foto de Drive es `drive:<id de Drive>` (lo que guarda `datos.foto`); el de
+una foto de la carta, `carta:<id del plato>` (ver «Fotos de la carta»).
+
+## Fotos de la carta
+
+Desde el 05/11/2026 (petición del dueño) la biblioteca enseña también las **fotos de los platos de
+la carta**, junto a las de Drive. Encima de las miniaturas hay un filtro **Todas · Drive · Carta**
+(con cuántas hay de cada origen) y cada foto de la carta lleva la etiqueta **«Carta»**; todo dentro
+del mismo selector, sin recargar y sin scroll de página.
+
+- **De dónde salen**: tabla `"Platos"`, leída por el panel con su cliente de Supabase (la sesión
+  del usuario; decide la RLS): `activado = true`, `imagen_url` no nula y de la marca elegida
+  (`restaurante = true` para Casa Tomás, `touza = true` para Touza). Ids de plato válidos:
+  `[A-Za-z0-9_-]{1,100}` (los demás no salen).
+- **Cómo salen**: tipo **«plato»**, descripción `nombre · categoría`, miniatura directa desde la URL
+  pública del bucket `platos`. El id en la pieza es **`carta:<id del plato>`** (`datos.foto`), que
+  `validarPieza` acepta como cualquier foto del catálogo.
+- **Aptitud post/story**: con las medidas reales de la imagen (`naturalWidth`/`naturalHeight` al
+  cargar la miniatura, guardadas en la caché de React Query) y la misma regla que Drive
+  (`esAptaPara`). Mientras no se saben, la foto **no se bloquea**: al elegirla, «preparar» devuelve
+  las medidas del propio fichero y la validación de la pieza manda.
+- **Preparar**: el panel llama a `instagram-drive` con
+  `{ accion: "preparar", origen: "carta", marca, platoId }`. La función lee el plato con el **JWT
+  del usuario**, exige que sea de la marca y esté activo (si no, 404) y que su `imagen_url` sea del
+  bucket público **`platos` de su propio Supabase** (`SUPABASE_URL`: mismo origen, sin credenciales,
+  sin `..` ni `%`-codificados); si no, **400**. Reconstruye la URL desde la ruta (no descarga la de
+  la fila), no sigue redirecciones, solo acepta JPEG/PNG/WebP de ≤ 8 MB y la sube a
+  `tmp/<uuid>.<jpg|png|webp>` con su content-type. Lee las medidas del fichero (también de WebP y
+  PNG). La limpieza oportunista de `tmp/` de más de 24 h es la misma. **No necesita los secretos de
+  Google**: funciona aunque Drive no esté configurado.
+- **Render**: `fotoPreparada` acepta `id: "carta:<id>"` igual que `drive:<id>`, con la **misma**
+  comprobación anti-SSRF de la URL (solo `tmp/` del bucket «instagram» de su Supabase). El tipo de
+  una foto de la carta es siempre «plato» (no se fía del que llega).
+- Para quitar una foto de la carta de la biblioteca, se quita la foto del plato (o se desactiva el
+  plato) en la gestión de la carta.
+
+Código: `fotosDesdePlatos`, `fotoDesdePlato`, `idFotoCarta`, `platoIdDeFoto`, `fotoPreparable` y
+`rutaPlatoDeUrl` en `src/lib/instagram/fotos.ts`; `usePlatosConFoto` y `anotarMedidasCarta` en
+`useFotosInstagram.ts`; `prepararFotoCarta` en `api.ts`; `prepararCarta`, `rutaPlatoDeUrl` y
+`medidasImagen` en `supabase/functions/instagram-drive/drive.ts`. Pruebas:
+`src/lib/instagram/__tests__/fotosCarta.test.ts`, el bloque «preparar una foto de la carta» de
+`instagram-drive/__tests__/drive.test.ts`, el de «carta» de `api/_lib/__tests__/instagramFotos.test.ts`
+y el recorrido de `EditorInstagram.test.tsx`. Sin migraciones. Hay que volver a desplegar
+`instagram-drive` (Supabase) y el panel con `/api/instagram-render` (Vercel).
 
 ## Preparación en el navegador (Subir foto)
 

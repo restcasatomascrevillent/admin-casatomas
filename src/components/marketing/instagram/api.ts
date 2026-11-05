@@ -11,7 +11,8 @@
  *    Meta. Funcionan también en local: van al Supabase de VITE_SUPABASE_URL
  *    con la clave pública (`apikey`) y el JWT, como el resto de funciones.
  *  - Biblioteca de fotos en Google Drive: Edge Function `instagram-drive`
- *    (listar, subir, miniatura y preparar la copia temporal en el bucket).
+ *    (listar, subir, miniatura y preparar la copia temporal en el bucket),
+ *    también para las fotos de la carta (preparar con origen «carta»).
  */
 import { supabase } from "@/integrations/supabase/client";
 import type { FotoDrive, MarcaId } from "@/lib/instagram";
@@ -332,6 +333,16 @@ export async function prepararFotoDrive(
   opts?: OpcionesLlamada,
 ): Promise<{ ruta: string; url: string; ancho: number | null; alto: number | null }> {
   const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "preparar", marca, id: driveId }) }, opts, cabecerasEdge());
+  return { ruta: String(r.ruta ?? ""), url: String(r.url ?? ""), ancho: typeof r.ancho === "number" ? r.ancho : null, alto: typeof r.alto === "number" ? r.alto : null };
+}
+
+/** Copia la foto de un plato de la carta al bucket (tmp/) y devuelve su URL pública (como prepararFotoDrive). */
+export async function prepararFotoCarta(
+  marca: MarcaId,
+  platoId: string,
+  opts?: OpcionesLlamada,
+): Promise<{ ruta: string; url: string; ancho: number | null; alto: number | null }> {
+  const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "preparar", origen: "carta", marca, platoId }) }, opts, cabecerasEdge());
   return { ruta: String(r.ruta ?? ""), url: String(r.url ?? ""), ancho: typeof r.ancho === "number" ? r.ancho : null, alto: typeof r.alto === "number" ? r.alto : null };
 }
 

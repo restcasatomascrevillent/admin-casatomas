@@ -10,7 +10,7 @@ import {
   baseFotosPublica,
   baseRecursosPanel,
   construirDocumento,
-  driveIdDeFoto,
+  fotoPreparable,
   obtenerPlantilla,
   plantillasDe,
   validarPieza,
@@ -88,8 +88,9 @@ export function EditorInstagram() {
   const firma = useMemo(() => JSON.stringify(pieza), [pieza]);
   const firmaDiferida = useDiferido(firma, ESPERA_VISTA_PREVIA);
 
-  // Biblioteca de Drive de la marca; la foto elegida se copia al bucket (preparar) para pintarla.
-  const { catalogo: catalogoDrive, cargando: cargandoFotos } = useFotosInstagram(borrador.marca);
+  // Biblioteca de la marca (Drive + fotos de la carta); la elegida se copia al bucket (preparar) para pintarla.
+  const { catalogo: catalogoDrive, cargando: cargandoDrive, cargandoCarta } = useFotosInstagram(borrador.marca);
+  const cargandoFotos = cargandoDrive || cargandoCarta;
   const preparacion = useFotoPreparada(borrador.marca, borrador.foto, catalogoDrive);
   const catalogo = useMemo(
     () => (preparacion.lista ? catalogoDrive.map((f) => (f.id === preparacion.lista!.foto.id ? preparacion.lista!.foto : f)) : catalogoDrive),
@@ -102,11 +103,13 @@ export function EditorInstagram() {
   // la de Drive aún no está copiada al bucket) no hay vista.
   const { documento, motivoSinVista } = useMemo(() => {
     const p = JSON.parse(firmaDiferida) as Partial<DatosPieza>;
-    if (driveIdDeFoto(p.foto) && !preparacion.lista) {
-      if (preparacion.error) return { documento: null, motivoSinVista: `No se ha podido preparar la foto de Drive: ${preparacion.error.message}` };
+    const preparable = fotoPreparable(p.foto);
+    if (preparable && !preparacion.lista) {
+      const de = preparable.origen === "carta" ? "de la carta" : "de Drive";
+      if (preparacion.error) return { documento: null, motivoSinVista: `No se ha podido preparar la foto ${de}: ${preparacion.error.message}` };
       // Mientras se carga la biblioteca o se copia la foto al bucket. Si la foto ya no está en Drive,
       // la validación de abajo lo dice («no está en el catálogo»).
-      if (preparacion.preparando || cargandoFotos) return { documento: null, motivoSinVista: "Preparando la foto de Drive…" };
+      if (preparacion.preparando || cargandoFotos) return { documento: null, motivoSinVista: `Preparando la foto ${de}…` };
     }
     const datos = "datos" in validacion ? validacion.datos : ({ ...p, titular: p.titular ?? "" } as DatosPieza);
     try {
@@ -276,8 +279,7 @@ export function EditorInstagram() {
             fotoTmp={preparacion.lista?.ruta ?? null}
             onPublicada={() => {
               // La función borra la copia tmp/ al publicar: la próxima vez se vuelve a preparar.
-              const d = driveIdDeFoto(borrador.foto);
-              if (d) qc.removeQueries({ queryKey: clavePreparada(d) });
+              if (fotoPreparable(borrador.foto)) qc.removeQueries({ queryKey: clavePreparada(borrador.foto) });
             }}
           />
         </TabsContent>

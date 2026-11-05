@@ -10,8 +10,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+/** Platos de la carta que devuelve el Supabase simulado (tabla "Platos"). */
+const carta = vi.hoisted(() => ({ platos: [] as unknown[] }));
+
 vi.mock("@/integrations/supabase/client", () => {
-  const consulta = { select: () => consulta, order: () => consulta, limit: () => Promise.resolve({ data: [], error: null }) };
+  const consulta = {
+    select: () => consulta,
+    eq: () => consulta,
+    not: () => consulta,
+    order: () => consulta,
+    limit: () => Promise.resolve({ data: carta.platos, error: null }),
+  };
   return {
     supabase: {
       auth: { getSession: () => Promise.resolve({ data: { session: { access_token: "jwt-de-prueba" } } }) },
@@ -97,6 +106,7 @@ function fetchFalso() {
 const llamadasA = (f: ReturnType<typeof vi.fn>, url: string) => f.mock.calls.filter(([u]) => u === url);
 
 beforeEach(() => {
+  carta.platos = [];
   vi.stubGlobal("fetch", fetchFalso());
 });
 afterEach(() => {
@@ -248,6 +258,40 @@ describe("EditorInstagram", () => {
     expect(enlace).toHaveAttribute("href", "https://www.instagram.com/p/abc/");
     // Al publicar de verdad se manda la copia tmp/ para que la función la borre.
     expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: false, fotoTmp: TMP });
+  });
+
+  it("fotos de la carta: filtro «Carta», insignia, medidas al cargar y preparar con origen «carta»", async () => {
+    const PLATO = "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+    carta.platos = [
+      { id: PLATO, nombre: "Chuleta", categoria: "Carnes", imagen_url: "http://127.0.0.1:54321/storage/v1/object/public/platos/chuleta.webp", activado: true, restaurante: true, touza: false },
+    ];
+    const f = fetch as unknown as ReturnType<typeof vi.fn>;
+    pintar(<EditorInstagram />);
+    await screen.findByTestId(`foto-drive:${APTA}`, undefined, { timeout: 3000 });
+    expect(screen.getByTestId("filtro-origen-carta")).toHaveTextContent("Carta (1)");
+    fireEvent.click(screen.getByTestId("filtro-origen-carta"));
+    expect(screen.queryByTestId(`foto-drive:${APTA}`)).toBeNull();
+    const boton = screen.getByTestId(`foto-carta:${PLATO}`);
+    expect(boton).toHaveAccessibleName(/^Carta: Chuleta · Carnes/);
+    expect(within(boton).getByText("Carta")).toBeInTheDocument();
+    // Sin medidas todavía no se bloquea; al cargar la miniatura se apuntan las reales.
+    expect(boton).not.toHaveAttribute("aria-disabled");
+    const img = boton.querySelector("img")!;
+    expect(img).toHaveAttribute("src", "http://127.0.0.1:54321/storage/v1/object/public/platos/chuleta.webp");
+    Object.defineProperty(img, "naturalWidth", { value: 1080 });
+    Object.defineProperty(img, "naturalHeight", { value: 1350 });
+    fireEvent.load(img);
+    fireEvent.click(boton);
+
+    const generar = await screen.findByRole("button", { name: /Generar imagen/ });
+    await waitFor(() => expect(generar).toBeEnabled());
+    const preparar = f.mock.calls.find(([u, i]) => u === URL_DRIVE && JSON.parse(String(i?.body)).accion === "preparar")!;
+    expect(JSON.parse(String(preparar[1].body))).toEqual({ accion: "preparar", origen: "carta", marca: "casa-tomas", platoId: PLATO });
+    fireEvent.click(generar);
+    await screen.findByText(/Imagen guardada/);
+    const cuerpoRender = JSON.parse(llamadasA(f, "/api/instagram-render")[0][1].body);
+    expect(cuerpoRender.pieza.foto).toBe(`carta:${PLATO}`);
+    expect(cuerpoRender.fotoPreparada).toEqual({ id: `carta:${PLATO}`, url: URL_TMP, ancho: 1080, alto: 1350, tipo: "plato", marca: "casa-tomas" });
   });
 
   it("si cambias el texto tras la prueba, hay que volver a probar", async () => {
