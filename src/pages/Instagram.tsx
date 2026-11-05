@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { BarChart3, CalendarDays, Clapperboard, Flag, Home, KanbanSquare, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
@@ -105,6 +106,11 @@ export default function Instagram() {
   const esMovil = useIsMobile();
   const [editorCompletoEnMovil, setEditorCompletoEnMovil] = useState(false);
   const crearEnMovil = esMovil && !abrir && !editorCompletoEnMovil;
+  // Con el asistente a la vista, todo el alto para él (pedido del dueño, 05/11/2026): sin la fila de marca y
+  // cuenta (el asistente tiene su selector y el punto de la cuenta va en su cabecera), pestañas solo con iconos
+  // y el asistente de borde a borde hasta abajo.
+  const asistenteMovilVisible = crearEnMovil && !soloAgencia && pestanaVisible === "crear";
+  const navigate = useNavigate();
   // ── fin Crear en el móvil ─────────────────────────────────────────────────
   const [encargoAbierto, setEncargoAbierto] = useState<string | null>(() =>
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("encargo"),
@@ -155,8 +161,10 @@ export default function Instagram() {
         <Tabs value={pestanaVisible} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
             accionesDebajoEnMovil="lg"
+            soloIconosEnMovil={asistenteMovilVisible}
+            className={asistenteMovilVisible ? "mb-0" : undefined}
             acciones={
-              soloAgencia ? undefined : (
+              soloAgencia || asistenteMovilVisible ? undefined : (
                 <>
                   <SelectorMarca valor={marca} onCambio={setMarca} />
                   <IndicadorCuenta marca={marca} />
@@ -212,11 +220,24 @@ export default function Instagram() {
           </TabsContent>
 
           {/* Desde `lg` Crear reparte el alto en dos columnas con scroll propio. */}
-          <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`} data-testid="pagina-instagram">
+          {/* En el móvil, el asistente va de borde a borde (anula el relleno del <main>) y reparte el alto él solo. */}
+          <TabsContent
+            value="crear"
+            className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden ${asistenteMovilVisible ? "-mx-3 -mb-3 flex flex-col overflow-hidden" : ""}`}
+            data-testid="pagina-instagram"
+          >
             {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
             {!soloAgencia && !crearEnMovil && <CrearInstagram abrir={abrir} onVerCalendario={() => setPestana("calendario")} />}
             {/* ── Crear en el móvil (instagram-movil) ── */}
-            {!soloAgencia && crearEnMovil && <CrearMovil incrustado onEditorCompleto={() => setEditorCompletoEnMovil(true)} />}
+            {!soloAgencia && crearEnMovil && (
+              <CrearMovil
+                incrustado
+                marcaInicial={marca === "todas" ? undefined : marca}
+                cuenta={<IndicadorCuenta marca={marca} compacto />}
+                onEditorCompleto={() => setEditorCompletoEnMovil(true)}
+                onPantallaCompleta={() => navigate("/instagram/rapido")}
+              />
+            )}
           </TabsContent>
 
           {/* Campañas: dos columnas con scroll propio desde `lg`. */}

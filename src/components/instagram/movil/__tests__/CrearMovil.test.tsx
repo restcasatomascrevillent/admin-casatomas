@@ -214,6 +214,61 @@ describe("CrearMovil", () => {
     expect(montar.llamadas).toHaveLength(2);
   });
 
+  it("mientras la IA trabaja enseña SUS fotos, los pasos y lo que contó (no un spinner en el vacío)", async () => {
+    const { s } = preparar();
+    let soltar: () => void = () => {};
+    const base = crearMontarSimulado();
+    const montar = (async (p: Parameters<typeof base>[0]) => {
+      await new Promise<void>((r) => (soltar = r));
+      return base(p);
+    }) as typeof base;
+    render(<CrearMovil servicios={{ ...s, montar }} />);
+    await elegir(3);
+    await screen.findByText(/3 fotos listas/);
+    fireEvent.change(screen.getByLabelText(/Algo que contar/), { target: { value: "llegó la centolla" } });
+    fireEvent.click(screen.getByRole("button", { name: /Montar con IA/ }));
+
+    const previa = await screen.findByTestId("montando-previa");
+    expect(previa).toHaveTextContent("Montando tu carrusel de 3 fotos");
+    expect(within(previa).getAllByRole("img")).toHaveLength(3);
+    expect(within(previa).getAllByTestId("brillo")).toHaveLength(3);
+    expect(await within(previa).findByRole("status")).toHaveTextContent("Mirando las fotos…");
+    expect(within(screen.getByTestId("pasos-ia")).getByText("Pensando el orden…")).toBeInTheDocument();
+    expect(screen.getByTestId("lo-que-me-has-contado")).toHaveTextContent("Lo que me has contado:«llegó la centolla»");
+    expect(screen.getByTestId("cabecera-asistente")).toHaveTextContent(/Paso 2\/3 ·.*Montar con IA/);
+
+    await act(async () => soltar());
+    expect(await screen.findByTestId("resumen-ia")).toBeInTheDocument();
+    expect(screen.queryByTestId("montando-previa")).toBeNull();
+  });
+
+  it("si la IA falla, los botones quedan abajo: «Probar otra vez» y «Volver a las fotos»", async () => {
+    const { s } = preparar();
+    const montar = crearMontarSimulado({ fallar: () => new Error("Cupo") });
+    render(<CrearMovil servicios={{ ...s, montar }} />);
+    await elegir(2);
+    await screen.findByText(/2 fotos listas/);
+    fireEvent.click(screen.getByRole("button", { name: /Montar con IA/ }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Cupo");
+    // Sigue viéndose la publicación (sin brillo): no queda la pantalla vacía.
+    expect(screen.getByTestId("montando-previa")).toHaveTextContent("Tu carrusel de 2 fotos");
+    expect(screen.queryByTestId("brillo")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Volver a las fotos" }));
+    expect(screen.getByTestId("cabecera-asistente")).toHaveTextContent(/Paso 1\/3 ·.*Fotos/);
+  });
+
+  it("en la pestaña: punto de la cuenta en la cabecera, «Pantalla completa» y «Editor completo»", () => {
+    const { s } = preparar();
+    const pantallaCompleta = vi.fn();
+    const editor = vi.fn();
+    render(<CrearMovil servicios={s} incrustado cuenta={<button type="button">cuenta</button>} onPantallaCompleta={pantallaCompleta} onEditorCompleto={editor} />);
+    expect(within(screen.getByTestId("cabecera-asistente")).getByRole("button", { name: "cuenta" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Pantalla completa/ }));
+    expect(pantallaCompleta).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: /Editor completo/ }));
+    expect(editor).toHaveBeenCalledTimes(1);
+  });
+
   it("recupera lo que se dejó a medias en el móvil", async () => {
     const { s } = preparar();
     const blob = new Blob(["x"], { type: "image/jpeg" });

@@ -200,7 +200,7 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
   const marcaSugerencia: MarcaId = marca === "todas" ? "casa-tomas" : marca;
 
   return (
-    <div className={cn("grid min-h-0 gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(17.5rem,1fr)] lg:grid-rows-[minmax(0,1fr)]", className)} data-testid="estudio-instagram">
+    <div className={cn("grid min-h-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(17.5rem,1fr)] lg:grid-rows-[minmax(0,1fr)]", className)} data-testid="estudio-instagram">
       {/* Columna izquierda */}
       <div className="flex min-h-0 flex-col gap-4">
         <Tarjeta titulo={tituloSemana(lunes)} accion={<Enlace onClick={() => onIr("calendario")}>Ver el mes</Enlace>} className="shrink-0">

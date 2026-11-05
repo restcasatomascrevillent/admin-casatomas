@@ -114,4 +114,15 @@ describe("PestanasPagina", () => {
     expect(barra.className).not.toContain("border-b-0");
     expect(screen.getByRole("button", { name: "Añadir" }).parentElement!.className).not.toContain("w-full");
   });
+
+  it("soloIconosEnMovil: en el móvil solo el icono (la etiqueta sigue siendo el nombre accesible) y un punto por contador", () => {
+    montar({ soloIconosEnMovil: true });
+    const primera = screen.getByRole("tab", { name: /^Primera/ });
+    expect(within(primera).getByText("Primera").className).toContain("sr-only sm:not-sr-only");
+    expect(primera).toHaveAttribute("title", "Primera");
+    expect(primera.className).toContain("min-w-11");
+    expect(screen.getByTestId("punto-a").className).toContain("sm:hidden");
+    // Sin icono, la etiqueta se ve igual que siempre.
+    expect(within(screen.getByRole("tab", { name: /^Segunda/ })).getByText("Segunda").className).not.toContain("sr-only");
+  });
 });
