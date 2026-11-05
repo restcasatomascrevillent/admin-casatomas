@@ -5,8 +5,12 @@ import {
   claveProveedor,
   esLineaDeServicio,
   formatCantidadLinea,
+  formatEntero,
   formatNumero,
   indiceAnomaliasPrecio,
+  indicePreciosLinea,
+  plural,
+  precioAnomalo,
   tieneAnomaliaPrecio,
   valorSinDescuento,
 } from "../formatters";
@@ -182,5 +186,70 @@ describe("valorSinDescuento (importación histórica)", () => {
   it("sin bruto, o igual al importe: nada", () => {
     expect(valorSinDescuento({ precio: 10, importe_bruto: null })).toBeNull();
     expect(valorSinDescuento({ precio: 10, importe_bruto: 10 })).toBeNull();
+  });
+});
+
+describe("indicePreciosLinea (media de referencia de cada línea, calculada una vez)", () => {
+  it("media del MISMO proveedor y nombre, sin la propia línea ni precios a 0", () => {
+    const a = linea("Gambón XXL", 10);
+    const b = linea("GAMBÓN xxl", 14);
+    const cero = linea("Gambón XXL", 0);
+    const otroProv = linea("Gambón XXL", 100);
+    const docs = [
+      doc(1, "Pescados Rías, S.L.", [a, cero], "pescados rias"),
+      doc(2, "Pescados Rías", [b], "pescados rias"),
+      doc(3, "Makro", [otroProv], "makro"),
+    ];
+    const media = indicePreciosLinea(docs);
+    expect(media(a, docs[0])).toBe(14); // solo la otra línea (b): ni la suya, ni la de 0, ni la de Makro
+    expect(media(b, docs[1])).toBe(10);
+    expect(media(otroProv, docs[2])).toBeUndefined(); // en Makro no hay otra
+    // Una línea nueva (no indexada) se compara con todas las del proveedor.
+    expect(media({ id: 0, producto_nombre: "gambon xxl" }, docs[0])).toBe(12);
+  });
+
+  it("sin proveedor o línea de servicio: sin referencia", () => {
+    const p1 = linea("Portes", 10);
+    const p2 = linea("Portes", 30);
+    const docs = [doc(1, "Enchenta", [p1]), doc(2, "Enchenta", [p2]), doc(3, "", [linea("Jamón", 5)])];
+    const media = indicePreciosLinea(docs);
+    expect(media(p1, docs[0])).toBeUndefined();
+    expect(media(docs[2].productos[0], docs[2])).toBeUndefined();
+  });
+
+  it("coherente con indiceAnomaliasPrecio y tieneAnomaliaPrecio", () => {
+    const docs = [
+      doc(1, "Campoluz", [linea("BRUGAL", 10), linea("TANQUERAY", 20)]),
+      doc(2, "Campoluz", [linea("Brugal", 11)]),
+      doc(3, "Campoluz", [linea("brugal", 40), linea("Tanqueray", 0)]),
+    ];
+    const media = indicePreciosLinea(docs);
+    const conLinea = docs.map((d) => d.productos.some((p) => precioAnomalo(p.precio_unitario, media(p, d))));
+    expect(conLinea).toEqual(docs.map((d) => tieneAnomaliaPrecio(d, docs)));
+    expect(conLinea).toEqual(docs.map(indiceAnomaliasPrecio(docs, media)));
+    expect(conLinea).toEqual([false, false, true]);
+  });
+
+  it("precioAnomalo: más del doble y con precio > 0", () => {
+    expect(precioAnomalo(21, 10)).toBe(true);
+    expect(precioAnomalo(20, 10)).toBe(false);
+    expect(precioAnomalo(0, 10)).toBe(false);
+    expect(precioAnomalo(null, 10)).toBe(false);
+    expect(precioAnomalo(50, undefined)).toBe(false);
+  });
+});
+
+describe("formatEntero y plural (es-ES, miles con punto)", () => {
+  it("agrupa también los de 4 cifras", () => {
+    expect(formatEntero(7)).toBe("7");
+    expect(formatEntero(1860)).toBe("1.860");
+    expect(formatEntero(12500)).toBe("12.500");
+    expect(formatEntero(1234567)).toBe("1.234.567");
+  });
+
+  it("singular y plural", () => {
+    expect(plural(1, "línea", "líneas")).toBe("1 línea");
+    expect(plural(0, "línea", "líneas")).toBe("0 líneas");
+    expect(plural(1860, "documento", "documentos")).toBe("1.860 documentos");
   });
 });

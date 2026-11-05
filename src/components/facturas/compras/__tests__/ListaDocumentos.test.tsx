@@ -92,18 +92,18 @@ describe("ListaDocumentos agrupada", () => {
     pintar();
     const meses = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(meses).toHaveLength(4);
-    expect(meses[0]).toMatch(/^Octubre 2026 · 4 documentos · 1\.?170,50\s€$/); // 1000 + 120,50 + 50 (el albarán facturado no suma)
-    expect(meses[1]).toMatch(/^Septiembre 2026 · 1 documento · 70,00\s€$/);
-    expect(meses[2]).toMatch(/^Mayo 2026 · 1 documento · 33,00\s€$/);
-    expect(meses[3]).toMatch(/^Sin fecha · 1 documento · 9,00\s€$/);
+    expect(meses[0]).toMatch(/^Octubre 2026 · 4 documentos · 1\.?170,50\s€ con IVA$/); // 1000 + 120,50 + 50 (el albarán facturado no suma)
+    expect(meses[1]).toMatch(/^Septiembre 2026 · 1 documento · 70,00\s€ con IVA$/);
+    expect(meses[2]).toMatch(/^Mayo 2026 · 1 documento · 33,00\s€ con IVA$/);
+    expect(meses[3]).toMatch(/^Sin fecha · 1 documento · 9,00\s€ con IVA$/);
   });
 
   it("dentro del mes, subgrupo por proveedor con sus documentos y total", () => {
     pintar();
     const octubre = screen.getByRole("region", { name: "Octubre 2026" });
     const provs = within(octubre).getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
-    expect(provs[0]).toMatch(/^Makro · 1 doc · 50,00\s€$/);
-    expect(provs[1]).toMatch(/^Pescados Rías Baixas · 3 docs · 1\.?120,50\s€$/);
+    expect(provs[0]).toMatch(/^Makro · 1 doc · 50,00\s€ con IVA$/);
+    expect(provs[1]).toMatch(/^Pescados Rías Baixas · 3 docs · 1\.?120,50\s€ con IVA$/);
   });
 
   it("el albarán ya facturado sale atenuado con «en F-xxx»", () => {
@@ -166,10 +166,65 @@ describe("ListaDocumentos agrupada", () => {
     }
   });
 
-  it("con búsqueda o chip activos se despliegan todos los meses", () => {
+  it("un chip (sin texto) no despliega meses: se respeta lo plegado", () => {
     pintar({ hayFiltros: true });
+    expect(cabeceraMes(/^Octubre 2026/).getAttribute("aria-expanded")).toBe("true");
+    expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("F-0006")).toBeNull();
+    expect(screen.queryByTestId("barra-meses")).toBeNull();
+  });
+
+  it("con texto buscado: solo los 3 meses más recientes con resultados, y «Abrir todos» / «Plegar todos»", () => {
+    // Octubre plegado a mano antes de buscar: durante la búsqueda no cuenta.
+    window.localStorage.setItem("compras.documentos.plegado", JSON.stringify({ "m:2026-10": false }));
+    pintar({ hayFiltros: true, busqueda: "f-" });
+    expect(cabeceraMes(/^Octubre 2026/).getAttribute("aria-expanded")).toBe("true");
+    expect(cabeceraMes(/^Septiembre 2026/).getAttribute("aria-expanded")).toBe("true");
     expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByText("F-0006")).toBeTruthy();
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByTestId("barra-meses").textContent).toContain("4 meses con resultados");
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir todos" }));
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("F-0007")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Plegar todos" }));
+    for (const m of [/^Octubre 2026/, /^Septiembre 2026/, /^Mayo 2026/, /^Sin fecha/]) {
+      expect(cabeceraMes(m).getAttribute("aria-expanded")).toBe("false");
+    }
+    // Lo de la búsqueda no se recuerda en localStorage.
+    expect(JSON.parse(window.localStorage.getItem("compras.documentos.plegado") ?? "{}")).toEqual({ "m:2026-10": false });
+  });
+
+  it("al cambiar el texto buscado se vuelve a la regla de los 3 primeros", () => {
+    const { rerender, props } = pintar({ hayFiltros: true, busqueda: "f-" });
+    fireEvent.click(screen.getByRole("button", { name: "Abrir todos" }));
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("true");
+    rerender(<ListaDocumentos {...props} busqueda="f-0" />);
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("false");
+    // Al borrar la búsqueda vuelve lo recordado (mes actual y anterior).
+    rerender(<ListaDocumentos {...props} busqueda="" hayFiltros={false} />);
+    expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByTestId("barra-meses")).toBeNull();
+  });
+
+  it("con búsqueda y 3 meses o menos con resultados, todos abiertos y sin botón", () => {
+    pintar({ hayFiltros: true, busqueda: "makro", documentos: DOCS.filter((d) => d.proveedor === "Makro" && d.fecha) });
+    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
+    for (const m of [/^Octubre 2026/, /^Septiembre 2026/, /^Mayo 2026/]) {
+      expect(cabeceraMes(m).getAttribute("aria-expanded")).toBe("true");
+    }
+    expect(screen.queryByTestId("barra-meses")).toBeNull();
+  });
+
+  it("cada mes lleva content-visibility: auto con un tamaño de reserva", () => {
+    const { container } = pintar();
+    const mayo = container.querySelector('section[data-mes="2026-05"]') as HTMLElement;
+    const octubre = container.querySelector('section[data-mes="2026-10"]') as HTMLElement;
+    expect(mayo.className).toContain("[content-visibility:auto]");
+    expect(mayo.getAttribute("style") ?? "").toMatch(/contain-intrinsic-size:\s*auto 45px/);
+    // Octubre abierto: cabecera + 2 proveedores + 4 documentos.
+    expect(octubre.getAttribute("style") ?? "").toMatch(new RegExp(`contain-intrinsic-size:\\s*auto ${45 + 2 * 44 + 4 * 49}px`));
   });
 
   it("enlace profundo: un documento en un mes plegado lo despliega", () => {
@@ -188,6 +243,19 @@ describe("ListaDocumentos agrupada", () => {
     // El usuario lo pliega a mano estando seleccionado: se respeta.
     fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/));
     expect(screen.queryByText("F-0004")).toBeNull();
+  });
+
+  it("enlace profundo con búsqueda: un documento en un mes plegado lo despliega (sin recordarlo)", () => {
+    pintar({ hayFiltros: true, busqueda: "f-", seleccionadoId: 7 });
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("true");
+    expect(window.localStorage.getItem("compras.documentos.plegado")).toBeNull();
+  });
+
+  it("filas: «1 línea» / «2 líneas»", () => {
+    const linea = { id: 1, producto_nombre: "X", precio: 1, proveedor: null };
+    pintar({ documentos: [doc(20, { productos: [linea] }), doc(21, { productos: [linea, { ...linea, id: 2 }] })] });
+    expect(screen.getByText("F-20").closest("button")!.textContent).toMatch(/· 1 línea(?!s)/);
+    expect(screen.getByText("F-21").closest("button")!.textContent).toContain("· 2 líneas");
   });
 
   it("enlace profundo: documento «Sin fecha»", () => {

@@ -12,6 +12,16 @@ export const formatNumero = (value: number): string =>
   new Intl.NumberFormat("es-ES", { maximumFractionDigits: 3 }).format(value);
 
 /**
+ * Entero con punto de miles SIEMPRE: 1.860 · 12.500. (`Intl` en es-ES no agrupa
+ * los de 4 cifras: daría «1860».)
+ */
+export const formatEntero = (value: number): string =>
+  String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+
+/** «1 línea» · «2 líneas» · «1.860 documentos». */
+export const plural = (n: number, uno: string, varios: string): string => `${formatEntero(n)} ${n === 1 ? uno : varios}`;
+
+/**
  * «24 kg», «3 ud» o, si la línea se factura por peso y trae sus unidades
  * (`bultos`), «12 ud · 24 kg». La cantidad es siempre la magnitud por la que
  * se multiplica el precio (kilos si el precio es por kilo).
@@ -162,46 +172,70 @@ export const tieneAnomaliaPrecio = (doc: Factura, allDocs: Factura[]): boolean =
 };
 
 /**
- * Lo mismo que `tieneAnomaliaPrecio`, para MUCHOS documentos: indexa una vez
- * los precios por proveedor y nombre de producto (suma y número) y cada línea
- * se compara con la media de las demás restando la suya. Con el histórico
- * (~1.900 documentos, ~12.000 líneas) la versión de uno en uno era cuadrática.
+ * Media de referencia del precio unitario de una línea: la de las DEMÁS líneas
+ * con el mismo nombre (sin acentos ni mayúsculas) DEL MISMO PROVEEDOR, sin
+ * precios a 0 ni negativos. `undefined` si no hay con qué comparar, si el
+ * documento no tiene proveedor o si la línea es de servicio (portes…).
  */
-export const indiceAnomaliasPrecio = (allDocs: Factura[]): ((doc: Factura) => boolean) => {
+export type MediaPrecioLinea = (
+  linea: Pick<ProductoFactura, "id" | "producto_nombre">,
+  doc: Pick<Factura, "proveedor" | "proveedor_normalizado">,
+) => number | undefined;
+
+const precioCuenta = (precio: number | null | undefined): precio is number => typeof precio === "number" && precio > 0;
+
+/**
+ * Indexa UNA vez los precios de `allDocs` por proveedor y nombre de producto
+ * (suma y número) y devuelve la función que da la media de referencia de una
+ * línea restando la suya (si está en el índice). Con el histórico (~1.900
+ * documentos, ~12.500 líneas) recorrerlo todo por cada línea era cuadrático.
+ */
+export const indicePreciosLinea = (allDocs: Factura[]): MediaPrecioLinea => {
   const indice = new Map<string, { suma: number; n: number }>();
+  /** Línea ya contada en el índice → su clave y su precio (para restarla de su propia media). */
+  const contadas = new Map<number, { k: string; precio: number }>();
   const claveLinea = (proveedor: string, nombre: string) => `${proveedor}\u0000${plano(nombre)}`;
-  const cuenta = (precio: number | null | undefined): precio is number => typeof precio === "number" && precio > 0;
   for (const f of allDocs) {
     const proveedor = claveProveedor(f);
     if (!proveedor) continue;
     for (const p of f.productos) {
-      if (!cuenta(p.precio_unitario)) continue;
+      if (!precioCuenta(p.precio_unitario)) continue;
       const k = claveLinea(proveedor, p.producto_nombre);
       const e = indice.get(k);
       if (e) {
         e.suma += p.precio_unitario;
         e.n += 1;
       } else indice.set(k, { suma: p.precio_unitario, n: 1 });
+      contadas.set(p.id, { k, precio: p.precio_unitario });
     }
   }
-  const indexados = new Set(allDocs);
-  return (doc) => {
+  return (linea, doc) => {
     const proveedor = claveProveedor(doc);
-    if (!proveedor) return false;
-    // ¿Está el propio documento en el índice? (si no, su línea no se resta).
-    const dentro = indexados.has(doc);
-    return doc.productos.some((p) => {
-      if (!cuenta(p.precio_unitario)) return false;
-      if (esLineaDeServicio(p.producto_nombre)) return false;
-      const e = indice.get(claveLinea(proveedor, p.producto_nombre));
-      if (!e) return false;
-      const n = dentro ? e.n - 1 : e.n;
-      if (n <= 0) return false;
-      const avg = (dentro ? e.suma - p.precio_unitario : e.suma) / n;
-      return p.precio_unitario > avg * 2;
-    });
+    if (!proveedor || esLineaDeServicio(linea.producto_nombre)) return undefined;
+    const k = claveLinea(proveedor, linea.producto_nombre);
+    const e = indice.get(k);
+    if (!e) return undefined;
+    const propia = contadas.get(linea.id);
+    const resta = propia && propia.k === k ? propia.precio : null;
+    const n = resta === null ? e.n : e.n - 1;
+    if (n <= 0) return undefined;
+    return (resta === null ? e.suma : e.suma - resta) / n;
   };
 };
+
+/** ¿El precio unitario pasa del doble de su media de referencia? */
+export const precioAnomalo = (precio: number | null | undefined, media: number | undefined): boolean =>
+  media !== undefined && precioCuenta(precio) && precio > media * 2;
+
+/**
+ * Lo mismo que `tieneAnomaliaPrecio`, para MUCHOS documentos, con el índice de
+ * `indicePreciosLinea` (se puede pasar uno ya calculado para no repetirlo).
+ */
+export const indiceAnomaliasPrecio = (
+  allDocs: Factura[],
+  media: MediaPrecioLinea = indicePreciosLinea(allDocs),
+): ((doc: Factura) => boolean) => (doc) =>
+  doc.productos.some((p) => precioAnomalo(p.precio_unitario, media(p, doc)));
 
 /**
  * Todo lo que hay que revisar de un documento en una sola lista: los avisos

@@ -6,7 +6,7 @@ import { useAlbaranes, useFacturas, type Factura } from "@/hooks/useFacturas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useCategoriasProducto, useResumenProductos } from "@/hooks/useProductosCatalogo";
 import { useProveedores } from "@/hooks/useProveedores";
-import { avisosDocumento, indiceAnomaliasPrecio } from "@/components/facturas/shared/formatters";
+import { avisosDocumento, indiceAnomaliasPrecio, indicePreciosLinea, plural } from "@/components/facturas/shared/formatters";
 import { TabProductos } from "@/components/facturas/productos/TabProductos";
 import { ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
 import { EditarFacturaDialog } from "@/components/facturas/EditarFacturaDialog";
@@ -109,15 +109,18 @@ export function TabCompras({
   // Los avisos se calculan una vez por documento y contra los de su mismo tipo
   // (`avisosDocumento` recorre todos los productos: dentro del render de cada
   // fila sería cuadrático).
+  // Índice de precios por tipo (proveedor + nombre), calculado una vez: lo usan
+  // los avisos de cada documento y el aviso de cada línea de la ficha.
+  const mediaPrecioFacturas = useMemo(() => indicePreciosLinea(facturas), [facturas]);
+  const mediaPrecioAlbaranes = useMemo(() => indicePreciosLinea(albaranes), [albaranes]);
   const avisosPorId = useMemo(() => {
     const mapa = new Map<number, ReturnType<typeof avisosDocumento>>();
-    // Índice de precios por tipo, calculado una vez (no por documento).
-    const anomaliaFactura = indiceAnomaliasPrecio(facturas);
-    const anomaliaAlbaran = indiceAnomaliasPrecio(albaranes);
+    const anomaliaFactura = indiceAnomaliasPrecio(facturas, mediaPrecioFacturas);
+    const anomaliaAlbaran = indiceAnomaliasPrecio(albaranes, mediaPrecioAlbaranes);
     facturas.forEach((f) => mapa.set(f.id, avisosDocumento(f, facturas, anomaliaFactura)));
     albaranes.forEach((a) => mapa.set(a.id, avisosDocumento(a, albaranes, anomaliaAlbaran)));
     return mapa;
-  }, [facturas, albaranes]);
+  }, [facturas, albaranes, mediaPrecioFacturas, mediaPrecioAlbaranes]);
 
   // ── Contadores y listas ───────────────────────────────────────────────────
   const contadores = useMemo(
@@ -267,7 +270,7 @@ export function TabCompras({
       <FichaDocumento
         doc={docSeleccionado}
         avisos={(avisosPorId.get(docSeleccionado.id) ?? SIN_AVISOS) as ReturnType<typeof avisosDocumento>}
-        mismoTipo={esAlbaran ? albaranes : facturas}
+        mediaPrecio={esAlbaran ? mediaPrecioAlbaranes : mediaPrecioFacturas}
         facturaDelAlbaran={esAlbaran && docSeleccionado.facturado_en_id != null ? (facturas.find((f) => f.id === docSeleccionado.facturado_en_id) ?? null) : null}
         albaranesDeLaFactura={esAlbaran ? [] : albaranes.filter((a) => a.facturado_en_id === docSeleccionado.id)}
         onEditar={setEditando}
@@ -388,6 +391,7 @@ export function TabCompras({
                     seleccionadoId={seleccion.documentos}
                     cargando={facturasQ.isLoading || albaranesQ.isLoading}
                     hayFiltros={hayTexto || filtroDocs !== "todo"}
+                    busqueda={hayTexto ? textoDiferido : ""}
                     onAbrir={(id) => {
                       setOrigen(null);
                       setSeleccion((s) => ({ ...s, documentos: id }));
@@ -396,7 +400,7 @@ export function TabCompras({
                 )}
               </div>
               <p className="shrink-0 py-1.5 text-xs text-muted-foreground" aria-live="polite">
-                {docsVisibles.length} docs
+                {plural(docsVisibles.length, "documento", "documentos")}
                 {/* Carga escalonada: la primera tanda ya está a la vista y las anteriores siguen llegando. */}
                 {((facturasQ.isFetching && facturasQ.data) || (albaranesQ.isFetching && albaranesQ.data)) && (
                   <span className="ml-1.5" data-testid="cargando-anteriores">· cargando anteriores…</span>
@@ -455,7 +459,7 @@ export function TabCompras({
                   }}
                 />
               </div>
-              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{provVisibles.length} proveedor(es)</p>
+              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{plural(provVisibles.length, "proveedor", "proveedores")}</p>
             </>
           )}
         </section>

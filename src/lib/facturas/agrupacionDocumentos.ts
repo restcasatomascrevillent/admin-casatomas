@@ -113,15 +113,22 @@ export type EstadoPlegado = Record<string, boolean>;
 export const claveEstadoMes = (mes: string) => `m:${mes}`;
 export const claveEstadoProveedor = (mes: string, proveedor: string) => `p:${mes}|${proveedor}`;
 
+/** Con texto buscado, cuántos meses con resultados (los más recientes) salen desplegados. */
+export const MESES_ABIERTOS_BUSCANDO = 3;
+
 /**
- * ¿Está abierto el mes? Lo que el usuario decidió manda; si no, solo el mes de
- * hoy y el anterior; y con búsqueda o chip activos, todos (para no esconder
- * resultados en un mes plegado).
+ * ¿Está abierto el mes? Lo que el usuario decidió manda (`estado`). Si no:
+ *  - sin búsqueda, solo el mes de hoy y el anterior (los chips no cambian nada:
+ *    antes abrían el año entero y en tablet eso eran cientos de filas);
+ *  - con búsqueda, `posicionBuscando` es el sitio del mes entre los que tienen
+ *    resultados (0 = el más reciente) y solo se abren los 3 primeros.
+ * Con búsqueda, `estado` es el de ESA búsqueda (no el recordado en localStorage).
  */
-export function mesAbierto(mes: string, estado: EstadoPlegado, hoy: Date, hayFiltros: boolean): boolean {
+export function mesAbierto(mes: string, estado: EstadoPlegado, hoy: Date, posicionBuscando: number | null = null): boolean {
   const k = claveEstadoMes(mes);
   if (k in estado) return estado[k];
-  return hayFiltros || mesesRecientes(hoy).includes(mes);
+  if (posicionBuscando !== null) return posicionBuscando < MESES_ABIERTOS_BUSCANDO;
+  return mesesRecientes(hoy).includes(mes);
 }
 
 /** ¿Está abierto el subgrupo de proveedor? Por defecto sí. */

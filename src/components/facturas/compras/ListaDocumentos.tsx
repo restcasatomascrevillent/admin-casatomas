@@ -1,7 +1,8 @@
 import { useLayoutEffect, useMemo, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, FileText, Receipt } from "lucide-react";
 import type { Factura } from "@/hooks/useFacturas";
-import { formatCurrency, formatDateCorta } from "@/components/facturas/shared/formatters";
+import { Button } from "@/components/ui/button";
+import { formatCurrency, formatDateCorta, plural } from "@/components/facturas/shared/formatters";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
 import type { ResolverProveedor } from "@/lib/facturas/proveedores";
 import {
@@ -10,15 +11,31 @@ import {
   claveEstadoProveedor,
   guardarPlegado,
   leerPlegado,
+  MESES_ABIERTOS_BUSCANDO,
   mesAbierto,
   proveedorAbierto,
   ubicacionDocumento,
   type EstadoPlegado,
+  type GrupoMes,
 } from "@/lib/facturas/agrupacionDocumentos";
 
 const ETIQUETA_TIPO: Record<string, string> = { factura: "Factura", albaran: "Albarán" };
 
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+const SIN_ESTADO: EstadoPlegado = {};
+
+/** Altura de reserva de un mes fuera de pantalla (`content-visibility: auto`): cabecera 45 px, proveedor 44, documento 49. */
+function altoEstimadoMes(mes: GrupoMes, abierto: boolean, provAbierto: (prov: string) => boolean): number {
+  if (!abierto) return 45;
+  return mes.proveedores.reduce((alto, p) => alto + 44 + (provAbierto(p.clave) ? p.documentos.length * 49 : 0), 45);
+}
+
+/** «con IVA» / «sin IVA» bajo un importe, discreto. */
+const RotuloIva = ({ texto }: { texto: string }) => (
+  <span className="block text-[11px] font-normal pointer-coarse:text-xs text-muted-foreground">
+    <span className="sr-only"> </span>
+    {texto}
+  </span>
+);
 
 /**
  * Compras › Documentos: lista agrupada por MES (el actual primero) y, dentro,
@@ -26,8 +43,12 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
  * enseña cuántos documentos hay y cuánto suman (facturas + albaranes sin
  * factura: un albarán ya facturado sale atenuado con «en F-xxx» y no suma).
  * Mes actual y anterior desplegados, el resto plegados; lo que el usuario
- * pliega o despliega se recuerda (localStorage). Con búsqueda o chip activos
- * se despliega todo, para no esconder resultados. Cada fila: número · tipo y
+ * pliega o despliega se recuerda (localStorage). Los chips no despliegan nada.
+ * Con texto buscado se abren solo los 3 meses más recientes con resultados (lo
+ * que se pliegue o despliegue mientras dura esa búsqueda no se recuerda) y
+ * arriba sale «Abrir todos» / «Plegar todos». Cada mes lleva
+ * `content-visibility: auto`: lo que queda fuera de pantalla no se pinta.
+ * Los totales llevan IVA (rótulo «con IVA»). Cada fila: número · tipo y
  * total en la primera línea, fecha · líneas en la segunda, y una sola insignia.
  * Cada nivel se tabula: mes a ras, proveedor con sangría de 16 px y documentos de
  * 32 px con una guía vertical fina que los une a su proveedor (8/16 px en <640 px).
@@ -41,6 +62,7 @@ export function ListaDocumentos({
   seleccionadoId,
   cargando,
   hayFiltros,
+  busqueda = "",
   onAbrir,
   hoy,
 }: {
@@ -53,21 +75,39 @@ export function ListaDocumentos({
   seleccionadoId: number | null;
   cargando: boolean;
   hayFiltros: boolean;
+  /** Texto buscado (vacío si no hay búsqueda): decide qué meses salen abiertos. */
+  busqueda?: string;
   onAbrir: (id: number) => void;
   /** Para pruebas y capturas: el «hoy» que decide qué meses salen desplegados. */
   hoy?: Date;
 }) {
   const [ahora] = useState(() => hoy ?? new Date());
   const [plegado, setPlegado] = useState<EstadoPlegado>(leerPlegado);
+  // Meses abiertos o plegados a mano durante UNA búsqueda: al cambiar el texto se olvida.
+  const [plegadoBusqueda, setPlegadoBusqueda] = useState<{ texto: string; estado: EstadoPlegado }>({ texto: "", estado: SIN_ESTADO });
   const grupos = useMemo(() => agruparDocumentos(documentos, resolver), [documentos, resolver]);
   const facturaPorId = useMemo(() => new Map(facturas.map((f) => [f.id, f])), [facturas]);
+  const posicionMes = useMemo(() => new Map(grupos.map((g, i) => [g.clave, i])), [grupos]);
 
-  const cambiar = (k: string, abierto: boolean) =>
+  const buscando = busqueda.trim() !== "";
+  const estadoMeses = buscando ? (plegadoBusqueda.texto === busqueda ? plegadoBusqueda.estado : SIN_ESTADO) : plegado;
+  const abiertoMes = (mes: string) => mesAbierto(mes, estadoMeses, ahora, buscando ? (posicionMes.get(mes) ?? 0) : null);
+
+  /** Cambia el estado recordado (localStorage): proveedores siempre, meses sin búsqueda. */
+  const recordar = (cambios: EstadoPlegado) =>
     setPlegado((e) => {
-      const siguiente = { ...e, [k]: abierto };
+      const siguiente = { ...e, ...cambios };
       guardarPlegado(siguiente);
       return siguiente;
     });
+  const cambiarMeses = (cambios: EstadoPlegado) => {
+    if (!buscando) return recordar(cambios);
+    setPlegadoBusqueda((e) => ({ texto: busqueda, estado: { ...(e.texto === busqueda ? e.estado : SIN_ESTADO), ...cambios } }));
+  };
+
+  const algunMesPlegado = buscando && grupos.some((g) => !abiertoMes(g.clave));
+  const verBotonTodos = buscando && (algunMesPlegado || grupos.length > MESES_ABIERTOS_BUSCANDO);
+  const todosLosMeses = (abierto: boolean) => cambiarMeses(Object.fromEntries(grupos.map((g) => [claveEstadoMes(g.clave), abierto])));
 
   // Enlace profundo o salto desde una ficha: si el documento abierto está en un
   // mes o proveedor plegado, se despliega (antes de pintar, para que la fila exista
@@ -77,15 +117,8 @@ export function ListaDocumentos({
   useLayoutEffect(() => {
     if (!doc) return;
     const { mes, proveedor } = ubicacionDocumento(doc, resolver);
-    const abrir: Record<string, boolean> = {};
-    if (!mesAbierto(mes, plegado, ahora, hayFiltros)) abrir[claveEstadoMes(mes)] = true;
-    if (!proveedorAbierto(mes, proveedor, plegado)) abrir[claveEstadoProveedor(mes, proveedor)] = true;
-    if (Object.keys(abrir).length === 0) return;
-    setPlegado((e) => {
-      const siguiente = { ...e, ...abrir };
-      guardarPlegado(siguiente);
-      return siguiente;
-    });
+    if (!abiertoMes(mes)) cambiarMeses({ [claveEstadoMes(mes)]: true });
+    if (!proveedorAbierto(mes, proveedor, plegado)) recordar({ [claveEstadoProveedor(mes, proveedor)]: true });
     // Solo cuando cambia el documento abierto (o aparece en la lista): si luego el usuario
     // pliega ese grupo, se respeta.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,17 +138,33 @@ export function ListaDocumentos({
 
   return (
     <div aria-label="Documentos" data-testid="documentos-agrupados">
+      {verBotonTodos && (
+        <div className="flex items-center justify-between gap-2 border-b border-border/60 pl-2 text-xs text-muted-foreground" data-testid="barra-meses">
+          <span className="min-w-0 truncate">{plural(grupos.length, "mes", "meses")} con resultados</span>
+          <Button variant="ghost" className="h-11 shrink-0 px-3 text-sm" onClick={() => todosLosMeses(algunMesPlegado)}>
+            {algunMesPlegado ? "Abrir todos" : "Plegar todos"}
+          </Button>
+        </div>
+      )}
       {grupos.map((mes) => {
-        const abierto = mesAbierto(mes.clave, plegado, ahora, hayFiltros);
+        const abierto = abiertoMes(mes.clave);
         const Chevron = abierto ? ChevronDown : ChevronRight;
+        const alto = altoEstimadoMes(mes, abierto, (p) => proveedorAbierto(mes.clave, p, plegado));
         return (
-          <section key={mes.clave} aria-label={mes.etiqueta} data-mes={mes.clave}>
+          <section
+            key={mes.clave}
+            aria-label={mes.etiqueta}
+            data-mes={mes.clave}
+            // Lo que queda fuera de pantalla no se maqueta ni se pinta (años de histórico en tablet).
+            className="[content-visibility:auto]"
+            style={{ containIntrinsicSize: `auto ${alto}px` }}
+          >
             {/* Cabecera del mes: fija dentro del scroll de la lista. */}
             <h3 className="sticky top-0 z-10 m-0 border-b border-border/60 bg-card text-[15px]">
               <button
                 type="button"
                 aria-expanded={abierto}
-                onClick={() => cambiar(claveEstadoMes(mes.clave), !abierto)}
+                onClick={() => cambiarMeses({ [claveEstadoMes(mes.clave)]: !abierto })}
                 className="flex min-h-11 w-full items-center gap-2 px-2 py-1 text-left font-semibold transition-colors hover:bg-muted/40"
               >
                 <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -128,7 +177,10 @@ export function ListaDocumentos({
                     <span className="sr-only"> · </span>
                   </span>
                 </span>
-                <span className="shrink-0 text-right tabular-nums">{formatCurrency(mes.total)}</span>
+                <span className="shrink-0 text-right leading-tight">
+                  <span className="tabular-nums">{formatCurrency(mes.total)}</span>
+                  <RotuloIva texto="con IVA" />
+                </span>
               </button>
             </h3>
             {abierto &&
@@ -142,7 +194,7 @@ export function ListaDocumentos({
                       <button
                         type="button"
                         aria-expanded={provAbierto}
-                        onClick={() => cambiar(claveEstadoProveedor(mes.clave, prov.clave), !provAbierto)}
+                        onClick={() => recordar({ [claveEstadoProveedor(mes.clave, prov.clave)]: !provAbierto })}
                         className="flex min-h-11 w-full items-center gap-2 px-2 py-1 text-left font-medium transition-colors hover:bg-muted/50"
                       >
                         <ChevronProv className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -154,7 +206,10 @@ export function ListaDocumentos({
                             <span className="sr-only"> · </span>
                           </span>
                         </span>
-                        <span className="shrink-0 text-right tabular-nums">{formatCurrency(prov.total)}</span>
+                        <span className="shrink-0 text-right leading-tight">
+                          <span className="tabular-nums">{formatCurrency(prov.total)}</span>
+                          <RotuloIva texto="con IVA" />
+                        </span>
                       </button>
                     </h4>
                     {provAbierto && (
@@ -242,7 +297,7 @@ function FilaDocumento({
           <span className="block truncate text-xs text-muted-foreground">
             {formatDateCorta(d.fecha)}
             {textoFactura && <span data-en-factura> · {textoFactura}</span>}
-            {d.productos.length > 0 && ` · ${d.productos.length} línea(s)`}
+            {d.productos.length > 0 && ` · ${plural(d.productos.length, "línea", "líneas")}`}
           </span>
         </span>
         <span className={`shrink-0 text-sm font-semibold tabular-nums ${facturado ? "font-normal line-through decoration-muted-foreground/60" : ""}`}>

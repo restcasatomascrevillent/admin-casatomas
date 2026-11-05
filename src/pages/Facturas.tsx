@@ -126,10 +126,8 @@ const Facturas = () => {
     const provTexto = doc.proveedor ? `del proveedor ${doc.proveedor}` : "sin proveedor especificado";
     const prompt = `Hola, quiero hacerte una consulta sobre el ${tipo} número ${doc.numero_documento} ${provTexto}.`;
 
-    // 3. Forzar scroll al top de la página de forma fluida
-    window.scrollTo({ top: 0, behavior: "smooth" });
-
-    // 4. Enviar consulta al chat (con setTimeout mínimo para darle tiempo a montar el DOM si estaba oculto)
+    // 3. Enviar consulta al chat (con setTimeout mínimo para darle tiempo a montar el DOM si estaba oculto).
+    //    Sin `window.scrollTo`: la página no tiene scroll (alto = pantalla).
     setTimeout(() => {
       if (chatRef.current) {
         chatRef.current.enviarConsulta(prompt);
