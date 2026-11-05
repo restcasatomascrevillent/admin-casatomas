@@ -10,8 +10,16 @@
  *   constante y FALLANDO CERRADO (500) si el secreto falta. El mismo valor
  *   vive en Vault como 'instagram_programador_secret'.
  *
- *   POST (cuerpo ignorado) → 200 { ok, procesadas, resultados: [{ id, piezaId, resultado, … }] }
+ *   POST {} → 200 { ok, procesadas, resultados: [{ id, piezaId, resultado, … }] }
+ *   POST { "accion": "limpiar" } → 200 { ok, accion: "limpiar", jpegMarcados,
+ *        jpegBorrados, tmpBorrados, avisos }: limpieza diaria del bucket (ver
+ *        limpieza.ts; cron «instagram-limpieza-bucket», migración 20261107010000).
  *   401 sin cabecera o incorrecta · 405 método · 500 falta configuración.
+ *
+ *   Cada pieza se publica con la cuenta de SU marca (ver entorno.ts:
+ *   IG_USER_ID_TOUZA… o los generales) y con el cerrojo de publicación
+ *   (409 «publicacion_en_curso» si alguien la está probando o publicando a
+ *   mano: se reintenta en la siguiente pasada).
  *
  *   Cada pasada, mientras quede tiempo (≤ MAX_POR_PASADA):
  *     1. instagram_programador_reclamar → UNA vencida con FOR UPDATE SKIP
@@ -38,10 +46,11 @@
  */
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
 import { NOMBRES_ENTORNO } from "../_shared/instagram/entorno.ts";
-import { json, opciones } from "../_shared/instagram/http.ts";
+import { json, leerJson, opciones } from "../_shared/instagram/http.ts";
 import { registrarSecreto, registro, sanear } from "../_shared/instagram/secretos.ts";
 import { leerPieza, type FilaPieza, type Sesion } from "../_shared/instagram/supabase.ts";
 import { publicarConSesion, type DependenciasPublicar } from "../instagram-publicar/publicar.ts";
+import { limpiarBucket } from "./limpieza.ts";
 
 export const ETIQUETA = "instagram-programador";
 export const CABECERA_SECRETO = "x-webhook-secret";
@@ -213,6 +222,11 @@ export function clasificar(estado: number, c: CuerpoPublicar, p: Pick<Programaci
     };
   }
   if (estado === 429) return { resultado: "aplazar", esperaSeg: ESPERA_CUOTA_SEG, contenedorId: contenedorEnviado, mensaje: textoError(c, estado) };
+  // Alguien la está probando o publicando a mano ahora mismo: a la siguiente
+  // pasada (no cuenta como fallo de Meta; si salió, la idempotencia la cierra).
+  if (estado === 409 && c.tipo === "publicacion_en_curso") {
+    return { resultado: "aplazar", esperaSeg: ESPERA_SIGUIENTE_PASADA_SEG, contenedorId: contenedorEnviado, mensaje: textoError(c, estado) };
+  }
   if (c.tipo === "contenedor_ya_publicado") {
     return {
       resultado: "error",
@@ -256,6 +270,7 @@ export async function procesar(s: Sesion, p: Programacion, env: Record<string, s
   const publicar = deps.publicar ?? publicarConSesion;
   try {
     const r = await publicar(s, peticion, {
+      origen: "programador",
       env,
       fetch: deps.fetch,
       dormir: deps.dormir,
@@ -321,6 +336,19 @@ export async function manejarProgramador(request: Request, deps: DependenciasPro
   registrarSecreto(claveServicio);
 
   const s = sesionServicio(url, claveServicio, deps.fetch ?? fetch);
+  const cuerpo = await leerJson(request, 4096);
+  const accion = cuerpo.ok && cuerpo.valor && typeof cuerpo.valor === "object" ? (cuerpo.valor as { accion?: unknown }).accion : undefined;
+  if (accion === "limpiar") {
+    try {
+      const r = await limpiarBucket(s, deps.ahora);
+      registro("info", ETIQUETA, "limpieza del bucket", { ...r, avisos: r.avisos.length });
+      return json(200, { ok: true, accion: "limpiar", ...r });
+    } catch (e) {
+      registro("error", ETIQUETA, "limpieza", e);
+      return json(500, { ok: false, error: "No se pudo limpiar el bucket", detalle: sanear((e as Error)?.message ?? e) });
+    }
+  }
+  if (accion !== undefined && accion !== "publicar") return json(400, { ok: false, error: "Acción no válida: usa «publicar» (o nada) o «limpiar»" });
   try {
     const resultados = await ejecutarPasada(s, env, deps);
     return json(200, { ok: true, procesadas: resultados.length, resultados });

@@ -36,6 +36,10 @@ interface Escenario {
   /** Filas de instagram_fotos (GET) y respuesta al insertar (POST). */
   fotos?: Array<Record<string, unknown>>;
   insertarFoto?: [number, unknown];
+  /** Respuesta de la RPC del cerrojo (por defecto, reservada). [404, …] = migración sin aplicar. */
+  reserva?: [number, unknown];
+  /** Respuesta al PATCH de alt_text (por defecto, 204). */
+  altText?: [number, unknown];
 }
 
 /** fetch simulado: Supabase (Auth, RPC, instagram_piezas, Storage) + Meta. */
@@ -51,7 +55,16 @@ export function falso(e: Escenario = {}) {
     llamadas.push(l);
     if (url === `${SB}/auth/v1/user`) return resp(...(e.usuario ?? [200, { id: "usuario-1" }]));
     if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, e.permiso ?? true);
+    if (url === `${SB}/rest/v1/rpc/instagram_pieza_reservar_publicacion`) {
+      return resp(...(e.reserva ?? [200, { ok: true, bloqueo: "b0000000-0000-4000-8000-000000000001" }]));
+    }
+    if (url === `${SB}/rest/v1/rpc/instagram_pieza_liberar_publicacion`) return resp(200, true);
     if (url.startsWith(`${SB}/rest/v1/instagram_piezas`)) {
+      if (metodo === "PATCH" && cuerpo && Object.keys(JSON.parse(cuerpo)).join() === "alt_text") {
+        const [estado, c] = e.altText ?? [204, null];
+        if (estado < 300 && fila) fila = { ...fila, ...JSON.parse(cuerpo) };
+        return resp(estado, c);
+      }
       if (metodo === "GET") return resp(200, fila ? [fila] : []);
       if (metodo === "POST") {
         fila = { caption: null, contenedor_id: null, media_id: null, permalink: null, ...JSON.parse(cuerpo!) };

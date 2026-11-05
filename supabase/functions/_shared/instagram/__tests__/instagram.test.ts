@@ -4,7 +4,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { clasificarError, mapearErrorGraph } from "../errores.ts";
 import { olvidarSecretos, registrarSecreto, sanear, sanearUrl } from "../secretos.ts";
 import { contarHashtags, validarCaption } from "../validacion.ts";
-import { problemasVariables } from "../entorno.ts";
+import { cuentasDistintas, leerConfigMetaMarca, problemasDeMarca, problemasVariables } from "../entorno.ts";
+import { validarAltText } from "../validacion.ts";
 import { GRAPH, JWT, SECRETO_APP, TOKEN_META } from "./simulacion.ts";
 
 beforeEach(() => olvidarSecretos());
@@ -52,5 +53,48 @@ describe("secretos que faltan", () => {
     expect(p[0].comoArreglarlo).not.toContain("corto");
     // Sin SUPABASE_URL reconocible: da los dos refs.
     expect(problemasVariables({})[0].comoArreglarlo).toMatch(/sfonaclosuafvlhutkon.*haqmmdfdzzatdnrrcgez/);
+  });
+});
+
+describe("cuenta por marca (secretos opcionales)", () => {
+  const BASE = { IG_ACCESS_TOKEN: TOKEN_META, IG_USER_ID: "17841400000000001", META_APP_ID: "1234567890" };
+  it("sin secretos de marca, las dos marcas caen en la cuenta general (como hasta ahora)", () => {
+    for (const marca of ["casa-tomas", "touza"] as const) {
+      const r = leerConfigMetaMarca(BASE, marca);
+      expect(r.ok && r.config).toMatchObject({ igUserId: "17841400000000001", token: TOKEN_META, origen: { propia: false, variableIgUserId: "IG_USER_ID", variableToken: "IG_ACCESS_TOKEN" } });
+    }
+    expect(cuentasDistintas(BASE)).toHaveLength(1);
+    expect(cuentasDistintas(BASE)[0].marcas).toEqual(["casa-tomas", "touza"]);
+  });
+
+  it("con IG_USER_ID_TOUZA (y su token opcional) Touza usa su cuenta; Casa Tomás sigue en la general", () => {
+    const env = { ...BASE, IG_USER_ID_TOUZA: "17841400000000077", IG_ACCESS_TOKEN_TOUZA: "EAAGtokenPropioDeTouza0000000000001" };
+    const t = leerConfigMetaMarca(env, "touza");
+    expect(t.ok && t.config).toMatchObject({ igUserId: "17841400000000077", token: "EAAGtokenPropioDeTouza0000000000001", origen: { propia: true } });
+    const c = leerConfigMetaMarca(env, "casa-tomas");
+    expect(c.ok && c.config.igUserId).toBe("17841400000000001");
+    expect(cuentasDistintas(env)).toHaveLength(2);
+  });
+
+  it("un secreto de marca mal escrito solo afecta a esa marca", () => {
+    const env = { ...BASE, IG_USER_ID_TOUZA: "@touza" };
+    expect(problemasVariables(env).map((p) => p.variable)).toEqual(["IG_USER_ID_TOUZA"]);
+    expect(problemasDeMarca(env, "touza").map((p) => p.variable)).toEqual(["IG_USER_ID_TOUZA"]);
+    expect(problemasDeMarca(env, "casa-tomas")).toEqual([]);
+    expect(leerConfigMetaMarca(env, "touza").ok).toBe(false);
+  });
+
+  it("si la marca tiene su ID y su token, no necesita los generales", () => {
+    const env = { META_APP_ID: "1234567890", IG_USER_ID_TOUZA: "17841400000000077", IG_ACCESS_TOKEN_TOUZA: "EAAGtokenPropioDeTouza0000000000001" };
+    expect(leerConfigMetaMarca(env, "touza").ok).toBe(true);
+    expect(leerConfigMetaMarca(env, "casa-tomas").ok).toBe(false);
+  });
+});
+
+describe("texto alternativo", () => {
+  it("≤ 1000 caracteres; en stories se avisa de que se ignora", () => {
+    expect(validarAltText("a".repeat(1000)).ok).toBe(true);
+    expect(validarAltText("a".repeat(1001)).errores[0]).toMatch(/1001 caracteres/);
+    expect(validarAltText("x", "story").avisos[0]).toMatch(/stories/);
   });
 });

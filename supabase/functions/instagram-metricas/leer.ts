@@ -6,9 +6,12 @@
  *   serie     28 días (alcance, seguidores, visualizaciones, interacciones)
  *   publicaciones  última captura de cada publicación, con marca, plantilla,
  *             formato, foto y tipo de foto si salió de una pieza del panel
- *             (instagram_piezas por media_id o pieza_id; tipo de las fotos
- *             subidas desde instagram_fotos; el de las del catálogo estático
- *             lo pone el panel con src/lib/instagram/fotos.ts)
+ *             (instagram_piezas por media_id o pieza_id). Tipo de foto:
+ *               «drive:<id>» (fotos de Drive, lo normal) → instagram_fotos.drive_id
+ *               «<uuid>» (subidas antes de Drive)        → instagram_fotos.id
+ *               «carta:<id>» (fotos de la carta)          → «plato»
+ *             El de las del catálogo estático lo pone el panel
+ *             (src/lib/instagram/fotos.ts).
  *   ultimaCaptura / ultimaCorrecta  para avisar de errores (p. ej. permiso)
  */
 import { fechaMadrid } from "../_shared/instagram/insights.ts";
@@ -18,6 +21,17 @@ import { resumirPeriodo, serieDiaria, ultimoDia, type FilaCuenta, type PuntoSeri
 export const DIAS_SERIE = 28;
 export const MAX_PUBLICACIONES_LEER = 60;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Igual que src/lib/instagram/fotos.ts (PREFIJO_FOTO_DRIVE y esIdDriveValido). */
+const PREFIJO_DRIVE = "drive:";
+const ID_DRIVE = /^[A-Za-z0-9_-]{10,200}$/;
+/** Igual que src/lib/instagram/fotos.ts (PREFIJO_FOTO_CARTA): las fotos de la carta son platos. */
+const PREFIJO_CARTA = "carta:";
+
+function driveIdDe(foto: string): string | null {
+  if (!foto.startsWith(PREFIJO_DRIVE)) return null;
+  const id = foto.slice(PREFIJO_DRIVE.length);
+  return ID_DRIVE.test(id) ? id : null;
+}
 
 interface FilaPublicacion {
   media_id: string;
@@ -152,16 +166,36 @@ export async function leerMetricas(db: Rest, opciones: { igUserId: string | null
     }
   }
 
-  // Tipo de las fotos subidas desde el panel (las del catálogo estático las resuelve el panel).
+  // Tipo de las fotos (las del catálogo estático las resuelve el panel). La
+  // clave del mapa es el valor de `datos.foto` tal cual («drive:<id>», uuid…).
   const tipos = new Map<string, string>();
-  const fotosSubidas = [...new Set([...piezasPorId.values()].map((p) => p.foto).filter((x): x is string => !!x && UUID.test(x)))];
+  const fotosPiezas = [...new Set([...piezasPorId.values()].map((p) => p.foto).filter((x): x is string => !!x))];
+  for (const foto of fotosPiezas) if (foto.startsWith(PREFIJO_CARTA)) tipos.set(foto, "plato");
+  const fotosSubidas = fotosPiezas.filter((x) => UUID.test(x));
+  const fotosDrive = fotosPiezas.map((x) => [x, driveIdDe(x)] as const).filter((x): x is readonly [string, string] => x[1] !== null);
+  const sinTabla = (e: unknown) => e instanceof ErrorBaseDatos && (e.estado === 404 || e.codigo === "PGRST205" || e.codigo === "42P01");
   if (fotosSubidas.length) {
     try {
       const fotos = await db.leer<{ id: string; tipo: string }>(`instagram_fotos?select=id,tipo&id=in.(${fotosSubidas.join(",")})`, "las fotos");
       for (const foto of fotos) tipos.set(foto.id, foto.tipo);
     } catch (e) {
       // Sin la tabla instagram_fotos (migración 20261105120000 sin aplicar) se sigue sin el tipo.
-      if (!(e instanceof ErrorBaseDatos) || (e.estado !== 404 && e.codigo !== "PGRST205" && e.codigo !== "42P01")) throw e;
+      if (!sinTabla(e)) throw e;
+    }
+  }
+  if (fotosDrive.length) {
+    try {
+      // Los ids de Drive solo llevan [A-Za-z0-9_-]: van entre comillas por si acaso.
+      const lista = fotosDrive.map(([, d]) => `"${d}"`).join(",");
+      const fotos = await db.leer<{ drive_id: string; tipo: string }>(`instagram_fotos?select=drive_id,tipo&drive_id=in.(${lista})`, "las fotos de Drive");
+      const porDrive = new Map(fotos.map((f) => [f.drive_id, f.tipo]));
+      for (const [foto, d] of fotosDrive) {
+        const tipo = porDrive.get(d);
+        if (tipo) tipos.set(foto, tipo);
+      }
+    } catch (e) {
+      // Sin la columna drive_id (migración 20261105150000 sin aplicar) se sigue sin el tipo.
+      if (!sinTabla(e) && !(e instanceof ErrorBaseDatos && (e.estado === 400 || e.codigo === "42703"))) throw e;
     }
   }
 

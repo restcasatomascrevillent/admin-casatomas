@@ -2,7 +2,9 @@
  * Acceso a Supabase de las Edge Functions de Instagram COMO EL USUARIO: clave
  * pública (anon/publishable) + `Authorization: Bearer <JWT del usuario>`, así
  * que la RLS de `instagram_piezas` y del bucket «instagram» se aplica igual
- * que en el panel. Nunca se usa service_role.
+ * que en el panel. Excepción (al final del fichero): el estado de publicación
+ * (estado, contenedor_id, media_id, permalink, drive_id) solo lo puede
+ * escribir el servidor, con service_role y DESPUÉS de autorizar al usuario.
  *
  * Autorización: sesión válida (/auth/v1/user) + permiso de la sección
  * Marketing (`can_write_section('marketing')`, la misma función que usan las
@@ -52,6 +54,10 @@ export interface FilaPieza {
   media_id: string | null;
   permalink: string | null;
   error: string | null;
+  /** Texto alternativo de la imagen (migración 20261107000000; no existe antes). */
+  alt_text?: string | null;
+  /** Cuándo se borró el JPEG por no publicarse (migración 20261107010000; null = está). */
+  imagen_borrada_at?: string | null;
   creado_por: string | null;
   created_at?: string;
   updated_at?: string;
@@ -306,4 +312,129 @@ export async function anotarDrivePieza(s: Sesion, id: string, driveId: string): 
     signal: AbortSignal.timeout(MS_TIEMPO),
   });
   if (!r.ok) throw new ErrorSupabase(`No se pudo anotar el id de Drive (${r.status}): ${await detalle(r)}`, r.status);
+}
+
+// ── Escritura del estado de publicación (solo el servidor) ──────────────────
+//
+// Desde la migración 20261107000000_instagram_publicacion_servidor, un usuario
+// del panel (authenticated) NO puede cambiar estado (salvo a borrador o
+// generada), contenedor_id, media_id, permalink ni drive_id de una pieza, ni
+// tocar una ya publicada. Lo escribe la Edge Function con la clave de servicio,
+// después de haber autorizado al usuario con su JWT. La auditoría recibe la
+// función (x-audit-source) y el usuario (x-audit-actor-id).
+
+/**
+ * Sesión para ESCRIBIR el estado de publicación. Si `s` ya es de servicio (el
+ * programador), la misma. Si falta SUPABASE_SERVICE_ROLE_KEY (no pasa en
+ * Supabase, que la inyecta siempre) se usa la del usuario, como antes.
+ */
+export function sesionEscritura(s: Sesion, env: Record<string, string | undefined>, etiqueta: string): Sesion {
+  const clave = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!clave || s.token === clave) return s;
+  registrarSecreto(clave);
+  const base = s.sb.url;
+  const actor = /^[0-9a-f-]{36}$/i.test(s.usuario) ? s.usuario : null;
+  const fetchAuditado: typeof fetch = (entrada, init = {}) => {
+    const destino = String(entrada instanceof Request ? entrada.url : entrada);
+    if (!destino.startsWith(base)) return s.fetch(entrada, init);
+    const cabeceras = new Headers(init.headers);
+    cabeceras.set("x-audit-source", etiqueta);
+    if (actor) cabeceras.set("x-audit-actor-id", actor);
+    return s.fetch(entrada, { ...init, headers: cabeceras });
+  };
+  return { usuario: s.usuario, token: clave, sb: { url: base, clave }, fetch: fetchAuditado };
+}
+
+/** Fila con TODAS las columnas (alt_text incluido si ya existe la columna). */
+export async function leerPiezaCompleta(s: Sesion, id: string): Promise<(FilaPieza & { alt_text?: string | null }) | null> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}&select=*`, {
+    headers: cabeceras(s, { Accept: "application/json" }),
+    signal: AbortSignal.timeout(MS_TIEMPO),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudo leer la pieza (${r.status}): ${await detalle(r)}`, r.status);
+  const filas = (await r.json()) as Array<FilaPieza & { alt_text?: string | null }>;
+  return filas[0] ?? null;
+}
+
+/**
+ * Guarda el texto alternativo (columna de 20261107000000). Nunca lanza:
+ * devuelve un aviso si no se pudo (p. ej. migración sin aplicar).
+ */
+export async function anotarAltText(s: Sesion, id: string, alt: string | null): Promise<string | null> {
+  try {
+    const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: cabeceras(s, { "Content-Type": "application/json", Prefer: "return=minimal" }),
+      body: JSON.stringify({ alt_text: alt }),
+      signal: AbortSignal.timeout(MS_TIEMPO),
+    });
+    if (r.ok) return null;
+    const texto = await detalle(r);
+    if (/alt_text|PGRST204|42703/.test(texto)) return "El texto alternativo se ha enviado a Instagram, pero no se ha guardado en el panel: falta aplicar la migración 20261107000000_instagram_publicacion_servidor.";
+    return `No se pudo guardar el texto alternativo (${r.status}): ${texto}`;
+  } catch (e) {
+    return sanear(`No se pudo guardar el texto alternativo: ${(e as Error)?.message ?? e}`);
+  }
+}
+
+async function rpcServicio(s: Sesion, nombre: string, cuerpo: Record<string, unknown>): Promise<{ estado: number; valor: unknown; texto: string }> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/rpc/${nombre}`, {
+    method: "POST",
+    headers: cabeceras(s, { "Content-Type": "application/json", Accept: "application/json" }),
+    body: JSON.stringify(cuerpo),
+    signal: AbortSignal.timeout(MS_TIEMPO),
+  });
+  const texto = await r.text().catch(() => "");
+  let valor: unknown = null;
+  try {
+    valor = texto ? JSON.parse(texto) : null;
+  } catch {
+    valor = null;
+  }
+  return { estado: r.status, valor, texto: sanear(texto).slice(0, 300) };
+}
+
+/** ¿La RPC no existe todavía (migración sin aplicar)? */
+function rpcSinCrear(estado: number, texto: string): boolean {
+  return estado === 404 || /PGRST202|42883|Could not find the function/i.test(texto);
+}
+
+export type ReservaPublicacion =
+  | { ok: true; bloqueo: string | null; sinCerrojo?: true }
+  | { ok: false; motivo: "en_curso" | "programada" | "publicada" | "no_existe"; programadaPara?: string | null; permalink?: string | null };
+
+/**
+ * Cerrojo de publicación de una pieza (RPC instagram_pieza_reservar_publicacion,
+ * solo service_role): impide dos publicaciones (o una prueba y una
+ * publicación) a la vez, y —si `comprobarProgramacion`— publicar a mano una
+ * pieza que tiene una programación activa. Sin la migración, sigue sin cerrojo.
+ */
+export async function reservarPublicacion(
+  s: Sesion,
+  piezaId: string,
+  o: { segundos: number; comprobarProgramacion: boolean },
+): Promise<ReservaPublicacion> {
+  const r = await rpcServicio(s, "instagram_pieza_reservar_publicacion", {
+    p_pieza_id: piezaId,
+    p_segundos: o.segundos,
+    p_comprobar_programacion: o.comprobarProgramacion,
+  });
+  if (r.estado >= 200 && r.estado < 300) {
+    const v = (r.valor ?? {}) as { ok?: boolean; bloqueo?: string; motivo?: string; programadaPara?: string | null; permalink?: string | null };
+    if (v.ok === true && typeof v.bloqueo === "string") return { ok: true, bloqueo: v.bloqueo };
+    const motivo = v.motivo === "programada" || v.motivo === "publicada" || v.motivo === "no_existe" ? v.motivo : "en_curso";
+    return { ok: false, motivo, programadaPara: v.programadaPara ?? null, permalink: v.permalink ?? null };
+  }
+  if (rpcSinCrear(r.estado, r.texto)) return { ok: true, bloqueo: null, sinCerrojo: true };
+  throw new ErrorSupabase(`No se pudo reservar la publicación (${r.estado}): ${r.texto}`, r.estado);
+}
+
+/** Suelta el cerrojo. Nunca lanza (si falla, caduca solo). */
+export async function liberarPublicacion(s: Sesion, piezaId: string, bloqueo: string | null): Promise<void> {
+  if (!bloqueo) return;
+  try {
+    await rpcServicio(s, "instagram_pieza_liberar_publicacion", { p_pieza_id: piezaId, p_bloqueo: bloqueo });
+  } catch {
+    /* caduca solo */
+  }
 }

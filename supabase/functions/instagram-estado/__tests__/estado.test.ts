@@ -46,6 +46,37 @@ describe("Edge Function instagram-estado", () => {
     return undefined;
   };
 
+  it("cuentas por marca: sin secretos propios, las dos en la general; con IG_USER_ID_TOUZA, Touza en la suya (sin tokens en la respuesta)", async () => {
+    const a = falso({ meta: metaEstado });
+    const r1 = await (await manejarEstado(peticion(null, `Bearer ${JWT}`, "GET"), { env: { ...ENV_META, META_APP_SECRET: SECRETO_APP }, fetch: a.f, ...depsRapidas })).json();
+    expect(r1.cuentasPorMarca).toEqual([
+      expect.objectContaining({ marca: "casa-tomas", propia: false, igUserId: ENV_META.IG_USER_ID, username: "oficiososia", estado: "ok", variableIgUserId: "IG_USER_ID" }),
+      expect.objectContaining({ marca: "touza", propia: false, igUserId: ENV_META.IG_USER_ID, username: "oficiososia", estado: "ok" }),
+    ]);
+    const TOUZA = "17841400000000077";
+    const TOKEN_TOUZA = "EAAGtokenPropioDeTouzaParaPruebas000000000001";
+    const metaTouza: Manejador = (l) => {
+      if (l.url.replace(GRAPH, "").startsWith(`/${TOUZA}?`)) {
+        expect(l.cabeceras.authorization).toBe(`Bearer ${TOKEN_TOUZA}`);
+        return resp(200, { id: TOUZA, username: "touza_pruebas" });
+      }
+      return metaEstado(l);
+    };
+    const b = falso({ meta: metaTouza });
+    const r = await manejarEstado(peticion(null, `Bearer ${JWT}`, "GET"), {
+      env: { ...ENV_META, META_APP_SECRET: SECRETO_APP, IG_USER_ID_TOUZA: TOUZA, IG_ACCESS_TOKEN_TOUZA: TOKEN_TOUZA },
+      fetch: b.f,
+      ...depsRapidas,
+    });
+    const texto = await r.text();
+    const j = JSON.parse(texto);
+    expect(j.cuentasPorMarca[1]).toMatchObject({ marca: "touza", propia: true, igUserId: TOUZA, username: "touza_pruebas", variableIgUserId: "IG_USER_ID_TOUZA", variableToken: "IG_ACCESS_TOKEN_TOUZA", estado: "ok" });
+    expect(j.cuentasPorMarca[0]).toMatchObject({ marca: "casa-tomas", propia: false, username: "oficiososia" });
+    expect(j.variables.find((v: { nombre: string }) => v.nombre === "IG_USER_ID_CASA_TOMAS").detalle).toMatch(/se usa IG_USER_ID/);
+    expect(texto).not.toContain(TOKEN_TOUZA);
+    expect(texto).not.toContain(TOKEN_META);
+  });
+
   it("401 sin token y 403 sin Marketing", async () => {
     expect((await manejarEstado(peticion(null, null, "GET"), { env: ENV_META, fetch: falso().f })).status).toBe(401);
     expect((await manejarEstado(peticion(null, `Bearer ${JWT}`, "GET"), { env: ENV_META, fetch: falso({ permiso: false }).f })).status).toBe(403);

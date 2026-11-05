@@ -195,6 +195,42 @@ describe("leer", () => {
     expect(rest.find((l) => l.url.includes("instagram_metricas_cuenta"))!.url).toContain(`ig_user_id=eq.${IG}`);
   });
 
+  it("tipo de foto de las piezas con fotos de Drive («drive:<id>», por drive_id) y de la carta («plato»)", async () => {
+    const DRIVE = "1AbcDriveFoto00000000001";
+    const PIEZA2 = "4f2b8a52-6c1e-4d7a-9b0f-1a2b3c4d5e6f";
+    const { f, llamadas } = simular({
+      tablas: {
+        instagram_metricas_publicacion_ultima: [
+          { media_id: "1790000000000001", pieza_id: PIEZA, fecha_captura: "2026-11-05", producto: "FEED" },
+          { media_id: "1790000000000002", pieza_id: PIEZA2, fecha_captura: "2026-11-05", producto: "FEED" },
+        ],
+        instagram_piezas: [
+          { id: PIEZA, media_id: "1790000000000001", marca: "casa-tomas", plantilla: "ct-foto-titular", formato: "post", foto: `drive:${DRIVE}` },
+          { id: PIEZA2, media_id: "1790000000000002", marca: "casa-tomas", plantilla: "ct-foto-titular", formato: "post", foto: "carta:42" },
+        ],
+        instagram_fotos: [{ drive_id: DRIVE, tipo: "ambiente" }],
+      },
+    });
+    const j = await (await manejarMetricas(peticion("GET", null, usuario), deps(f))).json();
+    expect(j.publicaciones[0]).toMatchObject({ foto: `drive:${DRIVE}`, tipoFoto: "ambiente" });
+    expect(j.publicaciones[1]).toMatchObject({ foto: "carta:42", tipoFoto: "plato" });
+    expect(llamadas.some((l) => l.url.includes(`instagram_fotos?select=drive_id,tipo&drive_id=in.(%22${DRIVE}%22)`) || l.url.includes(`drive_id=in.("${DRIVE}")`))).toBe(true);
+  });
+
+  it("leer con «marca»: la cuenta de esa marca (IG_USER_ID_TOUZA) o la general, y la lista de cuentas", async () => {
+    const TOUZA = "17841400000000077";
+    const env = { ...ENV, IG_USER_ID_TOUZA: TOUZA };
+    const a = simular();
+    const j = await (await manejarMetricas(new Request(`${SB}/functions/v1/instagram-metricas?marca=touza`, { headers: usuario }), deps(a.f, env))).json();
+    expect(a.llamadas.find((l) => l.url.includes("instagram_metricas_cuenta"))!.url).toContain(`ig_user_id=eq.${TOUZA}`);
+    expect(j.cuentas).toEqual([{ igUserId: IG, marcas: ["casa-tomas"] }, { igUserId: TOUZA, marcas: ["touza"] }]);
+    const b = simular();
+    const j2 = await (await manejarMetricas(new Request(`${SB}/functions/v1/instagram-metricas?marca=touza`, { headers: usuario }), deps(b.f))).json();
+    expect(b.llamadas.find((l) => l.url.includes("instagram_metricas_cuenta"))!.url).toContain(`ig_user_id=eq.${IG}`);
+    expect(j2.cuentas).toEqual([{ igUserId: IG, marcas: ["casa-tomas", "touza"] }]);
+    expect((await manejarMetricas(new Request(`${SB}/functions/v1/instagram-metricas?marca=otra`, { headers: usuario }), deps(simular().f))).status).toBe(400);
+  });
+
   it("sin datos: resumen null, serie vacía", async () => {
     const r = await manejarMetricas(peticion("POST", { accion: "leer" }, usuario), deps(simular().f));
     expect(await r.json()).toMatchObject({ ok: true, resumen: null, serie: [], publicaciones: [], ultimaCaptura: null });

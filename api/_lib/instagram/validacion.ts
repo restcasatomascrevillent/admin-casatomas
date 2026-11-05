@@ -1,6 +1,12 @@
 /**
  * Validaciones ANTES de gastar cuota (portado de instagram-studio/src/publicar/validacion.ts).
- * Caption: ≤ 2200 caracteres, ≤ 30 hashtags, ≤ 20 menciones.
+ * Caption: ≤ 2200 caracteres, ≤ 30 hashtags, ≤ 20 menciones; texto alternativo ≤ 1000.
+ *
+ * FUENTE ÚNICA de estas reglas: la usan la Edge Function (instagram-publicar),
+ * el panel (src/components/marketing/instagram/contadores.ts la importa) y,
+ * como COPIA IDÉNTICA, la función de Vercel (api/_lib/instagram/validacion.ts):
+ * Vercel no puede importar de supabase/functions. El test
+ * api/_lib/__tests__/copias-instagram.test.ts falla si la copia diverge.
  */
 export type TipoPublicacion = "post" | "story";
 
@@ -40,6 +46,28 @@ export function validarCaption(texto: string, tipo: TipoPublicacion = "post"): R
   if (tipo === "story" && texto.trim()) avisos.push("Las stories no admiten texto por la API: el texto se ignorará.");
   if (tipo === "post" && !texto.trim()) avisos.push("La publicación no lleva texto (caption vacío).");
   return { ok: errores.length === 0, errores, avisos, caracteres, hashtags, menciones };
+}
+
+/**
+ * Texto alternativo de la imagen (alt_text de la Graph API, solo en posts de
+ * imagen; las stories no lo admiten). Meta lo limita a 1000 caracteres.
+ */
+export const MAX_ALT_TEXT = 1000;
+
+export interface ResultadoAltText {
+  ok: boolean;
+  errores: string[];
+  avisos: string[];
+  caracteres: number;
+}
+
+export function validarAltText(texto: string, tipo: TipoPublicacion = "post"): ResultadoAltText {
+  const errores: string[] = [];
+  const avisos: string[] = [];
+  const caracteres = [...texto].length;
+  if (caracteres > MAX_ALT_TEXT) errores.push(`El texto alternativo tiene ${caracteres} caracteres; el máximo es ${MAX_ALT_TEXT}.`);
+  if (tipo === "story" && texto.trim()) avisos.push("Las stories no admiten texto alternativo por la API: se ignorará.");
+  return { ok: errores.length === 0, errores, avisos, caracteres };
 }
 
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

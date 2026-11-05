@@ -307,21 +307,105 @@ describe("Edge Function instagram-publicar", () => {
     expect(f).not.toHaveBeenCalled();
   });
 
-  it("la autorización va COMO EL USUARIO: clave pública + su JWT, nunca service_role", async () => {
+  it("autoriza y lee COMO EL USUARIO; el estado de publicación y el cerrojo, solo con service_role (auditado)", async () => {
     const { m } = metaPublicacion();
     const { f, llamadas } = falso({ fila: FILA_GENERADA, meta: m });
     const r = await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: { ...ENV_META, SUPABASE_SERVICE_ROLE_KEY: "service-role-secreta" }, fetch: f, ...depsRapidas });
     expect(r.status).toBe(200);
     expect(r.headers.get("access-control-allow-origin")).toBe("*");
     const aSupabase = llamadas.filter((l) => l.url.startsWith(SB) && !l.url.includes("/object/public/"));
-    expect(aSupabase.length).toBeGreaterThan(0);
-    for (const l of aSupabase) {
+    const escrituras = aSupabase.filter((l) => (l.url.includes("/rest/v1/instagram_piezas") && l.metodo === "PATCH") || l.url.includes("/rpc/instagram_pieza_"));
+    const resto = aSupabase.filter((l) => !escrituras.includes(l));
+    expect(escrituras.length).toBeGreaterThanOrEqual(3); // reservar, contenedor, prueba_ok, liberar
+    expect(resto.length).toBeGreaterThan(0);
+    for (const l of resto) {
       expect(l.cabeceras.apikey).toBe("clave-publica");
       expect(l.cabeceras.authorization).toBe(`Bearer ${JWT}`);
     }
+    for (const l of escrituras) {
+      expect(l.cabeceras.authorization).toBe("Bearer service-role-secreta");
+      expect(l.cabeceras["x-audit-source"]).toBe("instagram-publicar");
+    }
     const permiso = llamadas.find((l) => l.url.endsWith("/rpc/can_write_section"))!;
     expect(JSON.parse(permiso.cuerpo!)).toEqual({ _section: "marketing" });
-    expect(JSON.stringify(llamadas)).not.toContain("service-role-secreta");
+    expect(await r.text()).not.toContain("service-role-secreta");
+  });
+
+  it("cerrojo: 409 si se está publicando; publicar a mano una pieza programada → 409 «programada»; la prueba no mira la programación", async () => {
+    const { m, orden } = metaPublicacion();
+    const enCurso = falso({ fila: FILA_GENERADA, meta: m, reserva: [200, { ok: false, motivo: "en_curso" }] });
+    const r1 = await manejarPublicar(peticion({ id: ID, dryRun: false }), { env: ENV_META, fetch: enCurso.f, ...depsRapidas });
+    expect(r1.status).toBe(409);
+    expect(await r1.json()).toMatchObject({ tipo: "publicacion_en_curso" });
+    const programada = falso({ fila: FILA_GENERADA, meta: m, reserva: [200, { ok: false, motivo: "programada", programadaPara: "2026-11-20T12:00:00Z" }] });
+    const r2 = await manejarPublicar(peticion({ id: ID, dryRun: false }), { env: ENV_META, fetch: programada.f, ...depsRapidas });
+    expect(r2.status).toBe(409);
+    expect(await r2.json()).toMatchObject({ tipo: "programada", programadaPara: "2026-11-20T12:00:00Z" });
+    expect(orden).toEqual([]); // no se ha llamado a Meta
+    const reservas = programada.llamadas.filter((l) => l.url.endsWith("/rpc/instagram_pieza_reservar_publicacion"));
+    expect(JSON.parse(reservas[0].cuerpo!)).toMatchObject({ p_pieza_id: ID, p_comprobar_programacion: true });
+    const prueba = falso({ fila: FILA_GENERADA, meta: m });
+    await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: ENV_META, fetch: prueba.f, ...depsRapidas });
+    const rp = prueba.llamadas.find((l) => l.url.endsWith("/rpc/instagram_pieza_reservar_publicacion"))!;
+    expect(JSON.parse(rp.cuerpo!)).toMatchObject({ p_comprobar_programacion: false });
+    // Siempre se suelta el cerrojo.
+    expect(prueba.llamadas.some((l) => l.url.endsWith("/rpc/instagram_pieza_liberar_publicacion"))).toBe(true);
+  });
+
+  it("sin la migración del cerrojo (RPC 404) publica igual", async () => {
+    const { m } = metaPublicacion();
+    const { f } = falso({ fila: FILA_GENERADA, meta: m, reserva: [404, { code: "PGRST202", message: "Could not find the function" }] });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: ENV_META, fetch: f, ...depsRapidas });
+    expect(r.status).toBe(200);
+  });
+
+  it("texto alternativo: va a Meta en los posts, se guarda en la pieza y se valida (≤ 1000)", async () => {
+    const { m } = metaPublicacion();
+    const { f, llamadas, fila } = falso({ fila: FILA_GENERADA, meta: m });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: true, altText: "Chuleta de vaca a la brasa en plato oscuro" }), { env: ENV_META, fetch: f, ...depsRapidas });
+    expect(r.status).toBe(200);
+    const media = llamadas.find((l) => l.url.endsWith("/media"))!;
+    expect(new URLSearchParams(media.cuerpo!).get("alt_text")).toBe("Chuleta de vaca a la brasa en plato oscuro");
+    expect(fila()).toMatchObject({ alt_text: "Chuleta de vaca a la brasa en plato oscuro" });
+    // El guardado se reutiliza si no llega (programador).
+    const otra = falso({ fila: { ...FILA_GENERADA, alt_text: "Guardado" }, meta: metaPublicacion().m });
+    await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: ENV_META, fetch: otra.f, ...depsRapidas });
+    expect(new URLSearchParams(otra.llamadas.find((l) => l.url.endsWith("/media"))!.cuerpo!).get("alt_text")).toBe("Guardado");
+    // Story: no se manda.
+    const story = falso({ fila: { ...FILA_GENERADA, formato: "story" }, meta: metaPublicacion().m });
+    await manejarPublicar(peticion({ id: ID, dryRun: true, altText: "x" }), { env: ENV_META, fetch: story.f, ...depsRapidas });
+    expect(new URLSearchParams(story.llamadas.find((l) => l.url.endsWith("/media"))!.cuerpo!).get("alt_text")).toBeNull();
+    const largo = falso({ fila: FILA_GENERADA, meta: metaPublicacion().m });
+    const r4 = await manejarPublicar(peticion({ id: ID, dryRun: true, altText: "a".repeat(1001) }), { env: ENV_META, fetch: largo.f, ...depsRapidas });
+    expect(r4.status).toBe(422);
+  });
+
+  it("cuenta por marca: Touza con IG_USER_ID_TOUZA publica en su cuenta; sin él, en la general", async () => {
+    const TOUZA = "17841400000000077";
+    const llamadasMeta: string[] = [];
+    const meta = (l: { url: string; metodo: string }) => {
+      llamadasMeta.push(l.url);
+      const ruta = l.url.replace(/^https:\/\/graph\.facebook\.com\/v26\.0/, "");
+      if (ruta.startsWith(`/${TOUZA}/content_publishing_limit`)) return new Response(JSON.stringify({ data: [{ quota_usage: 0, config: { quota_total: 100, quota_duration: 86400 } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      if (ruta === `/${TOUZA}/media`) return new Response(JSON.stringify({ id: "1790000000000001" }), { status: 200, headers: { "Content-Type": "application/json" } });
+      return metaPublicacion().m(l as never);
+    };
+    const filaTouza = { ...FILA_GENERADA, marca: "touza" };
+    const a = falso({ fila: filaTouza, meta: meta as never });
+    const r = await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: { ...ENV_META, IG_USER_ID_TOUZA: TOUZA }, fetch: a.f, ...depsRapidas });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ cuenta: { marca: "touza", igUserId: TOUZA, propia: true } });
+    expect(llamadasMeta.some((u) => u.includes(`/${TOUZA}/media`))).toBe(true);
+    expect(llamadasMeta.some((u) => u.includes(`/${ENV_META.IG_USER_ID}/media`))).toBe(false);
+    // Casa Tomás, con el mismo entorno, sigue en la general.
+    const b = falso({ fila: FILA_GENERADA, meta: metaPublicacion().m });
+    const r2 = await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: { ...ENV_META, IG_USER_ID_TOUZA: TOUZA }, fetch: b.f, ...depsRapidas });
+    expect(await r2.json()).toMatchObject({ cuenta: { marca: "casa-tomas", igUserId: ENV_META.IG_USER_ID, propia: false } });
+    // Con token propio, Touza usa su token.
+    const c = falso({ fila: filaTouza, meta: meta as never });
+    const tokenTouza = "EAAGtokenPropioDeTouzaParaPruebas000000000001";
+    await manejarPublicar(peticion({ id: ID, dryRun: true }), { env: { ...ENV_META, IG_USER_ID_TOUZA: TOUZA, IG_ACCESS_TOKEN_TOUZA: tokenTouza }, fetch: c.f, ...depsRapidas });
+    expect(c.llamadas.find((l) => l.url.endsWith(`/${TOUZA}/media`))!.cabeceras.authorization).toBe(`Bearer ${tokenTouza}`);
   });
 
   it("503 sin secretos: el «cómo arreglarlo» apunta a los secretos de Supabase de ESTE proyecto", async () => {

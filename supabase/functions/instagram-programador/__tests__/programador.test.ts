@@ -275,5 +275,61 @@ describe("clasificar", () => {
     expect(clasificar(409, { error: "Ese contenedor no es el de esta pieza" }, p, "17")).toMatchObject({ resultado: "reintentar", contenedorId: null });
     expect(clasificar(409, { error: "La pieza no tiene imagen" }, p, null)).toMatchObject({ resultado: "error" });
     expect(clasificar(200, { publicado: false }, p, null)).toMatchObject({ resultado: "reintentar" });
+    // Alguien la está probando o publicando a mano: a la siguiente pasada, sin contar intento.
+    expect(clasificar(409, { tipo: "publicacion_en_curso", error: "en curso" }, p, "17")).toMatchObject({ resultado: "aplazar", contenedorId: "17" });
+    expect(clasificar(409, { tipo: "imagen_borrada", error: "La imagen se borró" }, p, null)).toMatchObject({ resultado: "error" });
+  });
+});
+
+describe("instagram-programador: núcleo con origen y limpieza del bucket", () => {
+  it("publica como «programador» (el cerrojo no le pide cancelar su propia programación)", async () => {
+    const progs = [prog("p1")];
+    const e = entorno({ progs });
+    const publicar = publicarFalso([[200, { publicado: true, mediaId: "1800000000000009", permalink: "u" }]]);
+    await manejarProgramador(e.peticion(), e.deps({ publicar }));
+    expect(publicar.mock.calls[0][2]).toMatchObject({ origen: "programador" });
+    // Con el núcleo real, la reserva va sin comprobar la programación.
+    const e2 = entorno({ progs: [prog("p2")], meta: metaPublicacion().m });
+    await manejarProgramador(e2.peticion(), e2.deps());
+    const reserva = e2.llamadas.find((l) => l.url.endsWith("/rpc/instagram_pieza_reservar_publicacion"))!;
+    expect(JSON.parse(reserva.cuerpo!)).toMatchObject({ p_comprobar_programacion: false });
+  });
+
+  it("«limpiar»: reclama los JPEG caducados (RPC), los borra por Storage solo en piezas/ y limpia tmp/ de más de 24 h", async () => {
+    const e = entorno({ progs: [] });
+    const borrados: string[][] = [];
+    const f = vi.fn(async (entrada: string | URL | Request, init: RequestInit = {}) => {
+      const url = String(entrada);
+      if (url === `${SB}/rest/v1/rpc/instagram_piezas_reclamar_jpeg_caducados`) {
+        expect(JSON.parse(String(init.body))).toEqual({ p_dias: 7, p_limite: 100 });
+        expect(new Headers(init.headers as HeadersInit).get("authorization")).toBe(`Bearer ${CLAVE_SERVICIO}`);
+        return resp(200, [{ id: "a", imagen_ruta: "piezas/2026-11/a.jpg" }, { id: "b", imagen_ruta: "fotos/raro.jpg" }]);
+      }
+      if (url === `${SB}/storage/v1/object/list/instagram`) {
+        return resp(200, [{ name: "vieja.jpg", created_at: new Date(T0 - 48 * 3600_000).toISOString() }, { name: "nueva.jpg", created_at: new Date(T0 - 3600_000).toISOString() }]);
+      }
+      if (url === `${SB}/storage/v1/object/instagram` && init.method === "DELETE") {
+        const prefijos = JSON.parse(String(init.body)).prefixes as string[];
+        borrados.push(prefijos);
+        return resp(200, prefijos.map((name) => ({ name })));
+      }
+      throw new Error(`URL inesperada ${url}`);
+    });
+    const r = await manejarProgramador(
+      new Request(`${SB}/functions/v1/instagram-programador`, { method: "POST", headers: { "x-webhook-secret": SECRETO, "Content-Type": "application/json" }, body: JSON.stringify({ accion: "limpiar" }) }),
+      { ...e.deps(), fetch: f as unknown as typeof fetch },
+    );
+    expect(r.status).toBe(200);
+    expect(await r.json()).toMatchObject({ ok: true, accion: "limpiar", jpegMarcados: 2, jpegBorrados: 1, tmpBorrados: 1 });
+    expect(borrados).toEqual([["piezas/2026-11/a.jpg"], ["tmp/vieja.jpg"]]);
+  });
+
+  it("acción desconocida → 400 (con el secreto correcto)", async () => {
+    const e = entorno({ progs: [] });
+    const r = await manejarProgramador(
+      new Request(`${SB}/functions/v1/instagram-programador`, { method: "POST", headers: { "x-webhook-secret": SECRETO }, body: JSON.stringify({ accion: "borrar-todo" }) }),
+      e.deps(),
+    );
+    expect(r.status).toBe(400);
   });
 });

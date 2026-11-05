@@ -1,9 +1,12 @@
 /**
  * Edge Function instagram-metricas — pestaña «Métricas» de Instagram.
  *
- *   «leer» (GET, o POST {accion:"leer"}) — usuario con can_read_section('marketing'):
+ *   «leer» (GET [?marca=touza], o POST {accion:"leer", marca?}) — usuario con can_read_section('marketing'):
  *     200 { ok, igUserId, hoy, ultimoDia, resumen: { d7, d28 } | null, serie, publicaciones,
- *           ultimaCaptura, ultimaCorrecta }      (ver leer.ts y resumen.ts)
+ *           ultimaCaptura, ultimaCorrecta, cuentas: [{ igUserId, marcas }] }   (ver leer.ts y resumen.ts)
+ *     Con «marca», la cuenta de esa marca (IG_USER_ID_<MARCA> o la general);
+ *     sin ella, la general (IG_USER_ID), como siempre. «cuentas» dice qué
+ *     cuentas distintas hay (hoy, una para las dos marcas).
  *
  *   «capturar» (POST {accion:"capturar"}) — tres formas de llamarla:
  *     · pg_cron (tarea instagram-metricas-diarias) con la cabecera
@@ -12,7 +15,10 @@
  *     · `Authorization: Bearer <service_role>` (scripts);
  *     · el botón «Actualizar ahora» del panel: usuario con
  *       can_write_section('marketing'); como mucho una vez cada 5 minutos.
- *     200 { ok, fechaCaptura, dias, publicaciones, avisos }
+ *     200 { ok, fechaCaptura, dias, publicaciones, avisos, cuentas: [{ igUserId, marcas, ok }] }
+ *     Captura TODAS las cuentas distintas (una por marca con cuenta propia; hoy
+ *     una sola). Si una falla y otra no, 200 con aviso; si fallan todas, el
+ *     error de la primera, como antes.
  *     502 { ok:false, tipo:"permiso_insights", permiso:"instagram_manage_insights", error, comoArreglarlo }
  *     503 { ok:false, tipo:"configuracion", error, problemas, comoArreglarlo }   (faltan secretos de Meta)
  *     429 { ok:false, tipo:"demasiado_pronto", error, reintentarEn }
@@ -26,7 +32,7 @@
  * ni registros (todo pasa por _shared/instagram/secretos.ts).
  */
 import { ClienteGraph } from "../_shared/instagram/cliente.ts";
-import { entornoDeno, leerConfigMeta } from "../_shared/instagram/entorno.ts";
+import { cuentasDistintas, entornoDeno, esMarcaCuenta, leerConfigMetaMarca, type MarcaCuenta } from "../_shared/instagram/entorno.ts";
 import { ErrorInstagram, errorInstagramAJson, estadoHttpDeError } from "../_shared/instagram/errores.ts";
 import { json, jsonAuth, leerJson, opciones } from "../_shared/instagram/http.ts";
 import { PERMISO_INSIGHTS } from "../_shared/instagram/insights.ts";
@@ -60,10 +66,13 @@ export interface DependenciasMetricas {
 type Accion = "leer" | "capturar";
 type Origen = "cron" | "panel" | "servicio";
 
-async function leerAccion(request: Request): Promise<{ ok: true; accion: Accion } | { ok: false; respuesta: Response }> {
+async function leerAccion(request: Request): Promise<{ ok: true; accion: Accion; marca: MarcaCuenta | null } | { ok: false; respuesta: Response }> {
   let accion: unknown = "leer";
+  let marca: unknown = null;
   if (request.method === "GET") {
-    accion = new URL(request.url).searchParams.get("accion") ?? "leer";
+    const q = new URL(request.url).searchParams;
+    accion = q.get("accion") ?? "leer";
+    marca = q.get("marca");
   } else {
     const cuerpo = await leerJson(request, 4096);
     if (!cuerpo.ok) {
@@ -71,12 +80,16 @@ async function leerAccion(request: Request): Promise<{ ok: true; accion: Accion 
       if (cuerpo.estado === 413) return { ok: false, respuesta: json(413, { ok: false, error: cuerpo.error }) };
     } else if (cuerpo.valor && typeof cuerpo.valor === "object") {
       accion = (cuerpo.valor as { accion?: unknown }).accion ?? "leer";
+      marca = (cuerpo.valor as { marca?: unknown }).marca ?? null;
     }
   }
   if (accion !== "leer" && accion !== "capturar") {
     return { ok: false, respuesta: json(400, { ok: false, error: "Acción no válida: usa «leer» o «capturar»" }) };
   }
-  return { ok: true, accion };
+  if (marca !== null && marca !== "" && !esMarcaCuenta(marca)) {
+    return { ok: false, respuesta: json(400, { ok: false, error: "«marca» tiene que ser casa-tomas o touza" }) };
+  }
+  return { ok: true, accion, marca: esMarcaCuenta(marca) ? marca : null };
 }
 
 async function anotarCaptura(db: Rest, fila: Record<string, unknown>): Promise<void> {
@@ -124,8 +137,11 @@ export async function manejarMetricas(request: Request, deps: DependenciasMetric
     if (!auth.ok) return jsonAuth(auth.estado, auth.motivo);
     if (a.accion === "leer") {
       try {
-        const igUserId = env.IG_USER_ID?.trim() || null;
-        return json(200, await leerMetricas(restUsuario(auth.sesion), { igUserId, ahora: ahora() }));
+        // Con marca: su cuenta (o la general si no tiene). Sin marca: la general.
+        const deMarca = a.marca ? leerConfigMetaMarca(env, a.marca) : null;
+        const igUserId = deMarca?.ok ? deMarca.config.igUserId : env.IG_USER_ID?.trim() || null;
+        const cuentas = cuentasDistintas(env).map((c) => ({ igUserId: c.config.igUserId, marcas: c.marcas }));
+        return json(200, { ...(await leerMetricas(restUsuario(auth.sesion), { igUserId, ahora: ahora() })), cuentas });
       } catch (e) {
         registro("error", "instagram-metricas", "fallo al leer", e);
         return json(500, { ok: false, error: `No se pudieron leer las métricas: ${mensajeSaneado(e)}` });
@@ -138,9 +154,12 @@ export async function manejarMetricas(request: Request, deps: DependenciasMetric
   if (!claveServicio) return json(500, { ok: false, error: "Falta SUPABASE_SERVICE_ROLE_KEY en la función" });
   const servicio = restServicio(sb, claveServicio, f);
 
-  const config = leerConfigMeta(env);
-  if (!config.ok) {
-    const nombres = config.problemas.map((p) => p.variable);
+  const cuentas = cuentasDistintas(env);
+  if (!cuentas.length) {
+    // Ninguna marca tiene una cuenta utilizable: los problemas de la general.
+    const config = leerConfigMetaMarca(env, "casa-tomas");
+    const problemas = config.ok ? [] : config.problemas;
+    const nombres = problemas.map((p) => p.variable);
     await anotarCaptura(servicio, {
       origen,
       fin: new Date(ahora()).toISOString(),
@@ -152,8 +171,8 @@ export async function manejarMetricas(request: Request, deps: DependenciasMetric
       ok: false,
       tipo: "configuracion",
       error: `Falta configurar Instagram en los secretos de Supabase: ${nombres.join(", ")}`,
-      problemas: config.problemas.map((p) => `${p.variable}: ${p.problema}`),
-      comoArreglarlo: config.problemas.map((p) => p.comoArreglarlo),
+      problemas: problemas.map((p) => `${p.variable}: ${p.problema}`),
+      comoArreglarlo: problemas.map((p) => p.comoArreglarlo),
     });
   }
 
@@ -179,48 +198,77 @@ export async function manejarMetricas(request: Request, deps: DependenciasMetric
     }
   }
 
-  const inicio = new Date(ahora()).toISOString();
-  const cliente = new ClienteGraph({
-    token: config.config.token,
-    versionApi: config.config.versionApi,
-    igUserId: config.config.igUserId,
-    fetch: (u, i) => f(u, i),
-    dormir: deps.dormir,
-    registro: (l) => registro("info", "instagram-metricas", l),
-  });
-  try {
-    const r = await capturarMetricas({ cliente, igUserId: config.config.igUserId, servicio, ahora });
-    await anotarCaptura(servicio, {
-      origen,
-      inicio,
-      fin: new Date(ahora()).toISOString(),
-      ok: true,
-      ig_user_id: config.config.igUserId,
-      dias: r.dias.length,
-      publicaciones: r.publicaciones,
-      avisos: r.avisos.map((x) => sanear(x).slice(0, 500)).slice(0, 20),
+  // Una captura por cuenta distinta (hoy, una para las dos marcas).
+  const correctas: Array<{ igUserId: string; marcas: MarcaCuenta[]; r: Awaited<ReturnType<typeof capturarMetricas>> }> = [];
+  const fallidas: Array<{ igUserId: string; marcas: MarcaCuenta[]; respuesta: Response; mensaje: string }> = [];
+  for (const cuenta of cuentas) {
+    const igUserId = cuenta.config.igUserId;
+    const inicio = new Date(ahora()).toISOString();
+    const cliente = new ClienteGraph({
+      token: cuenta.config.token,
+      versionApi: cuenta.config.versionApi,
+      igUserId,
+      fetch: (u, i) => f(u, i),
+      dormir: deps.dormir,
+      registro: (l) => registro("info", "instagram-metricas", l),
     });
-    return json(200, { ok: true, ...r });
-  } catch (e) {
-    const fallo = (tipo: string, mensaje: string) =>
-      anotarCaptura(servicio, {
+    try {
+      const r = await capturarMetricas({ cliente, igUserId, servicio, ahora });
+      await anotarCaptura(servicio, {
         origen,
         inicio,
         fin: new Date(ahora()).toISOString(),
-        ok: false,
-        ig_user_id: config.config.igUserId,
-        error_tipo: tipo,
-        error: sanear(mensaje).slice(0, 2000),
+        ok: true,
+        ig_user_id: igUserId,
+        dias: r.dias.length,
+        publicaciones: r.publicaciones,
+        avisos: r.avisos.map((x) => sanear(x).slice(0, 500)).slice(0, 20),
       });
-    if (e instanceof ErrorInstagram) {
-      const cuerpo = errorInstagramAJson(e);
-      const permiso = e.tipo === "permisos" && e.comoArreglarlo.includes(PERMISO_INSIGHTS);
-      await fallo(permiso ? "permiso_insights" : e.tipo, e.message);
-      if (permiso) return json(502, { ok: false, ...cuerpo, tipo: "permiso_insights", permiso: PERMISO_INSIGHTS });
-      return json(estadoHttpDeError(e), { ok: false, ...cuerpo });
+      correctas.push({ igUserId, marcas: cuenta.marcas, r });
+    } catch (e) {
+      const fallo = (tipo: string, mensaje: string) =>
+        anotarCaptura(servicio, {
+          origen,
+          inicio,
+          fin: new Date(ahora()).toISOString(),
+          ok: false,
+          ig_user_id: igUserId,
+          error_tipo: tipo,
+          error: sanear(mensaje).slice(0, 2000),
+        });
+      if (e instanceof ErrorInstagram) {
+        const cuerpo = errorInstagramAJson(e);
+        const permiso = e.tipo === "permisos" && e.comoArreglarlo.includes(PERMISO_INSIGHTS);
+        await fallo(permiso ? "permiso_insights" : e.tipo, e.message);
+        const respuesta = permiso
+          ? json(502, { ok: false, ...cuerpo, tipo: "permiso_insights", permiso: PERMISO_INSIGHTS })
+          : json(estadoHttpDeError(e), { ok: false, ...cuerpo });
+        fallidas.push({ igUserId, marcas: cuenta.marcas, respuesta, mensaje: e.message });
+        continue;
+      }
+      registro("error", "instagram-metricas", "fallo al capturar", e);
+      await fallo("interno", mensajeSaneado(e));
+      fallidas.push({
+        igUserId,
+        marcas: cuenta.marcas,
+        respuesta: json(500, { ok: false, tipo: "interno", error: `No se pudieron capturar las métricas: ${mensajeSaneado(e)}` }),
+        mensaje: mensajeSaneado(e),
+      });
     }
-    registro("error", "instagram-metricas", "fallo al capturar", e);
-    await fallo("interno", mensajeSaneado(e));
-    return json(500, { ok: false, tipo: "interno", error: `No se pudieron capturar las métricas: ${mensajeSaneado(e)}` });
   }
+  if (!correctas.length) return fallidas[0].respuesta;
+  const primera = correctas[0].r;
+  const avisos = correctas.flatMap((c) => (correctas.length > 1 ? c.r.avisos.map((x) => `${c.marcas.join(" y ")}: ${x}`) : c.r.avisos));
+  for (const x of fallidas) avisos.push(`No se pudieron capturar las métricas de la cuenta de ${x.marcas.join(" y ")}: ${sanear(x.mensaje)}`);
+  return json(200, {
+    ok: true,
+    fechaCaptura: primera.fechaCaptura,
+    dias: primera.dias,
+    publicaciones: correctas.reduce((n, c) => n + c.r.publicaciones, 0),
+    avisos,
+    cuentas: [
+      ...correctas.map((c) => ({ igUserId: c.igUserId, marcas: c.marcas, ok: true })),
+      ...fallidas.map((c) => ({ igUserId: c.igUserId, marcas: c.marcas, ok: false })),
+    ],
+  });
 }

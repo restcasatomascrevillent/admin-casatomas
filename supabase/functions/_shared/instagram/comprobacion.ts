@@ -10,9 +10,24 @@
  *   3. GET /me/permissions.
  *   4. Inferencia: si responden perfil y content_publishing_limit, el token
  *      es válido y tiene, como mínimo, los permisos que esas llamadas piden.
+ *
+ * Cuentas por marca: `cuentasPorMarca` dice en qué cuenta publica cada marca
+ * y de qué secretos sale (los suyos, IG_USER_ID_TOUZA…, o los generales).
+ * Si una marca tiene cuenta propia, se pide su perfil con su token.
  */
 import { ClienteGraph, type CuentaIg, type DatosDepuracion, type FuncionFetch, type LimitePublicacion, type PaginaConCuenta, type PerfilIg } from "./cliente.ts";
-import { arregloVariable, describirVariables, dondeSecreto, problemasVariables, VERSION_API_POR_DEFECTO, type Entorno } from "./entorno.ts";
+import {
+  arregloVariable,
+  describirVariables,
+  dondeSecreto,
+  leerConfigMetaMarca,
+  MARCAS_CUENTA,
+  origenCuenta,
+  problemasVariables,
+  VERSION_API_POR_DEFECTO,
+  type Entorno,
+  type MarcaCuenta,
+} from "./entorno.ts";
 import { ErrorInstagram } from "./errores.ts";
 import { mensajeSaneado, registrarSecreto, sanear, sanearProfundo } from "./secretos.ts";
 
@@ -35,8 +50,23 @@ export interface CuotaPublicacion {
   ventanaHoras: number | null;
 }
 
+/** En qué cuenta publica cada marca (nunca lleva el token). */
+export interface CuentaDeMarca {
+  marca: MarcaCuenta;
+  /** true si usa secretos propios (IG_USER_ID_<MARCA> o IG_ACCESS_TOKEN_<MARCA>). */
+  propia: boolean;
+  variableIgUserId: string;
+  variableToken: string;
+  igUserId: string | null;
+  username: string | null;
+  estado: EstadoComprobacion;
+  detalle: string;
+}
+
 export interface ResultadoEstado {
   ok: boolean;
+  /** Cuenta de cada marca (Casa Tomás y Touza). */
+  cuentasPorMarca: CuentaDeMarca[];
   /** Variables (nunca valores secretos). */
   variables: Array<{ nombre: string; presente: boolean; obligatoria: boolean; detalle: string; estado: EstadoComprobacion; comoArreglarlo?: string }>;
   /** Variables obligatorias que faltan o están mal. */
@@ -115,6 +145,7 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
 
   const base = (): ResultadoEstado => ({
     ok: false,
+    cuentasPorMarca: [],
     variables,
     faltan,
     identidad: null,
@@ -367,7 +398,49 @@ export async function comprobarEstado(env: Entorno, deps: DependenciasEstado = {
     agregar({ seccion: "Cuota", nombre: "Límite de publicación", estado: "falla", detalle: "no consultado (IG_USER_ID no válido)" });
   }
 
+  // ── 5. Cuenta de cada marca ──────────────────────────────────────────────
+  const cuentasPorMarca: CuentaDeMarca[] = [];
+  for (const marca of MARCAS_CUENTA) {
+    const o = origenCuenta(env, marca);
+    const comun = { marca, propia: o.propia, variableIgUserId: o.variableIgUserId, variableToken: o.variableToken };
+    if (!o.propia) {
+      const username = perfil?.username ?? encontrada?.username ?? null;
+      cuentasPorMarca.push({
+        ...comun,
+        igUserId: igValido ?? null,
+        username,
+        estado: perfil ? "ok" : "falla",
+        detalle: `publica en la cuenta general (IG_USER_ID)${username ? `: @${username}` : ""}`,
+      });
+      continue;
+    }
+    const cfg = leerConfigMetaMarca(env, marca);
+    if (!cfg.ok) {
+      cuentasPorMarca.push({ ...comun, igUserId: null, username: null, estado: "falla", detalle: cfg.problemas.map((p) => `${p.variable}: ${p.problema}`).join("; ") });
+      continue;
+    }
+    try {
+      const propio = new ClienteGraph({ token: cfg.config.token, versionApi, igUserId: cfg.config.igUserId, fetch: deps.fetch, dormir: deps.dormir, reintentos: 1, timeoutMs: 12_000 });
+      const p = await propio.perfil(cfg.config.igUserId);
+      cuentasPorMarca.push({ ...comun, igUserId: cfg.config.igUserId, username: p.username ?? null, estado: "ok", detalle: `cuenta propia (${o.variableIgUserId}${o.variableToken !== "IG_ACCESS_TOKEN" ? ` + ${o.variableToken}` : ""})${p.username ? `: @${p.username}` : ""}` });
+    } catch (e) {
+      cuentasPorMarca.push({ ...comun, igUserId: cfg.config.igUserId, username: null, estado: "falla", detalle: `cuenta propia (${o.variableIgUserId}), pero su perfil no responde: ${textoError(e).detalle}` });
+    }
+  }
+  for (const x of cuentasPorMarca) {
+    agregar({
+      seccion: "Identidad",
+      nombre: `Cuenta de ${x.marca === "touza" ? "Touza" : "Casa Tomás"}`,
+      estado: x.estado,
+      detalle: x.detalle,
+      comoArreglarlo: x.estado === "ok" ? undefined : x.propia
+        ? `Revisa ${x.variableIgUserId}${x.variableToken !== "IG_ACCESS_TOKEN" ? ` y ${x.variableToken}` : ""} (o bórralos para usar la cuenta general): ${dondeSecreto(x.variableIgUserId, env)}.`
+        : undefined,
+    });
+  }
+
   const r = base();
+  r.cuentasPorMarca = cuentasPorMarca;
   r.metodoVerificacion = metodo;
   r.cuota = cuota ? cuotaDe(cuota) : null;
   r.identidad = {

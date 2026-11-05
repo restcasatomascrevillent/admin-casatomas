@@ -6,8 +6,20 @@
  *
  *   Petición: POST `${SUPABASE_URL}/functions/v1/instagram-publicar` con
  *             `Authorization: Bearer <JWT de Supabase>` + `apikey` y JSON
- *             { "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "<id para reintentar>",
+ *             { "id": "<uuid>", "caption"?: "…", "altText"?: "…" (texto alternativo, ≤ 1000; solo posts),
+ *               "dryRun": true|false, "contenedorId"?: "<id para reintentar>",
  *               "fotoTmp"?: "tmp/<uuid>.jpg" (copia temporal de la foto de Drive usada; se borra al publicar) }
+ *
+ *   Cuenta: la de la MARCA de la pieza (IG_USER_ID_TOUZA / IG_ACCESS_TOKEN_TOUZA,
+ *   IG_USER_ID_CASA_TOMAS / …) y, si no existen, la general (IG_USER_ID /
+ *   IG_ACCESS_TOKEN). La respuesta lleva `cuenta: { marca, igUserId, propia }`.
+ *
+ *   Cerrojo (migración 20261107000000): antes de llamar a Meta se reserva la
+ *   pieza (RPC instagram_pieza_reservar_publicacion, service_role). Si otra
+ *   petición la está probando o publicando → 409 tipo «publicacion_en_curso».
+ *   Publicar A MANO una pieza con una programación activa → 409 tipo
+ *   «programada» (hay que cancelarla antes). El programador no pasa por esa
+ *   comprobación (la programación es suya).
  *
  *   Flujo: pieza (RLS) → caption (2200 caracteres, 30 #, 20 @) → HEAD de la
  *   URL pública del JPEG (200 + image/jpeg) → cuota (se aborta si usadas ≥
@@ -29,6 +41,8 @@
  *
  *   La fila se actualiza: dryRun → «prueba_ok» + contenedor_id; real →
  *   «publicada» + media_id + permalink; error de Meta → «error» + mensaje saneado.
+ *   Esas columnas solo las puede escribir el servidor: se escriben con la
+ *   clave de servicio (sesionEscritura), nunca con el JWT del usuario.
  *
  *   Tras una publicación REAL el JPEG se archiva en Google Drive
  *   (marketing/instagram/publicadas/AAAA-MM, ver _shared/instagram/drive.ts) y
@@ -42,17 +56,19 @@
  *   En prueba (dryRun) NO se borra nada: el contenedor necesita la URL hasta
  *   que se publique.
  *
- *   Todo como el usuario (clave pública + su JWT): nunca service_role.
+ *   Lectura de la pieza, Storage y Drive como el usuario (clave pública + su
+ *   JWT); el estado de publicación y el cerrojo, con service_role.
  */
 import { carpetaPublicadas, leerConfigDrive } from "../_shared/instagram/drive.ts";
 import { ClienteGraph, type FuncionFetch, type InfoContenedor } from "../_shared/instagram/cliente.ts";
 import { cuotaDe, type CuotaPublicacion } from "../_shared/instagram/comprobacion.ts";
-import { entornoDeno, leerConfigMeta } from "../_shared/instagram/entorno.ts";
+import { entornoDeno, esMarcaCuenta, leerConfigMetaMarca } from "../_shared/instagram/entorno.ts";
 import { ErrorInstagram, errorInstagramAJson, estadoHttpDeError } from "../_shared/instagram/errores.ts";
 import { json, jsonAuth, leerJson, opciones } from "../_shared/instagram/http.ts";
 import { registro, sanear } from "../_shared/instagram/secretos.ts";
 import {
   actualizarPieza,
+  anotarAltText,
   anotarDrivePieza,
   anotarError,
   autorizarMarketing,
@@ -60,12 +76,15 @@ import {
   borrarObjetos,
   ErrorSupabase,
   esRutaTmp,
-  leerPieza,
+  leerPiezaCompleta,
+  liberarPublicacion,
+  reservarPublicacion,
+  sesionEscritura,
   urlPublica,
   type FilaPieza,
   type Sesion,
 } from "../_shared/instagram/supabase.ts";
-import { esUuid, MAX_BYTES_IMAGEN, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
+import { esUuid, MAX_BYTES_IMAGEN, validarAltText, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
 
 const ETIQUETA = "instagram-publicar";
 
@@ -80,7 +99,12 @@ export const AVISO_JPEG_NO_BORRADO = "Publicada, pero el JPEG no se pudo borrar 
 /** Prefijo de `error` en una pieza publicada que no se pudo archivar en Drive (el JPEG sigue en el bucket). */
 export const AVISO_SIN_DRIVE = "Publicada, pero no se pudo guardar en Google Drive (el JPEG sigue en el bucket «instagram»):";
 
+/** Lo que dura el cerrojo de publicación (la función tiene ~150 s de reloj). */
+export const CERROJO_SEG = 180;
+
 export interface DependenciasPublicar {
+  /** «programador»: no comprueba si hay una programación activa (es la suya). */
+  origen?: "panel" | "programador";
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
   dormir?: (ms: number) => Promise<void>;
@@ -116,10 +140,11 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
 
   const cuerpo = await leerJson(request, 64 * 1024);
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
-  const entrada = cuerpo.valor as { id?: unknown; caption?: unknown; dryRun?: unknown; contenedorId?: unknown; fotoTmp?: unknown } | null;
+  const entrada = cuerpo.valor as { id?: unknown; caption?: unknown; altText?: unknown; dryRun?: unknown; contenedorId?: unknown; fotoTmp?: unknown } | null;
   if (!entrada || typeof entrada !== "object" || !esUuid(entrada.id)) return json(400, { ok: false, error: "Falta «id» (UUID de la pieza)" });
   if (typeof entrada.dryRun !== "boolean") return json(400, { ok: false, error: "«dryRun» tiene que ser true o false" });
   if (entrada.caption !== undefined && entrada.caption !== null && typeof entrada.caption !== "string") return json(400, { ok: false, error: "«caption» tiene que ser texto" });
+  if (entrada.altText !== undefined && entrada.altText !== null && typeof entrada.altText !== "string") return json(400, { ok: false, error: "«altText» tiene que ser texto" });
   if (entrada.contenedorId !== undefined && (typeof entrada.contenedorId !== "string" || !/^\d+$/.test(entrada.contenedorId))) {
     return json(400, { ok: false, error: "«contenedorId» no es válido" });
   }
@@ -130,7 +155,19 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   const dryRun = entrada.dryRun;
   const fotoTmp = typeof entrada.fotoTmp === "string" ? entrada.fotoTmp : null;
 
-  const meta = leerConfigMeta(env);
+  let leida: FilaPieza | null;
+  try {
+    leida = await leerPiezaCompleta(s, id);
+  } catch (e) {
+    registro("error", ETIQUETA, "leer pieza", e);
+    return json(500, { ok: false, error: sanear((e as Error).message) });
+  }
+  if (!leida) return json(404, { ok: false, error: "No existe esa pieza (o no tienes acceso)" });
+  const fila: FilaPieza = leida;
+
+  // Cuenta de la marca de la pieza (o la general si la marca no tiene la suya).
+  if (!esMarcaCuenta(fila.marca)) return json(422, { ok: false, error: `Marca desconocida: ${fila.marca}` });
+  const meta = leerConfigMetaMarca(env, fila.marca);
   if ("problemas" in meta) {
     return json(503, {
       ok: false,
@@ -140,17 +177,14 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
     });
   }
   const cfg = meta.config;
-
-  let fila: FilaPieza | null;
-  try {
-    fila = await leerPieza(s, id);
-  } catch (e) {
-    registro("error", ETIQUETA, "leer pieza", e);
-    return json(500, { ok: false, error: sanear((e as Error).message) });
-  }
-  if (!fila) return json(404, { ok: false, error: "No existe esa pieza (o no tienes acceso)" });
+  const cuenta = { marca: fila.marca, igUserId: cfg.igUserId, propia: cfg.origen.propia };
+  // El estado de publicación solo lo escribe el servidor (service_role).
+  const sw = sesionEscritura(s, env, ETIQUETA);
   if (fila.estado === "publicada") return json(409, { ok: false, error: "Esa pieza ya está publicada", permalink: fila.permalink, mediaId: fila.media_id });
   if (!fila.imagen_ruta) return json(409, { ok: false, error: "La pieza no tiene imagen: genérala antes de publicar" });
+  if (fila.imagen_borrada_at) {
+    return json(409, { ok: false, tipo: "imagen_borrada", error: "La imagen de esta pieza se borró del bucket por llevar días sin publicarse: vuelve a generarla" });
+  }
   const contenedorPedido = typeof entrada.contenedorId === "string" ? entrada.contenedorId : null;
   if (contenedorPedido && fila.contenedor_id !== contenedorPedido) {
     return json(409, { ok: false, error: "Ese contenedor no es el de esta pieza; vuelve a lanzar la publicación sin contenedorId" });
@@ -162,8 +196,72 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   if (!vCaption.ok) return json(422, { ok: false, error: "El texto no es válido", problemas: vCaption.errores });
   const avisos = [...vCaption.avisos];
   const resumenCaption = { caracteres: vCaption.caracteres, hashtags: vCaption.hashtags, menciones: vCaption.menciones };
+  // Texto alternativo: el que llega o el guardado. Las stories no lo llevan.
+  const altText = typeof entrada.altText === "string" ? entrada.altText.trim() : typeof fila.alt_text === "string" ? fila.alt_text : "";
+  const vAlt = validarAltText(altText, tipo);
+  if (!vAlt.ok) return json(422, { ok: false, error: "El texto alternativo no es válido", problemas: vAlt.errores });
+  avisos.push(...vAlt.avisos);
+  const altEnvio = tipo === "post" && altText ? altText : undefined;
 
-  const urlJpeg = urlPublica(s.sb, fila.imagen_ruta);
+  // Cerrojo: nadie más prueba ni publica esta pieza mientras tanto.
+  let reserva: Awaited<ReturnType<typeof reservarPublicacion>>;
+  try {
+    reserva = await reservarPublicacion(sw, id, { segundos: CERROJO_SEG, comprobarProgramacion: !dryRun && deps.origen !== "programador" });
+  } catch (e) {
+    registro("error", ETIQUETA, "cerrojo", e);
+    return json(500, { ok: false, error: sanear((e as Error).message) });
+  }
+  if (!reserva.ok) {
+    if (reserva.motivo === "programada") {
+      return json(409, {
+        ok: false,
+        tipo: "programada",
+        error: "Esta pieza tiene una publicación programada: cancélala en el calendario antes de publicarla a mano (así no sale dos veces).",
+        programadaPara: reserva.programadaPara ?? null,
+      });
+    }
+    if (reserva.motivo === "publicada") return json(409, { ok: false, tipo: "publicada", error: "Esa pieza ya está publicada", permalink: reserva.permalink ?? null });
+    if (reserva.motivo === "no_existe") return json(404, { ok: false, error: "No existe esa pieza (o no tienes acceso)" });
+    return json(409, {
+      ok: false,
+      tipo: "publicacion_en_curso",
+      error: "Esta pieza se está probando o publicando ahora mismo (en otra pestaña, otra persona o el programador). Espera un par de minutos.",
+    });
+  }
+  if (reserva.sinCerrojo) registro("warn", ETIQUETA, "sin cerrojo de publicación (falta la migración 20261107000000)", { id });
+  const bloqueo = reserva.bloqueo;
+  try {
+    return await publicarReservado({ s, sw, env, deps, id, dryRun, fotoTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, avisos, resumenCaption });
+  } finally {
+    await liberarPublicacion(sw, id, bloqueo);
+  }
+}
+
+interface ContextoPublicacion {
+  s: Sesion;
+  /** Sesión con la que se escribe el estado (service_role). */
+  sw: Sesion;
+  env: Record<string, string | undefined>;
+  deps: DependenciasPublicar;
+  id: string;
+  dryRun: boolean;
+  fotoTmp: string | null;
+  fila: FilaPieza;
+  cfg: { token: string; versionApi: string; igUserId: string; appId: string; appSecret: string | undefined };
+  cuenta: { marca: string; igUserId: string; propia: boolean };
+  contenedorPedido: string | null;
+  tipo: TipoPublicacion;
+  caption: string;
+  altText: string;
+  altEnvio: string | undefined;
+  avisos: string[];
+  resumenCaption: { caracteres: number; hashtags: number; menciones: number };
+}
+
+/** Pasos con Meta, con la pieza ya reservada. */
+async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
+  const { s, sw, env, deps, id, dryRun, fotoTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, avisos, resumenCaption } = c;
+  const urlJpeg = urlPublica(s.sb, fila.imagen_ruta as string);
   const fetchMeta: FuncionFetch = (url, init) => (deps.fetch ?? fetch)(url, init);
   const cliente = new ClienteGraph({
     token: cfg.token,
@@ -190,7 +288,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
       else if (tipoMime !== "image/jpeg") problemas.push(`La URL pública no sirve un JPEG (Content-Type: ${tipoMime || "vacío"})`);
       if (largo > MAX_BYTES_IMAGEN) problemas.push(`El JPEG pesa ${(largo / 1048576).toFixed(1)} MB (máximo 8 MB)`);
       if (problemas.length) {
-        await anotarError(s, id, problemas.join(" · "));
+        await anotarError(sw, id, problemas.join(" · "));
         return json(422, {
           ok: false,
           error: "Meta no podría descargar la imagen",
@@ -211,7 +309,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
     cuota = cuotaDe(await cliente.limitePublicacion());
   } catch (e) {
     if (e instanceof ErrorInstagram) {
-      await anotarError(s, id, `${e.message}. ${e.comoArreglarlo}`);
+      await anotarError(sw, id, `${e.message}. ${e.comoArreglarlo}`);
       return errorMeta(e);
     }
     throw e;
@@ -233,8 +331,13 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   try {
     // 3. Contenedor.
     if (!contenedorId) {
-      contenedorId = await cliente.crearContenedor({ imageUrl: urlJpeg, caption: tipo === "post" ? caption : undefined, tipo });
-      await actualizarPieza(s, id, { contenedor_id: contenedorId, caption, error: null });
+      contenedorId = await cliente.crearContenedor({ imageUrl: urlJpeg, caption: tipo === "post" ? caption : undefined, altText: altEnvio, tipo });
+      await actualizarPieza(sw, id, { contenedor_id: contenedorId, caption, error: null });
+      // Se guarda el texto alternativo enviado (el programador lo reutiliza).
+      if ((fila.alt_text ?? "") !== altText) {
+        const aviso = await anotarAltText(sw, id, altText || null);
+        if (aviso) avisos.push(aviso);
+      }
     }
     // 4. Hasta FINISHED, dentro del tiempo de la función.
     const presupuesto = deps.presupuestoMs ?? PRESUPUESTO_SONDEO_MS;
@@ -255,6 +358,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
           contenedor: { id: contenedorId, estado: ultimo },
           urlJpeg,
           cuota,
+          cuenta,
           avisos,
           mensaje: "Instagram todavía está procesando la imagen. Vuelve a intentarlo en unos segundos con el mismo contenedor.",
           reintentar: { id, contenedorId, dryRun },
@@ -265,7 +369,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
 
     // 5. Prueba: termina aquí, SIN media_publish.
     if (dryRun) {
-      await actualizarPieza(s, id, { estado: "prueba_ok", contenedor_id: contenedorId, caption, error: null });
+      await actualizarPieza(sw, id, { estado: "prueba_ok", contenedor_id: contenedorId, caption, error: null });
       registro("info", ETIQUETA, "prueba ok", { id, contenedorId, usuario: s.usuario });
       return json(200, {
         ok: true,
@@ -278,6 +382,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
         mediaId: null,
         permalink: null,
         cuota,
+        cuenta,
         caption: resumenCaption,
         avisos: [...avisos, "Prueba correcta: no se ha publicado nada. El contenedor caduca en 24 h."],
       });
@@ -300,7 +405,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
     let borrado: { borrado: boolean; motivo?: string } = { borrado: false };
     let errorFila: string | null = null;
     if (archivo.driveId) {
-      borrado = await borrarJpeg(s, fila.imagen_ruta);
+      borrado = await borrarJpeg(s, fila.imagen_ruta as string);
       if (!borrado.borrado) {
         registro("warn", ETIQUETA, "publicada, pero el JPEG sigue en el bucket", { id, motivo: borrado.motivo });
         avisos.push(`Publicado y guardado en Drive, pero no se pudo borrar el JPEG del bucket: ${borrado.motivo}`);
@@ -313,7 +418,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
       errorFila = `${AVISO_SIN_DRIVE} ${archivo.motivo}`.trim();
     }
     try {
-      await actualizarPieza(s, id, {
+      await actualizarPieza(sw, id, {
         estado: "publicada",
         contenedor_id: contenedorId,
         media_id: mediaId,
@@ -327,7 +432,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
     }
     if (archivo.driveId) {
       try {
-        await anotarDrivePieza(s, id, archivo.driveId);
+        await anotarDrivePieza(sw, id, archivo.driveId);
       } catch (e) {
         registro("warn", ETIQUETA, "no se pudo anotar drive_id", e);
         avisos.push("El JPEG está en Drive, pero no se pudo anotar en la pieza (¿falta la migración 20261105150000_instagram_drive?).");
@@ -347,13 +452,14 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
       mediaId,
       permalink,
       cuota: cuotaDespues,
+      cuenta,
       caption: resumenCaption,
       avisos,
     });
   } catch (e) {
     if (e instanceof ErrorInstagram) {
       registro("warn", ETIQUETA, "error de Meta", { id, tipo: e.tipo, codigo: e.codigo, subcodigo: e.subcodigo, mensaje: e.message });
-      await anotarError(s, id, `${e.message}. ${e.comoArreglarlo}`);
+      await anotarError(sw, id, `${e.message}. ${e.comoArreglarlo}`);
       return errorMeta(e, { contenedor: contenedorId ? { id: contenedorId } : null, cuota });
     }
     if (e instanceof ErrorSupabase) {
@@ -361,7 +467,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
       return json(500, { ok: false, error: e.message, contenedor: contenedorId ? { id: contenedorId } : null });
     }
     registro("error", ETIQUETA, "fallo", e);
-    await anotarError(s, id, (e as Error)?.message ?? String(e));
+    await anotarError(sw, id, (e as Error)?.message ?? String(e));
     return json(500, { ok: false, error: "No se pudo publicar", detalle: sanear((e as Error)?.message ?? e) });
   }
 }

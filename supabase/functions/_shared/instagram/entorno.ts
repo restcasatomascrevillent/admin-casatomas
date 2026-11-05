@@ -10,6 +10,15 @@
  *   META_APP_ID       ID de la app de Meta
  *   META_API_VERSION  vNN.N (por defecto v26.0)
  *   META_APP_SECRET   opcional (Sensitive): debug_token con token de app
+ *
+ * Cuenta POR MARCA (opcional, 05/11/2026): cada marca publica en su cuenta si
+ * existen sus secretos; si no, cae en los generales de arriba. Hoy no hay
+ * ninguno y las dos marcas publican en la cuenta de IG_USER_ID (@oficiososia,
+ * cuenta de pruebas): no hace falta tocar nada para que siga igual.
+ *   IG_USER_ID_CASA_TOMAS / IG_ACCESS_TOKEN_CASA_TOMAS
+ *   IG_USER_ID_TOUZA      / IG_ACCESS_TOKEN_TOUZA
+ * El token propio solo hace falta si la cuenta de esa marca no la ve el token
+ * general (otro usuario del sistema u otro portfolio).
  */
 import { enmascarar, registrarSecreto } from "./secretos.ts";
 
@@ -23,6 +32,37 @@ export interface ConfigMeta {
   appId: string;
   versionApi: string;
   appSecret: string | undefined;
+}
+
+/** Marcas que pueden tener cuenta propia (las de instagram_piezas.marca). */
+export const MARCAS_CUENTA = ["casa-tomas", "touza"] as const;
+export type MarcaCuenta = (typeof MARCAS_CUENTA)[number];
+
+export function esMarcaCuenta(v: unknown): v is MarcaCuenta {
+  return typeof v === "string" && (MARCAS_CUENTA as readonly string[]).includes(v);
+}
+
+const SUFIJO_MARCA: Record<MarcaCuenta, string> = { "casa-tomas": "CASA_TOMAS", touza: "TOUZA" };
+
+/** Nombres de los secretos opcionales de una marca. */
+export function secretosDeMarca(marca: MarcaCuenta): { igUserId: string; token: string } {
+  const s = SUFIJO_MARCA[marca];
+  return { igUserId: `IG_USER_ID_${s}`, token: `IG_ACCESS_TOKEN_${s}` };
+}
+
+/** De dónde sale la cuenta de una marca: sus secretos o los generales. */
+export interface OrigenCuenta {
+  marca: MarcaCuenta;
+  /** Secreto del que sale el ID (IG_USER_ID_TOUZA o IG_USER_ID). */
+  variableIgUserId: string;
+  /** Secreto del que sale el token (IG_ACCESS_TOKEN_TOUZA o IG_ACCESS_TOKEN). */
+  variableToken: string;
+  /** true si usa al menos un secreto propio de la marca. */
+  propia: boolean;
+}
+
+export interface ConfigMetaMarca extends ConfigMeta {
+  origen: OrigenCuenta;
 }
 
 export interface ProblemaVariable {
@@ -66,7 +106,19 @@ export const VARIABLES_META = [
   { nombre: "META_APP_ID", obligatoria: true, secreta: false },
   { nombre: "META_API_VERSION", obligatoria: false, secreta: false },
   { nombre: "META_APP_SECRET", obligatoria: false, secreta: true },
+  // Opcionales por marca: sin ellas, la marca usa IG_USER_ID / IG_ACCESS_TOKEN.
+  { nombre: "IG_USER_ID_CASA_TOMAS", obligatoria: false, secreta: false },
+  { nombre: "IG_ACCESS_TOKEN_CASA_TOMAS", obligatoria: false, secreta: true },
+  { nombre: "IG_USER_ID_TOUZA", obligatoria: false, secreta: false },
+  { nombre: "IG_ACCESS_TOKEN_TOUZA", obligatoria: false, secreta: true },
 ] as const;
+
+/** Variable general en la que cae una de marca si no existe. */
+function generalDe(nombre: string): "IG_USER_ID" | "IG_ACCESS_TOKEN" | null {
+  if (nombre.startsWith("IG_USER_ID_")) return "IG_USER_ID";
+  if (nombre.startsWith("IG_ACCESS_TOKEN_")) return "IG_ACCESS_TOKEN";
+  return null;
+}
 
 function valor(env: Entorno, nombre: string): string | undefined {
   const v = env[nombre];
@@ -89,7 +141,88 @@ export function problemasVariables(env: Entorno): ProblemaVariable[] {
   else if (!/^\d+$/.test(app)) p.push({ variable: "META_APP_ID", problema: "debe ser solo dígitos", comoArreglarlo: arregloVariable("META_APP_ID", env) });
   if (version && !/^v\d+\.\d+$/.test(version))
     p.push({ variable: "META_API_VERSION", problema: "formato inválido (usa vNN.N)", comoArreglarlo: arregloVariable("META_API_VERSION", env) });
+  // Las de marca son opcionales: solo se comprueba su formato si existen.
+  for (const marca of MARCAS_CUENTA) {
+    const n = secretosDeMarca(marca);
+    const igMarca = valor(env, n.igUserId);
+    const tokenMarca = valor(env, n.token);
+    if (igMarca && !/^\d+$/.test(igMarca)) {
+      p.push({ variable: n.igUserId, problema: "debe ser solo dígitos (el ID, no el @usuario)", comoArreglarlo: `Corrígelo (o bórralo: sin él, ${marca} usa IG_USER_ID) en ${dondeSecreto(n.igUserId, env)}.` });
+    }
+    if (tokenMarca && (tokenMarca.length < 20 || /\s/.test(tokenMarca))) {
+      p.push({ variable: n.token, problema: "parece incompleto o tiene espacios/saltos de línea", comoArreglarlo: `Cópialo de nuevo, sin espacios (o bórralo: sin él, ${marca} usa IG_ACCESS_TOKEN), en ${dondeSecreto(n.token, env)}.` });
+    }
+  }
   return p;
+}
+
+/** Problemas que impiden publicar con la cuenta de una marca (los generales que le afectan + los suyos). */
+export function problemasDeMarca(env: Entorno, marca: MarcaCuenta): ProblemaVariable[] {
+  const n = secretosDeMarca(marca);
+  const otras = new Set(MARCAS_CUENTA.filter((m) => m !== marca).flatMap((m) => Object.values(secretosDeMarca(m))));
+  const tieneId = Boolean(valor(env, n.igUserId));
+  const tieneToken = Boolean(valor(env, n.token));
+  return problemasVariables(env).filter((x) => {
+    if (otras.has(x.variable)) return false;
+    // Si la marca tiene su ID (o su token), el general no le hace falta.
+    if (x.variable === "IG_USER_ID" && tieneId) return false;
+    if (x.variable === "IG_ACCESS_TOKEN" && tieneToken) return false;
+    return true;
+  });
+}
+
+/** De qué secretos sale la cuenta de una marca (sin leer valores secretos). */
+export function origenCuenta(env: Entorno, marca: MarcaCuenta): OrigenCuenta {
+  const n = secretosDeMarca(marca);
+  const idPropio = Boolean(valor(env, n.igUserId));
+  const tokenPropio = Boolean(valor(env, n.token));
+  return {
+    marca,
+    variableIgUserId: idPropio ? n.igUserId : "IG_USER_ID",
+    variableToken: tokenPropio ? n.token : "IG_ACCESS_TOKEN",
+    propia: idPropio || tokenPropio,
+  };
+}
+
+/**
+ * Configuración para publicar con la cuenta de una marca: sus secretos si
+ * existen y, si no, los generales (IG_USER_ID / IG_ACCESS_TOKEN). App, versión
+ * y secreto de la app son siempre los generales.
+ */
+export function leerConfigMetaMarca(env: Entorno, marca: MarcaCuenta): { ok: true; config: ConfigMetaMarca } | { ok: false; problemas: ProblemaVariable[] } {
+  const origen = origenCuenta(env, marca);
+  registrarSecreto(valor(env, "IG_ACCESS_TOKEN"));
+  registrarSecreto(valor(env, secretosDeMarca(marca).token));
+  registrarSecreto(valor(env, "META_APP_SECRET"));
+  const problemas = problemasDeMarca(env, marca);
+  if (problemas.length) return { ok: false, problemas };
+  return {
+    ok: true,
+    config: {
+      token: valor(env, origen.variableToken) as string,
+      igUserId: valor(env, origen.variableIgUserId) as string,
+      appId: valor(env, "META_APP_ID") as string,
+      versionApi: valor(env, "META_API_VERSION") ?? VERSION_API_POR_DEFECTO,
+      appSecret: valor(env, "META_APP_SECRET"),
+      origen,
+    },
+  };
+}
+
+/**
+ * Cuentas distintas que hay que leer (métricas): una por par ID + token, con
+ * las marcas que la usan. Hoy, una sola (las dos marcas en IG_USER_ID).
+ */
+export function cuentasDistintas(env: Entorno): Array<{ config: ConfigMetaMarca; marcas: MarcaCuenta[] }> {
+  const salida: Array<{ config: ConfigMetaMarca; marcas: MarcaCuenta[] }> = [];
+  for (const marca of MARCAS_CUENTA) {
+    const r = leerConfigMetaMarca(env, marca);
+    if (!r.ok) continue;
+    const igual = salida.find((x) => x.config.igUserId === r.config.igUserId && x.config.token === r.config.token);
+    if (igual) igual.marcas.push(marca);
+    else salida.push({ config: r.config, marcas: [marca] });
+  }
+  return salida;
 }
 
 /** Configuración lista para publicar, o los problemas que lo impiden. */
@@ -125,10 +258,11 @@ export function describirVariables(env: Entorno): DescripcionVariable[] {
   return VARIABLES_META.map(({ nombre, obligatoria, secreta }) => {
     const v = valor(env, nombre);
     let detalle: string;
-    if (!v) detalle = nombre === "META_API_VERSION" ? `no definida (se usa ${VERSION_API_POR_DEFECTO})` : "no definida";
+    const general = generalDe(nombre);
+    if (!v) detalle = nombre === "META_API_VERSION" ? `no definida (se usa ${VERSION_API_POR_DEFECTO})` : general ? `no definida (se usa ${general})` : "no definida";
     else if (secreta) {
       registrarSecreto(v);
-      detalle = nombre === "IG_ACCESS_TOKEN" ? `${enmascarar(v)} (${v.length} caracteres)` : `definida (${v.length} caracteres)`;
+      detalle = nombre.startsWith("IG_ACCESS_TOKEN") ? `${enmascarar(v)} (${v.length} caracteres)` : `definida (${v.length} caracteres)`;
     } else detalle = v;
     return { nombre, presente: Boolean(v), obligatoria, detalle };
   });
@@ -139,6 +273,10 @@ export const NOMBRES_ENTORNO = [
   ...VARIABLES_META.map((v) => v.nombre),
   "SUPABASE_URL",
   "SUPABASE_ANON_KEY",
+  // Solo para escribir el estado de publicación (columnas que el panel ya no
+  // puede tocar, migración 20261107000000) y el cerrojo de publicación. La
+  // inyecta la plataforma en todas las Edge Functions.
+  "SUPABASE_SERVICE_ROLE_KEY",
   // Google Drive (archivo de fotos y piezas publicadas; ver drive.ts).
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
