@@ -438,7 +438,14 @@ export async function programarConSesion(
   }
   const v = r.valor;
   if (v.ok !== true) {
-    return json(409, { ok: false, requiereConfirmacion: v.requiereConfirmacion === true, conflictos: v.conflictos ?? [], error: "Hay otra publicación de la marca a menos de 30 minutos: confirma para programarla igualmente." });
+    // 200, como la RPC: el panel enseña los conflictos y repite con confirmarConflicto.
+    return json(200, {
+      ok: false,
+      id,
+      requiereConfirmacion: v.requiereConfirmacion === true,
+      conflictos: v.conflictos ?? [],
+      error: "Hay otra publicación de la marca a menos de 30 minutos: confirma para programarla igualmente.",
+    });
   }
   registro("info", ETIQUETA, "programada", { id, para: o.para, usuario: s.usuario });
   return json(200, {

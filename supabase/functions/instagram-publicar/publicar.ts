@@ -14,6 +14,12 @@
  *               "fotosTmp"?: ["tmp/<uuid>.jpg", …] (carrusel: las copias de sus fotos),
  *               "programarPara"?: "<ISO>", "confirmarConflicto"?: bool (PROGRAMAR en vez de publicar) }
  *
+ *   CONTRATO DEL PANEL (05/11/2026): en vez de «id», «ids»: [uuid, …] (1 =
+ *   esa pieza; 2–10 = piezas sueltas que se juntan en UN carrusel, ensamblar.ts,
+ *   con id determinista) y «accion»: "publicar" (por defecto) | "programar".
+ *   «directo» se admite y se ignora; alias del móvil: carrusel: { ids, altTexts }.
+ *   Contrato completo en docs/instagram-carrusel.md.
+ *
  *   SIN PASO DE PRUEBA (05/11/2026): publicar o programar ya no exigen «Prueba
  *   sin publicar». Publicar valida el texto y la imagen y crea el contenedor
  *   por dentro; `dryRun: true` queda como opción interna. Con
@@ -126,6 +132,7 @@ import {
 import { esUuid, MAX_BYTES_IMAGEN, validarAltText, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
 import { esReel, problemaReel, publicarReelReservado } from "./reel.ts";
 import { esCarrusel, problemaCarrusel, programarConSesion, publicarCarruselReservado } from "./carrusel.ts";
+import { ensamblarCarrusel, MAX_IDS_CARRUSEL } from "./ensamblar.ts";
 
 const ETIQUETA = "instagram-publicar";
 
@@ -200,6 +207,10 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
   const entrada = cuerpo.valor as {
     id?: unknown;
+    ids?: unknown;
+    carrusel?: unknown;
+    accion?: unknown;
+    directo?: unknown;
     caption?: unknown;
     altText?: unknown;
     altTexts?: unknown;
@@ -210,7 +221,26 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
     programarPara?: unknown;
     confirmarConflicto?: unknown;
   } | null;
-  if (!entrada || typeof entrada !== "object" || !esUuid(entrada.id)) return json(400, { ok: false, error: "Falta «id» (UUID de la pieza)" });
+  if (!entrada || typeof entrada !== "object") return json(400, { ok: false, error: "Falta «id» (UUID de la pieza)" });
+  // Contrato del panel (05/11/2026): «ids» (1 = post o story; 2–10 = carrusel,
+  // en orden) o «id». Alias del móvil: carrusel: { ids, altTexts }.
+  const alias = entrada.carrusel && typeof entrada.carrusel === "object" ? (entrada.carrusel as { ids?: unknown; altTexts?: unknown }) : null;
+  if (entrada.ids === undefined && alias?.ids !== undefined) entrada.ids = alias.ids;
+  if (entrada.altTexts === undefined && alias?.altTexts !== undefined) entrada.altTexts = alias.altTexts;
+  if (entrada.ids !== undefined && entrada.ids !== null) {
+    if (!Array.isArray(entrada.ids) || entrada.ids.length < 1 || entrada.ids.length > MAX_IDS_CARRUSEL || !entrada.ids.every(esUuid)) {
+      return json(400, { ok: false, error: `«ids» tiene que ser una lista de 1 a ${MAX_IDS_CARRUSEL} UUID de piezas` });
+    }
+    if (entrada.id !== undefined && entrada.id !== null && !(entrada.ids.length === 1 && entrada.ids[0] === entrada.id)) {
+      return json(400, { ok: false, error: "Manda «id» o «ids», no los dos" });
+    }
+  } else if (!esUuid(entrada.id)) {
+    return json(400, { ok: false, error: "Falta «id» (UUID de la pieza)" });
+  }
+  if (entrada.accion !== undefined && entrada.accion !== null && entrada.accion !== "publicar" && entrada.accion !== "programar") {
+    return json(400, { ok: false, error: "«accion» tiene que ser «publicar» o «programar»" });
+  }
+  if (entrada.accion === "programar" && typeof entrada.programarPara !== "string") return json(400, { ok: false, error: "Para programar falta «programarPara» (fecha ISO)" });
   // Sin paso de prueba: dryRun es opcional (por defecto, publicar).
   if (entrada.dryRun !== undefined && entrada.dryRun !== null && typeof entrada.dryRun !== "boolean") return json(400, { ok: false, error: "«dryRun» tiene que ser true o false" });
   if (entrada.altTexts !== undefined && entrada.altTexts !== null
@@ -232,7 +262,17 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   if (entrada.fotoTmp !== undefined && entrada.fotoTmp !== null && !esRutaTmp(entrada.fotoTmp)) {
     return json(400, { ok: false, error: "«fotoTmp» tiene que ser una ruta tmp/<uuid>.jpg del bucket" });
   }
-  const id = entrada.id;
+  // Varias piezas sueltas → un carrusel (ensamblar.ts). Una → esa pieza.
+  let id: string;
+  const ids = Array.isArray(entrada.ids) ? (entrada.ids as string[]) : null;
+  if (ids && ids.length > 1) {
+    if (deps.origen === "programador") return json(400, { ok: false, error: "El programador publica por «id»" });
+    const r = await ensamblarCarrusel(s, ids, { ahora: deps.ahora });
+    if (!r.ok) return json(r.estado, r.cuerpo);
+    id = r.id;
+  } else {
+    id = ids ? ids[0] : (entrada.id as string);
+  }
   const dryRun = entrada.dryRun === true;
   const fotoTmp = typeof entrada.fotoTmp === "string" ? entrada.fotoTmp : null;
   const fotosTmp = Array.isArray(entrada.fotosTmp) ? (entrada.fotosTmp as string[]) : [];
@@ -313,7 +353,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   }
 
   // PROGRAMAR directamente (sin prueba previa): valida y deja la programación.
-  if (typeof programarPara === "string") {
+  if (typeof programarPara === "string" && entrada.accion !== "publicar") {
     return await programarConSesion(
       { s, env, deps, id, fila, cuenta, caption, altText, altTexts, avisos, resumenCaption },
       {

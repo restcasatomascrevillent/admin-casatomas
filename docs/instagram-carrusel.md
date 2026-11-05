@@ -13,127 +13,131 @@ doble publicación).
 ## Cómo funciona
 
 ```
- Panel ── 1 llamada ──►  POST /api/instagram-render  { tipo: "carrusel", marca, diapositivas[2–10] }
-                          valida CADA imagen con validarPieza (como un post de la marca)
-                          1 Chromium, 3 páginas a la vez (reutilizadas) → N JPEG 1080×1350
-                          ──► bucket «instagram» piezas/AAAA-MM/<id>-01.jpg … -NN.jpg
-                          ──► instagram_piezas: UNA fila (tipo_medio = formato = 'carrusel',
-                              diapositivas = [{ foto, plantilla, datos, alt_text, imagen_ruta }])
+ Panel ── N llamadas (una por imagen, como hoy) ──►  POST /api/instagram-render { pieza, fotoPreparada, caption }
+                                                      → una pieza suelta «generada» por imagen: { id, urlJpeg }
 
- Panel ──────────────►  instagram-publicar  { id }                    (publicar YA, sin prueba)
-                          HEAD de las N imágenes · cuota (un carrusel = 1 publicación)
-                          N contenedores hijo (is_carousel_item, image_url, alt_text) → FINISHED
-                          contenedor CAROUSEL (children, caption) → FINISHED
-                          media_publish UNA vez → media_id guardado al momento
-                          Drive: las N imágenes; si están TODAS, se borran del bucket
-                       ─  instagram-publicar  { id, programarPara }   (programar, sin prueba)
-                          valida texto, textos alternativos e imágenes → RPC instagram_programar
-                          (con el JWT del usuario y el texto en la misma llamada)
+ Panel ──►  instagram-publicar { ids: [id1…idN], caption, altTexts, fotosTmp }        (publicar YA, sin prueba)
+             1 id   → esa pieza (post o story), como siempre
+             2–10   → MONTA un carrusel (ensamblar.ts): id determinista, copia los JPEG a
+                      piezas/AAAA-MM/<carrusel>-NN.jpg, crea UNA fila carrusel y borra las sueltas
+             HEAD de las imágenes · cuota (un carrusel = 1 publicación)
+             N contenedores hijo (is_carousel_item, image_url, alt_text) → FINISHED
+             contenedor CAROUSEL (children, caption) → FINISHED
+             media_publish UNA vez → media_id guardado al momento
+             Drive: las N imágenes; si están TODAS, se borran del bucket
+
+ Panel ──►  instagram-publicar { accion: "programar", ids, caption, altTexts, programarPara }
+             monta igual (si son 2–10) → valida texto, textos alternativos e imágenes
+             → RPC instagram_programar(id, para, …, p_caption, p_alt_texts) con el JWT del usuario
 
  pg_cron ── instagram-programador ── publicarConSesion({ id, dryRun: false }) ── igual que «publicar»
 ```
 
-## Contratos (para el panel)
+Opcional: el render también genera un carrusel entero en UNA llamada
+(`tipo: "carrusel"`, abajo). Las dos vías acaban en la misma fila carrusel.
+
+## Contrato final (para el panel de escritorio y el móvil)
 
 Todas con `Authorization: Bearer <JWT>` (y `apikey` en las Edge Functions);
 401 sin sesión, 403 sin «Editar» en Marketing.
 
-### Render: `POST /api/instagram-render`
+### 1. Render de cada imagen: `POST /api/instagram-render` (sin cambios)
+
+```jsonc
+{ "pieza": { "marca": "casa-tomas", "plantilla": "ct-foto-titular", "formato": "post",
+             "foto": "subida:<uuid>", "antetitulo": "Hoy", "titular": "Llegó del Cantábrico" },
+  "fotoPreparada": { "id": "subida:<uuid>", "url": "<SUPABASE_URL>/storage/v1/object/public/instagram/tmp/<uuid>.jpg",
+                     "ancho": 3024, "alto": 4032, "tipo": "plato", "marca": "casa-tomas" },
+  "caption": "…", "id": "<uuid para regenerar>" }
+→ 200 { ok, id, estado: "generada", urlJpeg, imagenRuta, ancho, alto, bytes, calidad, avisos }
+```
+
+- Para un carrusel, cada imagen con `formato: "post"` (1080×1350; Meta recorta
+  todas como la primera). Las claves de más (p. ej. `carrusel: { grupo, indice, total }`
+  del móvil) se ignoran.
+- `foto`: `subida:<uuid>` (JPEG subido por el panel a `tmp/<uuid>.(jpg|png|webp)`),
+  `drive:<id>`, `carta:<id>`, `vino:<id>` (este llega con la rama
+  `feat/instagram-ia-vision`; fusiona sin conflicto con esta), un id del
+  catálogo o nada (plantillas tipográficas). Las preparadas solo con
+  `fotoPreparada` cuya URL sea `tmp/` de NUESTRO Supabase; la de `subida:`,
+  además, de ESE uuid (sin SSRF).
+
+### 2. Publicar ahora: `POST ${SUPABASE_URL}/functions/v1/instagram-publicar`
 
 ```jsonc
 {
-  "tipo": "carrusel",
-  "marca": "casa-tomas",            // o "touza"
-  "diapositivas": [                 // 2–10, en el orden de publicación; la 1.ª es la portada
-    {
-      "foto": "subida:<uuid>",      // o "drive:<id>", "carta:<id>", id del catálogo, o null (tipográfica)
-      "plantilla": "ct-foto-titular",
-      "datos": { "antetitulo": "Hoy", "titular": "Llegó del Cantábrico" },  // rótulos (DatosPieza)
-      "altText": "Ostras sobre hielo picado",                               // opcional, ≤ 1000
-      "fotoPreparada": { "id": "subida:<uuid>", "url": "<SUPABASE>/storage/v1/object/public/instagram/tmp/<uuid>.jpg",
-                         "ancho": 3024, "alto": 4032, "tipo": "plato", "marca": "casa-tomas" }
-    }
-    // …
-  ],
-  "id": "<uuid>",                   // opcional: regenerar ese carrusel
-  "caption": "Texto #casatomas"     // opcional
+  "ids": ["<uuid>", "…"],          // 1 = post o story; 2–10 = carrusel EN ESTE ORDEN (la 1.ª es la portada)
+  "caption": "Texto #casatomas",   // opcional (si no, el guardado; en un carrusel nuevo, el de la 1.ª pieza)
+  "altTexts": ["…", "…"],          // opcional: carrusel, uno por imagen (si no, los guardados de cada pieza)
+  "altText": "…",                  // opcional: post (1 id)
+  "fotosTmp": ["tmp/<uuid>.jpg"],  // opcional: copias tmp/ de las fotos; se borran al publicar
+  "contenedorId": "…",             // solo al repetir tras un 202
+  "directo": true,                 // admitido e ignorado
+  "dryRun": false                  // OPCIONAL (por defecto false); true = solo crear y comprobar (uso interno)
 }
 ```
 
-Cada diapositiva es una `DiapositivaMontada` (lo que devuelve la IA) más su
-`fotoPreparada`. Se valida como el post
-`{ ...datos, marca, plantilla, formato: "post", foto }` con el esquema de
-siempre.
+`"id": "<uuid>"` en vez de `ids` sigue valiendo (una pieza, o un carrusel
+ya montado). Alias del móvil: `"carrusel": { "ids": […], "altTexts": […] }`.
 
-- **200** `{ ok, id, estado: "generada", tipoMedio: "carrusel", urlJpeg, imagenRuta,
-  diapositivas: [{ orden, urlJpeg, imagenRuta, ancho, alto, bytes, calidad, avisos, tiempos }],
-  avisos, msRender, msTotal }` (`urlJpeg`/`imagenRuta` = la portada).
-- **422** `{ error, problemas: ["Imagen 2: El titular tiene 9 palabras…", …] }`
-  (de todas las imágenes a la vez; también si no pasa la maquetación:
-  `tipo`, `imagenes: [4]`). Si falla una, **no se sube ninguna**.
-- **400** marca o cuerpo; **404** id; **409** ya publicada o el `id` no es
-  un carrusel (`tipo: "no_es_carrusel"`: una pieza no cambia de tipo).
-
-Fotos subidas desde el móvil: `subida:<uuid>` con el JPEG ya en
-`tmp/<uuid>.(jpg|png|webp)` del bucket «instagram». Se aceptan igual que
-`drive:`/`carta:` (pieza suelta o carrusel): solo con `fotoPreparada` cuya
-URL sea `tmp/` de NUESTRO Supabase **y de ese mismo uuid** (sin SSRF).
-
-Tiempo: un solo Chromium y `INSTAGRAM_RENDER_PARALELO` páginas a la vez
-(3 por defecto, de 1 a 6; variable de entorno de Vercel, opcional). Cada
-página renderiza varias imágenes seguidas: abrir una página cuesta más que
-renderizar en ella. Medido en local (Windows, Chromium de Playwright): 6
-imágenes en ~9 s, de ellos ~1,5 s de arranque. Límite de la función: 60 s.
-
-Al regenerar con menos imágenes, las que sobran se borran del bucket.
-
-### Publicar: `POST ${SUPABASE_URL}/functions/v1/instagram-publicar`
-
-```jsonc
-{
-  "id": "<uuid del carrusel>",
-  "caption": "…",                   // opcional (si no, el guardado)
-  "altTexts": ["…", "…"],           // opcional: uno por imagen, en orden (si no, los guardados)
-  "fotosTmp": ["tmp/<uuid>.jpg"],   // opcional: copias tmp/ de las fotos; se borran al publicar
-  "dryRun": false                   // OPCIONAL (por defecto false). true = solo crear y comprobar
-}
-```
-
-- **200** `{ ok, publicado: true, estado: "publicada", tipoMedio: "carrusel", mediaId, permalink,
-  contenedor: { id, estado, hijos }, urlsJpeg, imagenEnBucket, driveId, driveIds, cuota, cuenta, caption, avisos }`.
-- **202** `{ estado: "en_proceso", reintentar: { id, contenedorId, dryRun } }`: Meta
-  aún procesa; repetir con ese `contenedorId` (no crea otro).
-- **409** `tipo: "publicacion_en_curso" | "programada" | "publicada" | "imagen_borrada" | "sin_imagenes"`.
-- **422** texto, textos alternativos (si llegan, tantos como imágenes) o
-  imágenes que Meta no podría descargar («Imagen 3: …»).
+- **200** `{ ok, id, publicado: true, estado: "publicada", mediaId, permalink, contenedor: { id, estado, hijos? },
+  cuota, cuenta, caption, avisos, imagenEnBucket, driveId }`; en un carrusel además
+  `tipoMedio: "carrusel"`, `urlsJpeg`, `driveIds`. **`id` es el del carrusel** (el
+  que hay que usar después para programar, ver o reintentar).
+- **202** `{ ok: true, estado: "en_proceso", id, contenedor: { id }, reintentar: { id, contenedorId, dryRun } }`:
+  repetir con `contenedorId` (con los mismos `ids` o con `id`: llega al mismo carrusel).
+- **409** `tipo: "publicacion_en_curso" | "programada" | "publicada" | "imagen_borrada" | "sin_imagenes"`;
+  al montar, si alguna pieza está programada.
+- **422** texto, textos alternativos (si llegan, tantos como imágenes),
+  imágenes que Meta no podría descargar, o piezas que no se pueden juntar
+  (`problemas: ["Imagen 2: tiene que ser una imagen de feed…", "Imagen 3: es de otra marca…"]`).
 - Error de Meta en una imagen → la pieza queda en «error» con «Imagen N del
-  carrusel: …» y **no se publica nada**.
+  carrusel: …» y **no se publica nada**. Reintentar con los mismos `ids`
+  reutiliza el carrusel ya montado.
 
-Lo mismo vale para posts, stories y reels: `dryRun` ya no es obligatorio.
-
-### Programar: el mismo endpoint con `programarPara`
+### 3. Programar: el mismo endpoint con `accion: "programar"`
 
 ```jsonc
-{ "id": "<uuid>", "programarPara": "2026-12-24T10:00:00+01:00", "confirmarConflicto": false,
-  "caption": "…", "altText": "…" /* post */, "altTexts": ["…"] /* carrusel */ }
+{ "accion": "programar", "ids": ["…"], "programarPara": "2026-12-24T10:00:00+01:00",
+  "confirmarConflicto": false, "caption": "…", "altTexts": ["…"], "altText": "…" }
 ```
 
-Valida el texto y los textos alternativos, comprueba por HEAD que Meta podrá
-descargar las imágenes y llama a la RPC `instagram_programar` **con el JWT
-del usuario** (que comprueba «Editar», la fecha y los conflictos), pasándole
-el texto: no hace falta ninguna prueba previa.
+Monta el carrusel si son 2–10 ids, valida el texto y los textos
+alternativos, comprueba por HEAD que Meta podrá descargar las imágenes y
+llama a la RPC `instagram_programar` **con el JWT del usuario** (comprueba
+«Editar», la fecha y los conflictos), pasándole el texto. Sin prueba previa.
 
-- **200** `{ ok, programado: true, accion: "programada"|"reprogramada", programacion, conflictos }`
-- **409** `{ requiereConfirmacion: true, conflictos }` → repetir con `confirmarConflicto: true`.
+- **200** `{ ok: true, id, programado: true, accion: "programada"|"reprogramada",
+  programacion: { id, programada_para, … }, conflictos }`
+- **200** `{ ok: false, id, requiereConfirmacion: true, conflictos }` → repetir con `confirmarConflicto: true`.
 - **422** mensaje de la RPC (p. ej. «Hay que programarla con al menos 10 minutos de margen»).
 
-O directamente la RPC (el panel ya la usa):
-`instagram_programar(p_pieza_id, p_para, p_confirmar_conflicto default false,
-p_caption text default null, p_alt_text text default null, p_alt_texts text[] default null)`.
-`null` = se conserva lo guardado. La llamada de 3 argumentos sigue valiendo.
+(`programarPara` sin `accion` también programa.) El programador publica el
+carrusel entero (programa la pieza carrusel, no la primera imagen).
 
-Para un carrusel se programa **la pieza del carrusel** (su id): el
-programador publica el grupo entero.
+La RPC directa sigue disponible:
+`instagram_programar(p_pieza_id, p_para, p_confirmar_conflicto default false,
+p_caption text default null, p_alt_text text default null, p_alt_texts text[] default null)`
+(`null` = se conserva lo guardado; la llamada de 3 argumentos sigue valiendo).
+Para un carrusel, `p_pieza_id` tiene que ser el id del carrusel ya montado.
+
+### 4. Opcional: carrusel entero en UNA llamada al render
+
+```jsonc
+{ "tipo": "carrusel", "marca": "casa-tomas",
+  "diapositivas": [ { "foto": "subida:<uuid>", "plantilla": "ct-foto-titular",
+                      "datos": { "antetitulo": "Hoy", "titular": "Llegó del Cantábrico" },
+                      "altText": "Ostras sobre hielo", "fotoPreparada": { … } }, … ],   // 2–10 (DiapositivaMontada + fotoPreparada)
+  "caption": "…", "id": "<uuid para regenerar>" }
+→ 200 { ok, id, estado: "generada", tipoMedio: "carrusel", urlJpeg, imagenRuta,
+        diapositivas: [{ orden, urlJpeg, imagenRuta, ancho, alto, bytes, calidad, avisos, tiempos }], avisos, msRender, msTotal }
+→ 422 { problemas: ["Imagen 2: …"] } (de todas las imágenes a la vez; si falla una, no se sube ninguna)
+```
+
+Un solo Chromium y `INSTAGRAM_RENDER_PARALELO` páginas a la vez (3 por
+defecto, de 1 a 6; variable de Vercel opcional) que se reutilizan. Medido en
+local (Windows, Chromium de Playwright): 6 imágenes en ~9 s (~1,5 s de
+arranque). Se publica con `{ id }`.
 
 ## Base de datos (migración `20261112000000_instagram_carrusel`)
 
@@ -199,22 +203,16 @@ Deshacer: `supabase/rollbacks/20261112000000_instagram_carrusel_ROLLBACK.sql`
 - Cerrojo `instagram_pieza_reservar_publicacion` (409 «publicacion_en_curso»)
   y 409 «programada» al publicar a mano una pieza programada.
 
-## Panel móvil (feat/instagram-movil): cómo encaja
+## Qué cambia en los clientes
 
-El móvil (`src/components/instagram/movil/apiReal.ts`, `publicar.ts`) se
-escribió contra otro contrato: un render **por imagen** con
-`carrusel: { grupo, indice, total }` (una pieza por imagen) y publicar con
-`carrusel: { grupo, ids, altTexts }`. El servidor de esta rama **no** usa
-grupos de piezas: un carrusel es UNA pieza. Al integrar hay que cambiar en
-el móvil:
-
-| El móvil hace hoy | Con esta rama |
+| Cliente hoy | Contrato final |
 |---|---|
-| N × `POST /api/instagram-render { pieza, caption, fotoPreparada, carrusel: { grupo, indice, total } }` | 1 × `POST /api/instagram-render { tipo: "carrusel", marca, diapositivas: [{ foto, plantilla, datos, altText, fotoPreparada }], caption }` → `{ id, urlJpeg, diapositivas[] }` |
-| `instagram-publicar { carrusel: { grupo, ids, altTexts }, caption, dryRun: false, fotosTmp }` | `instagram-publicar { id, caption, altTexts, fotosTmp }` (`dryRun` sobra) |
-| `instagram_programar` con la primera imagen como portada | `instagram_programar(p_pieza_id = id del carrusel, p_para, …, p_caption, p_alt_texts)` o `instagram-publicar { id, programarPara, caption, altTexts }` |
-
-Las fotos `subida:<uuid>` en `tmp/<uuid>.jpg` ya se aceptan tal cual.
+| Escritorio (`feat/instagram-crear`, `API_SERVIDOR`): `{ directo, dryRun: false, ids, caption, altTexts, fotosTmp, contenedorId? }` | **Igual.** Usar el `id` de la respuesta (el del carrusel) para lo que venga después. |
+| Escritorio: `{ accion: "programar", ids, caption, altTexts, programarPara, confirmarConflicto }` | **Igual.** 200 con `programacion` o con `requiereConfirmacion`. |
+| Móvil (`feat/instagram-movil`): render por imagen con `carrusel: { grupo, indice, total }` | Igual (la clave `carrusel` se ignora). |
+| Móvil: `{ carrusel: { grupo, ids, altTexts }, caption, dryRun: false, fotosTmp }` | Vale tal cual (alias); mejor `{ ids, altTexts, caption, fotosTmp }`. |
+| Móvil: `instagram_programar` con la primera imagen como portada | `instagram-publicar { accion: "programar", ids, … }` (con la primera imagen sola programaría un post). |
+| Fotos `subida:<uuid>` en `tmp/<uuid>.jpg` | Se aceptan en el render. |
 
 ## Funciones que hay que volver a desplegar
 
@@ -236,6 +234,9 @@ npx supabase functions deploy instagram-publicar instagram-programador --project
   subidas, una fila, errores de todas las imágenes, regenerar con menos,
   `subida:<uuid>` y anti-SSRF) y **6 imágenes con Chromium real** si está el
   de Playwright.
+- `supabase/functions/instagram-publicar/__tests__/ids.test.ts`: el contrato con
+  `ids` (montar el carrusel, id determinista, reintento sin duplicar, piezas que
+  no se pueden juntar, alias del móvil y `accion: "programar"`).
 - `supabase/functions/instagram-publicar/__tests__/carrusel.test.ts`: cliente
   (hijos, padre, error en un hijo → nada publicado), publicar sin prueba,
   textos alternativos, Drive, doble publicación en carrusel, programador y

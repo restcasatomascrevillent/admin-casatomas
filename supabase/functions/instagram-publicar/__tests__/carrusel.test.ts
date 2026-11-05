@@ -341,10 +341,10 @@ describe("instagram-publicar: programar sin prueba previa", () => {
     expect(p.llamadasRpc).toHaveLength(0);
   });
 
-  it("conflicto con otra programada → 409 requiereConfirmacion; error de la RPC → 422 con su mensaje", async () => {
+  it("conflicto con otra programada → 200 requiereConfirmacion (como la RPC); error de la RPC → 422 con su mensaje", async () => {
     const c = conProgramar({ ...FILA_CARRUSEL }, [200, { ok: false, requiereConfirmacion: true, conflictos: [{ id: "x" }] }]);
     const r = await manejarPublicar(peticion({ id: ID, programarPara: PARA }), { env: ENV_META, fetch: c.f as unknown as typeof fetch });
-    expect(r.status).toBe(409);
+    expect(r.status).toBe(200);
     expect(await r.json()).toMatchObject({ requiereConfirmacion: true, conflictos: [{ id: "x" }] });
     const e = conProgramar({ ...FILA_CARRUSEL }, [400, { code: "22023", message: "Hay que programarla con al menos 10 minutos de margen" }]);
     const r2 = await manejarPublicar(peticion({ id: ID, programarPara: PARA }), { env: ENV_META, fetch: e.f as unknown as typeof fetch });
