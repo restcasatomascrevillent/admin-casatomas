@@ -6,6 +6,7 @@ import {
   esLineaDeServicio,
   formatCantidadLinea,
   formatNumero,
+  indiceAnomaliasPrecio,
   tieneAnomaliaPrecio,
   valorSinDescuento,
 } from "../formatters";
@@ -91,6 +92,32 @@ describe("tieneAnomaliaPrecio", () => {
     const viejo = doc(1, "Campoluz", [linea("TANQUERAY 70 CL.", 0), linea("TANQUERAY 70 CL.", 11.4)]);
     const nuevo = doc(2, "Campoluz", [linea("TANQUERAY 70 CL.", 11.4)]);
     expect(tieneAnomaliaPrecio(nuevo, [viejo, nuevo])).toBe(false);
+  });
+});
+
+describe("indiceAnomaliasPrecio (muchos documentos de una vez)", () => {
+  it("da lo mismo que tieneAnomaliaPrecio documento a documento", () => {
+    const nombres = ["Brugal 1888 70 cl.", "BRUGAL 1888 70 CL.", "Portes", "Jamón", "TANQUERAY 70 CL."];
+    const proveedores = ["Bodega Campoluz, S.L.", "BODEGA CAMPOLUZ, S.L.", "Enchenta", "Joselito"];
+    let semilla = 7;
+    const azar = () => (semilla = (semilla * 16807) % 2147483647) / 2147483647;
+    const docs = Array.from({ length: 60 }, (_, i) =>
+      doc(i + 1, proveedores[Math.floor(azar() * proveedores.length)], Array.from({ length: 1 + Math.floor(azar() * 4) }, () =>
+        linea(nombres[Math.floor(azar() * nombres.length)], [0, 10, 11, 25, 40][Math.floor(azar() * 5)]),
+      )),
+    );
+    const anomalia = indiceAnomaliasPrecio(docs);
+    const esperado = docs.map((d) => tieneAnomaliaPrecio(d, docs));
+    expect(docs.map(anomalia)).toEqual(esperado);
+    expect(esperado.some(Boolean)).toBe(true);
+    expect(docs.map((d) => avisosDocumento(d, docs, anomalia))).toEqual(docs.map((d) => avisosDocumento(d, docs)));
+  });
+
+  it("un documento que no está en la lista se compara con todos", () => {
+    const viejo = doc(1, "Campoluz", [linea("BRUGAL", 10)]);
+    const nuevo = doc(2, "Campoluz", [linea("BRUGAL", 30)]);
+    expect(indiceAnomaliasPrecio([viejo])(nuevo)).toBe(tieneAnomaliaPrecio(nuevo, [viejo]));
+    expect(indiceAnomaliasPrecio([viejo])(nuevo)).toBe(true);
   });
 });
 

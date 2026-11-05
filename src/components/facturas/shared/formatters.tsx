@@ -162,6 +162,48 @@ export const tieneAnomaliaPrecio = (doc: Factura, allDocs: Factura[]): boolean =
 };
 
 /**
+ * Lo mismo que `tieneAnomaliaPrecio`, para MUCHOS documentos: indexa una vez
+ * los precios por proveedor y nombre de producto (suma y número) y cada línea
+ * se compara con la media de las demás restando la suya. Con el histórico
+ * (~1.900 documentos, ~12.000 líneas) la versión de uno en uno era cuadrática.
+ */
+export const indiceAnomaliasPrecio = (allDocs: Factura[]): ((doc: Factura) => boolean) => {
+  const indice = new Map<string, { suma: number; n: number }>();
+  const claveLinea = (proveedor: string, nombre: string) => `${proveedor}\u0000${plano(nombre)}`;
+  const cuenta = (precio: number | null | undefined): precio is number => typeof precio === "number" && precio > 0;
+  for (const f of allDocs) {
+    const proveedor = claveProveedor(f);
+    if (!proveedor) continue;
+    for (const p of f.productos) {
+      if (!cuenta(p.precio_unitario)) continue;
+      const k = claveLinea(proveedor, p.producto_nombre);
+      const e = indice.get(k);
+      if (e) {
+        e.suma += p.precio_unitario;
+        e.n += 1;
+      } else indice.set(k, { suma: p.precio_unitario, n: 1 });
+    }
+  }
+  const indexados = new Set(allDocs);
+  return (doc) => {
+    const proveedor = claveProveedor(doc);
+    if (!proveedor) return false;
+    // ¿Está el propio documento en el índice? (si no, su línea no se resta).
+    const dentro = indexados.has(doc);
+    return doc.productos.some((p) => {
+      if (!cuenta(p.precio_unitario)) return false;
+      if (esLineaDeServicio(p.producto_nombre)) return false;
+      const e = indice.get(claveLinea(proveedor, p.producto_nombre));
+      if (!e) return false;
+      const n = dentro ? e.n - 1 : e.n;
+      if (n <= 0) return false;
+      const avg = (dentro ? e.suma - p.precio_unitario : e.suma) / n;
+      return p.precio_unitario > avg * 2;
+    });
+  };
+};
+
+/**
  * Todo lo que hay que revisar de un documento en una sola lista: los avisos
  * que guardo `validar_cordura_factura` al procesarlo mas, si aplica, la
  * anomalia de precio detectada en la propia pagina.
@@ -171,9 +213,13 @@ export const tieneAnomaliaPrecio = (doc: Factura, allDocs: Factura[]): boolean =
  * el problema escrito, el resto resumido en "+N") y deja el numero de
  * documento con su columna entera.
  */
-export const avisosDocumento = (doc: Factura, allDocs: Factura[]): AlertaValidacion[] => {
+export const avisosDocumento = (
+  doc: Factura,
+  allDocs: Factura[],
+  anomalia: (d: Factura) => boolean = (d) => tieneAnomaliaPrecio(d, allDocs),
+): AlertaValidacion[] => {
   const base = Array.isArray(doc.alertas) ? doc.alertas : [];
-  if (!tieneAnomaliaPrecio(doc, allDocs)) return base;
+  if (!anomalia(doc)) return base;
   return [
     ...base,
     {
