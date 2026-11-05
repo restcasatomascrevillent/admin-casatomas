@@ -21,8 +21,8 @@
  *
  * Detalle y contratos: docs/instagram-movil.md.
  */
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent } from "react";
-import { ArrowLeft, Camera, CheckCircle2, ExternalLink, ImagePlus, Loader2, Plus, RefreshCw, Sparkles, UtensilsCrossed, WifiOff, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ChangeEvent, type ReactNode } from "react";
+import { ArrowLeft, Camera, CheckCircle2, ExternalLink, ImagePlus, Loader2, Maximize2, PenLine, Plus, RefreshCw, Sparkles, UtensilsCrossed, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +49,7 @@ import { CarruselPrevia } from "./CarruselPrevia";
 import { ElegirCarta } from "./ElegirCarta";
 import { fotosParaMontar, huecosLibres, reducirFotos, resumenSubidas, subidaCaducada, todasSubidas, type FotoMovil } from "./estado";
 import { MiniaturasOrdenables } from "./MiniaturasOrdenables";
+import { MontandoPrevia } from "./MontandoPrevia";
 import { MAX_INDICACION, MAX_MONTAJES_SESION, mensajeErrorMontar } from "./montar";
 import { MAX_CAPTION, prepararYPublicar, type CacheRender, type CuandoPublicar, type ProgresoPublicar, type ResultadoPublicar } from "./publicar";
 import { conReintentos } from "./reintentos";
@@ -65,6 +66,10 @@ export interface CrearMovilProps {
   onSalir?: () => void;
   /** Enlace «Usar el editor completo» (en la pestaña). */
   onEditorCompleto?: () => void;
+  /** Botón «Pantalla completa» (en la pestaña): abre /instagram/rapido. */
+  onPantallaCompleta?: () => void;
+  /** Lo que va a la derecha de la cabecera (en la pestaña: el punto de la cuenta conectada). */
+  cuenta?: ReactNode;
   marcaInicial?: MarcaId;
 }
 
@@ -111,7 +116,16 @@ type EstadoPublicacion =
 
 type Confirmar = null | "salir" | "descartar";
 
-export function CrearMovil({ servicios: inyectados, simulado = false, incrustado = false, onSalir, onEditorCompleto, marcaInicial = "casa-tomas" }: CrearMovilProps) {
+export function CrearMovil({
+  servicios: inyectados,
+  simulado = false,
+  incrustado = false,
+  onSalir,
+  onEditorCompleto,
+  onPantallaCompleta,
+  cuenta,
+  marcaInicial = "casa-tomas",
+}: CrearMovilProps) {
   const servicios = useMemo(() => inyectados ?? (simulado ? serviciosSimulados({ espera: 400 }) : serviciosReales()), [inyectados, simulado]);
 
   const [paso, setPaso] = useState<PasoMovil>("fotos");
@@ -509,8 +523,9 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
   const resumenProgramada = `${nombreDia(fechaProgramada || hoy, hoy)} a las ${hora}`;
 
   // ── Pintar ──────────────────────────────────────────────────────────────
+  // Cabecera compacta: una sola línea «Paso 2/3 · Montar con IA» con la barra de progreso (05/11/2026).
   const cabecera = (
-    <header className="flex h-14 shrink-0 items-center gap-1 border-b px-1">
+    <header className="flex h-12 shrink-0 items-center gap-1 border-b px-1" data-testid="cabecera-asistente">
       {paso !== "fotos" && pub.fase !== "hecha" ? (
         <Button variant="ghost" size="icon" className="h-12 w-12 pointer-coarse:h-12 pointer-coarse:w-12" onClick={atras} disabled={trabajando || !!montando} aria-label="Volver al paso anterior">
           <ArrowLeft className="h-6 w-6" aria-hidden="true" />
@@ -522,15 +537,24 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
       ) : (
         <span className="w-2" />
       )}
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-muted-foreground">{pub.fase === "hecha" ? "Hecho" : `Paso ${info.n} de 3`}</p>
-        <h1 className="truncate text-lg font-semibold leading-tight">{pub.fase === "hecha" ? "Listo" : info.titulo}</h1>
-      </div>
-      <ol className="mr-3 flex gap-1" aria-hidden="true">
+      <h1 className="min-w-0 flex-1 truncate text-base font-semibold leading-tight">
+        {pub.fase === "hecha" ? (
+          "Listo"
+        ) : (
+          <>
+            <span className="font-normal text-muted-foreground" aria-hidden="true">
+              Paso {info.n}/3 ·
+            </span>
+            <span className="sr-only">Paso {info.n} de 3: </span> {info.titulo}
+          </>
+        )}
+      </h1>
+      <ol className={cn("flex shrink-0 gap-1", !cuenta && "mr-3")} aria-hidden="true">
         {[1, 2, 3].map((n) => (
-          <li key={n} className={cn("h-1.5 w-6 rounded-full", n <= info.n ? "bg-primary" : "bg-muted")} />
+          <li key={n} className={cn("h-1.5 w-4 rounded-full", n <= info.n || pub.fase === "hecha" ? "bg-primary" : "bg-muted")} />
         ))}
       </ol>
+      {cuenta}
     </header>
   );
 
@@ -543,7 +567,7 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
 
   const subtituloSubidas =
     sub.total === 0
-      ? "Con una foto sale un post; con varias, un carrusel (hasta 10)."
+      ? "Una foto: post. Varias: carrusel (hasta 10)."
       : sub.errores
         ? `${sub.errores === 1 ? "Una foto no se ha podido subir" : `${sub.errores} fotos no se han podido subir`}: se reintentará al montar.`
         : sub.pendientes
@@ -552,7 +576,7 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
 
   const pasoFotos = (
     <>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3">
         {recuperado && (
           <div role="status" className="flex items-center justify-between gap-2 rounded-lg bg-muted p-3 text-sm">
             <span>Hemos recuperado lo que dejaste a medias.</span>
@@ -582,7 +606,7 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
             <button
               type="button"
               onClick={() => inputCarrete.current?.click()}
-              className="flex min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 p-4 text-center text-lg font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/10"
+              className="flex min-h-32 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/60 bg-primary/5 p-4 text-center text-lg font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring active:bg-primary/10"
             >
               <ImagePlus className="h-10 w-10 text-primary" aria-hidden="true" />
               Hacer fotos o elegir del carrete
@@ -653,7 +677,7 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
             className="h-12 text-base"
             aria-describedby="ayuda-indicacion-movil"
           />
-          <p id="ayuda-indicacion-movil" className="text-xs text-muted-foreground">
+          <p id="ayuda-indicacion-movil" className="text-sm text-muted-foreground">
             Puedes dictarlo con el micrófono del teclado.
           </p>
         </div>
@@ -685,10 +709,19 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
           <Button className={GRANDE} disabled={!fotos.length || !cargado} onClick={() => void montar("primera")}>
             <Sparkles className="mr-2 h-5 w-5" aria-hidden="true" /> Montar con IA
           </Button>
-          {incrustado && onEditorCompleto && (
-            <Button variant="link" className="h-12 w-full text-sm" onClick={onEditorCompleto}>
-              Usar el editor completo
-            </Button>
+          {incrustado && (onEditorCompleto || onPantallaCompleta) && (
+            <div className="flex">
+              {onEditorCompleto && (
+                <Button variant="ghost" className="h-12 flex-1 px-2 text-sm text-muted-foreground" onClick={onEditorCompleto}>
+                  <PenLine className="mr-1.5 h-4 w-4" aria-hidden="true" /> Editor completo
+                </Button>
+              )}
+              {onPantallaCompleta && (
+                <Button variant="ghost" className="h-12 flex-1 px-2 text-sm text-muted-foreground" onClick={onPantallaCompleta}>
+                  <Maximize2 className="mr-1.5 h-4 w-4" aria-hidden="true" /> Pantalla completa
+                </Button>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -697,26 +730,25 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
 
   const pasoMontaje = (
     <>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-3">
+        {/* Mientras la IA trabaja (o si falla sin montaje): SU publicación montándose, no un spinner en el vacío. */}
         {montando ? (
-          <div className="flex min-h-72 flex-col items-center justify-center gap-4 text-center" role="status" aria-live="polite">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
-            <p className="text-lg font-semibold">
-              {montando === "subiendo" ? (sub.pendientes || sub.errores ? `Subiendo fotos: ${sub.subidas} de ${sub.total}…` : "Preparando las fotos…") : MENSAJES_IA[mensajeIA]}
-            </p>
-            {montando === "ia" && <p className="text-sm text-muted-foreground">La IA conoce la carta, la marca y lo que mejor funciona.</p>}
-          </div>
+          <MontandoPrevia
+            fotos={fotos}
+            estado={montando}
+            mensajes={MENSAJES_IA}
+            pasoIA={mensajeIA}
+            textoSubida={sub.pendientes || sub.errores ? `Subiendo fotos: ${sub.subidas} de ${sub.total}…` : "Preparando las fotos…"}
+            indicacion={indicacion}
+            nombreMarca={nombreMarca}
+          />
         ) : errorMontaje ? (
-          <div className="space-y-3">
+          <>
             <p role="alert" className="rounded-md bg-destructive/10 p-3 text-base text-destructive">
               {errorMontaje}
             </p>
-            {!montaje && (
-              <Button className={GRANDE} onClick={() => void montar("primera")} disabled={usadosRef.current >= MAX_MONTAJES_SESION}>
-                <RefreshCw className="mr-2 h-5 w-5" aria-hidden="true" /> Probar otra vez
-              </Button>
-            )}
-          </div>
+            {!montaje && <MontandoPrevia fotos={fotos} estado="error" mensajes={MENSAJES_IA} pasoIA={0} textoSubida="" indicacion={indicacion} nombreMarca={nombreMarca} />}
+          </>
         ) : null}
 
         {montaje && !montando && (
@@ -739,13 +771,24 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
                 Texto de la publicación
               </Label>
               <Textarea id="caption-movil" value={caption} onChange={(e) => setCaption(e.target.value)} rows={7} className="text-base" aria-describedby="contador-caption-movil" />
-              <p id="contador-caption-movil" className={cn("text-right text-xs", caption.length > MAX_CAPTION ? "text-destructive" : "text-muted-foreground")}>
+              <p id="contador-caption-movil" className={cn("text-right text-sm", caption.length > MAX_CAPTION ? "text-destructive" : "text-muted-foreground")}>
                 {caption.length} / {MAX_CAPTION}
               </p>
             </div>
           </>
         )}
       </div>
+
+      {!montaje && !montando && errorMontaje && (
+        <div className="shrink-0 space-y-2 border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <Button className={GRANDE} onClick={() => void montar("primera")} disabled={usadosRef.current >= MAX_MONTAJES_SESION}>
+            <RefreshCw className="mr-2 h-5 w-5" aria-hidden="true" /> Probar otra vez
+          </Button>
+          <Button variant="outline" className={cn(MEDIO, "w-full")} onClick={() => setPaso("fotos")}>
+            Volver a las fotos
+          </Button>
+        </div>
+      )}
 
       {montaje && !montando && (
         <div className="shrink-0 space-y-2 border-t bg-background p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
@@ -783,12 +826,20 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
     return cuando === "programar" ? "Programando…" : "Publicando…";
   };
 
+  // Paso 3: el resumen arriba y «¿cuándo?» pegado a los botones (al alcance del pulgar), sin hueco muerto en medio.
   const pasoPublicar = (
     <>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain p-3">
         {pub.fase === "hecha" ? (
-          <div className="flex flex-col items-center gap-3 py-6 text-center" role="status">
-            <CheckCircle2 className="h-16 w-16 text-green-700" aria-hidden="true" />
+          <div className="my-auto flex flex-col items-center gap-3 py-2 text-center" role="status">
+            {portada ? (
+              <div className="relative aspect-[4/5] w-2/5 overflow-hidden rounded-lg bg-muted">
+                <img src={portada.url} alt="" className="h-full w-full object-cover" />
+                <CheckCircle2 className="absolute bottom-2 right-2 h-10 w-10 rounded-full bg-white text-green-700" aria-hidden="true" />
+              </div>
+            ) : (
+              <CheckCircle2 className="h-16 w-16 text-green-700" aria-hidden="true" />
+            )}
             <p className="text-2xl font-semibold">{pub.resultado.estado === "publicada" ? "¡Publicada!" : "Programada"}</p>
             {pub.resultado.estado === "programada" && pub.resultado.programadaPara && (
               <p className="text-base">
@@ -807,32 +858,53 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
             )}
           </div>
         ) : trabajando ? (
-          <div className="flex min-h-72 flex-col items-center justify-center gap-4 text-center" role="status" aria-live="polite">
-            <Loader2 className="h-12 w-12 animate-spin text-primary" aria-hidden="true" />
-            <p className="text-lg font-semibold">{progresoTexto(pub.progreso, pub.cuando)}</p>
+          <div className="my-auto flex flex-col items-center justify-center gap-4 py-2 text-center" role="status" aria-live="polite">
+            {portada ? (
+              <div className="relative aspect-[4/5] w-1/2 overflow-hidden rounded-lg bg-muted">
+                <img src={portada.url} alt="" className="h-full w-full object-cover" />
+                <span aria-hidden="true" className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/50 to-transparent motion-safe:animate-brillo motion-reduce:hidden" />
+              </div>
+            ) : null}
+            <p className="flex items-center gap-2 text-lg font-semibold">
+              <Loader2 className="h-6 w-6 shrink-0 text-primary motion-safe:animate-spin" aria-hidden="true" />
+              {progresoTexto(pub.progreso, pub.cuando)}
+            </p>
             {pub.progreso?.fase === "preparando" && <Progress value={(pub.progreso.hechas / pub.progreso.total) * 100} className="h-3 w-full max-w-xs" aria-label="Imágenes preparadas" />}
             <p className="text-sm text-muted-foreground">No cierres esta pantalla.</p>
           </div>
         ) : (
           <>
             {montaje && (
-              <div className="flex items-center gap-3">
-                {portada && <img src={portada.url} alt="" className="h-20 w-16 shrink-0 rounded-md object-cover" />}
+              <div className="flex items-start gap-3" data-testid="resumen-publicar">
+                {portada && <img src={portada.url} alt="" className="aspect-[4/5] w-28 shrink-0 rounded-lg bg-muted object-cover" />}
                 <div className="min-w-0">
                   <p className="font-semibold">
                     {montaje.formato === "carrusel" ? `Carrusel de ${montaje.diapositivas.length} fotos` : montaje.formato === "story" ? "Story" : "Post de 1 foto"} · {nombreMarca}
                   </p>
-                  <p className="line-clamp-2 text-sm text-muted-foreground">{caption}</p>
+                  <p className="line-clamp-5 text-sm text-muted-foreground">{caption}</p>
                 </div>
               </div>
+            )}
+            {montaje && montaje.diapositivas.length > 1 && (
+              <ol className="grid grid-cols-5 gap-1.5" aria-label="Orden del carrusel" data-testid="tira-publicar">
+                {montaje.diapositivas.slice(1).map((d, i) => {
+                  const f = fotosSubidasParaPrevia.find((x) => x.id === d.foto);
+                  return (
+                    <li key={`${d.foto}-${i}`} className="relative aspect-[4/5] overflow-hidden rounded-md bg-muted">
+                      {f && <img src={f.url} alt="" className="h-full w-full object-cover" />}
+                      <span className="absolute bottom-0.5 left-0.5 rounded bg-black/70 px-1 text-sm font-semibold leading-tight text-white">{i + 2}</span>
+                    </li>
+                  );
+                })}
+              </ol>
             )}
             {pub.fase === "error" && (
               <p role="alert" className="rounded-md bg-destructive/10 p-3 text-base text-destructive">
                 {pub.mensaje}
               </p>
             )}
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Si la programas, ¿cuándo?</legend>
+            <fieldset className="mt-auto space-y-2">
+              <legend className="mb-2 text-sm font-medium">Si la programas, ¿cuándo?</legend>
               <div className="grid grid-cols-3 gap-2">
                 {(
                   [
@@ -935,7 +1007,7 @@ export function CrearMovil({ servicios: inyectados, simulado = false, incrustado
 
   return (
     <div
-      className={cn(incrustado ? "flex h-full min-h-[32rem] flex-col bg-background" : "fixed inset-0 z-50 flex h-[100dvh] flex-col bg-background")}
+      className={cn(incrustado ? "flex h-full min-h-0 flex-1 flex-col bg-background" : "fixed inset-0 z-50 flex h-[100dvh] flex-col bg-background")}
       data-testid="crear-movil"
       aria-busy={trabajando || !!montando}
     >

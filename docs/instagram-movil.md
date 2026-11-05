@@ -13,6 +13,21 @@ completa, pensado para 375×812 y una mano (botones abajo, 48 px o más).
 - **Código:** `src/components/instagram/movil/` (`CrearMovil.tsx` y sus piezas),
   `src/pages/InstagramRapido.tsx`. Pruebas en `__tests__/` (sin red ni IA).
 
+## Espacio en la pestaña «Crear» del móvil (05/11/2026)
+
+Con el asistente a la vista (< 768 px) la página le deja todo el alto: sin la
+fila «Las dos / CT / TZ · @cuenta» (el asistente tiene su selector y la cuenta
+es el punto de color de su cabecera, `IndicadorCuenta compacto`), pestañas solo
+con iconos (`PestanasPagina soloIconosEnMovil`, la etiqueta queda como nombre
+accesible) y el asistente de borde a borde hasta abajo, con los botones fijos
+dentro de la zona segura. Cabecera de una línea: «Paso 2/3 · Montar con IA» con
+la barra de progreso. En el paso 1, «Editor completo» y «Pantalla completa»
+(abre `/instagram/rapido`). Mientras la IA trabaja se ven las fotos elegidas en
+gris con un brillo (quieto con «reducir movimiento»), los pasos y «Lo que me
+has contado» (`MontandoPrevia.tsx`). Capturas y comprobaciones (sin scroll
+horizontal, botón principal a la vista, textos ≥ 14 px) a 360×740, 375×812 y
+390×844: `tests/e2e-movil/instagram-movil.capturas.mjs`.
+
 ## Los tres pasos
 
 1. **Fotos.** «Hacer fotos o elegir del carrete» (`<input type="file"

@@ -168,7 +168,7 @@ export function EncargosInstagram({ className, onAbrirPieza, encargoInicial = nu
             </Button>
           )}
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex min-w-0 gap-2">
           {"ok" in pushDisponible() && (
             <Button type="button" size="sm" variant="ghost" onClick={() => void avisarme()} title="Recibe un aviso en este dispositivo en cada cambio">
               <Bell className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -176,9 +176,11 @@ export function EncargosInstagram({ className, onAbrirPieza, encargoInicial = nu
             </Button>
           )}
           {roles.restaurante && (
-            <Button type="button" size="sm" onClick={() => setFormulario({ abierto: true, inicial: null, datos: null })}>
+            <Button type="button" size="sm" aria-label="Pedir un vídeo o una pieza" onClick={() => setFormulario({ abierto: true, inicial: null, datos: null })}>
               <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
-              Pedir un vídeo o una pieza
+              {/* En el móvil el texto largo no cabe junto a «Avisarme» (se salía por la derecha). */}
+              <span className="sm:hidden">Pedir encargo</span>
+              <span className="hidden sm:inline">Pedir un vídeo o una pieza</span>
             </Button>
           )}
         </div>

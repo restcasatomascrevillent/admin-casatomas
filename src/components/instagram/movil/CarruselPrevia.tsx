@@ -83,12 +83,13 @@ export function CarruselPrevia({ marca, formato, diapositivas, fotos, className 
         onScroll={alDeslizar}
         className={cn(
           "flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          total > 1 ? "gap-2 px-[7%]" : "justify-center",
+          // 80 %: en un móvil de 360–390 px la imagen y el principio de «lo que ha entendido la IA» caben juntos.
+          total > 1 ? "gap-2 px-[10%]" : "justify-center",
         )}
         data-testid="carrusel-previa"
       >
         {diapositivas.map((d, i) => (
-          <div key={`${d.foto}-${i}`} className={cn("shrink-0 snap-center", total > 1 ? "w-[86%]" : "w-[92%]")} role="group" aria-roledescription="imagen" aria-label={`Imagen ${i + 1} de ${total}`}>
+          <div key={`${d.foto}-${i}`} className="w-[80%] shrink-0 snap-center" role="group" aria-roledescription="imagen" aria-label={`Imagen ${i + 1} de ${total}`}>
             <Diapositiva documento={documentos[i]} foto={porId.get(d.foto)} formato={formato} titulo={`Imagen ${i + 1} de ${total}`} pintar={Math.abs(i - actual) <= 1} />
           </div>
         ))}

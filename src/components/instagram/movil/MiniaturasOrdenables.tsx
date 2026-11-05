@@ -46,7 +46,7 @@ function Miniatura({ foto, indice, total, seleccionada, onSeleccionar, onQuitar 
         )}
       >
         {foto.vista ? <img src={foto.vista} alt="" draggable={false} className="h-full w-full select-none object-cover" /> : null}
-        <span className="absolute left-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-xs font-semibold text-white">{indice === 0 ? "1 · Portada" : indice + 1}</span>
+        <span className="absolute left-1 top-1 rounded-full bg-black/70 px-2 py-0.5 text-sm font-semibold text-white">{indice === 0 ? "1 · Portada" : indice + 1}</span>
         <span className="absolute bottom-1 left-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/70 text-white" aria-hidden="true">
           {foto.estado === "subida" ? (
             <Check className="h-4 w-4" />

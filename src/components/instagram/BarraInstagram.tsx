@@ -56,7 +56,11 @@ export function textoIndicador(c: { estado: { ok: boolean; cuenta: { username: s
 
 const COLOR_PUNTO = { ok: "bg-[#117e39]", aviso: "bg-[#e7b008]", mal: "bg-red-600", gris: "bg-muted-foreground/60" } as const;
 
-export function IndicadorCuenta({ marca, className }: { marca: FiltroMarca; className?: string }) {
+/**
+ * `compacto`: solo el punto de color (botón de 44 px, el texto queda como nombre accesible y en el `title`). Para la
+ * cabecera del asistente móvil, donde no cabe «@cuenta».
+ */
+export function IndicadorCuenta({ marca, className, compacto = false }: { marca: FiltroMarca; className?: string; compacto?: boolean }) {
   const conexion = useConexionInstagram();
   const [abierto, setAbierto] = useState(false);
   const { texto, tono } = textoIndicador(conexion, marca);
@@ -66,15 +70,18 @@ export function IndicadorCuenta({ marca, className }: { marca: FiltroMarca; clas
         type="button"
         onClick={() => setAbierto(true)}
         className={cn(
-          "inline-flex h-8 max-w-[11rem] shrink-0 items-center gap-1.5 rounded-full px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-11",
+          compacto
+            ? "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            : "inline-flex h-8 max-w-[11rem] shrink-0 items-center gap-1.5 rounded-full px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:h-11",
           className,
         )}
+        title={compacto ? texto : undefined}
         aria-label={`Cuenta de Instagram: ${texto}. Ver la conexión`}
         data-testid="indicador-cuenta"
         data-tono={tono}
       >
-        <i aria-hidden="true" className={cn("h-2 w-2 shrink-0 rounded-full", COLOR_PUNTO[tono])} />
-        <span className="truncate">{texto}</span>
+        <i aria-hidden="true" className={cn("shrink-0 rounded-full", compacto ? "h-2.5 w-2.5" : "h-2 w-2", COLOR_PUNTO[tono])} />
+        {!compacto && <span className="truncate">{texto}</span>}
       </button>
       <Dialog open={abierto} onOpenChange={setAbierto}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
