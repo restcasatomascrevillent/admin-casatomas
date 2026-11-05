@@ -86,6 +86,8 @@ jobs:
         run: npm run test:instagram-metricas:db
       - name: Instagram, estado de publicación solo por el servidor, cerrojo, texto alternativo y limpieza del bucket (PGlite)
         run: npm run test:instagram-servidor:db
+      - name: IA de textos de Instagram, guías de marca y sugerencias (PGlite)
+        run: npm run test:instagram-ia:db
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
         run: npx vitest run api/
         env:
