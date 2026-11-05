@@ -10,7 +10,7 @@
 import { forwardRef, type ReactNode } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useNavigate } from "react-router-dom";
 import type { FilaGastoIa } from "@/lib/facturas/gastoIa";
 
 vi.mock("@/components/DashboardLayout", () => ({
@@ -29,9 +29,10 @@ vi.mock("@/components/facturas/compras/TabCompras", () => ({
 // El tablero de Análisis (con sus propios tests) se sustituye por un marcador con
 // un botón que abre un enlace, como hacen sus meses y proveedores.
 vi.mock("@/components/facturas/ChatFacturas", () => ({
-  ChatFacturas: forwardRef(({ onIrA }: { onIrA?: (e: string) => void }, _ref) => (
+  ChatFacturas: forwardRef(({ onIrA, activa }: { onIrA?: (e: string) => void; activa?: boolean }, _ref) => (
     <div>
       <p>Contenido del chat</p>
+      <p data-testid="chat-activa">{activa ? "activa" : "oculta"}</p>
       <button type="button" onClick={() => onIrA?.("?tab=compras&modo=documentos&mes=2026-07")}>
         Julio en Compras
       </button>
@@ -76,9 +77,19 @@ function conLayout(alto: number) {
     top: 24, bottom: 124, left: 0, right: 100, width: 100, height: 100, x: 0, y: 24, toJSON: () => ({}),
   } as DOMRect);
 }
+/** Botón «Atrás» del navegador, de mentira. */
+function Atras() {
+  const navegar = useNavigate();
+  return (
+    <button type="button" onClick={() => navegar(-1)}>
+      Atrás del navegador
+    </button>
+  );
+}
 function montar(ruta = "/facturas") {
   return render(
     <MemoryRouter initialEntries={[ruta]}>
+      <Atras />
       <Facturas />
     </MemoryRouter>,
   );
@@ -154,6 +165,36 @@ describe("Facturas · pestañas", () => {
     fireEvent.click(screen.getByRole("button", { name: "Julio en Compras" }));
     expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: documentos · mes 2026-07");
+  });
+
+  it("«Atrás» tras abrir un mes en Compras vuelve a Análisis (aunque la URL no lleve ?tab=)", () => {
+    montar("/facturas");
+    fireEvent.click(screen.getByRole("button", { name: "Julio en Compras" }));
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Atrás del navegador" }));
+    expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("chat-activa")).toHaveTextContent("activa");
+  });
+
+  it("Análisis sigue montada al ir a Compras (explorador, copiloto y conversación no se pierden) y sabe que no se ve", () => {
+    montar("/facturas");
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Compras/ }), { button: 0 });
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
+    expect(screen.getByTestId("chat-activa")).toHaveTextContent("oculta");
+  });
+
+  it("entrar por Compras no monta Análisis (no pide su tablero) hasta que se visita", () => {
+    montar("/facturas?tab=compras");
+    expect(screen.queryByText("Contenido del chat")).not.toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Análisis/ }), { button: 0 });
+    expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
+  });
+
+  it("en el móvil las pestañas van solo con icono (a 390 px el gasto de IA tapaba «Cargar»)", () => {
+    montar();
+    for (const p of within(screen.getByRole("tablist")).getAllByRole("tab")) expect(p.className).toContain("min-w-11");
+    expect(screen.getByRole("tab", { name: /^Cargar/ })).toHaveAccessibleName(/Cargar/);
   });
 
   it("?tab=documentos también lleva a Compras", () => {

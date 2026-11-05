@@ -49,11 +49,11 @@ export function LoQueMasHaSubido({ subidas, acciones }: { subidas: TableroCompra
               <FilaConMenu
                 className={FILA}
                 acciones={acciones(p)}
-                nombre={`${p.producto} (${p.proveedor}): de ${formatCurrency(p.precio_inicio)} a ${formatCurrency(p.precio_fin)} el ${p.unidad}, ${textoPct(p.variacion_pct)}. Opciones`}
+                nombre={`${p.producto} (${p.proveedor}): de ${formatCurrency(p.precio_inicio)} a ${formatCurrency(p.precio_fin)} por ${p.unidad}, ${textoPct(p.variacion_pct)}. Opciones`}
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{p.producto}</span>
-                  <span className="block truncate text-xs text-muted-foreground">
+                  <span className="line-clamp-2 break-words text-sm">{p.producto}</span>
+                  <span className="line-clamp-2 break-words text-xs text-muted-foreground">
                     {nombreCorto(p.proveedor)} · {formatCurrency(p.precio_inicio)} → {formatCurrency(p.precio_fin)}/{p.unidad}
                   </span>
                 </span>
@@ -123,7 +123,7 @@ export function GastoPorFamilia({
             <li key={f.id ?? f.familia} className="text-sm">
               <FilaConMenu nombre={`${f.familia}: ${formatCurrency(f.importe)} sin IVA. Opciones`} acciones={acciones(f)} className={FILA_BARRA}>
                 <span className="flex w-full items-baseline gap-2">
-                  <span className="min-w-0 flex-1 truncate">{f.familia}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1 break-words">{f.familia}</span>
                   <span className="shrink-0 tabular-nums">{formatCurrency(f.importe)}</span>
                 </span>
                 <span className="block h-1.5 w-full rounded-full bg-muted/60" aria-hidden>
@@ -183,7 +183,8 @@ export function GastosFijos({ fijos, acciones }: { fijos: TableroCompras["fijos"
                   title={f.nombre}
                   nombre={`${f.nombre}: ${formatCurrency(f.medio_mes)} al mes de media, ${f.meses} de ${f.meses_con_datos} meses. Opciones`}
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm">{nombreCorto(f.nombre)}</span>
+                  {/* En táctil no hay `title`: el nombre en dos líneas, no cortado (QA 05/11/2026). */}
+                  <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm">{nombreCorto(f.nombre)}</span>
                   <span className="shrink-0 text-sm tabular-nums">{formatCurrency(f.medio_mes)}</span>
                   <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">/mes</span>
                 </FilaConMenu>
@@ -224,7 +225,7 @@ export function AbonosPorProveedor({ abonos, acciones }: { abonos: AbonoProveedo
                 title={a.nombre}
                 nombre={`${a.nombre}: ${formatImporte(a.importe)} en ${plural(a.documentos, "abono", "abonos")}. Opciones`}
               >
-                <span className="min-w-0 flex-1 truncate text-sm">{nombreCorto(a.nombre)}</span>
+                <span className="line-clamp-2 min-w-0 flex-1 break-words text-sm">{nombreCorto(a.nombre)}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{plural(a.documentos, "doc.", "docs.")}</span>
                 <span className="w-24 shrink-0 text-right text-sm tabular-nums">{formatImporte(a.importe)}</span>
               </FilaConMenu>
@@ -249,7 +250,8 @@ export function CasaTomasYTouza({
   onVer,
 }: {
   locales: TableroCompras["locales"];
-  onVer: (local: "casa_tomas" | "touza", gasto: number) => void;
+  /** Sin `onVer` (cargando otro periodo) los dos bloques no se pueden tocar. */
+  onVer?: (local: "casa_tomas" | "touza", gasto: number) => void;
 }) {
   const ct = locales.casaTomas.gasto;
   const tz = locales.touza.gasto;
@@ -278,7 +280,12 @@ export function CasaTomasYTouza({
           <ul className="grid grid-cols-2 gap-2 text-sm">
             {bloques.map((b) => (
               <li key={b.clave}>
-                <button type="button" onClick={() => onVer(b.clave, b.gasto)} className={cn("group flex min-h-11 w-full flex-col rounded-md px-1.5 py-1 text-left hover:bg-muted/50", FOCO)}>
+                <button
+                  type="button"
+                  onClick={() => onVer?.(b.clave, b.gasto)}
+                  disabled={!onVer}
+                  className={cn("group flex min-h-11 w-full flex-col rounded-md px-1.5 py-1 text-left hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent", FOCO)}
+                >
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span className={cn("h-2.5 w-2.5 rounded-sm", b.color)} aria-hidden /> {b.nombre}
                     <ChevronRight className="h-3 w-3 opacity-60" aria-hidden />

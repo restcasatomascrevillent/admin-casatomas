@@ -127,13 +127,13 @@ function Grafico({ serie, alto }: { serie: SeriePrecio; alto: number }) {
               }}
               tickFormatter={fechaCorta}
               stroke="hsl(var(--muted-foreground))"
-              fontSize={11}
+              fontSize={12}
               tickMargin={6}
               minTickGap={24}
             />
             <YAxis
               stroke="hsl(var(--muted-foreground))"
-              fontSize={11}
+              fontSize={12}
               width={52}
               domain={["auto", "auto"]}
               tickFormatter={(v: number) => formatNumeroEs(v, 2, 0)}
@@ -141,7 +141,7 @@ function Grafico({ serie, alto }: { serie: SeriePrecio; alto: number }) {
                 value: serie.unidad ? `€/${serie.unidad}` : "€",
                 angle: -90,
                 position: "insideLeft",
-                style: { textAnchor: "middle", fill: "hsl(var(--muted-foreground))", fontSize: 11 },
+                style: { textAnchor: "middle", fill: "hsl(var(--muted-foreground))", fontSize: 12 },
               }}
             />
             <Tooltip content={<TooltipSerie unidad={serie.unidad} />} />

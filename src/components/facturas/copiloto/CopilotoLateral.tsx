@@ -4,6 +4,7 @@
 //
 // No es modal: el tablero sigue a la vista y se puede tocar con el panel
 // abierto (tocar fuera no lo cierra; se cierra con «Cerrar» o Escape).
+import { useRef } from "react";
 import { ArrowLeft, History, X } from "lucide-react";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ import type { Conversacion, MensajeChat } from "@/hooks/useChatFacturas";
 import type { GraficaIa } from "@/lib/facturas/graficasCopiloto";
 import { ConversacionesList } from "../ConversacionesList";
 import { PanelCopiloto } from "./PanelCopiloto";
+import { esTactil, useFocoAlCerrar } from "../analisis/desplazar";
 
 const BOTON = cn(
   "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -51,9 +53,23 @@ export function CopilotoLateral({
   onEliminarConversacion,
   ...panel
 }: Props) {
+  const contenido = useRef<HTMLDivElement>(null);
+  // Al cerrar, el foco vuelve a «Pregúntale a la IA» (o a lo que lo abrió).
+  const focoAlCerrar = useFocoAlCerrar(abierto);
   return (
     <Sheet open={abierto} onOpenChange={onAbiertoCambia} modal={false}>
       <SheetContent
+        ref={contenido}
+        // Al abrir, a escribir: el foco va a la caja de la pregunta. Con el dedo
+        // no (abriría el teclado encima de las sugerencias): se queda en el panel.
+        onOpenAutoFocus={(e) => {
+          if (esTactil()) return;
+          const caja = contenido.current?.querySelector<HTMLTextAreaElement>("textarea:not([disabled])");
+          if (!caja) return;
+          e.preventDefault();
+          caja.focus({ preventScroll: true });
+        }}
+        onCloseAutoFocus={focoAlCerrar}
         side="right"
         // Sin la X de serie (la cabecera ya trae «Cerrar» a 44 px) y sin padding: el hilo va a sangre.
         className="flex w-full max-w-none flex-col gap-0 p-0 sm:w-[360px] sm:max-w-[360px] [&>button.absolute]:hidden"

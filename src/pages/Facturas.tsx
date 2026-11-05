@@ -39,11 +39,11 @@ const Facturas = () => {
   // llevan directos a la pestaña «Cargar», también si ya estabas en Facturas.
   const [searchParams, setSearchParams] = useSearchParams();
   const { key: claveNavegacion } = useLocation();
-  const tabUrl = pestanaDeUrl(searchParams.get("tab"));
-  // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`), Compras.
-  const [activeTab, setActiveTab] = useState<string>(
-    () => tabUrl ?? (["modo", "doc", "mes", "prov"].some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL),
-  );
+  // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`), Compras; si no, Análisis.
+  // También al volver con «Atrás» a una URL sin `?tab=` (QA 05/11/2026: se quedaba en Compras).
+  const tabUrl =
+    pestanaDeUrl(searchParams.get("tab")) ?? (["modo", "doc", "mes", "prov"].some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL);
+  const [activeTab, setActiveTab] = useState<string>(tabUrl);
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
   // Desde Análisis: `&mes=YYYY-MM` (Documentos de ese mes) y `&prov=<id>` (ese proveedor desplegado).
@@ -51,7 +51,7 @@ const Facturas = () => {
     const modoUrl = MODOS_COMPRAS.find((m) => m.valor === searchParams.get("modo"))?.valor;
     const docNum = Number(searchParams.get("doc"));
     const doc = Number.isInteger(docNum) && docNum > 0 ? docNum : undefined;
-    const { mes, prov } = leerEnlaceCompras(searchParams);
+    const { mes, prov, local } = leerEnlaceCompras(searchParams);
     const modo: ModoCompras | undefined =
       searchParams.get("tab") === "productos" ? "productos" : (modoUrl ?? (doc || mes ? "documentos" : prov ? "proveedores" : undefined));
     return modo
@@ -61,11 +61,13 @@ const Facturas = () => {
           doc: modo === "documentos" ? doc : undefined,
           mes: modo === "documentos" ? mes : undefined,
           prov: modo === "proveedores" ? prov : undefined,
+          // El local de Análisis (un mes de Touza abre Compras en Touza cuando Compras lo lea).
+          local,
         }
       : undefined;
   }, [searchParams, claveNavegacion]);
   useEffect(() => {
-    if (tabUrl) setActiveTab(tabUrl);
+    setActiveTab(tabUrl);
     // `claveNavegacion`: volver a tocar el indicador estando ya en esta URL
     // (pero en otra pestaña) también vuelve a «Cargar».
   }, [tabUrl, claveNavegacion]);
@@ -101,10 +103,14 @@ const Facturas = () => {
   // Contadores para los badges de las pestañas
   // Un `count` de cabeceras: entrar por «Análisis» no descarga la lista de Compras.
   const { data: totalDocumentos = 0 } = useContadorDocumentos();
-  // Compras se monta la primera vez que se visita (y luego se queda montada).
+  // Compras y Análisis se montan la primera vez que se visitan (y luego se quedan
+  // montadas): entrar por una no descarga la otra, y al volver siguen como estaban
+  // (Análisis: el explorador, el copiloto abierto y la conversación; QA 05/11/2026).
   const [comprasMontada, setComprasMontada] = useState(activeTab === "compras");
+  const [analisisMontada, setAnalisisMontada] = useState(activeTab === "chat");
   useEffect(() => {
     if (activeTab === "compras") setComprasMontada(true);
+    if (activeTab === "chat") setAnalisisMontada(true);
   }, [activeTab]);
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
@@ -140,6 +146,8 @@ const Facturas = () => {
           {/* Botonera de navegación superior (pieza común PestanasPagina). El gasto del chatbot este mes va aparte,
               a la derecha, para que no parezca una pestaña más; abre su desglose al tocarlo. */}
           <PestanasPagina
+            // En el móvil, solo iconos: a 390 px el gasto de IA tapaba «Cargar» (QA 05/11/2026).
+            soloIconosEnMovil
             pestanas={[
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
@@ -167,9 +175,9 @@ const Facturas = () => {
 
             {/* PESTAÑA ANÁLISIS: tablero de gráficas fijas y copiloto de IA plegado
                 (ChatFacturas). El gasto de IA va junto a la pestaña (GastoIaPestana). */}
-            <TabsContent value="chat" className="h-full m-0 outline-none data-[state=inactive]:hidden">
+            <TabsContent value="chat" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="h-full min-h-0 overflow-hidden">
-                <ChatFacturas ref={chatRef} onIrA={irA} />
+                {(analisisMontada || activeTab === "chat") && <ChatFacturas ref={chatRef} onIrA={irA} activa={activeTab === "chat"} />}
               </div>
             </TabsContent>
 

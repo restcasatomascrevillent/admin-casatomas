@@ -43,12 +43,23 @@ export function useValorRetrasado<T>(valor: T, ms = 250): T {
   return retrasado;
 }
 
+/**
+ * La gráfica del explorador. Además de lo de react-query, `alDia`: los datos
+ * son de los parámetros de AHORA (ni están en los 250 ms de espera ni son los
+ * anteriores que se enseñan mientras llegan los nuevos). Si no lo están, sus
+ * cifras no se pueden tocar: sus documentos serían de otra consulta.
+ */
 export function useExplorarCompras(params: ParametrosExplorar, opciones: { retraso?: number; activo?: boolean } = {}) {
   const clave = JSON.stringify(params);
   const claveRetrasada = useValorRetrasado(clave, opciones.retraso ?? 250);
+  const q = useQueryExplorar(claveRetrasada, opciones.activo ?? true);
+  return Object.assign(q, { alDia: clave === claveRetrasada && !q.isPlaceholderData });
+}
+
+function useQueryExplorar(claveRetrasada: string, activo: boolean) {
   return useQuery({
     queryKey: ["explorar-compras", claveRetrasada],
-    enabled: opciones.activo ?? true,
+    enabled: activo,
     staleTime: 5 * 60_000,
     placeholderData: keepPreviousData,
     retry: (n, e) => !(e instanceof Error && e.message === TEXTO_EXPLORADOR_SIN_MIGRACION) && n < 1,

@@ -138,6 +138,12 @@ export interface GastoFijo {
   meses: number;
   meses_con_datos: number;
   documentos: number;
+  /**
+   * Primer y último día de los meses que entran en SU media (`desde_media` /
+   * `hasta_media` de la RPC, si los da): «Ver documentos» pide solo esos.
+   */
+  desdeMedia: string | null;
+  hastaMedia: string | null;
 }
 export interface AbonoProveedor {
   id: number | null;
@@ -202,6 +208,8 @@ const idONulo = (v: unknown): number | null => {
   const n = Number(v);
   return v != null && Number.isInteger(n) && n > 0 ? n : null;
 };
+/** `YYYY-MM-DD` (o el principio de un timestamp) o null. */
+const fechaONula = (v: unknown): string | null => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);
 const tramo = (v: unknown): Tramo | null => {
   const o = obj(v);
   return typeof o.desde === "string" && typeof o.hasta === "string" ? { desde: o.desde, hasta: o.hasta } : null;
@@ -292,6 +300,8 @@ export function normalizarTablero(entrada: unknown): TableroCompras {
         meses: num(x.meses),
         meses_con_datos: num(x.meses_con_datos),
         documentos: num(x.documentos),
+        desdeMedia: fechaONula(x.desde_media),
+        hastaMedia: fechaONula(x.hasta_media),
       })),
       totalMedioMes: num(fi.total_medio_mes),
       ventana: typeof v.desde === "string" && typeof v.hasta === "string" ? { desde: v.desde, hasta: v.hasta, mesesConDatos: num(v.meses_con_datos) } : null,
@@ -412,20 +422,23 @@ export function resumenProveedores(p: ProveedorGasto[]): string {
 
 // ─── Enlaces a Compras ──────────────────────────────────────────────────────
 
-/** Compras › Documentos con solo ese mes. */
-export const enlaceMesCompras = (mes: string) => `?tab=compras&modo=documentos&mes=${encodeURIComponent(mes)}`;
+/** Compras › Documentos con solo ese mes (y el local de Análisis, si hay uno elegido). */
+export const enlaceMesCompras = (mes: string, local?: "casa_tomas" | "touza" | null) =>
+  `?tab=compras&modo=documentos&mes=${encodeURIComponent(mes)}${local ? `&local=${local}` : ""}`;
 /** Compras › Proveedores con ese proveedor desplegado. */
 export const enlaceProveedorCompras = (id: number) => `?tab=compras&modo=proveedores&prov=${id}`;
 /** Compras › Productos (allí está «Clasificar con IA»). */
 export const ENLACE_PRODUCTOS_COMPRAS = "?tab=compras&modo=productos";
 
 /** Lee de la URL lo que piden esos enlaces (`mes` YYYY-MM y `prov` entero > 0). */
-export function leerEnlaceCompras(p: URLSearchParams): { mes?: string; prov?: number } {
+export function leerEnlaceCompras(p: URLSearchParams): { mes?: string; prov?: number; local?: "casa_tomas" | "touza" } {
   const mes = p.get("mes");
   const prov = Number(p.get("prov"));
+  const local = p.get("local");
   return {
     ...(mes && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes) ? { mes } : {}),
     ...(Number.isInteger(prov) && prov > 0 ? { prov } : {}),
+    ...(local === "casa_tomas" || local === "touza" ? { local } : {}),
   };
 }
 
@@ -444,7 +457,9 @@ export function sugerenciasDeTablero(t: TableroCompras | null | undefined, perio
     const dif = meses[i].total - meses[i - 1].total;
     if (dif > 0 && (!subida || dif > subida.dif)) subida = { mes: meses[i].mes, dif };
   }
-  if (subida) salida.push(`¿Por qué subió el gasto en ${nombreMes(subida.mes)}?`);
+  // Con «Todo» (o meses de varios años) el mes va con su año: «julio de 2025».
+  const variosAnios = periodo === "todo" || new Set(meses.map((m) => m.mes.slice(0, 4))).size > 1;
+  if (subida) salida.push(`¿Por qué subió el gasto en ${nombreMes(subida.mes)}${variosAnios ? ` de ${subida.mes.slice(0, 4)}` : ""}?`);
   const producto = t?.subidas.productos[0];
   if (producto) salida.push(`Compara el precio de ${producto.producto.toLowerCase()} entre proveedores`);
   const prov = t?.proveedores[0];

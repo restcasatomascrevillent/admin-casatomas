@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRef, type ReactNode } from "react";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from "react-router-dom";
 
 const doble = vi.hoisted(() => {
   const rpcs: Record<string, (a: Record<string, unknown>) => unknown> = {};
@@ -111,10 +111,11 @@ const TABLERO = {
   locales: { casa_tomas: { gasto: 1333190.24, documentos: 1857 }, touza: { gasto: 29301.33, documentos: 27 }, meses: [] },
 };
 
-const ubicacion = { actual: "" };
+const ubicacion = { actual: "", navegar: null as NavigateFunction | null };
 function Ubicacion() {
   const l = useLocation();
   ubicacion.actual = l.search;
+  ubicacion.navegar = useNavigate();
   return null;
 }
 
@@ -146,7 +147,7 @@ const DOCUMENTOS = {
 };
 const llamadas = (fn: string) => doble.rpc.mock.calls.filter((c) => c[0] === fn).map((c) => c[1]);
 
-function montar(props: { onIrA?: (e: string) => void } = {}, url = "/facturas?tab=chat") {
+function montar(props: { onIrA?: (e: string) => void; activa?: boolean } = {}, url = "/facturas?tab=chat") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ref = createRef<ChatFacturasRef>();
   const envoltorio = ({ children }: { children: ReactNode }) => (
@@ -257,15 +258,15 @@ describe("tablero: menús de las filas", () => {
     montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
     fireEvent.click(screen.getByRole("button", { name: /^PROVEEDOR 1, S\.L\.: 9\.000,00\s€/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Abrir en Compras" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=300");
-    await waitFor(() => expect(screen.queryByRole("menuitem")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     fireEvent.click(within(screen.getByRole("region", { name: "Abonos por proveedor" })).getByRole("button", { name: /CATRAL/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Abrir en Compras" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir en Compras" }));
     expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=proveedores&prov=377");
-    await waitFor(() => expect(screen.queryByRole("menuitem")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: /^PROVEEDOR 2, S\.L\./ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Ver su gasto por mes" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver su gasto por mes" }));
     await waitFor(() =>
       expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "gasto", p_agrupar: "mes", p_filtros: { proveedores: [301] } })),
     );
@@ -276,7 +277,7 @@ describe("tablero: menús de las filas", () => {
     const subidas = await screen.findByRole("region", { name: "Lo que más ha subido" });
     expect(subidas).toHaveTextContent(/mismo proveedor, 12 ene – 11 abr vs 9 jul – 6 oct/);
     fireEvent.click(within(subidas).getByRole("button", { name: /^PAN DE CRISTAL/ }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: "Ver su precio en el explorador" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver su precio en el explorador" }));
     await waitFor(() =>
       expect(llamadas("explorar_compras")).toContainEqual(
         expect.objectContaining({ p_medida: "precio", p_agrupar: "mes", p_desglose: "proveedor", p_filtros: { productos: ["PAN DE CRISTAL"], unidad: "ud" } }),
@@ -550,5 +551,193 @@ describe("adjuntos del chatbot (se guardan con el mensaje)", () => {
     });
     expect(result.current.mensajes[0].adjuntos).toEqual([]);
     expect(result.current.mensajes[1].adjuntos?.[0].tipo).toBe("serie_precio");
+  });
+});
+
+// ─── Arreglos de la QA del 05/11/2026 ───────────────────────────────────────
+
+describe("QA 05/11/2026: página, URL y pestañas", () => {
+  it("el tablero es `relative`: los resúmenes `sr-only` (absolute) no alargan la página", async () => {
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    await within(tablero()).findByText("308.808,70 €");
+    const t = tablero();
+    expect(t).toHaveClass("relative", "overflow-y-auto");
+    const ocultos = [...t.querySelectorAll<HTMLElement>(".sr-only")];
+    expect(ocultos.length).toBeGreaterThan(5);
+    // Cada uno tiene un antepasado posicionado DENTRO del tablero (el propio tablero cuenta).
+    for (const el of ocultos) {
+      const posicionado = el.parentElement?.closest(".relative");
+      expect(posicionado && t.contains(posicionado)).toBe(true);
+    }
+  });
+
+  it("ir a Compras no le reescribe el periodo en la URL (F21) y «Atrás» vuelve al mismo periodo", async () => {
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    // Al montar no se toca la URL.
+    expect(ubicacion.actual).toBe("?tab=chat");
+    fireEvent.click(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Mes" }));
+    await waitFor(() => expect(ubicacion.actual).toBe("?tab=chat&desde=2026-11-01&hasta=2026-11-30"));
+    act(() => ubicacion.navegar?.("/facturas?tab=compras&modo=documentos&mes=2026-07"));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+    });
+    expect(ubicacion.actual).toBe("?tab=compras&modo=documentos&mes=2026-07");
+    act(() => ubicacion.navegar?.(-1));
+    await waitFor(() => expect(ubicacion.actual).toBe("?tab=chat&desde=2026-11-01&hasta=2026-11-30"));
+    expect(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Mes" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("montada en otra pestaña (activa=false) el copiloto se esconde y, al volver, sigue abierto", async () => {
+    const { rerender, ref } = montar();
+    await screen.findByText("1.362.491,57 €");
+    fireEvent.click(screen.getByRole("button", { name: /pregúntale a la ia/i }));
+    expect(panel()).toBeInTheDocument();
+    rerender(<ChatFacturas ref={ref} activa={false} />);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    rerender(<ChatFacturas ref={ref} activa />);
+    expect(await screen.findByRole("dialog", { name: "Pregúntale a la IA" })).toBeInTheDocument();
+  });
+
+  it("con el copiloto abierto el contenido le deja sitio a la derecha (≥ lg) y el botón IA va junto al local", async () => {
+    const { container } = montar();
+    await screen.findByText("1.362.491,57 €");
+    const raiz = container.firstElementChild as HTMLElement;
+    expect(raiz.className).not.toContain("lg:pr-[360px]");
+    const boton = screen.getByRole("button", { name: /pregúntale a la ia/i });
+    expect(boton.parentElement).toBe(screen.getByRole("group", { name: "Local" }).parentElement);
+    fireEvent.click(boton);
+    expect(raiz.className).toContain("lg:pr-[360px]");
+  });
+});
+
+describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
+  it("mientras llega otro periodo las cifras viejas se atenúan y no se pueden tocar", async () => {
+    const original = doble.rpc.getMockImplementation()!;
+    let soltar: (v: unknown) => void = () => {};
+    doble.rpc.mockImplementation(((fn: string, args: Record<string, unknown> = {}) =>
+      fn === "tablero_compras" && args.p_desde === "2025-01-01" ? new Promise((r) => (soltar = r)) : original(fn, args)) as typeof original);
+    try {
+      montar();
+      await screen.findByText("1.362.491,57 €");
+      fireEvent.click(screen.getByTestId("periodo-personalizado"));
+      fireEvent.click(await screen.findByRole("button", { name: "Año pasado" }));
+      const ind = screen.getByLabelText("Indicadores del periodo");
+      await waitFor(() => expect(ind).toHaveAttribute("aria-busy", "true"));
+      expect(ind).toHaveClass("opacity-60");
+      expect(within(ind).queryAllByRole("button")).toHaveLength(0);
+      // Las filas de las tarjetas, desactivadas.
+      expect(screen.getByRole("button", { name: /^PROVEEDOR 1, S\.L\.: 9\.000,00\s€/ })).toBeDisabled();
+      await act(async () => soltar({ data: TABLERO, error: null }));
+      await waitFor(() => expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(4));
+    } finally {
+      doble.rpc.mockImplementation(original);
+    }
+  });
+
+  it("«Ver solo este tramo» se puede deshacer con «Volver al año 2026» (periodo y eje de antes)", async () => {
+    montar();
+    const ex = await screen.findByRole("region", { name: "Explorar" });
+    fireEvent.click(await within(ex).findByRole("button", { name: /ver como tabla/i }));
+    fireEvent.click(await within(ex).findByRole("button", { name: "Julio 2026" }));
+    fireEvent.click(within(within(ex).getByRole("region", { name: "Punto elegido" })).getByRole("button", { name: "Ver solo este tramo" }));
+    await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_agrupar: "dia", p_desde: "2026-07-01" })));
+    fireEvent.click(await within(ex).findByRole("button", { name: "Volver al año 2026" }));
+    await waitFor(() => expect(ubicacion.actual).toBe("?tab=chat&desde=2026-01-01&hasta=2026-12-31"));
+    expect(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Año 2026" })).toHaveAttribute("aria-pressed", "true");
+    // El eje vuelve a «Mes» (la gráfica del año ya estaba en caché: no hace falta pedirla otra vez).
+    await waitFor(() => expect(within(ex).getByRole("combobox", { name: "Agrupar por" })).toHaveTextContent("Mes"));
+    expect(within(ex).queryByRole("button", { name: /^Volver/ })).not.toBeInTheDocument();
+  });
+
+  it("«Abrir en Compras» de un mes conserva el local elegido", async () => {
+    const onIrA = vi.fn();
+    montar({ onIrA }, "/facturas?tab=chat&local=touza");
+    const ex = await screen.findByRole("region", { name: "Explorar" });
+    fireEvent.click(await within(ex).findByRole("button", { name: /ver como tabla/i }));
+    fireEvent.click(await within(ex).findByRole("button", { name: "Julio 2026" }));
+    fireEvent.click(within(within(ex).getByRole("region", { name: "Punto elegido" })).getByRole("button", { name: "Abrir en Compras" }));
+    expect(onIrA).toHaveBeenLastCalledWith("?tab=compras&modo=documentos&mes=2026-07&local=touza");
+  });
+
+  it("gastos fijos: «Ver documentos» pide solo los meses de su media (desde_media/hasta_media)", async () => {
+    doble.rpcs.tablero_compras = () => ({
+      ...TABLERO,
+      fijos: { ...TABLERO.fijos, proveedores: [{ ...TABLERO.fijos.proveedores[0], desde_media: "2026-02-01", hasta_media: "2026-10-31" }] },
+    });
+    montar();
+    const fijos = await screen.findByRole("region", { name: "Gastos fijos al mes" });
+    fireEvent.click(within(fijos).getByRole("button", { name: /^ACCIONA GREEN/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ver documentos" }));
+    await waitFor(() =>
+      expect(llamadas("documentos_de_cifra")).toContainEqual(
+        expect.objectContaining({ p_desde: "2026-02-01", p_hasta: "2026-10-31", p_filtros: { proveedores: [398], tipos: ["factura"] } }),
+      ),
+    );
+    expect(await screen.findByTestId("documentos-de-cifra")).toHaveTextContent(/media de 9 meses/);
+  });
+
+  it("al cerrar «Ver documentos», el foco vuelve a la cifra que se tocó", async () => {
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    const cifra = within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto con IVA/ });
+    cifra.focus();
+    fireEvent.click(cifra);
+    await screen.findByTestId("documentos-de-cifra");
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByTestId("documentos-de-cifra")).not.toBeInTheDocument());
+    expect(document.activeElement).toBe(cifra);
+  });
+
+  it("la 9.ª gráfica fijada avisa de que se quita la más antigua", async () => {
+    const ocho = Array.from({ length: 8 }, (_, i) => ({
+      id: `f${i}`,
+      titulo: `Fijada ${i}`,
+      config: { medida: "gasto", agrupar: "proveedor", desglose: null, grafica: "auto", top: i + 1, filtros: {} },
+      fijadaEn: "",
+    }));
+    window.localStorage.setItem("facturas-analisis-explorador-fijadas", JSON.stringify(ocho));
+    montar();
+    const ex = await screen.findByRole("region", { name: "Explorar" });
+    fireEvent.click(within(ex).getByRole("button", { name: "Fijar en el tablero" }));
+    expect(within(ex).getByRole("status")).toHaveTextContent(/Caben 8 gráficas fijadas/);
+    expect(JSON.parse(window.localStorage.getItem("facturas-analisis-explorador-fijadas") ?? "[]")).toHaveLength(8);
+  });
+});
+
+describe("QA 05/11/2026: copiloto", () => {
+  it("las tablas markdown de la IA se ven como tabla (GFM), no en crudo", async () => {
+    doble.invoke.mockResolvedValue({
+      data: { respuesta: "Estos son:\n\n| Proveedor | Gasto |\n| --- | ---: |\n| Catral | 1.200 € |\n| Flope | 900 € |" },
+      error: null,
+    });
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    fireEvent.click(screen.getByRole("button", { name: /pregúntale a la ia/i }));
+    await preguntar("¿Quién me vende más?");
+    const tabla = await within(panel()).findByRole("table");
+    expect(within(tabla).getByRole("columnheader", { name: "Proveedor" })).toBeInTheDocument();
+    expect(within(tabla).getByRole("cell", { name: "Catral" })).toBeInTheDocument();
+    expect(within(panel()).queryByText(/\| --- \|/)).not.toBeInTheDocument();
+  });
+
+  it("con «Todo» las sugerencias llevan el año del mes", async () => {
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    fireEvent.click(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Todo" }));
+    await waitFor(() => expect(llamadasTablero()).toContainEqual({ p_desde: null, p_hasta: null, p_local: null }));
+    fireEvent.click(screen.getByRole("button", { name: /pregúntale a la ia/i }));
+    expect(within(panel()).getByRole("button", { name: "¿Por qué subió el gasto en julio de 2026?" })).toBeInTheDocument();
+  });
+
+  it("no usa scrollIntoView (movía la página): el hilo se desplaza por dentro", async () => {
+    doble.invoke.mockResolvedValue({ data: { respuesta: "Hecho." }, error: null });
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    fireEvent.click(screen.getByRole("button", { name: /pregúntale a la ia/i }));
+    await preguntar("Hola");
+    await within(panel()).findByText("Hecho.");
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });

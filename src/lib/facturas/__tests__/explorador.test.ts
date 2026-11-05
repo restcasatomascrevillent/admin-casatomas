@@ -121,10 +121,15 @@ describe("lectura del JSON", () => {
     const { filas, series } = datosGrafica(normalizarExploracion(RESPUESTA));
     expect(series.map((s) => [s.etiqueta, s.color])).toEqual([
       ["Casa Tomás", "#0369a1"],
-      ["Touza", "#f97316"],
+      ["Touza", "#ea580c"],
     ]);
     expect(filas[1]).toMatchObject({ clave: "2026-02", corta: "feb", s_0: 300, s_1: 300, valor: 600 });
-    expect(filas[0].s_1).toBeNull();
+    // Tramo sin compras de Touza: 0 (no hueco), para que su línea se vea (QA 05/11/2026).
+    expect(filas[0].s_1).toBe(0);
+  });
+  it("el precio medio NO se rellena con 0 (un mes sin compras no tiene precio)", () => {
+    const ex = normalizarExploracion({ ...RESPUESTA, parametros: { ...RESPUESTA.parametros, medida: "precio", desglose: "local" } });
+    expect(datosGrafica(ex).filas[0].s_1).toBeNull();
   });
   it("«Sin clasificar» se aparta del eje de familias si se pide", () => {
     const ex = normalizarExploracion({
@@ -149,6 +154,8 @@ describe("formatos es-ES", () => {
   it("cifras y marcas de eje", () => {
     expect(formatoValor(1234.5, "gasto")).toBe("1.234,50 €");
     expect(formatoValor(-12, "abonos")).toBe("−12,00 €");
+    // La RPC da los abonos en positivo: salen con «−» igual (el mismo signo en todo Análisis).
+    expect(formatoValor(12, "abonos")).toMatch(/^−12,00\s€$/);
     expect(formatoValor(1860, "documentos")).toBe("1.860");
     expect(formatoValor(2.33333, "precio", "kg")).toBe("2,3333 €/kg");
     expect(formatoValor(24.5, "cantidad", "kg")).toBe("24,5 kg");
@@ -166,6 +173,15 @@ describe("formatos es-ES", () => {
     expect(rangoDeClave("trimestre", "2026-T4")).toEqual({ desde: "2026-10-01", hasta: "2026-12-31" });
     expect(rangoDeClave("semana", "2026-12-28")).toEqual({ desde: "2026-12-28", hasta: "2027-01-03" });
     expect(rangoDeClave("proveedor", "7")).toBeNull();
+    // La semana del borde se recorta al periodo de la gráfica.
+    expect(rangoDeClave("semana", "2025-12-29", { desde: "2026-01-01", hasta: "2026-12-31" })).toEqual({ desde: "2026-01-01", hasta: "2026-01-04" });
+    expect(rangoDeClave("semana", "2026-12-28", { desde: "2026-01-01", hasta: "2026-12-31" })).toEqual({ desde: "2026-12-28", hasta: "2026-12-31" });
+    expect(rangoDeClave("semana", "2026-03-02", { desde: null, hasta: null })).toEqual({ desde: "2026-03-02", hasta: "2026-03-08" });
+    expect(accionDePunto(cfg({ agrupar: "semana" }), { clave: "2025-12-29", etiqueta: "", id: null }, { desde: "2026-01-01", hasta: "2026-12-31" })).toMatchObject({
+      tipo: "tramo",
+      desde: "2026-01-01",
+      hasta: "2026-01-04",
+    });
   });
   it("color: el mismo proveedor, el mismo color en la gráfica; «Otros» gris; familia por id", () => {
     expect(colorSerie("proveedor", "7", 2)).toBe(colorSerie("proveedor", "9", 2));
@@ -233,6 +249,28 @@ describe("presets, fijados y CSV", () => {
     expect(lineas[1]).toBe("Mes;Casa Tomás;Touza;Gasto con IVA;Documentos");
     expect(lineas[3]).toBe("Febrero 2026;300;300;600;3");
     expect(lineas.at(-1)).toBe("Total;2850;300;3150;10");
+  });
+  it("CSV: un texto que empieza por = + - @ no se ejecuta como fórmula en Excel", () => {
+    const ex = normalizarExploracion({
+      ...RESPUESTA,
+      parametros: { ...RESPUESTA.parametros, agrupar: "proveedor", desglose: null },
+      series: [],
+      puntos: [
+        { clave: "1", etiqueta: '=HYPERLINK("http://x";"y")', id: 1, valor: 10, documentos: 1 },
+        { clave: "2", etiqueta: "+34 Pescados", id: 2, valor: 5, documentos: 1 },
+        { clave: "3", etiqueta: "@SUM(A1)", id: 3, valor: 5, documentos: 1 },
+        { clave: "4", etiqueta: "-1+1", id: 4, valor: 5, documentos: 1 },
+      ],
+    });
+    const lineas = csvExploracion(ex, "t").replace(/^\uFEFF/, "").trim().split("\r\n");
+    expect(lineas[2]).toBe(`"'=HYPERLINK(""http://x"";""y"")";10;1`);
+    expect(lineas[3]).toBe("'+34 Pescados;5;1");
+    expect(lineas[4]).toBe("'@SUM(A1);5;1");
+    expect(lineas[5]).toBe("'-1+1;5;1");
+  });
+  it("CSV de abonos: con «−», como en el resto de Análisis", () => {
+    const ex = normalizarExploracion({ ...RESPUESTA, parametros: { ...RESPUESTA.parametros, medida: "abonos", desglose: null }, series: [] });
+    expect(csvExploracion(ex, "t").trim().split("\r\n").at(-1)).toBe("Total;-3150;10");
   });
   it("título de la configuración", () => {
     expect(tituloConfig({ medida: "precio", agrupar: "mes", desglose: "proveedor" })).toBe("Precio medio sin IVA por mes, por proveedor");
