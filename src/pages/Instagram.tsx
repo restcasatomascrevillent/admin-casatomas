@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, CalendarDays, Clapperboard, Flag, PenLine } from "lucide-react";
+import { BarChart3, CalendarDays, Clapperboard, Flag, KanbanSquare, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -12,6 +12,7 @@ import { MetricasInstagram } from "@/components/instagram/metricas";
 import { crearReelDesdeBase, type ReelPieza } from "@/components/instagram/reels";
 import { PestanaReels } from "@/components/instagram/video";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { EncargosInstagram, usePendientesEncargos, useRolesEncargos } from "@/components/instagram/encargos";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
@@ -19,7 +20,7 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
  */
 const ALTURA_MINIMA_INSTAGRAM = 360;
 
-const PESTANAS = ["crear", "campanas", "reels", "calendario", "metricas"] as const;
+const PESTANAS = ["crear", "campanas", "reels", "calendario", "encargos", "metricas"] as const;
 
 const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
@@ -36,8 +37,10 @@ const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contai
  *    (docs/instagram-reels.md), generar el MP4 y probarlo, publicarlo o
  *    programarlo (docs/instagram-video.md).
  *  · Calendario: piezas programadas y publicadas (docs/instagram-programar.md).
+ *  · Encargos: piezas automáticas y encargos a Oficiosos (docs/instagram-encargos.md).
+ *    La agencia (permiso «instagram_agencia» sin Marketing) solo ve esta pestaña.
  *  · Métricas: estadísticas de la cuenta y de cada publicación (docs/instagram-metricas.md).
- * `?tab=calendario`, `?tab=campanas` o `?tab=metricas` abre directamente esa pestaña.
+ * `?tab=calendario`, `?tab=campanas`, `?tab=encargos` (con `&encargo=<id>`) o `?tab=metricas` abre directamente esa pestaña.
  *
  * Regla del panel: sin scroll vertical de página. La página mide el alto que
  * queda en pantalla (`useAlturaDisponible`) y cada pestaña hace scroll por
@@ -53,6 +56,14 @@ export default function Instagram() {
     return PESTANAS.includes(pedida as (typeof PESTANAS)[number]) ? (pedida as string) : "crear";
   });
   const [abrir, setAbrir] = useState<{ pieza: PiezaInstagram; clave: number } | null>(null);
+  const rolesEncargos = useRolesEncargos();
+  const pendientesEncargos = usePendientesEncargos();
+  // Agencia sin Marketing: solo «Encargos» (el resto de pestañas es del restaurante).
+  const soloAgencia = !rolesEncargos.cargando && rolesEncargos.agencia && !rolesEncargos.restaurante;
+  const pestanaVisible = soloAgencia ? "encargos" : pestana;
+  const [encargoAbierto, setEncargoAbierto] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("encargo"),
+  );
 
   // Borradores de campaña (y cualquier pieza del calendario): se abren en «Crear».
   const abrirEnEditor = async (piezaId: string) => {
@@ -73,20 +84,29 @@ export default function Instagram() {
     <DashboardLayout>
       {/* Sin título de página: «Instagram» activo en el menú lateral ya dice dónde estás. */}
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
-        <Tabs value={pestana} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
+        <Tabs value={pestanaVisible} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
             pestanas={[
               { valor: "crear", etiqueta: "Crear y publicar", etiquetaCorta: "Crear", icono: <PenLine /> },
               { valor: "campanas", etiqueta: "Campañas", icono: <Flag /> },
               { valor: "reels", etiqueta: "Reels", icono: <Clapperboard /> },
               { valor: "calendario", etiqueta: "Calendario", icono: <CalendarDays /> },
+              {
+                valor: "encargos",
+                etiqueta: "Encargos",
+                icono: <KanbanSquare />,
+                contador: pendientesEncargos,
+                tonoContador: "dorado" as const,
+                etiquetaContador: `${pendientesEncargos} pendientes`,
+              },
               { valor: "metricas", etiqueta: "Métricas", icono: <BarChart3 /> },
-            ]}
+            ].filter((p) => !soloAgencia || p.valor === "encargos")}
           />
 
           {/* Desde `lg` el editor reparte el alto en tres columnas con scroll propio. */}
           <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`} data-testid="pagina-instagram">
-            <EditorInstagram abrir={abrir} />
+            {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
+            {!soloAgencia && <EditorInstagram abrir={abrir} />}
           </TabsContent>
 
           {/* Campañas: dos columnas con scroll propio desde `lg`. */}
@@ -103,7 +123,23 @@ export default function Instagram() {
 
           {/* Calendario y Métricas solo se montan al abrirlas: así no consultan nada si no se miran. */}
           <TabsContent value="calendario" className={CONTENIDO_PESTANA}>
-            {pestana === "calendario" && <CalendarioInstagram marca="todas" onAbrirPieza={(id) => void abrirEnEditor(id)} />}
+            {pestana === "calendario" && (
+              <CalendarioInstagram
+                marca="todas"
+                onAbrirPieza={(id) => void abrirEnEditor(id)}
+                onAbrirEncargo={(id) => {
+                  setEncargoAbierto(id);
+                  setPestana("encargos");
+                }}
+              />
+            )}
+          </TabsContent>
+
+          {/* Encargos: el tablero reparte el alto y cada columna hace scroll. */}
+          <TabsContent value="encargos" className={`${CONTENIDO_PESTANA} overflow-hidden`}>
+            {pestanaVisible === "encargos" && (
+              <EncargosInstagram encargoInicial={encargoAbierto} onAbrirPieza={(id) => void abrirEnEditor(id)} />
+            )}
           </TabsContent>
 
           <TabsContent value="metricas" className={CONTENIDO_PESTANA}>

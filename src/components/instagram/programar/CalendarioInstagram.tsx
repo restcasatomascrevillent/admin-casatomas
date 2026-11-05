@@ -40,6 +40,8 @@ import {
 } from "./logica";
 import { ProgramarPiezaDialog } from "./ProgramarPiezaDialog";
 import { useAccionesProgramacion, useCalendarioInstagram } from "./useProgramacionInstagram";
+import { useHuecosEncargo } from "@/components/instagram/encargos/useEncargos";
+import { HuecoCalendario } from "@/components/instagram/encargos/HuecoCalendario";
 
 const BASE_FOTOS = baseFotosPublica(String(import.meta.env.VITE_SUPABASE_URL ?? ""));
 const NOMBRE_MARCA: Record<string, string> = { "casa-tomas": "Casa Tomás", touza: "Touza" };
@@ -219,6 +221,8 @@ export interface CalendarioInstagramProps {
   /** Alto mínimo (px) por debajo del cual la página hace scroll; ver useAlturaDisponible. */
   altoMinimo?: number;
   className?: string;
+  /** Si se pasa, un hueco de encargo (fecha deseada de un encargo enviado) abre su ficha. */
+  onAbrirEncargo?: (encargoId: string) => void;
 }
 
 /**
@@ -228,7 +232,7 @@ export interface CalendarioInstagramProps {
  * y verla en Instagram. Ocupa el alto que queda en pantalla
  * (useAlturaDisponible): sin scroll de página, el scroll va dentro de cada día.
  */
-export function CalendarioInstagram({ marca = "todas", vistaInicial = "semana", onAbrirPieza, altoMinimo = 360, className }: CalendarioInstagramProps) {
+export function CalendarioInstagram({ marca = "todas", vistaInicial = "semana", onAbrirPieza, altoMinimo = 360, className, onAbrirEncargo }: CalendarioInstagramProps) {
   const [nodo, setNodo] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(nodo, altoMinimo);
   const [vista, setVista] = useState<VistaCalendario>(vistaInicial);
@@ -243,6 +247,8 @@ export function CalendarioInstagram({ marca = "todas", vistaInicial = "semana", 
     return agruparPorDia(eventos);
   }, [data, marca]);
 
+  // Huecos de encargo (docs/instagram-encargos.md): vacío sin la migración o sin permiso.
+  const huecos = useHuecosEncargo(desde, hasta);
   const { cancelar } = useAccionesProgramacion();
   const [moviendo, setMoviendo] = useState<EventoCalendario | null>(null);
   const [cancelando, setCancelando] = useState<EventoCalendario | null>(null);
@@ -325,6 +331,7 @@ export function CalendarioInstagram({ marca = "todas", vistaInicial = "semana", 
           >
             {dias.map((d) => {
               const eventos = porDia.get(d) ?? [];
+              const huecosDia = (huecos.get(d) ?? []).filter((h) => marca === "todas" || h.marca === marca);
               const fuera = vista === "mes" && d.slice(0, 7) !== mes;
               const pasado = d < hoy;
               return (
@@ -351,6 +358,11 @@ export function CalendarioInstagram({ marca = "todas", vistaInicial = "semana", 
                     {compacta && eventos.length > 0 && <span className="ml-auto text-[10px] text-muted-foreground">{eventos.length}</span>}
                   </div>
                   <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+                    {huecosDia.map((h) => (
+                      <li key={`encargo-${h.id}`}>
+                        <HuecoCalendario hueco={h} compacta={compacta} onAbrir={onAbrirEncargo} />
+                      </li>
+                    ))}
                     {eventos.map((e) => (
                       <li key={e.clave}>
                         <TarjetaEvento

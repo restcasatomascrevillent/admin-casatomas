@@ -93,7 +93,8 @@ const menuItems: {
     title: "Instagram",
     url: "/instagram",
     icon: Instagram,
-    sectionKey: "marketing",
+    // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
+    sectionKey: ["marketing", "instagram_agencia"],
     toggleKey: "marketing",
   },
   {
