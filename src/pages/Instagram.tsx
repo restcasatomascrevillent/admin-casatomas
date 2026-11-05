@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { Suspense, lazy, useState, type ComponentType } from "react";
 import { BarChart3, CalendarDays, Clapperboard, Flag, KanbanSquare, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { EditorInstagram } from "@/components/marketing/instagram/EditorInstagram";
+import { CrearInstagram } from "@/components/instagram/crear";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarioInstagram } from "@/components/instagram/programar";
 import { CampanasInstagram, leerPieza } from "@/components/instagram/campanas";
 import type { PiezaInstagram } from "@/components/marketing/instagram/usePiezasInstagram";
@@ -22,6 +23,15 @@ const ALTURA_MINIMA_INSTAGRAM = 360;
 
 const PESTANAS = ["crear", "campanas", "reels", "calendario", "encargos", "metricas"] as const;
 
+/**
+ * Crear en el móvil (< 768 px): el flujo propio de src/components/instagram/movil
+ * (`CrearMovil`, otro encargo). Se engancha solo si el fichero existe: el glob
+ * vale {} hasta entonces y el móvil usa CrearInstagram apilado.
+ */
+type PropsCrearMovil = { abrir?: { pieza: PiezaInstagram; clave: number } | null; onVerCalendario?: () => void };
+const cargarCrearMovil = Object.values(import.meta.glob<{ CrearMovil: ComponentType<PropsCrearMovil> }>("../components/instagram/movil/CrearMovil.tsx"))[0];
+const CrearMovil = cargarCrearMovil ? lazy(() => cargarCrearMovil().then((m) => ({ default: m.CrearMovil }))) : null;
+
 const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 /**
@@ -29,7 +39,11 @@ const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contai
  * Newsletter). Mismo permiso que Newsletter: la sección «marketing».
  *
  * Pestañas (mismo patrón que Newsletter):
- *  · Crear: editor (formulario, vista previa y Publicar/Programar/Historial/Conexión).
+ *  · Crear: «Qué publicar» (fotos, qué contar, Montar con IA, Ajustar a mano) y
+ *    «Así quedará» (móvil de Instagram, texto, Publicar ahora / Programar), sin
+ *    paso de prueba (src/components/instagram/crear, 05/11/2026). El historial
+ *    ya no está en Crear (Calendario / «Publicadas») ni la conexión (indicador
+ *    «● @cuenta» de la barra de pestañas): los hacen otros encargos.
  *  · Campañas: propuestas de la IA; aceptar crea BORRADORES con fecha prevista
  *    (docs/instagram-campanas.md). Al abrir un borrador (aquí o en el
  *    calendario) se pasa a «Crear» con sus datos.
@@ -56,6 +70,7 @@ export default function Instagram() {
     return PESTANAS.includes(pedida as (typeof PESTANAS)[number]) ? (pedida as string) : "crear";
   });
   const [abrir, setAbrir] = useState<{ pieza: PiezaInstagram; clave: number } | null>(null);
+  const movil = useIsMobile();
   const rolesEncargos = useRolesEncargos();
   const pendientesEncargos = usePendientesEncargos();
   // Agencia sin Marketing: solo «Encargos» (el resto de pestañas es del restaurante).
@@ -103,10 +118,17 @@ export default function Instagram() {
             ].filter((p) => !soloAgencia || p.valor === "encargos")}
           />
 
-          {/* Desde `lg` el editor reparte el alto en tres columnas con scroll propio. */}
+          {/* Desde `lg` Crear reparte el alto en dos columnas con scroll propio. */}
           <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`} data-testid="pagina-instagram">
             {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
-            {!soloAgencia && <EditorInstagram abrir={abrir} />}
+            {!soloAgencia &&
+              (movil && CrearMovil ? (
+                <Suspense fallback={null}>
+                  <CrearMovil abrir={abrir} onVerCalendario={() => setPestana("calendario")} />
+                </Suspense>
+              ) : (
+                <CrearInstagram abrir={abrir} onVerCalendario={() => setPestana("calendario")} />
+              ))}
           </TabsContent>
 
           {/* Campañas: dos columnas con scroll propio desde `lg`. */}

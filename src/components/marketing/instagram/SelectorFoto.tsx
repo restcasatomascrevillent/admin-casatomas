@@ -48,7 +48,7 @@ function tipoPorDefecto(plantilla?: Pick<Plantilla, "tiposFoto">): TipoFoto {
 }
 
 /** Miniatura de una foto de Drive: se pide con la sesión y se enseña como blob URL. */
-function MiniaturaDrive({ marca, driveId }: { marca: MarcaId; driveId: string }) {
+export function MiniaturaDrive({ marca, driveId }: { marca: MarcaId; driveId: string }) {
   const { data, isError, isLoading } = useQuery({
     queryKey: ["instagram_drive_miniatura", driveId],
     queryFn: () => miniaturaDrive(marca, driveId),
@@ -73,7 +73,7 @@ function MiniaturaDrive({ marca, driveId }: { marca: MarcaId; driveId: string })
 }
 
 /** Miniatura de una foto de la carta: URL pública del bucket «platos»; al cargar apunta sus medidas reales. */
-function MiniaturaCarta({ platoId, url }: { platoId: string; url: string }) {
+export function MiniaturaCarta({ platoId, url }: { platoId: string; url: string }) {
   const qc = useQueryClient();
   const [rota, setRota] = useState(false);
   if (rota) {

@@ -344,6 +344,65 @@ export function publicar(
   return llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts, cabecerasEdge()).then(normalizarPublicar);
 }
 
+/**
+ * Publicación DIRECTA desde la pantalla «Crear» (sin prueba previa): una
+ * imagen (post o story) o un carrusel de 2–10 piezas ya generadas. Contrato
+ * PROPUESTO para instagram-publicar (lo implementa el servidor en otro
+ * encargo; ver src/components/instagram/crear/publicar.ts). Manda también
+ * `id`, `altText` y `fotoTmp` de la primera imagen para que la función actual
+ * lo entienda con una sola imagen.
+ */
+export function publicarDirecto(
+  args: { ids: string[]; caption: string; altTexts: string[]; fotosTmp: string[]; contenedorId?: string | null },
+  opts?: OpcionesLlamada,
+) {
+  const cuerpo: Record<string, unknown> = {
+    directo: true,
+    dryRun: false,
+    ids: args.ids,
+    id: args.ids[0],
+    caption: args.caption,
+    altTexts: args.altTexts,
+    altText: args.altTexts[0] ?? "",
+    fotosTmp: args.fotosTmp,
+  };
+  if (args.fotosTmp[0]) cuerpo.fotoTmp = args.fotosTmp[0];
+  if (args.contenedorId) cuerpo.contenedorId = args.contenedorId;
+  return llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts, cabecerasEdge()).then(normalizarPublicar);
+}
+
+/** Respuesta de programar desde «Crear» (contrato propuesto, ver publicarDirecto). */
+export type RespuestaProgramarDirecto =
+  | { ok: true; programadaPara: string; programacionId: string | null }
+  | { ok: false; requiereConfirmacion: true; conflictos: Array<{ programadaPara: string }> };
+
+/**
+ * Programa una imagen o un carrusel ya generados, guardando su texto y sus
+ * textos alternativos (sin prueba previa). Contrato PROPUESTO para
+ * instagram-publicar con `accion: "programar"`; una respuesta con
+ * `requiereConfirmacion: true` (200) avisa de otra publicación a ±30 min.
+ */
+export async function programarDirecto(
+  args: { ids: string[]; caption: string; altTexts: string[]; instante: Date; confirmarConflicto?: boolean },
+  opts?: OpcionesLlamada,
+): Promise<RespuestaProgramarDirecto> {
+  const cuerpo = {
+    accion: "programar",
+    ids: args.ids,
+    caption: args.caption,
+    altTexts: args.altTexts,
+    programarPara: args.instante.toISOString(),
+    confirmarConflicto: args.confirmarConflicto === true,
+  };
+  const r = await llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts, cabecerasEdge());
+  if (r.requiereConfirmacion === true) {
+    const conflictos = Array.isArray(r.conflictos) ? r.conflictos : [];
+    return { ok: false, requiereConfirmacion: true, conflictos: conflictos.map((c: Crudo) => ({ programadaPara: String(c?.programadaPara ?? c?.programada_para ?? "") })) };
+  }
+  const p = r.programacion ?? {};
+  return { ok: true, programadaPara: String(p.programada_para ?? p.programadaPara ?? r.programadaPara ?? args.instante.toISOString()), programacionId: p.id ?? null };
+}
+
 /** Estado de la conexión (variables, cuenta y cupo). Nunca devuelve valores secretos. */
 export function comprobarConexion(opts?: OpcionesLlamada) {
   return llamar<Crudo>(URL_ESTADO, { method: "GET" }, opts, cabecerasEdge()).then(normalizarEstado);

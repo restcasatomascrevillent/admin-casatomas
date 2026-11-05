@@ -107,8 +107,35 @@ Código:
   Chromium, render, saneado, acceso a Supabase). Tests:
   `api/_lib/__tests__/instagram.test.ts` (sin red ni Chromium).
 - Panel: `src/pages/Instagram.tsx` (página y ruta `/instagram`, entrada en
-  `src/components/AppSidebar.tsx`) y `src/components/marketing/instagram/`
-  (`api.ts`, `EditorInstagram.tsx`, `useFotosInstagram.ts`…).
+  `src/components/AppSidebar.tsx`), `src/components/instagram/crear/`
+  (pantalla «Crear», ver abajo) y `src/components/marketing/instagram/`
+  (`api.ts`, `useFotosInstagram.ts`, `VistaPreviaPieza.tsx`…; el editor
+  antiguo de tres columnas, `EditorInstagram.tsx`, ya no se usa).
+
+### Pantalla «Crear» (05/11/2026)
+
+Dos columnas, sin paso de prueba (`src/components/instagram/crear/`):
+
+- **Qué publicar**: de 1 a 10 fotos de la biblioteca (Drive o carta) o
+  subidas, en orden y arrastrables (la primera es la portada); «¿Qué quieres
+  contar?» y el tono; **Montar con IA** (`montar.ts` → instagram-ia,
+  acción `montar_pieza`, contrato en `src/lib/instagram/montar.ts`). Debajo,
+  plegado, **Ajustar a mano**: marca, formato, plantilla, rótulos y texto
+  alternativo de cada imagen.
+- **Así quedará**: la publicación en un móvil de Instagram (carrusel con
+  flechas y puntos), el «He entendido…» de la IA, el texto y los hashtags y,
+  fijos abajo, **Publicar ahora** (con confirmación) y **Programar** (con la
+  hora sugerida).
+- Al publicar o programar, `prepararYPublicar` (`publicar.ts`) genera las
+  imágenes de una en una («Preparando imágenes 3/6») y pide al servidor
+  publicar o programar **sin exigir la prueba**. El contrato que espera del
+  servidor (cuerpo `{ directo: true, ids, caption, altTexts, fotosTmp }` y
+  `{ accion: "programar", … }` en instagram-publicar) está en la cabecera de
+  `publicar.ts`.
+- El historial y la conexión ya no están en Crear: van al Calendario /
+  «Publicadas» y al indicador «● @cuenta» de la barra de pestañas.
+- En el móvil (< 768 px) Crear usa `src/components/instagram/movil/CrearMovil`
+  si existe (import perezoso en `src/pages/Instagram.tsx`).
 
 ## Secretos de Supabase
 
