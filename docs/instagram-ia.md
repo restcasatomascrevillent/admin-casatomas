@@ -4,7 +4,7 @@ Al crear una pieza, el botón **«Proponer 3 textos»** pide a la IA tres propue
 
 **Lo hace una persona.** La IA solo propone. Al elegir una propuesta se rellena el texto y nada más. No publica ni programa; eso sigue siendo el clic de siempre.
 
-Diseño: `instagram-studio/propuesta/PROPUESTA.md`, apartados 3.1-3.6 y fila «1» del apartado 7. Las acciones `ideas_semana` y `proponer_campana` son de la fase 2 y no están hechas.
+Diseño: `instagram-studio/propuesta/PROPUESTA.md`, apartados 3.1-3.6 y fila «1» del apartado 7. Las acciones `ideas_semana` y `proponer_campana` son de la fase 2: [instagram-campanas.md](instagram-campanas.md).
 
 ## Piezas
 
