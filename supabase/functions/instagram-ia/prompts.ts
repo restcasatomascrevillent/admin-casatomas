@@ -51,6 +51,8 @@ export interface DatosPrompt {
   carta: string[];
   textos_pieza: Record<string, string>;
   indicaciones: string;
+  /** «Qué funciona» de los últimos 90 días (fase 3); solo en sugerir_texto y si hay migración. */
+  que_funciona?: unknown;
 }
 
 function bloqueDatos(d: DatosPrompt, extra: Record<string, unknown> = {}): string {
@@ -74,9 +76,15 @@ export function promptSistemaTexto(marca: MarcaIA): string {
     "- «platos_citados»: los nombres EXACTOS de los platos de la carta que menciones (lista vacía si ninguno).",
     "Respeta el tono pedido (DATOS.tono) y las indicaciones del usuario (DATOS.indicaciones) si no contradicen las reglas.",
     "Reglas:",
-    ...[...REGLAS_COMUNES, ...REGLAS_MARCA[marca]].map((r) => `- ${r}`),
+    ...[...REGLAS_COMUNES, ...REGLAS_MARCA[marca], REGLA_QUE_FUNCIONA_TEXTO].map((r) => `- ${r}`),
   ].join("\n");
 }
+
+/** sugerir_texto: «Qué funciona» sirve para elegir, nunca se cita en la publicación. */
+export const REGLA_QUE_FUNCIONA_TEXTO =
+  "DATOS.que_funciona (si viene) resume qué ha funcionado en la cuenta en los últimos 90 días, con datos reales. Úsalo solo para elegir el enfoque, " +
+  "el gancho y los hashtags (prefiere los de «por.hashtag» que funcionan); fíjate solo en «conclusiones» y «por», y si «suficiente» es false no saques " +
+  "conclusiones. NUNCA menciones métricas, porcentajes ni «lo que funciona» en el texto de la publicación.";
 
 export function promptSistemaRotulos(marca: MarcaIA, plantilla: PlantillaRotulos): string {
   const campos = plantilla.campos
