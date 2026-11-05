@@ -1,7 +1,9 @@
 /**
- * Facturas › Compras (rediseño del 08/10/2026): UN buscador, selector
- * Documentos · Productos · Proveedores con contador por modo, chips por modo,
- * lista compacta + ficha, y saltos entre fichas (producto → documento → producto).
+ * Facturas › Compras (rediseño a todo el ancho del 05/11/2026): UN buscador,
+ * selector Documentos · Productos · Proveedores con contador por modo, local y
+ * periodo, resumen, chips por modo, lista a todo el ancho, ficha a pantalla
+ * completa con «Volver a la lista», proveedores en acordeón y saltos entre
+ * fichas (producto → documento → producto).
  *
  * Con un doble de Supabase propio (los documentos se filtran por `tipo`, las
  * líneas de un producto por `producto_id`) y 3 proveedores, 5 documentos y
@@ -50,6 +52,9 @@ const base = vi.hoisted(() => {
     fijarTablas(f: typeof tablas) {
       tablas = f;
     },
+    get tablas() {
+      return tablas;
+    },
   };
 });
 
@@ -78,6 +83,7 @@ const DOCS = [
   }),
   documento(2, "factura", "F-101", "BODEGA CAMPOLUZ, S.L.", "2026-09-05", {
     verificada: true,
+    local: "touza",
     alertas_validacion: [{ codigo: "iva_incoherente", severidad: "alta", mensaje: "El IVA no cuadra" }],
     productos_factura: [linea(102, "Vino tinto crianza", 12, "Vino tinto crianza")],
   }),
@@ -230,63 +236,15 @@ describe("Compras · buscador único y selector con contadores", () => {
   });
 });
 
-describe("Compras · enlace profundo a un documento (?doc=)", () => {
-  it("abre la ficha del documento pedido, sin «Volver», aunque haya filtros que lo escondan", async () => {
-    montar(vi.fn(), { modo: "documentos", clave: "k1", doc: 2 });
-    expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
-    expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true");
-    expect(screen.queryByRole("button", { name: /^Volver a/ })).not.toBeInTheDocument();
-    expect(within(listaDocs()).getByText("F-101").closest("button")).toHaveAttribute("aria-current", "true");
-  });
-
-  it("deja a la vista la fila abierta (nearest) solo al llegar por el enlace o por un salto, no al hacer clic en la lista", async () => {
-    const desplazar = vi.fn();
-    Element.prototype.scrollIntoView = desplazar;
-    montar(vi.fn(), { modo: "documentos", clave: "k3", doc: 2 });
-    await screen.findByRole("heading", { name: "Factura F-101" });
-    await waitFor(() => expect(desplazar).toHaveBeenCalledTimes(1));
-    expect(desplazar).toHaveBeenCalledWith(expect.objectContaining({ block: "nearest" }));
-    expect(desplazar.mock.contexts[0]).toBe(within(listaDocs()).getByText("F-101").closest("button"));
-
-    desplazar.mockClear();
-    fireEvent.click(within(listaDocs()).getByText("F-100"));
-    await screen.findByRole("heading", { name: "Factura F-100" });
-    await new Promise((r) => requestAnimationFrame(() => r(null)));
-    expect(desplazar).not.toHaveBeenCalled();
-  });
-
-  it("si el documento está en un mes plegado (agosto), lo despliega y deja a la vista su fila", async () => {
-    const desplazar = vi.fn();
-    Element.prototype.scrollIntoView = desplazar;
-    montar();
-    await screen.findByText("F-100");
-    expect(screen.queryByText("A-3")).not.toBeInTheDocument(); // agosto, plegado por defecto
-    cleanup();
-    montar(vi.fn(), { modo: "documentos", clave: "k-ago", doc: 5 });
-    expect(await screen.findByRole("heading", { name: "Albarán A-3" })).toBeInTheDocument();
-    const fila = within(listaDocs()).getByText("A-3").closest("button");
-    expect(fila).toHaveAttribute("aria-current", "true");
-    expect(screen.getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
-    await waitFor(() => expect(desplazar).toHaveBeenCalled());
-    expect(desplazar.mock.contexts.at(-1)).toBe(fila);
-  });
-
-  it("un documento que no existe no rompe nada", async () => {
-    montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
-    expect(await screen.findByText("F-100")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Factura F-100" })).not.toBeInTheDocument();
-  });
-});
-
 describe("Compras · chips por modo", () => {
   const chips = (nombre: string) => screen.getByRole("toolbar", { name: nombre });
 
-  it("Documentos: Todo · Facturas · Albaranes · Albaranes sin factura · Con avisos · Sin revisar", async () => {
+  it("Documentos: Todo · Facturas · Albaranes · Albaranes sin factura · Abonos · Con avisos · Sin revisar", async () => {
     montar();
     await screen.findByText("F-100");
     const barra = chips("Filtrar documentos");
     expect(within(barra).getAllByRole("button").map((b) => b.textContent?.replace(/\d+$/, "").trim())).toEqual([
-      "Todo", "Facturas", "Albaranes", "Albaranes sin factura", "Con avisos", "Sin revisar",
+      "Todo", "Facturas", "Albaranes", "Albaranes sin factura", "Abonos", "Con avisos", "Sin revisar",
     ]);
     // Chips compactos (32 px) con zona táctil de 44: contenedor h-11 y toque ampliado.
     expect(barra.className).toContain("h-11");
@@ -367,44 +325,52 @@ describe("Compras · chips por modo", () => {
   });
 });
 
-describe("Compras · filas planas", () => {
-  it("cada documento muestra una sola insignia (avisos > sin revisar > sin factura); el resto, en el tooltip", async () => {
+const vistaLista = () => screen.getByTestId("vista-lista");
+const listaVisible = () => !vistaLista().className.split(/\s+/).includes("hidden");
+const volverALista = () => screen.getByRole("button", { name: "Volver a la lista" });
+
+describe("Compras · ficha a pantalla completa", () => {
+  it("al tocar un documento su ficha ocupa la pestaña; «Volver a la lista» la deja como estaba", async () => {
     montar();
     await screen.findByText("F-100");
-    const fila = (num: string) => within(listaDocs()).getByText(num).closest("button") as HTMLElement;
-    // F-101: con avisos (y revisada) → solo «1 aviso».
-    expect(fila("F-101")).toHaveTextContent("1 aviso");
-    expect(fila("F-101")).not.toHaveTextContent("Sin revisar");
-    // A-1: sin revisar y sin factura → solo «Sin revisar +1», con las dos en el tooltip.
-    expect(fila("A-1")).toHaveTextContent("Sin revisar");
-    expect(fila("A-1")).toHaveTextContent("+1");
-    expect(fila("A-1")).not.toHaveTextContent("Sin factura");
-    expect(fila("A-1")).toHaveAttribute("title", "Sin revisar · Sin factura");
-    // El tipo va junto al número.
-    expect(fila("F-100")).toHaveTextContent("F-100 · Factura");
+    fireEvent.change(buscador(), { target: { value: "merluza" } });
+    await waitFor(() => expect(filasDocs()).toHaveLength(3));
+    const scroller = screen.getByTestId("lista-documentos");
+    Object.defineProperty(scroller, "scrollTop", { value: 300, writable: true, configurable: true });
+
+    fireEvent.click(within(listaDocs()).getByText("F-100"));
+    const ficha = await screen.findByTestId("ficha-compras");
+    expect(within(ficha).getByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
+    expect(listaVisible()).toBe(false);
+    // El foco va a «Volver a la lista».
+    expect(volverALista()).toHaveFocus();
+    expect(screen.queryByRole("button", { name: /^Volver a «/ })).not.toBeInTheDocument();
+
+    // Al ocultarse, el navegador pierde el scroll: se devuelve al volver.
+    scroller.scrollTop = 0;
+    fireEvent.click(volverALista());
+    expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument();
+    expect(listaVisible()).toBe(true);
+    expect(scroller.scrollTop).toBe(300);
+    expect(buscador()).toHaveValue("merluza");
+    expect(filasDocs()).toHaveLength(3);
+    // La fila que se abrió queda marcada y con el foco.
+    const fila = within(listaDocs()).getByText("F-100").closest("button");
+    expect(fila).toHaveAttribute("aria-current", "true");
+    expect(fila).toHaveFocus();
   });
 
-  it("la ficha tiene cabecera fija con «← Lista» y el nombre del elemento", async () => {
-    montar();
-    fireEvent.click(await screen.findByText("F-100"));
-    const cabecera = await screen.findByTestId("cabecera-ficha");
-    expect(within(cabecera).getByRole("button", { name: /Lista/ })).toBeInTheDocument();
-    expect(cabecera).toHaveTextContent("F-100");
-    fireEvent.click(within(cabecera).getByRole("button", { name: /Lista/ }));
-    await waitFor(() => expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument());
-  });
-});
-
-describe("Compras · fichas", () => {
-  it("documento: sus datos, los botones de siempre y sus líneas con enlace al producto", async () => {
+  it("documento: sus datos, los botones de siempre con texto y sus líneas con enlace al producto", async () => {
     const onIA = montar();
     fireEvent.click(await screen.findByText("F-100"));
     const ficha = await screen.findByTestId("ficha-compras");
     expect(within(ficha).getByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
-    expect(within(ficha).getByRole("button", { name: "Editar" })).toBeInTheDocument();
+    expect(within(ficha).getByRole("button", { name: "Editar" })).toHaveTextContent("Editar");
     expect(within(ficha).getByRole("button", { name: /Ver original|original/ })).toBeDisabled(); // sin escaneo guardado
     expect(within(ficha).getByRole("button", { name: /Sin revisar/ })).toBeInTheDocument();
-    fireEvent.click(within(ficha).getByRole("button", { name: /Preguntar a la IA/ }));
+    const ia = within(ficha).getByRole("button", { name: /Preguntar a la IA/ });
+    expect(ia).toHaveTextContent("IA");
+    fireEvent.click(ia);
     expect(onIA).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }), "factura");
     expect(within(ficha).getByRole("button", { name: "Ver el producto Merluza de pincho" })).toBeInTheDocument();
 
@@ -412,18 +378,22 @@ describe("Compras · fichas", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
-  it("albarán sin factura lo dice; albarán facturado enlaza con su factura", async () => {
+  it("albarán sin factura lo dice; albarán facturado enlaza con su factura y se puede volver", async () => {
     montar();
     fireEvent.click(await screen.findByText("A-1"));
     expect(await screen.findByText("Sin factura todavía")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("A-2"));
+    fireEvent.click(volverALista());
+    fireEvent.click(within(listaDocs()).getByText("A-2"));
     expect(await screen.findByText(/Facturado en/)).toBeInTheDocument();
-    const enlace = await screen.findByRole("link", { name: "Ver la factura F-101" });
-    fireEvent.click(enlace);
+    fireEvent.click(await screen.findByRole("link", { name: "Ver la factura F-101" }));
     expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
+    // F-101 es de Touza: lo dice la ficha.
+    expect(within(screen.getByTestId("ficha-compras")).getByText("Touza")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Volver a «albarán A-2»" }));
+    expect(await screen.findByRole("heading", { name: "Albarán A-2" })).toBeInTheDocument();
   });
 
-  it("producto → gráfica de precio y documentos donde aparece; al tocar uno salta y se puede volver", async () => {
+  it("producto → documento → «Volver a» el producto, y la lista de Productos sigue debajo", async () => {
     montar();
     fireEvent.click(modo(/^Productos/));
     const lista = await screen.findByTestId("lista-productos");
@@ -437,11 +407,13 @@ describe("Compras · fichas", () => {
 
     fireEvent.click(await within(ficha).findByRole("button", { name: "Abrir la factura F-100" }));
     expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
-    expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true");
 
-    fireEvent.click(screen.getByRole("button", { name: /Volver a «Merluza de pincho»/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Volver a «Merluza de pincho»" }));
     expect(await screen.findByRole("heading", { name: /Merluza de pincho/ })).toBeInTheDocument();
+
+    fireEvent.click(volverALista());
     expect(modo(/^Productos/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByTestId("lista-productos")).toBeInTheDocument();
   });
 
   it("de la línea de un documento al producto", async () => {
@@ -449,34 +421,223 @@ describe("Compras · fichas", () => {
     fireEvent.click(await screen.findByText("F-100"));
     fireEvent.click(await screen.findByRole("button", { name: "Ver el producto Merluza de pincho" }));
     expect(await screen.findByRole("figure", { name: /evolución del precio de merluza de pincho/i })).toBeInTheDocument();
-    expect(modo(/^Productos/)).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Volver a «factura F-100»" })).toBeInTheDocument();
+  });
+});
+
+describe("Compras · enlace profundo a un documento (?doc=)", () => {
+  it("abre la ficha del documento pedido a pantalla completa, sin «Volver a …»", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k1", doc: 2 });
+    expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Volver a «/ })).not.toBeInTheDocument();
+    expect(listaVisible()).toBe(false);
+    fireEvent.click(volverALista());
+    expect(modo(/^Documentos/)).toHaveAttribute("aria-pressed", "true");
+    expect(within(listaDocs()).getByText("F-101").closest("button")).toHaveAttribute("aria-current", "true");
   });
 
-  it("proveedor: ficha_proveedor_agente (qué le compras, cada cuánto, último pedido) y sus acciones", async () => {
+  it("también un documento de un mes plegado (agosto)", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k-ago", doc: 5 });
+    expect(await screen.findByRole("heading", { name: "Albarán A-3" })).toBeInTheDocument();
+  });
+
+  it("un documento que no existe no rompe nada", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
+    expect(await screen.findByText("F-100")).toBeInTheDocument();
+    expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument();
+  });
+});
+
+describe("Compras · filas a todo el ancho", () => {
+  it("todas las marcas a la vista (sin tooltip) y «Factura» no se repite", async () => {
+    montar();
+    await screen.findByText("F-100");
+    const fila = (num: string) => within(listaDocs()).getByText(num).closest("button") as HTMLElement;
+    expect(fila("F-101")).toHaveTextContent("1 aviso");
+    expect(fila("F-101")).toHaveTextContent("Touza");
+    expect(fila("F-101")).not.toHaveTextContent("Sin revisar");
+    expect(fila("A-1")).toHaveTextContent("Albarán");
+    expect(fila("A-1")).toHaveTextContent("Sin revisar");
+    expect(fila("A-1")).toHaveTextContent("Sin factura");
+    expect(fila("A-1")).not.toHaveAttribute("title");
+    expect(fila("F-100")).not.toHaveTextContent("Factura");
+    // El proveedor, con su nombre canónico.
+    expect(fila("F-100")).toHaveTextContent("Pescados Marta S.L.");
+    expect(fila("A-2")).toHaveTextContent("Incluido en F-101");
+  });
+});
+
+describe("Compras · local, periodo y resumen", () => {
+  const grupo = (nombre: string) => screen.getByRole("group", { name: nombre });
+
+  it("Local «Touza» deja solo sus documentos (y sus proveedores) en listas, contadores y resumen", async () => {
+    montar();
+    await screen.findByText("F-100");
+    fireEvent.click(within(grupo("Local")).getByRole("button", { name: "Touza" }));
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
+    expect(numerosVisibles()).toEqual(["F-101"]);
+    expect(cuenta(/^Proveedores/)).toBe("1");
+    expect(within(screen.getByRole("region", { name: /Resumen/ })).getByRole("heading", { level: 2 })).toHaveTextContent("Touza");
+    fireEvent.click(within(grupo("Local")).getByRole("button", { name: "Casa Tomás" }));
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("4"));
+  });
+
+  it("Periodo «Mes anterior» (septiembre) filtra documentos y proveedores; el mes único sale abierto", async () => {
+    montar();
+    await screen.findByText("F-100");
+    fireEvent.click(within(grupo("Periodo")).getByRole("button", { name: "Mes anterior" }));
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("3"));
+    expect(within(listaDocs()).getByRole("button", { name: /^Septiembre 2026/ })).toHaveAttribute("aria-expanded", "true");
+    expect(within(listaDocs()).queryByText("A-1")).not.toBeInTheDocument();
+    expect(cuenta(/^Proveedores/)).toBe("2"); // Hielos del Norte no tiene nada en septiembre
+    expect(screen.getByRole("heading", { level: 2, name: /Septiembre 2026/ })).toBeInTheDocument();
+  });
+
+  it("resumen: gasto neto, documentos, gráfica de 12 meses y top de proveedores; tocar un mes lo filtra", async () => {
+    montar();
+    await screen.findByText("F-100");
+    const resumen = screen.getByRole("region", { name: /Resumen/ });
+    // 99 (F-100) + 99 (F-101) + 99 (A-1, sin factura); A-2 y A-3 ya están facturados.
+    const cifras = within(resumen).getByLabelText("Cifras del periodo");
+    expect(cifras).toHaveTextContent(/Gasto neto con IVA297,00\s€/);
+    expect(cifras).toHaveTextContent(/Documentos5/);
+    const meses = within(resumen).getByRole("group", { name: /Meses/ });
+    expect(within(meses).getAllByRole("button")).toHaveLength(12);
+    const top = within(resumen).getByRole("list", { name: "Top 10 proveedores por gasto" });
+    expect(within(top).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      expect.stringContaining("Pescados Marta S.L."),
+      expect.stringContaining("Bodega Campoluz"),
+    ]);
+
+    fireEvent.click(within(meses).getByRole("button", { name: /^Agosto 2026/ }));
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
+    expect(screen.getByRole("button", { name: "Solo Agosto 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(listaDocs()).getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
+    // Otro toque en el mismo mes lo quita.
+    fireEvent.click(within(meses).getByRole("button", { name: /^Agosto 2026/ }));
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("5"));
+  });
+
+  it("el resumen se pliega y se recuerda", async () => {
+    montar();
+    await screen.findByText("F-100");
+    const cabecera = () => screen.getByRole("button", { name: /^Resumen/ });
+    expect(cabecera()).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(cabecera());
+    expect(cabecera()).toHaveAttribute("aria-expanded", "false");
+    expect(cabecera()).toHaveTextContent(/297,00\s€ con IVA · 5 documentos/);
+    cleanup();
+    montar();
+    await screen.findByText("F-100");
+    expect(cabecera()).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("tocar un proveedor del top lo abre desplegado en Proveedores", async () => {
+    montar();
+    await screen.findByText("F-100");
+    const top = screen.getByRole("list", { name: "Top 10 proveedores por gasto" });
+    fireEvent.click(within(top).getByRole("button", { name: /Bodega Campoluz/ }));
+    expect(modo(/^Proveedores/)).toHaveAttribute("aria-pressed", "true");
+    const provs = await screen.findByTestId("lista-proveedores-compras");
+    expect(within(provs).getByRole("button", { name: /^Bodega Campoluz/ })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("abonos: chip «Abonos», signo menos y título «Abono» en la ficha", async () => {
+    const original = DOCS.slice();
+    DOCS.push(documento(6, "factura", "AB-9", "BODEGA CAMPOLUZ, S.L.", "2026-10-02", { total: "-25.50", subtotal: "-23.18", iva: "-2.32" }));
+    try {
+      montar();
+      await screen.findByText("AB-9");
+      const barra = screen.getByRole("toolbar", { name: "Filtrar documentos" });
+      fireEvent.click(within(barra).getByRole("button", { name: /^Abonos/ }));
+      expect(numerosVisibles()).toEqual(["AB-9"]);
+      const fila = within(listaDocs()).getByText("AB-9").closest("button") as HTMLElement;
+      expect(fila).toHaveTextContent("Abono");
+      expect(fila).toHaveTextContent("−25,50");
+      fireEvent.click(fila);
+      expect(await screen.findByRole("heading", { name: "Abono AB-9" })).toBeInTheDocument();
+    } finally {
+      DOCS.splice(0, DOCS.length, ...original);
+    }
+  });
+
+  it("si falla la carga, «Reintentar» vuelve a pedir los documentos", async () => {
+    let fallar = true;
+    const normal = base.tablas;
+    base.fijarTablas((tabla, f) => {
+      if (tabla === "facturas" && fallar) throw new Error("sin conexión");
+      return normal(tabla, f);
+    });
+    montar();
+    const boton = await screen.findByRole("button", { name: "Reintentar" });
+    expect(screen.getByRole("alert")).toHaveTextContent("sin conexión");
+    fallar = false;
+    fireEvent.click(boton);
+    expect(await screen.findByText("F-100")).toBeInTheDocument();
+  });
+});
+
+describe("Compras · proveedores en acordeón", () => {
+  it("por gasto; al tocar uno se despliega con sus datos, qué le compras y sus documentos por meses", async () => {
     montar();
     fireEvent.click(modo(/^Proveedores/));
     const provs = await screen.findByTestId("lista-proveedores-compras");
-    fireEvent.click(within(provs).getByText("Pescados Marta S.L."));
-    const ficha = await screen.findByTestId("ficha-compras");
-    expect(await within(ficha).findByText("Pide cada semana")).toBeInTheDocument();
+    const cabeceras = () => within(provs).getAllByRole("heading", { level: 3 }).map((h) => h.textContent ?? "");
+    await waitFor(() => expect(cabeceras()[0]).toMatch(/^Pescados Marta S\.L\./));
+    expect(cabeceras().map((t) => t.split(/\d/)[0].trim())).toEqual(["Pescados Marta S.L.", "Bodega Campoluz", "Hielos del Norte"]);
+    // 99 (F-100) + 99 (A-1 sin factura); A-3 ya está en una factura.
+    expect(cabeceras()[0]).toMatch(/198,00\s€/);
+
+    const boton = within(provs).getByRole("button", { name: /^Pescados Marta S\.L\./ });
+    expect(boton).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(boton);
+    expect(boton).toHaveAttribute("aria-expanded", "true");
+    const despliegue = await screen.findByTestId("despliegue-proveedor");
+    expect(await within(despliegue).findByText("cada semana")).toBeInTheDocument();
     expect(base.rpc).toHaveBeenCalledWith("ficha_proveedor_agente", { p_texto: "Pescados Marta S.L." });
-    expect(within(ficha).getByText("01/10/2026")).toBeInTheDocument();
-    expect(within(ficha).getByRole("button", { name: "Ver el producto Merluza de pincho" })).toBeInTheDocument();
-    expect(within(ficha).getByText(/Llega como/)).toHaveTextContent("PESCADOS MARTA, S.L.");
+    expect(within(despliegue).getByText("01/10/2026")).toBeInTheDocument();
+    expect(within(despliegue).getByRole("button", { name: "Ver el producto Merluza de pincho" })).toBeInTheDocument();
+    expect(within(despliegue).getByText(/Llega como/)).toHaveTextContent("PESCADOS MARTA, S.L.");
+    // Sus documentos por meses, con su subtotal; el albarán facturado tachado.
+    const meses = within(despliegue).getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
+    expect(meses).toEqual([
+      expect.stringMatching(/^Octubre 2026 · 1 documento · 99,00\s€/),
+      expect.stringMatching(/^Septiembre 2026 · 1 documento · 99,00\s€/),
+      expect.stringMatching(/^Agosto 2026 · 1 documento · 0,00\s€/),
+    ]);
+    expect(within(despliegue).getByText("A-3").closest("button")).toHaveAttribute("data-facturado", "true");
+
     // Las acciones de siempre sobre proveedores.
-    expect(within(ficha).getByRole("button", { name: /Editar datos/ })).toBeInTheDocument();
-    fireEvent.click(within(ficha).getByRole("button", { name: /Fusionar con otro proveedor/ }));
+    expect(within(despliegue).getByRole("button", { name: /Editar datos/ })).toBeInTheDocument();
+    fireEvent.click(within(despliegue).getByRole("button", { name: /Fusionar con otro proveedor/ }));
     const dialogo = await screen.findByRole("dialog");
     expect(within(dialogo).getByRole("checkbox", { name: "Seleccionar Pescados Marta S.L." })).toBeChecked();
   });
 
-  it("proveedor → documento y de ahí al proveedor otra vez", async () => {
+  it("otro toque lo pliega; tocar otro proveedor pliega el anterior", async () => {
+    montar();
+    fireEvent.click(modo(/^Proveedores/));
+    const provs = await screen.findByTestId("lista-proveedores-compras");
+    const marta = within(provs).getByRole("button", { name: /^Pescados Marta/ });
+    const bodega = within(provs).getByRole("button", { name: /^Bodega Campoluz/ });
+    fireEvent.click(marta);
+    fireEvent.click(bodega);
+    expect(marta).toHaveAttribute("aria-expanded", "false");
+    expect(bodega).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(bodega);
+    expect(bodega).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("despliegue-proveedor")).not.toBeInTheDocument();
+  });
+
+  it("documento → su proveedor (desplegado) → otra vez el documento, y al volver sigue desplegado", async () => {
     montar();
     fireEvent.click(await screen.findByText("F-100"));
-    fireEvent.click(await within(screen.getByTestId("ficha-compras")).findByRole("button", { name: /PESCADOS MARTA, S\.L\./ }));
-    expect(await screen.findByRole("heading", { name: /Pescados Marta S\.L\./ })).toBeInTheDocument();
+    fireEvent.click(await within(screen.getByTestId("ficha-compras")).findByRole("button", { name: "Ver el proveedor PESCADOS MARTA, S.L." }));
     expect(modo(/^Proveedores/)).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(within(screen.getByTestId("ficha-compras")).getByRole("button", { name: "Abrir la factura F-100" }));
+    const despliegue = await screen.findByTestId("despliegue-proveedor");
+    fireEvent.click(within(despliegue).getByText("F-100"));
     expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
+    fireEvent.click(volverALista());
+    expect(screen.getByTestId("despliegue-proveedor")).toBeInTheDocument();
   });
 });

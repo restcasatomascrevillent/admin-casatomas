@@ -1,37 +1,56 @@
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, EyeOff, FileText, Receipt } from "lucide-react";
 import type { Factura } from "@/hooks/useFacturas";
-import { formatCurrency, formatDateCorta } from "@/components/facturas/shared/formatters";
+import { Button } from "@/components/ui/button";
+import { formatDateCorta, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
 import type { ResolverProveedor } from "@/lib/facturas/proveedores";
+import { esAbono, localDe } from "@/lib/facturas/resumenCompras";
 import {
   agruparDocumentos,
   claveEstadoMes,
-  claveEstadoProveedor,
   guardarPlegado,
   leerPlegado,
+  MESES_ABIERTOS_BUSCANDO,
   mesAbierto,
-  proveedorAbierto,
-  ubicacionDocumento,
   type EstadoPlegado,
+  type GrupoMes,
 } from "@/lib/facturas/agrupacionDocumentos";
 
-const ETIQUETA_TIPO: Record<string, string> = { factura: "Factura", albaran: "Albarán" };
+const SIN_ESTADO: EstadoPlegado = {};
 
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+/** Alto de reserva de un mes fuera de pantalla (`content-visibility: auto`): cabecera 49 px, documento 53 (dos líneas) o 45 (una, ≥1024 px). */
+function altoEstimadoMes(mes: GrupoMes, abierto: boolean): number {
+  return abierto ? 49 + mes.documentos.length * 53 : 49;
+}
+
+/** Insignia de texto (12 px, sin depender del color: siempre lleva palabra). */
+export const Insignia = ({ children, clase }: { children: ReactNode; clase: string }) => (
+  <span className={`inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 text-xs font-medium ${clase}`}>{children}</span>
+);
+
+export const CLASE_TOUZA = "border-violet-300 bg-violet-50 text-violet-800 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300";
+export const CLASE_ABONO = "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
+const CLASE_ALBARAN = "border-border bg-muted/50 text-foreground";
 
 /**
- * Compras › Documentos: lista agrupada por MES (el actual primero) y, dentro,
- * por PROVEEDOR. La cabecera del mes se queda fija al desplazar la lista y
- * enseña cuántos documentos hay y cuánto suman (facturas + albaranes sin
- * factura: un albarán ya facturado sale atenuado con «en F-xxx» y no suma).
- * Mes actual y anterior desplegados, el resto plegados; lo que el usuario
- * pliega o despliega se recuerda (localStorage). Con búsqueda o chip activos
- * se despliega todo, para no esconder resultados. Cada fila: número · tipo y
- * total en la primera línea, fecha · líneas en la segunda, y una sola insignia.
- * Cada nivel se tabula: mes a ras, proveedor con sangría de 16 px y documentos de
- * 32 px con una guía vertical fina que los une a su proveedor (8/16 px en <640 px).
- * Los importes quedan alineados a la derecha en los tres niveles.
+ * Compras › Documentos (rediseño del 05/11/2026): lista a TODO EL ANCHO,
+ * agrupada por MES (el actual primero). La cabecera del mes se queda fija al
+ * desplazar la lista y enseña cuántos documentos hay, cuánto suman con IVA
+ * (facturas + albaranes sin factura; un albarán ya facturado sale tachado con
+ * «Incluido en F-xxx» y no suma) y lo que restan los abonos.
+ *
+ * Cada fila: fecha · proveedor · nº de documento · marcas (Albarán / Abono,
+ * Touza, avisos, sin revisar, sin factura: todas a la vista, sin tooltip) ·
+ * importe. Desde 1024 px en columnas; por debajo (tablet en vertical) en dos
+ * líneas: proveedor e importe arriba, fecha · número · marcas debajo.
+ *
+ * Plegado: mes actual y anterior desplegados, el resto plegados (o el único
+ * mes, si solo hay uno); lo que el usuario pliega o despliega se recuerda
+ * (localStorage). Con texto buscado se abren solo los 3 meses más recientes
+ * con resultados y arriba sale «Abrir todos» / «Plegar todos». Con
+ * `recordar={false}` (despliegue de un proveedor) se abren los 3 meses más
+ * recientes y no se guarda nada. Cada mes lleva `content-visibility: auto`.
  */
 export function ListaDocumentos({
   documentos,
@@ -41,55 +60,75 @@ export function ListaDocumentos({
   seleccionadoId,
   cargando,
   hayFiltros,
+  busqueda = "",
   onAbrir,
   hoy,
+  conProveedor = true,
+  recordar = true,
+  cabecerasFijas = true,
+  mesPedido = null,
+  etiqueta = "Documentos",
 }: {
-  /** Los documentos ya filtrados (buscador y chip). */
+  /** Los documentos ya filtrados (buscador, chip, local y periodo). */
   documentos: Factura[];
-  /** Todas las facturas (sin filtrar): para decir «en F-xxx» aunque esa factura no salga en la lista. */
+  /** Todas las facturas (sin filtrar): para decir «Incluido en F-xxx» aunque esa factura no salga en la lista. */
   facturas: Factura[];
   resolver: ResolverProveedor;
   avisosPorId: Map<number, unknown[]>;
+  /** El último documento abierto (se marca con `aria-current`). */
   seleccionadoId: number | null;
   cargando: boolean;
   hayFiltros: boolean;
+  /** Texto buscado (vacío si no hay búsqueda): decide qué meses salen abiertos. */
+  busqueda?: string;
   onAbrir: (id: number) => void;
   /** Para pruebas y capturas: el «hoy» que decide qué meses salen desplegados. */
   hoy?: Date;
+  /** Columna de proveedor (no hace falta dentro del despliegue de un proveedor). */
+  conProveedor?: boolean;
+  /** Recordar el plegado en localStorage (lista principal) o no (despliegue de un proveedor). */
+  recordar?: boolean;
+  /** Cabeceras de mes fijas al desplazar (solo en la lista principal). */
+  cabecerasFijas?: boolean;
+  /** Abre ese mes (al tocar una barra del resumen); cada `n` nuevo vuelve a aplicarlo. */
+  mesPedido?: { mes: string; n: number } | null;
+  etiqueta?: string;
 }) {
   const [ahora] = useState(() => hoy ?? new Date());
-  const [plegado, setPlegado] = useState<EstadoPlegado>(leerPlegado);
-  const grupos = useMemo(() => agruparDocumentos(documentos, resolver), [documentos, resolver]);
+  const [plegado, setPlegado] = useState<EstadoPlegado>(() => (recordar ? leerPlegado() : {}));
+  // Meses abiertos o plegados a mano durante UNA búsqueda: al cambiar el texto se olvida.
+  const [plegadoBusqueda, setPlegadoBusqueda] = useState<{ texto: string; estado: EstadoPlegado }>({ texto: "", estado: SIN_ESTADO });
+  const grupos = useMemo(() => agruparDocumentos(documentos), [documentos]);
   const facturaPorId = useMemo(() => new Map(facturas.map((f) => [f.id, f])), [facturas]);
+  const posicionMes = useMemo(() => new Map(grupos.map((g, i) => [g.clave, i])), [grupos]);
 
-  const cambiar = (k: string, abierto: boolean) =>
+  const buscando = busqueda.trim() !== "";
+  const porPosicion = buscando || !recordar;
+  const estadoMeses = buscando ? (plegadoBusqueda.texto === busqueda ? plegadoBusqueda.estado : SIN_ESTADO) : plegado;
+  const abiertoMes = (mes: string) =>
+    mesAbierto(mes, estadoMeses, ahora, porPosicion ? (posicionMes.get(mes) ?? 0) : null, grupos.length);
+
+  const cambiarMeses = (cambios: EstadoPlegado) => {
+    if (buscando) {
+      setPlegadoBusqueda((e) => ({ texto: busqueda, estado: { ...(e.texto === busqueda ? e.estado : SIN_ESTADO), ...cambios } }));
+      return;
+    }
     setPlegado((e) => {
-      const siguiente = { ...e, [k]: abierto };
-      guardarPlegado(siguiente);
+      const siguiente = { ...e, ...cambios };
+      if (recordar) guardarPlegado(siguiente);
       return siguiente;
     });
+  };
 
-  // Enlace profundo o salto desde una ficha: si el documento abierto está en un
-  // mes o proveedor plegado, se despliega (antes de pintar, para que la fila exista
-  // cuando `TabCompras` la deje a la vista). Un clic en una fila ya visible no cambia nada.
-  const doc = seleccionadoId === null ? undefined : documentos.find((d) => d.id === seleccionadoId);
-  const hayDoc = doc !== undefined;
+  const algunMesPlegado = porPosicion && grupos.some((g) => !abiertoMes(g.clave));
+  const verBotonTodos = porPosicion && (algunMesPlegado || grupos.length > MESES_ABIERTOS_BUSCANDO);
+  const todosLosMeses = (abierto: boolean) => cambiarMeses(Object.fromEntries(grupos.map((g) => [claveEstadoMes(g.clave), abierto])));
+
+  // Al tocar un mes en la gráfica del resumen: ese mes, desplegado.
   useLayoutEffect(() => {
-    if (!doc) return;
-    const { mes, proveedor } = ubicacionDocumento(doc, resolver);
-    const abrir: Record<string, boolean> = {};
-    if (!mesAbierto(mes, plegado, ahora, hayFiltros)) abrir[claveEstadoMes(mes)] = true;
-    if (!proveedorAbierto(mes, proveedor, plegado)) abrir[claveEstadoProveedor(mes, proveedor)] = true;
-    if (Object.keys(abrir).length === 0) return;
-    setPlegado((e) => {
-      const siguiente = { ...e, ...abrir };
-      guardarPlegado(siguiente);
-      return siguiente;
-    });
-    // Solo cuando cambia el documento abierto (o aparece en la lista): si luego el usuario
-    // pliega ese grupo, se respeta.
+    if (mesPedido && !abiertoMes(mesPedido.mes)) cambiarMeses({ [claveEstadoMes(mesPedido.mes)]: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seleccionadoId, hayDoc]);
+  }, [mesPedido?.n]);
 
   if (cargando) return <p className="p-4 text-sm text-muted-foreground">Cargando documentos…</p>;
   if (documentos.length === 0) {
@@ -103,81 +142,74 @@ export function ListaDocumentos({
     );
   }
 
+  const Titulo = cabecerasFijas ? "h3" : "h4";
+
   return (
-    <div aria-label="Documentos" data-testid="documentos-agrupados">
+    <div aria-label={etiqueta} data-testid={recordar ? "documentos-agrupados" : undefined}>
+      {verBotonTodos && (
+        <div className="flex items-center justify-between gap-2 border-b border-border/60 pl-2 text-xs text-muted-foreground" data-testid="barra-meses">
+          <span className="min-w-0 truncate">{plural(grupos.length, "mes", "meses")}{buscando ? " con resultados" : ""}</span>
+          <Button variant="ghost" className="h-11 shrink-0 px-3 text-sm" onClick={() => todosLosMeses(algunMesPlegado)}>
+            {algunMesPlegado ? "Abrir todos" : "Plegar todos"}
+          </Button>
+        </div>
+      )}
       {grupos.map((mes) => {
-        const abierto = mesAbierto(mes.clave, plegado, ahora, hayFiltros);
+        const abierto = abiertoMes(mes.clave);
         const Chevron = abierto ? ChevronDown : ChevronRight;
         return (
-          <section key={mes.clave} aria-label={mes.etiqueta} data-mes={mes.clave}>
-            {/* Cabecera del mes: fija dentro del scroll de la lista. */}
-            <h3 className="sticky top-0 z-10 m-0 border-b border-border/60 bg-card text-[15px]">
+          <section
+            key={mes.clave}
+            aria-label={mes.etiqueta}
+            data-mes={mes.clave}
+            // Lo que queda fuera de pantalla no se maqueta ni se pinta (años de histórico en tablet).
+            className="[content-visibility:auto]"
+            style={{ containIntrinsicSize: `auto ${altoEstimadoMes(mes, abierto)}px` }}
+          >
+            <Titulo className={`m-0 border-b border-border/60 bg-card text-[15px] ${cabecerasFijas ? "sticky top-0 z-10" : ""}`}>
               <button
                 type="button"
                 aria-expanded={abierto}
-                onClick={() => cambiar(claveEstadoMes(mes.clave), !abierto)}
-                className="flex min-h-11 w-full items-center gap-2 px-2 py-1 text-left font-semibold transition-colors hover:bg-muted/40"
+                onClick={() => cambiarMeses({ [claveEstadoMes(mes.clave)]: !abierto })}
+                className="flex min-h-12 w-full items-center gap-2 px-2 py-1 text-left font-semibold transition-colors hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
               >
                 <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                {/* Mes arriba, nº de documentos debajo en pequeño; el total a la derecha, alineado. */}
                 <span className="flex min-w-0 flex-1 flex-col leading-tight">
                   <span className="truncate">{mes.etiqueta}</span>
                   <span className="truncate text-xs font-normal text-muted-foreground">
                     <span className="sr-only"> · </span>
-                    {plural(mes.documentos, "documento", "documentos")}
+                    {plural(mes.documentos.length, "documento", "documentos")}
                     <span className="sr-only"> · </span>
                   </span>
                 </span>
-                <span className="shrink-0 text-right tabular-nums">{formatCurrency(mes.total)}</span>
-              </button>
-            </h3>
-            {abierto &&
-              mes.proveedores.map((prov) => {
-                const provAbierto = proveedorAbierto(mes.clave, prov.clave, plegado);
-                const ChevronProv = provAbierto ? ChevronDown : ChevronRight;
-                return (
-                  <div key={prov.clave || "sin-proveedor"} data-proveedor={prov.clave}>
-                    {/* Nivel 2: sangría 16 px (8 en estrecho); el chevron queda sobre la guía de los documentos. */}
-                    <h4 className="m-0 ml-2 bg-muted/30 text-[13px] sm:ml-4" data-nivel="proveedor">
-                      <button
-                        type="button"
-                        aria-expanded={provAbierto}
-                        onClick={() => cambiar(claveEstadoProveedor(mes.clave, prov.clave), !provAbierto)}
-                        className="flex min-h-11 w-full items-center gap-2 px-2 py-1 text-left font-medium transition-colors hover:bg-muted/50"
-                      >
-                        <ChevronProv className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                        <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                          <span className="truncate">{prov.nombre}</span>
-                          <span className="truncate text-[11px] font-normal text-muted-foreground">
-                            <span className="sr-only"> · </span>
-                            {plural(prov.documentos.length, "doc", "docs")}
-                            <span className="sr-only"> · </span>
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-right tabular-nums">{formatCurrency(prov.total)}</span>
-                      </button>
-                    </h4>
-                    {provAbierto && (
-                      <ul
-                        className="ml-4 divide-y divide-border/50 border-l border-border sm:ml-8"
-                        data-nivel="documentos"
-                        aria-label={`${prov.nombre}, ${mes.etiqueta}`}
-                      >
-                        {prov.documentos.map((d) => (
-                          <FilaDocumento
-                            key={d.id}
-                            d={d}
-                            avisos={(avisosPorId.get(d.id) ?? []).length}
-                            abierto={seleccionadoId === d.id}
-                            factura={d.facturado_en_id != null ? (facturaPorId.get(d.facturado_en_id) ?? null) : null}
-                            onAbrir={onAbrir}
-                          />
-                        ))}
-                      </ul>
+                <span className="shrink-0 text-right leading-tight">
+                  <span className="tabular-nums">{formatImporte(mes.total)}</span>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    <span className="sr-only"> </span>con IVA
+                    {mes.abonos < 0 && (
+                      <span className="text-emerald-700 dark:text-emerald-400" data-abonos-mes>
+                        {" "}· incl. abonos {formatImporte(mes.abonos)}
+                      </span>
                     )}
-                  </div>
-                );
-              })}
+                  </span>
+                </span>
+              </button>
+            </Titulo>
+            {abierto && (
+              <ul className="divide-y divide-border/50" aria-label={`Documentos de ${mes.etiqueta}`}>
+                {mes.documentos.map((d) => (
+                  <FilaDocumento
+                    key={d.id}
+                    d={d}
+                    proveedor={conProveedor ? (d.proveedor && d.proveedor.trim() ? resolver(d.proveedor).nombre : "Sin proveedor") : null}
+                    avisos={(avisosPorId.get(d.id) ?? []).length}
+                    abierto={seleccionadoId === d.id}
+                    factura={d.facturado_en_id != null ? (facturaPorId.get(d.facturado_en_id) ?? null) : null}
+                    onAbrir={onAbrir}
+                  />
+                ))}
+              </ul>
+            )}
           </section>
         );
       })}
@@ -187,66 +219,89 @@ export function ListaDocumentos({
 
 function FilaDocumento({
   d,
+  proveedor,
   avisos,
   abierto,
   factura,
   onAbrir,
 }: {
   d: Factura;
+  /** Nombre canónico del proveedor; null = sin columna de proveedor. */
+  proveedor: string | null;
   avisos: number;
   abierto: boolean;
   /** La factura que recoge este albarán, si consta. */
   factura: Factura | null;
   onAbrir: (id: number) => void;
 }) {
-  // Albarán ya recogido en una factura: se enseña atenuado y no suma en los totales.
+  // Albarán ya recogido en una factura: se enseña atenuado y tachado, y no suma en los totales.
   const facturado = d.tipo === "albaran" && d.facturado_en_id != null;
-  // Una sola insignia visible: la más importante (avisos > sin revisar > sin factura).
-  // Las demás van en el tooltip de la fila.
-  const marcas: { clave: string; texto: string; icono: typeof AlertTriangle; clase: string }[] = [];
-  if (avisos > 0) marcas.push({ clave: "avisos", texto: `${avisos} ${avisos === 1 ? "aviso" : "avisos"}`, icono: AlertTriangle, clase: "text-red-700 dark:text-red-400" });
-  if (!d.verificada) marcas.push({ clave: "sin-revisar", texto: "Sin revisar", icono: EyeOff, clase: "text-muted-foreground" });
-  if (esAlbaranSinFactura(d)) marcas.push({ clave: "sin-factura", texto: "Sin factura", icono: Receipt, clase: "text-amber-700 dark:text-amber-400" });
-  const principal = marcas[0];
-  const Icono = principal?.icono;
-  const textoFactura = facturado ? `en ${factura?.numero_documento ?? "una factura"}` : null;
+  const abono = esAbono(d);
+  const touza = localDe(d) === "touza";
+  const conProveedor = proveedor !== null;
   return (
     <li>
       <button
         type="button"
         onClick={() => onAbrir(d.id)}
         aria-current={abierto ? "true" : undefined}
-        title={
-          facturado
-            ? `Ya incluido en ${factura ? `la factura ${factura.numero_documento}` : "una factura"}: no suma en los totales`
-            : marcas.length > 1
-              ? marcas.map((m) => m.texto).join(" · ")
-              : undefined
-        }
+        data-doc-id={d.id}
         data-facturado={facturado ? "true" : undefined}
-        className={`flex min-h-12 w-full scroll-mt-12 items-center gap-3 px-2 py-1.5 text-left transition-colors hover:bg-muted/40 ${abierto ? "bg-muted/70" : ""} ${facturado ? "opacity-60" : ""}`}
+        className={`grid min-h-12 w-full scroll-mt-12 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 px-2 py-1.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary lg:gap-y-0 ${
+          conProveedor
+            ? "lg:grid-cols-[5.5rem_minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1.5fr)_8rem]"
+            : "lg:grid-cols-[5.5rem_minmax(0,1fr)_minmax(0,2fr)_8rem]"
+        } ${abierto ? "bg-muted/70" : ""}`}
       >
-        <span className="min-w-0 flex-1">
-          <span className="flex min-w-0 items-baseline gap-1.5">
-            <span className="min-w-0 truncate text-sm font-semibold">
-              <span data-numero>{d.numero_documento}</span>
-              <span className="font-normal text-muted-foreground"> · {ETIQUETA_TIPO[d.tipo] ?? d.tipo}</span>
-            </span>
-            {principal && Icono && (
-              <span className={`inline-flex shrink-0 items-center gap-1 text-[11px] pointer-coarse:text-xs font-medium ${principal.clase}`}>
-                <Icono className="h-3 w-3" aria-hidden="true" /> {principal.texto}
-                {marcas.length > 1 && <span className="font-normal text-muted-foreground">+{marcas.length - 1}</span>}
+        {/* Línea 1 (estrecho): proveedor —o el número, si no hay columna de proveedor—. */}
+        <span className="col-start-1 row-start-1 min-w-0 truncate text-sm font-semibold lg:col-start-2">
+          {conProveedor ? proveedor : <span data-numero>{d.numero_documento}</span>}
+        </span>
+
+        {/* Línea 2 (estrecho): fecha · número · marcas. Desde 1024 px, cada cosa en su columna (`lg:contents`). */}
+        <span className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground lg:contents">
+          <span className="whitespace-nowrap tabular-nums lg:col-start-1 lg:row-start-1 lg:text-sm">{formatDateCorta(d.fecha)}</span>
+          {conProveedor && (
+            <>
+              <span aria-hidden="true" className="lg:hidden">·</span>
+              <span className="min-w-0 truncate font-medium text-foreground lg:col-start-3 lg:row-start-1 lg:text-sm lg:font-normal" data-numero>
+                {d.numero_documento}
+              </span>
+            </>
+          )}
+          <span className={`flex min-w-0 flex-wrap items-center gap-1 lg:row-start-1 ${conProveedor ? "lg:col-start-4" : "lg:col-start-3"}`}>
+            {d.tipo === "albaran" && <Insignia clase={CLASE_ALBARAN}>Albarán</Insignia>}
+            {abono && <Insignia clase={CLASE_ABONO}>Abono</Insignia>}
+            {touza && <Insignia clase={CLASE_TOUZA}>Touza</Insignia>}
+            {avisos > 0 && (
+              <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-red-700 dark:text-red-400">
+                <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> {plural(avisos, "aviso", "avisos")}
+              </span>
+            )}
+            {!d.verificada && (
+              <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-muted-foreground">
+                <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> Sin revisar
+              </span>
+            )}
+            {esAlbaranSinFactura(d) && (
+              <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400">
+                <Receipt className="h-3.5 w-3.5" aria-hidden="true" /> Sin factura
+              </span>
+            )}
+            {facturado && (
+              <span className="whitespace-nowrap text-xs text-muted-foreground" data-en-factura>
+                Incluido en {factura?.numero_documento ?? "una factura"} · no suma
               </span>
             )}
           </span>
-          <span className="block truncate text-xs text-muted-foreground">
-            {formatDateCorta(d.fecha)}
-            {textoFactura && <span data-en-factura> · {textoFactura}</span>}
-            {d.productos.length > 0 && ` · ${d.productos.length} línea(s)`}
-          </span>
         </span>
-        <span className={`shrink-0 text-sm font-semibold tabular-nums ${facturado ? "font-normal line-through decoration-muted-foreground/60" : ""}`}>
-          {d.total != null ? formatCurrency(d.total) : "—"}
+
+        <span
+          className={`col-start-2 row-span-2 row-start-1 self-center whitespace-nowrap text-right text-sm font-semibold tabular-nums lg:row-span-1 ${
+            conProveedor ? "lg:col-start-5" : "lg:col-start-4"
+          } ${facturado ? "font-normal text-muted-foreground line-through decoration-muted-foreground/60" : ""} ${abono ? "text-emerald-700 dark:text-emerald-400" : ""}`}
+        >
+          {d.total != null ? formatImporte(d.total) : "—"}
         </span>
       </button>
     </li>

@@ -1,12 +1,30 @@
 import { useState, type ReactNode } from "react";
-import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura, type Factura } from "@/hooks/useFacturas";
+import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCantidadLinea, formatCurrency, formatNumero, valorSinDescuento } from "./formatters";
+import { formatCantidadLinea, formatCurrency, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
+import { esLineaRegalo } from "@/lib/facturas/resumenCompras";
+
+/** «Regalo»: la línea no se cobró (importe 0) pero vale algo (`importe_bruto`). */
+const InsigniaRegalo = () => (
+  <span className="inline-flex h-6 shrink-0 items-center rounded-md border border-emerald-300 bg-emerald-50 px-1.5 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+    Regalo
+  </span>
+);
+
+/** «Valor sin descuento …» a la vista y su explicación en un popover táctil (no en `title`). */
+const ValorSinDescuento = ({ v, className = "" }: { v: { texto: string; titulo: string }; className?: string }) => (
+  <span className={`inline-flex items-center gap-1 ${className}`}>
+    <span>{v.texto}</span>
+    <AyudaPopover etiqueta="Qué es el valor sin descuento" className="-my-3.5 ml-0 mr-0 h-11 w-11">
+      {v.titulo}
+    </AyudaPopover>
+  </span>
+);
 
 /**
  * Categoría del producto de la línea (catálogo de Facturas › Productos). Solo
@@ -15,7 +33,7 @@ import { normalizarUnidadFactura } from "./unidad";
 export const EtiquetaCategoria = ({ p }: { p: ProductoFactura }) =>
   p.categoria ? (
     <span
-      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] pointer-coarse:text-xs font-normal leading-none text-muted-foreground"
+      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-xs font-normal leading-none text-muted-foreground"
       title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}
     >
       {p.categoria.nombre}
@@ -57,14 +75,18 @@ const NombreLinea = ({
 export const FilaProducto = ({
   p,
   isMobile,
-  allDocs,
+  mediaReferencia,
   onAbrirProducto,
   nuevaEnFacturaId,
   onCerrarNueva,
 }: {
   p: ProductoFactura;
   isMobile?: boolean;
-  allDocs: Factura[];
+  /**
+   * Media de referencia del precio unitario (otras líneas del mismo producto y
+   * proveedor; ver `indicePreciosLinea`). Sin ella no se avisa de nada.
+   */
+  mediaReferencia?: number;
   /** Si se pasa, el nombre de la línea enlaza con la ficha de su producto. */
   onAbrirProducto?: (productoId: number) => void;
   /** Modo «línea nueva»: `p` va vacío, se abre el formulario y Guardar crea la línea en ese documento. */
@@ -115,17 +137,14 @@ export const FilaProducto = ({
     }
   };
 
-  const pastPrices = allDocs
-    .flatMap(f => f.productos)
-    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-    .map(past => past.precio_unitario as number);
-
-  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
-
-  // Warning si el precio unitario cambia drásticamente respecto al último histórico (+100%)
-  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
+  // Aviso si el precio unitario pasa del doble de la media de referencia (mismo
+  // proveedor y nombre, sin precios a 0; la calcula quien monta la fila con
+  // `indicePreciosLinea`, una sola vez para todas las líneas).
+  const avgPrice = mediaReferencia;
+  const hasAnomaly = precioAnomalo(p.precio_unitario, avgPrice);
   const sinDescuento = valorSinDescuento(p);
-  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
+  const regalo = esLineaRegalo(p);
+  const showAnomalyWarning = isEditing ? precioAnomalo(precioUnitario === "" ? null : Number(precioUnitario), avgPrice) : hasAnomaly;
 
   if (isMobile) {
     if (isEditing) {
@@ -162,7 +181,8 @@ export const FilaProducto = ({
           <div className="flex items-baseline justify-between gap-2">
             <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
             <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
-              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
+              {regalo && <InsigniaRegalo />}
+              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatCurrency(avgPrice ?? null)})</AyudaPopover>}
               {formatCurrency(p.precio)}
             </span>
           </div>
@@ -176,7 +196,9 @@ export const FilaProducto = ({
             )}
           </p>
           {sinDescuento && (
-            <p className="text-muted-foreground" title={sinDescuento.titulo}>{sinDescuento.texto}</p>
+            <p className="text-muted-foreground">
+              <ValorSinDescuento v={sinDescuento} />
+            </p>
           )}
         </div>
         <Button
@@ -267,14 +289,19 @@ export const FilaProducto = ({
       </TableCell>
       <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
         <div className="flex items-center justify-end gap-1.5">
-          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
+          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatCurrency(avgPrice ?? null)})</AyudaPopover>}
           <span>{formatCurrency(p.precio_unitario ?? null)}</span>
         </div>
       </TableCell>
       <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
-        {formatCurrency(p.precio)}
+        <span className="inline-flex items-center justify-end gap-1.5">
+          {regalo && <InsigniaRegalo />}
+          {formatCurrency(p.precio)}
+        </span>
         {sinDescuento && (
-          <span className="block whitespace-normal text-xs font-normal text-muted-foreground" title={sinDescuento.titulo}>{sinDescuento.texto}</span>
+          <span className="block whitespace-normal text-xs font-normal text-muted-foreground">
+            <ValorSinDescuento v={sinDescuento} className="justify-end" />
+          </span>
         )}
       </TableCell>
     </TableRow>

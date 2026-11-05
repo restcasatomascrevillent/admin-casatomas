@@ -9,6 +9,7 @@
 import type { Factura } from "@/hooks/useFacturas";
 import { filtrarProductos, normalizarBusqueda, type MapaCategorias, type ResumenProducto } from "./productos";
 import { filtrarProveedores, type Proveedor, type ResolverProveedor } from "./proveedores";
+import { esAbono } from "./resumenCompras";
 
 export type ModoCompras = "documentos" | "productos" | "proveedores";
 
@@ -23,6 +24,7 @@ export type FiltroDocumentos =
   | "facturas"
   | "albaranes"
   | "albaranes_sin_factura"
+  | "abonos"
   | "con_avisos"
   | "sin_revisar";
 
@@ -31,6 +33,7 @@ export const FILTROS_DOCUMENTOS: { valor: FiltroDocumentos; etiqueta: string }[]
   { valor: "facturas", etiqueta: "Facturas" },
   { valor: "albaranes", etiqueta: "Albaranes" },
   { valor: "albaranes_sin_factura", etiqueta: "Albaranes sin factura" },
+  { valor: "abonos", etiqueta: "Abonos" },
   { valor: "con_avisos", etiqueta: "Con avisos" },
   { valor: "sin_revisar", etiqueta: "Sin revisar" },
 ];
@@ -96,6 +99,8 @@ function pasaFiltroDocumento(d: Factura, filtro: FiltroDocumentos, avisos: Aviso
       return d.tipo === "albaran";
     case "albaranes_sin_factura":
       return esAlbaranSinFactura(d);
+    case "abonos":
+      return esAbono(d);
     case "con_avisos":
       return (avisos.get(d.id) ?? []).length > 0;
     case "sin_revisar":
@@ -123,6 +128,7 @@ export function contarFiltrosDocumentos(docs: Factura[], texto: string, avisos: 
     facturas: cuenta("facturas"),
     albaranes: cuenta("albaranes"),
     albaranes_sin_factura: cuenta("albaranes_sin_factura"),
+    abonos: cuenta("abonos"),
     con_avisos: cuenta("con_avisos"),
     sin_revisar: cuenta("sin_revisar"),
   };

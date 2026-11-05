@@ -102,12 +102,18 @@ export interface Factura {
    * null = sin revisar.
    */
   verificacion_origen?: "auto" | "manual" | null;
+  /**
+   * A qué local va el documento (`facturas.local`, migración 20261104170000):
+   * 'casa_tomas' | 'touza'. null = sin marcar (lo subido por el OCR), que se
+   * trata como Casa Tomás (decisión del dueño). Ausente si la columna no existe.
+   */
+  local?: "casa_tomas" | "touza" | null;
 }
 
 const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
 
-const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean) => `
-      id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,${conFacturado ? " facturado_en_id," : ""}
+const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean, conLocal: boolean) => `
+      id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,${conFacturado ? " facturado_en_id," : ""}${conLocal ? " local," : ""}
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
       alertas_validacion, procesado_en, created_at, verificada, verificacion_origen,
       productos_factura (
@@ -150,10 +156,10 @@ const fetchDocumentosConProductos = async (
   // Una sola query con JOIN por tanda — se evita el N+1 de queries separadas.
   // Por tandas (`.range`, carga escalonada): PostgREST corta cada petición a
   // 1.000 filas y con el histórico hay más. Ver lib/facturas/cargaEscalonada.ts.
-  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean, primera: number, ultima: number) =>
+  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean, conLocal: boolean, primera: number, ultima: number) =>
     supabase
       .from('facturas')
-      .select(columnasDocumento(conBultos, conProducto, conFacturado, conBruto))
+      .select(columnasDocumento(conBultos, conProducto, conFacturado, conBruto, conLocal))
       .eq('tipo', tipo)
       .order('fecha', { ascending: false })
       // Desempate por id: sin un orden total las tandas repiten o se saltan documentos del mismo día.
@@ -174,11 +180,13 @@ const fetchDocumentosConProductos = async (
   let conFacturado = true;
   // Valor sin descuento: migración 20261104170000 (importación histórica).
   let conBruto = true;
+  // Local (Casa Tomás / Touza): la misma migración 20261104170000.
+  let conLocal = true;
   const mapaCategorias = new Map((categorias ?? []).map((c) => [c.id, c]));
 
   const leerTanda = async (primera: number, ultima: number): Promise<Factura[]> => {
-    let { data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto, primera, ultima);
-    for (let i = 0; i < 4 && error; i++) {
+    let { data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto, conLocal, primera, ultima);
+    for (let i = 0; i < 5 && error; i++) {
       const msg = error.message ?? '';
       if (conProducto && /producto_id|productos_catalogo|relationship/i.test(msg)) conProducto = false;
       // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
@@ -187,8 +195,10 @@ const fetchDocumentosConProductos = async (
       else if (conBultos && /bultos/i.test(msg)) conBultos = false;
       else if (conFacturado && /facturado_en_id/i.test(msg)) conFacturado = false;
       else if (conBruto && /importe_bruto|descuento_pct/i.test(msg)) conBruto = false;
+      // «column facturas.local does not exist»
+      else if (conLocal && /\blocal\b/i.test(msg)) conLocal = false;
       else break;
-      ({ data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto, primera, ultima));
+      ({ data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto, conLocal, primera, ultima));
     }
 
     if (error) throw error;
@@ -245,6 +255,7 @@ const fetchDocumentosConProductos = async (
         verificada: doc.verificada ?? false,
         verificacion_origen:
           doc.verificacion_origen === "auto" || doc.verificacion_origen === "manual" ? doc.verificacion_origen : null,
+        local: doc.local === "casa_tomas" || doc.local === "touza" ? doc.local : null,
       };
     });
   };
