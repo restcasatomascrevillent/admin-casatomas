@@ -84,15 +84,24 @@ export interface LimitePublicacion {
   restantes: number | null;
 }
 
-export type TipoPublicacion = "post" | "story";
+export type TipoPublicacion = "post" | "story" | "reel";
 
 export interface DatosContenedor {
-  imageUrl: string;
+  /** Posts y stories (JPEG público). */
+  imageUrl?: string | undefined;
   caption?: string | undefined;
   tipo: TipoPublicacion;
-  /** Texto alternativo; solo se envía en publicaciones de feed. */
+  /** Texto alternativo; solo se envía en publicaciones de feed (Meta: «Images only»). */
   altText?: string | undefined;
   igUserId?: string | undefined;
+  /** Reels: MP4 público (media_type=REELS). */
+  videoUrl?: string | undefined;
+  /** Reels: portada JPEG pública (si va, Meta ignora thumbOffsetMs). */
+  coverUrl?: string | undefined;
+  /** Reels: fotograma de portada en ms (si no hay coverUrl). */
+  thumbOffsetMs?: number | undefined;
+  /** Reels: también en el feed (por defecto, sí). */
+  shareToFeed?: boolean | undefined;
 }
 
 export type EstadoContenedor = "EXPIRED" | "ERROR" | "FINISHED" | "IN_PROGRESS" | "PUBLISHED";
@@ -349,7 +358,23 @@ export class ClienteGraph {
   /** POST /{ig-user-id}/media → id del contenedor. */
   async crearContenedor(d: DatosContenedor): Promise<string> {
     const id = this.idCuenta(d.igUserId);
-    const cuerpo: Record<string, string> = { image_url: d.imageUrl };
+    const cuerpo: Record<string, string> = {};
+    if (d.tipo === "reel") {
+      // Reels (doc de Meta, POST /{ig-user-id}/media): media_type=REELS +
+      // video_url; cover_url manda sobre thumb_offset; alt_text NO (solo imágenes).
+      if (!d.videoUrl) throw new Error("crearContenedor: un reel necesita videoUrl.");
+      cuerpo.media_type = "REELS";
+      cuerpo.video_url = d.videoUrl;
+      cuerpo.share_to_feed = d.shareToFeed === false ? "false" : "true";
+      if (d.caption) cuerpo.caption = d.caption;
+      if (d.coverUrl) cuerpo.cover_url = d.coverUrl;
+      else if (typeof d.thumbOffsetMs === "number" && d.thumbOffsetMs >= 0) cuerpo.thumb_offset = String(Math.round(d.thumbOffsetMs));
+      const r = await this.peticion<{ id?: string }>("POST", `/${encodeURIComponent(id)}/media`, { cuerpo });
+      if (!r.id) throw new ErrorInstagram({ tipo: "respuesta_inesperada", mensaje: "Meta no devolvió el id del contenedor." });
+      return String(r.id);
+    }
+    if (!d.imageUrl) throw new Error("crearContenedor: falta imageUrl.");
+    cuerpo.image_url = d.imageUrl;
     if (d.tipo === "story") {
       cuerpo.media_type = "STORIES";
     } else {

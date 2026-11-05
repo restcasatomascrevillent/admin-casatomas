@@ -58,6 +58,11 @@
  *
  *   Lectura de la pieza, Storage y Drive como el usuario (clave pública + su
  *   JWT); el estado de publicación y el cerrojo, con service_role.
+ *
+ *   REELS (tipo_medio = 'reel', migración 20261109100000): mismo cuerpo y
+ *   mismas reglas; el medio es el MP4 del cubo «instagram-video» y, si Meta no
+ *   termina de procesarlo enseguida, la pieza queda «procesando» y responde
+ *   202 (lo cierra el cron o «Comprobar ahora»). Detalle en reel.ts.
  */
 import { carpetaPublicadas, leerConfigDrive } from "../_shared/instagram/drive.ts";
 import { ClienteGraph, type FuncionFetch, type InfoContenedor } from "../_shared/instagram/cliente.ts";
@@ -85,6 +90,7 @@ import {
   type Sesion,
 } from "../_shared/instagram/supabase.ts";
 import { esUuid, MAX_BYTES_IMAGEN, validarAltText, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
+import { esReel, problemaReel, publicarReelReservado } from "./reel.ts";
 
 const ETIQUETA = "instagram-publicar";
 
@@ -181,16 +187,23 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   // El estado de publicación solo lo escribe el servidor (service_role).
   const sw = sesionEscritura(s, env, ETIQUETA);
   if (fila.estado === "publicada") return json(409, { ok: false, error: "Esa pieza ya está publicada", permalink: fila.permalink, mediaId: fila.media_id });
-  if (!fila.imagen_ruta) return json(409, { ok: false, error: "La pieza no tiene imagen: genérala antes de publicar" });
-  if (fila.imagen_borrada_at) {
-    return json(409, { ok: false, tipo: "imagen_borrada", error: "La imagen de esta pieza se borró del bucket por llevar días sin publicarse: vuelve a generarla" });
-  }
+  const reel = esReel(fila);
   const contenedorPedido = typeof entrada.contenedorId === "string" ? entrada.contenedorId : null;
+  if (reel) {
+    const problema = problemaReel(fila, contenedorPedido, (deps.ahora ?? Date.now)());
+    if (problema) return json(409, problema);
+  } else {
+    if (!fila.imagen_ruta) return json(409, { ok: false, error: "La pieza no tiene imagen: genérala antes de publicar" });
+    if (fila.imagen_borrada_at) {
+      return json(409, { ok: false, tipo: "imagen_borrada", error: "La imagen de esta pieza se borró del bucket por llevar días sin publicarse: vuelve a generarla" });
+    }
+  }
   if (contenedorPedido && fila.contenedor_id !== contenedorPedido) {
     return json(409, { ok: false, error: "Ese contenedor no es el de esta pieza; vuelve a lanzar la publicación sin contenedorId" });
   }
 
-  const tipo: TipoPublicacion = fila.formato === "story" ? "story" : "post";
+  // Los reels llevan texto como los posts.
+  const tipo: TipoPublicacion = !reel && fila.formato === "story" ? "story" : "post";
   const caption = typeof entrada.caption === "string" ? entrada.caption : (fila.caption ?? "");
   const vCaption = validarCaption(caption, tipo);
   if (!vCaption.ok) return json(422, { ok: false, error: "El texto no es válido", problemas: vCaption.errores });
@@ -201,7 +214,7 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   const vAlt = validarAltText(altText, tipo);
   if (!vAlt.ok) return json(422, { ok: false, error: "El texto alternativo no es válido", problemas: vAlt.errores });
   avisos.push(...vAlt.avisos);
-  const altEnvio = tipo === "post" && altText ? altText : undefined;
+  const altEnvio = !reel && tipo === "post" && altText ? altText : undefined;
 
   // Cerrojo: nadie más prueba ni publica esta pieza mientras tanto.
   let reserva: Awaited<ReturnType<typeof reservarPublicacion>>;
@@ -231,13 +244,14 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   if (reserva.sinCerrojo) registro("warn", ETIQUETA, "sin cerrojo de publicación (falta la migración 20261107000000)", { id });
   const bloqueo = reserva.bloqueo;
   try {
-    return await publicarReservado({ s, sw, env, deps, id, dryRun, fotoTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, avisos, resumenCaption });
+    const contexto: ContextoPublicacion = { s, sw, env, deps, id, dryRun, fotoTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, avisos, resumenCaption };
+    return await (reel ? publicarReelReservado(contexto) : publicarReservado(contexto));
   } finally {
     await liberarPublicacion(sw, id, bloqueo);
   }
 }
 
-interface ContextoPublicacion {
+export interface ContextoPublicacion {
   s: Sesion;
   /** Sesión con la que se escribe el estado (service_role). */
   sw: Sesion;

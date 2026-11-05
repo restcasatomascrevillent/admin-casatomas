@@ -39,7 +39,7 @@ export const SECCION_MARKETING = "marketing";
 export const BUCKET = "instagram";
 const MS_TIEMPO = 15_000;
 
-export type EstadoPieza = "borrador" | "generada" | "prueba_ok" | "publicada" | "error";
+export type EstadoPieza = "borrador" | "generada" | "procesando" | "prueba_ok" | "publicada" | "error";
 
 export interface FilaPieza {
   id: string;
@@ -58,6 +58,14 @@ export interface FilaPieza {
   alt_text?: string | null;
   /** Cuándo se borró el JPEG por no publicarse (migración 20261107010000; null = está). */
   imagen_borrada_at?: string | null;
+  /** Reels (migración 20261109100000; no existen antes): «imagen» o «reel» y su MP4. */
+  tipo_medio?: string | null;
+  video_ruta?: string | null;
+  portada_ruta?: string | null;
+  duracion_s?: number | string | null;
+  video_bytes?: number | null;
+  procesando_accion?: string | null;
+  procesando_desde?: string | null;
   creado_por: string | null;
   created_at?: string;
   updated_at?: string;

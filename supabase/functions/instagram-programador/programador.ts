@@ -40,6 +40,15 @@
  *          5xx, red, excepción         → reintentar con espera creciente
  *                                         (ESPERAS_REINTENTO); al 3.er intento, error
  *
+ *   REELS (docs/instagram-video.md): Meta tarda minutos en procesar un vídeo.
+ *     - Una programación de reel que recibe 202 se APLAZA (sin contar intento)
+ *       con el mismo contenedor mientras no pase ESPERA_MAX_REEL_MS desde su
+ *       hora; después cuenta como reintento normal.
+ *     - Al final de cada pasada se cierran los reels que el panel dejó
+ *       «procesando» (prueba o publicación): cerrarProcesando() repite la
+ *       misma petición con su contenedor (prueba_ok / publicada / error). A
+ *       las 24 h (el contenedor caduca) quedan en error.
+ *
  *   Escrituras con service_role: la auditoría exige la cabecera
  *   x-audit-source (fn_identificar_actor_auditoria); se pone en TODAS las
  *   llamadas a Supabase.
@@ -51,6 +60,7 @@ import { registrarSecreto, registro, sanear } from "../_shared/instagram/secreto
 import { leerPieza, type FilaPieza, type Sesion } from "../_shared/instagram/supabase.ts";
 import { publicarConSesion, type DependenciasPublicar } from "../instagram-publicar/publicar.ts";
 import { limpiarBucket } from "./limpieza.ts";
+import { cerrarProcesando } from "./procesando.ts";
 
 export const ETIQUETA = "instagram-programador";
 export const CABECERA_SECRETO = "x-webhook-secret";
@@ -71,6 +81,8 @@ export const PRESUPUESTO_SONDEO_MS = 40_000;
 /** No se empieza otra pieza pasado este tiempo de la pasada. */
 export const PRESUPUESTO_PASADA_MS = 60_000;
 export const MAX_POR_PASADA = 5;
+/** Reels: cuánto se aplaza sin contar intento mientras Meta procesa el vídeo (desde la hora programada). */
+export const ESPERA_MAX_REEL_MS = 60 * 60_000;
 
 export type Resultado = "publicada" | "reintentar" | "aplazar" | "error";
 
@@ -193,6 +205,7 @@ interface CuerpoPublicar {
   contenedor?: { id?: string | null } | null;
   reintentar?: { contenedorId?: string } | null;
   cuota?: { usadas?: number; total?: number | null } | null;
+  tipoMedio?: string;
 }
 
 function textoError(c: CuerpoPublicar, estado: number): string {
@@ -206,8 +219,28 @@ function textoError(c: CuerpoPublicar, estado: number): string {
  * Decide cómo cerrar la programación a partir de la respuesta del núcleo.
  * Pura (se prueba sola). `contenedorEnviado`: el que se pidió reutilizar.
  */
-export function clasificar(estado: number, c: CuerpoPublicar, p: Pick<Programacion, "intentos">, contenedorEnviado: string | null): Cierre {
+export function clasificar(
+  estado: number,
+  c: CuerpoPublicar,
+  p: Pick<Programacion, "intentos"> & { programada_para?: string },
+  contenedorEnviado: string | null,
+  ahora: number = Date.now(),
+): Cierre {
   const espera = esperaReintento(p.intentos);
+  // Reel: Meta sigue procesando el vídeo. No es un fallo: se aplaza sin contar
+  // intento (con el mismo contenedor) durante la primera hora.
+  if (estado === 202 && c.tipoMedio === "reel") {
+    const desde = p.programada_para ? Date.parse(p.programada_para) : NaN;
+    const contenedor = c.reintentar?.contenedorId ?? c.contenedor?.id ?? contenedorEnviado;
+    if (Number.isFinite(desde) && ahora - desde < ESPERA_MAX_REEL_MS) {
+      return {
+        resultado: "aplazar",
+        contenedorId: contenedor ?? null,
+        esperaSeg: ESPERA_SIGUIENTE_PASADA_SEG,
+        mensaje: "Instagram todavía está procesando el vídeo; se publica en la siguiente pasada con el mismo contenedor.",
+      };
+    }
+  }
   if (estado === 200 && c.publicado && c.mediaId) {
     const avisos = (c.avisos ?? []).filter(Boolean);
     return { resultado: "publicada", mediaId: c.mediaId, permalink: c.permalink ?? null, mensaje: avisos.length ? avisos.join(" · ") : null };
@@ -279,7 +312,7 @@ export async function procesar(s: Sesion, p: Programacion, env: Record<string, s
       intervaloMs: deps.intervaloMs,
     });
     const c = ((await r.json().catch(() => ({}))) ?? {}) as CuerpoPublicar;
-    return clasificar(r.status, c, p, contenedor);
+    return clasificar(r.status, c, p, contenedor, (deps.ahora ?? Date.now)());
   } catch (e) {
     registro("error", ETIQUETA, "fallo al publicar", { id: p.id, error: (e as Error)?.message ?? String(e) });
     return { resultado: "reintentar", esperaSeg: esperaReintento(p.intentos), contenedorId: contenedor, mensaje: `No se pudo publicar: ${(e as Error)?.message ?? e}` };
@@ -351,7 +384,16 @@ export async function manejarProgramador(request: Request, deps: DependenciasPro
   if (accion !== undefined && accion !== "publicar") return json(400, { ok: false, error: "Acción no válida: usa «publicar» (o nada) o «limpiar»" });
   try {
     const resultados = await ejecutarPasada(s, env, deps);
-    return json(200, { ok: true, procesadas: resultados.length, resultados });
+    const procesando = await cerrarProcesando(s, env, {
+      etiqueta: ETIQUETA,
+      publicar: deps.publicar,
+      fetch: deps.fetch,
+      dormir: deps.dormir,
+      ahora: deps.ahora,
+      presupuestoSondeoMs: deps.presupuestoSondeoMs ?? PRESUPUESTO_SONDEO_MS,
+      intervaloMs: deps.intervaloMs,
+    });
+    return json(200, { ok: true, procesadas: resultados.length, resultados, ...(procesando.length ? { procesando } : {}) });
   } catch (e) {
     registro("error", ETIQUETA, "pasada", e);
     return json(500, { ok: false, error: "No se pudo completar la pasada", detalle: sanear((e as Error)?.message ?? e) });
