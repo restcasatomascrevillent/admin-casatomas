@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from "@tanstack/react-query";
+import { cargarEscalonado, type CacheEscalonada } from "@/lib/facturas/cargaEscalonada";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -142,18 +143,26 @@ function categoriaDeLinea(
   return { nombre: c.nombre, ruta: padre ? `${padre.nombre} › ${c.nombre}` : c.nombre };
 }
 
-const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
-  // Una sola query con JOIN — se evita el N+1 de queries separadas
-  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean) =>
+const fetchDocumentosConProductos = async (
+  tipo: 'factura' | 'albaran',
+  { client, queryKey }: Pick<QueryFunctionContext, 'client' | 'queryKey'>,
+): Promise<Factura[]> => {
+  // Una sola query con JOIN por tanda — se evita el N+1 de queries separadas.
+  // Por tandas (`.range`, carga escalonada): PostgREST corta cada petición a
+  // 1.000 filas y con el histórico hay más. Ver lib/facturas/cargaEscalonada.ts.
+  const consultar = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean, primera: number, ultima: number) =>
     supabase
       .from('facturas')
       .select(columnasDocumento(conBultos, conProducto, conFacturado, conBruto))
       .eq('tipo', tipo)
       .order('fecha', { ascending: false })
+      // Desempate por id: sin un orden total las tandas repiten o se saltan documentos del mismo día.
+      .order('id', { ascending: false })
       // Las líneas en el orden impreso: se insertan en ese orden (también las de
       // los documentos largos, 04b), así que el id lo reproduce sin depender de
       // la columna `orden` (migración 20261005120000, puede no estar aplicada).
-      .order('id', { referencedTable: 'productos_factura', ascending: true });
+      .order('id', { referencedTable: 'productos_factura', ascending: true })
+      .range(primera, ultima);
 
   // La categoría de cada línea (catálogo de productos, migración
   // 20261007160000) es un extra: sin la migración se consulta sin ella.
@@ -165,90 +174,101 @@ const fetchDocumentosConProductos = async (tipo: 'factura' | 'albaran'): Promise
   let conFacturado = true;
   // Valor sin descuento: migración 20261104170000 (importación histórica).
   let conBruto = true;
-  let { data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto);
-  for (let i = 0; i < 4 && error; i++) {
-    const msg = error.message ?? '';
-    if (conProducto && /producto_id|productos_catalogo|relationship/i.test(msg)) conProducto = false;
-    // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
-    // mientras no esté, se repite la consulta sin esa columna en vez de dejar el
-    // listado de facturas vacío.
-    else if (conBultos && /bultos/i.test(msg)) conBultos = false;
-    else if (conFacturado && /facturado_en_id/i.test(msg)) conFacturado = false;
-    else if (conBruto && /importe_bruto|descuento_pct/i.test(msg)) conBruto = false;
-    else break;
-    ({ data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto));
-  }
   const mapaCategorias = new Map((categorias ?? []).map((c) => [c.id, c]));
 
-  if (error) throw error;
-  if (!data || data.length === 0) return [];
+  const leerTanda = async (primera: number, ultima: number): Promise<Factura[]> => {
+    let { data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto, primera, ultima);
+    for (let i = 0; i < 4 && error; i++) {
+      const msg = error.message ?? '';
+      if (conProducto && /producto_id|productos_catalogo|relationship/i.test(msg)) conProducto = false;
+      // `bultos` llega con la migración 20261005150000, que aplica el dueño a mano:
+      // mientras no esté, se repite la consulta sin esa columna en vez de dejar el
+      // listado de facturas vacío.
+      else if (conBultos && /bultos/i.test(msg)) conBultos = false;
+      else if (conFacturado && /facturado_en_id/i.test(msg)) conFacturado = false;
+      else if (conBruto && /importe_bruto|descuento_pct/i.test(msg)) conBruto = false;
+      else break;
+      ({ data, error } = await consultar(conBultos, conProducto, conFacturado, conBruto, primera, ultima));
+    }
 
-  return data.map((doc: any) => {
-    const productos: ProductoFactura[] = (doc.productos_factura || []).map((p: any) => {
-      const precioUnitario = Number(p.precio_unitario) || 0;
-      const cantidad = Number(p.cantidad) || 0;
-      // El importe IMPRESO (0 en un regalo); solo si no hay importe se calcula.
-      const totalProducto = p.total != null && p.total !== "" ? Number(p.total) : precioUnitario * cantidad;
+    if (error) throw error;
+    if (!data || data.length === 0) return [];
+
+    return data.map((doc: any) => {
+      const productos: ProductoFactura[] = (doc.productos_factura || []).map((p: any) => {
+        const precioUnitario = Number(p.precio_unitario) || 0;
+        const cantidad = Number(p.cantidad) || 0;
+        // El importe IMPRESO (0 en un regalo); solo si no hay importe se calcula.
+        const totalProducto = p.total != null && p.total !== "" ? Number(p.total) : precioUnitario * cantidad;
+        return {
+          id: p.id,
+          producto_nombre: p.nombre,
+          precio: totalProducto,
+          cantidad,
+          unidad: p.unidad ?? null,
+          bultos: p.bultos != null ? Number(p.bultos) : null,
+          proveedor: null,
+          precio_unitario: precioUnitario,
+          categoria: categoriaDeLinea(mapaCategorias, p.productos_catalogo?.categoria_id),
+          producto_canonico: p.productos_catalogo?.nombre ?? null,
+          producto_id: p.producto_id ?? null,
+          descuento_pct: p.descuento_pct != null ? Number(p.descuento_pct) : null,
+          importe_bruto: p.importe_bruto != null ? Number(p.importe_bruto) : null,
+          importe_bruto_estimado: p.importe_bruto_estimado === true,
+        };
+      });
+
       return {
-        id: p.id,
-        producto_nombre: p.nombre,
-        precio: totalProducto,
-        cantidad,
-        unidad: p.unidad ?? null,
-        bultos: p.bultos != null ? Number(p.bultos) : null,
-        proveedor: null,
-        precio_unitario: precioUnitario,
-        categoria: categoriaDeLinea(mapaCategorias, p.productos_catalogo?.categoria_id),
-        producto_canonico: p.productos_catalogo?.nombre ?? null,
-        producto_id: p.producto_id ?? null,
-        descuento_pct: p.descuento_pct != null ? Number(p.descuento_pct) : null,
-        importe_bruto: p.importe_bruto != null ? Number(p.importe_bruto) : null,
-        importe_bruto_estimado: p.importe_bruto_estimado === true,
+        id: doc.id,
+        tipo: doc.tipo,
+        numero_documento: doc.numero_documento,
+        proveedor: doc.proveedor,
+        proveedor_normalizado: doc.proveedor_normalizado ?? null,
+        cif: doc.cif,
+        fecha: doc.fecha,
+        subtotal: doc.subtotal != null ? Number(doc.subtotal) : null,
+        iva: doc.iva != null ? Number(doc.iva) : null,
+        total: doc.total != null ? Number(doc.total) : null,
+        // Solo se acepta el vocabulario que declara la columna. Cualquier otra
+        // cosa (o la columna sin migrar todavia) se trata como "no consta", que
+        // es mas honesto que asumir que se leyo del papel.
+        total_origen:
+          doc.total_origen === "leido" || doc.total_origen === "deducido" ? doc.total_origen : null,
+        observaciones: doc.observaciones,
+        productos,
+        drive_url: doc.drive_url ?? null,
+        archivo_path: doc.archivo_path ?? null,
+        facturado_en_id: doc.facturado_en_id != null ? Number(doc.facturado_en_id) : null,
+        alertas: Array.isArray(doc.alertas_validacion) ? doc.alertas_validacion : [],
+        procesado_en: doc.procesado_en ?? null,
+        created_at: doc.created_at ?? null,
+        verificada: doc.verificada ?? false,
+        verificacion_origen:
+          doc.verificacion_origen === "auto" || doc.verificacion_origen === "manual" ? doc.verificacion_origen : null,
       };
     });
+  };
 
-    return {
-      id: doc.id,
-      tipo: doc.tipo,
-      numero_documento: doc.numero_documento,
-      proveedor: doc.proveedor,
-      proveedor_normalizado: doc.proveedor_normalizado ?? null,
-      cif: doc.cif,
-      fecha: doc.fecha,
-      subtotal: doc.subtotal != null ? Number(doc.subtotal) : null,
-      iva: doc.iva != null ? Number(doc.iva) : null,
-      total: doc.total != null ? Number(doc.total) : null,
-      // Solo se acepta el vocabulario que declara la columna. Cualquier otra
-      // cosa (o la columna sin migrar todavia) se trata como "no consta", que
-      // es mas honesto que asumir que se leyo del papel.
-      total_origen:
-        doc.total_origen === "leido" || doc.total_origen === "deducido" ? doc.total_origen : null,
-      observaciones: doc.observaciones,
-      productos,
-      drive_url: doc.drive_url ?? null,
-      archivo_path: doc.archivo_path ?? null,
-      facturado_en_id: doc.facturado_en_id != null ? Number(doc.facturado_en_id) : null,
-      alertas: Array.isArray(doc.alertas_validacion) ? doc.alertas_validacion : [],
-      procesado_en: doc.procesado_en ?? null,
-      created_at: doc.created_at ?? null,
-      verificada: doc.verificada ?? false,
-      verificacion_origen:
-        doc.verificacion_origen === "auto" || doc.verificacion_origen === "manual" ? doc.verificacion_origen : null,
-    };
-  });
+  return cargarEscalonado<Factura>(
+    client as unknown as CacheEscalonada<Factura>,
+    queryKey,
+    leerTanda,
+  );
 };
 
+// Sin leer `signal` del contexto: así React Query no aborta la carga al cambiar
+// de pantalla y las tandas que faltan terminan por detrás.
 export const useFacturas = () =>
   useQuery({
     queryKey: ['facturas'],
-    queryFn: () => fetchDocumentosConProductos('factura'),
+    queryFn: ({ client, queryKey }) => fetchDocumentosConProductos('factura', { client, queryKey }),
     staleTime: STALE_TIME,
   });
 
 export const useAlbaranes = () =>
   useQuery({
     queryKey: ['albaranes'],
-    queryFn: () => fetchDocumentosConProductos('albaran'),
+    queryFn: ({ client, queryKey }) => fetchDocumentosConProductos('albaran', { client, queryKey }),
     staleTime: STALE_TIME,
   });
 

@@ -6,7 +6,7 @@ import { useAlbaranes, useFacturas, type Factura } from "@/hooks/useFacturas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useCategoriasProducto, useResumenProductos } from "@/hooks/useProductosCatalogo";
 import { useProveedores } from "@/hooks/useProveedores";
-import { avisosDocumento } from "@/components/facturas/shared/formatters";
+import { avisosDocumento, indiceAnomaliasPrecio } from "@/components/facturas/shared/formatters";
 import { TabProductos } from "@/components/facturas/productos/TabProductos";
 import { ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
 import { EditarFacturaDialog } from "@/components/facturas/EditarFacturaDialog";
@@ -111,8 +111,11 @@ export function TabCompras({
   // fila sería cuadrático).
   const avisosPorId = useMemo(() => {
     const mapa = new Map<number, ReturnType<typeof avisosDocumento>>();
-    facturas.forEach((f) => mapa.set(f.id, avisosDocumento(f, facturas)));
-    albaranes.forEach((a) => mapa.set(a.id, avisosDocumento(a, albaranes)));
+    // Índice de precios por tipo, calculado una vez (no por documento).
+    const anomaliaFactura = indiceAnomaliasPrecio(facturas);
+    const anomaliaAlbaran = indiceAnomaliasPrecio(albaranes);
+    facturas.forEach((f) => mapa.set(f.id, avisosDocumento(f, facturas, anomaliaFactura)));
+    albaranes.forEach((a) => mapa.set(a.id, avisosDocumento(a, albaranes, anomaliaAlbaran)));
     return mapa;
   }, [facturas, albaranes]);
 
@@ -392,7 +395,13 @@ export function TabCompras({
                   />
                 )}
               </div>
-              <p className="shrink-0 py-1.5 text-xs text-muted-foreground">{docsVisibles.length} docs</p>
+              <p className="shrink-0 py-1.5 text-xs text-muted-foreground" aria-live="polite">
+                {docsVisibles.length} docs
+                {/* Carga escalonada: la primera tanda ya está a la vista y las anteriores siguen llegando. */}
+                {((facturasQ.isFetching && facturasQ.data) || (albaranesQ.isFetching && albaranesQ.data)) && (
+                  <span className="ml-1.5" data-testid="cargando-anteriores">· cargando anteriores…</span>
+                )}
+              </p>
             </>
           )}
 
