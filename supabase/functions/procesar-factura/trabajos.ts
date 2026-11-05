@@ -23,7 +23,7 @@ import { type ContextoGuardado, type DocumentoPendiente, guardarDocumento, ofert
 import { bloqueContenido, type ClienteOpenAI } from "./openai.ts";
 import type { MotivoRelectura, PaginaCerrada } from "./pagina.ts";
 import { leerPieza } from "./pieza.ts";
-import { STORAGE_BUCKET } from "./archivo.ts";
+import { limpiarPendientesTrabajo, STORAGE_BUCKET } from "./archivo.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes, sumarGastoTrabajo } from "./costeLectura.ts";
 import { guardarLecturaUnica, pendienteUnico } from "./unico.ts";
 
@@ -349,9 +349,8 @@ async function falloDefinitivo(supabase: Supa, pagina: any, msg: string): Promis
 /**
  * «Consolidación» de un trabajo de una pieza: guardar lo leído EXACTAMENTE
  * como el camino síncrono (guardarLecturaUnica, original en base64 → Drive o
- * Storage). Si el original se archivó, se borra la copia de pendientes/; si
- * no se pudo archivar, la factura apunta a la copia de pendientes/ (que así
- * no se pierde). Duplicado → «Pendientes de decidir» con la pieza como original.
+ * copia temporal en Storage). La copia de pendientes/ la borra terminar(); si
+ * no se pudo archivar, la factura apunta a ella (y así no se pierde). Duplicado → «Pendientes de decidir» con la pieza como original.
  */
 // deno-lint-ignore no-explicit-any
 async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Promise<void> {
@@ -390,12 +389,11 @@ async function consolidarUnico(ctx: ContextoGuardado, trabajo: any, f: any): Pro
   if (g.estado === "guardado") {
     await guardarCosteLectura(supabase, g.facturaId, lectura);
     let respuesta = g.respuesta;
+    // La copia de pendientes/ la borra terminar() (limpiarPendientesTrabajo)
+    // salvo que la factura tenga que apuntar a ella:
     if (b64) {
-      if (respuesta.archivo_guardado) {
-        const { error } = await supabase.storage.from(STORAGE_BUCKET).remove([f.storage_path]);
-        if (error) console.warn("[ocr-trabajo] no se pudo borrar la copia de pendientes/:", error.message);
-      } else {
-        // Ni Drive ni Storage: el original sigue en pendientes/ y se apunta ahí.
+      if (!respuesta.archivo_guardado) {
+        // Ni Drive ni Storage temporal: el original sigue en pendientes/ y se apunta ahí.
         const { error } = await supabase.from("facturas").update({ archivo_path: f.storage_path }).eq("id", g.facturaId);
         if (!error) {
           respuesta = {
@@ -549,4 +547,8 @@ async function terminar(
     p_documento_pendiente: pendiente,
   });
   if (e) console.error("[ocr-trabajo] ocr_terminar_trabajo:", e.message);
+  // Storage es solo almacén temporal: al terminar o fallar, las piezas y el
+  // original de pendientes/ sobran (el original ya está en Drive o en
+  // temporal/). Un «duplicado» los conserva hasta que se decida.
+  if (!e && estado !== "duplicado") await limpiarPendientesTrabajo(supabase, id);
 }

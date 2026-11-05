@@ -96,7 +96,7 @@ describe("Avisos", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Facturas" }));
     await waitFor(() =>
-      expect(h.llamadas).toContainEqual({ op: "in", args: ["tipo", ["facturas_subida", "subida_precio"]] }),
+      expect(h.llamadas).toContainEqual({ op: "in", args: ["tipo", ["facturas_subida", "subida_precio", "original_sin_drive"]] }),
     );
   });
 

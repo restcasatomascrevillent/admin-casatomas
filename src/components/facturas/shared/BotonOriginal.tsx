@@ -27,8 +27,9 @@ interface BotonOriginalProps {
  *
  * Hay dos sitios posibles y el componente se encarga de elegir:
  *   - `drive_url`     -> enlace directo de Google Drive (cuando Drive esta configurado).
- *   - `archivo_path`  -> fichero en el bucket PRIVADO de Supabase Storage, que es
- *                        el fallback usado mientras no existan los secrets GOOGLE_*.
+ *   - `archivo_path`  -> copia TEMPORAL en el bucket PRIVADO de Supabase Storage:
+ *                        Drive falló al guardarla y el cron facturas-originales-drive
+ *                        la subirá (o es un original antiguo pendiente del rescate).
  *                        Al ser privado hace falta pedir una URL firmada al vuelo.
  *
  * Si no hay ninguno de los dos NO se devuelve `null`: se pinta el boton
@@ -119,8 +120,8 @@ export function BotonOriginal({ driveUrl: driveUrlBruta, archivoPath, variant, l
       onClick={abrirDesdeStorage}
       disabled={cargando}
       className={clases}
-      title="Ver documento original (archivo guardado)"
-      aria-label={variant === "mobile" ? undefined : variant === "ficha" || variant === "fila" ? label : "Ver documento original (archivo guardado)"}
+      title="Ver documento original (copia temporal: pendiente de subir a Google Drive)"
+      aria-label={variant === "mobile" ? undefined : variant === "ficha" || variant === "fila" ? label : "Ver documento original (copia temporal: pendiente de subir a Google Drive)"}
     >
       {icono}
       {texto}
