@@ -15,9 +15,9 @@ const PRODUCTOS_RESUMIDOS = 5;
 
 /** Un dato de la línea de datos: etiqueta gris y valor, en línea. */
 const Dato = ({ etiqueta, children }: { etiqueta: string; children: ReactNode }) => (
-  <div className="flex min-w-0 items-baseline gap-1.5">
-    <dt className="shrink-0 text-xs font-medium text-muted-foreground">{etiqueta}</dt>
-    <dd className="min-w-0 text-sm font-semibold tabular-nums">{children}</dd>
+  <div className="min-w-0 px-3 py-1.5 first:pl-0">
+    <dt className="text-xs font-medium text-muted-foreground">{etiqueta}</dt>
+    <dd className="min-w-0 text-sm font-medium tabular-nums">{children}</dd>
   </div>
 );
 
@@ -67,84 +67,87 @@ export function FichaProveedor({
   const documentos = agregado?.documentos ?? [];
 
   return (
-    <div className="space-y-2 border-l-2 border-primary/40 bg-muted/20 px-3 pb-2 pt-2 sm:px-4" data-testid="despliegue-proveedor">
-      <dl className="flex flex-wrap gap-x-5 gap-y-1" aria-label="Datos del proveedor">
-        <Dato etiqueta="CIF">
-          {proveedor.cif ?? "sin CIF"}
-          {proveedor.cifs_extra.length > 0 && <span className="font-normal text-muted-foreground"> (también {proveedor.cifs_extra.join(", ")})</span>}
-        </Dato>
-        {frecuencia && <Dato etiqueta="Pide">{frecuencia}</Dato>}
-        {ultimo && <Dato etiqueta="Último pedido">{formatDate(ultimo)}</Dato>}
-        {agregado && agregado.regalado > 0 && (
-          <Dato etiqueta="Regalado / descuentos">
-            {formatCurrency(agregado.regalado)}
-            <span className="font-normal text-muted-foreground"> sin IVA{agregado.regaladoEstimado ? " · estimado" : ""}</span>
+    <div className="border-b border-border/60 bg-muted/[0.12] shadow-[inset_3px_0_0_0_hsl(var(--primary))]" data-testid="despliegue-proveedor">
+      <div className="space-y-3 py-3 pl-10 pr-3">
+        <dl className="flex flex-wrap divide-x divide-border/60" aria-label="Datos del proveedor">
+          <Dato etiqueta="CIF">
+            {proveedor.cif ?? "sin CIF"}
+            {proveedor.cifs_extra.length > 0 && <span className="font-normal text-muted-foreground"> (también {proveedor.cifs_extra.join(", ")})</span>}
           </Dato>
-        )}
-        {agregado && agregado.nAbonos > 0 && (
-          <Dato etiqueta={agregado.nAbonos === 1 ? "Abono" : "Abonos"}>
-            <span className="text-emerald-700 dark:text-emerald-400">{formatImporte(agregado.abonos)}</span>
-            <span className="font-normal text-muted-foreground"> ({plural(agregado.nAbonos, "documento", "documentos")})</span>
-          </Dato>
-        )}
-      </dl>
-
-      {fichaQ.isLoading && (
-        <p className="text-sm text-muted-foreground" role="status">
-          Cargando qué le compras…
-        </p>
-      )}
-      {fichaQ.isError && (
-        <p className="text-sm text-muted-foreground" role="status">
-          No se ha podido leer qué le compras: {(fichaQ.error as { message?: string })?.message ?? "error desconocido"}.
-        </p>
-      )}
-      {ficha && ficha.top_productos.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qué le compras">
-          <span className="text-xs font-medium text-muted-foreground">Qué le compras:</span>
-          {ficha.top_productos.slice(0, PRODUCTOS_RESUMIDOS).map((t) => (
-            <button
-              key={`${t.producto}|${t.unidad ?? ""}`}
-              type="button"
-              onClick={() => onAbrirProducto(t.producto)}
-              aria-label={`Ver el producto ${t.producto}`}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border/60 bg-background px-2.5 text-sm hover:bg-muted/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-            >
-              <span className="font-medium">{t.producto}</span>
-              {t.ultimo_precio !== null && (
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {formatCurrency(t.ultimo_precio)}
-                  {t.unidad ? `/${t.unidad}` : ""}
-                </span>
-              )}
-            </button>
-          ))}
-          {ficha.top_productos.length > PRODUCTOS_RESUMIDOS && (
-            <span className="text-xs text-muted-foreground">y {ficha.top_productos.length - PRODUCTOS_RESUMIDOS} más · último precio sin IVA</span>
+          {frecuencia && <Dato etiqueta="Pide">{frecuencia}</Dato>}
+          {ultimo && <Dato etiqueta="Último pedido">{formatDate(ultimo)}</Dato>}
+          {agregado && agregado.regalado > 0 && (
+            <Dato etiqueta="Regalado / descuentos">
+              {formatCurrency(agregado.regalado)}
+              <span className="font-normal text-muted-foreground"> sin IVA{agregado.regaladoEstimado ? " · estimado" : ""}</span>
+            </Dato>
           )}
-        </div>
-      )}
+          {agregado && agregado.nAbonos > 0 && (
+            <Dato etiqueta={agregado.nAbonos === 1 ? "Abono" : "Abonos"}>
+              <span className="text-emerald-700 dark:text-emerald-400">{formatImporte(agregado.abonos)}</span>
+              <span className="font-normal text-muted-foreground"> ({plural(agregado.nAbonos, "documento", "documentos")})</span>
+            </Dato>
+          )}
+        </dl>
 
-      {(otrasFormas.length > 0 || proveedor.nombre_comercial) && (
-        <p className="text-xs text-muted-foreground">
-          {proveedor.nombre_comercial && <>Nombre comercial «{proveedor.nombre_comercial}». </>}
-          {otrasFormas.length > 0 && <>Llega como: {otrasFormas.map((v) => `«${v}»`).join(", ")}</>}
-        </p>
-      )}
+        {fichaQ.isLoading && (
+          <p className="text-sm text-muted-foreground" role="status">
+            Cargando qué le compras…
+          </p>
+        )}
+        {fichaQ.isError && (
+          <p className="text-sm text-muted-foreground" role="status">
+            No se ha podido leer qué le compras: {(fichaQ.error as { message?: string })?.message ?? "error desconocido"}.
+          </p>
+        )}
+        {ficha && ficha.top_productos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qué le compras">
+            <span className="mr-1 text-xs font-medium text-muted-foreground">Qué le compras</span>
+            {ficha.top_productos.slice(0, PRODUCTOS_RESUMIDOS).map((t) => (
+              <button
+                key={`${t.producto}|${t.unidad ?? ""}`}
+                type="button"
+                onClick={() => onAbrirProducto(t.producto)}
+                aria-label={`Ver el producto ${t.producto}`}
+                className="relative inline-flex h-9 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-[13px] transition-colors before:absolute before:inset-x-0 before:-inset-y-1 before:content-[''] hover:border-border hover:bg-muted/40 active:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none"
+              >
+                <span className="font-medium">{t.producto}</span>
+                {t.ultimo_precio !== null && (
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {formatCurrency(t.ultimo_precio)}
+                    {t.unidad ? `/${t.unidad}` : ""}
+                  </span>
+                )}
+              </button>
+            ))}
+            {ficha.top_productos.length > PRODUCTOS_RESUMIDOS && (
+              <span className="text-xs text-muted-foreground">y {ficha.top_productos.length - PRODUCTOS_RESUMIDOS} más · último precio sin IVA</span>
+            )}
+          </div>
+        )}
 
-      {puedeEditar && (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" className="h-11 gap-1.5" onClick={() => setEditando((v) => !v)} aria-expanded={editando}>
-            <Pencil className="h-4 w-4" aria-hidden="true" /> Editar datos
-          </Button>
-          <Button variant="outline" className="h-11 gap-1.5" onClick={() => setFusionando(true)}>
-            <Merge className="h-4 w-4" aria-hidden="true" /> Fusionar con otro proveedor
-          </Button>
-        </div>
-      )}
-      {editando && <EditorProveedor p={proveedor} onCerrar={() => setEditando(false)} />}
+        {(otrasFormas.length > 0 || proveedor.nombre_comercial) && (
+          <p className="text-xs text-muted-foreground">
+            {proveedor.nombre_comercial && <>Nombre comercial «{proveedor.nombre_comercial}». </>}
+            {otrasFormas.length > 0 && <>Llega como: {otrasFormas.map((v) => `«${v}»`).join(", ")}</>}
+          </p>
+        )}
 
-      <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+        {puedeEditar && (
+          <div className="-ml-3 flex flex-wrap gap-1">
+            <Button variant="ghost" className="h-11 gap-1.5 px-3 text-sm" onClick={() => setEditando((v) => !v)} aria-expanded={editando}>
+              <Pencil className="h-4 w-4" aria-hidden="true" /> Editar datos
+            </Button>
+            <Button variant="ghost" className="h-11 gap-1.5 px-3 text-sm" onClick={() => setFusionando(true)}>
+              <Merge className="h-4 w-4" aria-hidden="true" /> Fusionar con otro proveedor
+            </Button>
+          </div>
+        )}
+        {editando && <EditorProveedor p={proveedor} onCerrar={() => setEditando(false)} />}
+      </div>
+
+      {/* Sus documentos, planos (sin caja dentro de la caja), con un separador fino arriba. */}
+      <div className="border-t border-border/60 bg-card">
         <ListaDocumentos
           documentos={documentos}
           facturas={facturas}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, Loader2, Pencil, Sparkles } from "lucide-react";
+import { ExternalLink, FileImage, FileText, Loader2, Pencil, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ const SEGUNDOS_FIRMA = 120;
 interface BotonOriginalProps {
   driveUrl: string | null;
   archivoPath: string | null;
-  variant: "mobile" | "desktop" | "ficha";
+  /** `fila`: icono del tipo de archivo (PDF / imagen / Drive) en una fila de lista, 44 × 44. */
+  variant: "mobile" | "desktop" | "ficha" | "fila";
   /**
    * Texto del boton en movil ("Escaneo" en facturas, "Doc" en albaranes). En la
    * variante `ficha` es el nombre accesible ("Ver original") y el texto visible
@@ -39,14 +40,16 @@ export function BotonOriginal({ driveUrl: driveUrlBruta, archivoPath, variant, l
   // Solo http(s): un `javascript:`/`data:` de BD no se enlaza (CT-REM-FE-06).
   const driveUrl = urlSegura(driveUrlBruta);
   const [cargando, setCargando] = useState(false);
-  // `ficha`: solo icono en estrecho, icono + palabra corta desde `sm`, con el nombre accesible siempre puesto.
+  // `ficha`: solo icono en estrecho, icono + palabra corta desde `sm` (también en tablet), con el nombre accesible siempre puesto.
   const corto = label.replace(/^Ver /i, "").replace(/^./, (c) => c.toUpperCase());
   const texto =
-    variant === "mobile" ? label : variant === "ficha" ? <span className="hidden xl:inline">{corto}</span> : null;
+    variant === "mobile" ? label : variant === "ficha" ? <span className="hidden sm:inline">{corto}</span> : null;
 
   const clases =
-    variant === "ficha"
-      ? "inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40 dark:text-blue-400 dark:hover:bg-blue-950/40 dark:hover:text-blue-300"
+    variant === "fila"
+      ? "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-40"
+      : variant === "ficha"
+      ? "inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-40"
       : variant === "mobile"
       ? "inline-flex h-11 w-full min-w-0 items-center justify-center gap-1.5 rounded-md bg-blue-50 px-2 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40"
       : "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-blue-600 transition-colors hover:bg-blue-50 hover:text-blue-800 disabled:pointer-events-none disabled:opacity-40";
@@ -66,10 +69,13 @@ export function BotonOriginal({ driveUrl: driveUrlBruta, archivoPath, variant, l
     );
   }
 
+  // En la fila, el icono dice qué es el original: PDF, foto o enlace de Drive.
+  const IconoArchivo =
+    variant !== "fila" ? ExternalLink : archivoPath ? (/\.pdf(\?|$)/i.test(archivoPath) ? FileText : FileImage) : ExternalLink;
   const icono = cargando ? (
-    <Loader2 className="h-4 w-4 animate-spin" />
+    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
   ) : (
-    <ExternalLink className="h-4 w-4" />
+    <IconoArchivo className="h-4 w-4" aria-hidden="true" />
   );
 
   // Drive: enlace normal, sin pasar por Supabase.
@@ -82,7 +88,7 @@ export function BotonOriginal({ driveUrl: driveUrlBruta, archivoPath, variant, l
         onClick={(e) => e.stopPropagation()}
         className={clases}
         title="Ver documento original (Google Drive)"
-        aria-label={variant === "mobile" ? undefined : variant === "ficha" ? label : "Ver documento original (Google Drive)"}
+        aria-label={variant === "mobile" ? undefined : variant === "ficha" || variant === "fila" ? label : "Ver documento original (Google Drive)"}
       >
         {icono}
         {texto}
@@ -114,7 +120,7 @@ export function BotonOriginal({ driveUrl: driveUrlBruta, archivoPath, variant, l
       disabled={cargando}
       className={clases}
       title="Ver documento original (archivo guardado)"
-      aria-label={variant === "mobile" ? undefined : variant === "ficha" ? label : "Ver documento original (archivo guardado)"}
+      aria-label={variant === "mobile" ? undefined : variant === "ficha" || variant === "fila" ? label : "Ver documento original (archivo guardado)"}
     >
       {icono}
       {texto}
