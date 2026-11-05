@@ -167,6 +167,9 @@ pasar las URLs por `urlFoto`; mientras tanto se ve el hueco «Sin foto».
 
 ## Qué falta para el MP4 (fase 6)
 
+> **Hecho** (salvo el archivo en Drive de los MP4 y la «Sugerir rótulos» del punto 6): ver
+> [instagram-video.md](instagram-video.md). Lo de abajo queda como el plan original.
+
 1. **Página de captura** `__reel-instagram.html?trabajo=<id>` que monte
    `ReelEnInstante` a 1080×1920 sin escala ni controles y exponga
    `window.__fijarTiempo(t)` (con `flushSync`) y `window.__listo()` (espera

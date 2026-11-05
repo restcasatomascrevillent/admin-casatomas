@@ -7,7 +7,7 @@
 //     → { mp4, portada, duracion, bytes, fotogramas, avisos }   (lanza ErrorRender si no vale)
 //
 // Requisitos de Meta para reels (developers.facebook.com/docs/instagram-platform/
-// instagram-graph-api/reference/ig-user/media, «Reel Specifications», 09/11/2026):
+// instagram-graph-api/reference/ig-user/media, «Reel Specifications», consultada el 05/11/2026):
 // MP4 con el moov delante y sin listas de edición; H.264 progresivo, GOP
 // cerrado, 4:2:0; 23-60 fps; ≤ 1920 px de ancho; ≤ 25 Mbps; AAC ≤ 48 kHz,
 // 1-2 canales, 128 kbps; de 3 s a 15 min; ≤ 300 MB. Nuestro objetivo: 1080×1920,
