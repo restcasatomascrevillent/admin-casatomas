@@ -149,3 +149,22 @@ describe("Vinos: filtro con píldoras como en la carta de la web", () => {
     expect(pildora(tipos(), /^Todos 6/)).toBeInTheDocument();
   });
 });
+
+describe("Carta para imprimir (PDF A5/A4)", () => {
+  const boton = () => screen.queryByRole("button", { name: /Carta para imprimir/ });
+  const abrirSeccion = (nombre: RegExp) => {
+    fireEvent.mouseDown(screen.getByRole("tab", { name: nombre }));
+    fireEvent.click(screen.getByRole("tab", { name: nombre }));
+  };
+
+  it("sale en la barra de Platos y en la de Vinos, no en Bebidas ni en Cócteles", () => {
+    render(<TabCarta />);
+    expect(boton()).toBeInTheDocument();
+    abrirSeccion(/Vinos/);
+    expect(boton()).toBeInTheDocument();
+    abrirSeccion(/Bebidas/);
+    expect(boton()).not.toBeInTheDocument();
+    abrirSeccion(/Cócteles/);
+    expect(boton()).not.toBeInTheDocument();
+  });
+});
