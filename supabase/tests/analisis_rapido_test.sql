@@ -1,11 +1,11 @@
 set client_encoding = 'UTF8';
--- Test de 20261105190000_analisis_rapido. BEGIN … ROLLBACK: no deja nada escrito.
+-- Test de 20261105191000_analisis_rapido. BEGIN … ROLLBACK: no deja nada escrito.
 -- Acaba en «analisis_rapido_test: OK». Pasar también tablero_compras_test y
 -- explorar_compras_test (las cifras no cambian).
 --   supabase db query --linked -f supabase/tests/analisis_rapido_test.sql
 --
 --   R1 permisos: anon no lee la caché; la función del trigger no se puede
---      llamar desde la API; las RPC usan la caché (marca 20261105190000).
+--      llamar desde la API; las RPC usan la caché (marca 20261105191000).
 --   R2 la caché cubre todas las líneas y dice lo mismo que la función.
 --   R3 el trigger apunta los nombres nuevos (al insertar y al renombrar).
 --   R4 rapidez: tablero_compras del año y explorar_compras por familia en
@@ -32,7 +32,7 @@ begin
   if not (select relrowsecurity from pg_class where oid = 'public.nombres_linea_no_producto'::regclass) then
     raise exception 'FALLO R1: la caché no tiene RLS';
   end if;
-  if position('20261105190000' in pg_get_functiondef('public.tablero_compras(date,date,text)'::regprocedure)) = 0
+  if position('20261105191000' in pg_get_functiondef('public.tablero_compras(date,date,text)'::regprocedure)) = 0
      or position('nombres_linea_no_producto' in pg_get_functiondef('public.explorar_compras_hechos(date,date,text,text,text,jsonb)'::regprocedure)) = 0 then
     raise exception 'FALLO R1: las RPC no usan la caché';
   end if;

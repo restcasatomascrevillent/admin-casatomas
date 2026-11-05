@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Rollback de 20261105190000_analisis_rapido.sql: quita la caché
+-- Rollback de 20261105191000_analisis_rapido.sql: quita la caché
 -- nombres_linea_no_producto y su trigger. ANTES hay que devolver
 -- tablero_compras y explorar_compras_hechos a sus versiones sin caché
 -- (si no, fallarían al no encontrar la tabla):

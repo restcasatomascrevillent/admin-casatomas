@@ -24,7 +24,7 @@ set client_encoding = 'UTF8';
 -- bloqueo de sesión del panel; escribe solo el trigger (SECURITY DEFINER).
 --
 -- Idempotente. Test: supabase/tests/analisis_rapido_test.sql
--- Rollback: supabase/rollbacks/20261105190000_analisis_rapido_ROLLBACK.sql
+-- Rollback: supabase/rollbacks/20261105191000_analisis_rapido_ROLLBACK.sql
 -- ===========================================================================
 
 begin;
@@ -37,7 +37,7 @@ create table if not exists public.nombres_linea_no_producto (
   primary key (nombre_n, unidad_k)
 );
 comment on table public.nombres_linea_no_producto is
-  'Caché de es_linea_no_producto_tablero(nombre normalizado, unidad) para el tablero y el explorador de Análisis. La mantiene trg_productos_factura_no_producto. 20261105190000.';
+  'Caché de es_linea_no_producto_tablero(nombre normalizado, unidad) para el tablero y el explorador de Análisis. La mantiene trg_productos_factura_no_producto. 20261105191000.';
 
 alter table public.nombres_linea_no_producto enable row level security;
 revoke all on table public.nombres_linea_no_producto from public, anon;
@@ -107,7 +107,7 @@ security invoker
 set search_path = public
 as $$
 -- 20261105150500_tablero_compras
--- 20261105190000_analisis_rapido: «¿no es producto?» sale de la caché nombres_linea_no_producto
+-- 20261105191000_analisis_rapido: «¿no es producto?» sale de la caché nombres_linea_no_producto
 declare
   v_local     text := nullif(lower(btrim(coalesce(p_local, ''))), '');
   v_desde     date;
@@ -479,7 +479,7 @@ begin
 end;
 $$;
 comment on function public.tablero_compras(date, date, text) is
-  'Facturas › Análisis: todos los bloques del tablero de compras en un JSON (indicadores, meses, proveedores, subidas, familias, fijos, abonos, locales). SECURITY INVOKER. 20261105150500 (rápida: 20261105190000).';
+  'Facturas › Análisis: todos los bloques del tablero de compras en un JSON (indicadores, meses, proveedores, subidas, familias, fijos, abonos, locales). SECURITY INVOKER. 20261105150500 (rápida: 20261105191000).';
 
 revoke all on function public.tablero_compras(date, date, text) from public, anon;
 grant execute on function public.tablero_compras(date, date, text) to authenticated, service_role;
@@ -537,7 +537,7 @@ begin
          and (v_tipos is null or d.tipo_k = any(v_tipos));
   else
     -- «¿Es producto?» sale de la caché nombres_linea_no_producto
-    -- (20261105190000); solo lo que falte se calcula al vuelo.
+    -- (20261105191000); solo lo que falte se calcula al vuelo.
     return query
       with l as materialized (
        select x.* from (
