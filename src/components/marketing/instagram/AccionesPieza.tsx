@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { ProgramarPiezaDialog } from "@/components/instagram/programar";
+import { SugerirTextoIA } from "@/components/instagram/ia";
 import { MARCAS, type FormatoId, type MarcaId } from "@/lib/instagram";
 import {
   ErrorInstagram,
@@ -291,6 +292,24 @@ export function AccionesPieza({
           <p className="text-xs text-muted-foreground">Las stories no llevan texto: Instagram no lo admite al publicar desde aquí.</p>
         ) : (
           <>
+            <SugerirTextoIA
+              contexto={{
+                marca,
+                formato,
+                plantilla: String(pieza.plantilla ?? ""),
+                foto: typeof pieza.foto === "string" ? pieza.foto : null,
+                piezaId: servidor.id ?? null,
+                textos: textosDePieza(pieza),
+              }}
+              onElegir={(texto, hashtags, alt) => {
+                // La IA solo rellena: la persona revisa, prueba y publica.
+                onCaption(hashtags.length ? `${texto}
+
+${hashtags.map((h) => (h.startsWith("#") ? h : `#${h}`)).join(" ")}` : texto);
+                if (alt) onAltText(alt);
+              }}
+              deshabilitado={ocupado}
+            />
             <Textarea
               id="caption-ig"
               value={caption}
@@ -482,4 +501,14 @@ export function AccionesPieza({
       </AlertDialog>
     </div>
   );
+}
+
+/** Rótulos que ya lleva la pieza, para que la IA no los contradiga. */
+function textosDePieza(pieza: Record<string, unknown>): Partial<Record<"antetitulo" | "titular" | "cita" | "cta" | "pie", string>> {
+  const t: Partial<Record<"antetitulo" | "titular" | "cita" | "cta" | "pie", string>> = {};
+  for (const c of ["antetitulo", "titular", "cita", "cta", "pie"] as const) {
+    const v = pieza[c];
+    if (typeof v === "string" && v.trim()) t[c] = v;
+  }
+  return t;
 }
