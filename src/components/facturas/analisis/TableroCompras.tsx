@@ -1,48 +1,113 @@
 // Tablero de Facturas › Análisis: sale hecho al abrir la pestaña.
-//   Fila 1  4 indicadores (gasto con IVA, abonos, regalado, por revisar).
-//   Fila 2  Gasto por mes (~3/5) · Proveedores con más gasto (~2/5).
-//   Fila 3  rejilla de 3 columnas (2 en tablet vertical, 1 en móvil).
-//   Al final, las gráficas de la IA fijadas desde el copiloto.
+//   1. Cuatro indicadores (gasto con IVA, abonos, regalado, por revisar): cada
+//      uno abre los documentos que forman su cifra.
+//   2. EXPLORAR: la gráfica a medida (por defecto, el gasto por mes y local).
+//   3. Detalle en rejilla (2 columnas en tablet, 3 en pantallas anchas, 1 en
+//      móvil): proveedores, lo que más ha subido, familias, gastos fijos,
+//      abonos y Casa Tomás frente a Touza. Cada fila abre un menú: ver sus
+//      documentos, abrirlo en Compras o llevarlo al explorador.
+//   4. Las gráficas fijadas (del explorador y de la IA).
 // Solo este bloque hace scroll (la página no): lo pone quien lo usa.
-import { forwardRef } from "react";
-import { PinOff } from "lucide-react";
+import type { ReactNode } from "react";
+import { BarChart3, FileText, LineChart, Pin, ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
-import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
-import { tituloSerie, type GraficaFijada } from "@/lib/facturas/graficasCopiloto";
-import { textoRangoMeses, textoVariacion, type ProveedorGasto, type TableroCompras as Datos } from "@/lib/facturas/tableroCompras";
-import { GastoPorMes, ProveedoresTop } from "./GraficasPrincipales";
-import { AbonosPorProveedor, CasaTomasYTouza, GastoPorFamilia, GastosFijos, LoQueMasHaSubido, PrecioDeUnProducto } from "./TarjetasDetalle";
-import { FOCO, Indicador, Tarjeta } from "./piezas";
+import type { GraficaFijada } from "@/lib/facturas/graficasCopiloto";
+import {
+  ENLACE_PRODUCTOS_COMPRAS,
+  enlaceProveedorCompras,
+  nombreCorto,
+  textoRangoMeses,
+  textoVariacion,
+  type TableroCompras as Datos,
+} from "@/lib/facturas/tableroCompras";
+import { FILTROS_VACIOS, type ConfigExplorador, type ExploracionFijada, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
+import { peticionSimple, type PeticionDocumentos } from "@/lib/facturas/documentosCifra";
+import { ProveedoresTop } from "./GraficasPrincipales";
+import { AbonosPorProveedor, CasaTomasYTouza, GastoPorFamilia, GastosFijos, LoQueMasHaSubido } from "./TarjetasDetalle";
+import { FijadasDelTablero } from "./FijadasDelTablero";
+import { Indicador, type AccionMenu } from "./piezas";
 
 interface Props {
   datos: Datos;
-  /** «Todos»: gasto por mes apilado por local. */
-  apilado: boolean;
-  producto: string | null;
-  onProducto: (p: string | null) => void;
-  onMes: (mes: string) => void;
-  onProveedor: (id: number) => void;
-  onClasificar: () => void;
-  fijadas: GraficaFijada[];
-  onQuitarFijada: (id: string) => void;
+  periodo: { desde: string | null; hasta: string | null };
+  local: LocalRpc;
+  /** La tarjeta «Explorar» (la monta quien tiene su estado). */
+  explorador: ReactNode;
+  onDocumentos: (p: PeticionDocumentos) => void;
+  onIrA: (enlace: string) => void;
+  /** Lleva una configuración al explorador (y lo enseña). */
+  onExplorar: (c: Partial<ConfigExplorador>) => void;
+  fijadasIa: GraficaFijada[];
+  onQuitarFijadaIa: (id: string) => void;
+  fijadasExplorador: ExploracionFijada[];
+  onQuitarFijadaExplorador: (id: string) => void;
 }
 
-export const TableroCompras = forwardRef<HTMLInputElement, Props>(function TableroCompras(
-  { datos, apilado, producto, onProducto, onMes, onProveedor, onClasificar, fijadas, onQuitarFijada },
-  refBuscador,
-) {
+const ICONO = "h-4 w-4 text-muted-foreground";
+
+export function TableroCompras({
+  datos,
+  periodo,
+  local,
+  explorador,
+  onDocumentos,
+  onIrA,
+  onExplorar,
+  fijadasIa,
+  onQuitarFijadaIa,
+  fijadasExplorador,
+  onQuitarFijadaExplorador,
+}: Props) {
   const i = datos.indicadores;
   const variacion = textoVariacion(datos);
-  const abrirProveedor = (p: ProveedorGasto) => p.id !== null && onProveedor(p.id);
+
+  const docs = (
+    titulo: string,
+    medida: Medida,
+    extra: {
+      filtros?: Record<string, unknown>;
+      agrupar?: "proveedor" | "familia" | "local";
+      clave?: string;
+      cifra?: number | null;
+      desde?: string | null;
+      hasta?: string | null;
+      detalle?: string;
+      sinLocal?: boolean;
+    } = {},
+  ) =>
+    onDocumentos(
+      peticionSimple({
+        titulo,
+        detalle: extra.detalle,
+        desde: extra.desde !== undefined ? extra.desde : periodo.desde,
+        hasta: extra.hasta !== undefined ? extra.hasta : periodo.hasta,
+        medida,
+        filtros: extra.filtros,
+        local: extra.sinLocal ? null : local,
+        agrupar: extra.agrupar,
+        clave: extra.clave,
+        cifra: extra.cifra,
+      }),
+    );
+
+  const verDocs = (onClick: () => void): AccionMenu => ({ etiqueta: "Ver documentos", icono: <FileText className={ICONO} aria-hidden />, onClick });
+  const enCompras = (id: number | null): AccionMenu[] =>
+    id === null ? [] : [{ etiqueta: "Abrir en Compras", icono: <ShoppingCart className={ICONO} aria-hidden />, onClick: () => onIrA(enlaceProveedorCompras(id)) }];
+  const explorar = (etiqueta: string, c: Partial<ConfigExplorador>): AccionMenu => ({
+    etiqueta,
+    icono: <BarChart3 className={ICONO} aria-hidden />,
+    onClick: () => onExplorar(c),
+  });
 
   return (
-    <div className="space-y-3 pb-4">
-      {/* Fila 1 · indicadores */}
-      <dl className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4" aria-label="Indicadores del periodo" data-tour="facturas-analisis-indicadores">
+    <div className="space-y-4 pb-4">
+      {/* 1 · Indicadores */}
+      <ul className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4" aria-label="Indicadores del periodo" data-tour="facturas-analisis-indicadores">
         <Indicador
           etiqueta="Gasto con IVA"
           valor={formatCurrency(i.gasto)}
+          onVer={() => docs("Gasto con IVA", "gasto", { cifra: i.gasto })}
           nota={
             <>
               {textoRangoMeses(datos.meses)}
@@ -54,10 +119,16 @@ export const TableroCompras = forwardRef<HTMLInputElement, Props>(function Table
             </>
           }
         />
-        <Indicador etiqueta="Abonos" valor={formatImporte(i.abonos)} nota={plural(i.abonosN, "documento", "documentos")} />
+        <Indicador
+          etiqueta="Abonos"
+          valor={formatImporte(i.abonos)}
+          nota={plural(i.abonosN, "documento", "documentos")}
+          onVer={() => docs("Abonos", "abonos", { cifra: -i.abonos, detalle: "Importe devuelto, en positivo" })}
+        />
         <Indicador
           etiqueta="Regalado y descuentos"
           valor={formatCurrency(i.regalado)}
+          onVer={() => docs("Regalado y descuentos", "regalado", { cifra: i.regalado, detalle: "Lo que valía menos lo que se pagó" })}
           nota={
             <>
               lo que valía {formatCurrency(i.regaladoValia)}
@@ -70,49 +141,131 @@ export const TableroCompras = forwardRef<HTMLInputElement, Props>(function Table
           valor={formatEntero(i.albaranesSinFactura)}
           nota={i.albaranesSinFactura === 1 ? "albarán sin factura" : "albaranes sin factura"}
           claseNota={i.albaranesSinFactura > 0 ? "font-medium text-amber-700 dark:text-amber-400" : undefined}
+          onVer={() =>
+            docs("Albaranes sin factura", "gasto", {
+              filtros: { tipos: ["albaran"] },
+              cifra: i.albaranesSinFacturaImporte,
+              detalle: "Gasto con IVA de los albaranes que aún no están en una factura",
+            })
+          }
         />
-      </dl>
+      </ul>
 
-      {/* Fila 2 · gasto por mes y proveedores */}
-      <div className="grid gap-3 md:grid-cols-5">
-        <GastoPorMes meses={datos.meses} apilado={apilado} onMes={onMes} className="md:col-span-3" />
-        <ProveedoresTop proveedores={datos.proveedores} onProveedor={abrirProveedor} className="md:col-span-2" />
+      {/* 2 · Explorar */}
+      {explorador}
+
+      {/* 3 · Detalle */}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <ProveedoresTop
+          proveedores={datos.proveedores}
+          acciones={(p) =>
+            p.id === null
+              ? []
+              : [
+                  verDocs(() => docs(nombreCorto(p.nombre), "gasto", { agrupar: "proveedor", clave: String(p.id), cifra: p.gasto })),
+                  ...enCompras(p.id),
+                  explorar("Ver su gasto por mes", {
+                    medida: "gasto",
+                    agrupar: "mes",
+                    desglose: null,
+                    filtros: { ...FILTROS_VACIOS, proveedores: [{ id: p.id, nombre: nombreCorto(p.nombre) }] },
+                  }),
+                ]
+          }
+        />
+        <LoQueMasHaSubido
+          subidas={datos.subidas}
+          acciones={(s) => [
+            {
+              etiqueta: "Ver su precio en el explorador",
+              icono: <LineChart className={ICONO} aria-hidden />,
+              onClick: () =>
+                onExplorar({
+                  medida: "precio",
+                  agrupar: "mes",
+                  desglose: "proveedor",
+                  filtros: { ...FILTROS_VACIOS, productos: [s.producto], unidad: s.unidad ? s.unidad.toLowerCase() : null },
+                }),
+            },
+            ...(s.proveedor_id !== null
+              ? [
+                  verDocs(() =>
+                    docs(`${s.producto} · ${nombreCorto(s.proveedor)}`, "base", {
+                      filtros: { proveedores: [s.proveedor_id], productos: [s.producto] },
+                      detalle: "Base sin IVA de sus líneas",
+                    }),
+                  ),
+                  ...enCompras(s.proveedor_id),
+                ]
+              : []),
+          ]}
+        />
+        <GastoPorFamilia
+          familias={datos.familias}
+          onClasificar={() => onIrA(ENLACE_PRODUCTOS_COMPRAS)}
+          acciones={(f) =>
+            f.id === null
+              ? []
+              : [
+                  verDocs(() => docs(f.familia, "base", { agrupar: "familia", clave: String(f.id), cifra: f.importe, detalle: "Base sin IVA de sus líneas" })),
+                  explorar("Ver por mes en el explorador", {
+                    medida: "base",
+                    agrupar: "mes",
+                    desglose: null,
+                    filtros: { ...FILTROS_VACIOS, familias: [{ id: f.id as number, nombre: f.familia }] },
+                  }),
+                ]
+          }
+        />
+        <GastosFijos
+          fijos={datos.fijos}
+          acciones={(f) =>
+            f.id === null
+              ? []
+              : [
+                  verDocs(() =>
+                    docs(nombreCorto(f.nombre), "gasto", {
+                      filtros: { proveedores: [f.id], tipos: ["factura"] },
+                      desde: datos.fijos.ventana?.desde ?? periodo.desde,
+                      hasta: datos.fijos.ventana?.hasta ?? periodo.hasta,
+                      detalle: `Sus facturas; de media ${formatCurrency(f.medio_mes)} al mes`,
+                    }),
+                  ),
+                  ...enCompras(f.id),
+                ]
+          }
+        />
+        <AbonosPorProveedor
+          abonos={datos.abonos}
+          acciones={(a) =>
+            a.id === null
+              ? []
+              : [verDocs(() => docs(`Abonos de ${nombreCorto(a.nombre)}`, "abonos", { agrupar: "proveedor", clave: String(a.id), cifra: -a.importe })), ...enCompras(a.id)]
+          }
+        />
+        <CasaTomasYTouza
+          locales={datos.locales}
+          onVer={(l, gasto) => docs(l === "touza" ? "Touza" : "Casa Tomás", "gasto", { agrupar: "local", clave: l, cifra: gasto, sinLocal: true })}
+        />
       </div>
 
-      {/* Fila 3 · detalle */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-        <LoQueMasHaSubido subidas={datos.subidas} onProducto={onProducto} />
-        <PrecioDeUnProducto ref={refBuscador} producto={producto} onProducto={onProducto} />
-        <GastoPorFamilia familias={datos.familias} onClasificar={onClasificar} />
-        <GastosFijos fijos={datos.fijos} onProveedor={onProveedor} />
-        <AbonosPorProveedor abonos={datos.abonos} onProveedor={onProveedor} />
-        <CasaTomasYTouza locales={datos.locales} />
-      </div>
-
-      {/* Gráficas de la IA fijadas */}
-      {fijadas.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2" aria-label="Gráficas fijadas desde la IA" role="group">
-          {fijadas.map((g) => (
-            <Tarjeta
-              key={g.id}
-              titulo={tituloSerie(g.serie)}
-              subtitulo="Fijada desde la IA"
-              accion={
-                <button
-                  type="button"
-                  onClick={() => onQuitarFijada(g.id)}
-                  className={cn("inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground", FOCO)}
-                  aria-label={`Quitar del tablero: ${tituloSerie(g.serie)}`}
-                >
-                  <PinOff className="h-3.5 w-3.5" aria-hidden /> Quitar
-                </button>
-              }
-            >
-              <GraficoSeriePrecio datos={g.serie} compacto alto={180} />
-            </Tarjeta>
-          ))}
-        </div>
+      {/* 4 · Fijadas */}
+      {(fijadasExplorador.length > 0 || fijadasIa.length > 0) && (
+        <section aria-labelledby="titulo-fijadas" className="space-y-2">
+          <h3 id="titulo-fijadas" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            <Pin className="h-3.5 w-3.5" aria-hidden /> Tus gráficas fijadas
+          </h3>
+          <FijadasDelTablero
+            periodo={periodo}
+            local={local}
+            explorador={fijadasExplorador}
+            onQuitarExplorador={onQuitarFijadaExplorador}
+            onAbrir={(c) => onExplorar(c)}
+            ia={fijadasIa}
+            onQuitarIa={onQuitarFijadaIa}
+          />
+        </section>
       )}
     </div>
   );
-});
+}

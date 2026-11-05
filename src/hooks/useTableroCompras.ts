@@ -20,19 +20,26 @@ async function rpc(funcion: string, args: Record<string, unknown>) {
   return llamar.call(supabase, funcion, args);
 }
 
-export function useTableroCompras(desde: string | null, hasta: string | null, local: "casa_tomas" | "touza" | null) {
-  return useQuery({
-    queryKey: ["tablero-compras", desde, hasta, local],
+/** La consulta del tablero (la usan el hook y la precarga de los periodos más probables). */
+export function consultaTablero(desde: string | null, hasta: string | null, local: "casa_tomas" | "touza" | null) {
+  return {
+    queryKey: ["tablero-compras", desde, hasta, local] as const,
     staleTime: 5 * 60_000,
-    // Al cambiar de periodo o local se queda el tablero anterior hasta que llega el nuevo (sin parpadeo).
-    placeholderData: (anterior) => anterior,
-    retry: (n, e) => !(e instanceof Error && e.message === TEXTO_TABLERO_SIN_MIGRACION) && n < 1,
     queryFn: async (): Promise<TableroCompras> => {
       const { data, error } = await rpc("tablero_compras", { p_desde: desde, p_hasta: hasta, p_local: local });
       if (esErrorRpcInexistente(error)) throw new Error(TEXTO_TABLERO_SIN_MIGRACION);
       if (error) throw new Error(error.message || "No se ha podido cargar el tablero");
       return normalizarTablero(data);
     },
+  };
+}
+
+export function useTableroCompras(desde: string | null, hasta: string | null, local: "casa_tomas" | "touza" | null) {
+  return useQuery({
+    ...consultaTablero(desde, hasta, local),
+    // Al cambiar de periodo o local se queda el tablero anterior hasta que llega el nuevo (sin parpadeo).
+    placeholderData: (anterior) => anterior,
+    retry: (n, e) => !(e instanceof Error && e.message === TEXTO_TABLERO_SIN_MIGRACION) && n < 1,
   });
 }
 
@@ -54,21 +61,6 @@ export function useBuscarProductosComprados(texto: string) {
         if (nombre && !vistos.has(clave)) vistos.set(clave, nombre);
       }
       return [...vistos.values()].slice(0, 12);
-    },
-  });
-}
-
-/** Serie de precio de un producto por proveedor (la misma RPC que la ficha de producto y la IA). */
-export function useSeriePrecioProducto(producto: string | null) {
-  return useQuery({
-    queryKey: ["tablero-compras", "serie-precio", producto],
-    enabled: !!producto,
-    staleTime: 5 * 60_000,
-    retry: false,
-    queryFn: async (): Promise<unknown> => {
-      const { data, error } = await rpc("serie_precios_agente", { p_texto: producto, p_desde: null, p_hasta: null, p_unidad: null });
-      if (error) throw new Error(error.message || "No se ha podido leer el precio");
-      return data;
     },
   });
 }

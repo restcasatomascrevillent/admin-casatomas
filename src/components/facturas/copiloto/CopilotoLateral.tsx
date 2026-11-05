@@ -36,6 +36,7 @@ interface Props {
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
+  onExplorar?: (g: GraficaIa) => void;
 }
 
 export function CopilotoLateral({

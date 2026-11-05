@@ -1,8 +1,9 @@
 // Piezas comunes del tablero de Facturas › Análisis: selector segmentado,
 // tarjeta con título y resumen para lectores de pantalla, esqueleto y estados.
-import { useId, type ReactNode } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { useId, useState, type ReactNode } from "react";
+import { AlertTriangle, ChevronRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export const FOCO =
@@ -96,34 +97,120 @@ export function Tarjeta({
   );
 }
 
-/** Indicador: tarjeta gris sin borde, etiqueta, cifra y nota. */
-export function Indicador({ etiqueta, valor, nota, claseNota }: { etiqueta: string; valor: string; nota?: ReactNode; claseNota?: string }) {
+/**
+ * Indicador: tarjeta gris sin borde, etiqueta, cifra y nota. Con `onVer` toda
+ * la tarjeta es un botón que abre los documentos que forman la cifra.
+ */
+export function Indicador({
+  etiqueta,
+  valor,
+  nota,
+  claseNota,
+  onVer,
+}: {
+  etiqueta: string;
+  valor: string;
+  nota?: ReactNode;
+  claseNota?: string;
+  onVer?: () => void;
+}) {
+  const cuerpo = (
+    <>
+      <span className="flex items-center gap-1 truncate text-xs font-medium text-muted-foreground">
+        <span className="min-w-0 flex-1 truncate">{etiqueta}</span>
+        {onVer && <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:translate-x-0.5" aria-hidden />}
+      </span>
+      <span className="block truncate text-lg font-semibold tabular-nums tracking-tight text-foreground sm:text-xl">{valor}</span>
+      {nota && <span className={cn("block truncate text-xs text-muted-foreground", claseNota)}>{nota}</span>}
+      {onVer && <span className="sr-only">. Ver documentos</span>}
+    </>
+  );
+  const base = "block w-full min-w-0 rounded-xl bg-muted/50 px-3 py-2.5 text-left sm:px-4 sm:py-3";
   return (
-    <div className="min-w-0 rounded-xl bg-muted/50 px-3 py-2.5 sm:px-4 sm:py-3">
-      <dt className="truncate text-xs font-medium text-muted-foreground">{etiqueta}</dt>
-      <dd className="truncate text-lg font-semibold tabular-nums text-foreground sm:text-xl">{valor}</dd>
-      {nota && <dd className={cn("truncate text-xs text-muted-foreground", claseNota)}>{nota}</dd>}
-    </div>
+    <li className="min-w-0">
+      {onVer ? (
+        <button type="button" onClick={onVer} className={cn(base, "group min-h-11 transition-colors hover:bg-muted", FOCO)}>
+          {cuerpo}
+        </button>
+      ) : (
+        <div className={base}>{cuerpo}</div>
+      )}
+    </li>
+  );
+}
+
+export interface AccionMenu {
+  etiqueta: string;
+  icono?: ReactNode;
+  onClick: () => void;
+}
+
+/**
+ * Fila de una tarjeta que, al tocarla, ofrece qué hacer con ella (ver sus
+ * documentos, abrirla en Compras, llevarla al explorador). `children` es el
+ * contenido de la fila; `nombre`, su nombre accesible.
+ */
+export function FilaConMenu({
+  nombre,
+  acciones,
+  children,
+  className,
+  disabled,
+  title,
+}: {
+  nombre: string;
+  acciones: AccionMenu[];
+  children: ReactNode;
+  className?: string;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  return (
+    <Popover open={abierto} onOpenChange={setAbierto}>
+      <PopoverTrigger asChild>
+        <button type="button" aria-label={nombre} title={title} disabled={disabled || acciones.length === 0} className={className} aria-haspopup="menu">
+          {children}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-64 p-1" role="menu" aria-label={nombre}>
+        <p className="truncate px-2 py-1.5 text-xs text-muted-foreground" title={nombre}>
+          {nombre.replace(/\. ?Opciones$/, "")}
+        </p>
+        {acciones.map((a) => (
+          <button
+            key={a.etiqueta}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setAbierto(false);
+              a.onClick();
+            }}
+            className={cn("flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-muted/60", FOCO)}
+          >
+            {a.icono}
+            {a.etiqueta}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 }
 
 /** Esqueleto del tablero mientras llega la RPC (la misma forma que el tablero). */
 export function EsqueletoTablero() {
-  const bloque = "animate-pulse rounded-xl bg-muted/60";
+  const bloque = "animate-pulse rounded-xl bg-muted/60 motion-reduce:animate-none";
   return (
-    <div className="space-y-3" aria-busy="true" role="status" aria-label="Cargando el tablero">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="space-y-4" aria-busy="true" role="status" aria-label="Cargando el tablero">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <div key={i} className={cn(bloque, "h-20")} />
+          <div key={i} className={cn(bloque, "h-[4.5rem]")} />
         ))}
       </div>
-      <div className="grid gap-3 lg:grid-cols-5">
-        <div className={cn(bloque, "h-64 lg:col-span-3")} />
-        <div className={cn(bloque, "h-64 lg:col-span-2")} />
-      </div>
+      <div className={cn(bloque, "h-[30rem]")} />
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className={cn(bloque, "h-48")} />
+          <div key={i} className={cn(bloque, "h-56")} />
         ))}
       </div>
     </div>

@@ -99,8 +99,9 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Análisis: el tablero y la IA",
         pasos: [
-          "En «Análisis» el tablero sale hecho: gasto con IVA por mes (Casa Tomás y Touza), los proveedores a los que más compras, lo que más ha subido de precio, el precio de un producto, el gasto por familia, los gastos fijos al mes, los abonos y Casa Tomás frente a Touza. Arriba eliges el periodo (mes, trimestre, año o todo) y el local. No gasta IA.",
-          "Toca un mes para ver sus documentos en «Compras», o un proveedor para abrirlo allí. Toca un producto de «Lo que más ha subido» para ver su precio con cada proveedor. Si «Gasto por familia» avisa de líneas sin clasificar, «Clasificar con IA» te lleva a «Productos».",
+          "En «Análisis» el tablero sale hecho: las cifras del periodo, el explorador, los proveedores a los que más compras, lo que más ha subido de precio, el gasto por familia, los gastos fijos al mes, los abonos y Casa Tomás frente a Touza. Arriba eliges el periodo (mes, trimestre, año, todo o «Personalizado» con las fechas que quieras) y el local; el enlace de la página guarda esa elección para volver o compartirla. No gasta IA.",
+          "«Explorar» cambia la gráfica al momento: elige qué medir (gasto con IVA, base sin IVA, nº de documentos, abonos, regalado; y con un producto filtrado, cantidad o precio medio), el eje (día, semana, mes, trimestre, proveedor, familia, producto, local o tipo), el color y los filtros. Tienes atajos («Gasto por mes», «Top proveedores», «Por familia», «Precio de un producto», «Abonos por proveedor»), «Ver como tabla», «CSV» y «Fijar en el tablero».",
+          "Desde cualquier cifra llegas a sus facturas: toca un indicador, una barra del explorador («Ver documentos») o una fila de las tarjetas. Sale la lista de documentos que forman esa cifra (con el total, que cuadra) y, al tocar uno, su PDF en grande con «Anterior/Siguiente», «Abrir en Drive» y «Abrir en Compras». Si Drive pide iniciar sesión, usa «Abrir en Drive».",
           "Para lo demás, pulsa «Pregúntale a la IA»: sale un panel a la derecha con sugerencias y una caja para escribir con tus palabras. Si la respuesta trae una gráfica, «Fijar en el tablero» la deja al final del tablero. Tus conversaciones están en «Historial», dentro del panel. Arriba a la derecha ves lo que ha costado la IA este mes.",
         ],
       },
@@ -154,7 +155,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cómo veo si un producto ha subido de precio?",
         respuesta:
-          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. En «Análisis» tienes «Lo que más ha subido» y «Precio de un producto», ya hechos.",
+          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. En «Análisis» tienes «Lo que más ha subido» y, en el explorador, el atajo «Precio de un producto».",
       },
       {
         pregunta: "¿Dónde veo el papel original?",

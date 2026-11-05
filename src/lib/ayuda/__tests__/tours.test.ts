@@ -67,13 +67,14 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("Análisis de Facturas se explica por partes: barra, cifras, tablero y la IA plegada (se abre para enseñar la caja)", () => {
+  it("Análisis de Facturas se explica por partes: barra, cifras, explorador, tablero y la IA plegada (se abre para enseñar la caja)", () => {
     const ia = TOURS.facturas.filter((p) => p.pestana === "facturas-pestana-ia").map((p) => p.elemento);
     expect(ia).toEqual([
       "facturas-pestana-ia",
       "facturas-gasto-ia",
       "facturas-analisis-barra",
       "facturas-analisis-indicadores",
+      "facturas-analisis-explorador",
       "facturas-analisis-tablero",
       "facturas-ia-abrir",
       "facturas-ia-pregunta",
