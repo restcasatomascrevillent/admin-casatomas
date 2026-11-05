@@ -19,7 +19,7 @@ import {
 } from "../datos";
 import { claveAlergenoCarta, numeracionAlergenos } from "../alergenos";
 
-const NBSP = " ";
+const NBSP = "\u00A0";
 
 const plato = (p: Partial<FilaPlato> & Record<string, unknown>): FilaPlato =>
   ({

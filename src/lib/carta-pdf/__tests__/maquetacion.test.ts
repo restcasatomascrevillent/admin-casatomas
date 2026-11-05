@@ -18,7 +18,7 @@ const elemento = (nombre: string, detalle: string | null = "Descripción corta d
   id: nombre,
   nombre,
   detalle,
-  precio: "12,50 €",
+  precio: "12,50\u00A0€",
   unidad: null,
   copa: null,
   alergenos: [1, 7],

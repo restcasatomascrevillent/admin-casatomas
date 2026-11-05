@@ -116,8 +116,11 @@ describe("texto", () => {
 
   it("deja tildes, ñ, comillas y €, y quita lo que la fuente no tiene", () => {
     const tiene = (codigo: number) => kit.regular.hasGlyphForCodePoint(codigo);
-    expect(limpiarTexto("Ñoquis «crème» — 12,50 €", tiene)).toBe("Ñoquis «crème» — 12,50 €");
-    expect(limpiarTexto("Helado 🍦\tde­yema", tiene)).toBe("Helado de yema".replace(" de yema", " deyema"));
+    expect(limpiarTexto("Ñoquis «crème» — 12,50\u00A0€", tiene)).toBe("Ñoquis «crème» — 12,50\u00A0€");
+    // El emoji se va, el tabulador es un espacio y el guion blando desaparece.
+    expect(limpiarTexto("Helado 🍦\tcon\u00ADyema", tiene)).toBe("Helado conyema");
+    // El espacio fino del francés pasa a espacio duro.
+    expect(limpiarTexto("personnel\u202F:", tiene)).toBe("personnel\u00A0:");
     expect(limpiarTexto("Ελληνικά", tiene)).toBe("");
   });
 

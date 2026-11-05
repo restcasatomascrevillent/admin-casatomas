@@ -393,7 +393,7 @@ export function tiposVino(filas: readonly FilaVino[], carta: CartaImpresa): Opci
   }));
 }
 
-const plegar = (valor: string) => valor.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+const plegar = (valor: string) => valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 const ES_ESPANA = new Set(["espana", "spain", "espagne"]);
 
 /** Un dato de origen sin confirmar no se imprime (`origenComprobable` de la web). */

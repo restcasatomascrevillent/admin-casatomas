@@ -43,8 +43,7 @@ export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
     consultarPrecio: "Consultar precio",
     copa: "Copa",
     ivaIncluido: "Precios con IVA incluido.",
-    notaAlergenos:
-      "Si tiene alguna alergia o intolerancia alimentaria, consulte a nuestro personal: le informaremos de los alérgenos de cada plato.",
+    notaAlergenos: "Si tiene alguna alergia o intolerancia alimentaria, consulte a nuestro personal.",
     tituloAlergenos: "Alérgenos",
     explicacionAlergenos: "Los números junto a cada nombre indican los alérgenos que contiene.",
     todosLosVinosContienen: (lista) => `Todos nuestros vinos contienen ${lista}.`,
@@ -65,8 +64,7 @@ export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
     consultarPrecio: "Ask for price",
     copa: "Glass",
     ivaIncluido: "Prices include VAT.",
-    notaAlergenos:
-      "If you have any food allergy or intolerance, please ask our staff: we will tell you about the allergens in each dish.",
+    notaAlergenos: "If you have any food allergy or intolerance, please ask our staff.",
     tituloAlergenos: "Allergens",
     explicacionAlergenos: "The numbers next to each name show the allergens it contains.",
     todosLosVinosContienen: (lista) => `All our wines contain ${lista}.`,
@@ -87,9 +85,7 @@ export const TEXTOS: Record<IdiomaCarta, TextosCarta> = {
     consultarPrecio: "Prix sur demande",
     copa: "Verre",
     ivaIncluido: "Prix TVA incluse.",
-    // Espacio fino insecable delante de «:», como pide la tipografía francesa.
-    notaAlergenos:
-      "En cas d’allergie ou d’intolérance alimentaire, veuillez consulter notre personnel : nous vous informerons des allergènes de chaque plat.",
+    notaAlergenos: "En cas d’allergie ou d’intolérance alimentaire, veuillez consulter notre personnel.",
     tituloAlergenos: "Allergènes",
     explicacionAlergenos: "Les numéros à côté de chaque nom indiquent les allergènes qu’il contient.",
     todosLosVinosContienen: (lista) => `Tous nos vins contiennent des ${lista}.`,

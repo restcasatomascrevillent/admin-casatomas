@@ -41,7 +41,7 @@ const EXTRAS: Record<string, Etiquetas> = {
 const ORDEN_EXTRAS = Object.keys(EXTRAS);
 
 const plegar = (valor: string) =>
-  valor.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 
 const capitalizar = (valor: string) => {
   const limpio = valor.trim();

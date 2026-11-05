@@ -82,7 +82,10 @@ function ListaCasillas({
   );
 }
 
-export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, platos = [], vinos = [] }: Props) {
+// Por defecto, una lista vacía estable: con `= []` cada render estrenaba lista y se volvía a maquetar todo.
+const SIN_FILAS: readonly never[] = [];
+
+export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, platos = SIN_FILAS, vinos = SIN_FILAS }: Props) {
   const filas = tipo === "platos" ? platos : vinos;
   const hayTouza = useMemo(() => hayPublicados(filas, "touza"), [filas]);
   const [carta, setCarta] = useState<CartaImpresa>("restaurante");
@@ -200,9 +203,11 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                   <ToggleGroupItem
                     key={valor}
                     value={valor}
-                    className="h-10 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+                    aria-label={valor === "A5" ? "A5, 148 × 210 mm" : "A4, 210 × 297 mm"}
+                    className="h-auto flex-col gap-0 py-1.5 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
                   >
-                    {valor === "A5" ? "A5 · 148 × 210 mm" : "A4 · 210 × 297 mm"}
+                    <span className="font-semibold">{valor}</span>
+                    <span className="text-xs font-normal opacity-80">{valor === "A5" ? "148 × 210 mm" : "210 × 297 mm"}</span>
                   </ToggleGroupItem>
                 ))}
               </ToggleGroup>
@@ -328,11 +333,6 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
                 <span className="mt-1 block text-xs text-muted-foreground">Solo si la imprenta lo pide; para imprimir en casa, apagado.</span>
               </Label>
             </div>
-
-            <Button type="button" className="w-full" onClick={descargar} disabled={!paginas.length || descargando}>
-              {descargando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              Descargar PDF
-            </Button>
           </div>
 
           {/* Vista previa */}
@@ -351,7 +351,7 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={() => setAmpliada(null)}>
-                    <LayoutGrid className="mr-2 h-4 w-4" /> Todas
+                    <LayoutGrid className="mr-2 h-4 w-4" /> Ver todas
                   </Button>
                   <span className="text-sm tabular-nums text-muted-foreground">
                     {ampliada + 1} / {paginas.length}
@@ -377,7 +377,7 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
             ) : (
               <>
                 <p className="mb-3 text-sm text-muted-foreground">
-                  {paginas.length} páginas {tamano} · {totalElementos} {tipo === "vinos" ? "vinos" : "platos"}. Toca una página para verla en grande.
+                  Toca una página para verla en grande.
                 </p>
                 <ol className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                   {paginas.map((pagina, i) => (
@@ -397,6 +397,18 @@ export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, 
               </>
             )}
           </section>
+        </div>
+        {/* Pie fijo abajo: el resumen y «Descargar PDF» siempre a la vista, aunque la lista sea larga. */}
+        <div className="sticky -bottom-4 z-10 -mx-4 -mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t bg-background px-4 py-3 sm:-bottom-6 sm:-mx-6 sm:-mb-6 sm:px-6">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            {paginas.length
+              ? `${paginas.length} páginas ${tamano} · ${totalElementos} ${tipo === "vinos" ? "vinos" : "platos"}${sangrado ? " · con sangrado" : ""}`
+              : "Sin páginas todavía"}
+          </p>
+          <Button type="button" className="w-full sm:w-auto" onClick={descargar} disabled={!paginas.length || descargando}>
+            {descargando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            Descargar PDF
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
