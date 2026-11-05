@@ -42,7 +42,7 @@ set client_encoding = 'UTF8';
 -- recibe un tablero vacío («sin_datos»), igual que las RPC *_agente.
 --
 -- Idempotente. Test: supabase/tests/tablero_compras_test.sql
--- Rollback: supabase/rollbacks/20261105150000_tablero_compras_ROLLBACK.sql
+-- Rollback: supabase/rollbacks/20261105150500_tablero_compras_ROLLBACK.sql
 -- ===========================================================================
 
 begin;
@@ -82,7 +82,7 @@ stable
 security invoker
 set search_path = public
 as $$
--- 20261105150000_tablero_compras
+-- 20261105150500_tablero_compras
 declare
   v_local     text := nullif(lower(btrim(coalesce(p_local, ''))), '');
   v_desde     date;

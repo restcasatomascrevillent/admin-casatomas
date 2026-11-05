@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Rollback de 20261105150000_tablero_compras.sql: borra tablero_compras() y
+-- Rollback de 20261105150500_tablero_compras.sql: borra tablero_compras() y
 -- es_linea_no_producto_tablero(). Solo lectura: no hay datos que restaurar.
 -- La pestaña Facturas › Análisis dejará de cargar el tablero (mostrará el error
 -- con «Reintentar»). Se puede ejecutar dos veces.
