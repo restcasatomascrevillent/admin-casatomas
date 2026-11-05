@@ -2,8 +2,9 @@
  * Edge Function instagram-drive — biblioteca de fotos de Marketing › Instagram
  * en Google Drive (marketing/instagram/fotos/<marca>). Ver docs/instagram-fotos.md.
  *
- * Autorización: JWT de Supabase + can_write_section('marketing') (igual que
- * instagram-publicar e instagram-estado). Supabase (tabla instagram_fotos y
+ * Autorización: JWT de Supabase + «Ver» en Marketing (can_read_section) para
+ * listar y ver miniaturas; «Editar» (can_edit_section) para preparar y subir
+ * (403 si no, desde 20261111000000). Supabase (tabla instagram_fotos y
  * bucket «instagram») se usa COMO EL USUARIO: clave pública + su JWT; nunca
  * service_role. Drive, con los secretos de Google (ver _shared/instagram/drive.ts).
  *
@@ -62,6 +63,8 @@ import { CORS, json, jsonAuth, leerJson, opciones } from "../_shared/instagram/h
 import { registro, sanear } from "../_shared/instagram/secretos.ts";
 import {
   autorizarMarketing,
+  puedeEditarMarketing,
+  SIN_PERMISO_EDITAR,
   borrarObjetos,
   ErrorSupabase,
   insertarFotoDrive,
@@ -162,7 +165,9 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
   if (request.method === "OPTIONS") return opciones();
   if (request.method !== "GET" && request.method !== "POST") return json(405, { ok: false, error: "Método no permitido" });
   const env = deps.env ?? entornoDeno();
-  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch });
+  // Ver fotos (listar, miniatura) basta con «Ver»; copiarlas al cubo
+  // (preparar) o subirlas a Drive exige «Editar» (20261111000000).
+  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "leer" });
   if ("motivo" in auth) {
     if (auth.estado >= 500) registro("error", ETIQUETA, "autorización", { motivo: auth.motivo });
     return jsonAuth(auth.estado, auth.motivo);
@@ -179,6 +184,10 @@ export async function manejarDrive(request: Request, deps: DependenciasDrive = {
     if (!leido.valor || typeof leido.valor !== "object") return json(400, { ok: false, error: "El cuerpo tiene que ser un objeto JSON" });
     cuerpo = leido.valor as Record<string, unknown>;
     if (typeof cuerpo.accion === "string") accion = cuerpo.accion;
+  }
+
+  if (request.method === "POST" && (accion === "preparar" || accion === "subir") && !(await puedeEditarMarketing(s))) {
+    return jsonAuth(403, SIN_PERMISO_EDITAR);
   }
 
   // La foto de la carta no pasa por Google Drive: funciona aunque falten sus secretos.

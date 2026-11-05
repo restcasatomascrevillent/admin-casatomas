@@ -7,7 +7,13 @@
  *  - El token va en la cabecera `Authorization: Bearer`. La única excepción es
  *    /debug_token, que exige input_token (y access_token si es el de la app)
  *    en la query: esa URL se sanea antes de registrarla.
- *  - Reintentos con espera creciente solo para errores transitorios.
+ *  - Reintentos con espera creciente solo para errores transitorios. NUNCA
+ *    en media_publish (A1 de la evaluación: un reintento tras un tiempo
+ *    agotado puede publicar dos veces): si falla, se mira el contenedor
+ *    (publicarSinDuplicar) y, si ya está PUBLISHED, se recupera el medio.
+ *  - `limite` (instante en ms): ninguna petición pasa de ahí (el timeout se
+ *    recorta y no se reintenta si no da tiempo). Lo usa el programador para
+ *    no pasarse del reloj de la Edge Function (A4).
  *  - `fetch`, `dormir` y `ahora` se inyectan para poder probar sin red.
  */
 import { sanear, sanearUrl, mensajeSaneado, registrarSecreto } from "./secretos.ts";
@@ -36,7 +42,27 @@ export interface OpcionesCliente {
   ahora?: (() => number) | undefined;
   /** Registro de cada llamada (método, ruta y estado HTTP; nunca credenciales). */
   registro?: ((linea: string) => void) | undefined;
+  /** Instante (ms, mismo reloj que `ahora`) a partir del cual no se hacen más peticiones. */
+  limite?: number | undefined;
 }
+
+/** Medio publicado encontrado por la búsqueda de recuperación. */
+export interface MedioPublicado {
+  id: string;
+  permalink: string | null;
+}
+
+/** Resultado de publicarSinDuplicar. */
+export interface ResultadoPublicar {
+  /** id del medio; null si Meta dice PUBLISHED pero no se encontró cuál es. */
+  mediaId: string | null;
+  permalink: string | null;
+  /** true si media_publish falló pero el contenedor ya estaba publicado. */
+  recuperado: boolean;
+}
+
+/** Errores de media_publish tras los que puede que SÍ se haya publicado. */
+const TIPOS_DUDOSOS = new Set(["tiempo_agotado", "red", "transitorio", "desconocido", "respuesta_inesperada"]);
 
 export interface CuentaIg {
   id: string;
@@ -148,6 +174,7 @@ export class ClienteGraph {
   private readonly dormir: (ms: number) => Promise<void>;
   private readonly ahora: () => number;
   private readonly registro: ((linea: string) => void) | undefined;
+  private readonly limite: number | undefined;
 
   constructor(o: OpcionesCliente) {
     if (!o.token) throw new Error("ClienteGraph: falta el token (IG_ACCESS_TOKEN).");
@@ -165,6 +192,12 @@ export class ClienteGraph {
     this.dormir = o.dormir ?? dormirReal;
     this.ahora = o.ahora ?? Date.now;
     this.registro = o.registro;
+    this.limite = o.limite;
+  }
+
+  /** ms que quedan hasta el límite (Infinity si no hay). */
+  quedaMs(): number {
+    return this.limite === undefined ? Infinity : this.limite - this.ahora();
   }
 
   /** «…abcd» del token, para informes. */
@@ -201,8 +234,12 @@ export class ClienteGraph {
     let intento = 0;
     for (;;) {
       let error: ErrorInstagram;
+      const queda = this.quedaMs();
+      if (queda < 1_000) {
+        throw new ErrorInstagram({ tipo: "tiempo_agotado", mensaje: `Sin tiempo para ${metodo} ${rutaVisible} (límite de la pasada)` });
+      }
       try {
-        const respuesta = await this.fetch(url, { ...init, signal: AbortSignal.timeout(this.timeoutMs) });
+        const respuesta = await this.fetch(url, { ...init, signal: AbortSignal.timeout(Math.min(this.timeoutMs, queda)) });
         const texto = await respuesta.text();
         let cuerpo: unknown = null;
         try {
@@ -239,6 +276,7 @@ export class ClienteGraph {
       const limite = error.tipo === "contenedor_inexistente" ? Math.min(maxReintentos, 2) : maxReintentos;
       if (!error.reintentable || intento >= limite) throw error;
       const espera = this.esperaBaseMs * 2 ** intento;
+      if (espera + 1_000 > this.quedaMs()) throw error; // no da tiempo a otro intento
       this.registro?.(`  reintento ${intento + 1}/${limite} en ${Math.round(espera / 100) / 10} s (${error.tipo})`);
       await this.dormir(espera);
       intento++;
@@ -439,14 +477,81 @@ export class ClienteGraph {
     }
   }
 
-  /** POST /{ig-user-id}/media_publish con creation_id → id del medio publicado. */
+  /**
+   * POST /{ig-user-id}/media_publish con creation_id → id del medio publicado.
+   * SIN reintentos: un segundo media_publish tras un tiempo agotado puede
+   * duplicar la publicación. Usa publicarSinDuplicar.
+   */
   async publicar(creationId: string, igUserId?: string): Promise<string> {
     const id = this.idCuenta(igUserId);
     const r = await this.peticion<{ id?: string }>("POST", `/${encodeURIComponent(id)}/media_publish`, {
       cuerpo: { creation_id: creationId },
+      reintentos: 0,
     });
     if (!r.id) throw new ErrorInstagram({ tipo: "respuesta_inesperada", mensaje: "Meta no devolvió el id del medio publicado." });
     return String(r.id);
+  }
+
+  /**
+   * media_publish sin duplicar: si falla (tiempo agotado, red, 5xx…), mira el
+   * estado del contenedor. PUBLISHED → salió: busca el medio (por texto y
+   * hora) y lo devuelve con `recuperado`. Si no, relanza el error original:
+   * el contenedor queda guardado en la pieza y el siguiente intento lo vuelve
+   * a mirar antes de crear otro.
+   */
+  async publicarSinDuplicar(
+    creationId: string,
+    o: { igUserId?: string; caption?: string | null; tipo?: TipoPublicacion; desdeMs?: number } = {},
+  ): Promise<ResultadoPublicar> {
+    try {
+      return { mediaId: await this.publicar(creationId, o.igUserId), permalink: null, recuperado: false };
+    } catch (e) {
+      if (!(e instanceof ErrorInstagram)) throw e;
+      // Tras un error dudoso Meta puede tardar unos segundos en marcarlo: dos miradas.
+      const miradas = TIPOS_DUDOSOS.has(e.tipo) ? 2 : 1;
+      for (let i = 0; i < miradas; i++) {
+        if (i > 0) {
+          if (this.quedaMs() < 6_000) break;
+          await this.dormir(3_000);
+        }
+        let info: InfoContenedor;
+        try {
+          info = await this.estadoContenedor(creationId);
+        } catch {
+          break;
+        }
+        if (info.estado === "PUBLISHED") {
+          this.registro?.(`media_publish falló (${e.tipo}), pero el contenedor ya está publicado: no se reintenta`);
+          const m = await this.buscarMedioPublicado(o).catch(() => null);
+          return { mediaId: m?.id ?? null, permalink: m?.permalink ?? null, recuperado: true };
+        }
+        if (info.estado !== "FINISHED" && info.estado !== "IN_PROGRESS") break;
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * Busca un medio recién publicado: los últimos de la cuenta (stories en
+   * /stories) desde `desdeMs` − 10 min, con el mismo texto si lo hay. Si hay
+   * varios, el más reciente. null si no hay ninguno.
+   */
+  async buscarMedioPublicado(o: { igUserId?: string; caption?: string | null; tipo?: TipoPublicacion; desdeMs?: number } = {}): Promise<MedioPublicado | null> {
+    const id = this.idCuenta(o.igUserId);
+    const ruta = o.tipo === "story" ? "stories" : "media";
+    const r = await this.peticion<{ data?: Array<{ id?: string; caption?: string; timestamp?: string; permalink?: string }> }>(
+      "GET",
+      `/${encodeURIComponent(id)}/${ruta}`,
+      { consulta: { fields: "id,caption,timestamp,permalink", limit: "10" }, reintentos: 1 },
+    );
+    const desde = typeof o.desdeMs === "number" ? o.desdeMs - 10 * 60_000 : -Infinity;
+    const texto = (o.caption ?? "").trim();
+    const candidatos = (r.data ?? [])
+      .filter((m) => m.id && (Date.parse(m.timestamp ?? "") || 0) >= desde)
+      .filter((m) => o.tipo === "story" || !texto || (m.caption ?? "").trim() === texto)
+      .sort((a, b) => (Date.parse(b.timestamp ?? "") || 0) - (Date.parse(a.timestamp ?? "") || 0));
+    const m = candidatos[0];
+    return m?.id ? { id: String(m.id), permalink: m.permalink ?? null } : null;
   }
 
   /** GET /{media-id}?fields=permalink. */

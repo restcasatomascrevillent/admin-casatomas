@@ -96,6 +96,10 @@ jobs:
         run: npm run test:instagram-aprender:db
       - name: Encargos de Instagram, estados por RPC, agencia, rondas y pieza al aprobar (PGlite)
         run: npm run test:instagram-encargos:db
+      - name: Seguridad de Instagram, «Editar» para escribir, agencia y trabajador de render limitados, limpieza de vídeo y cupo de IA (PGlite)
+        run: npm run test:instagram-seguridad:db
+      - name: Versiones de migración sin repetir (salvo las históricas)
+        run: npm run test:migraciones
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
         run: npx vitest run api/
         env:

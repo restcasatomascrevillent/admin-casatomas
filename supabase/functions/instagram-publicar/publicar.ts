@@ -44,6 +44,22 @@
  *   Esas columnas solo las puede escribir el servidor: se escriben con la
  *   clave de servicio (sesionEscritura), nunca con el JWT del usuario.
  *
+ *   SIN DUPLICADOS (A1 de la evaluación, 05/11/2026):
+ *     · media_publish NUNCA se reintenta; si falla o se agota el tiempo se
+ *       mira el contenedor (ClienteGraph.publicarSinDuplicar): PUBLISHED → la
+ *       pieza se cierra como publicada con el medio que se encuentre.
+ *     · media_id y estado «publicada» se guardan EN CUANTO Meta lo confirma,
+ *       antes del permalink, de Drive y de borrar nada.
+ *     · Antes de crear OTRO contenedor se mira el que la pieza ya tenía: si
+ *       está PUBLISHED no se publica otra vez, se recupera el media_id.
+ *     · Si un contenedor pedido (reintento, prueba reutilizada) resulta estar
+ *       PUBLISHED, lo mismo. Sin medio encontrado, la pieza queda «publicada»
+ *       con AVISO_PUBLICADA_SIN_ID (eso bloquea volver a publicarla).
+ *   TIEMPO (A4): con `deps.limite` (el programador) no se empieza si no da
+ *   tiempo (503 tipo «sin_tiempo», sin contenedor) y no se llama a
+ *   media_publish sin RESERVA_PUBLICAR_MS por delante (202 tipo «sin_tiempo»
+ *   con el contenedor listo, para la siguiente pasada).
+ *
  *   Tras una publicación REAL el JPEG se archiva en Google Drive
  *   (marketing/instagram/publicadas/AAAA-MM, ver _shared/instagram/drive.ts) y
  *   su id se guarda en instagram_piezas.drive_id. SOLO si Drive lo tiene se
@@ -105,8 +121,18 @@ export const AVISO_JPEG_NO_BORRADO = "Publicada, pero el JPEG no se pudo borrar 
 /** Prefijo de `error` en una pieza publicada que no se pudo archivar en Drive (el JPEG sigue en el bucket). */
 export const AVISO_SIN_DRIVE = "Publicada, pero no se pudo guardar en Google Drive (el JPEG sigue en el bucket «instagram»):";
 
+/** Prefijo de `error` de una pieza que Instagram da por publicada pero cuyo medio no se encontró. */
+export const AVISO_PUBLICADA_SIN_ID =
+  "Instagram indica que ya se publicó (un intento anterior sí salió), pero no se encontró la publicación: compruébala en la cuenta. No se ha vuelto a publicar.";
+
 /** Lo que dura el cerrojo de publicación (la función tiene ~150 s de reloj). */
 export const CERROJO_SEG = 180;
+/** Con límite (programador): tiempo mínimo por delante para llamar a media_publish y guardar el resultado. */
+export const RESERVA_PUBLICAR_MS = 30_000;
+/** Con límite: tiempo mínimo para empezar (contenedor + algo de sondeo + RESERVA_PUBLICAR_MS). */
+export const MIN_PARA_EMPEZAR_MS = 45_000;
+/** Un contenedor de Meta caduca a las 24 h: la búsqueda del medio recuperado mira 25 h atrás. */
+export const VIDA_CONTENEDOR_MS = 25 * 60 * 60_000;
 
 export interface DependenciasPublicar {
   /** «programador»: no comprueba si hay una programación activa (es la suya). */
@@ -117,6 +143,13 @@ export interface DependenciasPublicar {
   ahora?: () => number;
   presupuestoMs?: number;
   intervaloMs?: number;
+  /** Instante (ms, reloj de `ahora`) a partir del cual no se hace nada más (programador, A4). */
+  limite?: number;
+}
+
+/** ms hasta el límite (Infinity si no hay). */
+export function quedaMs(deps: DependenciasPublicar): number {
+  return deps.limite === undefined ? Infinity : deps.limite - (deps.ahora ?? Date.now)();
 }
 
 function errorMeta(e: ErrorInstagram, extra: Record<string, unknown> = {}): Response {
@@ -272,6 +305,104 @@ export interface ContextoPublicacion {
   resumenCaption: { caracteres: number; hashtags: number; menciones: number };
 }
 
+/** Respuesta cuando no queda tiempo en la pasada (el programador la aplaza sin contar intento). */
+export function respuestaSinTiempo(c: ContextoPublicacion, contenedorId: string | null): Response {
+  return json(contenedorId ? 202 : 503, {
+    ok: !!contenedorId,
+    tipo: "sin_tiempo",
+    ...(contenedorId ? { estado: "en_proceso" } : { error: "No queda tiempo en esta pasada para publicar sin riesgo: se hará en la siguiente." }),
+    id: c.id,
+    dryRun: c.dryRun,
+    publicado: false,
+    contenedor: contenedorId ? { id: contenedorId } : null,
+    reintentar: contenedorId ? { id: c.id, contenedorId, dryRun: c.dryRun } : null,
+    avisos: c.avisos,
+  });
+}
+
+/**
+ * Guarda que la pieza YA está en Instagram (estado, media_id, contenedor…).
+ * Es lo primero que se hace tras media_publish: dos intentos. Nunca lanza:
+ * devuelve un aviso si no se pudo.
+ */
+export async function guardarPublicada(c: ContextoPublicacion, cambios: Partial<FilaPieza>): Promise<string | null> {
+  for (let i = 0; i < 2; i++) {
+    try {
+      await actualizarPieza(c.sw, c.id, { estado: "publicada", caption: c.caption, ...cambios });
+      return null;
+    } catch (e) {
+      registro("error", ETIQUETA, `publicada pero no se pudo anotar (intento ${i + 1})`, e);
+    }
+  }
+  return "Publicado en Instagram, pero no se pudo guardar el estado en el panel. NO la vuelvas a publicar: compruébala en Instagram.";
+}
+
+/**
+ * El contenedor ya estaba PUBLISHED (un intento anterior sí salió): se cierra
+ * la pieza como publicada SIN volver a publicar, con el medio que se
+ * encuentre (o sin él y con AVISO_PUBLICADA_SIN_ID).
+ */
+export async function recuperarPublicada(
+  c: ContextoPublicacion,
+  cliente: ClienteGraph,
+  contenedorId: string,
+  o: { encontrado?: { mediaId: string | null; permalink: string | null } | null; desdeMs: number },
+): Promise<Response> {
+  const reel = esReel(c.fila);
+  let medio = o.encontrado ? { ...o.encontrado } : null;
+  if (!medio || !medio.mediaId) {
+    const m = await cliente.buscarMedioPublicado({ caption: c.caption, tipo: reel ? "reel" : c.tipo, desdeMs: o.desdeMs }).catch(() => null);
+    medio = { mediaId: m?.id ?? null, permalink: m?.permalink ?? null };
+  }
+  if (medio.mediaId && !medio.permalink) medio.permalink = await cliente.permalink(medio.mediaId).catch(() => null);
+  const error = !medio.mediaId ? AVISO_PUBLICADA_SIN_ID : reel ? null : `${AVISO_SIN_DRIVE} se recuperó de un intento anterior que sí salió.`;
+  const aviso = await guardarPublicada(c, { contenedor_id: contenedorId, media_id: medio.mediaId, permalink: medio.permalink, error });
+  const avisos = [...c.avisos, "Instagram ya la tenía publicada (un intento anterior sí salió): no se ha vuelto a publicar."];
+  if (!medio.mediaId) avisos.push("No se encontró la publicación en la cuenta: compruébala en Instagram.");
+  if (aviso) avisos.push(aviso);
+  registro("warn", ETIQUETA, "ya estaba publicada: recuperada sin volver a publicar", { id: c.id, contenedorId, mediaId: medio.mediaId });
+  return json(200, {
+    ok: true,
+    id: c.id,
+    dryRun: false,
+    publicado: true,
+    recuperada: true,
+    estado: "publicada",
+    ...(reel ? { tipoMedio: "reel" } : {}),
+    contenedor: { id: contenedorId, estado: "PUBLISHED" },
+    mediaId: medio.mediaId,
+    permalink: medio.permalink,
+    cuenta: c.cuenta,
+    caption: c.resumenCaption,
+    avisos,
+  });
+}
+
+/**
+ * Antes de crear OTRO contenedor: ¿el que ya tenía la pieza salió? PUBLISHED
+ * → se recupera (Response). Si no se puede saber por la red, no se arriesga
+ * (502). En cualquier otro caso (FINISHED de una prueba, caducado, no
+ * existe…) null: se sigue.
+ */
+export async function comprobarContenedorAnterior(c: ContextoPublicacion, cliente: ClienteGraph, excepto: string | null): Promise<Response | null> {
+  const anterior = c.fila.contenedor_id;
+  if (!anterior || !/^\d+$/.test(anterior) || anterior === excepto) return null;
+  try {
+    const info = await cliente.estadoContenedor(anterior);
+    if (info.estado !== "PUBLISHED") return null;
+  } catch (e) {
+    if (e instanceof ErrorInstagram && ["red", "tiempo_agotado", "transitorio"].includes(e.tipo)) {
+      return json(502, {
+        ok: false,
+        tipo: e.tipo,
+        error: "No se pudo comprobar si el intento anterior ya se publicó en Instagram: no se crea otro para no duplicarla. Vuelve a intentarlo en un momento.",
+      });
+    }
+    return null;
+  }
+  return await recuperarPublicada(c, cliente, anterior, { desdeMs: (c.deps.ahora ?? Date.now)() - VIDA_CONTENEDOR_MS });
+}
+
 /** Pasos con Meta, con la pieza ya reservada. */
 async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
   const { s, sw, env, deps, id, dryRun, fotoTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, avisos, resumenCaption } = c;
@@ -289,7 +420,14 @@ async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
     timeoutMs: 15_000,
     reintentos: 2,
     registro: (l) => registro("info", ETIQUETA, l),
+    limite: deps.limite,
   });
+
+  // 0. Sin tiempo para terminar (programador): ni se empieza.
+  if (!contenedorPedido && quedaMs(deps) < MIN_PARA_EMPEZAR_MS) return respuestaSinTiempo(c, null);
+  // 0 bis. ¿El contenedor que ya tenía la pieza salió? Entonces no se publica otra vez.
+  const previo = await comprobarContenedorAnterior(c, cliente, contenedorPedido);
+  if (previo) return previo;
 
   // 1. La imagen pública se descarga sin sesión (es lo que hará Meta).
   if (!contenedorPedido) {
@@ -342,6 +480,7 @@ async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
   const inicio = ahora();
   let contenedorId = contenedorPedido;
   let info: InfoContenedor;
+  let publicadaYa = false;
   try {
     // 3. Contenedor.
     if (!contenedorId) {
@@ -358,9 +497,12 @@ async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
     try {
       info = await cliente.esperarFinished(contenedorId, {
         intervaloMs: deps.intervaloMs ?? INTERVALO_SONDEO_MS,
-        maxMs: Math.max(1_000, presupuesto - (ahora() - inicio)),
+        maxMs: Math.max(1_000, Math.min(presupuesto - (ahora() - inicio), quedaMs(deps) - RESERVA_PUBLICAR_MS)),
       });
     } catch (e) {
+      if (e instanceof ErrorInstagram && e.tipo === "contenedor_tiempo_agotado" && quedaMs(deps) < RESERVA_PUBLICAR_MS) {
+        return respuestaSinTiempo(c, contenedorId);
+      }
       if (e instanceof ErrorInstagram && e.tipo === "contenedor_tiempo_agotado") {
         const ultimo = /último estado: ([A-Z_]+)/.exec(e.message)?.[1] ?? "IN_PROGRESS";
         return json(202, {
@@ -404,7 +546,14 @@ async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
 
     // 6. Publicación real (esperarFinished garantiza FINISHED; doble cerrojo).
     if (info.estado !== "FINISHED") throw new ErrorInstagram({ tipo: "contenedor_no_listo" });
-    const mediaId = await cliente.publicar(contenedorId);
+    if (quedaMs(deps) < RESERVA_PUBLICAR_MS) return respuestaSinTiempo(c, contenedorId);
+    const pub = await cliente.publicarSinDuplicar(contenedorId, { caption, tipo, desdeMs: inicio });
+    if (pub.recuperado) return await recuperarPublicada(c, cliente, contenedorId, { encontrado: pub, desdeMs: inicio });
+    const mediaId = pub.mediaId as string;
+    // LO PRIMERO: que conste que ya está en Instagram (antes de Drive o de borrar nada).
+    publicadaYa = true;
+    const avisoGuardar = await guardarPublicada(c, { contenedor_id: contenedorId, media_id: mediaId, error: null });
+    if (avisoGuardar) avisos.push(avisoGuardar);
     let permalink: string | null = null;
     try {
       permalink = await cliente.permalink(mediaId);
@@ -431,19 +580,9 @@ async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
       avisos.push(`Publicado, pero no se pudo guardar en Google Drive: ${archivo.motivo}. El JPEG se queda en el bucket «instagram» (no se ha borrado).`);
       errorFila = `${AVISO_SIN_DRIVE} ${archivo.motivo}`.trim();
     }
-    try {
-      await actualizarPieza(sw, id, {
-        estado: "publicada",
-        contenedor_id: contenedorId,
-        media_id: mediaId,
-        permalink,
-        caption,
-        error: errorFila,
-      });
-    } catch (e) {
-      registro("error", ETIQUETA, "publicada pero no se pudo anotar", e);
-      avisos.push("Publicado en Instagram, pero no se pudo guardar el estado en el panel.");
-    }
+    // Segunda escritura: enlace y avisos de Drive (media_id ya está guardado).
+    const avisoFinal = await guardarPublicada(c, { contenedor_id: contenedorId, media_id: mediaId, permalink, error: errorFila });
+    if (avisoFinal && !avisoGuardar) avisos.push("Publicado y anotado, pero no se pudo guardar el enlace ni los avisos de Drive.");
     if (archivo.driveId) {
       try {
         await anotarDrivePieza(sw, id, archivo.driveId);
@@ -471,6 +610,14 @@ async function publicarReservado(c: ContextoPublicacion): Promise<Response> {
       avisos,
     });
   } catch (e) {
+    // Ya en Instagram (media_id guardado): nunca se pasa a «error».
+    if (publicadaYa) {
+      registro("error", ETIQUETA, "fallo después de publicar (la pieza sigue publicada)", e);
+      return json(500, { ok: false, publicado: true, error: "Publicado en Instagram, pero algo falló después (enlace o archivo). No la vuelvas a publicar.", detalle: sanear((e as Error)?.message ?? e) });
+    }
+    if (e instanceof ErrorInstagram && e.tipo === "contenedor_ya_publicado" && contenedorId) {
+      return await recuperarPublicada(c, cliente, contenedorId, { desdeMs: inicio - VIDA_CONTENEDOR_MS });
+    }
     if (e instanceof ErrorInstagram) {
       registro("warn", ETIQUETA, "error de Meta", { id, tipo: e.tipo, codigo: e.codigo, subcodigo: e.subcodigo, mensaje: e.message });
       await anotarError(sw, id, `${e.message}. ${e.comoArreglarlo}`);

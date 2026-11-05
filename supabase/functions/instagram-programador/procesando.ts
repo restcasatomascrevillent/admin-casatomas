@@ -14,9 +14,14 @@ import { registro, sanear } from "../_shared/instagram/secretos.ts";
 import type { Sesion } from "../_shared/instagram/supabase.ts";
 import { publicarConSesion, type DependenciasPublicar } from "../instagram-publicar/publicar.ts";
 
-export const MAX_PROCESANDO_POR_PASADA = 5;
+export const MAX_PROCESANDO_POR_PASADA = 3;
 /** A las 24 h el contenedor de Meta caduca: un «procesando» más viejo pasa a error. */
 export const CADUCIDAD_PROCESANDO_MS = 24 * 60 * 60_000;
+/**
+ * Con `limite` (A4): no se empieza otro reel con menos de esto por delante
+ * (sondeo corto de 20 s + media_publish + guardar).
+ */
+export const MIN_PARA_PROCESANDO_MS = 50_000;
 
 export interface ResultadoProcesando {
   piezaId: string;
@@ -34,6 +39,8 @@ export interface DependenciasProcesando {
   ahora?: () => number;
   presupuestoSondeoMs?: number;
   intervaloMs?: number;
+  /** Instante (ms) a partir del cual no se empieza ni se llama a nada (límite de la pasada). */
+  limite?: number;
 }
 
 interface FilaProcesando {
@@ -72,6 +79,8 @@ export async function cerrarProcesando(s: Sesion, env: Record<string, string | u
   const publicar = deps.publicar ?? publicarConSesion;
   const salida: ResultadoProcesando[] = [];
   for (const f of filas) {
+    // Sin tiempo para cerrar otro sin riesgo: se queda «procesando» para la siguiente pasada (A4).
+    if (deps.limite !== undefined && deps.limite - ahora() < MIN_PARA_PROCESANDO_MS) break;
     const accion = f.procesando_accion === "publicar" ? "publicar" : "prueba";
     const desde = f.procesando_desde ? Date.parse(f.procesando_desde) : NaN;
     try {
@@ -100,6 +109,7 @@ export async function cerrarProcesando(s: Sesion, env: Record<string, string | u
         ahora: deps.ahora,
         presupuestoMs: deps.presupuestoSondeoMs,
         intervaloMs: deps.intervaloMs,
+        limite: deps.limite,
       });
       const c = ((await r.json().catch(() => ({}))) ?? {}) as { estado?: string; mensaje?: string; error?: string };
       const resultado = r.status === 202 ? "sigue_procesando" : r.ok ? String(c.estado ?? "ok") : "error";

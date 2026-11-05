@@ -5,8 +5,9 @@
  * que en el panel. Nunca se usa service_role.
  *
  * Autorización: sesión válida (/auth/v1/user) + permiso de la sección
- * Marketing (`can_write_section('marketing')`, la misma función que usan las
- * políticas de RLS de escritura).
+ * Marketing con «Editar» (`can_edit_section('marketing')`, la misma función
+ * que usan las políticas de RLS de escritura desde 20261111000000). No
+ * `can_write_section`: mira «Ver» a propósito en todo el panel.
  *
  * Sin dependencias: fetch a Auth, PostgREST y Storage.
  */
@@ -71,7 +72,7 @@ export async function autorizarMarketing(cabecera: string | null | undefined, op
     const usuario = (await rUsuario.json().catch(() => null)) as { id?: string } | null;
     if (!usuario?.id) return { ok: false, estado: 401, motivo: "Sesión no válida" };
 
-    const rPermiso = await f(`${sb.url}/rest/v1/rpc/can_write_section`, {
+    const rPermiso = await f(`${sb.url}/rest/v1/rpc/can_edit_section`, {
       method: "POST",
       headers: cabeceras({ sb, token }, { "Content-Type": "application/json" }),
       body: JSON.stringify({ _section: SECCION_MARKETING }),
@@ -80,7 +81,9 @@ export async function autorizarMarketing(cabecera: string | null | undefined, op
     if (rPermiso.status === 401) return { ok: false, estado: 401, motivo: "Sesión no válida o caducada" };
     if (!rPermiso.ok) return { ok: false, estado: 500, motivo: `La comprobación de permisos respondió ${rPermiso.status}` };
     const puede = await rPermiso.json().catch(() => null);
-    if (puede !== true) return { ok: false, estado: 403, motivo: "Sin permiso de Marketing" };
+    if (puede !== true) {
+      return { ok: false, estado: 403, motivo: "Sin permiso para editar Marketing: hace falta «Editar» en Marketing (pídeselo a un administrador en Usuarios), no solo «Ver»" };
+    }
     return { ok: true, sesion: { usuario: usuario.id, token, sb, fetch: f } };
   } catch (e) {
     return { ok: false, estado: 500, motivo: sanear(`No se pudo comprobar la sesión: ${(e as Error)?.message ?? e}`) };

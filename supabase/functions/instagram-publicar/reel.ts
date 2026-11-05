@@ -30,7 +30,17 @@ import { ErrorInstagram, errorInstagramAJson, estadoHttpDeError } from "../_shar
 import { json } from "../_shared/instagram/http.ts";
 import { registro, sanear } from "../_shared/instagram/secretos.ts";
 import { actualizarPieza, anotarError, ErrorSupabase, type EntornoSupabase, type FilaPieza } from "../_shared/instagram/supabase.ts";
-import type { ContextoPublicacion } from "./publicar.ts";
+import {
+  comprobarContenedorAnterior,
+  guardarPublicada,
+  MIN_PARA_EMPEZAR_MS,
+  quedaMs,
+  recuperarPublicada,
+  RESERVA_PUBLICAR_MS,
+  respuestaSinTiempo,
+  VIDA_CONTENEDOR_MS,
+  type ContextoPublicacion,
+} from "./publicar.ts";
 
 const ETIQUETA = "instagram-publicar";
 
@@ -126,12 +136,19 @@ export async function publicarReelReservado(c: ContextoPublicacion): Promise<Res
     timeoutMs: 15_000,
     reintentos: 2,
     registro: (l) => registro("info", ETIQUETA, l),
+    limite: deps.limite,
   });
   if (c.altText) avisos.push("Los reels no admiten texto alternativo por la API de Instagram: se ha ignorado.");
 
   // Contenedor que ya existe: el pedido (reintento) o el de una prueba correcta.
   const reutilizado = !contenedorPedido && !dryRun ? contenedorReutilizable(fila, caption, ahora()) : null;
   let contenedorId = contenedorPedido ?? reutilizado;
+
+  // 0. Sin tiempo (programador): ni se empieza. Y si el contenedor que ya
+  // tenía la pieza salió en Instagram, no se publica otra vez (A1).
+  if (!contenedorId && quedaMs(deps) < MIN_PARA_EMPEZAR_MS) return respuestaSinTiempo(c, null);
+  const previo = await comprobarContenedorAnterior(c, cliente, contenedorId);
+  if (previo) return previo;
 
   // 1. El vídeo y la portada se descargan sin sesión (es lo que hará Meta).
   if (!contenedorId) {
@@ -183,6 +200,7 @@ export async function publicarReelReservado(c: ContextoPublicacion): Promise<Res
 
   const inicio = ahora();
   let info: InfoContenedor;
+  let publicadaYa = false;
   try {
     // 3. Contenedor REELS.
     if (!contenedorId) {
@@ -201,7 +219,7 @@ export async function publicarReelReservado(c: ContextoPublicacion): Promise<Res
     try {
       info = await cliente.esperarFinished(contenedorId, {
         intervaloMs: deps.intervaloMs ?? INTERVALO_SONDEO_REEL_MS,
-        maxMs: Math.max(1_000, presupuesto - (ahora() - inicio)),
+        maxMs: Math.max(1_000, Math.min(presupuesto - (ahora() - inicio), quedaMs(deps) - RESERVA_PUBLICAR_MS)),
       });
     } catch (e) {
       if (e instanceof ErrorInstagram && e.tipo === "contenedor_tiempo_agotado") {
@@ -255,7 +273,14 @@ export async function publicarReelReservado(c: ContextoPublicacion): Promise<Res
 
     // 6. Publicación real.
     if (info.estado !== "FINISHED") throw new ErrorInstagram({ tipo: "contenedor_no_listo" });
-    const mediaId = await cliente.publicar(contenedorId);
+    if (quedaMs(deps) < RESERVA_PUBLICAR_MS) return respuestaSinTiempo(c, contenedorId);
+    const pub = await cliente.publicarSinDuplicar(contenedorId, { caption, tipo: "reel", desdeMs: inicio });
+    if (pub.recuperado) return await recuperarPublicada(c, cliente, contenedorId, { encontrado: pub, desdeMs: inicio });
+    const mediaId = pub.mediaId as string;
+    // LO PRIMERO: que conste que ya está en Instagram (A1).
+    publicadaYa = true;
+    const avisoGuardar = await guardarPublicada(c, { contenedor_id: contenedorId, media_id: mediaId, error: null });
+    if (avisoGuardar) avisos.push(avisoGuardar);
     let permalink: string | null = null;
     try {
       permalink = await cliente.permalink(mediaId);
@@ -263,13 +288,8 @@ export async function publicarReelReservado(c: ContextoPublicacion): Promise<Res
       avisos.push("Publicado, pero no se pudo obtener el enlace (permalink).");
     }
     const cuotaDespues = { ...cuota, usadas: cuota.usadas + 1, restantes: cuota.restantes === null ? null : Math.max(0, cuota.restantes - 1) };
-    avisos.push("El MP4 se queda en el cubo «instagram-video»: el archivo en Google Drive de los vídeos está pendiente (docs/instagram-video.md).");
-    try {
-      await actualizarPieza(sw, id, { estado: "publicada", contenedor_id: contenedorId, media_id: mediaId, permalink, caption, error: null });
-    } catch (e) {
-      registro("error", ETIQUETA, "reel publicado pero no se pudo anotar", e);
-      avisos.push("Publicado en Instagram, pero no se pudo guardar el estado en el panel.");
-    }
+    avisos.push("El MP4 se queda en el cubo «instagram-video» y se borra solo a los 30 días (limpieza diaria); el archivo en Google Drive de los vídeos está pendiente (docs/instagram-video.md).");
+    if (permalink) await guardarPublicada(c, { contenedor_id: contenedorId, media_id: mediaId, permalink, error: null });
     registro("info", ETIQUETA, "reel publicado", { id, mediaId, usuario: s.usuario });
     return json(200, {
       ok: true,
@@ -291,6 +311,14 @@ export async function publicarReelReservado(c: ContextoPublicacion): Promise<Res
       avisos,
     });
   } catch (e) {
+    if (publicadaYa) {
+      registro("error", ETIQUETA, "fallo después de publicar el reel (sigue publicado)", e);
+      return json(500, { ok: false, publicado: true, error: "Reel publicado en Instagram, pero algo falló después. No lo vuelvas a publicar.", detalle: sanear((e as Error)?.message ?? e) });
+    }
+    // El contenedor (reintento, «procesando» o prueba reutilizada) ya salió: se recupera.
+    if (e instanceof ErrorInstagram && e.tipo === "contenedor_ya_publicado" && contenedorId) {
+      return await recuperarPublicada(c, cliente, contenedorId, { desdeMs: inicio - VIDA_CONTENEDOR_MS });
+    }
     if (e instanceof ErrorInstagram) {
       registro("warn", ETIQUETA, "error de Meta (reel)", { id, tipo: e.tipo, codigo: e.codigo, subcodigo: e.subcodigo, mensaje: e.message });
       await anotarError(sw, id, `${e.message}. ${e.comoArreglarlo}`);

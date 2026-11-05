@@ -9,10 +9,14 @@
 // (instagram_render_terminar → la pieza pasa a «generada») y avisa por push al
 // que lo encargó (Edge Function notificar-video, tipo «reel»).
 //
-// SEGURIDAD: NO usa service_role. Entra como un USUARIO DEL PANEL con la
-// sección Marketing (lo ideal: uno dedicado, «render@…», solo con Marketing).
-// La base de datos solo le deja reclamar, marcar progreso y cerrar SUS
-// trabajos, y escribir en el cubo instagram-video (RLS de Marketing).
+// SEGURIDAD: NO usa service_role. Entra como un USUARIO DEL PANEL dedicado
+// («render@…») con «Ver» y «Editar» SOLO en la sección «Instagram · Render»
+// (instagram_render, migración 20261111000000), SIN Marketing. Con eso la base
+// de datos solo le deja: leer la cola, reclamar, marcar progreso, soltar y
+// cerrar SUS trabajos, leer la pista de audio de un trabajo suyo, subir el MP4
+// y la portada con la ruta de su trabajo y borrar los vídeos viejos de esas
+// piezas que ya no usa nadie («anteriores» de instagram_render_terminar). No
+// puede publicar, programar, ver piezas, métricas ni encargos, ni usar Drive.
 //
 // USO (desde la raíz del repo, con las variables de entorno puestas):
 //   node scripts/instagram/render-reels.mjs              en bucle (cada RENDER_INTERVALO_S)
@@ -23,7 +27,7 @@
 // VARIABLES (ninguna se imprime):
 //   RENDER_SUPABASE_URL      (o VITE_SUPABASE_URL)   https://<ref>.supabase.co
 //   RENDER_SUPABASE_ANON_KEY (o VITE_SUPABASE_PUBLISHABLE_KEY / VITE_SUPABASE_ANON_KEY)
-//   RENDER_EMAIL, RENDER_PASSWORD   usuario del panel con Marketing
+//   RENDER_EMAIL, RENDER_PASSWORD   usuario del panel con «Editar» en Instagram · Render
 //   RENDER_PAGINA     "dist" (build local, por defecto si existe dist/), "vite"
 //                     (sin build) o la URL del panel publicado (https://…)
 //   RENDER_DISPOSITIVO  nombre del equipo (se ve en el panel); por defecto el hostname
@@ -41,6 +45,8 @@ import { buscarFfmpeg, ErrorRender, OBJETIVO_MB_POR_DEFECTO, renderizarReel, ser
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const CUBO = "instagram-video";
+/** Sección propia del trabajador (A6): solo render, sin Marketing. */
+export const SECCION_RENDER = "instagram_render";
 const ETIQUETA = "[render-reels]";
 
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ETIQUETA, ...a);
@@ -88,6 +94,36 @@ export function fotosPermitidas(fotos, urlSupabase) {
     else malas.push(id);
   }
   return { buenas, malas, prefijo };
+}
+
+/**
+ * Rutas de vídeos viejos que se pueden borrar: solo reels/AAAA-MM/<uuid>-<8 hex>.mp4|.jpg
+ * (lo que devuelve instagram_render_terminar en «anteriores»; la RLS lo vuelve a comprobar).
+ */
+export function anterioresValidos(anteriores) {
+  if (!Array.isArray(anteriores)) return [];
+  return anteriores
+    .filter((r) => typeof r === "string" && /^reels\/\d{4}-\d{2}\/[0-9a-f-]{36}-[0-9a-f]{8}\.(mp4|jpg)$/.test(r))
+    .slice(0, 20);
+}
+
+/** Borra los MP4 y portadas de renders anteriores de la pieza (A5). Nunca lanza. */
+export async function borrarAnteriores(sb, anteriores) {
+  const rutas = anterioresValidos(anteriores);
+  if (!rutas.length) return 0;
+  try {
+    const { data, error } = await sb.storage.from(CUBO).remove(rutas);
+    if (error) {
+      avisar("no se pudieron borrar los vídeos anteriores (los borrará la limpieza diaria):", error.message);
+      return 0;
+    }
+    const n = Array.isArray(data) ? data.length : 0;
+    if (n) log(`borrados ${n} vídeos o portadas anteriores de la pieza`);
+    return n;
+  } catch (e) {
+    avisar("no se pudieron borrar los vídeos anteriores:", e?.message ?? e);
+    return 0;
+  }
 }
 
 function textoError(e) {
@@ -144,6 +180,7 @@ async function procesar(sb, cfg, herramientas, pagina, trabajo) {
     });
     if (error) throw new ErrorRender(`No se pudo cerrar el trabajo: ${error.message}`);
     log(`listo: ${(r.bytes / 1048576).toFixed(1)} MB, ${r.duracion} s${data?.piezaAlDia === false ? " (el reel cambió mientras tanto: la pieza no se ha tocado)" : ""}`);
+    await borrarAnteriores(sb, data?.anteriores);
   } catch (e) {
     avisar(`error en ${trabajo.id.slice(0, 8)}:`, textoError(e).split("\n")[0]);
     const { error } = await sb.rpc("instagram_render_terminar", { p_id: trabajo.id, p_ok: false, p_error: textoError(e) });
@@ -197,9 +234,9 @@ async function principal() {
     console.error(`${ETIQUETA} No se pudo entrar con RENDER_EMAIL: ${eLogin.message}`);
     process.exit(2);
   }
-  const { data: puede, error: ePermiso } = await sb.rpc("can_write_section", { _section: "marketing" });
+  const { data: puede, error: ePermiso } = await sb.rpc("can_edit_section", { _section: SECCION_RENDER });
   if (ePermiso || puede !== true) {
-    console.error(`${ETIQUETA} El usuario no tiene permiso de edición en Marketing.`);
+    console.error(`${ETIQUETA} El usuario no tiene «Editar» en Instagram · Render (${SECCION_RENDER}). Dáselo en Usuarios (y quítale Marketing si lo tenía).`);
     process.exit(2);
   }
 

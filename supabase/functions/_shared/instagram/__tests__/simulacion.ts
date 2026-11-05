@@ -9,7 +9,8 @@ export const JWT = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c3VhcmlvLTEifQ.firmaSecreta
 export const TOKEN_META = "EAAGtokenSuperSecretoDeMetaParaPruebas0123456789abcd";
 export const SECRETO_APP = "secretoDeLaAppDeMeta987";
 export const SB = "https://sfonaclosuafvlhutkon.supabase.co";
-export const ENV_SB = { SUPABASE_URL: SB, SUPABASE_ANON_KEY: "clave-publica" };
+// Demo explícita: SB es un proyecto ficticio, que sin esto contaría como producción (A3).
+export const ENV_SB = { SUPABASE_URL: SB, SUPABASE_ANON_KEY: "clave-publica", INSTAGRAM_ENTORNO: "demo" };
 export const ENV_META = { ...ENV_SB, IG_ACCESS_TOKEN: TOKEN_META, IG_USER_ID: "17841400000000001", META_APP_ID: "1234567890", META_API_VERSION: "v26.0" };
 export const ID = "3f2b8a52-6c1e-4d7a-9b0f-1a2b3c4d5e6f";
 export const GRAPH = "https://graph.facebook.com/v26.0";
@@ -54,7 +55,7 @@ export function falso(e: Escenario = {}) {
     const l = { url, metodo, cabeceras, cuerpo, bruto: init.body };
     llamadas.push(l);
     if (url === `${SB}/auth/v1/user`) return resp(...(e.usuario ?? [200, { id: "usuario-1" }]));
-    if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, e.permiso ?? true);
+    if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, e.permiso ?? true);
     if (url === `${SB}/rest/v1/rpc/instagram_pieza_reservar_publicacion`) {
       return resp(...(e.reserva ?? [200, { ok: true, bloqueo: "b0000000-0000-4000-8000-000000000001" }]));
     }
