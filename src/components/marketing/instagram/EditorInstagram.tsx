@@ -140,7 +140,13 @@ export function EditorInstagram({ abrir = null }: EditorInstagramProps = {}) {
     return [...new Set(lista)];
   }, [validacion, maquetacionAlDia]);
   const avisos = maquetacionAlDia?.avisos ?? [];
-  const conProblema = useMemo<Set<CampoPieza>>(() => camposConProblemas(problemas), [problemas]);
+  // Sin foto elegida todavía no es un error que gritar: la vista previa ya dice
+  // «Elige una foto». Se sigue sin poder generar (`problemas` no cambia).
+  const problemasVisibles = useMemo(
+    () => (borrador.foto ? problemas : problemas.filter((p) => !camposConProblemas([p]).has("foto"))),
+    [problemas, borrador.foto],
+  );
+  const conProblema = useMemo<Set<CampoPieza>>(() => camposConProblemas(problemasVisibles), [problemasVisibles]);
 
   const cambiar = (cambio: Partial<Borrador>) => setBorrador((b) => ({ ...b, ...cambio }));
 
@@ -251,9 +257,9 @@ export function EditorInstagram({ abrir = null }: EditorInstagramProps = {}) {
           className="h-[min(55vh,30rem)] lg:h-auto lg:flex-1"
         />
         <div aria-live="polite" className="max-h-40 shrink-0 space-y-1 overflow-y-auto overscroll-contain" data-testid="problemas-pieza">
-          {problemas.length > 0 && (
+          {problemasVisibles.length > 0 && (
             <ul className="space-y-1 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
-              {problemas.map((p) => (
+              {problemasVisibles.map((p) => (
                 <li key={p} className="flex items-start gap-1.5">
                   <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                   <span>{humanizarProblema(p)}</span>

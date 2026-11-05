@@ -133,17 +133,9 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
   return (
     <fieldset className={cn("rounded-md", conProblema && "ring-2 ring-destructive ring-offset-2")} aria-describedby="ayuda-foto">
       <legend className="text-sm font-medium">Foto</legend>
-      <div className="mb-2 flex items-start justify-between gap-2">
-        <p id="ayuda-foto" className="text-xs text-muted-foreground">
-          Fotos de la carpeta de Google Drive de la marca y de los platos de la carta (marcadas «Carta»). Las que salen en gris no sirven para este formato o plantilla: tócalas para ver por qué.
-          Para quitar una de Drive, bórrala en Drive.
-        </p>
-        <Button type="button" variant="outline" size="sm" onClick={() => setSubir(true)} className="h-7 shrink-0 px-2 pointer-coarse:min-h-11">
-          <ImagePlus className="mr-1 h-4 w-4" aria-hidden="true" />
-          Subir foto
-        </Button>
-      </div>
-      <div role="group" aria-label="Origen de las fotos" className="mb-2 flex flex-wrap gap-1">
+      {/* Una sola fila: de dónde salen las fotos y «Subir foto». La ayuda, corta y debajo. */}
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-1">
+      <div role="group" aria-label="Origen de las fotos" className="flex flex-wrap gap-1">
         {FILTROS.map((f) => (
           <Button
             key={f.id}
@@ -159,6 +151,14 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
           </Button>
         ))}
       </div>
+        <Button type="button" variant="outline" size="sm" onClick={() => setSubir(true)} className="h-7 shrink-0 px-2 pointer-coarse:min-h-11">
+          <ImagePlus className="mr-1 h-4 w-4" aria-hidden="true" />
+          Subir foto
+        </Button>
+      </div>
+      <p id="ayuda-foto" className="mb-2 text-xs text-muted-foreground">
+        Las grises no sirven para este formato: tócalas para ver por qué. Las de Drive se borran en Drive.
+      </p>
       {avisos.map((a) => (
         <p key={a} className="mb-2 flex items-start gap-1.5 text-xs text-amber-700" data-testid="aviso-biblioteca">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -181,7 +181,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
           No se pueden cargar las fotos de la carta: {textoError(errorCarta)}
         </p>
       )}
-      {!cargando && !error && filtro !== "carta" && cuantas.drive === 0 && (
+      {!cargando && !error && filtro === "drive" && cuantas.drive === 0 && (
         <p className="text-xs text-muted-foreground">Aún no hay fotos en la carpeta de Drive de esta marca: sube la primera con «Subir foto».</p>
       )}
       {!cargandoCarta && !errorCarta && filtro === "carta" && cuantas.carta === 0 && (
