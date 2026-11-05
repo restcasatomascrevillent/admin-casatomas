@@ -42,7 +42,8 @@
     "test:instagram-servidor:db": "node scripts/test-instagram-servidor.mjs",
     "test:instagram-ia:db": "node scripts/test-instagram-ia.mjs",
     "test:instagram-video:db": "node scripts/test-instagram-video.mjs",
-    "instagram:recursos": "node scripts/instagram/subir-recursos.mjs"
+    "instagram:recursos": "node scripts/instagram/subir-recursos.mjs",
+    "instagram:render-reels": "node scripts/instagram/render-reels.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "6.3.1",

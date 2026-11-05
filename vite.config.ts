@@ -72,6 +72,12 @@ export default defineConfig(({ command }) => {
   worker: { format: "es" as const },
   build: {
     rollupOptions: {
+      // Segunda entrada: la página de captura de reels que abre el trabajador
+      // de render (docs/instagram-video.md). No carga nada del panel.
+      input: {
+        main: path.resolve(__dirname, "index.html"),
+        "reel-instagram": path.resolve(__dirname, "__reel-instagram.html"),
+      },
       output: {
         // Librerías que usa todo el panel en ficheros propios (01-11-2026): no
         // cambian entre despliegues, así que el navegador las conserva y solo
