@@ -78,6 +78,7 @@ function supabaseFalso(
       update: (cambios: Record<string, unknown>) => ((op.tipo = "update"), (op.cambios = cambios), c),
       eq: (k: string, v: unknown) => (op.filtros.push(["eq", k, v]), c),
       in: (k: string, v: unknown) => (op.filtros.push(["in", k, v]), c),
+      is: (k: string, v: unknown) => (op.filtros.push(["is", k, v]), c),
       maybeSingle: () => c,
       single: () => c,
       then: (ok: (r: unknown) => unknown, ko?: (e: unknown) => unknown) => {
@@ -288,6 +289,19 @@ describe("pasarLote", () => {
     expect(inf.huerfanos.subidos).toBe(1);
     expect(inf.pendientes.borrados).toBe(2);
     expect(subidas.map((s) => s.nombre)).toEqual(["anterior-sust-5e8dab44-foto.jpeg"]);
+    expect(fich).toEqual({});
+  });
+});
+
+describe("pasarHuerfano", () => {
+  it("si es el original de una factura que no tiene ninguno, se le pone como drive_url", async () => {
+    const fich: Record<string, Uint8Array> = { "2026/10/354-foto.jpeg": bytes("a") };
+    const sb = supabaseFalso(fich);
+    const { pasarHuerfano } = await import("./originalesDrive.ts");
+    await pasarHuerfano(sb.cliente, DRIVE, { name: "2026/10/354-foto.jpeg", factura_id: 354, fecha: "2026-10-10", proveedor: "Z", es_su_original: true });
+    expect(subidas.map((s) => s.nombre)).toEqual(["foto.jpeg"]);
+    expect(sb.ops[0].cambios).toEqual({ drive_url: URL_DRIVE });
+    expect(sb.ops[0].filtros).toEqual([["eq", "id", 354], ["is", "drive_url", null], ["is", "archivo_path", null]]);
     expect(fich).toEqual({});
   });
 });

@@ -46,6 +46,8 @@ export interface HuerfanoPorPasar {
   factura_id: number | null;
   fecha: string | null;
   proveedor: string | null;
+  /** La factura no tiene original y este fichero es el suyo: se le pone como drive_url. */
+  es_su_original?: boolean | null;
 }
 
 export interface PorPasar {
@@ -124,12 +126,21 @@ export async function pasarFactura(
   return subir ? "subida" : "copia_borrada";
 }
 
-/** Un fichero huérfano: a Drive y fuera de Storage. */
+/**
+ * Un fichero huérfano: a Drive y fuera de Storage. Si es el original de una
+ * factura que se quedó sin ninguno, se le apunta como drive_url; si no, va a
+ * Drive como «anterior-…» (original de un documento sustituido).
+ */
 export async function pasarHuerfano(supabase: Supa, drive: ConfigDrive, h: HuerfanoPorPasar): Promise<void> {
   const { bytes, mime } = await descargar(supabase, h.name);
   const base = nombreEnDrive(h.name);
-  const nombre = h.name.startsWith("temporal/") ? base : `anterior-${base}`;
-  await subirADrive(drive, bytes, nombre, mime, h.fecha, h.proveedor);
+  const nombre = h.name.startsWith("temporal/") || h.es_su_original ? base : `anterior-${base}`;
+  const url = await subirADrive(drive, bytes, nombre, mime, h.fecha, h.proveedor);
+  if (h.es_su_original && h.factura_id) {
+    const { error } = await supabase.from("facturas").update({ drive_url: url })
+      .eq("id", h.factura_id).is("drive_url", null).is("archivo_path", null);
+    if (error) throw new Error(`update factura ${h.factura_id}: ${error.message}`);
+  }
   await borrar(supabase, [h.name]);
 }
 

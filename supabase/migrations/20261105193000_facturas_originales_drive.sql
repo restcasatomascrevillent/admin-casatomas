@@ -136,7 +136,11 @@ as $$
   ),
   huerfanos as (
     select o.name, (o.metadata->>'size')::bigint as bytes, f.id as factura_id, f.fecha,
-           coalesce(p.nombre, f.proveedor) as proveedor
+           coalesce(p.nombre, f.proveedor) as proveedor,
+           -- La factura se quedó sin original (ni Drive ni Storage) y el fichero
+           -- es suyo (no «sust-»/«pagN-»): se le devuelve como drive_url.
+           (f.id is not null and f.drive_url is null and f.archivo_path is null
+            and regexp_replace(o.name, '^.*/', '') !~ '^\d+-(sust-|pag\d+-)') as es_su_original
       from storage.objects o
       left join public.facturas f
         on f.id = nullif(substring(regexp_replace(o.name, '^.*/', '') from '^(\d{1,18})-'), '')::bigint
