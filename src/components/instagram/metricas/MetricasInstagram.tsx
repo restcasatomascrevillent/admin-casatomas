@@ -22,18 +22,17 @@ import {
   nombrePlantilla,
   nombreTipoFoto,
   ordenarPublicaciones,
-  queFuncionaMejor,
   tasaDe,
   textoVariacion,
   tipoFotoDe,
-  type GrupoRendimiento,
 } from "./agregacion";
+import { QueFunciona } from "./QueFunciona";
 import { useMetricasInstagram, type ApiMetricas } from "./useMetricasInstagram";
 import type { Captura, Comparacion, DatosMetricas, Publicacion, ResumenPeriodo } from "./tipos";
 
 // SIN SCROLL DE PÁGINA (regla del dueño, 06/10/2026): desde `md` el bloque mide
 // el alto que queda hasta el fondo de la pantalla (`useAlturaDisponible`) y
-// solo hacen scroll la lista de publicaciones y «Qué funciona mejor». En móvil
+// solo hacen scroll el ranking de publicaciones y «Qué funciona». En móvil
 // (< md) va todo en columna y desplaza la pestaña entera, como Newsletter.
 
 const ALTURA_MINIMA = 520;
@@ -174,11 +173,14 @@ function Miniatura({ p }: { p: Publicacion }) {
   );
 }
 
-function FilaPublicacion({ p }: { p: Publicacion }) {
+function FilaPublicacion({ p, puesto }: { p: Publicacion; puesto: number }) {
   const tipo = tipoFotoDe(p);
   const titulo = p.caption?.split("\n")[0]?.trim() || (p.plantilla ? nombrePlantilla(p.plantilla) : "Sin texto");
   return (
-    <li className="flex gap-3 py-2" data-testid="publicacion">
+    <li className="flex items-start gap-2.5 py-2" data-testid="publicacion">
+      <span className="w-5 shrink-0 pt-0.5 text-right text-xs font-semibold tabular-nums text-muted-foreground" aria-hidden="true">
+        {puesto}
+      </span>
       <Miniatura p={p} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
@@ -204,7 +206,7 @@ function FilaPublicacion({ p }: { p: Publicacion }) {
           {p.plantilla && <span>· {nombrePlantilla(p.plantilla)}</span>}
           {tipo && <span>· {nombreTipoFoto(tipo)}</span>}
         </div>
-        <dl className="mt-1 grid grid-cols-4 gap-1 text-xs">
+        <dl className="mt-1 grid grid-cols-4 gap-x-2 gap-y-1 text-xs [&_dt]:truncate">
           <div>
             <dt className="text-muted-foreground">Alcance</dt>
             <dd className="tabular-nums">{formatearNumero(p.alcance)}</dd>
@@ -214,8 +216,8 @@ function FilaPublicacion({ p }: { p: Publicacion }) {
             <dd className="tabular-nums">{formatearNumero(interaccionesDe(p))}</dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Me gusta</dt>
-            <dd className="tabular-nums">{formatearNumero(p.meGusta)}</dd>
+            <dt className="text-muted-foreground">Guardados</dt>
+            <dd className="tabular-nums">{formatearNumero(p.guardados)}</dd>
           </div>
           <div>
             <dt className="text-muted-foreground">Tasa</dt>
@@ -227,45 +229,11 @@ function FilaPublicacion({ p }: { p: Publicacion }) {
   );
 }
 
-function TablaGrupos({ titulo, grupos }: { titulo: string; grupos: GrupoRendimiento[] }) {
-  return (
-    <section aria-label={titulo}>
-      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</h4>
-      {grupos.length === 0 ? (
-        <p className="text-xs text-muted-foreground">Sin datos todavía.</p>
-      ) : (
-        <table className="w-full text-xs">
-          <thead className="text-muted-foreground">
-            <tr>
-              <th className="py-1 text-left font-normal">&nbsp;</th>
-              <th className="py-1 text-right font-normal">Publ.</th>
-              <th className="py-1 text-right font-normal">Alcance medio</th>
-              <th className="py-1 text-right font-normal">Interacción media</th>
-              <th className="py-1 text-right font-normal">Tasa</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grupos.map((g, i) => (
-              <tr key={g.clave} className="border-t">
-                <td className={cn("py-1 pr-2", i === 0 && grupos.length > 1 && "font-semibold")}>{g.etiqueta}</td>
-                <td className="py-1 text-right tabular-nums">{g.publicaciones}</td>
-                <td className="py-1 text-right tabular-nums">{formatearNumero(g.alcanceMedio)}</td>
-                <td className="py-1 text-right tabular-nums">{formatearNumero(g.interaccionesMedias)}</td>
-                <td className="py-1 text-right tabular-nums">{formatearPorcentaje(g.tasaInteraccion)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
-  );
-}
-
 function Grafica({ datos, dias }: { datos: DatosMetricas; dias: number }) {
   const idGrafica = useId();
   const serie = useMemo(() => datos.serie.slice(-dias), [datos.serie, dias]);
   return (
-    <Card className="flex h-64 flex-col p-3 md:h-auto md:min-h-[12rem] md:flex-1">
+    <Card className="flex h-64 flex-col p-3 md:h-auto md:min-h-[10rem] md:flex-[2]">
       <figure aria-labelledby={idGrafica} className="flex min-h-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <CardTitle id={idGrafica} className="flex items-center gap-1.5 text-sm font-medium">
@@ -362,10 +330,9 @@ export function MetricasInstagram({ api, className }: MetricasInstagramProps) {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);
   const [periodo, setPeriodo] = useState<"7" | "28">("7");
-  const [orden, setOrden] = useState<"recientes" | "alcance">("recientes");
+  const [orden, setOrden] = useState<"recientes" | "alcance">("alcance");
 
   const datos = m.datos;
-  const mejor = useMemo(() => queFuncionaMejor(datos?.publicaciones ?? []), [datos?.publicaciones]);
   const publicaciones = useMemo(() => ordenarPublicaciones(datos?.publicaciones ?? [], orden), [datos?.publicaciones, orden]);
 
   const actualizar = () =>
@@ -442,24 +409,15 @@ export function MetricasInstagram({ api, className }: MetricasInstagramProps) {
         <div className="grid gap-3 md:min-h-0 md:flex-1 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <div className="flex flex-col gap-3 md:min-h-0">
             {datos.serie.length > 0 && <Grafica datos={datos} dias={Number(periodo)} />}
-            <Card className="flex flex-col p-3 md:min-h-0 md:flex-1" data-testid="que-funciona-mejor">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <CardTitle className="text-sm font-medium">Qué funciona mejor</CardTitle>
-                <span className="text-xs text-muted-foreground">
-                  {mejor.conPieza} publicaciones del panel{mejor.sinPieza > 0 && ` · ${mejor.sinPieza} de fuera no cuentan`}
-                </span>
-              </div>
-              <div className="space-y-4 md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1">
-                <TablaGrupos titulo="Por plantilla" grupos={mejor.porPlantilla} />
-                <TablaGrupos titulo="Por marca" grupos={mejor.porMarca} />
-                <TablaGrupos titulo="Por tipo de foto" grupos={mejor.porTipoFoto} />
-              </div>
-            </Card>
+            <QueFunciona datos={datos.queFunciona} className="md:min-h-0 md:flex-[3]" />
           </div>
 
           <Card className="flex flex-col p-3 md:min-h-0">
             <div className="mb-1 flex items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium">Publicaciones ({publicaciones.length})</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                {orden === "alcance" ? "Publicaciones con más alcance" : "Publicaciones recientes"}
+                <span className="font-normal text-muted-foreground"> ({publicaciones.length})</span>
+              </CardTitle>
               <ToggleGroup
                 type="single"
                 size="sm"
@@ -467,22 +425,22 @@ export function MetricasInstagram({ api, className }: MetricasInstagramProps) {
                 onValueChange={(v) => v && setOrden(v as "recientes" | "alcance")}
                 aria-label="Orden de las publicaciones"
               >
-                <ToggleGroupItem value="recientes" className="text-xs">
-                  Recientes
-                </ToggleGroupItem>
                 <ToggleGroupItem value="alcance" className="text-xs">
                   Más alcance
+                </ToggleGroupItem>
+                <ToggleGroupItem value="recientes" className="text-xs">
+                  Recientes
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
             {publicaciones.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">Sin publicaciones capturadas.</p>
             ) : (
-              <ul className="divide-y md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1" data-testid="lista-publicaciones">
-                {publicaciones.map((p) => (
-                  <FilaPublicacion key={p.mediaId} p={p} />
+              <ol className="divide-y md:min-h-0 md:flex-1 md:overflow-y-auto md:pr-1" data-testid="lista-publicaciones">
+                {publicaciones.map((p, i) => (
+                  <FilaPublicacion key={p.mediaId} p={p} puesto={i + 1} />
                 ))}
-              </ul>
+              </ol>
             )}
           </Card>
         </div>

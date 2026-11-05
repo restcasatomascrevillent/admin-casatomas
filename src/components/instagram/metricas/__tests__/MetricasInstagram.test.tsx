@@ -1,7 +1,7 @@
 /**
  * Pestaña «Métricas»: estados cargando, error, vacío, permiso que falta y con
- * datos (resumen con variación, lista con enlace, «Qué funciona mejor») y el
- * botón «Actualizar ahora». jsdom no pinta el gráfico (ResponsiveContainer sin
+ * datos (resumen con variación, ranking con enlace, «Qué funciona» con datos,
+ * con pocos datos y sin la migración) y el botón «Actualizar ahora». jsdom no pinta el gráfico (ResponsiveContainer sin
  * tamaño): se comprueba la tabla accesible que lo acompaña.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -18,6 +18,7 @@ import { ErrorMetricas } from "../api";
 import { formatearNumero } from "../agregacion";
 import type { ApiMetricas } from "../useMetricasInstagram";
 import type { Comparacion, DatosMetricas, ResumenPeriodo } from "../tipos";
+import { QF_CON_DATOS, QF_POCOS } from "./fixturesQueFunciona";
 
 const c = (actual: number | null, anterior: number | null, variacion: number | null): Comparacion => ({ actual, anterior, variacion });
 const resumen = (dias: number, alcance: number): ResumenPeriodo => ({
@@ -139,6 +140,9 @@ describe("MetricasInstagram", () => {
 
     expect(screen.getByRole("table", { name: "Alcance y seguidores de cada día" })).toBeInTheDocument();
 
+    // Ranking: por defecto por alcance; «Recientes» para ver la última primero.
+    fireEvent.click(screen.getByRole("radio", { name: "Recientes" }));
+    expect(screen.getByText("Publicaciones recientes")).toBeInTheDocument();
     const lista = screen.getByTestId("lista-publicaciones");
     const filas = within(lista).getAllByTestId("publicacion");
     expect(filas).toHaveLength(2);
@@ -148,13 +152,37 @@ describe("MetricasInstagram", () => {
     expect(within(filas[0]).getByRole("link")).toHaveAttribute("rel", "noopener noreferrer");
     expect(filas[1]).toHaveTextContent("Reel");
 
-    // Orden por alcance
+    // Ranking: por alcance (por defecto), con puesto
     fireEvent.click(screen.getByRole("radio", { name: "Más alcance" }));
     expect(within(screen.getByTestId("lista-publicaciones")).getAllByTestId("publicacion")[0]).toHaveTextContent("Reel");
+    expect(screen.getByText("Publicaciones con más alcance")).toBeInTheDocument();
 
-    const mejor = screen.getByTestId("que-funciona-mejor");
-    expect(mejor).toHaveTextContent("1 publicaciones del panel · 1 de fuera no cuentan");
-    expect(within(mejor).getByRole("region", { name: "Por tipo de foto" })).toHaveTextContent("Sala");
-    expect(within(mejor).getByRole("region", { name: "Por marca" })).toHaveTextContent("Casa Tomás");
+    // Sin «Qué funciona» (función o migración anteriores): lo dice, sin romper la pestaña.
+    expect(screen.getByTestId("que-funciona-sin-migracion")).toHaveTextContent("falta actualizar la base de datos");
+  });
+
+  it("«Qué funciona»: barras por formato, día, hora y hashtag con frases de datos reales", async () => {
+    pintar({ leer: async () => ({ ...DATOS, queFunciona: QF_CON_DATOS }), capturar: capturaOk });
+    const bloque = await screen.findByTestId("que-funciona");
+    expect(bloque).toHaveTextContent("12 publicaciones · últimos 90 días · media 5,5 %");
+    expect(within(bloque).queryByTestId("faltan-datos")).toBeNull();
+    const dia = within(bloque).getByRole("region", { name: "Por día" });
+    expect(dia).toHaveTextContent("Martes");
+    expect(dia).toHaveTextContent("Los martes funcionan mejor: 9 % de interacción en 4 publicaciones, frente al 5,5 % de media.");
+    expect(dia).not.toHaveTextContent("Domingo"); // 1 publicación: no compite con los días con muestra
+    expect(within(bloque).getByRole("region", { name: "Por hora" })).toHaveTextContent("Publicar entre las 12 y las 14 h funciona mejor");
+    expect(within(bloque).getByRole("region", { name: "Por formato" })).toHaveTextContent("Los reels funcionan mejor");
+    expect(within(bloque).getByRole("region", { name: "Por hashtag" })).toHaveTextContent("#cocido");
+    expect(within(bloque).getByRole("region", { name: "Por plantilla" })).toHaveTextContent("no hay diferencias claras");
+    expect(within(bloque).getByRole("region", { name: "Por tipo de foto" })).toHaveTextContent("faltan datos");
+  });
+
+  it("«Qué funciona» con pocos datos: aviso de «faltan datos» y ninguna conclusión", async () => {
+    pintar({ leer: async () => ({ ...DATOS, queFunciona: QF_POCOS }), capturar: capturaOk });
+    const aviso = await screen.findByTestId("faltan-datos");
+    expect(aviso).toHaveTextContent("Faltan datos. Solo hay 2 publicaciones");
+    expect(screen.getByTestId("que-funciona")).not.toHaveTextContent("funcionan mejor");
+    expect(screen.getByTestId("que-funciona")).not.toHaveTextContent("funciona mejor");
+    expect(within(screen.getByRole("region", { name: "Por día" })).getByText("(pocos datos)")).toBeInTheDocument();
   });
 });

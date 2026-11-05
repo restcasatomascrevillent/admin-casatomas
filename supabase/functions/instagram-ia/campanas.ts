@@ -35,6 +35,11 @@
  * de la marca SIN precios (featured primero), novedades del periodo, fechas
  * señaladas, fotos de la biblioteca, resumen de métricas de 90 días e
  * historial de ganchos; más la guía de la marca. Nunca datos de clientes.
+ * Fase 3: si existe la RPC instagram_que_funciona (20261110000000), las
+ * métricas que ve el modelo son su resumen («Qué funciona», con muestra
+ * mínima y frases con datos reales) en vez del de instagram_ia_contexto, y
+ * se quitan del razonamiento, los «por qué» y las ideas las frases con
+ * porcentajes que no salen de ahí.
  *
  * Validadores (_shared/instagram/validar-campana.ts): los MISMOS que los
  * textos y además platos solo por id y existentes, TOUZA sin «reservar» en
@@ -49,6 +54,13 @@ import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { json } from "../_shared/instagram/http.ts";
 import { registrarSecreto, registro } from "../_shared/instagram/secretos.ts";
 import type { Sesion } from "../_shared/instagram/supabase.ts";
+import {
+  cifrasPermitidas,
+  igUserIdDeMarca,
+  leerQueFuncionaIA,
+  quitarCifrasInventadas,
+  resumenQueFuncionaIA,
+} from "../_shared/instagram/que-funciona.ts";
 import { anonimizar, CUENTAS_PROPIAS, type MarcaIA } from "../_shared/instagram/validar-ia.ts";
 import {
   esFecha,
@@ -265,12 +277,17 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
 
   let guia: Awaited<ReturnType<typeof leerGuia>>;
   let bd: ContextoBD;
+  let queFunciona: Awaited<ReturnType<typeof leerQueFuncionaIA>> = null;
   try {
     const usadas = await contarHoy(s, ahora);
     if (usadas >= cupo) {
       return json(429, { ok: false, error: `Has llegado al tope de ${cupo} sugerencias de IA por día. Vuelve a probar mañana.` });
     }
-    [guia, bd] = await Promise.all([leerGuia(s, e.marca), leerContexto(s, e.marca, e.desde, e.hasta)]);
+    [guia, bd, queFunciona] = await Promise.all([
+      leerGuia(s, e.marca),
+      leerContexto(s, e.marca, e.desde, e.hasta),
+      leerQueFuncionaIA(s.fetch, s.sb.url, cab(s), e.marca, igUserIdDeMarca(env, e.marca)),
+    ]);
   } catch (err) {
     if (err instanceof ErrorBD) return json(err.estado, { ok: false, error: err.message });
     registro("error", FUNCION, "contexto de planificación", err);
@@ -307,8 +324,16 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
     novedades: bd.novedades,
     fechas: bd.fechas,
     fotos: bd.fotos,
-    metricas: bd.metricas,
+    // Fase 3: «Qué funciona» (con muestra mínima) si está la migración; si no, el resumen de la fase 2.
+    metricas: queFunciona ? resumenQueFuncionaIA(queFunciona) : bd.metricas,
     historial: bd.historial,
+  };
+  const permitidas = cifrasPermitidas(queFunciona);
+  let cifrasQuitadas = 0;
+  const limpiar = (t: string) => {
+    const r = quitarCifrasInventadas(t, permitidas);
+    cifrasQuitadas += r.quitadas;
+    return r.texto;
   };
   const mensajes: Mensaje[] = [
     { role: "system", content: esCampana ? promptSistemaCampana(e.marca) : promptSistemaIdeas(e.marca) },
@@ -331,7 +356,11 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
         const rev = revisarCampana(r.datos, ctx);
         descartadas.push(...rev.descartadas);
         if (rev.ok) {
-          campana = rev.valor;
+          campana = {
+            ...rev.valor,
+            razonamiento: limpiar(rev.valor.razonamiento),
+            piezas: rev.valor.piezas.map((p) => ({ ...p, porQue: limpiar(p.porQue) })),
+          };
           correcciones = rev.correcciones;
         }
         motivos = rev.descartadas.flatMap((d) => d.motivos.map((x) => `${d.donde}: ${x}`));
@@ -339,7 +368,7 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
         const brutas = Array.isArray(r.datos.ideas) ? r.datos.ideas.slice(0, 8) : [];
         const revs = brutas.map((b) => revisarIdea(b, ctx));
         revs.forEach((x, i) => !x.ok && descartadas.push({ donde: `Idea ${i + 1}`, motivos: x.errores }));
-        ideas = revs.filter((x) => x.ok).map((x) => x.valor).slice(0, 5);
+        ideas = revs.filter((x) => x.ok).map((x) => ({ ...x.valor, idea: limpiar(x.valor.idea) })).slice(0, 5);
         motivos = descartadas.flatMap((d) => d.motivos);
         if (!brutas.length) motivos = ["No ha propuesto ninguna idea."];
       }
@@ -349,6 +378,9 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
       }
     }
 
+    if (cifrasQuitadas) {
+      avisos.push(`Se han quitado ${cifrasQuitadas} frase(s) con cifras de métricas que no salen de «Qué funciona».`);
+    }
     const entrada = esCampana
       ? { accion: e.accion, marca: e.marca, desde: e.desde, hasta: e.hasta, semanas: e.semanas, piezasPorSemana: e.piezasPorSemana, objetivo: e.objetivo }
       : { accion: e.accion, marca: e.marca, desde: e.desde, hasta: e.hasta };

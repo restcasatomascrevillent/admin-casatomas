@@ -1,37 +1,17 @@
 /**
- * «Qué funciona mejor»: alcance e interacción medios de las publicaciones por
- * plantilla, por marca y por tipo de foto. Solo cuentan las publicaciones que
- * salieron de una pieza del panel (las demás no tienen plantilla ni foto
- * conocidas). Funciones puras, probadas en __tests__/agregacion.test.ts.
+ * Utilidades de la pestaña «Métricas»: interacciones y tasa de cada
+ * publicación, nombres (plantilla, marca, tipo de foto) y formatos en
+ * español. «Qué funciona» (por formato, plantilla, tipo de foto, día, hora y
+ * hashtag, con muestra mínima) lo agrega la base de datos (RPC
+ * instagram_que_funciona) y lo nombra vistaQueFunciona.ts. Funciones puras,
+ * probadas en __tests__/agregacion.test.ts.
  *
- * Tasa de interacción de un grupo = Σ interacciones / Σ alcance (no la media
- * de las tasas, que daría el mismo peso a una publicación con 10 cuentas que
- * a una con 10 000).
+ * Tasa de interacción = interacciones / alcance.
  */
 import { FOTOS, NOMBRE_TIPO_FOTO, buscarFoto, type Foto, type TipoFoto } from "@/lib/instagram/fotos";
 import { MARCAS, type MarcaId } from "@/lib/instagram/tokens";
 import { obtenerPlantilla } from "@/lib/instagram/plantillas/index";
 import type { Publicacion } from "./tipos";
-
-export interface GrupoRendimiento {
-  clave: string;
-  etiqueta: string;
-  publicaciones: number;
-  alcanceMedio: number | null;
-  interaccionesMedias: number | null;
-  /** % (1 decimal). */
-  tasaInteraccion: number | null;
-}
-
-export interface QueFuncionaMejor {
-  porPlantilla: GrupoRendimiento[];
-  porMarca: GrupoRendimiento[];
-  porTipoFoto: GrupoRendimiento[];
-  /** Publicaciones con pieza del panel que entran en la cuenta. */
-  conPieza: number;
-  /** Publicaciones que no salieron del panel (no se agrupan). */
-  sinPieza: number;
-}
 
 /** Interacciones de una publicación: las de Meta o, si no hay, la suma de su desglose. */
 export function interaccionesDe(p: Pick<Publicacion, "interacciones" | "meGusta" | "comentarios" | "guardados" | "compartidos">): number | null {
@@ -63,58 +43,6 @@ export function nombreMarca(id: string): string {
 
 export function nombreTipoFoto(id: string): string {
   return NOMBRE_TIPO_FOTO[id as TipoFoto] ?? id;
-}
-
-const media = (suma: number, n: number) => (n > 0 ? Math.round(suma / n) : null);
-
-/** Agrupa y ordena por alcance medio (de más a menos). */
-export function agrupar(
-  pubs: readonly Publicacion[],
-  claveDe: (p: Publicacion) => string | null,
-  etiquetaDe: (clave: string) => string,
-): GrupoRendimiento[] {
-  const grupos = new Map<string, { n: number; nAlc: number; alc: number; nInt: number; int: number; alcConInt: number; intConAlc: number }>();
-  for (const p of pubs) {
-    const clave = claveDe(p);
-    if (!clave) continue;
-    const g = grupos.get(clave) ?? { n: 0, nAlc: 0, alc: 0, nInt: 0, int: 0, alcConInt: 0, intConAlc: 0 };
-    g.n++;
-    const i = interaccionesDe(p);
-    if (typeof p.alcance === "number") {
-      g.nAlc++;
-      g.alc += p.alcance;
-    }
-    if (i !== null) {
-      g.nInt++;
-      g.int += i;
-    }
-    if (typeof p.alcance === "number" && i !== null) {
-      g.alcConInt += p.alcance;
-      g.intConAlc += i;
-    }
-    grupos.set(clave, g);
-  }
-  return [...grupos.entries()]
-    .map(([clave, g]) => ({
-      clave,
-      etiqueta: etiquetaDe(clave),
-      publicaciones: g.n,
-      alcanceMedio: media(g.alc, g.nAlc),
-      interaccionesMedias: media(g.int, g.nInt),
-      tasaInteraccion: g.alcConInt > 0 ? Math.round((g.intConAlc / g.alcConInt) * 1000) / 10 : null,
-    }))
-    .sort((a, b) => (b.alcanceMedio ?? -1) - (a.alcanceMedio ?? -1) || a.etiqueta.localeCompare(b.etiqueta, "es"));
-}
-
-export function queFuncionaMejor(pubs: readonly Publicacion[], fotos: readonly Foto[] = FOTOS): QueFuncionaMejor {
-  const conPieza = pubs.filter((p) => p.piezaId && p.marca);
-  return {
-    porPlantilla: agrupar(conPieza, (p) => p.plantilla, nombrePlantilla),
-    porMarca: agrupar(conPieza, (p) => p.marca, nombreMarca),
-    porTipoFoto: agrupar(conPieza, (p) => tipoFotoDe(p, fotos), nombreTipoFoto),
-    conPieza: conPieza.length,
-    sinPieza: pubs.length - conPieza.length,
-  };
 }
 
 const NUMERO = new Intl.NumberFormat("es-ES");

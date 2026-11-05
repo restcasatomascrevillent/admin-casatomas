@@ -27,7 +27,9 @@
  * marca (instagram_guias_marca), el plato de la foto si es de la carta
  * (nombre, categoría, descripción y alérgenos oficiales; el precio NO), los
  * nombres de la carta de la marca, la plantilla, los textos de la pieza, el
- * tono y las indicaciones. Todo como datos en un bloque JSON delimitado.
+ * tono y las indicaciones. En sugerir_texto, también «Qué funciona» de los
+ * últimos 90 días (RPC instagram_que_funciona, fase 3; si falta la
+ * migración, va sin él). Todo como datos en un bloque JSON delimitado.
  *
  * Después del modelo, ANTES de devolver, cada variante pasa por los
  * validadores de _shared/instagram/validar-ia.ts: se corrige o se descarta.
@@ -49,6 +51,7 @@ import { AcumuladorUso, registrarUso, type OpcionesRegistro } from "../_shared/r
 import { json, jsonAuth, leerJson, opciones } from "../_shared/instagram/http.ts";
 import { registrarSecreto, registro, sanear } from "../_shared/instagram/secretos.ts";
 import { autorizarMarketing, type Sesion } from "../_shared/instagram/supabase.ts";
+import { igUserIdDeMarca, leerQueFuncionaIA, resumenQueFuncionaIA } from "../_shared/instagram/que-funciona.ts";
 import { esUuid, validarCaption } from "../_shared/instagram/validacion.ts";
 import {
   anonimizar,
@@ -120,6 +123,10 @@ const NOMBRES_ENTORNO = [
   "OPENAI_API_KEY",
   "INSTAGRAM_IA_MODEL",
   "INSTAGRAM_IA_CUPO_DIARIO",
+  // Solo el ID (no secreto) de la cuenta de cada marca, para «Qué funciona».
+  "IG_USER_ID",
+  "IG_USER_ID_CASA_TOMAS",
+  "IG_USER_ID_TOUZA",
 ] as const;
 
 /** Entorno de la función: solo los nombres que hacen falta (nunca Deno.env entero). */
@@ -417,18 +424,21 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   let guia: Guia;
   let plato: PlatoContexto | null = null;
   let nombresCarta: string[];
+  let queFunciona: Awaited<ReturnType<typeof leerQueFuncionaIA>> = null;
   try {
     const usadas = await contarHoy(s, ahora);
     if (usadas >= cupo) {
       return json(429, { ok: false, error: `Has llegado al tope de ${cupo} sugerencias de IA por día. Vuelve a probar mañana.` });
     }
-    const [g, fila, carta] = await Promise.all([
+    const [g, fila, carta, qf] = await Promise.all([
       leerGuia(s, e.marca),
       e.platoId ? leerPlato(s, e.platoId) : Promise.resolve(null),
       leerNombresCarta(s, e.marca),
+      e.accion === "sugerir_texto" ? leerQueFuncionaIA(s.fetch, s.sb.url, cab(s), e.marca, igUserIdDeMarca(env, e.marca)) : Promise.resolve(null),
     ]);
     guia = g;
     nombresCarta = carta;
+    queFunciona = qf;
     if (e.platoId) {
       if (!fila) avisos.push("El plato de la foto ya no está en la carta: el texto no lo nombra.");
       else if (fila.activado !== true) avisos.push(`«${fila.nombre}» no está activo en la carta: el texto no lo nombra.`);
@@ -452,6 +462,7 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
     carta: nombresCarta.slice(0, 300),
     textos_pieza: e.textos,
     indicaciones: e.indicaciones,
+    ...(queFunciona ? { que_funciona: resumenQueFuncionaIA(queFunciona) } : {}),
   };
   const esTexto = e.accion === "sugerir_texto";
   const mensajes: Mensaje[] = [

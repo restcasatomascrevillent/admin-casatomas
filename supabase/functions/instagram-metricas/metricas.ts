@@ -3,7 +3,8 @@
  *
  *   «leer» (GET [?marca=touza], o POST {accion:"leer", marca?}) — usuario con can_read_section('marketing'):
  *     200 { ok, igUserId, hoy, ultimoDia, resumen: { d7, d28 } | null, serie, publicaciones,
- *           ultimaCaptura, ultimaCorrecta, cuentas: [{ igUserId, marcas }] }   (ver leer.ts y resumen.ts)
+ *           ultimaCaptura, ultimaCorrecta, queFunciona | null, cuentas: [{ igUserId, marcas }] }
+ *           (ver leer.ts y resumen.ts; queFunciona = RPC instagram_que_funciona, 90 días)
  *     Con «marca», la cuenta de esa marca (IG_USER_ID_<MARCA> o la general);
  *     sin ella, la general (IG_USER_ID), como siempre. «cuentas» dice qué
  *     cuentas distintas hay (hoy, una para las dos marcas).
@@ -141,7 +142,8 @@ export async function manejarMetricas(request: Request, deps: DependenciasMetric
         const deMarca = a.marca ? leerConfigMetaMarca(env, a.marca) : null;
         const igUserId = deMarca?.ok ? deMarca.config.igUserId : env.IG_USER_ID?.trim() || null;
         const cuentas = cuentasDistintas(env).map((c) => ({ igUserId: c.config.igUserId, marcas: c.marcas }));
-        return json(200, { ...(await leerMetricas(restUsuario(auth.sesion), { igUserId, ahora: ahora() })), cuentas });
+        // «Qué funciona» de la marca si se pide una (con cuenta compartida, sin las piezas de la otra).
+        return json(200, { ...(await leerMetricas(restUsuario(auth.sesion), { igUserId, ahora: ahora(), marca: a.marca })), cuentas });
       } catch (e) {
         registro("error", "instagram-metricas", "fallo al leer", e);
         return json(500, { ok: false, error: `No se pudieron leer las métricas: ${mensajeSaneado(e)}` });
