@@ -298,6 +298,8 @@ export function AccionesPieza({
                 formato,
                 plantilla: String(pieza.plantilla ?? ""),
                 foto: typeof pieza.foto === "string" ? pieza.foto : null,
+                // La IA ve la foto: la copia tmp/ ya preparada (solo si es la de esta pieza).
+                fotoUrl: fotoPreparada && fotoPreparada.id === pieza.foto ? fotoPreparada.url : null,
                 piezaId: servidor.id ?? null,
                 textos: textosDePieza(pieza),
               }}

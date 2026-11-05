@@ -15,7 +15,7 @@
  *    también para las fotos de la carta (preparar con origen «carta»).
  */
 import { supabase } from "@/integrations/supabase/client";
-import type { FotoDrive, MarcaId } from "@/lib/instagram";
+import type { FotoDrive, FotoPreparable, MarcaId } from "@/lib/instagram";
 import { auditDeviceId } from "@/lib/audit-device";
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
@@ -400,6 +400,23 @@ export async function prepararFotoCarta(
 ): Promise<{ ruta: string; url: string; ancho: number | null; alto: number | null }> {
   const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "preparar", origen: "carta", marca, platoId }) }, opts, cabecerasEdge());
   return { ruta: String(r.ruta ?? ""), url: String(r.url ?? ""), ancho: typeof r.ancho === "number" ? r.ancho : null, alto: typeof r.alto === "number" ? r.alto : null };
+}
+
+/** Copia la foto de un vino de la carta (tabla "Vinos", bucket «vinos») al bucket (tmp/), como prepararFotoCarta. */
+export async function prepararFotoVino(
+  marca: MarcaId,
+  vinoId: string,
+  opts?: OpcionesLlamada,
+): Promise<{ ruta: string; url: string; ancho: number | null; alto: number | null }> {
+  const r = await llamar<Crudo>(URL_DRIVE, { method: "POST", body: JSON.stringify({ accion: "preparar", origen: "vino", marca, vinoId }) }, opts, cabecerasEdge());
+  return { ruta: String(r.ruta ?? ""), url: String(r.url ?? ""), ancho: typeof r.ancho === "number" ? r.ancho : null, alto: typeof r.alto === "number" ? r.alto : null };
+}
+
+/** Prepara una foto de Drive, de la carta o de un vino según su origen. */
+export function prepararFotoOrigen(marca: MarcaId, origen: FotoPreparable, opts?: OpcionesLlamada) {
+  if (origen.origen === "carta") return prepararFotoCarta(marca, origen.id, opts);
+  if (origen.origen === "vino") return prepararFotoVino(marca, origen.id, opts);
+  return prepararFotoDrive(marca, origen.id, opts);
 }
 
 /** Miniatura de una foto de Drive (bytes, pedidos con la sesión). null si Drive no la tiene. */

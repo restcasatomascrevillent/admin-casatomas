@@ -314,3 +314,58 @@ describe("instagram-drive · preparar una foto de la carta (origen «carta»)", 
     expect(await pedirCarta({}, filaPlato(), "image/svg+xml")).toBe(422);
   });
 });
+
+describe("instagram-drive · preparar la foto de un vino de la carta (origen «vino»)", () => {
+  const VINO = "8ae1eafd-7999-4180-93dc-362364091af0";
+  const URL_VINO = `${SB}/storage/v1/object/public/vinos/combe-carta.webp`;
+  const WEBP = (() => {
+    const b = new Uint8Array(40);
+    b.set([..."RIFF"].map((c) => c.charCodeAt(0)), 0);
+    b.set([..."WEBPVP8X"].map((c) => c.charCodeAt(0)), 8);
+    b[16] = 10;
+    b.set([0x37, 0x04, 0, 0x9f, 0x05, 0], 24); // 1080×1440
+    return b;
+  })();
+
+  function conVinos(fila: Record<string, unknown> | null) {
+    const base = falso({ listado: [] });
+    const f = vi.fn(async (entrada: string | URL | Request, init: RequestInit = {}) => {
+      const url = String(entrada);
+      if (url.startsWith(`${SB}/rest/v1/Vinos?`)) {
+        base.llamadas.push({ url, metodo: "GET", cabeceras: Object.fromEntries(new Headers(init.headers as HeadersInit).entries()), cuerpo: null, bruto: null } as never);
+        return new Response(JSON.stringify(fila ? [fila] : []), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      if (url.startsWith(`${SB}/storage/v1/object/public/vinos/`)) {
+        base.llamadas.push({ url, metodo: "GET", cabeceras: {}, cuerpo: null, bruto: init } as never);
+        return new Response(WEBP as Uint8Array<ArrayBuffer>, { status: 200, headers: { "Content-Type": "image/webp" } });
+      }
+      return base.f(entrada, init);
+    });
+    return { f, llamadas: base.llamadas };
+  }
+  const filaVino = (o: Record<string, unknown> = {}) => ({ id: VINO, imagen_url: URL_VINO, activado: true, restaurante: true, touza: false, ...o });
+  const pedirVino = (cuerpo: Record<string, unknown> = {}) =>
+    pedir({ accion: "preparar", origen: "vino", marca: "casa-tomas", vinoId: VINO, ...cuerpo });
+
+  it("válido: lee el vino con el JWT, copia su foto del bucket «vinos» a tmp/ y devuelve URL y medidas", async () => {
+    const { f, llamadas } = conVinos(filaVino());
+    const r = await manejarDrive(pedirVino(), { env: ENV_SB, fetch: f, ...deps });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ ok: true, ruta: `tmp/${UUID}.webp`, url: `${SB}/storage/v1/object/public/instagram/tmp/${UUID}.webp`, ancho: 1080, alto: 1440 });
+    const lectura = llamadas.find((l) => l.url.startsWith(`${SB}/rest/v1/Vinos?`))!;
+    expect(lectura.url).toContain(`id=eq.${VINO}`);
+    expect(lectura.cabeceras.authorization).toBe(`Bearer ${JWT}`);
+    expect(llamadas.find((l) => l.url.startsWith(`${SB}/storage/v1/object/public/vinos/`))!.url).toBe(URL_VINO);
+  });
+
+  it("foto fuera del bucket «vinos» → 400; vino de otra marca o inactivo → 404; id raro → 400", async () => {
+    for (const imagen_url of [`${SB}/storage/v1/object/public/platos/a.webp`, "https://evil.example.com/storage/v1/object/public/vinos/a.webp"]) {
+      const { f, llamadas } = conVinos(filaVino({ imagen_url }));
+      expect((await manejarDrive(pedirVino(), { env: ENV_SB, fetch: f, ...deps })).status, imagen_url).toBe(400);
+      expect(llamadas.some((l) => l.url.includes("/object/public/"))).toBe(false);
+    }
+    expect((await manejarDrive(pedirVino(), { env: ENV_SB, fetch: conVinos(filaVino({ restaurante: false })).f, ...deps })).status).toBe(404);
+    expect((await manejarDrive(pedirVino(), { env: ENV_SB, fetch: conVinos(filaVino({ activado: false })).f, ...deps })).status).toBe(404);
+    expect((await manejarDrive(pedirVino({ vinoId: "a&select=*" }), { env: ENV_SB, fetch: conVinos(filaVino()).f, ...deps })).status).toBe(400);
+  });
+});

@@ -56,7 +56,7 @@ const LADO_MAXIMO_FOTO = 20_000;
 
 /**
  * `fotoPreparada` del cuerpo → Foto del catálogo, validada:
- *   { id: "drive:<id>" | "carta:<id>" (= pieza.foto), url: <URL pública de tmp/ en NUESTRO bucket>,
+ *   { id: "drive:<id>" | "carta:<id>" | "vino:<id>" (= pieza.foto), url: <URL pública de tmp/ en NUESTRO bucket>,
  *     ancho, alto (enteros), tipo: TipoFoto | null, marca }
  * Lanza ErrorFotoPreparada si algo no cuadra. La ruta sale de la URL y la URL
  * final se vuelve a construir con la base de nuestro Supabase.
@@ -83,13 +83,13 @@ export function fotoDesdePreparada(entrada: unknown, idPieza: string, supabaseUr
     ruta,
     ancho,
     alto,
-    // Las de la carta son siempre platos (no se fía del tipo que llega).
-    tipo: origen.origen === "carta" ? "plato" : ((e.tipo as TipoFoto | null | undefined) ?? null),
+    // Las de la carta son siempre platos y las de vinos, bebidas (no se fía del tipo que llega).
+    tipo: origen.origen === "carta" ? "plato" : origen.origen === "vino" ? "bebida" : ((e.tipo as TipoFoto | null | undefined) ?? null),
     aptaPost: esAptaPara(medidas, "post"),
     aptaStory: esAptaPara(medidas, "story"),
     descripcion: "",
     subida: true,
-    ...(origen.origen === "drive" ? { driveId: origen.id } : { platoId: origen.id }),
+    ...(origen.origen === "drive" ? { driveId: origen.id } : origen.origen === "vino" ? { vinoId: origen.id } : { platoId: origen.id }),
   };
 }
 

@@ -398,5 +398,21 @@ await falla(q("insert into public.instagram_sugerencias_ia (tipo, marca, modelo)
   comprobaciones++;
 }
 
+// ─── 11. «Montar con IA» (20261111090000_instagram_montar) ──────────────────
+{
+  const MONTAR = await leer("supabase/migrations/20261111090000_instagram_montar.sql");
+  const ROLLBACK_MONTAR = await leer("supabase/rollbacks/20261111090000_instagram_montar_ROLLBACK.sql");
+  await falla(q("insert into public.instagram_sugerencias_ia (tipo, marca, modelo) values ('montar_pieza', 'touza', 'm')"), /tipo_chk/, "montar_pieza antes de la migración");
+  await db.exec(MONTAR);
+  await q("insert into public.instagram_sugerencias_ia (tipo, marca, modelo) values ('montar_pieza', 'touza', 'm')");
+  await q("insert into public.instagram_sugerencias_ia (tipo, marca, modelo) values ('ideas_semana', 'touza', 'm')");
+  await falla(q("insert into public.instagram_sugerencias_ia (tipo, marca, modelo) values ('otra', 'touza', 'm')"), /tipo_chk/, "tipo raro con montar");
+  await db.exec(ROLLBACK_MONTAR);
+  igual((await q("select count(*)::int n from public.instagram_sugerencias_ia where tipo = 'montar_pieza'")).rows[0].n, 0, "el rollback de montar dejó filas");
+  await falla(q("insert into public.instagram_sugerencias_ia (tipo, marca, modelo) values ('montar_pieza', 'touza', 'm')"), /tipo_chk/, "el rollback de montar no restauró el CHECK");
+  await db.exec(MONTAR); // se puede volver a aplicar
+  comprobaciones++;
+}
+
 await db.close();
 console.log(`test-instagram-campanas: ${comprobaciones} comprobaciones OK`);

@@ -16,7 +16,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { fotoPreparable, type MarcaId } from "@/lib/instagram";
 import type { ReelPieza } from "@/lib/instagram/reels";
-import { prepararFotoCarta, prepararFotoDrive } from "@/components/marketing/instagram/api";
+import { prepararFotoOrigen } from "@/components/marketing/instagram/api";
 import { clavePreparada, VIDA_PREPARADA_MS } from "@/components/marketing/instagram/useFotosInstagram";
 import { fotosAPreparar, revisarPista, TIPOS_AUDIO, type PiezaReel, type TrabajoRender } from "./logica";
 
@@ -139,7 +139,7 @@ export async function prepararFoto(qc: QueryClient, marca: MarcaId, id: string):
   if (!origen) return undefined;
   const r = await qc.fetchQuery({
     queryKey: clavePreparada(id),
-    queryFn: () => (origen.origen === "carta" ? prepararFotoCarta(marca, origen.id) : prepararFotoDrive(marca, origen.id)),
+    queryFn: () => prepararFotoOrigen(marca, origen),
     staleTime: VIDA_PREPARADA_MS,
     gcTime: VIDA_PREPARADA_MS,
   });
