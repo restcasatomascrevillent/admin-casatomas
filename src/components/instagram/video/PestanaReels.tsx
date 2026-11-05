@@ -3,7 +3,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { EstudioReel, validarReel, type FotoElegida, type PeticionFotoReel, type ReelPieza } from "@/components/instagram/reels";
-import { ETIQUETA_ESTADO, NOMBRE_MARCA_CORTO } from "@/components/marketing/instagram/HistorialPiezas";
+import { NOMBRE_MARCA_CORTO } from "@/components/marketing/instagram/HistorialPiezas";
+import { InsigniaEstado } from "@/components/instagram/InsigniaEstado";
+import { INFO_BASES } from "@/lib/instagram/reels";
 import type { MarcaId } from "@/lib/instagram";
 import { cn } from "@/lib/utils";
 import { DialogoFotoReel } from "./DialogoFotoReel";
@@ -17,6 +19,14 @@ interface Props {
   /** Pieza del reel (vive en la página para no perderla al cambiar de pestaña). */
   piezaId: string | null;
   onPiezaId: (id: string | null) => void;
+  /** Marca de la barra de pestañas: filtra los reels guardados. */
+  marca?: MarcaId | "todas";
+}
+
+/** «Del mar» en vez del id «del-mar» (sin el número de orden del selector). */
+export function nombreBaseReel(id: string): string {
+  const info = INFO_BASES.find((b) => b.id === id);
+  return info ? info.nombre.replace(/^\d+\s*·\s*/, "") : id.replace(/[-_]+/g, " ").replace(/^./, (c) => c.toUpperCase());
 }
 
 /**
@@ -26,7 +36,7 @@ interface Props {
  * carta) con DialogoFotoReel. `?pieza=<id>` (el aviso push «Reel listo») abre
  * ese reel. Sin scroll de página: cada columna hace scroll por dentro.
  */
-export function PestanaReels({ reel, onChange, piezaId, onPiezaId }: Props) {
+export function PestanaReels({ reel, onChange, piezaId, onPiezaId, marca = "todas" }: Props) {
   const qc = useQueryClient();
   const [peticion, setPeticion] = useState<PeticionFotoReel | null>(null);
   const resolverFoto = useRef<((f: FotoElegida | null) => void) | null>(null);
@@ -79,7 +89,11 @@ export function PestanaReels({ reel, onChange, piezaId, onPiezaId }: Props) {
               Reels guardados
             </h3>
             {piezaId && (
-              <button type="button" className="text-xs text-primary underline-offset-2 hover:underline" onClick={() => onPiezaId(null)}>
+              <button
+                type="button"
+                className="inline-flex items-center rounded px-1 text-xs text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring pointer-coarse:min-h-11"
+                onClick={() => onPiezaId(null)}
+              >
                 Empezar uno nuevo
               </button>
             )}
@@ -87,8 +101,7 @@ export function PestanaReels({ reel, onChange, piezaId, onPiezaId }: Props) {
           {guardados.isError && <p className="text-xs text-muted-foreground">Los reels guardados aparecerán aquí cuando el vídeo esté activado en este Supabase.</p>}
           {guardados.data?.length === 0 && <p className="text-xs text-muted-foreground">Todavía no has generado ningún vídeo.</p>}
           <ul className="space-y-1" data-testid="reels-guardados">
-            {guardados.data?.map((p) => {
-              const estado = ETIQUETA_ESTADO[p.estado] ?? ETIQUETA_ESTADO.borrador;
+            {guardados.data?.filter((p) => marca === "todas" || p.marca === marca).map((p) => {
               return (
                 <li key={p.id}>
                   <button
@@ -102,13 +115,13 @@ export function PestanaReels({ reel, onChange, piezaId, onPiezaId }: Props) {
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">
-                        {NOMBRE_MARCA_CORTO[p.marca as MarcaId] ?? p.marca} · {p.plantilla}
+                        {nombreBaseReel(p.plantilla)} · {NOMBRE_MARCA_CORTO[p.marca as MarcaId] ?? p.marca}
                       </span>
                       <time className="text-muted-foreground" dateTime={p.updated_at}>
                         {format(new Date(p.updated_at), "d MMM, HH:mm", { locale: es })}
                       </time>
                     </span>
-                    <span className={cn("shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-medium", estado.clase)}>{estado.texto}</span>
+                    <InsigniaEstado dominio="pieza" estado={p.estado} />
                   </button>
                 </li>
               );

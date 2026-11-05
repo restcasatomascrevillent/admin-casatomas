@@ -53,6 +53,8 @@ interface Props {
   ajustes: AjustesEncargos;
   /** Al guardar o enviar: el id del encargo (para abrir su ficha). */
   onHecho?: (id: string) => void;
+  /** Datos de partida de un encargo NUEVO (p. ej. «Pedir foto a Oficiosos» desde Campañas o el Estudio). */
+  datosIniciales?: Partial<DatosFormulario> | null;
 }
 
 function Radio<T extends string>({ valor, opciones, onCambio, etiqueta }: { valor: T; opciones: ReadonlyArray<{ v: T; nombre: string }>; onCambio: (v: T) => void; etiqueta: string }) {
@@ -74,18 +76,20 @@ function Radio<T extends string>({ valor, opciones, onCambio, etiqueta }: { valo
   );
 }
 
-export function FormularioEncargo({ abierto, onAbierto, inicial, ajustes, onHecho }: Props) {
+export function FormularioEncargo({ abierto, onAbierto, inicial, ajustes, onHecho, datosIniciales }: Props) {
+  const vacio = (): DatosFormulario => ({ ...formularioVacio(datosIniciales?.marca), ...(datosIniciales ?? {}) });
   const qc = useQueryClient();
-  const [d, setD] = useState<DatosFormulario>(() => inicial?.datos ?? formularioVacio());
+  const [d, setD] = useState<DatosFormulario>(() => inicial?.datos ?? vacio());
   const [ocupado, setOcupado] = useState<null | "guardar" | "enviar">(null);
   const [errores, setErrores] = useState<string[]>([]);
   const hoy = hoyMadrid();
 
   useEffect(() => {
     if (abierto) {
-      setD(inicial?.datos ?? formularioVacio());
+      setD(inicial?.datos ?? vacio());
       setErrores([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- los datos de partida se toman al abrir
   }, [abierto, inicial]);
 
   const cambiar = (c: Partial<DatosFormulario>) => setD((x) => ({ ...x, ...c }));
@@ -126,7 +130,7 @@ export function FormularioEncargo({ abierto, onAbierto, inicial, ajustes, onHech
           toast.info("Generando la pieza…");
           try {
             await generarAutomatico(qc, env.encargo, d.fotos);
-            toast.success(d.formato === "reel" ? "Vídeo en cola: te avisamos cuando esté para revisar" : "Pieza generada: ya la puedes revisar");
+            toast.success(d.formato === "reel" ? "Lo estamos montando: te avisamos cuando esté para revisar" : "Pieza generada: ya la puedes revisar");
           } catch (e) {
             toast.error("El encargo está enviado, pero no se pudo generar la pieza", { description: `${mensajeErrorEncargo(e)} Vuelve a intentarlo desde la ficha.` });
           }

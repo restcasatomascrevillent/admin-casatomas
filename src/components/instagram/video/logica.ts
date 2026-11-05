@@ -66,7 +66,10 @@ export function estadoVisible(t: TrabajoRender | null | undefined, ahora = Date.
       const espera = ahora - Date.parse(t.created_at);
       return {
         etiqueta: "En cola",
-        detalle: espera > ESPERA_SIN_TRABAJADOR_MS ? "Se generará cuando el equipo de render esté encendido." : "Esperando al equipo de render…",
+        detalle:
+          espera > ESPERA_SIN_TRABAJADOR_MS
+            ? "Lo montaremos en cuanto el ordenador de vídeo esté encendido; te avisamos cuando esté."
+            : "Lo estamos montando; te avisamos cuando esté.",
         tono: "neutro",
         progreso: null,
         activo: true,
@@ -75,7 +78,7 @@ export function estadoVisible(t: TrabajoRender | null | undefined, ahora = Date.
     case "renderizando":
       return {
         etiqueta: "Renderizando",
-        detalle: t.dispositivo ? `En ${t.dispositivo}${t.fotogramas ? ` · ${t.fotogramas} fotogramas` : ""}` : null,
+        detalle: t.dispositivo ? `Montándolo en ${t.dispositivo}` : "Montando el vídeo…",
         tono: "trabajando",
         progreso: Math.max(0, Math.min(100, t.progreso ?? 0)),
         activo: true,

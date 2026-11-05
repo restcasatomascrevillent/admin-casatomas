@@ -13,6 +13,7 @@ import { AyudaPopover } from "@/components/AyudaPopover";
 import { TiraCifras, type CifraTira } from "@/components/panel/TiraCifras";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { cn } from "@/lib/utils";
+import { ParaOficiosos } from "@/components/instagram/ParaOficiosos";
 import { ErrorMetricas } from "./api";
 import {
   formatearNumero,
@@ -98,7 +99,7 @@ function cifras(r: ResumenPeriodo): CifraTira[] {
       valor: formatearNumero(m.seguidores.actual),
       detalle: cambio === null ? <Variacion c={m.seguidores} /> : <span>{cambio >= 0 ? `+${formatearNumero(cambio)}` : `−${formatearNumero(-cambio)}`}</span>,
     },
-    { etiqueta: "Alcance (suma diaria)", valor: formatearNumero(m.alcance.actual), detalle: <Variacion c={m.alcance} /> },
+    { etiqueta: "Alcance", valor: formatearNumero(m.alcance.actual), detalle: <Variacion c={m.alcance} /> },
     { etiqueta: "Visualizaciones", valor: formatearNumero(m.visualizaciones.actual), detalle: <Variacion c={m.visualizaciones} /> },
     { etiqueta: "Interacciones", valor: formatearNumero(m.interacciones.actual), detalle: <Variacion c={m.interacciones} /> },
     { etiqueta: "Cuentas que interactúan", valor: formatearNumero(m.cuentasInteraccion.actual), detalle: <Variacion c={m.cuentasInteraccion} /> },
@@ -114,14 +115,17 @@ function AvisoCaptura({ error, captura }: { error: Error | null; captura: Captur
     return (
       <Alert className="border-amber-500/60" data-testid="aviso-permiso">
         <KeyRound className="h-4 w-4" aria-hidden="true" />
-        <AlertTitle>Falta el permiso «instagram_manage_insights»</AlertTitle>
+        <AlertTitle>Instagram no nos deja leer las métricas todavía</AlertTitle>
         <AlertDescription className="space-y-1 text-sm">
-          <p>Sin ese permiso Meta no deja leer las métricas de la cuenta.</p>
-          <p>
-            Añádelo en <strong>Meta Business Suite → Configuración del negocio → Usuarios → Usuarios del sistema</strong> → (tu usuario) →
-            «Generar token», marcando <code>instagram_basic</code>, <code>instagram_content_publish</code> e <code>instagram_manage_insights</code>.
-            Cambia después el secreto <code>IG_ACCESS_TOKEN</code> en Supabase y pulsa «Actualizar ahora».
-          </p>
+          <p>Falta un permiso de la cuenta. Avisa a Oficiosos: en cuanto lo añadan, pulsa «Actualizar ahora».</p>
+          <ParaOficiosos>
+            <p>
+              Falta el permiso <code>instagram_manage_insights</code>. Añádelo en{" "}
+              <strong>Meta Business Suite → Configuración del negocio → Usuarios → Usuarios del sistema</strong> → (tu usuario) → «Generar token», marcando{" "}
+              <code>instagram_basic</code>, <code>instagram_content_publish</code> e <code>instagram_manage_insights</code>. Cambia después el secreto{" "}
+              <code>IG_ACCESS_TOKEN</code> en Supabase y pulsa «Actualizar ahora».
+            </p>
+          </ParaOficiosos>
         </AlertDescription>
       </Alert>
     );
@@ -132,10 +136,13 @@ function AvisoCaptura({ error, captura }: { error: Error | null; captura: Captur
         <AlertTriangle className="h-4 w-4" aria-hidden="true" />
         <AlertTitle>No se pudieron actualizar las métricas</AlertTitle>
         <AlertDescription className="space-y-1 text-sm">
-          <p>{e.message}</p>
-          {e.comoArreglarlo.map((p) => (
-            <p key={p}>{p}</p>
-          ))}
+          <p>Se verán las últimas cifras guardadas. Vuelve a probar en un rato; si sigue igual, avisa a Oficiosos.</p>
+          <ParaOficiosos>
+            <p>{e.message}</p>
+            {e.comoArreglarlo.map((p) => (
+              <p key={p}>{p}</p>
+            ))}
+          </ParaOficiosos>
         </AlertDescription>
       </Alert>
     );
@@ -145,7 +152,12 @@ function AvisoCaptura({ error, captura }: { error: Error | null; captura: Captur
       <Alert variant="destructive" data-testid="aviso-captura">
         <AlertTriangle className="h-4 w-4" aria-hidden="true" />
         <AlertTitle>La última captura falló ({hace(captura.inicio)})</AlertTitle>
-        <AlertDescription className="text-sm">{captura.error}</AlertDescription>
+        <AlertDescription className="space-y-1 text-sm">
+          <p>Se ven las cifras de la captura anterior. Pulsa «Actualizar ahora» para reintentarlo.</p>
+          <ParaOficiosos>
+            <p>{captura.error}</p>
+          </ParaOficiosos>
+        </AlertDescription>
       </Alert>
     );
   }
@@ -201,7 +213,7 @@ function FilaPublicacion({ p, puesto }: { p: Publicacion; puesto: number }) {
         </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
           <span>{fechaCorta(p.publicadoAt)}</span>
-          {p.producto && <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{PRODUCTO[p.producto] ?? p.producto}</Badge>}
+          {p.producto && <Badge variant="secondary" className="px-1.5 py-0 text-xs">{PRODUCTO[p.producto] ?? p.producto}</Badge>}
           {p.marca && <span>· {nombreMarca(p.marca)}</span>}
           {p.plantilla && <span>· {nombrePlantilla(p.plantilla)}</span>}
           {tipo && <span>· {nombreTipoFoto(tipo)}</span>}
@@ -457,7 +469,7 @@ export function MetricasInstagram({ api, className }: MetricasInstagramProps) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h3 className="text-base font-semibold">Métricas de Instagram</h3>
+          {/* Sin título: la pestaña «Métricas» ya dice dónde estás. */}
           <AyudaPopover etiqueta="Qué cuentan estas métricas">{TEXTO_AYUDA}</AyudaPopover>
         </div>
         <div className="flex flex-wrap items-center gap-2">
