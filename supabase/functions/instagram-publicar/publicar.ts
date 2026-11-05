@@ -7,8 +7,26 @@
  *   Petición: POST `${SUPABASE_URL}/functions/v1/instagram-publicar` con
  *             `Authorization: Bearer <JWT de Supabase>` + `apikey` y JSON
  *             { "id": "<uuid>", "caption"?: "…", "altText"?: "…" (texto alternativo, ≤ 1000; solo posts),
- *               "dryRun": true|false, "contenedorId"?: "<id para reintentar>",
- *               "fotoTmp"?: "tmp/<uuid>.jpg" (copia temporal de la foto de Drive usada; se borra al publicar) }
+ *               "altTexts"?: ["…", …] (carrusel: uno por imagen, en orden),
+ *               "dryRun"?: true|false (por defecto false: se publica SIN prueba previa),
+ *               "contenedorId"?: "<id para reintentar>",
+ *               "fotoTmp"?: "tmp/<uuid>.jpg" (copia temporal de la foto de Drive usada; se borra al publicar),
+ *               "fotosTmp"?: ["tmp/<uuid>.jpg", …] (carrusel: las copias de sus fotos),
+ *               "programarPara"?: "<ISO>", "confirmarConflicto"?: bool (PROGRAMAR en vez de publicar) }
+ *
+ *   SIN PASO DE PRUEBA (05/11/2026): publicar o programar ya no exigen «Prueba
+ *   sin publicar». Publicar valida el texto y la imagen y crea el contenedor
+ *   por dentro; `dryRun: true` queda como opción interna. Con
+ *   `programarPara`, valida igual (texto, textos alternativos, imágenes
+ *   accesibles) y llama a la RPC instagram_programar con el JWT del usuario,
+ *   pasándole el texto y los textos alternativos (migración 20261112000000):
+ *   200 { ok, programado: true, programacion, conflictos } ·
+ *   409 { ok: false, requiereConfirmacion: true, conflictos } (repetir con confirmarConflicto).
+ *
+ *   CARRUSEL (tipo_medio = 'carrusel', migración 20261112000000): un
+ *   contenedor hijo por imagen (is_carousel_item, image_url, alt_text) y el
+ *   contenedor CAROUSEL con children y caption; mismas reglas de doble
+ *   publicación, cerrojo, 202 y Drive (las N imágenes). Detalle en carrusel.ts.
  *
  *   Cuenta: la de la MARCA de la pieza (IG_USER_ID_TOUZA / IG_ACCESS_TOKEN_TOUZA,
  *   IG_USER_ID_CASA_TOMAS / …) y, si no existen, la general (IG_USER_ID /
@@ -107,6 +125,7 @@ import {
 } from "../_shared/instagram/supabase.ts";
 import { esUuid, MAX_BYTES_IMAGEN, validarAltText, validarCaption, type TipoPublicacion } from "../_shared/instagram/validacion.ts";
 import { esReel, problemaReel, publicarReelReservado } from "./reel.ts";
+import { esCarrusel, problemaCarrusel, programarConSesion, publicarCarruselReservado } from "./carrusel.ts";
 
 const ETIQUETA = "instagram-publicar";
 
@@ -179,9 +198,32 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
 
   const cuerpo = await leerJson(request, 64 * 1024);
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
-  const entrada = cuerpo.valor as { id?: unknown; caption?: unknown; altText?: unknown; dryRun?: unknown; contenedorId?: unknown; fotoTmp?: unknown } | null;
+  const entrada = cuerpo.valor as {
+    id?: unknown;
+    caption?: unknown;
+    altText?: unknown;
+    altTexts?: unknown;
+    dryRun?: unknown;
+    contenedorId?: unknown;
+    fotoTmp?: unknown;
+    fotosTmp?: unknown;
+    programarPara?: unknown;
+    confirmarConflicto?: unknown;
+  } | null;
   if (!entrada || typeof entrada !== "object" || !esUuid(entrada.id)) return json(400, { ok: false, error: "Falta «id» (UUID de la pieza)" });
-  if (typeof entrada.dryRun !== "boolean") return json(400, { ok: false, error: "«dryRun» tiene que ser true o false" });
+  // Sin paso de prueba: dryRun es opcional (por defecto, publicar).
+  if (entrada.dryRun !== undefined && entrada.dryRun !== null && typeof entrada.dryRun !== "boolean") return json(400, { ok: false, error: "«dryRun» tiene que ser true o false" });
+  if (entrada.altTexts !== undefined && entrada.altTexts !== null
+      && (!Array.isArray(entrada.altTexts) || entrada.altTexts.length > 10 || entrada.altTexts.some((a) => a !== null && typeof a !== "string"))) {
+    return json(400, { ok: false, error: "«altTexts» tiene que ser una lista de textos (uno por imagen del carrusel)" });
+  }
+  if (entrada.fotosTmp !== undefined && entrada.fotosTmp !== null && (!Array.isArray(entrada.fotosTmp) || entrada.fotosTmp.length > 10 || !entrada.fotosTmp.every(esRutaTmp))) {
+    return json(400, { ok: false, error: "«fotosTmp» tiene que ser una lista de rutas tmp/<uuid>.jpg del bucket" });
+  }
+  const programarPara = entrada.programarPara;
+  if (programarPara !== undefined && programarPara !== null && (typeof programarPara !== "string" || Number.isNaN(Date.parse(programarPara)))) {
+    return json(400, { ok: false, error: "«programarPara» tiene que ser una fecha ISO" });
+  }
   if (entrada.caption !== undefined && entrada.caption !== null && typeof entrada.caption !== "string") return json(400, { ok: false, error: "«caption» tiene que ser texto" });
   if (entrada.altText !== undefined && entrada.altText !== null && typeof entrada.altText !== "string") return json(400, { ok: false, error: "«altText» tiene que ser texto" });
   if (entrada.contenedorId !== undefined && (typeof entrada.contenedorId !== "string" || !/^\d+$/.test(entrada.contenedorId))) {
@@ -191,8 +233,9 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
     return json(400, { ok: false, error: "«fotoTmp» tiene que ser una ruta tmp/<uuid>.jpg del bucket" });
   }
   const id = entrada.id;
-  const dryRun = entrada.dryRun;
+  const dryRun = entrada.dryRun === true;
   const fotoTmp = typeof entrada.fotoTmp === "string" ? entrada.fotoTmp : null;
+  const fotosTmp = Array.isArray(entrada.fotosTmp) ? (entrada.fotosTmp as string[]) : [];
 
   let leida: FilaPieza | null;
   try {
@@ -221,9 +264,13 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   const sw = sesionEscritura(s, env, ETIQUETA);
   if (fila.estado === "publicada") return json(409, { ok: false, error: "Esa pieza ya está publicada", permalink: fila.permalink, mediaId: fila.media_id });
   const reel = esReel(fila);
+  const carrusel = esCarrusel(fila);
   const contenedorPedido = typeof entrada.contenedorId === "string" ? entrada.contenedorId : null;
   if (reel) {
     const problema = problemaReel(fila, contenedorPedido, (deps.ahora ?? Date.now)());
+    if (problema) return json(409, problema);
+  } else if (carrusel) {
+    const problema = problemaCarrusel(fila);
     if (problema) return json(409, problema);
   } else {
     if (!fila.imagen_ruta) return json(409, { ok: false, error: "La pieza no tiene imagen: genérala antes de publicar" });
@@ -247,7 +294,37 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   const vAlt = validarAltText(altText, tipo);
   if (!vAlt.ok) return json(422, { ok: false, error: "El texto alternativo no es válido", problemas: vAlt.errores });
   avisos.push(...vAlt.avisos);
-  const altEnvio = !reel && tipo === "post" && altText ? altText : undefined;
+  const altEnvio = !reel && !carrusel && tipo === "post" && altText ? altText : undefined;
+  // Carrusel: un texto alternativo por imagen (los que llegan o los guardados).
+  let altTexts: string[] | null = null;
+  if (carrusel) {
+    const ds = fila.diapositivas ?? [];
+    const llegan = Array.isArray(entrada.altTexts) ? (entrada.altTexts as Array<string | null>) : null;
+    if (llegan && llegan.length !== ds.length) {
+      return json(422, { ok: false, error: `Hacen falta ${ds.length} textos alternativos (uno por imagen) y llegan ${llegan.length}` });
+    }
+    altTexts = ds.map((d, i) => (llegan ? (llegan[i] ?? "") : (d.alt_text ?? "")).trim());
+    for (let i = 0; i < altTexts.length; i++) {
+      const v = validarAltText(altTexts[i], "post");
+      if (!v.ok) return json(422, { ok: false, error: `El texto alternativo de la imagen ${i + 1} no es válido`, problemas: v.errores });
+    }
+  } else if (entrada.altTexts !== undefined && entrada.altTexts !== null) {
+    return json(400, { ok: false, error: "«altTexts» es solo para carruseles (usa «altText»)" });
+  }
+
+  // PROGRAMAR directamente (sin prueba previa): valida y deja la programación.
+  if (typeof programarPara === "string") {
+    return await programarConSesion(
+      { s, env, deps, id, fila, cuenta, caption, altText, altTexts, avisos, resumenCaption },
+      {
+        para: programarPara,
+        confirmarConflicto: entrada.confirmarConflicto === true,
+        captionLlega: typeof entrada.caption === "string",
+        altTextLlega: typeof entrada.altText === "string",
+        altTextsLlegan: Array.isArray(entrada.altTexts),
+      },
+    );
+  }
 
   // Cerrojo: nadie más prueba ni publica esta pieza mientras tanto.
   let reserva: Awaited<ReturnType<typeof reservarPublicacion>>;
@@ -277,8 +354,8 @@ export async function publicarConSesion(s: Sesion, request: Request, deps: Depen
   if (reserva.sinCerrojo) registro("warn", ETIQUETA, "sin cerrojo de publicación (falta la migración 20261107000000)", { id });
   const bloqueo = reserva.bloqueo;
   try {
-    const contexto: ContextoPublicacion = { s, sw, env, deps, id, dryRun, fotoTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, avisos, resumenCaption };
-    return await (reel ? publicarReelReservado(contexto) : publicarReservado(contexto));
+    const contexto: ContextoPublicacion = { s, sw, env, deps, id, dryRun, fotoTmp, fotosTmp, fila, cfg, cuenta, contenedorPedido, tipo, caption, altText, altEnvio, altTexts, avisos, resumenCaption };
+    return await (reel ? publicarReelReservado(contexto) : carrusel ? publicarCarruselReservado(contexto) : publicarReservado(contexto));
   } finally {
     await liberarPublicacion(sw, id, bloqueo);
   }
@@ -293,6 +370,8 @@ export interface ContextoPublicacion {
   id: string;
   dryRun: boolean;
   fotoTmp: string | null;
+  /** Carrusel: copias tmp/ de sus fotos (se borran al publicar, si Drive tiene las imágenes). */
+  fotosTmp: string[];
   fila: FilaPieza;
   cfg: { token: string; versionApi: string; igUserId: string; appId: string; appSecret: string | undefined };
   cuenta: { marca: string; igUserId: string; propia: boolean };
@@ -301,6 +380,8 @@ export interface ContextoPublicacion {
   caption: string;
   altText: string;
   altEnvio: string | undefined;
+  /** Carrusel: texto alternativo de cada imagen, en orden ("" = sin texto). null si no es carrusel. */
+  altTexts: string[] | null;
   avisos: string[];
   resumenCaption: { caracteres: number; hashtags: number; menciones: number };
 }
