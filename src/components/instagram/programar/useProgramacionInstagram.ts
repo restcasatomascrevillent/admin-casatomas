@@ -13,9 +13,19 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { PiezaResumen, ProgramacionConPieza } from "./logica";
+import type { BorradorResumen, PiezaResumen, ProgramacionConPieza } from "./logica";
 
 const sb = supabase;
+
+/** Consulta sin tipos de los borradores (columnas nuevas que aún no están en types.ts). */
+interface ConsultaBorradores extends PromiseLike<{ data: unknown[] | null; error: unknown }> {
+  select(c: string): ConsultaBorradores;
+  not(c: string, op: string, v: unknown): ConsultaBorradores;
+  gte(c: string, v: string): ConsultaBorradores;
+  lt(c: string, v: string): ConsultaBorradores;
+  order(c: string, o: { ascending: boolean }): ConsultaBorradores;
+  limit(n: number): ConsultaBorradores;
+}
 
 export const CLAVE_PROGRAMACION = ["instagram_programaciones"] as const;
 /** Misma clave que el historial de piezas (usePiezasInstagram): se invalida al publicar/programar. */
@@ -59,8 +69,8 @@ export function useCalendarioInstagram(desde: Date, hasta: Date, opciones: { act
     queryKey: [...CLAVE_PROGRAMACION, "calendario", desde.toISOString(), hasta.toISOString()],
     enabled: opciones.activo ?? true,
     refetchInterval: 60_000,
-    queryFn: async (): Promise<{ programaciones: ProgramacionInstagram[]; publicadas: PiezaResumen[] }> => {
-      const [prog, pub] = await Promise.all([
+    queryFn: async (): Promise<{ programaciones: ProgramacionInstagram[]; publicadas: PiezaResumen[]; borradores: BorradorResumen[] }> => {
+      const [prog, pub, bor] = await Promise.all([
         sb
           .from("instagram_programaciones")
           .select(`${COLUMNAS_PROGRAMACION},pieza:instagram_piezas(${COLUMNAS_PIEZA})`)
@@ -77,12 +87,23 @@ export function useCalendarioInstagram(desde: Date, hasta: Date, opciones: { act
           .lt("publicada_at", hasta.toISOString())
           .order("publicada_at", { ascending: true })
           .limit(500),
+        // Borradores con fecha prevista (campañas). Sin la migración 20261109000000 la
+        // columna no existe: el calendario sigue sin ellos en vez de fallar entero.
+        (sb as unknown as { from(t: string): ConsultaBorradores })
+          .from("instagram_piezas")
+          .select(`${COLUMNAS_PIEZA},fecha_prevista,campana_id,programaciones:instagram_programaciones(estado)`)
+          .not("fecha_prevista", "is", null)
+          .gte("fecha_prevista", desde.toISOString())
+          .lt("fecha_prevista", hasta.toISOString())
+          .order("fecha_prevista", { ascending: true })
+          .limit(500),
       ]);
       if (prog.error) throw prog.error;
       if (pub.error) throw pub.error;
       return {
         programaciones: (prog.data ?? []) as unknown as ProgramacionInstagram[],
         publicadas: (pub.data ?? []) as unknown as PiezaResumen[],
+        borradores: bor.error ? [] : ((bor.data ?? []) as unknown as BorradorResumen[]),
       };
     },
   });
