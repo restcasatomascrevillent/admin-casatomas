@@ -15,6 +15,7 @@ export type TipoErrorInstagram =
   | "token"
   | "sesion"
   | "permisos"
+  | "app_bloqueada"
   | "cuenta_no_profesional"
   | "limite_llamadas"
   | "limite_publicacion"
@@ -63,6 +64,14 @@ const TEXTOS: Record<TipoErrorInstagram, Texto> = {
     mensaje: "Al token le faltan permisos para esta operación",
     comoArreglarlo:
       "Regenera el token del usuario del sistema marcando instagram_basic e instagram_content_publish (y pages_show_list / pages_read_engagement / business_management si usas la ruta de páginas). Comprueba también que la cuenta de Instagram está asignada como activo a ese usuario del sistema con control total.",
+    reintentable: false,
+  },
+  // OAuthException 200 «API access blocked.»: Meta ha bloqueado la APP entera
+  // (no es un permiso del token). Regenerar el token no lo arregla.
+  app_bloqueada: {
+    mensaje: "Meta ha bloqueado el acceso de la app a la API",
+    comoArreglarlo:
+      "Meta ha bloqueado el acceso de la app a la API. Revisa en developers.facebook.com las Acciones requeridas, las alertas y tu cuenta de desarrollador; si sigue, crea una app nueva y cambia META_APP_ID, META_APP_SECRET e IG_ACCESS_TOKEN",
     reintentable: false,
   },
   cuenta_no_profesional: {
@@ -309,6 +318,11 @@ export function leerUsoCasoNegocio(cabeceras: Headers | null | undefined): UsoCa
 
 const TRANSITORIOS_SUB = new Set([2207001, 2207003, 2207032]);
 
+/** OAuthException 200 con «API access blocked.»: Meta ha bloqueado la app entera. */
+export function esAppBloqueada(codigo: number | null, mensaje: string): boolean {
+  return codigo === 200 && /api access blocked/i.test(mensaje);
+}
+
 /** Clasifica un código/subcódigo de Meta en un tipo de error. */
 export function clasificarError(
   codigo: number | null,
@@ -336,6 +350,8 @@ export function clasificarError(
   if (c === 10 && /not\s+(a\s+)?(business|creator)|business or creator|professional account|cuenta profesional/i.test(mensaje)) {
     return "cuenta_no_profesional";
   }
+  // Antes que «permisos»: el código 200 también es el del bloqueo de la app.
+  if (esAppBloqueada(c, mensaje)) return "app_bloqueada";
   if (c === 10 || (c !== null && c >= 200 && c <= 299)) return "permisos";
   if (c === 4 || c === 17 || c === 32 || c === 613 || (c !== null && c >= 80000 && c <= 80099)) return "limite_llamadas";
   if (c === 100) return "peticion_invalida";
@@ -435,6 +451,7 @@ export function estadoHttpDeError(e: ErrorInstagram): number {
     case "transitorio":
     case "red":
     case "tiempo_agotado":
+    case "app_bloqueada":
       return 503;
     default:
       return 502;

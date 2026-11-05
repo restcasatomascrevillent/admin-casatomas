@@ -413,6 +413,7 @@ repetida.
 |---|---|---|
 | «El token de acceso no es válido» (190) | Token caducado, revocado o la app/cuenta se desasignó | Regenerar el token del usuario del sistema y cambiar el secreto `IG_ACCESS_TOKEN` en Supabase |
 | «Al token le faltan permisos» (10, 200-299) | Falta `instagram_content_publish` o la cuenta no está asignada | Regenerar el token con los dos permisos; asignar la cuenta con control total |
+| «Meta ha bloqueado el acceso de la app a la API» (OAuthException 200, «API access blocked.») | Meta ha bloqueado la **app** entera, no es un permiso del token: regenerar el token no sirve. «Comprobar» lo marca como «App de Meta bloqueada» | Revisar en developers.facebook.com las Acciones requeridas, las alertas y la cuenta de desarrollador; si sigue, crear una app nueva y cambiar `META_APP_ID`, `META_APP_SECRET` e `IG_ACCESS_TOKEN` |
 | «Se ha alcanzado el límite de publicaciones» (2207042) | Cuota de 24 h agotada | Esperar; «Comprobar conexión» muestra el uso |
 | «Meta no ha podido descargar la imagen» (9004 / 2207052) | La URL pública no responde o no es JPEG | Comprobar que el bucket «instagram» es público y regenerar la pieza |
 | «Instagram no ha podido procesar la imagen (ERROR)» | Formato/medidas no admitidos | Regenerar; revisar que es JPEG 1080×1350 o 1080×1920 |
