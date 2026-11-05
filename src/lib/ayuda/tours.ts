@@ -132,15 +132,6 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       lado: "bottom",
     },
     {
-      elemento: "facturas-resumen",
-      pestana: F_COMPRAS,
-      titulo: "El resumen",
-      texto:
-        "Lo gastado con IVA, los abonos, lo que te han regalado o descontado, una gráfica de los últimos 12 meses (toca un mes para ver solo ese) y los 10 proveedores en los que más gastas (toca uno para abrirlo). Se pliega con un toque y se acuerda.",
-      opcional: true,
-      lado: "bottom",
-    },
-    {
       elemento: "facturas-filtros",
       pestana: F_COMPRAS,
       titulo: "Filtros rápidos",
