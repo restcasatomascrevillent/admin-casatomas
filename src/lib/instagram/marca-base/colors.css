@@ -1,0 +1,79 @@
+/* COPIA LITERAL de instagram-studio/propuesta/marca-base/tokens/colors.css (sistema de marca oficial, 07/11/2026).
+   No se usa en el panel: es la referencia con la que src/lib/instagram/__tests__/tokensMarcaBase.test.ts
+   compara src/lib/instagram/tokens.ts. Si cambia la marca, se cambia allí y aquí a la vez. */
+/* Valores extraídos de las webs de producción (HSL de Tailwind convertidos a hex).
+   Casa Tomás = tema base (:root). Touza = [data-theme="touza"]. */
+:root{
+  /* Casa Tomás */
+  --ct-slate:#394147;        /* dark-slate 206 11% 25% — texto y primario */
+  --ct-slate-900:#22272A;    /* modo oscuro 206 11% 15% */
+  --ct-slate-800:#2E3438;    /* card oscuro 206 11% 20% */
+  --ct-mid-gray:#67615F;     /* 15 4% 39% — texto secundario */
+  --ct-stone:#9B8A7D;        /* 25 13% 55% — piedra */
+  --ct-sand-200:#DED8D4;     /* 25 13% 85% — muted / bordes */
+  --ct-sand-50:#F4F2F1;      /* 25 13% 95% — fondo de sección */
+  --ct-white:#FFFFFF;
+  --ct-gold:#B6852F;         /* 38 59% 45% — acento, CTA "Reservar mesa" */
+  --ct-gold-soft:rgba(182,133,47,.10);
+  /* Touza */
+  --tz-black:#0A0A0A;        /* 0 0% 4% */
+  --tz-card:#0F0F0F;         /* 0 0% 6% */
+  --tz-charcoal:#121212;     /* 0 0% 7% */
+  --tz-charcoal-light:#1F1F1F;
+  --tz-border:#242424;       /* 0 0% 14% */
+  --tz-muted:#8C8C8C;        /* 0 0% 55% */
+  --tz-cream:#F5F3EF;        /* 42 25% 95% */
+  --tz-cream-88:#E6E1D6;     /* 42 20% 88% */
+  --tz-gold:#D49A35;         /* 38 65% 52% — primario */
+  --tz-gold-light:#DAB981;   /* 38 55% 68% */
+  --tz-gold-dark:#AA7418;    /* 38 75% 38% */
+  --tz-amber:#D68A1F;        /* accent 35 75% 48% */
+  --tz-theme:#D4A574;        /* meta theme-color */
+  --destructive:#EF4444;
+
+  /* Semánticos (tema Casa Tomás) */
+  --bg:var(--ct-white);
+  --bg-section:var(--ct-sand-50);
+  --surface:var(--ct-white);
+  --surface-muted:var(--ct-sand-200);
+  --text:var(--ct-slate);
+  --text-muted:var(--ct-mid-gray);
+  --text-on-dark:#FFFFFF;
+  --heading:var(--ct-slate);
+  --border:var(--ct-sand-200);
+  --primary:var(--ct-slate);
+  --primary-contrast:#FFFFFF;
+  --accent:var(--ct-gold);
+  --accent-contrast:#FFFFFF;
+  --accent-soft:var(--ct-gold-soft);
+  --secondary:var(--ct-stone);
+  --ring:var(--ct-gold);
+  --btn-primary-bg:var(--ct-gold);
+  --btn-primary-fg:#FFFFFF;
+  --btn-secondary-bg:transparent;
+  --btn-secondary-fg:var(--ct-slate);
+  --btn-secondary-border:var(--ct-slate);
+}
+[data-theme="touza"]{
+  --bg:var(--tz-black);
+  --bg-section:var(--tz-charcoal);
+  --surface:var(--tz-card);
+  --surface-muted:var(--tz-charcoal-light);
+  --text:var(--tz-cream);
+  --text-muted:var(--tz-muted);
+  --text-on-dark:#FFFFFF;
+  --heading:#FFFFFF;
+  --border:var(--tz-border);
+  --primary:var(--tz-gold);
+  --primary-contrast:var(--tz-black);
+  --accent:var(--tz-gold);
+  --accent-contrast:var(--tz-black);
+  --accent-soft:rgba(212,154,53,.12);
+  --secondary:var(--tz-charcoal-light);
+  --ring:var(--tz-gold);
+  --btn-primary-bg:#FFFFFF;
+  --btn-primary-fg:#000000;
+  --btn-secondary-bg:transparent;
+  --btn-secondary-fg:#FFFFFF;
+  --btn-secondary-border:rgba(255,255,255,.2);
+}

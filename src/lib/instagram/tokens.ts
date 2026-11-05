@@ -10,6 +10,13 @@
  * formato `repo:fichero → variable`. Los HSL de los CSS de origen se han
  * convertido a hex con redondeo estándar (comprobado al copiar, 04/11/2026).
  *
+ * FUENTE OFICIAL (07/11/2026): el sistema de marca de instagram-studio
+ * (propuesta/marca-base/tokens/colors.css), copiado tal cual en
+ * src/lib/instagram/marca-base/colors.css. Los colores de aquí que tienen
+ * equivalente allí TIENEN que coincidir: lo comprueba
+ * src/lib/instagram/__tests__/tokensMarcaBase.test.ts. Si cambia la marca,
+ * se cambia primero esa copia y luego aquí.
+ *
  * Las plantillas NO deben usar estos valores a mano: usan las variables CSS
  * que genera `generarCss()` (--color-*, --fuente-*, --peso-*, --radio-*…).
  *
@@ -17,14 +24,16 @@
  * (calculados en el prototipo con src/marca/contraste.ts; AA pide ≥ 4,5 en texto normal y
  *  ≥ 3 en texto grande ≥ 24 px o ≥ 18,66 px en negrita)
  *
- *  Casa Tomás
- *   blanco   #ffffff sobre oro      #8e6725 → 5,10  AA (botón píldora)
+ *  Casa Tomás (oro oficial #b6852f: ver ORO_CASA_TOMAS)
+ *   blanco   #ffffff sobre oro      #b6852f →  3,29 SOLO texto grande (≥ 24 px, o ≥ 18,66 px en
+ *                                               negrita): la píldora del CTA lleva 26 px en negrita
+ *   oro      #b6852f sobre blanco   #ffffff →  3,29 SOLO texto grande / filetes, marcos, cifras
+ *   oro      #b6852f sobre papel    #fbf8f4 →  3,11 SOLO texto grande / decoración
+ *   oro      #b6852f sobre pizarra  #394147 →  3,16 SOLO texto grande / decoración
  *   blanco   #ffffff sobre pizarra  #394147 → 10,39 AAA
  *   pizarra  #394147 sobre blanco   #ffffff → 10,39 AAA (titulares)
  *   pizarra  #394147 sobre papel    #fbf8f4 →  9,81 AAA
- *   oro      #8e6725 sobre blanco   #ffffff →  5,10 AA
- *   oro      #8e6725 sobre papel    #fbf8f4 →  4,82 AA
- *   oro-texto#845f1f sobre papel    #fbf8f4 →  5,45 AA
+ *   oro-texto#845f1f sobre papel    #fbf8f4 →  5,45 AA (texto oro PEQUEÑO, p. ej. antetítulos de 21 px)
  *   oro-texto#845f1f sobre blanco   #ffffff →  5,77 AA
  *   oro-claro#d7ad65 sobre pizarra  #394147 →  4,97 AA
  *   gris-medio#67615f sobre blanco  #ffffff →  6,08 AA (antetítulos)
@@ -33,7 +42,7 @@
  *   piedra   #9b8a7d sobre blanco   #ffffff →  3,32 SOLO texto grande / decoración
  *
  *  Touza
- *   crema    #f5f4ef sobre negro    #0a0a0a → 17,98 AAA
+ *   crema    #f5f3ef sobre negro    #0a0a0a → 17,86 AAA
  *   oro      #d49a35 sobre negro    #0a0a0a →  7,99 AAA
  *   oro-claro#dab981 sobre negro    #0a0a0a → 10,59 AAA
  *   oro-oscuro#aa7418 sobre negro   #0a0a0a →  4,92 AA
@@ -145,6 +154,25 @@ export const LICENCIAS_FUENTES = [
   "montserrat/OFL.txt",
 ] as const;
 
+// ── Oro de Casa Tomás: decisión en UN solo sitio ─────────────────────────────
+/**
+ * Oro de Casa Tomás (fase 0 de Instagram, 07/11/2026). El dueño no contestó a
+ * la decisión 2 de la propuesta y se aplicó la recomendación:
+ *   - acento = #b6852f, el OFICIAL (marca-base/tokens/colors.css → --ct-gold,
+ *     web-casatomas:src/index.css → --accent / --gold = 38 59% 45%): filetes,
+ *     marcos, cifras grandes, la píldora del CTA (texto blanco ≥ 24 px en
+ *     negrita) y el oro de los reels;
+ *   - texto = #845f1f (web-casatomas → --ticket-stamp, 38 62% 32%): SOLO para
+ *     texto oro pequeño sobre fondo claro (AA 5,45 sobre papel).
+ * Antes se usaba #8e6725 («38 59% 35%»), atribuido por error a web-casatomas:
+ * ese valor nunca ha existido en su src/index.css.
+ *
+ * Para volver al oro oscuro: cambia `acento` aquí a "#8e6725" Y cambia
+ * --ct-gold en src/lib/instagram/marca-base/colors.css (y en marca-base), o el
+ * test de tokens fallará: la fuente oficial manda.
+ */
+export const ORO_CASA_TOMAS = { acento: "#b6852f", texto: "#845f1f" } as const;
+
 // ── Marcas ───────────────────────────────────────────────────────────────────
 
 export const MARCAS = {
@@ -152,13 +180,12 @@ export const MARCAS = {
     id: "casa-tomas",
     nombre: "Restaurante Casa Tomás",
     tema: "claro",
-    // Decisión del dueño: valores de PRODUCCIÓN (web-casatomas). El oro antiguo
-    // de casa-tomas-story (#b6852f, 38 59% 45%) ya NO se usa.
+    // Valores de PRODUCCIÓN (web-casatomas) = sistema de marca oficial (marca-base).
     colores: {
-      pizarra: "#394147", // web-casatomas:src/index.css → --primary / --dark-slate / --foreground (206 11% 25%)
-      oro: "#8e6725", // web-casatomas:src/index.css → --accent / --gold (38 59% 35%)
+      pizarra: "#394147", // web-casatomas:src/index.css → --primary / --dark-slate / --foreground (206 11% 25%); marca-base → --ct-slate
+      oro: ORO_CASA_TOMAS.acento, // web-casatomas:src/index.css → --accent / --gold (38 59% 45%); marca-base → --ct-gold
       "oro-claro": "#d7ad65", // web-casatomas:src/index.css → --gold-light (38 59% 62%)
-      "oro-texto": "#845f1f", // web-casatomas:src/index.css → --ticket-stamp (38 62% 32%)
+      "oro-texto": ORO_CASA_TOMAS.texto, // web-casatomas:src/index.css → --ticket-stamp (38 62% 32%): oro para texto pequeño
       piedra: "#9b8a7d", // web-casatomas:src/index.css → --stone (25 13% 55%)
       "piedra-clara": "#ded8d4", // web-casatomas:src/index.css → --muted / --border (25 13% 85%)
       "gris-medio": "#67615f", // web-casatomas:src/index.css → --mid-gray (15 4% 39%)
@@ -210,7 +237,8 @@ export const MARCAS = {
     tema: "oscuro",
     colores: {
       negro: "#0a0a0a", // touza-restaurant-website:src/index.css → --background (0 0% 4%)
-      crema: "#f5f4ef", // touza-restaurant-website:src/index.css → --foreground / --cream (42 25% 95%)
+      // marca-base → --tz-cream. La web da 42 25% 95% (≈ #f5f4ef con otro redondeo: 1/255 de diferencia).
+      crema: "#f5f3ef", // touza-restaurant-website:src/index.css → --foreground / --cream (42 25% 95%)
       oro: "#d49a35", // touza-restaurant-website:src/index.css → --primary / --gold (38 65% 52%)
       "oro-claro": "#dab981", // touza-restaurant-website:src/index.css → --gold-light (38 55% 68%)
       "oro-oscuro": "#aa7418", // touza-restaurant-website:src/index.css → --gold-dark (38 75% 38%)
