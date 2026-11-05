@@ -174,7 +174,7 @@ describe("Edge Function instagram-estado", () => {
 
 describe("Meta bloquea la app entera (OAuthException 200 «API access blocked.»)", () => {
   const ARREGLO =
-    "Meta ha bloqueado el acceso de la app a la API. Revisa en developers.facebook.com las Acciones requeridas, las alertas y tu cuenta de desarrollador; si sigue, crea una app nueva y cambia META_APP_ID, META_APP_SECRET e IG_ACCESS_TOKEN";
+    "Meta ha bloqueado el acceso a la API. Lo más habitual: el token no es de un usuario del sistema o no lleva los permisos de Instagram. Pégalo en developers.facebook.com/tools/debug/accesstoken: tiene que ser «System User», «Caduca: nunca» y llevar instagram_basic, instagram_content_publish e instagram_manage_insights. Si es así y sigue bloqueado, revisa las Acciones requeridas y las alertas de la app o crea una app nueva (y cambia META_APP_ID, META_APP_SECRET e IG_ACCESS_TOKEN)";
   const bloqueo = () => resp(400, { error: { message: "API access blocked.", type: "OAuthException", code: 200, fbtrace_id: "AbC" } });
 
   it("el mapeo lo clasifica como «app bloqueada», no reintentable, y no como permisos", () => {
@@ -182,7 +182,7 @@ describe("Meta bloquea la app entera (OAuthException 200 «API access blocked.»
     expect(e.tipo).toBe("app_bloqueada");
     expect(e.reintentable).toBe(false);
     expect(e.comoArreglarlo).toBe(ARREGLO);
-    expect(e.message).toMatch(/^Meta ha bloqueado el acceso de la app a la API/);
+    expect(e.message).toMatch(/^Meta ha bloqueado el acceso a la API/);
     expect(e.message).not.toMatch(/faltan permisos/);
     // Otro error 200 sigue siendo de permisos.
     expect(mapearErrorGraph({ estadoHttp: 403, cuerpo: { error: { message: "Permissions error", code: 200 } } }).tipo).toBe("permisos");

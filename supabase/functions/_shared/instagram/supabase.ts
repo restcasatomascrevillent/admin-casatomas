@@ -69,9 +69,22 @@ export interface FilaPieza {
   video_bytes?: number | null;
   procesando_accion?: string | null;
   procesando_desde?: string | null;
+  /** Carrusel (migración 20261112000000; no existe antes): imágenes en orden de publicación. */
+  diapositivas?: FilaDiapositiva[] | null;
+  /** Carrusel publicado: id en Drive de cada JPEG (solo el servidor). */
+  drive_ids?: string[] | null;
   creado_por: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+/** Una imagen de un carrusel (instagram_piezas.diapositivas, 20261112000000). */
+export interface FilaDiapositiva {
+  foto?: string | null;
+  plantilla: string;
+  datos?: unknown;
+  alt_text?: string | null;
+  imagen_ruta: string;
 }
 
 export interface Sesion {
@@ -483,4 +496,65 @@ export async function liberarPublicacion(s: Sesion, piezaId: string, bloqueo: st
   } catch {
     /* caduca solo */
   }
+}
+
+// ── Carrusel (migración 20261112000000) ─────────────────────────────────────
+
+/** Anota los JPEG de un carrusel archivados en Drive (drive_id = portada, drive_ids = todos). Solo el servidor. */
+export async function anotarDriveCarrusel(s: Sesion, id: string, driveIds: string[]): Promise<void> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: cabeceras(s, { "Content-Type": "application/json", Prefer: "return=minimal" }),
+    body: JSON.stringify({ drive_id: driveIds[0] ?? null, drive_ids: driveIds }),
+    signal: AbortSignal.timeout(MS_TIEMPO),
+  });
+  if (!r.ok) throw new ErrorSupabase(`No se pudieron anotar los ficheros de Drive (${r.status}): ${await detalle(r)}`, r.status);
+}
+
+/** Guarda las diapositivas (textos alternativos enviados). Nunca lanza: aviso si no se pudo. */
+export async function anotarDiapositivas(s: Sesion, id: string, diapositivas: FilaDiapositiva[]): Promise<string | null> {
+  try {
+    const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: cabeceras(s, { "Content-Type": "application/json", Prefer: "return=minimal" }),
+      body: JSON.stringify({ diapositivas }),
+      signal: AbortSignal.timeout(MS_TIEMPO),
+    });
+    if (r.ok) return null;
+    return `Los textos alternativos se han enviado a Instagram, pero no se han guardado en el panel (${r.status}): ${await detalle(r)}`;
+  } catch (e) {
+    return sanear(`No se pudieron guardar los textos alternativos: ${(e as Error)?.message ?? e}`);
+  }
+}
+
+export interface PeticionProgramar {
+  piezaId: string;
+  para: string;
+  confirmarConflicto?: boolean;
+  caption?: string | null;
+  altText?: string | null;
+  altTexts?: string[] | null;
+}
+
+/**
+ * RPC instagram_programar COMO EL USUARIO (su JWT: la RPC comprueba «Editar»
+ * y la sesión de panel). Devuelve su JSON o `{ estado, error }` si PostgREST
+ * la rechaza (fecha, pieza sin imagen, permiso…).
+ */
+export async function programarPieza(s: Sesion, p: PeticionProgramar): Promise<{ ok: true; valor: Record<string, unknown> } | { ok: false; estado: number; error: string }> {
+  const cuerpo: Record<string, unknown> = { p_pieza_id: p.piezaId, p_para: p.para, p_confirmar_conflicto: p.confirmarConflicto === true };
+  if (typeof p.caption === "string") cuerpo.p_caption = p.caption;
+  if (typeof p.altText === "string") cuerpo.p_alt_text = p.altText;
+  if (Array.isArray(p.altTexts)) cuerpo.p_alt_texts = p.altTexts;
+  const r = await s.fetch(`${s.sb.url}/rest/v1/rpc/instagram_programar`, {
+    method: "POST",
+    headers: cabeceras(s, { "Content-Type": "application/json", Accept: "application/json" }),
+    body: JSON.stringify(cuerpo),
+    signal: AbortSignal.timeout(MS_TIEMPO),
+  });
+  if (r.ok) {
+    const valor = (await r.json().catch(() => null)) as Record<string, unknown> | null;
+    return { ok: true, valor: valor ?? {} };
+  }
+  return { ok: false, estado: r.status, error: await detalle(r) };
 }

@@ -284,7 +284,7 @@ describe("tablero: carga, vacío y error", () => {
   it("la RPC aún no existe: pide aplicar la migración", async () => {
     delete doble.rpcs.tablero_compras;
     montar();
-    expect(await screen.findByRole("alert")).toHaveTextContent(/falta aplicar la migración 20261105150000_tablero_compras/);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/falta aplicar la migración 20261105150500_tablero_compras/);
   });
 });
 

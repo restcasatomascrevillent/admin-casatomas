@@ -23,6 +23,10 @@
  * instagram_fotos (subidas antes de Drive) con el mismo JWT. El catálogo
  * estático (FOTOS) queda de respaldo.
  *
+ * CARRUSEL: { "tipo": "carrusel", "marca", "diapositivas": [{ foto, plantilla, datos, altText?, fotoPreparada? }], "id"?, "caption"? }
+ * genera 2–10 JPEG 1080×1350 en una llamada (un Chromium, varias páginas a la
+ * vez). Contrato en api/_lib/instagram/carrusel.ts y docs/instagram-carrusel.md.
+ *
  * GET /api/instagram-render (con sesión de Marketing) — diagnóstico: arranca
  * Chromium y renderiza un lienzo de prueba (sin guardar nada).
  */
@@ -41,7 +45,8 @@ import {
   medidas,
   validarPieza,
 } from "./_lib/instagram/nucleo.js";
-import { crearRenderizador, ErrorRender, type Renderizador } from "./_lib/instagram/render.js";
+import { crearRenderizador, ErrorRender, type Renderizador, type RenderizadorLote } from "./_lib/instagram/render.js";
+import { manejarRenderCarrusel } from "./_lib/instagram/carrusel.js";
 import { catalogoParaPieza, ErrorFotoPreparada } from "./_lib/instagram/fotos.js";
 import { registro, sanear } from "./_lib/instagram/secretos.js";
 import {
@@ -63,6 +68,8 @@ export interface DependenciasRender {
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
   renderizar?: Renderizador;
+  /** Carruseles: varias imágenes con un solo Chromium (por defecto, crearRenderizadorLote). */
+  renderizarLote?: RenderizadorLote;
   /** Carpeta con fuentes y logos (public/instagram). Por defecto, la del bundle. */
   dirRecursos?: string;
   ahora?: () => Date;
@@ -80,12 +87,14 @@ export async function manejarRender(request: Request, deps: DependenciasRender =
 
   const cuerpo = await leerJson(request);
   if ("error" in cuerpo) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
-  const entrada = cuerpo.valor as { pieza?: unknown; id?: unknown; caption?: unknown; fotoPreparada?: unknown } | null;
-  if (!entrada || typeof entrada !== "object" || entrada.pieza === undefined) {
+  const entrada = cuerpo.valor as { tipo?: unknown; pieza?: unknown; id?: unknown; caption?: unknown; fotoPreparada?: unknown } | null;
+  if (!entrada || typeof entrada !== "object" || (entrada.pieza === undefined && entrada.tipo !== "carrusel")) {
     return json(400, { ok: false, error: "Falta «pieza» en el cuerpo" });
   }
   if (entrada.id !== undefined && entrada.id !== null && !esUuid(entrada.id)) return json(400, { ok: false, error: "«id» no es un UUID" });
   if (entrada.caption !== undefined && typeof entrada.caption !== "string") return json(400, { ok: false, error: "«caption» tiene que ser texto" });
+  // Carrusel: 2–10 imágenes en una llamada (docs/instagram-carrusel.md).
+  if (entrada.tipo === "carrusel") return manejarRenderCarrusel(request, s, entrada as Record<string, unknown>, deps, t0);
 
   // Foto subida desde el panel: se busca en instagram_fotos (RLS del usuario).
   let fotos: Awaited<ReturnType<typeof catalogoParaPieza>>;

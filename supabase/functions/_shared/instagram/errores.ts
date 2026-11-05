@@ -66,12 +66,13 @@ const TEXTOS: Record<TipoErrorInstagram, Texto> = {
       "Regenera el token del usuario del sistema marcando instagram_basic e instagram_content_publish (y pages_show_list / pages_read_engagement / business_management si usas la ruta de páginas). Comprueba también que la cuenta de Instagram está asignada como activo a ese usuario del sistema con control total.",
     reintentable: false,
   },
-  // OAuthException 200 «API access blocked.»: Meta ha bloqueado la APP entera
-  // (no es un permiso del token). Regenerar el token no lo arregla.
+  // OAuthException 200 «API access blocked.»: visto el 05/11/2026 con un token
+  // de USUARIO (no del sistema) sin los permisos de Instagram; también puede
+  // ser la app restringida. El mensaje cubre los dos casos.
   app_bloqueada: {
-    mensaje: "Meta ha bloqueado el acceso de la app a la API",
+    mensaje: "Meta ha bloqueado el acceso a la API",
     comoArreglarlo:
-      "Meta ha bloqueado el acceso de la app a la API. Revisa en developers.facebook.com las Acciones requeridas, las alertas y tu cuenta de desarrollador; si sigue, crea una app nueva y cambia META_APP_ID, META_APP_SECRET e IG_ACCESS_TOKEN",
+      "Meta ha bloqueado el acceso a la API. Lo más habitual: el token no es de un usuario del sistema o no lleva los permisos de Instagram. Pégalo en developers.facebook.com/tools/debug/accesstoken: tiene que ser «System User», «Caduca: nunca» y llevar instagram_basic, instagram_content_publish e instagram_manage_insights. Si es así y sigue bloqueado, revisa las Acciones requeridas y las alertas de la app o crea una app nueva (y cambia META_APP_ID, META_APP_SECRET e IG_ACCESS_TOKEN)",
     reintentable: false,
   },
   cuenta_no_profesional: {

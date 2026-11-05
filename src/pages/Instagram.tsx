@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { EditorInstagram } from "@/components/marketing/instagram/EditorInstagram";
+import { CrearInstagram } from "@/components/instagram/crear";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarioInstagram } from "@/components/instagram/programar";
 import { CampanasInstagram, CLAVE_CAMPANAS, leerPieza, listarCampanas, type IdeaSemanaIA } from "@/components/instagram/campanas";
 import type { PiezaInstagram } from "@/components/marketing/instagram/usePiezasInstagram";
@@ -18,7 +19,6 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { EncargosInstagram, usePendientesEncargos, useRolesEncargos, type DatosFormulario } from "@/components/instagram/encargos";
 // ── Crear en el móvil (instagram-movil): ver el bloque «Crear en el móvil» más abajo. ──
 import { CrearMovil } from "@/components/instagram/movil";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
@@ -49,7 +49,11 @@ function marcaInicial(): FiltroMarca {
  * Pestañas (maqueta instagram-studio/propuesta/maqueta, evaluación de diseño C):
  *  · Estudio (por defecto): la semana, la sugerencia de la IA, las próximas
  *    publicaciones, los encargos abiertos y 3 cifras (components/instagram/estudio).
- *  · Crear: editor (formulario, vista previa y Publicar/Programar/Historial/Conexión).
+ *  · Crear: «Qué publicar» (fotos, qué contar, Montar con IA, Ajustar a mano) y
+ *    «Así quedará» (móvil de Instagram, texto, Publicar ahora / Programar), sin
+ *    paso de prueba (src/components/instagram/crear, 05/11/2026). El historial
+ *    ya no está en Crear (Calendario / «Publicadas») ni la conexión (indicador
+ *    «● @cuenta» de la barra de pestañas): los hacen otros encargos.
  *  · Campañas: propuestas de la IA; aceptar crea BORRADORES con fecha prevista
  *    (docs/instagram-campanas.md). Al abrir un borrador se pasa a «Crear».
  *  · Reels: montar un reel con las bases de la marca, generar el MP4 y
@@ -207,10 +211,10 @@ export default function Instagram() {
             )}
           </TabsContent>
 
-          {/* Desde `lg` el editor reparte el alto en tres columnas con scroll propio. */}
+          {/* Desde `lg` Crear reparte el alto en dos columnas con scroll propio. */}
           <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`} data-testid="pagina-instagram">
             {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
-            {!soloAgencia && !crearEnMovil && <EditorInstagram abrir={abrir} />}
+            {!soloAgencia && !crearEnMovil && <CrearInstagram abrir={abrir} onVerCalendario={() => setPestana("calendario")} />}
             {/* ── Crear en el móvil (instagram-movil) ── */}
             {!soloAgencia && crearEnMovil && <CrearMovil incrustado onEditorCompleto={() => setEditorCompletoEnMovil(true)} />}
           </TabsContent>

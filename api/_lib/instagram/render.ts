@@ -18,7 +18,7 @@
  */
 import { existsSync, statSync } from "node:fs";
 import path from "node:path";
-import type { Browser, Page } from "playwright-core";
+import type { Browser, BrowserContext, Page } from "playwright-core";
 import type { Lanzador } from "./navegador.js";
 
 export const MAX_JPEG_BYTES = 8 * 1024 * 1024;
@@ -204,56 +204,168 @@ async function dimensiones(png: Buffer): Promise<{ width?: number; height?: numb
   return sharp(png).metadata();
 }
 
-async function renderizarEn(navegador: Browser, p: PeticionRender, msArranque: number): Promise<ResultadoRender> {
+/** Página preparada (listeners puestos) que se puede reutilizar para varias imágenes. */
+interface PaginaRender {
+  page: Page;
+  fallosRed: string[];
+  erroresJs: string[];
+}
+
+async function abrirPagina(contexto: BrowserContext): Promise<PaginaRender> {
+  const page = await contexto.newPage();
+  const pr: PaginaRender = { page, fallosRed: [], erroresJs: [] };
+  page.on("response", (r) => {
+    if (r.status() >= 400) pr.fallosRed.push(`HTTP ${r.status()} ${r.url()}`);
+  });
+  page.on("requestfailed", (r) => pr.fallosRed.push(`Fallo de red ${r.url()}`));
+  page.on("pageerror", (e) => pr.erroresJs.push(`Error JS en la plantilla: ${e.message}`));
+  await page.addInitScript(POLYFILL_NAME);
+  return pr;
+}
+
+/** Carga, comprueba y captura UNA imagen en una página ya abierta. */
+async function renderizarEnPagina(pr: PaginaRender, p: PeticionRender, msArranque: number, msPagina: number): Promise<ResultadoRender> {
+  const { page } = pr;
   const avisos: string[] = [];
+  // Página reutilizada: fuera las rutas y los fallos de la imagen anterior.
+  pr.fallosRed.length = 0;
+  pr.erroresJs.length = 0;
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  const vista = page.viewportSize();
+  if (!vista || vista.width !== p.ancho || vista.height !== p.alto) await page.setViewportSize({ width: p.ancho, height: p.alto });
+
+  const t0 = performance.now();
+  await cargarDocumento(page, p, p.timeoutMs ?? 25_000);
+  const fallosRecursos = (await page.evaluate(p.codigoEsperar ?? CODIGO_ESPERAR_RECURSOS)) as string[];
+  const problemasCarga = [...new Set([...pr.fallosRed, ...fallosRecursos, ...pr.erroresJs])];
+  if (problemasCarga.length) throw new ErrorRender("recursos", problemasCarga, "Hay recursos que no cargan");
+
+  const comprobacion = (await page.evaluate(envolverComprobacion(p.codigoComprobar))) as { errores: string[]; avisos: string[] };
+  if (comprobacion.errores.length) throw new ErrorRender("maquetacion", comprobacion.errores, "La pieza no pasa las comprobaciones de maquetación");
+  avisos.push(...comprobacion.avisos);
+  const msCarga = performance.now() - t0;
+
+  const t1 = performance.now();
+  const lienzo = page.locator(".lienzo").first();
+  if ((await lienzo.count()) === 0) throw new ErrorRender("maquetacion", ["El documento no tiene elemento .lienzo"], "Documento no válido");
+  const png = await lienzo.screenshot({ type: "png", animations: "disabled", caret: "hide", timeout: 15_000 });
+  const msCaptura = performance.now() - t1;
+  const meta = await dimensiones(png);
+  if (meta.width !== p.ancho || meta.height !== p.alto) {
+    throw new ErrorRender("tamano", [`La captura mide ${meta.width}×${meta.height} y debería medir ${p.ancho}×${p.alto}`], "Tamaño incorrecto");
+  }
+  const t2 = performance.now();
+  const { jpg, calidad } = await aJpeg(png, p.fondo ?? "#ffffff", avisos);
+  const msJpeg = performance.now() - t2;
+  return {
+    jpg,
+    ancho: p.ancho,
+    alto: p.alto,
+    calidad,
+    avisos,
+    tiempos: { msArranque: Math.round(msArranque), msPagina: Math.round(msPagina), msCarga: Math.round(msCarga), msCaptura: Math.round(msCaptura), msJpeg: Math.round(msJpeg) },
+  };
+}
+
+async function renderizarEn(navegador: Browser, p: PeticionRender, msArranque: number): Promise<ResultadoRender> {
   const tPagina = performance.now();
   const contexto = await navegador.newContext({ viewport: { width: p.ancho, height: p.alto }, deviceScaleFactor: 1 });
   try {
-    const page = await contexto.newPage();
-    const fallosRed: string[] = [];
-    const erroresJs: string[] = [];
-    page.on("response", (r) => {
-      if (r.status() >= 400) fallosRed.push(`HTTP ${r.status()} ${r.url()}`);
-    });
-    page.on("requestfailed", (r) => fallosRed.push(`Fallo de red ${r.url()}`));
-    page.on("pageerror", (e) => erroresJs.push(`Error JS en la plantilla: ${e.message}`));
-    await page.addInitScript(POLYFILL_NAME);
-    const msPagina = performance.now() - tPagina;
-
-    const t0 = performance.now();
-    await cargarDocumento(page, p, p.timeoutMs ?? 25_000);
-    const fallosRecursos = (await page.evaluate(p.codigoEsperar ?? CODIGO_ESPERAR_RECURSOS)) as string[];
-    const problemasCarga = [...new Set([...fallosRed, ...fallosRecursos, ...erroresJs])];
-    if (problemasCarga.length) throw new ErrorRender("recursos", problemasCarga, "Hay recursos que no cargan");
-
-    const comprobacion = (await page.evaluate(envolverComprobacion(p.codigoComprobar))) as { errores: string[]; avisos: string[] };
-    if (comprobacion.errores.length) throw new ErrorRender("maquetacion", comprobacion.errores, "La pieza no pasa las comprobaciones de maquetación");
-    avisos.push(...comprobacion.avisos);
-    const msCarga = performance.now() - t0;
-
-    const t1 = performance.now();
-    const lienzo = page.locator(".lienzo").first();
-    if ((await lienzo.count()) === 0) throw new ErrorRender("maquetacion", ["El documento no tiene elemento .lienzo"], "Documento no válido");
-    const png = await lienzo.screenshot({ type: "png", animations: "disabled", caret: "hide", timeout: 15_000 });
-    const msCaptura = performance.now() - t1;
-    const meta = await dimensiones(png);
-    if (meta.width !== p.ancho || meta.height !== p.alto) {
-      throw new ErrorRender("tamano", [`La captura mide ${meta.width}×${meta.height} y debería medir ${p.ancho}×${p.alto}`], "Tamaño incorrecto");
-    }
-    const t2 = performance.now();
-    const { jpg, calidad } = await aJpeg(png, p.fondo ?? "#ffffff", avisos);
-    const msJpeg = performance.now() - t2;
-    return {
-      jpg,
-      ancho: p.ancho,
-      alto: p.alto,
-      calidad,
-      avisos,
-      tiempos: { msArranque: Math.round(msArranque), msPagina: Math.round(msPagina), msCarga: Math.round(msCarga), msCaptura: Math.round(msCaptura), msJpeg: Math.round(msJpeg) },
-    };
+    const pr = await abrirPagina(contexto);
+    return await renderizarEnPagina(pr, p, msArranque, performance.now() - tPagina);
   } finally {
     await contexto.close().catch(() => undefined);
   }
+}
+
+/** Resultado de una imagen de un lote: la imagen o su error (para avisar de todas a la vez). */
+export type ResultadoLote = { ok: true; r: ResultadoRender } | { ok: false; error: unknown };
+
+/**
+ * Renderiza varias imágenes (un carrusel) en UNA llamada: un solo Chromium y
+ * hasta `concurrencia` páginas a la vez (cada una en su contexto). El orden
+ * del resultado es el de las peticiones. Nunca lanza por una imagen: la
+ * devuelve como `{ ok: false, error }`; sí lanza si Chromium no arranca.
+ */
+export type RenderizadorLote = (ps: PeticionRender[], o?: { concurrencia?: number }) => Promise<ResultadoLote[]>;
+
+/** Páginas a la vez por defecto (Vercel: 2 GB; Chromium + 3 páginas 1080×1350 caben de sobra). */
+export const CONCURRENCIA_LOTE = 3;
+
+/** Reparte `n` tareas entre `concurrencia` trabajadores, conservando el orden del resultado. */
+export async function enParalelo<T>(n: number, concurrencia: number, tarea: (i: number) => Promise<T>): Promise<T[]> {
+  const salida = new Array<T>(n);
+  let siguiente = 0;
+  const trabajador = async () => {
+    while (siguiente < n) {
+      const i = siguiente++;
+      salida[i] = await tarea(i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(concurrencia, n)) }, trabajador));
+  return salida;
+}
+
+/**
+ * Lote real: arranca Chromium UNA vez, abre `concurrencia` páginas (cada una
+ * en su contexto) y cada página renderiza varias imágenes seguidas: abrir una
+ * página cuesta más que renderizar en ella (≈ 1,5 s en Windows), así que se
+ * reutilizan. Lo cierra todo al acabar.
+ */
+export function crearRenderizadorLote(lanzar: Lanzador): RenderizadorLote {
+  return async (ps, o = {}) => {
+    const t0 = performance.now();
+    const navegador = await lanzar();
+    const msArranque = performance.now() - t0;
+    const salida = new Array<ResultadoLote>(ps.length);
+    let siguiente = 0;
+    const trabajador = async () => {
+      if (siguiente >= ps.length) return;
+      const tPagina = performance.now();
+      let contexto: BrowserContext | null = null;
+      let pr: PaginaRender | null = null;
+      try {
+        while (siguiente < ps.length) {
+          const i = siguiente++;
+          try {
+            if (!pr) {
+              contexto = await navegador.newContext({ viewport: { width: ps[i].ancho, height: ps[i].alto }, deviceScaleFactor: 1 });
+              pr = await abrirPagina(contexto);
+              salida[i] = { ok: true, r: await renderizarEnPagina(pr, ps[i], i === 0 ? msArranque : 0, performance.now() - tPagina) };
+            } else {
+              salida[i] = { ok: true, r: await renderizarEnPagina(pr, ps[i], 0, 0) };
+            }
+          } catch (error) {
+            salida[i] = { ok: false, error };
+            // Tras un fallo, página nueva para la siguiente (por si quedó a medias).
+            await contexto?.close().catch(() => undefined);
+            contexto = null;
+            pr = null;
+          }
+        }
+      } finally {
+        await contexto?.close().catch(() => undefined);
+      }
+    };
+    try {
+      await Promise.all(Array.from({ length: Math.max(1, Math.min(o.concurrencia ?? CONCURRENCIA_LOTE, ps.length)) }, trabajador));
+      return salida;
+    } finally {
+      await navegador.close().catch(() => undefined);
+    }
+  };
+}
+
+/** Lote a partir de un renderizador suelto (tests o diagnóstico): mismas reglas de concurrencia. */
+export function loteDesde(renderizar: Renderizador): RenderizadorLote {
+  return (ps, o = {}) =>
+    enParalelo(ps.length, o.concurrencia ?? CONCURRENCIA_LOTE, async (i): Promise<ResultadoLote> => {
+      try {
+        return { ok: true, r: await renderizar(ps[i]) };
+      } catch (error) {
+        return { ok: false, error };
+      }
+    });
 }
 
 /** Renderizador real: arranca Chromium, renderiza y lo cierra. */

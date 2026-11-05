@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Test de 20261105120000_vincular_albaranes_por_sentencia. BEGIN … ROLLBACK:
+-- Test de 20261105120500_vincular_albaranes_por_sentencia. BEGIN … ROLLBACK:
 -- no deja nada escrito. Acaba en «vincular_albaranes_por_sentencia_test: OK».
 --   npx supabase db query --linked -f supabase/tests/vincular_albaranes_por_sentencia_test.sql
 --

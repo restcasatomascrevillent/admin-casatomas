@@ -8,7 +8,7 @@ import { esErrorRpcInexistente } from "@/lib/facturas/preguntasRapidas";
 import { normalizarTablero, type TableroCompras } from "@/lib/facturas/tableroCompras";
 
 export const TEXTO_TABLERO_SIN_MIGRACION =
-  "El tablero aún no está activado en esta base de datos: falta aplicar la migración 20261105150000_tablero_compras.";
+  "El tablero aún no está activado en esta base de datos: falta aplicar la migración 20261105150500_tablero_compras.";
 
 /** supabase.rpc sin los tipos generados (la RPC no está en types.ts, que se mantiene a mano). */
 async function rpc(funcion: string, args: Record<string, unknown>) {
