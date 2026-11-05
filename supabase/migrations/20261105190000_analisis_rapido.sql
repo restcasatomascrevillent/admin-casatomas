@@ -106,7 +106,7 @@ stable
 security invoker
 set search_path = public
 as $$
--- 20261105150000_tablero_compras
+-- 20261105150500_tablero_compras
 -- 20261105190000_analisis_rapido: «¿no es producto?» sale de la caché nombres_linea_no_producto
 declare
   v_local     text := nullif(lower(btrim(coalesce(p_local, ''))), '');
@@ -479,7 +479,7 @@ begin
 end;
 $$;
 comment on function public.tablero_compras(date, date, text) is
-  'Facturas › Análisis: todos los bloques del tablero de compras en un JSON (indicadores, meses, proveedores, subidas, familias, fijos, abonos, locales). SECURITY INVOKER. 20261105150000 (rápida: 20261105190000).';
+  'Facturas › Análisis: todos los bloques del tablero de compras en un JSON (indicadores, meses, proveedores, subidas, familias, fijos, abonos, locales). SECURITY INVOKER. 20261105150500 (rápida: 20261105190000).';
 
 revoke all on function public.tablero_compras(date, date, text) from public, anon;
 grant execute on function public.tablero_compras(date, date, text) to authenticated, service_role;
