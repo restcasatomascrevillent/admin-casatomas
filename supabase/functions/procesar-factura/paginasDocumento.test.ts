@@ -63,7 +63,7 @@ describe("decidirCoincidencia", () => {
 
 // ── Supabase simulado ───────────────────────────────────────────────────────
 type Op = { m: string; a: unknown[] };
-function supabaseFalso(o: { trabajo?: unknown; rpc?: Record<string, unknown>; rpcError?: Record<string, string>; existente?: (n: string) => unknown }) {
+function supabaseFalso(o: { trabajo?: unknown; rpc?: Record<string, unknown>; rpcError?: Record<string, string>; existente?: (n: string) => unknown; sinOriginal?: boolean }) {
   const orden: string[] = [];
   const consultas: { tabla: string; ops: Op[] }[] = [];
   const rpcs: { nombre: string; args: Record<string, unknown> }[] = [];
@@ -100,7 +100,9 @@ function supabaseFalso(o: { trabajo?: unknown; rpc?: Record<string, unknown>; rp
           orden.push(`move:${desde}->${hasta}`);
           return { error: null };
         },
-        list: async () => ({ data: [], error: null }),
+        // El original del trabajo sigue en pendientes/ (salvo o.sinOriginal).
+        list: async (_carpeta: string, op?: { search?: string }) =>
+          ({ data: o.sinOriginal ? [] : op?.search ? [{ name: op.search }] : [], error: null }),
       }),
     },
   };
@@ -152,6 +154,15 @@ describe("sustituirFactura", () => {
     expect(iRpc).toBeGreaterThanOrEqual(0);
     expect(iMove).toBeGreaterThan(iRpc);
     expect(sb.rpcs.find((r) => r.nombre === "ocr_sustituir_factura")!.args.p_archivo_path).toMatch(/^temporal\/352-sust-t1-/);
+  });
+
+  it("QA S-9: si el original nuevo ya no está, la factura CONSERVA el suyo (no se le quita el drive_url)", async () => {
+    const sb = supabaseFalso({ trabajo: trabajo(), rpc: { ocr_sustituir_factura: { lineas_antes: 2, lineas: 2 } }, sinOriginal: true });
+    const ctx = { supabase: sb.supabase, openai: openaiFalso(), drive: DRIVE_OFF } as unknown as ContextoGuardado;
+    await sustituirFactura(ctx, { trabajoId: "t1", facturaId: 352, userId: "u", esperado: {} });
+    // p_archivo_path null → la RPC deja drive_url y archivo_path como estaban.
+    expect(sb.rpcs.find((r) => r.nombre === "ocr_sustituir_factura")!.args.p_archivo_path).toBeNull();
+    expect(sb.orden.some((x) => x.startsWith("move:"))).toBe(false);
   });
 
   it("si la RPC aborta no mueve nada y el mensaje es claro", async () => {

@@ -34,7 +34,11 @@ function fetchDrive(url: string, init?: RequestInit): Promise<Response> {
     subidas.push({ nombre: b.name, carpeta: b.parents[0] });
     return json({ id: "nuevo" });
   }
-  if (url.startsWith("https://www.googleapis.com/upload/drive/v3/files/")) {
+  if (url.startsWith("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart")) {
+    // Metadatos y contenido en una sola llamada (multipart/related).
+    const texto = new TextDecoder().decode(init?.body as Uint8Array);
+    const meta = JSON.parse(/\{"name".*?\]\}/.exec(texto)?.[0] ?? "{}");
+    subidas.push({ nombre: meta.name, carpeta: meta.parents?.[0] });
     return json({ id: "nuevo", webViewLink: URL_DRIVE });
   }
   return json({ error: `inesperado ${url}` }, 500);
@@ -185,7 +189,7 @@ describe("apuntarOriginal (guardado)", () => {
   it("Drive OK → drive_url y archivo_path a null, sin marcar pendiente", async () => {
     const sb = supabaseFalso({});
     const r = await apuntarOriginal(sb.cliente, 5, { drive_url: URL_DRIVE, archivo_path: null, error: null, drive_error: null });
-    expect(r).toEqual({ ok: true, error: null });
+    expect(r).toEqual({ ok: true, error: null, estado: "drive" });
     expect(sb.ops[0].cambios).toEqual({ drive_url: URL_DRIVE, archivo_path: null });
     expect(sb.rpcs).toEqual([]);
   });
@@ -300,7 +304,7 @@ describe("pasarHuerfano", () => {
     const { pasarHuerfano } = await import("./originalesDrive.ts");
     await pasarHuerfano(sb.cliente, DRIVE, { name: "2026/10/354-foto.jpeg", factura_id: 354, fecha: "2026-10-10", proveedor: "Z", es_su_original: true });
     expect(subidas.map((s) => s.nombre)).toEqual(["foto.jpeg"]);
-    expect(sb.ops[0].cambios).toEqual({ drive_url: URL_DRIVE });
+    expect(sb.ops[0].cambios).toEqual({ drive_url: URL_DRIVE, drive_intentos: 0, drive_error: null });
     expect(sb.ops[0].filtros).toEqual([["eq", "id", 354], ["is", "drive_url", null], ["is", "archivo_path", null]]);
     expect(fich).toEqual({});
   });

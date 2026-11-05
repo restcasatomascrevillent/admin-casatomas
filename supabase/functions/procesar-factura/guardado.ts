@@ -103,6 +103,8 @@ export interface RespuestaProcesado {
   alertas: Alerta[];
   archivo_guardado: boolean;
   archivo_error: string | null;
+  /** Dónde quedó el original (QA 05/11/2026, UI-8). Solo en documentos guardados. */
+  archivo_estado?: EstadoArchivo;
   webhookResponse: Record<string, unknown>;
   /** Solo si duplicado: lo que el panel necesita para «Sustituir la existente». */
   sustituible?: {
@@ -309,19 +311,40 @@ export async function apuntarOriginal(
   supabase: Supa,
   facturaId: number,
   a: ResultadoArchivo,
-): Promise<{ ok: boolean; error: string | null }> {
+  opciones: { esperaMs?: number } = {},
+): Promise<{ ok: boolean; error: string | null; estado: EstadoArchivo }> {
   if (a.drive_url || a.archivo_path) {
-    const { error } = await supabase.from("facturas").update(
-      a.drive_url ? { drive_url: a.drive_url, archivo_path: null } : { archivo_path: a.archivo_path },
-    ).eq("id", facturaId);
-    if (error) console.error("[archivo] No se pudo guardar la referencia al original:", error.message);
+    // QA 05/11/2026 (S-7): si el UPDATE falla, la factura NO apunta a su
+    // original aunque esté en Drive. Se reintenta (un corte puntual) en vez
+    // de volver a subir otra copia, y si no hay manera se devuelve el error.
+    const cambios = a.drive_url ? { drive_url: a.drive_url, archivo_path: null } : { archivo_path: a.archivo_path };
+    let ultimo: string | null = null;
+    for (let intento = 0; intento < 3; intento++) {
+      if (intento > 0) await new Promise((r) => setTimeout(r, (opciones.esperaMs ?? 500) * intento));
+      const { error } = await supabase.from("facturas").update(cambios).eq("id", facturaId);
+      if (!error) {
+        ultimo = null;
+        break;
+      }
+      ultimo = error.message ?? String(error);
+      console.error(`[archivo] No se pudo guardar la referencia al original de la factura ${facturaId} (intento ${intento + 1}):`, ultimo);
+    }
+    if (ultimo) {
+      const donde = a.drive_url ? `está en Drive: ${a.drive_url}` : `copia temporal en ${a.archivo_path}`;
+      console.error(`[archivo] PERDIDA DE LA REFERENCIA AL ORIGINAL de la factura ${facturaId} (${donde})`);
+      return { ok: false, estado: "perdido", error: `no se pudo apuntar el original en la factura (${ultimo}); ${donde}` };
+    }
   }
   if (!a.drive_url && a.archivo_path) await marcarPendienteDrive(supabase, facturaId, a.drive_error);
   return {
     ok: !!(a.drive_url || a.archivo_path),
+    estado: a.drive_url ? "drive" : a.archivo_path ? "temporal" : "perdido",
     error: a.error ?? (a.drive_error ? `original pendiente de subir a Drive (${a.drive_error})` : null),
   };
 }
+
+/** Dónde quedó el original: Drive, copia temporal (pendiente de Drive) o en ningún sitio. */
+export type EstadoArchivo = "drive" | "temporal" | "perdido";
 
 function respuestaExito(
   d: DatosNormalizados,
@@ -329,7 +352,7 @@ function respuestaExito(
   facturaId: number,
   alertas: Alerta[],
   totalOrigen: OrigenImporte | null,
-  archivo: { ok: boolean; error: string | null },
+  archivo: { ok: boolean; error: string | null; estado?: EstadoArchivo },
   extra: Partial<RespuestaProcesado> = {},
 ): RespuestaProcesado {
   const graves = alertas.filter((a) => a?.severidad === "alta").length;
@@ -343,6 +366,7 @@ function respuestaExito(
     alertas,
     archivo_guardado: archivo.ok,
     archivo_error: archivo.error,
+    archivo_estado: archivo.estado ?? (archivo.ok ? (archivo.error ? "temporal" : "drive") : "perdido"),
     webhookResponse: {
       tipo: d.tipo,
       numero_documento: d.numero_documento,
@@ -396,15 +420,10 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   // Idempotencia multipágina: si este trabajo ya guardó su factura (reintento
   // tras un corte), se devuelve esa en vez de crear otra.
   if (e.ocrTrabajoId) {
-    const { data: ya } = await supabase.from("facturas").select("id").eq("ocr_trabajo_id", e.ocrTrabajoId).maybeSingle();
-    if (ya?.id) {
-      const alertas = await validarYGuardarAlertas(supabase, ya.id, e.alertasPrevias);
-      return {
-        estado: "guardado",
-        facturaId: ya.id,
-        respuesta: respuestaExito(d, e.original.nombre, ya.id, alertas, e.totalOrigen, { ok: true, error: null }),
-      };
-    }
+    const { data: ya, error: eYa } = await supabase.from("facturas")
+      .select("id, drive_url, archivo_path").eq("ocr_trabajo_id", e.ocrTrabajoId).maybeSingle();
+    if (eYa) throw new Error(`No se pudo comprobar si el documento ya se guardó: ${eYa.message}`);
+    if (ya?.id) return await completarGuardada(ctx, e, ya);
   }
 
   // 4) Duplicado (las notas sin número llevan uno provisional, ver abajo)
@@ -473,30 +492,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
 
   try {
     // 7) Líneas (embeddings en lotes de 100)
-    if (d.productos.length > 0) {
-      const embs = await openai.embed(d.productos.map((p) => p.nombre));
-      const insertar = (conBultos: boolean, conIvaPct: boolean) =>
-        supabase.from("productos_factura")
-          .insert(
-            filasProductos(d, embs, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
-          );
-      // Columnas opcionales que puede faltar por migrar: se quita la que falte
-      // y se reintenta (a lo sumo una vez por columna).
-      let conBultos = true;
-      let conIvaPct = true;
-      let { error } = await insertar(conBultos, conIvaPct);
-      for (let i = 0; i < 2 && error; i++) {
-        if (conBultos && faltaColumnaBultos(error.message)) {
-          console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
-          conBultos = false;
-        } else if (conIvaPct && faltaColumnaIvaPct(error.message)) {
-          console.warn("[procesar-factura] columna iva_pct ausente; se guardan las líneas sin ella:", error.message);
-          conIvaPct = false;
-        } else break;
-        ({ error } = await insertar(conBultos, conIvaPct));
-      }
-      if (error) throw new Error(`insert productos: ${error.message}`);
-    }
+    await insertarLineas(ctx, facturaId, d, conColumnas04b);
 
     // 8) Validación de cordura
     const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias);
@@ -504,15 +500,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     // 9) Original: a Drive (carpeta del proveedor → mes). Storage solo como
     //    copia TEMPORAL si Drive falla (el cron facturas-originales-drive la
     //    sube después y la borra).
-    const proveedorCarpeta = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, facturaId, d.proveedor) : null;
-    const a: ResultadoArchivo = e.original.tipo === "base64"
-      ? await archivarOriginal(
-        ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
-      )
-      : await archivarDesdeStorage(
-        ctx.drive, supabase, e.original.path, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
-      );
-    const archivo = await apuntarOriginal(supabase, facturaId, a);
+    const archivo = await archivarYApuntar(ctx, e, facturaId);
 
     console.log(
       `[procesar-factura] OK ${d.tipo} ${d.numero_documento} · ${d.productos.length} productos · alertas: ${alertas.length}`,
@@ -522,6 +510,96 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     await compensarFacturaHuerfana(supabase, facturaId, err);
     throw err;
   }
+}
+
+/** Paso 7: líneas con sus embeddings. Un solo INSERT (todas o ninguna). */
+async function insertarLineas(ctx: ContextoGuardado, facturaId: number, d: DatosNormalizados, conColumnas04b: boolean): Promise<void> {
+  if (d.productos.length === 0) return;
+  const { supabase, openai } = ctx;
+  const embs = await openai.embed(d.productos.map((p) => p.nombre));
+  const insertar = (conBultos: boolean, conIvaPct: boolean) =>
+    supabase.from("productos_factura")
+      .insert(
+        filasProductos(d, embs, conColumnas04b, conBultos, conIvaPct).map((f) => ({ factura_id: facturaId, ...f })),
+      );
+  // Columnas opcionales que puede faltar por migrar: se quita la que falte
+  // y se reintenta (a lo sumo una vez por columna).
+  let conBultos = true;
+  let conIvaPct = true;
+  let { error } = await insertar(conBultos, conIvaPct);
+  for (let i = 0; i < 2 && error; i++) {
+    if (conBultos && faltaColumnaBultos(error.message)) {
+      console.warn("[procesar-factura] columna bultos ausente; se guardan las líneas sin ella:", error.message);
+      conBultos = false;
+    } else if (conIvaPct && faltaColumnaIvaPct(error.message)) {
+      console.warn("[procesar-factura] columna iva_pct ausente; se guardan las líneas sin ella:", error.message);
+      conIvaPct = false;
+    } else break;
+    ({ error } = await insertar(conBultos, conIvaPct));
+  }
+  if (error) throw new Error(`insert productos: ${error.message}`);
+}
+
+/** Paso 9: el original a Drive (o copia temporal) y la referencia en la factura. */
+async function archivarYApuntar(
+  ctx: ContextoGuardado,
+  e: EntradaGuardado,
+  facturaId: number,
+): Promise<{ ok: boolean; error: string | null; estado: EstadoArchivo }> {
+  const { supabase } = ctx;
+  const d = e.datos;
+  if (e.original.tipo === "base64" && !e.original.b64) {
+    return { ok: false, estado: "perdido", error: "el original ya no estaba disponible para archivarlo" };
+  }
+  const proveedorCarpeta = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, facturaId, d.proveedor) : null;
+  const a: ResultadoArchivo = e.original.tipo === "base64"
+    ? await archivarOriginal(
+      ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
+    )
+    : await archivarDesdeStorage(
+      ctx.drive, supabase, e.original.path, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
+    );
+  return await apuntarOriginal(supabase, facturaId, a);
+}
+
+/**
+ * Reintento de un trabajo cuya factura YA se insertó (la consolidación murió
+ * a medias). QA 05/11/2026:
+ *  - S-2: si se cortó entre la cabecera y las líneas, la factura no tiene
+ *    líneas: se insertan ahora (el INSERT de líneas es uno: todas o ninguna).
+ *  - S-1: si se cortó antes de apuntar el original, la factura no tiene ni
+ *    drive_url ni archivo_path: se archiva ahora. Antes se daba por guardado
+ *    y la limpieza borraba el ÚNICO original.
+ */
+async function completarGuardada(
+  ctx: ContextoGuardado,
+  e: EntradaGuardado,
+  ya: { id: number; drive_url?: string | null; archivo_path?: string | null },
+): Promise<ResultadoGuardado> {
+  const { supabase } = ctx;
+  const d = e.datos;
+  if (d.productos.length > 0) {
+    const { count, error } = await supabase.from("productos_factura")
+      .select("id", { count: "exact", head: true }).eq("factura_id", ya.id);
+    if (error) throw new Error(`No se pudieron contar las líneas de la factura ${ya.id}: ${error.message}`);
+    if (!count) {
+      console.warn(`[procesar-factura] factura ${ya.id} sin líneas tras un corte: se insertan ahora (${d.productos.length})`);
+      await insertarLineas(ctx, ya.id, d, true);
+    }
+  }
+  const alertas = await validarYGuardarAlertas(supabase, ya.id, e.alertasPrevias);
+  let archivo: { ok: boolean; error: string | null; estado: EstadoArchivo };
+  if (ya.drive_url) archivo = { ok: true, error: null, estado: "drive" };
+  else if (ya.archivo_path) archivo = { ok: true, error: "original pendiente de subir a Drive", estado: "temporal" };
+  else {
+    console.warn(`[procesar-factura] factura ${ya.id} sin original tras un corte: se archiva ahora`);
+    archivo = await archivarYApuntar(ctx, e, ya.id);
+  }
+  return {
+    estado: "guardado",
+    facturaId: ya.id,
+    respuesta: respuestaExito(d, e.original.nombre, ya.id, alertas, e.totalOrigen, archivo),
+  };
 }
 
 export const CODIGO_PAGINA_SUELTA = "pagina_suelta";
@@ -623,7 +701,15 @@ export async function sustituirFactura(
   // El original nuevo se mueve a su carpeta definitiva SOLO si la RPC sale
   // bien: la RPC ya apunta a la ruta definitiva y, si luego no se puede
   // mover, la factura vuelve a apuntar a la copia de pendientes/.
-  const destino = t.original_path
+  // QA 05/11/2026 (S-9): la RPC quita el drive_url de la factura cuando se le
+  // pasa la ruta del original nuevo. Si ese original ya no está en Storage, la
+  // factura se quedaría sin ninguno: se comprueba ANTES y, si falta, se
+  // conserva el original que ya tenía.
+  const originalNuevo = t.original_path ? await existeEnStorage(supabase, t.original_path) : false;
+  if (t.original_path && !originalNuevo) {
+    console.warn(`[sustituir] el original nuevo ${t.original_path} ya no está: la factura ${a.facturaId} conserva el anterior`);
+  }
+  const destino = t.original_path && originalNuevo
     ? rutaTemporal(a.facturaId, `sust-${String(a.trabajoId).slice(0, 8)}-${t.nombre_original}`)
     : null;
 
@@ -654,13 +740,24 @@ export async function sustituirFactura(
 
   // El original nuevo, a Drive; la RPC ya dejó la factura apuntando a la ruta
   // temporal (y sin drive_url) por si Drive falla.
-  let archivo = { ok: false, error: null as string | null };
+  let archivo: { ok: boolean; error: string | null; estado?: EstadoArchivo } = {
+    ok: false,
+    error: null as string | null,
+  };
   if (t.original_path && destino) {
     const proveedor = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, a.facturaId, d.proveedor) : null;
     const r = await archivarDesdeStorage(
       ctx.drive, supabase, t.original_path, t.nombre_original, t.original_mime, d.fecha, a.facturaId, proveedor, destino,
     );
     archivo = await apuntarOriginal(supabase, a.facturaId, r);
+  } else {
+    // Sin original nuevo: la factura sigue con el que tenía (si tenía).
+    const { data: f } = await supabase.from("facturas").select("drive_url, archivo_path").eq("id", a.facturaId).maybeSingle();
+    archivo = f?.drive_url
+      ? { ok: true, estado: "drive", error: t.original_path ? "el original nuevo no estaba; se conserva el anterior" : null }
+      : f?.archivo_path
+      ? { ok: true, estado: "temporal", error: "original pendiente de subir a Drive" }
+      : { ok: false, estado: "perdido", error: "sin original" };
   }
   await limpiarPendientesTrabajo(supabase, a.trabajoId);
 
@@ -713,7 +810,9 @@ export async function anadirPagina(
 
   const embs = d.productos.length > 0 ? await openai.embed(d.productos.map((x) => x.nombre)) : [];
   const lineas = filasProductos({ ...d, productos: d.productos.map((x) => ({ ...x, pagina: pag.actual })) }, embs, true);
-  const destino = t.original_path
+  // Igual que al sustituir: si el original de la página ya no está, no se
+  // apunta la factura a una ruta vacía.
+  const destino = t.original_path && await existeEnStorage(supabase, t.original_path)
     ? rutaTemporal(a.facturaId, `pag${pag.actual}-${String(a.trabajoId).slice(0, 8)}-${t.nombre_original}`)
     : null;
 
@@ -741,7 +840,10 @@ export async function anadirPagina(
   // El original de la página, a Drive (misma carpeta proveedor → mes, como
   // «pagN-…»). La RPC solo apunta la factura a la ruta temporal si no tenía
   // archivo_path; si Drive va bien, esa referencia se quita.
-  let archivo = { ok: !destino, error: null as string | null };
+  let archivo = {
+    ok: !destino,
+    error: t.original_path && !destino ? "el original de la página ya no estaba en el servidor" : null as string | null,
+  };
   if (t.original_path && destino) {
     const proveedor = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, a.facturaId, d.proveedor) : null;
     const r = await archivarDesdeStorage(
@@ -801,6 +903,19 @@ export async function anadirPagina(
   });
   r.webhookResponse = { ...r.webhookResponse, numero_documento: p.existente.numero_documento, total: res?.total ?? null };
   return r;
+}
+
+/** ¿Existe el fichero en el bucket? (lista su carpeta). Ante un error, se da por que NO. */
+export async function existeEnStorage(supabase: Supa, path: string): Promise<boolean> {
+  try {
+    const carpeta = path.slice(0, path.lastIndexOf("/"));
+    const nombre = path.slice(path.lastIndexOf("/") + 1);
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).list(carpeta, { search: nombre, limit: 100 });
+    if (error) return false;
+    return Array.isArray(data) && data.some((o: { name?: string } | null) => o?.name === nombre);
+  } catch {
+    return false;
+  }
 }
 
 /** Guarda en Storage (pendientes/) el original de un duplicado del camino síncrono. */

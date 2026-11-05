@@ -76,6 +76,31 @@ export function esNombreCliente(nombre: string | null | undefined): boolean {
   return !!nombre && NOMBRES_CLIENTE.test(nombre);
 }
 
+/** ¿Existe ese día? (2026-02-31 no). */
+export function fechaReal(a: number, m: number, d: number): boolean {
+  if (!(a >= 1900 && a <= 2200 && m >= 1 && m <= 12 && d >= 1)) return false;
+  const dt = new Date(Date.UTC(a, m - 1, d));
+  return dt.getUTCFullYear() === a && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/**
+ * Fecha del modelo → «AAAA-MM-DD», o null si no se entiende o no existe.
+ * Admite ISO (también dentro de un texto) y el formato español dd/mm/aaaa.
+ */
+export function fechaIso(valor: unknown): string | null {
+  if (typeof valor !== "string" || !valor.trim()) return null;
+  const s = valor.trim();
+  const iso = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  const es = s.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\b/);
+  const [a, m, d] = iso
+    ? [Number(iso[1]), Number(iso[2]), Number(iso[3])]
+    : es
+    ? [Number(es[3]), Number(es[2]), Number(es[1])]
+    : [NaN, NaN, NaN];
+  if (!fechaReal(a, m, d)) return null;
+  return `${a}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 // deno-lint-ignore no-explicit-any
 export function normalizarDatos(data: any) {
   if (!data || typeof data !== "object") throw new Error("Los datos extraídos no son un objeto válido");
@@ -87,15 +112,19 @@ export function normalizarDatos(data: any) {
   else if (tipo.includes("factura") || tipo.includes("invoice")) tipo = "factura";
   else tipo = "factura";
 
-  // fecha → YYYY-MM-DD
-  let fecha: string = data.fecha;
-  if (fecha) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
-      const m = String(fecha).match(/(\d{4})-(\d{2})-(\d{2})/);
-      fecha = m ? `${m[1]}-${m[2]}-${m[3]}` : new Date().toISOString().split("T")[0];
-    }
-  } else {
-    fecha = new Date().toISOString().split("T")[0];
+  // fecha → YYYY-MM-DD. Sin fecha legible (o imposible, «2026-02-31») se
+  // guarda con la de hoy, pero AVISANDO (QA 05/11/2026, S-14: antes callaba).
+  const leida = fechaIso(data.fecha);
+  const fecha: string = leida ?? new Date().toISOString().split("T")[0];
+  if (!leida) {
+    avisosCalidad.push({
+      codigo: "fecha_ausente",
+      severidad: "media",
+      mensaje: data.fecha
+        ? `No se ha entendido la fecha del documento («${String(data.fecha).slice(0, 40)}»): se guarda con la de hoy. Corrígela.`
+        : "El documento no tiene fecha legible: se guarda con la de hoy. Corrígela.",
+      detalle: { fecha_leida: data.fecha ?? null },
+    });
   }
 
   // El CIF del cliente NUNCA es el del proveedor: si llega, se descarta (null

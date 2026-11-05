@@ -138,6 +138,34 @@ curl -X POST "$SUPABASE_URL/functions/v1/facturas-originales-drive" \
   -d '{"accion":"informe"}'      # o {"accion":"pasar"}
 ```
 
+### QA de «Cargar» (06-nov-2026, migración `20261106200000_facturas_cargar_qa.sql`)
+
+Orden: desplegar `procesar-factura`, `ocr-trabajo`, `importar-factura-historica`
+y `facturas-originales-drive`; después la migración y su test
+(`supabase/tests/facturas_cargar_qa_test.sql`). Qué cambia:
+
+- Ningún original se pierde: si una consolidación se corta tras crear la
+  factura, el reintento archiva el original (y mete las líneas si faltan); la
+  limpieza nunca borra lo de `pendientes/` de una factura sin original, y el
+  cron se lo devuelve (va a Drive y se le pone como `drive_url`).
+- Drive: subida en UNA llamada (multipart; sin ficheros vacíos), carpetas sin
+  duplicar con subidas a la vez, cachés que se olvidan ante 401/404, el UPDATE
+  de `drive_url` se reintenta en vez de subir otra copia, aviso de Drive caído
+  agrupado (uno por hora).
+- Duplicados: el panel los descarta con `ocr_descartar_trabajo`; los que nadie
+  decide caducan a los 7 días (original a Drive como «anterior-…»).
+- «Reintentar» del panel: `ocr_reintentar_trabajo` reanuda el MISMO trabajo
+  (los «fallido» guardan sus ficheros 24 h).
+- URL de las Edge Functions desde Vault `project_url` (antes iba fija la del
+  proyecto viejo en `ocr_despachar` y dos despachadores más): **en producción
+  tiene que existir el secreto de Vault `project_url`**; sin él, el OCR por
+  trabajos queda mudo.
+- Cron `reanudar-trabajos-ocr` cada minuto (en la demo faltaba).
+- Storage: solo `pendientes/{uid}/` para el panel; bucket a 20 MB (PDF de la
+  importación histórica con Drive caído).
+- Rescate a mano de una factura sin original cuyo fichero está en Drive:
+  `{"accion":"buscar_original","factura_id":354,"nombre":"anterior-….jpeg","enlazar":true}`.
+
 ### Revision pendiente para el dueño
 
 - **Albaran id 38 (Carnicas Joselito, nº 2509134, 15-dic-2025): 120.580,00 €**, con
