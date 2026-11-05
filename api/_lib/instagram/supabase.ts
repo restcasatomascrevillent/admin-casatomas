@@ -36,6 +36,19 @@ export interface FilaPieza {
   creado_por: string | null;
   created_at?: string;
   updated_at?: string;
+  /** «imagen», «reel» o «carrusel» (20261109100000 / 20261112000000; solo si se pide). */
+  tipo_medio?: string | null;
+  /** Carrusel (20261112000000): imágenes en orden de publicación. */
+  diapositivas?: FilaDiapositiva[] | null;
+}
+
+/** Una imagen de un carrusel tal como se guarda en instagram_piezas.diapositivas. */
+export interface FilaDiapositiva {
+  foto: string | null;
+  plantilla: string;
+  datos: unknown;
+  alt_text: string | null;
+  imagen_ruta: string;
 }
 
 export interface Sesion {
@@ -111,9 +124,13 @@ async function detalle(r: Response): Promise<string> {
 
 const COLUMNAS = "id,marca,plantilla,formato,datos,caption,estado,imagen_ruta,contenedor_id,media_id,permalink,error,creado_por,created_at,updated_at";
 
-/** Fila de instagram_piezas visible para el usuario (null si no existe o la RLS la oculta). */
-export async function leerPieza(s: Sesion, id: string): Promise<FilaPieza | null> {
-  const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}&select=${COLUMNAS}`, {
+/**
+ * Fila de instagram_piezas visible para el usuario (null si no existe o la RLS la oculta).
+ * `conCarrusel` pide además tipo_medio y diapositivas (migración 20261112000000).
+ */
+export async function leerPieza(s: Sesion, id: string, o: { conCarrusel?: boolean } = {}): Promise<FilaPieza | null> {
+  const columnas = o.conCarrusel ? `${COLUMNAS},tipo_medio,diapositivas` : COLUMNAS;
+  const r = await s.fetch(`${s.sb.url}/rest/v1/instagram_piezas?id=eq.${encodeURIComponent(id)}&select=${columnas}`, {
     headers: cabeceras(s, { Accept: "application/json" }),
     signal: AbortSignal.timeout(MS_TIEMPO),
   });
@@ -172,4 +189,22 @@ export async function subirJpeg(s: Sesion, ruta: string, jpg: Uint8Array): Promi
     signal: AbortSignal.timeout(30_000),
   });
   if (!r.ok) throw new ErrorSupabase(`No se pudo subir el JPEG al bucket «${BUCKET}» (${r.status}): ${await detalle(r)}`, r.status);
+}
+
+/** Borra objetos del bucket con el JWT del usuario (RLS). Devuelve cuántos borró. Nunca lanza. */
+export async function borrarObjetos(s: Sesion, rutas: string[]): Promise<number> {
+  if (!rutas.length) return 0;
+  try {
+    const r = await s.fetch(`${s.sb.url}/storage/v1/object/${BUCKET}`, {
+      method: "DELETE",
+      headers: cabeceras(s, { "Content-Type": "application/json" }),
+      body: JSON.stringify({ prefixes: rutas }),
+      signal: AbortSignal.timeout(MS_TIEMPO),
+    });
+    if (!r.ok) return 0;
+    const lista = (await r.json().catch(() => null)) as unknown[] | null;
+    return Array.isArray(lista) ? lista.length : 0;
+  } catch {
+    return 0;
+  }
 }

@@ -161,6 +161,23 @@ interface OpcionesPeticion {
 
 const dormirReal = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+/** El mismo error, diciendo qué imagen del carrusel falló (mismo tipo, código y cómo arreglarlo). */
+function conImagen(e: unknown, n: number): unknown {
+  if (!(e instanceof ErrorInstagram)) return e;
+  return new ErrorInstagram({
+    tipo: e.tipo,
+    mensaje: `Imagen ${n} del carrusel: ${e.message}`,
+    comoArreglarlo: e.comoArreglarlo,
+    reintentable: e.reintentable,
+    codigo: e.codigo ?? undefined,
+    subcodigo: e.subcodigo ?? undefined,
+    estadoHttp: e.estadoHttp ?? undefined,
+    fbtraceId: e.fbtraceId ?? undefined,
+    detalleMeta: e.detalleMeta ?? undefined,
+    usoCasoNegocio: e.usoCasoNegocio ?? undefined,
+  });
+}
+
 export class ClienteGraph {
   private readonly token: string;
   readonly versionApi: string;
@@ -422,6 +439,73 @@ export class ClienteGraph {
     const r = await this.peticion<{ id?: string }>("POST", `/${encodeURIComponent(id)}/media`, { cuerpo });
     if (!r.id) throw new ErrorInstagram({ tipo: "respuesta_inesperada", mensaje: "Meta no devolvió el id del contenedor." });
     return String(r.id);
+  }
+
+  // ── Carrusel ─────────────────────────────────────────────────────────────
+  //
+  // Documentación oficial de Meta (consultada el 05/11/2026):
+  //   · https://developers.facebook.com/docs/instagram-platform/content-publishing
+  //     («Carousel posts»): 1) un contenedor por imagen con is_carousel_item=true;
+  //     2) el contenedor del carrusel (media_type=CAROUSEL, children = ids
+  //     separados por comas, caption); 3) media_publish con su id. Un carrusel
+  //     cuenta como UNA publicación en la cuota. Meta admite hasta 20; el panel,
+  //     10 (MAX_FOTOS_CARRUSEL). Todas las imágenes se recortan como la primera.
+  //   · https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/media
+  //     alt_text: «Only supported on a single image or image media in a
+  //     carousel» → va en CADA hijo, no en el contenedor del carrusel. Los hijos
+  //     no llevan caption (va en el contenedor).
+
+  /** POST /{ig-user-id}/media con is_carousel_item=true → id del contenedor hijo. */
+  async crearHijoCarrusel(d: { imageUrl: string; altText?: string | undefined; igUserId?: string | undefined }): Promise<string> {
+    const id = this.idCuenta(d.igUserId);
+    const cuerpo: Record<string, string> = { image_url: d.imageUrl, is_carousel_item: "true" };
+    if (d.altText) cuerpo.alt_text = d.altText;
+    const r = await this.peticion<{ id?: string }>("POST", `/${encodeURIComponent(id)}/media`, { cuerpo });
+    if (!r.id) throw new ErrorInstagram({ tipo: "respuesta_inesperada", mensaje: "Meta no devolvió el id del contenedor de una imagen del carrusel." });
+    return String(r.id);
+  }
+
+  /** POST /{ig-user-id}/media con media_type=CAROUSEL y children → id del contenedor del carrusel. */
+  async crearContenedorCarrusel(d: { hijos: string[]; caption?: string | undefined; igUserId?: string | undefined }): Promise<string> {
+    const id = this.idCuenta(d.igUserId);
+    if (d.hijos.length < 2) throw new Error("crearContenedorCarrusel: un carrusel necesita al menos 2 imágenes.");
+    const cuerpo: Record<string, string> = { media_type: "CAROUSEL", children: d.hijos.join(",") };
+    if (d.caption) cuerpo.caption = d.caption;
+    const r = await this.peticion<{ id?: string }>("POST", `/${encodeURIComponent(id)}/media`, { cuerpo });
+    if (!r.id) throw new ErrorInstagram({ tipo: "respuesta_inesperada", mensaje: "Meta no devolvió el id del contenedor del carrusel." });
+    return String(r.id);
+  }
+
+  /**
+   * Carrusel completo SIN publicar: un hijo por imagen (en orden), espera a
+   * que todos estén FINISHED y crea el contenedor CAROUSEL. Si un hijo falla
+   * (al crearlo o al procesarlo), lanza un ErrorInstagram que dice qué imagen
+   * y NO crea el contenedor del carrusel: no se publica nada (los hijos
+   * sueltos caducan solos a las 24 h y no cuentan en la cuota).
+   */
+  async crearCarrusel(
+    imagenes: Array<{ imageUrl: string; altText?: string | undefined }>,
+    o: { caption?: string | undefined; igUserId?: string | undefined; sondeo?: OpcionesSondeo; alCrearHijo?: (i: number, id: string) => void } = {},
+  ): Promise<{ contenedorId: string; hijos: string[] }> {
+    const hijos: string[] = [];
+    for (let i = 0; i < imagenes.length; i++) {
+      try {
+        const hijo = await this.crearHijoCarrusel({ imageUrl: imagenes[i].imageUrl, altText: imagenes[i].altText, igUserId: o.igUserId });
+        hijos.push(hijo);
+        o.alCrearHijo?.(i, hijo);
+      } catch (e) {
+        throw conImagen(e, i + 1);
+      }
+    }
+    for (let i = 0; i < hijos.length; i++) {
+      try {
+        await this.esperarFinished(hijos[i], o.sondeo);
+      } catch (e) {
+        throw conImagen(e, i + 1);
+      }
+    }
+    const contenedorId = await this.crearContenedorCarrusel({ hijos, caption: o.caption, igUserId: o.igUserId });
+    return { contenedorId, hijos };
   }
 
   async estadoContenedor(contenedorId: string): Promise<InfoContenedor> {

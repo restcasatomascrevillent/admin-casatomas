@@ -55,6 +55,52 @@ export class ErrorFotoPreparada extends Error {
 const LADO_MAXIMO_FOTO = 20_000;
 
 /**
+ * Fotos subidas desde el móvil o el escritorio (contrato «Montar con IA»,
+ * 05/11/2026): el panel sube el JPEG directamente a tmp/<uuid>.(jpg|png|webp)
+ * del bucket «instagram» y la foto se llama «subida:<uuid>». Mismo trato que
+ * Drive, la carta y los vinos: solo con `fotoPreparada` cuya URL sea tmp/ de
+ * NUESTRO bucket (sin SSRF) y, además, de ESE uuid.
+ */
+export const PREFIJO_FOTO_SUBIDA = "subida:";
+const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** uuid de «subida:<uuid>» (null si no lo es). */
+export function uuidDeFotoSubida(id: unknown): string | null {
+  if (typeof id !== "string" || !id.startsWith(PREFIJO_FOTO_SUBIDA)) return null;
+  const u = id.slice(PREFIJO_FOTO_SUBIDA.length).toLowerCase();
+  return RE_UUID.test(u) ? u : null;
+}
+
+/** «subida:<uuid>» + fotoPreparada → Foto (lanza ErrorFotoPreparada si algo no cuadra). */
+function fotoSubidaDesdePreparada(e: Record<string, unknown>, uuid: string, supabaseUrl: string): Foto {
+  const ruta = rutaTmpDeUrl(e.url, supabaseUrl);
+  if (!ruta || !ruta.startsWith(`tmp/${uuid}.`)) {
+    throw new ErrorFotoPreparada("«fotoPreparada.url» tiene que ser la copia tmp/<uuid> de «subida:<uuid>» en el bucket «instagram» de este Supabase");
+  }
+  if (typeof e.marca !== "string" || !(e.marca in MARCAS)) throw new ErrorFotoPreparada("«fotoPreparada.marca» no es válida");
+  const medida = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 && (v as number) <= LADO_MAXIMO_FOTO ? (v as number) : null);
+  const ancho = medida(e.ancho);
+  const alto = medida(e.alto);
+  if (!ancho || !alto) throw new ErrorFotoPreparada("«fotoPreparada» necesita ancho y alto (enteros positivos)");
+  if (e.tipo !== null && e.tipo !== undefined && !(TIPOS_FOTO as readonly string[]).includes(e.tipo as string)) {
+    throw new ErrorFotoPreparada("«fotoPreparada.tipo» no es válido");
+  }
+  const medidas = { ancho, alto };
+  return {
+    id: e.id as string,
+    marca: e.marca as MarcaId,
+    ruta,
+    ancho,
+    alto,
+    tipo: (e.tipo as TipoFoto | null | undefined) ?? null,
+    aptaPost: esAptaPara(medidas, "post"),
+    aptaStory: esAptaPara(medidas, "story"),
+    descripcion: "",
+    subida: true,
+  };
+}
+
+/**
  * `fotoPreparada` del cuerpo → Foto del catálogo, validada:
  *   { id: "drive:<id>" | "carta:<id>" | "vino:<id>" (= pieza.foto), url: <URL pública de tmp/ en NUESTRO bucket>,
  *     ancho, alto (enteros), tipo: TipoFoto | null, marca }
@@ -64,6 +110,8 @@ const LADO_MAXIMO_FOTO = 20_000;
 export function fotoDesdePreparada(entrada: unknown, idPieza: string, supabaseUrl: string): Foto {
   if (!entrada || typeof entrada !== "object") throw new ErrorFotoPreparada("«fotoPreparada» tiene que ser un objeto");
   const e = entrada as Record<string, unknown>;
+  const uuidSubida = uuidDeFotoSubida(e.id);
+  if (uuidSubida && e.id === idPieza) return fotoSubidaDesdePreparada(e, uuidSubida, supabaseUrl);
   const origen = fotoPreparable(e.id);
   if (!origen || e.id !== idPieza) throw new ErrorFotoPreparada("«fotoPreparada.id» no es la foto (de Drive o de la carta) de la pieza");
   const ruta = rutaTmpDeUrl(e.url, supabaseUrl);
@@ -104,7 +152,7 @@ export async function catalogoParaPieza(s: Sesion, pieza: unknown, fotoPreparada
   if (typeof idFoto !== "string") return FOTOS;
   const id = idFoto.trim();
   if (!id || FOTOS.some((f) => f.id === id)) return FOTOS;
-  if (fotoPreparable(id)) {
+  if (fotoPreparable(id) || uuidDeFotoSubida(id)) {
     // Sin fotoPreparada la validación dirá que la foto no está en el catálogo.
     if (fotoPreparada === undefined || fotoPreparada === null) return FOTOS;
     return [...FOTOS, fotoDesdePreparada(fotoPreparada, id, s.sb.url)];

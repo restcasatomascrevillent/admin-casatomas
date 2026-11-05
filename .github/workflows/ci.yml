@@ -98,6 +98,8 @@ jobs:
         run: npm run test:instagram-encargos:db
       - name: Seguridad de Instagram, «Editar» para escribir, agencia y trabajador de render limitados, limpieza de vídeo y cupo de IA (PGlite)
         run: npm run test:instagram-seguridad:db
+      - name: Carruseles de Instagram, diapositivas, programar con el texto y limpieza de todas las imágenes (PGlite)
+        run: npm run test:instagram-carrusel:db
       - name: Versiones de migración sin repetir (salvo las históricas)
         run: npm run test:migraciones
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)

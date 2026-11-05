@@ -10,7 +10,8 @@
  *     La RPC NUNCA devuelve una pieza con una programación activa
  *     (programada o publicando): una programación puede ir a 75 días vista y
  *     publica justo ese JPEG. Tampoco una publicada ni una que se está
- *     publicando (cerrojo). Al volver a generar la pieza, imagen_borrada_at
+ *     publicando (cerrojo). Un carrusel devuelve TODAS sus imágenes (una fila
+ *     por imagen, 20261112000000). Al volver a generar la pieza, imagen_borrada_at
  *     vuelve a null.
  *  2. Copias tmp/ de fotos de Drive y de la carta de más de 24 h (las mismas
  *     que ya borra instagram-drive al preparar otra). Ninguna programación
@@ -124,5 +125,6 @@ export async function limpiarBucket(s: Sesion, ahora: () => number = Date.now, o
   const tmpBorrados = await limpiarTmp(s, ahora);
   const video = await limpiarVideo(s, o);
   avisos.push(...video.avisos);
-  return { jpegMarcados: filas.length, jpegBorrados, tmpBorrados, videoMarcados: video.marcados, videoBorrados: video.borrados, avisos };
+  // Un carrusel devuelve una fila por imagen (20261112000000): se cuentan piezas.
+  return { jpegMarcados: new Set(filas.map((f) => f.id)).size, jpegBorrados, tmpBorrados, videoMarcados: video.marcados, videoBorrados: video.borrados, avisos };
 }

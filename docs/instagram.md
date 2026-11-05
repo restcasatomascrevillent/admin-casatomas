@@ -259,6 +259,8 @@ aplica, `problemas: string[]` y `comoArreglarlo`.
 no pasa la maquetación (desbordes, márgenes, zona segura del story, campos
 vacíos). 404 si el `id` no existe; 409 si esa pieza ya está publicada.
 
+> **Desde el 05/11/2026** `dryRun` es opcional (por defecto `false`: se publica sin «Prueba sin publicar»), `programarPara` programa en la misma llamada y hay **carruseles** (2–10 imágenes): ver [instagram-carrusel.md](instagram-carrusel.md).
+
 **POST `${SUPABASE_URL}/functions/v1/instagram-publicar`** — cuerpo `{ "id": "<uuid>", "caption"?: "…", "dryRun": true|false, "contenedorId"?: "…", "fotoTmp"?: "tmp/<uuid>.jpg" }`
 → 200 `{ ok, id, dryRun, publicado, estado: "prueba_ok"|"publicada", contenedor: { id, estado }, urlJpeg, mediaId, permalink, cuota: { usadas, total, restantes, ventanaHoras }, caption: { caracteres, hashtags, menciones }, avisos }`.
 Al publicar de verdad la respuesta añade `driveId` (id del JPEG en Drive, o
