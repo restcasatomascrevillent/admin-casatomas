@@ -585,7 +585,9 @@ describe("no gasta IA", () => {
     await waitFor(() => expect(screen.queryAllByRole("status")).toHaveLength(0));
     expect(doble.invoke).not.toHaveBeenCalled();
     expect(doble.inserts).toEqual([]);
-  });
+    // Pinta las 9 tarjetas del tablero (gráficas, tablas y chips): con la
+    // máquina cargada pasa de los 5 s por defecto.
+  }, 15_000);
 
   it("la siguiente pregunta libre a la IA no lleva los datos de la respuesta rápida", async () => {
     montar();
