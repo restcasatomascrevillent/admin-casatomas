@@ -65,7 +65,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Revisión automática y avisos",
         pasos: [
-          "Ve a «Compras». El documento nuevo aparece en el mes que le toca, dentro de su proveedor.",
+          "Ve a «Compras». El documento nuevo aparece en el mes que le toca, con su proveedor en la misma fila.",
           "Las facturas que cuadran (base + IVA = total, sin precios raros, de un proveedor que ya conocemos) se marcan solas como «Revisada auto»: no tienes que hacer nada con ellas.",
           "Si algo no encaja sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «No cuadra», «Línea mal», «Precio extremo», «Precio atípico», «Total enorme», «Sin total»… Toca el aviso y te lo explica. Para ver solo esas, usa el filtro «Con avisos»; para las que nadie ha mirado, «Sin revisar».",
         ],
@@ -73,7 +73,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Comprobar y corregir",
         pasos: [
-          "Abre el documento: arriba tienes los importes, debajo sus líneas y, al final de la ficha, la foto del papel original.",
+          "Toca el documento y su ficha ocupa toda la pantalla: arriba tienes los importes (y, si te regalaron algo o te hicieron descuento, cuánto vale), debajo sus líneas y, al final, la foto del papel original. «Volver a la lista» te deja la lista como estaba.",
           "Compara con el original usando el zoom: botones + y −, dos dedos o Ctrl + rueda para ampliar; arrastra para moverte; doble toque para acercar; «Girar» si salió torcida; y el botón de pantalla completa para verla en grande. «Original» (arriba) la abre en otra pestaña.",
           "Si algo está mal leído, pulsa «Editar» para corregir el proveedor, el número, la fecha o los importes, y activa «Marcar como verificada» para que pase a «Revisada». Una línea concreta se corrige con su lápiz. Al guardar, los avisos se vuelven a calcular.",
         ],
@@ -82,16 +82,17 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         titulo: "Albaranes y facturas",
         pasos: [
           "Un albarán es la nota de entrega; luego el proveedor manda la factura que los recoge. En la ficha de una factura ves sus albaranes y un cotejo producto a producto (entregado contra cobrado, sin IVA) con las diferencias en color. Con «Añadir albarán» unes uno que falte; los citados en la factura salen los primeros.",
-          "En la ficha de un albarán pone «Ya facturado» (con la factura y un botón para verla) o «Sin factura todavía», con «Asociar a factura». El filtro «Albaranes sin factura» te enseña los que aún no te han facturado. En la lista, un albarán ya facturado sale más claro y no suma, para no contarlo dos veces.",
+          "En la ficha de un albarán pone «Ya facturado» (con la factura y un botón para verla) o «Sin factura todavía», con «Asociar a factura». El filtro «Albaranes sin factura» te enseña los que aún no te han facturado. En la lista, un albarán ya facturado sale tachado con «Incluido en …» y no suma, para no contarlo dos veces.",
         ],
       },
       {
         titulo: "Buscar lo que has comprado",
         pasos: [
           "Escribe en el buscador de arriba (un producto, un proveedor o un número) y elige cómo mirarlo: «Documentos», «Productos» o «Proveedores». El número de cada botón dice cuántos resultados hay.",
-          "En «Documentos» la lista va por meses (con cuántos documentos hay y cuánto suman), dentro por proveedor y, debajo, sus documentos unidos por una línea. Toca un mes o un proveedor para plegarlo o desplegarlo; se acuerda de cómo lo dejaste.",
+          "Debajo del buscador eliges el local (Todos, Casa Tomás o Touza) y el periodo (este mes, el anterior, el trimestre, el año o todo). Cambian las listas, sus totales y el «Resumen»: gasto con IVA, abonos, lo regalado, una gráfica de 12 meses (toca un mes para ver solo ese) y los 10 proveedores en los que más gastas (toca uno para abrirlo). El resumen se pliega con un toque.",
+          "En «Documentos» la lista ocupa todo el ancho y va por meses (con cuántos documentos hay, cuánto suman y lo que restan los abonos). Cada fila: fecha, proveedor, número, marcas (Albarán, Abono, Touza, avisos, sin revisar…) e importe. Toca un mes para plegarlo o desplegarlo; se acuerda de cómo lo dejaste. Los abonos (devoluciones) salen en verde con «−» y tienen su filtro.",
           "En «Productos» ves cuánto gastas por categoría (toca una para filtrar), qué productos «Subieron de precio» y, al abrir uno, la gráfica de su precio por proveedor y en qué documentos aparece. Desde ahí puedes cambiarle la categoría, el nombre o unir duplicados.",
-          "En «Proveedores» ves cuánto le compras a cada uno, qué, cada cuánto y su último pedido. El filtro «Con albaranes sin factura» te dice a quién reclamar facturas.",
+          "En «Proveedores» están ordenados por lo que les gastas. Toca uno y se despliega ahí mismo: CIF, cada cuánto pide, último pedido, qué le compras y sus facturas por meses (toca una para abrirla); otro toque lo pliega. El filtro «Con albaranes sin factura» te dice a quién reclamar facturas.",
           "Desde una ficha puedes saltar a otra (de una línea a su producto, de un documento a su proveedor) y volver con «Volver a…».",
         ],
       },

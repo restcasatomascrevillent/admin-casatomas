@@ -118,7 +118,25 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "Tres formas de mirar",
       texto:
-        "«Documentos» enseña las facturas y albaranes. «Productos», lo que compras, cuánto gastas por categoría, qué ha subido de precio y cómo ha cambiado cada precio. «Proveedores», cuánto le compras a cada uno, cada cuánto y qué. El número indica cuántos resultados hay para lo que has buscado.",
+        "«Documentos» enseña las facturas y albaranes. «Productos», lo que compras, cuánto gastas por categoría, qué ha subido de precio y cómo ha cambiado cada precio. «Proveedores», de más a menos gasto; toca uno y se despliega con sus datos y sus facturas por meses. El número indica cuántos resultados hay para lo que has buscado.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-local-periodo",
+      pestana: F_COMPRAS,
+      titulo: "Local y periodo",
+      texto:
+        "Elige de qué local quieres ver las compras (Casa Tomás, Touza o los dos) y de qué periodo: este mes, el anterior, el trimestre, el año o todo. Cambian las listas y sus totales.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-resumen",
+      pestana: F_COMPRAS,
+      titulo: "El resumen",
+      texto:
+        "Lo gastado con IVA, los abonos, lo que te han regalado o descontado, una gráfica de los últimos 12 meses (toca un mes para ver solo ese) y los 10 proveedores en los que más gastas (toca uno para abrirlo). Se pliega con un toque y se acuerda.",
       opcional: true,
       lado: "bottom",
     },
@@ -127,7 +145,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "Filtros rápidos",
       texto:
-        "Toca un filtro para ver solo una parte: solo facturas, solo albaranes, los albaranes que aún no tienen factura, los que tienen avisos o los que nadie ha revisado todavía.",
+        "Toca un filtro para ver solo una parte: solo facturas, solo albaranes, los albaranes que aún no tienen factura, los abonos, los que tienen avisos o los que nadie ha revisado todavía.",
       opcional: true,
       lado: "bottom",
     },
@@ -136,16 +154,16 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "La lista, ordenada por meses",
       texto:
-        "Primero el mes (con cuántos documentos hay y cuánto suman), dentro cada proveedor un poco hacia dentro y, debajo, sus documentos unidos por una línea fina. Toca un mes o un proveedor para plegarlo o desplegarlo. Un albarán que ya está en una factura sale más claro y no suma, para no contarlo dos veces.",
+        "La lista ocupa todo el ancho, por meses (con cuántos documentos hay, cuánto suman y lo que restan los abonos). Cada fila: fecha, proveedor, número, marcas e importe. Toca un mes para plegarlo o desplegarlo. Un albarán que ya está en una factura sale tachado y no suma, para no contarlo dos veces.",
       opcional: true,
-      lado: "right",
+      lado: "top",
     },
     {
       elemento: "facturas-ficha",
       pestana: F_COMPRAS,
       titulo: "Avisos y revisión automática",
       texto:
-        "Toca un documento para abrir su ficha. Si algo no cuadra sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «Precio extremo», «Sin total»… (tócalo y te lo explica). Las que cuadran se marcan solas como «Revisada auto»: solo tienes que mirar las que tienen avisos y las que pone «Sin revisar».",
+        "Toca un documento y su ficha ocupa toda la pantalla; «Volver a la lista» te devuelve a la lista tal como estaba. Si algo no cuadra sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «Precio extremo», «Sin total»… (tócalo y te lo explica). Las que cuadran se marcan solas como «Revisada auto»: solo tienes que mirar las que tienen avisos y las que pone «Sin revisar».",
       opcional: true,
       lado: "left",
     },
