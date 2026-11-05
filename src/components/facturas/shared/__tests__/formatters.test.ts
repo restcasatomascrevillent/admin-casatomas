@@ -5,7 +5,9 @@ import {
   claveProveedor,
   esLineaDeServicio,
   formatCantidadLinea,
+  formatCurrency,
   formatEntero,
+  formatImporte,
   formatNumero,
   indiceAnomaliasPrecio,
   indicePreciosLinea,
@@ -251,5 +253,19 @@ describe("formatEntero y plural (es-ES, miles con punto)", () => {
     expect(plural(1, "línea", "líneas")).toBe("1 línea");
     expect(plural(0, "línea", "líneas")).toBe("0 líneas");
     expect(plural(1860, "documento", "documentos")).toBe("1.860 documentos");
+  });
+});
+
+describe("formatCurrency y formatImporte (miles con punto también con 4 cifras)", () => {
+  it("1.234,50 € y no 1234,50 €", () => {
+    expect(formatCurrency(1234.5).replace(/\s/g, " ")).toBe("1.234,50 €");
+    expect(formatCurrency(999).replace(/\s/g, " ")).toBe("999,00 €");
+    expect(formatCurrency(1234567.891).replace(/\s/g, " ")).toBe("1.234.567,89 €");
+    expect(formatCurrency(null)).toBe("-");
+  });
+
+  it("los abonos llevan el signo menos tipográfico", () => {
+    expect(formatImporte(-1234.5).replace(/\s/g, " ")).toBe("−1.234,50 €");
+    expect(formatImporte(12).replace(/\s/g, " ")).toBe("12,00 €");
   });
 });
