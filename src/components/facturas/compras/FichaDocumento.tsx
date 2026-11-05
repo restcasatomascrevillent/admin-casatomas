@@ -3,12 +3,14 @@ import { Package, Pencil, Plus, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import { formatCurrency, formatDate, formatDateTime, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
+import { formatCurrency, formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
 import { FilaProducto } from "@/components/facturas/shared/FilaProducto";
 import { esAlbaranSinFactura } from "@/lib/facturas/compras";
+import { esAbono, localDe, regaladoDocumento } from "@/lib/facturas/resumenCompras";
+import { CLASE_ABONO, CLASE_TOUZA, Insignia } from "./ListaDocumentos";
 import { AlbaranesDeFactura } from "./AlbaranesDeFactura";
 import { FacturaDelAlbaran } from "./FacturaDelAlbaran";
 import { CosteLecturaFactura } from "@/components/facturas/CosteLecturaDocumento";
@@ -84,6 +86,9 @@ export function FichaDocumento({
   // Al cambiar de documento se cierra el formulario de línea nueva.
   useEffect(() => setAñadiendo(false), [doc.id]);
   const esAlbaran = doc.tipo === "albaran";
+  const abono = esAbono(doc);
+  const nombreTipo = abono ? "Abono" : esAlbaran ? "Albarán" : "Factura";
+  const regalado = regaladoDocumento(doc);
   const hayImportes = doc.subtotal != null || doc.iva != null || doc.total != null;
   return (
     <div className="space-y-3 p-3 sm:p-4">
@@ -91,8 +96,10 @@ export function FichaDocumento({
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <h2 className="break-words text-lg font-semibold leading-tight">
-              {esAlbaran ? "Albarán" : "Factura"} {doc.numero_documento}
+              {nombreTipo} {doc.numero_documento}
             </h2>
+            {abono && esAlbaran && <Insignia clase={CLASE_ABONO}>Albarán</Insignia>}
+            {localDe(doc) === "touza" && <Insignia clase={CLASE_TOUZA}>Touza</Insignia>}
             <EstadoDocumento alertas={avisos} verificada={doc.verificada} origen={doc.verificacion_origen} onRevisar={() => onEditar(doc)} compacto={false} />
             {esAlbaran &&
               (esAlbaranSinFactura(doc) ? (
@@ -110,8 +117,8 @@ export function FichaDocumento({
               <button
                 type="button"
                 onClick={() => onAbrirProveedor(doc.proveedor as string)}
-                className="relative inline-flex items-center gap-1 rounded-sm text-left underline-offset-2 before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] hover:text-primary hover:underline"
-                title="Ver la ficha del proveedor"
+                className="relative inline-flex items-center gap-1 rounded-sm text-left underline-offset-2 before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] hover:text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                aria-label={`Ver el proveedor ${doc.proveedor}`}
               >
                 <Truck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="break-words">
@@ -131,7 +138,7 @@ export function FichaDocumento({
           </p>
         </div>
 
-        {/* Acciones compactas: icono + palabra corta; en estrecho, solo icono con su nombre accesible. */}
+        {/* Acciones: icono + palabra corta, también en tablet (la ficha ocupa todo el ancho). */}
         <div className="flex shrink-0 items-center gap-0.5" data-tour="facturas-ficha-acciones">
           <BotonOriginal
             driveUrl={doc.drive_url}
@@ -143,11 +150,9 @@ export function FichaDocumento({
             variant="ghost"
             className="h-11 min-w-11 shrink-0 gap-1.5 px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => onEditar(doc)}
-            aria-label="Editar"
-            title={esAlbaran ? "Editar este albarán" : "Editar esta factura"}
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden xl:inline">Editar</span>
+            <span>Editar</span>
           </Button>
           {onPreguntarIA && (
             <Button
@@ -155,10 +160,9 @@ export function FichaDocumento({
               className="h-11 min-w-11 shrink-0 gap-1.5 px-2.5 text-sm font-medium text-[hsl(38,59%,45%)] hover:bg-[hsl(38,59%,45%)/0.1] hover:text-[hsl(38,59%,45%)]"
               onClick={() => onPreguntarIA(doc)}
               aria-label="Preguntar a la IA"
-              title={esAlbaran ? "Analizar este albarán con la IA" : "Analizar esta factura con la IA"}
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden xl:inline">IA</span>
+              <span aria-hidden="true">IA</span>
             </Button>
           )}
         </div>
@@ -183,9 +187,18 @@ export function FichaDocumento({
           {doc.total != null && (
             <>
               {(doc.subtotal != null || doc.iva != null) && SEP}
-              <span className="font-bold">
+              <span className={`font-bold ${abono ? "text-emerald-700 dark:text-emerald-400" : ""}`}>
                 <span className="font-semibold">Total{doc.total_origen === "deducido" ? " (calculado, no leído)" : ""}</span>{" "}
-                {formatCurrency(doc.total)}
+                {formatImporte(doc.total)}
+              </span>
+            </>
+          )}
+          {regalado.importe > 0 && (
+            <>
+              {SEP}
+              <span data-testid="regalado-documento">
+                <span className="text-muted-foreground">Regalado / descuentos</span> {formatCurrency(regalado.importe)}
+                <span className="text-xs text-muted-foreground"> sin IVA{regalado.estimado ? " · estimado" : ""}</span>
               </span>
             </>
           )}
@@ -233,19 +246,19 @@ export function FichaDocumento({
       </section>
 
       {(doc.procesado_en || doc.created_at) && (
-        <p className="text-[11px] pointer-coarse:text-xs text-muted-foreground/80">
+        <p className="text-xs text-muted-foreground/80">
           {doc.procesado_en && <>Procesado {formatDateTime(doc.procesado_en)}</>}
           {doc.procesado_en && doc.created_at && " · "}
           {doc.created_at && <>Creado {formatDateTime(doc.created_at)}</>}
         </p>
       )}
-      <CosteLecturaFactura facturaId={doc.id} className="text-[11px] pointer-coarse:text-xs text-muted-foreground/80" />
+      <CosteLecturaFactura facturaId={doc.id} className="text-xs text-muted-foreground/80" />
 
       {/* Al final de la ficha, dentro de su scroll: la foto (o el PDF) del original. */}
       <OriginalIncrustado
         driveUrl={doc.drive_url}
         archivoPath={doc.archivo_path}
-        titulo={`${esAlbaran ? "Albarán" : "Factura"} ${doc.numero_documento}`}
+        titulo={`${nombreTipo} ${doc.numero_documento}`}
       />
     </div>
   );

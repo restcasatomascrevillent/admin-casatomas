@@ -2,10 +2,22 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
 
+// Una sola instancia (miles de filas). `useGrouping: "always"`: en es-ES `Intl`
+// no agrupa los importes de 4 cifras («1234,50 €»); así sale «1.234,50 €».
+// Un motor que no conozca el valor lo toma como `true` (el agrupado de siempre).
+const FORMATO_EUR = new Intl.NumberFormat("es-ES", {
+  style: "currency",
+  currency: "EUR",
+  useGrouping: "always",
+} as unknown as Intl.NumberFormatOptions);
+
 export const formatCurrency = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
-  return new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(value);
+  return FORMATO_EUR.format(value);
 };
+
+/** Importe con el signo menos tipográfico («−12,00 €»): abonos y descuentos. */
+export const formatImporte = (value: number | null): string => formatCurrency(value).replace(/^-/, "−");
 
 /** Cantidad con coma decimal y hasta 3 decimales (los kilos van al gramo): 75,48 · 24 · 1,5. */
 export const formatNumero = (value: number): string =>

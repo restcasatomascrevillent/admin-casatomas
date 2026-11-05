@@ -1,30 +1,38 @@
-import { AlertTriangle, Truck } from "lucide-react";
-import { formatCurrency, formatDateCorta, plural } from "@/components/facturas/shared/formatters";
+import type { ReactNode } from "react";
+import { AlertTriangle, ChevronDown, ChevronRight, Truck } from "lucide-react";
+import { formatDateCorta, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import type { Proveedor } from "@/lib/facturas/proveedores";
+import type { AgregadoProveedor } from "@/lib/facturas/resumenCompras";
 
 /**
- * Compras › Proveedores: una fila por proveedor canónico (cada uno una sola vez).
- * Total = facturas + albaranes SIN factura, con IVA (el albarán ya recogido en
- * una factura no cuenta dos veces: migración 20261105130000).
+ * Compras › Proveedores (rediseño del 05/11/2026): lista a todo el ancho, una
+ * fila por proveedor canónico, ordenada por GASTO con IVA (sin albaranes ya
+ * facturados, abonos restando: el criterio de la RPC corregida 20261105130000),
+ * con el local y el periodo elegidos. Al tocar un proveedor se DESPLIEGA ahí
+ * mismo (acordeón: uno abierto a la vez) con `despliegue`; otro toque lo pliega.
  */
 export function ListaProveedores({
   proveedores,
-  sinFacturaPorClave,
-  seleccionadoId,
+  agregados,
+  abiertoId,
   cargando,
   mensaje,
   hayFiltros,
-  onAbrir,
+  onAlternar,
+  despliegue,
 }: {
+  /** Ya filtrados y ordenados. */
   proveedores: Proveedor[];
-  /** Albaranes sin factura de cada proveedor, por clave `#id`. */
-  sinFacturaPorClave: Map<string, number>;
-  seleccionadoId: number | null;
+  /** Lo de cada proveedor (clave `#id`) con el local y el periodo elegidos. */
+  agregados: Map<string, AgregadoProveedor>;
+  abiertoId: number | null;
   cargando: boolean;
   /** Mensaje de la lista (p. ej. «falta la migración»); sustituye a la lista. */
   mensaje: string | null;
   hayFiltros: boolean;
-  onAbrir: (id: number) => void;
+  onAlternar: (id: number) => void;
+  /** El contenido del proveedor desplegado. */
+  despliegue: (p: Proveedor) => ReactNode;
 }) {
   if (cargando) return <p className="p-4 text-sm text-muted-foreground">Cargando proveedores…</p>;
   if (mensaje) return <p className="p-4 text-sm text-muted-foreground">{mensaje}</p>;
@@ -39,37 +47,45 @@ export function ListaProveedores({
   return (
     <ul className="divide-y divide-border/50" aria-label="Proveedores" data-testid="lista-proveedores-compras">
       {proveedores.map((p) => {
-        const sinFactura = sinFacturaPorClave.get(`#${p.id}`) ?? 0;
-        const abierto = seleccionadoId === p.id;
+        const a = agregados.get(`#${p.id}`);
+        const abierto = abiertoId === p.id;
+        const Chevron = abierto ? ChevronDown : ChevronRight;
+        const docs = a?.documentos.length ?? 0;
+        const ultima = a?.ultimaFecha ?? (hayFiltros ? null : p.ultima_fecha);
+        const sinFactura = a?.albaranesSinFactura ?? 0;
         return (
-          <li key={p.id}>
-            <button
-              type="button"
-              onClick={() => onAbrir(p.id)}
-              aria-current={abierto ? "true" : undefined}
-              className={`flex min-h-12 w-full items-center gap-3 px-2 py-1.5 text-left transition-colors hover:bg-muted/40 ${abierto ? "bg-muted/70" : ""}`}
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">{p.nombre}</span>
-                <span className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  <span className="min-w-0 truncate" title={p.ultima_fecha ? `Último documento: ${formatDateCorta(p.ultima_fecha)}` : undefined}>
-                    {plural(p.documentos, "doc", "docs")}
-                    {p.ultima_fecha ? ` · ${formatDateCorta(p.ultima_fecha)}` : ""}
-                  </span>
-                  {sinFactura > 0 && (
-                    <span className="inline-flex shrink-0 items-center gap-1 font-medium text-amber-700 dark:text-amber-400">
-                      <AlertTriangle className="h-3 w-3" aria-hidden="true" /> {plural(sinFactura, "albarán sin factura", "albaranes sin factura")}
+          <li key={p.id} data-proveedor-id={p.id}>
+            <h3 className={`m-0 text-base font-normal ${abierto ? "sticky top-0 z-10 bg-card" : ""}`}>
+              <button
+                type="button"
+                onClick={() => onAlternar(p.id)}
+                aria-expanded={abierto}
+                className={`flex min-h-12 w-full items-center gap-2 px-2 py-1.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${abierto ? "bg-muted/60" : ""}`}
+              >
+                <Chevron className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{p.nombre}</span>
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                    <span className="whitespace-nowrap">
+                      {plural(docs, "documento", "documentos")}
+                      {ultima ? ` · último ${formatDateCorta(ultima)}` : ""}
                     </span>
-                  )}
+                    {sinFactura > 0 && (
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap font-medium text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" /> {plural(sinFactura, "albarán sin factura", "albaranes sin factura")}
+                      </span>
+                    )}
+                  </span>
                 </span>
-              </span>
-              <span className="shrink-0 text-right leading-tight">
-                <span className="text-sm font-semibold tabular-nums">{formatCurrency(p.total_facturas + p.total_albaranes)}</span>
-                <span className="block text-[11px] pointer-coarse:text-xs text-muted-foreground">
-                  <span className="sr-only"> </span>con IVA
+                <span className="shrink-0 text-right leading-tight">
+                  <span className="text-sm font-semibold tabular-nums">{formatImporte(a?.gasto ?? 0)}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    <span className="sr-only"> </span>con IVA
+                  </span>
                 </span>
-              </span>
-            </button>
+              </button>
+            </h3>
+            {abierto && despliegue(p)}
           </li>
         );
       })}

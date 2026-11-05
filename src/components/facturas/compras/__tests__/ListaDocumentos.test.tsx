@@ -1,7 +1,8 @@
 /**
- * Compras › Documentos agrupados por mes y proveedor: cabeceras con totales,
- * albaranes facturados atenuados y sin sumar, meses antiguos plegados,
- * recuerdo del plegado y enlace profundo (documento dentro de un grupo plegado).
+ * Compras › Documentos a todo el ancho, agrupados por mes: cabeceras con
+ * totales (y abonos), filas con fecha · proveedor · número · marcas · importe,
+ * albaranes facturados tachados y sin sumar, meses antiguos plegados, recuerdo
+ * del plegado, mes pedido desde el resumen y despliegue de proveedor.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -82,45 +83,66 @@ function pintar(extra: Partial<React.ComponentProps<typeof ListaDocumentos>> = {
 }
 
 const cabeceraMes = (nombre: RegExp) => screen.getByRole("button", { name: nombre });
-/** Cabecera del subgrupo de un proveedor dentro de un mes (Makro sale en octubre y septiembre). */
-const cabeceraProveedor = (mes: string, nombre: RegExp) => within(screen.getByRole("region", { name: mes })).getByRole("button", { name: nombre });
+const fila = (numero: string) => screen.getByText(numero).closest("button")!;
 
-describe("ListaDocumentos agrupada", () => {
+describe("ListaDocumentos agrupada por mes", () => {
   beforeEach(() => window.localStorage.clear());
 
   it("cabeceras de mes en orden, con nº de documentos y total sin doble conteo", () => {
     pintar();
     const meses = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(meses).toHaveLength(4);
-    expect(meses[0]).toMatch(/^Octubre 2026 · 4 documentos · 1\.?170,50\s€ con IVA$/); // 1000 + 120,50 + 50 (el albarán facturado no suma)
+    expect(meses[0]).toMatch(/^Octubre 2026 · 4 documentos · 1\.170,50\s€ con IVA$/); // 1000 + 120,50 + 50 (el albarán facturado no suma)
     expect(meses[1]).toMatch(/^Septiembre 2026 · 1 documento · 70,00\s€ con IVA$/);
     expect(meses[2]).toMatch(/^Mayo 2026 · 1 documento · 33,00\s€ con IVA$/);
     expect(meses[3]).toMatch(/^Sin fecha · 1 documento · 9,00\s€ con IVA$/);
   });
 
-  it("dentro del mes, subgrupo por proveedor con sus documentos y total", () => {
-    pintar();
-    const octubre = screen.getByRole("region", { name: "Octubre 2026" });
-    const provs = within(octubre).getAllByRole("heading", { level: 4 }).map((h) => h.textContent);
-    expect(provs[0]).toMatch(/^Makro · 1 doc · 50,00\s€ con IVA$/);
-    expect(provs[1]).toMatch(/^Pescados Rías Baixas · 3 docs · 1\.?120,50\s€ con IVA$/);
+  it("sin subgrupos por proveedor: el proveedor es una columna de cada fila, del más reciente al más antiguo", () => {
+    pintar({ documentos: [doc(1, { fecha: "2026-10-01" }), doc(2, { fecha: "2026-10-09", proveedor: "Pescados Rías Baixas S.L." })] });
+    expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+    const filas = within(screen.getByRole("region", { name: "Octubre 2026" })).getAllByRole("listitem");
+    expect(filas.map((li) => li.querySelector("[data-numero]")?.textContent)).toEqual(["F-2", "F-1"]);
+    // Nombre canónico del proveedor, no el texto del documento.
+    expect(filas[0]).toHaveTextContent("Pescados Rías Baixas");
+    expect(filas[0]).not.toHaveTextContent("S.L.");
+    expect(filas[0]).toHaveTextContent("09/10/26");
   });
 
-  it("el albarán ya facturado sale atenuado con «en F-xxx»", () => {
+  it("los abonos: insignia, signo menos y «incl. abonos» en la cabecera del mes", () => {
+    pintar({ documentos: [doc(1, { total: 500 }), doc(2, { numero_documento: "AB-7", total: -120.4 })] });
+    const abono = fila("AB-7");
+    expect(abono).toHaveTextContent("Abono");
+    expect(abono).toHaveTextContent("−120,40");
+    expect(screen.getByRole("heading", { level: 3 }).textContent).toMatch(/379,60\s€ con IVA · incl\. abonos −120,40\s€/);
+  });
+
+  it("marca Albarán (no «Factura») y Touza; todas las marcas a la vista, sin tooltip", () => {
+    pintar({
+      documentos: [doc(1, { numero_documento: "F-1" }), doc(2, { numero_documento: "ALB-2", tipo: "albaran", verificada: false, local: "touza" })],
+      avisosPorId: new Map([[2, [{}, {}]]]),
+    });
+    expect(fila("F-1").textContent).not.toMatch(/Factura|Albarán|Touza/);
+    const alb = fila("ALB-2");
+    for (const t of ["Albarán", "Touza", "2 avisos", "Sin revisar", "Sin factura"]) expect(alb).toHaveTextContent(t);
+    expect(alb).not.toHaveAttribute("title");
+  });
+
+  it("el albarán ya facturado sale tachado con «Incluido en F-xxx · no suma»", () => {
     pintar();
-    const fila = screen.getByText("ALB-0002").closest("button")!;
-    expect(fila.getAttribute("data-facturado")).toBe("true");
-    expect(fila.className).toMatch(/opacity-60/);
-    expect(fila.textContent).toContain("en F-0001");
-    const libre = screen.getByText("ALB-0003").closest("button")!;
+    const f = fila("ALB-0002");
+    expect(f.getAttribute("data-facturado")).toBe("true");
+    expect(f.textContent).toContain("Incluido en F-0001 · no suma");
+    expect(f.querySelector(".line-through")).not.toBeNull();
+    expect(f).not.toHaveAttribute("title");
+    const libre = fila("ALB-0003");
     expect(libre.getAttribute("data-facturado")).toBeNull();
     expect(libre.textContent).toContain("Sin factura");
   });
 
   it("si la factura del albarán no está en la lista filtrada, sigue diciendo cuál es", () => {
-    const albaran = DOCS[1];
-    pintar({ documentos: [albaran] , seleccionadoId: null });
-    expect(screen.getByText("ALB-0002").closest("button")!.textContent).toContain("en F-0001");
+    pintar({ documentos: [DOCS[1]] });
+    expect(fila("ALB-0002").textContent).toContain("en F-0001");
   });
 
   it("mes actual y anterior desplegados; más antiguos y «Sin fecha» plegados", () => {
@@ -133,6 +155,12 @@ describe("ListaDocumentos agrupada", () => {
     expect(screen.getByText("F-0005")).toBeTruthy();
   });
 
+  it("si solo hay un mes (p. ej. un periodo), sale abierto aunque sea antiguo", () => {
+    pintar({ documentos: [DOCS[5]] });
+    expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("F-0006")).toBeTruthy();
+  });
+
   it("plegar y desplegar, y se recuerda en localStorage", () => {
     const { unmount } = pintar();
     fireEvent.click(cabeceraMes(/^Mayo 2026/));
@@ -143,13 +171,6 @@ describe("ListaDocumentos agrupada", () => {
     pintar();
     expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("true");
     expect(cabeceraMes(/^Octubre 2026/).getAttribute("aria-expanded")).toBe("false");
-  });
-
-  it("se puede plegar un proveedor sin tocar el resto", () => {
-    pintar();
-    fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/));
-    expect(screen.queryByText("F-0004")).toBeNull();
-    expect(screen.getByText("ALB-0003")).toBeTruthy();
   });
 
   it("con localStorage roto sigue funcionando", () => {
@@ -208,60 +229,42 @@ describe("ListaDocumentos agrupada", () => {
     expect(screen.queryByTestId("barra-meses")).toBeNull();
   });
 
-  it("con búsqueda y 3 meses o menos con resultados, todos abiertos y sin botón", () => {
-    pintar({ hayFiltros: true, busqueda: "makro", documentos: DOCS.filter((d) => d.proveedor === "Makro" && d.fecha) });
-    expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(3);
-    for (const m of [/^Octubre 2026/, /^Septiembre 2026/, /^Mayo 2026/]) {
-      expect(cabeceraMes(m).getAttribute("aria-expanded")).toBe("true");
-    }
-    expect(screen.queryByTestId("barra-meses")).toBeNull();
-  });
-
   it("cada mes lleva content-visibility: auto con un tamaño de reserva", () => {
     const { container } = pintar();
     const mayo = container.querySelector('section[data-mes="2026-05"]') as HTMLElement;
     const octubre = container.querySelector('section[data-mes="2026-10"]') as HTMLElement;
     expect(mayo.className).toContain("[content-visibility:auto]");
-    expect(mayo.getAttribute("style") ?? "").toMatch(/contain-intrinsic-size:\s*auto 45px/);
-    // Octubre abierto: cabecera + 2 proveedores + 4 documentos.
-    expect(octubre.getAttribute("style") ?? "").toMatch(new RegExp(`contain-intrinsic-size:\\s*auto ${45 + 2 * 44 + 4 * 49}px`));
+    expect(mayo.getAttribute("style") ?? "").toMatch(/contain-intrinsic-size:\s*auto 49px/);
+    expect(octubre.getAttribute("style") ?? "").toMatch(new RegExp(`contain-intrinsic-size:\\s*auto ${49 + 4 * 53}px`));
   });
 
-  it("enlace profundo: un documento en un mes plegado lo despliega", () => {
-    pintar({ seleccionadoId: 6 });
+  it("mes pedido desde el resumen: lo despliega", () => {
+    const { rerender, props } = pintar();
+    expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("false");
+    rerender(<ListaDocumentos {...props} mesPedido={{ mes: "2026-05", n: 1 }} />);
     expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("true");
-    const fila = screen.getByText("F-0006").closest("button")!;
-    expect(fila.getAttribute("aria-current")).toBe("true");
+    expect(screen.getByText("F-0006")).toBeTruthy();
   });
 
-  it("enlace profundo: también despliega el proveedor plegado y si no se pide otro documento no se vuelve a abrir", () => {
-    window.localStorage.setItem("compras.documentos.plegado", JSON.stringify({ "p:2026-10|#2": false }));
-    const { rerender, props } = pintar({ seleccionadoId: null });
-    expect(screen.queryByText("F-0004")).toBeNull();
-    rerender(<ListaDocumentos {...props} seleccionadoId={4} />);
-    expect(screen.getByText("F-0004").closest("button")!.getAttribute("aria-current")).toBe("true");
-    // El usuario lo pliega a mano estando seleccionado: se respeta.
-    fireEvent.click(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/));
-    expect(screen.queryByText("F-0004")).toBeNull();
+  it("el último documento abierto se marca con aria-current", () => {
+    pintar({ seleccionadoId: 4 });
+    expect(fila("F-0004").getAttribute("aria-current")).toBe("true");
+    expect(fila("F-0001").getAttribute("aria-current")).toBeNull();
   });
 
-  it("enlace profundo con búsqueda: un documento en un mes plegado lo despliega (sin recordarlo)", () => {
-    pintar({ hayFiltros: true, busqueda: "f-", seleccionadoId: 7 });
-    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("true");
-    expect(window.localStorage.getItem("compras.documentos.plegado")).toBeNull();
-  });
-
-  it("filas: «1 línea» / «2 líneas»", () => {
-    const linea = { id: 1, producto_nombre: "X", precio: 1, proveedor: null };
-    pintar({ documentos: [doc(20, { productos: [linea] }), doc(21, { productos: [linea, { ...linea, id: 2 }] })] });
-    expect(screen.getByText("F-20").closest("button")!.textContent).toMatch(/· 1 línea(?!s)/);
-    expect(screen.getByText("F-21").closest("button")!.textContent).toContain("· 2 líneas");
-  });
-
-  it("enlace profundo: documento «Sin fecha»", () => {
-    pintar({ seleccionadoId: 7 });
-    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("true");
+  it("despliegue de un proveedor: sin columna de proveedor, 3 meses abiertos y nada en localStorage", () => {
+    pintar({ conProveedor: false, recordar: false, cabecerasFijas: false });
+    // Cabeceras de mes como h4 (van debajo del h3 del proveedor) y no fijas.
+    const meses = screen.getAllByRole("heading", { level: 4 });
+    expect(meses).toHaveLength(4);
+    expect(meses[0].className).not.toContain("sticky");
+    for (const m of [/^Octubre 2026/, /^Septiembre 2026/, /^Mayo 2026/]) expect(cabeceraMes(m).getAttribute("aria-expanded")).toBe("true");
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("false");
+    // La fila empieza por el número (no por el proveedor).
+    expect(fila("F-0004").textContent).not.toContain("Makro");
+    fireEvent.click(cabeceraMes(/^Sin fecha/));
     expect(screen.getByText("F-0007")).toBeTruthy();
+    expect(window.localStorage.getItem("compras.documentos.plegado")).toBeNull();
   });
 
   it("un clic en una fila abre el documento", () => {
@@ -278,23 +281,10 @@ describe("ListaDocumentos agrupada", () => {
     expect(screen.getByText("No hay documentos registrados")).toBeTruthy();
   });
 
-  it("cabeceras y filas con zona táctil de 44 px como mínimo", () => {
+  it("cabeceras y filas con zona táctil de 44 px como mínimo y foco visible", () => {
     pintar();
-    expect(cabeceraMes(/^Octubre 2026/).className).toMatch(/min-h-11/);
-    expect(cabeceraProveedor("Octubre 2026", /^Makro\s*·?\s*1 doc/).className).toMatch(/min-h-11/);
-  });
-  it("tabula los tres niveles: mes a ras, proveedor con sangría y documentos con guía vertical", () => {
-    const { container } = pintar();
-    const mes = container.querySelector('section[data-mes="2026-10"]') as HTMLElement;
-    const h3 = mes.querySelector("h3") as HTMLElement;
-    expect(h3.className).not.toMatch(/ml-/);
-    const h4 = mes.querySelector('[data-nivel="proveedor"]') as HTMLElement;
-    expect(h4.className).toMatch(/(^| )ml-2( |$)/);
-    expect(h4.className).toMatch(/sm:ml-4/);
-    const lista = mes.querySelector('[data-nivel="documentos"]') as HTMLElement;
-    expect(lista.className).toMatch(/(^| )ml-4( |$)/);
-    expect(lista.className).toMatch(/sm:ml-8/);
-    expect(lista.className).toMatch(/border-l/);
-    expect(lista.className).toMatch(/border-border(\s|$)/);
+    expect(cabeceraMes(/^Octubre 2026/).className).toMatch(/min-h-12/);
+    expect(fila("F-0004").className).toMatch(/min-h-12/);
+    expect(fila("F-0004").className).toMatch(/focus-visible:outline/);
   });
 });

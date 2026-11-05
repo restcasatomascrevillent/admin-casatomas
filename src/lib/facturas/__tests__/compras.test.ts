@@ -116,9 +116,16 @@ describe("documentos", () => {
       facturas: 1,
       albaranes: 2,
       albaranes_sin_factura: 1,
+      abonos: 0,
       con_avisos: 0,
       sin_revisar: 3,
     });
+  });
+
+  it("chip «Abonos»: los documentos con total negativo", () => {
+    const conAbono = [...DOCS, { ...DOCS[0], id: 99, numero_documento: "AB-1", total: -40 }];
+    expect(filtrarDocumentos(conAbono, "", "abonos", AVISOS).map((d) => d.id)).toEqual([99]);
+    expect(contarFiltrosDocumentos(conAbono, "", AVISOS).abonos).toBe(1);
   });
 
   it("del más reciente al más antiguo", () => {

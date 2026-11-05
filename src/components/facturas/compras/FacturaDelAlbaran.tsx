@@ -51,7 +51,7 @@ function AsociarFactura({ albaranId }: { albaranId: number }) {
                 <span className="text-xs text-muted-foreground">{formatDate(f.fecha)}</span>
                 <span className="ml-auto tabular-nums">{formatCurrency(f.base)}</span>
                 {f.cita_albaran && (
-                  <span className="inline-flex h-6 w-full items-center text-[11px] pointer-coarse:text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex h-6 w-full items-center text-xs font-medium text-emerald-700 dark:text-emerald-300">
                     Cita este albarán
                   </span>
                 )}
