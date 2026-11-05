@@ -302,13 +302,15 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   const copilotoVisible = abierto && activa;
   return (
     // Con el copiloto abierto (360 px, no modal) el contenido deja su hueco a la
-    // derecha en ≥ sm: si no, el panel tapaba el botón y la franja derecha (QA 05/11/2026).
-    <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "sm:pr-[360px]")}>
+    // derecha (desde lg, 1024 px): si no, el panel tapaba el botón y la franja
+    // derecha (QA 05/11/2026). En la tablet vertical no: quedarían ~440 px y las
+    // tarjetas, a 2 columnas, se aplastaban; ahí el panel va por encima.
+    <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "lg:pr-[360px]")}>
       <div className="flex shrink-0 flex-wrap items-center gap-2" data-tour="facturas-analisis-barra">
         <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} />
         {/* Local, «Actualizando…» y la IA van juntos: si la barra no cabe (tablet en
             vertical), bajan juntos a la segunda fila y el botón no se queda solo. */}
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="flex flex-auto flex-wrap items-center gap-2 sm:flex-nowrap">
           <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} />
           {tablero.isFetching && !tablero.isLoading && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">

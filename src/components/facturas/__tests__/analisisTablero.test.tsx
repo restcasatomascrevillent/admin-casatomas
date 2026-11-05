@@ -600,15 +600,15 @@ describe("QA 05/11/2026: página, URL y pestañas", () => {
     expect(await screen.findByRole("dialog", { name: "Pregúntale a la IA" })).toBeInTheDocument();
   });
 
-  it("con el copiloto abierto el contenido le deja sitio a la derecha (≥ sm) y el botón IA va junto al local", async () => {
+  it("con el copiloto abierto el contenido le deja sitio a la derecha (≥ lg) y el botón IA va junto al local", async () => {
     const { container } = montar();
     await screen.findByText("1.362.491,57 €");
     const raiz = container.firstElementChild as HTMLElement;
-    expect(raiz.className).not.toContain("sm:pr-[360px]");
+    expect(raiz.className).not.toContain("lg:pr-[360px]");
     const boton = screen.getByRole("button", { name: /pregúntale a la ia/i });
     expect(boton.parentElement).toBe(screen.getByRole("group", { name: "Local" }).parentElement);
     fireEvent.click(boton);
-    expect(raiz.className).toContain("sm:pr-[360px]");
+    expect(raiz.className).toContain("lg:pr-[360px]");
   });
 });
 

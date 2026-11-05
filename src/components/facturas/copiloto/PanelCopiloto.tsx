@@ -51,8 +51,13 @@ interface Props {
 }
 
 /** Tablas y textos largos de la respuesta: que no ensanchen el panel (estrecho). */
-const CLASES_PROSA =
-  "break-words [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto [&_ul]:my-1 [&_ol]:my-1";
+// El panel no tiene el plugin de tipografía: las tablas (GFM) llevan aquí sus
+// líneas, relleno y cifras alineadas para que se lean como tabla.
+const CLASES_PROSA = cn(
+  "break-words [&_table]:my-2 [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_table]:border-collapse [&_table]:text-sm [&_table]:tabular-nums",
+  "[&_th]:border-b [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-medium [&_td]:border-b [&_td]:border-border/50 [&_td]:px-2 [&_td]:py-1",
+  "[&_pre]:overflow-x-auto [&_ul]:my-1 [&_ol]:my-1",
+);
 
 /** Referencias de la respuesta: proveedor · nº · fecha y enlace a la foto del original. */
 function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {

@@ -596,7 +596,8 @@ export function Explorador({
     >
       {/* Cabecera */}
       <header className="flex flex-wrap items-start gap-x-3 gap-y-1">
-        <div className="min-w-0 flex-1">
+        {/* min-w: con poco ancho, los botones bajan a otra línea en vez de aplastar el título. */}
+        <div className="min-w-[12rem] flex-1">
           <h3 id={idTitulo} className="flex items-center gap-2 text-base font-semibold leading-tight text-foreground">
             Explorar
             {actualizando && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Actualizando" />}
