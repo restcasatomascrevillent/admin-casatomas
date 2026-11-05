@@ -117,7 +117,7 @@ function normalizarBase(c: Record<string, unknown>): RespuestaBase {
   };
 }
 
-async function llamar(cuerpo: Record<string, unknown>, opts: OpcionesLlamada = {}): Promise<Record<string, unknown>> {
+export async function llamar(cuerpo: Record<string, unknown>, opts: OpcionesLlamada = {}): Promise<Record<string, unknown>> {
   const token = opts.token === undefined ? await tokenSesion() : opts.token;
   if (!token) throw new ErrorIA("No hay sesión: vuelve a entrar en el panel.", "sesion", 401);
   const f = opts.fetch ?? fetch;

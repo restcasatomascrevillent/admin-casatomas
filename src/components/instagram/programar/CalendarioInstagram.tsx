@@ -50,6 +50,7 @@ const ETIQUETA_ESTADO_EVENTO: Record<EventoCalendario["estado"], { texto: string
   publicada: { texto: "Publicada", clase: "bg-emerald-100 text-emerald-800" },
   error: { texto: "Error", clase: "bg-red-100 text-red-800" },
   cancelada: { texto: "Cancelada", clase: "bg-muted text-muted-foreground" },
+  borrador: { texto: "Borrador", clase: "bg-violet-100 text-violet-800" },
 };
 
 /** Título corto de la pieza: titular o cita, o el nombre de la plantilla. */
@@ -91,7 +92,44 @@ interface TarjetaProps {
   onAbrirPieza?: (piezaId: string) => void;
 }
 
+/** Borrador de campaña (fecha prevista, sin programar): borde discontinuo; abre el editor si hay callback. */
+function TarjetaBorrador({ evento, compacta, onAbrirPieza }: Pick<TarjetaProps, "evento" | "compacta" | "onAbrirPieza">) {
+  const titulo = tituloEvento(evento);
+  const etiqueta = `${evento.hora} · ${NOMBRE_MARCA[evento.marca] ?? evento.marca} · ${titulo} · Borrador sin programar`;
+  const contenido = (
+    <>
+      <Miniatura evento={evento} className={compacta ? "w-6" : "w-9"} />
+      <span className="min-w-0 flex-1">
+        <span className="font-semibold tabular-nums">{evento.hora}</span>
+        {!compacta && <span className="block truncate">{titulo}</span>}
+        <span className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+          <span className="truncate">{NOMBRE_MARCA[evento.marca] ?? evento.marca}</span>
+          {!compacta && <span className={cn("rounded-full px-1.5 py-px font-medium", ETIQUETA_ESTADO_EVENTO.borrador.clase)}>Borrador</span>}
+        </span>
+      </span>
+    </>
+  );
+  const clase = "flex w-full min-w-0 items-center gap-1.5 rounded-md border border-dashed border-violet-400 bg-background/60 p-1 text-left text-xs";
+  return onAbrirPieza ? (
+    <button
+      type="button"
+      data-testid="evento-instagram"
+      data-estado="borrador"
+      onClick={() => onAbrirPieza(evento.piezaId)}
+      className={cn(clase, "transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring")}
+      aria-label={`${etiqueta}. Abrir en el editor`}
+    >
+      {contenido}
+    </button>
+  ) : (
+    <div data-testid="evento-instagram" data-estado="borrador" className={clase} aria-label={etiqueta} role="note">
+      {contenido}
+    </div>
+  );
+}
+
 function TarjetaEvento({ evento, compacta, onMover, onCancelar, onVerError, onAbrirPieza }: TarjetaProps) {
+  if (evento.tipo === "borrador") return <TarjetaBorrador evento={evento} compacta={compacta} onAbrirPieza={onAbrirPieza} />;
   const estado = ETIQUETA_ESTADO_EVENTO[evento.estado];
   const titulo = tituloEvento(evento);
   const editable = evento.tipo === "programada" && (evento.estado === "programada" || evento.estado === "error");
@@ -176,7 +214,7 @@ export interface CalendarioInstagramProps {
   /** Filtro de marca; por defecto, las dos. */
   marca?: MarcaId | "todas";
   vistaInicial?: VistaCalendario;
-  /** Si se pasa, el menú de cada pieza ofrece «Abrir la pieza». */
+  /** Si se pasa, el menú de cada pieza ofrece «Abrir la pieza» y un borrador se abre al pulsarlo. */
   onAbrirPieza?: (piezaId: string) => void;
   /** Alto mínimo (px) por debajo del cual la página hace scroll; ver useAlturaDisponible. */
   altoMinimo?: number;
@@ -184,8 +222,8 @@ export interface CalendarioInstagramProps {
 }
 
 /**
- * Calendario de Instagram (semana y mes) con las piezas programadas y las
- * publicadas, en hora de Madrid. Cada pieza: miniatura, hora, marca y estado;
+ * Calendario de Instagram (semana y mes) con las piezas programadas, las
+ * publicadas y los borradores de campaña (borde discontinuo), en hora de Madrid. Cada pieza: miniatura, hora, marca y estado;
  * su menú permite mover (reprogramar), cancelar, ver el error, abrir la pieza
  * y verla en Instagram. Ocupa el alto que queda en pantalla
  * (useAlturaDisponible): sin scroll de página, el scroll va dentro de cada día.
@@ -201,7 +239,7 @@ export function CalendarioInstagram({ marca = "todas", vistaInicial = "semana", 
   const { desde, hasta } = useMemo(() => rangoVista(vista, dia), [vista, dia]);
   const { data, isLoading, error } = useCalendarioInstagram(desde, hasta);
   const porDia = useMemo(() => {
-    const eventos = construirEventos(data?.programaciones ?? [], data?.publicadas ?? []).filter((e) => marca === "todas" || e.marca === marca);
+    const eventos = construirEventos(data?.programaciones ?? [], data?.publicadas ?? [], data?.borradores ?? []).filter((e) => marca === "todas" || e.marca === marca);
     return agruparPorDia(eventos);
   }, [data, marca]);
 

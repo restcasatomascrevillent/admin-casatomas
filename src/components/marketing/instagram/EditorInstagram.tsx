@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, XCircle } from "lucide-react";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
@@ -74,7 +74,15 @@ function borradorInicial(): Borrador {
  * llenan el alto de la pestaña y cada una hace su propio scroll (regla del
  * dueño: la página no hace scroll). Por debajo van apiladas y desplaza la pestaña.
  */
-export function EditorInstagram() {
+export interface EditorInstagramProps {
+  /**
+   * Pieza que hay que abrir desde fuera (p. ej. un borrador de campaña desde
+   * el calendario o «Campañas»). Cada `clave` nueva la vuelve a abrir.
+   */
+  abrir?: { pieza: PiezaInstagram; clave: number } | null;
+}
+
+export function EditorInstagram({ abrir = null }: EditorInstagramProps = {}) {
   const qc = useQueryClient();
   const [borrador, setBorrador] = useState<Borrador>(borradorInicial);
   const [servidor, setServidor] = useState<ServidorPieza>(SERVIDOR_VACIO);
@@ -185,6 +193,14 @@ export function EditorInstagram() {
     });
     setLado("publicar");
   };
+
+  // Abrir una pieza que llega de fuera (borradores de campaña).
+  const claveAbierta = useRef<number | null>(null);
+  useEffect(() => {
+    if (!abrir || claveAbierta.current === abrir.clave) return;
+    claveAbierta.current = abrir.clave;
+    abrirPieza(abrir.pieza);
+  }, [abrir]); // abrirPieza solo usa setters
 
   const nuevaPieza = () => {
     setServidor(SERVIDOR_VACIO);

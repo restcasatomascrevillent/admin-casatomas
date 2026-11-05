@@ -222,11 +222,22 @@ export interface ProgramacionConPieza extends ProgramacionBasica {
   pieza?: PiezaResumen | null;
 }
 
+/** Borrador con fecha prevista (campañas, 20261109000000): un plan, aún sin programar. */
+export interface BorradorResumen extends PiezaResumen {
+  fecha_prevista: string | null;
+  campana_id?: string | null;
+  /** Programaciones de la pieza (embebidas): si tiene una activa ya sale como programada. */
+  programaciones?: Array<{ estado: string }> | null;
+}
+
 export interface EventoCalendario {
   clave: string;
-  /** «programada» (pendiente, publicándose o con error) o «publicada» (pieza ya en Instagram). */
-  tipo: "programada" | "publicada";
-  estado: EstadoProgramacion | "publicada";
+  /**
+   * «programada» (pendiente, publicándose o con error), «publicada» (pieza ya
+   * en Instagram) o «borrador» (fecha prevista de una campaña, sin programar).
+   */
+  tipo: "programada" | "publicada" | "borrador";
+  estado: EstadoProgramacion | "publicada" | "borrador";
   instante: string;
   dia: string;
   hora: string;
@@ -246,8 +257,34 @@ const ESTADOS_VISIBLES = new Set(["programada", "publicando", "error"]);
  * su hora programada) y piezas publicadas (en su publicada_at, se publicaran
  * a mano o programadas). Las canceladas no salen. Ordenados por instante.
  */
-export function construirEventos(programaciones: readonly ProgramacionConPieza[], publicadas: readonly PiezaResumen[]): EventoCalendario[] {
+export function construirEventos(
+  programaciones: readonly ProgramacionConPieza[],
+  publicadas: readonly PiezaResumen[],
+  borradores: readonly BorradorResumen[] = [],
+): EventoCalendario[] {
   const eventos: EventoCalendario[] = [];
+  const conProgramacion = new Set(programaciones.filter((p) => ESTADOS_VISIBLES.has(p.estado)).map((p) => p.pieza_id));
+  // Borradores: solo los que aún no están programados ni publicados (si no, ya salen como tales).
+  for (const b of borradores) {
+    if (!b.fecha_prevista || b.publicada_at || b.media_id || b.estado === "publicada" || conProgramacion.has(b.id)) continue;
+    if ((b.programaciones ?? []).some((p) => p.estado === "programada" || p.estado === "publicando")) continue;
+    const { fecha, hora } = utcAMadrid(b.fecha_prevista);
+    eventos.push({
+      clave: `b:${b.id}`,
+      tipo: "borrador",
+      estado: "borrador",
+      instante: b.fecha_prevista,
+      dia: fecha,
+      hora,
+      piezaId: b.id,
+      programacionId: null,
+      marca: b.marca,
+      pieza: b,
+      intentos: 0,
+      error: null,
+      permalink: null,
+    });
+  }
   for (const p of programaciones) {
     if (!ESTADOS_VISIBLES.has(p.estado)) continue;
     const { fecha, hora } = utcAMadrid(p.programada_para);
