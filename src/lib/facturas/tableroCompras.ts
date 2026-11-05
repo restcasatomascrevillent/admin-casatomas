@@ -4,7 +4,7 @@
 //  Rediseño del 05/11/2026: la pestaña «Análisis» es un TABLERO DE GRÁFICAS
 //  FIJAS que sale hecho al abrirla; el copiloto de IA va plegado en un panel.
 //  Los datos llegan en UN JSON de la RPC `tablero_compras(desde, hasta, local)`
-//  (migración 20261105150000): la tablet no descarga los ~1.900 documentos.
+//  (migración 20261105150500): la tablet no descarga los ~1.900 documentos.
 //
 //  Aquí: lectura defensiva de ese JSON, el periodo (Mes · Trimestre · Año ·
 //  Todo, naturales, como Compras: resumenCompras.ts), el periodo anterior
