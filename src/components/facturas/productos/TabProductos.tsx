@@ -531,10 +531,10 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
  * `before:` amplía el toque); fuera de Compras, la tarjeta de dos líneas de siempre.
  */
 /**
- * Casilla de 16 px con zona táctil de 44 (QA C-14): el `before:` amplía el
- * toque a todo el hueco de 44×44 que la rodea.
+ * Hueco de 44×44 de la casilla de 16 px (QA C-14): es un <label>, así que un
+ * toque en cualquier punto del hueco marca o desmarca la casilla.
  */
-const CASILLA_TACTIL = "relative before:absolute before:-inset-3.5 before:content-['']";
+const HUECO_CASILLA = "flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-muted/40";
 
 const chipCategoria = (compacto: boolean, extra: string) =>
   compacto
@@ -588,9 +588,9 @@ function FilaResumen({
         aria-current={abierto ? "true" : undefined}
       >
         {conCasilla && (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-            <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} className={CASILLA_TACTIL} />
-          </div>
+          <label className={HUECO_CASILLA} data-testid="hueco-casilla">
+            <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+          </label>
         )}
         <button type="button" onClick={onAbrir} className={`min-h-11 min-w-0 flex-1 rounded-md px-1.5 py-1 text-left active:bg-muted/50 ${FOCO}`}>
           <span className="flex min-w-0 items-center gap-1.5">
@@ -623,9 +623,13 @@ function FilaResumen({
       }`}
       aria-current={abierto ? "true" : undefined}
     >
-      <div className="flex h-11 w-11 items-center justify-center">
-        {conCasilla && <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} className={CASILLA_TACTIL} />}
-      </div>
+      {conCasilla ? (
+        <label className={HUECO_CASILLA}>
+          <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+        </label>
+      ) : (
+        <div className="h-11 w-11" />
+      )}
       <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 rounded-md px-1 py-1 text-left hover:bg-muted/40">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`min-w-0 break-words font-medium ${lg("lg:truncate")}`}>{p.nombre}</span>

@@ -888,6 +888,19 @@ describe("Compras · QA 05/11/2026", () => {
     expect(within(barra).getByRole("button", { name: /^Todo/ }).textContent).toMatch(/5$/);
   });
 
+  it("C-14: tocar en cualquier punto del hueco de 44 px de la casilla la marca", async () => {
+    montar();
+    fireEvent.click(modo(/^Productos/));
+    const lista = await screen.findByTestId("lista-productos");
+    await within(lista).findByText("Merluza de pincho");
+    const hueco = within(lista).getAllByTestId("hueco-casilla")[0];
+    expect(hueco.tagName).toBe("LABEL");
+    expect(hueco.className).toContain("h-11");
+    expect(hueco.className).toContain("w-11");
+    fireEvent.click(hueco);
+    expect(await screen.findByText("1 seleccionado")).toBeInTheDocument();
+  });
+
   it("Productos no pierde sus filtros al cambiar de modo y volver", async () => {
     montar();
     fireEvent.click(modo(/^Productos/));

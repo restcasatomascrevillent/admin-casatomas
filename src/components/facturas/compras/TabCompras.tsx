@@ -547,6 +547,8 @@ export function TabCompras({
   const conLocalYPeriodo = modo !== "productos";
   const mesElegido = periodo.tipo === "mes" ? periodo.mes : null;
   const cargandoProveedores = (!proveedoresQ.data && !proveedoresQ.isError) || (cargandoDocs && !listaQ.isError);
+  // Sin la lista de proveedores o sin la de documentos no hay recuento que dar («…» y «Sin datos», no «0»).
+  const sinDatosProveedores = !proveedoresQ.data || sinDatosDocs;
   const firmaFiltros =
     filtroDocs !== "todo" || filtrosActivos ? `${filtroDocs}|${local}|${periodo.tipo}|${periodo.tipo === "mes" ? periodo.mes : ""}` : "";
 
@@ -773,7 +775,7 @@ export function TabCompras({
                 {FILTROS_PROVEEDORES.map((f) => (
                   <button key={f.valor} type="button" className={CHIP} aria-pressed={filtroProv === f.valor} onClick={() => setFiltroProv(f.valor)}>
                     {f.etiqueta}
-                    <Cuenta n={cargandoProveedores || sinDatosDocs || buscandoLineas ? null : f.valor === "todos" ? provDelTexto.length : conSinFactura.length} />
+                    <Cuenta n={sinDatosProveedores || buscandoLineas ? null : f.valor === "todos" ? provDelTexto.length : conSinFactura.length} />
                   </button>
                 ))}
                 <Button variant="ghost" className="ml-auto h-11 shrink-0 gap-1.5 px-3 text-sm" onClick={() => setGestionando(true)}>
@@ -813,7 +815,11 @@ export function TabCompras({
                 )}
               </div>
               <p className={PIE_LISTA}>
-                {cargandoProveedores ? "Cargando…" : `${plural(provVisibles.length, "proveedor", "proveedores")} · por gasto con IVA`}
+                {cargandoProveedores
+                  ? "Cargando…"
+                  : sinDatosProveedores
+                    ? "Sin datos"
+                    : `${plural(provVisibles.length, "proveedor", "proveedores")} · por gasto con IVA`}
                 {buscandoLineas && <span className="ml-1.5">· buscando en las líneas…</span>}
               </p>
             </>
