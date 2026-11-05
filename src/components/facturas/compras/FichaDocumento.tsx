@@ -3,7 +3,7 @@ import { Package, Pencil, Plus, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import { formatCurrency, formatDate, formatDateTime } from "@/components/facturas/shared/formatters";
+import { formatCurrency, formatDate, formatDateTime, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
@@ -53,7 +53,7 @@ const SEP = (
 export function FichaDocumento({
   doc,
   avisos,
-  mismoTipo,
+  mediaPrecio,
   facturaDelAlbaran,
   albaranesDeLaFactura,
   onEditar,
@@ -64,8 +64,11 @@ export function FichaDocumento({
 }: {
   doc: Factura;
   avisos: AlertaValidacion[];
-  /** Documentos del mismo tipo (para detectar precios anómalos en las líneas). */
-  mismoTipo: Factura[];
+  /**
+   * Media de referencia del precio de cada línea (documentos del mismo tipo y
+   * proveedor), calculada UNA vez en `TabCompras` con `indicePreciosLinea`.
+   */
+  mediaPrecio?: MediaPrecioLinea;
   /** Si es un albarán ya facturado: la factura que lo recoge (si está cargada). */
   facturaDelAlbaran: Factura | null;
   /** Si es una factura: los albaranes que recoge. */
@@ -209,7 +212,7 @@ export function FichaDocumento({
         ) : (
           <div>
             {doc.productos.map((p) => (
-              <FilaProducto key={p.id} p={p} isMobile allDocs={mismoTipo} onAbrirProducto={onAbrirProducto} />
+              <FilaProducto key={p.id} p={p} isMobile mediaReferencia={mediaPrecio?.(p, doc)} onAbrirProducto={onAbrirProducto} />
             ))}
           </div>
         )}
@@ -219,7 +222,6 @@ export function FichaDocumento({
               key={`nueva-${doc.id}`}
               p={LINEA_VACIA}
               isMobile
-              allDocs={mismoTipo}
               nuevaEnFacturaId={doc.id}
               onCerrarNueva={() => setAñadiendo(false)}
             />

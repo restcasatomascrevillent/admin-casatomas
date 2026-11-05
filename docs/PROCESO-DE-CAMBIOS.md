@@ -15,7 +15,7 @@ Nada llega a producción sin el paso 5, y el paso 5 solo lo da el dueño, a mano
 | **Demo** | `staging` | `sfonaclosuafvlhutkon` (casatomas-staging) | https://web-casatomas-git-staging-casa-tomas.vercel.app | https://admin-casatomas-git-staging-casa-tomas.vercel.app |
 | **Producción** | `main` | `haqmmdfdzzatdnrrcgez` (casatomas-prod) | https://web-casatomas.vercel.app | https://admin-casatomas.vercel.app |
 
-- La demo es una **copia de los datos reales**, pero sin Stripe ni Resend: no cobra ni manda correos. Las URL de demo piden entrar con la cuenta de Vercel.
+- La demo es una **copia de los datos reales**, pero sin Stripe ni Resend: no cobra ni manda correos. Desde el 04/11/2026 las URL de demo (web, panel y Touza) se abren sin entrar con la cuenta de Vercel: se quitó *Vercel Authentication* de los tres proyectos a petición del dueño. El panel sigue pidiendo su usuario y contraseña. Para volver a cerrarlas: Vercel → proyecto → *Settings → Deployment Protection → Vercel Authentication*.
 - El proyecto viejo (`jeamoczmbfsnwkfjxcyo`, repos de `oficiososia`) ya no es producción. No se toca.
 
 ## Paso a paso

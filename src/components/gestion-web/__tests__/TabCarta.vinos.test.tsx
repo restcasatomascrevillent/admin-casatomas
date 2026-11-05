@@ -55,6 +55,8 @@ vi.mock("@/components/carta/VinoForm", () => ({
 vi.mock("@/components/carta/CoctelForm", () => ({ CoctelForm: () => null }));
 vi.mock("@/components/carta/AjustePreciosModal", () => ({ AjustePreciosModal: () => null }));
 vi.mock("@/components/carta/BotonVinoDesdeFoto", () => ({ BotonVinoDesdeFoto: () => null }));
+// La votación del vino favorito tiene sus propias pruebas (EncuestaVinoFavorito.test.tsx).
+vi.mock("@/components/carta/EncuestaVinoFavorito", () => ({ EncuestaVinoFavorito: () => null }));
 
 import TabCarta from "../tabs/TabCarta";
 

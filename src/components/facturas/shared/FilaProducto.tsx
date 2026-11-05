@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from "react";
-import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura, type Factura } from "@/hooks/useFacturas";
+import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCantidadLinea, formatCurrency, formatNumero } from "./formatters";
+import { formatCantidadLinea, formatCurrency, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
 
 /**
@@ -57,14 +57,18 @@ const NombreLinea = ({
 export const FilaProducto = ({
   p,
   isMobile,
-  allDocs,
+  mediaReferencia,
   onAbrirProducto,
   nuevaEnFacturaId,
   onCerrarNueva,
 }: {
   p: ProductoFactura;
   isMobile?: boolean;
-  allDocs: Factura[];
+  /**
+   * Media de referencia del precio unitario (otras líneas del mismo producto y
+   * proveedor; ver `indicePreciosLinea`). Sin ella no se avisa de nada.
+   */
+  mediaReferencia?: number;
   /** Si se pasa, el nombre de la línea enlaza con la ficha de su producto. */
   onAbrirProducto?: (productoId: number) => void;
   /** Modo «línea nueva»: `p` va vacío, se abre el formulario y Guardar crea la línea en ese documento. */
@@ -115,16 +119,13 @@ export const FilaProducto = ({
     }
   };
 
-  const pastPrices = allDocs
-    .flatMap(f => f.productos)
-    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-    .map(past => past.precio_unitario as number);
-
-  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
-
-  // Warning si el precio unitario cambia drásticamente respecto al último histórico (+100%)
-  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
-  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
+  // Aviso si el precio unitario pasa del doble de la media de referencia (mismo
+  // proveedor y nombre, sin precios a 0; la calcula quien monta la fila con
+  // `indicePreciosLinea`, una sola vez para todas las líneas).
+  const avgPrice = mediaReferencia;
+  const hasAnomaly = precioAnomalo(p.precio_unitario, avgPrice);
+  const sinDescuento = valorSinDescuento(p);
+  const showAnomalyWarning = isEditing ? precioAnomalo(precioUnitario === "" ? null : Number(precioUnitario), avgPrice) : hasAnomaly;
 
   if (isMobile) {
     if (isEditing) {
@@ -161,7 +162,7 @@ export const FilaProducto = ({
           <div className="flex items-baseline justify-between gap-2">
             <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
             <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
-              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
+              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatCurrency(avgPrice ?? null)})</AyudaPopover>}
               {formatCurrency(p.precio)}
             </span>
           </div>
@@ -174,6 +175,9 @@ export const FilaProducto = ({
               </>
             )}
           </p>
+          {sinDescuento && (
+            <p className="text-muted-foreground" title={sinDescuento.titulo}>{sinDescuento.texto}</p>
+          )}
         </div>
         <Button
           variant="ghost"
@@ -263,11 +267,16 @@ export const FilaProducto = ({
       </TableCell>
       <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
         <div className="flex items-center justify-end gap-1.5">
-          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
+          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatCurrency(avgPrice ?? null)})</AyudaPopover>}
           <span>{formatCurrency(p.precio_unitario ?? null)}</span>
         </div>
       </TableCell>
-      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">{formatCurrency(p.precio)}</TableCell>
+      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
+        {formatCurrency(p.precio)}
+        {sinDescuento && (
+          <span className="block whitespace-normal text-xs font-normal text-muted-foreground" title={sinDescuento.titulo}>{sinDescuento.texto}</span>
+        )}
+      </TableCell>
     </TableRow>
   );
 };

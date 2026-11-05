@@ -12,7 +12,15 @@ import type { OrigenImporte } from "./esquema.ts";
 import type { DatosNormalizados } from "./extraccion.ts";
 import { type ClienteOpenAI, vec } from "./openai.ts";
 import { costeDeCliente, guardarCosteLectura, leerCosteTrabajo, sumarCostes } from "./costeLectura.ts";
-import { archivarOriginal, type ConfigDrive, moverPendiente, rutaDefinitiva, STORAGE_BUCKET } from "./archivo.ts";
+import {
+  archivarOriginal,
+  type ConfigDrive,
+  copiarADriveDesdeStorage,
+  driveActivo,
+  moverPendiente,
+  rutaDefinitiva,
+  STORAGE_BUCKET,
+} from "./archivo.ts";
 import { decidirCoincidencia, leerPagina, type PaginaDocumento } from "./paginasDocumento.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -39,6 +47,13 @@ export interface EntradaGuardado {
   paginas?: number;
   /** Trabajo de OCR que lo produce (facturas.ocr_trabajo_id, UNIQUE). */
   ocrTrabajoId?: string | null;
+  /**
+   * El documento viene COMPLETO (importación histórica, 04/11/2026): no se
+   * busca «página x/y» en las observaciones para marcarlo como página suelta.
+   */
+  documentoCompleto?: boolean;
+  /** Columnas extra de la cabecera, en el MISMO insert (importación: local, import_clave). */
+  cabeceraExtra?: Record<string, unknown>;
 }
 
 /** Resumen de la factura que ya existe (ocr_factura_existente). */
@@ -195,6 +210,33 @@ function filasProductos(
   conBultos = true,
   conIvaPct = true,
 ) {
+  return igualarColumnasValor(filasProductosSinIgualar(d, embeddings, conColumnas04b, conBultos, conIvaPct));
+}
+
+/**
+ * En un insert por lotes, PostgREST toma la unión de claves de todas las filas
+ * y pone NULL (no el DEFAULT) en las que no la traen. `importe_bruto_estimado`
+ * es NOT NULL: si alguna línea trae el valor sin descuento, todas deben traer
+ * las tres columnas. Si ninguna las trae (OCR), no se añaden.
+ */
+export function igualarColumnasValor<T extends Record<string, unknown>>(filas: T[]): T[] {
+  const alguna = filas.some((f) => "importe_bruto" in f || "descuento_pct" in f);
+  if (!alguna) return filas;
+  return filas.map((f) => ({
+    descuento_pct: null,
+    importe_bruto: null,
+    importe_bruto_estimado: false,
+    ...f,
+  }));
+}
+
+function filasProductosSinIgualar(
+  d: DatosNormalizados,
+  embeddings: number[][],
+  conColumnas04b: boolean,
+  conBultos = true,
+  conIvaPct = true,
+) {
   return d.productos.map((p, i) => ({
     nombre: p.nombre,
     cantidad: p.cantidad,
@@ -210,7 +252,22 @@ function filasProductos(
     // Tipo de IVA impreso en la línea (migración 20261006105000). Igual que
     // `bultos`: solo si hay valor, para no depender de que la columna exista.
     ...(conIvaPct && p.iva_pct !== null && p.iva_pct !== undefined ? { iva_pct: p.iva_pct } : {}),
+    // Valor sin descuento (migración 20261104170000). Solo lo trae la
+    // importación histórica: el OCR no lo rellena y no depende de la columna.
+    ...valorSinDescuento(p),
   }));
+}
+
+/** descuento_pct / importe_bruto / importe_bruto_estimado de la línea, solo si vienen. */
+export function valorSinDescuento(p: unknown): Record<string, number | boolean> {
+  const l = p as { descuento_pct?: unknown; importe_bruto?: unknown; importe_bruto_estimado?: unknown };
+  const num = (v: unknown) => typeof v === "number" && Number.isFinite(v);
+  return {
+    ...(num(l.descuento_pct) ? { descuento_pct: l.descuento_pct as number } : {}),
+    ...(num(l.importe_bruto)
+      ? { importe_bruto: l.importe_bruto as number, importe_bruto_estimado: l.importe_bruto_estimado === true }
+      : {}),
+  };
 }
 
 /** ¿El error es que falta la columna `bultos` (migración 20261005150000 sin aplicar)? */
@@ -352,7 +409,7 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   // Página suelta de un documento de varias («Página 2/2»): sus líneas llevan
   // su número de página (así, al llegar las demás, se sabe cuáles faltan) y
   // un aviso de que faltan las otras.
-  const pagSuelta = (e.paginas ?? 1) <= 1 ? leerPagina(d) : null;
+  const pagSuelta = !e.documentoCompleto && (e.paginas ?? 1) <= 1 ? leerPagina(d) : null;
   const alertasPrevias = pagSuelta ? [...e.alertasPrevias, alertaPaginaSuelta(pagSuelta)] : e.alertasPrevias;
   if (pagSuelta) d.productos = d.productos.map((p) => ({ ...p, pagina: pagSuelta.actual }));
 
@@ -378,13 +435,14 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
   };
   const extra04b = { paginas: Math.min(20, Math.max(1, e.paginas ?? 1)), ...(e.ocrTrabajoId ? { ocr_trabajo_id: e.ocrTrabajoId } : {}) };
   let conColumnas04b = true;
-  let ins = await supabase.from("facturas").insert({ ...cabecera, ...extra04b }).select("id").single();
+  const extra = e.cabeceraExtra ?? {};
+  let ins = await supabase.from("facturas").insert({ ...cabecera, ...extra04b, ...extra }).select("id").single();
   if (ins.error && esColumnaNueva(ins.error.message) && !e.ocrTrabajoId) {
     // Migración 20261005120000 sin aplicar: el camino de una página sigue
     // funcionando como en v101 (sin pagina/orden).
     console.warn("[procesar-factura] columnas 04b ausentes; se guarda sin ellas:", ins.error.message);
     conColumnas04b = false;
-    ins = await supabase.from("facturas").insert(cabecera).select("id").single();
+    ins = await supabase.from("facturas").insert({ ...cabecera, ...extra }).select("id").single();
   }
   if (ins.error) throw new Error(`insert factura: ${ins.error.message}`);
   const facturaId: number = ins.data.id;
@@ -419,10 +477,13 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     // 8) Validación de cordura
     const alertas = await validarYGuardarAlertas(supabase, facturaId, alertasPrevias);
 
-    // 9) Original
+    // 9) Original (Drive: carpeta del proveedor → mes; Storage como respaldo)
+    const proveedorCarpeta = driveActivo(ctx.drive) ? await nombreProveedorFactura(supabase, facturaId, d.proveedor) : null;
     let archivo = { ok: false, error: null as string | null };
     if (e.original.tipo === "base64") {
-      const a = await archivarOriginal(ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId);
+      const a = await archivarOriginal(
+        ctx.drive, supabase, e.original.b64, e.original.nombre, e.original.mime, d.fecha, facturaId, proveedorCarpeta,
+      );
       archivo = { ok: !!(a.drive_url || a.archivo_path), error: a.error };
       if (a.drive_url || a.archivo_path) {
         const { error } = await supabase.from("facturas").update({
@@ -435,7 +496,11 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
       const m = await moverPendiente(supabase, e.original.path, rutaDefinitiva(d.fecha, facturaId, e.original.nombre));
       archivo = { ok: !!m.path, error: m.error };
       if (m.path) {
-        const { error } = await supabase.from("facturas").update({ archivo_path: m.path }).eq("id", facturaId);
+        // Documentos largos: el original vive en Storage; se copia también a Drive.
+        const driveUrl = await copiarADriveDesdeStorage(ctx.drive, supabase, m.path, e.original.nombre, d.fecha, proveedorCarpeta);
+        const { error } = await supabase.from("facturas")
+          .update({ archivo_path: m.path, ...(driveUrl ? { drive_url: driveUrl } : {}) })
+          .eq("id", facturaId);
         if (error) console.error("[archivo] No se pudo guardar la referencia al original:", error.message);
       } else {
         // El original sigue a salvo en pendientes/: se apunta ahí.
@@ -740,4 +805,24 @@ export async function guardarOriginalPendiente(
     console.warn("[duplicado] no se pudo guardar el original pendiente:", e);
     return null;
   }
+}
+
+/**
+ * Nombre del proveedor para la carpeta de Drive. El trigger de `facturas`
+ * resuelve `proveedor_id` al insertar (proveedores_unificados), así que se usa
+ * el nombre canónico de `proveedores`; si no lo hay, el leído del documento.
+ * Nunca lanza.
+ */
+// deno-lint-ignore no-explicit-any
+async function nombreProveedorFactura(supabase: any, facturaId: number, leido: string | null): Promise<string | null> {
+  try {
+    const { data } = await supabase.from("facturas").select("proveedor_id").eq("id", facturaId).single();
+    if (data?.proveedor_id) {
+      const { data: p } = await supabase.from("proveedores").select("nombre").eq("id", data.proveedor_id).single();
+      if (p?.nombre) return p.nombre;
+    }
+  } catch (e) {
+    console.warn("[Drive] No se pudo leer el proveedor canónico; se usa el leído:", e);
+  }
+  return leido ?? null;
 }

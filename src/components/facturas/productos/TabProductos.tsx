@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatCurrency, formatDateCorta } from "@/components/facturas/shared/formatters";
+import { formatCurrency, formatDateCorta, plural } from "@/components/facturas/shared/formatters";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   useCategoriasProducto,
@@ -290,7 +290,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
               disabled={clasificar.isPending}
               onClick={() => clasificar.mutate()}
               aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
-              title={`Clasificar ${pendientes} línea(s) con IA`}
+              title={`Clasificar ${plural(pendientes, "línea", "líneas")} con IA`}
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
               <span className="tabular-nums">{pendientes}</span>
@@ -309,9 +309,17 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         role="toolbar"
         aria-label="Gasto por categoría"
       >
-        <button type="button" onClick={() => elegirChip("todas")} aria-pressed={chipActivo("todas")} className={chipCategoria(compacto, "")}>
+        <button
+          type="button"
+          onClick={() => elegirChip("todas")}
+          aria-pressed={chipActivo("todas")}
+          className={chipCategoria(compacto, "")}
+          title="Gasto sin IVA (importes de línea)"
+        >
           <span className="font-semibold">Todas</span>
-          <span className="tabular-nums text-muted-foreground">{formatCurrency(gastoTotal)}</span>
+          <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+            {formatCurrency(gastoTotal)} <span className="text-[11px] pointer-coarse:text-xs">sin IVA</span>
+          </span>
         </button>
         {totales.map((t) => (
           <button
@@ -319,11 +327,12 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
             type="button"
             onClick={() => elegirChip(t.clave)}
             aria-pressed={chipActivo(t.clave)}
+            title="Gasto sin IVA (importes de línea)"
             className={chipCategoria(compacto, t.clave === "pendiente" ? "!border-amber-400/70 bg-amber-50 dark:bg-amber-950/30" : "")}
           >
             <span className="whitespace-nowrap font-semibold">{t.nombre}</span>
             <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-              {t.clave === "pendiente" ? `${t.lineas} línea(s) · ${formatCurrency(t.gasto)}` : formatCurrency(t.gasto)}
+              {t.clave === "pendiente" ? `${plural(t.lineas, "línea", "líneas")} · ${formatCurrency(t.gasto)}` : formatCurrency(t.gasto)}
             </span>
           </button>
         ))}
@@ -341,7 +350,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
             <span className="flex items-center gap-1 whitespace-nowrap font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-red-600" aria-hidden="true" /> Subieron de precio
             </span>
-            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{nombresSubida.size} producto(s)</span>
+            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{plural(nombresSubida.size, "producto", "productos")}</span>
           </button>
         )}
       </div>
@@ -423,8 +432,8 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
 
       <p className="shrink-0 text-xs text-muted-foreground">
         {vista === "productos"
-          ? `${visibles.length} producto(s) · ${formatCurrency(gastoVisible)}`
-          : `${pendientes} línea(s) sin clasificar`}{" "}
+          ? `${plural(visibles.length, "producto", "productos")} · ${formatCurrency(gastoVisible)}`
+          : `${plural(pendientes, "línea", "líneas")} sin clasificar`}{" "}
         · importes de línea sin IVA
       </p>
 
@@ -498,7 +507,7 @@ function FilaResumen({
     const detalle = [
       ruta ?? "Sin categoría",
       nombresProv.length > 0 ? nombresProv.join(", ") : null,
-      `${p.compras} compra(s)`,
+      plural(p.compras, "compra", "compras"),
       formatCantidades(p.cantidades),
       p.ultimo_precio !== null ? `últ. ${formatCurrency(p.ultimo_precio)}` : null,
     ]
@@ -574,7 +583,7 @@ function FilaResumen({
       {/* Móvil, tablet y Compras: gasto a la derecha; el resto debajo. lg+ (lista ancha): columnas. */}
       <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatCurrency(p.gasto)}</span>
       <span className={`col-start-2 col-end-4 text-xs text-muted-foreground ${lg("lg:hidden")}`}>
-        {p.compras} compra(s) · {formatCantidades(p.cantidades)}
+        {plural(p.compras, "compra", "compras")} · {formatCantidades(p.cantidades)}
         {p.ultimo_precio !== null && ` · últ. ${formatCurrency(p.ultimo_precio)}`}
       </span>
       {!compacta && (

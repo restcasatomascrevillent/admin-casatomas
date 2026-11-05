@@ -94,3 +94,29 @@ export const useFusionarProveedores = () =>
     },
     (r) => `Fusionados: ${r?.proveedores_borrados ?? 0} proveedor(es) menos, ${r?.documentos_movidos ?? 0} documento(s) movidos`,
   );
+
+/** proveedores.notas_ia por id (columna de 20261104150000; sin ella, mapa vacío). */
+export const useNotasIaProveedores = () =>
+  useQuery({
+    queryKey: [CLAVE_PROVEEDORES, "notas_ia"],
+    queryFn: async (): Promise<Record<number, string>> => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).from("proveedores").select("id,notas_ia").not("notas_ia", "is", null);
+      if (error) return {};
+      const m: Record<number, string> = {};
+      for (const f of (data ?? []) as { id: number; notas_ia: string }[]) m[Number(f.id)] = f.notas_ia;
+      return m;
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+
+export const useGuardarNotasIaProveedor = () =>
+  useMutacionProveedores(
+    async ({ id, notas }: { id: number; notas: string }) => {
+      const { error } = await rpc("proveedores_notas_ia_guardar", { p_id: id, p_notas: notas });
+      if (error) throw error;
+      return null;
+    },
+    () => "Indicaciones para la IA guardadas",
+  );

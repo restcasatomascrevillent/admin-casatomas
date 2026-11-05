@@ -4,6 +4,7 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
 import { crearClienteOpenAI } from "./openai.ts";
+import { cargarIndicaciones, conIndicaciones } from "./indicaciones.ts";
 import { crearRegistroUso, type RegistroUsoOcr } from "./registroUso.ts";
 import { anadirPagina, type ContextoGuardado, sustituirFactura } from "./guardado.ts";
 import { iniciarTrabajo, validarInicio } from "./trabajos.ts";
@@ -52,10 +53,10 @@ const cfgAuth: ConfigAuth = {
 // Google Drive (Opción A: OAuth de usuario real con refresh token). Mientras
 // los secrets GOOGLE_* no existan, el original va a Supabase Storage.
 const drive = {
-  clientId: Deno.env.get("GOOGLE_CLIENT_ID") ?? "",
-  clientSecret: Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "",
-  refreshToken: Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "",
-  parentFolder: Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "",
+  clientId: (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim(),
+  clientSecret: (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim(),
+  refreshToken: (Deno.env.get("GOOGLE_REFRESH_TOKEN") ?? "").trim(),
+  parentFolder: (Deno.env.get("GOOGLE_DRIVE_PARENT_FOLDER_ID") ?? "").trim(),
 };
 
 // Modelo de visión: secreto opcional OCR_MODELO (ver modelo.ts).
@@ -75,7 +76,11 @@ function contexto(disparador = `subida:${crypto.randomUUID()}`): ContextoGuardad
   const registro = crearRegistroUso({ funcion: "procesar-factura", disparador, cliente: supabase });
   return {
     supabase,
-    openai: crearClienteOpenAI({ apiKey: claveOpenAI("ocr"), config: cfgModelo, alUsar: registro.alUsar }),
+    // Indicaciones por proveedor (proveedores.notas_ia) en el prompt de extracción.
+    openai: conIndicaciones(
+      crearClienteOpenAI({ apiKey: claveOpenAI("ocr"), config: cfgModelo, alUsar: registro.alUsar }),
+      () => cargarIndicaciones(supabase),
+    ),
     drive,
     registro,
   };

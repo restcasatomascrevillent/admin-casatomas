@@ -11,7 +11,6 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useColaSubida } from "@/hooks/useColaSubida";
 import { type ElementoCola, progresoTanda } from "@/lib/facturas/colaSubida";
-import type { Esperado } from "@/lib/facturas/documentoLargo";
 import type { PendienteDecidir } from "@/lib/facturas/pendientesDecidir";
 import {
   claseFichero,
@@ -25,7 +24,8 @@ import {
 import { cn } from "@/lib/utils";
 import { FotoExistente } from "./AvisoDuplicadoDialog";
 import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
-import { type DecisionDuplicado, SustituirFacturaDialog } from "./SustituirFacturaDialog";
+import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
+import { useDecisionDuplicado } from "./useDecisionDuplicado";
 
 /** Dónde se ve el documento ya guardado (la pestaña Compras, en Documentos). */
 const RUTA_COMPRAS = "/facturas?tab=compras";
@@ -51,7 +51,7 @@ export function SubidaFacturas() {
   // Segundo input solo para la cámara de la tablet/móvil (`capture`): abre la
   // cámara directamente en vez del selector de archivos.
   const camaraInputRef = useRef<HTMLInputElement>(null);
-  const [decision, setDecision] = useState<DecisionDuplicado | null>(null);
+  const { decision, setDecision, cancelar, confirmar: confirmarDecision } = useDecisionDuplicado({ sustituir, anadirPagina });
   /** Fotos marcadas para unirlas como UN documento. */
   const [marcados, setMarcados] = useState<Set<string>>(() => new Set());
 
@@ -76,14 +76,6 @@ export function SubidaFacturas() {
     // Limpiar los inputs (permite volver a elegir el mismo archivo).
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (camaraInputRef.current) camaraInputRef.current.value = "";
-  };
-
-  // Los errores los enseña el propio diálogo (se queda abierto con el motivo).
-  const confirmarDecision = async (esperado: Esperado) => {
-    if (!decision) return;
-    if (decision.tipo === "sustituir") await sustituir(decision.s, esperado);
-    else await anadirPagina(decision.a, esperado);
-    setDecision(null);
   };
 
   const marcables = seleccionados.filter((e) => e.fotos || claseFichero(e) === "imagen");
@@ -330,7 +322,7 @@ export function SubidaFacturas() {
       )}
       <SustituirFacturaDialog
         decision={decision}
-        onCancelar={() => setDecision(null)}
+        onCancelar={cancelar}
         onConfirmar={confirmarDecision}
       />
     </div>

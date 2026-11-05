@@ -254,7 +254,7 @@ const barra = () => {
 const boton = (nombre: RegExp) => within(barra()).getByRole("button", { name: nombre });
 
 beforeEach(() => {
-  // jsdom no implementa scrollIntoView (ChatArea baja al último mensaje).
+  // jsdom no implementa scrollIntoView (el copiloto baja al último mensaje).
   Element.prototype.scrollIntoView = vi.fn();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(AHORA);

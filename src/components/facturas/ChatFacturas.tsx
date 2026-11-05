@@ -143,7 +143,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
             )}
           </button>
         </SheetTrigger>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetContent side="left" className="w-[85vw] max-w-72 p-0">
           <SheetHeader className="border-b border-border/50 px-4 py-3">
             <SheetTitle className="text-sm">Historial de análisis</SheetTitle>
           </SheetHeader>

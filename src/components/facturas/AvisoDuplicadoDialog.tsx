@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
+import type { Sustituible } from "@/lib/facturas/documentoLargo";
 
 /** Un documento recién subido que ya existía. */
 export interface AvisoDuplicado {
@@ -20,6 +21,10 @@ export interface AvisoDuplicado {
   tipo: "factura" | "albaran" | null;
   /** Queda en «Pendientes de decidir» (se puede sustituir). */
   pendiente: boolean;
+  /** Si es sustituible, el pop-up ofrece decidir aquí mismo. */
+  sustituible?: Sustituible | null;
+  /** Miniatura de la foto NUEVA (la recién subida), si el navegador aún la tiene. */
+  preview?: string;
 }
 
 interface Existente {
@@ -38,7 +43,12 @@ interface Props {
   restantes: number;
   onCerrar: () => void;
   onVerFicha: (id: number) => void;
+  /** «Decidir» (solo si es pendiente pero no sustituible, p. ej. sin datos): lleva a Cargar. */
   onDecidir: () => void;
+  /** «Sustituir por la nueva»: abre la confirmación de sustitución. */
+  onSustituir?: (s: Sustituible) => void;
+  /** «Dejar la que hay»: descarta el pendiente. */
+  onDejar?: (s: Sustituible) => void;
 }
 
 /** Botón con la foto del documento ya guardado (lee drive_url/archivo_path por id). */
@@ -81,7 +91,8 @@ const eur = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", c
  * Pop-up modal cuando se sube una factura o un albarán que ya estaba subido:
  * enseña los datos del existente y un enlace a SU foto para poder comprobarlo.
  */
-export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, onDecidir }: Props) {
+export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, onDecidir, onSustituir, onDejar }: Props) {
+  const s = aviso.sustituible && onSustituir ? aviso.sustituible : null;
   const { data: existente, isLoading } = useExistente(aviso.facturaId);
 
   const esAlbaran = (existente?.tipo ?? aviso.tipo ?? "").toString().toLowerCase().startsWith("albar");
@@ -108,6 +119,7 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
           <DialogTitle>{titulo}</DialogTitle>
           <DialogDescription>
             Has subido «{aviso.nombre}», pero ya estaba guardado. No se ha creado otro.
+            {s ? " ¿Quieres reemplazar el que hay por el nuevo?" : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -126,7 +138,13 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
           <p className="text-sm text-muted-foreground">No se han podido leer los datos del que ya estaba.</p>
         )}
 
-        {aviso.pendiente && (
+        {aviso.preview && (
+          <figure className="space-y-1">
+            <img src={aviso.preview} alt={`Foto nueva: ${aviso.nombre}`} className="max-h-40 rounded-md border object-contain" />
+            <figcaption className="text-xs text-muted-foreground">La que acabas de subir</figcaption>
+          </figure>
+        )}
+        {aviso.pendiente && !s && (
           <p className="text-sm">
             Queda en «Pendientes de decidir» por si quieres sustituir el que hay.
           </p>
@@ -151,14 +169,30 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
               Ver ficha
             </Button>
           ) : null}
-          {aviso.pendiente && (
-            <Button type="button" variant="outline" className="h-11" onClick={onDecidir}>
-              Decidir
-            </Button>
+          {s ? (
+            <>
+              <Button type="button" variant="ghost" className="h-11 text-muted-foreground" onClick={onCerrar}>
+                Decidir luego
+              </Button>
+              <Button type="button" variant="outline" className="h-11" onClick={() => onDejar?.(s)}>
+                Dejar la que hay
+              </Button>
+              <Button type="button" className="h-11" onClick={() => onSustituir?.(s)}>
+                Sustituir por la nueva
+              </Button>
+            </>
+          ) : (
+            <>
+              {aviso.pendiente && (
+                <Button type="button" variant="outline" className="h-11" onClick={onDecidir}>
+                  Decidir
+                </Button>
+              )}
+              <Button type="button" className="h-11" onClick={onCerrar}>
+                Cerrar
+              </Button>
+            </>
           )}
-          <Button type="button" className="h-11" onClick={onCerrar}>
-            Cerrar
-          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

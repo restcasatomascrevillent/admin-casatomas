@@ -35,6 +35,8 @@ import {
 } from "@/lib/facturas/pendientesDecidir";
 
 import { AvisoDuplicadoDialog, type AvisoDuplicado } from "@/components/facturas/AvisoDuplicadoDialog";
+import { SustituirFacturaDialog } from "@/components/facturas/SustituirFacturaDialog";
+import { useDecisionDuplicado } from "@/components/facturas/useDecisionDuplicado";
 
 export const CLAVE_PENDIENTES = "ocr_pendientes_decidir";
 
@@ -115,7 +117,14 @@ export function ColaSubidaProvider({ children, deps }: Props) {
             });
           } else {
             // El mismo documento: pop-up con enlace a la foto del existente (sin toast, para no avisar dos veces).
-            encolarAviso({ nombre: e.nombre, facturaId: r?.facturaId, tipo, pendiente: true });
+            encolarAviso({
+              nombre: e.nombre,
+              facturaId: r?.facturaId,
+              tipo,
+              pendiente: true,
+              sustituible: r?.sustituible ?? null,
+              preview: e.preview,
+            });
           }
           break;
         case "duplicada":
@@ -228,6 +237,9 @@ export function ColaSubidaProvider({ children, deps }: Props) {
     [cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina],
   );
 
+  // Mismo flujo (relectura + confirmación + servidor) que «Pendientes de decidir».
+  const { decision, setDecision, cancelar, confirmar } = useDecisionDuplicado({ sustituir, anadirPagina });
+
   const aviso = avisos[0];
   return (
     <ColaSubidaContext.Provider value={valor}>
@@ -246,8 +258,17 @@ export function ColaSubidaProvider({ children, deps }: Props) {
             setAvisos((prev) => prev.slice(1));
             navigate(RUTA_CARGAR);
           }}
+          onSustituir={(s) => {
+            setAvisos((prev) => prev.slice(1));
+            setDecision({ tipo: "sustituir", s });
+          }}
+          onDejar={(s) => {
+            descartarPendiente(s.trabajo_id);
+            setAvisos((prev) => prev.slice(1));
+          }}
         />
       )}
+      <SustituirFacturaDialog decision={decision} onCancelar={cancelar} onConfirmar={confirmar} />
     </ColaSubidaContext.Provider>
   );
 }

@@ -82,7 +82,7 @@ describe("Proveedores unificados en Productos", () => {
     const lista = await within(dialogo).findByTestId("lista-proveedores");
     expect(within(lista).getByText(/CIF E13781760/)).toBeInTheDocument();
     expect(within(lista).getByText(/Llega como: «HEREDEROS ANGEL MARIÑO HERMO C\.B\. \(ANGELMAR\)»/)).toBeInTheDocument();
-    expect(within(lista).getByText(/1 albarán\(es\)/)).toBeInTheDocument();
+    expect(within(lista).getByText(/1 albarán · 1\.?153,30\s€ sin factura/)).toBeInTheDocument();
     fireEvent.change(within(dialogo).getByLabelText("Buscar proveedor"), { target: { value: "b-32455032" } });
     expect(within(lista).getAllByRole("listitem")).toHaveLength(1);
     expect(within(lista).getByText("Flopeinversiones, S.L.")).toBeInTheDocument();

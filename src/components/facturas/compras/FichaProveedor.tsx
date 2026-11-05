@@ -3,7 +3,7 @@ import { Merge, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Factura } from "@/hooks/useFacturas";
 import { useFichaProveedor } from "@/hooks/useCompras";
-import { formatCurrency, formatDate, formatDateCorta } from "@/components/facturas/shared/formatters";
+import { formatCurrency, formatDate, formatDateCorta, formatEntero } from "@/components/facturas/shared/formatters";
 import { EditorProveedor, ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
 import { esAlbaranSinFactura, textoFrecuencia } from "@/lib/facturas/compras";
 import type { Proveedor } from "@/lib/facturas/proveedores";
@@ -94,15 +94,16 @@ export function FichaProveedor({
           </p>
         )}
         <dl className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Cifras del proveedor">
-          {dato("Documentos", `${proveedor.facturas} fact. · ${proveedor.albaranes} alb.`)}
-          {dato("Gasto", formatCurrency(ficha?.gasto ?? proveedor.total_facturas + proveedor.total_albaranes), "Gasto (con IVA)")}
+          {dato("Documentos", `${formatEntero(proveedor.facturas)} fact. · ${formatEntero(proveedor.albaranes)} alb.`)}
+          {/* Respaldo mientras carga la ficha: el mismo total que la lista (sin albaranes ya facturados desde 20261105130000). */}
+          {dato("Gasto con IVA", formatCurrency(ficha?.gasto ?? proveedor.total_facturas + proveedor.total_albaranes), "Gasto con IVA: facturas + albaranes sin factura")}
           {dato("Último pedido", ficha?.ultima ? formatDate(ficha.ultima) : proveedor.ultima_fecha ? formatDate(proveedor.ultima_fecha) : null)}
           {dato("Cada cuánto", frecuencia ? `Pide ${frecuencia}` : null)}
-          {dato("Sin factura", String(sinFactura.length), "Albaranes sin factura")}
+          {dato("Sin factura", formatEntero(sinFactura.length), "Albaranes sin factura")}
         </dl>
         {ficha?.reparto && (
           <p className="text-xs text-muted-foreground">
-            En facturas {formatCurrency(ficha.reparto.en_facturas)} · en albaranes sin factura {formatCurrency(ficha.reparto.en_albaranes_sin_factura)}
+            En facturas {formatCurrency(ficha.reparto.en_facturas)} · en albaranes sin factura {formatCurrency(ficha.reparto.en_albaranes_sin_factura)} · con IVA
           </p>
         )}
         {ficha && ficha.otros_parecidos.length > 0 && (
@@ -112,7 +113,9 @@ export function FichaProveedor({
 
       {ficha && ficha.top_productos.length > 0 && (
         <section aria-label="Qué le compras" className="space-y-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Qué le compras</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Qué le compras <span className="font-normal normal-case tracking-normal">· último precio sin IVA</span>
+          </h3>
           <ul className="divide-y divide-border/50 border-y border-border/50">
             {ficha.top_productos.map((t) => (
               <li key={`${t.producto}|${t.unidad ?? ""}`}>
@@ -135,7 +138,9 @@ export function FichaProveedor({
       )}
 
       <section aria-label="Documentos del proveedor" className="space-y-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documentos ({documentos.length})</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Documentos ({formatEntero(documentos.length)}) <span className="font-normal normal-case tracking-normal">· importes con IVA</span>
+        </h3>
         {documentos.length === 0 ? (
           <p className="text-sm text-muted-foreground">Ningún documento cargado.</p>
         ) : (

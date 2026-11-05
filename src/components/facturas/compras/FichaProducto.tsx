@@ -3,7 +3,7 @@ import { Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GraficoSeriePrecio } from "@/components/facturas/GraficoSeriePrecio";
-import { formatCurrency, formatDateCorta, formatNumero } from "@/components/facturas/shared/formatters";
+import { formatCurrency, formatDateCorta, formatNumero, plural } from "@/components/facturas/shared/formatters";
 import { DetalleProductoDialog } from "@/components/facturas/productos/DetalleProductoDialog";
 import { ContenidoProducto } from "./ContenidoProducto";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -97,8 +97,8 @@ export function FichaProducto({
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          {rutaCategoria(mapa, producto.categoria_id) ?? "Sin categoría"} · {producto.compras} compra(s) ·{" "}
-          {formatCantidades(producto.cantidades)} · {formatCurrency(producto.gasto)} (base sin IVA)
+          {rutaCategoria(mapa, producto.categoria_id) ?? "Sin categoría"} · {plural(producto.compras, "compra", "compras")} ·{" "}
+          {formatCantidades(producto.cantidades)} · gasto {formatCurrency(producto.gasto)} <span className="text-xs">sin IVA</span>
         </p>
       </header>
 
@@ -123,7 +123,7 @@ export function FichaProducto({
 
       <section aria-label="Documentos en los que aparece" className="space-y-1 pt-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Aparece en {lineasQ.isLoading ? "…" : `${documentos.length} ${documentos.length === 1 ? "documento" : "documentos"}`}
+          Aparece en {lineasQ.isLoading ? "…" : plural(documentos.length, "documento", "documentos")}
         </h3>
         {!lineasQ.isLoading && documentos.length === 0 && <p className="text-sm text-muted-foreground">Ningún documento todavía.</p>}
         <ul className="divide-y border-y border-border/50">

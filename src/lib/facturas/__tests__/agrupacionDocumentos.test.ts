@@ -8,6 +8,7 @@ import {
   etiquetaMes,
   guardarPlegado,
   leerPlegado,
+  MESES_ABIERTOS_BUSCANDO,
   mesAbierto,
   mesesRecientes,
   proveedorAbierto,
@@ -169,18 +170,28 @@ describe("agruparDocumentos", () => {
 describe("qué grupos están abiertos", () => {
   const hoy = new Date(2026, 9, 10);
 
-  it("por defecto, solo el mes actual y el anterior", () => {
-    expect(mesAbierto("2026-10", {}, hoy, false)).toBe(true);
-    expect(mesAbierto("2026-09", {}, hoy, false)).toBe(true);
-    expect(mesAbierto("2026-08", {}, hoy, false)).toBe(false);
-    expect(mesAbierto("sin-fecha", {}, hoy, false)).toBe(false);
+  it("por defecto (y con cualquier chip), solo el mes actual y el anterior", () => {
+    expect(mesAbierto("2026-10", {}, hoy)).toBe(true);
+    expect(mesAbierto("2026-09", {}, hoy)).toBe(true);
+    expect(mesAbierto("2026-08", {}, hoy)).toBe(false);
+    expect(mesAbierto("sin-fecha", {}, hoy)).toBe(false);
+    expect(mesAbierto("2026-03", {}, hoy, null)).toBe(false);
   });
 
-  it("con búsqueda o chip se abren todos, pero lo que decidió el usuario manda", () => {
-    expect(mesAbierto("2026-03", {}, hoy, true)).toBe(true);
-    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: false }, hoy, true)).toBe(false);
-    expect(mesAbierto("2026-10", { [claveEstadoMes("2026-10")]: false }, hoy, false)).toBe(false);
-    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: true }, hoy, false)).toBe(true);
+  it("con texto buscado se abren solo los 3 meses con resultados más recientes", () => {
+    expect(MESES_ABIERTOS_BUSCANDO).toBe(3);
+    expect(mesAbierto("2025-01", {}, hoy, 0)).toBe(true);
+    expect(mesAbierto("2024-12", {}, hoy, 2)).toBe(true);
+    expect(mesAbierto("2024-11", {}, hoy, 3)).toBe(false);
+    // Aunque sea el mes de hoy: si no está entre los 3 primeros con resultados, plegado.
+    expect(mesAbierto("2026-10", {}, hoy, 5)).toBe(false);
+  });
+
+  it("lo que decidió el usuario manda, con o sin búsqueda", () => {
+    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: false }, hoy, 0)).toBe(false);
+    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: true }, hoy, 7)).toBe(true);
+    expect(mesAbierto("2026-10", { [claveEstadoMes("2026-10")]: false }, hoy)).toBe(false);
+    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: true }, hoy)).toBe(true);
   });
 
   it("los proveedores empiezan abiertos", () => {

@@ -10,6 +10,10 @@
  * web»), la pestaña se ve con «Ver» en la sección «Reservas · Configuración» (`reservas_configuracion`),
  * no por ser admin. Lo que se puede editar dentro lo prueban EditorPlantillasEmail.permisos.test.tsx y
  * ConfiguracionTurnos.permisos.test.tsx.
+ *
+ * También el mismo día («pon subpestañas porque el scroll es eterno»), «General» se repartió en cuatro
+ * chips: «Reglas», «Servicio», «Mesas» y «Turnos». `?sub=general` (enlaces viejos) abre «Reglas». Qué
+ * enseña cada parte del formulario lo prueba ConfiguracionGeneralReservas.partes.test.tsx.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -29,7 +33,13 @@ vi.mock("@/components/reservas/PlanoEspacio2D", () => ({ PlanoEspacio2D: () => n
 vi.mock("@/components/reservas/servicio/ModoServicioPlano", () => ({ ModoServicioPlano: () => null }));
 vi.mock("@/components/reservas/GestionBlacklist", () => ({ GestionBlacklist: () => null }));
 vi.mock("@/components/reservas/ConfiguracionTurnos", () => ({
-  ConfiguracionTurnos: () => <div data-testid="configuracion-general" />,
+  ConfiguracionTurnos: () => <div data-testid="chip-turnos" />,
+}));
+vi.mock("@/components/reservas/ConfiguracionGeneralReservas", () => ({
+  ConfiguracionGeneralReservas: ({ parte }: { parte: string }) => <div data-testid={`chip-${parte}`} />,
+}));
+vi.mock("@/components/reservas/GestionMesasEspacios", () => ({
+  GestionMesasEspacios: () => <div data-testid="chip-mesas" />,
 }));
 vi.mock("@/components/emails/EditorPlantillasEmail", () => ({
   EditorPlantillasEmail: () => <div data-testid="editor-plantillas" />,
@@ -75,72 +85,129 @@ beforeEach(() => {
   h.permisos = new Set(["reservas:view", "reservas:edit", "reservas_configuracion:view"]);
 });
 
+/** Lo que pinta cada chip (los componentes de verdad van simulados arriba). */
+const CONTENIDO_CHIP = {
+  Reglas: "chip-reglas",
+  Servicio: "chip-servicio",
+  Mesas: "chip-mesas",
+  Turnos: "chip-turnos",
+  "Plantillas email": "editor-plantillas",
+} as const;
+type NombreChip = keyof typeof CONTENIDO_CHIP;
+const NOMBRES_CHIP = Object.keys(CONTENIDO_CHIP) as NombreChip[];
+
+/** Solo está el contenido de `activo`: los demás chips no están montados (Radix los desmonta). */
+function soloSeVe(activo: NombreChip) {
+  for (const nombre of NOMBRES_CHIP) {
+    expect(chip(nombre)).toHaveAttribute("aria-selected", String(nombre === activo));
+    if (nombre === activo) expect(screen.getByTestId(CONTENIDO_CHIP[nombre])).toBeInTheDocument();
+    else expect(screen.queryByTestId(CONTENIDO_CHIP[nombre])).not.toBeInTheDocument();
+  }
+}
+
 describe("Reservas › Configuración · subpestañas", () => {
-  it("Configuración abre en «General» (lo de siempre) y ofrece «Plantillas email» como otro chip", () => {
+  it("Configuración abre en «Reglas» y ofrece los cinco chips, en este orden", () => {
     montar();
     pulsar("Configuración");
 
     const chips = screen.getByTestId("chips-subnivel");
     expect(chips).toBeInTheDocument();
-    expect(chip("General")).toHaveAttribute("aria-selected", "true");
-    expect(chip("Plantillas email")).toHaveAttribute("aria-selected", "false");
-    expect(screen.getByTestId("configuracion-general")).toBeInTheDocument();
-    expect(screen.queryByTestId("editor-plantillas")).not.toBeInTheDocument();
+    expect(Array.from(chips.querySelectorAll('[role="tab"]'), (t) => t.textContent)).toEqual(NOMBRES_CHIP);
+    soloSeVe("Reglas");
   });
 
-  it("el chip «Plantillas email» enseña el editor de plantillas, y «General» vuelve a lo de siempre", () => {
+  it.each(NOMBRES_CHIP)("el chip «%s» enseña solo lo suyo, sin salir de Configuración", (nombre) => {
+    montar();
+    pulsar("Configuración");
+    pulsar(nombre);
+
+    soloSeVe(nombre);
+    expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("de «Plantillas email» se vuelve a «Reglas»", () => {
     montar();
     pulsar("Configuración");
     pulsar("Plantillas email");
+    pulsar("Reglas");
 
-    expect(chip("Plantillas email")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("editor-plantillas")).toBeInTheDocument();
-    expect(screen.queryByTestId("configuracion-general")).not.toBeInTheDocument();
-    // Sigue en la pestaña Configuración.
-    expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
-
-    pulsar("General");
-    expect(screen.getByTestId("configuracion-general")).toBeInTheDocument();
-    expect(screen.queryByTestId("editor-plantillas")).not.toBeInTheDocument();
+    soloSeVe("Reglas");
   });
 
-  it("?tab=configuracion&sub=plantillas (destino de la ruta vieja del Super Admin) abre directo las plantillas", () => {
-    montar("/reservas?tab=configuracion&sub=plantillas");
+  it.each([
+    ["/reservas?tab=configuracion&sub=plantillas", "Plantillas email"],
+    ["/reservas?tab=configuracion&sub=reglas", "Reglas"],
+    ["/reservas?tab=configuracion&sub=servicio", "Servicio"],
+    ["/reservas?tab=configuracion&sub=mesas", "Mesas"],
+    ["/reservas?tab=configuracion&sub=turnos", "Turnos"],
+  ] as const)("%s abre directo «%s»", (ruta, nombre) => {
+    montar(ruta);
 
     expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
-    expect(chip("Plantillas email")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("editor-plantillas")).toBeInTheDocument();
+    soloSeVe(nombre);
   });
 
-  it.each(["/reservas?tab=configuracion", "/reservas?tab=configuracion&sub=inventada"])(
-    "%s abre «General»",
-    (ruta) => {
-      montar(ruta);
+  it.each([
+    "/reservas?tab=configuracion",
+    // El chip único de antes del reparto: los enlaces guardados siguen llevando a Configuración.
+    "/reservas?tab=configuracion&sub=general",
+    "/reservas?tab=configuracion&sub=inventada",
+  ])("%s abre «Reglas»", (ruta) => {
+    montar(ruta);
 
-      expect(chip("General")).toHaveAttribute("aria-selected", "true");
-      expect(screen.getByTestId("configuracion-general")).toBeInTheDocument();
-    },
-  );
+    soloSeVe("Reglas");
+  });
 
   it("cambiar de chip a mano limpia el enlace de la URL, como al cambiar de pestaña", () => {
     montar("/reservas?tab=configuracion&sub=plantillas");
-    pulsar("General");
+    pulsar("Turnos");
 
     expect(screen.getByTestId("ubicacion")).toHaveTextContent(/^\/reservas$/);
     // Y no vuelve a saltar a las plantillas al limpiarse la URL.
-    expect(chip("General")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("configuracion-general")).toBeInTheDocument();
+    soloSeVe("Turnos");
   });
 });
 
+describe("Reservas › Configuración · aviso de «Solo lectura»", () => {
+  // Antes lo ponía ConfiguracionTurnos encima de todo el chip «General»; ahora lo pone la página en cada chip.
+  it.each(["Reglas", "Servicio", "Mesas", "Turnos"] as const)(
+    "con solo «Ver», el chip «%s» dice que es solo lectura",
+    (nombre) => {
+      h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
+      montar("/reservas?tab=configuracion");
+      pulsar(nombre);
+
+      expect(screen.getByText("Solo lectura")).toBeInTheDocument();
+      expect(screen.getByText(/no tiene «Puede editar» en «Reservas · Configuración»/)).toBeInTheDocument();
+    },
+  );
+
+  it("en «Plantillas email» no lo repite la página: el editor lleva el suyo", () => {
+    h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
+    montar("/reservas?tab=configuracion&sub=plantillas");
+
+    expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
+  });
+
+  it.each(["Reglas", "Servicio", "Mesas", "Turnos"] as const)(
+    "con «Puede editar», el chip «%s» no lo enseña",
+    (nombre) => {
+      h.permisos = new Set(["reservas:view", "reservas_configuracion:view", "reservas_configuracion:edit"]);
+      montar("/reservas?tab=configuracion");
+      pulsar(nombre);
+
+      expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
+    },
+  );
+});
+
 describe("Reservas › Configuración · permiso propio «Reservas · Configuración»", () => {
-  it("con «Ver» en la sección se ve la pestaña con sus dos chips, aunque no se pueda editar", () => {
+  it("con «Ver» en la sección se ve la pestaña con todos sus chips, aunque no se pueda editar", () => {
     h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
     montar("/reservas?tab=configuracion");
 
     expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
-    expect(chip("General")).toBeInTheDocument();
-    expect(chip("Plantillas email")).toBeInTheDocument();
+    for (const nombre of NOMBRES_CHIP) expect(chip(nombre)).toBeInTheDocument();
   });
 
   it("sin el permiso no hay pestaña Configuración, ni chips, ni plantillas: ni siendo admin ni editando Reservas", () => {

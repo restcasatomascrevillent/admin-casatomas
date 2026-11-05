@@ -8,6 +8,11 @@
       "maxDuration": 120,
       "includeFiles": "{public/modelos/isnet-general-use-u8.onnx,node_modules/onnxruntime-node/bin/napi-v6/linux/x64/**}",
       "excludeFiles": "node_modules/onnxruntime-node/bin/napi-v6/{win32,darwin,linux/arm64}/**"
+    },
+    "api/instagram-render.ts": {
+      "maxDuration": 60,
+      "includeFiles": "{node_modules/@sparticuz/chromium/bin/**,public/instagram/**}",
+      "excludeFiles": "{public/modelos/**,public/ffmpeg/**,node_modules/onnxruntime-node/**,node_modules/onnxruntime-web/**,node_modules/@ffmpeg/**,node_modules/ffmpeg-static/**}"
     }
   },
   "trailingSlash": false,

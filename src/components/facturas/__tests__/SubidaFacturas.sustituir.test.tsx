@@ -53,7 +53,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     });
     montarSubida();
     await enviarUno("ML101511.pdf");
-    fireEvent.click(await screen.findByRole("button", { name: "Cerrar" })); // pop-up de «ya estaba subido»
+    fireEvent.click(await screen.findByRole("button", { name: "Decidir luego" })); // pop-up de «ya estaba subido»
 
     const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
     expect(within(seccion).getByText(/Ya existe la factura ML\/101511 \(8 líneas\)/)).toBeTruthy();
@@ -74,6 +74,48 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     });
     expect(await screen.findByText(/Factura existente sustituida/)).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull();
+  });
+
+  const respuestaDuplicado = () =>
+    invoke.mockImplementation(async (_f: string, opciones?: { body?: Record<string, unknown> }) => {
+      if (opciones?.body?.modo === "iniciar") return RESPUESTA_SERVIDOR_ANTIGUO;
+      if (opciones?.body?.modo === "sustituir") {
+        return { data: { success: true, message: "Factura 54 sustituida: 8 → 54 líneas.", alertas: [] }, error: null };
+      }
+      return {
+        data: { success: true, tipo: "factura", duplicado: true, webhookResponse: { tipo: "factura", duplicado: true }, sustituible },
+        error: null,
+      };
+    });
+
+  it("pop-up de duplicado: «Sustituir por la nueva» pide confirmación, sustituye y quita el pendiente", async () => {
+    respuestaDuplicado();
+    montarSubida();
+    await enviarUno("ML101511.pdf");
+    const popup = await screen.findByRole("dialog");
+    expect(within(popup).getByRole("button", { name: "Dejar la que hay" })).toBeTruthy();
+    fireEvent.click(within(popup).getByRole("button", { name: "Sustituir por la nueva" }));
+    expect(await screen.findByText(/¿Sustituir la factura ML\/101511\?/)).toBeTruthy();
+    expect(invoke.mock.calls.filter((c) => c[1]?.body?.modo === "sustituir")).toHaveLength(0); // aún no: falta confirmar
+    fireEvent.click(screen.getByRole("button", { name: /Sí, sustituir/ }));
+    await waitFor(() => expect(invoke.mock.calls.some((c) => c[1]?.body?.modo === "sustituir")).toBe(true));
+    const llamada = invoke.mock.calls.find((c) => c[1]?.body?.modo === "sustituir")!;
+    expect(llamada[1].body).toEqual({
+      modo: "sustituir", factura_id: 54, trabajo_id: sustituible.trabajo_id,
+      esperado: { lineas: 8, updated_at: "2026-09-29T15:28:55.00448" },
+    });
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull());
+  });
+
+  it("pop-up de duplicado: «Dejar la que hay» descarta el pendiente sin llamar al servidor", async () => {
+    respuestaDuplicado();
+    montarSubida();
+    await enviarUno("ML101511.pdf");
+    fireEvent.click(await screen.findByRole("button", { name: "Dejar la que hay" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.queryByRole("region", { name: "Pendientes de decidir" })).toBeNull();
+    expect(window.localStorage.getItem(CLAVE_DESCARTADOS)).toContain(sustituible.trabajo_id);
+    expect(invoke.mock.calls.some((c) => c[1]?.body?.modo === "sustituir")).toBe(false);
   });
 
   it("un duplicado sin `sustituible` (servidor antiguo) se pinta como siempre, sin botón", async () => {
@@ -115,7 +157,7 @@ describe("SubidaFacturas · duplicado → «Pendientes de decidir» → «Sustit
     );
     montarSubida();
     await enviarUno("ML101511.pdf");
-    fireEvent.click(await screen.findByRole("button", { name: "Cerrar" })); // pop-up de «ya estaba subido»
+    fireEvent.click(await screen.findByRole("button", { name: "Decidir luego" })); // pop-up de «ya estaba subido»
     const seccion = await screen.findByRole("region", { name: "Pendientes de decidir" });
     expect(within(seccion).getByText(/Ya existe la factura ML\/101511 \(8 líneas\)/)).toBeTruthy();
     expect(invoke).toHaveBeenCalledTimes(1);

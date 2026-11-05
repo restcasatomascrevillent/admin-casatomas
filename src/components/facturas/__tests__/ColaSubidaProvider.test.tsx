@@ -167,13 +167,18 @@ describe("ColaSubidaProvider · pop-up de documento ya subido", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("duplicado sustituible: recuerda «Pendientes de decidir» y ofrece Decidir", async () => {
-    const sustituible = { existente: { id: 7, numero_documento: "A-123", lineas: 3 } } as unknown as ResultadoProcesamiento["sustituible"];
+  it("duplicado sustituible: ofrece «Sustituir por la nueva» y «Dejar la que hay» (sin mandar a Cargar) y mantiene la foto del existente", async () => {
+    const sustituible = { trabajo_id: "t-1", existente: { id: 7, numero_documento: "A-123", lineas: 3 } } as unknown as ResultadoProcesamiento["sustituible"];
     await subir(duplicada("dup.pdf", { sustituible }));
     const dialogo = await screen.findByRole("dialog");
-    expect(dialogo.textContent).toContain("Pendientes de decidir");
-    fireEvent.click(screen.getByRole("button", { name: "Decidir" }));
-    expect(screen.getByTestId("ubicacion").textContent).toBe("/facturas?tab=cargar");
+    expect(dialogo.textContent).toContain("reemplazar");
+    expect(screen.getByRole("button", { name: "Sustituir por la nueva" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dejar la que hay" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Decidir" })).toBeNull();
+    expect(await screen.findByRole("link", { name: /Ver la foto del que ya está|Ver documento original/ })).toBeTruthy();
+    // «Sustituir por la nueva» abre la confirmación (relectura).
+    fireEvent.click(screen.getByRole("button", { name: "Sustituir por la nueva" }));
+    expect(await screen.findByText(/¿Sustituir la factura A-123\?/)).toBeTruthy();
   });
 
   it("no aparece para una página añadible ni para un documento guardado", async () => {

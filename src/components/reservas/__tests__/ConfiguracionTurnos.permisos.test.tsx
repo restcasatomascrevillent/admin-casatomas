@@ -1,11 +1,13 @@
 /**
- * Reservas › Configuración › General con permiso propio (04/11/2026, petición del dueño: «que haya un
+ * Reservas › Configuración › Turnos con permiso propio (04/11/2026, petición del dueño: «que haya un
  * permiso para esa pestaña configurable tal y como se hace en gestor web»).
  *
  * Con «Ver» en «Reservas · Configuración» se consulta todo; crear, cambiar, activar o borrar periodos de
- * servicio pide «Puede editar», igual que la RLS de configuracion_turnos (20261104111000). Sin edición se
- * explica una vez, arriba, que es solo lectura (vale también para las reglas de debajo, que apagan sus
- * campos: ConfiguracionGeneralReservas.ocupacion.test.tsx).
+ * servicio pide «Puede editar», igual que la RLS de configuracion_turnos (20261104111000).
+ *
+ * Desde el mismo día esto es solo el chip «Turnos» («pon subpestañas porque el scroll es eterno»): las
+ * reglas ya no van encima, y el aviso de «Solo lectura» lo pone la página en cada chip
+ * (Reservas.configuracion.test.tsx).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -17,9 +19,6 @@ vi.mock("@/hooks/useUserRole", () => ({
     canAccess: seccion === "reservas_configuracion" && (tipo === "view" || h.puedeEditar),
     loading: false,
   }),
-}));
-vi.mock("@/components/reservas/ConfiguracionGeneralReservas", () => ({
-  ConfiguracionGeneralReservas: () => <div data-testid="reglas-generales" />,
 }));
 vi.mock("@/hooks/useEspaciosReserva", () => ({ useEspaciosReserva: () => ({ data: [] }) }));
 vi.mock("@/hooks/useConfiguracionTurnos", () => {
@@ -59,7 +58,7 @@ beforeEach(() => {
 });
 
 describe("ConfiguracionTurnos · «Reservas · Configuración»", () => {
-  it("con «Puede editar»: se crean, cambian, activan y borran periodos, sin aviso de solo lectura", () => {
+  it("con «Puede editar»: se crean, cambian, activan y borran periodos", () => {
     render(<ConfiguracionTurnos />);
 
     expect(screen.getByRole("button", { name: /Nuevo Periodo/ })).toBeInTheDocument();
@@ -69,18 +68,25 @@ describe("ConfiguracionTurnos · «Reservas · Configuración»", () => {
     expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
   });
 
-  it("con solo «Ver»: se ve todo, pero sin crear, editar, activar ni borrar, y se dice por qué", () => {
+  it("con solo «Ver»: se ve todo, pero sin crear, editar, activar ni borrar", () => {
     h.puedeEditar = false;
     render(<ConfiguracionTurnos />);
 
-    expect(screen.getByTestId("reglas-generales")).toBeInTheDocument();
     expect(screen.getByText("Comida")).toBeInTheDocument();
     expect(screen.getByText("13:00 - 16:00")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Nuevo Periodo/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Editar el periodo/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Eliminar el periodo/ })).not.toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Periodo Comida activo" })).toBeDisabled();
-    expect(screen.getByText("Solo lectura")).toBeInTheDocument();
-    expect(screen.getByText(/no tiene «Puede editar» en «Reservas · Configuración»/)).toBeInTheDocument();
+    // El aviso lo pone la página, encima de cada chip: aquí no se repite.
+    expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
+  });
+
+  it("es solo el chip «Turnos»: las reglas de reservas ya no van encima", () => {
+    render(<ConfiguracionTurnos />);
+
+    expect(screen.getByRole("heading", { name: "Configuración de Turnos" })).toBeInTheDocument();
+    expect(screen.queryByText(/Reglas/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Mesas y aforo por espacio")).not.toBeInTheDocument();
   });
 });

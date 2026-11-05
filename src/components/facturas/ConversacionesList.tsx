@@ -49,10 +49,10 @@ export function ConversacionesList({
           onClick={onNueva}
           variant="ghost"
           size="sm"
-          className="w-full justify-start gap-2 text-sm font-medium text-foreground hover:bg-muted/60"
+          className="w-full justify-start gap-2 text-sm font-medium text-foreground hover:bg-muted/60 pointer-coarse:min-h-11"
         >
           <Plus className="h-4 w-4 text-[hsl(38,59%,45%)]" aria-hidden />
-          Nueva conversación
+          Nueva
         </Button>
       </div>
 
@@ -126,7 +126,7 @@ export function ConversacionesList({
           <AlertDialogHeader>
             <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
             <AlertDialogDescription>
-              Se borrarán todos los mensajes de esta conversación. Esta acción no se puede deshacer.
+              Se borra con todos sus mensajes. No se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

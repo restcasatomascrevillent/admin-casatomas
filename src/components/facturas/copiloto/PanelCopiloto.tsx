@@ -24,6 +24,9 @@ import { cn } from "@/lib/utils";
 import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-seguro";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
 import { asuntoDeContexto, separarContexto } from "@/lib/facturas/tableroGraficas";
+import type { DocumentoCitado } from "@/lib/facturas/seriePrecio";
+import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
+import { BotonOriginal } from "../shared/BotonOriginal";
 
 export interface Sugerencia {
   icon: React.ElementType;
@@ -61,6 +64,37 @@ interface Props {
   /** Ids de tarjeta de las gráficas de un mensaje que siguen en el tablero. */
   graficasDe: (mensaje: MensajeChat) => string[];
   onVerGrafica: (tarjetaId: string) => void;
+}
+
+/** Tablas y textos largos de la respuesta: que no ensanchen la columna (estrecha) ni la página en móvil. */
+const CLASES_PROSA =
+  "break-words [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto [&_ul]:my-1 [&_ol]:my-1";
+
+/** Referencias de la respuesta: proveedor · nº · fecha y enlace a la foto del original. */
+function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
+  return (
+    <details className="group rounded-lg border border-border/60 text-sm" open={documentos.length <= 4}>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+        <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+        Documentos citados ({documentos.length})
+      </summary>
+      <ul className="divide-y divide-border/40 px-3 pb-1">
+        {documentos.map((d) => (
+          <li key={d.id} className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 py-1.5 text-xs leading-snug">
+              <span className="font-medium">
+                {d.tipo === "albaran" ? "Albarán" : "Factura"} {d.numero ?? "sin número"}
+              </span>
+              <span className="block truncate text-muted-foreground" title={d.proveedor ?? undefined}>
+                {[d.proveedor, d.fecha ? formatFechaEs(d.fecha) : null].filter(Boolean).join(" · ")}
+              </span>
+            </p>
+            <BotonOriginal driveUrl={d.drive_url} archivoPath={d.archivo_path} variant="desktop" />
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function TypingDots() {
@@ -259,7 +293,7 @@ export function PanelCopiloto({
       </div>
 
       {/* Caja de pregunta: con una tarjeta seleccionada, la pregunta va sobre ella. */}
-      <div className="shrink-0 pb-2 pt-1">
+      <div className="shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1">
         {seleccion && (
           <div className="mb-1 flex items-center gap-1 rounded-lg bg-[hsl(38,59%,45%)]/10 pl-2.5 text-xs text-foreground">
             <Crosshair className="h-3.5 w-3.5 shrink-0 text-[hsl(38,59%,40%)]" aria-hidden />
@@ -288,6 +322,11 @@ export function PanelCopiloto({
             onKeyDown={alPulsar}
             placeholder={seleccion ? "Pregunta sobre la gráfica seleccionada…" : "Escribe tu pregunta…"}
             enterKeyHint="send"
+            onFocus={(e) => {
+              // Móvil: al salir el teclado, que la caja siga a la vista.
+              const el = e.currentTarget;
+              setTimeout(() => el.scrollIntoView?.({ block: "nearest", behavior: "smooth" }), 300);
+            }}
             aria-label="Pregunta para el asistente"
             aria-describedby={seleccion ? "copiloto-seleccion" : undefined}
             disabled={isSending}
@@ -334,7 +373,7 @@ function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
         </span>
       )}
       <div className="max-w-[90%] rounded-2xl rounded-br-md bg-[hsl(38,59%,45%)] px-3 py-1.5 text-sm text-white">
-        <div className="prose prose-sm prose-invert max-w-none prose-p:my-0">
+        <div className="prose prose-sm prose-invert max-w-none break-words prose-p:my-0">
           <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
             {pregunta}
           </ReactMarkdown>
@@ -359,13 +398,15 @@ function MensajeAsistente({
   onVerGrafica: (id: string) => void;
   onRegenerar?: () => void;
 }) {
+  const documentos = (mensaje.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
   return (
-    <div className="flex flex-col gap-0.5">
-      <div className="prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1 prose-ul:my-1">
+    <div className="flex flex-col gap-1">
+      <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1")}>
         <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
           {mensaje.contenido}
         </ReactMarkdown>
       </div>
+      {documentos.length > 0 && <DocumentosCitados documentos={documentos} />}
       <div className="-ml-2 flex flex-wrap items-center gap-x-0.5 text-[11px] text-muted-foreground/80 pointer-coarse:text-xs">
         {graficas.map((id, i) => (
           <button

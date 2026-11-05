@@ -1,23 +1,12 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { rutaDeAviso, TIPO_ICON } from "@/lib/avisos";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Bell, Check, CheckCheck, Clock, AlertTriangle, Info, LayoutGrid, Receipt, Trash2, TrendingUp } from "lucide-react";
+import { Bell, Check, CheckCheck, Info, Trash2 } from "lucide-react";
 import { useNotificacionesDashboard } from "@/hooks/useNotificacionesDashboard";
 import { cn } from "@/lib/utils";
-
-const TIPO_ICON: Record<string, typeof AlertTriangle> = {
-  solicitud_pendiente: AlertTriangle,
-  reserva_nueva: Clock,
-  // Aviso del cron `reservas-aviso-sin-asignar`: reserva dentro de la ventana
-  // de asignación que aún no tiene sala o mesa.
-  reserva_sin_asignar: LayoutGrid,
-  // Fin de una tanda de subida de facturas en segundo plano (ColaSubidaProvider).
-  facturas_subida: Receipt,
-  // Trigger de productos_factura (20261007170000): producto más caro que su referencia.
-  subida_precio: TrendingUp,
-  sistema: Info,
-};
 
 function timeAgo(dateStr: string): string {
   const now = new Date();
@@ -44,26 +33,19 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
   const { notificaciones, countNoLeidas, marcarLeida, marcarTodasLeidas, eliminarNotificacion } =
     useNotificacionesDashboard();
   const navigate = useNavigate();
+  const [abierto, setAbierto] = useState(false);
 
   const handleClick = (notif: (typeof notificaciones)[0]) => {
     marcarLeida(notif.id);
-    // Las solicitudes viven ahora dentro de la pestaña unificada "Reservas",
-    // filtradas por "Solicitudes sin resolver" (antes: ?tab=solicitudes).
-    if (notif.tipo === "reserva_sin_asignar") {
-      // Reserva sin sala o sin mesa dentro de la ventana: al panel de
-      // asignación (pestaña "Asignación" de /reservas).
-      navigate("/reservas?tab=asignacion");
-    } else if (notif.referencia_tipo === "solicitud") {
-      navigate("/reservas?tab=reservas&status=solicitudes");
-    } else if (notif.referencia_tipo === "facturas_cargar") {
-      navigate("/facturas?tab=cargar");
-    } else if (notif.referencia_tipo === "facturas_productos") {
-      navigate("/facturas?tab=productos");
+    const ruta = rutaDeAviso(notif);
+    if (ruta) {
+      setAbierto(false);
+      navigate(ruta);
     }
   };
 
   return (
-    <Popover>
+    <Popover open={abierto} onOpenChange={setAbierto}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -91,7 +73,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
           debe crecer hacia la derecha. Con el "end" de antes quedaba anclado
           al borde de la ventana por la corrección de colisiones, no al botón.
           `collisionPadding` evita que se pegue al borde en móvil. */}
-      <PopoverContent className="w-80 p-0" align="start" sideOffset={8} collisionPadding={8}>
+      <PopoverContent className="w-[min(20rem,calc(100vw-1rem))] p-0" align="start" sideOffset={8} collisionPadding={8}>
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b">
           <span className="text-sm font-medium">Notificaciones</span>
@@ -109,7 +91,7 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
         </div>
 
         {/* Lista */}
-        <div className="max-h-[min(360px,60vh)] overflow-y-auto overscroll-contain custom-scrollbar">
+        <div className="max-h-[min(320px,50vh)] overflow-y-auto overscroll-contain custom-scrollbar">
           {notificaciones.length === 0 ? (
             <div className="p-6 text-center text-sm text-muted-foreground">
               Sin notificaciones
@@ -198,6 +180,19 @@ export function CentroNotificaciones({ className }: CentroNotificacionesProps = 
               })}
             </div>
           )}
+        </div>
+
+        <div className="border-t p-2">
+          <Button
+            variant="ghost"
+            className="h-10 w-full text-sm"
+            onClick={() => {
+              setAbierto(false);
+              navigate("/avisos");
+            }}
+          >
+            Ver todos los avisos
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

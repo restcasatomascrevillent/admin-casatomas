@@ -27,12 +27,14 @@ const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 const GestionWeb = lazy(() => import("./pages/GestorWeb"));
 const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(() => import("./pages/Marketing"));
+const Instagram = lazy(() => import("./pages/Instagram"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(() => import("./pages/Cheques"));
 const Tienda = lazy(() => import("./pages/Tienda"));
 const Facturas = lazy(() => import("./pages/Facturas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
+const Avisos = lazy(() => import("./pages/Avisos"));
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
@@ -130,11 +132,15 @@ const App = () => (
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
+                  {/* Instagram: sección propia desde el 05/11/2026 (antes, pestaña de Newsletter). Sección de permisos «marketing». */}
+                  <Route path="/instagram" element={pagina(<Instagram />)} />
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                   <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
+                  {/* Historial de avisos (campana): para todos los roles. */}
+                  <Route path="/avisos" element={pagina(<Avisos />)} />
                   <Route path="/ayuda" element={pagina(<Ayuda />)} />
                   <Route path="/super-admin/login" element={bajoDemanda(<SuperAdminLogin />)} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />

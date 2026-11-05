@@ -22,6 +22,9 @@ const ALTURA_MINIMA_NEWSLETTER = 360;
  * contenedor de las pestañas inactivas con el atributo `hidden`, y un `lg:flex` le gana a ese
  * atributo — la pestaña oculta seguiría ocupando la mitad del alto.
  */
+// Instagram salió de aquí el 05/11/2026: es una sección propia del menú (/instagram).
+const PESTANAS = ["crear", "suscriptores", "estadisticas"] as const;
+
 const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contain data-[state=inactive]:hidden";
 
 export default function Marketing() {
@@ -34,16 +37,23 @@ export default function Marketing() {
   // layout de siempre, con scroll de página.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_NEWSLETTER);
+  // `?tab=suscriptores` (o estadisticas) abre directamente esa pestaña (enlaces y
+  // capturas). Se lee una vez de la URL, sin depender del router (los tests
+  // pintan la página suelta).
+  const [pestana, setPestana] = useState(() => {
+    const pedida = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
+    return PESTANAS.includes(pedida as (typeof PESTANAS)[number]) ? (pedida as string) : "crear";
+  });
 
   return (
     <DashboardLayout>
       {/* Sin título de página (2026-09-25): la pestaña "Newsletter" activa
           en el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
-        <Tabs defaultValue="crear" className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
+        <Tabs value={pestana} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
             pestanas={[
-              { valor: "crear", etiqueta: "Enviar Newsletter", icono: <Send /> },
+              { valor: "crear", etiqueta: "Enviar Newsletter", etiquetaCorta: "Enviar", icono: <Send /> },
               { valor: "suscriptores", etiqueta: "Suscriptores", icono: <Users /> },
               { valor: "estadisticas", etiqueta: "Estadísticas", icono: <BarChart3 /> },
             ]}
@@ -65,6 +75,7 @@ export default function Marketing() {
           <TabsContent value="estadisticas" className={CONTENIDO_PESTANA}>
             <EstadisticasNewsletter historial={<HistorialEnvios />} />
           </TabsContent>
+
         </Tabs>
       </div>
     </DashboardLayout>

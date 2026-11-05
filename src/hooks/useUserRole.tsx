@@ -33,6 +33,10 @@ export const SECTIONS = [
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
   { key: "marketing", label: "Newsletter" },
+  // Usuarios de la agencia (Oficiosos) en los encargos de Instagram, 10/11/2026:
+  // aceptan, entregan versiones y comentan (pestaña Instagram › Encargos). Ver
+  // docs/instagram-encargos.md. Con «Marketing» se es el restaurante.
+  { key: "instagram_agencia", label: "Instagram · Agencia (Oficiosos)" },
   { key: "cheques", label: "Cheques regalo" },
   // Tienda de vinos de la web (escaparate: se compra en el restaurante), 2026-11-03.
   { key: "tienda", label: "Tienda" },

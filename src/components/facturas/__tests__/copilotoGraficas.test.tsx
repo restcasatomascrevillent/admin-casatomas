@@ -195,6 +195,27 @@ describe("gráficas de la IA en el tablero", () => {
     expect(within(copiloto()).getByText(/la merluza ha subido/i)).toBeInTheDocument();
   });
 
+  it("respuesta sin gráfica: al copiloto, con sus documentos citados; el tablero no cambia", async () => {
+    doble.invoke.mockResolvedValueOnce({
+      data: {
+        respuesta: "La última factura es la F-12 de Flope.",
+        adjuntos: [
+          {
+            tipo: "documentos",
+            datos: [{ id: 7, tipo: "factura", numero: "F-12", proveedor: "Flope", fecha: "2026-10-02", drive_url: null, archivo_path: null }],
+          },
+        ],
+      },
+      error: null,
+    });
+    montar();
+    await preguntar("¿Cuál es la última factura?");
+    await within(copiloto()).findByText("La última factura es la F-12 de Flope.");
+    expect(within(copiloto()).getByText(/documentos citados \(1\)/i)).toBeInTheDocument();
+    expect(within(copiloto()).getByText(/factura F-12/i)).toBeInTheDocument();
+    expect(within(tablero()).getByText(/aquí se quedan tus gráficas/i)).toBeInTheDocument();
+  });
+
   it("«Limpiar» vacía el tablero", async () => {
     await conGraficaDeLaIa();
     fireEvent.click(screen.getByRole("button", { name: /quitar todas las gráficas del tablero/i }));

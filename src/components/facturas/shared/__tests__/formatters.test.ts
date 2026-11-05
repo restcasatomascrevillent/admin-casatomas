@@ -5,8 +5,14 @@ import {
   claveProveedor,
   esLineaDeServicio,
   formatCantidadLinea,
+  formatEntero,
   formatNumero,
+  indiceAnomaliasPrecio,
+  indicePreciosLinea,
+  plural,
+  precioAnomalo,
   tieneAnomaliaPrecio,
+  valorSinDescuento,
 } from "../formatters";
 
 let siguienteId = 1;
@@ -93,6 +99,32 @@ describe("tieneAnomaliaPrecio", () => {
   });
 });
 
+describe("indiceAnomaliasPrecio (muchos documentos de una vez)", () => {
+  it("da lo mismo que tieneAnomaliaPrecio documento a documento", () => {
+    const nombres = ["Brugal 1888 70 cl.", "BRUGAL 1888 70 CL.", "Portes", "Jamón", "TANQUERAY 70 CL."];
+    const proveedores = ["Bodega Campoluz, S.L.", "BODEGA CAMPOLUZ, S.L.", "Enchenta", "Joselito"];
+    let semilla = 7;
+    const azar = () => (semilla = (semilla * 16807) % 2147483647) / 2147483647;
+    const docs = Array.from({ length: 60 }, (_, i) =>
+      doc(i + 1, proveedores[Math.floor(azar() * proveedores.length)], Array.from({ length: 1 + Math.floor(azar() * 4) }, () =>
+        linea(nombres[Math.floor(azar() * nombres.length)], [0, 10, 11, 25, 40][Math.floor(azar() * 5)]),
+      )),
+    );
+    const anomalia = indiceAnomaliasPrecio(docs);
+    const esperado = docs.map((d) => tieneAnomaliaPrecio(d, docs));
+    expect(docs.map(anomalia)).toEqual(esperado);
+    expect(esperado.some(Boolean)).toBe(true);
+    expect(docs.map((d) => avisosDocumento(d, docs, anomalia))).toEqual(docs.map((d) => avisosDocumento(d, docs)));
+  });
+
+  it("un documento que no está en la lista se compara con todos", () => {
+    const viejo = doc(1, "Campoluz", [linea("BRUGAL", 10)]);
+    const nuevo = doc(2, "Campoluz", [linea("BRUGAL", 30)]);
+    expect(indiceAnomaliasPrecio([viejo])(nuevo)).toBe(tieneAnomaliaPrecio(nuevo, [viejo]));
+    expect(indiceAnomaliasPrecio([viejo])(nuevo)).toBe(true);
+  });
+});
+
 describe("claveProveedor", () => {
   it("prefiere proveedor_normalizado", () => {
     expect(claveProveedor({ proveedor: "Bodega Campoluz, S.L.", proveedor_normalizado: "bodega campoluz" })).toBe(
@@ -138,5 +170,86 @@ describe("formatCantidadLinea (líneas por peso con sus unidades)", () => {
     expect(formatNumero(111.8)).toBe("111,8");
     expect(formatNumero(7.355)).toBe("7,355");
     expect(formatNumero(24)).toBe("24");
+  });
+});
+
+describe("valorSinDescuento (importación histórica)", () => {
+  const nbsp = (t: string | undefined) => t?.replace(/ /g, " ");
+  it("con descuento: valor antes de descuento y el %", () => {
+    const v = valorSinDescuento({ precio: 24.99, importe_bruto: 35.2, importe_bruto_estimado: false, descuento_pct: 29 });
+    expect(nbsp(v?.texto)).toBe("Valor sin descuento 35,20 € · dto. 29 %");
+  });
+  it("regalo con valor estimado", () => {
+    const v = valorSinDescuento({ precio: 0, importe_bruto: 13.5, importe_bruto_estimado: true, descuento_pct: null });
+    expect(nbsp(v?.texto)).toBe("Valor sin descuento 13,50 € (estimado)");
+  });
+  it("sin bruto, o igual al importe: nada", () => {
+    expect(valorSinDescuento({ precio: 10, importe_bruto: null })).toBeNull();
+    expect(valorSinDescuento({ precio: 10, importe_bruto: 10 })).toBeNull();
+  });
+});
+
+describe("indicePreciosLinea (media de referencia de cada línea, calculada una vez)", () => {
+  it("media del MISMO proveedor y nombre, sin la propia línea ni precios a 0", () => {
+    const a = linea("Gambón XXL", 10);
+    const b = linea("GAMBÓN xxl", 14);
+    const cero = linea("Gambón XXL", 0);
+    const otroProv = linea("Gambón XXL", 100);
+    const docs = [
+      doc(1, "Pescados Rías, S.L.", [a, cero], "pescados rias"),
+      doc(2, "Pescados Rías", [b], "pescados rias"),
+      doc(3, "Makro", [otroProv], "makro"),
+    ];
+    const media = indicePreciosLinea(docs);
+    expect(media(a, docs[0])).toBe(14); // solo la otra línea (b): ni la suya, ni la de 0, ni la de Makro
+    expect(media(b, docs[1])).toBe(10);
+    expect(media(otroProv, docs[2])).toBeUndefined(); // en Makro no hay otra
+    // Una línea nueva (no indexada) se compara con todas las del proveedor.
+    expect(media({ id: 0, producto_nombre: "gambon xxl" }, docs[0])).toBe(12);
+  });
+
+  it("sin proveedor o línea de servicio: sin referencia", () => {
+    const p1 = linea("Portes", 10);
+    const p2 = linea("Portes", 30);
+    const docs = [doc(1, "Enchenta", [p1]), doc(2, "Enchenta", [p2]), doc(3, "", [linea("Jamón", 5)])];
+    const media = indicePreciosLinea(docs);
+    expect(media(p1, docs[0])).toBeUndefined();
+    expect(media(docs[2].productos[0], docs[2])).toBeUndefined();
+  });
+
+  it("coherente con indiceAnomaliasPrecio y tieneAnomaliaPrecio", () => {
+    const docs = [
+      doc(1, "Campoluz", [linea("BRUGAL", 10), linea("TANQUERAY", 20)]),
+      doc(2, "Campoluz", [linea("Brugal", 11)]),
+      doc(3, "Campoluz", [linea("brugal", 40), linea("Tanqueray", 0)]),
+    ];
+    const media = indicePreciosLinea(docs);
+    const conLinea = docs.map((d) => d.productos.some((p) => precioAnomalo(p.precio_unitario, media(p, d))));
+    expect(conLinea).toEqual(docs.map((d) => tieneAnomaliaPrecio(d, docs)));
+    expect(conLinea).toEqual(docs.map(indiceAnomaliasPrecio(docs, media)));
+    expect(conLinea).toEqual([false, false, true]);
+  });
+
+  it("precioAnomalo: más del doble y con precio > 0", () => {
+    expect(precioAnomalo(21, 10)).toBe(true);
+    expect(precioAnomalo(20, 10)).toBe(false);
+    expect(precioAnomalo(0, 10)).toBe(false);
+    expect(precioAnomalo(null, 10)).toBe(false);
+    expect(precioAnomalo(50, undefined)).toBe(false);
+  });
+});
+
+describe("formatEntero y plural (es-ES, miles con punto)", () => {
+  it("agrupa también los de 4 cifras", () => {
+    expect(formatEntero(7)).toBe("7");
+    expect(formatEntero(1860)).toBe("1.860");
+    expect(formatEntero(12500)).toBe("12.500");
+    expect(formatEntero(1234567)).toBe("1.234.567");
+  });
+
+  it("singular y plural", () => {
+    expect(plural(1, "línea", "líneas")).toBe("1 línea");
+    expect(plural(0, "línea", "líneas")).toBe("0 líneas");
+    expect(plural(1860, "documento", "documentos")).toBe("1.860 documentos");
   });
 });

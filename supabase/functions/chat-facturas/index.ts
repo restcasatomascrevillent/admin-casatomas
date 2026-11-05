@@ -4,6 +4,9 @@ import { createClient as createClientBase } from "https://esm.sh/@supabase/supab
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import {
   type Adjunto,
+  type DocRef,
+  idsDeFilas,
+  unirReferencias,
   esErrorCorregible,
   marcarResultado,
   necesitaRespaldoSemantico,
@@ -145,7 +148,67 @@ async function embedConsulta(consulta: string, ctx: Ctx): Promise<string> {
   return vector;
 }
 
-interface ResultadoTool { contenido: string; fallo: boolean; adjunto?: Adjunto | null }
+interface ResultadoTool { contenido: string; fallo: boolean; adjunto?: Adjunto | null; referencias?: DocRef[] }
+
+/** Documentos (con enlace al original) para los ids dados. Best-effort: si falla, sin referencias. */
+// deno-lint-ignore no-explicit-any
+async function cargarReferencias(ids: number[], supabase: any): Promise<DocRef[]> {
+  if (ids.length === 0) return [];
+  try {
+    const { data, error } = await supabase
+      .from("facturas")
+      .select("id, tipo, numero_documento, proveedor, fecha, drive_url, archivo_path")
+      .in("id", ids);
+    if (error) throw error;
+    // deno-lint-ignore no-explicit-any
+    return (data ?? []).map((f: any) => ({
+      id: f.id, tipo: f.tipo ?? null, numero: f.numero_documento ?? null, proveedor: f.proveedor ?? null,
+      fecha: f.fecha ?? null, drive_url: f.drive_url ?? null, archivo_path: f.archivo_path ?? null,
+    }));
+  } catch (e) {
+    console.warn("[chat-facturas] referencias no disponibles:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
+
+/**
+ * variacion_precios no devuelve el id del documento (sin migracion): se
+ * localiza con la misma regla de la RPC (ultima compra = producto + unidad +
+ * fecha, el mayor factura_id) y se anade `numero` a cada fila para el modelo.
+ * Si algo no cuadra, la fila queda sin referencia (nunca una inventada).
+ */
+// deno-lint-ignore no-explicit-any
+async function referenciasVariacion(data: any, supabase: any): Promise<DocRef[]> {
+  if (!data || !Array.isArray(data.productos)) return [];
+  try {
+    // deno-lint-ignore no-explicit-any
+    const filas: any[] = data.productos.slice(0, 10);
+    const ids = await Promise.all(filas.map(async (p) => {
+      if (!p.producto || !p.fecha) return null;
+      const { data: prods } = await supabase.from("productos_catalogo").select("id").eq("nombre", p.producto).limit(3);
+      let mejor: number | null = null;
+      for (const pr of prods ?? []) {
+        const { data: ls } = await supabase
+          .rpc("lineas_precio_agente", { p_producto_id: pr.id, p_base: true })
+          .eq("fecha", p.fecha).eq("unidad", p.unidad ?? "ud")
+          .order("factura_id", { ascending: false }).limit(1);
+        const f = ls?.[0]?.factura_id;
+        if (Number.isInteger(f) && (mejor === null || f > mejor)) mejor = f;
+      }
+      return mejor;
+    }));
+    const refs = await cargarReferencias([...new Set(ids.filter((i): i is number => i !== null))], supabase);
+    const porId = new Map(refs.map((r) => [r.id, r]));
+    filas.forEach((p, i) => {
+      const r = ids[i] !== null ? porId.get(ids[i] as number) : undefined;
+      if (r) { p.documento_id = r.id; if (r.numero) p.numero = r.numero; }
+    });
+    return refs;
+  } catch (e) {
+    console.warn("[chat-facturas] referencias de variacion_precios fallidas:", e instanceof Error ? e.message : e);
+    return [];
+  }
+}
 
 /**
  * Ejecuta una herramienta. La traduccion a RPC y la validacion de argumentos
@@ -187,10 +250,20 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx):
       }
     }
 
+    let referencias: DocRef[] = [];
+    if (nombre === "variacion_precios") referencias = await referenciasVariacion(data, supabase);
+    else if (nombre === "filtrar_documentos") referencias = await cargarReferencias(idsDeFilas(data), supabase);
+    // Va en el resultado y no en el prompt de sistema (que viaja en cada ronda y tiene tope de tamaño).
+    if (referencias.length > 0 && data && typeof data === "object" && !Array.isArray(data)) {
+      (data as Record<string, unknown>).nota_referencias =
+        "Cita de cada dato proveedor, numero y fecha. La app muestra debajo los enlaces a la foto del original: no escribas URLs ni digas que no puedes enseñarla.";
+    }
+
     const { data: paraModelo, adjunto } = separarAdjunto(nombre, data);
     return {
       fallo: false,
       adjunto,
+      referencias,
       contenido: recortar(JSON.stringify(marcarResultado(nombre, paraModelo, ll.limite, ctx.pregunta))),
     };
   } catch (e) {
@@ -321,6 +394,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       let respuesta = "";
       let huboFalloDeHerramienta = false;
       const adjuntos: Adjunto[] = [];
+      const referenciasAcum: DocRef[][] = [];
 
       for (let paso = 0; paso < MAX_PASOS; paso++) {
         // Se retiran las herramientas en el ultimo paso —o si ya no queda tiempo
@@ -361,6 +435,7 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
             registrarHerramientaChat({ nombre: tc.function.name, argumentos: args, resultado: r.fallo || resultadoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool });
             if (r.fallo) huboFalloDeHerramienta = true;
             if (r.adjunto) adjuntos.push(r.adjunto);
+            if (r.referencias?.length) referenciasAcum.push(r.referencias);
             messages.push({ role: "tool", tool_call_id: tc.id, content: r.contenido });
           }
           // La API exige una respuesta por cada tool_call emitida: las que se
@@ -391,6 +466,9 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
           ? "No he podido consultar los datos de facturas en este momento. Vuelve a intentarlo en unos segundos."
           : "No he conseguido resolver la consulta. Prueba a preguntarlo de forma mas concreta, por ejemplo indicando un proveedor, un numero de documento o un mes.";
       }
+
+      const refs = unirReferencias(referenciasAcum);
+      if (refs.length > 0 && respuesta.trim()) adjuntos.push({ tipo: "documentos", datos: refs });
 
       return json({ success: true, respuesta, ...(adjuntos.length > 0 ? { adjuntos } : {}) }, 200);
     } catch (error) {

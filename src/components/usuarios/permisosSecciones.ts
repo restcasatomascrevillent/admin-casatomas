@@ -49,6 +49,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
   marketing: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
+  instagram_agencia:
+    "aún no se usa; con «Ver» ya acepta, entrega y comenta los encargos de Instagram como la agencia (Oficiosos).",
   cheques: "canjear cheques regalo y modificar la plantilla de factura.",
   tienda: "poner o quitar vinos de la tienda y cambiar sus ajustes (visible, descuento y textos).",
   facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
