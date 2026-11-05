@@ -43,6 +43,7 @@
     "test:instagram-ia:db": "node scripts/test-instagram-ia.mjs",
     "test:instagram-campanas:db": "node scripts/test-instagram-campanas.mjs",
     "test:instagram-video:db": "node scripts/test-instagram-video.mjs",
+    "test:instagram-encargos:db": "node scripts/test-instagram-encargos.mjs",
     "instagram:recursos": "node scripts/instagram/subir-recursos.mjs",
     "instagram:render-reels": "node scripts/instagram/render-reels.mjs"
   },
