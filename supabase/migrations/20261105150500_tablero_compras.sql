@@ -42,7 +42,7 @@ set client_encoding = 'UTF8';
 -- recibe un tablero vacío («sin_datos»), igual que las RPC *_agente.
 --
 -- Idempotente. Test: supabase/tests/tablero_compras_test.sql
--- Rollback: supabase/rollbacks/20261105150000_tablero_compras_ROLLBACK.sql
+-- Rollback: supabase/rollbacks/20261105150500_tablero_compras_ROLLBACK.sql
 -- ===========================================================================
 
 begin;
@@ -65,7 +65,7 @@ as $$
       or lower(btrim(coalesce(p_unidad, ''))) in ('servicio', 'servicios', 'kwh', 'kw', 'kw·día', 'kw·dia', 'día', 'dia', 'días', 'dias', 'mes', 'meses')
 $$;
 comment on function public.es_linea_no_producto_tablero(text, text) is
-  'Tablero de Compras: true si la línea no es un producto (servicio, portes, envase, descuento, energía, residuos, cuota…). 20261105150000.';
+  'Tablero de Compras: true si la línea no es un producto (servicio, portes, envase, descuento, energía, residuos, cuota…). 20261105150500.';
 
 revoke all on function public.es_linea_no_producto_tablero(text, text) from public, anon;
 grant execute on function public.es_linea_no_producto_tablero(text, text) to authenticated, service_role;
@@ -82,7 +82,7 @@ stable
 security invoker
 set search_path = public
 as $$
--- 20261105150000_tablero_compras
+-- 20261105150500_tablero_compras
 declare
   v_local     text := nullif(lower(btrim(coalesce(p_local, ''))), '');
   v_desde     date;
@@ -450,7 +450,7 @@ begin
 end;
 $$;
 comment on function public.tablero_compras(date, date, text) is
-  'Facturas › Análisis: todos los bloques del tablero de compras en un JSON (indicadores, meses, proveedores, subidas, familias, fijos, abonos, locales). SECURITY INVOKER. 20261105150000.';
+  'Facturas › Análisis: todos los bloques del tablero de compras en un JSON (indicadores, meses, proveedores, subidas, familias, fijos, abonos, locales). SECURITY INVOKER. 20261105150500.';
 
 revoke all on function public.tablero_compras(date, date, text) from public, anon;
 grant execute on function public.tablero_compras(date, date, text) to authenticated, service_role;

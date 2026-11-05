@@ -1,5 +1,5 @@
 // Datos del tablero de Facturas › Análisis: UNA llamada a la RPC
-// `tablero_compras` (migración 20261105150000) con todos los bloques.
+// `tablero_compras` (migración 20261105150500) con todos los bloques.
 // react-query guarda cada periodo/local 5 minutos: cambiar de «Año» a «Mes» y
 // volver no vuelve a pedir nada.
 import { useQuery } from "@tanstack/react-query";
