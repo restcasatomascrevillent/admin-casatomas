@@ -98,7 +98,7 @@ export function PanelVideoReel({ reel, piezaId, onPiezaId, className }: Props) {
       onPiezaId(r.piezaId);
       await qc.invalidateQueries({ queryKey: [...CLAVE_REEL, r.piezaId] });
       void qc.invalidateQueries({ queryKey: CLAVE_REELS });
-      toast.success("Vídeo en cola", { description: "Se generará en el equipo de render. Puedes seguir trabajando." });
+      toast.success("Lo estamos montando", { description: "Te avisamos cuando el vídeo esté. Puedes seguir trabajando." });
     } catch (e) {
       toast.error("No se pudo encolar el vídeo", { description: textoErrorVideo(e) });
     } finally {
@@ -176,7 +176,7 @@ export function PanelVideoReel({ reel, piezaId, onPiezaId, className }: Props) {
         {visible && (
           <div className="space-y-1.5 rounded-md border p-2 text-xs" role="status" data-testid="estado-render">
             <p className="flex items-center gap-2">
-              <span className={cn("rounded-full px-1.5 py-0.5 text-[11px] font-medium", TONO[visible.tono])}>{visible.etiqueta}</span>
+              <span className={cn("rounded-full px-1.5 py-0.5 text-xs font-medium", TONO[visible.tono])}>{visible.etiqueta}</span>
               {visible.detalle && <span className="min-w-0 flex-1 text-muted-foreground">{visible.detalle}</span>}
             </p>
             {visible.progreso !== null && visible.activo && <Progress value={visible.progreso} aria-label="Progreso del vídeo" className="h-1.5" />}

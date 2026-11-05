@@ -59,9 +59,9 @@ beforeEach(() => {
 
 describe("lógica del vídeo de los reels", () => {
   it("estado del trabajo: en cola (y aviso si el equipo de render no lo coge), renderizando con progreso, listo y error", () => {
-    expect(estadoVisible(trabajo(), ahora + 30_000)).toMatchObject({ etiqueta: "En cola", activo: true, detalle: "Esperando al equipo de render…" });
-    expect(estadoVisible(trabajo(), ahora + 5 * 60_000)?.detalle).toMatch(/cuando el equipo de render esté encendido/);
-    expect(estadoVisible(trabajo({ estado: "renderizando", progreso: 42, dispositivo: "PC Oficiosos", fotogramas: 615 }))).toMatchObject({ etiqueta: "Renderizando", progreso: 42, detalle: "En PC Oficiosos · 615 fotogramas" });
+    expect(estadoVisible(trabajo(), ahora + 30_000)).toMatchObject({ etiqueta: "En cola", activo: true, detalle: "Lo estamos montando; te avisamos cuando esté." });
+    expect(estadoVisible(trabajo(), ahora + 5 * 60_000)?.detalle).toMatch(/en cuanto el ordenador de vídeo esté encendido/);
+    expect(estadoVisible(trabajo({ estado: "renderizando", progreso: 42, dispositivo: "PC Oficiosos", fotogramas: 615 }))).toMatchObject({ etiqueta: "Renderizando", progreso: 42, detalle: "Montándolo en PC Oficiosos" });
     expect(estadoVisible(trabajo({ estado: "listo" }))).toMatchObject({ etiqueta: "Listo", activo: false });
     expect(estadoVisible(trabajo({ estado: "error", error: "ffmpeg" }))).toMatchObject({ etiqueta: "Error", detalle: "ffmpeg", tono: "mal" });
     expect(estadoVisible(null)).toBeNull();
@@ -114,7 +114,7 @@ describe("PanelVideoReel", () => {
     sbFalso.datos = { instagram_piezas: [pieza({ video_ruta: null, portada_ruta: null, estado: "borrador" })], instagram_trabajos_render: [trabajo({ estado: "renderizando", progreso: 40, dispositivo: "PC Oficiosos" })] };
     envolver(<PanelVideoReel reel={REEL} piezaId={PIEZA_ID} onPiezaId={vi.fn()} />);
     expect(await screen.findByText("Renderizando")).toBeInTheDocument();
-    expect(screen.getByText(/En PC Oficiosos/)).toBeInTheDocument();
+    expect(screen.getByText(/Montándolo en PC Oficiosos/)).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Generar vídeo/ })).toBeDisabled();
   });

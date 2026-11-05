@@ -7,6 +7,7 @@
  * Ver docs/instagram-encargos.md.
  */
 import type { MarcaId } from "@/lib/instagram";
+import { ESTADOS_ENCARGO, ESTILO_TONO } from "../estados";
 
 export type EstadoEncargo =
   | "borrador"
@@ -128,19 +129,10 @@ export const NOMBRE_ESTADO: Record<EstadoEncargo, string> = {
   cancelado: "Cancelado",
 };
 
-/** Clases de la insignia de cada estado (mismo lenguaje de color que la maqueta). */
-export const CLASE_ESTADO: Record<EstadoEncargo, string> = {
-  borrador: "bg-violet-100 text-violet-800",
-  enviado: "bg-slate-100 text-slate-800",
-  aceptado: "bg-blue-100 text-blue-800",
-  en_curso: "bg-blue-100 text-blue-800",
-  para_revisar: "bg-amber-100 text-amber-900",
-  cambios_pedidos: "bg-orange-100 text-orange-900",
-  aprobado: "bg-sky-100 text-sky-800",
-  publicado: "bg-emerald-100 text-emerald-800",
-  rechazado: "bg-red-100 text-red-800",
-  cancelado: "bg-muted text-muted-foreground",
-};
+/** Clases de la insignia de cada estado: las del módulo único de estados (../estados.ts, paleta de la maqueta). */
+export const CLASE_ESTADO = Object.fromEntries(
+  (Object.keys(ESTADOS_ENCARGO) as EstadoEncargo[]).map((e) => [e, `border ${ESTILO_TONO[ESTADOS_ENCARGO[e].tono].insignia}`]),
+) as Record<EstadoEncargo, string>;
 
 /** Estilos que se ofrecen a Oficiosos (texto libre en la BD). */
 export const ESTILOS_OFICIOSOS = [
@@ -165,11 +157,11 @@ export interface Columna {
 
 /** Columnas del tablero (maqueta: Pedido, En curso, Para revisar, Aprobado, Publicado). */
 export const COLUMNAS: readonly Columna[] = [
-  { id: "pedido", nombre: "Pedido", estados: ["borrador", "enviado", "aceptado", "rechazado"], color: "bg-violet-500" },
-  { id: "curso", nombre: "En curso", estados: ["en_curso", "cambios_pedidos"], color: "bg-blue-600" },
-  { id: "revisar", nombre: "Para revisar", estados: ["para_revisar"], color: "bg-amber-500" },
-  { id: "aprobado", nombre: "Aprobado", estados: ["aprobado"], color: "bg-sky-500" },
-  { id: "publicado", nombre: "Publicado", estados: ["publicado"], color: "bg-emerald-600" },
+  { id: "pedido", nombre: "Pedido", estados: ["borrador", "enviado", "aceptado", "rechazado"], color: ESTILO_TONO.borrador.punto },
+  { id: "curso", nombre: "En curso", estados: ["en_curso", "cambios_pedidos"], color: ESTILO_TONO.encargo.punto },
+  { id: "revisar", nombre: "Para revisar", estados: ["para_revisar"], color: ESTILO_TONO.revisar.punto },
+  { id: "aprobado", nombre: "Aprobado", estados: ["aprobado"], color: ESTILO_TONO.programada.punto },
+  { id: "publicado", nombre: "Publicado", estados: ["publicado"], color: ESTILO_TONO.publicada.punto },
 ];
 export const COLUMNA_CERRADOS: Columna = { id: "cerrados", nombre: "Cancelados", estados: ["cancelado"], color: "bg-muted-foreground" };
 

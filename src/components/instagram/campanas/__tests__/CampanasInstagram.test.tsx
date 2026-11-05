@@ -101,6 +101,8 @@ function envolver(ui: ReactNode) {
 }
 
 let fetchFalso: Mock;
+/** Llamadas a la IA (las miniaturas de Drive de las piezas también usan fetch). */
+const llamadasIA = () => fetchFalso.mock.calls.filter(([u]) => u === URL_IA);
 const respuesta = (cuerpo: unknown, estado = 200) => Promise.resolve(new Response(JSON.stringify(cuerpo), { status: estado }));
 
 beforeAll(() => {
@@ -119,7 +121,7 @@ beforeEach(() => {
 describe("CampanasInstagram", () => {
   it("pinta la ficha: objetivo, público, mensaje, línea de tiempo, fases y la pieza sin foto", async () => {
     envolver(<CampanasInstagram />);
-    expect(await screen.findByRole("heading", { name: "Temporada de setas" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Temporada de setas" }, { timeout: 5000 })).toBeInTheDocument();
     const ficha = screen.getByTestId("ficha-campana");
     for (const t of ["Llenar los mediodías", "Familias", "El otoño llega a la mesa"]) expect(within(ficha).getByText(t)).toBeInTheDocument();
     expect(within(ficha).getByRole("group", { name: "Línea de tiempo de la campaña" })).toBeInTheDocument();
@@ -140,7 +142,7 @@ describe("CampanasInstagram", () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("2 borradores añadidos al calendario", expect.anything()));
     const llamadas = sbFalso.rpc.mock.calls.map((c) => c[0]);
     expect(llamadas.some((n) => /programar|publicar/.test(String(n)))).toBe(false);
-    expect(fetchFalso).not.toHaveBeenCalled();
+    expect(llamadasIA()).toHaveLength(0);
   });
 
   it("«¿Qué quieres empujar?» llega a la IA y la nueva campaña queda elegida", async () => {
@@ -149,12 +151,15 @@ describe("CampanasInstagram", () => {
     );
     envolver(<CampanasInstagram />);
     await screen.findByRole("heading", { name: "Temporada de setas" });
+    // Con campañas en la lista el formulario va plegado: se abre con «Pedir otra campaña».
+    expect(screen.queryByLabelText("¿Qué quieres empujar?")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Pedir otra campaña" }));
     fireEvent.change(screen.getByLabelText("¿Qué quieres empujar?"), { target: { value: "Llenar los mediodías de diciembre" } });
     fireEvent.click(screen.getByRole("radio", { name: "2 semanas" }));
     sbFalso.datos.instagram_campanas = [{ ...CAMPANA, id: "c2", titulo: "Menú de empresa" }, CAMPANA];
     fireEvent.click(screen.getByRole("button", { name: "Proponer campaña" }));
-    await waitFor(() => expect(fetchFalso).toHaveBeenCalled());
-    const [url, init] = fetchFalso.mock.calls[0] as [string, RequestInit];
+    await waitFor(() => expect(llamadasIA().length).toBeGreaterThan(0));
+    const [url, init] = llamadasIA()[0] as [string, RequestInit];
     expect(url).toBe(URL_IA);
     expect(JSON.parse(String(init.body))).toMatchObject({
       accion: "proponer_campana",
@@ -173,7 +178,7 @@ describe("CampanasInstagram", () => {
     envolver(<CampanasInstagram />);
     fireEvent.click(await screen.findByRole("button", { name: "Proponer de nuevo" }));
     await waitFor(() => expect(sbFalso.rpc).toHaveBeenCalledWith("instagram_descartar_campana", { p_campana_id: "c1" }));
-    expect(JSON.parse(String((fetchFalso.mock.calls[0] as [string, RequestInit])[1].body))).toMatchObject({
+    expect(JSON.parse(String((llamadasIA()[0] as [string, RequestInit])[1].body))).toMatchObject({
       accion: "proponer_campana", desde: "2026-11-09", semanas: 3, piezasPorSemana: 1, objetivo: "setas",
     });
   });
@@ -202,6 +207,24 @@ describe("CampanasInstagram", () => {
   });
 });
 
+describe("Campañas: fotos de las piezas", () => {
+  it("las piezas con foto llevan miniatura; las que no, «Pedir foto a Oficiosos» con el formulario ya rellenado", async () => {
+    envolver(<CampanasInstagram />);
+    const ficha = await screen.findByTestId("ficha-campana");
+    await within(ficha).findByRole("heading", { name: "Temporada de setas" }, { timeout: 5000 });
+    // Las dos piezas con foto de Drive llevan su miniatura; la que no, el hueco discontinuo y el botón.
+    expect(within(ficha).getAllByTestId("miniatura-foto")).toHaveLength(2);
+    const botones = within(ficha).getAllByRole("button", { name: "Pedir foto a Oficiosos" });
+    expect(botones).toHaveLength(1);
+    fireEvent.click(botones[0]);
+    const form = await screen.findByTestId("formulario-encargo");
+    expect((within(form).getByLabelText("Título") as HTMLInputElement).value).toBe("Foto: Pulpo a la gallega");
+    // Para dos días antes de la pieza (vie 13 nov).
+    expect((within(form).getByLabelText("Para cuándo") as HTMLInputElement).value).toBe("2026-11-11");
+    expect(within(form).getByDisplayValue(/Foto para la campaña «Temporada de setas»/)).toBeInTheDocument();
+  });
+});
+
 describe("SugerenciaSemana", () => {
   it("enseña las fechas de la semana sin IA y solo pide ideas al pulsar", async () => {
     sbFalso.rpc = vi.fn().mockResolvedValue({ data: [{ titulo: "San Martín y la matanza", desde: "2026-11-11", hasta: "2026-11-11", verificacion: "verificada" }], error: null });
@@ -218,10 +241,10 @@ describe("SugerenciaSemana", () => {
     envolver(<SugerenciaSemana marca="casa-tomas" onCrear={onCrear} />);
     expect(await screen.findByText("San Martín y la matanza")).toBeInTheDocument();
     expect(sbFalso.rpc).toHaveBeenCalledWith("marketing_fechas_entre", { p_desde: "2026-11-02", p_hasta: "2026-11-08", p_marca: "casa-tomas" });
-    expect(fetchFalso).not.toHaveBeenCalled();
+    expect(llamadasIA()).toHaveLength(0);
     fireEvent.click(screen.getByRole("button", { name: "Pedir ideas a la IA" }));
     expect(await screen.findByText("El cocido del viernes")).toBeInTheDocument();
-    expect(JSON.parse(String((fetchFalso.mock.calls[0] as [string, RequestInit])[1].body))).toEqual({ accion: "ideas_semana", marca: "casa-tomas", semana: "2026-11-02" });
+    expect(JSON.parse(String((llamadasIA()[0] as [string, RequestInit])[1].body))).toEqual({ accion: "ideas_semana", marca: "casa-tomas", semana: "2026-11-02" });
     fireEvent.click(screen.getByRole("button", { name: /Otra idea/ }));
     expect(screen.getByText("Sábado de pulpo")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Crear" }));

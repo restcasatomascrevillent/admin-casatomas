@@ -16,7 +16,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CalendarCheck2, Check, ImageOff, Loader2, Pencil, RotateCcw, Sparkles, X } from "lucide-react";
+import { AlertTriangle, CalendarCheck2, Check, Loader2, Pencil, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { obtenerPlantilla, type MarcaId } from "@/lib/instagram";
 import { cn } from "@/lib/utils";
 import { hoyMadrid, sumarDias } from "@/components/instagram/programar/logica";
+import { InsigniaEstado } from "@/components/instagram/InsigniaEstado";
+import { MiniaturaFoto } from "@/components/instagram/MiniaturaFoto";
+import { FormularioEncargo } from "@/components/instagram/encargos/FormularioEncargo";
+import { useAjustesEncargos } from "@/components/instagram/encargos/useEncargos";
+import type { DatosFormulario } from "@/components/instagram/encargos/logica";
+import "@/components/instagram/titular-studio.css";
 import {
   aceptarCampana,
   borradoresDeCampana,
@@ -53,7 +59,28 @@ export interface CampanasInstagramProps {
   onAbrirBorrador?: (piezaId: string) => void;
   /** Si se pasa, tras aceptar sale «Ver en el calendario». */
   onVerCalendario?: () => void;
+  /** Marca de la barra de pestañas: filtra la lista y es la marca con la que se pide la siguiente. */
+  marca?: MarcaId | "todas";
+  /** Tras pedir una foto a Oficiosos: el id del encargo (para abrir su ficha). */
+  onAbrirEncargo?: (encargoId: string) => void;
   className?: string;
+}
+
+/** Datos de partida del encargo «Pedir foto a Oficiosos» para una pieza de campaña sin foto. */
+export function encargoDeFoto(c: Pick<CampanaInstagram, "marca" | "titulo">, p: PiezaCampanaIA, hoy: string): Partial<DatosFormulario> {
+  const que = p.plato?.nombre ?? (p.titular || p.gancho || "la pieza");
+  const antes = sumarDias(p.fecha, -2);
+  return {
+    marca: c.marca,
+    modo: "oficiosos",
+    formato: p.formato === "story" ? "story" : "post",
+    titulo: `Foto: ${que}`.slice(0, 120),
+    idea: [`Foto para la campaña «${c.titulo}» (${textoDia(p.fecha)}, ${p.hora}).`, p.titular && `Titular: «${p.titular}».`, p.encargoSugerido, p.porQue]
+      .filter(Boolean)
+      .join(" "),
+    texto: p.caption ?? "",
+    fecha_deseada: antes >= hoy ? antes : hoy,
+  };
 }
 
 function textoError(e: unknown): string {
@@ -61,15 +88,7 @@ function textoError(e: unknown): string {
 }
 
 function EstadoCampana({ estado }: { estado: CampanaInstagram["estado"] }) {
-  const t: Record<string, [string, string]> = {
-    propuesta: ["Propuesta", "bg-amber-100 text-amber-900"],
-    aceptada: ["En el calendario", "bg-emerald-100 text-emerald-800"],
-    en_curso: ["En curso", "bg-sky-100 text-sky-800"],
-    cerrada: ["Cerrada", "bg-muted text-muted-foreground"],
-    descartada: ["Descartada", "bg-muted text-muted-foreground"],
-  };
-  const [texto, clase] = t[estado] ?? [estado, "bg-muted"];
-  return <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", clase)}>{texto}</span>;
+  return <InsigniaEstado dominio="campana" estado={estado} />;
 }
 
 /** Línea de tiempo: fases proporcionales a sus días y un punto por pieza. */
@@ -80,7 +99,7 @@ function LineaTiempo({ c, marcadas }: { c: CampanaInstagram; marcadas: Set<numbe
     <div aria-label="Línea de tiempo de la campaña" role="group" className="space-y-1">
       <div className="grid gap-1" style={{ gridTemplateColumns: tramos.map((f) => `${Math.max(1, diasEntre(f.desde, f.hasta) + 1)}fr`).join(" ") }}>
         {tramos.map((f, i) => (
-          <div key={`${f.nombre}-${i}`} className="truncate rounded bg-muted px-2 py-1 text-[11px] font-medium" title={`${f.nombre} · ${textoRango(f.desde, f.hasta)}`}>
+          <div key={`${f.nombre}-${i}`} className="truncate rounded bg-muted px-2 py-1 text-xs font-medium" title={`${f.nombre} · ${textoRango(f.desde, f.hasta)}`}>
             {i + 1}. {f.nombre}
           </div>
         ))}
@@ -100,7 +119,7 @@ function LineaTiempo({ c, marcadas }: { c: CampanaInstagram; marcadas: Set<numbe
           />
         ))}
       </div>
-      <div className="flex justify-between text-[11px] text-muted-foreground">
+      <div className="flex justify-between text-xs text-muted-foreground">
         <span>{textoDia(desde)}</span>
         <span>{textoDia(hasta)}</span>
       </div>
@@ -114,12 +133,16 @@ function FilaPieza({
   marcada,
   editable,
   onMarcar,
+  marca,
+  onPedirFoto,
 }: {
   pieza: PiezaCampanaIA;
   indice: number;
   marcada: boolean;
   editable: boolean;
   onMarcar: (indice: number, v: boolean) => void;
+  marca: MarcaId;
+  onPedirFoto?: (pieza: PiezaCampanaIA) => void;
 }) {
   const plantilla = obtenerPlantilla(pieza.plantilla)?.nombre ?? pieza.plantilla;
   const titulo = pieza.titular || pieza.gancho || plantilla;
@@ -129,16 +152,13 @@ function FilaPieza({
       {editable && (
         <Checkbox id={id} checked={marcada} onCheckedChange={(v) => onMarcar(indice, v === true)} aria-label={`Incluir «${titulo}»`} className="mt-1" />
       )}
-      <span
-        className={cn(
-          "flex aspect-[4/5] w-10 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground",
-          pieza.formato === "story" && "aspect-[9/16] w-8",
-          pieza.faltaFoto && "border border-dashed border-amber-500 text-amber-600",
-        )}
-        aria-hidden="true"
-      >
-        <ImageOff className="h-4 w-4" />
-      </span>
+      <MiniaturaFoto
+        marca={marca}
+        foto={pieza.foto}
+        platoId={pieza.platoId}
+        falta={pieza.faltaFoto}
+        className={cn("aspect-[4/5] w-11 shrink-0", pieza.formato === "story" && "aspect-[9/16] w-9")}
+      />
       <div className="min-w-0 flex-1 text-sm">
         <label htmlFor={editable ? id : undefined} className="block font-medium leading-snug">
           {titulo}
@@ -147,7 +167,17 @@ function FilaPieza({
           {textoDia(pieza.fecha)} · {pieza.hora} · {pieza.formato === "story" ? "Story" : "Post"} · {plantilla}
           {pieza.plato ? ` · ${pieza.plato.nombre}` : ""}
         </p>
-        {pieza.faltaFoto && <p className="text-xs font-medium text-amber-700">Falta foto · hay que hacerla o pedirla</p>}
+        {pieza.faltaFoto && (
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-[#5c4500]">Falta foto</span>
+            {onPedirFoto && (
+              <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => onPedirFoto(pieza)}>
+                <Send className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                Pedir foto a Oficiosos
+              </Button>
+            )}
+          </div>
+        )}
         {pieza.porQue && <p className="mt-0.5 text-xs text-muted-foreground">{pieza.porQue}</p>}
         {pieza.encargoSugerido && <p className="mt-0.5 text-xs text-muted-foreground">Encargo: {pieza.encargoSugerido}</p>}
       </div>
@@ -159,9 +189,15 @@ function FilaPieza({
  * Pantalla «Campañas». Trae sus datos (TanStack Query): necesita el
  * QueryClientProvider del panel.
  */
-export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador, onVerCalendario, className }: CampanasInstagramProps) {
+export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador, onVerCalendario, marca: marcaPagina = "todas", onAbrirEncargo, className }: CampanasInstagramProps) {
   const qc = useQueryClient();
-  const [marca, setMarca] = useState<MarcaId>(marcaInicial);
+  const [marca, setMarca] = useState<MarcaId>(marcaPagina !== "todas" ? marcaPagina : marcaInicial);
+  useEffect(() => {
+    if (marcaPagina !== "todas") setMarca(marcaPagina);
+  }, [marcaPagina]);
+  const ajustes = useAjustesEncargos();
+  const [pedirFoto, setPedirFoto] = useState<{ datos: Partial<DatosFormulario> } | null>(null);
+  const [verFormulario, setVerFormulario] = useState(false);
   const [objetivo, setObjetivo] = useState("");
   const [semanas, setSemanas] = useState("3");
   const [porSemana, setPorSemana] = useState("3");
@@ -172,7 +208,7 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
   const [ultimaRespuesta, setUltimaRespuesta] = useState<{ campanaId: string; avisos: string[]; descartadas: number } | null>(null);
 
   const lista = useQuery({ queryKey: [...CLAVE_CAMPANAS, "lista"], queryFn: () => listarCampanas("todas") });
-  const campanas = useMemo(() => lista.data ?? [], [lista.data]);
+  const campanas = useMemo(() => (lista.data ?? []).filter((c) => marcaPagina === "todas" || c.marca === marcaPagina), [lista.data, marcaPagina]);
   const actual = campanas.find((c) => c.id === elegida) ?? campanas[0] ?? null;
   useEffect(() => {
     if (!elegida && campanas[0]) setElegida(campanas[0].id);
@@ -204,6 +240,7 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
     },
     onSuccess: (r) => {
       setElegida(r.campanaId);
+      setVerFormulario(false);
       setUltimaRespuesta({ campanaId: r.campanaId, avisos: r.avisos, descartadas: r.descartadas.length });
       refrescar();
     },
@@ -244,6 +281,8 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
   };
 
   const errorProponer = proponer.error as Error | null;
+  // Abierto si no hay campañas, si se pidió, o mientras se prepara o falla una propuesta.
+  const formularioAbierto = verFormulario || (!lista.isLoading && campanas.length === 0) || proponer.isPending || !!errorProponer;
   const sinFoto = actual?.propuesta.piezas.filter((p) => p.faltaFoto).length ?? 0;
   const editable = actual?.estado === "propuesta";
 
@@ -258,7 +297,7 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
           <h2 className="text-sm font-semibold">Propuestas de la IA</h2>
           <p className="text-xs text-muted-foreground">A partir de la carta, la temporada, las fechas señaladas y lo que mejor te funciona.</p>
         </div>
-        <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2" role="listbox" aria-label="Campañas">
+        <ul className="relative min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2" aria-label="Campañas">
           {lista.isLoading && (
             <li className="flex items-center gap-2 p-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando…
@@ -272,14 +311,18 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
             <li key={c.id}>
               <button
                 type="button"
-                role="option"
-                aria-selected={actual?.id === c.id}
+                aria-pressed={actual?.id === c.id}
                 onClick={() => setElegida(c.id)}
                 className={cn(
-                  "w-full rounded-md border p-2 text-left text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "flex w-full items-start gap-2 rounded-md border p-2 text-left text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   actual?.id === c.id && "border-primary bg-primary/5",
                 )}
               >
+                {(() => {
+                  const conFoto = c.propuesta.piezas.find((p) => !p.faltaFoto && (p.foto || p.platoId));
+                  return <MiniaturaFoto marca={c.marca} foto={conFoto?.foto} platoId={conFoto?.platoId} className="aspect-square w-12 shrink-0" />;
+                })()}
+                <span className="min-w-0 flex-1">
                 <span className="block font-medium">{c.titulo}</span>
                 <span className="block text-xs text-muted-foreground">
                   {NOMBRE_MARCA[c.marca] ?? c.marca} · {textoDuracion(c.desde, c.hasta)} · {textoRango(c.desde, c.hasta)}
@@ -287,11 +330,21 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
                 <span className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                   {c.propuesta.piezas.length} piezas <EstadoCampana estado={c.estado} />
                 </span>
+                </span>
               </button>
             </li>
           ))}
         </ul>
 
+        {/* Con campañas en la lista, el formulario va plegado tras «Pedir otra campaña» (la lista conserva el alto en la tablet). */}
+        {!formularioAbierto ? (
+          <div className="shrink-0 border-t p-3">
+            <Button variant="outline" className="w-full" onClick={() => setVerFormulario(true)}>
+              <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+              Pedir otra campaña
+            </Button>
+          </div>
+        ) : (
         <div className="shrink-0 space-y-2 border-t p-3">
           <Label htmlFor="campana-objetivo" className="text-sm font-medium">
             ¿Qué quieres empujar?
@@ -355,6 +408,7 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
             </Alert>
           )}
         </div>
+        )}
       </section>
 
       {/* Ficha de la campaña */}
@@ -367,10 +421,10 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
           <>
             <header className="flex shrink-0 flex-wrap items-start justify-between gap-2 border-b p-3">
               <div className="min-w-0">
-                <span className="text-[11px] font-medium uppercase tracking-wide text-primary">
+                <span className="text-xs font-medium uppercase tracking-wide text-[#926a26]">
                   Campaña {editable ? "propuesta" : ""} · {NOMBRE_MARCA[actual.marca] ?? actual.marca}
                 </span>
-                <h2 className="text-lg font-semibold leading-tight">{actual.titulo}</h2>
+                <h2 className="titular-studio text-xl leading-tight">{actual.titulo}</h2>
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                   <span>
                     {textoDuracion(actual.desde, actual.hasta)} · {textoRango(actual.desde, actual.hasta)}
@@ -397,12 +451,12 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
               )}
             </header>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
+            <div className="relative min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3">
               {ultimaRespuesta?.campanaId === actual.id && (ultimaRespuesta.avisos.length > 0 || ultimaRespuesta.descartadas > 0) && (
                 <Alert className="py-2">
                   <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                   <AlertDescription className="text-xs">
-                    {ultimaRespuesta.descartadas > 0 && <p>Se han quitado {ultimaRespuesta.descartadas} propuestas que no pasaban las comprobaciones.</p>}
+                    {ultimaRespuesta.descartadas > 0 && <p>La IA propuso {ultimaRespuesta.descartadas} piezas más que no pasaban las comprobaciones (precios, platos o alérgenos sin respaldo en la carta) y se han quitado.</p>}
                     {ultimaRespuesta.avisos.map((a) => (
                       <p key={a}>{a}</p>
                     ))}
@@ -411,16 +465,16 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
               )}
               <div className="grid gap-3 sm:grid-cols-3">
                 <div>
-                  <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Objetivo</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Objetivo</h3>
                   <p className="text-sm">{actual.propuesta.objetivo || actual.objetivo || "—"}</p>
                 </div>
                 <div>
-                  <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Para quién</h3>
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Para quién</h3>
                   <p className="text-sm">{actual.propuesta.publico || actual.publico || "—"}</p>
                 </div>
                 <div>
-                  <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Mensaje</h3>
-                  <p className="text-sm italic">{actual.propuesta.mensaje || actual.mensaje || "—"}</p>
+                  <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Mensaje</h3>
+                  <p className="titular-studio text-sm italic">{actual.propuesta.mensaje || actual.mensaje || "—"}</p>
                 </div>
               </div>
               {actual.propuesta.razonamiento && <p className="text-xs text-muted-foreground">{actual.propuesta.razonamiento}</p>}
@@ -438,7 +492,16 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
                     </h3>
                     <ul className="grid gap-1.5 xl:grid-cols-2">
                       {grupo.map(({ pieza, indice }) => (
-                        <FilaPieza key={indice} pieza={pieza} indice={indice} marcada={seleccion.has(indice)} editable={editable} onMarcar={marcar} />
+                        <FilaPieza
+                          key={indice}
+                          pieza={pieza}
+                          indice={indice}
+                          marcada={seleccion.has(indice)}
+                          editable={editable}
+                          onMarcar={marcar}
+                          marca={actual.marca}
+                          onPedirFoto={(p) => setPedirFoto({ datos: encargoDeFoto(actual, p, hoyMadrid()) })}
+                        />
                       ))}
                     </ul>
                   </div>
@@ -508,6 +571,17 @@ export function CampanasInstagram({ marcaInicial = "casa-tomas", onAbrirBorrador
           </>
         )}
       </section>
+
+      {/* «Pedir foto a Oficiosos»: el formulario de encargos, ya rellenado con la pieza. */}
+      {pedirFoto && (
+        <FormularioEncargo
+          abierto
+          onAbierto={(v) => !v && setPedirFoto(null)}
+          datosIniciales={pedirFoto.datos}
+          ajustes={ajustes.data ?? { plazo_dias_laborables: 5, rondas_incluidas: 2, cupo_mensual: null }}
+          onHecho={(id) => onAbrirEncargo?.(id)}
+        />
+      )}
     </div>
   );
 }

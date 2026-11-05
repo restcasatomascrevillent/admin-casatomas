@@ -14,6 +14,38 @@ Drive**, en la carpeta «marketing» del secreto
 `GOOGLE_DRIVE_MARKETING_FOLDER_ID`; el bucket «instagram» es solo una escala
 temporal. Detalle en [instagram-fotos.md](instagram-fotos.md).
 
+## Pantallas y uso (evaluación de diseño C, 05/11/2026)
+
+Objetivo visual: la maqueta aprobada `instagram-studio/propuesta/maqueta/`.
+
+- **Pestañas:** Estudio (por defecto) · Crear · Campañas · Reels · Calendario ·
+  Encargos · Métricas. A la derecha de la barra, la **marca** que filtra todas
+  las pestañas («Las dos / Casa Tomás / Touza», se recuerda en la sesión del
+  navegador) y el indicador **«● @cuenta»** (Edge Function `instagram-estado`,
+  pedida una vez al entrar y guardada 10 min), que abre la conexión.
+- **Estudio** (`src/components/instagram/estudio/EstudioInstagram.tsx`): la
+  semana con miniaturas (un día lleva al calendario), la «Sugerencia de la
+  semana» (IA solo al pulsar), las próximas publicaciones, 3 cifras de 28 días
+  con tendencia y los encargos abiertos. No crea ni publica nada sola.
+- **Crear** se está rediseñando aparte (dos columnas, «Montar con IA»): esta
+  tanda no lo toca. Para él quedan listos `programar/mejorHueco.ts` y
+  `useMejorHueco` (mejor día y hora de «Qué funciona»; sin datos, mañana a las
+  13:00) y `motivoInicial` en `ProgramarPiezaDialog`.
+- **Tablet:** sin scroll de página en ninguna pestaña a 1280×800 ni 1024×768;
+  se comprueba con `tests/e2e-movil/instagram-tablet.capturas.mjs` (Supabase falso).
+- **Estados:** un solo módulo (`src/components/instagram/estados.ts` e
+  `InsigniaEstado.tsx`) con la paleta de la maqueta: verde publicada, oro
+  programada/aprobado, piedra discontinua borrador, azul encargo, ámbar «te
+  toca» y rojo error. Úsalo en cualquier insignia nueva.
+- **Lenguaje:** lo técnico (ids, contenedores, URLs, secretos, errores de
+  Meta en bruto) va plegado en «Para Oficiosos» (`ParaOficiosos.tsx`); los
+  errores de publicación se explican con `errores.ts`. Letra mínima 12 px.
+- **Pendiente (siguiente paso):** Reels como un formato más de Crear (hoy es
+  su propia pestaña); el umbral del menú lateral (`NAV_EXPANDED_MIN_WIDTH`) lo
+  decide el dueño; «Aprobar y programar» en un solo botón en Encargos; marco de
+  móvil de Instagram y «Comprobaciones automáticas» en la vista previa;
+  portada del reel eligiendo un fotograma.
+
 ## Arquitectura
 
 ```
@@ -191,8 +223,11 @@ dueño, y con sus propios secretos.
 ## Probar la conexión desde el panel
 
 1. Entra en la demo con un usuario que tenga **Marketing**.
-2. **Instagram** (menú lateral) **→ pestaña Conexión → Comprobar** (llama a
-   la Edge Function `instagram-estado`). Muestra:
+2. **Instagram** (menú lateral) **→ indicador «● @cuenta» de la barra de
+   pestañas** (o Crear › Conexión) **→ Comprobar** (llama a la Edge Function
+   `instagram-estado`). Arriba, en llano: si está todo listo, en qué cuenta
+   publica cada marca, el cupo y si las fotos de Drive están disponibles. En
+   **«Para Oficiosos»** (plegado):
    - los secretos (presentes o no; del token, como mucho `…abcd`);
    - la cuenta (`@usuario` e id) y si coincide con `IG_USER_ID`;
    - la cuota de publicación (usadas / total en 24 h);

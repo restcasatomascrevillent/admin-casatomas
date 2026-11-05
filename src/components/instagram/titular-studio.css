@@ -1,0 +1,22 @@
+/* Titular editorial del Studio de Instagram (maqueta, `.titular-studio`): la
+   Libre Baskerville de la marca Casa Tomás, servida desde el propio panel
+   (public/instagram/fuentes, la misma que usan las plantillas). */
+@font-face {
+  font-family: "Libre Baskerville Studio";
+  src: url("/instagram/fuentes/libre-baskerville/LibreBaskerville-Variable-latin.c844cbb9.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Libre Baskerville Studio";
+  src: url("/instagram/fuentes/libre-baskerville/LibreBaskerville-Italic-Variable-latin.c44cc02a.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+.titular-studio {
+  font-family: "Libre Baskerville Studio", "Libre Baskerville", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}

@@ -205,7 +205,7 @@ export function FichaEncargo({ encargo, roles, onCerrar, onEditar, onAbrirPieza 
     setOcupado("generar");
     try {
       await generarAutomatico(qc, encargo, (detalle?.adjuntos ?? []).map((a) => ({ id: a.foto_id, nombre: a.nombre, miniatura: a.miniatura })));
-      toast.success(encargo.formato === "reel" ? "Vídeo en cola" : "Pieza generada");
+      toast.success(encargo.formato === "reel" ? "Lo estamos montando: te avisamos cuando esté" : "Pieza generada");
       await qc.invalidateQueries({ queryKey: CLAVE_ENCARGOS });
     } catch (e) {
       toast.error("No se pudo generar la pieza", { description: mensajeErrorEncargo(e) });
@@ -234,7 +234,7 @@ export function FichaEncargo({ encargo, roles, onCerrar, onEditar, onAbrirPieza 
 
         <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain p-4">
           {paso >= 0 && (
-            <ol className="flex gap-1 text-[11px]" aria-label="Estado del encargo">
+            <ol className="flex gap-1 text-xs" aria-label="Estado del encargo">
               {PASOS.map((p, i) => (
                 <li
                   key={p}
@@ -446,13 +446,13 @@ export function FichaEncargo({ encargo, roles, onCerrar, onEditar, onAbrirPieza 
               {hilo.map((h) =>
                 h.tipo === "mensaje" ? (
                   <li key={h.id} className={cn("max-w-[85%] rounded-lg p-2 text-sm", h.lado === "agencia" ? "bg-blue-50" : "ml-auto bg-muted")}>
-                    <div className="mb-0.5 text-[11px] text-muted-foreground">
+                    <div className="mb-0.5 text-xs text-muted-foreground">
                       <b>{h.lado === "agencia" ? "Oficiosos" : "Restaurante"}</b> · {new Date(h.cuando).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </div>
                     <p className="whitespace-pre-wrap break-words">{h.texto}</p>
                   </li>
                 ) : (
-                  <li key={h.id} className="text-center text-[11px] text-muted-foreground">
+                  <li key={h.id} className="text-center text-xs text-muted-foreground">
                     {h.texto} · {new Date(h.cuando).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </li>
                 ),

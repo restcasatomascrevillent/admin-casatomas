@@ -3,17 +3,16 @@ import { es } from "date-fns/locale";
 import { ExternalLink, ImageOff } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { explicarErrorPublicacion } from "@/components/instagram/errores";
 import { MARCAS, obtenerPlantilla, urlRecurso, type MarcaId } from "@/lib/instagram";
 import { usePiezasInstagram, type EstadoPieza, type PiezaInstagram } from "./usePiezasInstagram";
+import { ESTADOS_PIEZA, ESTILO_TONO } from "@/components/instagram/estados";
+import { InsigniaEstado } from "@/components/instagram/InsigniaEstado";
 
-export const ETIQUETA_ESTADO: Record<EstadoPieza, { texto: string; clase: string }> = {
-  borrador: { texto: "Borrador", clase: "bg-muted text-muted-foreground" },
-  generada: { texto: "Generada", clase: "bg-sky-100 text-sky-800" },
-  procesando: { texto: "Instagram procesando", clase: "bg-violet-100 text-violet-800" },
-  prueba_ok: { texto: "Prueba correcta", clase: "bg-amber-100 text-amber-900" },
-  publicada: { texto: "Publicada", clase: "bg-emerald-100 text-emerald-800" },
-  error: { texto: "Error", clase: "bg-red-100 text-red-800" },
-};
+/** Texto y clases de cada estado: los del módulo único de estados (components/instagram/estados.ts). */
+export const ETIQUETA_ESTADO = Object.fromEntries(
+  (Object.keys(ESTADOS_PIEZA) as EstadoPieza[]).map((e) => [e, { texto: ESTADOS_PIEZA[e].etiqueta, clase: `border ${ESTILO_TONO[ESTADOS_PIEZA[e].tono].insignia}` }]),
+) as Record<EstadoPieza, { texto: string; clase: string }>;
 
 export const NOMBRE_MARCA_CORTO: Record<MarcaId, string> = { "casa-tomas": "Casa Tomás", touza: "Touza" };
 
@@ -53,7 +52,6 @@ export function HistorialPiezas({ baseFotos, actual, onAbrir }: Props) {
   return (
     <ul className="space-y-1.5" data-testid="historial-instagram">
       {imagenes.map((p) => {
-        const estado = ETIQUETA_ESTADO[p.estado] ?? ETIQUETA_ESTADO.borrador;
         const img = urlImagenPieza(baseFotos, p);
         const marca = NOMBRE_MARCA_CORTO[p.marca as MarcaId] ?? MARCAS[p.marca as MarcaId]?.nombre ?? p.marca;
         // Los nombres de las plantillas de Touza ya empiezan por «Touza · ».
@@ -83,10 +81,14 @@ export function HistorialPiezas({ baseFotos, actual, onAbrir }: Props) {
                   {marca} · {plantilla} · {p.formato === "story" ? "Story" : "Post"}
                 </span>
                 <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                  <span className={cn("rounded-full px-1.5 py-0.5 text-[11px] font-medium", estado.clase)}>{estado.texto}</span>
+                  <InsigniaEstado dominio="pieza" estado={p.estado} />
                   <time dateTime={p.created_at}>{format(new Date(p.created_at), "d MMM, HH:mm", { locale: es })}</time>
                 </span>
-                {p.estado === "error" && p.error && <span className="mt-0.5 block truncate text-xs text-destructive" title={p.error}>{p.error}</span>}
+                {p.estado === "error" && p.error && (
+                  <span className="mt-0.5 block truncate text-xs text-destructive" title={p.error}>
+                    {explicarErrorPublicacion(p.error).titulo}
+                  </span>
+                )}
                 {p.imagen_borrada_at && p.estado !== "publicada" && (
                   <span className="mt-0.5 block text-xs text-amber-700">Imagen borrada por no publicarse: vuelve a generarla.</span>
                 )}
