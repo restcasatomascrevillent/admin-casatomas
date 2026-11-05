@@ -171,7 +171,14 @@ const atrasNavegador = () => act(() => sonda.nav?.(-1));
 
 function montar(
   onPreguntarIA = vi.fn(),
-  modoPedido?: { modo: "documentos" | "productos" | "proveedores"; clave: string; doc?: number; mes?: string; prov?: number },
+  modoPedido?: {
+    modo: "documentos" | "productos" | "proveedores";
+    clave: string;
+    doc?: number;
+    mes?: string;
+    prov?: number;
+    local?: "casa_tomas" | "touza";
+  },
 ) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   sonda.qc = qc;
@@ -476,6 +483,14 @@ describe("Compras · enlaces desde Análisis (?mes= y ?prov=)", () => {
     await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
     expect(screen.getByRole("button", { name: "Solo Agosto 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
     expect(within(listaDocs()).getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("?mes=2026-09&local=touza abre Documentos con ese mes y ese local", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k-mes-local", mes: "2026-09", local: "touza" });
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
+    expect(within(screen.getByRole("group", { name: "Local" })).getByRole("button", { name: "Touza" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Solo Septiembre 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
+    expect(numerosVisibles()).toEqual(["F-101"]);
   });
 
   it("?prov=2 abre Proveedores con ese proveedor desplegado", async () => {

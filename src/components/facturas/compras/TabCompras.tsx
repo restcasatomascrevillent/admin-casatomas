@@ -148,10 +148,10 @@ export function TabCompras({
   onPreguntarIA?: (doc: Factura, tipo: "factura" | "albarán") => void;
   /**
    * Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos.
-   * `doc`: abre ese documento. `mes` (YYYY-MM): filtra ese mes. `prov`: abre ese proveedor desplegado
-   * (los dos últimos, desde Facturas › Análisis).
+   * `doc`: abre ese documento. `mes` (YYYY-MM): filtra ese mes. `prov`: abre ese proveedor desplegado.
+   * `local`: deja ese local elegido (los tres últimos, desde Facturas › Análisis).
    */
-  modoPedido?: { modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number };
+  modoPedido?: { modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number; local?: "casa_tomas" | "touza" };
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   const qc = useQueryClient();
@@ -484,6 +484,11 @@ export function TabCompras({
     setPeriodo({ tipo: "mes", mes });
     setMesPedido((m) => ({ mes, n: (m?.n ?? 0) + 1 }));
   }, [modoPedido?.clave, modoPedido?.mes]);
+  // `&local=` (un mes de Análisis mirado con un local): ese local, como el mes.
+  useEffect(() => {
+    const l = modoPedido?.local;
+    if (l === "casa_tomas" || l === "touza") setLocal(l);
+  }, [modoPedido?.clave, modoPedido?.local]);
   const [provPendiente, setProvPendiente] = useState<number | null>(modoPedido?.prov ?? null);
   useEffect(() => {
     if (modoPedido?.prov) setProvPendiente(modoPedido.prov);
