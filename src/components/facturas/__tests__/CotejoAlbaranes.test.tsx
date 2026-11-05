@@ -176,7 +176,7 @@ describe("Ficha de factura › Albaranes y cotejo", () => {
     const cotejo = within(seccion).getByRole("region", { name: "Cotejo de albaranes y factura" });
     // Diferencia total sin color (la explican los no subidos); lo sin explicar, en verde (< 1 %).
     expect(within(cotejo).getByText(/son de albaranes citados sin subir/)).toBeInTheDocument();
-    expect(cotejo.querySelector('[data-tono="ok"]')).toHaveTextContent("-34,25");
+    expect(cotejo.querySelector('[data-tono="ok"]')).toHaveTextContent("−34,25") // signo menos tipográfico (QA C-17);
 
     const filas = within(cotejo).getAllByRole("row").slice(1);
     expect(filas).toHaveLength(3); // las 16 que cuadran, plegadas
@@ -292,7 +292,7 @@ describe("Ficha de albarán › factura que lo recoge", () => {
 
     const mini = await screen.findByRole("region", { name: "Cotejo del albarán con la factura" });
     expect(mini).toHaveTextContent("Este albarán");
-    expect(mini.querySelector('[data-tono="aviso"]')).toHaveTextContent("-17,25"); // 3,2 % del albarán
+    expect(mini.querySelector('[data-tono="aviso"]')).toHaveTextContent("−17,25"); // 3,2 % del albarán; signo menos tipográfico (QA C-17)
     expect(within(mini).getAllByRole("row")).toHaveLength(2); // cabecera + la mayonesa
     expect(within(mini).getByRole("button", { name: /1 línea cuadra/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Quitar el vínculo con la factura ML/101511" }).className).toContain("h-11");
