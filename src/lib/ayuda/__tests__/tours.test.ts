@@ -67,12 +67,13 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("la IA de Facturas se explica por partes: historial, ejemplos, «Al instante» y caja de pregunta", () => {
+  it("la IA de Facturas se explica por partes: historial, tablero, ejemplos, «Al instante» y caja de pregunta", () => {
     const ia = TOURS.facturas.filter((p) => p.pestana === "facturas-pestana-ia").map((p) => p.elemento);
     expect(ia).toEqual([
       "facturas-pestana-ia",
       "facturas-gasto-ia",
       "facturas-ia-historial",
+      "facturas-ia-tablero",
       "facturas-ia-sugerencias",
       "facturas-ia-al-instante",
       "facturas-ia-pregunta",

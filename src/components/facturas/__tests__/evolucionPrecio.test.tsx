@@ -1,6 +1,6 @@
 // «Evolución de precio»: pregunta rápida (selector de producto → RPC
-// serie_precios_agente → gráfica) y adjuntos del chatbot (se pintan bajo la
-// burbuja, se guardan con el mensaje y se leen de BD al recargar).
+// serie_precios_agente → gráfica) y adjuntos del chatbot (se pintan como
+// tarjeta del tablero, se guardan con el mensaje y se leen de BD al recargar).
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -175,10 +175,11 @@ describe("adjuntos del chatbot", () => {
     const caja = screen.getByLabelText("Pregunta para el asistente");
     fireEvent.change(caja, { target: { value: "¿Cómo ha evolucionado la merluza?" } });
     fireEvent.click(screen.getByRole("button", { name: /enviar pregunta/i }));
-    await screen.findByText("Aquí tienes la evolución.");
+    // La respuesta sale en el copiloto (y, si trae gráfica, también como explicación de su tarjeta).
+    await within(screen.getByRole("complementary", { name: /copiloto/i })).findByText("Aquí tienes la evolución.");
   }
 
-  it("pinta la gráfica bajo la burbuja y la guarda con el mensaje", async () => {
+  it("pinta la gráfica como tarjeta del tablero y la guarda con el mensaje", async () => {
     doble.invoke.mockResolvedValue({
       data: { respuesta: "Aquí tienes la evolución.", adjuntos: [{ tipo: "serie_precio", datos: SERIE }] },
       error: null,

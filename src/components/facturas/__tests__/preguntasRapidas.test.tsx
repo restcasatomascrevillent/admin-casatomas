@@ -570,7 +570,7 @@ describe("pintado del resultado", () => {
     montar();
     fireEvent.click(boton(/top proveedores/i));
     const tarjeta = await screen.findByRole("region", { name: /top proveedores/i });
-    fireEvent.click(within(tarjeta).getByRole("button", { name: /quitar esta respuesta/i }));
+    fireEvent.click(within(tarjeta).getByRole("button", { name: /quitar esta tarjeta/i }));
     expect(screen.queryByRole("region", { name: /top proveedores/i })).not.toBeInTheDocument();
   });
 });

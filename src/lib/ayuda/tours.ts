@@ -180,9 +180,9 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
     {
       elemento: F_IA,
       pestana: F_IA,
-      titulo: "3. Preguntar a la IA",
+      titulo: "3. Análisis con gráficas",
       texto:
-        "En «IA» le preguntas a la aplicación por tus compras, con tus palabras, como a una persona. Responde con los datos de tus facturas y albaranes. Te enseñamos sus partes.",
+        "En «Análisis» le preguntas a la aplicación por tus compras, con tus palabras, y las gráficas se quedan en un tablero. Responde con los datos de tus facturas y albaranes. Te enseñamos sus partes.",
       lado: "bottom",
     },
     {
@@ -199,7 +199,16 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_IA,
       titulo: "Tus conversaciones",
       texto:
-        "Aquí se guardan las preguntas que ya has hecho, con su fecha. Toca una para volver a ella y seguir donde lo dejaste. «Nueva conversación» empieza de cero.",
+        "Aquí se guardan los análisis que ya has hecho, con su fecha. Toca uno para volver a él con sus gráficas y seguir donde lo dejaste. «Nuevo» empieza de cero.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-ia-tablero",
+      pestana: F_IA,
+      titulo: "El tablero de gráficas",
+      texto:
+        "Cada gráfica que pidas se queda aquí como una tarjeta, la más nueva arriba. Toca una para seleccionarla: lo siguiente que preguntes irá sobre ella. Debajo tienes botones para preguntar más («solo los últimos 3 meses», «¿por qué subió?»). La X la quita.",
       opcional: true,
       lado: "right",
     },
