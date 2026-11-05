@@ -189,6 +189,9 @@ describe("valorSinDescuento (importación histórica)", () => {
     expect(valorSinDescuento({ precio: 10, importe_bruto: null })).toBeNull();
     expect(valorSinDescuento({ precio: 10, importe_bruto: 10 })).toBeNull();
   });
+  it("bruto MENOR que el importe: no es un descuento, nada (QA C-15)", () => {
+    expect(valorSinDescuento({ precio: 12, importe_bruto: 9.5, importe_bruto_estimado: false, descuento_pct: null })).toBeNull();
+  });
 });
 
 describe("indicePreciosLinea (media de referencia de cada línea, calculada una vez)", () => {

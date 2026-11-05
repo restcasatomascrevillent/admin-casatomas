@@ -195,6 +195,29 @@ describe("ListaDocumentos agrupada por mes", () => {
     expect(screen.queryByTestId("barra-meses")).toBeNull();
   });
 
+  it("con filtros (chip Abonos, local o periodo): 3 meses más recientes abiertos y «Abrir todos» (QA C-06)", () => {
+    // Antes, con un filtro todo salía plegado salvo el mes de hoy y el anterior, sin «Abrir todos».
+    window.localStorage.setItem("compras.documentos.plegado", JSON.stringify({ "m:2026-10": false }));
+    pintar({ hayFiltros: true, filtros: "abonos|todos|todo|" });
+    expect(cabeceraMes(/^Octubre 2026/).getAttribute("aria-expanded")).toBe("true");
+    expect(cabeceraMes(/^Septiembre 2026/).getAttribute("aria-expanded")).toBe("true");
+    expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-expanded")).toBe("true");
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "Abrir todos" }));
+    expect(cabeceraMes(/^Sin fecha/).getAttribute("aria-expanded")).toBe("true");
+    // Lo plegado con un filtro no se guarda.
+    expect(JSON.parse(window.localStorage.getItem("compras.documentos.plegado") ?? "{}")).toEqual({ "m:2026-10": false });
+  });
+
+  it("cada cabecera de mes abierta dice qué lista controla (aria-controls, QA M9)", () => {
+    pintar();
+    const octubre = cabeceraMes(/^Octubre 2026/);
+    const id = octubre.getAttribute("aria-controls");
+    expect(id).toBeTruthy();
+    expect(document.getElementById(id as string)?.tagName).toBe("UL");
+    expect(cabeceraMes(/^Mayo 2026/).getAttribute("aria-controls")).toBeNull();
+  });
+
   it("con texto buscado: solo los 3 meses más recientes con resultados, y «Abrir todos» / «Plegar todos»", () => {
     // Octubre plegado a mano antes de buscar: durante la búsqueda no cuenta.
     window.localStorage.setItem("compras.documentos.plegado", JSON.stringify({ "m:2026-10": false }));
