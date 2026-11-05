@@ -41,6 +41,7 @@
     "test:instagram-metricas:db": "node scripts/test-instagram-metricas.mjs",
     "test:instagram-servidor:db": "node scripts/test-instagram-servidor.mjs",
     "test:instagram-ia:db": "node scripts/test-instagram-ia.mjs",
+    "test:instagram-campanas:db": "node scripts/test-instagram-campanas.mjs",
     "instagram:recursos": "node scripts/instagram/subir-recursos.mjs"
   },
   "dependencies": {
