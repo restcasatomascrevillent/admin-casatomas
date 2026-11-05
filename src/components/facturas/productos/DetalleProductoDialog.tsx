@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/components/facturas/shared/formatters";
+import { formatImporte } from "@/components/facturas/shared/formatters";
 import {
   useAsignarLineas,
   useBorrarProducto,
@@ -87,8 +87,8 @@ export function DetalleProductoDialog({
           </DialogTitle>
           <DialogDescription>
             {rutaCategoria(mapa, producto.categoria_id) ?? "Sin categoría"} · {producto.compras} compra(s) ·{" "}
-            {formatCantidades(producto.cantidades)} · {formatCurrency(producto.gasto)} (base sin IVA)
-            {producto.ultimo_precio !== null && ` · último precio ${formatCurrency(producto.ultimo_precio)}`}
+            {formatCantidades(producto.cantidades)} · {formatImporte(producto.gasto)} (base sin IVA)
+            {producto.ultimo_precio !== null && ` · último precio ${formatImporte(producto.ultimo_precio)}`}
           </DialogDescription>
         </DialogHeader>
 

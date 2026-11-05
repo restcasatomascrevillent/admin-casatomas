@@ -1,14 +1,17 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Search, Truck, X } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowLeft, Loader2, Search, Truck, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { Factura } from "@/hooks/useFacturas";
+import { invalidarDerivadosCompras, type Factura } from "@/hooks/useFacturas";
 import { useBusquedaLineas, useDocumentoCompras, useListaCompras, usePrecargarDocumento } from "@/hooks/useListaCompras";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import { useCategoriasProducto, useResumenProductos } from "@/hooks/useProductosCatalogo";
+import { productoDeLinea, useCategoriasProducto, useResumenProductos } from "@/hooks/useProductosCatalogo";
 import { useProveedores } from "@/hooks/useProveedores";
-import { plural, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
-import { avisosCabecera, avisosFicha, crearResolverDeLista, type CabeceraDocumento } from "@/lib/facturas/listaCompras";
+import { formatEntero, plural, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
+import { avisosCabecera, avisosFicha, crearResolverDeLista, detalleError, type CabeceraDocumento } from "@/lib/facturas/listaCompras";
 import { TabProductos } from "@/components/facturas/productos/TabProductos";
 import { ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
 import { EditarFacturaDialog } from "@/components/facturas/EditarFacturaDialog";
@@ -18,12 +21,16 @@ import {
   FILTROS_DOCUMENTOS,
   FILTROS_PROVEEDORES,
   MODOS_COMPRAS,
+  busquedaConFicha,
   contarFiltrosDocumentos,
   coincideDocumento,
   contarPorModo,
+  estadoConFichas,
   filtrarDocumentos,
   palabrasBusqueda,
+  pilaDeFichas,
   proveedoresDelTexto,
+  type FichaCompras,
   type FiltroDocumentos,
   type FiltroProveedores,
   type ModoCompras,
@@ -39,7 +46,6 @@ import {
   pasaLocal,
   pasaPeriodo,
   rangoPeriodo,
-  textoPeriodo,
   type FiltroLocal,
   type Periodo,
 } from "@/lib/facturas/resumenCompras";
@@ -48,24 +54,44 @@ import { ListaProveedores } from "./ListaProveedores";
 import { FichaDocumento } from "./FichaDocumento";
 import { FichaProducto } from "./FichaProducto";
 import { FichaProveedor } from "./FichaProveedor";
-import { BARRA_CHIPS, CHIP, EstadoError, PISTA_SEGMENTOS, SEGMENTO } from "./estilo";
+import { AvisoFranja, BARRA_CHIPS, CHIP, EstadoError, PISTA_SEGMENTOS, SEGMENTO, useDesbordeHorizontal } from "./estilo";
 
 const TODO_EL_PERIODO = { desde: null, hasta: null, tipo: null } as const;
 const PERIODO_TODO: Periodo = { tipo: "todo" };
 
 /** La ficha a pantalla completa (documento o producto). */
-type Ficha = { tipo: "documento"; id: number } | { tipo: "producto"; id: number };
-
-/** De qué ficha se saltó a la actual, para volver con un toque («Volver a …»). */
-interface Origen {
-  ficha: Ficha;
-  etiqueta: string;
-}
+type Ficha = FichaCompras;
 
 /** Pie de la lista: recuento a la izquierda y la nota de los importes a la derecha. */
 const PIE_LISTA = "flex h-9 shrink-0 items-center gap-2 border-t border-border/60 px-3 text-xs text-muted-foreground";
 
 const tipoDocumento = (d: Pick<Factura, "total" | "tipo">) => (esAbono(d) ? "Abono" : d.tipo === "albaran" ? "Albarán" : "Factura");
+
+const mismaFicha = (a: Ficha | null | undefined, b: Ficha | null | undefined) => !!a && !!b && a.tipo === b.tipo && a.id === b.id;
+
+/**
+ * «Hoy», que cambia solo al pasar la medianoche o al volver a la pestaña otro
+ * día (QA 05/11/2026): con el panel abierto de un día para otro, «Este mes» y
+ * los meses desplegados seguían siendo los del día en que se abrió.
+ */
+function useHoy(): Date {
+  const [hoy, setHoy] = useState(() => new Date());
+  useEffect(() => {
+    const manana = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1).getTime();
+    const t = setTimeout(() => setHoy(new Date()), Math.max(manana - Date.now() + 1000, 1000));
+    const alVolver = () => {
+      if (document.visibilityState !== "visible") return;
+      const ahora = new Date();
+      if (ahora.toDateString() !== hoy.toDateString()) setHoy(ahora);
+    };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("visibilitychange", alVolver);
+    };
+  }, [hoy]);
+  return hoy;
+}
 
 /** Mientras llega la ficha: su cabecera (ya está en la lista) y huecos donde irán las líneas. */
 function FichaCargando({ cabecera }: { cabecera: CabeceraDocumento | undefined }) {
@@ -85,6 +111,20 @@ function FichaCargando({ cabecera }: { cabecera: CabeceraDocumento | undefined }
   );
 }
 
+/** Mientras el servidor busca en las líneas y aún no hay nada que enseñar (QA C-07: no «Ningún documento coincide»). */
+const BuscandoEnLineas = () => (
+  <div className="flex flex-col items-center px-6 py-12 text-center" role="status" data-testid="buscando-en-lineas">
+    <Loader2 className="mb-3 h-6 w-6 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden="true" />
+    <p className="text-sm font-semibold text-foreground">Buscando en las líneas…</p>
+    <p className="mt-1 max-w-sm text-sm text-muted-foreground">Miramos también los productos de cada documento.</p>
+  </div>
+);
+
+/** Recuento de un chip: «…» mientras no se sabe (QA F11) y con punto de miles (C-18). */
+const Cuenta = ({ n }: { n: number | null }) => (
+  <span className="text-xs font-normal tabular-nums text-muted-foreground">{n === null ? "…" : formatEntero(n)}</span>
+);
+
 /**
  * Facturas › Compras (rediseño a todo el ancho, 05/11/2026): UN buscador, tres
  * formas de mirar lo comprado (Documentos · Productos · Proveedores) con el
@@ -95,9 +135,11 @@ function FichaCargando({ cabecera }: { cabecera: CabeceraDocumento | undefined }
  * Al tocar un documento o un producto su ficha ocupa toda la pestaña, con
  * «← Volver a la lista» (que la deja exactamente como estaba: la lista no se
  * desmonta, solo se oculta, y se le devuelve la posición de scroll y el foco)
- * y, si se saltó desde otra ficha, «Volver a …». Los proveedores se despliegan
- * en su propia fila (acordeón). Sin scroll de página: solo la lista y la ficha
- * se desplazan por dentro.
+ * y, si se saltó desde otra ficha, «Volver a …». Cada ficha es una entrada del
+ * historial (`?doc=` / `?producto=`, QA C-12): «Atrás» del navegador retrocede
+ * una ficha o vuelve a la lista en vez de salir de Facturas. Los proveedores se
+ * despliegan en su propia fila (acordeón). Sin scroll de página: solo la lista y
+ * la ficha se desplazan por dentro.
  */
 export function TabCompras({
   onPreguntarIA,
@@ -112,10 +154,16 @@ export function TabCompras({
   modoPedido?: { modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number };
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
-  const [hoy] = useState(() => new Date());
+  const qc = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const hoy = useHoy();
   const [texto, setTexto] = useState("");
   const textoDiferido = useDeferredValue(texto);
   const [modo, setModo] = useState<ModoCompras>(modoPedido?.modo ?? "documentos");
+  // Productos se monta la primera vez que se mira y luego se queda (oculto): sus filtros no se pierden al cambiar de modo.
+  const [productosVisto, setProductosVisto] = useState(modo === "productos");
+  if (modo === "productos" && !productosVisto) setProductosVisto(true);
   const [filtroDocs, setFiltroDocs] = useState<FiltroDocumentos>("todo");
   const [filtroProv, setFiltroProv] = useState<FiltroProveedores>("todos");
   const [local, setLocal] = useState<FiltroLocal>("todos");
@@ -123,20 +171,27 @@ export function TabCompras({
   // El preset al que se vuelve al quitar el mes elegido en la gráfica.
   const [periodoPrevio, setPeriodoPrevio] = useState<Periodo>(PERIODO_TODO);
   const [mesPedido, setMesPedido] = useState<{ mes: string; n: number } | null>(null);
-  const [ficha, setFicha] = useState<Ficha | null>(null);
-  const [origen, setOrigen] = useState<Origen | null>(null);
   // Lo último abierto en cada lista (se marca con `aria-current` al volver).
   const [ultimoDoc, setUltimoDoc] = useState<number | null>(null);
   const [ultimoProducto, setUltimoProducto] = useState<number | null>(null);
   const [provAbierto, setProvAbierto] = useState<number | null>(null);
-  const [pedidoVerProv, setPedidoVerProv] = useState(0);
   const [editando, setEditando] = useState<Factura | null>(null);
   const [gestionando, setGestionando] = useState(false);
+  const [refLocalPeriodo, difLocalPeriodo] = useDesbordeHorizontal();
+  const [refChipsDocs, difChipsDocs] = useDesbordeHorizontal();
+  const [refChipsProv, difChipsProv] = useDesbordeHorizontal();
+
+  // ── Ficha abierta: la dice el historial (state de la navegación) ──────────
+  const pila = useMemo(() => pilaDeFichas(location.state), [location.state]);
+  const ficha: Ficha | null = pila.length > 0 ? pila[pila.length - 1] : null;
+  const claveFicha = ficha ? `${ficha.tipo}:${ficha.id}` : null;
 
   const vistaListaRef = useRef<HTMLDivElement>(null);
   const volverRef = useRef<HTMLButtonElement>(null);
   /** Al abrir una ficha: scroll de cada zona de la lista y el elemento con el foco, para devolverlos al volver. */
   const recuerdoLista = useRef<{ scrolls: [Element, number, number][]; foco: HTMLElement | null } | null>(null);
+  /** Al pedir ver un proveedor desde una ficha: se lleva a la vista cuando la lista vuelve a verse. */
+  const provPorEnsenar = useRef<number | null>(null);
 
   // ── Datos ─────────────────────────────────────────────────────────────────
   // La lista son solo CABECERAS (`documentos_lista()`: una petición, con avisos,
@@ -166,6 +221,24 @@ export function TabCompras({
   // Avisos de cada fila: los guardados y el de precio atípico (calculado en el servidor).
   const avisosPorId = useMemo(() => new Map(documentos.map((d) => [d.id, avisosCabecera(d)])), [documentos]);
 
+  // Han entrado o salido documentos (una subida que termina, un borrado): lo
+  // calculado con ellos (productos, gráficas, proveedores) también cambia (QA C-11).
+  const firmaLista = useMemo(() => {
+    let max = 0;
+    let suma = 0;
+    for (const d of documentos) {
+      if (d.id > max) max = d.id;
+      suma += d.id;
+    }
+    return `${documentos.length}:${max}:${suma}`;
+  }, [documentos]);
+  const firmaPrevia = useRef<string | null>(null);
+  useEffect(() => {
+    if (firmaPrevia.current !== null && firmaPrevia.current !== firmaLista && listaQ.data) invalidarDerivadosCompras(qc);
+    firmaPrevia.current = firmaLista;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaLista]);
+
   // Búsqueda por producto/línea: ids que casan según el servidor (o, con la
   // carga de antes, según las líneas que ya hay). Se suman a lo que casa en la
   // cabecera (número, proveedor, CIF), que sale al instante.
@@ -176,6 +249,9 @@ export function TabCompras({
     if (palabras.length === 0) return null;
     return new Set([...completos.values()].filter((d) => coincideDocumento(d, palabras)).map((d) => d.id));
   }, [completos, busquedaLineas.ids, textoDiferido]);
+  // Buscando en las líneas (servidor): lo que casa en la cabecera ya está a la vista.
+  const buscandoLineas = hayTexto && busquedaLineas.buscando;
+  const errorBusqueda = hayTexto && busquedaLineas.error ? busquedaLineas.error : null;
 
   // ── Local y periodo: afectan a Documentos y Proveedores (el resumen vive en Análisis) ─────────
   const rango = useMemo(() => rangoPeriodo(periodo, hoy), [periodo, hoy]);
@@ -190,15 +266,15 @@ export function TabCompras({
       ordenarProveedoresPorGasto(proveedoresDelTexto(proveedores, docsBase, textoDiferido, resolver, casanEnLineas), agregados, filtrosActivos),
     [proveedores, docsBase, textoDiferido, resolver, agregados, filtrosActivos, casanEnLineas],
   );
-  // null = aún no se sabe (su lista no ha llegado): el selector enseña «…».
+  // null = aún no se sabe (su lista no ha llegado o se está buscando en las líneas): el selector enseña «…».
   const contadores = useMemo((): Record<ModoCompras, number | null> => {
     const c = contarPorModo({ texto: textoDiferido, documentos: docsBase, productos, proveedores: [], mapaCategorias, resolver, extra: casanEnLineas });
     return {
-      documentos: listaQ.data ? c.documentos : null,
+      documentos: listaQ.data && !buscandoLineas ? c.documentos : null,
       productos: resumenQ.data ? c.productos : null,
-      proveedores: proveedoresQ.data ? provDelTexto.length : null,
+      proveedores: proveedoresQ.data && listaQ.data && !buscandoLineas ? provDelTexto.length : null,
     };
-  }, [textoDiferido, docsBase, productos, mapaCategorias, resolver, provDelTexto, casanEnLineas, listaQ.data, resumenQ.data, proveedoresQ.data]);
+  }, [textoDiferido, docsBase, productos, mapaCategorias, resolver, provDelTexto, casanEnLineas, listaQ.data, resumenQ.data, proveedoresQ.data, buscandoLineas]);
   const cuentaFiltrosDocs = useMemo(
     () => contarFiltrosDocumentos(docsBase, textoDiferido, avisosPorId, casanEnLineas),
     [docsBase, textoDiferido, avisosPorId, casanEnLineas],
@@ -211,18 +287,23 @@ export function TabCompras({
     () => provDelTexto.filter((p) => (agregados.get(`#${p.id}`)?.albaranesSinFactura ?? 0) > 0),
     [provDelTexto, agregados],
   );
+  // El proveedor abierto desde una ficha o desde Análisis se ve aunque los filtros lo escondan (rotulado).
+  const provFueraDeFiltros = useMemo(() => {
+    if (provAbierto === null) return null;
+    const lista = filtroProv === "albaranes_sin_factura" ? conSinFactura : provDelTexto;
+    return lista.some((p) => p.id === provAbierto) ? null : provAbierto;
+  }, [filtroProv, conSinFactura, provDelTexto, provAbierto]);
   const provVisibles = useMemo(() => {
     const lista = filtroProv === "albaranes_sin_factura" ? conSinFactura : provDelTexto;
-    // El proveedor abierto desde una ficha o desde el top 10 se ve aunque los filtros lo escondan.
-    if (provAbierto !== null && !lista.some((p) => p.id === provAbierto)) {
-      const p = proveedores.find((x) => x.id === provAbierto);
+    if (provFueraDeFiltros !== null) {
+      const p = proveedores.find((x) => x.id === provFueraDeFiltros);
       if (p) return [p, ...lista];
     }
     return lista;
-  }, [filtroProv, conSinFactura, provDelTexto, provAbierto, proveedores]);
+  }, [filtroProv, conSinFactura, provDelTexto, provFueraDeFiltros, proveedores]);
 
   // ── Ficha a pantalla completa ─────────────────────────────────────────────
-  const etiquetaFicha = (f: Ficha | null): string | null => {
+  const etiquetaFicha = (f: Ficha | null | undefined): string | null => {
     if (!f) return null;
     if (f.tipo === "documento") {
       const d = docPorId.get(f.id);
@@ -231,42 +312,51 @@ export function TabCompras({
     return productos.find((p) => p.producto_id === f.id)?.nombre ?? null;
   };
 
-  /** Abre una ficha. Desde la lista (`desdeLista`) se guarda cómo estaba; desde otra ficha, «Volver a …». */
-  const abrirFicha = (destino: Ficha, desdeLista: boolean) => {
-    if (desdeLista || !ficha) {
+  /**
+   * Abre una ficha: una entrada nueva del historial. Desde la lista
+   * (`desdeLista`) se guarda cómo estaba la lista y la pila empieza de nuevo;
+   * desde otra ficha, se apila («Volver a …»). `limpiarEnlace`: el enlace
+   * profundo (`?doc=` de Cargar) se sustituye antes por la lista, para que
+   * «Atrás» vuelva a ella y al recargar no se reabra.
+   */
+  const abrirFicha = (destino: Ficha, desdeLista: boolean, { limpiarEnlace = false }: { limpiarEnlace?: boolean } = {}) => {
+    if (mismaFicha(ficha, destino)) return;
+    const empiezaPila = desdeLista || !ficha;
+    if (empiezaPila) {
       const raiz = vistaListaRef.current;
       recuerdoLista.current = {
-        // Solo las zonas con scroll propio (lista, resumen, barras de chips).
+        // Solo las zonas con scroll propio (lista, barras de chips).
         scrolls: raiz
           ? [...raiz.querySelectorAll('[class*="overflow-"]')].filter((el) => el.scrollTop > 0 || el.scrollLeft > 0).map((el) => [el, el.scrollTop, el.scrollLeft] as [Element, number, number])
           : [],
         foco: document.activeElement instanceof HTMLElement && raiz?.contains(document.activeElement) ? document.activeElement : null,
       };
-      setOrigen(null);
-    } else {
-      const etiqueta = etiquetaFicha(ficha);
-      setOrigen(etiqueta && !(ficha.tipo === destino.tipo && ficha.id === destino.id) ? { ficha, etiqueta } : null);
     }
     if (destino.tipo === "documento") setUltimoDoc(destino.id);
     else setUltimoProducto(destino.id);
-    setFicha(destino);
+    if (limpiarEnlace) navigate({ pathname: location.pathname, search: busquedaConFicha(location.search, null) }, { replace: true });
+    const nuevaPila = empiezaPila ? [destino] : [...pila, destino];
+    // Desde la lista con una ficha ya abierta (no debería pasar): se sustituye, para no dejar fichas huérfanas en el historial.
+    navigate(
+      { pathname: location.pathname, search: busquedaConFicha(location.search, destino) },
+      { state: estadoConFichas(nuevaPila), replace: desdeLista && pila.length > 0 },
+    );
   };
 
+  /** Cierra todas las fichas: vuelve en el historial a la entrada de la lista. */
   const volverALista = () => {
-    setFicha(null);
-    setOrigen(null);
+    if (pila.length > 0) navigate(-pila.length);
   };
+  /** Una ficha atrás («Volver a …» y «Atrás» del navegador). */
   const volverAOrigen = () => {
-    if (!origen) return;
-    setFicha(origen.ficha);
-    setOrigen(null);
+    if (pila.length > 1) navigate(-1);
   };
 
   // Al abrir una ficha, el foco va a «Volver a la lista»; al volver, la lista
   // recupera su scroll y el foco vuelve a la fila que se tocó.
   const habiaFicha = useRef(false);
   useLayoutEffect(() => {
-    if (ficha) {
+    if (claveFicha) {
       volverRef.current?.focus({ preventScroll: true });
     } else if (habiaFicha.current) {
       const r = recuerdoLista.current;
@@ -276,24 +366,41 @@ export function TabCompras({
       });
       // El foco, a la fila que se tocó (en táctil un toque no enfoca: se busca la marcada como abierta).
       const foco = r?.foco?.isConnected ? r.foco : vistaListaRef.current?.querySelector<HTMLElement>('[aria-current="true"]');
-      foco?.focus({ preventScroll: true });
+      if (provPorEnsenar.current === null) foco?.focus({ preventScroll: true });
       recuerdoLista.current = null;
     }
-    habiaFicha.current = ficha !== null;
-  }, [ficha]);
+    habiaFicha.current = claveFicha !== null;
+  }, [claveFicha]);
 
   const abrirDocumento = (id: number) => abrirFicha({ tipo: "documento", id }, false);
   const abrirProducto = (id: number) => abrirFicha({ tipo: "producto", id }, false);
-  const abrirProductoPorNombre = (nombre: string, desdeLista: boolean) => {
+  /**
+   * «Qué le compras» de un proveedor (QA C-01): trae el nombre de la LÍNEA, no
+   * el del catálogo. Se busca el producto del catálogo con ese nombre; si no,
+   * el producto de las líneas que se llaman así (todas tienen `producto_id`);
+   * y si aun así no hay, los documentos con ese texto (la búsqueda mira las líneas).
+   */
+  const abrirProductoPorNombre = async (nombre: string, desdeLista: boolean) => {
     const n = normalizarBusqueda(nombre);
-    const p = productos.find((x) => normalizarBusqueda(x.nombre) === n);
-    if (p) abrirFicha({ tipo: "producto", id: p.producto_id }, desdeLista);
-    else {
-      // No está en el catálogo con ese nombre exacto: se busca en la lista de Productos.
-      volverALista();
-      setTexto(nombre);
-      setModo("productos");
+    const exacto = productos.find((x) => normalizarBusqueda(x.nombre) === n);
+    if (exacto) {
+      abrirFicha({ tipo: "producto", id: exacto.producto_id }, desdeLista);
+      return;
     }
+    let id: number | null = null;
+    try {
+      id = await productoDeLinea(nombre);
+    } catch {
+      id = null;
+    }
+    if (id !== null) {
+      abrirFicha({ tipo: "producto", id }, desdeLista);
+      return;
+    }
+    volverALista();
+    setFiltroDocs("todo");
+    setModo("documentos");
+    setTexto(nombre);
   };
 
   /** Lleva a Proveedores con ese proveedor desplegado y a la vista. */
@@ -303,23 +410,25 @@ export function TabCompras({
     setFiltroProv("todos");
     if (texto && !provDelTexto.some((x) => x.id === id)) setTexto("");
     setProvAbierto(id);
-    setPedidoVerProv((n) => n + 1);
+    provPorEnsenar.current = id;
   };
   const abrirProveedorPorNombre = (nombre: string) => {
     const clave = resolver(nombre).clave;
     const p = proveedores.find((x) => `#${x.id}` === clave);
     if (p) verProveedor(p.id);
   };
+  // El proveedor pedido, a la vista en cuanto la lista se ve (si venía de una ficha, al cerrarse).
   useEffect(() => {
-    if (pedidoVerProv === 0 || provAbierto === null) return;
+    const id = provPorEnsenar.current;
+    if (id === null || claveFicha !== null || modo !== "proveedores") return;
     const marco = requestAnimationFrame(() => {
-      const fila = vistaListaRef.current?.querySelector(`[data-proveedor-id="${provAbierto}"]`);
+      const fila = vistaListaRef.current?.querySelector(`[data-proveedor-id="${id}"]`);
       const sinMovimiento = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       fila?.scrollIntoView?.({ block: "start", behavior: sinMovimiento ? "auto" : "smooth" });
+      provPorEnsenar.current = null;
     });
     return () => cancelAnimationFrame(marco);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pedidoVerProv]);
+  }, [claveFicha, modo, provAbierto, provVisibles]);
 
   const alternarProveedor = (id: number) => setProvAbierto((actual) => (actual === id ? null : id));
 
@@ -327,22 +436,19 @@ export function TabCompras({
     setPeriodo(p);
     setMesPedido(null);
   };
-  const cambiarModo = (m: ModoCompras) => {
-    setModo(m);
-    setOrigen(null);
-  };
+  const cambiarModo = (m: ModoCompras) => setModo(m);
 
-  // Cambiar de modo desde fuera (enlace `?tab=productos`, `?modo=`): esa lista, sin ficha.
+  // Cambiar de modo desde fuera (enlace `?tab=productos`, `?modo=`): esa lista.
+  // (La ficha la dice el historial: un enlace nuevo ya llega sin ficha.)
   useEffect(() => {
     if (!modoPedido) return;
     setModo(modoPedido.modo);
-    if (!modoPedido.doc) volverALista();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modoPedido?.clave, modoPedido?.modo]);
 
   // Enlace profundo a un documento (`?doc=`): se espera a que haya datos; si no
   // está en la caché (recién subido) se refresca una vez y, si sigue sin estar,
-  // se abandona. Se abre su ficha sin «Volver a …».
+  // se avisa y se queda la lista. Se abre su ficha sin «Volver a …».
   const [docPendiente, setDocPendiente] = useState<number | null>(modoPedido?.doc ?? null);
   const refrescado = useRef(false);
   useEffect(() => {
@@ -354,11 +460,13 @@ export function TabCompras({
   useEffect(() => {
     if (docPendiente === null) return;
     if (docPorId.has(docPendiente)) {
-      abrirFicha({ tipo: "documento", id: docPendiente }, true);
+      abrirFicha({ tipo: "documento", id: docPendiente }, true, { limpiarEnlace: true });
       setDocPendiente(null);
     } else if (!listaQ.isFetching) {
-      if (refrescado.current || listaQ.isError) setDocPendiente(null);
-      else {
+      if (refrescado.current || listaQ.isError) {
+        if (!listaQ.isError) toast.error("No se encuentra ese documento", { description: "Puede que se haya borrado. Te dejamos la lista de documentos." });
+        setDocPendiente(null);
+      } else {
         refrescado.current = true;
         void listaQ.refetch();
       }
@@ -397,11 +505,7 @@ export function TabCompras({
       contenidoFicha = <FichaCargando cabecera={docPorId.get(ficha.id)} />;
     } else if (fichaDocQ.isError) {
       contenidoFicha = (
-        <EstadoError
-          titulo="No se ha podido abrir el documento"
-          detalle={`Error al cargar el documento: ${(fichaDocQ.error as { message?: string }).message ?? "error desconocido"}`}
-          onReintentar={() => void fichaDocQ.refetch()}
-        />
+        <EstadoError titulo="No se ha podido abrir el documento" detalle={detalleError(fichaDocQ.error)} onReintentar={() => void fichaDocQ.refetch()} />
       );
     } else if (doc) {
       const esAlbaran = doc.tipo === "albaran";
@@ -433,18 +537,18 @@ export function TabCompras({
     contenidoFicha = <FichaProducto productoId={ficha.id} onAbrirDocumento={abrirDocumento} />;
   }
 
-  const errorDocs = listaQ.error;
+  // Lista de documentos: sin datos y con error → error a pantalla completa; con
+  // datos (la copia del dispositivo) y un refresco fallido → franja (QA C-03).
+  const sinDatosDocs = !listaQ.data;
+  const errorDocsSinDatos = listaQ.isError && sinDatosDocs;
+  const errorDocsConDatos = listaQ.isError && !sinDatosDocs;
   const cargandoDocs = listaQ.isPending;
-  // Buscando en las líneas (servidor): lo que casa en la cabecera ya está a la vista.
-  const buscandoLineas = hayTexto && busquedaLineas.buscando;
   const reintentar = () => void listaQ.refetch();
-  const mensajeProveedores = proveedoresQ.data?.faltaMigracion
-    ? "La lista de proveedores unificados aún no está activada: falta aplicar la migración 20261007180000_proveedores_unificados."
-    : proveedoresQ.error
-      ? ((proveedoresQ.error as { message?: string }).message ?? "No se han podido cargar los proveedores")
-      : null;
   const conLocalYPeriodo = modo !== "productos";
   const mesElegido = periodo.tipo === "mes" ? periodo.mes : null;
+  const cargandoProveedores = (!proveedoresQ.data && !proveedoresQ.isError) || (cargandoDocs && !listaQ.isError);
+  const firmaFiltros =
+    filtroDocs !== "todo" || filtrosActivos ? `${filtroDocs}|${local}|${periodo.tipo}|${periodo.tipo === "mes" ? periodo.mes : ""}` : "";
 
   const despliegueProveedor = (p: Proveedor) => (
     <FichaProveedor
@@ -456,9 +560,10 @@ export function TabCompras({
       seleccionadoDocId={ultimoDoc}
       puedeEditar={puedeEditar}
       hayFiltros={filtrosActivos}
+      hoy={hoy}
       onAbrirDocumento={(id) => abrirFicha({ tipo: "documento", id }, true)}
       onPrecargarDocumento={precargar}
-      onAbrirProducto={(nombre) => abrirProductoPorNombre(nombre, true)}
+      onAbrirProducto={(nombre) => void abrirProductoPorNombre(nombre, true)}
     />
   );
 
@@ -475,13 +580,32 @@ export function TabCompras({
     elegirPeriodo(PERIODO_TODO);
   };
 
+  // Franjas de aviso de la lista (Documentos y Proveedores): lo de abajo se sigue viendo.
+  const franjas = (
+    <>
+      {errorDocsConDatos && (
+        <AvisoFranja testId="aviso-refresco" detalle={detalleError(listaQ.error)} onReintentar={reintentar}>
+          No se ha podido actualizar la lista: ves la última copia guardada.
+        </AvisoFranja>
+      )}
+      {errorBusqueda !== null && (
+        <AvisoFranja testId="aviso-busqueda" detalle={detalleError(errorBusqueda)} onReintentar={busquedaLineas.reintentar}>
+          No se ha podido buscar dentro de las líneas: solo salen los que coinciden por número, proveedor o CIF.
+        </AvisoFranja>
+      )}
+    </>
+  );
+
+  const origenEtiqueta = pila.length > 1 ? (etiquetaFicha(pila[pila.length - 2]) ?? (pila[pila.length - 2].tipo === "documento" ? "el documento" : "el producto")) : null;
+
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="tab-compras">
       {/* ── LISTA: se oculta (sin desmontarse) mientras hay una ficha abierta ── */}
       <div ref={vistaListaRef} className={`min-h-0 flex-1 flex-col gap-2 ${ficha ? "hidden" : "flex"}`} data-testid="vista-lista">
-        {/* Barra superior: UN buscador + qué mirar (con el nº de resultados de cada modo). */}
-        <div className="flex shrink-0 flex-col gap-2 md:flex-row md:items-center">
-          <div className="relative min-w-0 flex-1" data-tour="facturas-buscar">
+        {/* Barra superior: UN buscador + qué mirar (con el nº de resultados de cada modo).
+            Por debajo de 1024 px (tablet en vertical) el buscador va a todo el ancho y los modos debajo (QA M5). */}
+        <div className="flex shrink-0 flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="relative min-w-0 lg:flex-1" data-tour="facturas-buscar">
             <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
               type="search"
@@ -514,9 +638,9 @@ export function TabCompras({
                 {m.etiqueta}
                 <span
                   className="min-w-6 rounded-full bg-foreground/[0.07] px-1.5 text-center text-xs font-semibold leading-5 tabular-nums text-muted-foreground group-aria-pressed/modo:bg-primary group-aria-pressed/modo:text-primary-foreground"
-                  aria-label={contadores[m.valor] === null ? "contando" : `${contadores[m.valor]} ${contadores[m.valor] === 1 ? "resultado" : "resultados"}`}
+                  aria-label={contadores[m.valor] === null ? "contando" : `${formatEntero(contadores[m.valor] as number)} ${contadores[m.valor] === 1 ? "resultado" : "resultados"}`}
                 >
-                  {contadores[m.valor] ?? "…"}
+                  {contadores[m.valor] === null ? "…" : formatEntero(contadores[m.valor] as number)}
                 </span>
               </button>
             ))}
@@ -525,7 +649,11 @@ export function TabCompras({
 
         {/* Local y periodo (Documentos y Proveedores; Productos tiene sus propios filtros): dos controles segmentados. */}
         {conLocalYPeriodo && (
-          <div className="flex h-11 shrink-0 items-center gap-x-4 overflow-x-auto overscroll-x-contain no-scrollbar" data-tour="facturas-local-periodo">
+          <div
+            ref={refLocalPeriodo}
+            className={`flex h-11 shrink-0 items-center gap-x-4 overflow-x-auto overscroll-x-contain pr-6 no-scrollbar ${difLocalPeriodo}`}
+            data-tour="facturas-local-periodo"
+          >
             <div role="group" aria-label="Local" className="flex shrink-0 items-center gap-2">
               <span className="shrink-0 text-xs font-medium text-muted-foreground" aria-hidden="true">
                 Local
@@ -578,22 +706,27 @@ export function TabCompras({
         >
           {modo === "documentos" && (
             <>
-              <div className={`${BARRA_CHIPS} border-b border-border/60 px-2`} role="toolbar" aria-label="Filtrar documentos" data-tour="facturas-filtros">
+              <div
+                ref={refChipsDocs}
+                className={`${BARRA_CHIPS} border-b border-border/60 px-2 pr-6 ${difChipsDocs}`}
+                role="toolbar"
+                aria-label="Filtrar documentos"
+                data-tour="facturas-filtros"
+              >
                 {FILTROS_DOCUMENTOS.map((f) => (
                   <button key={f.valor} type="button" className={CHIP} aria-pressed={filtroDocs === f.valor} onClick={() => setFiltroDocs(f.valor)}>
                     {f.etiqueta}
-                    <span className="text-xs font-normal tabular-nums text-muted-foreground">{cuentaFiltrosDocs[f.valor]}</span>
+                    <Cuenta n={sinDatosDocs || buscandoLineas ? null : cuentaFiltrosDocs[f.valor]} />
                   </button>
                 ))}
               </div>
+              {franjas}
               {/* `relative`: lo posicionado por dentro (textos solo para lector de pantalla) no estira la página. */}
               <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain" data-testid="lista-documentos">
-                {errorDocs ? (
-                  <EstadoError
-                    titulo="No se han podido cargar los documentos"
-                    detalle={`Error al cargar los documentos: ${(errorDocs as { message?: string }).message ?? "error desconocido"}`}
-                    onReintentar={reintentar}
-                  />
+                {errorDocsSinDatos ? (
+                  <EstadoError titulo="No se han podido cargar los documentos" detalle={detalleError(listaQ.error)} onReintentar={reintentar} />
+                ) : buscandoLineas && docsVisibles.length === 0 ? (
+                  <BuscandoEnLineas />
                 ) : (
                   <ListaDocumentos
                     documentos={docsVisibles}
@@ -604,6 +737,8 @@ export function TabCompras({
                     cargando={cargandoDocs}
                     hayFiltros={hayTexto || filtroDocs !== "todo" || filtrosActivos}
                     busqueda={hayTexto ? textoDiferido : ""}
+                    filtros={firmaFiltros}
+                    hoy={hoy}
                     mesPedido={mesPedido}
                     onAbrir={(id) => abrirFicha({ tipo: "documento", id }, true)}
                     onPrecargar={precargar}
@@ -612,7 +747,7 @@ export function TabCompras({
                 )}
               </div>
               <p className={PIE_LISTA} aria-live="polite">
-                {errorDocs ? "Sin datos" : cargandoDocs ? "Cargando…" : plural(docsVisibles.length, "documento", "documentos")}
+                {errorDocsSinDatos ? "Sin datos" : cargandoDocs ? "Cargando…" : plural(docsVisibles.length, "documento", "documentos")}
                 {buscandoLineas && (
                   <span className="ml-1.5" data-testid="buscando-lineas">
                     · buscando en las líneas…
@@ -623,43 +758,62 @@ export function TabCompras({
             </>
           )}
 
-          {modo === "productos" && (
-            // El buscador es el de arriba; la lista, sus chips de categoría y sus
-            // herramientas (categorías, avisos de precio, clasificar) son las de
-            // Productos de siempre.
-            <TabProductos busqueda={textoDiferido} seleccionadoId={ultimoProducto} onAbrir={(id) => abrirFicha({ tipo: "producto", id }, true)} />
+          {/* Productos: el buscador es el de arriba; la lista, sus chips de categoría y sus
+              herramientas son las de Productos de siempre. Se queda montado (oculto) al
+              cambiar de modo: sus filtros no se pierden. */}
+          {productosVisto && (
+            <div className={modo === "productos" ? "flex min-h-0 flex-1 flex-col" : "hidden"} data-testid="modo-productos">
+              <TabProductos busqueda={textoDiferido} seleccionadoId={ultimoProducto} onAbrir={(id) => abrirFicha({ tipo: "producto", id }, true)} />
+            </div>
           )}
 
           {modo === "proveedores" && (
             <>
-              <div className={`${BARRA_CHIPS} border-b border-border/60 px-2`} role="toolbar" aria-label="Filtrar proveedores">
+              <div ref={refChipsProv} className={`${BARRA_CHIPS} border-b border-border/60 px-2 ${difChipsProv}`} role="toolbar" aria-label="Filtrar proveedores">
                 {FILTROS_PROVEEDORES.map((f) => (
                   <button key={f.valor} type="button" className={CHIP} aria-pressed={filtroProv === f.valor} onClick={() => setFiltroProv(f.valor)}>
                     {f.etiqueta}
-                    <span className="text-xs font-normal tabular-nums text-muted-foreground">
-                      {f.valor === "todos" ? provDelTexto.length : conSinFactura.length}
-                    </span>
+                    <Cuenta n={cargandoProveedores || sinDatosDocs || buscandoLineas ? null : f.valor === "todos" ? provDelTexto.length : conSinFactura.length} />
                   </button>
                 ))}
                 <Button variant="ghost" className="ml-auto h-11 shrink-0 gap-1.5 px-3 text-sm" onClick={() => setGestionando(true)}>
                   <Truck className="h-4 w-4" aria-hidden="true" /> Gestionar proveedores
                 </Button>
               </div>
+              {franjas}
               <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain" data-testid="lista-proveedores">
-                <ListaProveedores
-                  proveedores={provVisibles}
-                  agregados={agregados}
-                  abiertoId={provAbierto}
-                  cargando={proveedoresQ.isLoading}
-                  mensaje={mensajeProveedores}
-                  hayFiltros={hayTexto || filtroProv !== "todos" || filtrosActivos}
-                  onAlternar={alternarProveedor}
-                  despliegue={despliegueProveedor}
-                  onQuitarFiltros={quitarFiltrosProv}
-                />
+                {/* Sin la lista de documentos no hay importes: ni «0 €» ni lista a medias (QA C-08). */}
+                {errorDocsSinDatos ? (
+                  <EstadoError titulo="No se han podido cargar los importes de los proveedores" detalle={detalleError(listaQ.error)} onReintentar={reintentar} />
+                ) : proveedoresQ.isError && !proveedoresQ.data ? (
+                  <EstadoError
+                    titulo="No se han podido cargar los proveedores"
+                    detalle={detalleError(proveedoresQ.error)}
+                    onReintentar={() => void proveedoresQ.refetch()}
+                  />
+                ) : buscandoLineas && provVisibles.length === 0 ? (
+                  <BuscandoEnLineas />
+                ) : (
+                  <ListaProveedores
+                    proveedores={provVisibles}
+                    agregados={agregados}
+                    abiertoId={provAbierto}
+                    cargando={cargandoProveedores}
+                    mensaje={
+                      proveedoresQ.data?.faltaMigracion
+                        ? "La lista de proveedores unificados aún no está activada: falta aplicar la migración 20261007180000_proveedores_unificados."
+                        : null
+                    }
+                    hayFiltros={hayTexto || filtroProv !== "todos" || filtrosActivos}
+                    onAlternar={alternarProveedor}
+                    despliegue={despliegueProveedor}
+                    onQuitarFiltros={quitarFiltrosProv}
+                    fueraDeFiltros={provFueraDeFiltros}
+                  />
+                )}
               </div>
               <p className={PIE_LISTA}>
-                {plural(provVisibles.length, "proveedor", "proveedores")} · por gasto con IVA
+                {cargandoProveedores ? "Cargando…" : `${plural(provVisibles.length, "proveedor", "proveedores")} · por gasto con IVA`}
                 {buscandoLineas && <span className="ml-1.5">· buscando en las líneas…</span>}
               </p>
             </>
@@ -674,13 +828,18 @@ export function TabCompras({
             <Button ref={volverRef} variant="ghost" className="h-11 shrink-0 gap-1.5 px-2.5 text-sm font-medium" onClick={volverALista}>
               <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Volver a la lista
             </Button>
-            {origen && (
+            {origenEtiqueta && (
               <>
                 <span className="h-5 w-px shrink-0 bg-border" aria-hidden="true" />
                 <Button variant="ghost" className="h-11 min-w-0 gap-1.5 px-2.5 text-sm text-muted-foreground" onClick={volverAOrigen}>
                   <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">Volver a «{origen.etiqueta}»</span>
+                  <span className="truncate">Volver a «{origenEtiqueta}»</span>
                 </Button>
+                {pila.length > 2 && (
+                  <span className="shrink-0 pr-1 text-xs tabular-nums text-muted-foreground" aria-label={`${pila.length - 1} fichas atrás`}>
+                    +{pila.length - 2}
+                  </span>
+                )}
               </>
             )}
           </div>

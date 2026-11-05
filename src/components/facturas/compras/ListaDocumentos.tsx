@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ChevronRight, EyeOff, FileText, Receipt, SearchX } from "lucide-react";
 import type { Factura } from "@/hooks/useFacturas";
 import { Button } from "@/components/ui/button";
@@ -54,10 +54,12 @@ function altoEstimadoMes(mes: GrupoMes<DocumentoFila>, abierto: boolean): number
  *
  * Plegado: mes actual y anterior desplegados, el resto plegados (o el único
  * mes, si solo hay uno); lo que el usuario pliega o despliega se recuerda
- * (localStorage). Con texto buscado se abren solo los 3 meses más recientes
- * con resultados y arriba sale «Abrir todos» / «Plegar todos». Con
- * `recordar={false}` (despliegue de un proveedor) se abren los 3 meses más
- * recientes y no se guarda nada. Cada mes lleva `content-visibility: auto`.
+ * (localStorage). Con texto buscado O con filtros (chip, local, periodo:
+ * `filtros`, QA 05/11/2026 C-06) se abren los 3 meses más recientes con
+ * resultados y arriba sale «Abrir todos» / «Plegar todos»; lo que se pliegue
+ * ahí vale solo para esa búsqueda/filtro. Con `recordar={false}` (despliegue de
+ * un proveedor) se abren los 3 meses más recientes y no se guarda nada. Cada
+ * mes lleva `content-visibility: auto`.
  */
 export function ListaDocumentos({
   documentos,
@@ -68,6 +70,7 @@ export function ListaDocumentos({
   cargando,
   hayFiltros,
   busqueda = "",
+  filtros = "",
   onAbrir,
   onPrecargar,
   hoy,
@@ -90,6 +93,11 @@ export function ListaDocumentos({
   hayFiltros: boolean;
   /** Texto buscado (vacío si no hay búsqueda): decide qué meses salen abiertos. */
   busqueda?: string;
+  /**
+   * Firma de los filtros elegidos (chip, local, periodo; "" = ninguno). Con
+   * filtros, como con texto: los 3 meses más recientes abiertos y «Abrir todos».
+   */
+  filtros?: string;
   onAbrir: (id: number) => void;
   /** Pide la ficha por adelantado (ratón encima un momento o al pulsar), para que abra al instante. */
   onPrecargar?: (id: number) => void;
@@ -107,23 +115,28 @@ export function ListaDocumentos({
   /** «Quitar filtros» en la lista vacía (solo en la lista principal). */
   onQuitarFiltros?: () => void;
 }) {
-  const [ahora] = useState(() => hoy ?? new Date());
+  // «Hoy» lo da quien monta la lista (se actualiza al cambiar de día); si no, el del montaje.
+  const [ahoraMontaje] = useState(() => new Date());
+  const ahora = hoy ?? ahoraMontaje;
+  const idBase = useId();
   const [plegado, setPlegado] = useState<EstadoPlegado>(() => (recordar ? leerPlegado() : {}));
-  // Meses abiertos o plegados a mano durante UNA búsqueda: al cambiar el texto se olvida.
+  // Meses abiertos o plegados a mano durante UNA búsqueda o filtro: al cambiar se olvida.
   const [plegadoBusqueda, setPlegadoBusqueda] = useState<{ texto: string; estado: EstadoPlegado }>({ texto: "", estado: SIN_ESTADO });
   const grupos = useMemo(() => agruparDocumentos(documentos), [documentos]);
   const facturaPorId = useMemo(() => new Map(facturas.map((f) => [f.id, f])), [facturas]);
   const posicionMes = useMemo(() => new Map(grupos.map((g, i) => [g.clave, i])), [grupos]);
 
-  const buscando = busqueda.trim() !== "";
+  const hayTexto = busqueda.trim() !== "";
+  const firma = hayTexto || filtros ? `${busqueda.trim()}|${filtros}` : "";
+  const buscando = firma !== "";
   const porPosicion = buscando || !recordar;
-  const estadoMeses = buscando ? (plegadoBusqueda.texto === busqueda ? plegadoBusqueda.estado : SIN_ESTADO) : plegado;
+  const estadoMeses = buscando ? (plegadoBusqueda.texto === firma ? plegadoBusqueda.estado : SIN_ESTADO) : plegado;
   const abiertoMes = (mes: string) =>
     mesAbierto(mes, estadoMeses, ahora, porPosicion ? (posicionMes.get(mes) ?? 0) : null, grupos.length);
 
   const cambiarMeses = (cambios: EstadoPlegado) => {
     if (buscando) {
-      setPlegadoBusqueda((e) => ({ texto: busqueda, estado: { ...(e.texto === busqueda ? e.estado : SIN_ESTADO), ...cambios } }));
+      setPlegadoBusqueda((e) => ({ texto: firma, estado: { ...(e.texto === firma ? e.estado : SIN_ESTADO), ...cambios } }));
       return;
     }
     setPlegado((e) => {
@@ -189,6 +202,7 @@ export function ListaDocumentos({
       )}
       {grupos.map((mes) => {
         const abierto = abiertoMes(mes.clave);
+        const idLista = `${idBase}-${mes.clave}`;
         return (
           <section
             key={mes.clave}
@@ -202,6 +216,7 @@ export function ListaDocumentos({
               <button
                 type="button"
                 aria-expanded={abierto}
+                aria-controls={abierto ? idLista : undefined}
                 onClick={() => cambiarMeses({ [claveEstadoMes(mes.clave)]: !abierto })}
                 className={`flex min-h-12 w-full items-center gap-2 px-3 text-left transition-colors hover:bg-muted/40 active:bg-muted/60 motion-reduce:transition-none ${FOCO}`}
               >
@@ -231,7 +246,7 @@ export function ListaDocumentos({
               </button>
             </Titulo>
             {abierto && (
-              <ul className="divide-y divide-border/50" aria-label={`Documentos de ${mes.etiqueta}`}>
+              <ul id={idLista} className="divide-y divide-border/50" aria-label={`Documentos de ${mes.etiqueta}`}>
                 {mes.documentos.map((d) => (
                   <FilaDocumento
                     key={d.id}

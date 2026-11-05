@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AlertTriangle, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -98,23 +98,118 @@ export function EstadoVacio({
   );
 }
 
-/** Fallo al cargar: qué ha fallado, el detalle técnico en gris y «Reintentar». */
-export function EstadoError({ titulo, detalle, onReintentar }: { titulo: string; detalle?: string; onReintentar?: () => void }) {
+/**
+ * El detalle técnico de un error, PLEGADO (QA de diseño 05/11/2026, F12): el
+ * mensaje principal es siempre una frase amable; «Detalle» lo despliega para
+ * quien tenga que contarlo.
+ */
+export function DetalleTecnico({ detalle, className = "" }: { detalle?: string | null; className?: string }) {
+  if (!detalle) return null;
+  return (
+    <details className={`text-xs text-muted-foreground ${className}`}>
+      <summary className="relative inline-flex min-h-11 cursor-pointer items-center rounded-sm underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+        Detalle
+      </summary>
+      <p className="max-w-sm break-words pb-1">{detalle}</p>
+    </details>
+  );
+}
+
+/**
+ * Fallo al cargar SIN nada que enseñar: qué ha fallado (frase amable), qué
+ * hacer, «Reintentar» y el detalle técnico plegado. Con datos ya a la vista se
+ * usa `AvisoFranja` (no se tapan los datos por un refresco fallido).
+ */
+export function EstadoError({
+  titulo,
+  texto = "Comprueba la conexión y vuelve a intentarlo.",
+  detalle,
+  onReintentar,
+}: {
+  titulo: string;
+  texto?: string;
+  /** Texto técnico (mensaje de Supabase…): va plegado bajo «Detalle». */
+  detalle?: string;
+  onReintentar?: () => void;
+}) {
   return (
     <div className="flex flex-col items-center px-6 py-12 text-center" role="alert">
       <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300" aria-hidden="true">
         <AlertTriangle className="h-6 w-6" />
       </span>
       <p className="text-sm font-semibold text-foreground">{titulo}</p>
-      {detalle && <p className="mt-1 max-w-sm break-words text-sm text-muted-foreground">{detalle}</p>}
+      {texto && <p className="mt-1 max-w-sm text-sm text-muted-foreground">{texto}</p>}
       {onReintentar && (
         <Button variant="outline" className="mt-4 h-11 gap-1.5 px-4" onClick={onReintentar}>
           <RotateCw className="h-4 w-4" aria-hidden="true" /> Reintentar
         </Button>
       )}
+      <DetalleTecnico detalle={detalle} className="mt-2" />
     </div>
   );
 }
+
+/**
+ * Aviso en una franja fina encima de la lista (QA 05/11/2026, C-02/C-03): algo
+ * ha fallado pero lo que hay se sigue viendo (refresco fallido con la copia a la
+ * vista, búsqueda en las líneas caída…). Con «Reintentar» y el detalle plegado.
+ */
+export function AvisoFranja({
+  children,
+  detalle,
+  onReintentar,
+  testId,
+}: {
+  children: ReactNode;
+  detalle?: string;
+  onReintentar?: () => void;
+  testId?: string;
+}) {
+  return (
+    <div
+      role="alert"
+      data-testid={testId}
+      className="flex shrink-0 flex-wrap items-center gap-x-2 border-b border-amber-200 bg-amber-50 px-3 py-0.5 text-[13px] text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
+    >
+      <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 py-1.5">{children}</span>
+      {onReintentar && (
+        <Button variant="ghost" className="h-11 shrink-0 gap-1.5 px-3 text-[13px] text-amber-900 hover:bg-amber-100 dark:text-amber-200 dark:hover:bg-amber-900/40" onClick={onReintentar}>
+          <RotateCw className="h-4 w-4" aria-hidden="true" /> Reintentar
+        </Button>
+      )}
+      {detalle && <DetalleTecnico detalle={detalle} className="basis-full pl-6 text-amber-900/80 dark:text-amber-200/80" />}
+    </div>
+  );
+}
+
+/**
+ * Barras con scroll horizontal (chips, local/periodo): si queda contenido
+ * cortado a la derecha, el borde se difumina (QA de diseño 05/11/2026, M6) para
+ * que se vea que hay más. Devuelve la `ref` (callback) y la clase a añadir.
+ */
+export function useDesbordeHorizontal(): [(el: HTMLElement | null) => void, string] {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [hayMas, setHayMas] = useState(false);
+  const ref = useCallback((nodo: HTMLElement | null) => setEl(nodo), []);
+  useEffect(() => {
+    if (!el) return;
+    const medir = () => setHayMas(el.scrollWidth - el.clientWidth - el.scrollLeft > 4);
+    medir();
+    el.addEventListener("scroll", medir, { passive: true });
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(medir);
+    ro?.observe(el);
+    for (const hijo of Array.from(el.children)) ro?.observe(hijo);
+    return () => {
+      el.removeEventListener("scroll", medir);
+      ro?.disconnect();
+    };
+  }, [el]);
+  return [ref, hayMas ? DIFUMINADO_DERECHA : ""];
+}
+
+/** Borde derecho difuminado (hay más contenido con scroll horizontal). */
+export const DIFUMINADO_DERECHA = "[mask-image:linear-gradient(to_right,#000_calc(100%_-_2.5rem),transparent)]";
 
 /** Bloque de esqueleto (gris que late; quieto con «reducir movimiento»). */
 export const Hueso = ({ className = "" }: { className?: string }) => (

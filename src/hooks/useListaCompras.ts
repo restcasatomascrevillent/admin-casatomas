@@ -23,6 +23,7 @@ import {
   decodificarLista,
   faltaFuncionCompras,
   listaDesdeCompletos,
+  reintentarConsulta,
   type CabeceraDocumento,
 } from "@/lib/facturas/listaCompras";
 import { guardarCopiaLista, leerCopiaLista } from "@/lib/facturas/copiaListaCompras";
@@ -72,8 +73,18 @@ function copiaInicial(usuario: string | null): { datos: ListaCompras; guardado: 
   }
 }
 
+/**
+ * `retry` de las consultas de Compras: sin reintentar errores definitivos
+ * (sin permiso, 4xx; `reintentarConsulta`). Si el cliente tiene los reintentos
+ * apagados (pruebas), se respeta.
+ */
+export function opcionReintento(qc: QueryClient): false | ((fallos: number, error: unknown) => boolean) {
+  return qc.getDefaultOptions().queries?.retry === false ? false : reintentarConsulta;
+}
+
 /** Todas las cabeceras de documentos (facturas y albaranes), la más reciente primero. */
 export function useListaCompras() {
+  const qc = useQueryClient();
   const usuario = useUsuarioIdOpcional();
   // Se lee una vez por montaje (el JSON.parse de ~0,5 MB no se repite en cada render).
   const [copia] = useState(() => copiaInicial(usuario));
@@ -85,6 +96,8 @@ export function useListaCompras() {
     initialDataUpdatedAt: copia?.guardado,
     staleTime: FRESCO,
     gcTime: EN_MEMORIA,
+    // Sin reintentar errores definitivos (sin permiso, 4xx): se avisa enseguida.
+    retry: opcionReintento(qc),
   });
 }
 
@@ -106,6 +119,7 @@ const opcionesDocumento = (qc: QueryClient, id: number) => ({
   queryFn: () => leerDocumento(qc, id),
   staleTime: FRESCO,
   gcTime: EN_MEMORIA,
+  retry: opcionReintento(qc),
 });
 
 /** La ficha de un documento con sus líneas (null = no existe o no se puede ver). */
@@ -137,7 +151,10 @@ function useValorAsentado<T>(valor: T, ms: number): T {
  * `activa` = false: no se pide nada (sin texto o con la carga de antes, que ya
  * busca en las líneas que tiene).
  */
-export function useBusquedaLineas(texto: string, activa: boolean): { ids: ReadonlySet<number> | null; buscando: boolean; error: unknown } {
+export function useBusquedaLineas(
+  texto: string,
+  activa: boolean,
+): { ids: ReadonlySet<number> | null; buscando: boolean; error: unknown; reintentar: () => void } {
   const normal = normalizarBusqueda(texto);
   const asentado = useValorAsentado(normal, ESPERA_BUSQUEDA_MS);
   const q = useQuery({
@@ -151,7 +168,9 @@ export function useBusquedaLineas(texto: string, activa: boolean): { ids: Readon
     staleTime: FRESCO,
     retry: false,
   });
-  if (!activa || normal === "") return { ids: null, buscando: false, error: null };
+  const reintentar = () => void q.refetch();
+  if (!activa || normal === "") return { ids: null, buscando: false, error: null, reintentar };
   const vigente = asentado === normal && q.data !== undefined;
-  return { ids: vigente ? q.data : null, buscando: !vigente && !q.error, error: asentado === normal ? q.error : null };
+  const error = asentado === normal ? q.error : null;
+  return { ids: vigente ? q.data : null, buscando: !vigente && !error, error, reintentar };
 }

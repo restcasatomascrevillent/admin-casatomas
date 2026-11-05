@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatCurrency, formatDateCorta, plural } from "@/components/facturas/shared/formatters";
+import { formatDateCorta, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   useCategoriasProducto,
@@ -40,7 +40,9 @@ import { LineasSinClasificar } from "./LineasSinClasificar";
 import { ProveedoresDialog } from "./ProveedoresDialog";
 import { SelectorCategoria } from "./SelectorCategoria";
 import { AvisosPrecio } from "./AvisosPrecio";
-import { CHIP, EstadoVacio, FOCO, Hueso, filaEstado } from "@/components/facturas/compras/estilo";
+import { CHIP, EstadoError, EstadoVacio, FOCO, Hueso, filaEstado, useDesbordeHorizontal } from "@/components/facturas/compras/estilo";
+import { detalleError } from "@/lib/facturas/listaCompras";
+import { ConfirmarClasificarIA } from "./ConfirmarClasificarIA";
 
 type Orden = "gasto" | "compras" | "nombre";
 const TODOS = "__todos";
@@ -89,6 +91,8 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
   const [fusionando, setFusionando] = useState(false);
   const [editandoCategorias, setEditandoCategorias] = useState(false);
   const [viendoProveedores, setViendoProveedores] = useState(false);
+  const [confirmandoIA, setConfirmandoIA] = useState(false);
+  const [refChips, difuminado] = useDesbordeHorizontal();
 
   const filtroPeriodo = useMemo(() => ({ ...rangoPeriodo(periodo), tipo: tipo === TODOS ? null : tipo }), [periodo, tipo]);
   const categoriasQ = useCategoriasProducto();
@@ -132,16 +136,28 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
   const error = resumenQ.error ?? categoriasQ.error ?? gastoQ.error;
   if (error) {
     const sinMigrar = faltaMigracionCatalogo(error as { code?: string; message?: string });
-    return (
-      <div className="flex h-full items-center justify-center rounded-xl border bg-card p-6 text-center">
-        <div className="max-w-md space-y-2">
-          <p className="font-semibold">{sinMigrar ? "El catálogo de productos aún no está activado" : "No se ha podido cargar el catálogo"}</p>
-          <p className="text-sm text-muted-foreground">
-            {sinMigrar
-              ? "Falta aplicar la migración 20261007160000_productos_catalogo_categorias en la base de datos."
-              : (error as { message?: string }).message}
-          </p>
+    if (sinMigrar) {
+      return (
+        <div className="flex h-full items-center justify-center rounded-xl border bg-card p-6 text-center">
+          <div className="max-w-md space-y-2">
+            <p className="font-semibold">El catálogo de productos aún no está activado</p>
+            <p className="text-sm text-muted-foreground">Falta aplicar la migración 20261007160000_productos_catalogo_categorias en la base de datos.</p>
+          </div>
         </div>
+      );
+    }
+    // Frase amable y el detalle técnico plegado (QA de diseño F12).
+    return (
+      <div className={compacto ? "flex h-full min-h-0 flex-col justify-center" : "flex h-full items-center justify-center rounded-xl border bg-card"}>
+        <EstadoError
+          titulo="No se ha podido cargar el catálogo de productos"
+          detalle={detalleError(error)}
+          onReintentar={() => {
+            if (resumenQ.isError) void resumenQ.refetch();
+            if (categoriasQ.isError) void categoriasQ.refetch();
+            if (gastoQ.isError) void gastoQ.refetch();
+          }}
+        />
       </div>
     );
   }
@@ -292,24 +308,25 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
               variant="ghost"
               className="h-11 shrink-0 gap-1.5 px-3 text-primary"
               disabled={clasificar.isPending}
-              onClick={() => clasificar.mutate()}
-              aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
+              onClick={() => setConfirmandoIA(true)}
+              aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${formatEntero(pendientes)} con IA`}
               title={`Clasificar ${plural(pendientes, "línea", "líneas")} con IA`}
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span className="tabular-nums">{pendientes}</span>
+              <span className="tabular-nums">{formatEntero(pendientes)}</span>
             </Button>
           ) : (
-            <Button variant="outline" disabled={clasificar.isPending} onClick={() => clasificar.mutate()}>
+            <Button variant="outline" disabled={clasificar.isPending} onClick={() => setConfirmandoIA(true)}>
               <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
-              {clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
+              {clasificar.isPending ? "Clasificando…" : `Clasificar ${formatEntero(pendientes)} con IA`}
             </Button>
           ))}
       </div>
 
       {/* Gasto por categoría (clic = filtrar): una sola fila de chips, con scroll horizontal sin barra */}
       <div
-        className={`flex overflow-x-auto no-scrollbar ${compacto ? "order-1 h-11 min-w-0 flex-1 items-center gap-1" : "shrink-0 gap-2 pb-1"}`}
+        ref={refChips}
+        className={`flex overflow-x-auto no-scrollbar ${compacto ? "order-1 h-11 min-w-0 flex-1 items-center gap-1" : "shrink-0 gap-2 pb-1"} ${difuminado}`}
         role="toolbar"
         aria-label="Gasto por categoría"
       >
@@ -322,7 +339,14 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         >
           <span className="font-semibold">Todas</span>
           <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-            {formatCurrency(gastoTotal)} <span className="text-xs">sin IVA</span>
+            {/* Mientras llega el gasto, «…» y no «0,00 €» (QA de diseño F11). */}
+            {gastoQ.data ? (
+              <>
+                {formatImporte(gastoTotal)} <span className="text-xs">sin IVA</span>
+              </>
+            ) : (
+              "…"
+            )}
           </span>
         </button>
         {totales.map((t) => (
@@ -336,7 +360,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
           >
             <span className="whitespace-nowrap font-semibold">{t.nombre}</span>
             <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-              {t.clave === "pendiente" ? `${plural(t.lineas, "línea", "líneas")} · ${formatCurrency(t.gasto)}` : formatCurrency(t.gasto)}
+              {t.clave === "pendiente" ? `${plural(t.lineas, "línea", "líneas")} · ${formatImporte(t.gasto)}` : formatImporte(t.gasto)}
             </span>
           </button>
         ))}
@@ -371,7 +395,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
           )}
           {puedeEditar && seleccion.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 px-2 py-1" aria-label="Acciones sobre la selección">
-              <span className="text-sm font-medium">{seleccion.size} seleccionado(s)</span>
+              <span className="text-sm font-medium">{plural(seleccion.size, "seleccionado", "seleccionados")}</span>
               <SelectorCategoria
                 categorias={categorias}
                 valor={undefined}
@@ -470,7 +494,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
 
       <p className={compacto ? "flex h-9 shrink-0 items-center border-t border-border/60 px-3 text-xs text-muted-foreground" : "shrink-0 text-xs text-muted-foreground"}>
         {vista === "productos"
-          ? `${plural(visibles.length, "producto", "productos")} · ${formatCurrency(gastoVisible)}`
+          ? `${plural(visibles.length, "producto", "productos")} · ${formatImporte(gastoVisible)}`
           : `${plural(pendientes, "línea", "líneas")} sin clasificar`}{" "}
         · importes de línea sin IVA
       </p>
@@ -495,6 +519,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         />
       )}
       {editandoCategorias && <CategoriasDialog categorias={categorias} onCerrar={() => setEditandoCategorias(false)} />}
+      <ConfirmarClasificarIA abierto={confirmandoIA} lineas={pendientes} onCerrar={() => setConfirmandoIA(false)} onConfirmar={() => clasificar.mutate()} />
       {viendoProveedores && <ProveedoresDialog puedeEditar={puedeEditar} onCerrar={() => setViendoProveedores(false)} />}
     </div>
   );
@@ -505,6 +530,12 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
  * visualmente de 32 px pero con zona táctil de 44 (el contenedor mide 44 y el
  * `before:` amplía el toque); fuera de Compras, la tarjeta de dos líneas de siempre.
  */
+/**
+ * Casilla de 16 px con zona táctil de 44 (QA C-14): el `before:` amplía el
+ * toque a todo el hueco de 44×44 que la rodea.
+ */
+const CASILLA_TACTIL = "relative before:absolute before:-inset-3.5 before:content-['']";
+
 const chipCategoria = (compacto: boolean, extra: string) =>
   compacto
     ? `${CHIP} text-xs ${extra}`
@@ -547,7 +578,7 @@ function FilaResumen({
       nombresProv.length > 0 ? nombresProv.join(", ") : null,
       plural(p.compras, "compra", "compras"),
       formatCantidades(p.cantidades),
-      p.ultimo_precio !== null ? `últ. ${formatCurrency(p.ultimo_precio)}` : null,
+      p.ultimo_precio !== null ? `últ. ${formatImporte(p.ultimo_precio)}` : null,
     ]
       .filter(Boolean)
       .join(" · ");
@@ -558,7 +589,7 @@ function FilaResumen({
       >
         {conCasilla && (
           <div className="flex h-11 w-11 shrink-0 items-center justify-center">
-            <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+            <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} className={CASILLA_TACTIL} />
           </div>
         )}
         <button type="button" onClick={onAbrir} className={`min-h-11 min-w-0 flex-1 rounded-md px-1.5 py-1 text-left active:bg-muted/50 ${FOCO}`}>
@@ -576,7 +607,7 @@ function FilaResumen({
                 <title>Clasificado por la IA; nadie lo ha corregido todavía</title>
               </Sparkles>
             )}
-            <span className="ml-auto shrink-0 pl-2 text-sm font-semibold tabular-nums">{formatCurrency(p.gasto)}</span>
+            <span className="ml-auto shrink-0 pl-2 text-sm font-semibold tabular-nums">{formatImporte(p.gasto)}</span>
           </span>
           <span className="block truncate text-xs text-muted-foreground" title={detalle}>
             {detalle}
@@ -593,7 +624,7 @@ function FilaResumen({
       aria-current={abierto ? "true" : undefined}
     >
       <div className="flex h-11 w-11 items-center justify-center">
-        {conCasilla && <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />}
+        {conCasilla && <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} className={CASILLA_TACTIL} />}
       </div>
       <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 rounded-md px-1 py-1 text-left hover:bg-muted/40">
         <span className="flex min-w-0 items-center gap-1.5">
@@ -619,20 +650,20 @@ function FilaResumen({
         </span>
       </button>
       {/* Móvil, tablet y Compras: gasto a la derecha; el resto debajo. lg+ (lista ancha): columnas. */}
-      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatCurrency(p.gasto)}</span>
+      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatImporte(p.gasto)}</span>
       <span className={`col-start-2 col-end-4 text-xs text-muted-foreground ${lg("lg:hidden")}`}>
         {plural(p.compras, "compra", "compras")} · {formatCantidades(p.cantidades)}
-        {p.ultimo_precio !== null && ` · últ. ${formatCurrency(p.ultimo_precio)}`}
+        {p.ultimo_precio !== null && ` · últ. ${formatImporte(p.ultimo_precio)}`}
       </span>
       {!compacta && (
         <>
-          <span className="hidden text-right text-sm tabular-nums lg:block">{p.compras}</span>
+          <span className="hidden text-right text-sm tabular-nums lg:block">{formatEntero(p.compras)}</span>
           <span className="hidden truncate text-right text-sm tabular-nums lg:block" title={formatCantidades(p.cantidades)}>
             {formatCantidades(p.cantidades)}
           </span>
-          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatCurrency(p.gasto)}</span>
+          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatImporte(p.gasto)}</span>
           <span className="hidden text-right text-sm tabular-nums lg:block" title={p.ultima_fecha ? `Última compra ${formatDateCorta(p.ultima_fecha)}` : undefined}>
-            {p.ultimo_precio === null ? "—" : formatCurrency(p.ultimo_precio)}
+            {p.ultimo_precio === null ? "—" : formatImporte(p.ultimo_precio)}
           </span>
         </>
       )}

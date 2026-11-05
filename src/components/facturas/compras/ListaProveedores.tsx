@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { ChevronRight, Receipt, SearchX, Truck } from "lucide-react";
+import { useId, type ReactNode } from "react";
+import { ChevronRight, FilterX, Receipt, SearchX, Truck } from "lucide-react";
 import { formatDateCorta, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import type { Proveedor } from "@/lib/facturas/proveedores";
 import type { AgregadoProveedor, DocumentoAgregable } from "@/lib/facturas/resumenCompras";
@@ -23,6 +23,7 @@ export function ListaProveedores({
   onAlternar,
   despliegue,
   onQuitarFiltros,
+  fueraDeFiltros = null,
 }: {
   /** Ya filtrados y ordenados. */
   proveedores: Proveedor[];
@@ -38,7 +39,13 @@ export function ListaProveedores({
   despliegue: (p: Proveedor) => ReactNode;
   /** «Quitar filtros» en la lista vacía. */
   onQuitarFiltros?: () => void;
+  /**
+   * El proveedor abierto que se enseña AUNQUE los filtros (texto, local,
+   * periodo) lo dejarían fuera: se rotula «Fuera de los filtros».
+   */
+  fueraDeFiltros?: number | null;
 }) {
+  const idBase = useId();
   if (cargando) {
     return (
       <div role="status" aria-busy="true">
@@ -79,6 +86,7 @@ export function ListaProveedores({
         const docs = a?.documentos.length ?? 0;
         const ultima = a?.ultimaFecha ?? (hayFiltros ? null : p.ultima_fecha);
         const sinFactura = a?.albaranesSinFactura ?? 0;
+        const idDespliegue = `${idBase}-${p.id}`;
         return (
           <li key={p.id} data-proveedor-id={p.id}>
             <h3 className={`m-0 text-base font-normal ${abierto ? "sticky top-0 z-10 bg-card" : ""}`}>
@@ -86,6 +94,7 @@ export function ListaProveedores({
                 type="button"
                 onClick={() => onAlternar(p.id)}
                 aria-expanded={abierto}
+                aria-controls={abierto ? idDespliegue : undefined}
                 className={`flex min-h-14 w-full items-center gap-2.5 px-3 py-2 text-left active:bg-muted/50 ${filaEstado(abierto)} ${abierto ? "border-b border-border/60" : ""} ${FOCO}`}
               >
                 <ChevronRight
@@ -99,6 +108,11 @@ export function ListaProveedores({
                       {plural(docs, "documento", "documentos")}
                       {ultima ? ` · último ${formatDateCorta(ultima)}` : ""}
                     </span>
+                    {fueraDeFiltros === p.id && (
+                      <Marca tono="neutro" icono={<FilterX aria-hidden="true" />}>
+                        Fuera de los filtros
+                      </Marca>
+                    )}
                     {sinFactura > 0 && (
                       <Marca tono="sinFactura" icono={<Receipt aria-hidden="true" />}>
                         {plural(sinFactura, "albarán sin factura", "albaranes sin factura")}
@@ -114,7 +128,7 @@ export function ListaProveedores({
                 </span>
               </button>
             </h3>
-            {abierto && despliegue(p)}
+            {abierto && <div id={idDespliegue}>{despliegue(p)}</div>}
           </li>
         );
       })}

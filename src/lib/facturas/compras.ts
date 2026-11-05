@@ -251,6 +251,45 @@ export function documentosDeProveedor<D extends DocumentoBuscable>(docs: D[], pr
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
 }
 
+// ─── Fichas en el historial del navegador (QA 05/11/2026, C-12) ──────────────
+// Abrir una ficha (documento o producto) es una entrada nueva del historial con
+// `?doc=` o `?producto=` en la URL y, en el `state` de la navegación, la PILA de
+// fichas abiertas desde la lista (la actual, la última). «Atrás» del navegador
+// y «Volver a …» retroceden una ficha; «Volver a la lista», todas.
+
+export type FichaCompras = { tipo: "documento"; id: number } | { tipo: "producto"; id: number };
+
+/** Parámetros de la URL que son enlaces de Compras (se quitan al cambiar de pestaña). */
+export const PARAMS_ENLACE_COMPRAS = ["modo", "doc", "mes", "prov", "producto"] as const;
+
+/** La pila de fichas guardada en el `state` de la navegación ([] = la lista). */
+export function pilaDeFichas(estado: unknown): FichaCompras[] {
+  const pila = (estado as { fichaCompras?: { pila?: unknown } } | null)?.fichaCompras?.pila;
+  if (!Array.isArray(pila)) return [];
+  return pila.filter(
+    (f): f is FichaCompras =>
+      !!f &&
+      typeof f === "object" &&
+      ((f as FichaCompras).tipo === "documento" || (f as FichaCompras).tipo === "producto") &&
+      Number.isInteger((f as FichaCompras).id),
+  );
+}
+
+/** ¿Esta navegación es abrir/cerrar una ficha de Compras? (Facturas no debe tratarla como un enlace nuevo.) */
+export const esNavegacionDeFicha = (estado: unknown): boolean => pilaDeFichas(estado).length > 0;
+
+/** El `state` de la navegación con esa pila. */
+export const estadoConFichas = (pila: FichaCompras[]) => ({ fichaCompras: { pila } });
+
+/** La búsqueda de la URL (`?…`) con la ficha (o sin ninguna, `null`) y sin otros enlaces de Compras. */
+export function busquedaConFicha(busqueda: string, ficha: FichaCompras | null): string {
+  const p = new URLSearchParams(busqueda);
+  for (const k of PARAMS_ENLACE_COMPRAS) p.delete(k);
+  p.set("tab", "compras");
+  if (ficha) p.set(ficha.tipo === "documento" ? "doc" : "producto", String(ficha.id));
+  return `?${p.toString()}`;
+}
+
 // ─── Productos que han subido de precio ─────────────────────────────────────
 
 /** Nombres (normalizados) de los productos de `variacion_precios_agente` con subida. */

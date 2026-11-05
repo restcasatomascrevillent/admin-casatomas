@@ -7,7 +7,7 @@ import { TabCompras } from "@/components/facturas/compras/TabCompras";
 import { GastoIaPestana } from "@/components/facturas/GastoIaPestana";
 import { MonitorGastoIA } from "@/components/facturas/MonitorGastoIA";
 import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
-import { MODOS_COMPRAS, type ModoCompras } from "@/lib/facturas/compras";
+import { MODOS_COMPRAS, PARAMS_ENLACE_COMPRAS, esNavegacionDeFicha, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { Upload, BarChart3, ShoppingCart, History } from "lucide-react";
@@ -38,16 +38,22 @@ const Facturas = () => {
   // `?tab=cargar`: el indicador global de subidas, los toasts y la campana
   // llevan directos a la pestaña «Cargar», también si ya estabas en Facturas.
   const [searchParams, setSearchParams] = useSearchParams();
-  const { key: claveNavegacion } = useLocation();
+  const { key: claveNavegacion, state: estadoNavegacion } = useLocation();
+  // Abrir o cerrar una ficha de Compras es una entrada del historial (`?doc=` /
+  // `?producto=` con la pila en el `state`, QA 05/11/2026 C-12): no es un enlace
+  // nuevo, así que no se vuelve a aplicar como `modoPedido`.
+  const esFichaCompras = esNavegacionDeFicha(estadoNavegacion);
+  const ultimoModoPedido = useRef<{ modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number } | undefined>(undefined);
   const tabUrl = pestanaDeUrl(searchParams.get("tab"));
   // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`), Compras.
   const [activeTab, setActiveTab] = useState<string>(
-    () => tabUrl ?? (["modo", "doc", "mes", "prov"].some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL),
+    () => tabUrl ?? (PARAMS_ENLACE_COMPRAS.some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL),
   );
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
   // Desde Análisis: `&mes=YYYY-MM` (Documentos de ese mes) y `&prov=<id>` (ese proveedor desplegado).
   const modoPedido = useMemo(() => {
+    if (esFichaCompras) return ultimoModoPedido.current;
     const modoUrl = MODOS_COMPRAS.find((m) => m.valor === searchParams.get("modo"))?.valor;
     const docNum = Number(searchParams.get("doc"));
     const doc = Number.isInteger(docNum) && docNum > 0 ? docNum : undefined;
@@ -63,7 +69,10 @@ const Facturas = () => {
           prov: modo === "proveedores" ? prov : undefined,
         }
       : undefined;
-  }, [searchParams, claveNavegacion]);
+  }, [searchParams, claveNavegacion, esFichaCompras]);
+  useEffect(() => {
+    ultimoModoPedido.current = modoPedido;
+  }, [modoPedido]);
   useEffect(() => {
     if (tabUrl) setActiveTab(tabUrl);
     // `claveNavegacion`: volver a tocar el indicador estando ya en esta URL
@@ -77,10 +86,7 @@ const Facturas = () => {
       const p = new URLSearchParams(prev);
       p.set("tab", v);
       // El enlace profundo ya se aplicó: que no vuelva a abrir el documento al volver a Compras.
-      p.delete("modo");
-      p.delete("doc");
-      p.delete("mes");
-      p.delete("prov");
+      for (const k of PARAMS_ENLACE_COMPRAS) p.delete(k);
       return p;
     }, { replace: true });
   };

@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 
 const base = vi.hoisted(() => {
   type Filtro = { metodo: string; args: unknown[] };
@@ -162,11 +163,13 @@ function montar(
 ) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   render(
-    <QueryClientProvider client={qc}>
-      <div style={{ height: 800 }}>
-        <TabCompras onPreguntarIA={onPreguntarIA} modoPedido={modoPedido} />
-      </div>
-    </QueryClientProvider>,
+    <MemoryRouter initialEntries={["/facturas?tab=compras"]}>
+      <QueryClientProvider client={qc}>
+        <div style={{ height: 800 }}>
+          <TabCompras onPreguntarIA={onPreguntarIA} modoPedido={modoPedido} />
+        </div>
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
   return onPreguntarIA;
 }
@@ -405,7 +408,8 @@ describe("Compras · ficha a pantalla completa", () => {
     const ficha = await screen.findByTestId("ficha-compras");
     expect(await within(ficha).findByRole("heading", { name: /Merluza de pincho/ })).toBeInTheDocument();
     expect(await within(ficha).findByRole("figure", { name: /evolución del precio de merluza de pincho/i })).toBeInTheDocument();
-    expect(base.rpc).toHaveBeenCalledWith("serie_precios_agente", expect.objectContaining({ p_texto: "Merluza de pincho" }));
+    // La gráfica sale de las líneas de ESTE producto (QA C-04), no de la RPC por texto que mezclaba parecidos.
+    expect(base.rpc).not.toHaveBeenCalledWith("serie_precios_agente", expect.anything());
     expect(within(ficha).getByRole("button", { name: /Editar producto/ })).toBeInTheDocument();
 
     fireEvent.click(await within(ficha).findByRole("button", { name: "Abrir la factura F-100" }));

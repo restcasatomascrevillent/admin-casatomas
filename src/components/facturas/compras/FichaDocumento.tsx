@@ -3,7 +3,7 @@ import { Package, Pencil, Plus, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import { formatCurrency, formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
+import { formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
@@ -36,26 +36,42 @@ function useAnchoMinimo(ref: RefObject<HTMLElement>, min: number): boolean {
   return cumple;
 }
 
-/** Observaciones: dos líneas como mucho; el resto, tras «ver más». */
+/**
+ * Observaciones: dos líneas como mucho; el resto, tras «ver más». El botón va
+ * FUERA del párrafo recortado (dentro del `line-clamp` quedaba oculto, QA de
+ * diseño F2) y solo sale si el texto de verdad no cabe.
+ */
 function Observaciones({ texto }: { texto: string }) {
   const [abierto, setAbierto] = useState(false);
-  const largo = texto.length > 120 || texto.includes("\n");
+  const [desborda, setDesborda] = useState(false);
+  const parrafo = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = parrafo.current;
+    if (!el || abierto) return;
+    // En jsdom no hay medidas (todo 0): se cae a la regla de antes (largo o con saltos de línea).
+    const medir = () => setDesborda(el.clientHeight > 0 ? el.scrollHeight > el.clientHeight + 1 : texto.length > 120 || texto.includes("\n"));
+    medir();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(medir);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [texto, abierto]);
   return (
     <section aria-label="Observaciones" className="space-y-1">
       <h3 className={TITULO_SECCION}>Observaciones</h3>
-      <p className={`text-sm text-foreground/90 ${abierto ? "whitespace-pre-line" : "line-clamp-2"}`}>
+      <p ref={parrafo} className={`text-sm text-foreground/90 ${abierto ? "whitespace-pre-line" : "line-clamp-2"}`}>
         {texto}
-        {largo && (
-          <button
-            type="button"
-            onClick={() => setAbierto((v) => !v)}
-            aria-expanded={abierto}
-            className="relative ml-1 font-medium text-primary underline underline-offset-2 before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] hover:decoration-2"
-          >
-            {abierto ? "ver menos" : "ver más"}
-          </button>
-        )}
       </p>
+      {(desborda || abierto) && (
+        <button
+          type="button"
+          onClick={() => setAbierto((v) => !v)}
+          aria-expanded={abierto}
+          className="relative text-sm font-medium text-primary underline underline-offset-2 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-[''] hover:decoration-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+        >
+          {abierto ? "ver menos" : "ver más"}
+        </button>
+      )}
     </section>
   );
 }
@@ -134,12 +150,22 @@ export function FichaDocumento({
   const original = <OriginalIncrustado driveUrl={doc.drive_url} archivoPath={doc.archivo_path} titulo={titulo} relleno={visorLateral} />;
 
   const cabecera = (
+    // Bajo 640 px (móvil) el título ocupa su fila entera y las acciones van en otra
+    // debajo (QA M7: a 390 px el título se quedaba estrujado al lado de los botones).
     <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-border/60 px-4 py-3 sm:px-5">
-      <div className="min-w-0 flex-1 space-y-1">
+      <div className="w-full min-w-0 space-y-1 sm:w-auto sm:flex-1">
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           <h2 className="break-words text-xl font-semibold leading-tight tracking-tight">{titulo}</h2>
           {abono && esAlbaran && <Marca tono="neutro" grande>Albarán</Marca>}
-          <EstadoDocumento alertas={avisos} verificada={doc.verificada} origen={doc.verificacion_origen} onRevisar={() => onEditar(doc)} compacto={false} enLinea />
+          <EstadoDocumento
+            alertas={avisos}
+            verificada={doc.verificada}
+            origen={doc.verificacion_origen}
+            // «Sin revisar» solo lleva al diálogo de edición a quien puede editar (QA C-09).
+            onRevisar={puedeEditar ? () => onEditar(doc) : undefined}
+            compacto={false}
+            enLinea
+          />
           {esAlbaran && (esAlbaranSinFactura(doc) ? <Marca tono="sinFactura" grande>Sin factura todavía</Marca> : <Marca tono="ok" grande>Ya facturado</Marca>)}
         </div>
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-muted-foreground">
@@ -179,11 +205,16 @@ export function FichaDocumento({
       {/* Acciones agrupadas: icono + palabra, también en tablet. */}
       <div role="group" aria-label="Acciones del documento" className="flex shrink-0 items-center gap-0.5 rounded-lg border border-border/70 bg-background p-0.5" data-tour="facturas-ficha-acciones">
         <BotonOriginal driveUrl={doc.drive_url} archivoPath={doc.archivo_path} variant="ficha" label="Ver original" />
-        <span className="h-6 w-px bg-border/70" aria-hidden="true" />
-        <Button variant="ghost" className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium hover:bg-muted active:bg-muted/80" onClick={() => onEditar(doc)}>
-          <Pencil className="h-4 w-4" aria-hidden="true" />
-          <span>Editar</span>
-        </Button>
+        {/* «Editar» solo con permiso de edición (QA C-09: se ofrecía a quien solo puede ver). */}
+        {puedeEditar && (
+          <>
+            <span className="h-6 w-px bg-border/70" aria-hidden="true" />
+            <Button variant="ghost" className="h-11 min-w-11 shrink-0 gap-1.5 px-3 text-sm font-medium hover:bg-muted active:bg-muted/80" onClick={() => onEditar(doc)}>
+              <Pencil className="h-4 w-4" aria-hidden="true" />
+              <span>Editar</span>
+            </Button>
+          </>
+        )}
         {onPreguntarIA && (
           <>
             <span className="h-6 w-px bg-border/70" aria-hidden="true" />
@@ -206,8 +237,8 @@ export function FichaDocumento({
 
   const importes = hayImportes && (
     <dl aria-label="Importes" className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] divide-x divide-border/60 border-y border-border/60">
-      {doc.subtotal != null && <Cifra etiqueta="Base imponible">{formatCurrency(doc.subtotal)}</Cifra>}
-      {doc.iva != null && <Cifra etiqueta="IVA">{formatCurrency(doc.iva)}</Cifra>}
+      {doc.subtotal != null && <Cifra etiqueta="Base imponible">{formatImporte(doc.subtotal)}</Cifra>}
+      {doc.iva != null && <Cifra etiqueta="IVA">{formatImporte(doc.iva)}</Cifra>}
       {doc.total != null && (
         <Cifra etiqueta={`Total${doc.total_origen === "deducido" ? " (calculado, no leído)" : ""}`} destacada>
           <span className={abono ? "text-emerald-700 dark:text-emerald-400" : ""}>{formatImporte(doc.total)}</span>
@@ -215,7 +246,7 @@ export function FichaDocumento({
       )}
       {regalado.importe > 0 && (
         <Cifra etiqueta="Regalado / descuentos" testId="regalado-documento">
-          {formatCurrency(regalado.importe)}
+          {formatImporte(regalado.importe)}
           <span className="text-xs font-normal text-muted-foreground"> sin IVA{regalado.estimado ? " · estimado" : ""}</span>
         </Cifra>
       )}

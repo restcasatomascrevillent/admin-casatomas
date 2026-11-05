@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { cargarEscalonado, type CacheEscalonada } from "@/lib/facturas/cargaEscalonada";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -324,6 +324,54 @@ export function aFacturaDetalle(doc: Record<string, unknown>): Factura {
   };
 }
 
+// ─── Qué se refresca tras un cambio (QA 05/11/2026, C-11) ───────────────────
+// Además de ['facturas'] (lista, fichas y búsquedas de Compras) y ['albaranes'],
+// lo que se calcula con las líneas o los importes: el catálogo y sus líneas
+// (['productos']), las gráficas y fichas de Compras (['compras']) y la lista
+// de proveedores con sus importes (['proveedores']).
+const CLAVE_LISTA = ["facturas", "lista"] as const;
+
+/** Productos, gráficas/fichas de Compras y proveedores. */
+export function invalidarDerivadosCompras(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["productos"] });
+  qc.invalidateQueries({ queryKey: ["compras"] });
+  qc.invalidateQueries({ queryKey: ["proveedores"] });
+}
+
+/** Tras cambiar la cabecera de un documento (o subir uno): todo. */
+export function invalidarTrasDocumento(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: ["facturas"] });
+  qc.invalidateQueries({ queryKey: ["albaranes"] });
+  invalidarDerivadosCompras(qc);
+}
+
+/**
+ * Tras crear o editar una LÍNEA: su ficha, las búsquedas y lo derivado, pero
+ * NO se vuelve a bajar la lista entera (≈ 0,5 MB): su cabecera se corrige en
+ * la caché (`n_lineas`) y la lista queda marcada como vieja para la próxima
+ * vez. Con la carga de antes (la lista trae los documentos completos) sí se
+ * recarga, porque la ficha sale de ella.
+ */
+export function refrescarTrasLinea(qc: QueryClient, facturaId: number | null | undefined, lineasNuevas = 0) {
+  type Lista = { cabeceras: { id: number; n_lineas: number }[]; completos: unknown } | undefined;
+  const lista = qc.getQueryData<Lista>(CLAVE_LISTA);
+  if (!lista || lista.completos) {
+    qc.invalidateQueries({ queryKey: ["facturas"] });
+  } else {
+    qc.invalidateQueries({ queryKey: ["facturas"], predicate: (q) => q.queryKey[1] !== "lista" });
+    qc.invalidateQueries({ queryKey: CLAVE_LISTA, refetchType: "none" });
+    if (lineasNuevas !== 0 && facturaId != null) {
+      qc.setQueryData<Lista>(CLAVE_LISTA, (prev) =>
+        prev
+          ? { ...prev, cabeceras: prev.cabeceras.map((c) => (c.id === facturaId ? { ...c, n_lineas: c.n_lineas + lineasNuevas } : c)) }
+          : prev,
+      );
+    }
+  }
+  qc.invalidateQueries({ queryKey: ["albaranes"] });
+  invalidarDerivadosCompras(qc);
+}
+
 export const useUpdateFactura = () => {
   const queryClient = useQueryClient();
 
@@ -369,8 +417,7 @@ export const useUpdateFactura = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facturas'] });
-      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+      invalidarTrasDocumento(queryClient);
       toast.success("Documento actualizado correctamente");
     },
     onError: (error) => {
@@ -421,9 +468,8 @@ export const useCrearProductoFactura = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facturas'] });
-      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+    onSuccess: (_data, vars) => {
+      refrescarTrasLinea(queryClient, vars.factura_id, 1);
       toast.success("Línea añadida");
     },
     onError: (error) => {
@@ -463,9 +509,8 @@ export const useUpdateProductoFactura = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['facturas'] });
-      queryClient.invalidateQueries({ queryKey: ['albaranes'] });
+    onSuccess: (data) => {
+      refrescarTrasLinea(queryClient, (data as { factura_id?: number } | null)?.factura_id ?? null);
       toast.success("Línea de producto actualizada");
     },
     onError: (error) => {
