@@ -11,17 +11,26 @@
  *       marca: "casa-tomas" | "touza", formato: "post" | "story", plantilla: "<id>",
  *       tono?: "cercano" | "elegante" | "retranca"      (por defecto cercano),
  *       indicaciones?: string (≤ 500; se quitan correos y teléfonos),
- *       foto?: "carta:<id>" | …, platoId?: "<id de Platos>",
+ *       foto?: "carta:<id>" | "vino:<id>" | "drive:<id>" | …, platoId?: "<id de Platos>", vinoId?: "<id de Vinos>",
+ *       fotoUrl?: URL de la copia tmp/<uuid>.<ext> del bucket «instagram» de ESTE
+ *                 Supabase (la que el panel ya ha preparado). Cualquier otra → 400.
  *       textos?: { antetitulo?, titular?, cita?, cta?, pie? }   (lo que ya lleva la pieza),
  *       piezaId?: uuid, incluirPrecio?: boolean (solo sugerir_texto) }
  *
- *   200 sugerir_texto:   { ok, accion, sugerenciaId, modelo, versionGuia, plato,
+ *   200 sugerir_texto:   { ok, accion, sugerenciaId, modelo, versionGuia, plato, vino, foto,
+ *                          rotulos: { aviso, propuestos } | null   (rótulos de ejemplo o que no casan con la foto),
  *                          variantes: [{ gancho, caption, hashtags[], altText, platosCitados[], avisos[] }],
  *                          descartadas: [{ motivos[] }], avisos[] }
  *   200 sugerir_rotulos: { …, variantes: [{ antetitulo?, titular?, cita?, cta?, pie?, avisos[] }] }
  *   400 entrada mal · 401 sin sesión · 403 sin Marketing (edición) · 405 · 413
  *   422 ninguna variante pasó los validadores (con descartadas) · 429 cupo diario
  *   502 OpenAI o la base de datos fallaron · 503 falta la clave o la migración
+ *
+ * La IA VE la foto (vision.ts): paso previo de descripción con el modelo de
+ * visión (gpt-4.1, INSTAGRAM_IA_VISION_MODEL) y la imagen va también, con
+ * detail «low», al modelo de texto. Si la etiqueta coincide con un vino de la
+ * carta, se usan sus datos. Si los rótulos de la pieza son de un ejemplo o no
+ * casan con la foto, se avisa y se proponen otros.
  *
  * Contexto que recibe el modelo (sin datos personales nunca): la guía de la
  * marca (instagram_guias_marca), el plato de la foto si es de la carta
@@ -66,7 +75,21 @@ import {
   type MarcaIA,
   type PlatoContexto,
   type Revision,
+  type Rotulos,
 } from "../_shared/instagram/validar-ia.ts";
+import { rotulosDeEjemplo } from "./ejemplos.ts";
+import {
+  buscarVinoPorEtiqueta,
+  COLUMNAS_VINO,
+  describirFoto,
+  MODELO_VISION_POR_DEFECTO,
+  rutaBucketDeUrl,
+  rutaTmpDeUrl,
+  urlPublica,
+  vinoParaModelo,
+  type DescripcionFoto,
+  type FilaVino,
+} from "./vision.ts";
 import { ACCIONES_PLANIFICACION, manejarPlanificacion } from "./campanas.ts";
 import { plantillaIA } from "./plantillas.ts";
 import {
@@ -93,6 +116,9 @@ const MAX_INDICACIONES = 500;
 const MAX_TEXTO_PIEZA = 300;
 const RE_ID_PLATO = /^[A-Za-z0-9_-]{1,100}$/;
 const PREFIJO_FOTO_CARTA = "carta:";
+const PREFIJO_FOTO_VINO = "vino:";
+/** La guía pide de 3 a 5 hashtags concretos: si el modelo pone más, se recortan. */
+const MAX_HASHTAGS_GUIA = 5;
 
 export type Accion = "sugerir_texto" | "sugerir_rotulos";
 
@@ -104,6 +130,9 @@ export interface EntradaIA {
   tono: Tono;
   indicaciones: string;
   platoId: string | null;
+  vinoId: string | null;
+  /** URL de la copia tmp/ preparada (se valida contra SUPABASE_URL en manejarIA). */
+  fotoUrl: string | null;
   piezaId: string | null;
   textos: Partial<Record<CampoRotulo, string>>;
   incluirPrecio: boolean;
@@ -122,6 +151,7 @@ const NOMBRES_ENTORNO = [
   "SUPABASE_ANON_KEY",
   "OPENAI_API_KEY",
   "INSTAGRAM_IA_MODEL",
+  "INSTAGRAM_IA_VISION_MODEL",
   "INSTAGRAM_IA_CUPO_DIARIO",
   // Solo el ID (no secreto) de la cuenta de cada marca, para «Qué funciona».
   "IG_USER_ID",
@@ -169,6 +199,19 @@ export function validarEntrada(valor: unknown): { ok: true; entrada: EntradaIA }
     const p = o.foto.slice(PREFIJO_FOTO_CARTA.length);
     if (RE_ID_PLATO.test(p)) platoId = p;
   }
+  let vinoId: string | null = null;
+  if (o.vinoId !== undefined && o.vinoId !== null) {
+    if (typeof o.vinoId !== "string" || !RE_ID_PLATO.test(o.vinoId)) return { ok: false, error: "vinoId no válido" };
+    vinoId = o.vinoId;
+  } else if (typeof o.foto === "string" && o.foto.startsWith(PREFIJO_FOTO_VINO)) {
+    const v = o.foto.slice(PREFIJO_FOTO_VINO.length);
+    if (RE_ID_PLATO.test(v)) vinoId = v;
+  }
+  let fotoUrl: string | null = null;
+  if (o.fotoUrl !== undefined && o.fotoUrl !== null && o.fotoUrl !== "") {
+    if (typeof o.fotoUrl !== "string" || o.fotoUrl.length > 500) return { ok: false, error: "fotoUrl no válida" };
+    fotoUrl = o.fotoUrl;
+  }
   if (o.piezaId !== undefined && o.piezaId !== null && !esUuid(o.piezaId)) return { ok: false, error: "piezaId no válido" };
   const textos: Partial<Record<CampoRotulo, string>> = {};
   if (o.textos !== undefined && o.textos !== null) {
@@ -188,6 +231,8 @@ export function validarEntrada(valor: unknown): { ok: true; entrada: EntradaIA }
       tono: tono as Tono,
       indicaciones: anonimizar(cadena(o.indicaciones, MAX_INDICACIONES) ?? ""),
       platoId,
+      vinoId,
+      fotoUrl,
       piezaId: (o.piezaId as string | undefined) ?? null,
       textos,
       incluirPrecio: o.incluirPrecio === true && o.accion === "sugerir_texto",
@@ -262,6 +307,7 @@ export async function leerGuia(s: Sesion, marca: MarcaIA): Promise<Guia> {
 const COLUMNA_MARCA: Record<MarcaIA, string> = { "casa-tomas": "restaurante", touza: "touza" };
 
 interface FilaPlato extends PlatoContexto {
+  imagen_url?: string | null;
   activado: boolean | null;
   restaurante: boolean | null;
   touza: boolean | null;
@@ -269,12 +315,37 @@ interface FilaPlato extends PlatoContexto {
 
 export async function leerPlato(s: Sesion, id: string): Promise<FilaPlato | null> {
   const r = await s.fetch(
-    `${s.sb.url}/rest/v1/Platos?id=eq.${encodeURIComponent(id)}&select=id,nombre,descripcion,categoria,precio_eur,unidad,alergenos_oficiales,sin_gluten_disponible,activado,restaurante,touza`,
+    `${s.sb.url}/rest/v1/Platos?id=eq.${encodeURIComponent(id)}&select=id,nombre,descripcion,categoria,precio_eur,unidad,alergenos_oficiales,sin_gluten_disponible,imagen_url,activado,restaurante,touza`,
     { headers: cab(s), signal: AbortSignal.timeout(MS_SUPABASE) },
   );
   if (!r.ok) throw new ErrorBD(`No se pudo leer el plato (${r.status})`, 502);
   const filas = (await r.json().catch(() => [])) as FilaPlato[];
   return Array.isArray(filas) && filas[0] ? filas[0] : null;
+}
+
+export async function leerVino(s: Sesion, id: string): Promise<FilaVino | null> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/Vinos?id=eq.${encodeURIComponent(id)}&select=${COLUMNAS_VINO}`, {
+    headers: cab(s),
+    signal: AbortSignal.timeout(MS_SUPABASE),
+  });
+  if (!r.ok) throw new ErrorBD(`No se pudo leer el vino (${r.status})`, 502);
+  const filas = (await r.json().catch(() => [])) as FilaVino[];
+  return Array.isArray(filas) && filas[0] ? filas[0] : null;
+}
+
+/** Vinos activos de la marca (para reconocer el de la etiqueta). Nunca lanza: [] si falla. */
+export async function leerVinosMarca(s: Sesion, marca: MarcaIA): Promise<FilaVino[]> {
+  try {
+    const r = await s.fetch(
+      `${s.sb.url}/rest/v1/Vinos?select=${COLUMNAS_VINO}&activado=is.true&${COLUMNA_MARCA[marca]}=is.true&order=nombre&limit=500`,
+      { headers: cab(s), signal: AbortSignal.timeout(MS_SUPABASE) },
+    );
+    if (!r.ok) return [];
+    const filas = (await r.json().catch(() => [])) as FilaVino[];
+    return Array.isArray(filas) ? filas : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function leerNombresCarta(s: Sesion, marca: MarcaIA): Promise<string[]> {
@@ -312,7 +383,8 @@ export async function guardarSugerencia(s: Sesion, fila: Record<string, unknown>
 
 export class ErrorOpenAI extends Error {}
 
-export type Mensaje = { role: "system" | "user" | "assistant"; content: string };
+export type ParteMensaje = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail: "low" | "high" | "auto" } };
+export type Mensaje = { role: "system" | "user" | "assistant"; content: string | ParteMensaje[] };
 
 /** Esquema de Structured Outputs (response_format.json_schema). */
 export interface EsquemaJSON {
@@ -407,6 +479,15 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   const e = v.entrada;
   const plantilla = plantillaIA(e.plantilla)!;
 
+  // Imagen de la pieza (sin SSRF): solo la copia tmp/ del bucket «instagram» de
+  // NUESTRO Supabase; se reconstruye la URL desde la ruta, nunca se usa la que llega.
+  let urlImagen: string | null = null;
+  if (e.fotoUrl) {
+    const ruta = rutaTmpDeUrl(e.fotoUrl, s.sb.url);
+    if (!ruta) return json(400, { ok: false, error: "fotoUrl tiene que ser una copia tmp/ del bucket «instagram» de este Supabase" });
+    urlImagen = urlPublica(s.sb.url, "instagram", ruta);
+  }
+
   const clave = claveOpenAI("otros", (n) => env[n]);
   if (!clave) {
     return json(503, {
@@ -416,13 +497,15 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   }
   registrarSecreto(clave);
   const modelo = (env.INSTAGRAM_IA_MODEL ?? "").trim() || MODELO_POR_DEFECTO;
+  const modeloVision = (env.INSTAGRAM_IA_VISION_MODEL ?? "").trim() || MODELO_VISION_POR_DEFECTO;
   const cupo = Number(env.INSTAGRAM_IA_CUPO_DIARIO) > 0 ? Math.floor(Number(env.INSTAGRAM_IA_CUPO_DIARIO)) : CUPO_DIARIO_POR_DEFECTO;
   const ahora = deps.ahora?.() ?? new Date();
 
   // Contexto de la base de datos (antes de gastar nada en OpenAI).
   const avisos: string[] = [];
   let guia: Guia;
-  let plato: PlatoContexto | null = null;
+  let plato: FilaPlato | null = null;
+  let vino: FilaVino | null = null;
   let nombresCarta: string[];
   let queFunciona: Awaited<ReturnType<typeof leerQueFuncionaIA>> = null;
   try {
@@ -430,11 +513,12 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
     if (usadas >= cupo) {
       return json(429, { ok: false, error: `Has llegado al tope de ${cupo} sugerencias de IA por día. Vuelve a probar mañana.` });
     }
-    const [g, fila, carta, qf] = await Promise.all([
+    const [g, fila, carta, qf, filaVino] = await Promise.all([
       leerGuia(s, e.marca),
       e.platoId ? leerPlato(s, e.platoId) : Promise.resolve(null),
       leerNombresCarta(s, e.marca),
       e.accion === "sugerir_texto" ? leerQueFuncionaIA(s.fetch, s.sb.url, cab(s), e.marca, igUserIdDeMarca(env, e.marca)) : Promise.resolve(null),
+      e.vinoId ? leerVino(s, e.vinoId) : Promise.resolve(null),
     ]);
     guia = g;
     nombresCarta = carta;
@@ -445,40 +529,102 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
       else if (fila[COLUMNA_MARCA[e.marca] as "restaurante" | "touza"] !== true) avisos.push(`«${fila.nombre}» no es de la carta de esta marca: el texto no lo nombra.`);
       else plato = fila;
     }
+    if (e.vinoId) {
+      if (!filaVino) avisos.push("El vino de la foto ya no está en la carta: el texto no lo nombra.");
+      else if (filaVino.activado !== true) avisos.push(`«${filaVino.nombre}» no está activo en la carta de vinos: el texto no lo nombra.`);
+      else if (filaVino[COLUMNA_MARCA[e.marca] as "restaurante" | "touza"] !== true) avisos.push(`«${filaVino.nombre}» no es de la carta de esta marca: el texto no lo nombra.`);
+      else vino = filaVino;
+    }
   } catch (err) {
     if (err instanceof ErrorBD) return json(err.estado, { ok: false, error: err.message });
     registro("error", FUNCION, "contexto", err);
     return json(502, { ok: false, error: "No se pudo leer el contexto de la base de datos" });
   }
 
-  const ctx: ContextoValidacion = { marca: e.marca, plato, nombresCarta, ctas: guia.ctas, cuentasPropias: CUENTAS_PROPIAS };
-  const datos: DatosPrompt = {
-    marca: e.marca,
-    formato: e.formato,
-    plantilla: e.plantilla,
-    tono: e.tono,
-    guia: { version: guia.version, texto: guia.guia, hashtags_base: guia.hashtags_base, ctas: guia.ctas },
-    plato: platoParaModelo(plato),
-    carta: nombresCarta.slice(0, 300),
-    textos_pieza: e.textos,
-    indicaciones: e.indicaciones,
-    ...(queFunciona ? { que_funciona: resumenQueFuncionaIA(queFunciona) } : {}),
-  };
-  const esTexto = e.accion === "sugerir_texto";
-  const mensajes: Mensaje[] = [
-    { role: "system", content: esTexto ? promptSistemaTexto(e.marca) : promptSistemaRotulos(e.marca, plantilla) },
-    { role: "user", content: mensajeUsuario(datos) },
-  ];
-  const esquema = esTexto ? ESQUEMA_TEXTO : ESQUEMA_ROTULOS;
+  // Si no hay copia preparada, la foto del plato o del vino de la carta (solo de nuestros buckets).
+  if (!urlImagen && plato?.imagen_url) {
+    const r = rutaBucketDeUrl(plato.imagen_url, s.sb.url, "platos");
+    if (r) urlImagen = urlPublica(s.sb.url, "platos", r);
+  }
+  if (!urlImagen && vino?.imagen_url) {
+    const r = rutaBucketDeUrl(vino.imagen_url, s.sb.url, "vinos");
+    if (r) urlImagen = urlPublica(s.sb.url, "vinos", r);
+  }
 
+  const esTexto = e.accion === "sugerir_texto";
   const uso = new AcumuladorUso(FUNCION, modelo, "chat");
+  const usoVision = new AcumuladorUso(FUNCION, modeloVision, "vision");
   const inicioMs = Date.now();
   const registrar = deps.registrar ?? registrarUso;
   try {
+    // 1. La IA mira la foto (paso previo con el modelo de visión).
+    let descripcion: DescripcionFoto | null = null;
+    if (urlImagen) {
+      const d = await describirFoto(f, clave, modeloVision, urlImagen, e.marca, e.textos, usoVision, OPENAI);
+      descripcion = d.descripcion;
+      if (!descripcion) avisos.push(`No se ha podido describir la foto (${d.error ?? "sin respuesta"}): la propuesta se basa solo en la imagen.`);
+    }
+    // 2. ¿La etiqueta es de un vino de la carta?
+    if (descripcion && !plato && !vino && ["vino", "bebida", "producto"].includes(descripcion.tipo)) {
+      const leido = [descripcion.producto, descripcion.texto_legible].filter(Boolean).join(" · ");
+      if (leido) {
+        const v = buscarVinoPorEtiqueta(leido, await leerVinosMarca(s, e.marca));
+        if (v) {
+          vino = v;
+          avisos.push(`La etiqueta coincide con «${v.nombre}» de la carta de vinos: se usan sus datos.`);
+        }
+      }
+    }
+    // 3. Rótulos de un ejemplo o que no casan con la foto.
+    const deEjemplo = rotulosDeEjemplo(e.marca, e.textos);
+    const noCasan = descripcion?.rotulos_casan === false && Object.keys(e.textos).length > 0;
+    const avisoRotulos = deEjemplo.length
+      ? `Los rótulos de la pieza son los del ejemplo (${deEjemplo.map((c) => `«${e.textos[c]}»`).join(", ")}): cámbialos por unos que hablen de la foto.`
+      : noCasan
+        ? `Los rótulos de la pieza no casan con la foto${descripcion?.motivo_rotulos ? `: ${descripcion.motivo_rotulos}` : "."}`
+        : null;
+    if (avisoRotulos) avisos.push(avisoRotulos);
+
+    const ctx: ContextoValidacion = {
+      marca: e.marca,
+      plato,
+      nombresCarta: vino?.nombre ? [...nombresCarta, vino.nombre] : nombresCarta,
+      ctas: guia.ctas,
+      cuentasPropias: CUENTAS_PROPIAS,
+    };
+    const datos: DatosPrompt = {
+      marca: e.marca,
+      formato: e.formato,
+      plantilla: e.plantilla,
+      tono: e.tono,
+      guia: { version: guia.version, texto: guia.guia, hashtags_base: guia.hashtags_base, ctas: guia.ctas },
+      plato: platoParaModelo(plato),
+      vino: vinoParaModelo(vino),
+      foto: descripcion
+        ? { tipo: descripcion.tipo, que_se_ve: descripcion.que_se_ve, texto_legible: descripcion.texto_legible, producto: descripcion.producto, ambiente: descripcion.ambiente, alt_text: descripcion.alt_text }
+        : null,
+      carta: nombresCarta.slice(0, 300),
+      textos_pieza: avisoRotulos ? {} : e.textos,
+      rotulos_descartados: !!avisoRotulos,
+      indicaciones: e.indicaciones,
+      ...(queFunciona ? { que_funciona: resumenQueFuncionaIA(queFunciona) } : {}),
+    };
+    const texto = mensajeUsuario(datos);
+    const mensajes: Mensaje[] = [
+      { role: "system", content: esTexto ? promptSistemaTexto(e.marca, plantilla) : promptSistemaRotulos(e.marca, plantilla) },
+      {
+        role: "user",
+        content: urlImagen ? [{ type: "text", text: texto }, { type: "image_url", image_url: { url: urlImagen, detail: "low" } }] : texto,
+      },
+    ];
+    const esquema = esTexto ? ESQUEMA_TEXTO : ESQUEMA_ROTULOS;
+
     let buenas: Array<Revision<unknown>> = [];
     const descartadas: Array<{ motivos: string[] }> = [];
+    let datosModelo: Record<string, unknown> = {};
     for (let intento = 0; intento < MAX_INTENTOS && buenas.length === 0; intento++) {
-      const { variantes, bruto } = await pedirModelo(f, clave, modelo, mensajes, esquema, uso);
+      const { variantes, bruto, datos: d } = await pedirModelo(f, clave, modelo, mensajes, esquema, uso);
+      datosModelo = d;
       const revisadas = variantes
         .slice(0, VARIANTES)
         .map((x) => (esTexto ? revisarVarianteTexto(x, ctx) : revisarRotulos(x, plantilla, ctx)) as Revision<unknown>);
@@ -491,7 +637,23 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
       }
     }
 
-    let variantes = buenas.map((r) => ({ ...(r.valor as Record<string, unknown>), avisos: r.correcciones }));
+    let variantes = buenas.map((r) => {
+      const x = { ...(r.valor as Record<string, unknown>), avisos: r.correcciones };
+      if (esTexto && Array.isArray(x.hashtags) && x.hashtags.length > MAX_HASHTAGS_GUIA) {
+        return { ...x, hashtags: x.hashtags.slice(0, MAX_HASHTAGS_GUIA), avisos: [...r.correcciones, `Se han dejado ${MAX_HASHTAGS_GUIA} hashtags: la guía pide de 3 a ${MAX_HASHTAGS_GUIA} concretos.`] };
+      }
+      return x;
+    });
+    // Rótulos propuestos acordes a la foto (solo si los de la pieza no valen), validados como los de sugerir_rotulos.
+    let rotulos: { aviso: string; propuestos: Rotulos | null } | null = null;
+    if (avisoRotulos) {
+      let propuestos: Rotulos | null = null;
+      if (esTexto && datosModelo.rotulos_propuestos && typeof datosModelo.rotulos_propuestos === "object") {
+        const r = revisarRotulos(datosModelo.rotulos_propuestos, plantilla, ctx);
+        if (r.ok && Object.keys(r.valor).length) propuestos = r.valor;
+      }
+      rotulos = { aviso: avisoRotulos, propuestos };
+    }
     if (esTexto && e.incluirPrecio) {
       if (!plato || plato.precio_eur === null || plato.precio_eur === undefined) {
         avisos.push("No se ha añadido el precio: el plato no tiene precio en la carta.");
@@ -516,6 +678,8 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
       plantilla: e.plantilla,
       tono: e.tono,
       platoId: e.platoId,
+      vinoId: vino?.id ?? e.vinoId,
+      conImagen: !!urlImagen,
       piezaId: e.piezaId,
       incluirPrecio: e.incluirPrecio,
       indicaciones: e.indicaciones,
@@ -526,7 +690,7 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
       marca: e.marca,
       pieza_id: e.piezaId,
       entrada,
-      salida: { variantes, descartadas, avisos },
+      salida: { variantes, descartadas, avisos, rotulos, foto: datos.foto },
       modelo,
       version_guia: guia.version,
       variantes: variantes.length,
@@ -536,6 +700,10 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
     });
 
     const platoRespuesta = plato ? { id: plato.id, nombre: plato.nombre } : null;
+    const vinoRespuesta = vino ? { id: vino.id, nombre: vino.nombre } : null;
+    const fotoRespuesta = descripcion
+      ? { tipo: descripcion.tipo, queSeVe: descripcion.que_se_ve, textoLegible: descripcion.texto_legible, altText: descripcion.alt_text }
+      : null;
     if (!variantes.length) {
       return json(422, {
         ok: false,
@@ -553,6 +721,9 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
       modelo,
       versionGuia: guia.version,
       plato: platoRespuesta,
+      vino: vinoRespuesta,
+      foto: fotoRespuesta,
+      rotulos,
       variantes,
       descartadas,
       avisos,
@@ -560,12 +731,13 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   } catch (err) {
     uso.marcarError();
     if (err instanceof ErrorOpenAI) return json(502, { ok: false, error: err.message });
+    if (err instanceof ErrorBD) return json(err.estado, { ok: false, error: err.message });
     registro("error", FUNCION, "fallo", err);
     return json(500, { ok: false, error: "No se pudo generar la propuesta" });
   } finally {
-    await registrar(uso, {
-      disparador: e.piezaId ? `pieza:${e.piezaId}` : `usuario:${s.usuario}`,
-      duracionMs: Date.now() - inicioMs,
-    });
+    const opciones = { disparador: e.piezaId ? `pieza:${e.piezaId}` : `usuario:${s.usuario}`, duracionMs: Date.now() - inicioMs };
+    await registrar(uso, opciones);
+    // La descripción de la foto (modelo de visión) va en su propia fila de ia_uso.
+    if (!usoVision.vacio) await registrar(usoVision, opciones);
   }
 }

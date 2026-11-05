@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fotoPreparable, obtenerPlantilla, type MarcaId } from "@/lib/instagram";
 import { crearReelDesdeBase, INFO_BASES, type BaseReel, type ReelPieza } from "@/lib/instagram/reels";
-import { generarImagen, prepararFotoCarta, prepararFotoDrive, type FotoPreparada } from "@/components/marketing/instagram/api";
+import { generarImagen, prepararFotoOrigen, type FotoPreparada } from "@/components/marketing/instagram/api";
 import { borradorVacio, piezaDesdeBorrador } from "@/components/marketing/instagram/pieza";
 import { encolarRender, prepararFotosReel } from "@/components/instagram/video/useVideoReel";
 import { llamarRpc, type RespuestaEncargo } from "./api";
@@ -50,7 +50,7 @@ async function prepararPrimera(marca: MarcaId, fotos: readonly FotoEncargo[]): P
   const f = fotos[0];
   const origen = f ? fotoPreparable(f.id) : null;
   if (!f || !origen) return null;
-  const r = origen.origen === "carta" ? await prepararFotoCarta(marca, origen.id) : await prepararFotoDrive(marca, origen.id);
+  const r = await prepararFotoOrigen(marca, origen);
   return { id: f.id, url: r.url, ancho: r.ancho ?? 0, alto: r.alto ?? 0, tipo: null, marca };
 }
 

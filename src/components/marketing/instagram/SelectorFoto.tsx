@@ -30,7 +30,7 @@ export function motivoNoApta(foto: Foto, formato: FormatoId, plantilla?: Pick<Pl
   }
   // Foto de la carta cuyas medidas aún no se saben (no ha cargado la miniatura): no se bloquea;
   // al cargar o al prepararla llegan las reales y la validación de la pieza manda.
-  if ((!foto.ancho || !foto.alto) && foto.platoId) return null;
+  if ((!foto.ancho || !foto.alto) && (foto.platoId || foto.vinoId)) return null;
   if (!foto.ancho || !foto.alto) return "Drive todavía no sabe las medidas de esta foto: vuelve a abrir la biblioteca en un rato.";
   if (!esAptaPara(foto, formato)) {
     const f = FORMATOS[formato];
@@ -97,12 +97,14 @@ function MiniaturaCarta({ platoId, url }: { platoId: string; url: string }) {
   );
 }
 
-type FiltroOrigen = "todas" | "drive" | "carta";
+type FiltroOrigen = "todas" | "drive" | "carta" | "vinos";
 const FILTROS: ReadonlyArray<{ id: FiltroOrigen; nombre: string }> = [
   { id: "todas", nombre: "Todas" },
   { id: "drive", nombre: "Drive" },
   { id: "carta", nombre: "Carta" },
+  { id: "vinos", nombre: "Vinos" },
 ];
+const origenDe = (f: Foto): Exclude<FiltroOrigen, "todas"> => (f.vinoId ? "vinos" : f.platoId ? "carta" : "drive");
 
 interface Props {
   marca: MarcaId;
@@ -122,10 +124,11 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
   const [filtro, setFiltro] = useState<FiltroOrigen>("todas");
   const cuantas: Record<FiltroOrigen, number> = {
     todas: todas.length,
-    drive: todas.filter((f) => !f.platoId).length,
-    carta: todas.filter((f) => !!f.platoId).length,
+    drive: todas.filter((f) => origenDe(f) === "drive").length,
+    carta: todas.filter((f) => origenDe(f) === "carta").length,
+    vinos: todas.filter((f) => origenDe(f) === "vinos").length,
   };
-  const fotos = filtro === "todas" ? todas : todas.filter((f) => (filtro === "carta" ? !!f.platoId : !f.platoId));
+  const fotos = filtro === "todas" ? todas : todas.filter((f) => origenDe(f) === filtro);
   // En el móvil no hay «title» al pasar el ratón: al tocar una foto que no vale se explica debajo.
   const [aviso, setAviso] = useState<string | null>(null);
   const [subir, setSubir] = useState(false);
@@ -200,7 +203,7 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
                 aria-checked={elegida}
                 aria-disabled={motivo ? true : undefined}
                 title={motivo ?? descripcion}
-                aria-label={`${foto.platoId ? "Carta: " : ""}${descripcion}${motivo ? ` No disponible: ${motivo}` : ""}`}
+                aria-label={`${foto.vinoId ? "Vino: " : foto.platoId ? "Carta: " : ""}${descripcion}${motivo ? ` No disponible: ${motivo}` : ""}`}
                 data-testid={`foto-${foto.id}`}
                 // aria-disabled (no `disabled`): sigue siendo enfocable y el lector de pantalla lee el motivo.
                 onClick={() => {
@@ -214,16 +217,16 @@ export function SelectorFoto({ marca, formato, plantilla, valor, onCambio, baseF
                   motivo && "cursor-not-allowed opacity-40 grayscale",
                 )}
               >
-                {foto.platoId && foto.urlCarta ? (
-                  <MiniaturaCarta platoId={foto.platoId} url={foto.urlCarta} />
+                {(foto.platoId || foto.vinoId) && foto.urlCarta ? (
+                  <MiniaturaCarta platoId={foto.platoId ?? foto.id} url={foto.urlCarta} />
                 ) : foto.driveId ? (
                   <MiniaturaDrive marca={foto.marca} driveId={foto.driveId} />
                 ) : (
                   <img src={urlRecurso(baseFotos, foto.ruta)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                 )}
-                {foto.platoId && (
+                {(foto.platoId || foto.vinoId) && (
                   <span className="absolute bottom-1 left-1 rounded bg-primary/90 px-1 text-[10px] font-medium leading-4 text-primary-foreground" aria-hidden="true">
-                    Carta
+                    {foto.vinoId ? "Vino" : "Carta"}
                   </span>
                 )}
                 {!foto.tipo && (

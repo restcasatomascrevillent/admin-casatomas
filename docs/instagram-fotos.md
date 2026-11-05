@@ -104,6 +104,17 @@ Código: `fotosDesdePlatos`, `fotoDesdePlato`, `idFotoCarta`, `platoIdDeFoto`, `
 y el recorrido de `EditorInstagram.test.tsx`. Sin migraciones. Hay que volver a desplegar
 `instagram-drive` (Supabase) y el panel con `/api/instagram-render` (Vercel).
 
+## Vinos de la carta
+
+Desde el 05/11/2026 la biblioteca enseña también los **vinos de la carta** con foto (tabla `"Vinos"`, bucket público `vinos`), con el filtro **Vinos** y la etiqueta «Vino». Funciona igual que los platos:
+
+- Salen los vinos con `activado = true`, `imagen_url` no nula y de la marca (`restaurante` / `touza`). Tipo **«bebida»**, descripción `nombre · D.O.`, id **`vino:<id del vino>`**.
+- **Preparar**: `{ accion: "preparar", origen: "vino", marca, vinoId }` en `instagram-drive`, con las mismas comprobaciones que la carta (fila con el JWT, de la marca y activa; foto del bucket `vinos` de su Supabase; URL reconstruida; sin redirecciones; ≤ 8 MB).
+- **Render**: `fotoPreparada` acepta `vino:<id>`; el tipo es siempre «bebida».
+- La IA de textos reconoce el vino y usa sus datos (`docs/instagram-ia.md`).
+
+Código: `idFotoVino`, `vinoIdDeFoto`, `fotoDesdeVino`, `fotosDesdeVinos` en `src/lib/instagram/fotos.ts`; `useVinosConFoto` en `useFotosInstagram.ts`; `prepararFotoVino` y `prepararFotoOrigen` en `api.ts`; `prepararCarta` con `CARTA_VINOS` en `instagram-drive/drive.ts`. Sin migraciones.
+
 ## Preparación en el navegador (Subir foto)
 
 - Acepta JPEG, PNG y WebP; HEIC/HEIF solo si el navegador sabe abrirlo (Safari sí; Chrome y

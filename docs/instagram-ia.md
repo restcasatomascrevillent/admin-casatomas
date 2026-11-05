@@ -10,7 +10,7 @@ Diseño: `instagram-studio/propuesta/PROPUESTA.md`, apartados 3.1-3.6 y fila «1
 
 | Pieza | Dónde |
 |---|---|
-| Edge Function | `supabase/functions/instagram-ia/`: `index.ts` (envoltorio de auditoría), `ia.ts` (lógica y contrato), `prompts.ts` (prompts y esquemas JSON) y `plantillas.ts` (copia de los campos y límites de las plantillas) |
+| Edge Function | `supabase/functions/instagram-ia/`: `index.ts` (envoltorio de auditoría), `ia.ts` (lógica y contrato), `prompts.ts` (prompts y esquemas JSON), `vision.ts` (la IA ve la foto, vinos de la carta, URL sin SSRF), `ejemplos.ts` (copia de los rótulos de los ejemplos) y `plantillas.ts` (copia de los campos y límites de las plantillas) |
 | Validadores | `supabase/functions/_shared/instagram/validar-ia.ts` (lógica pura) |
 | Migración | `supabase/migrations/20261108000000_instagram_ia.sql`; rollback en `supabase/rollbacks/20261108000000_instagram_ia_ROLLBACK.sql` |
 | Panel | `src/components/instagram/ia/`: `SugerirTextoIA.tsx` (componente) y `api.ts` (llamadas) |
@@ -28,7 +28,8 @@ import { SugerirTextoIA } from "@/components/instagram/ia";
     marca: borrador.marca,            // "casa-tomas" | "touza"
     formato: borrador.formato,        // "post" | "story"
     plantilla: borrador.plantilla,    // p. ej. "ct-foto-titular"
-    foto: borrador.foto,              // si es "carta:<id>", usa ese plato
+    foto: borrador.foto,              // "carta:<id>" → ese plato; "vino:<id>" → ese vino
+    fotoUrl: fotoPreparada?.url,      // copia tmp/ ya preparada: la IA VE la foto
     platoId: null,                    // opcional; si no, se saca de la foto
     piezaId: piezaGuardada?.id,       // opcional; para el registro y el coste
     textos: { antetitulo, titular, cita, cta, pie }, // lo que ya lleve la pieza
@@ -64,7 +65,8 @@ import { SugerirTextoIA } from "@/components/instagram/ia";
   "plantilla": "ct-foto-titular",     // de la marca
   "tono": "cercano",                  // "elegante" | "retranca"; por defecto cercano
   "indicaciones": "Que se note el otoño",
-  "foto": "carta:pulpo-feira",        // o "platoId": "pulpo-feira"
+  "foto": "carta:pulpo-feira",        // o "platoId"; "vino:<id>" o "vinoId" para un vino
+  "fotoUrl": "https://<proyecto>.supabase.co/storage/v1/object/public/instagram/tmp/<uuid>.jpg", // opcional
   "piezaId": "<uuid>",                // opcional
   "textos": { "titular": "El pulpo de casa" },
   "incluirPrecio": false              // solo sugerir_texto
@@ -75,7 +77,10 @@ Respuesta 200 de `sugerir_texto`:
 
 ```jsonc
 { "ok": true, "accion": "sugerir_texto", "sugerenciaId": "<uuid|null>", "modelo": "gpt-5.6-luna",
-  "versionGuia": 1, "plato": { "id": "…", "nombre": "…" },
+  "versionGuia": 1, "plato": { "id": "…", "nombre": "…" }, "vino": { "id": "…", "nombre": "…" } | null,
+  "foto": { "tipo": "vino", "queSeVe": "…", "textoLegible": "…", "altText": "…" } | null,
+  // Solo si los rótulos de la pieza son de un ejemplo o no casan con la foto:
+  "rotulos": { "aviso": "Los rótulos de la pieza son los del ejemplo…", "propuestos": { "antetitulo": "…", "titular": "…", "cta": "…" } | null } | null,
   "variantes": [{ "gancho": "…", "caption": "…", "hashtags": ["#…"], "altText": "…",
                   "platosCitados": ["…"], "avisos": ["Se han quitado los emoji…"] }],
   "descartadas": [{ "motivos": ["Precio que no viene de la carta (15 €)…"] }],
@@ -86,12 +91,36 @@ En `sugerir_rotulos`, cada variante es `{ antetitulo?, titular?, cita?, cta?, pi
 
 | Código | Cuándo |
 |---|---|
-| 400 | Entrada mal: acción, marca, plantilla de otra marca, tono, ids o indicaciones de más de 500 caracteres |
+| 400 | Entrada mal: acción, marca, plantilla de otra marca, tono, ids, indicaciones de más de 500 caracteres o `fotoUrl` que no es una copia `tmp/` del bucket «instagram» de este Supabase |
 | 401 / 403 | Sin sesión / sin Marketing en edición |
 | 422 | Ninguna propuesta pasó los validadores, ni al segundo intento. Trae `descartadas` |
 | 429 | Cupo diario agotado (100 por usuario y día, UTC; se cambia con `INSTAGRAM_IA_CUPO_DIARIO`) |
 | 502 | OpenAI falló (con el motivo legible de `motivoErrorOpenAI`, p. ej. «sin saldo») o la base de datos no respondió |
 | 503 | Falta `OPENAI_API_KEY`, la migración o la guía de la marca |
+
+### La IA ve la foto (desde el 05/11/2026)
+
+Caso que lo motivó: el dueño eligió en la demo una foto de Drive de una botella (Domaine de la Combe, Côtes du Rhône) con los rótulos del ejemplo todavía puestos («Nuestros espacios / Un entorno para cada ocasión»). La IA no sabía qué había en la foto y escribió sobre «el espacio del restaurante, mesas y sillas».
+
+1. **Qué imagen.** La copia `tmp/<uuid>.<jpg|png|webp>` que el panel ya preparó (`fotoUrl` = `fotoPreparada.url`, la manda `AccionesPieza`). El servidor solo acepta una URL del bucket «instagram» de **su** Supabase (mismo origen, sin credenciales, solo `tmp/`) y la **reconstruye** desde la ruta: cualquier otra cosa, 400 y no se llama a OpenAI (sin SSRF). Sin `fotoUrl`, usa la foto del plato (bucket «platos») o del vino (bucket «vinos») de la carta, con la misma comprobación.
+2. **Descripción previa** con el modelo de visión de `extraer-vino-foto` (`gpt-4.1`, `detail: "high"`, Structured Outputs; se cambia con el secreto opcional `INSTAGRAM_IA_VISION_MODEL`). Devuelve JSON: `tipo` (vino, plato, cóctel, bebida, sala, ambiente, barra, producto, personas, otro), qué se ve, el texto legible de la etiqueta, el producto, el ambiente, un texto alternativo de una frase y si los rótulos de la pieza casan con la foto. Si falla, se sigue con la imagen y un aviso.
+3. **El modelo de texto** recibe esa descripción en `DATOS.foto` y además la imagen (`detail: "low"`, unos 85 tokens más).
+4. **Vino de la carta.** Con `vino:<id>` (o `vinoId`) se lee la fila de `"Vinos"` (activo y de la marca). Con una foto de Drive, si la etiqueta coincide con un vino de la carta de la marca (todas las palabras que lo identifican, sin artículos, tipo, D.O. ni añada; si hay empate, ninguno), se usan sus datos y se avisa. Al modelo le llegan: nombre, tipo (categoría), D.O., uva (`ingredientes`), región (`ubicacion_region`, `ubicacion_pais`), añada (sacada del nombre) y descripción. **La tabla no tiene bodega ni añada aparte**; el precio no se manda.
+5. **Rótulos.** Si los de la pieza son los de un ejemplo (`ejemplos.ts`, copia de `src/lib/instagram/ejemplos.ts` vigilada por `ejemplos.test.ts`) o el modelo de visión dice que no casan con la foto, no se mandan al modelo como pista (`rotulos_descartados: true`) y la respuesta trae `rotulos.aviso` (también en `avisos`) y `rotulos.propuestos`: antetítulo, titular (6 palabras como mucho) y CTA o cita, según la plantilla, validados como en `sugerir_rotulos`. El panel ya tiene `onElegirRotulos` para aplicarlos.
+6. **Coste.** La descripción va en su propia fila de `ia_uso` (operación `vision`, modelo `gpt-4.1`, que ya está en `ia_precios`). Unos 0,003-0,005 $ más por petición con foto. **Sin verificar hoy.**
+
+### Calidad del texto (prompts.ts)
+
+Según `marca-base/readme.md` (CONTENT FUNDAMENTALS):
+
+- caption de 150 a 350 caracteres por defecto, con gancho en la primera línea (90 como mucho);
+- una idea por publicación, sobre lo que se ve;
+- de 3 a 5 hashtags concretos y locales (si llegan más, el servidor deja 5 y avisa), sin genéricos;
+- sin relleno («elige tu ocasión», «nosotros ponemos la mesa», «una experiencia única»…);
+- tuteo; el gallego solo como firma ocasional;
+- en Casa Tomás, el vino se cuenta con maridaje («con nuestro chuletón…») y solo con platos de la carta;
+- texto alternativo: una frase literal de la foto real;
+- las 3 variantes con enfoques distintos: producto, maridaje u ocasión, y tono.
 
 ### Qué recibe el modelo
 
@@ -99,6 +128,8 @@ Recibe solo esto, como **datos** en un bloque JSON delimitado (`<<<DATOS … DAT
 
 - la guía de `instagram_guias_marca`;
 - el plato de la foto, si es de la carta, está activo y es de la marca: nombre, categoría, descripción (400 caracteres como mucho), alérgenos oficiales y `sin_gluten_disponible`. **El precio no**;
+- el vino de la foto, si lo hay (ver arriba). **El precio no**;
+- la descripción de la foto y la propia imagen, si la hay;
 - los nombres de la carta activa de la marca (300 como mucho);
 - la plantilla y los textos de la pieza;
 - el tono y las indicaciones, ya anonimizadas.
@@ -172,6 +203,8 @@ npx supabase secrets list --project-ref sfonaclosuafvlhutkon | grep OPENAI_API_K
 
 # 3. Función (verify_jwt = true sale de supabase/config.toml)
 npx supabase functions deploy instagram-ia --project-ref sfonaclosuafvlhutkon
+#    Con la visión y los vinos (05/11/2026) hay que desplegar también instagram-drive (origen «vino»):
+npx supabase functions deploy instagram-drive --project-ref sfonaclosuafvlhutkon
 ```
 
 ```sql
@@ -207,7 +240,8 @@ Las pruebas de la función nunca llaman a OpenAI: `fetch` está simulado. Cubren
 - el cupo;
 - la migración sin aplicar;
 - el registro del uso con el disparador correcto;
-- que la clave nunca sale en la respuesta.
+- que la clave nunca sale en la respuesta;
+- la visión (`vision.test.ts`): foto de Drive de un vino → la descripción y la imagen llegan al modelo y se reconoce el vino de la carta; rótulos de ejemplo o que no casan → aviso y rótulos propuestos; `vino:<id>` → datos del vino y su foto; URL de imagen ajena → 400 sin llamar a OpenAI.
 
 `plantillas.test.ts` falla si la copia de plantillas del servidor se separa de `src/lib/instagram/plantillas`.
 

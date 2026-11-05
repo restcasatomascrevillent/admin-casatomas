@@ -44,7 +44,9 @@ export interface Foto {
   problema?: string | null;
   /** Id del plato (fotos de la carta, «carta:<id>»). */
   platoId?: string;
-  /** URL pública de la foto en la carta (bucket «platos»): solo para la miniatura. */
+  /** Id del vino (fotos de la carta de vinos, «vino:<id>»). */
+  vinoId?: string;
+  /** URL pública de la foto en la carta (bucket «platos» o «vinos»): solo para la miniatura. */
   urlCarta?: string;
 }
 
@@ -281,15 +283,32 @@ export function platoIdDeFoto(id: unknown): string | null {
   return esIdPlatoValido(p) ? p : null;
 }
 
-/** Origen de una foto que hay que «preparar» (copiar a tmp/) antes de pintarla. */
-export type FotoPreparable = { origen: "drive"; id: string } | { origen: "carta"; id: string };
+/** Prefijo del id de las fotos de la carta de vinos en las piezas: «vino:<id del vino>». */
+export const PREFIJO_FOTO_VINO = "vino:";
 
-/** Drive («drive:<id>») o carta («carta:<id>»); null para el resto (catálogo estático, subidas antiguas). */
+/** «vino:<id>» a partir del id del vino. */
+export function idFotoVino(vinoId: string): string {
+  return `${PREFIJO_FOTO_VINO}${vinoId}`;
+}
+
+/** Id del vino de un id de foto «vino:<id>» (null si no es un vino o no es válido). */
+export function vinoIdDeFoto(id: unknown): string | null {
+  if (typeof id !== "string" || !id.startsWith(PREFIJO_FOTO_VINO)) return null;
+  const v = id.slice(PREFIJO_FOTO_VINO.length);
+  return esIdPlatoValido(v) ? v : null;
+}
+
+/** Origen de una foto que hay que «preparar» (copiar a tmp/) antes de pintarla. */
+export type FotoPreparable = { origen: "drive"; id: string } | { origen: "carta"; id: string } | { origen: "vino"; id: string };
+
+/** Drive («drive:<id>»), carta («carta:<id>») o vino («vino:<id>»); null para el resto (catálogo estático, subidas antiguas). */
 export function fotoPreparable(id: unknown): FotoPreparable | null {
   const d = driveIdDeFoto(id);
   if (d) return { origen: "drive", id: d };
   const p = platoIdDeFoto(id);
-  return p ? { origen: "carta", id: p } : null;
+  if (p) return { origen: "carta", id: p };
+  const v = vinoIdDeFoto(id);
+  return v ? { origen: "vino", id: v } : null;
 }
 
 /** Ruta dentro del bucket público «platos» de una URL de NUESTRO Supabase (null si es de otro sitio). */
@@ -366,6 +385,58 @@ export function fotosDesdePlatos(filas: readonly FilaPlatoFoto[], marca: MarcaId
   for (const fila of filas ?? []) {
     if (!fila || fila.activado !== true || !platoEsDeMarca(fila, marca) || vistos.has(fila.id)) continue;
     const foto = fotoDesdePlato(fila, marca, medidas[fila.id]);
+    if (!foto) continue;
+    vistos.add(fila.id);
+    fotos.push(foto);
+  }
+  return fotos;
+}
+
+// ── Fotos de la carta de vinos (tabla "Vinos", bucket público «vinos») ───────
+
+/** Lo que hace falta de una fila de "Vinos". */
+export interface FilaVinoFoto {
+  id: string;
+  nombre: string | null;
+  denominacion_origen?: string | null;
+  imagen_url: string | null;
+  activado?: boolean | null;
+  restaurante?: boolean | null;
+  touza?: boolean | null;
+}
+
+/**
+ * Vino → Foto del catálogo (tipo «bebida», descripción = nombre · D.O.). Las
+ * medidas, igual que las de los platos (al cargar la miniatura o al preparar).
+ */
+export function fotoDesdeVino(fila: FilaVinoFoto, marca: MarcaId, medidas?: { ancho: number; alto: number } | null, ruta = ""): Foto | null {
+  if (!fila || !esIdPlatoValido(fila.id) || typeof fila.imagen_url !== "string" || !fila.imagen_url.trim()) return null;
+  const ancho = medidas && Number.isInteger(medidas.ancho) && medidas.ancho > 0 ? medidas.ancho : 0;
+  const alto = medidas && Number.isInteger(medidas.alto) && medidas.alto > 0 ? medidas.alto : 0;
+  const apta = (formato: FormatoId) => ancho > 0 && alto > 0 && esAptaPara({ ancho, alto }, formato);
+  const descripcion = [(fila.nombre ?? "").trim(), (fila.denominacion_origen ?? "").trim()].filter(Boolean).join(" · ");
+  return {
+    id: idFotoVino(fila.id),
+    marca,
+    ruta,
+    ancho,
+    alto,
+    tipo: "bebida",
+    aptaPost: apta("post"),
+    aptaStory: apta("story"),
+    descripcion: descripcion || "Vino de la carta",
+    vinoId: fila.id,
+    urlCarta: fila.imagen_url.trim(),
+  };
+}
+
+/** Vinos de la carta de una marca → fotos (activos, con foto y de la marca). `medidas` por id de foto («vino:<id>»). */
+export function fotosDesdeVinos(filas: readonly FilaVinoFoto[], marca: MarcaId, medidas: Readonly<Record<string, { ancho: number; alto: number }>> = {}): Foto[] {
+  const vistos = new Set<string>();
+  const fotos: Foto[] = [];
+  for (const fila of filas ?? []) {
+    if (!fila || fila.activado !== true || !platoEsDeMarca(fila, marca) || vistos.has(fila.id)) continue;
+    const foto = fotoDesdeVino(fila, marca, medidas[idFotoVino(fila.id)]);
     if (!foto) continue;
     vistos.add(fila.id);
     fotos.push(foto);
