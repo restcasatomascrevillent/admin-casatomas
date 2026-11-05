@@ -13,13 +13,21 @@
  *             El de las del catálogo estático lo pone el panel
  *             (src/lib/instagram/fotos.ts).
  *   ultimaCaptura / ultimaCorrecta  para avisar de errores (p. ej. permiso)
+ *   queFunciona  «Qué funciona» de los últimos 90 días: la RPC
+ *             instagram_que_funciona (20261110000000), leída como el usuario.
+ *             null si la migración no está aplicada o la RPC falla (la
+ *             pestaña sigue funcionando sin ese bloque).
  */
 import { fechaMadrid } from "../_shared/instagram/insights.ts";
+import { registro } from "../_shared/instagram/secretos.ts";
 import { ErrorBaseDatos, type Rest } from "./acceso.ts";
 import { resumirPeriodo, serieDiaria, ultimoDia, type FilaCuenta, type PuntoSerie, type ResumenPeriodo } from "./resumen.ts";
 
 export const DIAS_SERIE = 28;
-export const MAX_PUBLICACIONES_LEER = 60;
+export const MAX_PUBLICACIONES_LEER = 120;
+/** El panel solo enseña el principio del texto (el completo lo usa «Qué funciona»). */
+const MAX_CAPTION_LEER = 300;
+export const DIAS_QUE_FUNCIONA = 90;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Igual que src/lib/instagram/fotos.ts (PREFIJO_FOTO_DRIVE y esIdDriveValido). */
 const PREFIJO_DRIVE = "drive:";
@@ -105,6 +113,8 @@ export interface RespuestaLeer {
   publicaciones: Publicacion[];
   ultimaCaptura: Captura | null;
   ultimaCorrecta: Captura | null;
+  /** Respuesta de instagram_que_funciona (ver la migración 20261110000000), o null. */
+  queFunciona: Record<string, unknown> | null;
 }
 
 const COLS_CUENTA =
@@ -131,9 +141,33 @@ function filtroCuenta(igUserId: string | null): string {
   return igUserId && /^\d+$/.test(igUserId) ? `&ig_user_id=eq.${igUserId}` : "";
 }
 
-export async function leerMetricas(db: Rest, opciones: { igUserId: string | null; ahora: number }): Promise<RespuestaLeer> {
+/**
+ * «Qué funciona» (RPC instagram_que_funciona por GET, como el usuario). Nunca
+ * lanza: sin la migración o con cualquier fallo, null.
+ */
+export async function leerQueFunciona(db: Rest, igUserId: string | null, marca: string | null): Promise<Record<string, unknown> | null> {
+  const q = new URLSearchParams({ p_dias: String(DIAS_QUE_FUNCIONA) });
+  if (igUserId && /^\d+$/.test(igUserId)) q.set("p_ig_user_id", igUserId);
+  if (marca === "casa-tomas" || marca === "touza") q.set("p_marca", marca);
+  try {
+    const r = (await db.leer<unknown>(`rpc/instagram_que_funciona?${q.toString()}`, "qué funciona")) as unknown;
+    const v = Array.isArray(r) ? r[0] : r;
+    return v && typeof v === "object" && !Array.isArray(v) && typeof (v as { publicaciones?: unknown }).publicaciones === "number"
+      ? (v as Record<string, unknown>)
+      : null;
+  } catch (e) {
+    const sinMigracion = e instanceof ErrorBaseDatos && (e.estado === 404 || e.codigo === "PGRST202" || e.codigo === "42883");
+    if (!sinMigracion) registro("warn", "instagram-metricas", "no se pudo leer «Qué funciona»", e);
+    return null;
+  }
+}
+
+export async function leerMetricas(
+  db: Rest,
+  opciones: { igUserId: string | null; ahora: number; marca?: string | null },
+): Promise<RespuestaLeer> {
   const f = filtroCuenta(opciones.igUserId);
-  const [cuenta, pubs, capturas, correctas] = await Promise.all([
+  const [cuenta, pubs, capturas, correctas, queFunciona] = await Promise.all([
     db.leer<FilaCuenta & { ig_user_id: string }>(
       `instagram_metricas_cuenta?select=${COLS_CUENTA}${f}&order=fecha.desc&limit=${DIAS_SERIE * 2 + 7}`,
       "las métricas de la cuenta",
@@ -144,6 +178,7 @@ export async function leerMetricas(db: Rest, opciones: { igUserId: string | null
     ),
     db.leer<Record<string, unknown>>(`instagram_metricas_capturas?select=${COLS_CAPTURA}&order=inicio.desc&limit=1`, "las capturas"),
     db.leer<Record<string, unknown>>(`instagram_metricas_capturas?select=${COLS_CAPTURA}&ok=is.true&order=inicio.desc&limit=1`, "las capturas"),
+    leerQueFunciona(db, opciones.igUserId, opciones.marca ?? null),
   ]);
 
   // Piezas del panel (por media_id o por pieza_id).
@@ -215,7 +250,7 @@ export async function leerMetricas(db: Rest, opciones: { igUserId: string | null
       publicadoAt: p.publicado_at,
       permalink: p.permalink,
       miniaturaUrl: p.miniatura_url,
-      caption: p.caption,
+      caption: typeof p.caption === "string" ? p.caption.slice(0, MAX_CAPTION_LEER) : p.caption,
       fechaCaptura: p.fecha_captura,
       alcance: p.alcance,
       meGusta: p.me_gusta,
@@ -238,5 +273,6 @@ export async function leerMetricas(db: Rest, opciones: { igUserId: string | null
     publicaciones,
     ultimaCaptura: captura(capturas[0]),
     ultimaCorrecta: captura(correctas[0]),
+    queFunciona,
   };
 }

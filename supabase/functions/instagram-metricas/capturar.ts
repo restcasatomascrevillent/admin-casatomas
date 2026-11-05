@@ -8,10 +8,16 @@
  *    rehace los últimos días (upsert por fecha + cuenta).
  *  - Seguidores: followers_count en el momento de la captura; se guarda solo
  *    en el día más reciente (los anteriores conservan lo que tenían).
- *  - Publicaciones: las MAX_PUBLICACIONES más recientes del feed + las
- *    historias activas (24 h). Una fila por publicación y día de captura
- *    (upsert por media_id + fecha_captura), enlazada con instagram_piezas
- *    por media_id.
+ *  - Publicaciones: TODAS las del feed (y reels) de los últimos
+ *    DIAS_PUBLICACIONES días, siguiendo las páginas de /media (como mucho
+ *    MAX_PUBLICACIONES), + las historias activas (24 h). Una fila por
+ *    publicación y día de captura (upsert por media_id + fecha_captura),
+ *    enlazada con instagram_piezas por media_id. Con el texto completo
+ *    (2200), sus hashtags, la hora local de Madrid y, en los reels, el
+ *    tiempo medio y total de reproducción y la tasa de salto.
+ *  - Si falta la migración 20261110000000_instagram_aprender (columnas
+ *    nuevas), se guarda como antes (texto de 300, sin hashtags ni reels) y
+ *    se avisa.
  *  - Si al token le falta instagram_manage_insights, la PRIMERA llamada de
  *    la cuenta falla y se lanza el error de permiso (no se guarda nada).
  *    Los fallos de una publicación suelta no paran la captura: van a avisos.
@@ -26,7 +32,7 @@ import {
   inicioDiaMadrid,
   insightsCuenta,
   insightsMedio,
-  mediosRecientes,
+  mediosDesde,
   seguidores,
   sumarDias,
   visitasPerfil,
@@ -34,12 +40,18 @@ import {
   type ValoresMedio,
 } from "../_shared/instagram/insights.ts";
 import { mensajeSaneado } from "../_shared/instagram/secretos.ts";
-import type { Rest } from "./acceso.ts";
+import { ErrorBaseDatos, type Rest } from "./acceso.ts";
 
 export const DIAS_CUENTA = 3;
-export const MAX_PUBLICACIONES = 30;
+/** Días hacia atrás de las publicaciones que se capturan (los de «Qué funciona»). */
+export const DIAS_PUBLICACIONES = 90;
+/** Tope de publicaciones por captura (unas 2 al día durante 90 días, con margen). */
+export const MAX_PUBLICACIONES = 200;
 /** Publicaciones cuyas métricas se piden a la vez. */
-const EN_PARALELO = 5;
+const EN_PARALELO = 8;
+/** Columnas de 20261110000000_instagram_aprender: sin la migración, se guardan sin ellas. */
+const COLUMNAS_APRENDER = ["hashtags", "publicado_local", "tiempo_medio_ms", "tiempo_total_ms", "tasa_salto"] as const;
+export const MIGRACION_APRENDER = "20261110000000_instagram_aprender";
 
 export interface DependenciasCaptura {
   cliente: ClienteGraph;
@@ -116,7 +128,12 @@ export async function capturarMetricas(d: DependenciasCaptura): Promise<Resultad
   for (const fila of filas) await d.servicio.guardar("instagram_metricas_cuenta", [fila], "fecha,ig_user_id");
 
   // ── Publicaciones ──
-  const medios: MedioIg[] = await mediosRecientes(d.cliente, d.igUserId, MAX_PUBLICACIONES);
+  const desdePub = inicioDiaMadrid(sumarDias(hoy, -DIAS_PUBLICACIONES));
+  const lista = await mediosDesde(d.cliente, d.igUserId, desdePub, MAX_PUBLICACIONES);
+  const medios: MedioIg[] = lista.medios;
+  if (lista.truncado) {
+    avisos.push(`Hay más publicaciones en los últimos ${DIAS_PUBLICACIONES} días de las que se capturan (${medios.length}): solo cuentan las más recientes.`);
+  }
   try {
     const vistos = new Set(medios.map((m) => m.id));
     for (const h of await historiasActivas(d.cliente, d.igUserId)) if (!vistos.has(h.id)) medios.push(h);
@@ -170,6 +187,11 @@ export async function capturarMetricas(d: DependenciasCaptura): Promise<Resultad
       permalink: m.permalink,
       miniatura_url: m.miniatura,
       caption: m.caption,
+      hashtags: m.hashtags,
+      publicado_local: m.publicadoLocal,
+      tiempo_medio_ms: v?.tiempoMedioMs ?? null,
+      tiempo_total_ms: v?.tiempoTotalMs ?? null,
+      tasa_salto: v?.tasaSalto ?? null,
       alcance: v?.alcance ?? null,
       me_gusta: v?.meGusta ?? m.meGusta,
       comentarios: v?.comentarios ?? m.comentarios,
@@ -179,7 +201,26 @@ export async function capturarMetricas(d: DependenciasCaptura): Promise<Resultad
       interacciones: v?.interacciones ?? null,
     };
   });
-  await d.servicio.guardar("instagram_metricas_publicacion", filasPub, "media_id,fecha_captura");
+  try {
+    await d.servicio.guardar("instagram_metricas_publicacion", filasPub, "media_id,fecha_captura");
+  } catch (e) {
+    if (!faltaMigracionAprender(e)) throw e;
+    // Sin las columnas nuevas: como antes (texto de 300, sin hashtags ni reels).
+    const antiguas = filasPub.map((f) => {
+      const copia: Record<string, unknown> = { ...f, caption: typeof f.caption === "string" ? f.caption.slice(0, 300) : f.caption };
+      for (const c of COLUMNAS_APRENDER) delete copia[c];
+      return copia;
+    });
+    await d.servicio.guardar("instagram_metricas_publicacion", antiguas, "media_id,fecha_captura");
+    avisos.push(`Falta aplicar la migración ${MIGRACION_APRENDER}: se han guardado las métricas sin hashtags, hora local ni métricas de reels, y con el texto recortado.`);
+  }
 
   return { fechaCaptura: hoy, dias, publicaciones: filasPub.length, avisos };
+}
+
+/** ¿El error es de que faltan las columnas de 20261110000000 (o el texto pasa de 300)? */
+export function faltaMigracionAprender(e: unknown): boolean {
+  if (!(e instanceof ErrorBaseDatos)) return false;
+  if (e.codigo === "PGRST204" || e.codigo === "42703") return true;
+  return e.codigo === "23514" && /instagram_metricas_publicacion_textos_chk/.test(e.message);
 }
