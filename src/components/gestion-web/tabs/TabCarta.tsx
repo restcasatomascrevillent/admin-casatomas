@@ -301,13 +301,13 @@ export default function TabCarta() {
                   <Plus className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">{actual.añadir}</span>
                 </Button>
-                {/* Carta física en A5 (05/11/2026): en el móvil, a todo el ancho debajo; desde `sm`, la primera de la fila. */}
+                {/* «PDF Carta» (05/11/2026): en el móvil ocupa una celda como los demás; desde `sm`, la primera de la fila. */}
                 {(seccionActiva === "platos" || seccionActiva === "vinos") && (
                   <BotonCartaImprimir
                     tipo={seccionActiva}
                     platos={platos}
                     vinos={vinos}
-                    className="col-span-2 sm:order-first sm:col-span-1"
+                    className="sm:order-first"
                   />
                 )}
               </div>

@@ -15,7 +15,8 @@ interface Props {
 }
 
 /**
- * «Carta para imprimir (PDF A5/A4)» en la barra de acciones de Gestor Web › Carta
+ * «PDF Carta» (carta para imprimir en A5/A4) en la barra de acciones de Gestor Web › Carta
+ * — texto corto a petición del dueño (05/11/2026: «el botón es muy grande») —
  * (platos y vinos). Solo lee la carta: lo ve quien ve la pestaña (permiso
  * «Gestor Web · Carta»), como el resto de la pestaña.
  */
@@ -35,7 +36,7 @@ export function BotonCartaImprimir({ tipo, platos, vinos, className }: Props) {
         }}
       >
         <Printer className="mr-2 h-4 w-4 shrink-0" />
-        <span className="truncate">Carta para imprimir (PDF A5/A4)</span>
+        <span className="truncate">PDF Carta</span>
       </Button>
       {montado && (
         <Suspense fallback={null}>

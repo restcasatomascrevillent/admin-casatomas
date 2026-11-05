@@ -151,7 +151,7 @@ describe("Vinos: filtro con píldoras como en la carta de la web", () => {
 });
 
 describe("Carta para imprimir (PDF A5/A4)", () => {
-  const boton = () => screen.queryByRole("button", { name: /Carta para imprimir/ });
+  const boton = () => screen.queryByRole("button", { name: /PDF Carta/ });
   const abrirSeccion = (nombre: RegExp) => {
     fireEvent.mouseDown(screen.getByRole("tab", { name: nombre }));
     fireEvent.click(screen.getByRole("tab", { name: nombre }));

@@ -60,7 +60,7 @@ const PLATOS = [
 
 async function abrir(props: Parameters<typeof BotonCartaImprimir>[0]) {
   render(<BotonCartaImprimir {...props} />);
-  fireEvent.click(screen.getByRole("button", { name: /Carta para imprimir/ }));
+  fireEvent.click(screen.getByRole("button", { name: /PDF Carta/ }));
   const dialogo = await screen.findByRole("dialog");
   await within(dialogo).findByText(/páginas A5/);
   return dialogo;
