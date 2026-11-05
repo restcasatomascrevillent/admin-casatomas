@@ -6,7 +6,8 @@ import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { EditorInstagram } from "@/components/marketing/instagram/EditorInstagram";
 import { CalendarioInstagram } from "@/components/instagram/programar";
 import { MetricasInstagram } from "@/components/instagram/metricas";
-import { EstudioReel, crearReelDesdeBase, type ReelPieza } from "@/components/instagram/reels";
+import { crearReelDesdeBase, type ReelPieza } from "@/components/instagram/reels";
+import { PestanaReels } from "@/components/instagram/video";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 
 /**
@@ -26,7 +27,8 @@ const CONTENIDO_PESTANA = "mt-0 flex-1 min-h-0 overflow-y-auto overscroll-contai
  * Pestañas (mismo patrón que Newsletter):
  *  · Crear: editor (formulario, vista previa y Publicar/Programar/Historial/Conexión).
  *  · Reels: montar un reel con las 5 bases de la marca y verlo animado
- *    (docs/instagram-reels.md). Aún sin MP4 ni publicar (fase 6).
+ *    (docs/instagram-reels.md), generar el MP4 y probarlo, publicarlo o
+ *    programarlo (docs/instagram-video.md).
  *  · Calendario: piezas programadas y publicadas (docs/instagram-programar.md).
  *  · Métricas: estadísticas de la cuenta y de cada publicación (docs/instagram-metricas.md).
  * `?tab=calendario` o `?tab=metricas` abre directamente esa pestaña.
@@ -39,6 +41,7 @@ export default function Instagram() {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_INSTAGRAM);
   const [reel, setReel] = useState<ReelPieza>(() => crearReelDesdeBase("del-mar"));
+  const [reelPiezaId, setReelPiezaId] = useState<string | null>(null);
   const [pestana, setPestana] = useState(() => {
     const pedida = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
     return PESTANAS.includes(pedida as (typeof PESTANAS)[number]) ? (pedida as string) : "crear";
@@ -65,7 +68,7 @@ export default function Instagram() {
 
           {/* Reels: el reel vive en la página para no perderlo al cambiar de pestaña. */}
           <TabsContent value="reels" className={`${CONTENIDO_PESTANA} lg:overflow-hidden`}>
-            {pestana === "reels" && <EstudioReel reel={reel} onChange={setReel} className="h-full min-h-0" />}
+            {pestana === "reels" && <PestanaReels reel={reel} onChange={setReel} piezaId={reelPiezaId} onPiezaId={setReelPiezaId} />}
           </TabsContent>
 
           {/* Calendario y Métricas solo se montan al abrirlas: así no consultan nada si no se miran. */}

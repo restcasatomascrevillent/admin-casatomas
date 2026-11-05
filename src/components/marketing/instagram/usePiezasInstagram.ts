@@ -7,7 +7,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 
-export type EstadoPieza = "borrador" | "generada" | "prueba_ok" | "publicada" | "error";
+/** «procesando»: reel que Meta aún procesa (migración 20261109100000, docs/instagram-video.md). */
+export type EstadoPieza = "borrador" | "generada" | "procesando" | "prueba_ok" | "publicada" | "error";
 
 /**
  * Fila de instagram_piezas. alt_text (20261107000000) e imagen_borrada_at

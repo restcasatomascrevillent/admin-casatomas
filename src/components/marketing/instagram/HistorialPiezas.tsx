@@ -9,6 +9,7 @@ import { usePiezasInstagram, type EstadoPieza, type PiezaInstagram } from "./use
 export const ETIQUETA_ESTADO: Record<EstadoPieza, { texto: string; clase: string }> = {
   borrador: { texto: "Borrador", clase: "bg-muted text-muted-foreground" },
   generada: { texto: "Generada", clase: "bg-sky-100 text-sky-800" },
+  procesando: { texto: "Instagram procesando", clase: "bg-violet-100 text-violet-800" },
   prueba_ok: { texto: "Prueba correcta", clase: "bg-amber-100 text-amber-900" },
   publicada: { texto: "Publicada", clase: "bg-emerald-100 text-emerald-800" },
   error: { texto: "Error", clase: "bg-red-100 text-red-800" },
@@ -45,11 +46,13 @@ export function HistorialPiezas({ baseFotos, actual, onAbrir }: Props) {
     );
   }
   if (error) return <p className="text-sm text-destructive">No se pudo cargar el historial.</p>;
-  if (!piezas?.length) return <p className="text-sm text-muted-foreground">Todavía no has generado ninguna pieza.</p>;
+  // Los reels se abren en la pestaña Reels (docs/instagram-video.md), no en este editor.
+  const imagenes = (piezas ?? []).filter((p) => (p as { tipo_medio?: string | null }).tipo_medio !== "reel");
+  if (!imagenes.length) return <p className="text-sm text-muted-foreground">Todavía no has generado ninguna pieza.</p>;
 
   return (
     <ul className="space-y-1.5" data-testid="historial-instagram">
-      {piezas.map((p) => {
+      {imagenes.map((p) => {
         const estado = ETIQUETA_ESTADO[p.estado] ?? ETIQUETA_ESTADO.borrador;
         const img = urlImagenPieza(baseFotos, p);
         const marca = NOMBRE_MARCA_CORTO[p.marca as MarcaId] ?? MARCAS[p.marca as MarcaId]?.nombre ?? p.marca;
