@@ -88,6 +88,8 @@ jobs:
         run: npm run test:instagram-servidor:db
       - name: IA de textos de Instagram, guías de marca y sugerencias (PGlite)
         run: npm run test:instagram-ia:db
+      - name: Reels en MP4, cola de render, cubo de vídeo y reels «procesando» (PGlite)
+        run: npm run test:instagram-video:db
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
         run: npx vitest run api/
         env:
