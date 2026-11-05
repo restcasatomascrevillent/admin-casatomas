@@ -159,6 +159,26 @@ Están en `_shared/instagram/validar-ia.ts`. Pasan después del modelo y antes d
 
 Si las 3 propuestas se descartan, se pide **una vez más** al modelo con los motivos (sin datos del usuario). Si vuelven a fallar, responde 422.
 
+## Montar con IA (`montar_pieza`, 05/11/2026)
+
+De 1 a 10 fotos → la publicación montada. Contrato: `src/lib/instagram/montar.ts` (copia literal en `supabase/functions/_shared/instagram/montar.ts`; `montar.test.ts` comprueba que son iguales salvo la importación del tipo de marca). Lógica: `supabase/functions/instagram-ia/montar.ts`. Panel: `montarPieza()` en `src/components/instagram/ia/api.ts` (la pantalla que la llama la hace otro agente).
+
+```jsonc
+{ "accion": "montar_pieza", "marca": "casa-tomas",
+  "fotos": [{ "id": "drive:<id>", "url": "https://<proyecto>.supabase.co/storage/v1/object/public/instagram/tmp/<uuid>.jpg" }],
+  "formato": "auto",          // o "post" | "carrusel" | "story"
+  "indicacion": "llegó bonito del Cantábrico", "tono": "cercano" }
+```
+
+Respuesta 200: `RespuestaMontar` (formato, diapositivas `{ foto, plantilla, datos, altText }` en orden de publicación con la portada primero, caption, hashtags, horaSugerida `AAAA-MM-DDTHH:MM` de Madrid o null, resumen y avisos) más `sugerenciaId`, `modelo` y `descartadas`. Errores: 400 (con `tipo: "foto_no_valida"` si una foto no es de nuestro bucket), 422 (`tipo: "rechazada"`), 429 (`tipo: "cupo"`), 502/503 (`tipo: "ia_no_disponible"` cuando es OpenAI o la clave).
+
+- **Fotos**: solo la copia `tmp/<uuid>` del bucket «instagram» de este Supabase o fotos de los buckets «platos» / «vinos»; la URL se reconstruye desde la ruta (sin SSRF). Ids `drive:`, `carta:`, `vino:` o `subida:`, sin repetir.
+- **Formato**: `auto` → 1 foto post, 2-10 carrusel. Uno fijo manda (un post o story con varias fotos se queda con la que elija la IA y se avisa; un carrusel necesita 2). En el carrusel cada imagen es un «post» 4:5.
+- **Visión**: las fotos van todas al modelo de texto (`gpt-5.6-luna`) en una sola llamada, con `detail: "high"` hasta 3 fotos y `"low"` desde 4. Sin paso previo con `gpt-4.1` (con 10 fotos saldría caro).
+- **Contexto**: guía de la marca, carta (con descripción si está la RPC `instagram_ia_contexto` de la fase 2; si no, los nombres), nombres de Vinos con D.O. y uva, el plato o vino de cada foto de la carta, fechas y novedades de las 3 semanas siguientes y «Qué funciona» si existe.
+- **Validadores**: el texto pasa los de `sugerir_texto` (precios: en un montaje ninguno vale; alérgenos, platos, datos personales, TOUZA sin reservas, límites de Instagram); los rótulos de cada imagen pasan los de `sugerir_rotulos` con los límites de **su** plantilla; la plantilla tiene que existir, ser de la marca, admitir el formato y llevar foto (si no, se corrige a la de foto de la marca y se avisa); las fotos devueltas tienen que ser las recibidas (las que no, o repetidas, se quitan con aviso); de 3 a 5 hashtags; hora dentro de los 30 días siguientes. Si no pasa, un reintento con los motivos y, si sigue mal, 422.
+- **Cupo y coste**: el mismo cupo diario (filas de `instagram_sugerencias_ia`, tipo `montar_pieza`) y el mismo registro en `ia_uso`. Hace falta la migración `20261111090000_instagram_montar.sql` (solo amplía el CHECK de `tipo`; rollback en `supabase/rollbacks/`). Sin ella, montar funciona pero no guarda la sugerencia ni cuenta para el cupo.
+
 ## Base de datos
 
 Migración `20261108000000_instagram_ia.sql`:

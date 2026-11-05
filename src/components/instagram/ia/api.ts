@@ -7,6 +7,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { auditDeviceId } from "@/lib/audit-device";
 import type { FormatoId, MarcaId } from "@/lib/instagram";
+import type { PeticionMontar, RespuestaMontar } from "@/lib/instagram/montar";
 
 const SUPABASE_URL = String(import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, "");
 const CLAVE_PUBLICA = String(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "");
@@ -236,6 +237,46 @@ export async function sugerirRotulos(ctx: ContextoPiezaIA, p: PeticionIA, opts?:
     avisos: textos((v as { avisos?: unknown } | null)?.avisos),
   }));
   return { ...normalizarBase(c), variantes };
+}
+
+/** Respuesta de «Montar con IA» (contrato en src/lib/instagram/montar.ts) más el registro de la sugerencia. */
+export interface RespuestaMontarIA extends RespuestaMontar {
+  sugerenciaId: string | null;
+  modelo: string;
+  descartadas: Array<{ motivos: string[] }>;
+}
+
+/**
+ * «Montar con IA»: de 1 a 10 fotos ya preparadas (URL tmp/ de nuestro bucket,
+ * o de los buckets «platos» / «vinos») → publicación montada: formato, orden,
+ * plantilla, rótulos y texto alternativo de cada imagen, caption, hashtags,
+ * hora sugerida, resumen y avisos. Solo propone.
+ */
+export async function montarPieza(p: Omit<PeticionMontar, "accion">, opts?: OpcionesLlamada): Promise<RespuestaMontarIA> {
+  const c = await llamar({ accion: "montar_pieza", ...p, indicacion: p.indicacion?.trim() || undefined }, opts);
+  const diapositivas = (Array.isArray(c.diapositivas) ? c.diapositivas : []).map((d) => {
+    const o = (d ?? {}) as Record<string, unknown>;
+    return {
+      foto: texto(o.foto),
+      plantilla: texto(o.plantilla),
+      datos: o.datos && typeof o.datos === "object" ? (o.datos as Record<string, unknown>) : {},
+      altText: texto(o.altText),
+    };
+  });
+  const formato = c.formato === "carrusel" || c.formato === "story" ? c.formato : "post";
+  return {
+    ok: true,
+    formato,
+    diapositivas,
+    caption: texto(c.caption),
+    hashtags: textos(c.hashtags),
+    horaSugerida: typeof c.horaSugerida === "string" ? c.horaSugerida : null,
+    resumen: texto(c.resumen),
+    avisos: textos(c.avisos),
+    sugerenciaId: typeof c.sugerenciaId === "string" ? c.sugerenciaId : null,
+    modelo: texto(c.modelo),
+    descartadas: normalizarBase(c).descartadas,
+  };
 }
 
 // La tabla es nueva (20261108000000_instagram_ia.sql) y aún no está en

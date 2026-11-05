@@ -7,7 +7,8 @@
  *   Authorization: Bearer <JWT del panel> (usuario con Marketing en edición)
  *
  *   Cuerpo común:
- *     { accion: "sugerir_texto" | "sugerir_rotulos",   (proponer_campana e ideas_semana: campanas.ts)
+ *     { accion: "sugerir_texto" | "sugerir_rotulos",   (proponer_campana e ideas_semana: campanas.ts;
+ *                                                       montar_pieza: montar.ts)
  *       marca: "casa-tomas" | "touza", formato: "post" | "story", plantilla: "<id>",
  *       tono?: "cercano" | "elegante" | "retranca"      (por defecto cercano),
  *       indicaciones?: string (≤ 500; se quitan correos y teléfonos),
@@ -91,6 +92,7 @@ import {
   type FilaVino,
 } from "./vision.ts";
 import { ACCIONES_PLANIFICACION, manejarPlanificacion } from "./campanas.ts";
+import { manejarMontar } from "./montar.ts";
 import { plantillaIA } from "./plantillas.ts";
 import {
   ESQUEMA_ROTULOS,
@@ -175,7 +177,7 @@ export function validarEntrada(valor: unknown): { ok: true; entrada: EntradaIA }
   if (!valor || typeof valor !== "object" || Array.isArray(valor)) return { ok: false, error: "El cuerpo debe ser un objeto JSON" };
   const o = valor as Record<string, unknown>;
   if (o.accion !== "sugerir_texto" && o.accion !== "sugerir_rotulos") {
-    return { ok: false, error: "accion debe ser «sugerir_texto», «sugerir_rotulos», «proponer_campana» o «ideas_semana»" };
+    return { ok: false, error: "accion debe ser «sugerir_texto», «sugerir_rotulos», «proponer_campana», «ideas_semana» o «montar_pieza»" };
   }
   if (o.marca !== "casa-tomas" && o.marca !== "touza") return { ok: false, error: "marca debe ser «casa-tomas» o «touza»" };
   const formato = o.formato ?? "post";
@@ -447,7 +449,7 @@ export async function pedirModelo(
 
 // ── Manejador ───────────────────────────────────────────────────────────────
 
-function platoParaModelo(p: PlatoContexto | null): Record<string, unknown> | null {
+export function platoParaModelo(p: PlatoContexto | null): Record<string, unknown> | null {
   if (!p) return null;
   return {
     nombre: p.nombre,
@@ -474,6 +476,8 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   if (ACCIONES_PLANIFICACION.includes(accion as never)) {
     return manejarPlanificacion(cuerpo.valor, { sesion: s, env, fetch: f, deps });
   }
+  // «Montar con IA»: fotos → publicación montada (montar.ts).
+  if (accion === "montar_pieza") return manejarMontar(cuerpo.valor, { sesion: s, env, fetch: f, deps });
   const v = validarEntrada(cuerpo.valor);
   if (!v.ok) return json(400, { ok: false, error: v.error });
   const e = v.entrada;

@@ -3,7 +3,7 @@
  * lee lo que la IA ha visto: vino, foto y aviso de rótulos con propuesta.
  */
 import { describe, expect, it, vi } from "vitest";
-import { sugerirTexto } from "../api";
+import { montarPieza, sugerirTexto } from "../api";
 
 describe("api de la IA: la foto", () => {
   it("manda fotoUrl y lee vino, foto y rótulos", async () => {
@@ -40,5 +40,32 @@ describe("api de la IA: la foto", () => {
     expect(JSON.parse(String(f.mock.calls[0][1].body)).fotoUrl).toBeUndefined();
     expect(r.rotulos).toBeNull();
     expect(r.vino).toBeNull();
+  });
+});
+
+describe("api de la IA: montar con IA", () => {
+  it("manda montar_pieza con las fotos y lee la publicación montada", async () => {
+    const f = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          formato: "carrusel",
+          diapositivas: [{ foto: "drive:b", plantilla: "ct-foto-titular", datos: { titular: "Centolla" }, altText: "Centolla." }],
+          caption: "Texto.",
+          hashtags: ["#Marisco"],
+          horaSugerida: "2026-11-07T13:00",
+          resumen: "2 fotos de marisco.",
+          avisos: [],
+          sugerenciaId: null,
+          modelo: "gpt-5.6-luna",
+          descartadas: [],
+        }),
+        { status: 200 },
+      ),
+    );
+    const fotos = [{ id: "drive:a", url: "https://x/a.jpg" }, { id: "drive:b", url: "https://x/b.jpg" }];
+    const r = await montarPieza({ marca: "casa-tomas", fotos, formato: "auto", indicacion: "  para el finde " }, { fetch: f as unknown as typeof fetch, token: "jwt" });
+    expect(JSON.parse(String(f.mock.calls[0][1].body))).toEqual({ accion: "montar_pieza", marca: "casa-tomas", fotos, formato: "auto", indicacion: "para el finde" });
+    expect(r).toMatchObject({ formato: "carrusel", diapositivas: [{ foto: "drive:b", datos: { titular: "Centolla" } }], horaSugerida: "2026-11-07T13:00" });
   });
 });
