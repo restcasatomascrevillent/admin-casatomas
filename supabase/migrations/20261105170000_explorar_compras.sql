@@ -152,14 +152,15 @@ end;
 $$;
 
 -- ── Clave de una dimensión (eje o desglose) ────────────────────────────────
--- SIN `set search_path` a propósito: así Postgres la «inlinea» (con SET no
--- puede) y no cuesta una llamada por línea (×7 más rápido con 12.000 líneas).
+-- SIN `set search_path` y STABLE (no IMMUTABLE) a propósito: así Postgres la
+-- «inlinea» (con SET no puede, y to_char es STABLE: declarada IMMUTABLE
+-- tampoco) y no cuesta una llamada por línea (~25 µs × 2 × 12.000 líneas).
 -- Solo usa funciones de pg_catalog, escritas con su esquema.
 create or replace function public.explorar_compras_clave(
   p_dim text, p_fecha date, p_prov_k text, p_loc text, p_tipo text, p_fam bigint, p_prod text)
 returns text
 language sql
-immutable
+stable
 as $$
   select case p_dim
     when 'dia'       then pg_catalog.to_char(p_fecha, 'YYYY-MM-DD')
