@@ -97,11 +97,11 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         ],
       },
       {
-        titulo: "Preguntar a la IA",
+        titulo: "Análisis: el tablero y la IA",
         pasos: [
-          "Para preguntas como «¿cuánto gastamos en carne este mes?», ve a «Análisis». Puedes tocar una pregunta de ejemplo o escribirla con tus palabras y pulsar la flecha. Las gráficas se quedan en el tablero; toca una para preguntar sobre ella.",
-          "Para lo más habitual, despliega «Al instante»: gasto de este mes, gasto por mes, mejores proveedores, productos más comprados, por revisar, con avisos, sin total, gasto por categoría, qué ha subido de precio y la evolución del precio de un producto. Salen al momento y no gastan IA.",
-          "A la izquierda (en la tablet, en «Historial») quedan tus conversaciones anteriores. Arriba a la derecha ves lo que ha costado la IA este mes; si se acerca al tope, se pone en naranja o rojo.",
+          "En «Análisis» el tablero sale hecho: gasto con IVA por mes (Casa Tomás y Touza), los proveedores a los que más compras, lo que más ha subido de precio, el precio de un producto, el gasto por familia, los gastos fijos al mes, los abonos y Casa Tomás frente a Touza. Arriba eliges el periodo (mes, trimestre, año o todo) y el local. No gasta IA.",
+          "Toca un mes para ver sus documentos en «Compras», o un proveedor para abrirlo allí. Toca un producto de «Lo que más ha subido» para ver su precio con cada proveedor. Si «Gasto por familia» avisa de líneas sin clasificar, «Clasificar con IA» te lleva a «Productos».",
+          "Para lo demás, pulsa «Pregúntale a la IA»: sale un panel a la derecha con sugerencias y una caja para escribir con tus palabras. Si la respuesta trae una gráfica, «Fijar en el tablero» la deja al final del tablero. Tus conversaciones están en «Historial», dentro del panel. Arriba a la derecha ves lo que ha costado la IA este mes.",
         ],
       },
     ],
@@ -154,7 +154,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cómo veo si un producto ha subido de precio?",
         respuesta:
-          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. También puedes usar «Qué ha subido de precio» o «Evolución de precio» en «Al instante», en la pestaña «Análisis».",
+          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. En «Análisis» tienes «Lo que más ha subido» y «Precio de un producto», ya hechos.",
       },
       {
         pregunta: "¿Dónde veo el papel original?",
@@ -169,7 +169,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cuánto cuesta usar la IA?",
         respuesta:
-          "Poco: cada pregunta al chatbot y cada documento leído cuestan céntimos. Lo ves arriba a la derecha (en «Análisis», lo del chatbot; en «Cargar», lo de leer documentos) y al tocarlo sale el detalle. Los botones de «Al instante» no gastan nada: leen tus datos directamente.",
+          "Poco: cada pregunta al chatbot y cada documento leído cuestan céntimos. Lo ves arriba a la derecha (en «Análisis», lo del chatbot; en «Cargar», lo de leer documentos) y al tocarlo sale el detalle. El tablero de «Análisis» no gasta nada: lee tus datos directamente.",
       },
     ],
   },

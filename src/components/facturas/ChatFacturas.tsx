@@ -1,51 +1,71 @@
-// Pestaña «Análisis» de Facturas: COPILOTO CENTRADO EN GRÁFICAS (05/11/2026).
+// Pestaña «Análisis» de Facturas (rediseño del 05/11/2026): TABLERO DE
+// GRÁFICAS FIJAS que sale hecho al abrirla, con el copiloto de IA PLEGADO.
 //
-// Antes era un chat; ahora las gráficas son lo principal:
-//   · Tablero (centro, grande): las gráficas de la IA y las respuestas «al
-//     instante» como tarjetas que se quedan fijadas, con chips «pregúntale más».
-//   · Copiloto (a un lado, estrecho; abajo y plegable en tablet vertical):
-//     la caja para preguntar, sugerencias y las respuestas cortas.
-//   · Tocar una tarjeta la selecciona: la siguiente pregunta lleva su contexto.
-//   · El historial de conversaciones va plegado en un panel lateral (Sheet).
-// Sin scroll de página: solo hacen scroll el tablero y el hilo del copiloto.
+//   · Barra: periodo [Mes · Trimestre · Año · Todo] (por defecto, el año),
+//     local [Todos · Casa Tomás · Touza] y un único «Pregúntale a la IA».
+//   · Tablero (lo único que hace scroll): indicadores, gasto por mes,
+//     proveedores, lo que más ha subido, precio de un producto, familias,
+//     gastos fijos, abonos y Casa Tomás frente a Touza. Datos: UNA llamada a
+//     la RPC `tablero_compras` (useTableroCompras).
+//   · Tocar un mes o un proveedor abre Compras filtrado (`onIrA`); tocar un
+//     producto que sube lo abre en «Precio de un producto».
+//   · Copiloto: panel lateral (CopilotoLateral) con el historial dentro; sus
+//     gráficas se pueden fijar al final del tablero.
 //
-// Se sigue llamando ChatFacturas (y expone `enviarConsulta`) para no tocar
-// la página: el «Preguntar a la IA» de Compras sigue funcionando igual.
-import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
-import { Eraser, History, Plus } from "lucide-react";
-import { useChatFacturas, type Conversacion, type MensajeChat } from "@/hooks/useChatFacturas";
-import { usePreguntasRapidas } from "@/hooks/usePreguntasRapidas";
-import { useTableroGraficas } from "@/hooks/useTableroGraficas";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+// Se sigue llamando ChatFacturas y expone `enviarConsulta`: el «Preguntar a la
+// IA» de una factura en Compras abre el panel y pregunta.
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Loader2, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useChatFacturas, type Conversacion } from "@/hooks/useChatFacturas";
+import { useTableroCompras } from "@/hooks/useTableroCompras";
+import { useGraficasFijadas } from "@/hooks/useGraficasFijadas";
+import { FILTROS_LOCAL, textoPeriodo, type FiltroLocal } from "@/lib/facturas/resumenCompras";
 import {
-  contextoTarjeta,
-  idDomTarjeta,
-  tarjetasTablero,
-  tituloTarjeta,
-  type ChipSeguimiento,
-  type Tarjeta,
-} from "@/lib/facturas/tableroGraficas";
-import { ConversacionesList } from "./ConversacionesList";
-import { PREGUNTAS_RAPIDAS } from "./preguntas-rapidas/catalogo";
-import { BarraPreguntasRapidas } from "./preguntas-rapidas/PreguntasRapidas";
-import { TableroGraficas } from "./copiloto/TableroGraficas";
-import { PanelCopiloto, type Sugerencia } from "./copiloto/PanelCopiloto";
-
-export type { Sugerencia } from "./copiloto/PanelCopiloto";
+  ENLACE_PRODUCTOS_COMPRAS,
+  enlaceMesCompras,
+  enlaceProveedorCompras,
+  fechasPeriodo,
+  localRpc,
+  PERIODO_ANALISIS_POR_DEFECTO,
+  periodosAnalisis,
+  sugerenciasDeTablero,
+  type PeriodoAnalisis,
+} from "@/lib/facturas/tableroCompras";
+import { TableroCompras } from "./analisis/TableroCompras";
+import { ErrorTablero, EsqueletoTablero, Segmentado } from "./analisis/piezas";
+import { CopilotoLateral } from "./copiloto/CopilotoLateral";
 
 export interface ChatFacturasRef {
   enviarConsulta: (texto: string) => void;
 }
 
 interface ChatFacturasProps {
-  sugerencias?: Sugerencia[];
+  /** Abre otra vista del panel con estos parámetros de URL (`?tab=compras&…`). */
+  onIrA?: (enlace: string) => void;
 }
 
-const BOTON_BARRA =
-  "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const PRESET_TEXTO: Record<PeriodoAnalisis, "este_mes" | "trimestre" | "anio" | "todo"> = {
+  mes: "este_mes",
+  trimestre: "trimestre",
+  anio: "anio",
+  todo: "todo",
+};
 
-export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ sugerencias }, ref) => {
+export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA }, ref) => {
+  const [hoy] = useState(() => new Date());
+  const [periodo, setPeriodo] = useState<PeriodoAnalisis>(PERIODO_ANALISIS_POR_DEFECTO);
+  const [local, setLocal] = useState<FiltroLocal>("todos");
+  const [producto, setProducto] = useState<string | null>(null);
+  const [abierto, setAbierto] = useState(false);
+  const [verHistorial, setVerHistorial] = useState(false);
+  const buscadorRef = useRef<HTMLInputElement>(null);
+
+  const fechas = useMemo(() => fechasPeriodo(periodo, hoy), [periodo, hoy]);
+  const tablero = useTableroCompras(fechas.desde, fechas.hasta, localRpc(local));
+  const { fijadas, fijar, quitar } = useGraficasFijadas();
+  const idsFijadas = useMemo(() => new Set(fijadas.map((g) => g.id)), [fijadas]);
+
   const {
     conversaciones,
     conversacionActiva,
@@ -59,155 +79,125 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ su
     eliminarConversacion,
   } = useChatFacturas();
 
-  // Preguntas rápidas (sin IA): resultados solo en memoria, fuera de
-  // `mensajes`; ver usePreguntasRapidas.ts. Se vacían al cambiar a mano de
-  // conversación (no cuando la primera pregunta libre crea una nueva).
-  const rapidas = usePreguntasRapidas({ catalogo: PREGUNTAS_RAPIDAS });
-  const tablero = useTableroGraficas(conversacionActiva?.id ?? null);
-  const [historialAbierto, setHistorialAbierto] = useState(false);
-
-  const tarjetas = useMemo(
-    () => tarjetasTablero(mensajes, rapidas.resultados, tablero.ocultas),
-    [mensajes, rapidas.resultados, tablero.ocultas],
-  );
-  const seleccionada = tarjetas.find((t) => t.id === tablero.seleccionadaId) ?? null;
-  const preguntaDe = (t: Tarjeta) =>
-    t.origen === "rapida" ? PREGUNTAS_RAPIDAS.find((p) => p.id === t.resultado.preguntaId) : undefined;
-  const titulo = (t: Tarjeta) => tituloTarjeta(t, preguntaDe(t)?.etiqueta);
-
-  const empezarDeCero = () => {
-    rapidas.limpiar();
-    tablero.seleccionar(null);
-  };
-  const abrirConversacion = (conv: Conversacion) => {
-    empezarDeCero();
-    setHistorialAbierto(false);
-    return seleccionarConversacion(conv);
-  };
-  const nueva = () => {
-    empezarDeCero();
-    setHistorialAbierto(false);
-    return nuevaConversacion();
-  };
-
-  /** Pregunta a la IA; con una tarjeta seleccionada, sobre ella. */
-  const preguntar = (texto: string, sobre: Tarjeta | null = seleccionada) =>
-    enviarMensaje(texto, { contexto: sobre ? contextoTarjeta(sobre, preguntaDe(sobre)) : null });
-
-  const seguimiento = (t: Tarjeta, chip: ChipSeguimiento) => {
-    tablero.seleccionar(t.id);
-    void preguntar(chip.pregunta, t);
-  };
-
-  const quitar = (t: Tarjeta) => {
-    if (t.origen === "ia") tablero.ocultar([t.id]);
-    else rapidas.descartar(t.id);
-    if (tablero.seleccionadaId === t.id) tablero.seleccionar(null);
-  };
-
-  const limpiarTablero = () => {
-    tablero.ocultar(tarjetas.filter((t) => t.origen === "ia").map((t) => t.id));
-    rapidas.limpiar();
-    tablero.seleccionar(null);
-  };
-
-  const graficasDe = (m: MensajeChat) =>
-    tarjetas.filter((t) => t.origen === "ia" && t.mensajeId === m.id).map((t) => t.id);
-
-  const verGrafica = (id: string) => {
-    const el = document.getElementById(idDomTarjeta(id));
-    if (!el) return;
-    el.scrollIntoView?.({ behavior: "smooth", block: "start" });
-    el.focus({ preventScroll: true });
-  };
+  const sugerencias = useMemo(() => sugerenciasDeTablero(tablero.data, periodo), [tablero.data, periodo]);
 
   useImperativeHandle(ref, () => ({
-    // «Preguntar a la IA» desde Compras: pregunta general, sin gráfica.
     enviarConsulta: (texto: string) => {
-      tablero.seleccionar(null);
+      setVerHistorial(false);
+      setAbierto(true);
       void enviarMensaje(texto);
     },
   }));
 
-  const barra = (
-    <div className="flex shrink-0 flex-wrap items-start gap-x-1 pb-1">
-      <Sheet open={historialAbierto} onOpenChange={setHistorialAbierto}>
-        <SheetTrigger asChild>
-          <button type="button" className={BOTON_BARRA} data-tour="facturas-ia-historial">
-            <History className="h-4 w-4" aria-hidden />
-            Historial
-            {conversaciones.length > 0 && (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold leading-none text-muted-foreground">
-                {conversaciones.length}
-              </span>
-            )}
-          </button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-[85vw] max-w-72 p-0">
-          <SheetHeader className="border-b border-border/50 px-4 py-3">
-            <SheetTitle className="text-sm">Historial de análisis</SheetTitle>
-          </SheetHeader>
-          <ConversacionesList
-            conversaciones={conversaciones}
-            conversacionActiva={conversacionActiva}
-            onSeleccionar={abrirConversacion}
-            onNueva={nueva}
-            onEliminar={eliminarConversacion}
-          />
-        </SheetContent>
-      </Sheet>
-      <button type="button" onClick={nueva} className={BOTON_BARRA} disabled={isSending} title="Empezar un análisis nuevo (el actual queda en el historial)">
-        <Plus className="h-4 w-4 text-[hsl(38,59%,45%)]" aria-hidden />
-        Nuevo
-      </button>
-      <BarraPreguntasRapidas
-        className="min-w-0 flex-1 pt-[0.375rem] pointer-coarse:pt-0"
-        catalogo={PREGUNTAS_RAPIDAS}
-        cargando={rapidas.cargando}
-        noDisponible={rapidas.noDisponible}
-        onPreguntar={(id, parametros) => rapidas.lanzar(id, mensajes.length, parametros)}
+  const elegirProducto = (p: string | null) => {
+    setProducto(p);
+    // Desde «Lo que más ha subido»: llevar la vista a «Precio de un producto».
+    requestAnimationFrame(() => {
+      const tarjeta = document.querySelector<HTMLElement>("[data-testid='tarjeta-precio-producto']");
+      tarjeta?.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
+      if (!p) buscadorRef.current?.focus();
+    });
+  };
+  const abrirConversacion = (c: Conversacion) => {
+    setVerHistorial(false);
+    return seleccionarConversacion(c);
+  };
+  const nueva = () => {
+    setVerHistorial(false);
+    return nuevaConversacion();
+  };
+
+  const datos = tablero.data;
+  let cuerpo;
+  if (tablero.isLoading) cuerpo = <EsqueletoTablero />;
+  else if (tablero.isError && !datos)
+    cuerpo = <ErrorTablero mensaje={(tablero.error as Error)?.message ?? ""} onReintentar={() => void tablero.refetch()} />;
+  else if (!datos || datos.sinDatos)
+    cuerpo = (
+      <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed border-border p-6" role="status">
+        <p className="text-sm text-muted-foreground">
+          No hay documentos en {periodo === "todo" ? "el histórico" : textoPeriodo({ tipo: PRESET_TEXTO[periodo] }, hoy).toLowerCase()}
+          {local !== "todos" ? ` de ${local === "touza" ? "Touza" : "Casa Tomás"}` : ""}.
+        </p>
+        {periodo !== "todo" && (
+          <Button type="button" variant="outline" className="h-11" onClick={() => setPeriodo("todo")}>
+            Ver todo el histórico
+          </Button>
+        )}
+      </div>
+    );
+  else
+    cuerpo = (
+      <TableroCompras
+        ref={buscadorRef}
+        datos={datos}
+        apilado={local === "todos"}
+        producto={producto}
+        onProducto={elegirProducto}
+        onMes={(mes) => onIrA?.(enlaceMesCompras(mes))}
+        onProveedor={(id) => onIrA?.(enlaceProveedorCompras(id))}
+        onClasificar={() => onIrA?.(ENLACE_PRODUCTOS_COMPRAS)}
+        fijadas={fijadas}
+        onQuitarFijada={quitar}
       />
-      <button
-        type="button"
-        onClick={limpiarTablero}
-        disabled={tarjetas.length === 0}
-        className={cn(BOTON_BARRA, "ml-auto")}
-        aria-label="Quitar todas las gráficas del tablero"
-        title="Quitar todas las gráficas del tablero (las conversaciones siguen en el historial)"
-      >
-        <Eraser className="h-4 w-4" aria-hidden />
-        <span className="hidden sm:inline">Limpiar</span>
-      </button>
-    </div>
-  );
+    );
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col gap-2 overflow-hidden lg:flex-row lg:gap-3">
-      <TableroGraficas
-        tarjetas={tarjetas}
-        catalogo={PREGUNTAS_RAPIDAS}
-        seleccionadaId={seleccionada?.id ?? null}
-        onAlternarSeleccion={tablero.alternarSeleccion}
-        onQuitar={quitar}
-        onSeguimiento={seguimiento}
-        onAtajo={(id, parametros) => rapidas.lanzar(id, mensajes.length, parametros)}
-        cargandoAtajo={rapidas.cargando}
-        atajoNoDisponible={rapidas.noDisponible}
-        cargando={isLoading}
-        pensando={isSending}
-        barra={barra}
-      />
-      <PanelCopiloto
+    <div className="flex h-full min-h-0 w-full flex-col gap-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-2" data-tour="facturas-analisis-barra">
+        <Segmentado<PeriodoAnalisis> etiqueta="Periodo" opciones={periodosAnalisis(hoy)} valor={periodo} onCambio={setPeriodo} />
+        <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} />
+        {tablero.isFetching && !tablero.isLoading && (
+          <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Actualizando…
+          </span>
+        )}
+        <Button
+          type="button"
+          className="ml-auto h-11 gap-1.5"
+          // Abre y cierra el panel (no es modal: el botón sigue a mano con él abierto).
+          onClick={() => {
+            setVerHistorial(false);
+            setAbierto((v) => !v);
+          }}
+          aria-expanded={abierto}
+          aria-controls={abierto ? "copiloto-lateral" : undefined}
+          data-tour="facturas-ia-abrir"
+        >
+          <Sparkles className="h-4 w-4" aria-hidden />
+          Pregúntale a la IA
+        </Button>
+      </div>
+
+      <div
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        role="region"
+        aria-label="Tablero de compras"
+        data-testid="tablero-analisis"
+        data-tour="facturas-analisis-tablero"
+      >
+        {cuerpo}
+      </div>
+
+      <CopilotoLateral
+        abierto={abierto}
+        onAbiertoCambia={setAbierto}
+        verHistorial={verHistorial}
+        onVerHistorial={setVerHistorial}
+        conversaciones={conversaciones}
+        conversacionActiva={conversacionActiva}
+        onSeleccionarConversacion={abrirConversacion}
+        onNuevaConversacion={nueva}
+        onEliminarConversacion={eliminarConversacion}
         mensajes={mensajes}
         isLoading={isLoading}
         isSending={isSending}
         sugerencias={sugerencias}
-        onEnviar={(texto) => void preguntar(texto)}
+        onEnviar={(texto) => void enviarMensaje(texto)}
         onRegenerar={regenerarRespuesta}
-        seleccion={seleccionada ? titulo(seleccionada) : null}
-        onQuitarSeleccion={() => tablero.seleccionar(null)}
-        graficasDe={graficasDe}
-        onVerGrafica={verGrafica}
+        fijadas={idsFijadas}
+        onFijar={fijar}
+        onQuitarFijada={quitar}
       />
     </div>
   );

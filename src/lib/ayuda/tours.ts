@@ -194,13 +194,13 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       opcional: true,
       lado: "left",
     },
-    // --- IA (solo se señala: el tour nunca envía preguntas, cuestan dinero) ---
+    // --- Análisis (solo se señala: el tour nunca envía preguntas, cuestan dinero) ---
     {
       elemento: F_IA,
       pestana: F_IA,
-      titulo: "3. Análisis con gráficas",
+      titulo: "3. Análisis: tus compras en gráficas",
       texto:
-        "En «Análisis» le preguntas a la aplicación por tus compras, con tus palabras, y las gráficas se quedan en un tablero. Responde con los datos de tus facturas y albaranes. Te enseñamos sus partes.",
+        "En «Análisis» tienes un tablero que sale hecho: lo que gastas, a quién, qué ha subido de precio y tus gastos fijos. Las cuentas son las de tus facturas y albaranes. Te enseñamos sus partes.",
       lado: "bottom",
     },
     {
@@ -208,55 +208,55 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_IA,
       titulo: "Lo que cuesta la IA",
       texto:
-        "Aquí arriba ves lo que ha costado este mes preguntar al asistente (suelen ser céntimos). Tócalo para ver el detalle. Si se acerca al tope de gasto, se pone en naranja o en rojo.",
+        "Aquí arriba ves lo que ha costado este mes preguntar a la IA (suelen ser céntimos). Tócalo para ver el detalle. Si se acerca al tope de gasto, se pone en naranja o en rojo. El tablero no gasta nada.",
       opcional: true,
       lado: "bottom",
     },
     {
-      elemento: "facturas-ia-historial",
+      elemento: "facturas-analisis-barra",
       pestana: F_IA,
-      titulo: "Tus conversaciones",
+      titulo: "Periodo y local",
       texto:
-        "Aquí se guardan los análisis que ya has hecho, con su fecha. Toca uno para volver a él con sus gráficas y seguir donde lo dejaste. «Nuevo» empieza de cero.",
+        "Elige qué mirar: este mes, el trimestre, el año o todo; y los dos locales juntos o solo Casa Tomás o Touza. Todo el tablero cambia a la vez.",
       opcional: true,
       lado: "bottom",
     },
     {
-      elemento: "facturas-ia-tablero",
+      elemento: "facturas-analisis-indicadores",
       pestana: F_IA,
-      titulo: "El tablero de gráficas",
+      titulo: "Las cifras del periodo",
       texto:
-        "Cada gráfica que pidas se queda aquí como una tarjeta, la más nueva arriba. Toca una para seleccionarla: lo siguiente que preguntes irá sobre ella. Debajo tienes botones para preguntar más («solo los últimos 3 meses», «¿por qué subió?»). La X la quita.",
+        "Lo gastado con IVA (y cuánto cambia frente al mismo periodo anterior, si está cargado), los abonos, lo que te han regalado o descontado y los albaranes que aún no tienen factura.",
       opcional: true,
-      lado: "right",
+      lado: "bottom",
     },
     {
-      elemento: "facturas-ia-sugerencias",
+      elemento: "facturas-analisis-tablero",
       pestana: F_IA,
-      titulo: "Preguntas de ejemplo",
+      titulo: "Las gráficas",
       texto:
-        "Si no sabes por dónde empezar, toca una de estas: «¿Cuánto hemos gastado en octubre?», las facturas de un proveedor, sus albaranes de esta semana o lo que más compráis. Se pregunta sola al tocarla.",
+        "Toca un mes para ver sus documentos o un proveedor para abrirlo en «Compras». Toca un producto de «Lo que más ha subido» para ver su precio con cada proveedor. En «Gasto por familia» te avisa de las líneas sin clasificar.",
       opcional: true,
       lado: "top",
     },
     {
-      elemento: "facturas-ia-al-instante",
+      elemento: "facturas-ia-abrir",
       pestana: F_IA,
-      abrir: "facturas-ia-al-instante-abrir",
-      titulo: "Al instante",
+      titulo: "Pregúntale a la IA",
       texto:
-        "Son las respuestas rápidas: salen al momento, sin escribir y sin gastar IA. Gasto de este mes, gasto por mes, mejores proveedores, productos más comprados, documentos por revisar, con avisos o sin total, gasto por categoría, qué ha subido de precio y la evolución del precio de un producto.",
+        "Para lo que no esté en el tablero, abre la IA y pregúntale con tus palabras. Sale un panel a la derecha; el tablero sigue a la vista.",
       opcional: true,
-      lado: "top",
+      lado: "bottom",
     },
     {
       elemento: "facturas-ia-pregunta",
       pestana: F_IA,
+      abrir: "facturas-ia-abrir",
       titulo: "Escribe tu pregunta",
       texto:
-        "Para todo lo demás, escríbela aquí con tus palabras y pulsa la flecha para enviarla. Por ejemplo: «¿Cuánto gastamos en carne en septiembre?» o «¿Qué proveedor nos vende más caro el aceite?».",
+        "Toca una sugerencia o escribe aquí y pulsa la flecha. Si la respuesta trae una gráfica, «Fijar en el tablero» la deja al final del tablero. Tus conversaciones están en «Historial», dentro del panel.",
       opcional: true,
-      lado: "top",
+      lado: "left",
     },
     PASO_FINAL,
   ],

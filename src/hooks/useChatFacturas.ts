@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
-import { componerMensaje } from "@/lib/facturas/tableroGraficas";
+import { componerMensaje } from "@/lib/facturas/graficasCopiloto";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -180,7 +180,7 @@ export function useChatFacturas() {
   }, [cargarConversaciones]);
 
   // ─── Enviar mensaje al chatbot (Edge Function `chat-facturas`) ───────────────
-  // `contexto`: la gráfica seleccionada en el tablero (ver tableroGraficas.ts).
+  // `contexto`: una gráfica sobre la que se pregunta (ver graficasCopiloto.ts).
   // Viaja al final del texto del mensaje: se guarda y se manda tal cual, así
   // que el modelo la ve sin cambiar la Edge Function. El título de la
   // conversación sale solo de la pregunta.

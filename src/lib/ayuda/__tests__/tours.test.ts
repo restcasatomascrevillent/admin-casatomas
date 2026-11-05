@@ -67,18 +67,19 @@ describe("tours de ayuda", () => {
     }
   });
 
-  it("la IA de Facturas se explica por partes: historial, tablero, ejemplos, «Al instante» y caja de pregunta", () => {
+  it("Análisis de Facturas se explica por partes: barra, cifras, tablero y la IA plegada (se abre para enseñar la caja)", () => {
     const ia = TOURS.facturas.filter((p) => p.pestana === "facturas-pestana-ia").map((p) => p.elemento);
     expect(ia).toEqual([
       "facturas-pestana-ia",
       "facturas-gasto-ia",
-      "facturas-ia-historial",
-      "facturas-ia-tablero",
-      "facturas-ia-sugerencias",
-      "facturas-ia-al-instante",
+      "facturas-analisis-barra",
+      "facturas-analisis-indicadores",
+      "facturas-analisis-tablero",
+      "facturas-ia-abrir",
       "facturas-ia-pregunta",
     ]);
-    expect(TOURS.facturas.find((p) => p.elemento === "facturas-ia-al-instante")?.abrir).toBe("facturas-ia-al-instante-abrir");
+    expect(TOURS.facturas.find((p) => p.elemento === "facturas-ia-pregunta")?.abrir).toBe("facturas-ia-abrir");
+    expect(TOURS.facturas.some((p) => /Al instante/.test(p.texto))).toBe(false);
   });
 
   it("esperarA: devuelve el elemento en cuanto aparece y null si no llega a tiempo", async () => {
