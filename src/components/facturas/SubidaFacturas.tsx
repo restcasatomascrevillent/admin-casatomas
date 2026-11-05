@@ -33,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { FotoExistente } from "./AvisoDuplicadoDialog";
 import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
 import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useDecisionDuplicado } from "./useDecisionDuplicado";
 
 /** Título del aviso de un fichero que no se admite. */
@@ -462,6 +463,8 @@ function SeccionPendientes({
   onDecidir: (p: PendienteDecidir) => void;
   onDescartar: (p: PendienteDecidir) => void;
 }) {
+  // Sustituir o añadir página cambia una factura: solo con permiso de edición (QA C-09).
+  const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   return (
     <section aria-label="Pendientes de decidir">
       <h3 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -487,7 +490,7 @@ function SeccionPendientes({
               ) : null}
             </p>
             <div className="flex flex-wrap gap-2">
-              {p.anadible ? (
+              {!puedeEditar ? null : p.anadible ? (
                 <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
                   <FilePlus2 className="h-4 w-4" aria-hidden="true" />
                   Añadir como página {p.anadible.pagina.actual} a la factura {p.anadible.existente.numero_documento}

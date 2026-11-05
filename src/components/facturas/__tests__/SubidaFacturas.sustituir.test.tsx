@@ -6,6 +6,11 @@ vi.mock("@/integrations/supabase/client", async () => {
   return { supabase: m.doble.supabase };
 });
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+// Con permiso de edición en Facturas (sin él no se ofrece sustituir ni añadir página).
+vi.mock("@/hooks/useUserRole", async (orig) => ({
+  ...(await orig<typeof import("@/hooks/useUserRole")>()),
+  useCanAccessSection: () => ({ canAccess: true, isLoading: false }),
+}));
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
 
 import { doble, filtra, RESPUESTA_SERVIDOR_ANTIGUO } from "./dobleSupabaseFacturas";

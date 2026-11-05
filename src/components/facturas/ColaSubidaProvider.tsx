@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { leerTrabajosOcrEnCurso } from "@/hooks/useTrabajoOcr";
 import { ColaSubidaContext, type ContextoColaSubida, RUTA_CARGAR } from "@/hooks/useColaSubida";
-import type { AlertaValidacion } from "@/hooks/useFacturas";
+import { invalidarTrasDocumento, type AlertaValidacion } from "@/hooks/useFacturas";
 import {
   clasificarResultado,
   crearColaSubida,
@@ -99,8 +99,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       const ver = { label: "Ver", onClick: () => navegarRef.current(rutaVerDocumento(r?.facturaId)) };
       const pos = { position: POSICION_AVISOS };
       if (r?.success && !r.duplicado) {
-        queryClient.invalidateQueries({ queryKey: ["facturas"] });
-        queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+        // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
+        invalidarTrasDocumento(queryClient);
       }
       const temporal = r?.archivoEstado === "temporal" ? " · original pendiente de subir a Drive (se subirá solo)" : "";
       switch (clase) {
@@ -258,8 +258,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       toast.success("Factura sustituida", { description: r.message });
       setSustituidos((prev) => new Set(prev).add(s.trabajo_id));
       cola.marcarSustituida(s.trabajo_id, r.alertas as AlertaValidacion[]);
-      queryClient.invalidateQueries({ queryKey: ["facturas"] });
-      queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+      // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
+      invalidarTrasDocumento(queryClient);
       queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
     },
     [cola, queryClient],
@@ -271,8 +271,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       toast.success(`Página ${a.pagina.actual} añadida`, { description: r.message });
       setSustituidos((prev) => new Set(prev).add(a.trabajo_id));
       cola.marcarPaginaAnadida(a.trabajo_id, r.alertas as AlertaValidacion[]);
-      queryClient.invalidateQueries({ queryKey: ["facturas"] });
-      queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+      // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
+      invalidarTrasDocumento(queryClient);
       queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
     },
     [cola, queryClient],
