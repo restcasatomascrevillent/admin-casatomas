@@ -172,7 +172,7 @@ export function AlbaranesDeFactura({
 }: {
   factura: Factura;
   /** Los albaranes con facturado_en_id = esta factura que ya tiene la lista (por si la RPC no está). */
-  albaranesCargados: Factura[];
+  albaranesCargados: Pick<Factura, "id" | "numero_documento" | "fecha" | "subtotal">[];
   onAbrirDocumento: (id: number) => void;
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");

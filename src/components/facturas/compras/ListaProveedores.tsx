@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ChevronRight, Receipt, SearchX, Truck } from "lucide-react";
 import { formatDateCorta, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import type { Proveedor } from "@/lib/facturas/proveedores";
-import type { AgregadoProveedor } from "@/lib/facturas/resumenCompras";
+import type { AgregadoProveedor, DocumentoAgregable } from "@/lib/facturas/resumenCompras";
 import { EstadoVacio, FOCO, Hueso, Marca, filaEstado } from "./estilo";
 
 /**
@@ -27,7 +27,7 @@ export function ListaProveedores({
   /** Ya filtrados y ordenados. */
   proveedores: Proveedor[];
   /** Lo de cada proveedor (clave `#id`) con el local y el periodo elegidos. */
-  agregados: Map<string, AgregadoProveedor>;
+  agregados: Map<string, AgregadoProveedor<DocumentoAgregable>>;
   abiertoId: number | null;
   cargando: boolean;
   /** Mensaje de la lista (p. ej. «falta la migración»); sustituye a la lista. */

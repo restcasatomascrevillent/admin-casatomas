@@ -8,7 +8,7 @@ import { EditorProveedor, ProveedoresDialog } from "@/components/facturas/produc
 import { textoFrecuencia } from "@/lib/facturas/compras";
 import type { Proveedor, ResolverProveedor } from "@/lib/facturas/proveedores";
 import type { AgregadoProveedor } from "@/lib/facturas/resumenCompras";
-import { ListaDocumentos } from "./ListaDocumentos";
+import { ListaDocumentos, type DocumentoFila } from "./ListaDocumentos";
 
 /** Cuántos productos de «Qué le compras» se enseñan en el despliegue. */
 const PRODUCTOS_RESUMIDOS = 5;
@@ -40,13 +40,14 @@ export function FichaProveedor({
   puedeEditar,
   hayFiltros,
   onAbrirDocumento,
+  onPrecargarDocumento,
   onAbrirProducto,
 }: {
   proveedor: Proveedor;
   /** Lo suyo con el local y el periodo elegidos (undefined = ningún documento). */
-  agregado: AgregadoProveedor | undefined;
+  agregado: AgregadoProveedor<DocumentoFila> | undefined;
   /** Todas las facturas, para «Incluido en F-xxx». */
-  facturas: Factura[];
+  facturas: Pick<Factura, "id" | "numero_documento">[];
   resolver: ResolverProveedor;
   avisosPorId: Map<number, unknown[]>;
   seleccionadoDocId: number | null;
@@ -54,6 +55,8 @@ export function FichaProveedor({
   /** Hay local o periodo elegidos (para el texto de «ningún documento»). */
   hayFiltros: boolean;
   onAbrirDocumento: (id: number) => void;
+  /** Pide la ficha de un documento por adelantado. */
+  onPrecargarDocumento?: (id: number) => void;
   /** Abre ese producto (por su nombre). */
   onAbrirProducto: (nombre: string) => void;
 }) {
@@ -157,6 +160,7 @@ export function FichaProveedor({
           cargando={false}
           hayFiltros={hayFiltros}
           onAbrir={onAbrirDocumento}
+          onPrecargar={onPrecargarDocumento}
           conProveedor={false}
           recordar={false}
           cabecerasFijas={false}

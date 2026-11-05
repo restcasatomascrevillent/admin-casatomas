@@ -2,11 +2,13 @@ import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState
 import { ArrowLeft, Search, Truck, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAlbaranes, useFacturas, type Factura } from "@/hooks/useFacturas";
+import type { Factura } from "@/hooks/useFacturas";
+import { useBusquedaLineas, useDocumentoCompras, useListaCompras, usePrecargarDocumento } from "@/hooks/useListaCompras";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useCategoriasProducto, useResumenProductos } from "@/hooks/useProductosCatalogo";
 import { useProveedores } from "@/hooks/useProveedores";
-import { avisosDocumento, indiceAnomaliasPrecio, indicePreciosLinea, plural } from "@/components/facturas/shared/formatters";
+import { plural, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
+import { avisosCabecera, avisosFicha, crearResolverDeLista, type CabeceraDocumento } from "@/lib/facturas/listaCompras";
 import { TabProductos } from "@/components/facturas/productos/TabProductos";
 import { ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
 import { EditarFacturaDialog } from "@/components/facturas/EditarFacturaDialog";
@@ -17,6 +19,7 @@ import {
   FILTROS_PROVEEDORES,
   MODOS_COMPRAS,
   contarFiltrosDocumentos,
+  coincideDocumento,
   contarPorModo,
   filtrarDocumentos,
   palabrasBusqueda,
@@ -48,7 +51,6 @@ import { FichaProveedor } from "./FichaProveedor";
 import { BARRA_CHIPS, CHIP, EstadoError, PISTA_SEGMENTOS, SEGMENTO } from "./estilo";
 
 const TODO_EL_PERIODO = { desde: null, hasta: null, tipo: null } as const;
-const SIN_AVISOS: ReturnType<typeof avisosDocumento> = [];
 const PERIODO_TODO: Periodo = { tipo: "todo" };
 
 /** La ficha a pantalla completa (documento o producto). */
@@ -63,7 +65,25 @@ interface Origen {
 /** Pie de la lista: recuento a la izquierda y la nota de los importes a la derecha. */
 const PIE_LISTA = "flex h-9 shrink-0 items-center gap-2 border-t border-border/60 px-3 text-xs text-muted-foreground";
 
-const tipoDocumento = (d: Factura) => (esAbono(d) ? "Abono" : d.tipo === "albaran" ? "Albarán" : "Factura");
+const tipoDocumento = (d: Pick<Factura, "total" | "tipo">) => (esAbono(d) ? "Abono" : d.tipo === "albaran" ? "Albarán" : "Factura");
+
+/** Mientras llega la ficha: su cabecera (ya está en la lista) y huecos donde irán las líneas. */
+function FichaCargando({ cabecera }: { cabecera: CabeceraDocumento | undefined }) {
+  const huecos = Math.min(Math.max(cabecera?.n_lineas ?? 4, 3), 8);
+  return (
+    <div className="space-y-4 px-4 py-3 sm:px-5" role="status" aria-busy="true" data-testid="ficha-cargando">
+      <p className="text-xl font-semibold leading-tight tracking-tight">
+        {cabecera ? `${tipoDocumento(cabecera)} ${cabecera.numero_documento}` : "Documento"}
+      </p>
+      <p className="text-sm text-muted-foreground">Cargando el documento…</p>
+      <div className="space-y-2" aria-hidden="true">
+        {Array.from({ length: huecos }, (_, i) => (
+          <div key={i} className="h-9 animate-pulse rounded-md bg-muted/60 motion-reduce:animate-none" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Facturas › Compras (rediseño a todo el ancho, 05/11/2026): UN buscador, tres
@@ -118,34 +138,44 @@ export function TabCompras({
   /** Al abrir una ficha: scroll de cada zona de la lista y el elemento con el foco, para devolverlos al volver. */
   const recuerdoLista = useRef<{ scrolls: [Element, number, number][]; foco: HTMLElement | null } | null>(null);
 
-  // ── Datos (react-query comparte la caché con las demás pantallas) ─────────
-  const facturasQ = useFacturas();
-  const albaranesQ = useAlbaranes();
-  const resumenQ = useResumenProductos(TODO_EL_PERIODO);
-  const categoriasQ = useCategoriasProducto();
-  const proveedoresQ = useProveedores();
+  // ── Datos ─────────────────────────────────────────────────────────────────
+  // La lista son solo CABECERAS (`documentos_lista()`: una petición, con avisos,
+  // regalado y nº de líneas calculados en el servidor); las líneas llegan al
+  // abrir la ficha y la búsqueda por producto la hace el servidor. Productos,
+  // categorías y proveedores se piden cuando la lista ya está (no compiten con
+  // ella) o en cuanto hacen falta (otro modo o texto buscado).
+  const listaQ = useListaCompras();
+  const precargar = usePrecargarDocumento();
+  const hayTexto = palabrasBusqueda(textoDiferido).length > 0;
+  const pedirResto = modo !== "documentos" || hayTexto || listaQ.isError || (listaQ.isSuccess && !listaQ.isFetching);
+  const resumenQ = useResumenProductos(TODO_EL_PERIODO, { enabled: pedirResto });
+  const categoriasQ = useCategoriasProducto({ enabled: pedirResto });
+  const proveedoresQ = useProveedores({ enabled: pedirResto });
 
-  const facturas = useMemo(() => facturasQ.data ?? [], [facturasQ.data]);
-  const albaranes = useMemo(() => albaranesQ.data ?? [], [albaranesQ.data]);
-  const documentos = useMemo(() => [...facturas, ...albaranes], [facturas, albaranes]);
+  const documentos = useMemo(() => listaQ.data?.cabeceras ?? [], [listaQ.data]);
+  // Sin la migración 20261105190000 la lista trae además los documentos completos (la carga de antes).
+  const completos = listaQ.data?.completos ?? null;
+  const albaranes = useMemo(() => documentos.filter((d) => d.tipo === "albaran"), [documentos]);
+  const facturas = useMemo(() => documentos.filter((d) => d.tipo !== "albaran"), [documentos]);
   const docPorId = useMemo(() => new Map(documentos.map((d) => [d.id, d])), [documentos]);
   const productos = useMemo(() => resumenQ.data ?? [], [resumenQ.data]);
   const proveedores = useMemo(() => proveedoresQ.data?.proveedores ?? [], [proveedoresQ.data]);
   const mapaCategorias = useMemo(() => indexarCategorias(categoriasQ.data ?? []), [categoriasQ.data]);
-  const resolver = useMemo(() => crearResolverProveedor(proveedores), [proveedores]);
+  // El proveedor unificado de cada documento sale de la propia lista (su `proveedor_id`); lo demás, como siempre.
+  const resolver = useMemo(() => crearResolverDeLista(documentos, crearResolverProveedor(proveedores)), [documentos, proveedores]);
+  // Avisos de cada fila: los guardados y el de precio atípico (calculado en el servidor).
+  const avisosPorId = useMemo(() => new Map(documentos.map((d) => [d.id, avisosCabecera(d)])), [documentos]);
 
-  // Índice de precios por tipo (proveedor + nombre), calculado una vez sobre TODO
-  // el histórico: lo usan los avisos de cada documento y el aviso de cada línea.
-  const mediaPrecioFacturas = useMemo(() => indicePreciosLinea(facturas), [facturas]);
-  const mediaPrecioAlbaranes = useMemo(() => indicePreciosLinea(albaranes), [albaranes]);
-  const avisosPorId = useMemo(() => {
-    const mapa = new Map<number, ReturnType<typeof avisosDocumento>>();
-    const anomaliaFactura = indiceAnomaliasPrecio(facturas, mediaPrecioFacturas);
-    const anomaliaAlbaran = indiceAnomaliasPrecio(albaranes, mediaPrecioAlbaranes);
-    facturas.forEach((f) => mapa.set(f.id, avisosDocumento(f, facturas, anomaliaFactura)));
-    albaranes.forEach((a) => mapa.set(a.id, avisosDocumento(a, albaranes, anomaliaAlbaran)));
-    return mapa;
-  }, [facturas, albaranes, mediaPrecioFacturas, mediaPrecioAlbaranes]);
+  // Búsqueda por producto/línea: ids que casan según el servidor (o, con la
+  // carga de antes, según las líneas que ya hay). Se suman a lo que casa en la
+  // cabecera (número, proveedor, CIF), que sale al instante.
+  const busquedaLineas = useBusquedaLineas(textoDiferido, completos === null && listaQ.isSuccess);
+  const casanEnLineas = useMemo(() => {
+    if (!completos) return busquedaLineas.ids;
+    const palabras = palabrasBusqueda(textoDiferido);
+    if (palabras.length === 0) return null;
+    return new Set([...completos.values()].filter((d) => coincideDocumento(d, palabras)).map((d) => d.id));
+  }, [completos, busquedaLineas.ids, textoDiferido]);
 
   // ── Local y periodo: afectan a Documentos y Proveedores (el resumen vive en Análisis) ─────────
   const rango = useMemo(() => rangoPeriodo(periodo, hoy), [periodo, hoy]);
@@ -156,20 +186,26 @@ export function TabCompras({
 
   // ── Contadores y listas ───────────────────────────────────────────────────
   const provDelTexto = useMemo(
-    () => ordenarProveedoresPorGasto(proveedoresDelTexto(proveedores, docsBase, textoDiferido, resolver), agregados, filtrosActivos),
-    [proveedores, docsBase, textoDiferido, resolver, agregados, filtrosActivos],
+    () =>
+      ordenarProveedoresPorGasto(proveedoresDelTexto(proveedores, docsBase, textoDiferido, resolver, casanEnLineas), agregados, filtrosActivos),
+    [proveedores, docsBase, textoDiferido, resolver, agregados, filtrosActivos, casanEnLineas],
   );
-  const contadores = useMemo(() => {
-    const c = contarPorModo({ texto: textoDiferido, documentos: docsBase, productos, proveedores: [], mapaCategorias, resolver });
-    return { ...c, proveedores: provDelTexto.length };
-  }, [textoDiferido, docsBase, productos, mapaCategorias, resolver, provDelTexto]);
+  // null = aún no se sabe (su lista no ha llegado): el selector enseña «…».
+  const contadores = useMemo((): Record<ModoCompras, number | null> => {
+    const c = contarPorModo({ texto: textoDiferido, documentos: docsBase, productos, proveedores: [], mapaCategorias, resolver, extra: casanEnLineas });
+    return {
+      documentos: listaQ.data ? c.documentos : null,
+      productos: resumenQ.data ? c.productos : null,
+      proveedores: proveedoresQ.data ? provDelTexto.length : null,
+    };
+  }, [textoDiferido, docsBase, productos, mapaCategorias, resolver, provDelTexto, casanEnLineas, listaQ.data, resumenQ.data, proveedoresQ.data]);
   const cuentaFiltrosDocs = useMemo(
-    () => contarFiltrosDocumentos(docsBase, textoDiferido, avisosPorId),
-    [docsBase, textoDiferido, avisosPorId],
+    () => contarFiltrosDocumentos(docsBase, textoDiferido, avisosPorId, casanEnLineas),
+    [docsBase, textoDiferido, avisosPorId, casanEnLineas],
   );
   const docsVisibles = useMemo(
-    () => filtrarDocumentos(docsBase, textoDiferido, filtroDocs, avisosPorId),
-    [docsBase, textoDiferido, filtroDocs, avisosPorId],
+    () => filtrarDocumentos(docsBase, textoDiferido, filtroDocs, avisosPorId, casanEnLineas),
+    [docsBase, textoDiferido, filtroDocs, avisosPorId, casanEnLineas],
   );
   const conSinFactura = useMemo(
     () => provDelTexto.filter((p) => (agregados.get(`#${p.id}`)?.albaranesSinFactura ?? 0) > 0),
@@ -320,16 +356,15 @@ export function TabCompras({
     if (docPorId.has(docPendiente)) {
       abrirFicha({ tipo: "documento", id: docPendiente }, true);
       setDocPendiente(null);
-    } else if (!facturasQ.isFetching && !albaranesQ.isFetching) {
-      if (refrescado.current) setDocPendiente(null);
+    } else if (!listaQ.isFetching) {
+      if (refrescado.current || listaQ.isError) setDocPendiente(null);
       else {
         refrescado.current = true;
-        void facturasQ.refetch();
-        void albaranesQ.refetch();
+        void listaQ.refetch();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [docPendiente, docPorId, facturasQ.isFetching, albaranesQ.isFetching]);
+  }, [docPendiente, docPorId, listaQ.isFetching]);
 
   // Enlaces desde Análisis: `?mes=YYYY-MM` deja ese mes como periodo (al quitarlo
   // se vuelve a «Todo») y `?prov=<id>` abre ese proveedor desplegado en cuanto
@@ -353,16 +388,31 @@ export function TabCompras({
   }, [provPendiente, proveedoresQ.data, proveedores]);
 
   // ── Contenido de la ficha ─────────────────────────────────────────────────
+  // El documento con sus líneas se pide al abrirlo (o antes, al pasar o pulsar su fila).
+  const fichaDocQ = useDocumentoCompras(ficha?.tipo === "documento" ? ficha.id : null);
   let contenidoFicha: ReactNode = null;
   if (ficha?.tipo === "documento") {
-    const doc = docPorId.get(ficha.id);
-    if (doc) {
+    const doc = fichaDocQ.data;
+    if (fichaDocQ.isPending) {
+      contenidoFicha = <FichaCargando cabecera={docPorId.get(ficha.id)} />;
+    } else if (fichaDocQ.isError) {
+      contenidoFicha = (
+        <EstadoError
+          titulo="No se ha podido abrir el documento"
+          detalle={`Error al cargar el documento: ${(fichaDocQ.error as { message?: string }).message ?? "error desconocido"}`}
+          onReintentar={() => void fichaDocQ.refetch()}
+        />
+      );
+    } else if (doc) {
       const esAlbaran = doc.tipo === "albaran";
+      // La media de referencia de cada línea viene calculada con la ficha.
+      const medias = new Map(doc.productos.map((p) => [p.id, p.media_referencia ?? undefined]));
+      const mediaPrecio: MediaPrecioLinea = (linea) => medias.get(linea.id);
       contenidoFicha = (
         <FichaDocumento
           doc={doc}
-          avisos={avisosPorId.get(doc.id) ?? SIN_AVISOS}
-          mediaPrecio={esAlbaran ? mediaPrecioAlbaranes : mediaPrecioFacturas}
+          avisos={avisosFicha(doc)}
+          mediaPrecio={mediaPrecio}
           facturaDelAlbaran={esAlbaran && doc.facturado_en_id != null ? (docPorId.get(doc.facturado_en_id) ?? null) : null}
           albaranesDeLaFactura={esAlbaran ? [] : albaranes.filter((a) => a.facturado_en_id === doc.id)}
           onEditar={setEditando}
@@ -383,15 +433,11 @@ export function TabCompras({
     contenidoFicha = <FichaProducto productoId={ficha.id} onAbrirDocumento={abrirDocumento} />;
   }
 
-  const hayTexto = palabrasBusqueda(textoDiferido).length > 0;
-  const errorDocs = facturasQ.error ?? albaranesQ.error;
-  const cargandoDocs = facturasQ.isLoading || albaranesQ.isLoading;
-  // Carga escalonada: la primera tanda ya está a la vista y las anteriores siguen llegando.
-  const llegandoAnteriores = Boolean((facturasQ.isFetching && facturasQ.data) || (albaranesQ.isFetching && albaranesQ.data));
-  const reintentar = () => {
-    void facturasQ.refetch();
-    void albaranesQ.refetch();
-  };
+  const errorDocs = listaQ.error;
+  const cargandoDocs = listaQ.isPending;
+  // Buscando en las líneas (servidor): lo que casa en la cabecera ya está a la vista.
+  const buscandoLineas = hayTexto && busquedaLineas.buscando;
+  const reintentar = () => void listaQ.refetch();
   const mensajeProveedores = proveedoresQ.data?.faltaMigracion
     ? "La lista de proveedores unificados aún no está activada: falta aplicar la migración 20261007180000_proveedores_unificados."
     : proveedoresQ.error
@@ -411,6 +457,7 @@ export function TabCompras({
       puedeEditar={puedeEditar}
       hayFiltros={filtrosActivos}
       onAbrirDocumento={(id) => abrirFicha({ tipo: "documento", id }, true)}
+      onPrecargarDocumento={precargar}
       onAbrirProducto={(nombre) => abrirProductoPorNombre(nombre, true)}
     />
   );
@@ -467,9 +514,9 @@ export function TabCompras({
                 {m.etiqueta}
                 <span
                   className="min-w-6 rounded-full bg-foreground/[0.07] px-1.5 text-center text-xs font-semibold leading-5 tabular-nums text-muted-foreground group-aria-pressed/modo:bg-primary group-aria-pressed/modo:text-primary-foreground"
-                  aria-label={`${contadores[m.valor]} ${contadores[m.valor] === 1 ? "resultado" : "resultados"}`}
+                  aria-label={contadores[m.valor] === null ? "contando" : `${contadores[m.valor]} ${contadores[m.valor] === 1 ? "resultado" : "resultados"}`}
                 >
-                  {contadores[m.valor]}
+                  {contadores[m.valor] ?? "…"}
                 </span>
               </button>
             ))}
@@ -559,15 +606,16 @@ export function TabCompras({
                     busqueda={hayTexto ? textoDiferido : ""}
                     mesPedido={mesPedido}
                     onAbrir={(id) => abrirFicha({ tipo: "documento", id }, true)}
+                    onPrecargar={precargar}
                     onQuitarFiltros={quitarFiltrosDocs}
                   />
                 )}
               </div>
               <p className={PIE_LISTA} aria-live="polite">
                 {errorDocs ? "Sin datos" : cargandoDocs ? "Cargando…" : plural(docsVisibles.length, "documento", "documentos")}
-                {llegandoAnteriores && (
-                  <span className="ml-1.5" data-testid="cargando-anteriores">
-                    · cargando anteriores…
+                {buscandoLineas && (
+                  <span className="ml-1.5" data-testid="buscando-lineas">
+                    · buscando en las líneas…
                   </span>
                 )}
                 <span className="ml-auto">importes con IVA</span>
@@ -612,7 +660,7 @@ export function TabCompras({
               </div>
               <p className={PIE_LISTA}>
                 {plural(provVisibles.length, "proveedor", "proveedores")} · por gasto con IVA
-                {llegandoAnteriores && <span className="ml-1.5">· cargando anteriores…</span>}
+                {buscandoLineas && <span className="ml-1.5">· buscando en las líneas…</span>}
               </p>
             </>
           )}

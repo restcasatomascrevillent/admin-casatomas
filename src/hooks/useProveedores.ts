@@ -27,9 +27,11 @@ export interface ResultadoProveedores {
   faltaMigracion: boolean;
 }
 
-export const useProveedores = () =>
+/** `enabled: false` deja la petición para luego (Compras la pide cuando ya tiene la lista). */
+export const useProveedores = ({ enabled = true }: { enabled?: boolean } = {}) =>
   useQuery({
     queryKey: [CLAVE_PROVEEDORES, "listado"],
+    enabled,
     queryFn: async (): Promise<ResultadoProveedores> => {
       const { data, error } = await rpc("proveedores_listado");
       if (error) {

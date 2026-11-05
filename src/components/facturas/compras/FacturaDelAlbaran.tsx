@@ -101,8 +101,8 @@ export function FacturaDelAlbaran({
   onAbrirDocumento,
 }: {
   albaran: Factura;
-  /** La factura que lo recoge, si está cargada en la lista. */
-  factura: Factura | null;
+  /** La factura que lo recoge, si está cargada en la lista (basta su número). */
+  factura: Pick<Factura, "numero_documento"> | null;
   onAbrirDocumento: (id: number) => void;
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");

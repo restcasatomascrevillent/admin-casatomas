@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ChevronRight, EyeOff, FileText, Receipt, SearchX } from "lucide-react";
 import type { Factura } from "@/hooks/useFacturas";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   leerPlegado,
   MESES_ABIERTOS_BUSCANDO,
   mesAbierto,
+  type DocumentoAgrupable,
   type EstadoPlegado,
   type GrupoMes,
 } from "@/lib/facturas/agrupacionDocumentos";
@@ -22,8 +23,18 @@ import { CABECERA_COLUMNAS, EstadoVacio, FOCO, FONDO_CABECERA, Hueso, Marca, fil
 
 const SIN_ESTADO: EstadoPlegado = {};
 
+/**
+ * Lo que necesita una fila: la cabecera del documento (vale `Factura` y la
+ * cabecera ligera de `documentos_lista()`, que no trae las líneas).
+ */
+export type DocumentoFila = DocumentoAgrupable &
+  Pick<Factura, "numero_documento" | "proveedor" | "drive_url" | "archivo_path" | "verificada"> & { local?: Factura["local"] };
+
+/** Espera con el ratón encima antes de pedir la ficha por adelantado. */
+const ESPERA_PRECARGA_MS = 120;
+
 /** Alto de reserva de un mes fuera de pantalla (`content-visibility: auto`): cabecera 49 px, documento 53 (dos líneas) o 49 (una, ≥1024 px). */
-function altoEstimadoMes(mes: GrupoMes, abierto: boolean): number {
+function altoEstimadoMes(mes: GrupoMes<DocumentoFila>, abierto: boolean): number {
   return abierto ? 49 + mes.documentos.length * 53 : 49;
 }
 
@@ -58,6 +69,7 @@ export function ListaDocumentos({
   hayFiltros,
   busqueda = "",
   onAbrir,
+  onPrecargar,
   hoy,
   conProveedor = true,
   recordar = true,
@@ -67,9 +79,9 @@ export function ListaDocumentos({
   onQuitarFiltros,
 }: {
   /** Los documentos ya filtrados (buscador, chip, local y periodo). */
-  documentos: Factura[];
+  documentos: DocumentoFila[];
   /** Todas las facturas (sin filtrar): para decir «Incluido en F-xxx» aunque esa factura no salga en la lista. */
-  facturas: Factura[];
+  facturas: Pick<Factura, "id" | "numero_documento">[];
   resolver: ResolverProveedor;
   avisosPorId: Map<number, unknown[]>;
   /** El último documento abierto (se marca con `aria-current`). */
@@ -79,6 +91,8 @@ export function ListaDocumentos({
   /** Texto buscado (vacío si no hay búsqueda): decide qué meses salen abiertos. */
   busqueda?: string;
   onAbrir: (id: number) => void;
+  /** Pide la ficha por adelantado (ratón encima un momento o al pulsar), para que abra al instante. */
+  onPrecargar?: (id: number) => void;
   /** Para pruebas y capturas: el «hoy» que decide qué meses salen desplegados. */
   hoy?: Date;
   /** Columna de proveedor (no hace falta dentro del despliegue de un proveedor). */
@@ -228,6 +242,7 @@ export function ListaDocumentos({
                     factura={d.facturado_en_id != null ? (facturaPorId.get(d.facturado_en_id) ?? null) : null}
                     columnas={columnas}
                     onAbrir={onAbrir}
+                    onPrecargar={onPrecargar}
                   />
                 ))}
               </ul>
@@ -283,18 +298,27 @@ function FilaDocumento({
   factura,
   columnas,
   onAbrir,
+  onPrecargar,
 }: {
-  d: Factura;
+  d: DocumentoFila;
   /** Nombre canónico del proveedor; null = sin columna de proveedor. */
   proveedor: string | null;
   avisos: number;
   abierto: boolean;
   /** La factura que recoge este albarán, si consta. */
-  factura: Factura | null;
+  factura: Pick<Factura, "numero_documento"> | null;
   /** Plantilla de columnas desde 1024 px (la misma que la cabecera). */
   columnas: string;
   onAbrir: (id: number) => void;
+  onPrecargar?: (id: number) => void;
 }) {
+  // Precarga de la ficha: con el ratón encima un momento (no al pasar de largo) o al pulsar.
+  const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelarPrecarga = () => {
+    if (temporizador.current) clearTimeout(temporizador.current);
+    temporizador.current = null;
+  };
+  useEffect(() => cancelarPrecarga, []);
   // Albarán ya recogido en una factura: se enseña atenuado y tachado, y no suma en los totales.
   const facturado = d.tipo === "albaran" && d.facturado_en_id != null;
   const abono = esAbono(d);
@@ -307,6 +331,17 @@ function FilaDocumento({
       <button
         type="button"
         onClick={() => onAbrir(d.id)}
+        onPointerEnter={
+          onPrecargar
+            ? (e) => {
+                if (e.pointerType !== "mouse") return;
+                cancelarPrecarga();
+                temporizador.current = setTimeout(() => onPrecargar(d.id), ESPERA_PRECARGA_MS);
+              }
+            : undefined
+        }
+        onPointerLeave={onPrecargar ? cancelarPrecarga : undefined}
+        onPointerDown={onPrecargar ? () => onPrecargar(d.id) : undefined}
         aria-current={abierto ? "true" : undefined}
         data-doc-id={d.id}
         data-facturado={facturado ? "true" : undefined}

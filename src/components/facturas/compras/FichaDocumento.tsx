@@ -105,10 +105,10 @@ export function FichaDocumento({
    * proveedor), calculada UNA vez en `TabCompras` con `indicePreciosLinea`.
    */
   mediaPrecio?: MediaPrecioLinea;
-  /** Si es un albarán ya facturado: la factura que lo recoge (si está cargada). */
-  facturaDelAlbaran: Factura | null;
-  /** Si es una factura: los albaranes que recoge. */
-  albaranesDeLaFactura: Factura[];
+  /** Si es un albarán ya facturado: la factura que lo recoge (si está en la lista; basta su número). */
+  facturaDelAlbaran: Pick<Factura, "numero_documento"> | null;
+  /** Si es una factura: los albaranes que recoge (cabeceras de la lista). */
+  albaranesDeLaFactura: Pick<Factura, "id" | "numero_documento" | "fecha" | "subtotal">[];
   onEditar: (doc: Factura) => void;
   onPreguntarIA?: (doc: Factura) => void;
   onAbrirProducto: (productoId: number) => void;

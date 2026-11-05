@@ -39,9 +39,10 @@ vi.mock("@/components/facturas/ChatFacturas", () => ({
   )),
 }));
 vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p>Contenido de la subida</p> }));
-vi.mock("@/hooks/useFacturas", () => ({
-  useFacturas: () => ({ data: [{ id: 1, proveedor: "Marta" }, { id: 2, proveedor: null }] }),
-  useAlbaranes: () => ({ data: [{ id: 3, proveedor: "Marta" }] }),
+vi.mock("@/hooks/useListaCompras", () => ({
+  useListaCompras: () => ({
+    data: { cabeceras: [{ id: 1, proveedor: "Marta" }, { id: 2, proveedor: null }, { id: 3, proveedor: "Marta" }], completos: null },
+  }),
 }));
 vi.mock("@/hooks/useChatFacturas", () => ({ useChatFacturas: () => ({ conversaciones: [] }) }));
 

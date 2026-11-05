@@ -14,7 +14,8 @@ import { Upload, BarChart3, ShoppingCart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
+import type { Factura } from "@/hooks/useFacturas";
+import { useListaCompras } from "@/hooks/useListaCompras";
 import { leerEnlaceCompras } from "@/lib/facturas/tableroCompras";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
@@ -91,10 +92,9 @@ const Facturas = () => {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_FACTURAS);
 
-  // Contadores para los badges de las pestañas
-  const { data: facturas } = useFacturas();
-  const { data: albaranes } = useAlbaranes();
-  const totalDocumentos = (facturas?.length ?? 0) + (albaranes?.length ?? 0);
+  // Contador de la pestaña: la misma lista ligera que pinta Compras (una sola petición compartida).
+  const { data: lista } = useListaCompras();
+  const totalDocumentos = lista?.cabeceras.length ?? 0;
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
     // 1. Cambiamos a la pestaña del chat
