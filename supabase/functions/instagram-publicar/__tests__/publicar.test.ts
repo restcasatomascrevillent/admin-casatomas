@@ -2,7 +2,7 @@
 /**
  * Edge Function instagram-publicar (antes api/instagram-publicar.ts de Vercel)
  * sin red: fetch simulado de Supabase y de la Graph API. Autorización
- * (can_write_section('marketing') con el JWT del usuario), dry-run sin
+ * (can_edit_section('marketing') con el JWT del usuario), dry-run sin
  * media_publish, cuota, 202 «en_proceso», archivo en Google Drive y borrado
  * del JPEG solo si Drive lo tiene, saneado del token y secretos que faltan →
  * mensaje que apunta a los secretos de Supabase.
@@ -326,7 +326,7 @@ describe("Edge Function instagram-publicar", () => {
       expect(l.cabeceras.authorization).toBe("Bearer service-role-secreta");
       expect(l.cabeceras["x-audit-source"]).toBe("instagram-publicar");
     }
-    const permiso = llamadas.find((l) => l.url.endsWith("/rpc/can_write_section"))!;
+    const permiso = llamadas.find((l) => l.url.endsWith("/rpc/can_edit_section"))!;
     expect(JSON.parse(permiso.cuerpo!)).toEqual({ _section: "marketing" });
     expect(await r.text()).not.toContain("service-role-secreta");
   });

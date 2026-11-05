@@ -21,6 +21,13 @@
  *   (409 «publicacion_en_curso» si alguien la está probando o publicando a
  *   mano: se reintenta en la siguiente pasada).
  *
+ *   TIEMPO (A4 de la evaluación): límite GLOBAL de LIMITE_PASADA_MS desde que
+ *   entra la petición. No se reclama otra programación sin MIN_PARA_PUBLICAR_MS
+ *   por delante; el núcleo de publicación recibe el límite (menos
+ *   MARGEN_CIERRE_MS) y no empieza ni llama a media_publish si no le da tiempo
+ *   («sin_tiempo» → aplazar sin contar intento); los reels «procesando» se
+ *   cierran solo si quedan MIN_PARA_PROCESANDO_MS.
+ *
  *   Cada pasada, mientras quede tiempo (≤ MAX_POR_PASADA):
  *     1. instagram_programador_reclamar → UNA vencida con FOR UPDATE SKIP
  *        LOCKED y bloqueo con caducidad (dos pasadas nunca cogen la misma; un
@@ -59,8 +66,14 @@ import { json, leerJson, opciones } from "../_shared/instagram/http.ts";
 import { registrarSecreto, registro, sanear } from "../_shared/instagram/secretos.ts";
 import { leerPieza, type FilaPieza, type Sesion } from "../_shared/instagram/supabase.ts";
 import { publicarConSesion, type DependenciasPublicar } from "../instagram-publicar/publicar.ts";
-import { limpiarBucket } from "./limpieza.ts";
-import { cerrarProcesando } from "./procesando.ts";
+import { DIAS_VIDEO_PUBLICADO, limpiarBucket } from "./limpieza.ts";
+import { cerrarProcesando, MIN_PARA_PROCESANDO_MS } from "./procesando.ts";
+
+/** Días que un reel publicado conserva su MP4 en el cubo (INSTAGRAM_DIAS_VIDEO_PUBLICADO, 1-365). */
+export function diasVideoPublicado(env: Record<string, string | undefined>): number {
+  const n = Math.floor(Number(env.INSTAGRAM_DIAS_VIDEO_PUBLICADO));
+  return Number.isFinite(n) && n >= 1 && n <= 365 ? n : DIAS_VIDEO_PUBLICADO;
+}
 
 export const ETIQUETA = "instagram-programador";
 export const CABECERA_SECRETO = "x-webhook-secret";
@@ -80,7 +93,18 @@ export const BLOQUEO_SEG = 600;
 export const PRESUPUESTO_SONDEO_MS = 40_000;
 /** No se empieza otra pieza pasado este tiempo de la pasada. */
 export const PRESUPUESTO_PASADA_MS = 60_000;
-export const MAX_POR_PASADA = 5;
+export const MAX_POR_PASADA = 3;
+/**
+ * Límite GLOBAL de la pasada (A4 de la evaluación), desde que entra la
+ * petición: la Edge Function tiene 150 s de reloj en el plan gratuito (400 s
+ * en el de pago); se deja margen. Ninguna llamada a Meta pasa de aquí
+ * (ClienteGraph `limite`) y nada se empieza si no da tiempo a terminarlo.
+ */
+export const LIMITE_PASADA_MS = 110_000;
+/** Lo que se guarda al final del límite para cerrar la programación (RPC). */
+export const MARGEN_CIERRE_MS = 10_000;
+/** No se reclama otra programación con menos de esto por delante (una publicación completa). */
+export const MIN_PARA_PUBLICAR_MS = 75_000;
 /** Reels: cuánto se aplaza sin contar intento mientras Meta procesa el vídeo (desde la hora programada). */
 export const ESPERA_MAX_REEL_MS = 60 * 60_000;
 
@@ -127,10 +151,14 @@ export interface DependenciasProgramador {
   presupuestoPasadaMs?: number;
   presupuestoSondeoMs?: number;
   intervaloMs?: number;
+  /** Límite global de la pasada en ms desde el inicio (por defecto LIMITE_PASADA_MS). */
+  limitePasadaMs?: number;
+  /** Instante (ms) en el que termina la pasada; si no, inicio + limitePasadaMs. */
+  limite?: number;
 }
 
 /** Nombres que lee esta función: los de Instagram + service role + su secreto. */
-export const NOMBRES_ENTORNO_PROGRAMADOR = [...NOMBRES_ENTORNO, "SUPABASE_SERVICE_ROLE_KEY", "INSTAGRAM_PROGRAMADOR_SECRET"] as const;
+export const NOMBRES_ENTORNO_PROGRAMADOR = [...NOMBRES_ENTORNO, "SUPABASE_SERVICE_ROLE_KEY", "INSTAGRAM_PROGRAMADOR_SECRET", "INSTAGRAM_DIAS_VIDEO_PUBLICADO"] as const;
 
 export function entornoProgramador(): Record<string, string | undefined> {
   const deno = (globalThis as unknown as { Deno?: { env: { get(n: string): string | undefined } } }).Deno;
@@ -227,6 +255,24 @@ export function clasificar(
   ahora: number = Date.now(),
 ): Cierre {
   const espera = esperaReintento(p.intentos);
+  // Sin tiempo en esta pasada (A4): a la siguiente, sin contar intento y con
+  // el contenedor si ya lo había.
+  if (c.tipo === "sin_tiempo") {
+    return {
+      resultado: "aplazar",
+      esperaSeg: ESPERA_SIGUIENTE_PASADA_SEG,
+      contenedorId: c.reintentar?.contenedorId ?? c.contenedor?.id ?? contenedorEnviado ?? null,
+      mensaje: "No quedaba tiempo en la pasada para publicar sin riesgo; se publica en la siguiente.",
+    };
+  }
+  // Instagram ya la tenía publicada pero no se encontró el medio (A1): no se
+  // reintenta jamás; la pieza ya está «publicada» en el panel.
+  if (estado === 200 && c.publicado && !c.mediaId) {
+    return {
+      resultado: "error",
+      mensaje: "Instagram indica que ya se publicó, pero no se encontró la publicación: compruébala en la cuenta. No se ha vuelto a publicar.",
+    };
+  }
   // Reel: Meta sigue procesando el vídeo. No es un fallo: se aplaza sin contar
   // intento (con el mismo contenedor) durante la primera hora.
   if (estado === 202 && c.tipoMedio === "reel") {
@@ -310,6 +356,8 @@ export async function procesar(s: Sesion, p: Programacion, env: Record<string, s
       ahora: deps.ahora,
       presupuestoMs: deps.presupuestoSondeoMs ?? PRESUPUESTO_SONDEO_MS,
       intervaloMs: deps.intervaloMs,
+      // El núcleo no pasa de aquí: queda MARGEN_CIERRE_MS para cerrar la programación.
+      limite: deps.limite === undefined ? undefined : deps.limite - MARGEN_CIERRE_MS,
     });
     const c = ((await r.json().catch(() => ({}))) ?? {}) as CuerpoPublicar;
     return clasificar(r.status, c, p, contenedor, (deps.ahora ?? Date.now)());
@@ -324,11 +372,13 @@ export async function ejecutarPasada(s: Sesion, env: Record<string, string | und
   const ahora = deps.ahora ?? Date.now;
   const inicio = ahora();
   const presupuesto = deps.presupuestoPasadaMs ?? PRESUPUESTO_PASADA_MS;
+  const limite = deps.limite ?? inicio + (deps.limitePasadaMs ?? LIMITE_PASADA_MS);
   const resultados: ResultadoPasada[] = [];
-  while (resultados.length < MAX_POR_PASADA && ahora() - inicio < presupuesto) {
+  // Solo se reclama otra si da tiempo a una publicación completa (A4).
+  while (resultados.length < MAX_POR_PASADA && ahora() - inicio < presupuesto && limite - ahora() >= MIN_PARA_PUBLICAR_MS) {
     const p = await reclamar(s);
     if (!p) break;
-    const c = await procesar(s, p, env, deps);
+    const c = await procesar(s, p, env, { ...deps, limite });
     let tras: { estado: string; intentos: number } | null = null;
     try {
       tras = await cerrar(s, p, c);
@@ -368,12 +418,15 @@ export async function manejarProgramador(request: Request, deps: DependenciasPro
   if (!url || !claveServicio) return json(500, { ok: false, error: "Falta la configuración de Supabase (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)" });
   registrarSecreto(claveServicio);
 
+  // El reloj de la pasada empieza aquí (A4): todo lo que sigue cabe en el límite.
+  const ahora = deps.ahora ?? Date.now;
+  const limite = deps.limite ?? ahora() + (deps.limitePasadaMs ?? LIMITE_PASADA_MS);
   const s = sesionServicio(url, claveServicio, deps.fetch ?? fetch);
   const cuerpo = await leerJson(request, 4096);
   const accion = cuerpo.ok && cuerpo.valor && typeof cuerpo.valor === "object" ? (cuerpo.valor as { accion?: unknown }).accion : undefined;
   if (accion === "limpiar") {
     try {
-      const r = await limpiarBucket(s, deps.ahora);
+      const r = await limpiarBucket(s, deps.ahora, { diasVideoPublicado: diasVideoPublicado(env) });
       registro("info", ETIQUETA, "limpieza del bucket", { ...r, avisos: r.avisos.length });
       return json(200, { ok: true, accion: "limpiar", ...r });
     } catch (e) {
@@ -383,17 +436,28 @@ export async function manejarProgramador(request: Request, deps: DependenciasPro
   }
   if (accion !== undefined && accion !== "publicar") return json(400, { ok: false, error: "Acción no válida: usa «publicar» (o nada) o «limpiar»" });
   try {
-    const resultados = await ejecutarPasada(s, env, deps);
-    const procesando = await cerrarProcesando(s, env, {
-      etiqueta: ETIQUETA,
-      publicar: deps.publicar,
-      fetch: deps.fetch,
-      dormir: deps.dormir,
-      ahora: deps.ahora,
-      presupuestoSondeoMs: deps.presupuestoSondeoMs ?? PRESUPUESTO_SONDEO_MS,
-      intervaloMs: deps.intervaloMs,
+    const resultados = await ejecutarPasada(s, env, { ...deps, limite });
+    // Los reels «procesando», solo con tiempo de sobra (si no, a la siguiente pasada).
+    const conTiempo = limite - ahora() >= MIN_PARA_PROCESANDO_MS;
+    const procesando = conTiempo
+      ? await cerrarProcesando(s, env, {
+          etiqueta: ETIQUETA,
+          publicar: deps.publicar,
+          fetch: deps.fetch,
+          dormir: deps.dormir,
+          ahora: deps.ahora,
+          presupuestoSondeoMs: deps.presupuestoSondeoMs ?? PRESUPUESTO_SONDEO_MS,
+          intervaloMs: deps.intervaloMs,
+          limite: limite - MARGEN_CIERRE_MS,
+        })
+      : [];
+    return json(200, {
+      ok: true,
+      procesadas: resultados.length,
+      resultados,
+      ...(procesando.length ? { procesando } : {}),
+      ...(conTiempo ? {} : { procesandoAplazado: true }),
     });
-    return json(200, { ok: true, procesadas: resultados.length, resultados, ...(procesando.length ? { procesando } : {}) });
   } catch (e) {
     registro("error", ETIQUETA, "pasada", e);
     return json(500, { ok: false, error: "No se pudo completar la pasada", detalle: sanear((e as Error)?.message ?? e) });

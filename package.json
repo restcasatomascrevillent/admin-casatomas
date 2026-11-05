@@ -45,6 +45,8 @@
     "test:instagram-video:db": "node scripts/test-instagram-video.mjs",
     "test:instagram-aprender:db": "node scripts/test-instagram-aprender.mjs",
     "test:instagram-encargos:db": "node scripts/test-instagram-encargos.mjs",
+    "test:instagram-seguridad:db": "node scripts/test-instagram-seguridad.mjs",
+    "test:migraciones": "node scripts/comprobar-versiones-migraciones.mjs",
     "instagram:recursos": "node scripts/instagram/subir-recursos.mjs",
     "instagram:render-reels": "node scripts/instagram/render-reels.mjs"
   },

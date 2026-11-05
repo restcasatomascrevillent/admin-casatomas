@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   anonimizar,
+  dietasConfirmadas,
   erroresAlergenos,
   erroresDatosPersonales,
   erroresPlatos,
@@ -247,5 +248,38 @@ describe("rótulos", () => {
     expect(revisarRotulos({ titular: "Cócteles a 9 €" }, tz, CTX_TOUZA).ok).toBe(false);
     expect(revisarRotulos({ titular: "Cócteles sin gluten" }, tz, CTX_TOUZA).ok).toBe(false);
     expect(revisarRotulos({ titular: "Touza de noche" }, tz, CTX_TOUZA).valor.titular).toBe("TOUZA de noche");
+  });
+});
+
+describe("«vegetariano» con el dato de la carta (Platos.etiquetas_dieteticas, A8)", () => {
+  const PISTO: PlatoContexto = { ...PULPO, id: "pisto", nombre: "Pisto con huevo", etiquetas_dieteticas: ["vegetariano"] };
+  const PAN: PlatoContexto = { ...PULPO, id: "pan", nombre: "Pan con tomate", etiquetas_dieteticas: ["vegetariano", "vegano"] };
+
+  it("se puede decir «vegetariano» (y #vegetariano) si la carta lo confirma", () => {
+    expect(erroresAlergenos("Un plato vegetariano de temporada", PISTO, ["#vegetariano"])).toEqual([]);
+    expect(erroresAlergenos("Opción vegetariana", PAN)).toEqual([]);
+  });
+
+  it("«vegano» solo si la carta dice «vegano»", () => {
+    expect(erroresAlergenos("Opción vegana", PISTO).join(" ")).toMatch(/no consta como vegano/);
+    expect(erroresAlergenos("Opción vegana", PISTO, ["#vegano"])).not.toEqual([]);
+    expect(erroresAlergenos("Opción vegana y plant based", PAN, ["#vegan"])).toEqual([]);
+  });
+
+  it("sin el dato (null, columna sin aplicar o sin plato) sigue prohibido", () => {
+    expect(erroresAlergenos("Plato vegetariano", PULPO).join(" ")).toMatch(/no consta como vegetariano/);
+    expect(erroresAlergenos("Plato vegetariano", { ...PISTO, etiquetas_dieteticas: null })).not.toEqual([]);
+    expect(erroresAlergenos("Plato vegetariano", null)).not.toEqual([]);
+    expect(erroresAlergenos("Plato vegetariano", PULPO, ["#vegetariano"]).length).toBeGreaterThan(0);
+  });
+
+  it("las demás dietas (keto, light…) nunca, aunque sea vegetariano", () => {
+    expect(erroresAlergenos("Vegetariano y keto", PISTO).join(" ")).toMatch(/keto/);
+  });
+
+  it("dietasConfirmadas: «vegano» implica «vegetariano»", () => {
+    expect([...dietasConfirmadas(PAN)].sort()).toEqual(["vegano", "vegetariano"]);
+    expect([...dietasConfirmadas({ etiquetas_dieteticas: ["vegano"] })].sort()).toEqual(["vegano", "vegetariano"]);
+    expect([...dietasConfirmadas({ etiquetas_dieteticas: "vegetariano" })]).toEqual([]);
   });
 });

@@ -26,7 +26,7 @@ const AUTENTICACION_PROPIA: Record<string, { mecanismo: string; patrones: RegExp
   "clasificar-productos": { mecanismo: "x-ocr-secret o usuario con facturas:edit", patrones: [/verificarSecreto/, /autenticar\(req, cfgAuth, "edit"\)/] },
   "sincronizar-costes-openai": { mecanismo: "x-ocr-secret en tiempo constante", patrones: [/verificarSecreto/] },
   "instagram-programador": { mecanismo: "x-webhook-secret en tiempo constante, fail-closed (solo pg_cron)", patrones: [/x-webhook-secret/, /compararTiempoConstante/] },
-  "instagram-metricas": { mecanismo: "x-webhook-secret del cron en tiempo constante (falla cerrado) o usuario de marketing", patrones: [/x-webhook-secret/, /compararTiempoConstante/, /can_read_section/, /can_write_section/] },
+  "instagram-metricas": { mecanismo: "x-webhook-secret del cron en tiempo constante (falla cerrado) o usuario de marketing (leer con «Ver», capturar con «Editar»)", patrones: [/x-webhook-secret/, /compararTiempoConstante/, /can_read_section/, /can_edit_section/] },
 };
 
 function fuentes(dir: string): string {

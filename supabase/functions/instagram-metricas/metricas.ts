@@ -15,7 +15,7 @@
  *       tiempo constante; FALLA CERRADO si el secreto no está configurado);
  *     · `Authorization: Bearer <service_role>` (scripts);
  *     · el botón «Actualizar ahora» del panel: usuario con
- *       can_write_section('marketing'); como mucho una vez cada 5 minutos.
+ *       can_edit_section('marketing') («Editar»); como mucho una vez cada 5 minutos.
  *     200 { ok, fechaCaptura, dias, publicaciones, avisos, cuentas: [{ igUserId, marcas, ok }] }
  *     Captura TODAS las cuentas distintas (una por marca con cuenta propia; hoy
  *     una sola). Si una falla y otra no, 200 con aviso; si fallan todas, el

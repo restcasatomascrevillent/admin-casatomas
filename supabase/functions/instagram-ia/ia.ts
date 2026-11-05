@@ -60,6 +60,7 @@ import {
   formatearPrecio,
   parseAlergenosOficiales,
   revisarRotulos,
+  dietasConfirmadas,
   revisarVarianteTexto,
   type CampoRotulo,
   type ContextoValidacion,
@@ -123,6 +124,7 @@ const NOMBRES_ENTORNO = [
   "OPENAI_API_KEY",
   "INSTAGRAM_IA_MODEL",
   "INSTAGRAM_IA_CUPO_DIARIO",
+  "INSTAGRAM_IA_CUPO_GLOBAL",
   // Solo el ID (no secreto) de la cuenta de cada marca, para «Qué funciona».
   "IG_USER_ID",
   "IG_USER_ID_CASA_TOMAS",
@@ -231,6 +233,54 @@ export async function contarHoy(s: Sesion, ahora: Date): Promise<number> {
   return total ? Number(total) : 0;
 }
 
+/** Tope diario de llamadas a la IA de Instagram entre TODOS los usuarios (INSTAGRAM_IA_CUPO_GLOBAL). */
+export const CUPO_GLOBAL_POR_DEFECTO = 300;
+
+export type ReservaCupo = { ok: true; usadas: number } | { ok: false; motivo: "usuario" | "global"; cupo: number };
+
+export function cuposDe(env: Record<string, string | undefined>): { cupo: number; global: number } {
+  const n = (v: string | undefined, def: number) => (Number(v) > 0 ? Math.floor(Number(v)) : def);
+  return { cupo: n(env.INSTAGRAM_IA_CUPO_DIARIO, CUPO_DIARIO_POR_DEFECTO), global: n(env.INSTAGRAM_IA_CUPO_GLOBAL, CUPO_GLOBAL_POR_DEFECTO) };
+}
+
+/**
+ * Gasta una llamada del cupo ANTES de llamar a OpenAI (A8 de la evaluación):
+ * RPC instagram_ia_reservar_cupo, atómica (cerrojo en la base de datos), así
+ * que dos peticiones a la vez no se cuelan y un fallo de OpenAI también
+ * cuenta. Además del cupo por usuario hay un tope global diario. Si la
+ * migración 20261111000000 aún no está, cuenta como antes (contarHoy).
+ */
+export async function reservarCupoIA(s: Sesion, cupo: number, cupoGlobal: number, ahora: Date): Promise<ReservaCupo> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/rpc/instagram_ia_reservar_cupo`, {
+    method: "POST",
+    headers: cab(s, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ p_cupo: cupo, p_cupo_global: cupoGlobal }),
+    signal: AbortSignal.timeout(MS_SUPABASE),
+  });
+  if (r.ok) {
+    const v = (await r.json().catch(() => null)) as { ok?: boolean; motivo?: string; usadas?: number; cupo?: number } | null;
+    if (v?.ok === true) return { ok: true, usadas: Number(v.usadas) || 0 };
+    return { ok: false, motivo: v?.motivo === "global" ? "global" : "usuario", cupo: Number(v?.cupo) || cupo };
+  }
+  const t = await textoError(r);
+  if (r.status === 404 || /PGRST202|42883|Could not find the function/i.test(t)) {
+    const usadas = await contarHoy(s, ahora);
+    return usadas >= cupo ? { ok: false, motivo: "usuario", cupo } : { ok: true, usadas: usadas + 1 };
+  }
+  if (r.status === 401 || r.status === 403) throw new ErrorBD("Sin permiso para usar la IA: hace falta «Editar» en Marketing.", 502);
+  throw new ErrorBD(`No se pudo comprobar el cupo diario (${r.status})`, 502);
+}
+
+/** 429 del cupo agotado. */
+export function respuestaCupo(r: Extract<ReservaCupo, { ok: false }>): Response {
+  return json(429, {
+    ok: false,
+    error: r.motivo === "global"
+      ? `Se ha llegado al tope de ${r.cupo} sugerencias de IA por día entre todos los usuarios. Vuelve a probar mañana.`
+      : `Has llegado al tope de ${r.cupo} sugerencias de IA por día. Vuelve a probar mañana.`,
+  });
+}
+
 interface Guia {
   version: number;
   guia: string;
@@ -267,11 +317,13 @@ interface FilaPlato extends PlatoContexto {
   touza: boolean | null;
 }
 
+const COLUMNAS_PLATO = "id,nombre,descripcion,categoria,precio_eur,unidad,alergenos_oficiales,sin_gluten_disponible,activado,restaurante,touza";
+
 export async function leerPlato(s: Sesion, id: string): Promise<FilaPlato | null> {
-  const r = await s.fetch(
-    `${s.sb.url}/rest/v1/Platos?id=eq.${encodeURIComponent(id)}&select=id,nombre,descripcion,categoria,precio_eur,unidad,alergenos_oficiales,sin_gluten_disponible,activado,restaurante,touza`,
-    { headers: cab(s), signal: AbortSignal.timeout(MS_SUPABASE) },
-  );
+  const url = (columnas: string) => `${s.sb.url}/rest/v1/Platos?id=eq.${encodeURIComponent(id)}&select=${columnas}`;
+  // Con las dietas confirmadas (20261104151000); sin esa columna, como antes.
+  let r = await s.fetch(url(`${COLUMNAS_PLATO},etiquetas_dieteticas`), { headers: cab(s), signal: AbortSignal.timeout(MS_SUPABASE) });
+  if (r.status === 400) r = await s.fetch(url(COLUMNAS_PLATO), { headers: cab(s), signal: AbortSignal.timeout(MS_SUPABASE) });
   if (!r.ok) throw new ErrorBD(`No se pudo leer el plato (${r.status})`, 502);
   const filas = (await r.json().catch(() => [])) as FilaPlato[];
   return Array.isArray(filas) && filas[0] ? filas[0] : null;
@@ -383,6 +435,8 @@ function platoParaModelo(p: PlatoContexto | null): Record<string, unknown> | nul
     descripcion: (p.descripcion ?? "").slice(0, 400) || null,
     alergenos_oficiales: parseAlergenosOficiales(p.alergenos_oficiales) ?? "sin dato oficial: no afirmes nada de alérgenos",
     sin_gluten_disponible: p.sin_gluten_disponible === true,
+    // Confirmadas por el restaurante en la carta (20261104151000); vacío = no se puede decir.
+    dietas_confirmadas: [...dietasConfirmadas(p)],
   };
 }
 
@@ -416,7 +470,7 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   }
   registrarSecreto(clave);
   const modelo = (env.INSTAGRAM_IA_MODEL ?? "").trim() || MODELO_POR_DEFECTO;
-  const cupo = Number(env.INSTAGRAM_IA_CUPO_DIARIO) > 0 ? Math.floor(Number(env.INSTAGRAM_IA_CUPO_DIARIO)) : CUPO_DIARIO_POR_DEFECTO;
+  const { cupo, global: cupoGlobal } = cuposDe(env);
   const ahora = deps.ahora?.() ?? new Date();
 
   // Contexto de la base de datos (antes de gastar nada en OpenAI).
@@ -426,10 +480,8 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
   let nombresCarta: string[];
   let queFunciona: Awaited<ReturnType<typeof leerQueFuncionaIA>> = null;
   try {
-    const usadas = await contarHoy(s, ahora);
-    if (usadas >= cupo) {
-      return json(429, { ok: false, error: `Has llegado al tope de ${cupo} sugerencias de IA por día. Vuelve a probar mañana.` });
-    }
+    const reserva = await reservarCupoIA(s, cupo, cupoGlobal, ahora);
+    if (!reserva.ok) return respuestaCupo(reserva);
     const [g, fila, carta, qf] = await Promise.all([
       leerGuia(s, e.marca),
       e.platoId ? leerPlato(s, e.platoId) : Promise.resolve(null),

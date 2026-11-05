@@ -6,7 +6,7 @@ import { manejarMetricas } from "./metricas.ts";
 // metricas.ts; aquí solo se engancha al envoltorio de auditoría, como el resto.
 // Está en ADMITE_INTEGRACION porque la llama pg_cron sin usuario: se defiende
 // sola con x-webhook-secret (INSTAGRAM_METRICAS_CRON_SECRET, tiempo constante,
-// falla cerrado) o con el usuario y can_read_section / can_write_section.
+// falla cerrado) o con el usuario y can_read_section / can_edit_section.
 // Secretos: los de Meta (IG_ACCESS_TOKEN, IG_USER_ID, META_APP_ID…) y
 // INSTAGRAM_METRICAS_CRON_SECRET en Supabase → Edge Functions → Secrets.
 Deno.serve(conAuditoriaDePeticion("instagram-metricas", createClientBase, (req) => manejarMetricas(req)));

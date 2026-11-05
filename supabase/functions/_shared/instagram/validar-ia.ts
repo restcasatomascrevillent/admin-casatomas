@@ -32,6 +32,27 @@ export interface PlatoContexto {
   unidad: string | null;
   alergenos_oficiales: unknown;
   sin_gluten_disponible: boolean;
+  /**
+   * Dietas CONFIRMADAS por el restaurante (Platos.etiquetas_dieteticas,
+   * migración 20261104151000_platos_vegetarianos): 'vegetariano' y/o
+   * 'vegano'. Sin la columna o null = sin confirmar.
+   */
+  etiquetas_dieteticas?: unknown;
+}
+
+/** Dietas confirmadas de un plato: «vegano» implica también «vegetariano». */
+export function dietasConfirmadas(plato: Pick<PlatoContexto, "etiquetas_dieteticas"> | null): Set<"vegetariano" | "vegano"> {
+  const s = new Set<"vegetariano" | "vegano">();
+  const v = plato?.etiquetas_dieteticas;
+  if (!Array.isArray(v)) return s;
+  for (const x of v) {
+    const k = typeof x === "string" ? x.trim().toLowerCase() : "";
+    if (k === "vegano") {
+      s.add("vegano");
+      s.add("vegetariano");
+    } else if (k === "vegetariano") s.add("vegetariano");
+  }
+  return s;
 }
 
 export interface ContextoValidacion {
@@ -165,8 +186,12 @@ function alergenoTras(palabras: string[]): AlergenoUE[] {
  *     no incluye gluten;
  *   · «sin <alérgeno>»: solo si alergenos_oficiales (con dato) no lo incluye;
  *   · «contiene <alérgeno>»: solo si alergenos_oficiales lo incluye;
- *   · «sin alérgenos», «apto para alérgicos», «vegano», «vegetariano»…:
- *     nunca (la carta no tiene ese dato).
+ *   · «vegetariano» (y #vegetariano): solo si el plato de la pieza tiene
+ *     'vegetariano' o 'vegano' en etiquetas_dieteticas (confirmado por el
+ *     restaurante en la carta, 20261104151000); «vegano», «plant based»:
+ *     solo con 'vegano';
+ *   · «sin alérgenos», «apto para alérgicos», «keto», «light»…: nunca (la
+ *     carta no tiene ese dato).
  * Sin plato en el contexto, cualquier afirmación así es un error.
  */
 export function erroresAlergenos(texto: string, plato: PlatoContexto | null, hashtags: string[] = []): string[] {
@@ -203,13 +228,27 @@ export function erroresAlergenos(texto: string, plato: PlatoContexto | null, has
       if (!oficiales?.has(a)) errores.push(`Dice que contiene ${ETIQUETA_ALERGENO[a]}, pero no está en los alérgenos oficiales de ${nombre}.`);
     }
   }
-  const dieta = RE_DIETA.exec(t);
-  if (dieta) errores.push(`Dice «${dieta[0]}»: la carta no tiene ese dato y no se puede afirmar.`);
+  const dietas = dietasConfirmadas(plato);
+  // «vegetariano/a» y «vegano/a» solo con el dato confirmado en la carta; el resto, nunca.
+  const dietaOk = (palabra: string): boolean =>
+    /^vegetarian/.test(palabra) ? dietas.has("vegetariano") : /^vegan|^plant ?based/.test(palabra) ? dietas.has("vegano") : false;
+  for (const m of t.matchAll(new RegExp(RE_DIETA.source, "gu"))) {
+    if (dietaOk(m[0])) continue;
+    errores.push(
+      /^vegetarian|^vegan|^plant/.test(m[0])
+        ? `Dice «${m[0]}», pero ${nombre} no consta como ${/^vegetarian/.test(m[0]) ? "vegetariano" : "vegano"} en la carta.`
+        : `Dice «${m[0]}»: la carta no tiene ese dato y no se puede afirmar.`,
+    );
+    break;
+  }
   for (const h of hashtags) {
-    const k = plegar(h).replace(/\s+/g, "");
+    const k = plegar(h).replace(/\s+/g, "").replace(/^#/, "");
     if (!HASHTAGS_DIETA.test(k)) continue;
     const esGluten = /gluten|celiac/.test(k);
-    if (!(esGluten && sinGlutenOk)) errores.push(`El hashtag ${h} afirma algo de alérgenos o dieta que la carta no respalda.`);
+    if (esGluten && sinGlutenOk) continue;
+    if (/^vegetarian/.test(k) && dietas.has("vegetariano")) continue;
+    if (/^(?:vegan|plantbased)/.test(k) && dietas.has("vegano")) continue;
+    errores.push(`El hashtag ${h} afirma algo de alérgenos o dieta que la carta no respalda.`);
   }
   return [...new Set(errores)];
 }

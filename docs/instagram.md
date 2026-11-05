@@ -124,8 +124,11 @@ desplegar la función.
 | `META_APP_ID` | sí | developers.facebook.com → Mis apps → (app) → Configuración → Básica. |
 | `META_API_VERSION` | no | `vNN.N`; por defecto `v26.0`. |
 | `META_APP_SECRET` | no | Opcional. Con él la comprobación del token usa `debug_token` con token de app (método documentado: caducidad, app y permisos). |
-| `IG_USER_ID_CASA_TOMAS`, `IG_USER_ID_TOUZA` | no | Cuenta **propia** de cada marca. Sin ellos, la marca publica en `IG_USER_ID` (hoy las dos van a @oficiososia, la cuenta de pruebas). |
-| `IG_ACCESS_TOKEN_CASA_TOMAS`, `IG_ACCESS_TOKEN_TOUZA` | no | Token propio de la marca, solo si el general no ve su cuenta (otro usuario del sistema u otro portfolio). Sin él, se usa `IG_ACCESS_TOKEN`. |
+| `IG_USER_ID_CASA_TOMAS`, `IG_USER_ID_TOUZA` | **en producción, sí** | Cuenta **propia** de cada marca. En la demo, sin ellos la marca publica en `IG_USER_ID` (hoy las dos van a @oficiososia, la cuenta de pruebas). En **producción** son obligatorios y nunca se cae en `IG_USER_ID`: si falta el de Touza, Touza no publica (503) en vez de publicar en la cuenta de Casa Tomás. |
+| `IG_ACCESS_TOKEN_CASA_TOMAS`, `IG_ACCESS_TOKEN_TOUZA` | **en producción, sí** | Token de la marca. En la demo, solo si el general no ve su cuenta (sin él, se usa `IG_ACCESS_TOKEN`). En **producción**, obligatorio (puede ser el mismo valor para las dos marcas si un usuario del sistema ve las dos cuentas). |
+| `INSTAGRAM_ENTORNO` | no | `demo` o `produccion`. Casi nunca hace falta: ver «Producción: una cuenta por marca». |
+| `INSTAGRAM_IA_CUPO_GLOBAL` | no | Tope diario de sugerencias de IA entre todos los usuarios (300 por defecto; el de cada usuario es `INSTAGRAM_IA_CUPO_DIARIO`, 100). |
+| `INSTAGRAM_DIAS_VIDEO_PUBLICADO` | no | Días que un reel publicado conserva su MP4 en el cubo (30 por defecto, 1-365). |
 | `GOOGLE_DRIVE_MARKETING_FOLDER_ID` | sí, para el archivo | Id de la carpeta «marketing» de Drive (lo que va tras `/folders/` en su enlace). Sin él, la biblioteca de fotos no carga y al publicar el JPEG se queda en el bucket. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` | sí, para el archivo | Los **mismos** de las facturas (ya están). Ojo con el alcance del token: ver «TRAMPA: el alcance drive.file» en [instagram-fotos.md](instagram-fotos.md). |
 
@@ -280,6 +283,27 @@ Desde la migración `20261107000000_instagram_publicacion_servidor`:
   posts (las stories no lo admiten) y se guarda al probar, así que el
   programador lo reutiliza.
 
+## Que no salga dos veces (A1)
+
+Desde la evaluación de seguridad del 05/11/2026 (`instagram-publicar`,
+`instagram-programador` y `_shared/instagram/cliente.ts`):
+
+- **`media_publish` no se reintenta nunca.** Si falla o se agota el tiempo,
+  se consulta el contenedor: si Meta lo marca `PUBLISHED`, la pieza se cierra
+  como publicada con el medio que se encuentre (últimas publicaciones de la
+  cuenta, mismo texto y hora); si no, error, y el contenedor queda guardado.
+- **`media_id` y «publicada» se guardan en cuanto Meta confirma**, antes del
+  enlace, de Google Drive y de borrar nada. Si la función se corta después,
+  la pieza ya figura como publicada.
+- **Antes de crear otro contenedor** se mira el que tenía la pieza: si ya salió
+  (`PUBLISHED`), no se publica otra vez y se recupera el `media_id`. Si no se
+  puede comprobar por la red, 502 sin crear nada.
+- Si Meta da la pieza por publicada pero no se encuentra cuál es, queda
+  «publicada» sin `media_id` con el aviso «compruébala en la cuenta»: ya no se
+  puede volver a publicar ni a programar.
+- Lo mismo para los reels (también al cerrar un «procesando») y en el
+  programador.
+
 ## Limpieza del bucket (JPEG que no se publican)
 
 Migración `20261107010000_instagram_limpieza_bucket`. Cada día a las 03:30
@@ -298,12 +322,98 @@ Una pieza con la imagen borrada sale en el historial con el aviso «vuelve a
 generarla»; no se puede programar ni publicar hasta regenerarla (al
 regenerar, `imagen_borrada_at` vuelve a null).
 
+## Seguridad (bloque A de la evaluación, 05/11/2026)
+
+Migración `20261111000000_instagram_seguridad` + las funciones de esta
+versión (ver `instagram-studio/propuesta/evaluacion/seguridad.md`).
+
+### «Editar» para escribir (A2)
+
+`can_write_section` mira «Ver» a propósito en todo el panel y **no se ha
+tocado**. En Instagram, en cambio:
+
+| Acción | Permiso |
+|---|---|
+| Ver piezas, calendario, métricas, campañas, encargos; «Comprobar conexión»; listar fotos de Drive | «Ver» en Marketing (`can_read_section`) |
+| Crear o cambiar piezas, subir a los cubos o a Drive, usar la IA, probar, publicar, programar, generar vídeos, aceptar campañas, pedir encargos, «Actualizar ahora» de métricas | **«Editar»** en Marketing (`can_edit_section`) |
+| Aceptar, entregar, comentar encargos como la agencia | **«Editar»** en Instagram · Agencia |
+| Trabajador de render | **«Editar»** en Instagram · Render (sin Marketing; ver [instagram-video.md](instagram-video.md)) |
+
+Lo comprueban a la vez la base de datos (RLS y RPC) y las funciones
+(`autorizarMarketing` de las Edge Functions y de `/api/instagram-render`,
+`instagram-metricas`, `notificar-video`). **Antes de aplicar la migración en
+producción**, dar «Editar» en Marketing a quien publica.
+
+### Producción: una cuenta por marca (A3)
+
+`entornoInstagram` (`_shared/instagram/entorno.ts`), de más a menos fuerte:
+el proyecto de producción (`haqmmdfdzzatdnrrcgez`) es producción siempre; si
+no, manda `INSTAGRAM_ENTORNO`; la demo (`sfonaclosuafvlhutkon`) es demo;
+cualquier otro proyecto cuenta como producción (falla cerrado). En
+producción cada marca exige `IG_USER_ID_<MARCA>` e `IG_ACCESS_TOKEN_<MARCA>`
+y nunca usa los generales; «Comprobar conexión» lo dice en «Entorno» y en la
+cuenta de cada marca.
+
+### Tiempo del programador (A4)
+
+Límite global de 110 s por pasada desde que entra la petición (la función
+tiene 150 s en el plan gratuito). Ninguna llamada a Meta pasa del límite, no
+se reclama otra programación sin 75 s por delante, no se crea un contenedor
+sin 45 s ni se llama a `media_publish` sin 30 s («sin_tiempo»: se aplaza sin
+contar intento, con el contenedor si ya existía), y los reels «procesando»
+solo se cierran si quedan 50 s. Como mucho 3 programaciones y 3 reels por
+pasada.
+
+### Otros (A5-A8)
+
+- Cubo `instagram-video`: limpieza diaria de MP4 y portadas sin pieza y de
+  reels publicados hace más de 30 días; el trabajador borra el vídeo anterior
+  al regenerar ([instagram-video.md](instagram-video.md)).
+- Agencia: subidas atadas a sus encargos en curso, con límites, y sin leer
+  los reels del restaurante ([instagram-encargos.md](instagram-encargos.md)).
+- Cupo de IA atómico (RPC `instagram_ia_reservar_cupo`): se gasta antes de
+  llamar a OpenAI, también si falla, con tope por usuario y global.
+- Una pieza programada o publicándose no cambia de marca, formato, datos,
+  imagen ni vídeo (hay que cancelar la programación), y su fichero no se
+  puede sustituir ni borrar en los cubos; una publicada no se borra.
+- El aviso push de un evento de encargo sale una sola vez
+  (`instagram_encargo_eventos.notificado_at`).
+- La IA puede decir «vegetariano» (o «vegano») de un plato solo si
+  `Platos.etiquetas_dieteticas` lo confirma (migración
+  `20261104151000_platos_vegetarianos`, que ya está en la base).
+
+### Versiones de migración repetidas
+
+`20261105120000_instagram_fotos.sql` comparte versión con
+`20261105120000_vincular_albaranes_por_sentencia.sql` (y hay otras cinco
+parejas más antiguas). Como aquí se aplican con `db query -f`, no ha pasado
+nada; con `db push`, `db reset` o `migration list` chocarían en
+`schema_migrations`. **No se renombran** (están aplicadas en demo y
+producción y cambiarles el nombre descuadraría el historial): quedan
+listadas en `scripts/comprobar-versiones-migraciones.mjs`, y
+`npm run test:migraciones` (también en el CI) falla si aparece otra
+repetida.
+
+### Orden de despliegue
+
+1. Permisos: «Editar» en Marketing a quien publica, en Instagram · Agencia a
+   la agencia y en Instagram · Render al usuario del trabajador (sin
+   Marketing). En producción, además, los secretos de cada marca.
+2. Migración `20261111000000_instagram_seguridad` (demo primero).
+3. Edge Functions: `instagram-publicar`, `instagram-programador`,
+   `instagram-ia`, `instagram-drive`, `instagram-estado`,
+   `instagram-metricas`, `notificar-video` (en ese orden; todas leen
+   `_shared/`). Vercel (`/api/instagram-render`) sale con el despliegue
+   normal del panel.
+4. Actualizar el código del trabajador de render (`git pull`) y reiniciarlo.
+
 ## Errores frecuentes
 
 | Qué dice | Por qué | Qué hacer |
 |---|---|---|
 | «El token de acceso no es válido» (190) | Token caducado, revocado o la app/cuenta se desasignó | Regenerar el token del usuario del sistema y cambiar el secreto `IG_ACCESS_TOKEN` en Supabase |
 | «Al token le faltan permisos» (10, 200-299) | Falta `instagram_content_publish` o la cuenta no está asignada | Regenerar el token con los dos permisos; asignar la cuenta con control total |
+| «Meta ha bloqueado el acceso de la app a la API» (OAuthException 200, «API access blocked.») | Meta ha bloqueado la **app** entera, no es un permiso del token: regenerar el token no sirve. «Comprobar» lo marca como «App de Meta bloqueada» | Revisar en developers.facebook.com las Acciones requeridas, las alertas y la cuenta de desarrollador; si sigue, crear una app nueva y cambiar `META_APP_ID`, `META_APP_SECRET` e `IG_ACCESS_TOKEN` |
 | «Se ha alcanzado el límite de publicaciones» (2207042) | Cuota de 24 h agotada | Esperar; «Comprobar conexión» muestra el uso |
 | «Meta no ha podido descargar la imagen» (9004 / 2207052) | La URL pública no responde o no es JPEG | Comprobar que el bucket «instagram» es público y regenerar la pieza |
 | «Instagram no ha podido procesar la imagen (ERROR)» | Formato/medidas no admitidos | Regenerar; revisar que es JPEG 1080×1350 o 1080×1920 |
