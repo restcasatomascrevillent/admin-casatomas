@@ -16,18 +16,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { ProgramarPiezaDialog } from "@/components/instagram/programar";
-import type { FormatoId } from "@/lib/instagram";
+import { MARCAS, type FormatoId, type MarcaId } from "@/lib/instagram";
 import {
   ErrorInstagram,
   MENSAJE_SIN_SERVIDOR,
   comprobarConexion,
+  cuentaDeMarca,
   generarImagen,
   publicar,
   textoError,
   type Cuota,
   type FotoPreparada,
+  type RespuestaEstado,
 } from "./api";
-import { MAX_CAPTION, MAX_HASHTAGS, MAX_MENCIONES, resumenCaption } from "./contadores";
+import { MAX_ALT_TEXT, MAX_CAPTION, MAX_HASHTAGS, MAX_MENCIONES, contarCaracteres, problemasAltText, resumenCaption } from "./contadores";
 import { textoCuota } from "./ConexionInstagram";
 import { humanizarProblema } from "./pieza";
 import type { EstadoPieza } from "./usePiezasInstagram";
@@ -45,6 +47,8 @@ export interface ServidorPieza {
   permalink: string | null;
   /** Texto con el que pasó la prueba: si se cambia, hay que volver a probar. */
   captionProbado: string | null;
+  /** Texto alternativo con el que pasó la prueba (lo reutiliza el programador). */
+  altProbado?: string | null;
   /** Meta aún procesaba la imagen: «Reintentar» con el mismo contenedor. */
   reintento: { dryRun: boolean } | null;
   avisos: string[];
@@ -60,6 +64,7 @@ export const SERVIDOR_VACIO: ServidorPieza = {
   cuota: null,
   permalink: null,
   captionProbado: null,
+  altProbado: null,
   reintento: null,
   avisos: [],
 };
@@ -69,6 +74,8 @@ interface Props {
   /** JSON.stringify(pieza): identifica lo que se ve. */
   firma: string;
   formato: FormatoId;
+  /** Marca de la pieza: decide la cuenta de Instagram. */
+  marca: MarcaId;
   /** Hay problemas de validación o de maquetación: no se puede generar. */
   bloqueada: boolean;
   /** La vista previa aún no se ha medido. */
@@ -77,9 +84,12 @@ interface Props {
   onServidor: (s: ServidorPieza | ((previo: ServidorPieza) => ServidorPieza)) => void;
   caption: string;
   onCaption: (c: string) => void;
-  /** Cuenta de Instagram (de «Comprobar conexión»), para el diálogo de publicar. */
-  cuenta: string | null;
-  onCuenta: (c: string | null) => void;
+  /** Texto alternativo de la imagen (solo posts). */
+  altText: string;
+  onAltText: (a: string) => void;
+  /** Resultado de «Comprobar conexión» (cuenta de cada marca), para el diálogo de publicar. */
+  estadoConexion: RespuestaEstado | null;
+  onEstadoConexion: (e: RespuestaEstado | null) => void;
   /** Tras guardar algo en el servidor (para refrescar el historial). */
   onCambioServidor?: () => void;
   /** Foto de Drive ya copiada al bucket (la necesita el render). */
@@ -113,14 +123,17 @@ export function AccionesPieza({
   pieza,
   firma,
   formato,
+  marca,
   bloqueada,
   midiendo,
   servidor,
   onServidor,
   caption,
   onCaption,
-  cuenta,
-  onCuenta,
+  altText,
+  onAltText,
+  estadoConexion,
+  onEstadoConexion,
   onCambioServidor,
   fotoPreparada,
   fotoTmp,
@@ -136,13 +149,19 @@ export function AccionesPieza({
   // Las stories no llevan texto por la API: se manda vacío.
   const captionEnvio = story ? "" : caption;
   const resumen = resumenCaption(captionEnvio);
+  // Tampoco texto alternativo (Meta no lo admite en stories).
+  const altEnvio = story ? "" : altText.trim();
+  const problemasAlt = problemasAltText(altEnvio);
+  const cuenta = cuentaDeMarca(estadoConexion, marca);
+  const nombreMarca = MARCAS[marca]?.nombre ?? marca;
   const imagenAlDia = !!servidor.id && !!servidor.urlJpeg && servidor.firma === firma;
   const publicada = servidor.estado === "publicada";
   const ocupado = accion !== null;
 
   const puedeGenerar = !bloqueada && !midiendo && !ocupado;
-  const puedeProbar = imagenAlDia && !publicada && resumen.problemas.length === 0 && !ocupado;
-  const pruebaVigente = servidor.estado === "prueba_ok" && imagenAlDia && servidor.captionProbado === captionEnvio;
+  const puedeProbar = imagenAlDia && !publicada && resumen.problemas.length === 0 && problemasAlt.length === 0 && !ocupado;
+  const pruebaVigente =
+    servidor.estado === "prueba_ok" && imagenAlDia && servidor.captionProbado === captionEnvio && (servidor.altProbado ?? "") === altEnvio;
   const puedePublicar = pruebaVigente && !ocupado;
 
   const fallo = (e: unknown, titulo: string) => {
@@ -172,7 +191,7 @@ export function AccionesPieza({
     setAccion(dryRun ? "probar" : "publicar");
     setError(null);
     try {
-      const r = await publicar({ id: servidor.id, caption: captionEnvio, dryRun, contenedorId, fotoTmp: dryRun ? null : fotoTmp });
+      const r = await publicar({ id: servidor.id, caption: captionEnvio, altText: altEnvio, dryRun, contenedorId, fotoTmp: dryRun ? null : fotoTmp });
       onServidor((s) => ({
         ...s,
         estado: r.estado === "en_proceso" ? s.estado : (r.estado as ServidorPieza["estado"]),
@@ -182,6 +201,7 @@ export function AccionesPieza({
         urlJpeg: s.urlJpeg ?? r.urlJpeg,
         permalink: r.permalink ?? s.permalink,
         captionProbado: dryRun && r.estado === "prueba_ok" ? captionEnvio : s.captionProbado,
+        altProbado: dryRun && r.estado === "prueba_ok" ? altEnvio : (s.altProbado ?? null),
         reintento: r.estado === "en_proceso" ? { dryRun } : null,
         avisos: r.avisos,
       }));
@@ -205,10 +225,9 @@ export function AccionesPieza({
     if (cuenta) return;
     setBuscandoCuenta(true);
     try {
-      const r = await comprobarConexion();
-      onCuenta(r.cuenta?.username ?? null);
+      onEstadoConexion(await comprobarConexion());
     } catch {
-      onCuenta(null);
+      onEstadoConexion(null);
     } finally {
       setBuscandoCuenta(false);
     }
@@ -289,6 +308,28 @@ export function AccionesPieza({
               <span>Menciones {contador(resumen.menciones, MAX_MENCIONES)}</span>
             </p>
             {resumen.problemas.map((p) => (
+              <p key={p} className="text-xs text-destructive">
+                {p}
+              </p>
+            ))}
+            <Label htmlFor="alt-ig" className="block pt-2 text-sm font-medium">
+              Texto alternativo <span className="font-normal text-muted-foreground">(opcional)</span>
+            </Label>
+            <Textarea
+              id="alt-ig"
+              value={altText}
+              onChange={(e) => onAltText(e.target.value)}
+              rows={2}
+              placeholder="Describe la imagen para quien no la ve: «Chuletón trinchado sobre tabla, con patatas»."
+              aria-describedby="contador-alt"
+              aria-invalid={problemasAlt.length > 0 || undefined}
+              disabled={publicada}
+              className="resize-y text-sm"
+            />
+            <p id="contador-alt" className="text-xs text-muted-foreground">
+              Lo leen los lectores de pantalla de Instagram. Caracteres {contador(contarCaracteres(altEnvio), MAX_ALT_TEXT)}
+            </p>
+            {problemasAlt.map((p) => (
               <p key={p} className="text-xs text-destructive">
                 {p}
               </p>
@@ -381,7 +422,11 @@ export function AccionesPieza({
               <CalendarClock className="mr-2 h-4 w-4" aria-hidden="true" />
               Programar…
             </Button>
-            {!pruebaVigente && <p className="text-xs text-muted-foreground">Publicar y Programar se activan cuando la prueba sin publicar sale bien (así queda guardado el texto).</p>}
+            {!pruebaVigente && (
+              <p className="text-xs text-muted-foreground">
+                Publicar y Programar se activan cuando la prueba sin publicar sale bien (así quedan guardados el texto y el texto alternativo).
+              </p>
+            )}
             <ProgramarPiezaDialog
               piezaId={servidor.id ?? null}
               open={programando}
@@ -417,8 +462,8 @@ export function AccionesPieza({
               {buscandoCuenta
                 ? "Comprobando la cuenta…"
                 : cuenta
-                  ? `Se publicará en la cuenta @${cuenta}. No se puede deshacer desde aquí.`
-                  : "Se publicará en la cuenta configurada (no se ha podido comprobar cuál). No se puede deshacer desde aquí."}
+                  ? `Se publicará en la cuenta @${cuenta} (${nombreMarca}). No se puede deshacer desde aquí.`
+                  : `Se publicará en la cuenta configurada para ${nombreMarca} (no se ha podido comprobar cuál). No se puede deshacer desde aquí.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

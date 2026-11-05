@@ -42,7 +42,7 @@ import { EditorInstagram } from "../EditorInstagram";
 import { ConexionInstagram } from "../ConexionInstagram";
 import { FormularioPieza } from "../FormularioPieza";
 import { borradorVacio } from "../pieza";
-import { MENSAJE_SIN_SERVIDOR, URL_DRIVE, URL_ESTADO, URL_PUBLICAR, normalizarEstado } from "../api";
+import { MENSAJE_SIN_SERVIDOR, URL_DRIVE, URL_ESTADO, URL_PUBLICAR, cuentaDeMarca, normalizarEstado } from "../api";
 import { obtenerPlantilla } from "@/lib/instagram";
 
 function pintar(nodo: ReactNode) {
@@ -237,6 +237,8 @@ describe("EditorInstagram", () => {
 
     fireEvent.change(screen.getByLabelText("2. Texto de la publicación"), { target: { value: "Hola #casatomas @amigo" } });
     expect(screen.getByText(/Hashtags/)).toHaveTextContent("1/30");
+    fireEvent.change(screen.getByLabelText(/Texto alternativo/), { target: { value: " Salón con mesas de madera " } });
+    expect(screen.getByText(/Lo leen los lectores/)).toHaveTextContent("25/1000");
     fireEvent.click(screen.getByRole("button", { name: /Prueba sin publicar/ }));
     await screen.findByText("3 de 100 en 24 h");
     const [, initPrueba] = llamadasA(f, URL_PUBLICAR)[0];
@@ -244,20 +246,20 @@ describe("EditorInstagram", () => {
     // Publicar va a la Edge Function de Supabase (secretos de Meta en Supabase), con la clave pública.
     expect(URL_PUBLICAR).toBe("http://127.0.0.1:54321/functions/v1/instagram-publicar");
     expect(initPrueba.headers.apikey).toBe("clave-anon-de-pruebas");
-    expect(JSON.parse(initPrueba.body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: true });
+    expect(JSON.parse(initPrueba.body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", altText: "Salón con mesas de madera", dryRun: true });
 
     const publicar = screen.getByRole("button", { name: /Publicar en Instagram/ });
     expect(publicar).toBeEnabled();
     fireEvent.click(publicar);
     const dialogo = await screen.findByRole("alertdialog");
-    await within(dialogo).findByText("Se publicará en la cuenta @casatomascrevillent. No se puede deshacer desde aquí.");
+    await within(dialogo).findByText("Se publicará en la cuenta @casatomascrevillent (Restaurante Casa Tomás). No se puede deshacer desde aquí.");
     expect(llamadasA(f, URL_ESTADO)).toHaveLength(1);
     fireEvent.click(within(dialogo).getByRole("button", { name: "Publicar" }));
 
     const enlace = await screen.findByRole("link", { name: /Ver la publicación/ });
     expect(enlace).toHaveAttribute("href", "https://www.instagram.com/p/abc/");
     // Al publicar de verdad se manda la copia tmp/ para que la función la borre.
-    expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", dryRun: false, fotoTmp: TMP });
+    expect(JSON.parse(llamadasA(f, URL_PUBLICAR)[1][1].body)).toEqual({ id: ID, caption: "Hola #casatomas @amigo", altText: "Salón con mesas de madera", dryRun: false, fotoTmp: TMP });
   });
 
   it("fotos de la carta: filtro «Carta», insignia, medidas al cargar y preparar con origen «carta»", async () => {
@@ -376,6 +378,25 @@ describe("normalizarEstado", () => {
     expect(r.cuota).toEqual({ usadas: 2, total: 100, ventanaHoras: 24 });
     // Sin bloque «drive» (función antigua desplegada): null, no se inventa nada.
     expect(r.drive).toBeNull();
+  });
+
+  it("cuentas por marca: la de cada marca; sin el bloque (función antigua), la general", () => {
+    const r = normalizarEstado({
+      ok: true,
+      identidad: { igUserId: "17", username: "oficiososia" },
+      cuentasPorMarca: [
+        { marca: "casa-tomas", propia: false, igUserId: "17", username: "oficiososia", estado: "ok", detalle: "general", variableIgUserId: "IG_USER_ID", variableToken: "IG_ACCESS_TOKEN" },
+        { marca: "touza", propia: true, igUserId: "77", username: "touza_pruebas", estado: "ok", detalle: "propia", variableIgUserId: "IG_USER_ID_TOUZA", variableToken: "IG_ACCESS_TOKEN" },
+        { marca: "otra", propia: true, igUserId: "1", username: "x", estado: "ok" },
+      ],
+    });
+    expect(r.cuentasPorMarca.map((c) => c.marca)).toEqual(["casa-tomas", "touza"]);
+    expect(cuentaDeMarca(r, "touza")).toBe("touza_pruebas");
+    expect(cuentaDeMarca(r, "casa-tomas")).toBe("oficiososia");
+    const antigua = normalizarEstado({ ok: true, identidad: { igUserId: "17", username: "oficiososia" } });
+    expect(antigua.cuentasPorMarca).toEqual([]);
+    expect(cuentaDeMarca(antigua, "touza")).toBe("oficiososia");
+    expect(cuentaDeMarca(null, "touza")).toBeNull();
   });
 
   it("normaliza el bloque de Google Drive (alcance, carpeta, comprobaciones y avisos)", () => {

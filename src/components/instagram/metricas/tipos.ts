@@ -67,8 +67,16 @@ export interface Captura {
   avisos: string[];
 }
 
+/** Cuenta de Instagram distinta y las marcas que publican en ella. */
+export interface CuentaMetricas {
+  igUserId: string;
+  marcas: string[];
+}
+
 export interface DatosMetricas {
   igUserId: string | null;
+  /** Cuentas distintas (hoy, una para las dos marcas). Falta si la función es anterior. */
+  cuentas?: CuentaMetricas[];
   hoy: string;
   ultimoDia: string | null;
   resumen: { d7: ResumenPeriodo; d28: ResumenPeriodo } | null;

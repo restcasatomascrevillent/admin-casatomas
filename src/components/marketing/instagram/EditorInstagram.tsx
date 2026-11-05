@@ -20,6 +20,7 @@ import {
   type MarcaId,
 } from "@/lib/instagram";
 import { AccionesPieza, SERVIDOR_VACIO, type ServidorPieza } from "./AccionesPieza";
+import type { RespuestaEstado } from "./api";
 import { ConexionInstagram } from "./ConexionInstagram";
 import { FormularioPieza, NOMBRE_FORMATO } from "./FormularioPieza";
 import { HistorialPiezas, urlImagenPieza } from "./HistorialPiezas";
@@ -78,7 +79,8 @@ export function EditorInstagram() {
   const [borrador, setBorrador] = useState<Borrador>(borradorInicial);
   const [servidor, setServidor] = useState<ServidorPieza>(SERVIDOR_VACIO);
   const [caption, setCaption] = useState("");
-  const [cuenta, setCuenta] = useState<string | null>(null);
+  const [altText, setAltText] = useState("");
+  const [estadoConexion, setEstadoConexion] = useState<RespuestaEstado | null>(null);
   const [lado, setLado] = useState("publicar");
   const [indiceEjemplo, setIndiceEjemplo] = useState(1);
   const [maquetacion, setMaquetacion] = useState<(ResultadoMaquetacion & { documento: string }) | null>(null);
@@ -166,16 +168,20 @@ export function EditorInstagram() {
     const b = borradorDesdeDatos({ ...(p.datos ?? {}), marca: p.marca, plantilla: p.plantilla, formato: p.formato } as never, base);
     setBorrador(b);
     setCaption(p.caption ?? "");
+    setAltText(p.alt_text ?? "");
     const firmaPieza = JSON.stringify(piezaDesdeBorrador(b, obtenerPlantilla(b.plantilla)));
+    // Si el JPEG se borró por llevar días sin publicarse, hay que volver a generarlo.
+    const conImagen = !!p.imagen_ruta && !p.imagen_borrada_at;
     setServidor({
       ...SERVIDOR_VACIO,
       id: p.id,
       estado: p.estado,
       urlJpeg: urlImagenPieza(BASE_FOTOS, p),
-      firma: p.imagen_ruta ? firmaPieza : null,
+      firma: conImagen ? firmaPieza : null,
       contenedorId: p.contenedor_id,
       permalink: p.permalink,
       captionProbado: p.estado === "prueba_ok" ? (p.formato === "story" ? "" : p.caption ?? "") : null,
+      altProbado: p.estado === "prueba_ok" ? (p.formato === "story" ? "" : (p.alt_text ?? "").trim()) : null,
     });
     setLado("publicar");
   };
@@ -183,6 +189,7 @@ export function EditorInstagram() {
   const nuevaPieza = () => {
     setServidor(SERVIDOR_VACIO);
     setCaption("");
+    setAltText("");
   };
 
   const { ancho, alto } = FORMATOS[borrador.formato];
@@ -266,14 +273,17 @@ export function EditorInstagram() {
             pieza={pieza}
             firma={firma}
             formato={borrador.formato}
+            marca={borrador.marca}
             bloqueada={problemas.length > 0 || !documento}
             midiendo={midiendo}
             servidor={servidor}
             onServidor={setServidor}
             caption={caption}
             onCaption={setCaption}
-            cuenta={cuenta}
-            onCuenta={setCuenta}
+            altText={altText}
+            onAltText={setAltText}
+            estadoConexion={estadoConexion}
+            onEstadoConexion={setEstadoConexion}
             onCambioServidor={() => void qc.invalidateQueries({ queryKey: CLAVE_PIEZAS })}
             fotoPreparada={preparacion.lista?.preparada ?? null}
             fotoTmp={preparacion.lista?.ruta ?? null}
@@ -288,7 +298,7 @@ export function EditorInstagram() {
         </TabsContent>
         {/* forceMount: el resultado de «Comprobar» no se pierde al cambiar de chip. */}
         <TabsContent value="conexion" forceMount className={cn(CONTENIDO_LADO, lado !== "conexion" && "hidden")}>
-          <ConexionInstagram onEstado={(e) => setCuenta(e.cuenta?.username ?? null)} className="border-0 p-0" />
+          <ConexionInstagram onEstado={setEstadoConexion} className="border-0 p-0" />
         </TabsContent>
       </Tabs>
     </div>

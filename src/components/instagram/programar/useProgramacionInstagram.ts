@@ -7,14 +7,15 @@
  *  - useAccionesProgramacion(): programar, reprogramar y cancelar por RPC
  *    (instagram_programar, instagram_reprogramar,
  *    instagram_cancelar_programacion), que validan en el servidor.
- * Las tablas aún no están en `types.ts` (se actualiza a mano): cliente sin tipos.
+ * Tipos de las tablas y RPC en `src/integrations/supabase/types.ts` (a mano,
+ * fase 0 de Instagram): columnas y RPC mal escritas dan error de tipos; los
+ * estados se estrechan aquí.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { PiezaResumen, ProgramacionConPieza } from "./logica";
 
-const sb = supabase as unknown as SupabaseClient;
+const sb = supabase;
 
 export const CLAVE_PROGRAMACION = ["instagram_programaciones"] as const;
 /** Misma clave que el historial de piezas (usePiezasInstagram): se invalida al publicar/programar. */
@@ -130,7 +131,7 @@ export function useAccionesProgramacion() {
         ? await sb.rpc("instagram_reprogramar", { p_id: e.programacionId, p_para: e.instante.toISOString(), p_confirmar_conflicto: confirmar })
         : await sb.rpc("instagram_programar", { p_pieza_id: e.piezaId, p_para: e.instante.toISOString(), p_confirmar_conflicto: confirmar });
       if (error) throw new Error(mensajeError(error));
-      return data as RespuestaProgramar;
+      return data as unknown as RespuestaProgramar;
     },
     onSuccess: (r) => {
       if (r.ok) refrescar();
@@ -141,7 +142,7 @@ export function useAccionesProgramacion() {
     mutationFn: async (programacionId: string): Promise<ProgramacionInstagram> => {
       const { data, error } = await sb.rpc("instagram_cancelar_programacion", { p_id: programacionId });
       if (error) throw new Error(mensajeError(error));
-      return (data as { programacion: ProgramacionInstagram }).programacion;
+      return (data as unknown as { programacion: ProgramacionInstagram }).programacion;
     },
     onSuccess: refrescar,
   });

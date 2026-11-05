@@ -16,9 +16,12 @@ export const ETIQUETA_ESTADO: Record<EstadoPieza, { texto: string; clase: string
 
 export const NOMBRE_MARCA_CORTO: Record<MarcaId, string> = { "casa-tomas": "Casa Tomás", touza: "Touza" };
 
-/** URL del JPEG de una pieza (bucket «instagram»), con ?v= para no ver una versión vieja de la caché. */
-export function urlImagenPieza(baseFotos: string, p: Pick<PiezaInstagram, "imagen_ruta" | "updated_at">): string | null {
-  if (!p.imagen_ruta) return null;
+/**
+ * URL del JPEG de una pieza (bucket «instagram»), con ?v= para no ver una versión vieja de la caché.
+ * null si no tiene o si la limpieza diaria lo borró por no publicarse (imagen_borrada_at).
+ */
+export function urlImagenPieza(baseFotos: string, p: Pick<PiezaInstagram, "imagen_ruta" | "updated_at"> & { imagen_borrada_at?: string | null }): string | null {
+  if (!p.imagen_ruta || p.imagen_borrada_at) return null;
   const url = /^https?:\/\//.test(p.imagen_ruta) ? p.imagen_ruta : urlRecurso(baseFotos, p.imagen_ruta);
   return `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(p.updated_at ?? "")}`;
 }
@@ -81,6 +84,9 @@ export function HistorialPiezas({ baseFotos, actual, onAbrir }: Props) {
                   <time dateTime={p.created_at}>{format(new Date(p.created_at), "d MMM, HH:mm", { locale: es })}</time>
                 </span>
                 {p.estado === "error" && p.error && <span className="mt-0.5 block truncate text-xs text-destructive" title={p.error}>{p.error}</span>}
+                {p.imagen_borrada_at && p.estado !== "publicada" && (
+                  <span className="mt-0.5 block text-xs text-amber-700">Imagen borrada por no publicarse: vuelve a generarla.</span>
+                )}
               </span>
             </button>
             {p.permalink && (

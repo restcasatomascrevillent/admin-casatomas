@@ -63,8 +63,19 @@ export interface Cuota {
   ventanaHoras?: number | null;
 }
 
+/** Cuenta de Instagram con la que se publica una pieza (la de su marca o la general). */
+export interface CuentaPublicacion {
+  marca: string;
+  igUserId: string | null;
+  /** true si la marca tiene secretos propios (IG_USER_ID_<MARCA>…). */
+  propia: boolean;
+}
+
 /** Respuesta de instagram-publicar, ya normalizada. */
 export interface RespuestaPublicar {
+  cuenta: CuentaPublicacion | null;
+  /** «programada», «publicacion_en_curso»… en los 409. */
+  tipo?: string | null;
   estado: EstadoPublicacion;
   contenedorId: string | null;
   /** Estado del contenedor en Meta (FINISHED, IN_PROGRESS…). */
@@ -97,9 +108,24 @@ export interface EstadoDrive {
   avisos: string[];
 }
 
+/** En qué cuenta publica cada marca (de instagram-estado). */
+export interface CuentaDeMarca {
+  marca: MarcaId;
+  propia: boolean;
+  igUserId: string | null;
+  username: string | null;
+  /** Secretos de los que sale: IG_USER_ID_TOUZA o IG_USER_ID… */
+  variableIgUserId: string;
+  variableToken: string;
+  estado: EstadoComprobacion;
+  detalle: string;
+}
+
 /** Respuesta de instagram-estado, ya normalizada. Nunca trae valores secretos. */
 export interface RespuestaEstado {
   ok: boolean;
+  /** Vacío si la función desplegada aún no distingue marcas. */
+  cuentasPorMarca: CuentaDeMarca[];
   variables: Comprobacion[];
   comprobaciones: Comprobacion[];
   cuenta: { id: string | null; username: string } | null;
@@ -197,7 +223,10 @@ function normalizarCuota(c: unknown): Cuota | null {
 }
 
 export function normalizarPublicar(r: Crudo): RespuestaPublicar {
+  const c = r.cuenta;
   return {
+    cuenta: c && typeof c === "object" && typeof c.marca === "string" ? { marca: c.marca, igUserId: c.igUserId ?? null, propia: c.propia === true } : null,
+    tipo: typeof r.tipo === "string" ? r.tipo : null,
     estado: String(r.estado ?? ""),
     contenedorId: r.contenedor?.id ?? r.contenedorId ?? null,
     estadoContenedor: r.contenedor?.estado ?? null,
@@ -223,8 +252,23 @@ export function normalizarEstado(r: Crudo): RespuestaEstado {
   const pasos = new Set<string>();
   for (const x of [...variables, ...comprobaciones]) if (x.estado !== "ok" && x.comoArreglarlo) pasos.add(x.comoArreglarlo);
   for (const x of [r.comoArreglarlo].flat()) if (typeof x === "string" && x) pasos.add(x);
+  const cuentasPorMarca: CuentaDeMarca[] = Array.isArray(r.cuentasPorMarca)
+    ? r.cuentasPorMarca
+        .filter((x: Crudo) => x && (x.marca === "casa-tomas" || x.marca === "touza"))
+        .map((x: Crudo) => ({
+          marca: x.marca as MarcaId,
+          propia: x.propia === true,
+          igUserId: typeof x.igUserId === "string" ? x.igUserId : null,
+          username: typeof x.username === "string" ? x.username : null,
+          variableIgUserId: String(x.variableIgUserId ?? "IG_USER_ID"),
+          variableToken: String(x.variableToken ?? "IG_ACCESS_TOKEN"),
+          estado: normalizarEstadoComprobacion(x.estado),
+          detalle: String(x.detalle ?? ""),
+        }))
+    : [];
   return {
     ok: r.ok === true,
+    cuentasPorMarca,
     variables,
     comprobaciones,
     cuenta: username ? { id: r.identidad?.igUserId ?? r.cuenta?.id ?? null, username } : null,
@@ -256,6 +300,16 @@ function normalizarDrive(d: unknown): EstadoDrive | null {
   };
 }
 
+/**
+ * @usuario de la cuenta en la que publica una marca. Si la función desplegada
+ * aún no distingue marcas, la cuenta general (`cuenta`).
+ */
+export function cuentaDeMarca(estado: RespuestaEstado | null, marca: string): string | null {
+  if (!estado) return null;
+  const propia = estado.cuentasPorMarca.find((c) => c.marca === marca);
+  return propia ? propia.username : (estado.cuenta?.username ?? null);
+}
+
 /** Foto de Drive ya copiada al bucket, tal como la necesita el render. */
 export interface FotoPreparada {
   id: string;
@@ -276,13 +330,15 @@ export function generarImagen(pieza: unknown, id?: string | null, opts?: Opcione
 
 /**
  * Prueba (dryRun) o publicación real. `contenedorId` para reintentar uno
- * «en_proceso». `fotoTmp`: copia temporal de la foto de Drive (se borra al publicar).
+ * «en_proceso». `fotoTmp`: copia temporal de la foto de Drive (se borra al
+ * publicar). `altText`: texto alternativo (solo posts; se guarda en la pieza).
  */
 export function publicar(
-  args: { id: string; caption: string; dryRun: boolean; contenedorId?: string | null; fotoTmp?: string | null },
+  args: { id: string; caption: string; altText?: string; dryRun: boolean; contenedorId?: string | null; fotoTmp?: string | null },
   opts?: OpcionesLlamada,
 ) {
   const cuerpo: Record<string, unknown> = { id: args.id, caption: args.caption, dryRun: args.dryRun };
+  if (args.altText !== undefined) cuerpo.altText = args.altText;
   if (args.contenedorId) cuerpo.contenedorId = args.contenedorId;
   if (args.fotoTmp) cuerpo.fotoTmp = args.fotoTmp;
   return llamar<Crudo>(URL_PUBLICAR, { method: "POST", body: JSON.stringify(cuerpo) }, opts, cabecerasEdge()).then(normalizarPublicar);

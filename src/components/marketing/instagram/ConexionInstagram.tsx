@@ -2,11 +2,13 @@ import { useState, type ReactNode } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2, PlugZap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { MARCAS } from "@/lib/instagram";
 import { comprobarConexion, ErrorInstagram, textoError, type Cuota, type EstadoDrive, type RespuestaEstado } from "./api";
 
 /**
  * «Conexión con Instagram»: llama a la Edge Function instagram-estado y enseña ✔/✖/⚠ por
- * variable, la cuenta y el cupo, con «Cómo arreglarlo». Debajo, Google Drive
+ * variable, la cuenta (y en qué cuenta publica cada marca: la suya si tiene
+ * IG_USER_ID_<MARCA>, si no la general) y el cupo, con «Cómo arreglarlo». Debajo, Google Drive
  * (donde se archivan las fotos y las piezas publicadas): secretos, permiso
  * (alcance) del token y si la carpeta «marketing» se ve y se puede escribir.
  * La función nunca devuelve valores secretos: aquí solo se pintan nombre,
@@ -150,6 +152,18 @@ export function ConexionInstagram({ onEstado, className }: Props) {
               <Linea estado={estado.cuenta ? "ok" : "falla"}>
                 Cuenta: {estado.cuenta ? <strong>@{estado.cuenta.username}</strong> : <span className="text-muted-foreground">sin identificar</span>}
               </Linea>
+              {estado.cuentasPorMarca.map((c) => (
+                <Linea key={c.marca} estado={c.estado}>
+                  <span data-testid={`cuenta-marca-${c.marca}`}>
+                    {MARCAS[c.marca]?.nombre ?? c.marca} publica en{" "}
+                    {c.username ? <strong>@{c.username}</strong> : <span className="text-muted-foreground">una cuenta sin identificar</span>}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      · {c.propia ? `cuenta propia (${c.variableIgUserId})` : "cuenta general (IG_USER_ID)"}
+                    </span>
+                  </span>
+                </Linea>
+              ))}
               {estado.cuota && (
                 <Linea estado={estadoCuota(estado.cuota.usadas, estado.cuota.total)}>
                   Publicaciones: {textoCuota(estado.cuota)}

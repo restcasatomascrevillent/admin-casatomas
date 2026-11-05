@@ -2202,6 +2202,387 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_fotos: {
+        Row: {
+          alto: number
+          ancho: number
+          created_at: string
+          descripcion: string
+          drive_id: string | null
+          id: string
+          marca: string
+          ruta: string | null
+          subida_por: string | null
+          tipo: string
+        }
+        Insert: {
+          alto: number
+          ancho: number
+          created_at?: string
+          descripcion?: string
+          drive_id?: string | null
+          id?: string
+          marca: string
+          ruta?: string | null
+          subida_por?: string | null
+          tipo: string
+        }
+        Update: {
+          alto?: number
+          ancho?: number
+          created_at?: string
+          descripcion?: string
+          drive_id?: string | null
+          id?: string
+          marca?: string
+          ruta?: string | null
+          subida_por?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
+      instagram_metricas_capturas: {
+        Row: {
+          avisos: Json
+          dias: number
+          error: string | null
+          error_tipo: string | null
+          fin: string | null
+          id: number
+          ig_user_id: string | null
+          inicio: string
+          ok: boolean
+          origen: string
+          publicaciones: number
+        }
+        Insert: {
+          avisos?: Json
+          dias?: number
+          error?: string | null
+          error_tipo?: string | null
+          fin?: string | null
+          id?: never
+          ig_user_id?: string | null
+          inicio?: string
+          ok?: boolean
+          origen: string
+          publicaciones?: number
+        }
+        Update: {
+          avisos?: Json
+          dias?: number
+          error?: string | null
+          error_tipo?: string | null
+          fin?: string | null
+          id?: never
+          ig_user_id?: string | null
+          inicio?: string
+          ok?: boolean
+          origen?: string
+          publicaciones?: number
+        }
+        Relationships: []
+      }
+      instagram_metricas_cuenta: {
+        Row: {
+          alcance: number | null
+          capturado_at: string
+          comentarios: number | null
+          compartidos: number | null
+          cuentas_interaccion: number | null
+          fecha: string
+          guardados: number | null
+          id: number
+          ig_user_id: string
+          interacciones: number | null
+          me_gusta: number | null
+          seguidores: number | null
+          toques_enlaces: number | null
+          visitas_perfil: number | null
+          visualizaciones: number | null
+        }
+        Insert: {
+          alcance?: number | null
+          capturado_at?: string
+          comentarios?: number | null
+          compartidos?: number | null
+          cuentas_interaccion?: number | null
+          fecha: string
+          guardados?: number | null
+          id?: never
+          ig_user_id: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          seguidores?: number | null
+          toques_enlaces?: number | null
+          visitas_perfil?: number | null
+          visualizaciones?: number | null
+        }
+        Update: {
+          alcance?: number | null
+          capturado_at?: string
+          comentarios?: number | null
+          compartidos?: number | null
+          cuentas_interaccion?: number | null
+          fecha?: string
+          guardados?: number | null
+          id?: never
+          ig_user_id?: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          seguidores?: number | null
+          toques_enlaces?: number | null
+          visitas_perfil?: number | null
+          visualizaciones?: number | null
+        }
+        Relationships: []
+      }
+      instagram_metricas_publicacion: {
+        Row: {
+          alcance: number | null
+          capturado_at: string
+          caption: string | null
+          comentarios: number | null
+          compartidos: number | null
+          fecha_captura: string
+          guardados: number | null
+          id: number
+          ig_user_id: string
+          interacciones: number | null
+          me_gusta: number | null
+          media_id: string
+          miniatura_url: string | null
+          permalink: string | null
+          pieza_id: string | null
+          producto: string | null
+          publicado_at: string | null
+          tipo_medio: string | null
+          visualizaciones: number | null
+        }
+        Insert: {
+          alcance?: number | null
+          capturado_at?: string
+          caption?: string | null
+          comentarios?: number | null
+          compartidos?: number | null
+          fecha_captura: string
+          guardados?: number | null
+          id?: never
+          ig_user_id: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          media_id: string
+          miniatura_url?: string | null
+          permalink?: string | null
+          pieza_id?: string | null
+          producto?: string | null
+          publicado_at?: string | null
+          tipo_medio?: string | null
+          visualizaciones?: number | null
+        }
+        Update: {
+          alcance?: number | null
+          capturado_at?: string
+          caption?: string | null
+          comentarios?: number | null
+          compartidos?: number | null
+          fecha_captura?: string
+          guardados?: number | null
+          id?: never
+          ig_user_id?: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          media_id?: string
+          miniatura_url?: string | null
+          permalink?: string | null
+          pieza_id?: string | null
+          producto?: string | null
+          publicado_at?: string | null
+          tipo_medio?: string | null
+          visualizaciones?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_metricas_publicacion_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_piezas: {
+        Row: {
+          alt_text: string | null
+          caption: string | null
+          contenedor_id: string | null
+          created_at: string
+          creado_por: string | null
+          datos: Json
+          drive_id: string | null
+          error: string | null
+          estado: string
+          formato: string
+          id: string
+          imagen_borrada_at: string | null
+          imagen_ruta: string | null
+          marca: string
+          media_id: string | null
+          permalink: string | null
+          plantilla: string
+          publicada_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          alt_text?: string | null
+          caption?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          datos?: Json
+          drive_id?: string | null
+          error?: string | null
+          estado?: string
+          formato: string
+          id?: string
+          imagen_borrada_at?: string | null
+          imagen_ruta?: string | null
+          marca: string
+          media_id?: string | null
+          permalink?: string | null
+          plantilla: string
+          publicada_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alt_text?: string | null
+          caption?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          datos?: Json
+          drive_id?: string | null
+          error?: string | null
+          estado?: string
+          formato?: string
+          id?: string
+          imagen_borrada_at?: string | null
+          imagen_ruta?: string | null
+          marca?: string
+          media_id?: string | null
+          permalink?: string | null
+          plantilla?: string
+          publicada_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      instagram_programaciones: {
+        Row: {
+          bloqueada_hasta: string | null
+          bloqueo_id: string | null
+          cancelada_at: string | null
+          cancelada_por: string | null
+          contenedor_id: string | null
+          created_at: string
+          creado_por: string | null
+          estado: string
+          id: string
+          intentos: number
+          marca: string
+          media_id: string | null
+          permalink: string | null
+          pieza_id: string
+          programada_para: string
+          publicada_at: string | null
+          siguiente_intento_at: string
+          ultimo_error: string | null
+          ultimo_intento_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          bloqueada_hasta?: string | null
+          bloqueo_id?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          estado?: string
+          id?: string
+          intentos?: number
+          marca: string
+          media_id?: string | null
+          permalink?: string | null
+          pieza_id: string
+          programada_para: string
+          publicada_at?: string | null
+          siguiente_intento_at: string
+          ultimo_error?: string | null
+          ultimo_intento_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bloqueada_hasta?: string | null
+          bloqueo_id?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          estado?: string
+          id?: string
+          intentos?: number
+          marca?: string
+          media_id?: string | null
+          permalink?: string | null
+          pieza_id?: string
+          programada_para?: string
+          publicada_at?: string | null
+          siguiente_intento_at?: string
+          ultimo_error?: string | null
+          ultimo_intento_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_programaciones_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_publicaciones_en_curso: {
+        Row: {
+          bloqueada_hasta: string
+          bloqueo_id: string
+          created_at: string
+          pieza_id: string
+        }
+        Insert: {
+          bloqueada_hasta: string
+          bloqueo_id: string
+          created_at?: string
+          pieza_id: string
+        }
+        Update: {
+          bloqueada_hasta?: string
+          bloqueo_id?: string
+          created_at?: string
+          pieza_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_publicaciones_en_curso_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: true
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       items_documento: {
         Row: {
           cantidad: number | null
@@ -4956,6 +5337,38 @@ export type Database = {
         }
         Relationships: []
       }
+      instagram_metricas_publicacion_ultima: {
+        Row: {
+          alcance: number | null
+          capturado_at: string | null
+          caption: string | null
+          comentarios: number | null
+          compartidos: number | null
+          fecha_captura: string | null
+          guardados: number | null
+          id: number | null
+          ig_user_id: string | null
+          interacciones: number | null
+          me_gusta: number | null
+          media_id: string | null
+          miniatura_url: string | null
+          permalink: string | null
+          pieza_id: string | null
+          producto: string | null
+          publicado_at: string | null
+          tipo_medio: string | null
+          visualizaciones: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_metricas_publicacion_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vista_asignacion_dia: {
         Row: {
           espacio_id: string | null
@@ -5468,6 +5881,26 @@ export type Database = {
       has_section_permission: {
         Args: { _permission: string; _section: string; _user_id: string }
         Returns: boolean
+      }
+      instagram_cancelar_programacion: {
+        Args: { p_id: string }
+        Returns: Json
+      }
+      instagram_programar: {
+        Args: {
+          p_confirmar_conflicto?: boolean
+          p_para: string
+          p_pieza_id: string
+        }
+        Returns: Json
+      }
+      instagram_reprogramar: {
+        Args: {
+          p_confirmar_conflicto?: boolean
+          p_id: string
+          p_para: string
+        }
+        Returns: Json
       }
       http: {
         Args: { request: Database["public"]["CompositeTypes"]["http_request"] }

@@ -57,13 +57,13 @@ function lista(x: unknown): string[] {
   return [x].flat().filter((s): s is string => typeof s === "string" && s.length > 0);
 }
 
-async function llamar<T>(init: RequestInit, opts: OpcionesLlamada = {}): Promise<T> {
+async function llamar<T>(init: RequestInit, opts: OpcionesLlamada = {}, consulta = ""): Promise<T> {
   const token = opts.token === undefined ? await tokenSesion() : opts.token;
   if (!token) throw new ErrorMetricas("No hay sesión: vuelve a entrar en el panel.", "sesion", 401);
   const f = opts.fetch ?? fetch;
   let r: Response;
   try {
-    r = await f(URL_METRICAS, {
+    r = await f(`${URL_METRICAS}${consulta}`, {
       ...init,
       headers: {
         ...(init.body ? { "Content-Type": "application/json" } : {}),
@@ -102,9 +102,12 @@ async function llamar<T>(init: RequestInit, opts: OpcionesLlamada = {}): Promise
   throw new ErrorMetricas(mensaje, "servidor", r.status, pasos);
 }
 
-/** Resumen, serie y publicaciones (no llama a Meta). */
-export function leerMetricas(opts?: OpcionesLlamada): Promise<DatosMetricas> {
-  return llamar<DatosMetricas & { ok: true }>({ method: "GET" }, opts);
+/**
+ * Resumen, serie y publicaciones (no llama a Meta). Con `marca`, los de la
+ * cuenta de esa marca (solo cambia algo si tiene cuenta propia).
+ */
+export function leerMetricas(opts?: OpcionesLlamada, marca?: string | null): Promise<DatosMetricas> {
+  return llamar<DatosMetricas & { ok: true }>({ method: "GET" }, opts, marca ? `?marca=${encodeURIComponent(marca)}` : "");
 }
 
 /** Pide ahora las métricas a Meta y las guarda (necesita poder editar Marketing). */

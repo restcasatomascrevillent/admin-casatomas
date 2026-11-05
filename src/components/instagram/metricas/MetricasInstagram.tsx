@@ -356,7 +356,9 @@ function Centro({ children, rol = "status", etiqueta }: { children: ReactNode; r
  *   <MetricasInstagram />
  */
 export function MetricasInstagram({ api, className }: MetricasInstagramProps) {
-  const m = useMetricasInstagram(api);
+  // Cuenta: solo hay que elegir si alguna marca tiene cuenta propia (IG_USER_ID_<MARCA>).
+  const [marcaCuenta, setMarcaCuenta] = useState<string | null>(null);
+  const m = useMetricasInstagram(api, marcaCuenta);
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA);
   const [periodo, setPeriodo] = useState<"7" | "28">("7");
@@ -501,6 +503,22 @@ export function MetricasInstagram({ api, className }: MetricasInstagramProps) {
           <AyudaPopover etiqueta="Qué cuentan estas métricas">{TEXTO_AYUDA}</AyudaPopover>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {(datos?.cuentas?.length ?? 0) > 1 && (
+            <ToggleGroup
+              type="single"
+              size="sm"
+              value={marcaCuenta ?? datos?.cuentas?.[0]?.marcas[0] ?? ""}
+              onValueChange={(v) => v && setMarcaCuenta(v)}
+              aria-label="Cuenta de Instagram"
+              data-testid="selector-cuenta-metricas"
+            >
+              {datos?.cuentas?.map((c) => (
+                <ToggleGroupItem key={c.igUserId} value={c.marcas[0]}>
+                  {c.marcas.map(nombreMarca).join(" y ")}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
+          )}
           {datos?.resumen && (
             <ToggleGroup
               type="single"

@@ -124,6 +124,8 @@ desplegar la función.
 | `META_APP_ID` | sí | developers.facebook.com → Mis apps → (app) → Configuración → Básica. |
 | `META_API_VERSION` | no | `vNN.N`; por defecto `v26.0`. |
 | `META_APP_SECRET` | no | Opcional. Con él la comprobación del token usa `debug_token` con token de app (método documentado: caducidad, app y permisos). |
+| `IG_USER_ID_CASA_TOMAS`, `IG_USER_ID_TOUZA` | no | Cuenta **propia** de cada marca. Sin ellos, la marca publica en `IG_USER_ID` (hoy las dos van a @oficiososia, la cuenta de pruebas). |
+| `IG_ACCESS_TOKEN_CASA_TOMAS`, `IG_ACCESS_TOKEN_TOUZA` | no | Token propio de la marca, solo si el general no ve su cuenta (otro usuario del sistema u otro portfolio). Sin él, se usa `IG_ACCESS_TOKEN`. |
 | `GOOGLE_DRIVE_MARKETING_FOLDER_ID` | sí, para el archivo | Id de la carpeta «marketing» de Drive (lo que va tras `/folders/` en su enlace). Sin él, la biblioteca de fotos no carga y al publicar el JPEG se queda en el bucket. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN` | sí, para el archivo | Los **mismos** de las facturas (ya están). Ojo con el alcance del token: ver «TRAMPA: el alcance drive.file» en [instagram-fotos.md](instagram-fotos.md). |
 
@@ -134,6 +136,21 @@ npx supabase secrets set IG_ACCESS_TOKEN=… IG_USER_ID=… META_APP_ID=… --pr
 ```
 
 o en el Dashboard: **Edge Functions → Secrets → Add new secret**.
+
+**Cuenta por marca** (07/11/2026). Cada pieza se publica, se programa y se
+mide con la cuenta de **su marca**: `IG_USER_ID_<MARCA>` /
+`IG_ACCESS_TOKEN_<MARCA>` si existen y, si no, `IG_USER_ID` /
+`IG_ACCESS_TOKEN`. Sin tocar nada todo sigue como antes. Cuando Touza tenga
+su cuenta de Instagram (en el mismo portfolio y asignada al usuario del
+sistema), basta con:
+
+```
+npx supabase secrets set IG_USER_ID_TOUZA=<ID numérico> --project-ref sfonaclosuafvlhutkon
+```
+
+«Comprobar conexión» enseña en qué cuenta publica cada marca y de qué
+secreto sale; el diálogo de «Publicar» nombra la cuenta de la marca de la
+pieza; «Métricas» captura cada cuenta distinta y deja elegirla.
 `SUPABASE_URL` y `SUPABASE_ANON_KEY` los pone la plataforma en todas las
 funciones; de ahí sale la URL pública del JPEG.
 
@@ -239,19 +256,47 @@ Google; 502 si Drive falla (con `comoArreglarlo`). Detalle en [instagram-fotos.m
   configura en el panel de Vercel (Settings → Functions), no en
   `vercel.json`; el plan Hobby da 2 GB, suficiente.
 
-## Propuesta (sin hacer): limpiar los JPEG que no se publican
+## Estado de publicación solo por el servidor y doble publicación
 
-Las piezas generadas o probadas que nunca se publican dejan su JPEG en el
-bucket. Propuesta para más adelante (**no implementada**): una tarea de
-`pg_cron` diaria que borre los JPEG de `piezas/` cuya fila lleve más de 24 h
-sin publicar (estado «generada», «prueba_ok» o «error»; a las 24 h el
-contenedor de Meta ya ha caducado y la URL no hace falta) y deje la fila con
-una marca de «imagen borrada» para que el panel ofrezca «Volver a generar».
-Habría que hacerlo con una función `security definer` que borre por la API de
-Storage (no con `delete from storage.objects`, que deja el fichero huérfano en
-el almacenamiento) o con una Edge Function llamada desde `pg_cron` con
-`pg_net`, y conviene antes una columna propia en `instagram_piezas` (por
-ejemplo `imagen_borrada_at timestamptz`) en lugar de deducirlo del estado.
+Desde la migración `20261107000000_instagram_publicacion_servidor`:
+
+- El panel (rol `authenticated`) **no** puede poner una pieza en
+  «prueba_ok», «publicada» o «error», ni escribir `contenedor_id`,
+  `media_id`, `permalink` o `drive_id`, ni tocar una pieza publicada. Solo
+  lo que hace el render: crear o regenerar en «generada». Lo demás lo
+  escriben `instagram-publicar` (con `service_role` **después** de
+  autorizar al usuario con su JWT; la auditoría guarda la función y el
+  usuario) y `instagram-programador`.
+- **Cerrojo**: antes de llamar a Meta, `instagram-publicar` reserva la pieza
+  (RPC `instagram_pieza_reservar_publicacion`, solo `service_role`, caduca
+  a los 3 min). Una segunda prueba o publicación a la vez → 409
+  «publicacion_en_curso».
+- **Publicar a mano una pieza programada → 409 «programada»**: hay que
+  cancelar la programación en el calendario antes. El programador no pasa
+  por esa comprobación (la programación es suya) y, si alguien la tiene
+  reservada, la aplaza a la siguiente pasada.
+- **Texto alternativo** (`instagram_piezas.alt_text`, ≤ 1000): campo
+  opcional bajo el texto de la publicación. Va a Meta (`alt_text`) en los
+  posts (las stories no lo admiten) y se guarda al probar, así que el
+  programador lo reutiliza.
+
+## Limpieza del bucket (JPEG que no se publican)
+
+Migración `20261107010000_instagram_limpieza_bucket`. Cada día a las 03:30
+UTC el cron `instagram-limpieza-bucket` llama a `instagram-programador` con
+`{ "accion": "limpiar" }` (mismo secreto que el programador):
+
+- borra por la API de Storage los JPEG de `piezas/` que llevan **7 días** sin
+  cambios y sin publicar, y les pone `imagen_borrada_at`;
+- **nunca** los de una pieza con una programación activa (programada o
+  publicándose; se puede programar a 75 días), ni los publicados, ni los que
+  se están publicando;
+- borra también las copias `tmp/` de más de 24 h (ninguna programación las
+  necesita: el JPEG ya lleva la foto dentro).
+
+Una pieza con la imagen borrada sale en el historial con el aviso «vuelve a
+generarla»; no se puede programar ni publicar hasta regenerarla (al
+regenerar, `imagen_borrada_at` vuelve a null).
 
 ## Errores frecuentes
 

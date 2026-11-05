@@ -11,11 +11,12 @@ import type { DatosMetricas, ResultadoCaptura } from "./tipos";
 export const CLAVE_METRICAS = ["instagram", "metricas"] as const;
 
 export interface ApiMetricas {
-  leer: () => Promise<DatosMetricas>;
+  /** `marca`: la cuenta de esa marca (null = la general). */
+  leer: (marca?: string | null) => Promise<DatosMetricas>;
   capturar: () => Promise<ResultadoCaptura>;
 }
 
-const API_POR_DEFECTO: ApiMetricas = { leer: () => leerMetricas(), capturar: () => capturarMetricas() };
+const API_POR_DEFECTO: ApiMetricas = { leer: (marca) => leerMetricas(undefined, marca), capturar: () => capturarMetricas() };
 
 /** No se reintenta lo que no se arregla solo (sesión, permisos, función sin desplegar). */
 export function debeReintentar(intentos: number, error: unknown): boolean {
@@ -25,11 +26,13 @@ export function debeReintentar(intentos: number, error: unknown): boolean {
   return intentos < 2;
 }
 
-export function useMetricasInstagram(api: ApiMetricas = API_POR_DEFECTO) {
+export function useMetricasInstagram(api: ApiMetricas = API_POR_DEFECTO, marca: string | null = null) {
   const qc = useQueryClient();
   const consulta = useQuery({
-    queryKey: CLAVE_METRICAS,
-    queryFn: api.leer,
+    queryKey: marca ? [...CLAVE_METRICAS, marca] : CLAVE_METRICAS,
+    queryFn: () => api.leer(marca),
+    // Al cambiar de cuenta se sigue viendo la anterior hasta que llega la nueva.
+    placeholderData: (previo) => previo,
     staleTime: 5 * 60_000,
     retry: debeReintentar,
   });
