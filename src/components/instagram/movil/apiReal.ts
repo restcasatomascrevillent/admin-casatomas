@@ -24,15 +24,15 @@
  *             (lo que ya existe); carrusel: instagram-publicar
  *             { carrusel: { grupo, ids, altTexts }, caption, dryRun: false, fotosTmp }
  *             → { estado: "publicada", permalink }.
- *  programar → RPC instagram_programar(p_pieza_id = primera imagen, p_para,
- *             p_confirmar_conflicto = true). Para un carrusel, el servidor
- *             tiene que publicar el grupo de la portada (render con `carrusel`).
+ *  programar → instagram-publicar { accion: "programar", ids, caption, altTexts,
+ *             programarPara, confirmarConflicto } (programarDirecto): el servidor
+ *             junta el carrusel y programa el grupo entero.
  */
 import { supabase } from "@/integrations/supabase/client";
 import { auditDeviceId } from "@/lib/audit-device";
 import { rutaTmpDeUrl, type MarcaId } from "@/lib/instagram";
 import type { FotoParaMontar } from "@/lib/instagram/montar";
-import { ErrorInstagram, URL_PUBLICAR, URL_RENDER, normalizarPublicar, prepararFotoCarta, publicar, subirFotoDrive } from "@/components/marketing/instagram/api";
+import { ErrorInstagram, URL_PUBLICAR, URL_RENDER, normalizarPublicar, prepararFotoCarta, programarDirecto, publicar, subirFotoDrive } from "@/components/marketing/instagram/api";
 import type { ApiPublicacionMovil, ArgsRender } from "./publicar";
 import { ErrorReintentable, conReintentos } from "./reintentos";
 
@@ -162,12 +162,12 @@ export const apiPublicacionReal: ApiPublicacionMovil = {
     return { permalink: r.permalink, avisos: r.avisos };
   },
   async programar(a) {
-    const sb = supabase as unknown as { rpc(f: string, p: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> };
-    const { data, error } = await sb.rpc("instagram_programar", { p_pieza_id: a.piezaIds[0], p_para: a.instante.toISOString(), p_confirmar_conflicto: true });
-    if (error) throw new ErrorInstagram(error.message ?? "No se ha podido programar", "servidor");
-    const d = (data ?? {}) as { ok?: boolean; error?: string; programacion?: { programada_para?: string } };
-    if (d.ok === false) throw new ErrorInstagram(d.error ?? "No se ha podido programar", "servidor");
-    return { programadaPara: d.programacion?.programada_para ?? a.instante.toISOString(), avisos: [] };
+    // Contrato final (docs/instagram-carrusel.md): instagram-publicar
+    // { accion: "programar", ids, … } junta el carrusel en el servidor y
+    // programa el grupo entero (antes se programaba solo la primera imagen).
+    const r = await programarDirecto({ ids: a.piezaIds, caption: a.caption, altTexts: a.altTexts, instante: a.instante, confirmarConflicto: true });
+    if (!r.ok) throw new ErrorInstagram("Ya hay otra publicación de esta marca a esa hora. Elige otra hora.", "servidor");
+    return { programadaPara: r.programadaPara, avisos: [] };
   },
 };
 
