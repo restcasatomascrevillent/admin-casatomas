@@ -90,8 +90,12 @@ export function TabCompras({
   modoPedido,
 }: {
   onPreguntarIA?: (doc: Factura, tipo: "factura" | "albarán") => void;
-  /** Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos. */
-  modoPedido?: { modo: ModoCompras; clave: string; doc?: number };
+  /**
+   * Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos.
+   * `doc`: abre ese documento. `mes` (YYYY-MM): filtra ese mes. `prov`: abre ese proveedor desplegado
+   * (los dos últimos, desde Facturas › Análisis).
+   */
+  modoPedido?: { modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number };
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   const [hoy] = useState(() => new Date());
@@ -353,6 +357,27 @@ export function TabCompras({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docPendiente, docPorId, facturasQ.isFetching, albaranesQ.isFetching]);
+
+  // Enlaces desde Análisis: `?mes=YYYY-MM` deja ese mes como periodo (al quitarlo
+  // se vuelve a «Todo») y `?prov=<id>` abre ese proveedor desplegado en cuanto
+  // llega la lista de proveedores (si no existe, no se hace nada).
+  useEffect(() => {
+    const mes = modoPedido?.mes;
+    if (!mes) return;
+    setPeriodoPrevio(PERIODO_TODO);
+    setPeriodo({ tipo: "mes", mes });
+    setMesPedido((m) => ({ mes, n: (m?.n ?? 0) + 1 }));
+  }, [modoPedido?.clave, modoPedido?.mes]);
+  const [provPendiente, setProvPendiente] = useState<number | null>(modoPedido?.prov ?? null);
+  useEffect(() => {
+    if (modoPedido?.prov) setProvPendiente(modoPedido.prov);
+  }, [modoPedido?.clave, modoPedido?.prov]);
+  useEffect(() => {
+    if (provPendiente === null || !proveedoresQ.data) return;
+    if (proveedores.some((p) => p.id === provPendiente)) verProveedor(provPendiente);
+    setProvPendiente(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provPendiente, proveedoresQ.data, proveedores]);
 
   // ── Contenido de la ficha ─────────────────────────────────────────────────
   let contenidoFicha: ReactNode = null;

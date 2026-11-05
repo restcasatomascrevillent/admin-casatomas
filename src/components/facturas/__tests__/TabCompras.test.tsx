@@ -156,7 +156,10 @@ function prepararBase() {
   });
 }
 
-function montar(onPreguntarIA = vi.fn(), modoPedido?: { modo: "documentos" | "productos" | "proveedores"; clave: string; doc?: number }) {
+function montar(
+  onPreguntarIA = vi.fn(),
+  modoPedido?: { modo: "documentos" | "productos" | "proveedores"; clave: string; doc?: number; mes?: string; prov?: number },
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
@@ -445,6 +448,30 @@ describe("Compras · enlace profundo a un documento (?doc=)", () => {
     montar(vi.fn(), { modo: "documentos", clave: "k2", doc: 999 });
     expect(await screen.findByText("F-100")).toBeInTheDocument();
     expect(screen.queryByTestId("ficha-compras")).not.toBeInTheDocument();
+  });
+});
+
+describe("Compras · enlaces desde Análisis (?mes= y ?prov=)", () => {
+  it("?mes=2026-08 abre Documentos con solo agosto", async () => {
+    montar(vi.fn(), { modo: "documentos", clave: "k-mes", mes: "2026-08" });
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("1"));
+    expect(screen.getByRole("button", { name: "Solo Agosto 2026: quitar" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(listaDocs()).getByRole("button", { name: /^Agosto 2026/ })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("?prov=2 abre Proveedores con ese proveedor desplegado", async () => {
+    montar(vi.fn(), { modo: "proveedores", clave: "k-prov", prov: 2 });
+    const provs = await screen.findByTestId("lista-proveedores-compras");
+    expect(modo(/^Proveedores/)).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() =>
+      expect(within(provs).getByRole("button", { name: /^Bodega Campoluz/ })).toHaveAttribute("aria-expanded", "true"),
+    );
+  });
+
+  it("un proveedor que no existe deja la lista como estaba", async () => {
+    montar(vi.fn(), { modo: "proveedores", clave: "k-prov-x", prov: 999 });
+    const provs = await screen.findByTestId("lista-proveedores-compras");
+    expect(within(provs).getByRole("button", { name: /^Bodega Campoluz/ })).toHaveAttribute("aria-expanded", "false");
   });
 });
 
