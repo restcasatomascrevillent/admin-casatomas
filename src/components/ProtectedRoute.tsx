@@ -14,14 +14,15 @@ interface ProtectedRouteProps {
 }
 
 // Mapeo de rutas a secciones
-const ROUTE_TO_SECTION: Record<string, SectionKey> = {
+const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/dashboard": "dashboard",
   "/": "dashboard",
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
-  // Instagram: sección propia del menú, mismo permiso que Newsletter.
-  "/instagram": "marketing",
+  // Instagram: sección propia del menú, mismo permiso que Newsletter. La
+  // agencia (Oficiosos, «instagram_agencia») entra solo a la pestaña Encargos.
+  "/instagram": ["marketing", "instagram_agencia"],
   "/tienda": "tienda",
   "/facturas": "facturas",
   "/usuarios": "usuarios",
@@ -43,6 +44,7 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/cheques", secciones: ["cheques"] },
   { ruta: "/tienda", secciones: ["tienda"] },
   { ruta: "/facturas", secciones: ["facturas"] },
+  { ruta: "/instagram", secciones: ["instagram_agencia"] },
 ];
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
