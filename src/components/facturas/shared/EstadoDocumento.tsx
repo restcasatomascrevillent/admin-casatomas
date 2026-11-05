@@ -59,6 +59,8 @@ interface EstadoDocumentoProps {
   onRevisar: () => void;
   /** En las tarjetas hay sitio de sobra: se pintan todas las alertas. */
   compacto?: boolean;
+  /** En una fila (cabecera de la ficha): las insignias una al lado de otra, no apiladas. */
+  enLinea?: boolean;
 }
 
 /**
@@ -67,7 +69,7 @@ interface EstadoDocumentoProps {
  */
 const INSIGNIA_TACTIL = `${INSIGNIA} relative h-7 text-xs before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']`;
 
-export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar, compacto = true }: EstadoDocumentoProps) {
+export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar, compacto = true, enLinea = false }: EstadoDocumentoProps) {
   const lista = alertas ?? [];
   const graves = lista.filter((a) => a.severidad === "alta");
   // En la tabla solo cabe una insignia de aviso; el resto se resume en "+N".
@@ -75,7 +77,7 @@ export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar,
   const ocultas = lista.length - visibles.length;
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className={enLinea ? "flex flex-wrap items-center gap-1.5" : "flex flex-col items-start gap-1"}>
       {visibles.map((a, i) => {
         const color =
           a.severidad === "alta"
@@ -127,7 +129,7 @@ export function EstadoDocumento({ alertas, verificada, origen = null, onRevisar,
               type="button"
               onClick={(e) => e.stopPropagation()}
               aria-label="Revisada automáticamente: cuadra todo y el proveedor es conocido; no la ha mirado nadie"
-              className={`${INSIGNIA_TACTIL} border-emerald-100 bg-transparent text-emerald-600/80`}
+              className={`${INSIGNIA_TACTIL} border-emerald-200 bg-transparent text-emerald-700 dark:border-emerald-800 dark:text-emerald-300`}
             >
               <Sparkles className="h-3 w-3 shrink-0" />
               Revisada auto

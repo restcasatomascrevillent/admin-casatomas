@@ -10,7 +10,7 @@
 //  subidas del OCR) es de Casa Tomás, decisión del dueño.
 // ============================================================================
 import type { Factura } from "@/hooks/useFacturas";
-import { claveMes, etiquetaMes, importeQueSuma, masReciente, redondear, sumaEnTotal } from "./agrupacionDocumentos";
+import { claveMes, etiquetaMes, importeQueSuma, masReciente, redondear, sumaEnTotal, type DocumentoAgrupable } from "./agrupacionDocumentos";
 import type { Proveedor, ResolverProveedor } from "./proveedores";
 
 // ─── Local ──────────────────────────────────────────────────────────────────
@@ -144,14 +144,27 @@ export function regaladoDocumento(d: Pick<Factura, "productos">): Regalado {
   return { importe: redondear(importe), estimado, regalos };
 }
 
+/**
+ * Regalado de un documento: el que ya trae calculado (cabecera de la lista,
+ * `documentos_lista()`) o, si trae sus líneas, sumándolas.
+ */
+export function regaladoDe(d: { regalado?: Regalado; productos?: Factura["productos"] }): Regalado {
+  if (d.regalado) return d.regalado;
+  return d.productos ? regaladoDocumento({ productos: d.productos }) : { importe: 0, estimado: false, regalos: 0 };
+}
+
 // ─── Por proveedor ──────────────────────────────────────────────────────────
 
-export interface AgregadoProveedor {
+/** Lo mínimo para sumar por proveedor: la cabecera y el regalado (ya calculado o con sus líneas). */
+export type DocumentoAgregable = DocumentoAgrupable &
+  Pick<Factura, "proveedor"> & { regalado?: Regalado; productos?: Factura["productos"] };
+
+export interface AgregadoProveedor<D extends DocumentoAgregable = Factura> {
   /** Clave canónica (`#id`), el texto normalizado si no está unificado, o "" sin proveedor. */
   clave: string;
   nombre: string;
   /** Sus documentos (del filtro de local y periodo), el más reciente primero. */
-  documentos: Factura[];
+  documentos: D[];
   /** Neto con IVA (sin albaranes ya facturados; los abonos restan). */
   gasto: number;
   /** Lo que restan sus abonos (0 o negativo) y cuántos son. */
@@ -167,8 +180,8 @@ const claveProveedorDoc = (d: Pick<Factura, "proveedor">, resolver: ResolverProv
   d.proveedor && d.proveedor.trim() ? resolver(d.proveedor) : null;
 
 /** Una pasada por los documentos: lo de cada proveedor (para la lista, el despliegue y el top). */
-export function agregarPorProveedor(docs: Factura[], resolver: ResolverProveedor): Map<string, AgregadoProveedor> {
-  const mapa = new Map<string, AgregadoProveedor>();
+export function agregarPorProveedor<D extends DocumentoAgregable>(docs: D[], resolver: ResolverProveedor): Map<string, AgregadoProveedor<D>> {
+  const mapa = new Map<string, AgregadoProveedor<D>>();
   for (const d of docs) {
     const r = claveProveedorDoc(d, resolver);
     const clave = r?.clave || "";
@@ -196,7 +209,7 @@ export function agregarPorProveedor(docs: Factura[], resolver: ResolverProveedor
       a.abonos += i;
     }
     if (sumaEnTotal(d)) {
-      const reg = regaladoDocumento(d);
+      const reg = regaladoDe(d);
       a.regalado += reg.importe;
       if (reg.importe > 0 && reg.estimado) a.regaladoEstimado = true;
     }
@@ -219,7 +232,7 @@ export function agregarPorProveedor(docs: Factura[], resolver: ResolverProveedor
  */
 export function ordenarProveedoresPorGasto(
   proveedores: Proveedor[],
-  agregados: Map<string, AgregadoProveedor>,
+  agregados: Map<string, AgregadoProveedor<DocumentoAgregable>>,
   soloConDocumentos: boolean,
 ): Proveedor[] {
   const gasto = (p: Proveedor) => agregados.get(`#${p.id}`)?.gasto ?? 0;
@@ -309,7 +322,7 @@ export function mesesGrafica(docs: Factura[], hoy: Date, n = 12): MesGrafica[] {
 }
 
 /** Los `n` proveedores con más gasto (sin «Sin proveedor» ni los que no suman nada). */
-export function topProveedores(agregados: Map<string, AgregadoProveedor>, n = 10): AgregadoProveedor[] {
+export function topProveedores<D extends DocumentoAgregable>(agregados: Map<string, AgregadoProveedor<D>>, n = 10): AgregadoProveedor<D>[] {
   return [...agregados.values()]
     .filter((a) => a.clave !== "" && a.gasto > 0)
     .sort((a, b) => b.gasto - a.gasto || a.nombre.localeCompare(b.nombre, "es"))

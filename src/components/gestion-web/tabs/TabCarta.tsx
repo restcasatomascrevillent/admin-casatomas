@@ -31,6 +31,7 @@ import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 import { BotonVinoDesdeFoto, type VinoDesdeFoto } from "@/components/carta/BotonVinoDesdeFoto";
 import { OrdenarCategoria } from "@/components/carta/OrdenarCategoria";
 import { FiltrosVinos } from "@/components/carta/FiltrosVinos";
+import { BotonCartaImprimir } from "@/components/carta/imprimir/BotonCartaImprimir";
 import {
   categoriaDelFiltro,
   FILTRO_TODOS,
@@ -300,6 +301,15 @@ export default function TabCarta() {
                   <Plus className="mr-2 h-4 w-4 shrink-0" />
                   <span className="truncate">{actual.añadir}</span>
                 </Button>
+                {/* «PDF Carta» (05/11/2026): en el móvil ocupa una celda como los demás; desde `sm`, la primera de la fila. */}
+                {(seccionActiva === "platos" || seccionActiva === "vinos") && (
+                  <BotonCartaImprimir
+                    tipo={seccionActiva}
+                    platos={platos}
+                    vinos={vinos}
+                    className="sm:order-first"
+                  />
+                )}
               </div>
             }
           />

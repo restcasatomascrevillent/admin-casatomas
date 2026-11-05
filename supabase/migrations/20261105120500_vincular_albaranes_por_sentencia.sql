@@ -1,6 +1,6 @@
 set client_encoding = 'UTF8';
 -- ===========================================================================
--- 20261105120000_vincular_albaranes_por_sentencia — Facturas largas (05/11/2026)
+-- 20261105120500_vincular_albaranes_por_sentencia — Facturas largas (05/11/2026)
 -- ===========================================================================
 -- PROBLEMA
 --   trg_productos_factura_vincular_albaranes era FOR EACH ROW: al guardar una
@@ -37,7 +37,7 @@ CREATE OR REPLACE FUNCTION public.trg_productos_factura_vincular_albaranes()
  SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
--- 20261105120000_vincular_albaranes_por_sentencia: por sentencia, una llamada por proveedor.
+-- 20261105120500_vincular_albaranes_por_sentencia: por sentencia, una llamada por proveedor.
 declare
   v_facturas bigint[];
   v_prov bigint;

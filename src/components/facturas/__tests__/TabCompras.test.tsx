@@ -488,8 +488,8 @@ describe("Compras · filas a todo el ancho", () => {
     expect(fila("A-1")).toHaveTextContent("Sin factura");
     expect(fila("A-1")).not.toHaveAttribute("title");
     expect(fila("F-100")).not.toHaveTextContent("Factura");
-    // El proveedor, con su nombre canónico.
-    expect(fila("F-100")).toHaveTextContent("Pescados Marta S.L.");
+    // El proveedor, con su nombre canónico (con la carga de antes, en cuanto llega la lista de proveedores).
+    await waitFor(() => expect(fila("F-100")).toHaveTextContent("Pescados Marta S.L."));
     expect(fila("A-2")).toHaveTextContent("Incluido en F-101");
   });
 });
@@ -615,5 +615,144 @@ describe("Compras · proveedores en acordeón", () => {
     expect(await screen.findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
     fireEvent.click(volverALista());
     expect(screen.getByTestId("despliegue-proveedor")).toBeInTheDocument();
+  });
+});
+
+// ─── Con la migración 20261105190000: lista ligera, ficha y búsqueda en el servidor ───
+// Las mismas 5 compras, servidas como lo hace la base: `documentos_lista()` (cabeceras
+// compactas, sin líneas), `documento_compras(id)` y `buscar_documentos_compras(texto)`.
+const PROVEEDOR_DE: Record<string, number> = { "PESCADOS MARTA, S.L.": 1, "Pescados Marta": 1, "BODEGA CAMPOLUZ, S.L.": 2 };
+const sinTildes = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+type Doc = (typeof DOCS)[number];
+const lineasDe = (d: Doc) => (d.productos_factura ?? []) as ReturnType<typeof linea>[];
+const filaLista = (d: Doc) => [
+  d.id, d.tipo, d.numero_documento, d.proveedor, PROVEEDOR_DE[d.proveedor] ?? null, d.cif, d.fecha, d.facturado_en_id,
+  (d as { local?: string }).local ?? null, d.subtotal, d.total, d.total_origen, d.drive_url, d.archivo_path, d.verificada, null,
+  lineasDe(d).length,
+  d.alertas_validacion.length ? (d.alertas_validacion as { codigo: string; severidad: string }[]).map((a) => [a.codigo, a.severidad]) : null,
+  null,
+  false,
+];
+const listaServidor = () => ({
+  v: 1,
+  proveedores: { 1: "Pescados Marta S.L.", 2: "Bodega Campoluz" },
+  docs: [...DOCS].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id).map(filaLista),
+});
+const fichaServidor = ({ p_id }: Record<string, unknown>) => {
+  const d = DOCS.find((x) => x.id === p_id);
+  if (!d) return null;
+  return {
+    ...d,
+    productos: lineasDe(d).map((l) => ({
+      ...l,
+      producto_canonico: l.productos_catalogo?.nombre ?? null,
+      categoria: l.productos_catalogo ? { nombre: "Pescado y marisco", ruta: "Pescado y marisco" } : null,
+      media_referencia: l.id === 101 ? 10 : null, // la merluza de F-100 (30 €) cuesta el triple que otras veces
+    })),
+  };
+};
+const buscarServidor = ({ p_texto }: Record<string, unknown>) => {
+  const palabras = sinTildes(String(p_texto)).split(" ").filter(Boolean);
+  return DOCS.filter((d) => {
+    const pajar = sinTildes(
+      [d.numero_documento, d.proveedor, d.cif, d.observaciones, ...lineasDe(d).flatMap((l) => [l.nombre, l.productos_catalogo?.nombre])]
+        .filter(Boolean)
+        .join(" "),
+    );
+    return palabras.every((w) => pajar.includes(w));
+  }).map((d) => d.id);
+};
+
+describe("Compras · lista ligera (documentos_lista, documento_compras, buscar_documentos_compras)", () => {
+  let tablasPedidas: string[];
+  beforeEach(() => {
+    base.rpcs.documentos_lista = listaServidor;
+    base.rpcs.documento_compras = fichaServidor;
+    base.rpcs.buscar_documentos_compras = buscarServidor;
+    tablasPedidas = [];
+    const normal = base.tablas;
+    base.fijarTablas((tabla, f) => {
+      tablasPedidas.push(tabla);
+      return normal(tabla, f);
+    });
+  });
+  const llamadas = (fn: string) => base.rpc.mock.calls.filter((c) => c[0] === fn);
+
+  it("una sola petición con las cabeceras: ni la tabla de facturas ni sus líneas", async () => {
+    montar();
+    await screen.findByText("F-100");
+    expect(cuenta(/^Documentos/)).toBe("5");
+    expect(llamadas("documentos_lista")).toHaveLength(1);
+    expect(tablasPedidas).not.toContain("facturas");
+    expect(tablasPedidas).not.toContain("productos_factura");
+    // El nombre unificado del proveedor viene en la propia lista (sin esperar a proveedores_listado).
+    const fila = within(listaDocs()).getByText("F-100").closest("button") as HTMLElement;
+    expect(fila).toHaveTextContent("Pescados Marta S.L.");
+    expect(within(listaDocs()).getByText("F-101").closest("button")).toHaveTextContent("1 aviso");
+  });
+
+  it("productos y proveedores se piden cuando la lista ya ha llegado (no compiten con ella)", async () => {
+    let soltar: (v: unknown) => void = () => {};
+    const pendiente = new Promise((r) => (soltar = r));
+    const original = base.rpc.getMockImplementation();
+    base.rpc.mockImplementation(async (fn: string, args: Record<string, unknown> = {}) => {
+      if (fn === "documentos_lista") {
+        await pendiente;
+        return { data: listaServidor(), error: null };
+      }
+      return original!(fn, args);
+    });
+    try {
+      montar();
+      await screen.findByTestId("esqueleto-documentos");
+      expect(llamadas("productos_resumen")).toHaveLength(0);
+      expect(llamadas("proveedores_listado")).toHaveLength(0);
+      expect(cuenta(/^Productos/)).toBe("…");
+      soltar(null);
+      await screen.findByText("F-100");
+      await waitFor(() => expect(cuenta(/^Productos/)).toBe("3"));
+      expect(cuenta(/^Proveedores/)).toBe("3");
+      expect(llamadas("productos_resumen")).toHaveLength(1);
+      expect(llamadas("proveedores_listado")).toHaveLength(1);
+    } finally {
+      base.rpc.mockImplementation(original!);
+    }
+  });
+
+  it("buscar «merluza» pregunta al servidor por las líneas: 3 documentos y los mismos contadores", async () => {
+    montar();
+    await screen.findByText("F-100");
+    fireEvent.change(buscador(), { target: { value: "Merluza" } });
+    await waitFor(() => expect(cuenta(/^Documentos/)).toBe("3"));
+    expect(filasDocs()).toHaveLength(3);
+    expect(within(listaDocs()).queryByText("F-101")).not.toBeInTheDocument();
+    await waitFor(() => expect(cuenta(/^Proveedores/)).toBe("1"));
+    expect(cuenta(/^Productos/)).toBe("2");
+    expect(llamadas("buscar_documentos_compras").map((c) => c[1])).toEqual([{ p_texto: "merluza" }]);
+    // Lo que casa en la cabecera sale sin esperar al servidor: el número de documento.
+    fireEvent.change(buscador(), { target: { value: "F-101" } });
+    await waitFor(() => expect(numerosVisibles()).toEqual(["F-101"]));
+  });
+
+  it("la ficha pide sus líneas al abrirla y marca la línea con precio atípico", async () => {
+    montar();
+    fireEvent.click(await screen.findByText("F-100"));
+    const ficha = await screen.findByTestId("ficha-compras");
+    expect(await within(ficha).findByRole("heading", { name: "Factura F-100" })).toBeInTheDocument();
+    expect(within(ficha).getByText("MERLUZA PINCHO 3KG")).toBeInTheDocument();
+    expect(within(ficha).getByRole("button", { name: "Ver el producto Merluza de pincho" })).toBeInTheDocument();
+    expect(llamadas("documento_compras").map((c) => c[1])).toEqual([{ p_id: 1 }]);
+    // La media de referencia viene con la ficha: la insignia del documento lo dice.
+    expect(within(ficha).getByRole("button", { name: "Precio atípico: ver el aviso completo" })).toBeInTheDocument();
+  });
+
+  it("pulsar la fila ya pide la ficha (antes de soltar el dedo)", async () => {
+    montar();
+    const fila = (await screen.findByText("F-101")).closest("button") as HTMLElement;
+    fireEvent.pointerDown(fila);
+    await waitFor(() => expect(llamadas("documento_compras")).toHaveLength(1));
+    fireEvent.click(fila);
+    expect(await screen.findByRole("heading", { name: "Factura F-101" })).toBeInTheDocument();
+    expect(llamadas("documento_compras")).toHaveLength(1);
   });
 });

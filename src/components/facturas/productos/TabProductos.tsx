@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { FolderTree, Merge, Search, SlidersHorizontal, Sparkles, Truck, TrendingUp, X } from "lucide-react";
+import { FolderTree, Merge, Search, SearchX, SlidersHorizontal, Sparkles, Truck, TrendingUp, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,6 +40,7 @@ import { LineasSinClasificar } from "./LineasSinClasificar";
 import { ProveedoresDialog } from "./ProveedoresDialog";
 import { SelectorCategoria } from "./SelectorCategoria";
 import { AvisosPrecio } from "./AvisosPrecio";
+import { CHIP, EstadoVacio, FOCO, Hueso, filaEstado } from "@/components/facturas/compras/estilo";
 
 type Orden = "gasto" | "compras" | "nombre";
 const TODOS = "__todos";
@@ -225,12 +226,15 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
     <div
       className={
         compacto
-          ? "flex h-full min-h-0 flex-col gap-0.5"
+          ? "flex h-full min-h-0 flex-col"
           : "flex h-full min-h-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-2 shadow-sm sm:p-3"
       }
     >
+      {/* En Compras, herramientas y chips de categoría van en UNA fila: chips a la izquierda
+          (con scroll horizontal) y las herramientas fijas a la derecha. Fuera de Compras, dos filas. */}
+      <div className={compacto ? "flex shrink-0 items-center gap-1 border-b border-border/60 px-2" : "contents"}>
       {/* Herramientas: en Compras, botones de icono con etiqueta accesible (nada se corta a 1280). */}
-      <div className={`flex shrink-0 items-center ${compacto ? "gap-0.5" : "flex-wrap gap-2"}`}>
+      <div className={`flex shrink-0 items-center ${compacto ? "order-2 gap-0.5 border-l border-border/60 pl-1" : "flex-wrap gap-2"}`}>
         {busquedaExterna === undefined && (
           <div className="relative min-w-[12rem] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -305,7 +309,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
 
       {/* Gasto por categoría (clic = filtrar): una sola fila de chips, con scroll horizontal sin barra */}
       <div
-        className={`flex shrink-0 overflow-x-auto no-scrollbar ${compacto ? "h-11 items-center gap-1" : "gap-2 pb-1"}`}
+        className={`flex overflow-x-auto no-scrollbar ${compacto ? "order-1 h-11 min-w-0 flex-1 items-center gap-1" : "shrink-0 gap-2 pb-1"}`}
         role="toolbar"
         aria-label="Gasto por categoría"
       >
@@ -354,9 +358,10 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
           </button>
         )}
       </div>
+      </div>
 
       {vista === "productos" && (!compacto || categoria !== "todas" || (puedeEditar && seleccion.size > 0)) && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className={`flex shrink-0 flex-wrap items-center gap-2 ${compacto ? "border-b border-border/60 px-2 py-0.5" : ""}`}>
           {/* En Compras este selector va dentro de «Filtros» (la lista es estrecha y el alto, justo). */}
           {!compacto && selectorSubcategoria}
           {categoria !== "todas" && (
@@ -388,13 +393,46 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
       )}
 
       {/* Lista (scroll por dentro) */}
-      <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${compacto ? "border-t border-border/50" : "rounded-lg border"}`} data-testid="lista-productos">
+      <div className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain ${compacto ? "" : "rounded-lg border"}`} data-testid="lista-productos">
         {vista === "pendientes" ? (
           <LineasSinClasificar catalogo={productos} categorias={categorias} puedeEditar={puedeEditar} />
         ) : resumenQ.isLoading ? (
-          <p className="p-4 text-sm text-muted-foreground">Cargando productos…</p>
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Cargando productos…</span>
+            <ul className="divide-y divide-border/50" aria-hidden="true">
+              {Array.from({ length: 8 }, (_, i) => (
+                <li key={i} className="flex min-h-12 items-center gap-3 px-3 py-2">
+                  <Hueso className="h-4 w-4 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Hueso className={`h-3.5 ${i % 2 ? "w-1/3" : "w-1/2"}`} />
+                    <Hueso className="h-3 w-3/5" />
+                  </div>
+                  <Hueso className="h-3.5 w-16" />
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : visibles.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">Ningún producto coincide con los filtros.</p>
+          <EstadoVacio
+            icono={<SearchX />}
+            titulo="Ningún producto coincide con los filtros"
+            texto={productos.length === 0 ? "Los productos aparecen al subir facturas y clasificar sus líneas." : "Prueba con otra palabra, otra categoría u otros filtros."}
+            accion={
+              filtrosActivos > 0 || categoria !== "todas" || soloSubidas
+                ? {
+                    etiqueta: "Quitar filtros",
+                    onClick: () => {
+                      setCategoria("todas");
+                      setPeriodo("todo");
+                      setTipo(TODOS);
+                      setProveedor("");
+                      setOrden("gasto");
+                      setSoloSubidas(false);
+                    },
+                  }
+                : undefined
+            }
+          />
         ) : (
           <>
             {!compacto && (
@@ -430,7 +468,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         )}
       </div>
 
-      <p className="shrink-0 text-xs text-muted-foreground">
+      <p className={compacto ? "flex h-9 shrink-0 items-center border-t border-border/60 px-3 text-xs text-muted-foreground" : "shrink-0 text-xs text-muted-foreground"}>
         {vista === "productos"
           ? `${plural(visibles.length, "producto", "productos")} · ${formatCurrency(gastoVisible)}`
           : `${plural(pendientes, "línea", "líneas")} sin clasificar`}{" "}
@@ -469,7 +507,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
  */
 const chipCategoria = (compacto: boolean, extra: string) =>
   compacto
-    ? `relative flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3 text-xs before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] aria-pressed:bg-muted aria-pressed:text-foreground hover:bg-muted/50 ${extra}`
+    ? `${CHIP} text-xs ${extra}`
     : `flex min-h-11 shrink-0 flex-col justify-center rounded-lg border px-3 py-1 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10 ${extra}`;
 
 function FilaResumen({
@@ -515,7 +553,7 @@ function FilaResumen({
       .join(" · ");
     return (
       <li
-        className={`flex items-center gap-1 px-2 py-1 ${abierto ? "bg-muted/70" : seleccionado ? "bg-primary/5" : ""}`}
+        className={`flex min-h-12 items-center gap-1 py-0.5 pl-1 pr-2 ${filaEstado(abierto)} ${!abierto && seleccionado ? "bg-primary/5" : ""}`}
         aria-current={abierto ? "true" : undefined}
       >
         {conCasilla && (
@@ -523,7 +561,7 @@ function FilaResumen({
             <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
           </div>
         )}
-        <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 flex-1 rounded-md px-1 py-0.5 text-left hover:bg-muted/40">
+        <button type="button" onClick={onAbrir} className={`min-h-11 min-w-0 flex-1 rounded-md px-1.5 py-1 text-left active:bg-muted/50 ${FOCO}`}>
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-sm font-medium" title={p.nombre}>
               {p.nombre}

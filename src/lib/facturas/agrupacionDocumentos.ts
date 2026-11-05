@@ -17,12 +17,15 @@ export const CLAVE_SIN_FECHA = "sin-fecha";
 
 const MESES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
-export interface GrupoMes {
+/** Lo mínimo de un documento para agruparlo y sumarlo (vale `Factura` y la cabecera de la lista). */
+export type DocumentoAgrupable = Pick<Factura, "id" | "fecha" | "tipo" | "total"> & { facturado_en_id?: number | null };
+
+export interface GrupoMes<D extends DocumentoAgrupable = Factura> {
   /** `YYYY-MM`, o `CLAVE_SIN_FECHA`. */
   clave: string;
   etiqueta: string;
   /** Del más reciente al más antiguo. */
-  documentos: Factura[];
+  documentos: D[];
   /** Neto con IVA: facturas + albaranes sin factura, abonos restando. */
   total: number;
   /** Lo que restan los abonos de ese mes (0 o negativo). */
@@ -64,15 +67,15 @@ export const masReciente = (a: Pick<Factura, "fecha" | "id">, b: Pick<Factura, "
   (b.fecha ?? "").localeCompare(a.fecha ?? "") || b.id - a.id;
 
 /** Agrupa por mes (el más reciente primero; «Sin fecha» al final). */
-export function agruparDocumentos(docs: Factura[]): GrupoMes[] {
-  const meses = new Map<string, Factura[]>();
+export function agruparDocumentos<D extends DocumentoAgrupable>(docs: D[]): GrupoMes<D>[] {
+  const meses = new Map<string, D[]>();
   for (const d of docs) {
     const mes = claveMes(d.fecha);
     const lista = meses.get(mes);
     if (lista) lista.push(d);
     else meses.set(mes, [d]);
   }
-  const salida: GrupoMes[] = [];
+  const salida: GrupoMes<D>[] = [];
   for (const [clave, documentos] of meses) {
     documentos.sort(masReciente);
     let total = 0;

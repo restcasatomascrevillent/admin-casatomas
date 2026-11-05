@@ -149,7 +149,7 @@ export const FilaProducto = ({
   if (isMobile) {
     if (isEditing) {
       return (
-        <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
+        <div className="relative my-1 flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-3 text-xs">
           <Input className="h-11 text-base md:text-base" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" aria-label="Nombre del producto" />
           <div className="flex gap-2">
             <Input className="h-11 w-full text-base md:text-base" type="number" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" aria-label="Cantidad" />
@@ -172,28 +172,23 @@ export const FilaProducto = ({
       );
     }
 
+    // Columnas (dentro de un contenedor con `container-type: inline-size`, la sección
+    // «Líneas» de la ficha): desde 30rem, Producto · Cantidad · Precio · Importe · lápiz,
+    // alineadas con la cabecera de la tabla; por debajo, nombre + importe y en gris
+    // «cantidad × precio · categoría». El lápiz va a la derecha: con puntero solo
+    // aparece al pasar por encima (o con el foco); en táctil se ve siempre.
     return (
-      // Fila plana con separador fino, dos líneas: nombre + importe, y debajo en gris
-      // «cantidad × precio · categoría». El lápiz va a la derecha: con puntero solo
-      // aparece al pasar por encima (o con el foco); en táctil se ve siempre.
-      <div className="group/prod flex items-start gap-1 border-b border-border/50 py-1.5 text-xs last:border-b-0">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
-            <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
-              {regalo && <InsigniaRegalo />}
-              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatCurrency(avgPrice ?? null)})</AyudaPopover>}
-              {formatCurrency(p.precio)}
-            </span>
-          </div>
+      <div
+        className={`group/prod grid grid-cols-[minmax(0,1fr)_auto_2.75rem] items-center gap-x-3 border-b border-border/50 py-1.5 text-xs last:border-b-0 hover:bg-muted/20 [@container(min-width:30rem)]:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_7rem_2.75rem]`}
+      >
+        <div className="min-w-0">
+          <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
           <p className="text-muted-foreground">
-            {formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}
-            {p.categoria && (
-              <>
-                {" · "}
-                <span title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}>{p.categoria.nombre}</span>
-              </>
-            )}
+            <span className={`[@container(min-width:30rem)]:hidden`}>
+              {formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}
+              {p.categoria && " · "}
+            </span>
+            {p.categoria && <span title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}>{p.categoria.nombre}</span>}
           </p>
           {sinDescuento && (
             <p className="text-muted-foreground">
@@ -201,6 +196,13 @@ export const FilaProducto = ({
             </p>
           )}
         </div>
+        <span className={`hidden text-right text-sm tabular-nums text-muted-foreground [@container(min-width:30rem)]:block`}>{formatCantidadLinea(p)}</span>
+        <span className={`hidden text-right text-sm tabular-nums text-muted-foreground [@container(min-width:30rem)]:block`}>{formatCurrency(p.precio_unitario ?? null)}</span>
+        <span className="flex items-center justify-end gap-1.5 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">
+          {regalo && <InsigniaRegalo />}
+          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-600" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatCurrency(avgPrice ?? null)})</AyudaPopover>}
+          {formatCurrency(p.precio)}
+        </span>
         <Button
           variant="ghost"
           size="icon"

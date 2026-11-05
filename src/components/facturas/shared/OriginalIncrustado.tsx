@@ -62,12 +62,24 @@ function VisorPantallaCompleta({ url, abierto, onCerrar, titulo }: { url: string
  *   - nada                  -> no pinta nada.
  * Solo se monta con la ficha abierta, así que la URL firmada no se pide antes.
  */
-export function OriginalIncrustado({ driveUrl: driveUrlBruta, archivoPath, titulo }: { driveUrl: string | null; archivoPath: string | null; titulo: string }) {
+export function OriginalIncrustado({
+  driveUrl: driveUrlBruta,
+  archivoPath,
+  titulo,
+  relleno = false,
+}: {
+  driveUrl: string | null;
+  archivoPath: string | null;
+  titulo: string;
+  /** Visor lateral de la ficha: el original ocupa todo el alto disponible (el padre es `flex flex-col`). */
+  relleno?: boolean;
+}) {
   const driveUrl = urlSegura(driveUrlBruta); // CT-REM-FE-06
-  if (archivoPath) return <OriginalDeStorage archivoPath={archivoPath} titulo={titulo} />;
+  if (archivoPath) return <OriginalDeStorage archivoPath={archivoPath} titulo={titulo} relleno={relleno} />;
   if (driveUrl) {
     return (
-      <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-muted-foreground">
+      <p className="flex flex-wrap items-center gap-x-1.5 rounded-lg border border-dashed border-border px-3 text-sm text-muted-foreground">
+        <FileText className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span>Original en Google Drive ·</span>
         <a href={driveUrl} target="_blank" rel="noopener noreferrer" className={ENLACE}>
           <ExternalLink className="h-4 w-4" aria-hidden="true" /> Abrir
@@ -78,7 +90,7 @@ export function OriginalIncrustado({ driveUrl: driveUrlBruta, archivoPath, titul
   return null;
 }
 
-function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titulo: string }) {
+function OriginalDeStorage({ archivoPath, titulo, relleno }: { archivoPath: string; titulo: string; relleno: boolean }) {
   const q = useUrlOriginal(archivoPath);
   const pdf = esPdf(archivoPath);
   const [cargada, setCargada] = useState(false);
@@ -93,8 +105,8 @@ function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titul
   };
 
   const cabecera = (
-    <div className="flex items-center justify-between gap-2">
-      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="flex shrink-0 items-center justify-between gap-2">
+      <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">
         <FileText className="h-3.5 w-3.5" aria-hidden="true" /> Documento original
       </h3>
       {url && (
@@ -108,7 +120,7 @@ function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titul
   let cuerpo;
   if (q.isError || falloImagen) {
     cuerpo = (
-      <div role="status" className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+      <div role="status" className={`flex flex-wrap items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground ${relleno ? "m-auto" : ""}`}>
         <ImageOff className="h-4 w-4 shrink-0" aria-hidden="true" />
         <span className="min-w-0 flex-1">No se ha podido cargar el documento original.</span>
         <button type="button" onClick={reintentar} className={ENLACE}>
@@ -118,20 +130,20 @@ function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titul
     );
   } else if (!url) {
     cuerpo = (
-      <div className="flex h-48 items-center justify-center rounded-md bg-muted/50" aria-busy="true">
+      <div className={`flex items-center justify-center rounded-md bg-muted/50 ${relleno ? "min-h-0 flex-1" : "h-48"}`} aria-busy="true">
         <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Cargando el original" />
       </div>
     );
   } else if (pdf) {
     cuerpo = (
-      <object data={url} type="application/pdf" aria-label={titulo} className="h-[70dvh] min-h-80 w-full rounded-md border bg-muted/40">
+      <object data={url} type="application/pdf" aria-label={titulo} className={`w-full rounded-md border bg-muted/40 ${relleno ? "min-h-0 flex-1" : "h-[70dvh] min-h-80"}`}>
         <p className="p-3 text-sm text-muted-foreground">Este navegador no puede mostrar el PDF aquí. Usa «Abrir PDF».</p>
       </object>
     );
   } else {
     cuerpo = (
-      <div className="space-y-1">
-        <div className="relative">
+      <div className={relleno ? "flex min-h-0 flex-1 flex-col gap-1" : "space-y-1"}>
+        <div className={relleno ? "relative min-h-0 flex-1" : "relative"}>
           {/* Nada de `display:none` mientras carga: una imagen `lazy` oculta no se pide nunca. */}
           {!cargada && <span className="absolute inset-0 z-10 animate-pulse rounded-md bg-muted" aria-hidden="true" />}
           <ImagenZoom
@@ -143,16 +155,16 @@ function OriginalDeStorage({ archivoPath, titulo }: { archivoPath: string; titul
             onLoad={() => setCargada(true)}
             onError={() => setFalloImagen(true)}
             onPantallaCompleta={() => setVisor(true)}
-            className="h-[65dvh] max-h-[44rem] min-h-72"
+            className={relleno ? "h-full bg-background" : "h-[55dvh] max-h-[44rem] min-h-72 bg-background"}
           />
         </div>
-        <p className="text-xs text-muted-foreground">Ctrl + rueda o pellizca para ampliar · arrastra para moverte · doble clic para acercar</p>
+        <p className="shrink-0 text-xs text-muted-foreground">Ctrl + rueda o pellizca para ampliar · arrastra para moverte · doble clic para acercar</p>
       </div>
     );
   }
 
   return (
-    <section aria-label="Documento original" className="space-y-2" data-tour="facturas-original">
+    <section aria-label="Documento original" className={relleno ? "flex min-h-0 flex-1 flex-col gap-2" : "space-y-2"} data-tour="facturas-original">
       {cabecera}
       {cuerpo}
       {url && !pdf && <VisorPantallaCompleta url={url} abierto={visor} onCerrar={() => setVisor(false)} titulo={titulo} />}

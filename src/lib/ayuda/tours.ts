@@ -208,7 +208,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_IA,
       titulo: "Periodo y local",
       texto:
-        "Elige qué mirar: este mes, el trimestre, el año o todo; y los dos locales juntos o solo Casa Tomás o Touza. Todo el tablero cambia a la vez.",
+        "Elige qué mirar: este mes, el trimestre, el año, todo o unas fechas a tu gusto («Personalizado», con atajos como «últimos 30 días»); y los dos locales juntos o solo Casa Tomás o Touza. Todo el tablero cambia a la vez.",
       opcional: true,
       lado: "bottom",
     },
@@ -217,16 +217,25 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_IA,
       titulo: "Las cifras del periodo",
       texto:
-        "Lo gastado con IVA (y cuánto cambia frente al mismo periodo anterior, si está cargado), los abonos, lo que te han regalado o descontado y los albaranes que aún no tienen factura.",
+        "Lo gastado con IVA (y cuánto cambia frente al mismo periodo anterior, si está cargado), los abonos, lo que te han regalado o descontado y los albaranes que aún no tienen factura. Toca una cifra para ver las facturas que la forman y abrir su PDF.",
       opcional: true,
       lado: "bottom",
+    },
+    {
+      elemento: "facturas-analisis-explorador",
+      pestana: F_IA,
+      titulo: "Explorar: tu gráfica a medida",
+      texto:
+        "Cambia la gráfica al momento sin preguntar a la IA: qué medir (gasto, base, abonos, precio…), por qué agruparlo (día, mes, proveedor, familia…), por qué colorearlo y qué filtrar. Toca una barra para ver solo ese tramo o sus documentos. «Fijar en el tablero» la guarda.",
+      opcional: true,
+      lado: "top",
     },
     {
       elemento: "facturas-analisis-tablero",
       pestana: F_IA,
       titulo: "Las gráficas",
       texto:
-        "Toca un mes para ver sus documentos o un proveedor para abrirlo en «Compras». Toca un producto de «Lo que más ha subido» para ver su precio con cada proveedor. En «Gasto por familia» te avisa de las líneas sin clasificar.",
+        "Toca un proveedor, un producto que sube, una familia o un gasto fijo: verás sus documentos, podrás abrirlo en «Compras» o llevarlo al explorador. En «Gasto por familia» te avisa de las líneas sin clasificar.",
       opcional: true,
       lado: "top",
     },

@@ -14,16 +14,20 @@ import { Upload, BarChart3, ShoppingCart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
 import { useUserRole } from "@/hooks/useUserRole";
-import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
+import type { Factura } from "@/hooks/useFacturas";
+import { useContadorDocumentos } from "@/hooks/useContadorDocumentos";
 import { leerEnlaceCompras } from "@/lib/facturas/tableroCompras";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
 
-// Rediseño del 08/10/2026: Compras | Análisis (antes «IA») | Cargar. «Documentos» y «Productos»
-// (las pestañas de antes) son ahora modos de Compras; sus enlaces antiguos
-// (`?tab=productos` de la campana, marcadores) siguen funcionando.
-const PESTANAS = ["compras", "chat", "cargar"] as const;
+// Rediseño del 08/10/2026: «Documentos» y «Productos» (las pestañas de antes) son
+// ahora modos de Compras; sus enlaces antiguos (`?tab=productos` de la campana,
+// marcadores) siguen funcionando. Desde el 05/11/2026 (petición del dueño) el orden
+// es Análisis · Compras · Cargar y se entra en Análisis (valor `chat`).
+const PESTANAS = ["chat", "compras", "cargar"] as const;
+/** Pestaña al entrar en /facturas sin `?tab=`. */
+const PESTANA_INICIAL = "chat";
 const pestanaDeUrl = (v: string | null): string | null => {
   if (v === "documentos" || v === "productos") return "compras";
   return (PESTANAS as readonly string[]).includes(v ?? "") ? (v as string) : null;
@@ -36,7 +40,10 @@ const Facturas = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { key: claveNavegacion } = useLocation();
   const tabUrl = pestanaDeUrl(searchParams.get("tab"));
-  const [activeTab, setActiveTab] = useState<string>(tabUrl ?? "compras");
+  // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`), Compras.
+  const [activeTab, setActiveTab] = useState<string>(
+    () => tabUrl ?? (["modo", "doc", "mes", "prov"].some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL),
+  );
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
   // Desde Análisis: `&mes=YYYY-MM` (Documentos de ese mes) y `&prov=<id>` (ese proveedor desplegado).
@@ -92,9 +99,13 @@ const Facturas = () => {
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_FACTURAS);
 
   // Contadores para los badges de las pestañas
-  const { data: facturas } = useFacturas();
-  const { data: albaranes } = useAlbaranes();
-  const totalDocumentos = (facturas?.length ?? 0) + (albaranes?.length ?? 0);
+  // Un `count` de cabeceras: entrar por «Análisis» no descarga la lista de Compras.
+  const { data: totalDocumentos = 0 } = useContadorDocumentos();
+  // Compras se monta la primera vez que se visita (y luego se queda montada).
+  const [comprasMontada, setComprasMontada] = useState(activeTab === "compras");
+  useEffect(() => {
+    if (activeTab === "compras") setComprasMontada(true);
+  }, [activeTab]);
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
     // 1. Cambiamos a la pestaña del chat
@@ -130,8 +141,8 @@ const Facturas = () => {
               a la derecha, para que no parezca una pestaña más; abre su desglose al tocarlo. */}
           <PestanasPagina
             pestanas={[
-              { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
+              { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ]}
             acciones={
@@ -151,7 +162,7 @@ const Facturas = () => {
             {/* `forceMount`: seguir montada al ir a «IA» desde una ficha, para
                 encontrar al volver la misma búsqueda y la misma ficha abierta. */}
             <TabsContent value="compras" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <TabCompras onPreguntarIA={handlePreguntarIA} modoPedido={modoPedido} />
+              {comprasMontada && <TabCompras onPreguntarIA={handlePreguntarIA} modoPedido={modoPedido} />}
             </TabsContent>
 
             {/* PESTAÑA ANÁLISIS: tablero de gráficas fijas y copiloto de IA plegado

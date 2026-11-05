@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, Info, KanbanSquare, LayoutGrid, Receipt, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock, CloudOff, Info, KanbanSquare, LayoutGrid, Receipt, TrendingUp } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
@@ -9,6 +9,8 @@ export function rutaDeAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_
   if (n.referencia_tipo === "solicitud") return "/reservas?tab=reservas&status=solicitudes";
   if (n.referencia_tipo === "facturas_cargar") return "/facturas?tab=cargar";
   if (n.referencia_tipo === "facturas_productos") return "/facturas?tab=productos";
+  // Original de una factura que no se ha podido subir a Drive (20261105193000).
+  if (n.referencia_tipo === "facturas_original") return "/facturas?tab=compras";
   // Encargos de Instagram (20261110100000): la ficha del encargo.
   if (n.referencia_tipo === "instagram_encargo") {
     return n.referencia_id ? `/instagram?tab=encargos&encargo=${encodeURIComponent(n.referencia_id)}` : "/instagram?tab=encargos";
@@ -20,7 +22,7 @@ export type FiltroAvisos = "todos" | "sin_leer" | "reservas" | "facturas" | "otr
 
 export const TIPOS_POR_FILTRO: Record<"reservas" | "facturas", string[]> = {
   reservas: ["solicitud_pendiente", "reserva_nueva", "reserva_sin_asignar"],
-  facturas: ["facturas_subida", "subida_precio"],
+  facturas: ["facturas_subida", "subida_precio", "original_sin_drive"],
 };
 
 export const FILTROS_AVISOS: { valor: FiltroAvisos; etiqueta: string }[] = [
@@ -71,6 +73,8 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   facturas_subida: Receipt,
   // Trigger de productos_factura (20261007170000): producto más caro que su referencia.
   subida_precio: TrendingUp,
+  // facturas_original_drive_fallo (20261105193000): 5 fallos seguidos subiendo un original a Drive.
+  original_sin_drive: CloudOff,
   // Encargos de Instagram: aceptado, entregado, mensaje de Oficiosos…
   instagram_encargo: KanbanSquare,
   sistema: Info,

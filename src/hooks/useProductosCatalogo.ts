@@ -53,9 +53,15 @@ const rpc = (fn: string, args?: Record<string, unknown>) => (supabase.rpc as any
 
 const argsPeriodo = (f: FiltroPeriodo) => ({ p_desde: f.desde, p_hasta: f.hasta, p_tipo: f.tipo });
 
-export const useCategoriasProducto = () =>
+/** `enabled: false` deja la petición para luego (Compras la pide cuando ya tiene la lista). */
+export interface OpcionesConsulta {
+  enabled?: boolean;
+}
+
+export const useCategoriasProducto = ({ enabled = true }: OpcionesConsulta = {}) =>
   useQuery({
     queryKey: [CLAVE_PRODUCTOS, "categorias"],
+    enabled,
     queryFn: async (): Promise<CategoriaProducto[]> => {
       const { data, error } = await supabase
         .from("categorias_producto")
@@ -68,9 +74,10 @@ export const useCategoriasProducto = () =>
     retry: false,
   });
 
-export const useResumenProductos = (f: FiltroPeriodo) =>
+export const useResumenProductos = (f: FiltroPeriodo, { enabled = true }: OpcionesConsulta = {}) =>
   useQuery({
     queryKey: [CLAVE_PRODUCTOS, "resumen", f.desde, f.hasta, f.tipo],
+    enabled,
     queryFn: async (): Promise<ResumenProducto[]> => {
       const { data, error } = await rpc("productos_resumen", argsPeriodo(f));
       if (error) throw error;

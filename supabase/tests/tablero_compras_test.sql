@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Test de 20261105150000_tablero_compras. BEGIN … ROLLBACK: no deja nada escrito.
+-- Test de 20261105150500_tablero_compras. BEGIN … ROLLBACK: no deja nada escrito.
 -- Acaba en «tablero_compras_test: OK».
 --   supabase db query --linked -f supabase/tests/tablero_compras_test.sql
 --
@@ -44,8 +44,8 @@ begin
   if has_function_privilege('anon', 'public.es_linea_no_producto_tablero(text,text)', 'execute') then
     raise exception 'FALLO T1: anon puede ejecutar es_linea_no_producto_tablero';
   end if;
-  if position('20261105150000' in pg_get_functiondef('public.tablero_compras(date,date,text)'::regprocedure)) = 0 then
-    raise exception 'FALLO T1: tablero_compras no es la de 20261105150000';
+  if position('20261105150500' in pg_get_functiondef('public.tablero_compras(date,date,text)'::regprocedure)) = 0 then
+    raise exception 'FALLO T1: tablero_compras no es la de 20261105150500';
   end if;
 
   -- T2 ─────────────────────────────────────────────────────────────────────

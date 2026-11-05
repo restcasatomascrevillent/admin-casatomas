@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, type QueryFunctionContext } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cargarEscalonado, type CacheEscalonada } from "@/lib/facturas/cargaEscalonada";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -37,6 +37,13 @@ export interface ProductoFactura {
   descuento_pct?: number | null;
   importe_bruto?: number | null;
   importe_bruto_estimado?: boolean;
+  /**
+   * Precio de referencia de la línea: media del precio unitario de las DEMÁS
+   * líneas con el mismo nombre, del mismo proveedor y tipo de documento (lo
+   * calcula `documento_compras()`, migración 20261105190000). null = sin con
+   * qué comparar; ausente = no se ha calculado.
+   */
+  media_referencia?: number | null;
 }
 
 /** Una anomalia de importes detectada por `procesar-factura` al cargar el documento. */
@@ -110,8 +117,6 @@ export interface Factura {
   local?: "casa_tomas" | "touza" | null;
 }
 
-const STALE_TIME = 1000 * 60 * 2; // 2 minutos — evita refetches al cambiar de pestaña
-
 const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean, conLocal: boolean) => `
       id, tipo, numero_documento, proveedor, proveedor_normalizado, cif, fecha,${conFacturado ? " facturado_en_id," : ""}${conLocal ? " local," : ""}
       subtotal, iva, total, total_origen, observaciones, drive_url, archivo_path,
@@ -149,10 +154,12 @@ function categoriaDeLinea(
   return { nombre: c.nombre, ruta: padre ? `${padre.nombre} › ${c.nombre}` : c.nombre };
 }
 
-const fetchDocumentosConProductos = async (
-  tipo: 'factura' | 'albaran',
-  { client, queryKey }: Pick<QueryFunctionContext, 'client' | 'queryKey'>,
-): Promise<Factura[]> => {
+/**
+ * Los documentos de un tipo con TODAS sus líneas (la carga de antes de la
+ * migración 20261105190000). Solo se usa si `documentos_lista()` aún no existe
+ * (ver useListaCompras.ts): con el histórico son ≈ 5,9 MB.
+ */
+export const leerDocumentosCompletos = async (tipo: 'factura' | 'albaran'): Promise<Factura[]> => {
   // Una sola query con JOIN por tanda — se evita el N+1 de queries separadas.
   // Por tandas (`.range`, carga escalonada): PostgREST corta cada petición a
   // 1.000 filas y con el histórico hay más. Ver lib/facturas/cargaEscalonada.ts.
@@ -260,28 +267,62 @@ const fetchDocumentosConProductos = async (
     });
   };
 
-  return cargarEscalonado<Factura>(
-    client as unknown as CacheEscalonada<Factura>,
-    queryKey,
-    leerTanda,
-  );
+  // Sin escribir en ninguna caché a medias: quien llama recibe todo de una vez.
+  const sinCache: CacheEscalonada<Factura> = { getQueryData: () => [], setQueryData: () => undefined };
+  return cargarEscalonado<Factura>(sinCache, [tipo], leerTanda);
 };
 
-// Sin leer `signal` del contexto: así React Query no aborta la carga al cambiar
-// de pantalla y las tandas que faltan terminan por detrás.
-export const useFacturas = () =>
-  useQuery({
-    queryKey: ['facturas'],
-    queryFn: ({ client, queryKey }) => fetchDocumentosConProductos('factura', { client, queryKey }),
-    staleTime: STALE_TIME,
-  });
-
-export const useAlbaranes = () =>
-  useQuery({
-    queryKey: ['albaranes'],
-    queryFn: ({ client, queryKey }) => fetchDocumentosConProductos('albaran', { client, queryKey }),
-    staleTime: STALE_TIME,
-  });
+/** La ficha de `documento_compras(id)` (migración 20261105190000) como `Factura`. */
+export function aFacturaDetalle(doc: Record<string, unknown>): Factura {
+  const n = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
+  const lineas = Array.isArray(doc.productos) ? (doc.productos as Record<string, unknown>[]) : [];
+  return {
+    id: Number(doc.id),
+    tipo: String(doc.tipo ?? ""),
+    numero_documento: String(doc.numero_documento ?? ""),
+    proveedor: (doc.proveedor as string | null) ?? null,
+    proveedor_normalizado: (doc.proveedor_normalizado as string | null) ?? null,
+    cif: (doc.cif as string | null) ?? null,
+    fecha: String(doc.fecha ?? ""),
+    subtotal: n(doc.subtotal),
+    iva: n(doc.iva),
+    total: n(doc.total),
+    total_origen: doc.total_origen === "leido" || doc.total_origen === "deducido" ? doc.total_origen : null,
+    observaciones: (doc.observaciones as string | null) ?? null,
+    productos: lineas.map((p) => {
+      const precioUnitario = Number(p.precio_unitario) || 0;
+      const cantidad = Number(p.cantidad) || 0;
+      const categoria = p.categoria as { nombre?: unknown; ruta?: unknown } | null;
+      return {
+        id: Number(p.id),
+        producto_nombre: String(p.nombre ?? ""),
+        // El importe IMPRESO (0 en un regalo); solo si no hay importe se calcula.
+        precio: p.total != null && p.total !== "" ? Number(p.total) : precioUnitario * cantidad,
+        cantidad,
+        unidad: (p.unidad as string | null) ?? null,
+        bultos: n(p.bultos),
+        proveedor: null,
+        precio_unitario: precioUnitario,
+        categoria: categoria && typeof categoria.nombre === "string" ? { nombre: categoria.nombre, ruta: String(categoria.ruta ?? categoria.nombre) } : null,
+        producto_canonico: (p.producto_canonico as string | null) ?? null,
+        producto_id: p.producto_id != null ? Number(p.producto_id) : null,
+        descuento_pct: n(p.descuento_pct),
+        importe_bruto: n(p.importe_bruto),
+        importe_bruto_estimado: p.importe_bruto_estimado === true,
+        media_referencia: n(p.media_referencia),
+      };
+    }),
+    drive_url: (doc.drive_url as string | null) ?? null,
+    archivo_path: (doc.archivo_path as string | null) ?? null,
+    facturado_en_id: n(doc.facturado_en_id),
+    alertas: Array.isArray(doc.alertas_validacion) ? (doc.alertas_validacion as AlertaValidacion[]) : [],
+    procesado_en: (doc.procesado_en as string | null) ?? null,
+    created_at: (doc.created_at as string | null) ?? null,
+    verificada: doc.verificada === true,
+    verificacion_origen: doc.verificacion_origen === "auto" || doc.verificacion_origen === "manual" ? doc.verificacion_origen : null,
+    local: doc.local === "casa_tomas" || doc.local === "touza" ? doc.local : null,
+  };
+}
 
 export const useUpdateFactura = () => {
   const queryClient = useQueryClient();

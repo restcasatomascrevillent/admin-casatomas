@@ -345,7 +345,8 @@ describe("una página: camino síncrono ≡ trabajo de una pieza", () => {
         expect((t.fin.p_resultado as Record<string, unknown>).coste_usd).toBe(0.0123);
         expect(t.sb.subidas.map((x) => ({ ...x, bytes: Buffer.from(x.bytes).toString("base64") })))
           .toEqual(s.sb.subidas.map((x) => ({ ...x, bytes: Buffer.from(x.bytes).toString("base64") })));
-        expect(s.sb.subidas[0].path).toMatch(/^2026\/09\/101-/);
+        // Sin Drive (secretos vacíos en la prueba): copia TEMPORAL, pendiente de Drive.
+        expect(s.sb.subidas[0].path).toMatch(/^temporal\/101-/);
         // La copia de pendientes/ se borra una vez archivado el original.
         expect(t.sb.borrados).toEqual([[t.ruta]]);
       }

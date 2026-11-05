@@ -112,13 +112,31 @@ supabase functions deploy chat-facturas    --project-ref sfonaclosuafvlhutkon
 
 **3) Panel** (build normal).
 
-### Archivo del documento original
+### Archivo del documento original (desde el 05-nov-2026: solo Google Drive)
 
-Mientras los secrets `GOOGLE_*` no existan, `procesar-factura` guarda el PDF o la
-imagen en el bucket `facturas-originales` y deja la ruta en `facturas.archivo_path`.
-Antes se descartaba el fichero con un `console.warn`. En cuanto se configuren los
-secrets de Drive, vuelve a usarse Drive sin tocar codigo; Storage queda como red de
-seguridad si Drive falla.
+Orden del dueño: «no se puede guardar nada en Supabase Storage». El original va
+SIEMPRE a Drive (carpeta del proveedor → «2026-03 Marzo») y se guarda
+`facturas.drive_url`. El bucket `facturas-originales` es solo almacén temporal:
+
+- `pendientes/{uid}/{trabajo}/…`: piezas del OCR por trabajos. Se borran al
+  terminar o fallar el trabajo (los «duplicado» las guardan hasta decidir).
+- `temporal/{factura}-{nombre}`: el original cuando Drive falla al guardar. La
+  factura queda «pendiente de Drive» (`archivo_path` sin `drive_url`; el botón del
+  original lo dice) y la Edge Function `facturas-originales-drive` (pg_cron
+  `facturas-originales-drive`, cada 10 min, solo si hay algo que hacer) la sube y
+  borra la copia. A los 5 fallos seguidos: aviso de prioridad alta en la campana
+  (`original_sin_drive`); después reintenta cada 6 h.
+
+La misma función rescata lo antiguo (rutas `AAAA/MM/…`, huérfanos de
+sustituciones y restos de `pendientes/`). Migración
+`20261105193000_facturas_originales_drive.sql` (test en
+`supabase/tests/facturas_originales_drive_test.sql`). A mano (admin):
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/facturas-originales-drive" \
+  -H "Authorization: Bearer <JWT de un admin>" -H "Content-Type: application/json" \
+  -d '{"accion":"informe"}'      # o {"accion":"pasar"}
+```
 
 ### Revision pendiente para el dueño
 

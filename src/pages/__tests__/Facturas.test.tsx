@@ -39,11 +39,14 @@ vi.mock("@/components/facturas/ChatFacturas", () => ({
   )),
 }));
 vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p>Contenido de la subida</p> }));
-vi.mock("@/hooks/useFacturas", () => ({
-  useFacturas: () => ({ data: [{ id: 1, proveedor: "Marta" }, { id: 2, proveedor: null }] }),
-  useAlbaranes: () => ({ data: [{ id: 3, proveedor: "Marta" }] }),
+vi.mock("@/hooks/useListaCompras", () => ({
+  useListaCompras: () => ({
+    data: { cabeceras: [{ id: 1, proveedor: "Marta" }, { id: 2, proveedor: null }, { id: 3, proveedor: "Marta" }], completos: null },
+  }),
 }));
 vi.mock("@/hooks/useChatFacturas", () => ({ useChatFacturas: () => ({ conversaciones: [] }) }));
+// El contador de la pestaña Compras es un `count` de cabeceras (no descarga la lista): 2 facturas + 1 albarán.
+vi.mock("@/hooks/useContadorDocumentos", () => ({ useContadorDocumentos: () => ({ data: 3 }) }));
 
 const gasto: { filas: FilaGastoIa[] } = { filas: [] };
 vi.mock("@/hooks/useGastoIa", () => ({
@@ -102,12 +105,14 @@ describe("Facturas · importación histórica (solo administradores)", () => {
 });
 
 describe("Facturas · pestañas", () => {
-  it("son tres: Compras · Análisis · Cargar (ya no hay Documentos ni Productos)", () => {
+  it("son tres: Análisis · Compras · Cargar, y se entra en Análisis (ya no hay Documentos ni Productos)", () => {
     montar();
     const pestanas = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Compras", "Análisis", "Cargar"]);
-    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
+    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Análisis", "Compras", "Cargar"]);
+    expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
+    // Compras no se monta hasta que se visita: entrar por Análisis no descarga su lista.
+    expect(screen.queryByTestId("compras")).not.toBeInTheDocument();
     for (const p of pestanas) expect(p.className).toContain("min-h-11");
   });
 
@@ -163,8 +168,17 @@ describe("Facturas · pestañas", () => {
     expect(screen.getByTestId("monitor-gasto-ia-ocr")).toBeInTheDocument();
   });
 
+  it("?tab=compras entra en Compras; un enlace a Compras sin ?tab= (?doc=) también", () => {
+    montar("/facturas?tab=compras");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    cleanup();
+    montar("/facturas?modo=documentos&doc=7");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: documentos · doc 7");
+  });
+
   it("Compras sigue montada al ir a Análisis (la búsqueda y la ficha abierta no se pierden)", () => {
-    montar();
+    montar("/facturas?tab=compras");
     fireEvent.mouseDown(screen.getByRole("tab", { name: /^Análisis/ }), { button: 0 });
     expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
@@ -208,7 +222,7 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
 describe("Facturas · sin scroll de página", () => {
   it("la página mide justo lo que queda de ventana y la pestaña reparte ese alto por dentro", () => {
     conLayout(800);
-    montar();
+    montar("/facturas?tab=compras");
     const raiz = screen.getByRole("tablist").closest("[style*='height']") as HTMLElement;
     // 800 − 24 (posición del bloque) − 24 (relleno inferior del <main>)
     expect(raiz.style.height).toBe("752px");
