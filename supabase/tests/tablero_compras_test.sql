@@ -1,5 +1,5 @@
 set client_encoding = 'UTF8';
--- Test de 20261105150000_tablero_compras. BEGIN … ROLLBACK: no deja nada escrito.
+-- Test de 20261105150500_tablero_compras. BEGIN … ROLLBACK: no deja nada escrito.
 -- Acaba en «tablero_compras_test: OK».
 --   supabase db query --linked -f supabase/tests/tablero_compras_test.sql
 --
