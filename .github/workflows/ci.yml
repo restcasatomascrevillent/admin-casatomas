@@ -92,6 +92,8 @@ jobs:
         run: npm run test:instagram-campanas:db
       - name: Reels en MP4, cola de render, cubo de vídeo y reels «procesando» (PGlite)
         run: npm run test:instagram-video:db
+      - name: Métricas para aprender de Instagram, «Qué funciona» (PGlite)
+        run: npm run test:instagram-aprender:db
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
         run: npx vitest run api/
         env:
