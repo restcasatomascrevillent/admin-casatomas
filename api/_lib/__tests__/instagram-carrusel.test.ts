@@ -228,3 +228,45 @@ describe("render real del carrusel", () => {
     60_000,
   );
 });
+
+// ── Fotos subidas desde el móvil («subida:<uuid>» en tmp/<uuid>.jpg) ───────
+describe("fotoPreparada «subida:<uuid>» (móvil)", () => {
+  const U = "0b4f2c1e-5a6d-4e7f-8a9b-0c1d2e3f4a5b";
+  const preparada = (url: string, id = `subida:${U}`) => ({ id, url, ancho: 3000, alto: 4000, tipo: "plato", marca: "casa-tomas" });
+  const conFoto = (fotoPreparada: unknown) => ({
+    tipo: "carrusel",
+    marca: "casa-tomas",
+    diapositivas: [
+      { foto: `subida:${U}`, plantilla: "ct-foto-titular", datos: { antetitulo: "Hoy", titular: "Llegó del Cantábrico" }, fotoPreparada },
+      SEIS[1],
+    ],
+  });
+
+  it("se acepta si la URL es tmp/<ese uuid> de NUESTRO bucket", async () => {
+    const { f } = falso();
+    const r = await manejarRender(peticion(conFoto(preparada(`${SB}/storage/v1/object/public/instagram/tmp/${U}.jpg`))), { env: ENV_SB, fetch: f, renderizar: jpgFalso, nuevoId: () => ID });
+    expect(r.status, JSON.stringify(await r.clone().json())).toBe(200);
+    const pieza = (await r.json()) as { ok: boolean };
+    expect(pieza.ok).toBe(true);
+  });
+
+  it("400 si la URL es de otro sitio, de otra ruta del bucket o de OTRO uuid (sin SSRF)", async () => {
+    for (const url of [
+      `https://evil.example/storage/v1/object/public/instagram/tmp/${U}.jpg`,
+      `${SB}/storage/v1/object/public/instagram/piezas/2026-11/${U}.jpg`,
+      `${SB}/storage/v1/object/public/instagram/tmp/1b4f2c1e-5a6d-4e7f-8a9b-0c1d2e3f4a5b.jpg`,
+    ]) {
+      const { f } = falso();
+      const r = await manejarRender(peticion(conFoto(preparada(url))), { env: ENV_SB, fetch: f, renderizar: jpgFalso });
+      expect([400, 422], url).toContain(r.status);
+      expect((await r.json()).ok).toBe(false);
+    }
+  });
+
+  it("también en una pieza suelta ({ pieza, fotoPreparada })", async () => {
+    const { f } = falso();
+    const pieza = { marca: "casa-tomas", plantilla: "ct-foto-titular", formato: "post", foto: `subida:${U}`, antetitulo: "Hoy", titular: "Llegó del Cantábrico" };
+    const r = await manejarRender(peticion({ pieza, fotoPreparada: preparada(`${SB}/storage/v1/object/public/instagram/tmp/${U}.jpg`) }), { env: ENV_SB, fetch: f, renderizar: jpgFalso, nuevoId: () => ID });
+    expect(r.status).toBe(200);
+  });
+});
