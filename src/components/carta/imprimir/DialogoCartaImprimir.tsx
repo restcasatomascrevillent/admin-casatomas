@@ -83,7 +83,7 @@ function ListaCasillas({
 }
 
 // Por defecto, una lista vacía estable: con `= []` cada render estrenaba lista y se volvía a maquetar todo.
-const SIN_FILAS: readonly never[] = [];
+const SIN_FILAS = [] as const;
 
 export default function DialogoCartaImprimir({ abierto, onCambiarAbierto, tipo, platos = SIN_FILAS, vinos = SIN_FILAS }: Props) {
   const filas = tipo === "platos" ? platos : vinos;
