@@ -13,6 +13,9 @@ import { crearReelDesdeBase, type ReelPieza } from "@/components/instagram/reels
 import { PestanaReels } from "@/components/instagram/video";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { EncargosInstagram, usePendientesEncargos, useRolesEncargos } from "@/components/instagram/encargos";
+// ── Crear en el móvil (instagram-movil): ver el bloque «Crear en el móvil» más abajo. ──
+import { CrearMovil } from "@/components/instagram/movil";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
@@ -61,6 +64,15 @@ export default function Instagram() {
   // Agencia sin Marketing: solo «Encargos» (el resto de pestañas es del restaurante).
   const soloAgencia = !rolesEncargos.cargando && rolesEncargos.agencia && !rolesEncargos.restaurante;
   const pestanaVisible = soloAgencia ? "encargos" : pestana;
+  // ── Crear en el móvil (instagram-movil) ───────────────────────────────────
+  // Por debajo de 768 px la pestaña «Crear» es el asistente rápido CrearMovil,
+  // salvo si se abre una pieza concreta (campañas, calendario) o se pide el
+  // editor completo. Bloque aparte a propósito: el Crear de escritorio lo
+  // rediseña otro cambio y así no se pisan.
+  const esMovil = useIsMobile();
+  const [editorCompletoEnMovil, setEditorCompletoEnMovil] = useState(false);
+  const crearEnMovil = esMovil && !abrir && !editorCompletoEnMovil;
+  // ── fin Crear en el móvil ─────────────────────────────────────────────────
   const [encargoAbierto, setEncargoAbierto] = useState<string | null>(() =>
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("encargo"),
   );
@@ -106,7 +118,9 @@ export default function Instagram() {
           {/* Desde `lg` el editor reparte el alto en tres columnas con scroll propio. */}
           <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`} data-testid="pagina-instagram">
             {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
-            {!soloAgencia && <EditorInstagram abrir={abrir} />}
+            {!soloAgencia && !crearEnMovil && <EditorInstagram abrir={abrir} />}
+            {/* ── Crear en el móvil (instagram-movil) ── */}
+            {!soloAgencia && crearEnMovil && <CrearMovil incrustado onEditorCompleto={() => setEditorCompletoEnMovil(true)} />}
           </TabsContent>
 
           {/* Campañas: dos columnas con scroll propio desde `lg`. */}
