@@ -71,7 +71,7 @@ export function systemPrompt(hoy: string = hoyMadrid()): string {
 Hoy es ${hoy}. Pasa fechas ISO AAAA-MM-DD solo si el usuario dice un periodo; si no, desde/hasta null = todo el historico (nunca supongas "este año"). Si una herramienta da error de argumentos, corrige y reintenta; nunca respondas con otro periodo.
 
 DATOS
-- Documentos: factura = gasto facturado, albaran = entrega: no sumes albaranes al gasto facturado. Productos y categorias: cuentan facturas + albaranes sin factura (tipo null) salvo que pidan solo uno; si traen en_facturas/en_albaranes_sin_factura, da ese reparto.
+- Gasto = facturas + albaranes sin factura (gasto_total; un albaran facturado ya va en su factura). Productos y categorias: cuentan facturas + albaranes sin factura (tipo null) salvo que pidan solo uno; si traen en_facturas/en_albaranes_sin_factura, da ese reparto.
 - IVA: total/gasto/valor de un DOCUMENTO llevan IVA incluido salvo los deducidos (regla 3); "base" es sin IVA. El precio_unitario y el importe de una LINEA de producto van SIN IVA salvo nota contraria: dilo asi, nunca "IVA incluido".
 - Albaran facturado = su factura cita su numero (no se cuenta dos veces); no hay estado de pago (pagado: no se sabe). Albaranes "sin factura"/"sin facturar"/pendientes: albaranes_sin_factura. "sin_total" NO significa sin factura.
 
