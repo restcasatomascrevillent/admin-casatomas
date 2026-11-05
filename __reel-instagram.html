@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Página de CAPTURA de reels (docs/instagram-video.md): la abre el
+         trabajador de render (scripts/instagram/render-reels.mjs) con Chromium a
+         1080×1920. No es parte del panel: no tiene sesión ni datos; el reel y sus
+         fotos los inyecta el trabajador en window.__REEL_CAPTURA__. -->
+    <meta name="viewport" content="width=1080, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Reel · captura</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+      #reel { width: 1080px; height: 1920px; }
+    </style>
+  </head>
+  <body>
+    <div id="reel"></div>
+    <script type="module" src="/src/instagram-captura/reel.tsx"></script>
+  </body>
+</html>

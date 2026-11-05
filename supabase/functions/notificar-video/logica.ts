@@ -80,14 +80,51 @@ export function suscripcionCaducada(statusCode: number | undefined): boolean {
 
 // --- Recorte de fotos (tabla trabajos_recorte, cuerpo `{ trabajo_id, tipo: "recorte" }`) ---
 
-export type TipoTrabajo = "video" | "recorte";
+export type TipoTrabajo = "video" | "recorte" | "reel";
 
-/** `tipo` del cuerpo: "recorte" o, por defecto (compatibilidad), "video". null si viene otro valor. */
+/** `tipo` del cuerpo: "recorte", "reel" o, por defecto (compatibilidad), "video". null si viene otro valor. */
 export function leerTipo(cuerpo: unknown): TipoTrabajo | null {
   const tipo = (cuerpo as { tipo?: unknown } | null)?.tipo;
   if (tipo === undefined || tipo === null || tipo === "video") return "video";
   if (tipo === "recorte") return "recorte";
+  if (tipo === "reel") return "reel";
   return null;
+}
+
+/** Sección del panel que hay que poder editar para avisar de cada tipo de trabajo. */
+export function seccionDeTipo(tipo: TipoTrabajo): "gestor_carta" | "marketing" {
+  return tipo === "reel" ? "marketing" : "gestor_carta";
+}
+
+// --- Reels de Instagram (tabla instagram_trabajos_render, `{ trabajo_id, tipo: "reel" }`) ---
+
+export interface TrabajoReelNotificable {
+  id: string;
+  pieza_id: string;
+  estado: string;
+  error: string | null;
+  creado_por: string | null;
+  procesado_por: string | null;
+}
+
+/** Misma regla: solo quien lo generó (el trabajador) o quien lo encargó, y ya terminado. */
+export function autorizarNotificacionReel(t: TrabajoReelNotificable, userId: string): Autorizacion {
+  return autorizarNotificacion({ ...t, plato_id: t.pieza_id }, userId);
+}
+
+export function construirCargaReel(t: TrabajoReelNotificable): CargaPush {
+  const listo = t.estado === "listo";
+  return {
+    titulo: listo ? "Reel listo" : "No se pudo generar el reel",
+    cuerpo: listo
+      ? "El vídeo ya está generado. Pulsa para verlo, probarlo y publicarlo."
+      : `${(t.error ?? "Error al generar el vídeo").slice(0, 140)}. Pulsa para revisarlo.`,
+    url: `/instagram?tab=reels&pieza=${encodeURIComponent(t.pieza_id)}`,
+    tag: `reel-${t.pieza_id}`,
+    trabajo_id: t.id,
+    plato_id: t.pieza_id,
+    estado: listo ? "listo" : "error",
+  };
 }
 
 export interface TrabajoRecorteNotificable {

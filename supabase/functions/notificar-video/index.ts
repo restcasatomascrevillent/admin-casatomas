@@ -13,7 +13,10 @@
 //   (mailto:… o https://…). Sin ellos responde 503 y el panel sigue igual
 //   (el vídeo ya está guardado; solo no llega el aviso).
 //
-// Body: { trabajo_id: uuid, tipo?: "video" | "recorte" }
+// Body: { trabajo_id: uuid, tipo?: "video" | "recorte" | "reel" }
+//   tipo "reel" (09-11-2026): trabajo de `instagram_trabajos_render` (reel de
+//   Instagram generado por el trabajador de render); exige la sección
+//   «marketing» en vez de «gestor_carta». Ver docs/instagram-video.md.
 //   tipo "recorte" (02-11-2026): trabajo de `trabajos_recorte` (foto de la
 //   carta guardada sin recortar desde un móvil y recortada en un ordenador).
 // Respuesta: { ok: true, enviadas, borradas, fallidas } | { ok: false, error }
@@ -26,14 +29,18 @@ import { comprobarPermisoSeccion, type ClientePermiso } from "../_shared/permiso
 import {
   autorizarNotificacion,
   autorizarNotificacionRecorte,
+  autorizarNotificacionReel,
   construirCarga,
   construirCargaRecorte,
+  construirCargaReel,
   leerTipo,
   leerTrabajoId,
+  seccionDeTipo,
   suscripcionCaducada,
   type PlatoNotificable,
   type TrabajoNotificable,
   type TrabajoRecorteNotificable,
+  type TrabajoReelNotificable,
 } from "./logica.ts";
 
 const corsHeaders = {
@@ -68,18 +75,6 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
     global: { headers: { Authorization: authHeader } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const permiso = await comprobarPermisoSeccion(
-    supabaseUser as unknown as ClientePermiso,
-    "gestor_carta",
-    "escribir",
-    "No tienes permiso para editar la carta",
-  );
-  if (!permiso.ok) return json({ ok: false, error: permiso.error }, permiso.status);
-
-  if (!VAPID_PUBLIC || !VAPID_PRIVATE || !VAPID_SUBJECT) {
-    return json({ ok: false, codigo: "sin_vapid", error: "Avisos push sin configurar (faltan los secretos VAPID_*)" }, 503);
-  }
-
   let cuerpo: unknown;
   try {
     cuerpo = await req.json();
@@ -92,11 +87,38 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const tipo = leerTipo(cuerpo);
   if (!tipo) return json({ ok: false, error: "tipo no válido" }, 400);
 
+  // Carta para vídeos y recortes; Marketing para los reels de Instagram.
+  const seccion = seccionDeTipo(tipo);
+  const permiso = await comprobarPermisoSeccion(
+    supabaseUser as unknown as ClientePermiso,
+    seccion,
+    "escribir",
+    seccion === "marketing" ? "No tienes permiso de Marketing" : "No tienes permiso para editar la carta",
+  );
+  if (!permiso.ok) return json({ ok: false, error: permiso.error }, permiso.status);
+
+  if (!VAPID_PUBLIC || !VAPID_PRIVATE || !VAPID_SUBJECT) {
+    return json({ ok: false, codigo: "sin_vapid", error: "Avisos push sin configurar (faltan los secretos VAPID_*)" }, 503);
+  }
+
   const admin = createClientBase(SUPABASE_URL, SERVICE_ROLE, { auth: { autoRefreshToken: false, persistSession: false } });
 
   let destinatario: string | null;
   let carga: string;
-  if (tipo === "recorte") {
+  if (tipo === "reel") {
+    const { data: tr, error: eR } = await admin
+      .from("instagram_trabajos_render")
+      .select("id, pieza_id, estado, error, creado_por, procesado_por")
+      .eq("id", trabajoId)
+      .maybeSingle();
+    if (eR) return json({ ok: false, error: "No se pudo leer el trabajo" }, 500);
+    if (!tr) return json({ ok: false, error: "El trabajo no existe" }, 404);
+    const r = tr as TrabajoReelNotificable;
+    const autR = autorizarNotificacionReel(r, permiso.userId);
+    if (!autR.ok) return json({ ok: false, error: autR.error }, autR.status);
+    destinatario = r.creado_por;
+    carga = JSON.stringify(construirCargaReel(r));
+  } else if (tipo === "recorte") {
     const { data: tr, error: eR } = await admin
       .from("trabajos_recorte")
       .select("id, tabla, registro_id, nombre, estado, error, creado_por, procesado_por")

@@ -12,3 +12,4 @@ export * from "./esquema.js";
 export * from "./bases.js";
 export * from "./edicion.js";
 export { ReelEnInstante, ZonaSeguraReel, pintarReelEnInstante, type OpcionesPintarReel, type ReelEnInstanteProps } from "./ReelKit.js";
+export * from "./captura.js";
