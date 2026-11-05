@@ -47,7 +47,7 @@ function simular(e: Escenario = {}) {
     llamadas.push(l);
     if (url === `${SB}/auth/v1/user`) return resp(200, { id: "usuario-1" });
     if (url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, e.leer ?? true);
-    if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, e.escribir ?? true);
+    if (url === `${SB}/rest/v1/rpc/can_edit_section`) return resp(200, e.escribir ?? true);
     if (url.startsWith(`${SB}/rest/v1/`)) {
       const tabla = url.slice(`${SB}/rest/v1/`.length).split("?")[0];
       if (metodo === "POST") {

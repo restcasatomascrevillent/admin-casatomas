@@ -7,7 +7,8 @@
  * Antes era la función de Vercel api/instagram-estado.ts.
  *
  *   Petición: GET (o POST) `${SUPABASE_URL}/functions/v1/instagram-estado`
- *             con `Authorization: Bearer <JWT de Supabase>` (usuario con Marketing).
+ *             con `Authorization: Bearer <JWT de Supabase>` (usuario con «Ver» en
+ *             Marketing: no cambia nada, solo consulta).
  *   200: { ok, variables: [{ nombre, presente, obligatoria, detalle, estado, comoArreglarlo? }],
  *          faltan: string[], identidad: { igUserId, username, nombre, publicaciones, coincide, cuentasVistas } | null,
  *          cuota: { usadas, total, restantes, ventanaHoras } | null,
@@ -44,7 +45,7 @@ export async function manejarEstado(request: Request, deps: DependenciasEstadoHt
   if (request.method === "OPTIONS") return opciones();
   if (request.method !== "GET" && request.method !== "POST") return json(405, { ok: false, error: "Método no permitido" });
   const env = deps.env ?? entornoDeno();
-  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch });
+  const auth = await autorizarMarketing(request.headers.get("authorization"), { env, fetch: deps.fetch, permiso: "leer" });
   if ("motivo" in auth) return jsonAuth(auth.estado, auth.motivo);
   try {
     const f = deps.fetch;

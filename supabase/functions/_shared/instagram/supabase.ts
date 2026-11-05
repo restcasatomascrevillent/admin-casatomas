@@ -7,8 +7,11 @@
  * escribir el servidor, con service_role y DESPUÉS de autorizar al usuario.
  *
  * Autorización: sesión válida (/auth/v1/user) + permiso de la sección
- * Marketing (`can_write_section('marketing')`, la misma función que usan las
- * políticas de RLS de escritura).
+ * Marketing. Para escribir, publicar, programar, usar la IA o subir hace falta
+ * «Editar» (`can_edit_section('marketing')`, la misma función que usan las
+ * políticas de RLS de escritura desde 20261111000000); para leer basta «Ver»
+ * (`can_read_section`). `can_write_section` NO se usa: mira «Ver» a propósito
+ * en todo el panel.
  *
  * Sin dependencias (ni supabase-js): fetch a Auth, PostgREST y Storage, que
  * se puede simular en los tests. SUPABASE_URL y SUPABASE_ANON_KEY los inyecta
@@ -83,13 +86,25 @@ export type ResultadoSesion = { ok: true; sesion: Sesion } | { ok: false; estado
 export interface OpcionesSupabase {
   env?: Record<string, string | undefined>;
   fetch?: typeof fetch;
+  /** «editar» (por defecto): can_edit_section. «leer»: can_read_section. */
+  permiso?: PermisoMarketing;
+}
+
+export type PermisoMarketing = "editar" | "leer";
+
+/** Mensaje del 403 cuando falta «Editar». */
+export const SIN_PERMISO_EDITAR = "Sin permiso para editar Marketing: hace falta «Editar» en Marketing (pídeselo a un administrador en Usuarios), no solo «Ver»";
+
+/** RPC de PostgREST que decide cada permiso. */
+export function rpcDePermiso(permiso: PermisoMarketing): "can_edit_section" | "can_read_section" {
+  return permiso === "leer" ? "can_read_section" : "can_edit_section";
 }
 
 function cabeceras(s: Pick<Sesion, "sb" | "token">, extra: Record<string, string> = {}): Record<string, string> {
   return { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, ...extra };
 }
 
-/** Sesión válida + permiso de Marketing. */
+/** Sesión válida + permiso de Marketing («Editar» por defecto). */
 export async function autorizarMarketing(cabecera: string | null | undefined, opts: OpcionesSupabase = {}): Promise<ResultadoSesion> {
   const token = tokenDeCabecera(cabecera);
   if (!token) return { ok: false, estado: 401, motivo: "Falta la sesión" };
@@ -105,19 +120,42 @@ export async function autorizarMarketing(cabecera: string | null | undefined, op
     const usuario = (await rUsuario.json().catch(() => null)) as { id?: string } | null;
     if (!usuario?.id) return { ok: false, estado: 401, motivo: "Sesión no válida" };
 
-    const rPermiso = await f(`${sb.url}/rest/v1/rpc/can_write_section`, {
-      method: "POST",
-      headers: cabeceras({ sb, token }, { "Content-Type": "application/json" }),
-      body: JSON.stringify({ _section: SECCION_MARKETING }),
-      signal: senal,
-    });
-    if (rPermiso.status === 401) return { ok: false, estado: 401, motivo: "Sesión no válida o caducada" };
-    if (!rPermiso.ok) return { ok: false, estado: 500, motivo: `La comprobación de permisos respondió ${rPermiso.status}` };
-    const puede = await rPermiso.json().catch(() => null);
-    if (puede !== true) return { ok: false, estado: 403, motivo: "Sin permiso de Marketing" };
+    const permiso = opts.permiso ?? "editar";
+    const puede = await consultarPermiso({ sb, token, fetch: f }, permiso, senal);
+    if (puede === 401) return { ok: false, estado: 401, motivo: "Sesión no válida o caducada" };
+    if (typeof puede === "number") return { ok: false, estado: 500, motivo: `La comprobación de permisos respondió ${puede}` };
+    if (!puede) return { ok: false, estado: 403, motivo: permiso === "leer" ? "Sin permiso de Marketing" : SIN_PERMISO_EDITAR };
     return { ok: true, sesion: { usuario: usuario.id, token, sb, fetch: f } };
   } catch (e) {
     return { ok: false, estado: 500, motivo: sanear(`No se pudo comprobar la sesión: ${(e as Error)?.message ?? e}`) };
+  }
+}
+
+/** true/false, o el estado HTTP si la comprobación falló. */
+async function consultarPermiso(
+  s: Pick<Sesion, "sb" | "token" | "fetch">,
+  permiso: PermisoMarketing,
+  senal: AbortSignal = AbortSignal.timeout(MS_TIEMPO),
+): Promise<boolean | number> {
+  const r = await s.fetch(`${s.sb.url}/rest/v1/rpc/${rpcDePermiso(permiso)}`, {
+    method: "POST",
+    headers: cabeceras(s, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ _section: SECCION_MARKETING }),
+    signal: senal,
+  });
+  if (!r.ok) return r.status;
+  return (await r.json().catch(() => null)) === true;
+}
+
+/**
+ * Para las funciones que autorizan con «leer» y tienen acciones de escritura
+ * (instagram-drive): ¿la sesión tiene además «Editar»? Nunca lanza (false).
+ */
+export async function puedeEditarMarketing(s: Sesion): Promise<boolean> {
+  try {
+    return (await consultarPermiso(s, "editar")) === true;
+  } catch {
+    return false;
   }
 }
 
@@ -246,11 +284,11 @@ export async function listarObjetos(s: Sesion, carpeta: string, limite = 200): P
   }
 }
 
-/** Borra objetos del bucket. Devuelve cuántos borró. Nunca lanza. */
-export async function borrarObjetos(s: Sesion, rutas: string[]): Promise<number> {
+/** Borra objetos de un cubo («instagram» por defecto). Devuelve cuántos borró. Nunca lanza. */
+export async function borrarObjetos(s: Sesion, rutas: string[], cubo: string = BUCKET): Promise<number> {
   if (!rutas.length) return 0;
   try {
-    const r = await s.fetch(`${s.sb.url}/storage/v1/object/${BUCKET}`, {
+    const r = await s.fetch(`${s.sb.url}/storage/v1/object/${cubo}`, {
       method: "DELETE",
       headers: cabeceras(s, { "Content-Type": "application/json" }),
       body: JSON.stringify({ prefixes: rutas }),

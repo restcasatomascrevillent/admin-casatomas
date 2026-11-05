@@ -7,8 +7,8 @@
  *    dejan escribir a nadie más) y para el registro de capturas.
  *
  * Autorización del usuario: sesión válida (/auth/v1/user) + permiso de la
- * sección Marketing: can_read_section para «leer», can_write_section para
- * «capturar» (botón «Actualizar ahora»). Mismo esquema que
+ * sección Marketing: can_read_section para «leer», can_edit_section («Editar»,
+ * desde 20261111000000) para «capturar» (botón «Actualizar ahora»). Mismo esquema que
  * _shared/instagram/supabase.ts (autorizarMarketing), que solo comprueba
  * escritura y por eso no se reutiliza aquí.
  */
@@ -54,7 +54,7 @@ export async function autorizarSeccion(
     const usuario = (await rUsuario.json().catch(() => null)) as { id?: string } | null;
     if (!usuario?.id) return { ok: false, estado: 401, motivo: "Sesión no válida" };
 
-    const rpc = permiso === "leer" ? "can_read_section" : "can_write_section";
+    const rpc = permiso === "leer" ? "can_read_section" : "can_edit_section";
     const rPermiso = await f(`${sb.url}/rest/v1/rpc/${rpc}`, {
       method: "POST",
       headers: cabeceras(sb.clave, token, { "Content-Type": "application/json" }),
@@ -65,7 +65,7 @@ export async function autorizarSeccion(
     if (!rPermiso.ok) return { ok: false, estado: 500, motivo: `La comprobación de permisos respondió ${rPermiso.status}` };
     const puede = await rPermiso.json().catch(() => null);
     if (puede !== true) {
-      return { ok: false, estado: 403, motivo: permiso === "leer" ? "Sin permiso de Marketing" : "Sin permiso para editar Marketing" };
+      return { ok: false, estado: 403, motivo: permiso === "leer" ? "Sin permiso de Marketing" : "Sin permiso para editar Marketing: hace falta «Editar» en Marketing, no solo «Ver»" };
     }
     return { ok: true, sesion: { usuario: usuario.id, token, sb, fetch: f } };
   } catch (e) {

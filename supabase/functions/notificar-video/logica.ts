@@ -174,6 +174,53 @@ export function construirCargaRecorte(t: TrabajoRecorteNotificable, imagenUrl?: 
 /** Con cualquiera de las dos se puede avisar de un encargo (luego se exige ser el autor del evento). */
 export const SECCIONES_ENCARGO = ["marketing", "instagram_agencia"] as const;
 
+/**
+ * Reels: el trabajador de render (sección propia «instagram_render», A6 de la
+ * evaluación) o alguien de Marketing. Luego se exige haber procesado o creado
+ * el trabajo.
+ */
+export const SECCIONES_REEL = ["instagram_render", "marketing"] as const;
+
+/** Secciones con las que se puede pedir un aviso de ese tipo (con «Editar» en las de Instagram). */
+export function seccionesDeTipo(tipo: TipoTrabajo): readonly string[] {
+  if (tipo === "encargo") return SECCIONES_ENCARGO;
+  if (tipo === "reel") return SECCIONES_REEL;
+  return [seccionDeTipo(tipo)];
+}
+
+/** Instagram exige «Editar» (can_edit_section, 20261111000000); la carta sigue como estaba. */
+export function modoPermisoDeTipo(tipo: TipoTrabajo): "editar" | "escribir" {
+  return tipo === "encargo" || tipo === "reel" ? "editar" : "escribir";
+}
+
+/** Cliente mínimo (supabase-js con service role) para marcar el aviso. */
+export interface ClienteAviso {
+  from: (tabla: string) => {
+    update: (v: Record<string, unknown>) => {
+      eq: (c: string, v: string) => {
+        is: (c: string, v: null) => { select: (c: string) => PromiseLike<{ data: unknown[] | null; error: { message?: string; code?: string } | null }> };
+      };
+    };
+  };
+}
+
+/**
+ * Marca el evento como avisado SOLO si no lo estaba (UPDATE … WHERE
+ * notificado_at IS NULL): la primera llamada gana y las siguientes no mandan
+ * nada (B4 de la evaluación). Si la columna aún no existe (migración
+ * 20261111000000 sin aplicar), deja avisar como antes.
+ */
+export async function reclamarAvisoEncargo(admin: ClienteAviso, eventoId: string, ahora = new Date()): Promise<"avisar" | "ya_avisado"> {
+  const { data, error } = await admin
+    .from("instagram_encargo_eventos")
+    .update({ notificado_at: ahora.toISOString() })
+    .eq("id", eventoId)
+    .is("notificado_at", null)
+    .select("id");
+  if (error) return /notificado_at|42703|PGRST204/.test(`${error.code ?? ""} ${error.message ?? ""}`) ? "avisar" : "ya_avisado";
+  return Array.isArray(data) && data.length > 0 ? "avisar" : "ya_avisado";
+}
+
 /** Un aviso solo se puede pedir poco después del evento (no se reenvían avisos viejos). */
 export const VIDA_AVISO_ENCARGO_MS = 15 * 60_000;
 

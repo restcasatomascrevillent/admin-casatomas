@@ -73,7 +73,7 @@ function falso(e: Escenario = {}) {
     const cuerpo = typeof init.body === "string" ? init.body : null;
     llamadas.push({ url, metodo, cabeceras, cuerpo });
     if (url === `${SB}/auth/v1/user`) return resp(200, { id: USUARIO });
-    if (url === `${SB}/rest/v1/rpc/can_write_section`) return resp(200, e.permiso ?? true);
+    if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, e.permiso ?? true);
     if (url.startsWith(`${SB}/rest/v1/instagram_sugerencias_ia`) && metodo === "HEAD") {
       return new Response(null, { status: 200, headers: { "content-range": `*/${e.usadasHoy ?? 0}` } });
     }
