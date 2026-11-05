@@ -84,6 +84,61 @@ export interface DatosMetricas {
   publicaciones: Publicacion[];
   ultimaCaptura: Captura | null;
   ultimaCorrecta: Captura | null;
+  /** «Qué funciona» de 90 días (RPC instagram_que_funciona). null sin la migración; falta si la función es anterior. */
+  queFunciona?: QueFunciona | null;
+}
+
+// ── «Qué funciona» (contrato de la RPC instagram_que_funciona, migración 20261110000000) ──
+
+export type EjeQueFunciona = "formato" | "plantilla" | "tipo_foto" | "dia" | "franja" | "hashtag";
+
+export interface GrupoQueFunciona {
+  clave: string;
+  publicaciones: number;
+  alcance_medio: number | null;
+  /** Interacciones / alcance, en % (1 decimal). */
+  tasa: number | null;
+  guardados_por_alcance: number | null;
+  /** Tiene la muestra mínima. */
+  suficiente: boolean;
+  orden: number;
+}
+
+export interface ConclusionQueFunciona {
+  eje: EjeQueFunciona;
+  estado: "mejor" | "parecido" | "faltan_datos";
+  clave?: string;
+  publicaciones?: number;
+  tasa?: number;
+  tasa_media?: number;
+  /** Frase de la base de datos (con ids de plantilla). */
+  texto: string;
+}
+
+export interface PublicacionQueFunciona {
+  media_id: string;
+  fecha?: string;
+  formato?: string;
+  plantilla?: string;
+  gancho?: string;
+  alcance?: number;
+  tasa?: number;
+}
+
+export interface QueFunciona {
+  periodo_dias: number;
+  desde?: string;
+  minimo: number;
+  publicaciones: number;
+  con_pieza?: number;
+  tasa_media: number | null;
+  guardados_media?: number | null;
+  suficiente: boolean;
+  aviso: string | null;
+  por: Partial<Record<EjeQueFunciona, GrupoQueFunciona[]>>;
+  conclusiones: ConclusionQueFunciona[];
+  mejores: PublicacionQueFunciona[];
+  peores: PublicacionQueFunciona[];
 }
 
 export interface ResultadoCaptura {
