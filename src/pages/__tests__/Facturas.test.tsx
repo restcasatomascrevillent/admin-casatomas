@@ -103,11 +103,13 @@ describe("Facturas · importación histórica (solo administradores)", () => {
 });
 
 describe("Facturas · pestañas", () => {
-  it("son tres: Compras · Análisis · Cargar (ya no hay Documentos ni Productos)", () => {
+  it("son tres: Análisis · Compras · Cargar, y se entra en Análisis (ya no hay Documentos ni Productos)", () => {
     montar();
     const pestanas = within(screen.getByRole("tablist")).getAllByRole("tab");
-    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Compras", "Análisis", "Cargar"]);
-    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(pestanas.map((p) => p.textContent?.replace(/\d+$/, "").trim())).toEqual(["Análisis", "Compras", "Cargar"]);
+    expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
+    // Compras sigue montada por detrás (sin enlace pedido).
     expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
     for (const p of pestanas) expect(p.className).toContain("min-h-11");
   });
@@ -164,8 +166,17 @@ describe("Facturas · pestañas", () => {
     expect(screen.getByTestId("monitor-gasto-ia-ocr")).toBeInTheDocument();
   });
 
+  it("?tab=compras entra en Compras; un enlace a Compras sin ?tab= (?doc=) también", () => {
+    montar("/facturas?tab=compras");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    cleanup();
+    montar("/facturas?modo=documentos&doc=7");
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: documentos · doc 7");
+  });
+
   it("Compras sigue montada al ir a Análisis (la búsqueda y la ficha abierta no se pierden)", () => {
-    montar();
+    montar("/facturas?tab=compras");
     fireEvent.mouseDown(screen.getByRole("tab", { name: /^Análisis/ }), { button: 0 });
     expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Contenido del chat")).toBeInTheDocument();
@@ -209,7 +220,7 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
 describe("Facturas · sin scroll de página", () => {
   it("la página mide justo lo que queda de ventana y la pestaña reparte ese alto por dentro", () => {
     conLayout(800);
-    montar();
+    montar("/facturas?tab=compras");
     const raiz = screen.getByRole("tablist").closest("[style*='height']") as HTMLElement;
     // 800 − 24 (posición del bloque) − 24 (relleno inferior del <main>)
     expect(raiz.style.height).toBe("752px");

@@ -21,10 +21,13 @@ import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
 
-// Rediseño del 08/10/2026: Compras | Análisis (antes «IA») | Cargar. «Documentos» y «Productos»
-// (las pestañas de antes) son ahora modos de Compras; sus enlaces antiguos
-// (`?tab=productos` de la campana, marcadores) siguen funcionando.
-const PESTANAS = ["compras", "chat", "cargar"] as const;
+// Rediseño del 08/10/2026: «Documentos» y «Productos» (las pestañas de antes) son
+// ahora modos de Compras; sus enlaces antiguos (`?tab=productos` de la campana,
+// marcadores) siguen funcionando. Desde el 05/11/2026 (petición del dueño) el orden
+// es Análisis · Compras · Cargar y se entra en Análisis (valor `chat`).
+const PESTANAS = ["chat", "compras", "cargar"] as const;
+/** Pestaña al entrar en /facturas sin `?tab=`. */
+const PESTANA_INICIAL = "chat";
 const pestanaDeUrl = (v: string | null): string | null => {
   if (v === "documentos" || v === "productos") return "compras";
   return (PESTANAS as readonly string[]).includes(v ?? "") ? (v as string) : null;
@@ -37,7 +40,10 @@ const Facturas = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { key: claveNavegacion } = useLocation();
   const tabUrl = pestanaDeUrl(searchParams.get("tab"));
-  const [activeTab, setActiveTab] = useState<string>(tabUrl ?? "compras");
+  // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`), Compras.
+  const [activeTab, setActiveTab] = useState<string>(
+    () => tabUrl ?? (["modo", "doc", "mes", "prov"].some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL),
+  );
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
   // Desde Análisis: `&mes=YYYY-MM` (Documentos de ese mes) y `&prov=<id>` (ese proveedor desplegado).
@@ -130,8 +136,8 @@ const Facturas = () => {
               a la derecha, para que no parezca una pestaña más; abre su desglose al tocarlo. */}
           <PestanasPagina
             pestanas={[
-              { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
+              { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ]}
             acciones={
