@@ -77,6 +77,12 @@ function falso(e: Escenario = {}) {
     llamadas.push({ url, metodo, cabeceras, cuerpo });
     if (url === `${SB}/auth/v1/user`) return resp(200, { id: USUARIO });
     if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, true);
+    // Cupo atómico (RPC de 20261111000000): misma cuenta que el HEAD de antes.
+    if (url === `${SB}/rest/v1/rpc/instagram_ia_reservar_cupo`) {
+      const p = JSON.parse(cuerpo ?? "{}") as { p_cupo: number };
+      const u = e.usadasHoy ?? 0;
+      return resp(200, u >= p.p_cupo ? { ok: false, motivo: "usuario", cupo: p.p_cupo } : { ok: true, usadas: u + 1, cupo: p.p_cupo });
+    }
     if (url.startsWith(`${SB}/rest/v1/instagram_sugerencias_ia`) && metodo === "HEAD") {
       return new Response(null, { status: 200, headers: { "content-range": `*/${e.usadasHoy ?? 0}` } });
     }

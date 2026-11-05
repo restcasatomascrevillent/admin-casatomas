@@ -76,8 +76,7 @@ import {
 } from "../_shared/instagram/validar-campana.ts";
 import {
   cab,
-  contarHoy,
-  CUPO_DIARIO_POR_DEFECTO,
+  cuposDe,
   ErrorBD,
   ErrorOpenAI,
   faltaTabla,
@@ -86,6 +85,8 @@ import {
   leerGuia,
   MODELO_POR_DEFECTO,
   pedirModelo,
+  reservarCupoIA,
+  respuestaCupo,
   textoError,
   type DependenciasIA,
   type Mensaje,
@@ -207,14 +208,35 @@ export async function leerContexto(s: Sesion, marca: MarcaIA, desde: string, has
   }
   const c = ((await r.json().catch(() => null)) ?? {}) as Record<string, unknown>;
   const lista = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+  const carta = lista<PlatoCarta>(c.carta).filter((p) => p && typeof p.id === "string" && typeof p.nombre === "string");
+  const dietas = await leerDietasCarta(s);
   return {
-    carta: lista<PlatoCarta>(c.carta).filter((p) => p && typeof p.id === "string" && typeof p.nombre === "string"),
+    carta: carta.map((p) => (dietas.has(p.id) ? { ...p, etiquetas_dieteticas: dietas.get(p.id) } : p)),
     novedades: lista(c.novedades),
     fechas: lista(c.fechas),
     fotos: lista<{ id: string }>(c.fotos).filter((f) => f && typeof f.id === "string"),
     metricas: c.metricas ?? null,
     historial: lista(c.historial),
   };
+}
+
+/**
+ * Dietas confirmadas de la carta (Platos.etiquetas_dieteticas, 20261104151000),
+ * para que el validador deje decir «vegetariano» de un plato que lo es.
+ * Nunca lanza: sin la columna (o si falla) no hay ninguna y se sigue sin poder decirlo.
+ */
+export async function leerDietasCarta(s: Sesion): Promise<Map<string, unknown>> {
+  try {
+    const r = await s.fetch(`${s.sb.url}/rest/v1/Platos?select=id,etiquetas_dieteticas&etiquetas_dieteticas=not.is.null&limit=500`, {
+      headers: cab(s),
+      signal: AbortSignal.timeout(MS_SUPABASE),
+    });
+    if (!r.ok) return new Map();
+    const filas = (await r.json().catch(() => [])) as Array<{ id?: unknown; etiquetas_dieteticas?: unknown }>;
+    return new Map((Array.isArray(filas) ? filas : []).filter((f) => typeof f?.id === "string").map((f) => [f.id as string, f.etiquetas_dieteticas]));
+  } catch {
+    return new Map();
+  }
 }
 
 export async function guardarCampana(s: Sesion, fila: Record<string, unknown>): Promise<string> {
@@ -273,16 +295,15 @@ export async function manejarPlanificacion(valor: unknown, m: ContextoManejador)
   }
   registrarSecreto(clave);
   const modelo = (env.INSTAGRAM_IA_MODEL ?? "").trim() || MODELO_POR_DEFECTO;
-  const cupo = Number(env.INSTAGRAM_IA_CUPO_DIARIO) > 0 ? Math.floor(Number(env.INSTAGRAM_IA_CUPO_DIARIO)) : CUPO_DIARIO_POR_DEFECTO;
+  // El MISMO cupo que las sugerencias de texto, reservado antes de llamar a OpenAI (A8).
+  const { cupo, global: cupoGlobal } = cuposDe(env);
 
   let guia: Awaited<ReturnType<typeof leerGuia>>;
   let bd: ContextoBD;
   let queFunciona: Awaited<ReturnType<typeof leerQueFuncionaIA>> = null;
   try {
-    const usadas = await contarHoy(s, ahora);
-    if (usadas >= cupo) {
-      return json(429, { ok: false, error: `Has llegado al tope de ${cupo} sugerencias de IA por día. Vuelve a probar mañana.` });
-    }
+    const reserva = await reservarCupoIA(s, cupo, cupoGlobal, ahora);
+    if (!reserva.ok) return respuestaCupo(reserva);
     [guia, bd, queFunciona] = await Promise.all([
       leerGuia(s, e.marca),
       leerContexto(s, e.marca, e.desde, e.hasta),

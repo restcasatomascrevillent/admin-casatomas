@@ -133,6 +133,7 @@ function falso(o: { qf?: [number, unknown]; openai: Response[] }) {
     llamadas.push({ url, metodo, cuerpo });
     if (url === `${SB}/auth/v1/user`) return resp(200, { id: "11111111-1111-4111-8111-111111111111" });
     if (url === `${SB}/rest/v1/rpc/can_edit_section` || url === `${SB}/rest/v1/rpc/can_read_section`) return resp(200, true);
+    if (url === `${SB}/rest/v1/rpc/instagram_ia_reservar_cupo`) return resp(200, { ok: true, usadas: 1, cupo: 100 });
     if (url.startsWith(`${SB}/rest/v1/instagram_sugerencias_ia`) && metodo === "HEAD") return new Response(null, { status: 200, headers: { "content-range": "*/0" } });
     if (url.startsWith(`${SB}/rest/v1/instagram_sugerencias_ia`) && metodo === "POST") return resp(201, [{ id: "99999999-9999-4999-8999-999999999999" }]);
     if (url.startsWith(`${SB}/rest/v1/instagram_guias_marca`)) return resp(200, [GUIA]);

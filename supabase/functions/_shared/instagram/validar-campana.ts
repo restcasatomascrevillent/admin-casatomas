@@ -46,6 +46,8 @@ export interface PlatoCarta {
   tiene_foto?: boolean;
   alergenos_oficiales?: unknown;
   sin_gluten_disponible?: boolean;
+  /** Dietas confirmadas ('vegetariano', 'vegano'), si las hay (20261104151000). */
+  etiquetas_dieteticas?: unknown;
 }
 
 /** Plantilla con lo que hace falta para planificar. */
@@ -172,6 +174,7 @@ export function platoParaValidar(p: PlatoCarta | null): PlatoContexto | null {
     unidad: null,
     alergenos_oficiales: p.alergenos_oficiales ?? null,
     sin_gluten_disponible: p.sin_gluten_disponible === true,
+    etiquetas_dieteticas: p.etiquetas_dieteticas ?? null,
   };
 }
 
