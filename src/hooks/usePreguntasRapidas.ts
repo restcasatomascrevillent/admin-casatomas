@@ -1,33 +1,13 @@
-// Estado de las PREGUNTAS RÁPIDAS del chat de facturas (sin IA).
+// Lecturas compartidas de las RPC `*_agente` (sin IA).
 //
-// DECISIÓN (07/10/2026): los resultados viven SOLO en memoria del navegador.
-//   · No se escriben en `chat_facturas_mensajes` ni en ninguna tabla.
-//   · No entran en `mensajes` de useChatFacturas.
-// La Edge Function `chat-facturas` reconstruye el contexto leyendo el
-// historial de la BD por `session_id`, así que lo que no se guarda nunca le
-// llega al modelo: la siguiente pregunta libre a la IA no carga con estos
-// datos (0 tokens). Contrapartida: al recargar o cambiar de conversación
-// desaparecen; se vuelven a pedir con un toque y son al instante.
-import { useCallback, useEffect, useRef, useState } from "react";
+// Antes este fichero era el hook de las «preguntas rápidas» del chat (chips
+// «Al instante»), que desaparecen con el tablero de Facturas › Análisis
+// (05/11/2026). Quedan las dos lecturas que usa Compras (useCompras.ts).
 import { supabase } from "@/integrations/supabase/client";
-import type { ContextoConsulta, LlamarRpc, PreguntaRapida } from "@/components/facturas/preguntas-rapidas/catalogo";
 import { esErrorRpcInexistente, RpcNoDisponibleError } from "@/lib/facturas/preguntasRapidas";
 
-export interface ResultadoRapido {
-  id: string;
-  preguntaId: string;
-  /** `no_disponible`: la RPC aún no existe en la BD (migración sin aplicar). */
-  estado: "cargando" | "ok" | "error" | "no_disponible";
-  datos?: unknown;
-  error?: string;
-  /** ISO; solo para enseñar la hora. */
-  creadoEn: string;
-  /**
-   * Nº de mensajes de la conversación que había al pedirlo: la tarjeta se
-   * pinta justo después de ese mensaje (no depende del reloj del servidor).
-   */
-  despuesDe: number;
-}
+/** Llama a una RPC por nombre y devuelve su JSON (o lanza el error). */
+export type LlamarRpc = (funcion: string, args: Record<string, unknown>) => Promise<unknown>;
 
 /** supabase.rpc sin los tipos generados (no todas las *_agente están en types.ts). */
 export const llamarRpcSupabase: LlamarRpc = async (funcion, args) => {
@@ -45,7 +25,7 @@ export const llamarRpcSupabase: LlamarRpc = async (funcion, args) => {
 /**
  * Umbral de «subida de precio» configurado en Facturas › Productos
  * (`configuracion_facturas`, migración 20261007170000). null si no se puede
- * leer (tabla aún sin crear, sin fila o error): la pregunta usa el defecto.
+ * leer (tabla aún sin crear, sin fila o error): se usa el de por defecto.
  */
 export const leerUmbralSubidaPrecio = async (): Promise<number | null> => {
   try {
@@ -61,70 +41,3 @@ export const leerUmbralSubidaPrecio = async (): Promise<number | null> => {
     return null;
   }
 };
-
-const MAX_RESULTADOS = 20;
-
-interface Opciones {
-  catalogo: PreguntaRapida[];
-  llamarRpc?: LlamarRpc;
-  leerUmbral?: ContextoConsulta["umbralSubidaPrecio"];
-  /** Inyectable en pruebas. */
-  ahora?: () => Date;
-}
-
-export function usePreguntasRapidas({
-  catalogo,
-  llamarRpc = llamarRpcSupabase,
-  leerUmbral = leerUmbralSubidaPrecio,
-  ahora = () => new Date(),
-}: Opciones) {
-  const [resultados, setResultados] = useState<ResultadoRapido[]>([]);
-  // Preguntas cuya RPC aún no existe: el botón se apaga hasta recargar.
-  const [noDisponibles, setNoDisponibles] = useState<ReadonlySet<string>>(new Set());
-  const montado = useRef(true);
-  useEffect(() => {
-    montado.current = true;
-    return () => {
-      montado.current = false;
-    };
-  }, []);
-
-  const lanzar = useCallback(
-    async (preguntaId: string, despuesDe: number, parametros?: unknown) => {
-      const pregunta = catalogo.find((p) => p.id === preguntaId);
-      if (!pregunta?.consultar || pregunta.proximamente) return;
-      const id = crypto.randomUUID();
-      setResultados((prev) =>
-        [...prev, { id, preguntaId, estado: "cargando" as const, creadoEn: new Date().toISOString(), despuesDe }].slice(
-          -MAX_RESULTADOS,
-        ),
-      );
-      try {
-        const datos = await pregunta.consultar(llamarRpc, ahora(), { umbralSubidaPrecio: leerUmbral }, parametros);
-        if (!montado.current) return;
-        setResultados((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "ok", datos } : r)));
-      } catch (e) {
-        if (!montado.current) return;
-        if (e instanceof RpcNoDisponibleError) {
-          setNoDisponibles((prev) => new Set(prev).add(preguntaId));
-          setResultados((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "no_disponible" } : r)));
-          return;
-        }
-        const error = e instanceof Error ? e.message : String(e);
-        console.error(`[preguntas-rapidas] ${preguntaId}:`, e);
-        setResultados((prev) => prev.map((r) => (r.id === id ? { ...r, estado: "error", error } : r)));
-      }
-    },
-    // `ahora` suele ser una flecha nueva en cada render; no hace falta como dependencia.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [catalogo, llamarRpc, leerUmbral],
-  );
-
-  const descartar = useCallback((id: string) => setResultados((prev) => prev.filter((r) => r.id !== id)), []);
-  const limpiar = useCallback(() => setResultados([]), []);
-  const cargando = (preguntaId: string) => resultados.some((r) => r.preguntaId === preguntaId && r.estado === "cargando");
-
-  const noDisponible = (preguntaId: string) => noDisponibles.has(preguntaId);
-
-  return { resultados, lanzar, descartar, limpiar, cargando, noDisponible };
-}

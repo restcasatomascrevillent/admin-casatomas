@@ -31,16 +31,12 @@ import {
   PERIODOS,
   agregarPorProveedor,
   esAbono,
-  mesesGrafica,
   mismoPeriodo,
   ordenarProveedoresPorGasto,
   pasaLocal,
   pasaPeriodo,
   rangoPeriodo,
-  resumirCompras,
   textoPeriodo,
-  topProveedores,
-  type AgregadoProveedor,
   type FiltroLocal,
   type Periodo,
 } from "@/lib/facturas/resumenCompras";
@@ -49,7 +45,6 @@ import { ListaProveedores } from "./ListaProveedores";
 import { FichaDocumento } from "./FichaDocumento";
 import { FichaProducto } from "./FichaProducto";
 import { FichaProveedor } from "./FichaProveedor";
-import { ResumenCompras } from "./ResumenCompras";
 
 const TODO_EL_PERIODO = { desde: null, hasta: null, tipo: null } as const;
 const SIN_AVISOS: ReturnType<typeof avisosDocumento> = [];
@@ -76,7 +71,8 @@ const tipoDocumento = (d: Factura) => (esAbono(d) ? "Abono" : d.tipo === "albara
  * Facturas › Compras (rediseño a todo el ancho, 05/11/2026): UN buscador, tres
  * formas de mirar lo comprado (Documentos · Productos · Proveedores) con el
  * número de resultados de cada una, el local (Todos · Casa Tomás · Touza) y el
- * periodo, el resumen plegable y la lista A TODO EL ANCHO.
+ * periodo y la lista A TODO EL ANCHO. El resumen y las gráficas están en Análisis
+ * (decisión del dueño, 05/11/2026: Compras es solo «los documentos, como un Drive mejor»).
  *
  * Al tocar un documento o un producto su ficha ocupa toda la pestaña, con
  * «← Volver a la lista» (que la deja exactamente como estaba: la lista no se
@@ -90,8 +86,12 @@ export function TabCompras({
   modoPedido,
 }: {
   onPreguntarIA?: (doc: Factura, tipo: "factura" | "albarán") => void;
-  /** Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos. */
-  modoPedido?: { modo: ModoCompras; clave: string; doc?: number };
+  /**
+   * Abre Compras en ese modo (cada `clave` nueva vuelve a aplicarlo). Sin esto, Documentos.
+   * `doc`: abre ese documento. `mes` (YYYY-MM): filtra ese mes. `prov`: abre ese proveedor desplegado
+   * (los dos últimos, desde Facturas › Análisis).
+   */
+  modoPedido?: { modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number };
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   const [hoy] = useState(() => new Date());
@@ -149,15 +149,12 @@ export function TabCompras({
     return mapa;
   }, [facturas, albaranes, mediaPrecioFacturas, mediaPrecioAlbaranes]);
 
-  // ── Local y periodo: afectan a Documentos, Proveedores y Resumen ─────────
+  // ── Local y periodo: afectan a Documentos y Proveedores (el resumen vive en Análisis) ─────────
   const rango = useMemo(() => rangoPeriodo(periodo, hoy), [periodo, hoy]);
   const filtrosActivos = local !== "todos" || rango !== null;
   const docsLocal = useMemo(() => documentos.filter((d) => pasaLocal(d, local)), [documentos, local]);
   const docsBase = useMemo(() => (rango ? docsLocal.filter((d) => pasaPeriodo(d, rango)) : docsLocal), [docsLocal, rango]);
   const agregados = useMemo(() => agregarPorProveedor(docsBase, resolver), [docsBase, resolver]);
-  const resumen = useMemo(() => resumirCompras(docsBase), [docsBase]);
-  const meses = useMemo(() => mesesGrafica(docsLocal, hoy), [docsLocal, hoy]);
-  const top = useMemo(() => topProveedores(agregados, 10), [agregados]);
 
   // ── Contadores y listas ───────────────────────────────────────────────────
   const provDelTexto = useMemo(
@@ -279,14 +276,6 @@ export function TabCompras({
     const p = proveedores.find((x) => `#${x.id}` === clave);
     if (p) verProveedor(p.id);
   };
-  const abrirProveedorDelTop = (a: AgregadoProveedor) => {
-    if (a.clave.startsWith("#")) verProveedor(Number(a.clave.slice(1)));
-    else {
-      // Proveedor sin unificar (falta la migración): sus documentos, por el nombre.
-      setTexto(a.nombre);
-      setModo("documentos");
-    }
-  };
   useEffect(() => {
     if (pedidoVerProv === 0 || provAbierto === null) return;
     const marco = requestAnimationFrame(() => {
@@ -304,16 +293,6 @@ export function TabCompras({
     setPeriodo(p);
     setMesPedido(null);
   };
-  const elegirMes = (mes: string) => {
-    if (periodo.tipo === "mes" && periodo.mes === mes) {
-      elegirPeriodo(periodoPrevio);
-      return;
-    }
-    if (periodo.tipo !== "mes") setPeriodoPrevio(periodo);
-    setPeriodo({ tipo: "mes", mes });
-    setMesPedido((m) => ({ mes, n: (m?.n ?? 0) + 1 }));
-  };
-
   const cambiarModo = (m: ModoCompras) => {
     setModo(m);
     setOrigen(null);
@@ -353,6 +332,27 @@ export function TabCompras({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docPendiente, docPorId, facturasQ.isFetching, albaranesQ.isFetching]);
+
+  // Enlaces desde Análisis: `?mes=YYYY-MM` deja ese mes como periodo (al quitarlo
+  // se vuelve a «Todo») y `?prov=<id>` abre ese proveedor desplegado en cuanto
+  // llega la lista de proveedores (si no existe, no se hace nada).
+  useEffect(() => {
+    const mes = modoPedido?.mes;
+    if (!mes) return;
+    setPeriodoPrevio(PERIODO_TODO);
+    setPeriodo({ tipo: "mes", mes });
+    setMesPedido((m) => ({ mes, n: (m?.n ?? 0) + 1 }));
+  }, [modoPedido?.clave, modoPedido?.mes]);
+  const [provPendiente, setProvPendiente] = useState<number | null>(modoPedido?.prov ?? null);
+  useEffect(() => {
+    if (modoPedido?.prov) setProvPendiente(modoPedido.prov);
+  }, [modoPedido?.clave, modoPedido?.prov]);
+  useEffect(() => {
+    if (provPendiente === null || !proveedoresQ.data) return;
+    if (proveedores.some((p) => p.id === provPendiente)) verProveedor(provPendiente);
+    setProvPendiente(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [provPendiente, proveedoresQ.data, proveedores]);
 
   // ── Contenido de la ficha ─────────────────────────────────────────────────
   let contenidoFicha: ReactNode = null;
@@ -506,22 +506,6 @@ export function TabCompras({
               )}
             </div>
           </div>
-        )}
-
-        {conLocalYPeriodo && (
-          <ResumenCompras
-            datos={resumen}
-            meses={meses}
-            top={top}
-            local={local}
-            rango={rango}
-            mesElegido={mesElegido}
-            periodo={`${textoPeriodo(periodo, hoy)}${local === "todos" ? "" : ` · ${FILTROS_LOCAL.find((f) => f.valor === local)?.etiqueta}`}`}
-            parcial={llegandoAnteriores}
-            cargando={cargandoDocs}
-            onElegirMes={elegirMes}
-            onAbrirProveedor={abrirProveedorDelTop}
-          />
         )}
 
         {/* Lista a todo el ancho */}

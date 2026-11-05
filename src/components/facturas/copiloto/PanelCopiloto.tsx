@@ -1,72 +1,49 @@
-// Copiloto del tablero de gráficas: columna estrecha a un lado (en horizontal)
-// o franja plegable abajo (tablet en vertical). Caja para preguntar,
-// sugerencias iniciales y las respuestas cortas de la IA. Las gráficas de esas
-// respuestas van al tablero; aquí solo queda un «Ver gráfica».
+// Copiloto de IA de Facturas › Análisis: el contenido del panel lateral
+// «Pregúntale a la IA» (CopilotoLateral). Sugerencias sacadas del tablero, el
+// hilo de la conversación y la caja para preguntar abajo.
+//
+// Las gráficas que manda la IA (adjuntos `serie_precio`) se ven AQUÍ, bajo su
+// respuesta, con «Fijar en el tablero» para dejarlas al final del tablero.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
-import {
-  ArrowUp,
-  BarChart3,
-  Bot,
-  Check,
-  ChevronDown,
-  Copy,
-  Crosshair,
-  FileText,
-  LineChart,
-  Package,
-  RefreshCw,
-  X,
-  Zap,
-} from "lucide-react";
+import { ArrowUp, Check, Copy, Crosshair, FileText, LineChart, Pin, PinOff, RefreshCw, Sparkles } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { COMPONENTES_MARKDOWN_SEGUROS, urlMarkdownSegura } from "@/lib/markdown-seguro";
 import type { MensajeChat } from "@/hooks/useChatFacturas";
-import { asuntoDeContexto, separarContexto } from "@/lib/facturas/tableroGraficas";
+import { asuntoDeContexto, graficasDeMensaje, separarContexto, type GraficaIa } from "@/lib/facturas/graficasCopiloto";
 import type { DocumentoCitado } from "@/lib/facturas/seriePrecio";
 import { formatFechaEs } from "@/lib/facturas/preguntasRapidas";
 import { BotonOriginal } from "../shared/BotonOriginal";
+import { GraficoSeriePrecio } from "../GraficoSeriePrecio";
 
 export interface Sugerencia {
-  icon: React.ElementType;
   texto: string;
   /** Solo rellena la caja (falta un dato, p. ej. el producto) en vez de preguntar ya. */
   rellenar?: boolean;
 }
 
-const SUGERENCIAS_DEFAULT: Sugerencia[] = [
-  { icon: FileText, texto: "¿Cuáles son las últimas facturas recibidas?" },
-  { icon: BarChart3, texto: "¿Cuánto hemos gastado este mes?" },
-  { icon: Package, texto: "¿Qué facturas hay pendientes de pago?" },
-  { icon: Zap, texto: "Resume los albaranes de esta semana" },
-];
+/** Siempre la última: la IA dibuja el precio de un producto. */
+const SUGERENCIA_GRAFICA: Sugerencia = { texto: "Enséñame la gráfica del precio de ", rellenar: true };
 
-/** Sugerencia de gráfica que va siempre primero: la IA solo dibuja precios de un producto. */
-const SUGERENCIA_GRAFICA: Sugerencia = {
-  icon: LineChart,
-  texto: "Enséñame la gráfica del precio de ",
-  rellenar: true,
-};
-
-const DORADO_FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(38,59%,45%)] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const FOCO = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const BOTON_PIE = cn("flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground", FOCO);
 
 interface Props {
   mensajes: MensajeChat[];
   isLoading: boolean;
   isSending: boolean;
-  sugerencias?: Sugerencia[];
+  /** Preguntas para empezar (sacadas del tablero). */
+  sugerencias: string[];
   onEnviar: (texto: string) => void;
   onRegenerar?: () => void;
-  /** Título de la tarjeta seleccionada (la pregunta irá sobre ella). */
-  seleccion: string | null;
-  onQuitarSeleccion: () => void;
-  /** Ids de tarjeta de las gráficas de un mensaje que siguen en el tablero. */
-  graficasDe: (mensaje: MensajeChat) => string[];
-  onVerGrafica: (tarjetaId: string) => void;
+  /** Ids de las gráficas ya fijadas en el tablero. */
+  fijadas: ReadonlySet<string>;
+  onFijar: (g: GraficaIa) => void;
+  onQuitarFijada: (id: string) => void;
 }
 
-/** Tablas y textos largos de la respuesta: que no ensanchen la columna (estrecha) ni la página en móvil. */
+/** Tablas y textos largos de la respuesta: que no ensanchen el panel (estrecho). */
 const CLASES_PROSA =
   "break-words [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto [&_pre]:overflow-x-auto [&_ul]:my-1 [&_ol]:my-1";
 
@@ -74,7 +51,7 @@ const CLASES_PROSA =
 function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
   return (
     <details className="group rounded-lg border border-border/60 text-sm" open={documentos.length <= 4}>
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden">
+      <summary className={cn("flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-xs font-medium text-muted-foreground [&::-webkit-details-marker]:hidden", FOCO)}>
         <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
         Documentos citados ({documentos.length})
       </summary>
@@ -97,9 +74,9 @@ function DocumentosCitados({ documentos }: { documentos: DocumentoCitado[] }) {
   );
 }
 
-function TypingDots() {
+function Escribiendo() {
   return (
-    <div className="flex items-center gap-1 py-2" role="status" aria-label="Escribiendo…">
+    <div className="flex items-center gap-1 py-2" role="status" aria-label="La IA está escribiendo…">
       {[0, 180, 360].map((ms) => (
         <span
           key={ms}
@@ -126,11 +103,7 @@ function BotonCopiar({ texto }: { texto: string }) {
         }
       }}
       title={copiado ? "¡Copiado!" : "Copiar respuesta"}
-      className={cn(
-        "flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium transition-colors",
-        DORADO_FOCO,
-        copiado ? "bg-emerald-500/10 text-emerald-600" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-      )}
+      className={cn(BOTON_PIE, copiado && "bg-emerald-500/10 text-emerald-600")}
     >
       {copiado ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
       {copiado ? "Copiado" : "Copiar"}
@@ -138,35 +111,16 @@ function BotonCopiar({ texto }: { texto: string }) {
   );
 }
 
-export function PanelCopiloto({
-  mensajes,
-  isLoading,
-  isSending,
-  sugerencias,
-  onEnviar,
-  onRegenerar,
-  seleccion,
-  onQuitarSeleccion,
-  graficasDe,
-  onVerGrafica,
-}: Props) {
+export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onEnviar, onRegenerar, fijadas, onFijar, onQuitarFijada }: Props) {
   const [input, setInput] = useState("");
-  // Plegado: solo tiene efecto por debajo de `lg` (tablet en vertical); en
-  // horizontal la columna está siempre abierta.
-  const [plegado, setPlegado] = useState(false);
   const finRef = useRef<HTMLDivElement>(null);
   const cajaRef = useRef<HTMLTextAreaElement>(null);
-  const lista = [SUGERENCIA_GRAFICA, ...(sugerencias && sugerencias.length > 0 ? sugerencias : SUGERENCIAS_DEFAULT)];
+  const lista: Sugerencia[] = [...sugerencias.map((texto) => ({ texto })), SUGERENCIA_GRAFICA];
   const ultimoAsistente = mensajes.reduce((u, m, i) => (m.rol === "assistant" ? i : u), -1);
 
   useEffect(() => {
     finRef.current?.scrollIntoView?.({ behavior: "smooth", block: "end" });
   }, [mensajes, isSending]);
-
-  // Al preguntar con el copiloto plegado se despliega: la respuesta se ve.
-  useEffect(() => {
-    if (isSending) setPlegado(false);
-  }, [isSending]);
 
   const enviar = () => {
     const texto = input.trim();
@@ -199,73 +153,41 @@ export function PanelCopiloto({
   const hayTexto = input.trim().length > 0;
 
   return (
-    <aside
-      aria-labelledby="copiloto-titulo"
-      className={cn(
-        "flex min-h-0 shrink-0 flex-col border-t border-border/60 pt-1",
-        // Tablet en vertical: franja de abajo, como mucho la mitad del alto.
-        "max-h-[50%]",
-        // Horizontal: columna estrecha a la derecha, todo el alto.
-        "lg:max-h-none lg:w-80 lg:border-l lg:border-t-0 lg:pl-3 lg:pt-0 xl:w-96",
-      )}
-    >
-      <div className="flex shrink-0 items-center gap-2">
-        <h2 id="copiloto-titulo" className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-          <Bot className="h-4 w-4 text-[hsl(38,59%,45%)]" aria-hidden />
-          Copiloto
-        </h2>
-        <button
-          type="button"
-          onClick={() => setPlegado((v) => !v)}
-          aria-expanded={!plegado}
-          aria-controls="copiloto-hilo"
-          className={cn(
-            "ml-auto inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted/60 hover:text-foreground lg:hidden",
-            DORADO_FOCO,
-          )}
-        >
-          {plegado ? `Ver respuestas${mensajes.length > 0 ? ` (${mensajes.length})` : ""}` : "Plegar"}
-          <ChevronDown className={cn("h-4 w-4 transition-transform", !plegado && "rotate-180")} aria-hidden />
-        </button>
-      </div>
-
-      <div
-        id="copiloto-hilo"
-        className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", plegado ? "hidden lg:block" : "block")}
-      >
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
         {vacio ? (
-          <div className="space-y-2 py-2">
-            <p className="text-xs text-muted-foreground">
-              Pregunta por tus compras con tus palabras. Las gráficas se quedan en el tablero; toca una para preguntar
-              sobre ella.
+          <div className="space-y-2 py-3">
+            <p className="text-sm text-muted-foreground">
+              Pregunta por tus compras con tus palabras. Si la respuesta trae una gráfica, puedes fijarla en el tablero.
             </p>
-            <ul className="space-y-0.5" data-tour="facturas-ia-sugerencias" aria-label="Sugerencias para empezar">
-              {lista.map((s) => {
-                const Icono = s.icon;
-                return (
-                  <li key={s.texto}>
-                    <button
-                      type="button"
-                      onClick={() => usarSugerencia(s)}
-                      disabled={isSending}
-                      className={cn(
-                        "group flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50",
-                        DORADO_FOCO,
-                      )}
-                    >
-                      <Icono className="h-4 w-4 shrink-0 group-hover:text-[hsl(38,59%,45%)]" aria-hidden />
-                      <span className="leading-snug">{s.rellenar ? `${s.texto.trim()}…` : s.texto}</span>
-                    </button>
-                  </li>
-                );
-              })}
+            <ul className="space-y-1" data-tour="facturas-ia-sugerencias" aria-label="Sugerencias para empezar">
+              {lista.map((s) => (
+                <li key={s.texto}>
+                  <button
+                    type="button"
+                    onClick={() => usarSugerencia(s)}
+                    disabled={isSending}
+                    className={cn(
+                      "group flex min-h-11 w-full items-center gap-2.5 rounded-lg border border-border/60 px-3 py-2 text-left text-sm text-foreground transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50",
+                      FOCO,
+                    )}
+                  >
+                    {s.rellenar ? (
+                      <LineChart className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    ) : (
+                      <Sparkles className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                    )}
+                    <span className="leading-snug">{s.rellenar ? `${s.texto.trim()}…` : s.texto}</span>
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         ) : (
-          <ol className="space-y-3 py-2" aria-label="Conversación con el copiloto">
+          <ol className="space-y-3 py-3" aria-label="Conversación con la IA">
             {isLoading && mensajes.length === 0 && (
               <li>
-                <TypingDots />
+                <Escribiendo />
               </li>
             )}
             {mensajes.map((m, i) => (
@@ -275,8 +197,9 @@ export function PanelCopiloto({
                 ) : (
                   <MensajeAsistente
                     mensaje={m}
-                    graficas={graficasDe(m)}
-                    onVerGrafica={onVerGrafica}
+                    fijadas={fijadas}
+                    onFijar={onFijar}
+                    onQuitarFijada={onQuitarFijada}
                     onRegenerar={i === ultimoAsistente && !isSending ? onRegenerar : undefined}
                   />
                 )}
@@ -284,7 +207,7 @@ export function PanelCopiloto({
             ))}
             {isSending && (
               <li>
-                <TypingDots />
+                <Escribiendo />
               </li>
             )}
           </ol>
@@ -292,35 +215,14 @@ export function PanelCopiloto({
         <div ref={finRef} />
       </div>
 
-      {/* Caja de pregunta: con una tarjeta seleccionada, la pregunta va sobre ella. */}
-      <div className="shrink-0 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1">
-        {seleccion && (
-          <div className="mb-1 flex items-center gap-1 rounded-lg bg-[hsl(38,59%,45%)]/10 pl-2.5 text-xs text-foreground">
-            <Crosshair className="h-3.5 w-3.5 shrink-0 text-[hsl(38,59%,40%)]" aria-hidden />
-            <span className="min-w-0 flex-1 truncate" id="copiloto-seleccion">
-              Sobre: <span className="font-semibold">{seleccion}</span>
-            </span>
-            <button
-              type="button"
-              onClick={onQuitarSeleccion}
-              aria-label="Dejar de preguntar sobre esta gráfica"
-              title="Preguntar en general"
-              className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-muted", DORADO_FOCO)}
-            >
-              <X className="h-4 w-4" aria-hidden />
-            </button>
-          </div>
-        )}
-        <div
-          className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-[hsl(38,59%,45%)]"
-          data-tour="facturas-ia-pregunta"
-        >
+      <div className="shrink-0 border-t border-border/60 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+        <div className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-ring" data-tour="facturas-ia-pregunta">
           <Textarea
             ref={cajaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={alPulsar}
-            placeholder={seleccion ? "Pregunta sobre la gráfica seleccionada…" : "Escribe tu pregunta…"}
+            placeholder="Escribe tu pregunta…"
             enterKeyHint="send"
             onFocus={(e) => {
               // Móvil: al salir el teclado, que la caja siga a la vista.
@@ -328,7 +230,6 @@ export function PanelCopiloto({
               setTimeout(() => el.scrollIntoView?.({ block: "nearest", behavior: "smooth" }), 300);
             }}
             aria-label="Pregunta para el asistente"
-            aria-describedby={seleccion ? "copiloto-seleccion" : undefined}
             disabled={isSending}
             rows={1}
             className="max-h-32 min-h-[52px] resize-none rounded-2xl border-0 bg-transparent py-3.5 pl-4 pr-14 text-base shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 md:text-base"
@@ -340,17 +241,15 @@ export function PanelCopiloto({
             aria-label="Enviar pregunta"
             className={cn(
               "absolute bottom-1 right-1 flex h-11 w-11 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed",
-              DORADO_FOCO,
-              hayTexto && !isSending
-                ? "bg-[hsl(38,59%,45%)] text-white hover:bg-[hsl(38,59%,38%)]"
-                : "bg-muted text-muted-foreground",
+              FOCO,
+              hayTexto && !isSending ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-muted text-muted-foreground",
             )}
           >
             <ArrowUp className="h-4 w-4" aria-hidden />
           </button>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }
 
@@ -367,19 +266,19 @@ function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       {contexto && (
-        <span className="inline-flex max-w-full items-center gap-1 truncate text-[11px] text-muted-foreground pointer-coarse:text-xs">
+        <span className="inline-flex max-w-full items-center gap-1 truncate text-xs text-muted-foreground">
           <Crosshair className="h-3 w-3 shrink-0" aria-hidden />
           <span className="truncate">sobre {asuntoDeContexto(contexto)}</span>
         </span>
       )}
-      <div className="max-w-[90%] rounded-2xl rounded-br-md bg-[hsl(38,59%,45%)] px-3 py-1.5 text-sm text-white">
+      <div className="max-w-[90%] rounded-2xl rounded-br-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
         <div className="prose prose-sm prose-invert max-w-none break-words prose-p:my-0">
           <ReactMarkdown components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
             {pregunta}
           </ReactMarkdown>
         </div>
       </div>
-      <p className="px-1 text-[11px] text-muted-foreground/80 pointer-coarse:text-xs">
+      <p className="px-1 text-xs text-muted-foreground/80">
         <SinGuardar mensaje={mensaje} />
         {hora(mensaje.created_at)}
       </p>
@@ -389,16 +288,19 @@ function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
 
 function MensajeAsistente({
   mensaje,
-  graficas,
-  onVerGrafica,
+  fijadas,
+  onFijar,
+  onQuitarFijada,
   onRegenerar,
 }: {
   mensaje: MensajeChat;
-  graficas: string[];
-  onVerGrafica: (id: string) => void;
+  fijadas: ReadonlySet<string>;
+  onFijar: (g: GraficaIa) => void;
+  onQuitarFijada: (id: string) => void;
   onRegenerar?: () => void;
 }) {
   const documentos = (mensaje.adjuntos ?? []).flatMap((a) => (a.tipo === "documentos" ? a.datos : []));
+  const graficas = graficasDeMensaje(mensaje);
   return (
     <div className="flex flex-col gap-1">
       <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1")}>
@@ -406,33 +308,28 @@ function MensajeAsistente({
           {mensaje.contenido}
         </ReactMarkdown>
       </div>
+      {graficas.map((g) => {
+        const fijada = fijadas.has(g.id);
+        return (
+          <div key={g.id} className="rounded-xl border border-border/70 p-2">
+            <GraficoSeriePrecio datos={g.serie} alto={180} />
+            <button
+              type="button"
+              onClick={() => (fijada ? onQuitarFijada(g.id) : onFijar(g))}
+              aria-pressed={fijada}
+              className={cn(BOTON_PIE, "mt-1", fijada && "text-primary")}
+            >
+              {fijada ? <PinOff className="h-3.5 w-3.5" aria-hidden /> : <Pin className="h-3.5 w-3.5" aria-hidden />}
+              {fijada ? "Fijada en el tablero · quitar" : "Fijar en el tablero"}
+            </button>
+          </div>
+        );
+      })}
       {documentos.length > 0 && <DocumentosCitados documentos={documentos} />}
-      <div className="-ml-2 flex flex-wrap items-center gap-x-0.5 text-[11px] text-muted-foreground/80 pointer-coarse:text-xs">
-        {graficas.map((id, i) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => onVerGrafica(id)}
-            className={cn(
-              "flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-[hsl(38,59%,35%)] hover:bg-muted/60 dark:text-[hsl(38,59%,62%)]",
-              DORADO_FOCO,
-            )}
-          >
-            <LineChart className="h-3.5 w-3.5" aria-hidden />
-            {graficas.length > 1 ? `Ver gráfica ${i + 1}` : "Ver gráfica"}
-          </button>
-        ))}
+      <div className="-ml-2 flex flex-wrap items-center gap-x-0.5 text-xs text-muted-foreground/80">
         <BotonCopiar texto={mensaje.contenido} />
         {onRegenerar && (
-          <button
-            type="button"
-            onClick={onRegenerar}
-            title="Regenerar respuesta"
-            className={cn(
-              "flex min-h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-              DORADO_FOCO,
-            )}
-          >
+          <button type="button" onClick={onRegenerar} title="Regenerar respuesta" className={BOTON_PIE}>
             <RefreshCw className="h-3.5 w-3.5" aria-hidden />
             Regenerar
           </button>

@@ -9,7 +9,7 @@
  */
 import { forwardRef, type ReactNode } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { FilaGastoIa } from "@/lib/facturas/gastoIa";
 
@@ -17,15 +17,26 @@ vi.mock("@/components/DashboardLayout", () => ({
   DashboardLayout: ({ children }: { children: ReactNode }) => <main style={{ paddingBottom: 24 }}>{children}</main>,
 }));
 vi.mock("@/components/facturas/compras/TabCompras", () => ({
-  TabCompras: ({ modoPedido }: { modoPedido?: { modo: string; doc?: number } }) => (
+  TabCompras: ({ modoPedido }: { modoPedido?: { modo: string; doc?: number; mes?: string; prov?: number } }) => (
     <p data-testid="compras">
       Compras · modo pedido: {modoPedido?.modo ?? "ninguno"}
       {modoPedido?.doc ? ` · doc ${modoPedido.doc}` : ""}
+      {modoPedido?.mes ? ` · mes ${modoPedido.mes}` : ""}
+      {modoPedido?.prov ? ` · prov ${modoPedido.prov}` : ""}
     </p>
   ),
 }));
+// El tablero de Análisis (con sus propios tests) se sustituye por un marcador con
+// un botón que abre un enlace, como hacen sus meses y proveedores.
 vi.mock("@/components/facturas/ChatFacturas", () => ({
-  ChatFacturas: forwardRef(() => <p>Contenido del chat</p>),
+  ChatFacturas: forwardRef(({ onIrA }: { onIrA?: (e: string) => void }, _ref) => (
+    <div>
+      <p>Contenido del chat</p>
+      <button type="button" onClick={() => onIrA?.("?tab=compras&modo=documentos&mes=2026-07")}>
+        Julio en Compras
+      </button>
+    </div>
+  )),
 }));
 vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p>Contenido de la subida</p> }));
 vi.mock("@/hooks/useFacturas", () => ({
@@ -115,6 +126,29 @@ describe("Facturas · pestañas", () => {
   it("un doc= que no es un número válido se ignora", () => {
     montar("/facturas?tab=compras&doc=abc");
     expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
+  });
+
+  it("enlaces del tablero de Análisis: &mes= abre Documentos de ese mes; &prov= ese proveedor", () => {
+    montar("/facturas?tab=compras&modo=documentos&mes=2026-07");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: documentos · mes 2026-07");
+    cleanup();
+    montar("/facturas?tab=compras&modo=proveedores&prov=298");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: proveedores · prov 298");
+    cleanup();
+    // Sin modo, el parámetro lo deduce; un mes o un proveedor mal escrito se ignora.
+    montar("/facturas?tab=compras&prov=12");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: proveedores · prov 12");
+    cleanup();
+    montar("/facturas?tab=compras&mes=2026-13&prov=x");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: ninguno");
+  });
+
+  it("tocar un mes del tablero lleva de Análisis a Compras con ese mes", () => {
+    montar("/facturas?tab=chat");
+    expect(screen.getByRole("tab", { name: /^Análisis/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Julio en Compras" }));
+    expect(screen.getByRole("tab", { name: /^Compras/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("compras")).toHaveTextContent("modo pedido: documentos · mes 2026-07");
   });
 
   it("?tab=documentos también lleva a Compras", () => {

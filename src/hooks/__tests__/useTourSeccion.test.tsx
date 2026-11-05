@@ -201,15 +201,15 @@ describe("useTourSeccion", () => {
     document.body.innerHTML = "";
   });
 
-  it("si despliega «Al instante», lo vuelve a plegar al cerrar el tour", async () => {
+  it("si abre el panel de la IA, lo vuelve a cerrar al acabar el tour", async () => {
     document.body.innerHTML = `
       <button data-tour="facturas-pestana-ia" aria-selected="true"></button>
-      <div data-tour="facturas-ia-al-instante">
-        <button data-tour="facturas-ia-al-instante-abrir" aria-expanded="false"></button>
+      <div data-tour="facturas-ia-pregunta">
+        <button data-tour="facturas-ia-abrir" aria-expanded="false"></button>
       </div>`;
     const visible = () => [{}] as unknown as DOMRectList;
-    const bloque = document.querySelector<HTMLElement>('[data-tour="facturas-ia-al-instante"]')!;
-    const abrir = document.querySelector<HTMLElement>('[data-tour="facturas-ia-al-instante-abrir"]')!;
+    const bloque = document.querySelector<HTMLElement>('[data-tour="facturas-ia-pregunta"]')!;
+    const abrir = document.querySelector<HTMLElement>('[data-tour="facturas-ia-abrir"]')!;
     bloque.getClientRects = visible;
     abrir.getClientRects = visible;
     abrir.addEventListener("click", () =>
@@ -234,13 +234,13 @@ describe("useTourSeccion", () => {
     document.body.innerHTML = "";
   });
 
-  it("no pliega «Al instante» si ya estaba desplegado antes del tour", async () => {
+  it("no cierra el panel de la IA si ya estaba abierto antes del tour", async () => {
     document.body.innerHTML = `
       <button data-tour="facturas-pestana-ia" aria-selected="true"></button>
-      <div data-tour="facturas-ia-al-instante">
-        <button data-tour="facturas-ia-al-instante-abrir" aria-expanded="true"></button>
+      <div data-tour="facturas-ia-pregunta">
+        <button data-tour="facturas-ia-abrir" aria-expanded="true"></button>
       </div>`;
-    const abrir = document.querySelector<HTMLElement>('[data-tour="facturas-ia-al-instante-abrir"]')!;
+    const abrir = document.querySelector<HTMLElement>('[data-tour="facturas-ia-abrir"]')!;
     const clic = vi.fn();
     abrir.addEventListener("click", clic);
     const { result } = renderHook(() => useTourSeccion("facturas", { auto: false }), { wrapper: envoltorio });

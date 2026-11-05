@@ -10,18 +10,17 @@ import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
 import { MODOS_COMPRAS, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { FileText, Upload, BarChart3, Package, Zap, ShoppingCart, History } from "lucide-react";
+import { Upload, BarChart3, ShoppingCart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Factura, useFacturas, useAlbaranes } from "@/hooks/useFacturas";
-import { useChatFacturas } from "@/hooks/useChatFacturas";
-import type { Sugerencia } from "@/components/facturas/ChatFacturas";
+import { leerEnlaceCompras } from "@/lib/facturas/tableroCompras";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
 
-// Rediseño del 08/10/2026: Compras | IA | Cargar. «Documentos» y «Productos»
+// Rediseño del 08/10/2026: Compras | Análisis (antes «IA») | Cargar. «Documentos» y «Productos»
 // (las pestañas de antes) son ahora modos de Compras; sus enlaces antiguos
 // (`?tab=productos` de la campana, marcadores) siguen funcionando.
 const PESTANAS = ["compras", "chat", "cargar"] as const;
@@ -40,12 +39,23 @@ const Facturas = () => {
   const [activeTab, setActiveTab] = useState<string>(tabUrl ?? "compras");
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
+  // Desde Análisis: `&mes=YYYY-MM` (Documentos de ese mes) y `&prov=<id>` (ese proveedor desplegado).
   const modoPedido = useMemo(() => {
     const modoUrl = MODOS_COMPRAS.find((m) => m.valor === searchParams.get("modo"))?.valor;
     const docNum = Number(searchParams.get("doc"));
     const doc = Number.isInteger(docNum) && docNum > 0 ? docNum : undefined;
-    const modo: ModoCompras | undefined = searchParams.get("tab") === "productos" ? "productos" : (modoUrl ?? (doc ? "documentos" : undefined));
-    return modo ? { modo, clave: claveNavegacion, doc: modo === "documentos" ? doc : undefined } : undefined;
+    const { mes, prov } = leerEnlaceCompras(searchParams);
+    const modo: ModoCompras | undefined =
+      searchParams.get("tab") === "productos" ? "productos" : (modoUrl ?? (doc || mes ? "documentos" : prov ? "proveedores" : undefined));
+    return modo
+      ? {
+          modo,
+          clave: claveNavegacion,
+          doc: modo === "documentos" ? doc : undefined,
+          mes: modo === "documentos" ? mes : undefined,
+          prov: modo === "proveedores" ? prov : undefined,
+        }
+      : undefined;
   }, [searchParams, claveNavegacion]);
   useEffect(() => {
     if (tabUrl) setActiveTab(tabUrl);
@@ -62,9 +72,14 @@ const Facturas = () => {
       // El enlace profundo ya se aplicó: que no vuelva a abrir el documento al volver a Compras.
       p.delete("modo");
       p.delete("doc");
+      p.delete("mes");
+      p.delete("prov");
       return p;
     }, { replace: true });
   };
+  // Enlaces del tablero de Análisis a Compras (un mes, un proveedor, Productos):
+  // entran en el historial, así «Atrás» vuelve al tablero.
+  const irA = (enlace: string) => setSearchParams(new URLSearchParams(enlace));
   // Importación histórica (04/11/2026): solo administradores.
   const { isAdmin } = useUserRole();
   const [importacionAbierta, setImportacionAbierta] = useState(false);
@@ -79,44 +94,7 @@ const Facturas = () => {
   // Contadores para los badges de las pestañas
   const { data: facturas } = useFacturas();
   const { data: albaranes } = useAlbaranes();
-  const { conversaciones } = useChatFacturas();
   const totalDocumentos = (facturas?.length ?? 0) + (albaranes?.length ?? 0);
-  const totalConversaciones = conversaciones.length;
-
-  // ─── Sugerencias dinámicas basadas en datos reales ─────────────────────────
-  const sugerenciasDinamicas = useMemo((): Sugerencia[] => {
-    const mesActual = new Date().toLocaleString("es-ES", { month: "long" });
-    const mesCapitalizado = mesActual.charAt(0).toUpperCase() + mesActual.slice(1);
-
-    // Proveedor más reciente de facturas
-    const proveedorReciente = facturas?.find((f) => f.proveedor)?.proveedor ?? null;
-    // Proveedor más reciente de albaranes
-    const proveedorAlbaran = albaranes?.find((a) => a.proveedor)?.proveedor ?? null;
-
-    const sugerencias: Sugerencia[] = [
-      {
-        icon: BarChart3,
-        texto: `¿Cuánto hemos gastado en ${mesCapitalizado}?`,
-      },
-      {
-        icon: FileText,
-        texto: proveedorReciente
-          ? `Muéstrame todas las facturas de ${proveedorReciente}`
-          : "¿Cuáles son las últimas facturas recibidas?",
-      },
-      {
-        icon: Package,
-        texto: proveedorAlbaran
-          ? `¿Qué albaranes de ${proveedorAlbaran} hay esta semana?`
-          : "Resume los albaranes de esta semana",
-      },
-      {
-        icon: Zap,
-        texto: `¿Qué productos hemos comprado más veces este mes?`,
-      },
-    ];
-    return sugerencias;
-  }, [facturas, albaranes]);
 
   const handlePreguntarIA = (doc: Factura, tipo: 'factura' | 'albarán') => {
     // 1. Cambiamos a la pestaña del chat
@@ -153,7 +131,7 @@ const Facturas = () => {
           <PestanasPagina
             pestanas={[
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
-              { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, contador: totalConversaciones, tonoContador: "dorado", tour: "facturas-pestana-ia" },
+              { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
             ]}
             acciones={
@@ -176,11 +154,11 @@ const Facturas = () => {
               <TabCompras onPreguntarIA={handlePreguntarIA} modoPedido={modoPedido} />
             </TabsContent>
 
-            {/* PESTAÑA IA: el gasto de IA ya no ocupa una línea aquí; va junto a la
-                pestaña (GastoIaPestana). */}
+            {/* PESTAÑA ANÁLISIS: tablero de gráficas fijas y copiloto de IA plegado
+                (ChatFacturas). El gasto de IA va junto a la pestaña (GastoIaPestana). */}
             <TabsContent value="chat" className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="h-full min-h-0 overflow-hidden">
-                <ChatFacturas ref={chatRef} sugerencias={sugerenciasDinamicas} />
+                <ChatFacturas ref={chatRef} onIrA={irA} />
               </div>
             </TabsContent>
 
