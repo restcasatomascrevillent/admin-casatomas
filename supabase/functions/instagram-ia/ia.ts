@@ -7,7 +7,7 @@
  *   Authorization: Bearer <JWT del panel> (usuario con Marketing en edición)
  *
  *   Cuerpo común:
- *     { accion: "sugerir_texto" | "sugerir_rotulos",
+ *     { accion: "sugerir_texto" | "sugerir_rotulos",   (proponer_campana e ideas_semana: campanas.ts)
  *       marca: "casa-tomas" | "touza", formato: "post" | "story", plantilla: "<id>",
  *       tono?: "cercano" | "elegante" | "retranca"      (por defecto cercano),
  *       indicaciones?: string (≤ 500; se quitan correos y teléfonos),
@@ -64,6 +64,7 @@ import {
   type PlatoContexto,
   type Revision,
 } from "../_shared/instagram/validar-ia.ts";
+import { ACCIONES_PLANIFICACION, manejarPlanificacion } from "./campanas.ts";
 import { plantillaIA } from "./plantillas.ts";
 import {
   ESQUEMA_ROTULOS,
@@ -137,7 +138,7 @@ export function validarEntrada(valor: unknown): { ok: true; entrada: EntradaIA }
   if (!valor || typeof valor !== "object" || Array.isArray(valor)) return { ok: false, error: "El cuerpo debe ser un objeto JSON" };
   const o = valor as Record<string, unknown>;
   if (o.accion !== "sugerir_texto" && o.accion !== "sugerir_rotulos") {
-    return { ok: false, error: "accion debe ser «sugerir_texto» o «sugerir_rotulos»" };
+    return { ok: false, error: "accion debe ser «sugerir_texto», «sugerir_rotulos», «proponer_campana» o «ideas_semana»" };
   }
   if (o.marca !== "casa-tomas" && o.marca !== "touza") return { ok: false, error: "marca debe ser «casa-tomas» o «touza»" };
   const formato = o.formato ?? "post";
@@ -189,22 +190,22 @@ export function validarEntrada(valor: unknown): { ok: true; entrada: EntradaIA }
 
 // ── Supabase (con el JWT del usuario) ───────────────────────────────────────
 
-class ErrorBD extends Error {
+export class ErrorBD extends Error {
   constructor(mensaje: string, readonly estado: 502 | 503) {
     super(mensaje);
   }
 }
 
-function cab(s: Sesion, extra: Record<string, string> = {}): Record<string, string> {
+export function cab(s: Sesion, extra: Record<string, string> = {}): Record<string, string> {
   return { apikey: s.sb.clave, Authorization: `Bearer ${s.token}`, Accept: "application/json", ...extra };
 }
 
-async function textoError(r: Response): Promise<string> {
+export async function textoError(r: Response): Promise<string> {
   return sanear(await r.text().catch(() => "")).slice(0, 300);
 }
 
 /** 404/42P01/PGRST205: la tabla no existe (migración sin aplicar). */
-function faltaTabla(estado: number, texto: string): boolean {
+export function faltaTabla(estado: number, texto: string): boolean {
   return estado === 404 || /42P01|PGRST20[0-9]|does not exist|Could not find the table/i.test(texto);
 }
 
@@ -302,18 +303,26 @@ export async function guardarSugerencia(s: Sesion, fila: Record<string, unknown>
 
 // ── OpenAI ──────────────────────────────────────────────────────────────────
 
-class ErrorOpenAI extends Error {}
+export class ErrorOpenAI extends Error {}
 
-type Mensaje = { role: "system" | "user" | "assistant"; content: string };
+export type Mensaje = { role: "system" | "user" | "assistant"; content: string };
 
-async function pedirModelo(
+/** Esquema de Structured Outputs (response_format.json_schema). */
+export interface EsquemaJSON {
+  name: string;
+  strict: boolean;
+  schema: unknown;
+}
+
+export async function pedirModelo(
   f: typeof fetch,
   clave: string,
   modelo: string,
   mensajes: Mensaje[],
-  esquema: typeof ESQUEMA_TEXTO | typeof ESQUEMA_ROTULOS,
+  esquema: EsquemaJSON,
   uso: AcumuladorUso,
-): Promise<{ variantes: unknown[]; bruto: string }> {
+  maxTokens = 2000,
+): Promise<{ variantes: unknown[]; datos: Record<string, unknown>; bruto: string }> {
   let res: Response;
   try {
     res = await f(`${OPENAI}/chat/completions`, {
@@ -327,7 +336,7 @@ async function pedirModelo(
         // permitida solo con "none" y max_completion_tokens (no max_tokens).
         reasoning_effort: "none",
         temperature: 0.8,
-        max_completion_tokens: 2000,
+        max_completion_tokens: maxTokens,
         // Agrupa el caché del prefijo estático (prompt de sistema) por marca y acción.
         prompt_cache_key: `${FUNCION}-${esquema.name}`,
       }),
@@ -350,8 +359,8 @@ async function pedirModelo(
   if (typeof msg?.refusal === "string" && msg.refusal) throw new ErrorOpenAI("El modelo se ha negado a proponer este texto.");
   if (typeof msg?.content !== "string") throw new ErrorOpenAI("OpenAI respondió sin contenido.");
   try {
-    const datos = JSON.parse(msg.content) as { variantes?: unknown };
-    return { variantes: Array.isArray(datos?.variantes) ? datos.variantes : [], bruto: msg.content };
+    const datos = JSON.parse(msg.content) as Record<string, unknown> & { variantes?: unknown };
+    return { variantes: Array.isArray(datos?.variantes) ? datos.variantes : [], datos: datos ?? {}, bruto: msg.content };
   } catch {
     throw new ErrorOpenAI("OpenAI respondió con un JSON que no se puede leer.");
   }
@@ -381,6 +390,11 @@ export async function manejarIA(request: Request, deps: DependenciasIA = {}): Pr
 
   const cuerpo = await leerJson(request, 32 * 1024);
   if (!cuerpo.ok) return json(cuerpo.estado, { ok: false, error: cuerpo.error });
+  // Fase 2: proponer_campana e ideas_semana (campanas.ts).
+  const accion = (cuerpo.valor as { accion?: unknown } | null)?.accion;
+  if (ACCIONES_PLANIFICACION.includes(accion as never)) {
+    return manejarPlanificacion(cuerpo.valor, { sesion: s, env, fetch: f, deps });
+  }
   const v = validarEntrada(cuerpo.valor);
   if (!v.ok) return json(400, { ok: false, error: v.error });
   const e = v.entrada;

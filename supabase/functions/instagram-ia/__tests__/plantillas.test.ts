@@ -22,4 +22,18 @@ describe("plantillas de instagram-ia", () => {
       .sort((a, b) => a.id.localeCompare(b.id));
     expect(delServidor).toEqual(delPanel);
   });
+
+  it("formatos, foto y si sirve para campañas (fase 2) cuadran con el panel", () => {
+    const delPanel = PLANTILLAS.map((p) => ({
+      id: p.id,
+      formatos: [...p.formatos],
+      conFoto: (p.admitidos as readonly string[]).includes("foto"),
+      // Sirve para una campaña si lo único obligatorio (además del titular) es la foto.
+      campanas: p.obligatorios.every((c) => c === "foto"),
+    }));
+    const delServidor = [...PLANTILLAS_IA]
+      .map((p) => ({ id: p.id, formatos: [...p.formatos], conFoto: p.conFoto, campanas: p.campanas }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+    expect(delServidor).toEqual(delPanel);
+  });
 });
