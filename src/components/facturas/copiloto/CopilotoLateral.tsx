@@ -22,7 +22,7 @@ import { PanelCopiloto } from "./PanelCopiloto";
 import { esTactil, useFocoAlCerrar } from "../analisis/desplazar";
 
 const BOTON = cn(
-  "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-md px-1.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+  "inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-1.5 text-sm text-muted-foreground hover:bg-muted/60 hover:text-foreground",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
 );
 
@@ -115,7 +115,7 @@ export function CopilotoLateral({
               <History className="h-4 w-4" aria-hidden />
               Historial
               {conversaciones.length > 0 && (
-                <span className="rounded-full bg-muted px-1.5 text-xs font-semibold leading-5 text-muted-foreground">{conversaciones.length}</span>
+                <span className="min-w-5 rounded-full bg-muted px-1 text-center text-xs font-semibold leading-5 text-muted-foreground">{conversaciones.length}</span>
               )}
             </button>
           )}

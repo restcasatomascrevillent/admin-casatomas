@@ -792,7 +792,7 @@ export function ResultadoAlInstante({
             {chip.descripcion}. <span className="whitespace-nowrap">{subtitulo}</span>
           </p>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-0.5">
+        <div className="-ml-2.5 flex max-w-full flex-wrap items-center gap-0.5 sm:ml-0">
           {chip.pide === "producto" && producto && (
             <button type="button" className={cn(ACCION, FOCO)} onClick={() => onProducto(null)}>
               <Search className="h-4 w-4" aria-hidden /> Cambiar producto
