@@ -59,6 +59,7 @@ describe("TOOLS", () => {
       "ficha_proveedor",
       "albaranes_sin_factura",
       "grafico_precio",
+      "volumen_comprado",
       "buscar_productos",
       "buscar_facturas",
       "consulta_flexible",
@@ -86,6 +87,7 @@ describe("TOOLS", () => {
         ficha_proveedor: { proveedor: "luga" },
         albaranes_sin_factura: { proveedor: "luga" },
         grafico_precio: { producto: "jamon" },
+        volumen_comprado: { categoria: "cerveza" },
         buscar_productos: { consulta: "gambas" },
         buscar_facturas: { consulta: "pescado", tipo: null },
       }[n] as Record<string, unknown> ?? {};
@@ -114,7 +116,9 @@ describe("TOOLS", () => {
     // los diga, +448 ~ 110 tokens por ronda; el modelo ponia "este año" y tipo=factura).
     // 9.626 con la ronda 8 (08/10/2026: ficha_proveedor, grafico_precio y unidad/categoria;
     // +998 ~ 250 tokens por ronda).
-    expect(tamano).toBeLessThan(9_700);
+    // 10.376 con volumen_comprado (06/11/2026: litros/kilos de cerveza, vino, agua…; +756,
+    // ~190 tokens por ronda; el prompt no crece: la pista va en la descripcion).
+    expect(tamano).toBeLessThan(10_400);
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -374,6 +378,7 @@ describe("prepararLlamada", () => {
         ficha_proveedor: { proveedor: "luga" },
         albaranes_sin_factura: { proveedor: "luga" },
         grafico_precio: { producto: "jamon" },
+        volumen_comprado: { categoria: "cerveza" },
         buscar_productos: { consulta: "jamon" },
         buscar_facturas: { consulta: "jamon" },
       }[n] as Record<string, unknown> ?? {};
@@ -701,7 +706,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(5730);
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(9620);
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_400); // 9.620 + volumen_comprado (06/11/2026)
   });
 });
 
@@ -735,6 +740,39 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(5730);
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(9620);
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_400); // 9.620 + volumen_comprado (06/11/2026)
+  });
+});
+
+describe("volumen_comprado (06/11/2026, migracion 20261106400000)", () => {
+  it("traduce categoria/producto, periodo y unidad a volumen_comprado_agente", () => {
+    expect(prepararLlamada("volumen_comprado", { categoria: "cerveza", producto: null, desde: "2026-01-01", hasta: "2026-12-31", unidad: null })).toEqual({
+      tipo: "rpc",
+      rpc: "volumen_comprado_agente",
+      params: { p_texto: null, p_categoria: "cerveza", p_desde: "2026-01-01", p_hasta: "2026-12-31", p_medida: null },
+      limite: null,
+    });
+    expect(prepararLlamada("volumen_comprado", { categoria: "vino", producto: " tinto ", desde: null, hasta: null, unidad: "l" })).toMatchObject({
+      params: { p_texto: "tinto", p_categoria: "vino", p_medida: "l" },
+    });
+    expect(prepararLlamada("volumen_comprado", { categoria: null, producto: "gamba", desde: null, hasta: null, unidad: "litros" })).toMatchObject({
+      params: { p_texto: "gamba", p_medida: null },
+    });
+  });
+
+  it("sin categoria ni producto o con fechas malas: error corregible", () => {
+    let msg = "";
+    try { prepararLlamada("volumen_comprado", { categoria: null, producto: null }); } catch (e) { msg = (e as Error).message; }
+    expect(esErrorCorregible(msg)).toBe(true);
+    expect(() => prepararLlamada("volumen_comprado", { categoria: "cerveza", desde: "2026-12-31", hasta: "2026-01-01" })).toThrow(/rango/i);
+  });
+
+  it("la descripcion cubre litros, cuantas cervezas, barriles y lineas sin convertir", () => {
+    const t = TOOLS.find((x) => x.function.name === "volumen_comprado")!.function;
+    expect(t.description).toMatch(/litros de cerveza/);
+    expect(t.description).toMatch(/cuantos barriles/);
+    expect(t.description).toMatch(/lineas_sin_convertir/);
+    expect(Object.keys((t.parameters as Esquema).properties)).toEqual(["categoria", "producto", "desde", "hasta", "unidad"]);
+    expect(systemPrompt("2026-11-06").length).toBeLessThanOrEqual(5730);
   });
 });
