@@ -54,7 +54,9 @@ vi.mock("@/components/carta/VinoForm", () => ({
 }));
 vi.mock("@/components/carta/CoctelForm", () => ({ CoctelForm: () => null }));
 vi.mock("@/components/carta/AjustePreciosModal", () => ({ AjustePreciosModal: () => null }));
-vi.mock("@/components/carta/BotonVinoDesdeFoto", () => ({ BotonVinoDesdeFoto: () => null }));
+vi.mock("@/components/carta/BotonVinoDesdeFoto", () => ({
+  BotonVinoDesdeFoto: () => <button type="button">Varias botellas</button>,
+}));
 // La votación del vino favorito tiene sus propias pruebas (EncuestaVinoFavorito.test.tsx).
 vi.mock("@/components/carta/EncuestaVinoFavorito", () => ({ EncuestaVinoFavorito: () => null }));
 
@@ -166,5 +168,44 @@ describe("Carta para imprimir (PDF A5/A4)", () => {
     expect(boton()).not.toBeInTheDocument();
     abrirSeccion(/Cócteles/);
     expect(boton()).not.toBeInTheDocument();
+  });
+});
+
+describe("Barra de botones de la carta: jerarquía y grupos", () => {
+  const abrirSeccion = (nombre: RegExp) => {
+    fireEvent.mouseDown(screen.getByRole("tab", { name: nombre }));
+    fireEvent.click(screen.getByRole("tab", { name: nombre }));
+  };
+  const barra = () => document.querySelector<HTMLElement>('[data-tour="gw-carta-acciones"]')!;
+  const herramientas = () => within(barra()).getByRole("group", { name: "Herramientas de la carta" });
+  const nombresHerramientas = () => within(herramientas()).getAllByRole("button").map((b) => b.getAttribute("aria-label"));
+
+  it("«Añadir …» es la única principal (rellena); «PDF Carta» y «Ajustar precios» van juntas en el grupo de herramientas", () => {
+    render(<TabCarta />);
+    const anadir = within(barra()).getByRole("button", { name: "Añadir plato" });
+    expect(anadir.className).toContain("bg-primary");
+    expect(nombresHerramientas()).toEqual(["PDF Carta", "Ajustar precios"]);
+    for (const boton of within(herramientas()).getAllByRole("button")) expect(boton.className).not.toContain("bg-primary");
+    // En el móvil, «Añadir plato» ocupa la fila de arriba entera y las dos herramientas, la de debajo.
+    expect(anadir.className).toContain("col-span-2");
+    expect(herramientas().className).toContain("grid-cols-2");
+  });
+
+  it("en Vinos, «Varias botellas» va con «Añadir vino» (señalado para el tour) y no entre las herramientas", () => {
+    render(<TabCarta />);
+    abrirSeccion(/Vinos/);
+    const anadir = within(barra()).getByRole("button", { name: "Añadir vino" });
+    const grupoAnadir = barra().querySelector<HTMLElement>('[data-tour="gw-carta-vinos-foto"]')!;
+    expect(grupoAnadir).toContainElement(anadir);
+    expect(within(grupoAnadir).getByRole("button", { name: "Varias botellas" })).toBeInTheDocument();
+    expect(nombresHerramientas()).toEqual(["PDF Carta", "Ajustar precios"]);
+  });
+
+  it("en Bebidas solo queda «Ajustar precios» de herramienta, en la misma fila que «Añadir bebida» en el móvil", () => {
+    render(<TabCarta />);
+    abrirSeccion(/Bebidas/);
+    expect(nombresHerramientas()).toEqual(["Ajustar precios"]);
+    expect(herramientas().className).toContain("col-span-1");
+    expect(within(barra()).getByRole("button", { name: "Añadir bebida" }).className).not.toContain("col-span-2");
   });
 });

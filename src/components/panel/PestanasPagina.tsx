@@ -51,14 +51,34 @@ interface PestanasPaginaProps {
    * 01/11/2026). Antes los botones subían ENCIMA de las pestañas, apretados a la derecha y con un hueco vacío
    * a la izquierda, entre dos barras de pestañas (al dueño no le gustaba, 02/11/2026). Desde `sm`, todo en
    * una fila como siempre. Con `"lg"` se queda debajo hasta 1024 px (Reservas: 6 pestañas + «Nueva reserva» no caben
-   * en 768 ni en apaisado).
+   * en 768 ni en apaisado); con `"xl"`, hasta 1280 px (Gestor Web › Carta: con el menú lateral, las 4 secciones y sus
+   * botones no caben en una fila hasta entonces).
    */
-  accionesDebajoEnMovil?: boolean | "lg";
+  accionesDebajoEnMovil?: boolean | "lg" | "xl";
   className?: string;
 }
 
 const CLASE_PESTANA =
   "flex h-10 items-center gap-1 sm:gap-2 rounded-none border-b-2 border-transparent bg-transparent px-2 sm:px-3 text-muted-foreground shadow-none transition-colors hover:text-foreground pointer-coarse:min-h-11 data-[state=active]:border-[hsl(38,59%,45%)] data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none flex-1 sm:flex-none";
+
+/** Clases de `accionesDebajoEnMovil`: fila, tira de pestañas y acciones, según hasta dónde bajan los botones. */
+const DEBAJO = {
+  sm: {
+    fila: "flex-wrap gap-y-3 border-b-0 sm:flex-nowrap sm:border-b",
+    tira: "basis-full border-b border-border/60 sm:basis-auto sm:border-b-0",
+    acciones: "w-full sm:w-auto",
+  },
+  lg: {
+    fila: "flex-wrap gap-y-3 border-b-0 lg:flex-nowrap lg:border-b",
+    tira: "basis-full border-b border-border/60 sm:basis-full lg:basis-auto lg:border-b-0",
+    acciones: "w-full lg:w-auto",
+  },
+  xl: {
+    fila: "flex-wrap gap-y-3 border-b-0 xl:flex-nowrap xl:border-b",
+    tira: "basis-full border-b border-border/60 sm:basis-full xl:basis-auto xl:border-b-0",
+    acciones: "w-full xl:w-auto",
+  },
+} as const;
 
 const TONO_CONTADOR = {
   primario: "bg-primary/10 text-primary",
@@ -113,7 +133,7 @@ export function PestanasPagina({
   className,
 }: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
-  const hastaLg = accionesDebajoEnMovil === "lg";
+  const debajo = accionesDebajoEnMovil ? DEBAJO[accionesDebajoEnMovil === true ? "sm" : accionesDebajoEnMovil] : null;
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-background to-transparent";
   return (
     <div
@@ -121,7 +141,7 @@ export function PestanasPagina({
       className={cn(
         "mb-2 flex w-full shrink-0 items-center gap-2 border-b border-border/60",
         // En el móvil la línea va bajo las pestañas (no bajo la fila de botones de abajo).
-        accionesDebajoEnMovil && (hastaLg ? "flex-wrap gap-y-3 border-b-0 lg:flex-nowrap lg:border-b" : "flex-wrap gap-y-3 border-b-0 sm:flex-nowrap sm:border-b"),
+        debajo?.fila,
         className,
       )}
     >
@@ -129,7 +149,7 @@ export function PestanasPagina({
         ref={ref}
         className={cn(
           "relative min-w-0 flex-1 sm:flex-initial",
-          accionesDebajoEnMovil && (hastaLg ? "basis-full border-b border-border/60 sm:basis-full lg:basis-auto lg:border-b-0" : "basis-full border-b border-border/60 sm:basis-auto sm:border-b-0"),
+          debajo?.tira,
         )}
       >
         <TabsList
@@ -183,7 +203,7 @@ export function PestanasPagina({
         <div
           className={cn(
             "ml-auto flex shrink-0 items-center gap-2",
-            accionesDebajoEnMovil && (hastaLg ? "w-full lg:w-auto" : "w-full sm:w-auto"),
+            debajo?.acciones,
           )}
         >
           {acciones}
