@@ -91,6 +91,8 @@ const ANDAMIAJE = `
   create table public.productos_factura (id bigserial primary key, factura_id bigint references public.facturas (id),
     nombre varchar, cantidad numeric default 1, unidad varchar default 'ud', precio_unitario numeric, total numeric,
     producto_id bigint, nombre_normalizado text generated always as (lower(nombre)) stored);
+  create table public.historial_precios (id uuid primary key default gen_random_uuid(), producto_nombre text, proveedor text,
+    precio numeric, fecha date, factura_id bigint);
   create table public.conversaciones (id uuid primary key default gen_random_uuid(), session_id text, titulo text);
   create table public.mensajes_chat (id bigserial primary key, conversacion_id uuid, session_id text, role text, content text);
 
@@ -103,6 +105,16 @@ const ANDAMIAJE = `
     begin if new.nombre ilike '%gamba%' then new.producto_id := 7; end if; return new; end $f$;
   create trigger trg_productos_factura_asignar_producto before insert or update of nombre on public.productos_factura
     for each row execute function public.productos_factura_asignar_producto();
+  -- Apunta el precio al añadir una línea (actualizar_historial_precios): SECURITY INVOKER, como en la demo.
+  create function public.actualizar_historial_precios() returns trigger language plpgsql set search_path to 'public' as $f$
+    begin
+      if (select tipo from public.facturas where id = new.factura_id) = 'factura' and new.precio_unitario is not null then
+        insert into public.historial_precios (producto_nombre, proveedor, precio, fecha, factura_id)
+        select new.nombre, f.proveedor, new.precio_unitario, f.fecha, new.factura_id from public.facturas f where f.id = new.factura_id;
+      end if;
+      return new;
+    end $f$;
+  create trigger trigger_historial_precios after insert on public.productos_factura for each row execute function public.actualizar_historial_precios();
   -- Recalcula avisos de la cabecera al cambiar una línea (productos_factura_recalcular_alertas).
   create function public.productos_factura_recalcular_alertas() returns trigger language plpgsql security definer set search_path = public as $f$
     begin update public.facturas set alertas_validacion = jsonb_build_array(jsonb_build_object('codigo', 'recalculada'))
@@ -113,7 +125,7 @@ const ANDAMIAJE = `
   do $f$
   declare t text;
   begin
-    foreach t in array array['ocr_trabajos', 'ocr_trabajo_paginas', 'facturas', 'productos_factura', 'conversaciones', 'mensajes_chat'] loop
+    foreach t in array array['ocr_trabajos', 'ocr_trabajo_paginas', 'facturas', 'productos_factura', 'historial_precios', 'conversaciones', 'mensajes_chat'] loop
       execute format('alter table public.%I enable row level security', t);
       execute format('grant select, insert, update, delete on public.%I to authenticated', t);
       execute format('grant all on public.%I to service_role', t);
@@ -135,6 +147,9 @@ const ANDAMIAJE = `
     using ((select public.can_write_section('facturas'))) with check ((select public.can_write_section('facturas')));
   create policy productos_factura_delete_seccion on public.productos_factura for delete to authenticated using ((select public.can_write_section('facturas')));
   create policy productos_factura_service_role on public.productos_factura for all to service_role using (true) with check (true);
+  create policy historial_precios_select_seccion on public.historial_precios for select to authenticated using ((select public.can_read_section('facturas')));
+  create policy historial_precios_insert_seccion on public.historial_precios for insert to authenticated with check ((select public.can_write_section('facturas')));
+  create policy historial_precios_service_role on public.historial_precios for all to service_role using (true) with check (true);
   create policy ocr_trabajos_select on public.ocr_trabajos for select to authenticated using ((select public.can_read_section('facturas')));
   create policy ocr_paginas_select on public.ocr_trabajo_paginas for select to authenticated using ((select public.can_read_section('facturas')));
   create policy conversaciones_select_seccion on public.conversaciones for select to authenticated using ((select public.can_read_section('facturas')));
@@ -361,10 +376,16 @@ await rechaza(U.SUBIDA, `update public.productos_factura set factura_id = 6 wher
 igual(await cuantas(U.SUBIDA, `update public.productos_factura set total = 1 where id = ${ternera} returning id`), 0, "ni las líneas de otro");
 igual(await cuantas(U.VER, `update public.productos_factura set total = 1 where id = ${merluza} returning id`), 0, "«Ver» no corrige líneas");
 igual(await cuantas(U.SUBIDA, `delete from public.productos_factura where id = ${merluza} returning id`), 0, "solo Subida no borra líneas");
-await como(U.SUBIDA, () => q("insert into public.productos_factura (factura_id, nombre, total) values (1, 'Gambas', 12)"));
+await como(U.SUBIDA, () => q("insert into public.productos_factura (factura_id, nombre, precio_unitario, total) values (1, 'Gambas', 6, 12)"));
 comprobaciones++;
 igual((await q("select producto_id::int p from public.productos_factura where factura_id = 1 and nombre = 'Gambas'")).rows[0].p, 7,
   "solo Subida añade una línea que faltaba a lo suyo; el producto lo asigna el servidor");
+igual((await q("select precio::int p from public.historial_precios where factura_id = 1 and producto_nombre = 'Gambas'")).rows, [{ p: 6 }],
+  "y el historial de precios la apunta (trigger SECURITY INVOKER)");
+await rechaza(U.SUBIDA, "insert into public.historial_precios (producto_nombre, precio, factura_id) values ('Colado', 1, 2)", RLS,
+  "solo Subida apuntó un precio en lo de otro");
+await rechaza(U.VER, "insert into public.historial_precios (producto_nombre, precio, factura_id) values ('Colado', 1, 1)", RLS,
+  "«Ver» apuntó un precio");
 await rechaza(U.SUBIDA, "insert into public.productos_factura (factura_id, nombre, total, producto_id) values (1, 'Pulpo', 5, 3)",
   /Clasificar una línea exige «Editar»/, "solo Subida clasificó al añadir");
 await rechaza(U.SUBIDA, "insert into public.productos_factura (factura_id, nombre, total) values (2, 'Pulpo', 5)", RLS, "solo Subida añadió a lo de otro");

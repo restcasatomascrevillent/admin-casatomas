@@ -34,6 +34,9 @@ set client_encoding = 'UTF8';
 --                           Sin DELETE (no hay botón de borrar líneas).
 --       ocr_trabajos        SELECT de sus trabajos (la cola de «Cargar»).
 --       ocr_trabajo_paginas SELECT de las páginas de sus trabajos.
+--       historial_precios   INSERT de las líneas que añade a lo suyo: lo hace
+--                           el trigger actualizar_historial_precios, que es
+--                           SECURITY INVOKER (no se toca la función).
 --     Y un trigger que, a quien NO tiene «Editar», solo le deja cambiar los
 --     datos leídos: en la cabecera proveedor, CIF, número, fecha, importes,
 --     retención y observaciones; en las líneas nombre, cantidad, unidad,
@@ -85,6 +88,7 @@ begin
   if to_regclass('public.productos_factura') is null then v_faltan := v_faltan || 'public.productos_factura'::text; end if;
   if to_regclass('public.ocr_trabajos') is null then v_faltan := v_faltan || 'public.ocr_trabajos'::text; end if;
   if to_regclass('public.ocr_trabajo_paginas') is null then v_faltan := v_faltan || 'public.ocr_trabajo_paginas'::text; end if;
+  if to_regclass('public.historial_precios') is null then v_faltan := v_faltan || 'public.historial_precios'::text; end if;
   if to_regclass('storage.objects') is null then v_faltan := v_faltan || 'storage.objects'::text; end if;
   if to_regprocedure('public.has_section_permission(uuid, text, text)') is null then
     v_faltan := v_faltan || 'has_section_permission(uuid, text, text)'::text;
@@ -321,6 +325,12 @@ create policy productos_factura_update_subida on public.productos_factura for up
 
 drop policy if exists productos_factura_insert_subida on public.productos_factura;
 create policy productos_factura_insert_subida on public.productos_factura for insert to authenticated
+  with check ((select public.facturas_puede_subir()) and public.factura_subida_por_mi(factura_id));
+
+-- Añadir una línea a lo suyo dispara actualizar_historial_precios (SECURITY
+-- INVOKER), que apunta el precio en historial_precios: solo para lo suyo.
+drop policy if exists historial_precios_insert_subida on public.historial_precios;
+create policy historial_precios_insert_subida on public.historial_precios for insert to authenticated
   with check ((select public.facturas_puede_subir()) and public.factura_subida_por_mi(factura_id));
 
 drop policy if exists ocr_trabajos_select_subida on public.ocr_trabajos;

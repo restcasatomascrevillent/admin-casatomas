@@ -37,6 +37,7 @@ drop policy if exists facturas_update_subida on public.facturas;
 drop policy if exists productos_factura_select_subida on public.productos_factura;
 drop policy if exists productos_factura_update_subida on public.productos_factura;
 drop policy if exists productos_factura_insert_subida on public.productos_factura;
+drop policy if exists historial_precios_insert_subida on public.historial_precios;
 drop policy if exists ocr_trabajos_select_subida on public.ocr_trabajos;
 drop policy if exists ocr_paginas_select_subida on public.ocr_trabajo_paginas;
 
