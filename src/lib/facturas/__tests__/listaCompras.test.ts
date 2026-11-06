@@ -31,7 +31,7 @@ describe("decodificarLista", () => {
       proveedor_canonico: "Pescados Marta S.L.", cif: "B123", fecha: "2026-10-02", facturado_en_id: null, local: "touza",
       subtotal: 90, total: 99, total_origen: "leido", drive_url: null, archivo_path: "facturas/7.pdf", verificada: false,
       verificacion_origen: "auto", n_lineas: 4, alertas: [{ codigo: "iva_incoherente", severidad: "alta" }],
-      regalado: { importe: 12.5, estimado: true, regalos: 1 }, precio_atipico: true,
+      regalado: { importe: 12.5, estimado: true, regalos: 1 }, precio_atipico: true, retencion_irpf: null,
     });
     expect(a).toMatchObject({ id: 8, tipo: "albaran", facturado_en_id: 7, proveedor: null, total: null, alertas: [], regalado: SIN_REGALADO, precio_atipico: false });
   });

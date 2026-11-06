@@ -20,7 +20,7 @@ import { sumarDiasIso, textoRango } from "./periodoAnalisis";
 
 // ─── Catálogos ──────────────────────────────────────────────────────────────
 
-export type Medida = "gasto" | "base" | "documentos" | "abonos" | "regalado" | "cantidad" | "precio";
+export type Medida = "gasto" | "base" | "documentos" | "abonos" | "regalado" | "cantidad" | "precio" | "retencion_irpf";
 export type Agrupar = "dia" | "semana" | "mes" | "trimestre" | "proveedor" | "familia" | "producto" | "local" | "tipo";
 export type Desglose = "local" | "proveedor" | "familia" | "tipo";
 export type TipoGrafica = "barras" | "apiladas" | "lineas" | "area" | "horizontales" | "tabla";
@@ -45,6 +45,7 @@ export const MEDIDAS: InfoMedida[] = [
   { valor: "documentos", etiqueta: "Nº de documentos", iva: null, formato: "entero", porLineas: false, requiereProducto: false, ayuda: "Facturas, albaranes y abonos" },
   { valor: "abonos", etiqueta: "Abonos", iva: "con IVA", formato: "eur", porLineas: false, requiereProducto: false, ayuda: "Importe devuelto (documentos en negativo)" },
   { valor: "regalado", etiqueta: "Regalado y descuentos", iva: "sin IVA", formato: "eur", porLineas: true, requiereProducto: false, ayuda: "Lo que valía menos lo que se pagó" },
+  { valor: "retencion_irpf", etiqueta: "Retención IRPF", iva: null, formato: "eur", porLineas: false, requiereProducto: false, ayuda: "IRPF retenido (alquileres, gestoría…); el gasto ya lo descuenta" },
   { valor: "cantidad", etiqueta: "Cantidad comprada", iva: null, formato: "cantidad", porLineas: true, requiereProducto: true, ayuda: "Filtra antes un producto" },
   { valor: "precio", etiqueta: "Precio medio", iva: "sin IVA", formato: "precio", porLineas: true, requiereProducto: true, ayuda: "Filtra antes un producto" },
 ];
@@ -141,11 +142,14 @@ export function cuentaPorLineas(c: Pick<ConfigExplorador, "medida" | "agrupar" |
   return infoMedida(c.medida).porLineas || fuerzaLineas(c);
 }
 
+/** Medidas que solo se cuentan por documento (gasto y abonos con IVA, retención IRPF). */
+const porDocumento = (m: Medida): boolean => m === "gasto" || m === "abonos" || m === "retencion_irpf";
+
 /** ¿Se puede elegir esta medida con el resto de la configuración? (null = sí; si no, por qué). */
 export function motivoMedidaNoDisponible(m: Medida, c: ConfigExplorador): string | null {
   const info = infoMedida(m);
   if (info.requiereProducto && c.filtros.productos.length === 0) return "Filtra antes un producto";
-  if ((m === "gasto" || m === "abonos") && fuerzaLineas(c))
+  if (porDocumento(m) && fuerzaLineas(c))
     return "Con familias o productos se mide la base sin IVA";
   return null;
 }
@@ -162,7 +166,7 @@ export function ajustarConfig(c: ConfigExplorador): { config: ConfigExplorador; 
     config = { ...config, medida: "gasto" };
     aviso = "Cantidad y precio necesitan un producto: se mide el gasto.";
   }
-  if ((config.medida === "gasto" || config.medida === "abonos") && fuerzaLineas(config)) {
+  if (porDocumento(config.medida) && fuerzaLineas(config)) {
     config = { ...config, medida: "base" };
     aviso = "Por familias o productos se mide la base sin IVA de las líneas (el IVA va por documento).";
   }
@@ -246,6 +250,8 @@ export interface PuntoExploracion {
   valor: number | null;
   documentos: number;
   desglose: Record<string, number | null> | null;
+  /** Mes (o trimestre con un mes) con muchos menos documentos de lo normal: faltan facturas (20261106310000). */
+  incompleto?: boolean;
 }
 
 export interface SerieExploracion {
@@ -268,8 +274,17 @@ export interface Exploracion {
     unidad: string | null;
   };
   sinDatos: boolean;
-  total: { valor: number | null; documentos: number; lineas: number | null; variacionPct: number | null };
+  total: {
+    valor: number | null;
+    documentos: number;
+    lineas: number | null;
+    variacionPct: number | null;
+    /** La variación usa meses incompletos (20261106310000): por qué no es fiable. */
+    variacionAviso?: string | null;
+  };
   anterior: { desde: string; hasta: string; valor: number | null; documentos: number } | null;
+  /** «AAAA-MM» de los meses incompletos del periodo (20261106310000). */
+  mesesIncompletos?: string[];
   unidades: { unidad: string; lineas: number }[] | null;
   series: SerieExploracion[];
   puntos: PuntoExploracion[];
@@ -317,7 +332,16 @@ export function normalizarExploracion(entrada: unknown): Exploracion {
       unidad: txtONulo(p.unidad),
     },
     sinDatos: r.sin_datos === true,
-    total: { valor: numONulo(t.valor), documentos: num(t.documentos), lineas: numONulo(t.lineas), variacionPct: numONulo(t.variacion_pct) },
+    total: {
+      valor: numONulo(t.valor),
+      documentos: num(t.documentos),
+      lineas: numONulo(t.lineas),
+      variacionPct: numONulo(t.variacion_pct),
+      variacionAviso: txtONulo(t.variacion_aviso),
+    },
+    mesesIncompletos: Array.isArray(r.meses_incompletos)
+      ? r.meses_incompletos.filter((m): m is string => typeof m === "string" && /^\d{4}-\d{2}$/.test(m))
+      : [],
     anterior:
       a && typeof a.desde === "string" && typeof a.hasta === "string"
         ? { desde: a.desde, hasta: a.hasta, valor: numONulo(a.valor), documentos: num(a.documentos) }
@@ -337,6 +361,7 @@ export function normalizarExploracion(entrada: unknown): Exploracion {
           valor: numONulo(x.valor),
           documentos: num(x.documentos),
           desglose: d ? Object.fromEntries(Object.entries(d).map(([k, v]) => [k, numONulo(v)])) : null,
+          ...(x.incompleto === true ? { incompleto: true } : {}),
         };
       }),
     resto: resto ? { entidades: num(resto.entidades), valor: numONulo(resto.valor), documentos: num(resto.documentos) } : null,
@@ -485,6 +510,8 @@ export interface FilaGrafica {
   valor: number | null;
   documentos: number;
   id: number | null;
+  /** Mes incompleto (faltan facturas): la barra va con trama y atenuada. */
+  incompleto?: boolean;
   /** Valor de cada serie del desglose: `s_<índice>`. */
   [serie: `s_${number}`]: number | null;
 }
@@ -532,6 +559,7 @@ export function datosGrafica(
   const filas = puntos.map((p) => {
     const e = etiquetasClave(agrupar, p.clave, p.etiqueta, variosAnios);
     const fila: FilaGrafica = { clave: p.clave, corta: e.corta, larga: e.larga, valor: p.valor ?? (rellenar ? 0 : null), documentos: p.documentos, id: p.id };
+    if (p.incompleto) fila.incompleto = true;
     for (const s of series) fila[s.dato] = p.desglose?.[s.clave] ?? (rellenar ? 0 : null);
     return fila;
   });

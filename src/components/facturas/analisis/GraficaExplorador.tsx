@@ -6,7 +6,7 @@
 //     enseña debajo qué se puede hacer con él (filtrar, ver documentos…).
 //   · La gráfica es una imagen con su resumen (role="img"); lo navegable con
 //     teclado es la TABLA, donde cada fila y cada celda son botones.
-import { useMemo, type ReactNode } from "react";
+import { useId, useMemo, type ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -55,10 +55,25 @@ interface PropsGrafica {
   compacta?: boolean;
 }
 
-function Leyenda({ series }: { series: SerieGrafica[] }) {
-  if (series.length === 0) return null;
+/** Muestra de la trama de un mes incompleto (la misma que la barra). */
+const MuestraTrama = () => (
+  <span
+    className="h-2.5 w-2.5 shrink-0 rounded-sm border border-dashed"
+    style={{ borderColor: COLOR_UNICO, background: `repeating-linear-gradient(45deg, ${COLOR_UNICO} 0 2px, transparent 2px 4px)`, opacity: 0.7 }}
+    aria-hidden
+  />
+);
+
+function Leyenda({ series, incompletos }: { series: SerieGrafica[]; incompletos: boolean }) {
+  if (series.length === 0 && !incompletos) return null;
   return (
     <ul className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="Leyenda">
+      {incompletos && (
+        <li className="flex min-w-0 items-center gap-1.5 font-medium text-amber-800 dark:text-amber-400" data-testid="leyenda-mes-incompleto">
+          <MuestraTrama />
+          <span>Mes incompleto: faltan facturas por subir</span>
+        </li>
+      )}
       {series.map((s) => (
         <li key={s.clave} className="flex min-w-0 items-center gap-1.5">
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: s.color }} aria-hidden />
@@ -102,6 +117,7 @@ function Globo({
         <span className="flex-1 text-muted-foreground">{series.length ? "Total" : "Valor"}</span>
         <span className="font-semibold tabular-nums">{formatoValor(fila.valor, medida, unidad)}</span>
       </p>
+      {fila.incompleto && <p className="font-medium text-amber-800 dark:text-amber-400">Mes incompleto: faltan facturas por subir</p>}
       <p className="text-muted-foreground">{fila.documentos === 1 ? "1 documento" : `${formatEntero(fila.documentos)} documentos`} · toca para elegir</p>
     </div>
   );
@@ -116,6 +132,34 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
     if (fila && onSeleccion) onSeleccion(fila.clave);
   };
   const opacidad = (clave: string) => (seleccion && seleccion !== clave ? 0.35 : 1);
+  // Meses incompletos (faltan facturas): barra con trama (una serie) o atenuada y con
+  // borde discontinuo (varias series), y una línea en la leyenda.
+  const idTrama = `trama-incompleto-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const hayIncompletos = filas.some((f) => f.incompleto);
+  const trama = hayIncompletos && (
+    <defs>
+      <pattern id={idTrama} patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill={COLOR_UNICO} fillOpacity={0.3} />
+        <line x1="0" y1="0" x2="0" y2="6" stroke={COLOR_UNICO} strokeWidth="2.5" />
+      </pattern>
+    </defs>
+  );
+  const celdaUnica = (f: FilaGrafica) => (
+    <Cell
+      key={f.clave}
+      fillOpacity={opacidad(f.clave)}
+      cursor="pointer"
+      {...(f.incompleto ? { fill: `url(#${idTrama})`, stroke: COLOR_UNICO, strokeDasharray: "3 2" } : {})}
+    />
+  );
+  const celdaSerie = (f: FilaGrafica, color: string) => (
+    <Cell
+      key={f.clave}
+      fillOpacity={opacidad(f.clave) * (f.incompleto ? 0.4 : 1)}
+      cursor="pointer"
+      {...(f.incompleto ? { stroke: color, strokeDasharray: "3 2" } : {})}
+    />
+  );
   // Con el dedo el globo se queda pegado y tapa la tira «Punto elegido»: con un
   // punto elegido, se oculta (con ratón sigue al pasar por encima).
   const sinGlobo = !!seleccion && esTactil();
@@ -137,24 +181,21 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
     grafica = (
       <ResponsiveContainer width="100%" height={altoH}>
         <BarChart data={filas} layout="vertical" margin={{ ...margen, right: series.length === 0 ? 56 : 12 }} onClick={elegir} barCategoryGap={compacta ? 3 : 6}>
+          {trama}
           <CartesianGrid horizontal={false} stroke={REJILLA} strokeDasharray="3 3" />
           <XAxis type="number" tickFormatter={ejeY} tick={EJE} axisLine={false} tickLine={false} />
           <YAxis type="category" dataKey="corta" width={compacta ? 110 : 160} tick={EJE} axisLine={false} tickLine={false} interval={0} />
           {globo}
           {series.length === 0 ? (
             <Bar dataKey="valor" fill={COLOR_UNICO} radius={[0, 4, 4, 0]} isAnimationActive={false}>
-              {filas.map((f) => (
-                <Cell key={f.clave} fillOpacity={opacidad(f.clave)} cursor="pointer" />
-              ))}
+              {filas.map(celdaUnica)}
               {/* En tablet no hay «pasar el ratón»: la cifra, al final de cada barra. */}
               <LabelList dataKey="valor" position="right" formatter={cifraBarra} className="fill-foreground text-xs tabular-nums" />
             </Bar>
           ) : (
             series.map((s, i) => (
               <Bar key={s.clave} dataKey={s.dato} name={s.etiqueta} stackId="a" fill={s.color} isAnimationActive={false} radius={i === series.length - 1 ? [0, 4, 4, 0] : 0}>
-                {filas.map((f) => (
-                  <Cell key={f.clave} fillOpacity={opacidad(f.clave)} cursor="pointer" />
-                ))}
+                {filas.map((f) => celdaSerie(f, s.color))}
               </Bar>
             ))
           )}
@@ -214,15 +255,14 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
     grafica = (
       <ResponsiveContainer width="100%" height={alto}>
         <BarChart data={filas} margin={margen} onClick={elegir} barCategoryGap={filas.length > 40 ? 1 : "18%"}>
+          {trama}
           <CartesianGrid vertical={false} stroke={REJILLA} strokeDasharray="3 3" />
           <XAxis dataKey="corta" tick={EJE} axisLine={false} tickLine={false} minTickGap={8} />
           <YAxis tickFormatter={ejeY} tick={EJE} axisLine={false} tickLine={false} width={anchoEjeY} />
           {globo}
           {series.length === 0 ? (
             <Bar dataKey="valor" fill={COLOR_UNICO} radius={[4, 4, 0, 0]} isAnimationActive={false}>
-              {filas.map((f) => (
-                <Cell key={f.clave} fillOpacity={opacidad(f.clave)} cursor="pointer" />
-              ))}
+              {filas.map(celdaUnica)}
             </Bar>
           ) : (
             series.map((s, i) => (
@@ -235,9 +275,7 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
                 isAnimationActive={false}
                 radius={!apilar || i === series.length - 1 ? [4, 4, 0, 0] : 0}
               >
-                {filas.map((f) => (
-                  <Cell key={f.clave} fillOpacity={opacidad(f.clave)} cursor="pointer" />
-                ))}
+                {filas.map((f) => celdaSerie(f, s.color))}
               </Bar>
             ))
           )}
@@ -248,7 +286,7 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <Leyenda series={series} />
+      <Leyenda series={series} incompletos={hayIncompletos} />
       <div role="img" aria-label={descripcion} className="min-w-0 select-none [&_.recharts-surface]:outline-none">
         {grafica}
       </div>

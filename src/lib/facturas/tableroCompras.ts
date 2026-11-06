@@ -100,6 +100,8 @@ export interface MesGasto {
   touza: number;
   total: number;
   documentos: number;
+  /** Muchos menos documentos de lo normal: faltan facturas por subir (20261106310000). */
+  incompleto?: boolean;
 }
 export interface ProveedorGasto {
   id: number | null;
@@ -179,8 +181,18 @@ export interface TableroCompras {
     regaladoEstimadas: number;
     regaladoEstimadoImporte: number;
     proveedores: number;
+    /** Retención IRPF de los documentos del periodo (20261106300000); el gasto ya la descuenta. */
+    retencionIrpf: number;
+    retencionIrpfDocumentos: number;
+    /** Meses incompletos en el periodo y en el anterior (20261106310000). */
+    mesesIncompletos: number;
+    mesesIncompletosAnterior: number | null;
+    /** La variación usa meses incompletos: texto del aviso (null = fiable). */
+    variacionAviso: string | null;
   };
   meses: MesGasto[];
+  /** «AAAA-MM» de los meses incompletos del periodo. */
+  mesesIncompletos: string[];
   proveedores: ProveedorGasto[];
   subidas: { productos: Subida[]; tramoInicio: Tramo | null; tramoFin: Tramo | null; comparados: number };
   familias: { familias: Familia[]; importeTotal: number; lineas: number; sinClasificar: { lineas: number; importe: number } };
@@ -257,10 +269,25 @@ export function normalizarTablero(entrada: unknown): TableroCompras {
       regaladoEstimadas: num(i.regalado_estimadas),
       regaladoEstimadoImporte: num(i.regalado_estimado_importe),
       proveedores: num(i.proveedores),
+      retencionIrpf: num(i.retencion_irpf),
+      retencionIrpfDocumentos: num(i.retencion_irpf_documentos),
+      mesesIncompletos: num(i.meses_incompletos),
+      mesesIncompletosAnterior: numONulo(i.meses_incompletos_anterior),
+      variacionAviso: textoONulo(i.variacion_aviso),
     },
     meses: lista(r.meses)
       .filter((m) => typeof m.mes === "string")
-      .map((m) => ({ mes: texto(m.mes), casa_tomas: num(m.casa_tomas), touza: num(m.touza), total: num(m.total), documentos: num(m.documentos) })),
+      .map((m) => ({
+        mes: texto(m.mes),
+        casa_tomas: num(m.casa_tomas),
+        touza: num(m.touza),
+        total: num(m.total),
+        documentos: num(m.documentos),
+        incompleto: m.incompleto === true,
+      })),
+    mesesIncompletos: lista(r.meses_incompletos)
+      .map((m) => texto(m.mes))
+      .filter((m) => /^\d{4}-\d{2}$/.test(m)),
     proveedores: lista(r.proveedores).map((x) => ({
       id: idONulo(x.id),
       nombre: texto(x.nombre) || "Sin proveedor",
@@ -355,6 +382,19 @@ export function textoVariacion(t: Pick<TableroCompras, "indicadores" | "periodo"
   const ant = t.periodo.anterior;
   if (pct === null || !ant) return null;
   return { texto: `${textoPct(pct)} frente a ${fechaCorta(ant.desde)} – ${fechaCorta(ant.hasta)}`, sube: pct > 0 };
+}
+
+/**
+ * Nota de meses incompletos (20261106310000): «Octubre 2026 está incompleto:
+ * faltan facturas por subir» o «2 meses incompletos (Octubre 2026, Noviembre
+ * 2026): faltan facturas por subir». null si no hay.
+ */
+export function textoMesesIncompletos(meses: readonly string[]): string | null {
+  if (meses.length === 0) return null;
+  const nombres = meses.map(etiquetaMes);
+  return meses.length === 1
+    ? `${nombres[0]} está incompleto: faltan facturas por subir`
+    : `${meses.length} meses incompletos (${nombres.join(", ")}): faltan facturas por subir`;
 }
 
 /** «mismo proveedor, 12 ene – 11 abr vs 9 jul – 6 oct» */

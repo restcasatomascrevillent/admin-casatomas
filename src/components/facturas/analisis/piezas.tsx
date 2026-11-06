@@ -109,12 +109,15 @@ export function Indicador({
   valor,
   nota,
   claseNota,
+  extra,
   onVer,
 }: {
   etiqueta: string;
   valor: string;
   nota?: ReactNode;
   claseNota?: string;
+  /** Notas de más debajo de la nota (retención IRPF, meses incompletos): cada una en su línea. */
+  extra?: ReactNode;
   onVer?: () => void;
 }) {
   const cuerpo = (
@@ -125,6 +128,7 @@ export function Indicador({
       </span>
       <span className="block truncate text-lg font-semibold tabular-nums tracking-tight text-foreground sm:text-xl">{valor}</span>
       {nota && <span className={cn("line-clamp-2 break-words text-xs text-muted-foreground", claseNota)}>{nota}</span>}
+      {extra && <span className="mt-0.5 block space-y-0.5 break-words text-xs text-muted-foreground">{extra}</span>}
       {onVer && <span className="sr-only">. Ver documentos</span>}
     </>
   );
