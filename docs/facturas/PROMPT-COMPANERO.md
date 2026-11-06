@@ -55,8 +55,9 @@ EN QUÉ SEGUIR (por prioridad)
 2. Rediseñar variacion_precios_agente (tarda ~50 s en la demo).
 3. Preparar el paso a producción de Facturas (README §7): lista de migraciones, funciones y scripts
    de datos, con la traducción de ids de aplicar_clasificacion.sql. NO lo ejecutes sin el «sí».
-4. Pendientes de datos: factura 520 de Narejos, aviso de CIF de la 2158, fusión de carabineros.
-5. Modo oscuro en Facturas y volúmenes de bebida (litros por formato), si el dueño lo confirma.
+4. Pendientes de datos: factura 520 de Narejos (mirar IMG_1153.png en Drive) y aviso de CIF de la 2158.
+5. Volúmenes (docs/facturas/VOLUMENES.md): completar a mano las cajas sin nº de botellas que salen
+   «sin convertir» y una pantalla para editar envases. Modo oscuro solo si el dueño lo pide.
 
 Trabaja en pasos pequeños, una sola pregunta al dueño cada vez, y al acabar cada tarea resume qué
 cambió, dónde está (rama y commit) y qué falta.
