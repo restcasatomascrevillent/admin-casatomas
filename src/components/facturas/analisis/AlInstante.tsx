@@ -63,6 +63,7 @@ import { isoLocal } from "@/lib/facturas/periodoAnalisis";
 import type { Exploracion, LocalRpc } from "@/lib/facturas/explorador";
 import { GraficaExplorador, TablaExploracion } from "./GraficaExplorador";
 import { FOCO } from "./piezas";
+import { usePuedeEditarFacturas } from "./edicionFacturas";
 
 const ICONOS: Record<IdAlInstante, LucideIcon> = {
   "gasto-mes": Wallet,
@@ -623,6 +624,8 @@ function GastoCategoria({
 }) {
   const d = datos.datos;
   const ex = useMemo(() => exploracionCategorias(d, periodo.desde, periodo.hasta), [d, periodo.desde, periodo.hasta]);
+  // Clasificar cambia datos: el enlace, solo con «Editar» en Facturas (06/11/2026).
+  const puedeEditar = usePuedeEditarFacturas();
   if (d.sin_datos || !d.total || ex.sinDatos) return <Vacio texto="No hay líneas de producto con importe en este periodo." />;
   const primera = ex.puntos[0];
   return (
@@ -649,7 +652,7 @@ function GastoCategoria({
           (d.avisos?.sin_importe ?? 0) > 0 && { texto: `${plural(d.avisos?.sin_importe ?? 0, "línea", "líneas")} sin importe: no suman.` },
         ]}
       />
-      {d.sin_clasificar && d.sin_clasificar.lineas > 0 && onIrA && (
+      {d.sin_clasificar && d.sin_clasificar.lineas > 0 && onIrA && puedeEditar && (
         <button type="button" className={cn(ACCION, "-ml-2.5 self-start text-primary", FOCO)} onClick={() => onIrA(ENLACE_PRODUCTOS_COMPRAS)}>
           Clasificarlas en Compras › Productos
         </button>

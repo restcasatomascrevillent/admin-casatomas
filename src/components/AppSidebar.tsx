@@ -114,7 +114,8 @@ const menuItems: {
     title: "Facturas",
     url: "/facturas",
     icon: Receipt,
-    sectionKey: "facturas",
+    // Con solo «Facturas · Subida» también sale (entra a la pestaña Cargar, 06/11/2026).
+    sectionKey: ["facturas", "facturas_subida"],
     toggleKey: "facturas",
   },
   {

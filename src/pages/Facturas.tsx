@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useLocation, useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { SubidaFacturas } from "@/components/facturas/SubidaFacturas";
 import { ChatFacturas, ChatFacturasRef } from "@/components/facturas/ChatFacturas";
@@ -15,6 +15,9 @@ import { Upload, BarChart3, ShoppingCart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ImportacionHistoricaDialog } from "@/components/facturas/ImportacionHistoricaDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { usePermisosFacturas } from "@/hooks/usePermisosFacturas";
+import { pestanaPermitida, pestanasFacturas, type PestanaFacturas } from "@/lib/facturas/permisos";
+import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import type { Factura } from "@/hooks/useFacturas";
 import { useContadorDocumentos } from "@/hooks/useContadorDocumentos";
 import { leerEnlaceCompras } from "@/lib/facturas/tableroCompras";
@@ -30,13 +33,19 @@ import { esRutaIaCompleta } from "@/lib/facturas/copilotoCompleto";
 const PESTANAS = ["chat", "compras", "cargar"] as const;
 /** Pestaña al entrar en /facturas sin `?tab=`. */
 const PESTANA_INICIAL = "chat";
-const pestanaDeUrl = (v: string | null): string | null => {
+const pestanaDeUrl = (v: string | null): PestanaFacturas | null => {
   if (v === "documentos" || v === "productos") return "compras";
-  return (PESTANAS as readonly string[]).includes(v ?? "") ? (v as string) : null;
+  return (PESTANAS as readonly string[]).includes(v ?? "") ? (v as PestanaFacturas) : null;
 };
+// Permisos (06/11/2026, dueño; ver lib/facturas/permisos.ts): «Ver» consulta Análisis y
+// Compras; «Facturas · Subida», la pestaña Cargar (con solo Subida, es la única y los
+// enlaces a Análisis o Compras llevan a ella); «Editar», todo (la IA solo con «Editar»).
+// Lo que no se puede usar se OCULTA y arriba sale «Solo lectura».
 
 const Facturas = () => {
   const chatRef = useRef<ChatFacturasRef>(null);
+  const permisos = usePermisosFacturas();
+  const visibles = pestanasFacturas(permisos);
   // `?tab=cargar`: el indicador global de subidas, los toasts y la campana
   // llevan directos a la pestaña «Cargar», también si ya estabas en Facturas.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -51,9 +60,11 @@ const Facturas = () => {
   const ultimoModoPedido = useRef<{ modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number } | undefined>(undefined);
   // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`…), Compras; si no, Análisis.
   // También al volver con «Atrás» a una URL sin `?tab=` (QA 05/11/2026: se quedaba en Compras).
-  const tabUrl = pantallaIa
+  const tabPedida: PestanaFacturas = pantallaIa
     ? "chat"
     : pestanaDeUrl(searchParams.get("tab")) ?? (PARAMS_ENLACE_COMPRAS.some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL);
+  // La pedida si se puede ver; si no, la primera que sí (solo Subida: Cargar).
+  const tabUrl: string = pestanaPermitida(tabPedida, permisos) ?? PESTANA_INICIAL;
   const [activeTab, setActiveTab] = useState<string>(tabUrl);
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
@@ -86,6 +97,17 @@ const Facturas = () => {
     // `claveNavegacion`: volver a tocar el indicador estando ya en esta URL
     // (pero en otra pestaña) también vuelve a «Cargar».
   }, [tabUrl, claveNavegacion]);
+  // Un enlace a una pestaña que no puede ver (solo Subida y `?tab=compras&doc=7`):
+  // la URL pasa a la que se ve, sin apilar historial (la cola sabe así que está en Cargar).
+  useEffect(() => {
+    if (permisos.cargando || pantallaIa || tabUrl === tabPedida || searchParams.get("tab") === tabUrl) return;
+    setSearchParams((prev) => {
+      const p = new URLSearchParams(prev);
+      p.set("tab", tabUrl);
+      for (const k of PARAMS_ENLACE_COMPRAS) p.delete(k);
+      return p;
+    }, { replace: true });
+  }, [permisos.cargando, pantallaIa, tabUrl, tabPedida, searchParams, setSearchParams]);
   // La pestaña va también a la URL (sin apilar historial): así la cola sabe si
   // estás mirando «Cargar» y no apunta en la campana lo que ya ves.
   const cambiarPestana = (v: string) => {
@@ -101,8 +123,10 @@ const Facturas = () => {
   // Enlaces del tablero de Análisis a Compras (un mes, un proveedor, Productos):
   // entran en el historial, así «Atrás» vuelve al tablero.
   const irA = (enlace: string) => setSearchParams(new URLSearchParams(enlace));
-  // Importación histórica (04/11/2026): solo administradores.
+  // Importación histórica (04/11/2026): solo administradores con «Editar» en Facturas
+  // (la Edge Function exige las dos cosas).
   const { isAdmin } = useUserRole();
+  const puedeImportar = isAdmin && permisos.editar;
   const [importacionAbierta, setImportacionAbierta] = useState(false);
   const subidas = useColaSubidaOpcional();
   const activosSubida = subidas?.activos ?? 0;
@@ -114,12 +138,17 @@ const Facturas = () => {
 
   // Contadores para los badges de las pestañas
   // Un `count` de cabeceras: entrar por «Análisis» no descarga la lista de Compras.
-  const { data: totalDocumentos = 0 } = useContadorDocumentos();
+  // Sin Compras (solo Subida) no se pide.
+  const { data: totalDocumentos = 0 } = useContadorDocumentos({ enabled: permisos.consultar });
   // Compras y Análisis se montan la primera vez que se visitan (y luego se quedan
   // montadas): entrar por una no descarga la otra, y al volver siguen como estaban
   // (Análisis: el explorador, el copiloto abierto y la conversación; QA 05/11/2026).
   const [comprasMontada, setComprasMontada] = useState(activeTab === "compras");
   const [analisisMontada, setAnalisisMontada] = useState(activeTab === "chat");
+  const veAnalisisYCompras = visibles.includes("chat");
+  const veCargar = visibles.includes("cargar");
+  // «Solo lectura» en Análisis y Compras para quien los consulta sin «Editar» (en Cargar sube y corrige lo suyo).
+  const soloLectura = permisos.consultar && !permisos.editar && activeTab !== "cargar";
   useEffect(() => {
     if (activeTab === "compras") setComprasMontada(true);
     if (activeTab === "chat") setAnalisisMontada(true);
@@ -141,6 +170,9 @@ const Facturas = () => {
       }
     }, 100);
   };
+
+  // La IA a pantalla completa exige «Editar»: sin él, a /facturas (Análisis, o Cargar con solo Subida).
+  if (pantallaIa && !permisos.cargando && !permisos.editar) return <Navigate to="/facturas" replace />;
 
   return (
     <DashboardLayout>
@@ -165,12 +197,15 @@ const Facturas = () => {
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
               { valor: "cargar", etiqueta: "Cargar", icono: <Upload />, contador: activosSubida, etiquetaContador: `${activosSubida} procesando`, contadorEnMovil: true, tour: "facturas-pestana-cargar" },
-            ]}
+            ].filter((p) => visibles.includes(p.valor as PestanaFacturas))}
             acciones={
               <>
-                <GastoIaPestana className="ml-auto" />
-                {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
-                <BotonAvisosSeccion seccion="facturas" />
+                {/* El gasto del chatbot es de la IA: solo con «Editar». Sin él, un hueco empuja lo demás a la derecha. */}
+                {permisos.editar ? <GastoIaPestana className="ml-auto" /> : <span className="ml-auto" aria-hidden="true" />}
+                {soloLectura && <EtiquetaSoloLectura />}
+                {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral).
+                    Son de lo comprado (precios, documentos): solo para quien consulta Facturas. */}
+                {permisos.consultar && <BotonAvisosSeccion seccion="facturas" />}
                 <BotonAyuda seccion="facturas" />
               </>
             }
@@ -184,48 +219,65 @@ const Facturas = () => {
                 y la ficha hacen scroll por dentro. */}
             {/* `forceMount`: seguir montada al ir a «IA» desde una ficha, para
                 encontrar al volver la misma búsqueda y la misma ficha abierta. */}
-            <TabsContent value="compras" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              {comprasMontada && <TabCompras onPreguntarIA={handlePreguntarIA} modoPedido={modoPedido} />}
-            </TabsContent>
+            {veAnalisisYCompras && (
+              <TabsContent value="compras" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
+                {/* «Preguntar a la IA» desde una ficha: solo con «Editar». */}
+                {comprasMontada && <TabCompras onPreguntarIA={permisos.editar ? handlePreguntarIA : undefined} modoPedido={modoPedido} />}
+              </TabsContent>
+            )}
 
             {/* PESTAÑA ANÁLISIS: tablero de gráficas fijas y copiloto de IA plegado
                 (ChatFacturas). El gasto de IA va junto a la pestaña (GastoIaPestana). */}
-            <TabsContent value="chat" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <div className="h-full min-h-0 overflow-hidden">
-                {(analisisMontada || activeTab === "chat") && (
-                  <ChatFacturas ref={chatRef} onIrA={irA} activa={activeTab === "chat"} pantallaCompleta={pantallaIa} />
-                )}
-              </div>
-            </TabsContent>
+            {veAnalisisYCompras && (
+              <TabsContent value="chat" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
+                <div className="h-full min-h-0 overflow-hidden">
+                  {(analisisMontada || activeTab === "chat") && (
+                    <ChatFacturas
+                      ref={chatRef}
+                      onIrA={irA}
+                      activa={activeTab === "chat"}
+                      pantallaCompleta={pantallaIa}
+                      conIa={permisos.editar}
+                      puedeEditar={permisos.editar}
+                    />
+                  )}
+                </div>
+              </TabsContent>
+            )}
 
             {/* PESTAÑA 3: CARGAR DATOS */}
             {/* Sin scroll de página (petición del dueño, 05-oct-2026): la tarjeta
                 ocupa el alto de la pestaña y solo su lista hace scroll por dentro
                 (ver lib/facturas/alturaCargar.ts). */}
-            <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
-              <div className="mx-auto flex h-full max-w-3xl flex-col gap-1">
-                {activeTab === "cargar" && (
-                  <div className="flex min-w-0 max-w-full shrink-0 items-center justify-end gap-2">
-                    {isAdmin && (
-                      <Button variant="outline" size="sm" className="mr-auto" onClick={() => setImportacionAbierta(true)}>
-                        <History className="mr-1.5 h-4 w-4" /> Importación histórica
-                      </Button>
-                    )}
-                    <div className="min-w-0 max-w-full" data-tour="facturas-coste-lectura">
-                      <MonitorGastoIA modo="ocr" />
+            {veCargar && (
+              <TabsContent value="cargar" className="h-full m-0 outline-none data-[state=inactive]:hidden">
+                <div className="mx-auto flex h-full max-w-3xl flex-col gap-1">
+                  {/* Importación histórica y gasto de lectura: de quien consulta Facturas (con solo Subida, no). */}
+                  {activeTab === "cargar" && (puedeImportar || permisos.consultar) && (
+                    <div className="flex min-w-0 max-w-full shrink-0 items-center justify-end gap-2">
+                      {puedeImportar && (
+                        <Button variant="outline" size="sm" className="mr-auto" onClick={() => setImportacionAbierta(true)}>
+                          <History className="mr-1.5 h-4 w-4" /> Importación histórica
+                        </Button>
+                      )}
+                      {permisos.consultar && (
+                        <div className="min-w-0 max-w-full" data-tour="facturas-coste-lectura">
+                          <MonitorGastoIA modo="ocr" />
+                        </div>
+                      )}
                     </div>
+                  )}
+                  <div className="flex-1 min-h-0">
+                    <SubidaFacturas />
                   </div>
-                )}
-                <div className="flex-1 min-h-0">
-                  <SubidaFacturas />
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
+            )}
 
           </div>
         </Tabs>
       </div>
-      {isAdmin && <ImportacionHistoricaDialog open={importacionAbierta} onOpenChange={setImportacionAbierta} />}
+      {puedeImportar && <ImportacionHistoricaDialog open={importacionAbierta} onOpenChange={setImportacionAbierta} />}
     </DashboardLayout>
   );
 };

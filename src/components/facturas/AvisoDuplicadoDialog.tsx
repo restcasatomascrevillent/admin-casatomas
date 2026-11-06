@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import type { Sustituible } from "@/lib/facturas/documentoLargo";
+import { useCorreccionDocumento, usePermisosFacturas } from "@/hooks/usePermisosFacturas";
 
 /** Un documento recién subido que ya existía. */
 export interface AvisoDuplicado {
@@ -92,7 +93,11 @@ const eur = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", c
  * enseña los datos del existente y un enlace a SU foto para poder comprobarlo.
  */
 export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, onDecidir, onSustituir, onDejar }: Props) {
-  const s = aviso.sustituible && onSustituir ? aviso.sustituible : null;
+  // Permisos (06/11/2026): sustituir aquí, con «Editar» o, con «Facturas · Subida», si la que
+  // ya estaba la subió él; «Ver ficha» (Compras), solo para quien consulta Facturas.
+  const { consultar } = usePermisosFacturas();
+  const { puede: puedeSustituir, comprobando } = useCorreccionDocumento(aviso.facturaId);
+  const s = aviso.sustituible && onSustituir && puedeSustituir ? aviso.sustituible : null;
   const { data: existente, isLoading } = useExistente(aviso.facturaId);
 
   const esAlbaran = (existente?.tipo ?? aviso.tipo ?? "").toString().toLowerCase().startsWith("albar");
@@ -138,7 +143,11 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
             ))}
           </dl>
         ) : (
-          <p className="text-sm text-muted-foreground">No se han podido leer los datos del que ya estaba.</p>
+          <p className="text-sm text-muted-foreground">
+            {consultar
+              ? "No se han podido leer los datos del que ya estaba."
+              : "No puedes ver los datos del que ya estaba: lo subió otra persona."}
+          </p>
         )}
 
         {aviso.preview && (
@@ -147,9 +156,11 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
             <figcaption className="text-xs text-muted-foreground">La que acabas de subir</figcaption>
           </figure>
         )}
-        {aviso.pendiente && !s && (
+        {aviso.pendiente && !s && !comprobando && (
           <p className="text-sm">
-            Queda en «Pendientes de decidir» por si quieres sustituir el que hay.
+            {aviso.sustituible && onSustituir && !puedeSustituir
+              ? "El que ya estaba lo subió otra persona: sustituirlo lo hace quien tiene «Editar» en Facturas. Queda en «Pendientes de decidir» por si prefieres descartar el nuevo."
+              : "Queda en «Pendientes de decidir» por si quieres sustituir el que hay."}
           </p>
         )}
         {restantes > 0 && (
@@ -171,7 +182,7 @@ export function AvisoDuplicadoDialog({ aviso, restantes, onCerrar, onVerFicha, o
                 label="Ver la foto del que ya está"
               />
             </div>
-            {aviso.facturaId ? (
+            {aviso.facturaId && consultar ? (
               <Button
                 type="button"
                 variant="outline"

@@ -19,7 +19,11 @@ vi.mock("@/components/facturas/GastoIaPestana", () => ({ GastoIaPestana: () => <
 vi.mock("@/components/avisos/BotonAvisosSeccion", () => ({ BotonAvisosSeccion: () => null }));
 vi.mock("@/components/ayuda/BotonAyuda", () => ({ BotonAyuda: () => null }));
 vi.mock("@/hooks/useContadorDocumentos", () => ({ useContadorDocumentos: () => ({ data: 3 }) }));
-vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ role: null, isAdmin: false, permissions: [], loading: false }) }));
+// Con «Editar» en Facturas: la IA solo sale con él (06/11/2026; sin él, ver Facturas.permisos.test.tsx).
+vi.mock("@/hooks/useUserRole", () => ({
+  useUserRole: () => ({ role: null, isAdmin: false, permissions: [], loading: false }),
+  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+}));
 
 import { doble, explorar, SERIE, TABLERO } from "./dobleAnalisis";
 import Facturas from "@/pages/Facturas";

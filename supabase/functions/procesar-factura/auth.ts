@@ -120,6 +120,7 @@ export const MENSAJE_SOLO_LO_PROPIO =
  * Falla cerrado: sin la columna, sin la fila o con cualquier error, false.
  */
 // deno-lint-ignore no-explicit-any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function esDocumentoPropio(supabase: any, facturaId: number, trabajoId: string, userId: string): Promise<boolean> {
   try {
     const { data: f, error: eF } = await supabase.from("facturas").select("subido_por").eq("id", facturaId).maybeSingle();

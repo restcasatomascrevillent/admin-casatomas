@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Factura, useUpdateFactura } from "@/hooks/useFacturas";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 
 const formSchema = z.object({
     proveedor: z.string().nullable(),
@@ -43,6 +44,9 @@ interface EditarFacturaDialogProps {
 
 export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFacturaDialogProps) {
     const updateFacturaMutation = useUpdateFactura();
+    // Verificar es de «Editar» en Facturas (06/11/2026). Quien corrige lo que subió él con
+    // «Facturas · Subida» solo cambia los datos leídos: el interruptor no sale y no se manda.
+    const { canAccess: puedeVerificar } = useCanAccessSection("facturas", "edit");
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -90,7 +94,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                 iva: values.iva,
                 total: values.total,
                 observaciones: values.observaciones || null,
-                verificada: values.verificada,
+                ...(puedeVerificar ? { verificada: values.verificada } : {}),
             });
             onOpenChange(false);
         } catch (err) {
@@ -230,6 +234,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                             )}
                         />
 
+                        {puedeVerificar && (
                         <div className="flex bg-muted/50 p-4 rounded-lg items-center justify-between border">
                             <div className="space-y-0.5 pr-3">
                                 <FormLabel className="text-base text-foreground">Marcar como verificada</FormLabel>
@@ -258,6 +263,7 @@ export function EditarFacturaDialog({ factura, open, onOpenChange }: EditarFactu
                                 )}
                             />
                         </div>
+                        )}
 
                         <div className="flex justify-end gap-2 pt-2">
                             <Button

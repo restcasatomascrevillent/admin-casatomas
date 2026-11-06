@@ -37,9 +37,10 @@ export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
 
 /**
  * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,
- * Reservas · Configuración, Cheques y Tienda miran el permiso de edición
- * (`useCanAccessSection(…, "edit")`); en el resto basta con «Ver». Si una sección empieza
- * a exigir edición, cambiar su texto aquí. Se muestra detrás de «Editar: ».
+ * Reservas · Configuración, Cheques, Tienda y Facturas (06/11/2026) miran el permiso de
+ * edición (`useCanAccessSection(…, "edit")`); en el resto basta con «Ver». Si una sección
+ * empieza a exigir edición, cambiar su texto aquí. Se muestra detrás de «Editar: » (en las
+ * de un solo interruptor, detrás de su etiqueta, p. ej. «Puede subir: »).
  */
 export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   dashboard: "sin efecto aquí; las reservas del día dependen de «Reservas».",
@@ -55,8 +56,27 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",
   cheques: "canjear cheques regalo y modificar la plantilla de factura.",
   tienda: "poner o quitar vinos de la tienda y cambiar sus ajustes (visible, descuento y textos).",
-  facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
+  facturas:
+    "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y usar la IA; también subir (pestaña Cargar). Con solo «Ver» se consultan Análisis y Compras.",
+  facturas_subida:
+    "pestaña Cargar: subir facturas y albaranes, decidir sobre los repetidos y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
 };
+
+/**
+ * Secciones con UN solo interruptor (06/11/2026): «Facturas · Subida» («Puede
+ * subir»). Lo que habilita no se divide en ver/editar: se guarda en can_view y
+ * can_edit queda siempre a false (la BD acepta cualquiera de los dos,
+ * facturas_puede_subir()). En la tabla, el interruptor va en la columna «Ver» y
+ * la de «Puede editar» queda vacía.
+ */
+export const SECCIONES_UN_INTERRUPTOR: Partial<Record<SeccionConfigurable["key"], { etiqueta: string }>> = {
+  facturas_subida: { etiqueta: "Puede subir" },
+};
+
+/** Etiqueta del único interruptor de la sección («Puede subir»), o null si tiene «Ver» y «Puede editar». */
+export function interruptorUnico(sectionKey: string): string | null {
+  return SECCIONES_UN_INTERRUPTOR[sectionKey as SeccionConfigurable["key"]]?.etiqueta ?? null;
+}
 
 /**
  * Por qué el diálogo «Permisos» sale en solo lectura a quien no es super admin: la RLS de
@@ -74,8 +94,10 @@ type PermisoGuardado = { section_key: string; can_view?: boolean | null; can_edi
 export function permisosParaEditar(origen: ReadonlyArray<PermisoGuardado>): PermisoSeccion[] {
   return SECCIONES_CONFIGURABLES.map((seccion) => {
     const guardado = origen.find((p) => p.section_key === seccion.key);
-    const can_edit = Boolean(guardado?.can_edit);
-    return { section_key: seccion.key, can_view: Boolean(guardado?.can_view) || can_edit, can_edit };
+    const guardadoEditar = Boolean(guardado?.can_edit);
+    // Un solo interruptor: lo que haya (can_view o can_edit) es «sí», y se guarda en can_view.
+    const can_edit = interruptorUnico(seccion.key) ? false : guardadoEditar;
+    return { section_key: seccion.key, can_view: Boolean(guardado?.can_view) || guardadoEditar, can_edit };
   });
 }
 
@@ -88,7 +110,8 @@ export function cambiarVer(permisos: PermisoSeccion[], sectionKey: string, ver: 
 
 /** Cambia «Puede editar» de una sección; sin «Ver» no se puede activar. */
 export function cambiarEditar(permisos: PermisoSeccion[], sectionKey: string, editar: boolean): PermisoSeccion[] {
-  return permisos.map((p) => (p.section_key === sectionKey ? { ...p, can_edit: editar && p.can_view } : p));
+  const unico = interruptorUnico(sectionKey) !== null;
+  return permisos.map((p) => (p.section_key === sectionKey ? { ...p, can_edit: editar && p.can_view && !unico } : p));
 }
 
 /** Los mismos permisos sin edición en ninguna sección (para quien no puede concederla). */
@@ -106,12 +129,28 @@ export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArr
 
 export type DatosPermisos = Pick<ManagedUser, "is_super_admin" | "role" | "permissions">;
 
-/** «Ver» y «Editar» de cada sección, más la fila de Usuarios (va por rol, no por permisos). */
-export function seccionesConPermisos(user: DatosPermisos) {
+/**
+ * «Ver» y «Editar» de cada sección, más la fila de Usuarios (va por rol, no por permisos).
+ * Las de un solo interruptor llevan `unInterruptor` («Puede subir») y su valor en `ver`
+ * (y el mismo en `editar`, para quien solo mire esos dos).
+ */
+export function seccionesConPermisos(user: DatosPermisos): Array<{
+  key: string;
+  label: string;
+  ayuda: string;
+  ver: boolean;
+  editar: boolean;
+  unInterruptor?: string;
+}> {
   const permisos = permisosParaEditar(user.permissions);
   return [
     ...SECCIONES_CONFIGURABLES.map((seccion) => {
       const permiso = permisos.find(p => p.section_key === seccion.key);
+      const unico = interruptorUnico(seccion.key);
+      if (unico) {
+        const si = user.is_super_admin || Boolean(permiso?.can_view);
+        return { key: seccion.key, label: seccion.label, ayuda: `${unico}: ${AYUDA_EDICION[seccion.key]}`, ver: si, editar: si, unInterruptor: unico };
+      }
       return {
         key: seccion.key,
         label: seccion.label,

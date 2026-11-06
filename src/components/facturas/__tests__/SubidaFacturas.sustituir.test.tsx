@@ -5,7 +5,7 @@ vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("./dobleSupabaseFacturas");
   return { supabase: m.doble.supabase };
 });
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), useUsuarioIdOpcional: () => "u1" }));
 // Con permiso de edición en Facturas (sin él no se ofrece sustituir ni añadir página).
 vi.mock("@/hooks/useUserRole", async (orig) => ({
   ...(await orig<typeof import("@/hooks/useUserRole")>()),

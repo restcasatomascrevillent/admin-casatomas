@@ -5,7 +5,9 @@ vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("./dobleSupabaseFacturas");
   return { supabase: m.doble.supabase };
 });
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), useUsuarioIdOpcional: () => "u1" }));
+// Con «Editar» en Facturas (todo, como antes del 06/11/2026); los perfiles, en SubidaFacturas.permisos.test.tsx.
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 

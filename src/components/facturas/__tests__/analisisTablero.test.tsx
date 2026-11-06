@@ -147,7 +147,8 @@ const DOCUMENTOS = {
 };
 const llamadas = (fn: string) => doble.rpc.mock.calls.filter((c) => c[0] === fn).map((c) => c[1]);
 
-function montar(props: { onIrA?: (e: string) => void; activa?: boolean } = {}, url = "/facturas?tab=chat") {
+// Con «Editar» en Facturas (la IA y «Clasificar con IA»), salvo que se diga otra cosa (06/11/2026).
+function montar(props: { onIrA?: (e: string) => void; activa?: boolean; conIa?: boolean; puedeEditar?: boolean } = {}, url = "/facturas?tab=chat") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const ref = createRef<ChatFacturasRef>();
   const envoltorio = ({ children }: { children: ReactNode }) => (
@@ -158,7 +159,7 @@ function montar(props: { onIrA?: (e: string) => void; activa?: boolean } = {}, u
       </MemoryRouter>
     </QueryClientProvider>
   );
-  const r = render(<ChatFacturas ref={ref} {...props} />, { wrapper: envoltorio });
+  const r = render(<ChatFacturas ref={ref} conIa puedeEditar {...props} />, { wrapper: envoltorio });
   return { ...r, ref };
 }
 
@@ -280,6 +281,43 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     expect(tarjeta).toHaveTextContent(/10\.396 líneas sin clasificar/);
     fireEvent.click(within(tarjeta).getByRole("button", { name: /clasificar con ia/i }));
     expect(onIrA).toHaveBeenCalledWith("?tab=compras&modo=productos");
+  });
+});
+
+describe("con solo «Ver» en Facturas (06/11/2026): se consulta, sin IA y sin lo que cambia datos", () => {
+  it("el tablero sale entero pero sin «Pregúntale a la IA» ni su panel, y no pide el historial del chat", async () => {
+    const desde = vi.spyOn(doble.supabase, "from");
+    montar({ conIa: false, puedeEditar: false });
+    await screen.findByText("1.362.491,57 €");
+    expect(screen.queryByRole("button", { name: /pregúntale a la ia/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Pregúntale a la IA" })).not.toBeInTheDocument();
+    // «Personalizar» su propia vista sí (se guarda por usuario).
+    expect(screen.getByRole("button", { name: "Personalizar el tablero" })).toBeInTheDocument();
+    expect(desde.mock.calls.some(([t]) => t === "chat_facturas_conversaciones")).toBe(false);
+    desde.mockRestore();
+  });
+
+  it("(contraste) con «Editar» sí sale la IA y se pide el historial", async () => {
+    const desde = vi.spyOn(doble.supabase, "from");
+    montar();
+    await screen.findByText("1.362.491,57 €");
+    expect(screen.getByRole("button", { name: /pregúntale a la ia/i })).toBeInTheDocument();
+    await waitFor(() => expect(desde.mock.calls.some(([t]) => t === "chat_facturas_conversaciones")).toBe(true));
+    desde.mockRestore();
+  });
+
+  it("«Clasificar con IA» no sale (avisa igual de las líneas sin clasificar)", async () => {
+    montar({ conIa: false, puedeEditar: false });
+    const tarjeta = await screen.findByRole("region", { name: "Gasto por familia" });
+    expect(tarjeta).toHaveTextContent(/10\.396 líneas sin clasificar/);
+    expect(within(tarjeta).queryByRole("button", { name: /clasificar con ia/i })).not.toBeInTheDocument();
+  });
+
+  it("el «Preguntar a la IA» de Compras (enviarConsulta) no hace nada", async () => {
+    const { ref } = montar({ conIa: false, puedeEditar: false });
+    await screen.findByText("1.362.491,57 €");
+    act(() => ref.current?.enviarConsulta("¿Y esta factura?"));
+    expect(screen.queryByRole("dialog", { name: "Pregúntale a la IA" })).not.toBeInTheDocument();
   });
 });
 
@@ -627,9 +665,9 @@ describe("QA 05/11/2026: página, URL y pestañas", () => {
     await screen.findByText("1.362.491,57 €");
     fireEvent.click(screen.getByRole("button", { name: /pregúntale a la ia/i }));
     expect(panel()).toBeInTheDocument();
-    rerender(<ChatFacturas ref={ref} activa={false} />);
+    rerender(<ChatFacturas ref={ref} activa={false} conIa puedeEditar />);
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    rerender(<ChatFacturas ref={ref} activa />);
+    rerender(<ChatFacturas ref={ref} activa conIa puedeEditar />);
     expect(await screen.findByRole("dialog", { name: "Pregúntale a la IA" })).toBeInTheDocument();
   });
 

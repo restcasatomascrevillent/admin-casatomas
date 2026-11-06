@@ -6,6 +6,7 @@ import {
   AYUDA_EDICION,
   SECCIONES_CONFIGURABLES,
   SOLO_SUPER_ADMIN_CAMBIA_PERMISOS,
+  interruptorUnico,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
 
@@ -69,13 +70,15 @@ export function TablaPermisosSecciones({
               const ver = permiso?.can_view ?? false;
               const editar = permiso?.can_edit ?? false;
               const idAyuda = `${idBase}-${seccion.key}-ayuda-edicion`;
+              // «Facturas · Subida» (06/11/2026): un solo interruptor («Puede subir»), en la columna «Ver».
+              const unico = interruptorUnico(seccion.key);
 
               return (
                 <TableRow key={seccion.key}>
                   <TableCell className="px-3 py-3">
                     <p className="font-medium">{seccion.label}</p>
                     <p id={idAyuda} className="mt-0.5 text-xs text-muted-foreground">
-                      Editar: {AYUDA_EDICION[seccion.key]}
+                      {unico ?? "Editar"}: {AYUDA_EDICION[seccion.key]}
                     </p>
                   </TableCell>
                   <TableCell className="px-2 py-3 text-center">
@@ -83,17 +86,22 @@ export function TablaPermisosSecciones({
                       checked={ver}
                       disabled={soloLectura}
                       onCheckedChange={(valor) => onCambiarVer(seccion.key, valor)}
-                      aria-label={`Ver ${seccion.label}`}
+                      aria-label={unico ? `${unico}: ${seccion.label}` : `Ver ${seccion.label}`}
+                      aria-describedby={unico ? idAyuda : undefined}
                     />
                   </TableCell>
                   <TableCell className="px-2 py-3 text-center">
-                    <Switch
-                      checked={editar}
-                      disabled={!ver || !puedeConcederEdicion || soloLectura}
-                      onCheckedChange={(valor) => onCambiarEditar(seccion.key, valor)}
-                      aria-label={`Puede editar ${seccion.label}`}
-                      aria-describedby={idAyuda}
-                    />
+                    {unico ? (
+                      <span className="text-xs text-muted-foreground" aria-hidden="true">—</span>
+                    ) : (
+                      <Switch
+                        checked={editar}
+                        disabled={!ver || !puedeConcederEdicion || soloLectura}
+                        onCheckedChange={(valor) => onCambiarEditar(seccion.key, valor)}
+                        aria-label={`Puede editar ${seccion.label}`}
+                        aria-describedby={idAyuda}
+                      />
+                    )}
                   </TableCell>
                 </TableRow>
               );
@@ -103,6 +111,7 @@ export function TablaPermisosSecciones({
       </div>
       <p className="text-xs text-muted-foreground">
         «Puede editar» solo se activa si la sección tiene «Ver»; al quitar «Ver» se quita también.
+        «Facturas · Subida» lleva un solo interruptor («Puede subir») y no necesita «Ver» en Facturas.
       </p>
     </div>
   );

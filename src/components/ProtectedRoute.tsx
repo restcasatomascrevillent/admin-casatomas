@@ -24,7 +24,8 @@ const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   // agencia (Oficiosos, «instagram_agencia») entra solo a la pestaña Encargos.
   "/instagram": ["marketing", "instagram_agencia"],
   "/tienda": "tienda",
-  "/facturas": "facturas",
+  // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
+  "/facturas": ["facturas", "facturas_subida"],
   "/usuarios": "usuarios",
 };
 // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
@@ -43,7 +44,7 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/marketing", secciones: ["marketing"] },
   { ruta: "/cheques", secciones: ["cheques"] },
   { ruta: "/tienda", secciones: ["tienda"] },
-  { ruta: "/facturas", secciones: ["facturas"] },
+  { ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
   { ruta: "/instagram", secciones: ["instagram_agencia"] },
 ];
 

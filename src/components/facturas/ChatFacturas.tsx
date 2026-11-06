@@ -23,6 +23,12 @@
 // `pantallaCompleta` (ruta `/facturas/ia`, 06/11/2026): el chat ocupa el sitio
 // del tablero (ChatPantallaCompleta) con este mismo estado; el tablero y el
 // explorador siguen montados (ocultos) y al volver están como se dejaron.
+//
+// Permisos (06/11/2026, dueño): la IA (botón, panel lateral y pantalla
+// completa) solo con «Editar» en Facturas (`conIa`); con solo «Ver» se consulta
+// el tablero y el explorador, y lo que cambia datos (p. ej. «Clasificar con
+// IA») no sale (`puedeEditar`, por EdicionFacturasContext). Las dos, por
+// defecto, no: la página Facturas las pasa según el permiso.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -58,6 +64,7 @@ import { CopilotoLateral } from "./copiloto/CopilotoLateral";
 import { ChatPantallaCompleta } from "./copiloto/ChatPantallaCompleta";
 import { enlacePantallaCompleta, destinoVolver, type EstadoPantallaCompleta } from "@/lib/facturas/copilotoCompleto";
 import { desplazarDentro, esMovil } from "./analisis/desplazar";
+import { EdicionFacturasContext } from "./analisis/edicionFacturas";
 
 export interface ChatFacturasRef {
   enviarConsulta: (texto: string) => void;
@@ -70,6 +77,10 @@ interface ChatFacturasProps {
   activa?: boolean;
   /** `/facturas/ia`: el chat a pantalla completa en lugar del tablero. */
   pantallaCompleta?: boolean;
+  /** La IA de Facturas (botón, panel y pantalla completa): solo con «Editar». Por defecto, no. */
+  conIa?: boolean;
+  /** «Editar» en Facturas: enseña los accesos que cambian datos («Clasificar con IA»). Por defecto, no. */
+  puedeEditar?: boolean;
 }
 
 const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
@@ -116,7 +127,9 @@ function textoSeleccion(sel: SeleccionPeriodo, hoy: Date): string {
   return f.desde && f.hasta ? textoRango(f.desde, f.hasta) : NOMBRE_PERIODO[sel.tipo];
 }
 
-export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true, pantallaCompleta = false }, ref) => {
+export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true, pantallaCompleta: pidePantallaCompleta = false, conIa = false, puedeEditar = false }, ref) => {
+  // Sin IA no hay pantalla completa (la página ya lleva a /facturas): se queda el tablero.
+  const pantallaCompleta = pidePantallaCompleta && conIa;
   const hoy = useHoy();
   const hoyRef = useRef(hoy);
   hoyRef.current = hoy;
@@ -203,7 +216,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     enviarMensaje,
     regenerarRespuesta,
     eliminarConversacion,
-  } = useChatFacturas();
+  } = useChatFacturas({ activo: conIa });
   // Lo escrito en la caja vive aquí: sigue al pasar del panel a pantalla completa y al volver.
   const [borrador, setBorrador] = useState("");
 
@@ -212,6 +225,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
 
   useImperativeHandle(ref, () => ({
     enviarConsulta: (texto: string) => {
+      if (!conIa) return;
       setVerHistorial(false);
       setAbierto(true);
       void enviarMensaje(texto);
@@ -348,7 +362,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       />
     );
 
-  const copilotoVisible = abierto && activa && !pantallaCompleta;
+  const copilotoVisible = conIa && abierto && activa && !pantallaCompleta;
   return (
     // Con el copiloto abierto (360 px, no modal) el contenido deja su hueco a la
     // derecha (desde lg, 1024 px): si no, el panel tapaba el botón y la franja
@@ -381,6 +395,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
             <LayoutGrid className="h-4 w-4" aria-hidden />
             <span className="hidden xl:inline">Personalizar</span>
           </Button>
+          {conIa && (
           <Button
             type="button"
             className="ml-auto h-11 gap-1.5 sm:ml-0"
@@ -398,6 +413,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
             {/* En tablet vertical la barra no cabe entera: «IA» a secas (el nombre accesible sigue entero). */}
             <span className="hidden lg:inline">Pregúntale a la</span> IA
           </Button>
+          )}
         </div>
       </div>
 
@@ -410,7 +426,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         data-testid="tablero-analisis"
         data-tour="facturas-analisis-tablero"
       >
-        {cuerpo}
+        <EdicionFacturasContext.Provider value={puedeEditar}>{cuerpo}</EdicionFacturasContext.Provider>
       </div>
 
       {pantallaCompleta && (
@@ -439,6 +455,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
 
       <DocumentosDeCifra peticion={peticionDocs} onCerrar={() => setPeticionDocs(null)} onIrA={onIrA} />
 
+      {conIa && (
       <CopilotoLateral
         abierto={copilotoVisible}
         onAbiertoCambia={setAbierto}
@@ -464,6 +481,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         borrador={borrador}
         onBorrador={setBorrador}
       />
+      )}
     </div>
   );
 });

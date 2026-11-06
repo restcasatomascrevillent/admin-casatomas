@@ -104,3 +104,29 @@ describe("ConfigurarRolesModal · «Puede editar» en los roles preconfigurados"
     expect(within(dialogo).getByRole("switch", { name: "Puede editar Facturas" })).toBeDisabled();
   });
 });
+
+describe("ConfigurarRolesModal · «Facturas · Subida» (06/11/2026): un solo interruptor", () => {
+  it("sale con «Puede subir» (sin «Ver» ni «Puede editar» propios) y se guarda en can_view", async () => {
+    const dialogo = abrir();
+
+    const subir = within(dialogo).getByRole("switch", { name: "Puede subir: Facturas · Subida" });
+    expect(subir).not.toBeChecked();
+    expect(within(dialogo).queryByRole("switch", { name: "Ver Facturas · Subida" })).toBeNull();
+    expect(within(dialogo).queryByRole("switch", { name: "Puede editar Facturas · Subida" })).toBeNull();
+    expect(within(dialogo).getByText(/^Puede subir: pestaña Cargar/)).toBeInTheDocument();
+    fireEvent.click(subir);
+    fireEvent.change(within(dialogo).getByLabelText("Nombre del rol"), { target: { value: "Cocina" } });
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar rol" }));
+
+    await waitFor(() => expect(onCreatePreset).toHaveBeenCalledTimes(1));
+    const [, , permisos] = onCreatePreset.mock.calls[0] as [string, string, Fila[]];
+    // Va por libre: no necesita «Ver» en Facturas.
+    expect(de(permisos, "facturas_subida")).toEqual({ section_key: "facturas_subida", can_view: true, can_edit: false });
+    expect(de(permisos, "facturas")).toEqual({ section_key: "facturas", can_view: false, can_edit: false });
+  });
+
+  it("también lo cambia quien no puede conceder edición (es un permiso de «Ver»)", () => {
+    const dialogo = abrir({ puedeConcederEdicion: false });
+    expect(within(dialogo).getByRole("switch", { name: "Puede subir: Facturas · Subida" })).toBeEnabled();
+  });
+});
