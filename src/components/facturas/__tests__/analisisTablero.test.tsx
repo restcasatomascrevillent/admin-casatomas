@@ -741,3 +741,54 @@ describe("QA 05/11/2026: copiloto", () => {
     expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });
+
+describe("tablero: retención de IRPF y meses incompletos (06/11/2026)", () => {
+  const AVISO = "La comparación incluye meses incompletos (07/2026): faltan facturas por subir y la variación no es fiable.";
+  beforeEach(() => {
+    doble.rpcs.tablero_compras = () => ({
+      ...TABLERO,
+      indicadores: { ...TABLERO.indicadores, retencion_irpf: 5920.09, retencion_irpf_documentos: 42, meses_incompletos: 1, variacion_aviso: AVISO },
+      meses: TABLERO.meses.map((m) => ({ ...m, incompleto: m.mes === "2026-07" })),
+      meses_incompletos: [{ mes: "2026-07", documentos: 237, referencia: 600, motivo: "reciente" }],
+    });
+    doble.rpcs.explorar_compras = (a) => {
+      const ex = explorar(a);
+      return {
+        ...ex,
+        total: { ...ex.total, variacion_pct: -40, variacion_aviso: AVISO },
+        anterior: { desde: "2025-01-01", hasta: "2025-11-05", valor: 500000, documentos: 400 },
+        meses_incompletos: ["2026-07"],
+        puntos: ex.puntos.map((p) => ({ ...p, incompleto: p.clave === "2026-07" })),
+      };
+    };
+  });
+
+  it("«Gasto con IVA» no cambia y dice lo retenido, el coste real, el mes incompleto y que la variación no es fiable", async () => {
+    montar();
+    const ind = await screen.findByLabelText("Indicadores del periodo");
+    expect(ind).toHaveTextContent(/Gasto con IVA1\.362\.491,57\s€/);
+    expect(within(ind).getByTestId("nota-retencion-irpf")).toHaveTextContent(/^incluye −5\.920,09\s€ de IRPF retenido; coste real 1\.368\.411,66\s€$/);
+    expect(within(ind).getByTestId("nota-meses-incompletos")).toHaveTextContent("Julio 2026 está incompleto: faltan facturas por subir");
+    expect(ind).toHaveTextContent(/\+13,5 % frente a 1 ene 2025 – 5 nov 2025 \(no fiable\)/);
+  });
+
+  it("la gráfica del explorador explica la trama del mes incompleto y la variación avisa", async () => {
+    montar();
+    const ex = await screen.findByRole("region", { name: "Explorar" });
+    expect(await within(ex).findByTestId("leyenda-mes-incompleto")).toHaveTextContent("Mes incompleto: faltan facturas por subir");
+    expect(within(ex).getByTestId("variacion-no-fiable")).toHaveAttribute("title", AVISO);
+  });
+
+  it("sin retención ni meses incompletos no sale ninguna nota", async () => {
+    doble.rpcs.tablero_compras = () => TABLERO;
+    doble.rpcs.explorar_compras = explorar;
+    montar();
+    const ind = await screen.findByLabelText("Indicadores del periodo");
+    expect(within(ind).queryByTestId("nota-retencion-irpf")).toBeNull();
+    expect(within(ind).queryByTestId("nota-meses-incompletos")).toBeNull();
+    expect(ind).not.toHaveTextContent(/no fiable/);
+    const ex = await screen.findByRole("region", { name: "Explorar" });
+    await within(ex).findByText("308.808,70 €");
+    expect(within(ex).queryByTestId("leyenda-mes-incompleto")).toBeNull();
+  });
+});

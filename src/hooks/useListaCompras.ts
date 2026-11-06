@@ -21,6 +21,7 @@ import { aFacturaDetalle, leerDocumentosCompletos, type Factura } from "@/hooks/
 import { useUsuarioIdOpcional } from "@/hooks/useAuth";
 import {
   decodificarLista,
+  decodificarMesesIncompletos,
   faltaFuncionCompras,
   listaDesdeCompletos,
   reintentarConsulta,
@@ -44,6 +45,8 @@ export interface ListaCompras {
   cabeceras: CabeceraDocumento[];
   /** Solo sin la migración: los documentos completos de la carga de antes (las fichas salen de aquí). */
   completos: Map<number, Factura> | null;
+  /** «AAAA-MM» de los meses con muchos menos documentos de lo normal (20261106310000); vacío sin la migración. */
+  mesesIncompletos?: ReadonlySet<string>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,7 +57,7 @@ async function leerLista(usuario: string | null): Promise<ListaCompras> {
   if (!error) {
     const cabeceras = decodificarLista(data);
     guardarCopiaLista(usuario, data);
-    return { cabeceras, completos: null };
+    return { cabeceras, completos: null, mesesIncompletos: decodificarMesesIncompletos(data) };
   }
   if (!faltaFuncionCompras(error)) throw error;
   // Sin la migración 20261105190000: la carga de antes, facturas y albaranes a la vez.
@@ -67,7 +70,10 @@ function copiaInicial(usuario: string | null): { datos: ListaCompras; guardado: 
   const c = leerCopiaLista(usuario);
   if (!c) return undefined;
   try {
-    return { datos: { cabeceras: decodificarLista(c.crudo), completos: null }, guardado: c.guardado };
+    return {
+      datos: { cabeceras: decodificarLista(c.crudo), completos: null, mesesIncompletos: decodificarMesesIncompletos(c.crudo) },
+      guardado: c.guardado,
+    };
   } catch {
     return undefined;
   }

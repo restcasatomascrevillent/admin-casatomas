@@ -750,6 +750,7 @@ export function TabCompras({
                     onAbrir={(id) => abrirFicha({ tipo: "documento", id }, true)}
                     onPrecargar={precargar}
                     onQuitarFiltros={quitarFiltrosDocs}
+                    mesesIncompletos={listaQ.data?.mesesIncompletos}
                   />
                 )}
               </div>

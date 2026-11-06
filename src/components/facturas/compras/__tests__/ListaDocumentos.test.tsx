@@ -311,3 +311,25 @@ describe("ListaDocumentos agrupada por mes", () => {
     expect(fila("F-0004").className).toMatch(/focus-visible:outline/);
   });
 });
+
+describe("ListaDocumentos › retención de IRPF y meses incompletos (06/11/2026)", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("marca discreta «IRPF» solo en la fila del documento con retención", () => {
+    pintar({ documentos: [doc(1, { numero_documento: "F-0001", retencion_irpf: 209 }), doc(4, { numero_documento: "F-0004" })] });
+    expect(within(fila("F-0001")).getByText("IRPF")).toBeInTheDocument();
+    expect(fila("F-0001")).toHaveTextContent(/IRPF retenido/);
+    expect(within(fila("F-0004")).queryByText("IRPF")).toBeNull();
+  });
+
+  it("«posiblemente incompleto» en la cabecera de los meses incompletos, y solo en esos", () => {
+    pintar({ mesesIncompletos: new Set(["2026-10"]) });
+    expect(cabeceraMes(/^Octubre 2026/)).toHaveTextContent(/posiblemente incompleto/);
+    expect(cabeceraMes(/^Septiembre 2026/)).not.toHaveTextContent(/incompleto/);
+  });
+
+  it("sin la lista de meses incompletos (migración sin aplicar) no sale nada", () => {
+    pintar();
+    expect(screen.queryByText(/posiblemente incompleto/)).toBeNull();
+  });
+});

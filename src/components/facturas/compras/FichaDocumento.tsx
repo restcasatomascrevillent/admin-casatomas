@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
+import { etiquetaRetencion } from "@/lib/facturas/retencion";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
 import { OriginalIncrustado } from "@/components/facturas/shared/OriginalIncrustado";
 import { EstadoDocumento } from "@/components/facturas/shared/EstadoDocumento";
@@ -235,12 +236,18 @@ export function FichaDocumento({
     </header>
   );
 
+  const retencion = doc.retencion_irpf ?? null;
   const importes = hayImportes && (
     <dl aria-label="Importes" className="grid grid-cols-[repeat(auto-fit,minmax(8.5rem,1fr))] divide-x divide-border/60 border-y border-border/60">
       {doc.subtotal != null && <Cifra etiqueta="Base imponible">{formatImporte(doc.subtotal)}</Cifra>}
       {doc.iva != null && <Cifra etiqueta="IVA">{formatImporte(doc.iva)}</Cifra>}
+      {retencion != null && (
+        <Cifra etiqueta={etiquetaRetencion(doc.retencion_irpf_pct)} testId="retencion-documento">
+          {formatImporte(-retencion)}
+        </Cifra>
+      )}
       {doc.total != null && (
-        <Cifra etiqueta={`Total${doc.total_origen === "deducido" ? " (calculado, no leído)" : ""}`} destacada>
+        <Cifra etiqueta={`${retencion != null ? "Total a pagar" : "Total"}${doc.total_origen === "deducido" ? " (calculado, no leído)" : ""}`} destacada>
           <span className={abono ? "text-emerald-700 dark:text-emerald-400" : ""}>{formatImporte(doc.total)}</span>
         </Cifra>
       )}

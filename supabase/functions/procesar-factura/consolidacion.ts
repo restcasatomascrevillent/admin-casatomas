@@ -512,6 +512,10 @@ export function consolidar(piezasEntrada: PaginaCerrada[], rondaRelectura = 0): 
         f[campo] = de ? de.resultado!.pie[campo] : null;
         f[lit] = de ? de.resultado!.pie[lit] : null;
       }
+      // La retención de IRPF viaja igual (importe y %, de la misma franja).
+      const deRet = [...conPie].reverse().find((p) => esNum(p.resultado!.pie.retencion_irpf));
+      f.retencion_irpf = deRet ? deRet.resultado!.pie.retencion_irpf : null;
+      f.retencion_irpf_pct = deRet ? (deRet.resultado!.pie.retencion_irpf_pct ?? null) : null;
       pieFusionado = f;
     }
     // Solo es raro si DESPUÉS del pie hay más filas de producto (una franja
@@ -648,6 +652,8 @@ export function consolidar(piezasEntrada: PaginaCerrada[], rondaRelectura = 0): 
     subtotal: pie?.subtotal ?? null,
     iva_literal: pie?.iva_literal ?? null,
     iva: pie?.iva ?? null,
+    retencion_irpf: pie?.retencion_irpf ?? null,
+    retencion_irpf_pct: pie?.retencion_irpf_pct ?? null,
     total_literal: pie?.total_literal ?? null,
     total: pie?.total ?? null,
     observaciones,

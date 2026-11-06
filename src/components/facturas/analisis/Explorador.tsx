@@ -345,6 +345,11 @@ function Totales({
             )}
           >
             {textoPct(var_)} <span className="font-normal text-muted-foreground">({formatoValor(ant.valor, ex.parametros.medida, unidad)})</span>
+            {ex.total.variacionAviso && (
+              <span className="font-normal text-amber-800 dark:text-amber-400" title={ex.total.variacionAviso} data-testid="variacion-no-fiable">
+                {" "}· no fiable: hay meses incompletos
+              </span>
+            )}
           </dd>
         </div>
       )}

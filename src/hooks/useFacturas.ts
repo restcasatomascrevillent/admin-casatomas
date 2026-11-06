@@ -115,6 +115,14 @@ export interface Factura {
    * trata como Casa Tomás (decisión del dueño). Ausente si la columna no existe.
    */
   local?: "casa_tomas" | "touza" | null;
+  /**
+   * Retención de IRPF (migración 20261106300000): alquileres, gestoría,
+   * profesionales. Mismo signo que la base; null = sin retención. `total` ya
+   * la descuenta (total = subtotal + iva − retencion_irpf: lo que se paga).
+   */
+  retencion_irpf?: number | null;
+  /** Porcentaje de esa retención (19, 15…); null si no se sabe. */
+  retencion_irpf_pct?: number | null;
 }
 
 const columnasDocumento = (conBultos: boolean, conProducto: boolean, conFacturado: boolean, conBruto: boolean, conLocal: boolean) => `
@@ -288,6 +296,8 @@ export function aFacturaDetalle(doc: Record<string, unknown>): Factura {
     iva: n(doc.iva),
     total: n(doc.total),
     total_origen: doc.total_origen === "leido" || doc.total_origen === "deducido" ? doc.total_origen : null,
+    retencion_irpf: n(doc.retencion_irpf) || null,
+    retencion_irpf_pct: n(doc.retencion_irpf_pct) || null,
     observaciones: (doc.observaciones as string | null) ?? null,
     productos: lineas.map((p) => {
       const precioUnitario = Number(p.precio_unitario) || 0;

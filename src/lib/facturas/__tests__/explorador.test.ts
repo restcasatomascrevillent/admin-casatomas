@@ -109,7 +109,7 @@ describe("elección automática de gráfica", () => {
 describe("lectura del JSON", () => {
   it("convierte números en texto, desgloses y anterior", () => {
     const ex = normalizarExploracion(RESPUESTA);
-    expect(ex.total).toEqual({ valor: 3150, documentos: 10, lineas: null, variacionPct: 12.5 });
+    expect(ex.total).toEqual({ valor: 3150, documentos: 10, lineas: null, variacionPct: 12.5, variacionAviso: null });
     expect(ex.parametros.desglose).toBe("local");
     expect(ex.puntos[1].desglose).toEqual({ casa_tomas: 300, touza: 300 });
     expect(ex.anterior?.valor).toBe(2800);

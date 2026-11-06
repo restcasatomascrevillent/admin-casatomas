@@ -125,6 +125,17 @@ export type ResultadoGuardado =
   | { estado: "duplicado"; existente: ResumenExistente | null; respuesta: RespuestaProcesado };
 
 const COLUMNAS_04B = /\b(paginas|ocr_trabajo_id|pagina|orden|albaran_ref)\b/;
+/** Columnas de la retención de IRPF para el insert de `facturas`: vacío si no
+ *  hay retención (las columnas son NULL por defecto). `?? null` porque un
+ *  documento pendiente guardado antes del 06/11/2026 no trae los campos. */
+export function columnasRetencion(
+  d: { retencion_irpf?: number | null; retencion_irpf_pct?: number | null },
+): { retencion_irpf?: number | null; retencion_irpf_pct?: number | null } {
+  const importe = d.retencion_irpf ?? null;
+  const pct = d.retencion_irpf_pct ?? null;
+  return importe === null && pct === null ? {} : { retencion_irpf: importe, retencion_irpf_pct: pct };
+}
+
 /** ¿El error es de una columna que aún no existe (migración 20261005120000 sin aplicar)? */
 export function esColumnaNueva(msg: string | undefined | null): boolean {
   return !!msg && /column|columna|schema cache/i.test(msg) && COLUMNAS_04B.test(msg);
@@ -469,6 +480,10 @@ export async function guardarDocumento(ctx: ContextoGuardado, e: EntradaGuardado
     subtotal: d.subtotal,
     iva: d.iva,
     total: d.total,
+    // Retención de IRPF (06/11/2026): solo si la hay. NULL es el valor por
+    // defecto de las columnas, y así una factura sin retención se sigue
+    // guardando aunque la migración de las columnas no esté aplicada.
+    ...columnasRetencion(d),
     total_origen: e.totalOrigen,
     observaciones: d.observaciones,
     resumen: d.resumen,
@@ -726,6 +741,8 @@ export async function sustituirFactura(
       subtotal: d.subtotal,
       iva: d.iva,
       total: d.total,
+      retencion_irpf: d.retencion_irpf ?? null,
+      retencion_irpf_pct: d.retencion_irpf_pct ?? null,
       total_origen: p.totalOrigen,
       observaciones: d.observaciones,
       resumen: d.resumen,
@@ -829,6 +846,8 @@ export async function anadirPagina(
       subtotal: d.subtotal,
       iva: d.iva,
       total: d.total,
+      retencion_irpf: d.retencion_irpf ?? null,
+      retencion_irpf_pct: d.retencion_irpf_pct ?? null,
       total_origen: p.totalOrigen,
     },
     p_lineas: lineas,

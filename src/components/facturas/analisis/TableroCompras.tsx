@@ -20,10 +20,12 @@ import {
   ENLACE_PRODUCTOS_COMPRAS,
   enlaceProveedorCompras,
   nombreCorto,
+  textoMesesIncompletos,
   textoRangoMeses,
   textoVariacion,
   type TableroCompras as Datos,
 } from "@/lib/facturas/tableroCompras";
+import { notaRetencionGasto } from "@/lib/facturas/retencion";
 import { FILTROS_VACIOS, type ConfigExplorador, type ExploracionFijada, type LocalRpc, type Medida } from "@/lib/facturas/explorador";
 import { peticionSimple, type PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import { ProveedoresTop } from "./GraficasPrincipales";
@@ -67,6 +69,8 @@ export function TableroCompras({
 }: Props) {
   const i = datos.indicadores;
   const variacion = textoVariacion(datos);
+  const notaRetencion = notaRetencionGasto(i.gasto, i.retencionIrpf);
+  const mesesIncompletos = textoMesesIncompletos(datos.mesesIncompletos ?? []);
 
   const docs = (
     titulo: string,
@@ -127,11 +131,31 @@ export function TableroCompras({
             <>
               {textoRangoMeses(datos.meses)}
               {variacion && (
-                <span className={cn("ml-1 font-medium", variacion.sube ? "text-red-700 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400")}>
+                <span
+                  className={cn("ml-1 font-medium", variacion.sube ? "text-red-700 dark:text-red-400" : "text-emerald-700 dark:text-emerald-400")}
+                  title={i.variacionAviso ?? undefined}
+                >
                   · {variacion.texto}
+                  {i.variacionAviso && <span className="font-normal text-amber-800 dark:text-amber-400"> (no fiable)</span>}
                 </span>
               )}
             </>
+          }
+          extra={
+            (notaRetencion || mesesIncompletos) && (
+              <>
+                {notaRetencion && (
+                  <span className="block line-clamp-2" data-testid="nota-retencion-irpf">
+                    {notaRetencion}
+                  </span>
+                )}
+                {mesesIncompletos && (
+                  <span className="block line-clamp-2 font-medium text-amber-800 dark:text-amber-400" data-testid="nota-meses-incompletos">
+                    {mesesIncompletos}
+                  </span>
+                )}
+              </>
+            )
           }
         />
         <Indicador

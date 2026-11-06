@@ -28,7 +28,11 @@ const SIN_ESTADO: EstadoPlegado = {};
  * cabecera ligera de `documentos_lista()`, que no trae las líneas).
  */
 export type DocumentoFila = DocumentoAgrupable &
-  Pick<Factura, "numero_documento" | "proveedor" | "drive_url" | "archivo_path" | "verificada"> & { local?: Factura["local"] };
+  Pick<Factura, "numero_documento" | "proveedor" | "drive_url" | "archivo_path" | "verificada"> & {
+    local?: Factura["local"];
+    /** Retención de IRPF (null/ausente = sin retención): marca «IRPF» en la fila. */
+    retencion_irpf?: number | null;
+  };
 
 /** Espera con el ratón encima antes de pedir la ficha por adelantado. */
 const ESPERA_PRECARGA_MS = 120;
@@ -80,6 +84,7 @@ export function ListaDocumentos({
   mesPedido = null,
   etiqueta = "Documentos",
   onQuitarFiltros,
+  mesesIncompletos,
 }: {
   /** Los documentos ya filtrados (buscador, chip, local y periodo). */
   documentos: DocumentoFila[];
@@ -114,6 +119,8 @@ export function ListaDocumentos({
   etiqueta?: string;
   /** «Quitar filtros» en la lista vacía (solo en la lista principal). */
   onQuitarFiltros?: () => void;
+  /** «AAAA-MM» de los meses con muchos menos documentos de lo normal: «posiblemente incompleto» en su cabecera. */
+  mesesIncompletos?: ReadonlySet<string>;
 }) {
   // «Hoy» lo da quien monta la lista (se actualiza al cambiar de día); si no, el del montaje.
   const [ahoraMontaje] = useState(() => new Date());
@@ -230,6 +237,15 @@ export function ListaDocumentos({
                   <span className="whitespace-nowrap text-xs font-normal text-muted-foreground">
                     {plural(mes.documentos.length, "documento", "documentos")}
                   </span>
+                  {mesesIncompletos?.has(mes.clave) && (
+                    <span
+                      className="whitespace-nowrap text-xs font-medium text-amber-700 dark:text-amber-400"
+                      title="Tiene muchos menos documentos que un mes normal: faltan facturas por subir"
+                      data-mes-incompleto
+                    >
+                      <span className="sr-only"> · </span>posiblemente incompleto
+                    </span>
+                  )}
                   <span className="sr-only"> · </span>
                 </span>
                 <span className="flex shrink-0 flex-wrap items-baseline justify-end gap-x-1 text-right">
@@ -382,6 +398,11 @@ function FilaDocumento({
             {d.tipo === "albaran" && <Marca tono="neutro">Albarán</Marca>}
             {abono && <Marca tono="abono">Abono</Marca>}
             {touza && <Marca tono="touza">Touza</Marca>}
+            {d.retencion_irpf != null && (
+              <Marca tono="neutro">
+                IRPF<span className="sr-only"> retenido</span>
+              </Marca>
+            )}
             {avisos > 0 && (
               <Marca tono="aviso" icono={<AlertTriangle aria-hidden="true" />}>
                 {plural(avisos, "aviso", "avisos")}

@@ -48,6 +48,8 @@ export interface CabeceraDocumento {
   regalado: Regalado;
   /** Algún producto cuesta más del doble que en otros documentos del mismo proveedor y tipo. */
   precio_atipico: boolean;
+  /** Retención de IRPF (20261106310000: docs[i][20]); null = sin retención o sin la migración. */
+  retencion_irpf: number | null;
 }
 
 export const SIN_REGALADO: Regalado = Object.freeze({ importe: 0, estimado: false, regalos: 0 }) as Regalado;
@@ -107,9 +109,24 @@ export function decodificarLista(crudo: unknown): CabeceraDocumento[] {
       alertas,
       regalado: reg ? { importe: num(reg[0]) ?? 0, estimado: reg[1] === true, regalos: num(reg[2]) ?? 0 } : SIN_REGALADO,
       precio_atipico: fila[19] === true,
+      retencion_irpf: num(fila[20]) || null,
     });
   }
   return salida;
+}
+
+/**
+ * Meses incompletos de `documentos_lista()` (migración 20261106310000): los
+ * «AAAA-MM» con muchos menos documentos de lo normal (faltan facturas por
+ * subir). Sin la migración, o si no viene, ninguno.
+ */
+export function decodificarMesesIncompletos(crudo: unknown): Set<string> {
+  const lista = (crudo as { meses_incompletos?: unknown } | null)?.meses_incompletos;
+  if (!Array.isArray(lista)) return new Set();
+  const meses = lista
+    .map((m) => (typeof m === "string" ? m : (m as { mes?: unknown } | null)?.mes))
+    .filter((m): m is string => typeof m === "string" && /^\d{4}-\d{2}$/.test(m));
+  return new Set(meses);
 }
 
 /** Cabecera de un documento COMPLETO (la carga de antes, sin la migración). */
@@ -136,6 +153,7 @@ export function cabeceraDeFactura(f: Factura, precioAtipico: boolean): CabeceraD
     alertas: f.alertas.map((a) => ({ codigo: a.codigo, severidad: a.severidad })),
     regalado: regaladoDocumento(f),
     precio_atipico: precioAtipico,
+    retencion_irpf: f.retencion_irpf ?? null,
   };
 }
 

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { normalizarDatos } from "../procesar-factura/extraccion";
-import { valorSinDescuento } from "../procesar-factura/guardado";
-import { aplicarExtras, mismaFacturaPorImporte, numero, prepararImportacion, validarEntrada, valorBruto } from "./mapeo";
+import { columnasRetencion, valorSinDescuento } from "../procesar-factura/guardado";
+import {
+  aplicarExtras,
+  mismaFacturaPorImporte,
+  numero,
+  porcentajeRetencion,
+  prepararImportacion,
+  validarEntrada,
+  valorBruto,
+} from "./mapeo";
 
 // ============================================================================
 //  mapeo.test.ts · importación histórica: JSON extraído → crudo del OCR
@@ -206,6 +214,62 @@ describe("prepararImportacion + normalizarDatos", () => {
     const { d } = convertir(factura({ recargo_equivalencia: 1.4, retencion_irpf: 5 }));
     expect(d.observaciones).toContain("Recargo de equivalencia impreso: 1.4 €");
     expect(d.observaciones).toContain("Retención IRPF impresa: 5 €");
+  });
+
+  // Alquiler: base 750, IVA 157,50, retención 19 % 142,50 → total 765.
+  const alquiler = (o: Record<string, unknown> = {}) =>
+    factura({
+      productos: [linea({ nombre: "ALQUILER LOCAL", precio_unitario: 750, total: 750, iva_pct: 21 })],
+      cargos_pie: [],
+      subtotal: 750,
+      iva: 157.5,
+      retencion_irpf: 142.5,
+      total: 765,
+      ...o,
+    });
+
+  it("retención IRPF: llega al crudo y al insert con su % (142,50 sobre 750 → 19 %)", () => {
+    const { prep, d } = convertir(alquiler());
+    expect(prep.crudo.retencion_irpf).toBe(142.5);
+    expect(prep.crudo.retencion_irpf_pct).toBe(19);
+    expect(d.retencion_irpf).toBe(142.5);
+    expect(d.retencion_irpf_pct).toBe(19);
+    expect(d.total).toBe(765);
+    expect(columnasRetencion(d)).toEqual({ retencion_irpf: 142.5, retencion_irpf_pct: 19 });
+    expect(d.observaciones).toContain("Retención IRPF impresa: 142.5 €");
+  });
+
+  it("retención IRPF: texto «142,50» y el % del JSON manda", () => {
+    const { d } = convertir(alquiler({ retencion_irpf: "142,50", retencion_irpf_pct: 19 }));
+    expect(d.retencion_irpf).toBe(142.5);
+    expect(d.retencion_irpf_pct).toBe(19);
+    expect(convertir(alquiler({ retencion_irpf: 75, retencion_irpf_pct: 15 })).d.retencion_irpf_pct).toBe(15);
+  });
+
+  it("retención IRPF 0 o null → null (y el insert no la lleva)", () => {
+    for (const r of [0, null, "0,00"]) {
+      const { prep, d } = convertir(alquiler({ retencion_irpf: r, total: 907.5 }));
+      expect(prep.crudo.retencion_irpf).toBeNull();
+      expect(d.retencion_irpf).toBeNull();
+      expect(d.retencion_irpf_pct).toBeNull();
+      expect(columnasRetencion(d)).toEqual({});
+    }
+  });
+
+  it("abono con retención: importe en negativo como la base, % positivo", () => {
+    const { prep, d } = convertir(alquiler({ tipo: "abono" }));
+    expect(prep.crudo.subtotal).toBe(-750);
+    expect(prep.crudo.retencion_irpf).toBe(-142.5);
+    expect(d.retencion_irpf).toBe(-142.5);
+    expect(d.retencion_irpf_pct).toBe(19);
+    expect(d.total).toBe(-765);
+  });
+
+  it("porcentajeRetencion: % increíble o sin base → null", () => {
+    expect(porcentajeRetencion(142.5, null, null)).toBeNull();
+    expect(porcentajeRetencion(500, null, 750)).toBeNull(); // 66,67 %: fuera de 0-50
+    expect(porcentajeRetencion(142.5, 190, 750)).toBe(19); // % del JSON absurdo → se calcula
+    expect(porcentajeRetencion(7.5, null, 750)).toBe(1);
   });
 
   it("sin número impreso: número provisional como el OCR", () => {
