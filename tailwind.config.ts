@@ -130,5 +130,56 @@ export default {
       // Complemento exacto de la condición con la que `hoverOnlyWhenSupported` activa `hover:`.
       addVariant("no-hover", "@media (hover: none), (pointer: coarse)");
     }),
+    // CONTAINER QUERIES (Facturas › Análisis, 06/11/2026), la misma sintaxis que
+    // el plugin oficial `@tailwindcss/container-queries` (sin añadir dependencia):
+    //   `@container` / `@container/tablero` → `container-type: inline-size` (y nombre);
+    //   `@md:` · `@[30rem]:` · `@[30rem]/tablero:` → `@container [nombre] (min-width: …)`.
+    // Sirven para que una tarjeta se ordene según el sitio que TIENE (el tablero
+    // se estrecha al abrir la IA), no según el ancho de la pantalla.
+    plugin(
+      ({ matchUtilities, matchVariant, theme }) => {
+        matchUtilities(
+          { "@container": (value, { modifier }) => ({ "container-type": value, ...(modifier ? { "container-name": modifier } : {}) }) },
+          { values: { DEFAULT: "inline-size", normal: "normal" }, modifiers: "any" },
+        );
+        const ancho = (v: string) => {
+          const n = /^(\d+\.\d+|\d+|\.\d+)\D+/.exec(v)?.[1];
+          return n === undefined ? null : parseFloat(v);
+        };
+        matchVariant(
+          "@",
+          (value = "", { modifier }) => (ancho(value) !== null ? `@container ${modifier ?? ""} (min-width: ${value})` : []),
+          {
+            values: theme("containers") ?? {},
+            sort(a, z) {
+              const d = parseFloat(a.value) - parseFloat(z.value);
+              if (d !== 0) return d;
+              const ma = a.modifier ?? "";
+              const mz = z.modifier ?? "";
+              if (ma === "" && mz !== "") return 1;
+              if (ma !== "" && mz === "") return -1;
+              return ma.localeCompare(mz, "en", { numeric: true });
+            },
+          },
+        );
+      },
+      {
+        theme: {
+          containers: {
+            xs: "20rem",
+            sm: "24rem",
+            md: "28rem",
+            lg: "32rem",
+            xl: "36rem",
+            "2xl": "42rem",
+            "3xl": "48rem",
+            "4xl": "56rem",
+            "5xl": "64rem",
+            "6xl": "72rem",
+            "7xl": "80rem",
+          },
+        },
+      },
+    ),
   ],
 } satisfies Config;

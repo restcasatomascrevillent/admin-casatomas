@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { periodosAnalisis, type PeriodoAnalisis } from "@/lib/facturas/tableroCompras";
 import { atajosPeriodo, isoLocal, textoRango, type SeleccionPeriodo } from "@/lib/facturas/periodoAnalisis";
-import { FOCO } from "./piezas";
+import { FOCO, useEscapeCierra } from "./piezas";
 
 const aFecha = (iso: string) => new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
 
@@ -21,6 +21,8 @@ export function SelectorPeriodo({ valor, onCambio, hoy }: { valor: SeleccionPeri
   const [abierto, setAbierto] = useState(false);
   const [rango, setRango] = useState<DateRange | undefined>();
   const personalizado = valor.tipo === "personalizado" ? valor : null;
+  // Escape cierra solo el calendario (también dentro del detalle en grande de un módulo).
+  useEscapeCierra(abierto, () => setAbierto(false));
 
   const abrir = (o: boolean) => {
     if (o) setRango(personalizado ? { from: aFecha(personalizado.desde), to: aFecha(personalizado.hasta) } : undefined);
@@ -57,7 +59,8 @@ export function SelectorPeriodo({ valor, onCambio, hoy }: { valor: SeleccionPeri
         <PopoverContent
           align="start"
           collisionPadding={8}
-          className="w-auto max-w-[min(40rem,calc(100vw-1rem))] p-0"
+          // `pointer-events-auto`: también se usa dentro del detalle en grande de un módulo (un Dialog).
+          className="pointer-events-auto w-auto max-w-[min(40rem,calc(100vw-1rem))] p-0"
           aria-label="Elegir fechas"
         >
           <div className="flex flex-col sm:flex-row">

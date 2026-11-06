@@ -26,7 +26,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarSearch, Loader2, Sparkles } from "lucide-react";
+import { CalendarSearch, LayoutGrid, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useChatFacturas, type Conversacion } from "@/hooks/useChatFacturas";
@@ -132,6 +132,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   const [peticionDocs, setPeticionDocs] = useState<PeticionDocumentos | null>(null);
   const [abierto, setAbierto] = useState(false);
   const [verHistorial, setVerHistorial] = useState(false);
+  // «Personalizar» el tablero (el diálogo lo monta TableroCompras).
+  const [personalizando, setPersonalizando] = useState(false);
   const [tramos, setTramos] = useState<TramoAnterior[]>([]);
   // Lo último que hay (o se ha escrito) en la URL: solo se escribe lo que CAMBIA aquí.
   const escrito = useRef({ seleccion, local, dia: isoLocal(hoy) });
@@ -316,6 +318,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         periodo={fechas}
         local={lrpc}
         pendiente={tablero.isPlaceholderData}
+        personalizando={personalizando}
+        onPersonalizando={setPersonalizando}
         onDocumentos={setPeticionDocs}
         onIrA={irA}
         onExplorar={explorar}
@@ -364,7 +368,22 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
           )}
           <Button
             type="button"
-            className="ml-auto h-11 gap-1.5"
+            variant="outline"
+            // En el móvil no cabe junto al local sin dejar sola a la IA: allí se personaliza
+            // desde el final del tablero («Añadir o quitar módulos»).
+            className="ml-auto hidden h-11 gap-1.5 sm:inline-flex"
+            onClick={() => setPersonalizando(true)}
+            disabled={!datos || datos.sinDatos}
+            aria-haspopup="dialog"
+            aria-label="Personalizar el tablero"
+            title="Elegir qué cifras y módulos se ven, en qué orden y de qué tamaño"
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden />
+            <span className="hidden xl:inline">Personalizar</span>
+          </Button>
+          <Button
+            type="button"
+            className="ml-auto h-11 gap-1.5 sm:ml-0"
             // Abre y cierra el panel (no es modal: el botón sigue a mano con él abierto).
             onClick={() => {
               setVerHistorial(false);

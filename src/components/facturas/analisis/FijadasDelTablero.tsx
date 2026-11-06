@@ -93,7 +93,7 @@ export function FijadasDelTablero({
   onQuitarIa: (id: string) => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2" role="group" aria-label="Gráficas fijadas">
+    <div className="grid gap-3 @[40rem]/tablero:grid-cols-2" role="group" aria-label="Gráficas fijadas">
       {explorador.map((f) => (
         <TarjetaFijada key={f.id} fijada={f} periodo={periodo} local={local} onQuitar={() => onQuitarExplorador(f.id)} onAbrir={onAbrir} />
       ))}
