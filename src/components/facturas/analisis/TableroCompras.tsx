@@ -157,6 +157,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Gasto con IVA"
             valor={formasImporte(i.gasto)}
             onVer={pendiente ? undefined : () => docs("Gasto con IVA", "gasto", { cifra: i.gasto })}
@@ -175,27 +176,23 @@ export function TableroCompras({
               </>
             }
             extra={
-              (notaRetencion || mesesIncompletos) && (
-                <>
-                  {notaRetencion && (
-                    <span className="block line-clamp-2" data-testid="nota-retencion-irpf" title={notaRetencion}>
-                      {notaRetencion}
-                    </span>
-                  )}
-                  {mesesIncompletos && (
-                    <span className="block line-clamp-2 font-medium text-amber-800 dark:text-amber-400" data-testid="nota-meses-incompletos" title={mesesIncompletos}>
-                      {mesesIncompletos}
-                    </span>
-                  )}
-                </>
+              notaRetencion && (
+                <span className="block" data-testid="nota-retencion-irpf">
+                  {notaRetencion}
+                </span>
               )
             }
+            avisos={[
+              ...(mesesIncompletos ? [<span key="m" data-testid="nota-meses-incompletos">{mesesIncompletos}</span>] : []),
+              ...(i.variacionAviso ? [<span key="v">{i.variacionAviso}</span>] : []),
+            ]}
           />
         );
       case "abonos":
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Abonos"
             valor={formasImporte(i.abonos)}
             nota={plural(i.abonosN, "documento", "documentos")}
@@ -206,6 +203,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Regalado y descuentos"
             valor={formasImporte(i.regalado)}
             onVer={pendiente ? undefined : () => docs("Regalado y descuentos", "regalado", { cifra: i.regalado, detalle: "Lo que valía menos lo que se pagó" })}
@@ -221,10 +219,18 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Por revisar"
             valor={formasEntero(i.albaranesSinFactura)}
             nota={i.albaranesSinFactura === 1 ? "albarán sin factura" : "albaranes sin factura"}
-            claseNota={i.albaranesSinFactura > 0 ? "font-medium text-amber-800 dark:text-amber-400" : undefined}
+            avisos={
+              i.albaranesSinFactura > 0
+                ? [
+                    `${plural(i.albaranesSinFactura, "albarán aún no está", "albaranes aún no están")} en una factura (${formatCurrency(i.albaranesSinFacturaImporte)} con IVA).`,
+                  ]
+                : []
+            }
+            accion="Ver los albaranes sin factura"
             onVer={
               pendiente
                 ? undefined
@@ -243,6 +249,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Gasto este mes"
             valor={d ? formasImporte(d.indicadores.gasto) : "…"}
             nota={d ? `${mes} · ${plural(d.indicadores.documentos, "documento", "documentos")}` : "Cargando…"}
@@ -255,6 +262,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Media al mes"
             valor={formasImporte(n ? i.gasto / n : 0)}
             nota={n ? `con IVA · ${plural(n, "mes con documentos", "meses con documentos")}` : "sin meses con documentos"}
@@ -267,6 +275,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Documentos"
             valor={formasEntero(i.documentos)}
             nota={`${plural(i.facturas, "factura", "facturas")} · ${plural(i.abonosN, "abono", "abonos")}`}
@@ -277,6 +286,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Proveedores"
             valor={formasEntero(i.proveedores)}
             nota="con compras en el periodo"
@@ -288,6 +298,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Gastos fijos al mes"
             valor={formasImporte(datos.fijos.totalMedioMes)}
             nota={datos.fijos.proveedores.length ? `con IVA · ${plural(datos.fijos.proveedores.length, "proveedor", "proveedores")}` : "sin gastos fijos detectados"}
@@ -299,6 +310,7 @@ export function TableroCompras({
         return (
           <Indicador
             key={id}
+            deshabilitado={pendiente}
             etiqueta="Retención IRPF"
             valor={formasImporte(i.retencionIrpf)}
             nota={i.retencionIrpfDocumentos ? `en ${plural(i.retencionIrpfDocumentos, "documento", "documentos")} · el gasto ya la descuenta` : "ningún documento con retención"}

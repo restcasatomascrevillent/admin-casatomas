@@ -188,6 +188,18 @@ beforeEach(() => {
   vi.setSystemTime(new Date(2026, 10, 5, 12));
 });
 
+
+/** Toca una cifra de arriba y devuelve su ventanita de información (06/11/2026: la tarjeta solo enseña la cifra). */
+async function infoDe(nombre: RegExp) {
+  fireEvent.click(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: nombre }));
+  return screen.findByTestId("info-indicador");
+}
+/** Cierra la ventanita abierta. */
+async function cerrarInfo() {
+  fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+  await waitFor(() => expect(screen.queryByTestId("info-indicador")).not.toBeInTheDocument());
+}
+
 describe("tablero: sale hecho al abrir la pestaña", () => {
   it("una sola llamada a tablero_compras con el año en curso y todos los locales", async () => {
     montar();
@@ -196,13 +208,31 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     expect(within(screen.getByRole("group", { name: "Periodo" })).getByRole("button", { name: "Año 2026" })).toHaveAttribute("aria-pressed", "true");
   });
 
-  it("4 indicadores: gasto (con meses y variación), abonos, regalado, por revisar", async () => {
+  it("4 indicadores: en la tarjeta solo la etiqueta y la cifra; al tocarla, la información", async () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
-    expect(ind).toHaveTextContent(/Gasto con IVA1\.362\.491,57\s€jun – jul 2026\s?· \+13,5 % frente a 1 ene 2025 – 5 nov 2025/);
-    expect(ind).toHaveTextContent(/Abonos−14\.376,94\s€43 documentos/);
-    expect(ind).toHaveTextContent(/Regalado y descuentos28\.204,41\s€lo que valía 107\.581,24\s€ · 69 estimados/);
-    expect(ind).toHaveTextContent(/Por revisar40albaranes sin factura/);
+    expect(ind).toHaveTextContent(/Gasto con IVA1\.362\.491,57\s€/);
+    expect(ind).toHaveTextContent(/Abonos−14\.376,94\s€/);
+    expect(ind).toHaveTextContent(/Regalado y descuentos28\.204,41\s€/);
+    expect(ind).toHaveTextContent(/Por revisar40/);
+    // Sin texto en la tarjeta (06/11/2026).
+    expect(ind).not.toHaveTextContent(/jun – jul 2026|43 documentos|lo que valía|albaranes sin factura/);
+    // «Por revisar» con 40 albaranes: aviso en la tarjeta.
+    const porRevisar = within(ind).getByRole("button", { name: /^Por revisar/ });
+    expect(within(porRevisar).getByTestId("aviso-indicador")).toHaveTextContent("1");
+    expect(porRevisar).toHaveAccessibleName(/1 aviso por revisar/);
+
+    let info = await infoDe(/^Gasto con IVA/);
+    expect(info).toHaveTextContent(/jun – jul 2026\s?· \+13,5 % frente a 1 ene 2025 – 5 nov 2025/);
+    await cerrarInfo();
+    info = await infoDe(/^Abonos/);
+    expect(info).toHaveTextContent("43 documentos");
+    await cerrarInfo();
+    info = await infoDe(/^Regalado y descuentos/);
+    expect(info).toHaveTextContent(/lo que valía 107\.581,24\s€ · 69 estimados/);
+    await cerrarInfo();
+    info = await infoDe(/^Por revisar/);
+    expect(within(info).getByRole("list", { name: "Por revisar" })).toHaveTextContent(/40 albaranes aún no están en una factura/);
   });
 
   it("todas las tarjetas, con título y resumen para lectores de pantalla", async () => {
@@ -367,7 +397,8 @@ describe("ver documentos de una cifra", () => {
     const onIrA = vi.fn();
     montar({ onIrA });
     await screen.findByText("1.362.491,57 €");
-    fireEvent.click(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto con IVA/ }));
+    const info = await infoDe(/^Gasto con IVA/);
+    fireEvent.click(within(info).getByRole("button", { name: "Ver documentos" }));
     const hoja = await screen.findByTestId("documentos-de-cifra");
     await waitFor(() =>
       expect(llamadas("documentos_de_cifra")).toContainEqual(
@@ -394,7 +425,8 @@ describe("ver documentos de una cifra", () => {
   it("«Por revisar» pide solo los albaranes sin factura", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    fireEvent.click(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Por revisar/ }));
+    const info = await infoDe(/^Por revisar/);
+    fireEvent.click(within(info).getByRole("button", { name: "Ver los albaranes sin factura" }));
     await waitFor(() =>
       expect(llamadas("documentos_de_cifra")).toContainEqual(expect.objectContaining({ p_medida: "gasto", p_filtros: { tipos: ["albaran"] } })),
     );
@@ -685,6 +717,7 @@ describe("QA 05/11/2026: cifras de otro periodo, tramos y documentos", () => {
     const cifra = within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Gasto con IVA/ });
     cifra.focus();
     fireEvent.click(cifra);
+    fireEvent.click(within(await screen.findByTestId("info-indicador")).getByRole("button", { name: "Ver documentos" }));
     await screen.findByTestId("documentos-de-cifra");
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     await waitFor(() => expect(screen.queryByTestId("documentos-de-cifra")).not.toBeInTheDocument());
@@ -768,9 +801,13 @@ describe("tablero: retención de IRPF y meses incompletos (06/11/2026)", () => {
     montar();
     const ind = await screen.findByLabelText("Indicadores del periodo");
     expect(ind).toHaveTextContent(/Gasto con IVA1\.362\.491,57\s€/);
-    expect(within(ind).getByTestId("nota-retencion-irpf")).toHaveTextContent(/^incluye −5\.920,09\s€ de IRPF retenido; coste real 1\.368\.411,66\s€$/);
-    expect(within(ind).getByTestId("nota-meses-incompletos")).toHaveTextContent("Julio 2026 está incompleto: faltan facturas por subir");
-    expect(ind).toHaveTextContent(/\+13,5 % frente a 1 ene 2025 – 5 nov 2025 \(no fiable\)/);
+    // Aviso en la tarjeta: mes incompleto y variación no fiable.
+    const gasto = within(ind).getByRole("button", { name: /^Gasto con IVA/ });
+    expect(within(gasto).getByTestId("aviso-indicador")).toHaveTextContent("2");
+    const info = await infoDe(/^Gasto con IVA/);
+    expect(within(info).getByTestId("nota-retencion-irpf")).toHaveTextContent(/^incluye −5\.920,09\s€ de IRPF retenido; coste real 1\.368\.411,66\s€$/);
+    expect(within(info).getByTestId("nota-meses-incompletos")).toHaveTextContent("Julio 2026 está incompleto: faltan facturas por subir");
+    expect(info).toHaveTextContent(/\+13,5 % frente a 1 ene 2025 – 5 nov 2025 \(no fiable\)/);
   });
 
   it("la gráfica del explorador explica la trama del mes incompleto y la variación avisa", async () => {

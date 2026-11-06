@@ -6,7 +6,7 @@
 // ordenan según el sitio que tienen DE VERDAD (al abrir la IA el tablero se
 // estrecha ~360 px aunque la pantalla siga siendo ancha), no según la pantalla.
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronRight, Maximize2, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText, Maximize2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -212,8 +212,14 @@ export function Tarjeta({
 }
 
 /**
- * Indicador: tarjeta gris sin borde, etiqueta, cifra y nota. Con `onVer` toda
- * la tarjeta es un botón que abre los documentos que forman la cifra.
+ * Indicador: tarjeta gris sin borde con la etiqueta y la cifra, nada más
+ * (06/11/2026, dueño: «las tarjetas de arriba sin texto; que haya como una
+ * notificación si hay algo que revisar y cuando se cliquen salga la info»).
+ *
+ * - `avisos`: lo que hay que revisar (meses incompletos, albaranes sin
+ *   factura…). Con alguno, la tarjeta lleva un aviso ámbar con el número.
+ * - Al tocarla se abre una ventanita con la información (`nota`, `extra` y los
+ *   avisos) y «Ver documentos» (`onVer`). El foco vuelve a la tarjeta.
  *
  * `valor`: la cifra o sus formas de larga a corta (lib/facturas/cifras.ts):
  * nunca se corta, sale la primera que cabe. El tamaño de la letra va con el
@@ -225,50 +231,119 @@ export function Indicador({
   nota,
   claseNota,
   extra,
+  avisos = [],
   onVer,
   accion = "Ver documentos",
+  deshabilitado = false,
   testId,
 }: {
   etiqueta: string;
   valor: string | string[];
+  /** Información que sale al tocarla (rango, variación, documentos…). */
   nota?: ReactNode;
   claseNota?: string;
-  /** Notas de más debajo de la nota (retención IRPF, meses incompletos): cada una en su línea. */
+  /** Más información (retención IRPF…): cada una en su línea. */
   extra?: ReactNode;
+  /** Lo que hay que revisar: aviso ámbar en la tarjeta y en la ventanita. */
+  avisos?: ReactNode[];
   onVer?: () => void;
-  /** Qué hace al tocarla (para el lector de pantalla): por defecto, «Ver documentos». */
+  /** Texto del botón de la ventanita: por defecto, «Ver documentos». */
   accion?: string;
+  /** Mientras llega otro periodo: la cifra vieja no se puede tocar. */
+  deshabilitado?: boolean;
   testId?: string;
 }) {
   const formas = Array.isArray(valor) ? valor : [valor];
+  const [abierto, setAbierto] = useState(false);
+  const disparador = useRef<HTMLButtonElement>(null);
+  const idInfo = useId();
+  const nAvisos = avisos.length;
+  const hayInfo = !deshabilitado && Boolean(nota || extra || nAvisos > 0 || onVer);
   const cuerpo = (
     <>
       {/* La etiqueta en dos líneas si hace falta: «Regalado y des…» no decía nada (QA 06/11/2026). */}
       <span className="flex items-start gap-1 text-xs font-medium leading-snug text-muted-foreground">
-        <span className="line-clamp-2 min-w-0 flex-1 break-words">{etiqueta}</span>
-        {onVer && <ChevronRight className="mt-px h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:translate-x-0.5" aria-hidden />}
+        <span className={cn("line-clamp-2 min-w-0 flex-1 break-words", nAvisos > 0 && "pr-9")}>{etiqueta}</span>
+        {nAvisos === 0 && hayInfo && <ChevronRight className="mt-px h-3.5 w-3.5 shrink-0 opacity-60 transition-transform group-hover:translate-x-0.5" aria-hidden />}
       </span>
       <Cifra
         formas={formas}
         className="mt-0.5 text-[clamp(1.0625rem,0.55rem+4.5cqi,1.5rem)] font-semibold leading-tight tabular-nums tracking-tight text-foreground"
       />
-      {nota && <span className={cn("mt-0.5 line-clamp-2 break-words text-xs leading-snug text-muted-foreground", claseNota)}>{nota}</span>}
-      {extra && <span className="mt-1 block space-y-0.5 break-words text-xs leading-snug text-muted-foreground">{extra}</span>}
-      {onVer && <span className="sr-only">. {accion}</span>}
+      {/* El aviso, arriba a la derecha (va detrás de la cifra en el texto: «Gasto con IVA 1.362.491,57 €»). */}
+      {nAvisos > 0 && (
+        <span
+          className="absolute right-2 top-2 inline-flex h-5 items-center gap-0.5 rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-900 shadow-sm dark:bg-amber-500/20 dark:text-amber-200 @[13rem]:right-3 @[13rem]:top-2.5"
+          data-testid="aviso-indicador"
+          aria-hidden
+        >
+          <AlertTriangle className="h-3 w-3" />
+          {nAvisos}
+        </span>
+      )}
+      {hayInfo && (
+        <span className="sr-only">
+          {nAvisos > 0 ? `. ${nAvisos === 1 ? "1 aviso" : `${nAvisos} avisos`} por revisar` : ""}. Ver la información
+        </span>
+      )}
     </>
   );
-  // Columna arriba del todo: las cuatro miden lo mismo (la más alta manda) y todas empiezan arriba.
-  const base =
-    "flex h-full w-full min-w-0 flex-col items-stretch justify-start rounded-xl border border-transparent bg-muted/50 px-3 py-2.5 text-left @[13rem]:px-4 @[13rem]:py-3";
+  // Columna arriba del todo: las cuatro miden lo mismo y todas empiezan arriba.
+  const base = cn(
+    "relative flex h-full w-full min-w-0 flex-col items-stretch justify-start rounded-xl border bg-muted/50 px-3 py-2.5 text-left @[13rem]:px-4 @[13rem]:py-3",
+    nAvisos > 0 ? "border-amber-300/70 dark:border-amber-500/40" : "border-transparent",
+  );
+  if (!hayInfo)
+    return (
+      <li className="@container relative min-w-0" data-testid={testId}>
+        <div className={base}>{cuerpo}</div>
+      </li>
+    );
   return (
     <li className="@container relative min-w-0" data-testid={testId}>
-      {onVer ? (
-        <button type="button" onClick={onVer} className={cn(base, "group min-h-11 transition-colors hover:border-border/70 hover:bg-muted", FOCO)}>
-          {cuerpo}
-        </button>
-      ) : (
-        <div className={base}>{cuerpo}</div>
-      )}
+      <Popover open={abierto} onOpenChange={setAbierto}>
+        <PopoverTrigger asChild>
+          <button ref={disparador} type="button" className={cn(base, "group min-h-11 transition-colors hover:border-border/70 hover:bg-muted", FOCO)}>
+            {cuerpo}
+          </button>
+        </PopoverTrigger>
+        {/* `pointer-events-auto`: dentro de un Dialog de otra versión de Radix el cuerpo queda sin eventos. */}
+        <PopoverContent align="start" collisionPadding={12} aria-labelledby={idInfo} className="pointer-events-auto w-80 max-w-[calc(100vw-2rem)] p-3" data-testid="info-indicador">
+          <p id={idInfo} className="text-xs font-medium text-muted-foreground">
+            {etiqueta}
+          </p>
+          <p className="mt-0.5 text-xl font-semibold tabular-nums tracking-tight text-foreground">{formas[0]}</p>
+          {nota && <p className={cn("mt-1.5 break-words text-sm leading-snug text-muted-foreground", claseNota)}>{nota}</p>}
+          {extra && <div className="mt-1.5 space-y-1 break-words text-sm leading-snug text-muted-foreground">{extra}</div>}
+          {nAvisos > 0 && (
+            <ul className="mt-2.5 space-y-1.5" aria-label="Por revisar">
+              {avisos.map((a, n) => (
+                <li key={n} className="flex items-start gap-2 rounded-md bg-amber-50 px-2.5 py-2 text-sm font-medium leading-snug text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <span className="min-w-0 break-words">{a}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {onVer && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-3 h-10 w-full pointer-coarse:h-11"
+              onClick={() => {
+                setAbierto(false);
+                // El foco vuelve a la tarjeta ANTES de abrir la hoja: al cerrarla, vuelve aquí.
+                disparador.current?.focus({ preventScroll: true });
+                onVer();
+              }}
+            >
+              <FileText className="mr-2 h-4 w-4" aria-hidden />
+              {accion}
+            </Button>
+          )}
+        </PopoverContent>
+      </Popover>
     </li>
   );
 }
