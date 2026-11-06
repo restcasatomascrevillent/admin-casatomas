@@ -1,0 +1,380 @@
+{
+  "cif": "B53980611",
+  "nombre": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+  "nombres_impresos": ["DISTRIBUCIONES DIRECTAS 2004, S.L.", "LA LICORERIA"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R269.pdf", "R1034.pdf", "R1072.pdf", "R1637.pdf", "R244.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega con un albarán (a veces PDF con varias facturas, una por página, incluido algún abono)",
+    "varias_facturas_por_pdf": true,
+    "paginas_tipicas": "1-3",
+    "numero_factura": {
+      "ejemplos": ["2900000956", "2900001485", "2900005612", "2900006292", "2900006392", "2900011111"],
+      "patron": "^29\\d{8}$",
+      "donde": "fila bajo la cabecera: 'CÓD CLIENTE | N.I.F. | HOJA | FACTURA Nº | FECHA | FORMA DE PAGO'; la 4ª celda (10 dígitos que empieza por 29)"
+    },
+    "fecha": "celda FECHA de esa misma fila, DD/MM/AAAA; la fecha del albarán va aparte ('Albarán : 2904000251 de fecha : 28/01/2026')",
+    "albaranes": "cabecera 'Albarán : 29040xxxxx de fecha : DD/MM/AAAA' antes de las líneas; los abonos llevan albarán 29000xxxxx"
+  },
+
+  "lectura": {
+    "columnas": ["CÓD. ARTÍCULO", "DESCRIPCIÓN", "C.J.", "UNID", "%DTO", "PRECIO", "TOTAL"],
+    "cantidad_es": "botellas en UNID (C.J. = cajas completas; UNID ya incluye todas las botellas, cajas x 6 más sueltas)",
+    "columna_peso": null,
+    "precio_es_por": "botella",
+    "descuento_por_linea": { "existe": true, "columna": "%DTO (a veces 9,00 % en la línea; normalmente 0,00 % y el descuento va en el pie)", "valores_habituales": [9] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [
+      "Descuento comercial del 9 % sobre la suma de líneas, impreso como IMPORTE en la casilla '% DTO.' del pie (p. ej. 60,83 sobre 675,88; 7,43 sobre 82,60)",
+      "El pie imprime una tabla fija de tipos de IVA (5, 10, 21, 4, 7,5) con sus recargos de equivalencia (0,62; 1,4; 5,2; 0,5; 1) que NO se aplican"
+    ],
+    "trampas": [
+      "'007183' es el código de cliente, no el número de factura (que empieza por 29).",
+      "Líneas con C.J. 0,00 y UNID 4,00: son botellas sueltas; no multiplicar por 6.",
+      "Líneas repetidas con precio 0,000 y total 0,000 son botellas regaladas/bonificadas (el mismo código aparece dos veces): conservarlas con importe 0.",
+      "La caja es de 6 botellas en todas las muestras (2 cajas = 12 UNID).",
+      "En el pie, la tabla 5/0,62 · 10/1,4 · 21/5,2 · 4/0,5 · 7,5/1 son porcentajes de recargo, no importes: el IVA real es solo el de 21 %.",
+      "El descuento del pie sale como un número suelto en la columna '% DTO.' (importe en euros, no porcentaje).",
+      "Los precios llevan 3 decimales y los miles con punto (1.804,500).",
+      "Abonos: cantidades y totales negativos (-5 cajas, -33 UNID, -365,900), con IVA y total negativos.",
+      "Un PDF de 3 páginas puede ser 3 facturas distintas (cada una con su número 29000…)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = UNID x precio x (1 - dto_linea/100); las líneas a precio 0 suman 0",
+    "descuento_pie = 9 % x suma de líneas (cuando el %DTO de las líneas es 0)",
+    "base = suma de líneas - descuento_pie (675,88 - 60,83 = 615,05; 82,60 - 7,43 = 75,17)",
+    "iva = base x 21 % (615,05 x 21 % = 129,16; 75,17 x 21 % = 15,79)",
+    "total = base + iva (615,05 + 129,16 = 744,21; 75,17 + 15,79 = 90,96)",
+    "si el 9 % ya viene en el %DTO de la línea (Sambuca: 2 x 14,48 x 0,91 = 26,35) no hay descuento adicional en el pie (26,35 + 5,53 = 31,88)"
+  ],
+
+  "guia_ocr": "Escaneo/PDF de La Licorería (Distribuciones Directas 2004), licores en botella. Número de factura: fila bajo la cabecera, 4ª celda (10 dígitos, empieza por 29); '007183' es el cliente. Fecha en esa fila. Columnas: C.J. (cajas), UNID (botellas totales, caja de 6), %DTO, PRECIO por botella, TOTAL. Líneas repetidas a 0,000 son botellas gratis. El pie trae el descuento 9 % como importe en '% DTO.', base, 21 % IVA y total; ignora la tabla de recargos (5, 10, 4, 7,5). Albarán y su fecha arriba de las líneas. Abonos en negativo.",
+
+  "productos": [
+    {
+      "nombre_impreso": "GIN MARE",
+      "nombre_normalizado": "Gin Mare",
+      "familia": "ginebra",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 28.33, "max": 28.33, "por": "botella", "ejemplos": [["2026-01-28", 28.33]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GIN TANQUERAY",
+      "nombre_normalizado": "Gin Tanqueray",
+      "familia": "ginebra",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.48, "max": 12.48, "por": "botella", "ejemplos": [["2026-01-28", 12.48]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "GIN TANQUERAY O,Oº",
+      "nombre_normalizado": "Tanqueray 0,0 (sin alcohol)",
+      "familia": "ginebra sin alcohol",
+      "presentacion": "botella vidrio, sin alcohol",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": null, "max": null, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GIN MARTIN MILLERS 0.70",
+      "nombre_normalizado": "Gin Martin Miller's 70 cl",
+      "familia": "ginebra",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 20.05, "max": 20.05, "por": "botella", "ejemplos": [["2026-06-02", 20.05]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "GIN LONDON Nº 1 0.70",
+      "nombre_normalizado": "Gin London Nº 1 70 cl",
+      "familia": "ginebra",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 20.65, "max": 20.65, "por": "botella", "ejemplos": [["2026-02-12", 20.65]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RON LEGENDARIO 7 AÑOS ELIXIR",
+      "nombre_normalizado": "Ron Legendario 7 años Elixir",
+      "familia": "ron",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.9, "max": 12.9, "por": "botella", "ejemplos": [["2026-01-28", 12.9]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "RON BRUGAL AÑEJO",
+      "nombre_normalizado": "Ron Brugal añejo",
+      "familia": "ron",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.75, "max": 12.75, "por": "botella", "ejemplos": [["2026-01-28", 12.75]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RON DON PAPA MASSKARA",
+      "nombre_normalizado": "Ron Don Papa Masskara",
+      "familia": "ron",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": null, "max": null, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "W. JOHNNIE WALKER RED LABEL 0.70",
+      "nombre_normalizado": "Whisky Johnnie Walker Red Label 70 cl",
+      "familia": "whisky",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.3, "max": 12.3, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "W. JOHNNIE WALKER BLACK LABEL 0.70",
+      "nombre_normalizado": "Whisky Johnnie Walker Black Label 70 cl",
+      "familia": "whisky",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": null, "max": null, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "WM. MACALLAN 12 AÑOS DOUBLE CASK",
+      "nombre_normalizado": "Whisky de malta Macallan 12 años Double Cask",
+      "familia": "whisky de malta",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 61.89, "max": 61.89, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "B. JACK DANIELS FIRE 70cl.",
+      "nombre_normalizado": "Jack Daniel's Fire 70 cl",
+      "familia": "bourbon / whiskey",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 18.76, "max": 18.76, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "B. JACK DANIELS APPLE",
+      "nombre_normalizado": "Jack Daniel's Apple",
+      "familia": "bourbon / whiskey",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 18.76, "max": 18.76, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "B. JACK DANIELS BONDED RYE",
+      "nombre_normalizado": "Jack Daniel's Bonded Rye",
+      "familia": "bourbon / whiskey",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 23.89, "max": 23.89, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "TEQUILA PATRON SILVER 0.70",
+      "nombre_normalizado": "Tequila Patrón Silver 70 cl",
+      "familia": "tequila",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 38.36, "max": 38.36, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "TEQUILA PATRON AÑEJO",
+      "nombre_normalizado": "Tequila Patrón añejo",
+      "familia": "tequila",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 57.14, "max": 57.14, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "VODKA ABSOLUT 0.70",
+      "nombre_normalizado": "Vodka Absolut 70 cl",
+      "familia": "vodka",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.38, "max": 12.38, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BRANDY MAGNO 0.70",
+      "nombre_normalizado": "Brandy Magno 70 cl",
+      "familia": "brandy",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 10.98, "max": 10.98, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "LC. BAILEYS 0.70",
+      "nombre_normalizado": "Licor Baileys 70 cl",
+      "familia": "licor de crema",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.18, "max": 12.18, "por": "botella", "ejemplos": [["2026-01-28", 12.18]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "A. APEROL LITRO",
+      "nombre_normalizado": "Aperol 1 litro",
+      "familia": "aperitivo",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 100, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 11.42, "max": 11.42, "por": "botella", "ejemplos": [["2026-01-28", 11.42]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LC. LIMON VILLA MASSA",
+      "nombre_normalizado": "Licor de limón Villa Massa (limoncello)",
+      "familia": "licor",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 10.74, "max": 10.74, "por": "botella", "ejemplos": [["2026-01-28", 10.74]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "LC. PACHARAN ZOCO 1441 70cl.",
+      "nombre_normalizado": "Pacharán Zoco 1441 70 cl",
+      "familia": "pacharán",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 12.84, "max": 12.84, "por": "botella", "ejemplos": [["2026-06-18", 12.84]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "LC. PACHARAN BEREZKO LITRO",
+      "nombre_normalizado": "Pacharán Berezko 1 litro",
+      "familia": "pacharán",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 100, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 11.088, "max": 11.09, "por": "botella", "ejemplos": [["2026-06-02", 11.09]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "LC. SAMBUCA MOLINARI EXTRA LITRO",
+      "nombre_normalizado": "Sambuca Molinari Extra 1 litro",
+      "familia": "licor anisado",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 100, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 14.27, "max": 14.48, "por": "botella", "ejemplos": [["2026-09-29", 14.48]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "ORUJO AFILADOR CAFE",
+      "nombre_normalizado": "Orujo Afilador de café",
+      "familia": "orujo",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 7.3, "max": 7.3, "por": "botella", "ejemplos": [["2026-06-02", 7.3]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ORUJO AFILADOR HIERBAS 0.70",
+      "nombre_normalizado": "Orujo Afilador de hierbas 70 cl",
+      "familia": "orujo",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 6.95, "max": 6.95, "por": "botella", "ejemplos": [["2026-06-02", 6.95]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ORUJO AFILADOR CREMA 70 cl.",
+      "nombre_normalizado": "Crema de orujo Afilador 70 cl",
+      "familia": "crema de orujo",
+      "presentacion": "botella vidrio",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 8.25, "max": 8.25, "por": "botella", "ejemplos": [["2026-06-02", 8.25]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LS. GRANADINA RIVES SIN",
+      "nombre_normalizado": "Granadina Rives sin alcohol",
+      "familia": "jarabe/granadina sin alcohol",
+      "presentacion": "botella",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 3.71, "max": 3.71, "por": "botella", "ejemplos": [] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "El tamaño de botella solo se imprime en algunas líneas (0.70, 70cl., LITRO); en las demás (Tanqueray, Gin Mare, Brugal, Legendario, Macallan, Patrón Añejo, Don Papa, Limón Villa Massa, Orujo Café, Granadina) queda null por no estar en la factura.",
+    "La caja se deduce de 6 botellas por caja (2 cajas = 12 UNID, 15 cajas = 90 UNID); para Gin Mare, Patrón y Granadina solo hay botellas sueltas y no se confirma.",
+    "Los 'precios' de Tanqueray 0,0, Johnnie Walker Black y Don Papa solo aparecen como botellas bonificadas a 0,000: sin precio de compra.",
+    "Hay productos a 3 decimales distintos entre dos facturas del mismo producto (Pacharán Berezko 11,090 compra / 11,088 abono; Sambuca 14,27 sin descuento / 14,48 con 9 % en línea).",
+    "No se ha visto cómo se imprime un descuento distinto del 9 %.",
+    "Descuento del 9 % en pie: se supone fijo del proveedor, pero solo se ha comprobado en 4 facturas."
+  ]
+}

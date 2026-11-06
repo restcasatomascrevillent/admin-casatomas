@@ -1,0 +1,63 @@
+{
+ "archivo": "R662.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 03326",
+ "fecha": "2026-04-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 33,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.3,
+   "descuento_pct": null,
+   "total": 537.9,
+   "iva_pct": 10,
+   "albaran_ref": "F570637",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 3,
+   "nombre": "VIEIRA CARNE 30/40 X1",
+   "producto_ficha": "Vieira carne (sin concha) 30/40",
+   "cantidad": 10,
+   "unidad": "ud",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 200.0,
+   "iva_pct": 10,
+   "albaran_ref": "F570637",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 737.9,
+ "desglose_iva": [
+  {
+   "base": 737.9,
+   "pct": 10,
+   "cuota": 73.79
+  }
+ ],
+ "iva": 73.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 811.69,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F570637. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

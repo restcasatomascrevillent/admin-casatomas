@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "ARLANDIZ LLORCA, S.L.",
+ "cif": "B54490115",
+ "local": "casa_tomas",
+ "numero_documento": "316/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 3.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.1,
+   "descuento_pct": null,
+   "total": 86.63,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 86.63,
+ "desglose_iva": [
+  {
+   "base": 86.63,
+   "pct": 10.0,
+   "cuota": 8.66
+  }
+ ],
+ "iva": 8.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 95.29,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 11394. Embarcaciones: PEPE ARMONIA.",
+ "alertas": []
+}

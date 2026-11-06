@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  24
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SKIPI CB",
+ "cif": "E42614479",
+ "local": "casa_tomas",
+ "numero_documento": "162/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 24,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.7,
+   "descuento_pct": null,
+   "total": 50.49,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 50.49,
+ "desglose_iva": [
+  {
+   "base": 50.49,
+   "pct": 10.0,
+   "cuota": 5.05
+  }
+ ],
+ "iva": 5.05,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 55.54,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6830. Embarcaciones: ninguna.",
+ "alertas": []
+}

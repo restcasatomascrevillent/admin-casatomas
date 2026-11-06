@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO PIANELO, ANTONIO",
+ "cif": "48322439Z",
+ "local": "casa_tomas",
+ "numero_documento": "195/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 12,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 3.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.53,
+   "descuento_pct": null,
+   "total": 94.45,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 94.45,
+ "desglose_iva": [
+  {
+   "base": 94.45,
+   "pct": 10.0,
+   "cuota": 9.45
+  }
+ ],
+ "iva": 9.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 103.9,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 4952. Embarcaciones: ninguna.",
+ "alertas": []
+}

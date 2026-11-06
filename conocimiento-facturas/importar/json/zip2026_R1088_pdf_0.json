@@ -1,0 +1,48 @@
+{
+ "archivo": "R1088.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ZENIT CONSULTORES DEL LEVANTE 2017 SL",
+ "cif": "B54998844",
+ "local": "casa_tomas",
+ "numero_documento": "26-0442",
+ "fecha": "2026-07-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Mantenimiento, actualización y asesoramiento en materia de protección de datos",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 195.0,
+   "descuento_pct": null,
+   "total": 195.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 195.0,
+ "desglose_iva": [
+  {
+   "base": 195.0,
+   "pct": 21,
+   "cuota": 40.95
+  }
+ ],
+ "iva": 40.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 235.95,
+ "observaciones": "Forma de pago: transferencia (IBAN impreso, no transcrito). Vencimiento 30/07/2026. Cliente impreso: MASIDE 2011 SLU, NIF B54583356.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R723.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0019983",
+ "fecha": "2026-05-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VINO TINTO BRICK VINA LANZAR 1 L",
+   "producto_ficha": "Vino tinto Viña Lanzar brick 1 L",
+   "cantidad": 12,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "l",
+   "precio_unitario": 0.795,
+   "descuento_pct": null,
+   "total": 9.54,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 9.54,
+ "desglose_iva": [
+  {
+   "base": 9.54,
+   "pct": 21,
+   "cuota": 2
+  }
+ ],
+ "iva": 2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 11.54,
+ "observaciones": "Crédito a 30 días, vencimiento 12-06-2026.",
+ "alertas": []
+}

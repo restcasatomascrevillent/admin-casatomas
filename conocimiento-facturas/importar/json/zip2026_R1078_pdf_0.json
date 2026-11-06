@@ -1,0 +1,82 @@
+{
+ "archivo": "R1078.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "226",
+ "fecha": "2026-07-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "kg Capellans capte seco",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.3,
+   "descuento_pct": null,
+   "total": 82.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L. Rellenas anchoa F5Y capte",
+   "producto_ficha": "Aceituna rellena de anchoa FSY 180 (lata)",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 38.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "T. Cuquillo T3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.9,
+   "descuento_pct": null,
+   "total": 13.9,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 135.0,
+ "desglose_iva": [
+  {
+   "base": 135.0,
+   "pct": 10,
+   "cuota": 13.5
+  }
+ ],
+ "iva": 13.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 148.5,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": [
+  "Cuota IVA se lee '18,50' pero 135,00 × 10 % = 13,50 y 135,00 + 13,50 = 148,50 (total impreso); se toma 13,50 por cuadre con el total."
+ ]
+}

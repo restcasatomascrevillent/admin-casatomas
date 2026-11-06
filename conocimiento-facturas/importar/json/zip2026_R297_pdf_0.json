@@ -1,0 +1,80 @@
+{
+ "archivo": "R297.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CECINA DE CEBÓN SELECTIUN, S.L.",
+ "cif": "B24731358",
+ "local": "casa_tomas",
+ "numero_documento": "F2600103",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CECINA KURADO WAGYU LIMIT EDITION (lote 2585)",
+   "producto_ficha": null,
+   "cantidad": 4.36,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.0,
+   "descuento_pct": null,
+   "total": 414.2,
+   "iva_pct": 10,
+   "albaran_ref": "F2600118",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "KURADO WAGYU LIMIT EDITION (lote 2577)",
+   "producto_ficha": null,
+   "cantidad": 4.82,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.0,
+   "descuento_pct": null,
+   "total": 457.9,
+   "iva_pct": 10,
+   "albaran_ref": "F2600118",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "KURADO WAGYU LIMIT EDITION (lote 2557)",
+   "producto_ficha": null,
+   "cantidad": 5.14,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.0,
+   "descuento_pct": null,
+   "total": 488.3,
+   "iva_pct": 10,
+   "albaran_ref": "F2600118",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1360.4,
+ "desglose_iva": [
+  {
+   "base": 1360.4,
+   "pct": 10,
+   "cuota": 136.04
+  }
+ ],
+ "iva": 136.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1496.44,
+ "observaciones": "Destinatario: MASIDE 2011 S.LU (REST CASA TOMAS), cliente 0266. Pedido F260131 (albarán F2600118, 09/02/2026). Forma de pago: recibo a 10 días, vencimiento 10/03/2026 por 1.496,44 €. Totales impresos: 3 bultos, 14,320 kg.",
+ "alertas": []
+}

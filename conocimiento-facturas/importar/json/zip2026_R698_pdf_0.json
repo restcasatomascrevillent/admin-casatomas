@@ -1,0 +1,59 @@
+{
+ "archivo": "R698.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/002290",
+ "fecha": "2026-05-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CERDO PINCHO ROJO MINI GRANEL (40G) 6KG",
+   "producto_ficha": "Mini pincho rojo de cerdo 40 g, granel (caja 6 kg)",
+   "cantidad": 18.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.95,
+   "descuento_pct": null,
+   "total": 107.01,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4761",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/4761)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 108.51,
+ "desglose_iva": [
+  {
+   "base": 107.01,
+   "pct": 10,
+   "cuota": 10.7
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 11.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 119.53,
+ "observaciones": "Transferencia a 10 dias, vencimiento 19/05/2026. Albaran LA/4761 de 07/05/2026 (3 bultos, 18 kg). FTV-6888487 es una referencia del encabezado, no el numero de factura. La columna 'Dto. Clientes' del pie es la base del 4 %/10 %, no un descuento.",
+ "alertas": [
+  "18 kg x 5,95 = 107,10 pero el importe impreso es 107,01 (diferencia 0,09, fuera de la tolerancia de 0,05). Se deja 107,01, que es el que cuadra con la base y la cuota del 10 % del pie."
+ ]
+}

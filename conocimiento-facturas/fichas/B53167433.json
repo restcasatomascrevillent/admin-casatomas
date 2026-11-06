@@ -1,0 +1,328 @@
+{
+  "cif": "B53167433",
+  "nombre": "DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.",
+  "nombres_impresos": ["DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.", "DIST. BEBIDAS CATRAL, S.L."],
+  "categoria": "bebidas",
+  "locales": ["casa_tomas"],
+  "muestras": ["R162.pdf", "R664.pdf", "R1152.pdf", "R311.pdf", "R1603.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes (solo escaneos). Cliente: BARRA RESTAURANTE CASA TOMAS / MASIDE 2011 S.L. (B54583356), cliente 03393, ruta MMR1, forma de pago REPOSICION",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "2-3 hojas de factura (HOJA Nº 1/3, 2/3, 3/3). Las hojas llegan en ORDEN INVERSO en el PDF (la última hoja, con los totales, es la página 1). A veces se añade al final un justificante de transferencia bancaria (Ruralvía) que NO es factura",
+    "numero_factura": {
+      "ejemplos": ["000227", "000489", "001061", "002482", "A00047"],
+      "patron": "^A?\\d{5,6}$",
+      "donde": "casilla FACTURA Nº, arriba a la izquierda bajo el membrete. Seis cifras sin año; con prefijo A es un abono (rappel)"
+    },
+    "fecha": "casilla FECHA junto al número, DD/MM/AAAA; es la fecha de cierre del mes (30/01/2026, 27/02/2026, 30/04/2026, 30/06/2026, 30/09/2026). No confundir con las fechas de los albaranes",
+    "albaranes": "cabecera en negrita 'ALBARAN Nº : 2026/000246 DE FECHA : 28/01/2026' antes de sus líneas. Un albarán puede continuar en la hoja siguiente: su cabecera no se repite y la hoja siguiente empieza con líneas sueltas (a veces solo la línea -D de descuento sin su línea de artículo)"
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Cantidad", "Descripción", "Precio", "% I.V.A.", "Dto (siempre vacía)", "Total neto"],
+    "cantidad_es": "cajas de 24 (o de 12 en Cruzcampo sin gluten) para tercios; barriles para barril; unidades para tubo de CO2. NO son botellas",
+    "columna_peso": null,
+    "precio_es_por": "caja (o barril / tubo). Precio de lista, sin el descuento",
+    "descuento_por_linea": {
+      "existe": false,
+      "columna": "Dto (columna presente pero vacía)",
+      "valores_habituales": [],
+      "nota": "El descuento NO va en la columna Dto: va en una línea aparte debajo de cada artículo, con código terminado en -D, descripción 'DESCUENTO …' o 'DESC. …', cantidad NEGATIVA igual a la del artículo y precio positivo (el descuento por unidad). Total neto de esa línea = cantidad × precio = negativo"
+    },
+    "iva_por_linea": true,
+    "tipos_iva": [21, 10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "Líneas con código acabado en -E ('ENVASE BARRIL 50 L.', 'ENVASE BARRIL 20 L. DAVID', 'ENVASE HEINEKEN 1/3 L.N * 24', 'ENVASE AMSTEL 1/3 * 24'), también 'PLASTICO HEINEKEN 1/3 L.N' (código -P) y 'FIANZA TUBO CARBONICO' (9050-E). Cantidad POSITIVA = envase cobrado (entrega); cantidad NEGATIVA = envase devuelto y abonado. Van al 21 % y suman o restan en el bruto",
+    "cargos_y_descuentos_pie": [
+      "Pie de la última hoja: IMPORTE BRUTO (aparece dos veces: total y base por tipo de IVA), % I.V.A., IMPORTE I.V.A., % R.E. e IMPORTE R.E. (vacíos), TOTAL",
+      "SUMA ANTERIOR: importe impreso bajo la dirección del cliente en algunas hojas 2 y 3: acumulado de las hojas anteriores, no es una línea",
+      "Sin punto verde, sin portes y sin pronto pago en las muestras",
+      "Abono por RAPPEL (factura A00047, 30/06/2026): una línea '00900-R RAPPEL BARRIL CRUZCAMPO 50 L.' con precio y total negativos, más líneas basura con código 0 y precio 0,00; total negativo"
+    ],
+    "trampas": [
+      "Hojas en orden inverso: ordénalas por 'HOJA Nº n/N' y trata el último n/N como el que tiene los totales; las hojas intermedias tienen el pie vacío",
+      "Cada artículo va con su línea -D inmediatamente debajo: son dos líneas, la segunda con importe negativo. Si se lee solo la de artículo, el gasto sale casi el doble (Cruzcampo 50 L: 203,98 lista, 98,83 descuento, 105,15 neto)",
+      "El descuento puede salir con el artículo equivocado (R664 hoja 2/2: 6 barriles El Águila 20 L seguidos de 'DESCUENTO BARRIL CRUZCAMPO 20 L' ×6 a 53,16). Se suma lo impreso; no 'corregir'",
+      "Las líneas de ENVASE cambian de signo según se entreguen o se devuelvan: leer bien el signo de la cantidad",
+      "Una hoja puede empezar con líneas -D de un albarán cuyas líneas de artículo están en la hoja anterior",
+      "El mismo precio de lista cambia durante el año (Heineken 41,25 en enero y 41,85 después; Cruzcampo sin gluten 19,22 → 19,52): no es un error",
+      "Agua Vichy lleva IVA 10 %: la factura tiene entonces dos bases (21 % y 10 %)",
+      "Justificante de transferencia bancaria adjunto (R1152, página 2): no es factura, descártalo",
+      "Dígitos 21 pegados a la línea vertical de la columna: %IVA siempre 21 o 10"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = cantidad × precio (el signo lo da la cantidad; la columna Dto está vacía y no se aplica)",
+    "neto_real_de_un_artículo = precio_lista − precio de su línea -D (p. ej. Heineken 1/3 long neck caja 24: 41,85 − 16,28 = 25,57)",
+    "suma_hoja = suma de total_linea de la hoja (artículos + -D + envases ± + fianza)",
+    "SUMA ANTERIOR (si está impresa) de la hoja n = suma anterior de la hoja n−1 + suma_hoja de la hoja n−1. Comprobado en R162: 3.606,95 + (−44,52 de la hoja 3/3) = 3.562,43",
+    "IMPORTE BRUTO = suma de todas las líneas de todas las hojas",
+    "IVA = base_21 × 21 % + base_10 × 10 % (base_10 solo si hay agua Vichy); redondeo al céntimo; sin recargo de equivalencia",
+    "TOTAL = bruto + IVA. Ejemplos: R162 3.562,43 + 748,11 = 4.310,54; R311 4.288,11 + 900,50 = 5.188,61; R1603 5.632,63 + 1.182,85 = 6.815,48; R664 3.965,70 (3.905,79 al 21 % + 59,91 al 10 %) + 826,21 (820,22 + 5,99) = 4.791,91",
+    "Abono (número con prefijo A): todo en negativo; A00047 = −429,33 + (−90,16) = −519,49"
+  ],
+
+  "guia_ocr": "Factura mensual de Catral a Casa Tomás que agrupa albaranes. Columnas: Código | Cantidad | Descripción | Precio | %IVA | Dto (vacía) | Total neto. Las hojas vienen en orden inverso: ordénalas por 'HOJA Nº'; los totales solo están en la última. Cantidad = cajas (24 ó 12 tercios) o barriles; precio = por caja/barril, de lista. Tras cada artículo sigue su línea 'DESCUENTO…' (código -D) con cantidad negativa y total negativo: léela como línea aparte. ENVASE (-E) y PLASTICO: cantidad positiva = cobrado, negativa = devuelto. 'SUMA ANTERIOR' es un acumulado, no una línea. Un albarán puede seguir en la hoja siguiente sin cabecera. Número con A = abono. Ignora justificantes bancarios.",
+
+  "productos": [
+    {
+      "nombre_impreso": "BARRIL CRUZCAMPO 50 L. ESP. SK",
+      "nombre_normalizado": "Cruzcampo Especial barril 50 L",
+      "familia": "cerveza",
+      "presentacion": "barril retornable de grifo",
+      "formato": { "envase": "barril", "contenido": 50, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "barril" },
+      "unidad_factura": "barril",
+      "precio": { "min": 203.98, "max": 203.98, "por": "barril (lista, sin descuento)", "descuento_por_ud": 98.83, "neto_por_ud": 105.15, "ejemplos": [["2026-01-05", 203.98], ["2026-09-03", 203.98]] },
+      "iva_pct": 21,
+      "veces_visto": 20
+    },
+    {
+      "nombre_impreso": "BARRIL CRUZCAMPO 20 L. ESP.",
+      "nombre_normalizado": "Cruzcampo Especial barril 20 L",
+      "familia": "cerveza",
+      "presentacion": "barril retornable de grifo",
+      "formato": { "envase": "barril", "contenido": 20, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "barril" },
+      "unidad_factura": "barril",
+      "precio": { "min": 92.35, "max": 92.35, "por": "barril (lista, sin descuento)", "descuento_por_ud": 53.16, "neto_por_ud": 39.19, "ejemplos": [["2026-01-05", 92.35], ["2026-09-03", 92.35]] },
+      "iva_pct": 21,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "BARRIL EL AGUILA SIN FILTRAR 20L.",
+      "nombre_normalizado": "El Águila sin filtrar barril 20 L",
+      "familia": "cerveza",
+      "presentacion": "barril retornable de grifo",
+      "formato": { "envase": "barril", "contenido": 20, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "barril" },
+      "unidad_factura": "barril",
+      "precio": { "min": 101.32, "max": 101.47, "por": "barril (lista, sin descuento)", "descuento_por_ud": 45.90, "neto_por_ud": 55.57, "ejemplos": [["2026-01-05", 101.32], ["2026-01-22", 101.47]] },
+      "iva_pct": 21,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "HEINEKEN 1/3 LONG NET * 24",
+      "nombre_normalizado": "Heineken 1/3 long neck (caja 24)",
+      "familia": "cerveza",
+      "presentacion": "botellín de vidrio retornable (cobra ENVASE aparte)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 41.25, "max": 41.85, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 16.28, "neto_por_ud": 25.57, "ejemplos": [["2026-01-05", 41.25], ["2026-01-22", 41.85]] },
+      "iva_pct": 21,
+      "veces_visto": 17
+    },
+    {
+      "nombre_impreso": "HEINEKEN 0'0 % 1/3 * 24",
+      "nombre_normalizado": "Heineken 0,0 % 1/3 (caja 24)",
+      "familia": "cerveza sin alcohol",
+      "presentacion": "botellín de vidrio",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 42.95, "max": 43.55, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 16.98, "neto_por_ud": 26.57, "ejemplos": [["2026-01-05", 42.95], ["2026-02-03", 43.55]] },
+      "iva_pct": 21,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "AMSTEL ORO 0% 1/3 E.R. *24",
+      "nombre_normalizado": "Amstel Oro 0,0 % 1/3 (caja 24)",
+      "familia": "cerveza sin alcohol",
+      "presentacion": "botellín de vidrio (E.R., presumiblemente envase retornable)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 40.16, "max": 40.65, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 15.40, "neto_por_ud": 25.25, "ejemplos": [["2026-01-05", 40.16], ["2026-01-22", 40.65]] },
+      "iva_pct": 21,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "AMSTEL 1/3 * 24",
+      "nombre_normalizado": "Amstel 1/3 (caja 24)",
+      "familia": "cerveza",
+      "presentacion": "botellín de vidrio retornable (cobra ENVASE aparte)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 34.93, "max": 35.53, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 12.34, "neto_por_ud": 23.19, "ejemplos": [["2026-01-08", 34.93], ["2026-02-03", 35.53]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "AMSTEL RADLER LIMON 1/3 E.R*24",
+      "nombre_normalizado": "Amstel Radler limón 1/3 (caja 24)",
+      "familia": "cerveza con limón",
+      "presentacion": "botellín de vidrio (E.R.)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 39.13, "max": 39.73, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 14.87, "neto_por_ud": 24.86, "ejemplos": [["2026-01-14", 39.13], ["2026-02-03", 39.73]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "EL AGUILA 1/3 * 24 B.R.",
+      "nombre_normalizado": "El Águila 1/3 botella retornable (caja 24)",
+      "familia": "cerveza",
+      "presentacion": "botellín de vidrio retornable (B.R.)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 36.57, "max": 37.17, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 12.71, "neto_por_ud": 24.46, "ejemplos": [["2026-01-14", 36.57], ["2026-02-03", 37.17]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "CRUZCAMPO ESP. SIN GLUTEN 1/3 NR.* 12",
+      "nombre_normalizado": "Cruzcampo Especial sin gluten 1/3 (caja 12)",
+      "familia": "cerveza sin gluten",
+      "presentacion": "botellín de vidrio no retornable (NR)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 19.22, "max": 19.52, "por": "caja de 12 (lista, sin descuento)", "descuento_por_ud": 7.07, "neto_por_ud": 12.45, "ejemplos": [["2026-01-05", 19.22], ["2026-01-22", 19.52]] },
+      "iva_pct": 21,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "CRUZCAMPO GRAN RESERVA 1/3 N.R. * 24",
+      "nombre_normalizado": "Cruzcampo Gran Reserva 1/3 (caja 24)",
+      "familia": "cerveza",
+      "presentacion": "botellín de vidrio no retornable (NR)",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 42.12, "max": 42.12, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 16.20, "neto_por_ud": 25.92, "ejemplos": [["2026-01-28", 42.12], ["2026-09-22", 42.12]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "18/70 LA RUBIA RECUP. 1/3 * 24",
+      "nombre_normalizado": "18/70 La Rubia 1/3 recuperable (caja 24)",
+      "familia": "cerveza",
+      "presentacion": "botellín de vidrio recuperable",
+      "formato": { "envase": "botella", "contenido": 33, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 34.71, "max": 35.31, "por": "caja de 24 (lista, sin descuento)", "descuento_por_ud": 10.26, "neto_por_ud": 24.45, "ejemplos": [["2026-01-05", 34.71], ["2026-04-29", 35.31]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "BITTER KAS N.R. * 24",
+      "nombre_normalizado": "Bitter Kas sin alcohol no retornable (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella no retornable",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 18.59, "max": 18.59, "por": "caja de 24 (sin línea de descuento)", "ejemplos": [["2026-02-19", 18.59], ["2026-09-03", 18.59]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "AGUA VICHY 1/4 N.R.* 24",
+      "nombre_normalizado": "Agua Vichy Catalán 1/4 (caja 24)",
+      "familia": "agua",
+      "presentacion": "botella no retornable",
+      "formato": { "envase": "botella", "contenido": 25, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 19.97, "max": 19.97, "por": "caja de 24 (sin línea de descuento)", "ejemplos": [["2026-04-24", 19.97]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "TUBO CARBONICO 12 Kg.",
+      "nombre_normalizado": "Botella de CO2 12 kg",
+      "familia": "gas de grifo",
+      "presentacion": "botella de gas retornable (cobra FIANZA aparte)",
+      "formato": { "envase": "bombona", "contenido": 12, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 46.94, "max": 50.04, "por": "unidad", "ejemplos": [["2026-01-05", 46.94], ["2026-04-08", 50.04]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "FIANZA TUBO CARBONICO",
+      "nombre_normalizado": "Fianza botella de CO2 (devolución)",
+      "familia": "envase",
+      "presentacion": "fianza; cantidad negativa al devolver el tubo",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 60.00, "max": 60.00, "por": "unidad", "ejemplos": [["2026-02-19", 60.00]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ENVASE BARRIL 50 L.",
+      "nombre_normalizado": "Envase (depósito) barril 50 L",
+      "familia": "envase",
+      "presentacion": "depósito del casco; + cobrado, − devuelto",
+      "formato": { "envase": "barril", "contenido": 50, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "barril" },
+      "unidad_factura": "barril",
+      "precio": { "min": 12.02, "max": 12.02, "por": "barril", "ejemplos": [["2026-01-14", 12.02]] },
+      "iva_pct": 21,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "ENVASE BARRIL 20 L. DAVID",
+      "nombre_normalizado": "Envase (depósito) barril 20 L",
+      "familia": "envase",
+      "presentacion": "depósito del casco; + cobrado, − devuelto",
+      "formato": { "envase": "barril", "contenido": 20, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "barril" },
+      "unidad_factura": "barril",
+      "precio": { "min": 20.00, "max": 20.00, "por": "barril", "ejemplos": [["2026-01-05", 20.00]] },
+      "iva_pct": 21,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "ENVASE HEINEKEN 1/3 L.N * 24",
+      "nombre_normalizado": "Envase (depósito) caja Heineken 1/3 long neck 24",
+      "familia": "envase",
+      "presentacion": "depósito de caja con botellines; + cobrado, − devuelto",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 3.70, "max": 3.70, "por": "caja", "ejemplos": [["2026-01-05", 3.70]] },
+      "iva_pct": 21,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "ENVASE AMSTEL 1/3 * 24",
+      "nombre_normalizado": "Envase (depósito) caja Amstel 1/3 24",
+      "familia": "envase",
+      "presentacion": "depósito de caja con botellines; + cobrado, − devuelto",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 2.40, "max": 2.40, "por": "caja", "ejemplos": [["2026-01-08", 2.40]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "PLASTICO HEINEKEN 1/3 L.N",
+      "nombre_normalizado": "Envase plástico (caja) Heineken 1/3 long neck",
+      "familia": "envase",
+      "presentacion": "plástico/caja devuelta (−8 en la muestra)",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 1.54, "max": 1.54, "por": "unidad", "ejemplos": [["2026-02-12", 1.54]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RAPPEL BARRIL CRUZCAMPO 50 L.",
+      "nombre_normalizado": "Rappel (abono trimestral) barril Cruzcampo 50 L",
+      "familia": "abono",
+      "presentacion": "abono comercial; una sola línea negativa, el resto de líneas del abono tiene código 0 y precio 0,00",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "abono",
+      "precio": { "min": -429.33, "max": -429.33, "por": "abono (cantidad 1)", "ejemplos": [["2026-06-30", -429.33]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "veces_visto son recuentos aproximados sobre las 5 muestras (cerca de 5 hojas cada una); el proveedor tiene 22 PDF y no hay PDF digitales, así que el catálogo sale solo de las muestras: puede haber artículos que no aparecen (p. ej. Paulaner, Guinness, Desperados, Ladrón de Manzanas, cuyos logos salen en el membrete)",
+    "'1/3' se interpreta como tercio (33 cl) y '1/4' como 25 cl; la factura no escribe el contenido en cl",
+    "Significado exacto de N.R./NR (no retornable), B.R./RECUP. (retornable/recuperable), E.R. (¿envase retornable?) y L.N (long neck) deducido por el contexto: los artículos con ENVASE aparte (Heineken LN, Amstel) son retornables; para Amstel Oro 0%, Radler y El Águila no se vio línea de envase propia",
+    "'ESP. SK' en los barriles Cruzcampo: no se sabe qué significa SK (sistema de conexión / tipo de barril)",
+    "'DAVID' en ENVASE BARRIL 20 L: tipo o marca del casco, sin confirmar",
+    "Qué es exactamente 'PLASTICO HEINEKEN 1/3 L.N' (caja o separadores de plástico): solo aparece una vez, con −8 uds a 1,54",
+    "Los descuentos -D por unidad varían por artículo y se infirieron de las muestras; neto_por_ud es precio lista menos ese descuento y no figura impreso",
+    "Rappel A00047: la factura trae líneas con código 0 y precio 0,00 y un texto cortado ('… DEL 3ER T. 2026 - A…'); se entiende que es el rappel del 3.er trimestre pero el texto no se lee entero. El PDF incluye una transferencia bancaria de Catral a Maside por 519,49 € (pago del abono)",
+    "Línea anómala en R664 hoja 2/2: 6 barriles El Águila 20 L con descuento 'BARRIL CRUZCAMPO 20 L' ×6 a 53,16 en lugar del 45,90 de El Águila; los totales impresos cuadran con lo impreso",
+    "En las hojas intermedias el pie está vacío y 'SUMA ANTERIOR' solo salió impresa en R162 y R664; en R311 y R1603 no se vio",
+    "Solo se han visto facturas a Casa Tomás (cliente 03393, ruta MMR1); no hay evidencia de Touza con este proveedor"
+  ]
+}

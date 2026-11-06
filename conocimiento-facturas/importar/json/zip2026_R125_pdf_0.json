@@ -1,0 +1,46 @@
+{
+ "archivo": "R125.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "160",
+ "fecha": "2026-01-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOGAVANTE",
+   "producto_ficha": null,
+   "cantidad": 3.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48,
+   "descuento_pct": null,
+   "total": 148.8,
+   "iva_pct": 10,
+   "albaran_ref": "337",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 148.8,
+ "desglose_iva": [
+  {
+   "base": 148.8,
+   "pct": 10,
+   "cuota": 14.88
+  }
+ ],
+ "iva": 14.88,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 163.68,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 19/01/2026 por 163.68. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

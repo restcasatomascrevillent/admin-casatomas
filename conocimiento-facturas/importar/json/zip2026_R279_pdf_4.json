@@ -1,0 +1,63 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "JOSE LOPEZ SEMPERE Y OTROS, C.B.",
+ "cif": "E03582699",
+ "local": "casa_tomas",
+ "numero_documento": "241/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 5,
+   "nombre": "MACRUROS (emb. TAPILU)",
+   "producto_ficha": null,
+   "cantidad": 5.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 392.55,
+   "iva_pct": 10,
+   "albaran_ref": "4407, 2811, 3521",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 5,
+   "nombre": "MACRUROS (emb. SENMAR)",
+   "producto_ficha": null,
+   "cantidad": 2.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 259.09,
+   "iva_pct": 10,
+   "albaran_ref": "4407, 2811, 3521",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 651.64,
+ "desglose_iva": [
+  {
+   "base": 651.64,
+   "pct": 10,
+   "cuota": 65.16
+  }
+ ],
+ "iva": 65.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 716.8,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 57. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

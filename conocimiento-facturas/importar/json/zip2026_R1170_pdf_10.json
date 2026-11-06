@@ -1,0 +1,63 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  11
+ ],
+ "tipo": "factura",
+ "proveedor": "ARLANDIZ LLORCA, S.L.",
+ "cif": "B54490115",
+ "local": "casa_tomas",
+ "numero_documento": "523/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 11,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 6.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.6,
+   "descuento_pct": null,
+   "total": 40.92,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 11,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.7,
+   "descuento_pct": null,
+   "total": 24.23,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 65.15,
+ "desglose_iva": [
+  {
+   "base": 65.15,
+   "pct": 10,
+   "cuota": 6.52
+  }
+ ],
+ "iva": 6.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 71.67,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): ARLANDIZ LLORCA, NOU CALPE QUATRE. Albaranes de subasta (informativo): 15994.",
+ "alertas": []
+}

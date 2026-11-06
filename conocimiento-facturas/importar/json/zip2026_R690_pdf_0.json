@@ -1,0 +1,65 @@
+{
+ "archivo": "R690.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.",
+ "cif": "B53167433",
+ "local": "casa_tomas",
+ "numero_documento": "A00030",
+ "fecha": "2026-04-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPPEL BARRIL CRUZCAMPO 50 L.",
+   "producto_ficha": "Rappel (abono trimestral) barril Cruzcampo 50 L",
+   "cantidad": 1.0,
+   "unidad": "abono",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "A- DEL 2° T. 2026 - A",
+   "producto_ficha": "Rappel (abono trimestral) barril Cruzcampo 50 L",
+   "cantidad": -1.0,
+   "unidad": "abono",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 429.32,
+   "descuento_pct": null,
+   "total": -429.32,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -429.32,
+ "desglose_iva": [
+  {
+   "base": -429.32,
+   "pct": 21,
+   "cuota": -90.16
+  }
+ ],
+ "iva": -90.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -519.48,
+ "observaciones": "Abono por rappel del 2º trimestre 2026. Sello PAGADO 13-5-26 'Transf x C. Rural'. Página 2 del PDF = justificante de transferencia Ruralvía de 519,48 EUR (13-05-2026, concepto PAGO FACT. A00030 de 28/04/2026), no es factura y no se extrae. En esta factura la línea 'RAPPEL BARRIL CRUZCAMPO 50 L.' sale con precio 0,00 y el importe (-429,32) está en una fila con código 0, cantidad -1,00, precio 429,32 y descripción 'A- DEL 2° T. 2026 - A' (cantidad negativa x precio positivo).",
+ "alertas": [
+  "El importe del rappel (-429,32) va en una fila con código 0 y no en la línea 00900-R (que sale a 0,00). Hay además 2 filas de relleno código 0, cantidad 1, precio 0,00, descripción vacía, no extraídas."
+ ]
+}

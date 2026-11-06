@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  22
+ ],
+ "tipo": "factura",
+ "proveedor": "PEREZ CHACOPINO, ANTONIO",
+ "cif": "48366966J",
+ "local": "casa_tomas",
+ "numero_documento": "92/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 22,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.5,
+   "descuento_pct": null,
+   "total": 45.63,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 45.63,
+ "desglose_iva": [
+  {
+   "base": 45.63,
+   "pct": 10.0,
+   "cuota": 4.56
+  }
+ ],
+ "iva": 4.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 50.19,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6319. Embarcaciones: ninguna.",
+ "alertas": []
+}

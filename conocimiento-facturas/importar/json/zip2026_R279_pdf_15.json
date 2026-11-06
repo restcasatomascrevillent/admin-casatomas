@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  16
+ ],
+ "tipo": "factura",
+ "proveedor": "TOMAS RAMON, SAMUEL",
+ "cif": "48345328H",
+ "local": "casa_tomas",
+ "numero_documento": "52/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 16,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 3.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 130.89,
+   "iva_pct": 10,
+   "albaran_ref": "4150",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 130.89,
+ "desglose_iva": [
+  {
+   "base": 130.89,
+   "pct": 10,
+   "cuota": 13.09
+  }
+ ],
+ "iva": 13.09,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 143.98,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 670. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

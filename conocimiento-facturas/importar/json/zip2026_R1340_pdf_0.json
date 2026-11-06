@@ -1,0 +1,46 @@
+{
+ "archivo": "R1340.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90292650",
+ "fecha": "2026-08-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Real Conservera Española Mejillones en Escabeche",
+   "producto_ficha": "Mejillones en escabeche, Real Conservera Española",
+   "cantidad": 60,
+   "unidad": "lata",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.7,
+   "descuento_pct": null,
+   "total": 762.0,
+   "iva_pct": 10,
+   "albaran_ref": "40333935",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 762.0,
+ "desglose_iva": [
+  {
+   "base": 762.0,
+   "pct": 10,
+   "cuota": 76.2
+  }
+ ],
+ "iva": 76.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 838.2,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 17/10/2026. Punto verde 0,00 EUR. Albarán 40333935 del 14/08/2026. Margen: '7/9 Piezas c/12 Latas RO-120'.",
+ "alertas": []
+}

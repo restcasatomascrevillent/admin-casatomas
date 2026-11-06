@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "RAFAEL BAEZA MACIA Y OTRA C.B.",
+ "cif": "E53671566",
+ "local": "casa_tomas",
+ "numero_documento": "318/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 91.21,
+   "descuento_pct": null,
+   "total": 155.06,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 155.06,
+ "desglose_iva": [
+  {
+   "base": 155.06,
+   "pct": 10.0,
+   "cuota": 15.51
+  }
+ ],
+ "iva": 15.51,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 170.57,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6830. Embarcaciones: ninguna.",
+ "alertas": []
+}

@@ -1,0 +1,80 @@
+{
+ "archivo": "R436.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "NEGOCIANTS S.L.U. (Grupo Vila Viniteca)",
+ "cif": "B60389731",
+ "local": "casa_tomas",
+ "numero_documento": "FVR-N2603-04352",
+ "fecha": "2026-03-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MACAN 2020 (ref. 145275)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.9,
+   "descuento_pct": null,
+   "total": 586.8,
+   "iva_pct": 21,
+   "albaran_ref": "AV-N26-034012",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MACAN 2021 (ref. 150076)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.9,
+   "descuento_pct": null,
+   "total": 586.8,
+   "iva_pct": 21,
+   "albaran_ref": "AV-N26-034012",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MACAN 2019 (ref. 141773)",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.9,
+   "descuento_pct": null,
+   "total": 293.4,
+   "iva_pct": 21,
+   "albaran_ref": "AV-N26-034012",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1467.0,
+ "desglose_iva": [
+  {
+   "base": 1467.0,
+   "pct": 21,
+   "cuota": 308.07
+  }
+ ],
+ "iva": 308.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1775.07,
+ "observaciones": "Pedido PV-N26-034303, doc. externo B2B-0000153732. Recibo domiciliado, vencimiento 19/04/2026 por 1.775,07 €. Total de botellas: 30.",
+ "alertas": []
+}

@@ -1,0 +1,70 @@
+{
+ "archivo": "R264.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-1188",
+ "fecha": "2026-02-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MINI PALITOS EMMENTAL MCCAIN 6X1",
+   "producto_ficha": "Mini palitos de emmental McCain (6 x 1 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 53.7,
+   "iva_pct": 10,
+   "albaran_ref": "B 2.573",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 2.573",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 62.45,
+ "desglose_iva": [
+  {
+   "base": 53.7,
+   "pct": 10,
+   "cuota": 5.37
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  }
+ ],
+ "iva": 5.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 68.17,
+ "observaciones": "Remesa semanal, vencimiento 01/03/2026. Cuadra al céntimo con el pie.",
+ "alertas": [
+  "MINI PALITOS EMMENTAL MCCAIN (5801): línea sin lote ni fecha de caducidad impresos. Cantidad 12,00 × Precio 8,95 = 107,40, pero el Total impreso es 53,70. Se deja el impreso, que el pie confirma (base 10 % = 53,70)."
+ ]
+}

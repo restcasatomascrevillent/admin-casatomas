@@ -1,0 +1,100 @@
+{
+ "archivo": "R622.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CIELO DE BOCA, S.L.",
+ "cif": "B73915944",
+ "local": "casa_tomas",
+ "numero_documento": "A26/6237",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CB-CHULETERO VACA 8 COST. +15 KG \"EXTRA\"",
+   "producto_ficha": "Chuletero de vaca 8 costillas, extra (pieza, precio por kg)",
+   "cantidad": 13.42,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.25,
+   "descuento_pct": 0.0,
+   "total": 352.28,
+   "iva_pct": 10,
+   "albaran_ref": "A26/6691",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GG-PLUMA IBERICA",
+   "producto_ficha": "Pluma de cerdo ibérico (pieza, precio por kg)",
+   "cantidad": 11.71,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.95,
+   "descuento_pct": 0.0,
+   "total": 257.04,
+   "iva_pct": 10,
+   "albaran_ref": "A26/6691",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CR-PIONONO C/3 BANDEJAS DE 30 UDS.",
+   "producto_ficha": "Pionono (caja de 3 bandejas de 30 uds)",
+   "cantidad": 3,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 40.5,
+   "descuento_pct": 0.0,
+   "total": 121.5,
+   "iva_pct": 10,
+   "albaran_ref": "A26/8280",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "GG-PLUMA IBERICA",
+   "producto_ficha": "Pluma de cerdo ibérico (pieza, precio por kg)",
+   "cantidad": 10.87,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.95,
+   "descuento_pct": 0.0,
+   "total": 238.6,
+   "iva_pct": 10,
+   "albaran_ref": "A26/8280",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 969.41,
+ "desglose_iva": [
+  {
+   "base": 969.41,
+   "pct": 10,
+   "cuota": 96.94
+  }
+ ],
+ "iva": 96.94,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1066.35,
+ "observaciones": "Factura de abril con dos albaranes (A26/6691 y A26/8280). Carnes por peso: cantidad = kg, bultos = piezas. Número impreso 'A26/ 6,237' normalizado a A26/6237. Pago por giro a 5 días.",
+ "alertas": [
+  "Línea 769 (GG-PLUMA IBERICA, 11,71 kg a 21,95 EUR/kg): 11,71 x 21,95 = 257,03, pero la línea imprime 257,04. El total impreso (base 969,41) cuadra con 257,03, así que la línea está 0,01 por encima. Se deja lo impreso."
+ ]
+}

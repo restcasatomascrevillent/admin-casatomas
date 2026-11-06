@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  13
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS GONZALEZ LOPEZ C.B.",
+ "cif": "E42544965",
+ "local": "casa_tomas",
+ "numero_documento": "1.326/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 13,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 14.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.42,
+   "descuento_pct": null,
+   "total": 716.58,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 716.58,
+ "desglose_iva": [
+  {
+   "base": 716.58,
+   "pct": 10,
+   "cuota": 71.66
+  }
+ ],
+ "iva": 71.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 788.24,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): NUEVO MAGU. Albaranes de subasta (informativo): 18463, 17909, 17803, 17345, 17462.",
+ "alertas": []
+}

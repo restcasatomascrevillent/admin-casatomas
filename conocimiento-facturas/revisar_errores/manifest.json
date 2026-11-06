@@ -1,0 +1,282 @@
+[
+ {
+  "clave": "zip2026:R729.pdf#0",
+  "json": "json/zip2026_R729_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R729.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO, S.R.L.",
+  "total": 5447.83,
+  "fecha": "2026-05-15",
+  "local": "casa_tomas",
+  "alertas": 0
+ },
+ {
+  "clave": "zip2026:R1000.pdf#0",
+  "json": "json/zip2026_R1000_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1000.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 6702.44,
+  "fecha": "2026-06-30",
+  "local": "casa_tomas",
+  "alertas": 0
+ },
+ {
+  "clave": "zip2026:R1106.pdf#0",
+  "json": "json/zip2026_R1106_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1106.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 5664.41,
+  "fecha": "2026-07-15",
+  "local": "casa_tomas",
+  "alertas": 1
+ },
+ {
+  "clave": "zip2026:R1265.pdf#0",
+  "json": "json/zip2026_R1265_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1265.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "Tomás Nicolás Riquelme",
+  "total": 159.4,
+  "fecha": "2026-07-29",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R1234.pdf#0",
+  "json": "json/zip2026_R1234_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1234.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 4679.26,
+  "fecha": "2026-07-31",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R1251.pdf#0",
+  "json": "json/zip2026_R1251_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1251.pdf",
+    "pages": [
+     1,
+     2
+    ]
+   }
+  ],
+  "proveedor": "Luga Sabores S.L.",
+  "total": 2354.05,
+  "fecha": "2026-07-31",
+  "local": "casa_tomas",
+  "alertas": 0
+ },
+ {
+  "clave": "zip2026:R1260.pdf#0",
+  "json": "json/zip2026_R1260_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1260.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4
+    ]
+   }
+  ],
+  "proveedor": "SUMINISTROS HOSTELEROS ALTAMIRA, S. L.",
+  "total": 2742.58,
+  "fecha": "2026-07-31",
+  "local": "casa_tomas",
+  "alertas": 4
+ },
+ {
+  "clave": "zip2026:R1451.pdf#0",
+  "json": "json/zip2026_R1451_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1451.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 7216.86,
+  "fecha": "2026-08-14",
+  "local": "casa_tomas",
+  "alertas": 0
+ },
+ {
+  "clave": "zip2026:R1452.pdf#0",
+  "json": "json/zip2026_R1452_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1452.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4,
+     5,
+     6
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 6023.72,
+  "fecha": "2026-08-31",
+  "local": "casa_tomas",
+  "alertas": 1
+ },
+ {
+  "clave": "zip2026:R1546.pdf#0",
+  "json": "json/zip2026_R1546_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1546.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 4010.24,
+  "fecha": "2026-09-15",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R1615.pdf#0",
+  "json": "json/zip2026_R1615_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1615.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4
+    ]
+   }
+  ],
+  "proveedor": "SUMINISTROS HOSTELEROS ALTAMIRA, S. L.",
+  "total": 3583.53,
+  "fecha": "2026-09-30",
+  "local": "casa_tomas",
+  "alertas": 5
+ },
+ {
+  "clave": "zip2026:R1641.pdf#0",
+  "json": "json/zip2026_R1641_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1641.pdf",
+    "pages": [
+     1,
+     2,
+     3,
+     4,
+     5
+    ]
+   }
+  ],
+  "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+  "total": 6829.82,
+  "fecha": "2026-09-30",
+  "local": "casa_tomas",
+  "alertas": 1
+ },
+ {
+  "clave": "zip2026:R1642.pdf#0",
+  "json": "json/zip2026_R1642_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1642.pdf",
+    "pages": [
+     1,
+     2,
+     3
+    ]
+   }
+  ],
+  "proveedor": "Luga Sabores S.L.",
+  "total": 3967.39,
+  "fecha": "2026-09-30",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R1644.pdf#0",
+  "json": "json/zip2026_R1644_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1644.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "BENEOLIVA, S.COOP. V.L.",
+  "total": 663.73,
+  "fecha": "2026-09-30",
+  "local": "casa_tomas",
+  "alertas": 0
+ }
+]

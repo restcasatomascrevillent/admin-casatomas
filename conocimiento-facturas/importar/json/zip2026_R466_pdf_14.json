@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  15
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ PEREZ, JOSE",
+ "cif": "77707228A",
+ "local": "casa_tomas",
+ "numero_documento": "90/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 15,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 6.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.19,
+   "descuento_pct": null,
+   "total": 48.51,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 48.51,
+ "desglose_iva": [
+  {
+   "base": 48.51,
+   "pct": 10.0,
+   "cuota": 4.85
+  }
+ ],
+ "iva": 4.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 53.36,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6447. Embarcaciones: NUEVO JOSE UNO.",
+ "alertas": []
+}

@@ -1,0 +1,80 @@
+{
+ "archivo": "R1369.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "OLGA BABYNYUK - Caviar&Delicatessen",
+ "cif": "X3946097X",
+ "local": "casa_tomas",
+ "numero_documento": "F/26-67",
+ "fecha": "2026-08-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "10gr. Pure Huso Dauricus",
+   "producto_ficha": null,
+   "cantidad": 20.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 10,
+   "contenido_unidad": "g",
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 240.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "30gr. Pure Huso Dauricus",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 30,
+   "contenido_unidad": "g",
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "50gr. Pure Huso Dauricus",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "g",
+   "precio_unitario": 60.0,
+   "descuento_pct": null,
+   "total": 300.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 720.0,
+ "desglose_iva": [
+  {
+   "base": 720.0,
+   "pct": 10,
+   "cuota": 72.0
+  }
+ ],
+ "iva": 72.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 792.0,
+ "observaciones": "Forma de pago: transferencia inmediata. Vencimiento 28/08/2026. Cliente: Restaurante Casa Tomas (MASIDE 2011 S.L.U.), código B54583356.",
+ "alertas": []
+}

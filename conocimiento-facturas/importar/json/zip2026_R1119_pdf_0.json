@@ -1,0 +1,83 @@
+{
+ "archivo": "R1119.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "JUAN CARLOS POVEDA GARCIA (Povesat Electroreparaciones)",
+ "cif": "79100928H",
+ "local": "casa_tomas",
+ "numero_documento": "00136",
+ "fecha": "2026-07-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAMBIO DE FILTRO (revisión de máquina de conductos Mitsubishi, limpieza de turbina, ajuste de embocado)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": null,
+   "total": 35.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOMBA DE DRENAJE PARA EVAPORADOR",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 180.0,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TRABAJOS",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 70.0,
+   "descuento_pct": null,
+   "total": 70.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 285.0,
+ "desglose_iva": [
+  {
+   "base": 285.0,
+   "pct": 21,
+   "cuota": 59.85
+  }
+ ],
+ "iva": 59.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 344.85,
+ "observaciones": "Pago contado 02/07/2026. Servicio realizado en local C/ Santa María La Cabeza, 4 (dirección del cliente impresa: nº 2).",
+ "alertas": [
+  "Las filas 'revisión de máquina...', 'limpieza de turbina' y 'ajuste de embocado' no llevan importe propio; se agrupan en la línea de cambio de filtro (35,00).",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

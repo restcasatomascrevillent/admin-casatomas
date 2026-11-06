@@ -1,0 +1,63 @@
+{
+ "archivo": "R207.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "NEGOCIANTS S.L.U. (Grupo Vila Viniteca)",
+ "cif": "B60389731",
+ "local": "casa_tomas",
+ "numero_documento": "FVR-N2602-02346",
+ "fecha": "2026-02-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "REMIREZ DE GANUZA trasnocho 2019 (ref. 148374)",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 66.95,
+   "descuento_pct": null,
+   "total": 200.85,
+   "iva_pct": 21,
+   "albaran_ref": "AV-N26-016213",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TORBRECK runrig shiraz 2020 (ref. 137793)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 179.9,
+   "descuento_pct": null,
+   "total": 179.9,
+   "iva_pct": 21,
+   "albaran_ref": "AV-N26-016213",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 380.75,
+ "desglose_iva": [
+  {
+   "base": 380.75,
+   "pct": 21,
+   "cuota": 79.96
+  }
+ ],
+ "iva": 79.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 460.71,
+ "observaciones": "Pedido PV-N26-016868, doc. externo B2B-0000146725. Recibo domiciliado, vencimiento 13/03/2026 por 460,71 €. Ruta 91MURCIA.",
+ "alertas": []
+}

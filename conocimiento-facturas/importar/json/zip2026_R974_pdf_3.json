@@ -1,0 +1,63 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "PEREZ MARTINEZ, MARIA",
+ "cif": "21283635X",
+ "local": "casa_tomas",
+ "numero_documento": "772/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 5.65,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.8,
+   "descuento_pct": null,
+   "total": 49.72,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 4,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.9,
+   "descuento_pct": null,
+   "total": 64.89,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 114.61,
+ "desglose_iva": [
+  {
+   "base": 114.61,
+   "pct": 10,
+   "cuota": 11.46
+  }
+ ],
+ "iva": 11.46,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 126.07,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 11871, 12947.",
+ "alertas": []
+}

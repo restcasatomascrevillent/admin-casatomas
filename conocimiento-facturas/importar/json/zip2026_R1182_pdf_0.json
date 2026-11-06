@@ -1,0 +1,117 @@
+{
+ "archivo": "R1182.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "J CARBO (nombre según texto)",
+ "cif": "A79393179",
+ "local": "casa_tomas",
+ "numero_documento": "211197415",
+ "fecha": "2026-07-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LOMO TERNERA BLANCA C/H C/SOL (art. 312026)",
+   "producto_ficha": null,
+   "cantidad": 11.98,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.7,
+   "descuento_pct": null,
+   "total": 236.01,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TIRAS ASADO TERNERA (art. 310005)",
+   "producto_ficha": null,
+   "cantidad": 7.02,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.8,
+   "descuento_pct": null,
+   "total": 110.92,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CHORIZO CRIOLLO (art. 365005)",
+   "producto_ficha": null,
+   "cantidad": 4.328,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.0,
+   "descuento_pct": null,
+   "total": 30.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CHULETAS CORDERO LECHAL EXTRA (art. 450011)",
+   "producto_ficha": null,
+   "cantidad": 1.18,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.7,
+   "descuento_pct": null,
+   "total": 37.41,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MOLLEJAS CORDERO NACIONAL -C- (art. 250098)",
+   "producto_ficha": null,
+   "cantidad": 10.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.5,
+   "descuento_pct": null,
+   "total": 270.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 684.94,
+ "desglose_iva": [
+  {
+   "base": 684.94,
+   "pct": 10,
+   "cuota": 68.49
+  }
+ ],
+ "iva": 68.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 753.43,
+ "observaciones": "Pedido 6946308, forma de pago RECIBO. Peso neto total 34,708 kg. Nota de línea: «10 días fecha sacrificio. max. 12kg» (lomo). Nota: «Servicio martes 28». Costes de subproductos no incluidos (Orden APA 1556/2002).",
+ "alertas": [
+  "El nombre del emisor no aparece en la cabecera; en el pie solo figura «J CARBO». El CIF se toma de la carpeta (A79393179). Revisar el PDF original.",
+  "Bultos tomados de «1,0 UN» / «3,0 BJ» / «1,0 BJ» cuando aparecen; el chorizo («2,0 KG») no se trata como bultos."
+ ]
+}

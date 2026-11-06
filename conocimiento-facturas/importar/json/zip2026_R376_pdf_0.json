@@ -1,0 +1,102 @@
+{
+ "archivo": "R376.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/4372",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AGUA SAN PELLEGRINO CON GAS 50,5CL C24 CRIS",
+   "producto_ficha": "Agua San Pellegrino con gas 50,5 cl, cristal (caja 24)",
+   "cantidad": 192,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 50.5,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.685,
+   "descuento_pct": 0.0,
+   "total": 131.52,
+   "iva_pct": 10,
+   "albaran_ref": "26/4.299",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CAVA GRAMONA IMPERIAL BRUT CORPINNAT 75CL 12º C6",
+   "producto_ficha": "Gramona Imperial Brut Corpinnat 75 cl (caja 6)",
+   "cantidad": 48,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.69,
+   "descuento_pct": 0.0,
+   "total": 801.12,
+   "iva_pct": 21,
+   "albaran_ref": "26/4.299",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GIN.TANQUERAY 70CL 43,1º C6 ROSCA",
+   "producto_ficha": "Ginebra Tanqueray 70 cl, 43,1º, tapón rosca (caja 6)",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 9.58,
+   "descuento_pct": 0.0,
+   "total": 229.92,
+   "iva_pct": 21,
+   "albaran_ref": "26/4.299",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "W.WHITE LABEL 70CL 40º C6 REF",
+   "producto_ficha": "Whisky White Label 70 cl (caja 6)",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 8.85,
+   "descuento_pct": 0.0,
+   "total": 212.4,
+   "iva_pct": 21,
+   "albaran_ref": "26/4.299",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1374.96,
+ "desglose_iva": [
+  {
+   "base": 131.52,
+   "pct": 10,
+   "cuota": 13.15
+  },
+  {
+   "base": 1243.44,
+   "pct": 21,
+   "cuota": 261.12
+  }
+ ],
+ "iva": 274.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1649.23,
+ "observaciones": "Giro/B2B, vencimiento 13/03/26. Albarán 26/4.299 (12/03/26). IVA por línea deducido de las bases impresas (10 % agua).",
+ "alertas": []
+}

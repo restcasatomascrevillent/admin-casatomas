@@ -1,0 +1,46 @@
+{
+ "archivo": "R385.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUMT LEVANTE, S.L.U.",
+ "cif": "B53971560",
+ "local": "casa_tomas",
+ "numero_documento": "1098",
+ "fecha": "2026-03-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Q.OVEJA CURADO TRUFADO CAMPOLLANO",
+   "producto_ficha": null,
+   "cantidad": 6.22,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.01,
+   "descuento_pct": null,
+   "total": 155.56,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 155.56,
+ "desglose_iva": [
+  {
+   "base": 155.56,
+   "pct": 4,
+   "cuota": 6.22
+  }
+ ],
+ "iva": 6.22,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 161.78,
+ "observaciones": "Pago al CONTADO; entrega Restaurante Casa Tomas; cantidad = kg (peso)",
+ "alertas": []
+}

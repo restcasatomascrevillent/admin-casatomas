@@ -1,0 +1,82 @@
+{
+ "archivo": "R1111.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260352",
+ "fecha": "2026-07-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 87.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000352",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 115.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000352",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": "Buey (probablemente buey de mar)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 40.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000352",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 242.2,
+ "desglose_iva": [
+  {
+   "base": 242.2,
+   "pct": 10,
+   "cuota": 24.22
+  }
+ ],
+ "iva": 24.22,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 266.42,
+ "observaciones": "Transferencia CaixaBank; vencimiento 07/07/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: BUEY 20,00 (ficha 19,00)"
+ ]
+}

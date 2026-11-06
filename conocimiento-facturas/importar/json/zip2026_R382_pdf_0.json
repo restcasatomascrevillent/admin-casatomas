@@ -1,0 +1,48 @@
+{
+ "archivo": "R382.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170754740",
+ "fecha": "2026-03-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 199.7,
+   "unidad": "kg",
+   "bultos": 14,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.59,
+   "descuento_pct": null,
+   "total": 117.82,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 117.82,
+ "desglose_iva": [
+  {
+   "base": 117.82,
+   "pct": 4,
+   "cuota": 4.71
+  }
+ ],
+ "iva": 4.71,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 122.53,
+ "observaciones": "Fecha entrega 13.03.2026, igual que la fecha de factura. Total BT 14. Neto = bruto - tara (206,00 - 6,30).",
+ "alertas": [
+  "PATATA I a 0,590 EUR/kg: por debajo del minimo de la ficha (0,60). Lo impreso se deja tal cual."
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "JOSE LOPEZ SEMPERE Y OTROS, C.B.",
+ "cif": "E03582699",
+ "local": "casa_tomas",
+ "numero_documento": "580/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 104.4,
+   "descuento_pct": null,
+   "total": 292.32,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 292.32,
+ "desglose_iva": [
+  {
+   "base": 292.32,
+   "pct": 10.0,
+   "cuota": 29.23
+  }
+ ],
+ "iva": 29.23,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 321.55,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6963, 7074. Embarcaciones: TAPILU.",
+ "alertas": []
+}

@@ -1,0 +1,67 @@
+{
+ "archivo": "R1345.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "Winterhalter Iberica S.L.U.",
+ "cif": "B92282029",
+ "local": "casa_tomas",
+ "numero_documento": "7100184015",
+ "fecha": "2026-08-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "F 40 Detergente para cristal con Oxipower",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 100.0,
+   "descuento_pct": 15,
+   "total": 340.0,
+   "iva_pct": 21,
+   "albaran_ref": "8002691621",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "B 100 N Abrillantador",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 10,
+   "contenido_unidad": "l",
+   "precio_unitario": 91.0,
+   "descuento_pct": 15,
+   "total": 77.35,
+   "iva_pct": 21,
+   "albaran_ref": "8002691621",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 417.35,
+ "desglose_iva": [
+  {
+   "base": 417.35,
+   "pct": 21,
+   "cuota": 87.64
+  }
+ ],
+ "iva": 87.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 504.99,
+ "observaciones": "Pedido 2002243101 (Mail CC Tomas, 17/08/2026). Entrega 18/08/2026. Pago en 30 dias netos, recibo domiciliado. Las lineas imprimen 12,00 KG y 10 LI bajo el producto: se toman como contenido por unidad. Paginas 2 a 5: condiciones generales de venta.",
+ "alertas": []
+}

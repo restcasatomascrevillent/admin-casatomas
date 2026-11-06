@@ -1,0 +1,48 @@
+{
+ "archivo": "R572.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0002/(2026)006426",
+ "fecha": "2026-04-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MIEL DE FLORES MC 5KG",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "cubo",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.49,
+   "descuento_pct": null,
+   "total": 19.49,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 19.49,
+ "desglose_iva": [
+  {
+   "base": 19.49,
+   "pct": 10,
+   "cuota": 1.95
+  }
+ ],
+ "iva": 1.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 21.44,
+ "observaciones": "Pagado con tarjeta (VISA debito).",
+ "alertas": []
+}

@@ -1,0 +1,65 @@
+{
+ "archivo": "R1553.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170781991",
+ "fecha": "2026-09-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 330.6,
+   "unidad": "kg",
+   "bultos": 24,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.75,
+   "descuento_pct": null,
+   "total": 247.95,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 407.2,
+   "unidad": "kg",
+   "bultos": 24,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.75,
+   "descuento_pct": null,
+   "total": 305.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 553.35,
+ "desglose_iva": [
+  {
+   "base": 553.35,
+   "pct": 4,
+   "cuota": 22.13
+  }
+ ],
+ "iva": 22.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 575.48,
+ "observaciones": "Fecha entrega 24.09.2026. Referencia impresa 0810053127. Total BT 48. Dos líneas de patata I ES con lotes distintos (ES 885479 y ES 997225).",
+ "alertas": [
+  "Patata I ES a 0,75 €/kg en las dos líneas; la ficha tiene 0,60-0,74. Se deja lo impreso."
+ ]
+}

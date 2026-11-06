@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  13
+ ],
+ "tipo": "factura",
+ "proveedor": "POMARES SOLER, S.L.",
+ "cif": "B42585679",
+ "local": "casa_tomas",
+ "numero_documento": "720/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 13,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 9.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.7,
+   "descuento_pct": null,
+   "total": 84.83,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 84.83,
+ "desglose_iva": [
+  {
+   "base": 84.83,
+   "pct": 10.0,
+   "cuota": 8.48
+  }
+ ],
+ "iva": 8.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 93.31,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9950. Embarcaciones: MONTCLAR I.",
+ "alertas": []
+}

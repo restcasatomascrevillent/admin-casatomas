@@ -1,0 +1,82 @@
+{
+ "archivo": "R8.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170745198",
+ "fecha": "2026-01-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 20K ES",
+   "producto_ficha": "Patata agria (saco 20 kg)",
+   "cantidad": 100.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 20,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.64,
+   "descuento_pct": null,
+   "total": 64.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FRESON I 2K ES",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 6.0,
+   "descuento_pct": null,
+   "total": 36.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 5 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 5 (Costa Rica)",
+   "cantidad": 12.8,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 23.04,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 123.04,
+ "desglose_iva": [
+  {
+   "base": 123.04,
+   "pct": 4,
+   "cuota": 4.92
+  }
+ ],
+ "iva": 4.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 127.96,
+ "observaciones": "Fecha entrega 05.01.2026, igual que la fecha de factura. Total BT 9. Asterisco GLOBALG.A.P. quitado del nombre.",
+ "alertas": [
+  "FRESON I 2K ES no figura en el catalogo de la ficha (solo FRESON I 1K). producto_ficha null."
+ ]
+}

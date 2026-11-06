@@ -1,0 +1,65 @@
+{
+ "archivo": "R687.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 2239",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PULPO 2 MARRUECOS A BORDO",
+   "producto_ficha": null,
+   "cantidad": 31.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.5,
+   "descuento_pct": null,
+   "total": 551.25,
+   "iva_pct": 10,
+   "albaran_ref": "20264005",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "COCOCHAS MERLUZA FRESCO",
+   "producto_ficha": "Cocochas de merluza fresco",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 68.0,
+   "descuento_pct": null,
+   "total": 68.0,
+   "iva_pct": 10,
+   "albaran_ref": "20264005",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 619.25,
+ "desglose_iva": [
+  {
+   "base": 619.25,
+   "pct": 10,
+   "cuota": 61.93
+  }
+ ],
+ "iva": 61.93,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 681.18,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 30/05/2026, transferencia a 30 días. Albarán 20264005 del 29/04/2026, pedido 18550. Nota de entrega 8369 impresa en la línea de cocochas. Nota 'Baul' ignorada. La fila Total (1 caja, 32,50 kg) no son euros.",
+ "alertas": [
+  "PULPO 2 MARRUECOS A BORDO no figura en el catálogo de la ficha: producto_ficha null."
+ ]
+}

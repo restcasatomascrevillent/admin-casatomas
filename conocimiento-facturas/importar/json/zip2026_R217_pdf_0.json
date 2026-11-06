@@ -1,0 +1,88 @@
+{
+ "archivo": "R217.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-1022",
+ "fecha": "2026-02-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BURRATA IQF 10UD (2BAND. 125GR)",
+   "producto_ficha": "Burrata IQF 125 g (10 uds, 2 bandejas)",
+   "cantidad": 20.0,
+   "unidad": "kg",
+   "bultos": 20,
+   "contenido_cantidad": 125,
+   "contenido_unidad": "g",
+   "precio_unitario": 4.4,
+   "descuento_pct": null,
+   "total": 44.0,
+   "iva_pct": 4,
+   "albaran_ref": "B 2.069",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MINI PALITOS EMMENTAL MCCAIN 6X1",
+   "producto_ficha": "Mini palitos de emmental McCain (6 x 1 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 53.7,
+   "iva_pct": 10,
+   "albaran_ref": "B 2.069",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GAMBON COLA 1 NAUTIS",
+   "producto_ficha": "Cola de gambón (Nautis, 6 x 2 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.75,
+   "descuento_pct": null,
+   "total": 153.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 2.075",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 250.7,
+ "desglose_iva": [
+  {
+   "base": 206.7,
+   "pct": 10,
+   "cuota": 20.67
+  },
+  {
+   "base": 44.0,
+   "pct": 4,
+   "cuota": 1.76
+  }
+ ],
+ "iva": 22.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 273.13,
+ "observaciones": "Remesa semanal, vencimiento 22/02/2026. Los importes impresos cuadran con el pie: base 10 % 206,70 (53,70 + 153,00) y base 4 % 44,00.",
+ "alertas": [
+  "BURRATA IQF (5402): Cantidad 20,00 × Precio 4,40 = 88,00, pero el Total impreso es 44,00. Se deja el impreso, que el pie confirma (base 4 % = 44,00).",
+  "MINI PALITOS EMMENTAL MCCAIN (5801): línea sin lote ni fecha de caducidad impresos. Cantidad 12,00 × Precio 8,95 = 107,40, pero el Total impreso es 53,70. Se deja el impreso, que el pie confirma (base 10 % incluye 53,70)."
+ ]
+}

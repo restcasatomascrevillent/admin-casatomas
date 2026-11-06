@@ -1,0 +1,63 @@
+{
+ "archivo": "R1575.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0041295",
+ "fecha": "2026-09-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ATUN ACEITE GIRASOL BACHI 650 G",
+   "producto_ficha": null,
+   "cantidad": 6,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 650,
+   "contenido_unidad": "g",
+   "precio_unitario": 7.09,
+   "descuento_pct": null,
+   "total": 42.54,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "AGUA CON GAS SAN PELLEGRINO 50 CL",
+   "producto_ficha": null,
+   "cantidad": 72,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.82,
+   "descuento_pct": null,
+   "total": 59.04,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 101.58,
+ "desglose_iva": [
+  {
+   "base": 101.58,
+   "pct": 10,
+   "cuota": 10.16
+  }
+ ],
+ "iva": 10.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 111.74,
+ "observaciones": "Crédito a 30 días, vencimiento 24-10-2026. Cajero 2081682. Las 72 botellas de agua se anulan en el abono 9904161-0001522 (R1576).",
+ "alertas": []
+}

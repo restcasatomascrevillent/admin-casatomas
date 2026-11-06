@@ -1,0 +1,46 @@
+{
+ "archivo": "R604.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170761975",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA FRISIA I ES",
+   "producto_ficha": "Patata Frisia cat. I (saco 20 kg)",
+   "cantidad": 240.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 240.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 240.0,
+ "desglose_iva": [
+  {
+   "base": 240.0,
+   "pct": 4,
+   "cuota": 9.6
+  }
+ ],
+ "iva": 9.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 249.6,
+ "observaciones": "Entrega 30.04.2026. Línea con GLOBALG.A.P. (asterisco quitado). Cuadro de envases vacío. Total BT 12.",
+ "alertas": []
+}

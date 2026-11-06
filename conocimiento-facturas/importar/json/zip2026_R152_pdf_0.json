@@ -1,0 +1,93 @@
+{
+ "archivo": "R152.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "FA2025/0024803",
+ "fecha": "2025-11-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MONIN PUREE LE FRUIT FRUTA PASION 1LTO.",
+   "producto_ficha": "Monin puré Le Fruit fruta de la pasión 1 L",
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 17.29,
+   "descuento_pct": null,
+   "total": 207.48,
+   "iva_pct": 10,
+   "albaran_ref": "2025/0008349",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MONIN PUREE LE FRUIT MANGO LTO.",
+   "producto_ficha": "Monin puré Le Fruit mango 1 L",
+   "cantidad": 8,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 17.64,
+   "descuento_pct": null,
+   "total": 141.12,
+   "iva_pct": 10,
+   "albaran_ref": "2025/0008349",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GESTION Y LOGISTICA",
+   "producto_ficha": "Gestión y logística",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.37,
+   "descuento_pct": null,
+   "total": 2.37,
+   "iva_pct": 21,
+   "albaran_ref": "2025/0008349",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Punto verde (P.V.) 10 %",
+   "importe": 0.55,
+   "iva_pct": 10
+  }
+ ],
+ "subtotal": 351.52,
+ "desglose_iva": [
+  {
+   "base": 2.37,
+   "pct": 21,
+   "cuota": 0.5
+  },
+  {
+   "base": 349.15,
+   "pct": 10,
+   "cuota": 34.92
+  }
+ ],
+ "iva": 35.42,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 386.93,
+ "observaciones": "Albarán 2025/0008349 de 12/11/25. Destino CASA TOMAS (C/ Santa María de la Cabeza, 2, Crevillente). Pago: remesa bancaria, vencimiento 10/12/25. P.V. 0,55 incluido en la base. Cabecera impresa: 'E MASIDE 2011, S.L.U.' con NIF B54583356; el pie y la ficha dan Bodega Campoluz CIF B53375358 (usado).",
+ "alertas": [
+  "Redondeo de 0,01 €: IVA impreso 0,50 + 34,92 = 35,42, pero total 386,93 menos base 351,52 implica 35,41. Se deja lo impreso."
+ ]
+}

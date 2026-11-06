@@ -1,0 +1,63 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  20
+ ],
+ "tipo": "factura",
+ "proveedor": "RUSO VIDAL, CB",
+ "cif": "E70667209",
+ "local": "casa_tomas",
+ "numero_documento": "933/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 20,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 57.2,
+   "descuento_pct": null,
+   "total": 82.94,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 20,
+   "nombre": "33 CEFALOPODOS",
+   "producto_ficha": "Cefalópodos (familia 33)",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.4,
+   "descuento_pct": null,
+   "total": 33.88,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 116.82,
+ "desglose_iva": [
+  {
+   "base": 116.82,
+   "pct": 10,
+   "cuota": 11.68
+  }
+ ],
+ "iva": 11.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 128.5,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18463.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R1574.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Transgourmet Ibérica, S.A.U.",
+ "cif": "A17371758",
+ "local": "casa_tomas",
+ "numero_documento": "260041046015816",
+ "fecha": "2026-09-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Media canal cerdo E/K",
+   "producto_ficha": null,
+   "cantidad": 39.88,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.25,
+   "descuento_pct": null,
+   "total": 129.61,
+   "iva_pct": 10,
+   "albaran_ref": "000317069",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 129.61,
+ "desglose_iva": [
+  {
+   "base": 129.61,
+   "pct": 10,
+   "cuota": 12.96
+  }
+ ],
+ "iva": 12.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 142.57,
+ "observaciones": "Albarán 000317069, vencimiento 28/09/2026",
+ "alertas": []
+}

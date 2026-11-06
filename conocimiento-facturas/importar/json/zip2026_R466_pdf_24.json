@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  25
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS JJ Y OTRAS CB",
+ "cif": "E42689075",
+ "local": "casa_tomas",
+ "numero_documento": "246/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 25,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.3,
+   "descuento_pct": null,
+   "total": 35.53,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 35.53,
+ "desglose_iva": [
+  {
+   "base": 35.53,
+   "pct": 10.0,
+   "cuota": 3.55
+  }
+ ],
+ "iva": 3.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 39.08,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 4815. Embarcaciones: TOSKET.",
+ "alertas": []
+}

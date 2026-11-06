@@ -1,0 +1,63 @@
+{
+ "archivo": "R89.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "JOSE MANUEL LOPEZ CARRATALA (Distribuciones LOPEZ MAYO)",
+ "cif": "21438704J",
+ "local": "casa_tomas",
+ "numero_documento": "K-026",
+ "fecha": "2026-01-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "c/ 48 RO-120 8/12 mejillones esc. Ramón Franco",
+   "producto_ficha": null,
+   "cantidad": 48,
+   "unidad": "lata",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.09,
+   "descuento_pct": null,
+   "total": 244.32,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "latas RO-120 8/12 mejillones esc. Ramón Franco",
+   "producto_ficha": null,
+   "cantidad": 24,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.09,
+   "descuento_pct": null,
+   "total": 122.16,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 366.48,
+ "desglose_iva": [
+  {
+   "base": 366.48,
+   "pct": 10,
+   "cuota": 36.65
+  }
+ ],
+ "iva": 36.65,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 403.13,
+ "observaciones": "Transferencia a ES** **** **** **** **** 1412. Lote 544 (ambas líneas).",
+ "alertas": []
+}

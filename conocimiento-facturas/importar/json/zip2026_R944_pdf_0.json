@@ -1,0 +1,87 @@
+{
+ "archivo": "R944.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MAS PREVENCION, SERVICIO DE PREVENCION, S.L.U.",
+ "cif": "B99083404",
+ "local": "casa_tomas",
+ "numero_documento": "F26119664",
+ "fecha": "2026-06-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Seguridad, Higiene y Ergonomía (facturación anual, periodo 01/06/26 a 31/05/27)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 299.93,
+   "descuento_pct": null,
+   "total": 299.93,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Vigilancia de la salud RRMM (sujeta a IVA)",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.44,
+   "descuento_pct": null,
+   "total": 109.76,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Vigilancia de la salud exenta (operación exenta de IVA, art. 20 Ley 37/1992)",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 55.72,
+   "descuento_pct": null,
+   "total": 222.88,
+   "iva_pct": 0,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 632.57,
+ "desglose_iva": [
+  {
+   "base": 409.69,
+   "pct": 21,
+   "cuota": 86.03
+  },
+  {
+   "base": 222.88,
+   "pct": 0,
+   "cuota": 0.0
+  }
+ ],
+ "iva": 86.03,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 718.6,
+ "observaciones": "Cliente 54471. Forma de pago: recibo domiciliado. Vencimiento a partir del 07/07/2026 (718,60 €). Número de trabajadores a facturar según media de los últimos 12 meses (facturación anual). Cliente impreso: MASIDE 2011 SL, NIF B54583356.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

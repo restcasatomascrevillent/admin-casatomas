@@ -1,0 +1,63 @@
+{
+ "archivo": "R1107.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 4169",
+ "fecha": "2026-07-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FTE. DORADA 120/160 X5",
+   "producto_ficha": "Dorada 120/160 g (caja 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.5,
+   "descuento_pct": null,
+   "total": 125.0,
+   "iva_pct": 10,
+   "albaran_ref": "20267327",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CABEZA ALISTADO",
+   "producto_ficha": "Cabeza de alistado (listado)",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": null,
+   "total": 30.8,
+   "iva_pct": 10,
+   "albaran_ref": "20267327",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 155.8,
+ "desglose_iva": [
+  {
+   "base": 155.8,
+   "pct": 10,
+   "cuota": 15.58
+  }
+ ],
+ "iva": 15.58,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 171.38,
+ "observaciones": "Transferencia a 30 dias, vencimiento 19/08/2026. Albaran 20267327 de 15/07/2026, pedido 20976. Nota impresa en cabeza: Itas. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

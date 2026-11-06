@@ -1,0 +1,117 @@
+{
+ "archivo": "R1335.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260483",
+ "fecha": "2026-08-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 116.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000483",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA S.E.",
+   "producto_ficha": "Ostra S.E.",
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.8,
+   "descuento_pct": null,
+   "total": 134.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000483",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BESUGO",
+   "producto_ficha": "Besugo",
+   "cantidad": 7.55,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 45.0,
+   "descuento_pct": null,
+   "total": 339.75,
+   "iva_pct": 10,
+   "albaran_ref": "1-000483",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CABRACHO",
+   "producto_ficha": "Cabracho",
+   "cantidad": 0.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 15.6,
+   "iva_pct": 10,
+   "albaran_ref": "1-000483",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "DORADA",
+   "producto_ficha": "Dorada",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.0,
+   "descuento_pct": null,
+   "total": 372.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000483",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 977.75,
+ "desglose_iva": [
+  {
+   "base": 977.75,
+   "pct": 10,
+   "cuota": 97.78
+  }
+ ],
+ "iva": 97.78,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1075.53,
+ "observaciones": "Albarán 1-000483 del 13/08/2026. Forma de pago: transferencia CaixaBank; vencimiento 13/08/2026 por 1.075,53. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "OSTRA S.E. a 2,80 €/ud; la ficha da 2,40 €/ud para OSTRA S.E.",
+  "CABRACHO a 26,00 €/kg; la ficha da 37,00 €/kg."
+ ]
+}

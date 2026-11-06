@@ -1,0 +1,99 @@
+{
+ "archivo": "R1614.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "SUMINISTROS HOSTELEROS ALTAMIRA, S. L.",
+ "cif": "B53363974",
+ "local": "casa_tomas",
+ "numero_documento": "A - 26/0002188",
+ "fecha": "2026-09-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DETERGENTE MANUAL PALM P33 CONCENTRADO 1K",
+   "producto_ficha": "Detergente manual Palm P33 concentrado 1 kg",
+   "cantidad": -20.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.694,
+   "descuento_pct": null,
+   "total": -53.88,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LEJIA CAPRICHOSA COMUN 2L C/8u",
+   "producto_ficha": "Lejía Caprichosa común 2 L",
+   "cantidad": -6.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "l",
+   "precio_unitario": 1.144,
+   "descuento_pct": null,
+   "total": -6.86,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BOLSA BASURA 55X60 30L AZUL ELITE C/60PX12U",
+   "producto_ficha": "Bolsa basura 55x60 azul 30 L (paquete 12)",
+   "cantidad": -35.0,
+   "unidad": "paquete",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "ud",
+   "precio_unitario": 0.644,
+   "descuento_pct": null,
+   "total": -22.54,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BOLSA BASURA 55X60 30L AZUL ELITE C/60PX12U",
+   "producto_ficha": "Bolsa basura 55x60 azul 30 L (paquete 12)",
+   "cantidad": -25.0,
+   "unidad": "paquete",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "ud",
+   "precio_unitario": 0.644,
+   "descuento_pct": null,
+   "total": -16.1,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -99.38,
+ "desglose_iva": [
+  {
+   "base": -99.38,
+   "pct": 21,
+   "cuota": -20.87
+  }
+ ],
+ "iva": -20.87,
+ "recargo_equivalencia": 0.0,
+ "retencion_irpf": null,
+ "total": -120.25,
+ "observaciones": "Documento impreso como FACTURA RECTIFICATIVA DE A-26/0001446 (abono). Las cuatro líneas son las del albarán A-26/0002977 de esa factura, en negativo. Forma de pago: APLAZADO, vencimiento 02/10/2026 por -120,25 €. Cliente: MASIDE 2011, S. L. (BARRA CASA TOMAS RESTAURANTE).",
+ "alertas": [
+  "Abono: rectifica la factura A-26/0001446 (R1612) y reduce el total en 120,25 €."
+ ]
+}

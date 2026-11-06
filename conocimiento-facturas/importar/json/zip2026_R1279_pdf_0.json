@@ -1,0 +1,145 @@
+{
+ "archivo": "R1279.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-6267",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CERDO CARRILLADA (OLIVA)",
+   "producto_ficha": "Carrillada de cerdo Oliva",
+   "cantidad": 20.89,
+   "unidad": "kg",
+   "bultos": 3.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.65,
+   "descuento_pct": null,
+   "total": 201.59,
+   "iva_pct": 10,
+   "albaran_ref": "B 12.238",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 12.238",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CHOCO G ENV MARRUECOS",
+   "producto_ficha": "Choco grande envasado, Marruecos",
+   "cantidad": 14.2,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 149.1,
+   "iva_pct": 10,
+   "albaran_ref": "B 12.238",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "GAMBON REBOZADO XXL 1X2",
+   "producto_ficha": "Gambón rebozado XXL (2 kg)",
+   "cantidad": 8.0,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 17.5,
+   "descuento_pct": null,
+   "total": 140.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 12.238",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MEJILLON MOLLA G BATEAMAR",
+   "producto_ficha": "Carne de mejillón (molla) G Bateamar",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 22.5,
+   "iva_pct": 10,
+   "albaran_ref": "B 12.347",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "CANELON CARNE/TRUFA/FOIE AUDENS",
+   "producto_ficha": "Canelón de carne, trufa y foie Audens",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 38.0,
+   "descuento_pct": null,
+   "total": 38.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 12.347",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 559.94,
+ "desglose_iva": [
+  {
+   "base": 513.19,
+   "pct": 10,
+   "cuota": 51.32
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  },
+  {
+   "base": 38.0,
+   "pct": 10,
+   "cuota": 3.8
+  }
+ ],
+ "iva": 55.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 615.41,
+ "observaciones": "Vencimiento 06/08/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": [
+  "«CHOCO G ENV MARRUECOS»: precio 10,50 €/kg; la ficha tiene 8,95 €/kg.",
+  "«GAMBON REBOZADO XXL 1X2»: precio 17,50 €/kg; la ficha tiene 15,00 €/kg.",
+  "Letra de IVA X en «CANELON CARNE/TRUFA/FOIE AUDENS»: el pie suma su base al 10 %; se usa 10 %, la ficha no lo confirma."
+ ]
+}

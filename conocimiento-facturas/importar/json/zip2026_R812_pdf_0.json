@@ -1,0 +1,51 @@
+{
+ "archivo": "R812.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "Tecnomar Viveros S.L.",
+ "cif": "B83719351",
+ "local": "casa_tomas",
+ "numero_documento": "26/0853",
+ "fecha": "2026-05-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VISITA MANTENIMIENTO VIVERO",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 146.4,
+   "descuento_pct": null,
+   "total": 146.4,
+   "iva_pct": 21,
+   "albaran_ref": "2603/18222",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 146.4,
+ "desglose_iva": [
+  {
+   "base": 146.4,
+   "pct": 21,
+   "cuota": 30.74
+  }
+ ],
+ "iva": 30.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 177.14,
+ "observaciones": "Pago por transferencia a CaixaBank, vencimiento 28/05/2026. Albaran 2603/18222 (06/05/2026), pagina 3: revision de equipos; se dejan 1 caja de ampollas de bacterias y 1 sacadera nueva. Paginas 2 y 4 en blanco o solo firma.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

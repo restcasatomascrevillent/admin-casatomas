@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  25
+ ],
+ "tipo": "factura",
+ "proveedor": "INNAZ PESCA, SL",
+ "cif": "B19393974",
+ "local": "casa_tomas",
+ "numero_documento": "812/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 25,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.9,
+   "descuento_pct": null,
+   "total": 42.38,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 42.38,
+ "desglose_iva": [
+  {
+   "base": 42.38,
+   "pct": 10,
+   "cuota": 4.24
+  }
+ ],
+ "iva": 4.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 46.62,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 15519.",
+ "alertas": []
+}

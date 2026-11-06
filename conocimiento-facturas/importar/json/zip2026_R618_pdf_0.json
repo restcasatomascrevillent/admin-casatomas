@@ -1,0 +1,49 @@
+{
+ "archivo": "R618.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VICENTE BAILÉN MOROTE",
+ "cif": "21977632M",
+ "local": "casa_tomas",
+ "numero_documento": null,
+ "fecha": "2026-05-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Alquiler local C/ Santa María de la Cabeza 4 (mes de mayo)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "mes",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 750.0,
+   "descuento_pct": null,
+   "total": 750.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 750.0,
+ "desglose_iva": [
+  {
+   "base": 750.0,
+   "pct": 21,
+   "cuota": 157.5
+  }
+ ],
+ "iva": 157.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": 142.5,
+ "total": 765.0,
+ "observaciones": "Alquiler mensual de local. Retención IRPF 19%. Destinatario MASIDE 2011 SL (B54583356), dirección impresa C/ Santa María de la Cabeza 2.",
+ "alertas": [
+  "Campo número de factura vacío en el documento",
+  "El local alquilado es C/ Santa María de la Cabeza 4 y el destinatario impreso es Santa María 2; se asigna casa_tomas por el destinatario"
+ ]
+}

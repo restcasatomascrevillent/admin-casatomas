@@ -1,0 +1,46 @@
+{
+ "archivo": "R1118.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/13359",
+ "fecha": "2026-07-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AGUA SOLAN DE CABRAS 50CL C20",
+   "producto_ficha": "Agua Solán de Cabras 50 cl (caja 20)",
+   "cantidad": 200,
+   "unidad": "botella",
+   "bultos": 10,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.325,
+   "descuento_pct": 0.0,
+   "total": 65.0,
+   "iva_pct": 10,
+   "albaran_ref": "26/13.408",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 65.0,
+ "desglose_iva": [
+  {
+   "base": 65.0,
+   "pct": 10,
+   "cuota": 6.5
+  }
+ ],
+ "iva": 6.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 71.5,
+ "observaciones": "Giro/B2B, vencimiento 11/07/26. Albarán 26/13.408 (10/07/26). IVA 10 % deducido de las bases impresas.",
+ "alertas": []
+}

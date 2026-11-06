@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  23
+ ],
+ "tipo": "factura",
+ "proveedor": "LUDEÑA GEA, JORGE",
+ "cif": "48322320X",
+ "local": "casa_tomas",
+ "numero_documento": "454/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 23,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.23,
+   "descuento_pct": null,
+   "total": 35.91,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 35.91,
+ "desglose_iva": [
+  {
+   "base": 35.91,
+   "pct": 10,
+   "cuota": 3.59
+  }
+ ],
+ "iva": 3.59,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 39.5,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): ANTONIA Y CINTA. Albaranes de subasta (informativo): 18463.",
+ "alertas": []
+}

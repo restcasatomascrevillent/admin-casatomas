@@ -1,0 +1,70 @@
+{
+  "cif": "B09707274",
+  "nombre": "EL CAPRICHO DE LOREN, S.L.",
+  "nombres_impresos": ["EL CAPRICHO DE LOREN SL"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R222.pdf", "R634.pdf", "R1033.pdf", "R1610.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fin de mes) que agrupa 2 o 3 albaranes; siempre el mismo único artículo (gildas)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["F26 - 76", "F26 - 418", "F26 - 698", "F26 - 1077"],
+      "patron": "^F26 - \\d{2,4}$",
+      "donde": "Tabla 'Número | Fecha | Código Cliente' bajo el membrete: primera celda."
+    },
+    "fecha": "Segunda celda de esa tabla, DD-MM-AAAA con guiones (ej. 30-06-2026). Fecha de factura, no la del albarán.",
+    "albaranes": "Fila 'Albarán nº 2601493 del 08-06-2026' antes de cada línea. El nº de albarán no es el de factura."
+  },
+
+  "lectura": {
+    "columnas": ["Cod. Artículo", "Descripción", "Cantidad", "Precio", "Dto.", "Importe"],
+    "cantidad_es": "bandejas (cada bandeja trae 18 gildas)",
+    "columna_peso": null,
+    "precio_es_por": "bandeja de 18 unidades, precio de lista antes del descuento",
+    "descuento_por_linea": { "existe": true, "columna": "Dto.", "valores_habituales": [35] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin líneas de envase",
+    "cargos_y_descuentos_pie": ["Dtos. Lineales: suma de los descuentos del 35 % de todas las líneas (no es pronto pago)", "Dto. PP vacío; Gastos y Portes vacíos"],
+    "trampas": [
+      "El precio (22,91 / 23,57) es de lista: el importe ya lleva el 35 % de descuento. 8 x 23,57 = 188,56 pero el importe es 122,56.",
+      "El Dto. 35,00 va pegado al precio ('| 23,57 35,00 | 122,56'), sin separador.",
+      "La dirección del cliente y el 'Código Cliente 130' están en la misma fila que el número de factura; el CIF del cliente (B54583356) no es el del proveedor.",
+      "Línea 'Base Imponible % IVA | Cuota IVA | % RE | Cuota RE | 366,56 | 128,30' trae al final Suma Bruto y Dtos. Lineales, no la base.",
+      "Código TBAI-B09707274-... al pie es el sello de TicketBAI, no un producto."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio × (1 − 35/100). Ej. R634: 8 × 23,57 × 0,65 = 122,56",
+    "Suma Bruto = suma de cantidad × precio; Dtos. Lineales = suma de los descuentos; Base = Suma Bruto − Dtos. Lineales. R222: 366,56 − 128,30 = 238,26",
+    "IVA = base × 10 %. R222: 23,83; total = base + IVA = 262,09",
+    "R1033 (3 albaranes): bruto 565,68 − dto 197,99 = base 367,69; IVA 36,77; total 404,46"
+  ],
+
+  "guia_ocr": "Emisor El Capricho de Loren (Bilbao); cliente Maside 2011/Casa Tomás, código cliente 130. Número de factura 'F26 - nnn' y fecha DD-MM-AAAA en la tabla 'Número | Fecha | Código Cliente'. Solo hay un artículo (00001 GILDA TRADICIONAL BANDEJA 18 UDS.) repetido por albarán. Cantidad en bandejas con decimales (8,00). Precio es de lista y el Dto. 35,00 va justo detrás: importe = cantidad × precio × 0,65. IVA 10 %. Ignora la fila 'Albarán nº ... del ...' y el código TBAI.",
+
+  "productos": [
+    {
+      "nombre_impreso": "GILDA TRADICIONAL BANDEJA 18 UDS.",
+      "nombre_normalizado": "Gilda tradicional (bandeja de 18 uds)",
+      "familia": "aperitivo / pincho",
+      "presentacion": "pincho de gilda tradicional ya montado, en bandeja (conservación no indicada)",
+      "formato": { "envase": "bandeja", "contenido": 18, "unidad_contenido": "uds", "unidades_por_bulto": 18, "bulto": "bandeja" },
+      "unidad_factura": "bandeja",
+      "precio": { "min": 22.91, "max": 23.57, "por": "bandeja (precio de lista, antes del 35 % de dto.)", "ejemplos": [["2026-01-19", 22.91], ["2026-04-06", 23.57], ["2026-09-28", 23.57]], "nota": "Neto tras el 35 %: 14,89 (enero) y 15,32 (desde abril) por bandeja." },
+      "iva_pct": 10,
+      "veces_visto": 24
+    }
+  ],
+
+  "dudas": [
+    "El catálogo trae el mismo producto en las 9 facturas; cantidades siempre 8,00 bandejas por albarán. No se sabe si la gilda es fresca o refrigerada.",
+    "Precio de lista subió de 22,91 a 23,57 entre enero y abril de 2026."
+  ]
+}

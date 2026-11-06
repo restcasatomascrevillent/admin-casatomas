@@ -1,0 +1,46 @@
+{
+ "archivo": "R1098.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "92 S",
+ "fecha": "2026-07-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 105.12,
+   "iva_pct": 10,
+   "albaran_ref": "154 S",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 105.12,
+ "desglose_iva": [
+  {
+   "base": 105.12,
+   "pct": 10,
+   "cuota": 10.51
+  }
+ ],
+ "iva": 10.51,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 115.63,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura.",
+ "alertas": []
+}

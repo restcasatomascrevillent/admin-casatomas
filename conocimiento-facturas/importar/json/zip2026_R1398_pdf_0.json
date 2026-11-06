@@ -1,0 +1,63 @@
+{
+ "archivo": "R1398.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ACEITES CREVILLENTE, S.L.",
+ "cif": "B53012969",
+ "local": "casa_tomas",
+ "numero_documento": "A/482",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ACEITE GIRASOL OLEICO 25L",
+   "producto_ficha": "Aceite de girasol alto oleico (garrafa 25 L)",
+   "cantidad": 300.0,
+   "unidad": "l",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.96,
+   "descuento_pct": null,
+   "total": 588.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ACEITE GIRASOL REFINADO",
+   "producto_ficha": "Aceite de girasol refinado (garrafa 25 L)",
+   "cantidad": 75.0,
+   "unidad": "l",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.65,
+   "descuento_pct": null,
+   "total": 123.75,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 711.75,
+ "desglose_iva": [
+  {
+   "base": 711.75,
+   "pct": 10,
+   "cuota": 71.18
+  }
+ ],
+ "iva": 71.18,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 782.93,
+ "observaciones": "ClassicGes 6. Cantidades en litros. Fecha valor igual a la de factura. Forma de pago: transferencia bancaria.",
+ "alertas": []
+}

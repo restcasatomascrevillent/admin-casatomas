@@ -240,6 +240,16 @@ export const TOOLS = [
   fn("grafico_precio",
     "Grafica y evolucion del precio de UN producto.",
     { producto: { type: "string" }, desde: FECHA_NULL, hasta: FECHA_NULL, unidad: UNIDAD }),
+  fn("volumen_comprado",
+    "Litros/kilos y n de envases comprados aunque vaya en cajas o barriles ('litros de cerveza', " +
+    "'cuantas cervezas', 'cuantos barriles'). Di lineas_sin_convertir.",
+    {
+      categoria: { type: ["string", "null"], description: "cerveza, vino" },
+      producto: { type: ["string", "null"], description: "agua, aceite, tinto" },
+      desde: FECHA_HIST,
+      hasta: FECHA_HIST,
+      unidad: { type: ["string", "null"], enum: ["l", "kg", null] },
+    }),
   fn("buscar_productos",
     "Lineas de producto por nombre o descripcion ('compramos gambas?', 'que aceite').",
     { consulta: { type: "string" } }),
@@ -591,6 +601,26 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
         tipo: "rpc",
         rpc: "serie_precios_agente",
         params: { p_texto: producto, p_desde: desde, p_hasta: hasta, p_unidad: texto(args.unidad) },
+        limite: null,
+      };
+    }
+
+    case "volumen_comprado": {
+      const categoria = texto(args.categoria);
+      const producto = texto(args.producto);
+      if (!categoria && !producto) throw new Error('Falta el parametro "categoria" o "producto".');
+      const { desde, hasta } = rangoOpcional(args);
+      const unidad = texto(args.unidad);
+      return {
+        tipo: "rpc",
+        rpc: "volumen_comprado_agente",
+        params: {
+          p_texto: producto,
+          p_categoria: categoria,
+          p_desde: desde,
+          p_hasta: hasta,
+          p_medida: unidad === "l" || unidad === "kg" ? unidad : null,
+        },
         limite: null,
       };
     }

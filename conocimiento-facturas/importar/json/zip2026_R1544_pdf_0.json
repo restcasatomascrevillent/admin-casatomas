@@ -1,0 +1,63 @@
+{
+ "archivo": "R1544.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 5676",
+ "fecha": "2026-09-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA PELADA LUNA DE MAR",
+   "producto_ficha": "Quisquilla pelada Luna de Mar",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 80.0,
+   "iva_pct": 10,
+   "albaran_ref": "202610186",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CALAMAR LIMPIO 4 LANZAL 8x1",
+   "producto_ficha": "Calamar limpio 4 Lanzal (8 x 1 kg)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.75,
+   "descuento_pct": null,
+   "total": 64.5,
+   "iva_pct": 10,
+   "albaran_ref": "202610186",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 144.5,
+ "desglose_iva": [
+  {
+   "base": 144.5,
+   "pct": 10,
+   "cuota": 14.45
+  }
+ ],
+ "iva": 14.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 158.95,
+ "observaciones": "Transferencia a 30 dias, vencimiento 18/10/2026. Albaran 202610186 de 15/09/2026, pedido 23050. Lote del calamar impreso en minusculas (clx1/309/2606). Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

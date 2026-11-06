@@ -1,0 +1,63 @@
+{
+ "archivo": "R929.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260282",
+ "fecha": "2026-06-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 52.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000282",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 86.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000282",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 138.4,
+ "desglose_iva": [
+  {
+   "base": 138.4,
+   "pct": 10,
+   "cuota": 13.84
+  }
+ ],
+ "iva": 13.84,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 152.24,
+ "observaciones": "Transferencia CaixaBank; vencimiento 12/06/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": []
+}

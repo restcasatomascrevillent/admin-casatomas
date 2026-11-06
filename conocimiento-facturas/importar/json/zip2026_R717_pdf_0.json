@@ -1,0 +1,82 @@
+{
+ "archivo": "R717.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "159",
+ "fecha": "2026-05-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Chupadedos T3",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 10.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Cuquillo +3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.5,
+   "descuento_pct": null,
+   "total": 14.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Gordal DH 2kg 60/80",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 90.7,
+ "desglose_iva": [
+  {
+   "base": 90.7,
+   "pct": 10,
+   "cuota": 9.07
+  }
+ ],
+ "iva": 9.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 99.77,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante. Foto girada 90 grados.",
+ "alertas": [
+  "Línea 1: cantidad 2 × precio 10,50 = 21,00 pero el importe impreso es 10,50; manda el importe (suma bruto 90,70 = 10,50 + 14,50 + 65,70)."
+ ]
+}

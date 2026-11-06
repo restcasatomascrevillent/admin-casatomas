@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  18
+ ],
+ "tipo": "factura",
+ "proveedor": "ACOSTA SAURA, PEDRO DAVID",
+ "cif": "23954260J",
+ "local": "casa_tomas",
+ "numero_documento": "220/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 18,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 6.65,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.92,
+   "descuento_pct": null,
+   "total": 99.2,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 99.2,
+ "desglose_iva": [
+  {
+   "base": 99.2,
+   "pct": 10,
+   "cuota": 9.92
+  }
+ ],
+ "iva": 9.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 109.12,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): EL PACIFICO. Albaranes de subasta (informativo): 12947.",
+ "alertas": []
+}

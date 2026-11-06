@@ -1,0 +1,107 @@
+{
+ "archivo": "R1138.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Exclusivas Uriarte, S.L.",
+ "cif": "B03821576",
+ "local": "casa_tomas",
+ "numero_documento": "A26/5906",
+ "fecha": "2026-06-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TROMPETA DE LOS MUERTOS PETRAS 1 KG.",
+   "producto_ficha": "Trompeta de los muertos Petras 1 kg",
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 10.98,
+   "descuento_pct": null,
+   "total": 32.94,
+   "iva_pct": 4,
+   "albaran_ref": "A26/9031",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "QS",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.9,
+   "descuento_pct": null,
+   "total": 139.5,
+   "iva_pct": 21,
+   "albaran_ref": "A26/9031",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "QS",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/9031",
+   "bonificada": true,
+   "precio_referencia": 27.9
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BOSQUE DE MATASNOS ETIQ BLANCA",
+   "producto_ficha": "Bosque de Matasnos etiqueta blanca",
+   "cantidad": 24.0,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.96,
+   "descuento_pct": null,
+   "total": 503.04,
+   "iva_pct": 21,
+   "albaran_ref": "A26/9031",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 675.48,
+ "desglose_iva": [
+  {
+   "base": 32.94,
+   "pct": 4,
+   "cuota": 1.32
+  },
+  {
+   "base": 642.54,
+   "pct": 21,
+   "cuota": 134.93
+  }
+ ],
+ "iva": 136.25,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 811.73,
+ "observaciones": "Forma de pago: recibo 45 días domiciliado. Nota impresa: añadir bolsa pendiente de entregar. Factura digital (texto).",
+ "alertas": [
+  "Descripción de las líneas 2 y 3 ilegible en el texto: solo sale 'QS' (lote LQS19-UE/NA); posible vino. Cajas/UxC=6 no confirmado.",
+  "La línea 3 (1 ud a 0,00) es regalo del mismo artículo.",
+  "IVA de la línea 2 (21%) deducido de la base 642,54 = 139,50+503,04."
+ ]
+}

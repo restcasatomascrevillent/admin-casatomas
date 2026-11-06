@@ -1,0 +1,80 @@
+{
+ "archivo": "R580.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 2097",
+ "fecha": "2026-04-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 30/50",
+   "producto_ficha": "Pez espada 30/50 (FAO 87 Pacífico)",
+   "cantidad": 5.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.0,
+   "descuento_pct": null,
+   "total": 53.55,
+   "iva_pct": 10,
+   "albaran_ref": "20263719",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. DORADA 120/160 X5",
+   "producto_ficha": "Dorada 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.5,
+   "descuento_pct": null,
+   "total": 62.5,
+   "iva_pct": 10,
+   "albaran_ref": "20263719",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "RAPE 1 MURIEL",
+   "producto_ficha": "Rape 1 Muriel",
+   "cantidad": 13.9,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 166.8,
+   "iva_pct": 10,
+   "albaran_ref": "20263719",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 282.85,
+ "desglose_iva": [
+  {
+   "base": 282.85,
+   "pct": 10,
+   "cuota": 28.29
+  }
+ ],
+ "iva": 28.29,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 311.14,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 24/05/2026, transferencia a 30 días. Albarán 20263719 del 22/04/2026, pedido 18334. Nota 'Baul' ignorada. La fila Total (2 cajas, 24,85 kg) no son euros.",
+ "alertas": []
+}

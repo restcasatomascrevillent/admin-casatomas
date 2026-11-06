@@ -1,0 +1,63 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  15
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS GONZALEZ LOPEZ C.B.",
+ "cif": "E42544965",
+ "local": "casa_tomas",
+ "numero_documento": "1.137/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 15,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 10.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 77.39,
+   "descuento_pct": null,
+   "total": 812.58,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 15,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 3.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 80.15,
+   "descuento_pct": null,
+   "total": 260.49,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1073.07,
+ "desglose_iva": [
+  {
+   "base": 1073.07,
+   "pct": 10,
+   "cuota": 107.31
+  }
+ ],
+ "iva": 107.31,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1180.38,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): NUEVO MAGU, ROSQUI. Albaranes de subasta (informativo): 15155, 15519, 14658, 15037, 14423.",
+ "alertas": []
+}

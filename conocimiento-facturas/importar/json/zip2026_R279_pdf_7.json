@@ -1,0 +1,80 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO RUSO AMBIT Y OTROS, C.B.",
+ "cif": "E03306933",
+ "local": "casa_tomas",
+ "numero_documento": "240/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 0.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 32.11,
+   "iva_pct": 10,
+   "albaran_ref": "3521, 4407",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 8,
+   "nombre": "MACRUROS",
+   "producto_ficha": null,
+   "cantidad": 2.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 231.33,
+   "iva_pct": 10,
+   "albaran_ref": "3521, 4407",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 8,
+   "nombre": "CEFALOPODOS",
+   "producto_ficha": null,
+   "cantidad": 0.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 12.66,
+   "iva_pct": 10,
+   "albaran_ref": "3521, 4407",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 276.1,
+ "desglose_iva": [
+  {
+   "base": 276.1,
+   "pct": 10,
+   "cuota": 27.61
+  }
+ ],
+ "iva": 27.61,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 303.71,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 140. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

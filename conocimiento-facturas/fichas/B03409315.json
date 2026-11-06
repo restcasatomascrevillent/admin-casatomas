@@ -1,0 +1,79 @@
+{
+  "cif": "B03409315",
+  "nombre": "CONGELADOS EL MILITAR, S.L.",
+  "nombres_impresos": ["Congelados El Militar", "CONGELADOS EL MILITAR, S.L."],
+  "categoria": "marisco",
+  "locales": ["casa_tomas"],
+  "muestras": ["R119.pdf", "R662.pdf", "R1332.pdf", "R508.pdf", "R1597.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán por factura, semanal); producto congelado",
+    "varias_facturas_por_pdf": true,
+    "paginas_tipicas": "1 página por factura; un PDF junta 4-5 facturas semanales (las muestras tienen 4-5 páginas = 4-5 facturas)",
+    "numero_factura": { "ejemplos": ["2026 A 00166", "2026 A 05270", "2026 A 07957"], "patron": "^2026 A \\d{5}$", "donde": "tabla de cabecera C.I.F. | Nro.FACTURA | Fecha | Cod.Cliente | Página (con espacios entre 2026, A y el número)" },
+    "fecha": "misma tabla de cabecera, DD-MM-AAAA con guiones",
+    "albaranes": "línea 'ALBARAN F566502 FECHA 08-01-2026' justo antes de las líneas; una factura = un albarán. Cliente impreso: MASIDE 2011, S.L.U. / CASA TOMAS BARRA, CIF B54583356, Cod. cliente 4300001948"
+  },
+
+  "lectura": {
+    "columnas": ["Código (con sufijo de lote -970, -996…)", "Mercancía", "Cajas", "Kilos/Und. (con unidad KG o UN)", "Precio", "Importe"],
+    "cantidad_es": "la columna 'Cajas' cuenta bultos; la cantidad que se factura es la de 'Kilos/Und.' con su unidad (KG o UN)",
+    "columna_peso": "Kilos/Und. (p. ej. 56,900 KG, 3 decimales)",
+    "precio_es_por": "kg en líneas KG; unidad en líneas UN",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10, 4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "El pie TOTAL IMPORTES | BASE IMPONIBLE | CUOTA I.V.A. | Rec. Equiv. trae una fila por tipo de IVA: '1.114,41 | 1.114,41 10,0 | 111,44 | 1,4'. Ese 1,4 (o 0,5) es el % de recargo y NO se cobra: el total no lo suma.",
+      "El único producto al 4 % visto es REVUELTO SETAS (fila extra '25,50 | 4,0 | 1,02 | 0,5'); lo demás va al 10 %.",
+      "El código del pulpo cambia (3986921-970, 3986921-996, 1356921, 3036921-813): no usar el código para identificar el producto.",
+      "El precio del pulpo cambia de 18,90 a 15,90 €/kg en marzo; comprobar importe = kg × precio.",
+      "El CIF impreso en la cabecera (B54583356) es el del CLIENTE (Maside 2011), no el del emisor; el emisor solo sale en el texto legal del pie.",
+      "Una página del PDF = una factura distinta con su propio número y total."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = kilos (columna Kilos/Und.) × precio, redondeado a 2 decimales (56,900 × 18,90 = 1.075,41; 60 UN × 1,00 = 60,00)",
+    "TOTAL IMPORTES = suma de importes de las líneas = base total",
+    "cuota IVA = base de cada tipo × % (10 % o 4 %); el recargo de equivalencia impreso no se suma",
+    "TOTAL FACTURA = base 10 % + cuota 10 % + base 4 % + cuota 4 %. Ejemplo R508 pág.1: 316,50 + 31,65 + 25,50 + 1,02 = 374,67"
+  ],
+
+  "guia_ocr": "Factura de Congelados El Militar para Maside 2011. Una página = una factura. Número 'Nro.FACTURA' con formato '2026 A 00166' y fecha DD-MM-AAAA en la tabla de cabecera. Cada línea: código | nombre | Cajas | Kilos o unidades con su unidad (KG/UN) | precio | importe. Usa la cantidad de la columna Kilos/Und., no la de Cajas. Precio por kg en líneas KG. IVA 10 % casi siempre; REVUELTO SETAS al 4 %. El recargo de equivalencia (1,4 / 0,5) solo se imprime, no suma. El pie tiene una fila de base/cuota por cada tipo de IVA. Ignora el texto legal.",
+
+  "productos": [
+    { "nombre_impreso": "PULPO T-2 BORDO MARRUECOS", "nombre_normalizado": "Pulpo T-2 congelado a bordo (Marruecos)", "familia": "marisco", "presentacion": "congelado, pieza entera, calibre T-2", "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja (~28 kg)" }, "unidad_factura": "kg", "precio": { "min": 15.90, "max": 18.90, "por": "kg", "ejemplos": [["2026-01-08", 18.90], ["2026-03-04", 15.90], ["2026-04-29", 16.30]] }, "iva_pct": 10, "veces_visto": 16 },
+    { "nombre_impreso": "PULPO T-2 MARRUECOS BORDO", "nombre_normalizado": "Pulpo T-2 congelado a bordo (Marruecos), variante de código", "familia": "marisco", "presentacion": "congelado, pieza entera", "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" }, "unidad_factura": "kg", "precio": { "min": 16.30, "max": 16.30, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "VIEIRA CARNE 30/40 X1", "nombre_normalizado": "Vieira carne (sin concha) 30/40", "familia": "marisco", "presentacion": "congelado, carne sin concha, calibre 30/40", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bolsa de 1 kg (X1)" }, "unidad_factura": "bolsa (UN)", "precio": { "min": 20.00, "max": 20.00, "por": "bolsa de 1 kg", "ejemplos": [["2026-01-28", 20.00]] }, "iva_pct": 10, "veces_visto": 9 },
+    { "nombre_impreso": "VIEIRA MED/CONCHA 20/30 X1 CHILE", "nombre_normalizado": "Vieira media concha 20/30 (Chile)", "familia": "marisco", "presentacion": "congelado, media concha, calibre 20/30", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bolsa de 1 kg (X1)" }, "unidad_factura": "kg", "precio": { "min": 15.25, "max": 15.25, "por": "kg", "ejemplos": [["2026-01-21", 15.25], ["2026-03-04", 15.25]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "VIEIRA MED/CONCHA 10/20 X1", "nombre_normalizado": "Vieira media concha 10/20", "familia": "marisco", "presentacion": "congelado, media concha, calibre 10/20", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bolsa de 1 kg (X1)" }, "unidad_factura": "kg", "precio": { "min": 15.75, "max": 15.75, "por": "kg", "ejemplos": [["2026-09-23", 15.75]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "COLAS ALISTAO 1", "nombre_normalizado": "Colas alistao 1", "familia": "marisco", "presentacion": "congelado, colas", "formato": { "envase": "bolsa", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 25.50, "max": 25.50, "por": "kg", "ejemplos": [["2026-04-08", 25.50]] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "COLAS ALISTAO 2 CARABELAS", "nombre_normalizado": "Colas alistao 2 carabelas", "familia": "marisco", "presentacion": "congelado, colas", "formato": { "envase": "bolsa", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 24.00, "max": 27.00, "por": "kg", "ejemplos": [["2026-01-21", 27.00], ["2026-09-30", 24.00]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "TORPEDO LANGOSTINOS 1KG", "nombre_normalizado": "Torpedo de langostinos (bolsa 1 kg)", "familia": "marisco", "presentacion": "congelado, rebozado/preparado (torpedo)", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bolsa de 1 kg" }, "unidad_factura": "kg", "precio": { "min": 11.00, "max": 11.00, "por": "kg", "ejemplos": [["2026-07-09", 11.00], ["2026-09-23", 11.00]] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "TWISTER DE LANGOSTINOS 800GR", "nombre_normalizado": "Twister de langostinos 800 g", "familia": "marisco", "presentacion": "congelado, preparado", "formato": { "envase": "paquete", "contenido": 800, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": "paquete" }, "unidad_factura": "paquete (UN)", "precio": { "min": 12.50, "max": 13.00, "por": "paquete", "ejemplos": [["2026-01-08", 13.00]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "RAPE 300/500", "nombre_normalizado": "Rape 300/500 (cola)", "familia": "pescado", "presentacion": "congelado, calibre 300/500 g", "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja (13-15 kg)" }, "unidad_factura": "kg", "precio": { "min": 14.25, "max": 14.25, "por": "kg", "ejemplos": [["2026-07-09", 14.25], ["2026-07-29", 14.25]] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "FLT.CORVINA S/ESPINA X7", "nombre_normalizado": "Filete de corvina sin espina (caja 7 kg)", "familia": "pescado", "presentacion": "congelado, filete sin espina", "formato": { "envase": "caja", "contenido": 7, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja de 7 kg" }, "unidad_factura": "kg", "precio": { "min": 9.50, "max": 9.50, "por": "kg", "ejemplos": [["2026-07-01", 9.50], ["2026-07-22", 9.50]] }, "iva_pct": 10, "veces_visto": 7 },
+    { "nombre_impreso": "RD.ESPADA EXT.", "nombre_normalizado": "Rodaja de pez espada extra", "familia": "pescado", "presentacion": "congelado, rodaja", "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 10.00, "max": 10.00, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "CHOCO M", "nombre_normalizado": "Choco mediano", "familia": "marisco", "presentacion": "congelado, entero", "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 8.80, "max": 8.80, "por": "kg", "ejemplos": [["2026-03-11", 8.80]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "CALAMAR (3P) I.Q.F", "nombre_normalizado": "Calamar I.Q.F. (congelado individual)", "familia": "marisco", "presentacion": "congelado individual (IQF)", "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 8.50, "max": 8.50, "por": "kg", "ejemplos": [["2026-03-12", 8.50]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "CAL.LIMPIO 10/20 X1", "nombre_normalizado": "Calamar limpio 10/20", "familia": "marisco", "presentacion": "congelado, limpio", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bolsa X1" }, "unidad_factura": "UN (bolsa; la factura la marca como UN)", "precio": { "min": 8.00, "max": 8.00, "por": "bolsa/kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "TORT. CAMARON PREMIUM 30.UNI", "nombre_normalizado": "Tortita de camarón premium (pack 30 uds)", "familia": "marisco", "presentacion": "congelado, preparado", "formato": { "envase": "caja", "contenido": 30, "unidad_contenido": "ud", "unidades_por_bulto": 30, "bulto": "caja de 30 unidades" }, "unidad_factura": "unidad (UN)", "precio": { "min": 1.00, "max": 1.00, "por": "ud", "ejemplos": [["2026-07-09", 1.00], ["2026-09-09", 1.00]] }, "iva_pct": 10, "veces_visto": 17 },
+    { "nombre_impreso": "ROLLITO CARRILLADA Y SETAS 25.UND", "nombre_normalizado": "Rollito de carrillada y setas (caja 25 uds)", "familia": "precocinado", "presentacion": "congelado, precocinado", "formato": { "envase": "caja", "contenido": 25, "unidad_contenido": "ud", "unidades_por_bulto": 25, "bulto": "caja de 25 unidades" }, "unidad_factura": "unidad (UN)", "precio": { "min": 1.00, "max": 1.05, "por": "ud", "ejemplos": [["2026-03-11", 1.00], ["2026-07-29", 1.00]] }, "iva_pct": 10, "veces_visto": 13 },
+    { "nombre_impreso": "REVUELTO SETAS X1", "nombre_normalizado": "Revuelto de setas (bolsa 1 kg)", "familia": "precocinado", "presentacion": "congelado, verdura preparada", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bolsa de 1 kg (X1)" }, "unidad_factura": "kg", "precio": { "min": 4.25, "max": 4.25, "por": "kg", "ejemplos": [["2026-07-01", 4.25]] }, "iva_pct": 4, "veces_visto": 7 }
+  ],
+
+  "dudas": [
+    "Ficha basada en 5 PDF de muestra (12 en total); el catálogo sale de las 20 líneas del catalogo_lineas.txt.",
+    "VIEIRA CARNE 30/40 X1: la factura la cuenta en UN (10 UN a 20,00 €); se asume bolsa de 1 kg pero no está explícito.",
+    "TORT. CAMARON y ROLLITO: la columna Cajas es igual a las unidades (60 cajas = 60 UN) y el precio es por unidad (1,00 €), aunque el nombre dice 30 UNI / 25 UND por caja. No está claro si 'Cajas' son realmente cajas.",
+    "COLAS ALISTAO: no se sabe de qué especie son las colas; se deja la familia genérica.",
+    "CAL.LIMPIO 10/20 X1 figura en UN con precio 8,00 (parece precio por kg/bolsa de 1 kg).",
+    "El IVA del REVUELTO SETAS (4 %) es el impreso en la factura; el resto de líneas va al 10 %.",
+    "El recargo de equivalencia aparece como % en el pie pero no entra en el total."
+  ]
+}

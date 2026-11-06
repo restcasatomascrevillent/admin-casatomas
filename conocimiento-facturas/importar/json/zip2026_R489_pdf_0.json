@@ -1,0 +1,85 @@
+{
+ "archivo": "R489.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "LICORES Y DISTRIBUCIONES BELLOD, S.L.",
+ "cif": "B03141165",
+ "local": "casa_tomas",
+ "numero_documento": "1818/026",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MARCHAPAN PICOS CAMPEROS 150G.",
+   "producto_ficha": "Marchapán Picos Camperos 150 g",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "g",
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 40.0,
+   "iva_pct": 4,
+   "albaran_ref": "2848/026",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ESTRECHO ENRIQUE MENDOZA 75CL.",
+   "producto_ficha": "Estrecho Enrique Mendoza 75 cl",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 15.93,
+   "descuento_pct": null,
+   "total": 95.58,
+   "iva_pct": 21,
+   "albaran_ref": "2848/026",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ENRIQUE MENDOZA ORAVAL 75CL",
+   "producto_ficha": "Enrique Mendoza Oraval 75 cl",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 6.97,
+   "descuento_pct": null,
+   "total": 41.82,
+   "iva_pct": 21,
+   "albaran_ref": "2848/026",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 177.4,
+ "desglose_iva": [
+  {
+   "base": 40.0,
+   "pct": 4,
+   "cuota": 1.6
+  },
+  {
+   "base": 137.4,
+   "pct": 21,
+   "cuota": 28.85
+  }
+ ],
+ "iva": 30.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 207.85,
+ "observaciones": "Número impreso 1.818/026. Albarán 2848/026 de 17/03/2026. Transferencia 30 días, vencimiento 30/04/2026. Vino: cantidad en botellas sueltas.",
+ "alertas": []
+}

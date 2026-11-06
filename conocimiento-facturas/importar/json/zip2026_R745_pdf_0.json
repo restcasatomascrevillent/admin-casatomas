@@ -1,0 +1,67 @@
+{
+ "archivo": "R745.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "Tecnomar Viveros S.L.",
+ "cif": "B83719351",
+ "local": "casa_tomas",
+ "numero_documento": "26/0687",
+ "fecha": "2026-05-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VIVERO DE MARISCO MODELO MERCURY 200 VTR DY BLANCO DE MEDIDAS 205x75x165 CM",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7860.0,
+   "descuento_pct": null,
+   "total": 7860.0,
+   "iva_pct": 21,
+   "albaran_ref": "2608/18156",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TRANSPORTE, COLOCACION Y PUESTA EN MARCHA",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 480.0,
+   "descuento_pct": null,
+   "total": 480.0,
+   "iva_pct": 21,
+   "albaran_ref": "2608/18156",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 8340.0,
+ "desglose_iva": [
+  {
+   "base": 8340.0,
+   "pct": 21,
+   "cuota": 1751.4
+  }
+ ],
+ "iva": 1751.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 10091.4,
+ "observaciones": "Pago por transferencia a CaixaBank, vencimiento 04/05/2026. Albaran 2608/18156 (30/04/2026), pagina 3: instalacion del vivero Mercury 200; queda pendiente la sustitucion del ventilador del equipo de frio.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

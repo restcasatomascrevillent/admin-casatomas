@@ -1,0 +1,169 @@
+{
+ "archivo": "R1456.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/004385",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG",
+   "producto_ficha": "Calamar patagonico limpio 9-12 cm (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.34,
+   "descuento_pct": null,
+   "total": 56.69,
+   "iva_pct": 10,
+   "albaran_ref": "LA/8098",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CEBOLLA PERLA (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla perla (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.21,
+   "descuento_pct": null,
+   "total": 22.05,
+   "iva_pct": 4,
+   "albaran_ref": "LA/8098",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CEBOLLA PERLA (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla perla (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.21,
+   "descuento_pct": null,
+   "total": 22.05,
+   "iva_pct": 4,
+   "albaran_ref": "LA/8761",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "HAMBURGUESA MINI LANGOSTINO 31G (3X1KG) 3KG",
+   "producto_ficha": "Mini hamburguesa de langostino 31 g (3x1 kg)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.74,
+   "descuento_pct": null,
+   "total": 76.46,
+   "iva_pct": 10,
+   "albaran_ref": "LA/8761",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CAJA POREX",
+   "producto_ficha": "Caja de porex (envase)",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": null,
+   "albaran_ref": "LA/8761",
+   "bonificada": true
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "SM B5 MANGO MELON PIÑA KIWI (20X150G) 3KG",
+   "producto_ficha": "Base smoothie mango-melon-pina-kiwi (20x150 g)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "g",
+   "precio_unitario": 9.0,
+   "descuento_pct": null,
+   "total": 27.0,
+   "iva_pct": 4,
+   "albaran_ref": "LA/8761",
+   "bonificada": false
+  },
+  {
+   "orden": 7,
+   "pagina": 1,
+   "nombre": "GILDAS ANCHOA GIRASOL PREM 25UD",
+   "producto_ficha": "Gildas de anchoa premium (25 ud)",
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 23.66,
+   "descuento_pct": null,
+   "total": 23.66,
+   "iva_pct": 10,
+   "albaran_ref": "LA/8761",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/8098)",
+   "importe": 1.5,
+   "iva_pct": 21
+  },
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/8761)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 230.91,
+ "desglose_iva": [
+  {
+   "base": 156.81,
+   "pct": 10,
+   "cuota": 15.68
+  },
+  {
+   "base": 71.1,
+   "pct": 4,
+   "cuota": 2.84
+  },
+  {
+   "base": 3.0,
+   "pct": 21,
+   "cuota": 0.63
+  }
+ ],
+ "iva": 19.15,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 250.06,
+ "observaciones": "Transferencia a 10 dias, vencimiento 10/09/2026. Albaranes LA/8098 (06/08/2026, 78,74 EUR, 2 bultos, 15 kg) y LA/8761 (27/08/2026, 149,17 EUR, 5 bultos, 20 kg). El IVA por linea no viene impreso: se asigna 10 % a hamburguesa y gildas, y 4 % a la base smoothie, porque es lo unico que cuadra con las bases del pie (156,81 al 10 %, 71,10 al 4 %). La caja porex va sin coste. Diferencias de centimos dentro de tolerancia: cebolla 22,10 frente a 22,05; hamburguesa 76,44 frente a 76,46; calamar 56,70 frente a 56,69. FTV-7236251 es una referencia del encabezado, no el numero de factura.",
+ "alertas": []
+}

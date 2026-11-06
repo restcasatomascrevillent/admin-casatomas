@@ -1,0 +1,63 @@
+{
+ "archivo": "R1168.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+ "cif": "B30224109",
+ "local": "casa_tomas",
+ "numero_documento": "7128",
+ "fecha": "2026-07-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GRAMONA BRUT IMPERIAL GRVA 75 CL.",
+   "producto_ficha": "Gramona Imperial Brut Gran Reserva 75 cl (cava)",
+   "cantidad": 36.0,
+   "unidad": "botella",
+   "bultos": 6.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.92,
+   "descuento_pct": null,
+   "total": 609.12,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GRAMONA TRES LUSTROS GRVA BRUT S/E 75 CL.",
+   "producto_ficha": null,
+   "cantidad": 36.0,
+   "unidad": "botella",
+   "bultos": 6.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 23.72,
+   "descuento_pct": null,
+   "total": 853.92,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1463.04,
+ "desglose_iva": [
+  {
+   "base": 1463.04,
+   "pct": 21,
+   "cuota": 307.24
+  }
+ ],
+ "iva": 307.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1770.28,
+ "observaciones": "Forma de pago REPOSICION. Copia factura. CERRADO LUNES. Totales con coma de miles (1,463.04 / 1,770.28).",
+ "alertas": []
+}

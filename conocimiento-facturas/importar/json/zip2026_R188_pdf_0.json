@@ -1,0 +1,68 @@
+{
+ "archivo": "R188.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA SELECCION - VINOS CALDERON S.L.U.",
+ "cif": "B53804522",
+ "local": "casa_tomas",
+ "numero_documento": "F26000063",
+ "fecha": "2026-02-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MARQ. MARQUES DE MURRIETA MAGNUM 20",
+   "producto_ficha": "Marqués de Murrieta Magnum (añada sin leer)",
+   "cantidad": 11,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "cl",
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 396.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000108",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MARQ. MARQUES DE MURRIETA MAGNUM 20",
+   "producto_ficha": "Marqués de Murrieta Magnum (añada sin leer)",
+   "cantidad": 1,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "cl",
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000108",
+   "bonificada": true,
+   "precio_referencia": 36.0
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 396.0,
+ "desglose_iva": [
+  {
+   "base": 396.0,
+   "pct": 21,
+   "cuota": 83.16
+  }
+ ],
+ "iva": 83.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 479.16,
+ "observaciones": "Escaneo (imagen). Albarán A26000108 de 06/02/2026. Anotación manuscrita 'Cobro 06/03/2026' (no impresa). Magnum 150 cl deducido de la palabra MAGNUM (no impreso).",
+ "alertas": [
+  "Escaneo recortado por la derecha: la añada (20..) y parte de IVA y total no se ven completos. El total 479,16 coincide con base 396,00 + IVA 83,16.",
+  "Línea de 1 magnum sin precio ni importe: se toma como bonificada.",
+  "Precio 36,00 € por magnum: bajo según la ficha; contrastar."
+ ]
+}

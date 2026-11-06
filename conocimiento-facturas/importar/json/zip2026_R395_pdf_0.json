@@ -1,0 +1,124 @@
+{
+ "archivo": "R395.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-1797",
+ "fecha": "2026-03-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CANELON CARNE/TRUFA/FOIE AUDENS",
+   "producto_ficha": "Canelón de carne, trufa y foie Audens",
+   "cantidad": 3.75,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 38.0,
+   "descuento_pct": null,
+   "total": 142.5,
+   "iva_pct": 10,
+   "albaran_ref": "B 3.652",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CERDO CARRILLADA (OLIVA)",
+   "producto_ficha": "Carrillada de cerdo Oliva",
+   "cantidad": 17.77,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.65,
+   "descuento_pct": null,
+   "total": 171.48,
+   "iva_pct": 10,
+   "albaran_ref": "B 3.652",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 3.652",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "POLLO MUSLO DESH. 4X2.5",
+   "producto_ficha": "Muslo de pollo deshuesado sin piel (4 x 2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.95,
+   "descuento_pct": null,
+   "total": 49.5,
+   "iva_pct": 10,
+   "albaran_ref": "B 3.652",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "BURRATA IQF 10UD (2BAND. 125GR)",
+   "producto_ficha": "Burrata IQF 125 g (10 uds, 2 bandejas)",
+   "cantidad": 40.0,
+   "unidad": "kg",
+   "bultos": 40,
+   "contenido_cantidad": 125,
+   "contenido_unidad": "g",
+   "precio_unitario": 4.4,
+   "descuento_pct": null,
+   "total": 176.0,
+   "iva_pct": 4,
+   "albaran_ref": "B 3.652",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 548.23,
+ "desglose_iva": [
+  {
+   "base": 220.98,
+   "pct": 10,
+   "cuota": 22.1
+  },
+  {
+   "base": 142.5,
+   "pct": 10,
+   "cuota": 14.25
+  },
+  {
+   "base": 184.75,
+   "pct": 4,
+   "cuota": 7.39
+  }
+ ],
+ "iva": 43.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 591.97,
+ "observaciones": "Remesa semanal, vencimiento 22/03/2026. La letra X del canelón AD220 es 10 % según el pie (142,50 al 10 % = 14,25). Notas «3 cajas + 3 bandejas» y «3 cajas OJO DE CERDO» no son líneas. Cuadra al céntimo.",
+ "alertas": []
+}

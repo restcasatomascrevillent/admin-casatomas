@@ -1,0 +1,144 @@
+{
+ "archivo": "R793.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-4204",
+ "fecha": "2026-05-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "POLLO TIRAS SWEET CHILI 3X1 AUDENS",
+   "producto_ficha": "Tiras de pollo sweet chili Audens (3 x 1 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.2,
+   "descuento_pct": null,
+   "total": 134.4,
+   "iva_pct": 10,
+   "albaran_ref": "B 8.395",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CHOCO G ENV MARRUECOS",
+   "producto_ficha": "Choco grande envasado, Marruecos",
+   "cantidad": 7.15,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 75.08,
+   "iva_pct": 10,
+   "albaran_ref": "B 8.395",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 8.395",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "POLLO ALAS 4X2.5",
+   "producto_ficha": "Alas de pollo (4 x 2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.9,
+   "descuento_pct": null,
+   "total": 29.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 8.395",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CANELON CARNE/TRUFA/FOIE AUDENS",
+   "producto_ficha": "Canelón de carne, trufa y foie Audens",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 38.0,
+   "descuento_pct": null,
+   "total": 76.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 8.395",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "QUESO FRESCO TEMPURA 4X500 AL VENT",
+   "producto_ficha": "Queso fresco en tempura (4 x 500 g)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 11.35,
+   "descuento_pct": null,
+   "total": 22.7,
+   "iva_pct": 10,
+   "albaran_ref": "B 8.395",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 345.93,
+ "desglose_iva": [
+  {
+   "base": 261.18,
+   "pct": 10,
+   "cuota": 26.12
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  },
+  {
+   "base": 76.0,
+   "pct": 10,
+   "cuota": 7.6
+  }
+ ],
+ "iva": 34.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 380.0,
+ "observaciones": "Vencimiento 05/06/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": [
+  "«CHOCO G ENV MARRUECOS»: precio 10,50 €/kg; la ficha tiene 8,95 €/kg.",
+  "Letra de IVA X en «CANELON CARNE/TRUFA/FOIE AUDENS»: el pie suma su base al 10 %; se usa 10 %, la ficha no lo confirma."
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R93.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUMT LEVANTE, S.L.U.",
+ "cif": "B53971560",
+ "local": "casa_tomas",
+ "numero_documento": "390",
+ "fecha": "2026-01-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ATUN EN ACEITE RO-1000 CORTIZO",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.97,
+   "descuento_pct": null,
+   "total": 167.28,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 167.28,
+ "desglose_iva": [
+  {
+   "base": 167.28,
+   "pct": 10,
+   "cuota": 16.73
+  }
+ ],
+ "iva": 16.73,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 184.01,
+ "observaciones": "Pago al CONTADO; entrega Restaurante Casa Tomas; cantidad = kg (peso)",
+ "alertas": []
+}

@@ -1,0 +1,48 @@
+{
+ "archivo": "R1121.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "NEGOCIANTS S.L.U. (Grupo Vila Viniteca)",
+ "cif": "B60389731",
+ "local": "casa_tomas",
+ "numero_documento": "FVR-N2607-04751",
+ "fecha": "2026-07-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMIREZ 2024 (AVAN) (ref. 146062)",
+   "producto_ficha": null,
+   "cantidad": 90.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.6,
+   "descuento_pct": null,
+   "total": 1224.0,
+   "iva_pct": null,
+   "albaran_ref": "AV-N26-096776",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Anticipos de clientes (aplicación de anticipo AVAN 24)",
+   "importe": -1224.0,
+   "iva_pct": null
+  }
+ ],
+ "subtotal": null,
+ "desglose_iva": [],
+ "iva": null,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": null,
+ "observaciones": "Pedido PV-N25-101536, doc. externo AVAN 24. Recibo domiciliado. La línea de 1.224,00 queda compensada por el anticipo de -1.224,00; no hay B.I., IVA ni total impresos.",
+ "alertas": [
+  "El pie no imprime B.I., IVA ni total. El neto aparente es 0,00 (1.224,00 de línea menos 1.224,00 de anticipo). No se rellenan importes de pie. Revisar si es factura final o solo aplicación de anticipo."
+ ]
+}

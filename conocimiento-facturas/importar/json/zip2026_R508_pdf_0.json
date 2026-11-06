@@ -1,0 +1,63 @@
+{
+ "archivo": "R508.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 01650",
+ "fecha": "2026-03-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VIEIRA MED/CONCHA 20/30 X1 CHILE",
+   "producto_ficha": "Vieira media concha 20/30 (Chile)",
+   "cantidad": 16,
+   "unidad": "kg",
+   "bultos": 16,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.25,
+   "descuento_pct": null,
+   "total": 244.0,
+   "iva_pct": 10,
+   "albaran_ref": "F568459",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 60.6,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.9,
+   "descuento_pct": null,
+   "total": 963.54,
+   "iva_pct": 10,
+   "albaran_ref": "F568459",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1207.54,
+ "desglose_iva": [
+  {
+   "base": 1207.54,
+   "pct": 10,
+   "cuota": 120.75
+  }
+ ],
+ "iva": 120.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1328.29,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F568459. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

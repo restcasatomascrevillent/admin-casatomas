@@ -1,0 +1,46 @@
+{
+ "archivo": "R1268.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0052/(2026)041957",
+ "fecha": "2026-08-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LECHE ENT ARO BK 1L",
+   "producto_ficha": "Leche entera Aro brik 1 L (pack 6)",
+   "cantidad": -1,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 5.92,
+   "descuento_pct": null,
+   "total": -5.92,
+   "iva_pct": 4,
+   "albaran_ref": "9-213075812",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -5.92,
+ "desglose_iva": [
+  {
+   "base": -5.92,
+   "pct": 4,
+   "cuota": -0.24
+  }
+ ],
+ "iva": -0.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -6.16,
+ "observaciones": "Factura de devolucion (abono) de la factura 0/0(063)0052/(2026)041786 de 04/08/2026 (R1267). Devuelve 1 pack de LECHE ENT ARO (cantidad -1). Pedido 9-213075812. Pago en entrega: se devuelven -6,16 EUR.",
+ "alertas": []
+}

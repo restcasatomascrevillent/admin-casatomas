@@ -1,0 +1,80 @@
+{
+ "archivo": "R358.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26001773",
+ "fecha": "2026-03-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOJAMA DE ATUN ALETA AMARILLA SELECCION EXTRA",
+   "producto_ficha": "Mojama de atún aleta amarilla selección extra",
+   "cantidad": 5.04,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 181.44,
+   "iva_pct": 10,
+   "albaran_ref": "26101899",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 1.92,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 80.64,
+   "iva_pct": 10,
+   "albaran_ref": "26101899",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 12.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 151.2,
+   "iva_pct": 10,
+   "albaran_ref": "26101899",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 413.28,
+ "desglose_iva": [
+  {
+   "base": 413.28,
+   "pct": 10,
+   "cuota": 41.33
+  }
+ ],
+ "iva": 41.33,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 454.61,
+ "observaciones": "Transferencia Banco Santander, vencimiento 06/04/2026. Albarán 26101899 de 05/03/2026.",
+ "alertas": []
+}

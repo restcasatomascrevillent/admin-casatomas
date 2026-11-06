@@ -1,0 +1,66 @@
+{
+ "archivo": "R419.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260069",
+ "fecha": "2026-02-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LENGUADO",
+   "producto_ficha": "Lenguado",
+   "cantidad": 30.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.0,
+   "descuento_pct": null,
+   "total": 691.15,
+   "iva_pct": 10,
+   "albaran_ref": "1-000069",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LUBINA",
+   "producto_ficha": "Lubina",
+   "cantidad": 10.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 259.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000069",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 950.35,
+ "desglose_iva": [
+  {
+   "base": 950.35,
+   "pct": 10,
+   "cuota": 95.04
+  }
+ ],
+ "iva": 95.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1045.39,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 25/02/2026 por 1.045,39. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": [
+  "LENGUADO a 23,00 €/kg; la ficha indica 29,50 €/kg.",
+  "LUBINA a 24,00 €/kg; la ficha indica 26,50 €/kg."
+ ]
+}

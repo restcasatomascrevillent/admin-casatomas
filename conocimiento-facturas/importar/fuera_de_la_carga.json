@@ -1,0 +1,316 @@
+{
+ "descartadas_por_duplicado": [
+  {
+   "archivo": "R736.pdf",
+   "igual_a": "R704.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1072.pdf",
+   "igual_a": "R1034.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1178.pdf",
+   "igual_a": "R1165.pdf",
+   "motivo": "mismo total y fecha"
+  },
+  {
+   "archivo": "R1184.pdf",
+   "igual_a": "R1183.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1390.pdf",
+   "igual_a": "R1389.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1423.pdf",
+   "igual_a": "R1422.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1492.pdf",
+   "igual_a": "R1491.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1492.pdf",
+   "igual_a": "R1491.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1492.pdf",
+   "igual_a": "R1491.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1597.pdf",
+   "igual_a": "R1596.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1597.pdf",
+   "igual_a": "R1596.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1597.pdf",
+   "igual_a": "R1596.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1597.pdf",
+   "igual_a": "R1596.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R341.pdf",
+   "igual_a": "R211.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R551.pdf",
+   "igual_a": "R535.pdf",
+   "motivo": "mismo total y fecha"
+  },
+  {
+   "archivo": "R676.pdf",
+   "igual_a": "R657.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R677.pdf",
+   "igual_a": "R657.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R679.pdf",
+   "igual_a": "R509.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R852.pdf",
+   "igual_a": "R1072.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1343.pdf",
+   "igual_a": "R1342.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1357.pdf",
+   "igual_a": "R1356.pdf",
+   "motivo": "mismo número"
+  },
+  {
+   "archivo": "R1577.pdf",
+   "igual_a": "R1557.pdf",
+   "motivo": "mismo número"
+  }
+ ],
+ "no_facturas": [
+  {
+   "archivo": "R1070.pdf",
+   "que_es": "Liquidacion trimestral de comision de custodia de valores, Banco de Sabadell (oficina Crevillente), periodo 01/04/2026-30/06/2026: 331,81 USD mas IVA 69,68 USD = 401,49 USD cargados el 07/07/2026"
+  },
+  {
+   "archivo": "R1194.pdf",
+   "que_es": "Aviso de dividendo y confirmacion de liquidacion, Banco de Sabadell: NATURGY ENERGY, 700 titulos, bruto 420,00 EUR, retencion -79,80 EUR, costes -2,42 EUR, abonado neto 337,78 EUR el 29/07/2026"
+  },
+  {
+   "archivo": "R1248.pdf",
+   "que_es": "Liquidacion trimestral de comision de custodia de valores, Banco de Sabadell, periodo 01/04/2026-30/06/2026: 32,84 EUR mas IVA 6,90 EUR = 39,74 EUR cargados el 07/07/2026"
+  },
+  {
+   "archivo": "R1679.pdf",
+   "que_es": "Liquidacion trimestral de comision de custodia de valores, Banco de Sabadell (oficina Crevillente), periodo 01/07/2026-30/09/2026: 328,46 USD mas IVA 68,98 USD = 397,44 USD cargados el 13/10/2026"
+  },
+  {
+   "archivo": "R510.pdf",
+   "que_es": "Aviso de dividendo y confirmacion de liquidacion, Banco de Sabadell: NATURGY ENERGY, 700 titulos, bruto 399,00 EUR, retencion -75,81 EUR, costes -2,42 EUR, abonado neto 320,77 EUR el 31/03/2026"
+  },
+  {
+   "archivo": "R681.pdf",
+   "que_es": "Liquidacion trimestral de comision de custodia de valores, Banco de Sabadell (oficina Crevillente), periodo 01/01/2026-31/03/2026: 324,65 USD mas IVA 68,18 USD = 392,83 USD cargados el 15/04/2026"
+  },
+  {
+   "archivo": "R682.pdf",
+   "que_es": "Liquidacion trimestral de comision de custodia de valores, Banco de Sabadell, periodo 01/01/2026-31/03/2026: 24,14 EUR mas IVA 5,07 EUR = 29,21 EUR cargados el 15/04/2026"
+  },
+  {
+   "archivo": "R76.pdf",
+   "que_es": "Liquidacion trimestral de comision de administracion/custodia de valores, Banco de Sabadell (oficina Crevillente), periodo 01/10/2025-31/12/2025: 374,25 USD mas IVA 78,59 USD = 452,84 USD cargados el 14/01/2026"
+  },
+  {
+   "archivo": "R91.pdf",
+   "que_es": "Liquidacion trimestral de comision de custodia de valores, Banco de Sabadell, periodo 01/10/2025-31/12/2025: 23,00 EUR mas IVA 4,83 EUR = 27,83 EUR cargados el 14/01/2026"
+  },
+  {
+   "archivo": "R1146.pdf",
+   "que_es": "aviso de pago de dividendo ORACLE CORP (abono en cuenta), total importe 88,42 EUR, 29/07/2026"
+  },
+  {
+   "archivo": "R1249.pdf",
+   "que_es": "aviso de pago de dividendo MARVELL TECHNOLOGY (abono en cuenta), total importe 2,83 EUR, 04/08/2026"
+  },
+  {
+   "archivo": "R1667.pdf",
+   "que_es": "adeudo de comision de custodia de valores (Bankinter), total liquido 64,83 EUR, 01/10/2026"
+  },
+  {
+   "archivo": "R170.pdf",
+   "que_es": "aviso de pago de dividendo ORACLE CORP (abono en cuenta), total importe 30,25 EUR, 28/01/2026"
+  },
+  {
+   "archivo": "R511.pdf",
+   "que_es": "adeudo de comision trimestral de custodia de valores (Bankinter), total liquido 60,93 EUR, 01/04/2026"
+  },
+  {
+   "archivo": "R603.pdf",
+   "que_es": "aviso de pago de dividendo ORACLE CORP (abono en cuenta), total importe 103,15 EUR, 29/04/2026"
+  },
+  {
+   "archivo": "R63.pdf",
+   "que_es": "adeudo de comision de administracion y custodia de valores (Bankinter), total liquido 2,61 EUR, 22/01/2026"
+  },
+  {
+   "archivo": "R815.pdf",
+   "que_es": "adeudo de comision de custodia de valores (Bankinter), total liquido 23,02 EUR, 02/06/2026"
+  },
+  {
+   "archivo": "R972.pdf",
+   "que_es": "aviso de pago de dividendo META PLATFORMS (abono en cuenta), total importe 20,56 EUR, 30/06/2026"
+  },
+  {
+   "archivo": "R973.pdf",
+   "que_es": "aviso de pago de dividendo META PLATFORMS (abono en cuenta), total importe 20,56 EUR, 30/06/2026; duplicado de R972"
+  },
+  {
+   "archivo": "R1375.pdf",
+   "que_es": "cuota de arrendamiento financiero (leasing) de BBVA, vencimiento 17/08/2026, contrato 0182 3029 0501 00000001660148; neto 1.035,97 € + IVA 217,55 € = total 1.253,52 €. Cargo bancario, no factura de proveedor."
+  },
+  {
+   "archivo": "R1567.pdf",
+   "que_es": "cuota de arrendamiento financiero (leasing) de BBVA, vencimiento 17/09/2026, contrato 0182 3029 0501 00000001660148; neto 1.033,83 € + IVA 217,10 € = total 1.250,93 €. Cargo bancario, no factura de proveedor."
+  },
+  {
+   "archivo": "R429.pdf",
+   "que_es": "cuota de arrendamiento financiero (leasing) de BBVA, vencimiento 17/03/2026, contrato 0182 3029 0501 00000001660148; neto 1.009,43 € + IVA 211,98 € = total 1.221,41 €. Cargo bancario, no factura de proveedor."
+  },
+  {
+   "archivo": "R1618.pdf",
+   "que_es": "prefactura de pago anticipado (AVA) de NEGOCIANTS S.L.U., nº PREFV-N2609-00310, 15/09/2026, 54.413,40 € con IVA (B.I. 44.969,75 + IVA 9.443,65) en 3 vencimientos de 18.137,80 € (30/11/2026, 30/12/2026, 30/01/2027). Pag. anticip. PV-N26-134636."
+  },
+  {
+   "archivo": "R1081.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 08-07-2026: 104,67 EUR (base 86,50 + IVA 18,17), periodo 01.07.2026-31.07.2026, factura SGAE 1260372321. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R1082.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 08-07-2026: 111,73 EUR (base 92,34 + IVA 19,39), periodo 01.07.2026-30.09.2026, factura SGAE 1260372320. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R1083.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-07-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R1084.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-07-2026: cuota de mantenimiento TPV 10,00 EUR + IVA 2,10 EUR = 12,10 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R1275.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-08-2026: cuota de mantenimiento TPV 10,00 EUR + IVA 2,10 EUR = 12,10 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R1276.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-08-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R1517.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-09-2026: cuota de mantenimiento TPV 20,00 EUR + IVA 4,20 EUR = 24,20 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R1518.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-09-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R1519.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 09-09-2026: 104,67 EUR (base 86,50 + IVA 18,17), periodo 01.09.2026-30.09.2026, factura SGAE 1260486330. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R247.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-02-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R248.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-02-2026: cuota de mantenimiento TPV 20,00 EUR + IVA 4,20 EUR = 24,20 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R364.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-03-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R365.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-03-2026: cuota de mantenimiento TPV 10,00 EUR + IVA 2,10 EUR = 12,10 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R553.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-04-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R554.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-04-2026: cuota de mantenimiento TPV 20,00 EUR + IVA 4,20 EUR = 24,20 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R709.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-05-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R710.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-05-2026: cuota de mantenimiento TPV 20,00 EUR + IVA 4,20 EUR = 24,20 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R74.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-01-2026: cuota de mantenimiento TPV 10,00 EUR + IVA 2,10 EUR = 12,10 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R75.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-01-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R936.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 15-04-2026: 104,67 EUR (base 86,50 + IVA 18,17), periodo 01.04.2026-30.04.2026, factura SGAE 1260202631. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R937.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 12-05-2026: 104,67 EUR (base 86,50 + IVA 18,17), periodo 01.05.2026-31.05.2026, factura SGAE 1260301845. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R938.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 09-06-2026: 104,67 EUR (base 86,50 + IVA 18,17), periodo 01.06.2026-30.06.2026, factura SGAE 1260327410. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R939.pdf",
+   "que_es": "adeudo SEPA a favor de SGAE (cliente MASIDE 2011), cargado en cuenta el 15-04-2026: 111,73 EUR (base 92,34 + IVA 19,39), periodo 01.04.2026-30.06.2026, factura SGAE 1260202630. Justificante bancario, no es la factura del proveedor."
+  },
+  {
+   "archivo": "R952.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-06-2026: cuota de mantenimiento TPV 20,00 EUR + IVA 4,20 EUR = 24,20 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R953.pdf",
+   "que_es": "liquidacion de comisiones TPV del banco (comercio BARRA REST CASA TOMAS), 01-06-2026: comisiones de linea GPRS de 2 terminales 20,88 EUR + IVA 4,38 EUR = 25,26 EUR cargados. No es factura de proveedor."
+  },
+  {
+   "archivo": "R250.pdf",
+   "que_es": "cuota de arrendamiento financiero (leasing) BBVA, contrato 0182 3029 0501 0000001660148, vto. 17/02/2026: neto 1.011,14 (amortización 779,03 + interés 232,11) + IVA 212,34 = 1.223,48 €"
+  },
+  {
+   "archivo": "R1237.pdf",
+   "que_es": "cuota de arrendamiento financiero (leasing) BBVA, contrato 0182 3029 0501 0000001660148, vto. 17/07/2026: neto 1.038,10 (amortización 783,23 + interés 254,87) + IVA 218,00 = 1.256,10 €"
+  }
+ ]
+}

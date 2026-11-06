@@ -1,0 +1,128 @@
+{
+  "cif": "B73028474",
+  "nombre": "Salazones Garre",
+  "nombres_impresos": ["Salazones Garre", "@salazonesgarre.com"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R62.pdf", "R587.pdf", "R1126.pdf", "R1621.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega: un albarán por factura, 1 página, digital",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["F / 26000135", "F / 26003490", "F / 26006405", "F / 26007943"],
+      "patron": "^F ?/ ?26\\d{6}$",
+      "donde": "casilla 'FACTURA Nº:' arriba a la derecha, con la forma 'F / 26006405'. El código de barras de encima (*F26006405180720264300002645*) repite número + fecha + cliente. Ojo: 'F26…' NO es un CIF; el NIF del proveedor (B-73028474) aparece arriba en 'DATOS CLIENTE' y el CIF del cliente (B54583356, Maside 2011) en 'CIF/NIF.:'."
+    },
+    "fecha": "casilla 'FECHA:' junto al número, DD/MM/AAAA. No confundir con la fecha del albarán (línea 'Albarán: … | Fecha: …'), con 'CONSUMO PREFERENTE' ni con el vencimiento del pie.",
+    "albaranes": "una sola cabecera 'Albarán: 26107281 | Fecha: 13/07/2026 | Obs:' antes de las líneas (el albarán es de 2-4 días antes que la factura)."
+  },
+
+  "lectura": {
+    "columnas": ["Referencia", "Descripción", "Nº Lote", "Cantidad", "Precio", "Dto", "Total"],
+    "cantidad_es": "kg (3 decimales, coma decimal)",
+    "columna_peso": null,
+    "precio_es_por": "kg",
+    "descuento_por_linea": { "existe": true, "columna": "Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Cuadro de totales: Total Bruto | % DTOS (siempre 0,00%) | Base Imponible | I.V.A. % | Importe IVA | RE % | Importe R.E. | IMPORTE TOTAL €"],
+    "trampas": [
+      "Debajo de cada línea hay 1-2 renglones de texto (nombre latino, método de pesca, 'Fao 34.', 'FECHA | CONSUMO PREFERENTE: dd-mm-aaaa', 'BEST BEFORE'): no son artículos ni importes.",
+      "El número de factura empieza por F26… y parece un CIF: no es un CIF.",
+      "La referencia (35001012…) es el código de artículo de 8 dígitos; el Nº Lote es AA/029-2026 (no es cantidad).",
+      "Precio con símbolo '€' pegado ('12,000 €') y tres decimales; el precio es por kg.",
+      "La línea de pie 'TRANSFERENCIA A BANCO SANTANDER | vencimiento | importe' repite el total, no es una línea más ni una segunda factura; el IBAN va en la última línea."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = cantidad_kg × precio_€/kg (sin descuento, Dto vacío)",
+    "Total Bruto = Base Imponible = suma de totales de línea (% DTOS = 0,00%)",
+    "IVA = 10% de la base, redondeado a céntimos",
+    "IMPORTE TOTAL = base + IVA (R1126: 297,84 + 29,78 = 327,62; R587: 530,84 + 53,08 = 583,92)",
+    "el importe del vencimiento del pie es igual al IMPORTE TOTAL"
+  ],
+
+  "guia_ocr": "Factura digital de una sola entrega, una página. Número en 'FACTURA Nº: F / 2600xxxx' (no es un CIF); fecha en 'FECHA:' (DD/MM/AAAA), distinta de la del albarán y del consumo preferente. Cada artículo: Referencia (8 dígitos), Descripción, Nº Lote AA/xxx-2026, Cantidad en KG con 3 decimales, Precio en €/kg, Total. Ignora los renglones de nombre latino, método de pesca, Fao y 'CONSUMO PREFERENTE'. Sin descuentos. IVA único 10%. Comprueba cantidad × precio = total y base + IVA = IMPORTE TOTAL. El cliente es MASIDE 2011 (CIF B54583356).",
+
+  "productos": [
+    {
+      "nombre_impreso": "BONITO ENTERO",
+      "nombre_normalizado": "Bonito entero (Sarda sarda)",
+      "familia": "pescado",
+      "presentacion": "bonito entero, salazón/curado (la factura no indica si es fresco o congelado)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 12.0, "max": 12.0, "por": "kg", "ejemplos": [["2026-01-09", 12.0], ["2026-04-25", 12.0], ["2026-07-18", 12.0], ["2026-09-02", 12.0]] },
+      "iva_pct": 10,
+      "veces_visto": 21
+    },
+    {
+      "nombre_impreso": "HUEVA DE MARUCA CALIDAD EXTRA",
+      "nombre_normalizado": "Hueva de maruca calidad extra (Molva molva)",
+      "familia": "pescado",
+      "presentacion": "hueva curada/salada de maruca",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 42.0, "max": 42.0, "por": "kg", "ejemplos": [["2026-01-09", 42.0], ["2026-07-18", 42.0]] },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "MOJAMA DE ATUN ALETA AMARILLA SELECCION EXTRA",
+      "nombre_normalizado": "Mojama de atún aleta amarilla selección extra",
+      "familia": "pescado",
+      "presentacion": "mojama (lomo de atún salado y curado)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 36.0, "max": 36.0, "por": "kg", "ejemplos": [["2026-04-25", 36.0]] },
+      "iva_pct": 10,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "HUEVA DE MUJOL SELECCION EXTRA",
+      "nombre_normalizado": "Hueva de mújol selección extra",
+      "familia": "pescado",
+      "presentacion": "hueva curada de mújol, calidad extra",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 70.0, "max": 70.0, "por": "kg", "ejemplos": [["2026-04-25", 70.0]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "HUEVA DE MUJOL MEDIANA 100/140 gramos",
+      "nombre_normalizado": "Hueva de mújol mediana (pieza 100-140 g)",
+      "familia": "pescado",
+      "presentacion": "hueva curada de mújol, calibre mediano 100/140 g la pieza",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 70.0, "max": 70.0, "por": "kg", "ejemplos": [["2026-09-02", 70.0]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "HUEVA DE ATUN ROJO",
+      "nombre_normalizado": "Hueva de atún rojo",
+      "familia": "pescado",
+      "presentacion": "hueva curada de atún rojo",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 120.0, "max": 120.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    }
+  ],
+
+  "dudas": [
+    "No se ve en ninguna muestra si el bonito entero es fresco, congelado o en salazón; solo se sabe que viene de Salazones Garre con lote AA.",
+    "Precios por kg constantes todo el año (bonito 12, maruca 42, mojama 36, mújol 70, atún rojo 120): una variación es señal de lectura errónea.",
+    "El ejemplo de fecha del atún rojo (R691) no está entre las muestras leídas; solo se conoce de catalogo_lineas (1,480 kg × 120 = 177,60).",
+    "El IVA 10% sale en el cuadro del pie, no por línea; solo se vio 10% en las 4 muestras."
+  ]
+}

@@ -1,0 +1,85 @@
+{
+ "archivo": "R621.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "AVATEL TELECOM, S.A.",
+ "cif": "A93135218",
+ "local": "casa_tomas",
+ "numero_documento": "CURF26/150911",
+ "fecha": "2026-05-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Telefonía Fija Empresas 1-30 Abr 966107887",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.15,
+   "descuento_pct": null,
+   "total": 0.15,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Centralita Empresa MAX 1-31 May",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 49.99,
+   "descuento_pct": null,
+   "total": 49.99,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Promo 15 meses Centralita Empresa MAX 1-31 May",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -10.0,
+   "descuento_pct": null,
+   "total": -10.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 40.14,
+ "desglose_iva": [
+  {
+   "base": 40.14,
+   "pct": 21,
+   "cuota": 8.43
+  }
+ ],
+ "iva": 8.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 48.57,
+ "observaciones": "Consumo 01/04/2026-30/04/2026. Domiciliación bancaria, vence 02/05/2026. Centralita Empresa MAX (extensión virtual, móvil y SMS incluidos) va como una sola línea; sus componentes no traen importe propio. Páginas 2-4: detalle de llamadas.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

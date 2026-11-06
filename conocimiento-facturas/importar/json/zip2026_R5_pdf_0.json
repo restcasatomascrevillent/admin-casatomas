@@ -1,0 +1,115 @@
+{
+ "archivo": "R5.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "ORANGE ESPAGNE S.A.U.",
+ "cif": "A82009812",
+ "local": "casa_tomas",
+ "numero_documento": "E10010596537-0126",
+ "fecha": "2026-01-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Pack Love Empresa Impulsa 3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 72.7,
+   "descuento_pct": null,
+   "total": 76.96,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Fibra + llamadas",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 40.95,
+   "descuento_pct": null,
+   "total": 27.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Orange TV",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 58.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Compra de dispositivos a plazos",
+   "producto_ficha": null,
+   "cantidad": 3,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 33.56,
+   "iva_pct": 0,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 196.02,
+ "desglose_iva": [
+  {
+   "base": 162.46,
+   "pct": 21,
+   "cuota": 34.12
+  },
+  {
+   "base": 33.56,
+   "pct": 0,
+   "cuota": 0
+  }
+ ],
+ "iva": 34.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 230.14,
+ "observaciones": "Telefonía, fibra y TV. Periodo 01/12/2025-31/12/2025. Vencimiento 06/01/2026, domiciliación bancaria. Pack: cuota 72,70 + adicional 4,26. Fibra: cuota 40,95 con descuento -13,45. Dispositivos: 3 equipos a plazos, importe impreso en «otros impuestos incluidos» (sin IVA desglosado, tratado como base 0 %). Subtotal = suma de bases (21 %: 162,46; 0 %: 33,56). Destinatario impreso: TOMAS VAZQUEZ GONZALEZ MASIDE 2011 SL.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

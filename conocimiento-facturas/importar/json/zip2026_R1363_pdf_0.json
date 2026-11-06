@@ -1,0 +1,46 @@
+{
+ "archivo": "R1363.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "5975",
+ "fecha": "2026-08-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GAMBA BLANCA",
+   "producto_ficha": "Gamba blanca",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.8,
+   "descuento_pct": null,
+   "total": 59.6,
+   "iva_pct": 10,
+   "albaran_ref": "20951",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 59.6,
+ "desglose_iva": [
+  {
+   "base": 59.6,
+   "pct": 10,
+   "cuota": 5.96
+  }
+ ],
+ "iva": 5.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 65.56,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura.",
+ "alertas": []
+}

@@ -1,0 +1,82 @@
+{
+ "archivo": "R232.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "24 S",
+ "fecha": "2026-02-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 105.12,
+   "iva_pct": 10,
+   "albaran_ref": "34 S",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 105.12,
+   "iva_pct": 10,
+   "albaran_ref": "37 S",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 24.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.29,
+   "descuento_pct": null,
+   "total": 54.96,
+   "iva_pct": 10,
+   "albaran_ref": "40 S",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 265.2,
+ "desglose_iva": [
+  {
+   "base": 265.2,
+   "pct": 10,
+   "cuota": 26.52
+  }
+ ],
+ "iva": 26.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 291.72,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Destinatario Casa Tomás (cliente 1607). Ostras: la columna Kilos son piezas. Agrupa los albaranes 34 S, 37 S y 40 S.",
+ "alertas": [
+  "Ostra Royale nº 2 en albarán 40 S a 2,29 €/pieza; la ficha y el resto de facturas la tienen a 2,19 €/pieza. Se deja lo impreso."
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  22
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO-GARZON SL",
+ "cif": "B42678672",
+ "local": "casa_tomas",
+ "numero_documento": "243/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 22,
+   "nombre": "MACRUROS (emb. NUEVO RAMON Y DOLORES)",
+   "producto_ficha": null,
+   "cantidad": 3.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 225.37,
+   "iva_pct": 10,
+   "albaran_ref": "3654, 2073, 3521, 2691",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 22,
+   "nombre": "PLEURONECTIFORMES (emb. NUEVO ALBOR)",
+   "producto_ficha": null,
+   "cantidad": 2.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 97.02,
+   "iva_pct": 10,
+   "albaran_ref": "3654, 2073, 3521, 2691",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 22,
+   "nombre": "MACRUROS (emb. NUEVO ALBOR)",
+   "producto_ficha": null,
+   "cantidad": 2.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 69.84,
+   "iva_pct": 10,
+   "albaran_ref": "3654, 2073, 3521, 2691",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 392.23,
+ "desglose_iva": [
+  {
+   "base": 392.23,
+   "pct": 10,
+   "cuota": 39.22
+  }
+ ],
+ "iva": 39.22,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 431.45,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 757. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

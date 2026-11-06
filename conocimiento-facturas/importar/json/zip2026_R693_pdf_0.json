@@ -1,0 +1,116 @@
+{
+ "archivo": "R693.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260215",
+ "fecha": "2026-05-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 87.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000215",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 115.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000215",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GALLINETA",
+   "producto_ficha": "Gallineta",
+   "cantidad": 9.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 228.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000215",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "RODABALLO",
+   "producto_ficha": "Rodaballo",
+   "cantidad": 64.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.5,
+   "descuento_pct": null,
+   "total": 1965.73,
+   "iva_pct": 10,
+   "albaran_ref": "1-000215",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "SALMONETE",
+   "producto_ficha": "Salmonete",
+   "cantidad": 9.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": null,
+   "total": 230.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000215",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 2625.93,
+ "desglose_iva": [
+  {
+   "base": 2625.93,
+   "pct": 10,
+   "cuota": 262.59
+  }
+ ],
+ "iva": 262.59,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2888.52,
+ "observaciones": "Transferencia CaixaBank; vencimiento 06/05/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: GALLINETA 24,00 (ficha 20,90); RODABALLO 30,50 (ficha 34,50); SALMONETE 25,00 (ficha 24,00)"
+ ]
+}

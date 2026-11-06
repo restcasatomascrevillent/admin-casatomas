@@ -1,0 +1,80 @@
+{
+ "archivo": "R650.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ACEITES CREVILLENTE, S.L.",
+ "cif": "B53012969",
+ "local": "casa_tomas",
+ "numero_documento": "A/220",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ACEITE GIRASOL OLEICO 25L",
+   "producto_ficha": "Aceite de girasol alto oleico (garrafa 25 L)",
+   "cantidad": 150.0,
+   "unidad": "l",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.9,
+   "descuento_pct": null,
+   "total": 285.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ACEITE GIRASOL OLEICO 25L",
+   "producto_ficha": "Aceite de girasol alto oleico (garrafa 25 L)",
+   "cantidad": 150.0,
+   "unidad": "l",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.92,
+   "descuento_pct": null,
+   "total": 288.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ACEITE GIRASOL REFINADO",
+   "producto_ficha": "Aceite de girasol refinado (garrafa 25 L)",
+   "cantidad": 75.0,
+   "unidad": "l",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.6,
+   "descuento_pct": null,
+   "total": 120.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 693.0,
+ "desglose_iva": [
+  {
+   "base": 693.0,
+   "pct": 10,
+   "cuota": 69.3
+  }
+ ],
+ "iva": 69.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 762.3,
+ "observaciones": "ClassicGes 6. Cantidades en litros. Fecha valor 06/05/2026 (no es la fecha de factura). Forma de pago: transferencia bancaria.",
+ "alertas": []
+}

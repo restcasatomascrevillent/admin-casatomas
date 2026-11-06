@@ -1,0 +1,69 @@
+{
+  "cif": "B54182407",
+  "nombre": "GRANJA AVÍCOLA AVIQUES, S.L.",
+  "nombres_impresos": ["GRANJA AVICOLA AVIQUES, S.L.", "AVICOLA AVIQUES"],
+  "categoria": "huevos",
+  "locales": ["casa_tomas"],
+  "muestras": ["R147.pdf", "R584.pdf", "R984.pdf", "R1587.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes semanales (VERI*FACTU)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["26/325", "26/1432", "26/2099", "26/3275"], "patron": "^26/\\d+$", "donde": "casilla 'Nº Factura' bajo 'FACTURA', primera de la fila 'Nº Factura | Fecha | Nº Cliente | Pág.'" },
+    "fecha": "casilla Fecha a continuación del número, DD/MM/AAAA (28-30 del mes). El nº de cliente es 18",
+    "albaranes": "cabecera 'Nº Albarán: T4/726 de la fecha: 07/01/2026' antes de cada línea; no están siempre en orden de fecha (T3/3138 del 29/04 va antes que T4/944 del 01/04)"
+  },
+
+  "lectura": {
+    "columnas": ["REFERENCIA", "PRODUCTO", "LOTE", "CANTIDAD", "PRECIO", "%DTO", "IMPORTE"],
+    "cantidad_es": "docenas de huevos (60,00 = 60 docenas = 720 huevos)",
+    "columna_peso": null,
+    "precio_es_por": "docena",
+    "descuento_por_linea": { "existe": true, "columna": "%DTO", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "La columna LOTE a veces trae un entero pequeño (2, 3, 15, 36…; parece el nº de semana) justo antes de la cantidad, y a veces no trae nada: si la línea tiene cuatro cifras (lote, cantidad, precio, importe) la primera es el lote; si tiene tres, la primera es la cantidad",
+      "La cantidad son docenas, no huevos: 30,00 x 2,50 = 75,00",
+      "El precio bajó de 2,50 (hasta abril) a 2,30 (junio en adelante)",
+      "La casilla %DTO va vacía; Bruto y Base imponible coinciden",
+      "El pie 'Bruto | Descuento | Base Imponible | % IVA Cuota IVA | % R.E. Cuota R.E. | TOTAL FACTURA' trae una sola fila con 4,00 como porcentaje de IVA",
+      "Los albaranes van con tipo T3 o T4 y no en orden cronológico"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe línea = cantidad (docenas) x precio (€/docena) x (1 - dto/100); 60 x 2,50 = 150,00",
+    "Bruto = suma de importes = Base imponible (no hay descuento)",
+    "IVA 4% = base x 0,04 (412,50 -> 16,50; 552,00 -> 22,08)",
+    "total = base + IVA (412,50 + 16,50 = 429,00; 552,00 + 22,08 = 574,08)"
+  ],
+
+  "guia_ocr": "Factura mensual de huevos con albaranes semanales. Nº factura 26/nnnn, fecha DD/MM/AAAA, cliente 18. Cada albarán empieza con 'Nº Albarán: Tn/nnnn de la fecha: DD/MM/AAAA'. Línea: referencia 10003, producto DOCENA HUEVOS GR. CAT.A CLASE M, LOTE (entero pequeño opcional), CANTIDAD en docenas (decimales con coma), PRECIO por docena (2,50 o 2,30), importe. Si la línea trae cuatro cifras la primera es el lote, no la cantidad. IVA 4%. El orden de los albaranes no es cronológico.",
+
+  "productos": [
+    {
+      "nombre_impreso": "10003 DOCENA HUEVOS GR. CAT.A CLASE ´M´",
+      "nombre_normalizado": "Huevos frescos categoría A, clase M (docena)",
+      "familia": "huevos",
+      "presentacion": "huevos frescos de gallina, clase M (medianos), categoría A",
+      "formato": { "envase": "docena", "contenido": 12, "unidad_contenido": "huevos", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "docena",
+      "precio": { "min": 2.30, "max": 2.50, "por": "docena", "ejemplos": [["2026-01-07", 2.50], ["2026-04-01", 2.50], ["2026-06-03", 2.30], ["2026-09-30", 2.30]] },
+      "iva_pct": 4,
+      "veces_visto": 38
+    }
+  ],
+
+  "dudas": [
+    "No se sabe cómo llegan físicamente (cartones de 30 u otros): las cantidades son múltiplos de 15 docenas (15, 30, 45, 60, 75), lo que encaja con cartones de 30 huevos, pero no consta en la factura",
+    "Fecha exacta del cambio de precio 2,50 -> 2,30: está entre el 29/04 y el 03/06 de 2026",
+    "Significado del LOTE (parece el nº de semana del año) y por qué falta en alguna línea",
+    "Catálogo: solo hay un artículo visto en las muestras"
+  ]
+}

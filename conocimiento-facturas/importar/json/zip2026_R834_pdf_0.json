@@ -1,0 +1,99 @@
+{
+ "archivo": "R834.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BACALAOS EL BARQUERO, S.A.",
+ "cif": "A33437286",
+ "local": "casa_tomas",
+ "numero_documento": "FV-A26-01514",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LOMOS BACALAO DESALADO 333 grs. B.1 KG",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 333,
+   "contenido_unidad": "g",
+   "precio_unitario": 15.5,
+   "descuento_pct": null,
+   "total": 46.5,
+   "iva_pct": 10,
+   "albaran_ref": "ALV-A26-03226",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "COCOCHA BACALAO DESALADA MUESTRA",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "ALV-A26-03226",
+   "bonificada": true
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LOMO BACALAO DESALADO BANDEJA 400 grs.",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 400,
+   "contenido_unidad": "g",
+   "precio_unitario": 19.98,
+   "descuento_pct": null,
+   "total": 39.96,
+   "iva_pct": 10,
+   "albaran_ref": "ALV-A26-03226",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CONCENTRADO DE BACALAO PARA PIL-PIL 100 ml MUESTRA",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "ml",
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "ALV-A26-03226",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 86.46,
+ "desglose_iva": [
+  {
+   "base": 86.46,
+   "pct": 10,
+   "cuota": 8.65
+  }
+ ],
+ "iva": 8.65,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 95.11,
+ "observaciones": "Forma de pago: transferencia BBVA (IBAN no transcrito). Vencimiento 30/06/2026 (95,11 €). Albarán ALV-A26-03226 de 28/05/26. Las muestras figuran a 0 €. Códigos de artículo y lotes no incluidos.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

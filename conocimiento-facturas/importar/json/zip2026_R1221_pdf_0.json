@@ -1,0 +1,66 @@
+{
+ "archivo": "R1221.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ GALVAÑ CANDELA",
+ "cif": "48368394S",
+ "local": "touza",
+ "numero_documento": "FACT/033",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Mano de obra, instalación (altavoz por caída, Touza)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.0,
+   "descuento_pct": null,
+   "total": 48.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MATERIALES VARIOS",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 20.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 68.0,
+ "desglose_iva": [
+  {
+   "base": 68.0,
+   "pct": 21,
+   "cuota": 14.28
+  }
+ ],
+ "iva": 14.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 82.28,
+ "observaciones": "Concepto impreso: «INSTALACIÓN ALTOVOZ POR CAIDA TOUZA», lugar «Crevillent 24 de julio de 2026». Pago por transferencia a la cuenta indicada en el pie.",
+ "alertas": [
+  "La fecha de cabecera es 29/7/26 pero el texto del concepto dice «24 de julio de 2026». Se usa la fecha de cabecera; revisar.",
+  "El destinatario impreso es MASIDE 2011 S.L. (sin local); el local Touza se toma del concepto. Confirmar."
+ ]
+}

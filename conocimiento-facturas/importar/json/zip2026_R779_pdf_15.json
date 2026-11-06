@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  16
+ ],
+ "tipo": "factura",
+ "proveedor": "DORADO BONMATI, EMILIO MANUEL",
+ "cif": "48578223S",
+ "local": "casa_tomas",
+ "numero_documento": "193/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 16,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.8,
+   "descuento_pct": null,
+   "total": 38.16,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 38.16,
+ "desglose_iva": [
+  {
+   "base": 38.16,
+   "pct": 10.0,
+   "cuota": 3.82
+  }
+ ],
+ "iva": 3.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 41.98,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 11164. Embarcaciones: ANTOÑITA AGUADO.",
+ "alertas": []
+}

@@ -1,0 +1,82 @@
+{
+ "archivo": "R186.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MARIA ASUNCIÓN VELAR VILLAR",
+ "cif": "13697919Q",
+ "local": "casa_tomas",
+ "numero_documento": "9067",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ANCHOAS XL. ALTA REST. 00 10UND",
+   "producto_ficha": null,
+   "cantidad": 56,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 532,
+   "iva_pct": 10,
+   "albaran_ref": "200840",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ANCHOAS XL. ALTA REST. 00 10UND",
+   "producto_ficha": null,
+   "cantidad": 17,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 161.5,
+   "iva_pct": 10,
+   "albaran_ref": "200840",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ANCHOAS XL. ALTA REST. 00 10UND",
+   "producto_ficha": null,
+   "cantidad": 23,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 218.5,
+   "iva_pct": 10,
+   "albaran_ref": "200840",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 912,
+ "desglose_iva": [
+  {
+   "base": 912,
+   "pct": 10,
+   "cuota": 91.2
+  }
+ ],
+ "iva": 91.2,
+ "recargo_equivalencia": 0,
+ "retencion_irpf": null,
+ "total": 1003.2,
+ "observaciones": "Conservas Mª Asun Velar. Cliente 329. Destinatario impreso MASIDE 2011 S.L.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

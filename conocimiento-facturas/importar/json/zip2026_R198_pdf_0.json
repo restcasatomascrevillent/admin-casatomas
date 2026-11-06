@@ -1,0 +1,101 @@
+{
+ "archivo": "R198.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260035",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMEJA FINA",
+   "producto_ficha": "Almeja fina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 100.0,
+   "descuento_pct": null,
+   "total": 200.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000035",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.0,
+   "descuento_pct": null,
+   "total": 66.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000035",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CENTOLLA",
+   "producto_ficha": "Centolla",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.0,
+   "descuento_pct": null,
+   "total": 108.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000035",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "VOLANDEIRA",
+   "producto_ficha": "Volandeira",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 10,
+   "albaran_ref": "1-000035",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 374.0,
+ "desglose_iva": [
+  {
+   "base": 374.0,
+   "pct": 10,
+   "cuota": 37.4
+  }
+ ],
+ "iva": 37.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 411.4,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 29/01/2026 por 411,40. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": [
+  "VOLANDEIRA aparece solo con cantidad 1,50: sin precio ni importe impreso. Revisar a mano; la base 374,00 cuadra sin esta línea. Unidad supuesta kg.",
+  "NAVAJA a 33,00 €/kg; la ficha indica 28,00 €/kg.",
+  "CENTOLLA a 27,00 €/kg; la ficha indica 25,00 €/kg."
+ ]
+}

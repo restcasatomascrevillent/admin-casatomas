@@ -1,0 +1,116 @@
+{
+ "archivo": "R1483.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "8697",
+ "fecha": "2026-09-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOMATE RAF G",
+   "producto_ficha": "Tomate Raf calibre G",
+   "cantidad": 14.08,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.2,
+   "descuento_pct": null,
+   "total": 101.38,
+   "iva_pct": 4,
+   "albaran_ref": "A 6682/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATAS MINI 2,700KG",
+   "producto_ficha": "Patata mini (bolsa 2,7 kg)",
+   "cantidad": 13.5,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 2.7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.4,
+   "descuento_pct": null,
+   "total": 45.9,
+   "iva_pct": 4,
+   "albaran_ref": "A 6682/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CALABACIN",
+   "producto_ficha": "Calabacín",
+   "cantidad": 22.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.0,
+   "descuento_pct": null,
+   "total": 44.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 6682/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BERENJENA BLANCA T.",
+   "producto_ficha": "Berenjena blanca",
+   "cantidad": 52.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 52.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 6682/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TOMATE DULCE II",
+   "producto_ficha": "Tomate dulce categoría II",
+   "cantidad": 37.5,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.5,
+   "descuento_pct": null,
+   "total": 93.75,
+   "iva_pct": 4,
+   "albaran_ref": "A 6682/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 337.03,
+ "desglose_iva": [
+  {
+   "base": 337.03,
+   "pct": 4,
+   "cuota": 13.48
+  }
+ ],
+ "iva": 13.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 350.51,
+ "observaciones": "Transferencia 30 días. Albarán A 6682/26 del 10/09/2026. Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

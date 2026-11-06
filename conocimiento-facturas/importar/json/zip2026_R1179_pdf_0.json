@@ -1,0 +1,46 @@
+{
+ "archivo": "R1179.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A439/26",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRUFA DE VERANO TUBER AESTIVUM",
+   "producto_ficha": "Trufa de verano (Tuber aestivum)",
+   "cantidad": 0.306,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 250.0,
+   "descuento_pct": null,
+   "total": 76.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 76.5,
+ "desglose_iva": [
+  {
+   "base": 76.5,
+   "pct": 4,
+   "cuota": 3.06
+  }
+ ],
+ "iva": 3.06,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 79.56,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 439. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás).",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R332.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO, S.R.L.",
+ "cif": "B06805246",
+ "local": "casa_tomas",
+ "numero_documento": "PS26/249",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GOUR-MAYO-WASABI 1 KG",
+   "producto_ficha": "Mayonesa de wasabi 1 kg",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.76,
+   "descuento_pct": null,
+   "total": 13.76,
+   "iva_pct": 10,
+   "albaran_ref": "PS26/373",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 13.76,
+ "desglose_iva": [
+  {
+   "base": 13.76,
+   "pct": 10,
+   "cuota": 1.38
+  }
+ ],
+ "iva": 1.38,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 15.14,
+ "observaciones": "Giro resumen / forma de pago según cabecera. Albaranes 1; fechas de entrega 19/02/2026 a 19/02/2026. Suma de líneas 13.76; cargo 1,82 €/entrega solo en pie. Factura de pescadería/familia (sin cargo de 1,82 € visible).",
+ "alertas": []
+}

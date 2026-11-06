@@ -1,0 +1,106 @@
+{
+ "archivo": "R302.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "NATURCID, S.L.",
+ "cif": null,
+ "local": "casa_tomas",
+ "numero_documento": "2026 722",
+ "fecha": "2026-02-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MANZANILLA DULCE-ECO-PIRAMIDE 15g (1,5gX10) CJ12 VEGANO con envuelta individual",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.57,
+   "descuento_pct": null,
+   "total": 30.84,
+   "iva_pct": 10,
+   "albaran_ref": "A2026-287",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Total contribución a scrap pirámide (manzanilla)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0024,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "A2026-287",
+   "bonificada": true
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "POLEO-ECO-PIRAMIDE 19g (1,9gX10) CJ12 VEGANO con envuelta individual",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.57,
+   "descuento_pct": null,
+   "total": 30.84,
+   "iva_pct": 10,
+   "albaran_ref": "A2026-287",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Total contribución a scrap pirámide (poleo)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0024,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "A2026-287",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento 10 % sobre bruto",
+   "importe": -6.17,
+   "iva_pct": 10
+  }
+ ],
+ "subtotal": 55.51,
+ "desglose_iva": [
+  {
+   "base": 55.51,
+   "pct": 10,
+   "cuota": 5.55
+  }
+ ],
+ "iva": 5.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 61.06,
+ "observaciones": "Forma de pago impresa: giro 30 días f.f.; en vencimientos figura domiciliación Banco de Sabadell (no transcrita). Vencimiento 29/03/2026 (61,06 €). Bruto 61,68 €. Las líneas de contribución al scrap no traen importe impreso (100 % dto). Nº de registro de envases ENV/2023/000016735. Nombre del emisor tomado del texto legal; CIF del emisor no impreso en el texto.",
+ "alertas": [
+  "El CIF del emisor no aparece en el texto del PDF; el nombre se toma de las condiciones impresas.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

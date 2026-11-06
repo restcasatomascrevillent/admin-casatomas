@@ -1,0 +1,65 @@
+{
+ "archivo": "R943.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "J CARBO (nombre según texto)",
+ "cif": "A79393179",
+ "local": "casa_tomas",
+ "numero_documento": "211189356",
+ "fecha": "2026-06-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LOMO TERNERA BLANCA C/H C/SOL (art. 312026)",
+   "producto_ficha": null,
+   "cantidad": 11.55,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.7,
+   "descuento_pct": null,
+   "total": 227.54,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MOLLEJAS CORAZON TERNERA -C- (art. 210241)",
+   "producto_ficha": null,
+   "cantidad": 5.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.5,
+   "descuento_pct": null,
+   "total": 85.55,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 313.09,
+ "desglose_iva": [
+  {
+   "base": 313.09,
+   "pct": 10,
+   "cuota": 31.31
+  }
+ ],
+ "iva": 31.31,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 344.4,
+ "observaciones": "Pedido 6896506, forma de pago RECIBO. Peso neto total 17,450 kg. Pie informativo: costes de gestión de subproductos (Orden APA 1556/2002) no incluidos en factura; subproductos a Ibergrasa.",
+ "alertas": [
+  "El nombre del emisor no aparece en la cabecera; en el pie solo figura «J CARBO». El CIF se toma de la carpeta (A79393179). Revisar el PDF original."
+ ]
+}

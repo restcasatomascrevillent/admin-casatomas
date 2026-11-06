@@ -1,0 +1,109 @@
+{
+ "archivo": "R34.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904161-0000057",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LOTE N.11 NAVIDAD-25",
+   "producto_ficha": null,
+   "cantidad": -5,
+   "unidad": "ud",
+   "bultos": -5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 55.242,
+   "descuento_pct": null,
+   "total": -276.21,
+   "iva_pct": null,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LOTE N.11 NAVIDAD NAVIDAD 1 UNID",
+   "producto_ficha": null,
+   "cantidad": -5,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -34.05,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LOTE N.11 NAVIDAD NAVIDAD 1 UNID",
+   "producto_ficha": null,
+   "cantidad": -5,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -157.82,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "LOTE DE NAVIDAD 11 NAVIDAD 1 UNID",
+   "producto_ficha": null,
+   "cantidad": -5,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -84.34,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -276.21,
+ "desglose_iva": [
+  {
+   "base": -34.05,
+   "pct": 4,
+   "cuota": -1.36
+  },
+  {
+   "base": -157.82,
+   "pct": 10,
+   "cuota": -15.78
+  },
+  {
+   "base": -84.34,
+   "pct": 21,
+   "cuota": -17.71
+  }
+ ],
+ "iva": -34.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -311.06,
+ "observaciones": "Rótulo FACTURA; anula la factura 99041600058246 de 22-12-2025. Serie 9904161 = abono. Vencimiento 14-01-2026, crédito.",
+ "alertas": [
+  "Lote de Navidad: la línea cabecera 1990011 lleva total -276,21 (= -5 × 55,242, base total); las 3 líneas componentes (4%, 10%, 21%) llevan importes -34,050/-157,820/-84,340 en la columna Pvp S/Iva, sin Total, y se dejan con total null para no duplicar. Cabecera con Pvp C/Iva -311,060 impreso."
+ ]
+}

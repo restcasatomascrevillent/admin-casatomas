@@ -1,0 +1,80 @@
+{
+ "archivo": "R325.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "1353",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 14.5,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.8,
+   "descuento_pct": null,
+   "total": 388.6,
+   "iva_pct": 10,
+   "albaran_ref": "3511",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "QUISQUILLA",
+   "producto_ficha": "Quisquilla",
+   "cantidad": 14.3,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 93.0,
+   "descuento_pct": null,
+   "total": 1329.9,
+   "iva_pct": 10,
+   "albaran_ref": "3786",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MEJILLON",
+   "producto_ficha": "Mejillón vivo (cultivo suspendido)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.25,
+   "descuento_pct": null,
+   "total": 52.5,
+   "iva_pct": 10,
+   "albaran_ref": "3786",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1771.0,
+ "desglose_iva": [
+  {
+   "base": 1771.0,
+   "pct": 10,
+   "cuota": 177.1
+  }
+ ],
+ "iva": 177.1,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1948.1,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Factura sin serie. Destinatario Casa Tomás (cliente 1607). Agrupa los albaranes 3511 y 3786.",
+ "alertas": []
+}

@@ -1,0 +1,85 @@
+{
+ "archivo": "R434.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-1966",
+ "fecha": "2026-03-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 4.092",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LUBINA FILETE C/P (CAJA BLANCA) ISOLA 1X5",
+   "producto_ficha": "Filete de lubina con piel Isola (caja blanca, 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 15.95,
+   "descuento_pct": null,
+   "total": 79.75,
+   "iva_pct": 10,
+   "albaran_ref": "B 4.092",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CHOCO G ENV MARRUECOS",
+   "producto_ficha": "Choco grande envasado, Marruecos",
+   "cantidad": 8.1,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 72.5,
+   "iva_pct": 10,
+   "albaran_ref": "B 4.092",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 161.0,
+ "desglose_iva": [
+  {
+   "base": 152.25,
+   "pct": 10,
+   "cuota": 15.23
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  }
+ ],
+ "iva": 15.58,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 176.58,
+ "observaciones": "Remesa semanal, vencimiento 29/03/2026. Cuadra al céntimo con el pie.",
+ "alertas": []
+}

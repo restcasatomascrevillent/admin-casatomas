@@ -1,0 +1,65 @@
+{
+ "archivo": "R135.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ZAMBU HIGIENE, S.L.",
+ "cif": "B73056269",
+ "local": "casa_tomas",
+ "numero_documento": "FVA+26/005421",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOALLITA PERFUMADA LUXE PERS. A:2col UC:12 K TE BLANC",
+   "producto_ficha": "Toallita perfumada Luxe personalizada, té blanco (caja de 12)",
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 99.0,
+   "descuento_pct": null,
+   "total": 495.0,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/004755",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud",
+   "producto_ficha": "Toallas secamanos zig-zag laminada 22x21 cm (paquete 180)",
+   "cantidad": 60.0,
+   "unidad": "paquete",
+   "bultos": 3,
+   "contenido_cantidad": 180,
+   "contenido_unidad": "ud",
+   "precio_unitario": 0.89,
+   "descuento_pct": null,
+   "total": 53.4,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/005930",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 548.4,
+ "desglose_iva": [
+  {
+   "base": 548.4,
+   "pct": 21,
+   "cuota": 115.16
+  }
+ ],
+ "iva": 115.16,
+ "recargo_equivalencia": 0.0,
+ "retencion_irpf": null,
+ "total": 663.56,
+ "observaciones": "Transferencia a 45 días (T.P. 4). Pie: base, IVA 21 %, recargo 0,00. Zambú avisa de que incluirá la contribución Ecoembes en una factura futura (aún no aparece). Albaranes: ALB+26/004755, ALB+26/005930. Líneas -100 % = regalo, importe 0,00.",
+ "alertas": [
+  "Unidad de venta de la toallita no impresa (UC:12 K): se anota «ud»; confirmar si es caja de 12."
+ ]
+}

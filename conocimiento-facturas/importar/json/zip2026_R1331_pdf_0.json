@@ -1,0 +1,99 @@
+{
+ "archivo": "R1331.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/16181",
+ "fecha": "2026-08-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ANIS TENIS SECO 1L 48º C6",
+   "producto_ficha": "Anís Tenis Seco 1 L (caja 6)",
+   "cantidad": 36,
+   "unidad": "botella",
+   "bultos": 6,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 10.25,
+   "descuento_pct": 0.0,
+   "total": 369.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/16.219",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RON BRUGAL AÑEJO 70CL 38º C6",
+   "producto_ficha": "Ron Brugal Añejo 70 cl (caja 6)",
+   "cantidad": 36,
+   "unidad": "botella",
+   "bultos": 6,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 9.78,
+   "descuento_pct": 0.0,
+   "total": 352.08,
+   "iva_pct": 21,
+   "albaran_ref": "26/16.219",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "RON MATUSALEM 15A 70CL 40º C6",
+   "producto_ficha": null,
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.0,
+   "descuento_pct": 0.0,
+   "total": 96.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/16.219",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "W.WHITE LABEL 70CL 40º C6 REF",
+   "producto_ficha": "Whisky White Label 70 cl (caja 6)",
+   "cantidad": 36,
+   "unidad": "botella",
+   "bultos": 6,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 8.85,
+   "descuento_pct": 0.0,
+   "total": 318.6,
+   "iva_pct": 21,
+   "albaran_ref": "26/16.219",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1135.68,
+ "desglose_iva": [
+  {
+   "base": 1135.68,
+   "pct": 21,
+   "cuota": 238.49
+  }
+ ],
+ "iva": 238.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1374.17,
+ "observaciones": "Giro/B2B, vencimiento 15/08/26. Albarán 26/16.219 (13/08/26). Todas las líneas al 21 %.",
+ "alertas": [
+  "RON MATUSALEM 15A 70CL 40º C6 no está en la ficha (la ficha tiene 7 años); producto_ficha en null."
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "archivo": "R821.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONFITERIA CERVIÑO S.L.",
+ "cif": "B32106940",
+ "local": "casa_tomas",
+ "numero_documento": "26/0000263",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAJA 400 CAÑAS",
+   "producto_ficha": "Cañas de repostería (caja de 400)",
+   "cantidad": 400,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.48,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": "333",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOMBAS",
+   "producto_ficha": "Bombas",
+   "cantidad": 45,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.45,
+   "descuento_pct": null,
+   "total": 65.25,
+   "iva_pct": 10,
+   "albaran_ref": "333",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CREMA",
+   "producto_ficha": "Crema (sin cargo)",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "333",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 257.25,
+ "desglose_iva": [
+  {
+   "base": 257.25,
+   "pct": 10,
+   "cuota": 25.73
+  }
+ ],
+ "iva": 25.73,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 282.98,
+ "observaciones": "Recibo 30 días, vencimiento 30/06/2026. Albarán 333 de 13/05/2026. La línea CREMA (código 111) va a 0,000 €: sin cargo.",
+ "alertas": []
+}

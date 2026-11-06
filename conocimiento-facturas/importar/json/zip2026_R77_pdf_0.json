@@ -1,0 +1,80 @@
+{
+ "archivo": "R77.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "24",
+ "fecha": "2026-01-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "kg Capellans secs G.",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.3,
+   "descuento_pct": null,
+   "total": 82.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L/ Gordal DH F5kg 2kg N",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "L/ Rellenas anchoa F5y 2500 kg N",
+   "producto_ficha": "Aceituna rellena de anchoa FSY 180 (lata)",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 38.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 186.8,
+ "desglose_iva": [
+  {
+   "base": 186.8,
+   "pct": 10,
+   "cuota": 18.68
+  }
+ ],
+ "iva": 18.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 205.48,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": []
+}

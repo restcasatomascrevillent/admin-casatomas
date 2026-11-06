@@ -1,0 +1,55 @@
+{
+  "cif": "G03065158",
+  "nombre": "COFRADÍA DE PESCADORES DE SANTA POLA",
+  "nombres_impresos": ["COFRADIA DE PESCADORES DE SANTA POLA", "Lonja de Pescados"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R103.pdf", "R606.pdf", "R975.pdf", "R1569.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura de servicios mensual (compradores): alquiler de cajas + comisión de venta de la lonja. NO contiene pescado: el pescado lo facturan los armadores aparte (ver proveedor B54490115)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["114 /SC26", "778 /SC26", "1.216 /SC26", "1.887 /SC26"], "patron": "^[\\d.]+ ?/SC26$", "donde": "casilla 'Nº/Serie Factura' arriba a la derecha; puede llevar punto de millar (1.887)" },
+    "fecha": "casilla 'Fecha' bajo el número: último día del mes facturado (DD/MM/AAAA); el periodo está en 'del 01/MM/2026 al 30/MM/2026'",
+    "albaranes": "fila 'Nº Albaranes | 8' y 'Albaranes | 63 299 419 …': lista de los albaranes de compra del mes, solo informativa"
+  },
+
+  "lectura": {
+    "columnas": ["Concepto", "% IVA", "Cantidad", "PVP/Ud ó %", "Base", "Importe"],
+    "cantidad_es": "cajas alquiladas en 'Alquiler Cajas'; en 'Comisión Venta' la cantidad es el porcentaje (4,15 %)",
+    "columna_peso": null,
+    "precio_es_por": "caja (0,17 € por caja) en el alquiler; % sobre el importe vendido en la comisión",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": true,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "'Alquiler Cajas': 0,17 € por caja usada",
+    "cargos_y_descuentos_pie": ["'Sumas Totales' = suma de las 2 líneas (neto, antes de IVA)"],
+    "trampas": [
+      "En 'Comisión Venta' el número grande (8.677,59) es la BASE de compras del mes sobre la que se aplica el 4,15 %, no un precio ni un importe a pagar",
+      "'4,15' es un porcentaje, no unidades",
+      "La fila de IVA solo trae 5 valores: base, 21,00, cuota, (recargo vacío), total",
+      "El número de factura lleva punto de millar y '/SC26'; no confundir con los números de albarán"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "alquiler = cajas × 0,17 (87 × 0,17 = 14,79; 58 × 0,17 = 9,86)",
+    "comisión = base × 4,15 % (8.677,59 × 4,15 % = 360,10; 3.058,09 → 126,92)",
+    "base imponible = alquiler + comisión (R103: 14,79 + 360,10 = 374,89)",
+    "IVA = base × 21 % (78,73); total = 453,62"
+  ],
+
+  "guia_ocr": "Factura de Servicios de la Cofradía de Santa Pola (lonja): no vende pescado, cobra servicios. Solo hay dos líneas: 'Alquiler Cajas' (cantidad = cajas, precio 0,17) y 'Comisión Venta' (cantidad = 4,15 %, columna Base = compras del mes sobre las que se calcula, importe = base × 4,15 %). Número en 'Nº/Serie Factura' (p. ej. 1.887 /SC26), fecha de fin de mes. IVA único 21 %. Total = suma de líneas + 21 %. La lista de albaranes es informativa, no son líneas.",
+
+  "productos": [
+    { "nombre_impreso": "Alquiler Cajas", "nombre_normalizado": "Alquiler de cajas de la lonja", "familia": "cargo de lonja", "presentacion": "servicio", "formato": null, "unidad_factura": "caja", "precio": { "min": 0.17, "max": 0.17, "por": "caja", "ejemplos": [["2026-01-31", 0.17]] }, "iva_pct": 21, "veces_visto": 9 },
+    { "nombre_impreso": "Comisión Venta", "nombre_normalizado": "Comisión de venta de la lonja (4,15 %)", "familia": "cargo de lonja", "presentacion": "servicio (porcentaje sobre compras del mes)", "formato": null, "unidad_factura": "% sobre base", "precio": { "min": 4.15, "max": 4.15, "por": "% de la base", "ejemplos": [["2026-01-31", 4.15]] }, "iva_pct": 21, "veces_visto": 9 }
+  ],
+
+  "dudas": [
+    "La base de la comisión (8.677,59 en enero) debería ser el total de lo comprado ese mes en la lonja (facturas de armadores, B54490115); no se ha comprobado que coincida."
+  ]
+}

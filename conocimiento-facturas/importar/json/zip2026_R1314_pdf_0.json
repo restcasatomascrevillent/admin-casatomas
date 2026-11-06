@@ -1,0 +1,63 @@
+{
+ "archivo": "R1314.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SUMINISTROS HOSTELEROS BENISSA, S.L.U.",
+ "cif": "B53414637",
+ "local": "casa_tomas",
+ "numero_documento": "SCF 141791",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CUCHILLO CHULETERO K6 | K6 COMAS",
+   "producto_ficha": "Cuchillo chuletero K6 (Comas)",
+   "cantidad": 120.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.07,
+   "descuento_pct": 20,
+   "total": 486.72,
+   "iva_pct": 21,
+   "albaran_ref": "SCA / 204640",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CUCHILLO CHULETERO HQ MONTBLANC | COMAS",
+   "producto_ficha": "Cuchillo chuletero HQ Montblanc (Comas)",
+   "cantidad": 60.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.57,
+   "descuento_pct": 20,
+   "total": 459.36,
+   "iva_pct": 21,
+   "albaran_ref": "SCA / 204640",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 946.08,
+ "desglose_iva": [
+  {
+   "base": 946.08,
+   "pct": 21,
+   "cuota": 198.68
+  }
+ ],
+ "iva": 198.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1144.76,
+ "observaciones": "Albarán SCA / 204640 de 30/06/2026. Destinatario CASA TOMAS, RTE (Benissa); cliente MASIDE 2011 SLU. Forma de pago PENDIENTE. Sin portes ni descuentos en el pie. Las líneas de IBAN y las tres sedes de cabecera no son importes ni productos.",
+ "alertas": []
+}

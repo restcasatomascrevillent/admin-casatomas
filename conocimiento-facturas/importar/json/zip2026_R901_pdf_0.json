@@ -1,0 +1,63 @@
+{
+ "archivo": "R901.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3212",
+ "fecha": "2026-06-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA 1 ONCE DE ENERO",
+   "producto_ficha": "Quisquilla nº 1 Once de Enero",
+   "cantidad": 12.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.0,
+   "descuento_pct": null,
+   "total": 781.2,
+   "iva_pct": 10,
+   "albaran_ref": "20265286",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "QUISQUILLA EXTRA ONCE DE ENERO",
+   "producto_ficha": "Quisquilla extra Once de Enero",
+   "cantidad": 13.32,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 79.0,
+   "descuento_pct": null,
+   "total": 1052.28,
+   "iva_pct": 10,
+   "albaran_ref": "20265286",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1833.48,
+ "desglose_iva": [
+  {
+   "base": 1833.48,
+   "pct": 10,
+   "cuota": 183.35
+  }
+ ],
+ "iva": 183.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2016.83,
+ "observaciones": "Transferencia a 30 dias, vencimiento 11/07/2026. Albaran 20265286 de 01/06/2026, pedido 19508. Observacion impresa: Guardar camara. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

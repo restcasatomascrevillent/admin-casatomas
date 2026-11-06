@@ -1,0 +1,48 @@
+{
+ "archivo": "R1529.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Mercedes-Benz Renting, S.A.",
+ "cif": "A82532771",
+ "local": "casa_tomas",
+ "numero_documento": "0126146657",
+ "fecha": "2026-08-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Arrendamiento y servicios contrato 0001197586 cuota 12 matricula 1173NFN 08/2026",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1669.22,
+   "descuento_pct": null,
+   "total": 1669.22,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1669.22,
+ "desglose_iva": [
+  {
+   "base": 1669.22,
+   "pct": 21,
+   "cuota": 350.54
+  }
+ ],
+ "iva": 350.54,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2019.76,
+ "observaciones": "Renting furgoneta; vencimiento = fecha factura; suplidos 0,00",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

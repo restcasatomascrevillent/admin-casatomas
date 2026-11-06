@@ -1,0 +1,65 @@
+{
+ "archivo": "R328.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TALLERES DIEGO CHAPA Y PINTURA, S.L.",
+ "cif": "B53252763",
+ "local": "casa_tomas",
+ "numero_documento": "210/F",
+ "fecha": "2026-02-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LAMPARA GAS XENON 85V 35W.",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 74.8,
+   "descuento_pct": null,
+   "total": 74.8,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA EN CHAPA",
+   "producto_ficha": null,
+   "cantidad": 1.3,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.5,
+   "descuento_pct": null,
+   "total": 55.25,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 130.05,
+ "desglose_iva": [
+  {
+   "base": 130.05,
+   "pct": 21,
+   "cuota": 27.31
+  }
+ ],
+ "iva": 27.31,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 157.36,
+ "observaciones": "Cobro al contado 24/02/2026. Trabajo: desmontar y montar faro derecho para sustituir lámpara xenón de cruce. Entrada 23/02/2026, salida 24/02/2026. Reparación garantizada 3 meses o 2.000 km. Referencias de artículo no incluidas en el nombre.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

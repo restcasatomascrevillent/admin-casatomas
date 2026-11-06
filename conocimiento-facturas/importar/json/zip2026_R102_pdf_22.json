@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  23
+ ],
+ "tipo": "factura",
+ "proveedor": "EMERGE ACTIVOS SL",
+ "cif": "B67939538",
+ "local": "casa_tomas",
+ "numero_documento": "41/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 23,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 3.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.04,
+   "descuento_pct": null,
+   "total": 61.88,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 61.88,
+ "desglose_iva": [
+  {
+   "base": 61.88,
+   "pct": 10.0,
+   "cuota": 6.19
+  }
+ ],
+ "iva": 6.19,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 68.07,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645, 751. Embarcaciones: ninguna.",
+ "alertas": []
+}

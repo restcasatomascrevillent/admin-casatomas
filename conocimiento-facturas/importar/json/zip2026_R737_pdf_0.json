@@ -1,0 +1,48 @@
+{
+ "archivo": "R737.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES GUTI E HIJOS S.L",
+ "cif": "B72748676",
+ "local": "casa_tomas",
+ "numero_documento": "B 662",
+ "fecha": "2026-05-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUESO ADIANO MANCHEGO CURADO ARTESANO",
+   "producto_ficha": "Queso manchego curado artesano (Adiano)",
+   "cantidad": 5.64,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.65,
+   "descuento_pct": null,
+   "total": 133.39,
+   "iva_pct": 4,
+   "albaran_ref": "798",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 133.39,
+ "desglose_iva": [
+  {
+   "base": 133.39,
+   "pct": 4,
+   "cuota": 5.34
+  }
+ ],
+ "iva": 5.34,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 138.73,
+ "observaciones": "Pago 30 días vista. Albarán 798. Cantidad impresa = piezas (bultos); cantidad JSON = kilos.",
+ "alertas": [
+  "Precio 23.65 €/kg distinto del rango de la ficha (24,64-24,65 curado / 21,93 semicurado)"
+ ]
+}

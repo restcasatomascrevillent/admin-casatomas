@@ -1,0 +1,46 @@
+{
+ "archivo": "R218.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Redissa & Dibos, s.l.",
+ "cif": "B73066458",
+ "local": "casa_tomas",
+ "numero_documento": "1/2026 381",
+ "fecha": "2026-01-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Blanco Godello A Coroa 200 Cestos 75 cl.",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 18.0,
+   "descuento_pct": null,
+   "total": 108.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 108.0,
+ "desglose_iva": [
+  {
+   "base": 108.0,
+   "pct": 21,
+   "cuota": 22.68
+  }
+ ],
+ "iva": 22.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 130.68,
+ "observaciones": "Restaurante Barra Casa Tomás; cerrado lunes; forma de pago reposición",
+ "alertas": []
+}

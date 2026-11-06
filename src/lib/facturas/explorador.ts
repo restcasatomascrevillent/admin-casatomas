@@ -20,7 +20,7 @@ import { sumarDiasIso, textoRango } from "./periodoAnalisis";
 
 // ─── Catálogos ──────────────────────────────────────────────────────────────
 
-export type Medida = "gasto" | "base" | "documentos" | "abonos" | "regalado" | "cantidad" | "precio" | "retencion_irpf";
+export type Medida = "gasto" | "base" | "documentos" | "abonos" | "regalado" | "cantidad" | "precio" | "retencion_irpf" | "litros" | "kilos";
 export type Agrupar = "dia" | "semana" | "mes" | "trimestre" | "proveedor" | "familia" | "producto" | "local" | "tipo";
 export type Desglose = "local" | "proveedor" | "familia" | "tipo";
 export type TipoGrafica = "barras" | "apiladas" | "lineas" | "area" | "horizontales" | "tabla";
@@ -47,6 +47,9 @@ export const MEDIDAS: InfoMedida[] = [
   { valor: "regalado", etiqueta: "Regalado y descuentos", iva: "sin IVA", formato: "eur", porLineas: true, requiereProducto: false, ayuda: "Lo que valía menos lo que se pagó" },
   { valor: "retencion_irpf", etiqueta: "Retención IRPF", iva: null, formato: "eur", porLineas: false, requiereProducto: false, ayuda: "IRPF retenido (alquileres, gestoría…); el gasto ya lo descuenta" },
   { valor: "cantidad", etiqueta: "Cantidad comprada", iva: null, formato: "cantidad", porLineas: true, requiereProducto: true, ayuda: "Filtra antes un producto" },
+  // 20261106400000_facturas_volumenes: cajas, packs, barriles y botellas pasados a litros/kilos.
+  { valor: "litros", etiqueta: "Litros", iva: null, formato: "cantidad", porLineas: true, requiereProducto: false, ayuda: "Cajas, packs, barriles y botellas pasados a litros (bebidas, aceite…)" },
+  { valor: "kilos", etiqueta: "Kilos", iva: null, formato: "cantidad", porLineas: true, requiereProducto: false, ayuda: "Lo comprado al kilo y las cajas o envases con su peso" },
   { valor: "precio", etiqueta: "Precio medio", iva: "sin IVA", formato: "precio", porLineas: true, requiereProducto: true, ayuda: "Filtra antes un producto" },
 ];
 
@@ -170,6 +173,10 @@ export function ajustarConfig(c: ConfigExplorador): { config: ConfigExplorador; 
     config = { ...config, medida: "base" };
     aviso = "Por familias o productos se mide la base sin IVA de las líneas (el IVA va por documento).";
   }
+  if ((config.medida === "litros" || config.medida === "kilos") && config.filtros.unidad) {
+    config = { ...config, filtros: { ...config.filtros, unidad: null } };
+    aviso = "Litros y kilos ya convierten cajas, botellas y barriles: se quita el filtro de unidad.";
+  }
   if (config.grafica === "apiladas" && !config.desglose) config = { ...config, grafica: "auto" };
   return { config, aviso };
 }
@@ -281,6 +288,8 @@ export interface Exploracion {
     variacionPct: number | null;
     /** La variación usa meses incompletos (20261106310000): por qué no es fiable. */
     variacionAviso?: string | null;
+    /** Litros/kilos: líneas que no se pudieron pasar (no suman; 20261106400000). */
+    lineasSinConvertir?: number | null;
   };
   anterior: { desde: string; hasta: string; valor: number | null; documentos: number } | null;
   /** «AAAA-MM» de los meses incompletos del periodo (20261106310000). */
@@ -338,6 +347,7 @@ export function normalizarExploracion(entrada: unknown): Exploracion {
       lineas: numONulo(t.lineas),
       variacionPct: numONulo(t.variacion_pct),
       variacionAviso: txtONulo(t.variacion_aviso),
+      ...(numONulo(t.lineas_sin_convertir) !== null ? { lineasSinConvertir: numONulo(t.lineas_sin_convertir) } : {}),
     },
     mesesIncompletos: Array.isArray(r.meses_incompletos)
       ? r.meses_incompletos.filter((m): m is string => typeof m === "string" && /^\d{4}-\d{2}$/.test(m))

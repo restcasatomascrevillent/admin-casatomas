@@ -1,0 +1,66 @@
+{
+ "archivo": "R236.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+ "cif": "B30224109",
+ "local": "casa_tomas",
+ "numero_documento": "1353",
+ "fecha": "2026-02-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TINTO R.DUERO BAGUS 75 CL.",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "botella",
+   "bultos": 2.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 27.2,
+   "descuento_pct": null,
+   "total": 326.4,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TINTO R.DUERO BAGUS MAGNUM",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "cl",
+   "precio_unitario": 59.2,
+   "descuento_pct": null,
+   "total": 59.2,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 385.6,
+ "desglose_iva": [
+  {
+   "base": 385.6,
+   "pct": 21,
+   "cuota": 80.98
+  }
+ ],
+ "iva": 80.98,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 466.58,
+ "observaciones": "Forma de pago REPOSICION. Nº factura impreso 2026/1 1353. Escaneo muy desvaido. Observaciones: CERRADO LUNES.",
+ "alertas": [
+  "Escaneo muy tenue: precios 27.20/59.20, cajas y total leidos con dificultad (cuadran: 326.40+59.20=385.60; IVA 80.98; total 466.58).",
+  "Linea Magnum: la columna Cajas va en blanco; se asume 1 botella magnum (150 cl)."
+ ]
+}

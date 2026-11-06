@@ -1,0 +1,65 @@
+{
+ "archivo": "R1670.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "328",
+ "fecha": "2026-10-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "kg Capellanes seco c/ite",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 84.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L/ Rellenas anchoa FSY 180",
+   "producto_ficha": "Aceituna rellena de anchoa FSY 180 (lata)",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 38.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 122.7,
+ "desglose_iva": [
+  {
+   "base": 122.7,
+   "pct": 10,
+   "cuota": 12.27
+  }
+ ],
+ "iva": 12.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 134.97,
+ "observaciones": "Pago: Alicante. Factura manuscrita de talonario; cliente MASIDE 2011 S.L. B54583356, R.E. y descuento vacíos.",
+ "alertas": [
+  "Precio de rellenas manuscrito 12'50; manda el importe 38,70 (= 3 x 12,90), que cuadra con base y total."
+ ]
+}

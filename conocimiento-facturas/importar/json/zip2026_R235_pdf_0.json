@@ -1,0 +1,46 @@
+{
+ "archivo": "R235.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90261482",
+ "fecha": "2026-02-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Jamón Bellota 100% Ibérico 5J 9-10 kg N24",
+   "producto_ficha": "Jamón de bellota 100% ibérico 5J, pieza de 9-10 kg",
+   "cantidad": 10,
+   "unidad": "pieza",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 519.4,
+   "descuento_pct": null,
+   "total": 5194.0,
+   "iva_pct": 10,
+   "albaran_ref": "40298006",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 5194.0,
+ "desglose_iva": [
+  {
+   "base": 5194.0,
+   "pct": 10,
+   "cuota": 519.4
+  }
+ ],
+ "iva": 519.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 5713.4,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 18/04/2026. Punto verde 0,50 EUR informativo, no sumado al total. Albarán 40298006 del 12/02/2026.",
+ "alertas": []
+}

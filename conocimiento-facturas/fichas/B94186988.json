@@ -1,0 +1,83 @@
+{
+  "cif": "B94186988",
+  "nombre": "Enchenta SLU",
+  "nombres_impresos": ["ENCHENTA SLU", "Enchenta"],
+  "categoria": "marisco",
+  "locales": ["casa_tomas"],
+  "muestras": ["R60.pdf", "R636.pdf", "R1116.pdf", "R391.pdf", "R1607.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura que agrupa varios albaranes de pocos días (de 1 a 4 albaranes, cada uno con su fecha); las hay de un solo albarán (R60: 2)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2 (la página 2 es continuación con la tabla de líneas vacía y solo trae bases, IVA y totales)",
+    "numero_factura": { "ejemplos": ["1-4845", "1-4989", "1-5089", "1-5330", "1-5498"], "patron": "^1-\\d{4}$", "donde": "cabecera 'Factura 1-4845 | Fecha 16-Enero-2026', junto al QR tributario" },
+    "fecha": "cabecera, junto al número, con el mes en letra: 16-Enero-2026 (DD-Mes-AAAA); coincide con la fecha del vencimiento y con la del último albarán",
+    "albaranes": "cada grupo de líneas empieza con '13-Enero-2026 Albarán: 3-5' (fecha, nº de albarán con formato 3-N); cada línea de producto va seguida de una línea 'Lote: ...'"
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Detalle", "Cant", "P.Unidad", "Desc", "Total", "Iva"],
+    "cantidad_es": "kg para el pescado y el marisco al peso (rape, lubina, percebe, navaja, berberecho, almeja…); UNIDADES para la ostra plana (24, 36, 48); en PORTES siempre 1. La factura no imprime la unidad: se deduce del precio",
+    "columna_peso": null,
+    "precio_es_por": "kg (ostra plana: por unidad; portes: por servicio)",
+    "descuento_por_linea": { "existe": true, "columna": "Desc", "valores_habituales": [0] },
+    "iva_por_linea": true,
+    "tipos_iva": [10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["PORTES: una línea PT por cada albarán, con IVA 21 % (marisco al 10 %); importes de 14,57 a 71,85. Pie con 'Desc 0,00 | Req. Eq. 0,00'"],
+    "trampas": [
+      "Cantidades con PUNTO decimal (2.00, 8.40) y precios con COMA (95,00); en el pie las bases también llevan punto (503.5 €) y los totales coma (575,03 €)",
+      "Cada línea de producto va seguida de 'Lote: nº': el lote no es una cantidad ni un precio",
+      "Hay dos IVA en la misma factura: 10 % en el marisco y pescado, 21 % solo en PORTES",
+      "El mismo artículo puede salir varias veces con precios distintos en albaranes distintos (LUBINA SALVAJE a 27,00 y 25,00 el mismo día)",
+      "La fecha usa el mes en letra (Enero, Septiembre…), no numérico",
+      "La página 2 repite la cabecera con una tabla vacía: no tiene líneas; en el pie de la página 2 están las bases y totales de toda la factura",
+      "Hay líneas a 0,00 € (CABRACHO 3.00 × 0,00 = 0,00): regalo/abono, no un error de lectura",
+      "El pie de IVA se escribe 'Base 503.5 € 10 % I.V.A 50.35 €'"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = cantidad × precio × (1 − desc/100) (Desc siempre 0 en las muestras)",
+    "Total Neto = suma de totales de línea, incluidos los portes (R60: 503,50 + 17,50 = 521,00)",
+    "Base 10 % = suma de líneas con IVA 10; Base 21 % = suma de PORTES; IVA = cada base × su tipo, redondeado por tipo (R60: 50,35 + 3,68 = 54,03; R636: 90,34 + 15,09 = 105,43 impreso 105,42, tolerar 1 céntimo)",
+    "Total Factura = Total Neto + Total IVA (R60: 521,00 + 54,03 = 575,03; R1116: 1.079,22 + 115,53 = 1.194,75; R1607: 740,62 + 85,15 = 825,77)",
+    "El importe del vencimiento es igual al Total Factura"
+  ],
+
+  "guia_ocr": "Factura que agrupa albaranes. Número en cabecera 'Factura 1-NNNN'; fecha 'DD-Mes-AAAA' con el mes en letra. Cada albarán empieza con su fecha y 'Albarán: 3-N'; tras cada producto hay una línea 'Lote' que se ignora. Columnas: código | detalle | cantidad | precio unidad | desc | total | IVA. Cantidad en kg, salvo OSTRA PLANA en unidades. IVA 10 % en el marisco y 21 % solo en PORTES, una línea por albarán. Cantidades con punto decimal y precios con coma. Página 2 sin líneas: solo bases, IVA y totales. Comprueba que Total Neto + Total IVA = Total Factura.",
+
+  "productos": [
+    { "nombre_impreso": "PT PORTES", "nombre_normalizado": "Portes (transporte)", "familia": "servicio", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "servicio (cantidad 1)", "precio": { "min": 14.57, "max": 71.85, "por": "servicio", "ejemplos": [["2026-01-16", 17.5], ["2026-04-30", 71.85], ["2026-07-10", 14.57]] }, "iva_pct": 21, "veces_visto": 62 },
+    { "nombre_impreso": "NV NAVAJA", "nombre_normalizado": "Navaja", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 20.0, "max": 29.0, "por": "kg", "ejemplos": [["2026-01-15", 25.0], ["2026-03-07", 29.0], ["2026-07-06", 22.0], ["2026-09-24", 20.0]] }, "iva_pct": 10, "veces_visto": 47 },
+    { "nombre_impreso": "BE BERBERECHO", "nombre_normalizado": "Berberecho", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 23.5, "max": 33.5, "por": "kg", "ejemplos": [["2026-01-13", 23.5], ["2026-03-07", 33.5], ["2026-04-29", 33.0], ["2026-07-06", 31.5]] }, "iva_pct": 10, "veces_visto": 44 },
+    { "nombre_impreso": "OPL OSTRA PLANA", "nombre_normalizado": "Ostra plana", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 12, "bulto": "docena" }, "unidad_factura": "unidad (cantidad 24, 36 o 48)", "precio": { "min": 2.15, "max": 2.75, "por": "ud", "ejemplos": [["2026-01-13", 2.75], ["2026-04-29", 2.7], ["2026-09-25", 2.15]] }, "iva_pct": 10, "veces_visto": 24 },
+    { "nombre_impreso": "LB LUBINA SALVAJE", "nombre_normalizado": "Lubina salvaje", "familia": "pescado", "presentacion": "salvaje", "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 19.5, "max": 34.5, "por": "kg", "ejemplos": [["2026-03-06", 21.5], ["2026-03-06", 19.5], ["2026-04-29", 25.0], ["2026-04-29", 27.0], ["2026-07-08", 34.5]] }, "iva_pct": 10, "veces_visto": 24 },
+    { "nombre_impreso": "RP RAPE", "nombre_normalizado": "Rape", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 14.0, "max": 20.5, "por": "kg", "ejemplos": [["2026-04-29", 14.0], ["2026-09-22", 16.0], ["2026-09-25", 15.0]] }, "iva_pct": 10, "veces_visto": 15 },
+    { "nombre_impreso": "PE PERCEBE", "nombre_normalizado": "Percebe", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 75.0, "max": 93.0, "por": "kg", "ejemplos": [["2026-07-08", 93.0]] }, "iva_pct": 10, "veces_visto": 8 },
+    { "nombre_impreso": "AF ALMEJA FINA", "nombre_normalizado": "Almeja fina", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 75.0, "max": 125.0, "por": "kg", "ejemplos": [["2026-01-13", 95.0], ["2026-03-02", 125.0], ["2026-07-10", 75.0]] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "SM SANMARTIÑO", "nombre_normalizado": "Sanmartiño (centolla)", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 21.5, "max": 21.5, "por": "kg", "ejemplos": [["2026-03-06", 21.5]] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "LE LENGUADO", "nombre_normalizado": "Lenguado", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 30.5, "max": 30.5, "por": "kg", "ejemplos": [["2026-03-06", 30.5]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "CAB CABRACHO", "nombre_normalizado": "Cabracho", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 0.0, "max": 33.0, "por": "kg", "ejemplos": [["2026-07-08", 33.0]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "COR CORUXO", "nombre_normalizado": "Coruxo", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 30.5, "max": 30.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "ESC ESCARAPOTA", "nombre_normalizado": "Escarapota", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 25.0, "max": 25.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "MJ MEJILLÓN", "nombre_normalizado": "Mejillón", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 3.35, "max": 3.35, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "SL SALMONETE", "nombre_normalizado": "Salmonete", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 26.0, "max": 26.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "SAL SALMONETE", "nombre_normalizado": "Salmonete (código SAL)", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 34.0, "max": 34.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "BM BUEY DE MAR", "nombre_normalizado": "Buey de mar", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 13.5, "max": 13.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "REY REY", "nombre_normalizado": "Rey (pescado, tipo no indicado)", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 73.0, "max": 73.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Presentación del marisco: la factura nunca dice vivo, fresco, cocido ni congelado, por eso presentacion va null (solo se distingue LUBINA SALVAJE). El dueño debe confirmar cómo llegan los productos, sobre todo MEJILLÓN, PERCEBE, SANMARTIÑO y BUEY DE MAR",
+    "La unidad de Cantidad no está impresa: se deduce de que cantidad × precio = total y del orden de precio. Kilos para casi todo; la ostra plana va en unidades (múltiplos de 12) con precio por unidad; nada se vende por docena en la factura",
+    "REY, CORUXO y ESCARAPOTA: no se sabe a qué especie corresponden; REY a 73 €/kg parece un pescado muy caro (¿pez rey?). Confirmar",
+    "SALMONETE sale con dos códigos (SL a 26,00 y SAL a 34,00): se dejan como dos productos hasta confirmar si son el mismo",
+    "CABRACHO: una línea con cantidad 3.00 y precio 0,00 (R1115, regalo o abono); el mínimo 0,00 viene de ahí, el precio real ronda 33,00",
+    "En R636 la suma de IVA por tipo (90,34 + 15,09) da 105,43 y el pie imprime 105,42: el redondeo no es estrictamente por tipo; tolerar 1 céntimo",
+    "Los rangos de precio salen de las 5 muestras y de los ejemplos del catálogo digital; la mayoría de artículos tienen pocos datos",
+    "El catálogo digital contiene 18 artículos, todos incluidos en la ficha; no queda ninguno fuera"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R547.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "2387",
+ "fecha": "2026-04-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.8,
+   "descuento_pct": null,
+   "total": 268.0,
+   "iva_pct": 10,
+   "albaran_ref": "7404",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 268.0,
+ "desglose_iva": [
+  {
+   "base": 268.0,
+   "pct": 10,
+   "cuota": 26.8
+  }
+ ],
+ "iva": 26.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 294.8,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Serie no impresa en la cabecera. Un albarán (7404, 11/04/2026).",
+ "alertas": []
+}

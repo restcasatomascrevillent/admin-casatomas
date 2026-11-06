@@ -1,0 +1,117 @@
+{
+ "archivo": "R294.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CIELO DE BOCA, S.L.",
+ "cif": "B73915944",
+ "local": "casa_tomas",
+ "numero_documento": "A26/2765",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BG-MINI DONUT DE POLLO Y QUESO 20 UN 800 GR",
+   "producto_ficha": "Mini donut de pollo y queso (20 uds, 800 g)",
+   "cantidad": 14,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 800,
+   "contenido_unidad": "g",
+   "precio_unitario": 6.2,
+   "descuento_pct": 0.0,
+   "total": 86.8,
+   "iva_pct": 10,
+   "albaran_ref": "A26/2058",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CB-CROQUETA CREMOSA 45 GR.CONG.DE PEPPERONI",
+   "producto_ficha": "Croqueta cremosa de pepperoni 45 g (congelada)",
+   "cantidad": 12,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 45,
+   "contenido_unidad": "g",
+   "precio_unitario": 13.95,
+   "descuento_pct": 0.0,
+   "total": 167.4,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3084",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CR-PIONONO C/3 BANDEJAS DE 30 UDS.",
+   "producto_ficha": "Pionono (caja de 3 bandejas de 30 uds)",
+   "cantidad": 3,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 40.5,
+   "descuento_pct": 10.0,
+   "total": 109.35,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3084",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CR-PIONONO C/3 BANDEJAS DE 30 UDS.",
+   "producto_ficha": "Pionono (caja de 3 bandejas de 30 uds)",
+   "cantidad": 3,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 40.5,
+   "descuento_pct": 0.0,
+   "total": 121.5,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3614",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CB-CARRILLERA DE CERDO CONFITADA EN SU JUGO 5 UDS.C/5 KG APROX",
+   "producto_ficha": "Carrillera de cerdo confitada en su jugo (5 uds por ~5 kg, precio por kg)",
+   "cantidad": 5.9,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.95,
+   "descuento_pct": 0.0,
+   "total": 88.21,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3614",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 573.26,
+ "desglose_iva": [
+  {
+   "base": 573.26,
+   "pct": 10,
+   "cuota": 57.33
+  }
+ ],
+ "iva": 57.33,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 630.59,
+ "observaciones": "Factura de febrero con tres albaranes (A26/2058, A26/3084, A26/3614). Sin lotes ni caducidades en el texto. Carrillera por peso: cantidad = kg, bultos = piezas. Número impreso 'A26/ 2,765' normalizado a A26/2765. Pago por giro a 5 días.",
+ "alertas": [
+  "Texto suelto 'VOLATYS' bajo la línea del donut (no se sabe si es marca, lote o error). No se incluye en el nombre del producto."
+ ]
+}
