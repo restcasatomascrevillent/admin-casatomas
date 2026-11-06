@@ -21,6 +21,9 @@
 //    · `cargos_pie` (portes, embalajes, punto verde…) entran como líneas, para
 //      que las líneas sumen la base imponible.
 //    · El total es el IMPRESO: total_origen = 'leido'.
+//    · `retencion_irpf` (06/11/2026) va al crudo con el signo del abono, como
+//      subtotal/iva/total, y su % (el del JSON o |ret|/|base|): total =
+//      subtotal + iva − retencion_irpf. 0 o null = sin retención (null).
 // ============================================================================
 
 export type Local = "casa_tomas" | "touza";
@@ -98,6 +101,19 @@ export function valorBruto(
     return { importe_bruto: r2(cantidad * precioReferencia), importe_bruto_estimado: true };
   }
   return { importe_bruto: null, importe_bruto_estimado: false };
+}
+
+/**
+ * % de la retención de IRPF: el del JSON si es creíble (0-50 %); si no,
+ * round(100·|ret|/|base|, 2) cuando hay base y sale en ese rango; si no, null.
+ */
+export function porcentajeRetencion(retencion: number, pctJson: number | null, subtotal: number | null): number | null {
+  const creible = (n: number | null): n is number => n !== null && Number.isFinite(n) && n > 0 && n <= 50;
+  const leido = pctJson === null ? null : r2(Math.abs(pctJson));
+  if (creible(leido)) return leido;
+  if (subtotal === null || subtotal === 0) return null;
+  const calculado = r2((100 * Math.abs(retencion)) / Math.abs(subtotal));
+  return creible(calculado) ? calculado : null;
 }
 
 /** Página de la línea DENTRO del PDF de esta factura (paginas_pdf: páginas del PDF original). */
@@ -185,7 +201,12 @@ export function prepararImportacion(datos: Json, opciones: { nombrePdf?: string;
 
   const archivo = (typeof datos.archivo === "string" && datos.archivo.trim()) || opciones.nombrePdf || "sin nombre";
   const recargo = numero(datos.recargo_equivalencia);
-  const retencion = numero(datos.retencion_irpf);
+  const retencionLeida = numero(datos.retencion_irpf);
+  const retencion = retencionLeida ? Math.abs(retencionLeida) : null;
+  const subtotal = signo(numero(datos.subtotal));
+  const retencionPct = retencion === null
+    ? null
+    : porcentajeRetencion(retencion, numero(datos.retencion_irpf_pct), subtotal);
   const avisos = (Array.isArray(datos.alertas) ? datos.alertas : []).map(textoAviso).filter((x: string | null): x is string => !!x);
   const partes = [
     typeof datos.observaciones === "string" ? datos.observaciones : null,
@@ -219,9 +240,11 @@ export function prepararImportacion(datos: Json, opciones: { nombrePdf?: string;
       ? String(datos.numero_documento)
       : null,
     fecha: typeof datos.fecha === "string" ? datos.fecha : null,
-    subtotal: signo(numero(datos.subtotal)),
+    subtotal,
     iva: signo(numero(datos.iva)),
     total: signo(numero(datos.total)),
+    retencion_irpf: signo(retencion),
+    retencion_irpf_pct: retencionPct,
     observaciones: null,
     resumen: null,
     productos,

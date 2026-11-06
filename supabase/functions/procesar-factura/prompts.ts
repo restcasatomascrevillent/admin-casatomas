@@ -303,6 +303,11 @@ F. IMPORTES DEL PIE: SE COPIAN, NO SE CALCULAN. Y SE CITAN.
    Para el IVA, ojo: "10,00 %" es un porcentaje, no es la cita de la cuota.
    La cita de la cuota es el importe en euros. Si sólo está el porcentaje,
    iva_literal = null e iva = null.
+   RETENCIÓN IRPF (alquileres, gestorías, profesionales): si el pie imprime
+   una retención que se RESTA del total, copia su importe en euros, en
+   positivo, en "retencion_irpf" y su porcentaje en "retencion_irpf_pct"; si
+   no hay, null. Ahí el total a pagar es base + IVA − retención. No es el
+   recargo de equivalencia (que suma).
 
 ════════════════════════════════════════════
 5. REPASO ANTES DE RESPONDER
@@ -332,7 +337,7 @@ Así que el repaso NO es "consigue que cuadre". Es esto, en este orden:
 
   (4) Sólo ahora, y sólo como LUPA para encontrar dígitos mal leídos: mira si
       cantidad × precio_unitario se parece al total de la línea, si las líneas
-      suman algo parecido al subtotal y si base + iva se parece al total.
+      suman algo parecido al subtotal y si base + iva (− retención) se parece al total.
       Cuando algo se desvíe, VUELVE A MIRAR ESA ZONA DE LA IMAGEN: casi
       siempre hay un dígito confundido (3/8, 5/6, 1/7, 0/9, 6/0) o una coma y
       un punto cambiados.

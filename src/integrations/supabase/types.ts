@@ -1709,6 +1709,8 @@ export type Database = {
           proveedor_id: number | null
           proveedor_normalizado: string | null
           resumen: string | null
+          retencion_irpf: number | null
+          retencion_irpf_pct: number | null
           subtotal: number | null
           tipo: string
           total: number | null
@@ -1741,6 +1743,8 @@ export type Database = {
           proveedor_id?: number | null
           proveedor_normalizado?: string | null
           resumen?: string | null
+          retencion_irpf?: number | null
+          retencion_irpf_pct?: number | null
           subtotal?: number | null
           tipo: string
           total?: number | null
@@ -1773,6 +1777,8 @@ export type Database = {
           proveedor_id?: number | null
           proveedor_normalizado?: string | null
           resumen?: string | null
+          retencion_irpf?: number | null
+          retencion_irpf_pct?: number | null
           subtotal?: number | null
           tipo?: string
           total?: number | null

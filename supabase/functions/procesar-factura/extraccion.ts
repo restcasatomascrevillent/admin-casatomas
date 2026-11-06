@@ -24,6 +24,7 @@ import {
   MAX_CAMBIOS_RELECTURA,
   mensajeCorrectivo,
   type OrigenImporte,
+  retencionConSigno,
   retirarImportesNoImpresos,
   tipoIvaLinea,
   validarEstructura,
@@ -216,6 +217,10 @@ export function normalizarDatos(data: any) {
     sugerencia_magnitud: number | null;
   }) => ({ ...p, sugerencia: p.sugerencia_magnitud })));
 
+  const subtotal = toNumber(data.subtotal, true);
+  const total = toNumber(data.total, true);
+  const retencion = retencionNormalizada(data.retencion_irpf, data.retencion_irpf_pct, subtotal, total);
+
   return {
     tipo,
     proveedor,
@@ -224,9 +229,14 @@ export function normalizarDatos(data: any) {
     /** Paginación impresa («PÁGINA Nº 1/2»); null si el papel no la trae. */
     pagina: paginaImpresa(data.pagina),
     fecha,
-    subtotal: toNumber(data.subtotal, true),
+    subtotal,
     iva: toNumber(data.iva, true),
-    total: toNumber(data.total, true),
+    total,
+    /** Retención de IRPF (facturas.retencion_irpf) con el signo de la base:
+     *  total = subtotal + iva − retencion_irpf. null = sin retención. */
+    retencion_irpf: retencion.retencion_irpf,
+    /** Porcentaje positivo (facturas.retencion_irpf_pct); null si no se sabe. */
+    retencion_irpf_pct: retencion.retencion_irpf_pct,
     observaciones: limpiarObservaciones(data.observaciones),
     resumen: data.resumen || null,
     productos,
@@ -234,6 +244,30 @@ export function normalizarDatos(data: any) {
      *  los llamantes los añaden a alertasPrevias). */
     avisos: [...(avisoMagnitud ? [avisoMagnitud] : []), ...avisosCalidad],
   };
+}
+
+/**
+ * Retención de IRPF lista para guardar: importe con el signo de la base (o del
+ * total si no hay base), 0 → null, y porcentaje positivo. Si el porcentaje no
+ * viene (o no es creíble, fuera de 0-50 %) se calcula con la base. Si viene
+ * el porcentaje pero no el importe, NO se inventa el importe: los dos a null.
+ */
+export function retencionNormalizada(
+  importe: unknown,
+  pct: unknown,
+  subtotal: number | null,
+  total: number | null,
+): { retencion_irpf: number | null; retencion_irpf_pct: number | null } {
+  const r = retencionConSigno({ subtotal, total, retencion_irpf: toNumber(importe, true) });
+  if (r === null) return { retencion_irpf: null, retencion_irpf_pct: null };
+  const creible = (n: number | null) => n !== null && Number.isFinite(n) && n > 0 && n <= 50;
+  const leido = toNumber(pct, true);
+  const leidoAbs = leido === null ? null : Math.round(Math.abs(leido) * 100) / 100;
+  if (creible(leidoAbs)) return { retencion_irpf: r, retencion_irpf_pct: leidoAbs };
+  const calculado = subtotal !== null && Number.isFinite(subtotal) && subtotal !== 0
+    ? Math.round((10000 * Math.abs(r)) / Math.abs(subtotal)) / 100
+    : null;
+  return { retencion_irpf: r, retencion_irpf_pct: creible(calculado) ? calculado : null };
 }
 
 /** {actual, total} con enteros positivos; null si no hay ninguno. */

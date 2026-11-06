@@ -516,3 +516,33 @@ describe("consolidar · defensas vistas en el banco real (05-oct-2026)", () => {
     expect(out.documento.productos).toHaveLength(54);
   });
 });
+
+describe("retención de IRPF en el pie de las piezas", () => {
+  it("viaja del pie de la última página al documento consolidado y cuadra", () => {
+    // Alquiler + comunidad: base 750, IVA 157,50, retención 19 % 142,50 → 765.
+    const pie = {
+      total_literal: "765,00", subtotal_literal: "750,00", iva_literal: "157,50",
+      subtotal: 750, iva: 157.5, retencion_irpf: 142.5, retencion_irpf_pct: 19, total: 765,
+      tabla_totales_vacia: false,
+    };
+    const cabecera = {
+      ...resultado([]).cabecera_visible,
+      tipo: "factura" as const, proveedor: "INMUEBLES SL", cif: "B12345678", numero_documento: "A-1", fecha: "2026-10-01",
+    };
+    const p1 = resultado([linea({ nombre: "Alquiler local", precio_unitario: 400, total: 400, importe_literal: "400,00" })], {
+      cabecera_visible: cabecera,
+    });
+    const p2 = resultado([linea({ nombre: "Comunidad", precio_unitario: 350, total: 350, importe_literal: "350,00" })], {
+      cabecera_visible: cabecera,
+      pie,
+    });
+    const c = consolidar([pieza(1, p1), pieza(2, p2)]);
+    expect(c.documento.retencion_irpf).toBe(142.5);
+    expect(c.documento.retencion_irpf_pct).toBe(19);
+    const listo = prepararDocumentoConsolidado(c);
+    expect(listo.datos.retencion_irpf).toBe(142.5);
+    expect(listo.datos.retencion_irpf_pct).toBe(19);
+    expect(listo.datos.total).toBe(765);
+    expect(listo.alertasPrevias.map((a) => a.codigo)).not.toContain("iva_incoherente");
+  });
+});
