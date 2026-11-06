@@ -199,29 +199,32 @@ beforeEach(() => {
 });
 
 describe("Super Admin › Servicios · pestañas y URL", () => {
-  it("cuatro pestañas; sin `?tab=` abre el Resumen y cada pestaña queda en la URL", async () => {
+  it("cuatro pestañas; sin `?tab=` abre Estado y cada pestaña queda en la URL", async () => {
     pintar();
     expect(screen.getByRole("heading", { level: 1, name: "Servicios" })).toBeInTheDocument();
-    expect(screen.getAllByRole("tab").map((x) => x.textContent?.replace(/\d+$/, ""))).toEqual(["Resumen", "Servicios", "Costes", "Configurar"]);
-    expect(pestana("Resumen")).toHaveAttribute("aria-selected", "true");
-    await screen.findByRole("region", { name: /Requiere atención/ });
+    expect(screen.getAllByRole("tab").map((x) => x.textContent?.replace(/\d+$/, ""))).toEqual(["Estado", "Servicios", "Costes", "Configurar"]);
+    expect(pestana("Estado")).toHaveAttribute("aria-selected", "true");
+    await screen.findByRole("list", { name: "Estado de cada servicio" });
 
     abrirPestana("Costes");
     expect(pestana("Costes")).toHaveAttribute("aria-selected", "true");
     expect(ubicacion()).toBe("/super-admin/servicios?tab=costes");
     abrirPestana("Configurar");
     expect(ubicacion()).toBe("/super-admin/servicios?tab=configurar");
-    abrirPestana("Resumen");
+    abrirPestana("Estado");
     expect(ubicacion()).toBe("/super-admin/servicios");
   });
 
-  it("`?tab=servicios` abre directamente esa pestaña; un `?tab=` desconocido, el Resumen", async () => {
+  it("`?tab=servicios` abre directamente esa pestaña; un `?tab=` desconocido (o el viejo `resumen`), Estado", async () => {
     const { unmount } = pintar("/super-admin/servicios?tab=servicios");
     expect(pestana("Servicios")).toHaveAttribute("aria-selected", "true");
     await waitFor(() => tarjeta("Vercel"));
     unmount();
-    pintar("/super-admin/servicios?tab=otra");
-    expect(pestana("Resumen")).toHaveAttribute("aria-selected", "true");
+    const otra = pintar("/super-admin/servicios?tab=otra");
+    expect(pestana("Estado")).toHaveAttribute("aria-selected", "true");
+    otra.unmount();
+    pintar("/super-admin/servicios?tab=resumen");
+    expect(pestana("Estado")).toHaveAttribute("aria-selected", "true");
   });
 
   it("la ruta vieja /super-admin/costes lleva a la pestaña Costes", async () => {
@@ -240,23 +243,54 @@ describe("Super Admin › Servicios · pestañas y URL", () => {
   });
 });
 
-describe("Super Admin › Servicios › Resumen", () => {
-  it("de un vistazo: gasto del mes, previsión a fin de mes y del año", async () => {
+describe("Super Admin › Servicios › Estado", () => {
+  it("de un vistazo: el estado de toda la instalación, el recuento por colores y el gasto del mes", async () => {
     pintar();
-    const mes = await screen.findByTestId("cifra-mes");
-    // Cuotas: Hostinger 95,88 €/año = 7,99 €/mes. Uso: Stripe 1,55 € + OpenAI 2,90 US$ × 0,9 = 2,61 €.
-    await waitFor(() => expect(t(mes.textContent)).toContain("12,15 €"));
-    expect(t(mes.textContent)).toContain("7,99 € de cuotas + 4,16 € por uso, hasta hoy");
-    expect(t(mes.textContent)).toContain("No incluye Loading: falta su precio.");
-    const { mes: finMes, anio } = previsiones();
-    expect(t(screen.getByTestId("cifra-fin-mes").textContent)).toContain(`≈ ${eur(finMes)}`);
-    expect(t(screen.getByTestId("cifra-anio").textContent)).toContain(`≈ ${eur(anio)}`);
-    expect(t(screen.getByTestId("cifra-anio").textContent)).toContain("Cuotas: 95,88 € al año");
+    const general = await screen.findByTestId("estado-general");
+    // Resend al 98 % y GitHub con la clave rechazada: dos urgentes.
+    await waitFor(() => expect(general).toHaveAttribute("data-estado", "rojo"));
+    expect(within(general).getByRole("heading", { level: 2, name: "2 servicios necesitan atención" })).toBeInTheDocument();
+    const cuenta = within(general).getByRole("list", { name: "Servicios por estado" });
+    expect(within(cuenta).getAllByRole("listitem").map((li) => t(li.textContent))).toEqual(["2 urgentes", "3 avisos", "3 bien"]);
+    const gasto = screen.getByTestId("estado-gasto");
+    await waitFor(() => expect(t(gasto.textContent)).toContain("12,15 €"));
+    expect(t(gasto.textContent)).toContain(`≈ ${eur(previsiones().mes)} a fin de mes`);
+    // El contador de la pestaña: los urgentes.
+    expect(pestana("Estado")).toHaveTextContent("2");
   });
 
-  it("«Requiere atención»: lo urgente primero (rojo), luego avisos y lo que hay que revisar", async () => {
+  it("una ficha por servicio: lo urgente primero, con anillo de consumo y dos o tres palabras", async () => {
     pintar();
-    const bloque = await screen.findByRole("region", { name: /Requiere atención \(6\)/ });
+    const lista = await screen.findByRole("list", { name: "Estado de cada servicio" });
+    await waitFor(() => expect(within(lista).getAllByRole("listitem").length).toBe(8));
+    const fichas = within(lista).getAllByRole("listitem");
+    expect(fichas.map((f) => [f.getAttribute("data-ficha"), f.getAttribute("data-estado")])).toEqual([
+      ["github", "rojo"], ["resend", "rojo"],
+      ["vercel", "ambar"], ["supabase", "ambar"], ["loading", "ambar"],
+      ["stripe", "verde"], ["openai", "verde"], ["hostinger", "verde"],
+    ]);
+    const resend = fichas.find((f) => f.getAttribute("data-ficha") === "resend")!;
+    expect(t(resend.textContent)).toMatch(/Resend.*98%.*Al 98 %.*Correos este mes/);
+    expect(within(fichas[0]).getByRole("button")).toHaveAccessibleName(/GitHub: Urgente, Clave rechazada/);
+    expect(t(fichas.find((f) => f.getAttribute("data-ficha") === "vercel")!.textContent)).toContain("Falta la clave");
+    // Loading no tiene lectura automática, pero renueva en 20 días: aviso, con su ficha.
+    expect(fichas.find((f) => f.getAttribute("data-ficha") === "loading")).toHaveTextContent("Renueva en 20 días");
+    expect(screen.queryByRole("list", { name: "Servicios sin datos automáticos" })).toBeNull();
+  });
+
+  it("la ficha lleva a la tarjeta del servicio en la pestaña Servicios y la enfoca", async () => {
+    pintar();
+    const lista = await screen.findByRole("list", { name: "Estado de cada servicio" });
+    fireEvent.click(await within(lista).findByRole("button", { name: /^Resend:/ }));
+    expect(pestana("Servicios")).toHaveAttribute("aria-selected", "true");
+    expect(ubicacion()).toBe("/super-admin/servicios?tab=servicios");
+    await waitFor(() => expect(document.activeElement).toBe(tarjeta("Resend")));
+  });
+
+  it("«Qué mirar»: una línea por cosa (sin párrafos), lo urgente primero; lo informativo va aparte, en pequeño", async () => {
+    pintar();
+    const bloque = await screen.findByRole("region", { name: "Qué mirar" });
+    await waitFor(() => expect(within(bloque).getAllByRole("listitem").length).toBe(5));
     const filas = within(bloque).getAllByRole("listitem");
     expect(filas.map((f) => [f.getAttribute("data-pendiente")?.split(":").slice(0, 2).join(":"), f.getAttribute("data-gravedad")])).toEqual([
       ["consumo:resend", "rojo"],
@@ -264,17 +298,13 @@ describe("Super Admin › Servicios › Resumen", () => {
       ["consumo:supabase", "ambar"],
       ["renovacion:loading", "ambar"],
       ["error:falta_secreto", "ambar"],
-      ["configurar:por-confirmar", "info"],
     ]);
-    expect(t(filas[0].textContent)).toMatch(/Resend · Correos este mes.*98 % del límite \(2950 de 3000 correos\)/);
-    expect(filas[1]).toHaveTextContent("GitHub: rechaza la clave guardada");
-    expect(filas[3]).toHaveTextContent(/Loading · Renovación \(dominio o plan\).*Se renueva en 20 días/);
-    expect(filas[4]).toHaveTextContent("Vercel: falta configurar la clave");
-    expect(filas[5]).toHaveTextContent("3 servicios con el plan o el precio por confirmar");
-    expect(filas[5]).toHaveTextContent("Loading, Resend, Hostinger");
-    // Dos urgentes: el contador de la pestaña lo dice.
-    expect(within(bloque).getByText(/2 son urgentes/)).toBeInTheDocument();
-    expect(pestana("Resumen")).toHaveTextContent("2");
+    expect(filas[0]).toHaveTextContent("Resend · Correos este mes");
+    expect(filas[0]).not.toHaveTextContent(/del límite/); // sin el detalle
+    // Lo informativo (planes por confirmar) no es una fila: un enlace pequeño a Configurar.
+    const porConfirmar = screen.getByRole("button", { name: "3 servicios con el plan o el precio por confirmar" });
+    fireEvent.click(porConfirmar);
+    expect(pestana("Configurar")).toHaveAttribute("aria-selected", "true");
   });
 
   it("avisa de la IA que no registra su gasto y lleva a Costes", async () => {
@@ -282,44 +312,26 @@ describe("Super Admin › Servicios › Resumen", () => {
       ? { data: [{ funcion: "ocr_facturas", descripcion: "OCR", instrumentada: false, ultima_fila: null, dias_sin_registro: null }], error: null }
       : { data: [], error: null });
     pintar();
-    const bloque = await screen.findByRole("region", { name: /Requiere atención/ });
-    const fila = await within(bloque).findByText("Una función de IA no registra su gasto");
-    fireEvent.click(within(fila.closest("li")!).getByRole("button", { name: /Ver en Costes/ }));
+    const bloque = await screen.findByRole("region", { name: "Qué mirar" });
+    fireEvent.click(await within(bloque).findByRole("button", { name: /Una función de IA no registra su gasto/ }));
     expect(pestana("Costes")).toHaveAttribute("aria-selected", "true");
     expect(ubicacion()).toBe("/super-admin/servicios?tab=costes");
   });
 
-  it("«Ver» lleva a la tarjeta del servicio en la pestaña Servicios y la enfoca", async () => {
+  it("todo bien: «Todo en orden» en verde, sin «Qué mirar»; lo que no tiene lectura automática, en pequeño y sin empeorar el total", async () => {
+    h.servicios = [
+      servicio({ proveedor: "supabase", nombre: "Supabase", limites: { bd_tamano: { etiqueta: "BD", limite: 500, unidad: "MB" } } }),
+      servicio({ proveedor: "google", nombre: "Google Maps Platform (reseñas)", categoria: "mapas" }),
+    ];
+    h.invoke.mockResolvedValue({ data: { lecturas: [{ proveedor: "supabase", tomado_en: AHORA, error: null, detalles: {}, metricas: { bd_tamano: { valor: 10, unidad: "MB" } } }], sin_lector: ["google"], generado_en: AHORA }, error: null });
     pintar();
-    const bloque = await screen.findByRole("region", { name: /Requiere atención/ });
-    fireEvent.click(await within(bloque).findByRole("button", { name: "Ver: Resend · Correos este mes" }));
-    expect(pestana("Servicios")).toHaveAttribute("aria-selected", "true");
-    expect(ubicacion()).toBe("/super-admin/servicios?tab=servicios");
-    await waitFor(() => expect(document.activeElement).toBe(tarjeta("Resend")));
-  });
-
-  it("lo más cerca del límite (con barra y %) y las próximas renovaciones", async () => {
-    pintar();
-    const cerca = await screen.findByRole("region", { name: "Lo más cerca del límite" });
-    await waitFor(() => expect(within(cerca).getAllByRole("progressbar")).toHaveLength(3));
-    expect(within(cerca).getAllByRole("progressbar").map((b) => b.getAttribute("aria-label"))).toEqual([
-      "Resend · Correos este mes", "Supabase · Tamaño de la base de datos", "OpenAI · Gasto de IA este mes",
-    ]);
-    expect(within(cerca).getAllByRole("progressbar")[0].getAttribute("aria-valuetext")).toMatch(/98\s%.*al límite/);
-    const renov = screen.getByRole("list", { name: "Próximas renovaciones" });
-    const filas = within(renov).getAllByRole("listitem");
-    expect(filas[0]).toHaveTextContent(/Loading.*en 20 días/);
-    expect(filas[1]).toHaveTextContent(/Dominio restaurantecasatomascrevillente\.es \(según su API\).*en 70 días/);
-    fireEvent.click(within(cerca).getByRole("button", { name: /Ver todo el consumo/ }));
-    expect(pestana("Servicios")).toHaveAttribute("aria-selected", "true");
-  });
-
-  it("sin nada pendiente lo dice en verde", async () => {
-    h.servicios = [servicio({ proveedor: "supabase", nombre: "Supabase", limites: { bd_tamano: { etiqueta: "BD", limite: 500, unidad: "MB" } } })];
-    h.invoke.mockResolvedValue({ data: { lecturas: [{ proveedor: "supabase", tomado_en: AHORA, error: null, detalles: {}, metricas: { bd_tamano: { valor: 10, unidad: "MB" } } }], sin_lector: [], generado_en: AHORA }, error: null });
-    pintar();
-    expect(await screen.findByText(/Nada pendiente/)).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Requiere atención" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 2, name: "Todo en orden" })).toBeInTheDocument();
+    expect(screen.getByTestId("estado-general")).toHaveAttribute("data-estado", "verde");
+    expect(screen.queryByRole("region", { name: "Qué mirar" })).toBeNull();
+    const sinDatos = screen.getByRole("list", { name: "Servicios sin datos automáticos" });
+    const google = within(sinDatos).getByRole("button", { name: /Google Maps Platform \(reseñas\): Se mira en su panel/ });
+    expect(google).toHaveTextContent("Google Maps Platform");
+    expect(google).not.toHaveTextContent("reseñas");
   });
 });
 
@@ -336,11 +348,15 @@ describe("Super Admin › Servicios › Servicios (tarjetas)", () => {
     expect(barra).toHaveAttribute("aria-valuenow", "80");
     expect(barra.getAttribute("aria-valuetext")).toMatch(/80\s%.*cerca del límite/);
     expect(within(supa).getByText(/400 MB/)).toBeInTheDocument();
-    expect(within(supa).getByText(/sin dato/)).toBeInTheDocument();
-    expect(within(supa).getByText("Supabase no da este dato por API en el plan Free.")).toBeInTheDocument();
+    // Lo secundario (límites aún sin dato, notas) va plegado en «Más detalles» (06/11/2026).
+    const detallesSupa = within(supa).getByTestId("detalles-supabase");
+    expect(detallesSupa.tagName).toBe("DETAILS");
+    expect(detallesSupa).not.toHaveAttribute("open");
+    expect(within(detallesSupa).getByText(/Sin dato todavía/)).toBeInTheDocument();
+    expect(within(detallesSupa).getByText(/Supabase no da este dato por API en el plan Free\./)).toBeInTheDocument();
     expect(within(supa).getByText(/se renueva cada 15 min/)).toBeInTheDocument();
-    expect(within(supa).getByText(/Para ver más datos, configura la clave/)).toBeInTheDocument();
-    expect(within(supa).getByText("Base de datos")).toBeInTheDocument(); // categoría
+    expect(within(detallesSupa).getByText(/Para ver más datos, configura la clave/)).toBeInTheDocument();
+    expect(within(supa).getByTitle("Base de datos")).toBeInTheDocument(); // categoría, en el icono
     // Resend al 98 %: rojo, dicho con palabras; y «por confirmar».
     expect(within(tarjeta("Resend")).getAllByText(/Al límite/).length).toBeGreaterThan(0);
     expect(within(tarjeta("Resend")).getByText("Por confirmar")).toBeInTheDocument();
@@ -354,11 +370,12 @@ describe("Super Admin › Servicios › Servicios (tarjetas)", () => {
     // OpenAI: el gasto en dólares con su equivalente en euros (tipo de cambio 0,9).
     expect(t(within(tarjeta("OpenAI")).getByText(/2,90 US\$/).textContent)).toBe("2,90 US$ (≈ 2,61 €)");
     // Vercel: enlace a los precios oficiales.
-    expect(within(tarjeta("Vercel")).getByRole("link", { name: /Precios oficiales de Vercel/ })).toHaveAttribute("href", "https://vercel.com/pricing");
+    expect(within(within(tarjeta("Vercel")).getByTestId("detalles-vercel")).getByRole("link", { name: /Precios oficiales de Vercel/ })).toHaveAttribute("href", "https://vercel.com/pricing");
     // GitHub: clave rechazada.
     expect(within(tarjeta("GitHub")).getByRole("alert")).toHaveTextContent(/rechazado la clave/);
     expect(h.invoke).toHaveBeenCalledWith("servicios-uso", { body: { forzar: false } });
-    // Sin el coste ni los avisos de antes: están en Resumen y en Costes.
+    // Sin el coste ni los avisos de antes: están en Estado y en Costes; y sin la leyenda del semáforo.
+    expect(screen.queryByText(/Semáforo del consumo/)).toBeNull();
     expect(screen.queryByRole("region", { name: "Coste y renovaciones" })).toBeNull();
   });
 
@@ -389,14 +406,14 @@ describe("Super Admin › Servicios › Servicios (tarjetas)", () => {
     expect(within(vercel).getByRole("link", { name: /secretos de Supabase/ })).toBeInTheDocument();
   });
 
-  it("«Actualizar ahora» fuerza solo esa tarjeta; «Actualizar todo ahora», todas", async () => {
+  it("«Actualizar ahora» fuerza solo esa tarjeta; «Actualizar» (arriba), todas", async () => {
     pintar("/super-admin/servicios?tab=servicios");
     const vercel = await waitFor(() => tarjeta("Vercel"));
     await waitFor(() => expect(h.invoke).toHaveBeenCalledTimes(1));
     fireEvent.click(within(vercel).getByRole("button", { name: "Actualizar ahora el consumo de Vercel" }));
     await waitFor(() => expect(h.invoke).toHaveBeenLastCalledWith("servicios-uso", { body: { forzar: true, proveedor: "vercel" } }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /Actualizar todo ahora/ })).not.toBeDisabled());
-    fireEvent.click(screen.getByRole("button", { name: /Actualizar todo ahora/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Actualizar" })).not.toBeDisabled());
+    fireEvent.click(screen.getByRole("button", { name: "Actualizar" }));
     await waitFor(() => expect(h.invoke).toHaveBeenLastCalledWith("servicios-uso", { body: { forzar: true } }));
   });
 

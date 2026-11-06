@@ -13,7 +13,9 @@ import {
   formatearPorcentaje,
   haceCuanto,
   leerNumero,
-  masCercaDelLimite,
+  estadoInstalacion,
+  sinAclaracion,
+  titularEstado,
   ordenarServicios,
   pendientesServicios,
   peorSemaforo,
@@ -285,7 +287,7 @@ describe("edición de los campos nuevos", () => {
   });
 });
 
-describe("Resumen: lo más cerca del límite y lo que requiere atención", () => {
+describe("Estado de la instalación y lo que requiere atención", () => {
   const HOY = new Date("2026-11-03T12:00:00Z");
   const supa = SERVICIO;
   const resend = servicio({ proveedor: "resend", nombre: "Resend", limites: { correos_mes: { etiqueta: "Correos este mes", limite: 3000, unidad: "correos" } } });
@@ -305,10 +307,58 @@ describe("Resumen: lo más cerca del límite y lo que requiere atención", () =>
   ]);
   const todos = [supa, resend, vercel, github, vapi, loading, apagado];
 
-  it("masCercaDelLimite: las métricas con %, de mayor a menor, solo de lo que se usa", () => {
-    const r = masCercaDelLimite(todos, lecturas, 2);
-    expect(r.map((a) => [a.proveedor, a.clave, Math.round(a.porcentaje)])).toEqual([["resend", "correos_mes", 98], ["supabase", "bd_tamano", 60]]);
-    expect(masCercaDelLimite(todos, lecturas)).toHaveLength(3);
+  it("estadoInstalacion: una ficha por servicio en uso, lo urgente primero, con dos o tres palabras", () => {
+    const e = estadoInstalacion({ servicios: todos, lecturas, renovaciones: proximasRenovaciones(todos, lecturas, HOY) });
+    const sinNbsp = (t: string) => t.replace(/\u00a0/g, " ");
+    expect(e.fichas.map((f) => [f.proveedor, f.estado, sinNbsp(f.motivo)])).toEqual([
+      ["resend", "rojo", "Al 98 %"],
+      ["loading", "rojo", "Renovación pasada"],
+      ["vercel", "ambar", "Falta la clave"],
+      ["github", "ambar", "Falta la clave"],
+      ["vapi", "ambar", "No se pudo leer"],
+      ["supabase", "verde", "Bien"],
+    ]);
+    // El anillo: la métrica más cerca de su límite (Supabase: la base de datos al 60 %).
+    expect(Math.round(e.fichas.at(-1)!.principal!.porcentaje)).toBe(60);
+    expect(e.fichas.find((f) => f.proveedor === "resend")!.principal).toMatchObject({ etiqueta: "Correos este mes" });
+    expect(e.cuenta).toEqual({ rojo: 2, ambar: 3, verde: 1, gris: 0 });
+    expect(e.general).toBe("rojo");
+    expect(titularEstado(e)).toBe("2 servicios necesitan atención");
+    // Lo que no se usa (Perplexity, con la clave rechazada) no tiene ficha.
+    expect(e.fichas.some((f) => f.proveedor === "perplexity")).toBe(false);
+  });
+
+  it("estadoInstalacion: clave rechazada en rojo, renovación cercana en ámbar y sin datos en gris (no empeora el total)", () => {
+    const rechazada = servicio({ proveedor: "stripe", nombre: "Stripe" });
+    const dominio = servicio({ proveedor: "hostinger", nombre: "Hostinger", renovacion: "2026-11-23" });
+    const manual = servicio({ proveedor: "google", nombre: "Google Maps Platform (reseñas)" });
+    const nuevo = servicio({ proveedor: "nuevo", nombre: "Nuevo" });
+    const lect = new Map<string, LecturaServicio>([
+      ["stripe", lectura("stripe", { error: "credencial_rechazada" })],
+      ["hostinger", lectura("hostinger", {})],
+    ]);
+    const servs = [rechazada, dominio, manual, nuevo];
+    const e = estadoInstalacion({ servicios: servs, lecturas: lect, renovaciones: proximasRenovaciones(servs, lect, HOY), sinLector: new Set(["google"]) });
+    expect(e.fichas.map((f) => [f.nombre, f.estado, f.motivo])).toEqual([
+      ["Stripe", "rojo", "Clave rechazada"],
+      ["Hostinger", "ambar", "Renueva en 20 días"],
+      ["Google Maps Platform", "gris", "Se mira en su panel"],
+      ["Nuevo", "gris", "Sin datos aún"],
+    ]);
+    expect(e.fichas[2].nombreCompleto).toBe("Google Maps Platform (reseñas)");
+
+    const soloAvisos = estadoInstalacion({ servicios: [dominio, manual], lecturas: lect, renovaciones: proximasRenovaciones([dominio], lect, HOY), sinLector: new Set(["google"]) });
+    expect([soloAvisos.general, titularEstado(soloAvisos)]).toEqual(["ambar", "Todo funciona · 1 aviso"]);
+    const bien = estadoInstalacion({ servicios: [dominio, manual], lecturas: lect, renovaciones: [], sinLector: new Set(["google"]) });
+    expect([bien.general, titularEstado(bien)]).toEqual(["verde", "Todo en orden"]);
+    const vacio = estadoInstalacion({ servicios: [manual], lecturas: new Map(), renovaciones: [], sinLector: new Set(["google"]) });
+    expect([vacio.general, titularEstado(vacio)]).toEqual(["gris", "Todavía sin datos"]);
+  });
+
+  it("sinAclaracion quita solo el paréntesis final", () => {
+    expect(sinAclaracion("Vapi (asistente telefónico)")).toBe("Vapi");
+    expect(sinAclaracion("Visitas a las webs (peticiones al CDN)")).toBe("Visitas a las webs");
+    expect(sinAclaracion("Gasto de IA")).toBe("Gasto de IA");
   });
 
   it("pendientesServicios: rojo primero; las claves que faltan juntas; renovaciones; IA; por confirmar", () => {
