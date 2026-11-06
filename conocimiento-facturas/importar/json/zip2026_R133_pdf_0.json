@@ -1,0 +1,48 @@
+{
+ "archivo": "R133.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ALEJANDRO POVEDA ESTEVE",
+ "cif": "78008883J",
+ "local": "casa_tomas",
+ "numero_documento": "01",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOTELLAS 500ML VERDE HACIENDA EL PALO",
+   "producto_ficha": null,
+   "cantidad": 96.0,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "cl",
+   "precio_unitario": 9.62,
+   "descuento_pct": null,
+   "total": 923.52,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 923.52,
+ "desglose_iva": [
+  {
+   "base": 923.52,
+   "pct": 4,
+   "cuota": 36.94
+  }
+ ],
+ "iva": 36.94,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 960.46,
+ "observaciones": "Descripción impresa: «96/BOTELLAS 500ML VERDE HACIENDA EL PALO-8/CAJAS» (96 botellas, 8 cajas). Precio unitario no impreso: 9,62 = total / 96. Pago por transferencia. Nº impreso «01» junto a la fecha 14-01-26. Destinatario: MASIDE 2011,S.L. CASA TOMAS.",
+ "alertas": [
+  "Mismo proveedor, descripción e importe que R482 (fecha 18-03-26, nº 10): verificar si es duplicado o pedido repetido."
+ ]
+}

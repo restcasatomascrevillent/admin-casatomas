@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ PEREZ, JOSE",
+ "cif": "77707228A",
+ "local": "casa_tomas",
+ "numero_documento": "334/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 44.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.27,
+   "descuento_pct": null,
+   "total": 277.76,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 277.76,
+ "desglose_iva": [
+  {
+   "base": 277.76,
+   "pct": 10,
+   "cuota": 27.78
+  }
+ ],
+ "iva": 27.78,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 305.54,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): NUEVO JOSE UNO. Albaranes de subasta (informativo): 12947, 13065.",
+ "alertas": []
+}

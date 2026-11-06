@@ -1,0 +1,49 @@
+{
+ "archivo": "R838.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "5859",
+ "fecha": "2026-06-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (-6 x 1,65)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -9.9,
+   "descuento_pct": null,
+   "total": -9.9,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -9.9,
+ "desglose_iva": [
+  {
+   "base": -9.9,
+   "pct": 21,
+   "cuota": -2.08
+  }
+ ],
+ "iva": -2.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -11.98,
+ "observaciones": "Factura solo de envases (albarán ENV 1460/26 del 03/06/2026), con importes negativos por devolución de 6 bateas. Referencia impresa: DEVOLUCION DEL 22/05/2026. Transferencia 30 días. Destinatario no impreso en el texto del PDF (la ficha asigna casa_tomas).",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

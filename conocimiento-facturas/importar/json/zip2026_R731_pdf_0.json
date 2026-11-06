@@ -1,0 +1,83 @@
+{
+ "archivo": "R731.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90276098",
+ "fecha": "2026-05-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Jamón Bellota 100% Ibérico 5J 7-8 kg N24",
+   "producto_ficha": "Jamón de bellota 100% ibérico 5J, pieza de 7-8 kg",
+   "cantidad": 7.37,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 10,
+   "albaran_ref": "40314510",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Real Conservera Española Ventresca de Bonito en",
+   "producto_ficha": "Ventresca de bonito en aceite, Real Conservera Española",
+   "cantidad": 36,
+   "unidad": "lata",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.4,
+   "descuento_pct": null,
+   "total": 410.4,
+   "iva_pct": 10,
+   "albaran_ref": "40314510",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Real Conservera Española Sardinillas en A.O. 14/18",
+   "producto_ficha": "Sardinillas en aceite de oliva 14/18, Real Conservera Española",
+   "cantidad": 24,
+   "unidad": "lata",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.0,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": "40314510",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 602.4,
+ "desglose_iva": [
+  {
+   "base": 602.4,
+   "pct": 10,
+   "cuota": 60.24
+  }
+ ],
+ "iva": 60.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 662.64,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 14/07/2026. Punto verde 0,27 EUR informativo, no sumado al total. Albarán 40314510 del 11/05/2026. Hay texto del margen 'Piezas c/12 Latas RO-120 FA' que no es línea.",
+ "alertas": [
+  "Línea de jamón 7-8 kg N24 (7,370 kg) sin precio ni importe impresos en el texto extraído.",
+  "La base del pie (602,40) coincide solo con ventresca (410,40) + sardinillas (192,00): la línea de jamón no suma en el total. Revisar el PDF original."
+ ]
+}

@@ -1,0 +1,53 @@
+{
+ "archivo": "R582.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+ "cif": "B01414531",
+ "local": "casa_tomas",
+ "numero_documento": "VFN 26/001245",
+ "fecha": "2026-02-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "C/6B LP ROSE 0,75",
+   "producto_ficha": "LP Rosé 75 cl (caja 6)",
+   "cantidad": 3.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 430.8,
+   "descuento_pct": null,
+   "total": 1292.4,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 26/001584",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "- 20 % BONIFICAC S/ 1.292,4",
+   "importe": -258.48,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 1033.92,
+ "desglose_iva": [
+  {
+   "base": 1033.92,
+   "pct": 21,
+   "cuota": 217.12
+  }
+ ],
+ "iva": 217.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1251.04,
+ "observaciones": "Observaciones impresas: ALB-SE26-00139. Pedido cliente E26-00008. Forma de pago GIRO 60 días; vencimiento 17/04/26 por 1.251,04 €. Punto verde 0,81 € incluido en factura (informativo, ya dentro de la base).",
+ "alertas": []
+}

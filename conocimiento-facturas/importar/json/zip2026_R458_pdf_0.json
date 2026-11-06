@@ -1,0 +1,63 @@
+{
+ "archivo": "R458.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MR FRIO SOLUCIONES TERMICAS, S.L.",
+ "cif": "B24831901",
+ "local": "casa_tomas",
+ "numero_documento": "000080",
+ "fecha": "2026-03-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BURLETE PUERTA ORIGINAL (horno Repagas)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 536.44,
+   "descuento_pct": 15,
+   "total": 455.97,
+   "iva_pct": 21,
+   "albaran_ref": "P-67",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA OFICIAL",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": 15,
+   "total": 29.75,
+   "iva_pct": 21,
+   "albaran_ref": "P-67",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 485.72,
+ "desglose_iva": [
+  {
+   "base": 485.72,
+   "pct": 21,
+   "cuota": 102.0
+  }
+ ],
+ "iva": 102.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 587.72,
+ "observaciones": "Reparación de horno Repagas, albarán P-67 (04/03/2026). Forma de pago: transferencia bancaria Santander. Garantía 3 meses. Destinatario RESTAURANTE CASA TOMÁS / MASIDE 2011 SL (B-54583356), C/ Santa María de la Cabeza 2.",
+ "alertas": []
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "NUEVO TOMAS Y CARMEN CB",
+ "cif": "E54588041",
+ "local": "casa_tomas",
+ "numero_documento": "906/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 4.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 122.8,
+   "descuento_pct": null,
+   "total": 546.46,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 4,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 3.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 109.2,
+   "descuento_pct": null,
+   "total": 349.43,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 895.89,
+ "desglose_iva": [
+  {
+   "base": 895.89,
+   "pct": 10,
+   "cuota": 89.59
+  }
+ ],
+ "iva": 89.59,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 985.48,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): NUEVO TOMAS Y CARMEN, JUAREZ HERMANOS. Albaranes de subasta (informativo): 18463, 17462, 18020, 17096, 17224.",
+ "alertas": []
+}

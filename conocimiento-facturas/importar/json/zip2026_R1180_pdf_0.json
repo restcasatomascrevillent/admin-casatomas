@@ -1,0 +1,63 @@
+{
+ "archivo": "R1180.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26006642",
+ "fecha": "2026-07-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 15.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 183.6,
+   "iva_pct": 10,
+   "albaran_ref": "26107830",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MOJAMA DE ATUN ALETA AMARILLA SELECCION EXTRA",
+   "producto_ficha": "Mojama de atún aleta amarilla selección extra",
+   "cantidad": 8.12,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 292.32,
+   "iva_pct": 10,
+   "albaran_ref": "26107830",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 475.92,
+ "desglose_iva": [
+  {
+   "base": 475.92,
+   "pct": 10,
+   "cuota": 47.59
+  }
+ ],
+ "iva": 47.59,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 523.51,
+ "observaciones": "Transferencia Banco Santander, vencimiento 24/08/2026. Albarán 26107830 de 23/07/2026.",
+ "alertas": []
+}

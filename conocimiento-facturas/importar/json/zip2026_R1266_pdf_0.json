@@ -1,0 +1,68 @@
+{
+ "archivo": "R1266.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUMT LEVANTE, S.L.U.",
+ "cif": "B53971560",
+ "local": "casa_tomas",
+ "numero_documento": "3396",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Q.OVEJA CURADO TRUFADO CAMPOLLANO",
+   "producto_ficha": null,
+   "cantidad": 7.21,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.01,
+   "descuento_pct": null,
+   "total": 180.32,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ATUN EN ACEITE RO-1000 CORTIZO",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.97,
+   "descuento_pct": null,
+   "total": 167.28,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 347.6,
+ "desglose_iva": [
+  {
+   "base": 167.28,
+   "pct": 10,
+   "cuota": 16.73
+  },
+  {
+   "base": 180.32,
+   "pct": 4,
+   "cuota": 7.21
+  }
+ ],
+ "iva": 23.94,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 371.54,
+ "observaciones": "Pago al CONTADO; entrega Restaurante Casa Tomas; cantidad = kg (peso)",
+ "alertas": []
+}

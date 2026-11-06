@@ -1,0 +1,63 @@
+{
+ "archivo": "R54.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CÁRNICAS JOSELITO, S.A.",
+ "cif": "A87934337",
+ "local": "casa_tomas",
+ "numero_documento": "M-2600144",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PAPADA CURADA JOSELITO",
+   "producto_ficha": null,
+   "cantidad": 5.758,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.8,
+   "descuento_pct": null,
+   "total": 142.8,
+   "iva_pct": 10,
+   "albaran_ref": "M-2600157",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PANCETA CURADA JOSELITO (+/- 5 KG)",
+   "producto_ficha": null,
+   "cantidad": 5.976,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.8,
+   "descuento_pct": null,
+   "total": 118.32,
+   "iva_pct": 10,
+   "albaran_ref": "M-2600157",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 261.12,
+ "desglose_iva": [
+  {
+   "base": 261.12,
+   "pct": 10,
+   "cuota": 26.11
+  }
+ ],
+ "iva": 26.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 287.23,
+ "observaciones": "Forma de pago: GIRO a 30 días F.F. Vencimiento 13/02/2026 por 287,23 €. Albarán M-2600157 (14/01/2026). Cliente 13608. Entrega en Santa María de la Cabeza, 2.",
+ "alertas": []
+}

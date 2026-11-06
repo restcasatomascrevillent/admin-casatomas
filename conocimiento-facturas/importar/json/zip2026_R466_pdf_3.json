@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "CASTELLO QUILEZ, ANTONIO",
+ "cif": "48364349H",
+ "local": "casa_tomas",
+ "numero_documento": "133/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 2.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.64,
+   "descuento_pct": null,
+   "total": 78.58,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 78.58,
+ "desglose_iva": [
+  {
+   "base": 78.58,
+   "pct": 10.0,
+   "cuota": 7.86
+  }
+ ],
+ "iva": 7.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 86.44,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 5317, 4952. Embarcaciones: ninguna.",
+ "alertas": []
+}

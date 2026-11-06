@@ -1,0 +1,80 @@
+{
+ "archivo": "R1332.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 06165",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "RAPE 300/500",
+   "producto_ficha": "Rape 300/500 (cola)",
+   "cantidad": 15.3,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.25,
+   "descuento_pct": null,
+   "total": 218.03,
+   "iva_pct": 10,
+   "albaran_ref": "F574200",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 4,
+   "nombre": "ROLLITO CARRILLADA Y SETAS 25.UND",
+   "producto_ficha": "Rollito de carrillada y setas (caja 25 uds)",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 50,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 10,
+   "albaran_ref": "F574200",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 4,
+   "nombre": "VIEIRA CARNE 30/40 X1",
+   "producto_ficha": "Vieira carne (sin concha) 30/40",
+   "cantidad": 10,
+   "unidad": "ud",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 200.0,
+   "iva_pct": 10,
+   "albaran_ref": "F574200",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 468.03,
+ "desglose_iva": [
+  {
+   "base": 468.03,
+   "pct": 10,
+   "cuota": 46.8
+  }
+ ],
+ "iva": 46.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 514.83,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F574200. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

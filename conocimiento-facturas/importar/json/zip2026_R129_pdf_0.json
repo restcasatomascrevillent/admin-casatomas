@@ -1,0 +1,46 @@
+{
+ "archivo": "R129.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90258952",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Paleta Bellota 100% Ibérica 5J 5-6 kg",
+   "producto_ficha": "Paleta de bellota 100% ibérica 5J, pieza de 5-6 kg",
+   "cantidad": 2,
+   "unidad": "pieza",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 171.05,
+   "descuento_pct": null,
+   "total": 342.1,
+   "iva_pct": 10,
+   "albaran_ref": "40295280",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 342.1,
+ "desglose_iva": [
+  {
+   "base": 342.1,
+   "pct": 10,
+   "cuota": 34.21
+  }
+ ],
+ "iva": 34.21,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 376.31,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 29/03/2026. Punto verde 0,50 EUR informativo, no sumado al total. Albarán 40295280 del 26/01/2026.",
+ "alertas": []
+}

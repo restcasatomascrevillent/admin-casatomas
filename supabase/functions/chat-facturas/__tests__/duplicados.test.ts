@@ -80,8 +80,8 @@ describe("prompt ronda 9", () => {
     expect(p).toMatch(/sin ganador si avisos\.unidades_mezcladas o productos_coincidentes > 1/);
   });
 
-  it("tamanos no crecen (prompt <= 5.732, TOOLS <= 9.626)", () => {
+  it("tamanos no crecen (prompt <= 5.732, TOOLS <= 10.400 con volumen_comprado)", () => {
     expect(p.length).toBeLessThanOrEqual(5732);
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(9626);
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_400); // 9.626 + volumen_comprado (06/11/2026)
   });
 });

@@ -1,0 +1,117 @@
+{
+ "archivo": "R344.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Fontanería S.Mas (Salvador Mas Alfonso)",
+ "cif": "33483836E",
+ "local": "casa_tomas",
+ "numero_documento": "24",
+ "fecha": "2026-03-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TAPAS WC NEGRAS",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 80.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TRABAJOS: colocar tapas WC",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": null,
+   "total": 25.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BARRA ABATIBLE SATINADO 80 CM",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 115.0,
+   "descuento_pct": null,
+   "total": 115.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PULSADOR SIGMA NEGRO CISTERNA EMPOTRADA",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 86.0,
+   "descuento_pct": null,
+   "total": 86.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TRABAJOS: colocar barra y pulsador",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 37.0,
+   "descuento_pct": null,
+   "total": 37.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 343.0,
+ "desglose_iva": [
+  {
+   "base": 343.0,
+   "pct": 21,
+   "cuota": 72.03
+  }
+ ],
+ "iva": 72.03,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 415.03,
+ "observaciones": "Pago por banco Sabadell (IBAN ES** **** **** **** **** 5511). El pie dice «Estos precios ya incluyen un 21% de IVA», pero el total impreso es base + IVA (343,00 + 72,03 = 415,03).",
+ "alertas": [
+  "El texto no imprime el nombre del emisor. La cabecera muestra MASIDE 2011 S.L. (B54583356), que es el propio local; el proveedor se identifica solo por el CIF de la carpeta. Revisar el PDF original.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

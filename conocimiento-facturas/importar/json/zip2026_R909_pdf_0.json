@@ -1,0 +1,50 @@
+{
+ "archivo": "R909.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CARBURANTES CREVILLENTE, S.L.",
+ "cif": "B54744933",
+ "local": "casa_tomas",
+ "numero_documento": "L021-905",
+ "fecha": "2026-06-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DIESEL_64",
+   "producto_ficha": null,
+   "cantidad": 28.85,
+   "unidad": "l",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.4809,
+   "descuento_pct": null,
+   "total": 42.73,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 42.73,
+ "desglose_iva": [
+  {
+   "base": 42.73,
+   "pct": 10,
+   "cuota": 4.27
+  }
+ ],
+ "iva": 4.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 47.0,
+ "observaciones": "Ticket-factura TPV1 19:04:07, pagado en efectivo. Matrícula 8384GZL. Marcado DUPLICADO.",
+ "alertas": [
+  "IVA impreso 10% en carburante (habitual 21%); se deja lo impreso.",
+  "Las líneas venían impresas con IVA incluido: se han pasado a base imponible",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

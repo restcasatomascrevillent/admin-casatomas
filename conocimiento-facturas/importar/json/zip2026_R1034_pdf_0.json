@@ -1,0 +1,54 @@
+{
+ "archivo": "R1034.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900006292",
+ "fecha": "2026-06-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LC. PACHARAN ZOCO 1441 70cl.",
+   "producto_ficha": "Pacharán Zoco 1441 70 cl",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 12.84,
+   "descuento_pct": null,
+   "total": 77.04,
+   "iva_pct": 21,
+   "albaran_ref": "2904001688",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (importe impreso en la casilla % DTO. del pie)",
+   "importe": -6.93,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 70.11,
+ "desglose_iva": [
+  {
+   "base": 70.11,
+   "pct": 21,
+   "cuota": 14.72
+  }
+ ],
+ "iva": 14.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 84.83,
+ "observaciones": "Albarán 2904001688 del 17/06/2026. Forma de pago no impresa. Total unidades 6.",
+ "alertas": [
+  "Mismo nº de factura, albarán y total que R1072 página 3: 2900006292 (18/06/2026). Posible duplicado."
+ ]
+}

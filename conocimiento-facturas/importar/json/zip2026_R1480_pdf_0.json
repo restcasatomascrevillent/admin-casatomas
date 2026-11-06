@@ -1,0 +1,63 @@
+{
+ "archivo": "R1480.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EPAGAL, S.L. (Bonilla a la Vista)",
+ "cif": "B15151434",
+ "local": "casa_tomas",
+ "numero_documento": "02/4141",
+ "fecha": "2026-09-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA LISA 50 g",
+   "producto_ficha": null,
+   "cantidad": 60,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "g",
+   "precio_unitario": 0.9,
+   "descuento_pct": null,
+   "total": 54.0,
+   "iva_pct": 10,
+   "albaran_ref": "05/329",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATA LISA 40 g LATA CON SAL",
+   "producto_ficha": null,
+   "cantidad": 24,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 40,
+   "contenido_unidad": "g",
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 108.0,
+   "iva_pct": 10,
+   "albaran_ref": "05/329",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 162.0,
+ "desglose_iva": [
+  {
+   "base": 162.0,
+   "pct": 10,
+   "cuota": 16.2
+  }
+ ],
+ "iva": 16.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 178.2,
+ "observaciones": "Transferencia. Cliente 003868. Pedido PP/14042. Punto Verde 0,02 ya incluido en líneas.",
+ "alertas": []
+}

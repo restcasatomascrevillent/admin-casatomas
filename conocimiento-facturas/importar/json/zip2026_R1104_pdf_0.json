@@ -1,0 +1,121 @@
+{
+ "archivo": "R1104.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3968",
+ "fecha": "2026-07-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLA ALISTADO 14X1 PESCANOVA",
+   "producto_ficha": "Cola de alistado Pescanova (14 x 1 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.9,
+   "descuento_pct": null,
+   "total": 83.7,
+   "iva_pct": 10,
+   "albaran_ref": "20266994",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "20266994",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "QUISQUILLA PELADA LUNA DE MAR",
+   "producto_ficha": "Quisquilla pelada Luna de Mar",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 64.0,
+   "iva_pct": 10,
+   "albaran_ref": "20266994",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "GAMBA BLANCA PELADA P LUNA DE MAR",
+   "producto_ficha": "Gamba blanca pelada Luna de Mar",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.5,
+   "descuento_pct": null,
+   "total": 66.0,
+   "iva_pct": 10,
+   "albaran_ref": "20266994",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "RAPE MMPP S/P 1000/1500 ALF",
+   "producto_ficha": "Rape MMPP sin piel 1000/1500 g",
+   "cantidad": 2.76,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.0,
+   "descuento_pct": null,
+   "total": 52.44,
+   "iva_pct": 10,
+   "albaran_ref": "20266994",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 281.64,
+ "desglose_iva": [
+  {
+   "base": 266.14,
+   "pct": 10,
+   "cuota": 26.61
+  },
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  }
+ ],
+ "iva": 27.23,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 308.87,
+ "observaciones": "Transferencia a 30 dias, vencimiento 08/08/2026. Albaran 20266994 de 08/07/2026, pedido 20731. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": [
+  "COLA ALISTADO 14X1: CAJAS=3 y CANTIDAD=3,00 a 27,90. Si fueran 3 cajas de 14 x 1 kg serian 42 kg; la ficha lo deja en duda (precio por kg o por caja). Se deja lo impreso: 3,00 kg a 27,90 €."
+ ]
+}

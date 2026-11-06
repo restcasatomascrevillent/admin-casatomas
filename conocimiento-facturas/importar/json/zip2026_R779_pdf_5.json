@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  6
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO PIANELO, ANTONIO",
+ "cif": "48322439Z",
+ "local": "casa_tomas",
+ "numero_documento": "364/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 6,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 55.7,
+   "descuento_pct": null,
+   "total": 61.27,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 61.27,
+ "desglose_iva": [
+  {
+   "base": 61.27,
+   "pct": 10.0,
+   "cuota": 6.13
+  }
+ ],
+ "iva": 6.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 67.4,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9580. Embarcaciones: ninguna.",
+ "alertas": []
+}

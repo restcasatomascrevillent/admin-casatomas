@@ -1,0 +1,63 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "PEREZ MARTINEZ, MARIA",
+ "cif": "21283635X",
+ "local": "casa_tomas",
+ "numero_documento": "599/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.8,
+   "descuento_pct": null,
+   "total": 39.68,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 4,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 49.8,
+   "descuento_pct": null,
+   "total": 89.64,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 129.32,
+ "desglose_iva": [
+  {
+   "base": 129.32,
+   "pct": 10.0,
+   "cuota": 12.93
+  }
+ ],
+ "iva": 12.93,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 142.25,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 11164, 9454. Embarcaciones: ninguna.",
+ "alertas": []
+}

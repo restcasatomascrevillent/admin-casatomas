@@ -1,0 +1,46 @@
+{
+ "archivo": "R1163.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A403/26",
+ "fecha": "2026-07-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAVIAR OSCIETRA IMPERIAL, 50 gr.",
+   "producto_ficha": "Caviar Oscietra Imperial 50 g",
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "g",
+   "precio_unitario": 65.0,
+   "descuento_pct": null,
+   "total": 195.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 195.0,
+ "desglose_iva": [
+  {
+   "base": 195.0,
+   "pct": 10,
+   "cuota": 19.5
+  }
+ ],
+ "iva": 19.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 214.5,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 403. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás).",
+ "alertas": []
+}

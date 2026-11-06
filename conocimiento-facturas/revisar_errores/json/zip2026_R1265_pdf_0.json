@@ -1,0 +1,100 @@
+{
+ "archivo": "R1265.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "251",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "T. Aceitunas chupadedos T3",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 21.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "T. Aceitunas partidas T3 (lectura dudosa)",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.9,
+   "descuento_pct": null,
+   "total": 27.8,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "kg Altramuces suprema salados",
+   "producto_ficha": null,
+   "cantidad": 4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.2,
+   "descuento_pct": null,
+   "total": 12.8,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "kg Capellán seco c/ite",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.3,
+   "descuento_pct": null,
+   "total": 82.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 144.0,
+ "desglose_iva": [
+  {
+   "base": 144.0,
+   "pct": 10,
+   "cuota": 14.4
+  }
+ ],
+ "iva": 14.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 159.4,
+ "observaciones": "Pago: Alicante. Factura manuscrita de talonario; cliente MASIDE 2011 S.L. B54583356, R.E. y descuento vacíos.",
+ "alertas": [
+  "Texto manuscrito de las dos primeras líneas y de la 4ª parcialmente ilegible; nombres aproximados.",
+  "Total impreso 159,40 no cuadra: base 144,00 + IVA 14,40 = 158,40 (1 euro de diferencia). Se deja lo impreso."
+ ]
+}

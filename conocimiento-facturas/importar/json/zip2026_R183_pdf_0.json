@@ -1,0 +1,48 @@
+{
+ "archivo": "R183.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.",
+ "cif": "B53167433",
+ "local": "casa_tomas",
+ "numero_documento": "A00007",
+ "fecha": "2026-01-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPPEL BARRIL CRUZCAMPO 50 L.",
+   "producto_ficha": "Rappel (abono trimestral) barril Cruzcampo 50 L",
+   "cantidad": -1.0,
+   "unidad": "abono",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 420.0,
+   "descuento_pct": null,
+   "total": -420.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -420.0,
+ "desglose_iva": [
+  {
+   "base": -420.0,
+   "pct": 21,
+   "cuota": -88.2
+  }
+ ],
+ "iva": -88.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -508.2,
+ "observaciones": "Abono por rappel (1er trimestre 2026). Sello PAGADO 10-02-2026 'Transf x C. Rural'. Página 2 del PDF = justificante de transferencia Ruralvía de 508,20 EUR (concepto PAGO FACT. A00007 DE 28-01-26), no es factura y no se extrae. Bajo la línea de rappel hay 3 filas con código 0, cantidad 1, precio 0,00 y total 0,00 (una con el texto 'DEL 1ER T. 2026 - A', continuación de la descripción), no extraídas como productos.",
+ "alertas": [
+  "Filas de relleno con código 0 y precio 0,00 (una con texto 'DEL 1ER T. 2026 - A') no extraídas como productos."
+ ]
+}

@@ -1,0 +1,141 @@
+{
+ "archivo": "R1076.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0029111",
+ "fecha": "2026-07-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BEBIDA ESPIRITUOSA ORGULLO 1 L",
+   "producto_ficha": "Bebida espirituosa Orgullo 1 L",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "l",
+   "precio_unitario": 6.61,
+   "descuento_pct": null,
+   "total": 6.61,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LECHE.COND.DES. 2,5KG PROSALUD 2,5 KG",
+   "producto_ficha": "Leche condensada desnatada Prosalud 2,5 kg",
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 21,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIMIENTO ROJO KILO",
+   "producto_ficha": "Pimiento rojo",
+   "cantidad": 5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.59,
+   "descuento_pct": null,
+   "total": 12.95,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PIMIENTO VERDE KG",
+   "producto_ficha": null,
+   "cantidad": 5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.69,
+   "descuento_pct": null,
+   "total": 13.45,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TOMATE CHERRY RAMA KILO",
+   "producto_ficha": "Tomate cherry en rama",
+   "cantidad": 3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.31,
+   "descuento_pct": null,
+   "total": 24.93,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "PIMIENTO PIQUILLO ENTERO DON MOLINICO 1,9 KG",
+   "producto_ficha": null,
+   "cantidad": 18,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": 1.9,
+   "contenido_unidad": "kg",
+   "precio_unitario": 10.55,
+   "descuento_pct": null,
+   "total": 189.9,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 268.84,
+ "desglose_iva": [
+  {
+   "base": 51.33,
+   "pct": 4,
+   "cuota": 2.05
+  },
+  {
+   "base": 210.9,
+   "pct": 10,
+   "cuota": 21.09
+  },
+  {
+   "base": 6.61,
+   "pct": 21,
+   "cuota": 1.39
+  }
+ ],
+ "iva": 24.53,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 293.37,
+ "observaciones": "Crédito a 30 días, vencimiento 06-08-2026. Anotaciones manuscritas '4 k', '4 jk', '3 k' bajo algunas líneas (no impresas, no son cantidades facturadas). Aviso impreso de pago en efectivo. El piquillo es ENTERO (código 0100341), distinto del piquillo en tiras de la ficha.",
+ "alertas": []
+}

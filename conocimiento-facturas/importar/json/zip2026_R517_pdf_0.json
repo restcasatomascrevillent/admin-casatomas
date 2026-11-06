@@ -1,0 +1,49 @@
+{
+ "archivo": "R517.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Alfonso Bernal Mestre",
+ "cif": "74174952K",
+ "local": "casa_tomas",
+ "numero_documento": "04/2026",
+ "fecha": "2026-04-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Alquiler de local c/ Santa María de la Cabeza nº 2, Crevillent, mes de abril 2026",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "mes",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 345.54,
+   "descuento_pct": null,
+   "total": 345.54,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 345.54,
+ "desglose_iva": [
+  {
+   "base": 345.54,
+   "pct": 21,
+   "cuota": 72.56
+  }
+ ],
+ "iva": 72.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": 65.65,
+ "total": 352.45,
+ "observaciones": "Alquiler local, retención 19%. Escaneo girado 180 grados; solo se ve la parte inferior (importes, partes y concepto)",
+ "alertas": [
+  "DNI del arrendador leído del escaneo girado: 74174952K",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

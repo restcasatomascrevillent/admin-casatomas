@@ -1,0 +1,63 @@
+{
+ "archivo": "R270.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TEXDECOLAN, S.L (Dani Uniformes)",
+ "cif": "B54942107",
+ "local": "casa_tomas",
+ "numero_documento": "FAC08699",
+ "fecha": "2026-01-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Delantal sin peto y bolsillo 50x75 cm sarga poliéster",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.95,
+   "descuento_pct": null,
+   "total": 95.4,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Gorro gran chef con velcro",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.75,
+   "descuento_pct": null,
+   "total": 105.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 200.4,
+ "desglose_iva": [
+  {
+   "base": 200.4,
+   "pct": 21,
+   "cuota": 42.08
+  }
+ ],
+ "iva": 42.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 242.48,
+ "observaciones": "",
+ "alertas": []
+}

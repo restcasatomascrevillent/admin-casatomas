@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  20
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS JJ Y OTRAS CB",
+ "cif": "E42689075",
+ "local": "casa_tomas",
+ "numero_documento": "54/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 20,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 5.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.5,
+   "descuento_pct": null,
+   "total": 108.65,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 108.65,
+ "desglose_iva": [
+  {
+   "base": 108.65,
+   "pct": 10.0,
+   "cuota": 10.87
+  }
+ ],
+ "iva": 10.87,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 119.52,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645. Embarcaciones: FELETE.",
+ "alertas": []
+}

@@ -1,0 +1,65 @@
+{
+ "archivo": "R1532.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TRANSGOURMET IBÉRICA, S.A.U.",
+ "cif": "A17371758",
+ "local": "casa_tomas",
+ "numero_documento": "260041046015284",
+ "fecha": "2026-09-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHULETA LOMO CERD.CONG.PRE.CARN.E/I",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.47,
+   "descuento_pct": null,
+   "total": 27.35,
+   "iva_pct": 10,
+   "albaran_ref": "000213994",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RIÑONADA TERNERA HEMBRA E/K",
+   "producto_ficha": null,
+   "cantidad": 18.4,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.63,
+   "descuento_pct": null,
+   "total": 416.39,
+   "iva_pct": 10,
+   "albaran_ref": "000213994",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 443.74,
+ "desglose_iva": [
+  {
+   "base": 443.74,
+   "pct": 10,
+   "cuota": 44.37
+  }
+ ],
+ "iva": 44.37,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 488.11,
+ "observaciones": "Cliente 2002989, ruta 04102, albarán 000213994. Vencimiento 18/09/2026, importe pendiente 488,11. Lote riñonada 2609001874. CIF emisor leído del margen izquierdo (CIF ES A17371758).",
+ "alertas": [
+  "Cantidad impresa 1,00 (bultos) y UNID 5,000 / 18,400; se toman los kg como cantidad (precio por kg)."
+ ]
+}

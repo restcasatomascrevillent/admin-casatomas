@@ -1,0 +1,80 @@
+{
+ "archivo": "R630.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CREVIGEST, S.L.",
+ "cif": "B03898012",
+ "local": "casa_tomas",
+ "numero_documento": "24",
+ "fecha": "2026-05-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Alquiler local c/ Santa María de la Cabeza nº 1B (mes de mayo)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "mes",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 718.9,
+   "descuento_pct": null,
+   "total": 718.9,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Consumo Electricidad 28-02-2026 a 31-03-2026",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 97.78,
+   "descuento_pct": null,
+   "total": 97.78,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Consumo Agua 05-11-2025 a 04-02-2026",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.68,
+   "descuento_pct": null,
+   "total": 31.68,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 848.36,
+ "desglose_iva": [
+  {
+   "base": 848.36,
+   "pct": 21,
+   "cuota": 178.16
+  }
+ ],
+ "iva": 178.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": 161.19,
+ "total": 865.33,
+ "observaciones": "Alquiler mensual de local más consumos de luz y agua repercutidos. Retención IRPF 19%. Destinatario MASIDE 2011 SL (B54583356), dirección impresa C/ Santa María de la Cabeza 2. Pago por transferencia Banco Santander.",
+ "alertas": []
+}

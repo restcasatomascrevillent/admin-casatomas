@@ -1,0 +1,100 @@
+{
+ "archivo": "R260.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260049",
+ "fecha": "2026-02-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.0,
+   "descuento_pct": null,
+   "total": 68.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000049",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 57.6,
+   "iva_pct": 10,
+   "albaran_ref": "1-000049",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ALMEJA RUBIA",
+   "producto_ficha": "Almeja rubia",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.0,
+   "descuento_pct": null,
+   "total": 93.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000049",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 72.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000049",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 290.6,
+ "desglose_iva": [
+  {
+   "base": 290.6,
+   "pct": 10,
+   "cuota": 29.06
+  }
+ ],
+ "iva": 29.06,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 319.66,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 12/02/2026 por 319,66. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": [
+  "NAVAJA a 34,00 €/kg; la ficha indica 28,00 €/kg.",
+  "ALMEJA RUBIA a 31,00 €/kg; la ficha indica 28,50 €/kg."
+ ]
+}

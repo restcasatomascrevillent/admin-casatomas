@@ -1,0 +1,97 @@
+{
+ "archivo": "R638.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "3010",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.8,
+   "descuento_pct": null,
+   "total": 134.0,
+   "iva_pct": 10,
+   "albaran_ref": "8743",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RAPE",
+   "producto_ficha": "Rape entero",
+   "cantidad": 5.2,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.95,
+   "descuento_pct": null,
+   "total": 56.94,
+   "iva_pct": 10,
+   "albaran_ref": "8743",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TELLINA",
+   "producto_ficha": "Tellina",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.8,
+   "descuento_pct": null,
+   "total": 119.2,
+   "iva_pct": 10,
+   "albaran_ref": "8867",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "GAMBA ROJA",
+   "producto_ficha": "Gamba roja",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 55.0,
+   "descuento_pct": null,
+   "total": 220.0,
+   "iva_pct": 10,
+   "albaran_ref": "8985",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 530.14,
+ "desglose_iva": [
+  {
+   "base": 530.14,
+   "pct": 10,
+   "cuota": 53.01
+  }
+ ],
+ "iva": 53.01,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 583.15,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Serie no impresa en la cabecera. Cuatro líneas en tres albaranes: 8743 (28/04/2026), 8867 (29/04/2026) y 8985 (30/04/2026).",
+ "alertas": []
+}

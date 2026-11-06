@@ -1,0 +1,80 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS ISLA TABARCA, S.L.",
+ "cif": "B54006085",
+ "local": "casa_tomas",
+ "numero_documento": "94/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 6.35,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.23,
+   "descuento_pct": null,
+   "total": 103.03,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 3,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.85,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 52.45,
+   "descuento_pct": null,
+   "total": 97.03,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 3,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 7.35,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 67.48,
+   "descuento_pct": null,
+   "total": 495.96,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 696.02,
+ "desglose_iva": [
+  {
+   "base": 696.02,
+   "pct": 10.0,
+   "cuota": 69.6
+  }
+ ],
+ "iva": 69.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 765.62,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645, 751, 1832, 870. Embarcaciones: EL CUCHARON, CAMPEON PRIMERO.",
+ "alertas": []
+}

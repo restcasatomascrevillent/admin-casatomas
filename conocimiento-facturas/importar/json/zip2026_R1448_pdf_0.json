@@ -1,0 +1,116 @@
+{
+ "archivo": "R1448.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MR FRIO SOLUCIONES TERMICAS, S.L.",
+ "cif": "B24831901",
+ "local": "casa_tomas",
+ "numero_documento": "000232",
+ "fecha": "2026-09-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "INTERRUPTOR PUESTA EN MARCHA ORIGINAL (cortadora Brahler)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 84.5,
+   "descuento_pct": 15,
+   "total": 71.83,
+   "iva_pct": 21,
+   "albaran_ref": "J-82",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA OFICIAL",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": 15,
+   "total": 29.75,
+   "iva_pct": 21,
+   "albaran_ref": "J-82",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BISAGRA PUERTA ARCON CONGELADOR -60º",
+   "producto_ficha": null,
+   "cantidad": 4,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39.0,
+   "descuento_pct": 15,
+   "total": 132.6,
+   "iva_pct": 21,
+   "albaran_ref": "J-92",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA OFICIAL",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": 15,
+   "total": 29.75,
+   "iva_pct": 21,
+   "albaran_ref": "J-92",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA OFICIAL: desmontar cajón turbina terraza, sacar gorro cocina y volver a montar",
+   "producto_ficha": null,
+   "cantidad": 1.5,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": 15,
+   "total": 44.63,
+   "iva_pct": 21,
+   "albaran_ref": "P-254",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 308.56,
+ "desglose_iva": [
+  {
+   "base": 308.56,
+   "pct": 21,
+   "cuota": 64.8
+  }
+ ],
+ "iva": 64.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 373.36,
+ "observaciones": "Reparaciones de cortadora, congelador y cocina (albaranes J-82, J-92, P-254). Forma de pago: transferencia bancaria Santander. Destinatario RESTAURANTE CASA TOMÁS / MASIDE 2011 SL (B-54583356), C/ Santa María de la Cabeza 2.",
+ "alertas": [
+  "La cuenta de transferencia impresa (Santander) es distinta de la que aparecía en las facturas anteriores; verificar antes de pagar"
+ ]
+}

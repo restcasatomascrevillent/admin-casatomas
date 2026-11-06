@@ -1,0 +1,48 @@
+{
+ "archivo": "R68.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170747737",
+ "fecha": "2026-01-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOMATE SECO I 2,5K ES",
+   "producto_ficha": "Tomate seco (bulto 2,5 kg)",
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.95,
+   "descuento_pct": null,
+   "total": 29.88,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 29.88,
+ "desglose_iva": [
+  {
+   "base": 29.88,
+   "pct": 4,
+   "cuota": 1.2
+  }
+ ],
+ "iva": 1.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 31.08,
+ "observaciones": "Fecha entrega 23.01.2026, igual que la fecha de factura. Anotacion suelta '(CP)': no es producto. Total BT 1.",
+ "alertas": [
+  "La ficha da iva_pct null para tomate seco, pero la factura imprime IVA 4,0 %. Se usa 4 (lo impreso)."
+ ]
+}

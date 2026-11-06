@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  20
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS EL MONTGO, S.L.",
+ "cif": "B42710996",
+ "local": "casa_tomas",
+ "numero_documento": "369/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 20,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.85,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 66.5,
+   "descuento_pct": null,
+   "total": 123.03,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 123.03,
+ "desglose_iva": [
+  {
+   "base": 123.03,
+   "pct": 10.0,
+   "cuota": 12.3
+  }
+ ],
+ "iva": 12.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 135.33,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 7074. Embarcaciones: EL MONTGO.",
+ "alertas": []
+}

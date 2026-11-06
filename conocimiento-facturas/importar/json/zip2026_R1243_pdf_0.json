@@ -1,0 +1,99 @@
+{
+ "archivo": "R1243.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DON JUAN Fº (JUAN Fº MORALES MORENO)",
+ "cif": null,
+ "local": "casa_tomas",
+ "numero_documento": "169/2026",
+ "fecha": "2026-08-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Suministro y colocación: chapa perforada 2x1 con agujeros de 8mm en galva lacada color",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 91.0,
+   "descuento_pct": null,
+   "total": 91.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Mano de obra y desplazamiento",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 60.0,
+   "descuento_pct": null,
+   "total": 60.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Suministro y colocación: marco fijo, ángulo de 40 zincado de 199x66 con tramex",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 178.0,
+   "descuento_pct": null,
+   "total": 178.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Quitar lamas de zeta existentes y colocar marco con tornillos",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 150.0,
+   "descuento_pct": null,
+   "total": 150.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 479.0,
+ "desglose_iva": [
+  {
+   "base": 479.0,
+   "pct": 21,
+   "cuota": 100.59
+  }
+ ],
+ "iva": 100.59,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 579.59,
+ "observaciones": "Sin forma de pago ni vencimiento impresos; figura cuenta bancaria para transferencia (no transcrita). Referencia impresa: RESTAURANTE CASA TOMAS. Nº de cliente 948.",
+ "alertas": [
+  "Emisor sin CIF impreso; el nombre se toma del pie legal («DON JUAN Fº» / «JUAN Fº MORALES MORENO»)."
+ ]
+}

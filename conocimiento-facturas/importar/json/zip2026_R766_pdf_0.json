@@ -1,0 +1,87 @@
+{
+ "archivo": "R766.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-3817",
+ "fecha": "2026-05-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GAMBON REBOZADO XXL 1X2",
+   "producto_ficha": "Gambón rebozado XXL (2 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 17.5,
+   "descuento_pct": null,
+   "total": 70.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 7.982",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 7.982",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "JUDIA PLANA TROZOS ANEDILCO 2X2.5",
+   "producto_ficha": "Judía plana en trozos Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.7,
+   "descuento_pct": null,
+   "total": 8.5,
+   "iva_pct": 4,
+   "albaran_ref": "B 7.982",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 87.25,
+ "desglose_iva": [
+  {
+   "base": 70.0,
+   "pct": 10,
+   "cuota": 7.0
+  },
+  {
+   "base": 17.25,
+   "pct": 4,
+   "cuota": 0.69
+  }
+ ],
+ "iva": 7.69,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 94.94,
+ "observaciones": "Remesa semanal, vencimiento 31/05/2026. Cuadra al céntimo con el pie.",
+ "alertas": [
+  "GAMBON REBOZADO XXL (2617): precio 17,50 €/kg; la ficha registra 15,00 €/kg. Se deja el precio impreso (4,00 × 17,50 = 70,00, que cuadra con el pie)."
+ ]
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R907.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 04175",
+ "fecha": "2026-05-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "VIEIRA CARNE 30/40 X1",
+   "producto_ficha": "Vieira carne (sin concha) 30/40",
+   "cantidad": 10,
+   "unidad": "ud",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 200.0,
+   "iva_pct": 10,
+   "albaran_ref": "F571695",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 4,
+   "nombre": "TORT. CAMARON PREMIUM 30.UNI",
+   "producto_ficha": "Tortita de camarón premium (pack 30 uds)",
+   "cantidad": 30,
+   "unidad": "ud",
+   "bultos": 30,
+   "contenido_cantidad": 30,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 30.0,
+   "iva_pct": 10,
+   "albaran_ref": "F571695",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 230.0,
+ "desglose_iva": [
+  {
+   "base": 230.0,
+   "pct": 10,
+   "cuota": 23.0
+  }
+ ],
+ "iva": 23.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 253.0,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F571695. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

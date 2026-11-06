@@ -1,0 +1,85 @@
+{
+ "archivo": "R134.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "AVATEL TELECOM, S.A.",
+ "cif": "A93135218",
+ "local": "casa_tomas",
+ "numero_documento": "CURF26/042398",
+ "fecha": "2026-02-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Telefonía Fija Empresas 1-31 Ene 966107887",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.61,
+   "descuento_pct": null,
+   "total": 2.61,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Pack Negocio PLUS 1-28 Feb",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.99,
+   "descuento_pct": null,
+   "total": 33.99,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Promo 15 meses Pack Negocio PLUS 1-28 Feb",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -5.0,
+   "descuento_pct": null,
+   "total": -5.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 31.6,
+ "desglose_iva": [
+  {
+   "base": 31.6,
+   "pct": 21,
+   "cuota": 6.64
+  }
+ ],
+ "iva": 6.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 38.24,
+ "observaciones": "Consumo 01/01/2026-31/01/2026. Domiciliación bancaria, vence 03/02/2026. Pack Negocio PLUS va como una sola línea; sus componentes (móvil 15 GB, fibra, SVA) no traen importe propio. Páginas 2-4: detalle de llamadas.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

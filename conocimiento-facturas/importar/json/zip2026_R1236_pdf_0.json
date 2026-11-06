@@ -1,0 +1,63 @@
+{
+ "archivo": "R1236.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "D. PRIMERAS MARCAS, S.A.U.",
+ "cif": "A58172685",
+ "local": "casa_tomas",
+ "numero_documento": "FV26072899",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "L.Beyer Gewurztraminer 2021 (cód. 730226)",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 16.25,
+   "descuento_pct": null,
+   "total": 97.5,
+   "iva_pct": 21,
+   "albaran_ref": "AR2624127",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Viña Tondonia Reserva B 2014 (cód. 197122)",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 27.75,
+   "descuento_pct": null,
+   "total": 55.5,
+   "iva_pct": 21,
+   "albaran_ref": "AR2624127",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 153.0,
+ "desglose_iva": [
+  {
+   "base": 153.0,
+   "pct": 21,
+   "cuota": 32.13
+  }
+ ],
+ "iva": 32.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 185.13,
+ "observaciones": "Pedido PV2624347, albarán AR2624127 (15/07/26). Pago domiciliado, Banco Sabadell, vencimiento 30/08/2026 por 185,13 €. Impuesto punto verde 0,00.",
+ "alertas": []
+}

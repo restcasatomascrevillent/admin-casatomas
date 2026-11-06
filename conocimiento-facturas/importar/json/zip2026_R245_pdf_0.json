@@ -1,0 +1,49 @@
+{
+ "archivo": "R245.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "80013670",
+ "fecha": "2026-02-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Jamón Bellota 100% Ibérico 5J 9-10 kg N24",
+   "producto_ficha": "Jamón de bellota 100% ibérico 5J, pieza de 9-10 kg",
+   "cantidad": 2,
+   "unidad": "pieza",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 519.4,
+   "descuento_pct": null,
+   "total": -1038.8,
+   "iva_pct": 10,
+   "albaran_ref": "20018125",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -1038.8,
+ "desglose_iva": [
+  {
+   "base": -1038.8,
+   "pct": 10,
+   "cuota": -103.88
+  }
+ ],
+ "iva": -103.88,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -1142.68,
+ "observaciones": "Factura rectificativa-abono que rectifica la factura 90257812 (R88). Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 22/03/2026. Punto verde 0,10 EUR informativo, no sumado al total.",
+ "alertas": [
+  "Abono con importes impresos sin signo negativo; se dejan positivos tal como salen.",
+  "Sin fecha de albarán ni pedido impresos; el nº de albarán 20018125 tiene formato distinto (no 40xxxxxx)."
+ ]
+}

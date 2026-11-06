@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "PARRES ORTS, TOMAS",
+ "cif": "33496819X",
+ "local": "casa_tomas",
+ "numero_documento": "33/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.7,
+   "descuento_pct": null,
+   "total": 28.62,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 28.62,
+ "desglose_iva": [
+  {
+   "base": 28.62,
+   "pct": 10.0,
+   "cuota": 2.86
+  }
+ ],
+ "iva": 2.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 31.48,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645. Embarcaciones: SANTPERENCA.",
+ "alertas": []
+}

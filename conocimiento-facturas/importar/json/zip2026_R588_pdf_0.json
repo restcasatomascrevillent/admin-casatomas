@@ -1,0 +1,138 @@
+{
+ "archivo": "R588.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENCHENTA SLU",
+ "cif": "B94186988",
+ "local": "casa_tomas",
+ "numero_documento": "1-5076",
+ "fecha": "2026-04-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.0,
+   "descuento_pct": 0,
+   "total": 62.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-57",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.5,
+   "descuento_pct": 0,
+   "total": 61.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-57",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.3,
+   "descuento_pct": 0,
+   "total": 15.3,
+   "iva_pct": 21,
+   "albaran_ref": "3-57",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.0,
+   "descuento_pct": 0,
+   "total": 60.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-61",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.5,
+   "descuento_pct": 0,
+   "total": 122.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-61",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.55,
+   "descuento_pct": 0,
+   "total": 17.55,
+   "iva_pct": 21,
+   "albaran_ref": "3-61",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 337.85,
+ "desglose_iva": [
+  {
+   "base": 305.0,
+   "pct": 10,
+   "cuota": 30.5
+  },
+  {
+   "base": 32.85,
+   "pct": 21,
+   "cuota": 6.9
+  }
+ ],
+ "iva": 37.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 375.25,
+ "observaciones": "Transferencia BBVA. Vencimiento igual a la fecha de la factura. Albaranes 3-57 y 3-61.",
+ "alertas": [
+  "Precio fuera del rango de la ficha: NAVAJA 31,00 € (3-57) y 30,00 € (3-61); rango 20–29."
+ ]
+}

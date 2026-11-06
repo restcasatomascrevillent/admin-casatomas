@@ -1,0 +1,65 @@
+{
+ "archivo": "R680.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TOLDOS Y PROYECTOS ÑAOGAR SLU",
+ "cif": "B13724414",
+ "local": "casa_tomas",
+ "numero_documento": "A/89",
+ "fecha": "2026-05-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Cambio de lona para inferior y faldilla de 12cm para toldo modelo telón color antracita medida 4.35x0.87m",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 120.0,
+   "descuento_pct": null,
+   "total": 120.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Trabajos",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.0,
+   "descuento_pct": null,
+   "total": 30.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 150.0,
+ "desglose_iva": [
+  {
+   "base": 150.0,
+   "pct": 21,
+   "cuota": 31.5
+  }
+ ],
+ "iva": 31.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 181.5,
+ "observaciones": "Transferencia ES** **** **** **** **** 9896",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

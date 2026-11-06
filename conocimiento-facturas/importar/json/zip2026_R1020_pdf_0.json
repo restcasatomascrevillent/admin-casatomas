@@ -1,0 +1,67 @@
+{
+ "archivo": "R1020.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MANBO BAKERY SL",
+ "cif": "B70717194",
+ "local": "casa_tomas",
+ "numero_documento": "1 000791",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MINI MOLLETE ANDALUZ DYL 38 GR 90 UD (art. 12647), albarán 1-001995",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.68,
+   "descuento_pct": null,
+   "total": 80.04,
+   "iva_pct": 4,
+   "albaran_ref": "1-001995",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MINI MOLLETE ANDALUZ DYL 38 GR 90 UD (art. 12647), albarán 1-002340",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.68,
+   "descuento_pct": null,
+   "total": 80.04,
+   "iva_pct": 4,
+   "albaran_ref": "1-002340",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 160.08,
+ "desglose_iva": [
+  {
+   "base": 160.08,
+   "pct": 4,
+   "cuota": 6.4
+  }
+ ],
+ "iva": 6.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 166.48,
+ "observaciones": "Cabecera: «Factura | 1 | 000791 | 1 | 30/06/2026». Dos albaranes en una factura: 1-001995 (02/06/2026) y 1-002340 (30/06/2026), servicios 800452192 y 800466691. Forma de pago y vencimientos sin datos impresos. El pie muestra tipos 21/10/4 y solo tiene importe en el tipo 4%.",
+ "alertas": [
+  "El nº de factura se toma como «1 000791» porque la cabecera trae dos cifras (1 y 000791); confirmar en el PDF original.",
+  "El artículo indica «90 UD» en el nombre; no consta si el precio es por unidad o por paquete.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

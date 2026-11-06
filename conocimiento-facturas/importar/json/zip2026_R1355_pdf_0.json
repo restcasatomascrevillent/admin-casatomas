@@ -1,0 +1,49 @@
+{
+ "archivo": "R1355.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "8237",
+ "fecha": "2026-08-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": null,
+   "nombre": "Envase BANDEJA CARMELO MARTIN (3 x 1,6500)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.95,
+   "descuento_pct": null,
+   "total": 4.95,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 4.95,
+ "desglose_iva": [
+  {
+   "base": 4.95,
+   "pct": 21,
+   "cuota": 1.04
+  }
+ ],
+ "iva": 1.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 5.99,
+ "observaciones": "Transferencia 30 días. Factura solo de envases (albarán ENV 2206/26 del 21/08/2026). Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

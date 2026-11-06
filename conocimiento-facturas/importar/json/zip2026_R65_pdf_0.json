@@ -1,0 +1,48 @@
+{
+ "archivo": "R65.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PLUXEE ESPAÑA, S.A.U.",
+ "cif": "A78604113",
+ "local": "casa_tomas",
+ "numero_documento": "5275519",
+ "fecha": "2026-01-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Comisión gestión cheques restaurante",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.6,
+   "descuento_pct": null,
+   "total": 6.6,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 6.6,
+ "desglose_iva": [
+  {
+   "base": 6.6,
+   "pct": 21,
+   "cuota": 1.39
+  }
+ ],
+ "iva": 1.39,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 7.99,
+ "observaciones": "Transferencia. Importe operaciones no sujetas -132,00 (cheques). Importe facturado 7,99; importe a pagar -124,01 (abono de nominal de cheques menos comisión). | Liquidación de cheques: importe a pagar -124.01 (no es gasto); se registra solo la comisión facturada.",
+ "alertas": [
+  "Total a pagar -124,01 = -132,00 + 7,99; el importe facturado (comisión + IVA) es 7,99. Cuota IVA impresa 1,39 (6,60x21% = 1,386)."
+ ]
+}

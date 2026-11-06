@@ -1,0 +1,78 @@
+{
+  "cif": "B73903429",
+  "nombre": "OROWINES LEVANTE, S.L. (ORO Wines)",
+  "nombres_impresos": ["OROWINES LEVANTE, S.L.", "ORO WINES"],
+  "categoria": "vino",
+  "locales": ["casa_tomas"],
+  "muestras": ["R107.pdf", "R357.pdf", "R595.pdf", "R773.pdf", "R1240.pdf", "R1386.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por pedido ('Ventas - Factura'), una página, normalmente una sola línea; solo llegan escaneos",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["VFOL260211", "VFOL260621", "VFOL261218", "VFOL261479", "VFOL262195", "VFOL262334"], "patron": "^VFOL26\\d{4}$", "donde": "'Nº factura' arriba a la derecha, bajo 'Ventas - Factura'" },
+    "fecha": "escrita en palabras bajo el 'Nº pedido' de la izquierda: '28. enero 2026', '4. marzo 2026'; no hay casilla 'Fecha'",
+    "albaranes": null
+  },
+
+  "lectura": {
+    "columnas": ["Nº producto", "Descripción", "Cantidad", "U.M.", "Precio venta", "% Dto.", "Importe"],
+    "cantidad_es": "cajas de 6 botellas cuando la descripción dice 'C.x06 BOT.0,75 L' (U.M. dice 'Unidad' pero la unidad es la caja); botellas sueltas cuando dice 'BOTELLA 0,75 L'",
+    "columna_peso": null,
+    "precio_es_por": "caja (botella en la línea 'BOTELLA')",
+    "descuento_por_linea": { "existe": true, "columna": "% Dto.", "valores_habituales": [100] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Pie: 'Total EUR IVA+RE excl.', 'Importe IVA (21%)', 'Total EUR IVA+RE incl.'"],
+    "trampas": [
+      "Hay dos números parecidos: 'Nº factura VFOL…' (el bueno, a la derecha) y 'Nº pedido VPOL…' (a la izquierda, pedido del proveedor). 'Su Nº pedido 2026-00xxxx' es el nuestro. No confundirlos.",
+      "U.M. 'Unidad' engaña: 4 Unidad × 64,80 son 4 cajas de 6 botellas (24 botellas), 10,80 € por botella.",
+      "Bonificación: línea 'BOTELLA 0,75 L' a 10,80 con 100,00 % de dto. e importe en blanco (R773, 4 botellas gratis); no suma al total.",
+      "La fecha de factura va en palabras con el mes en minúscula; el vencimiento (60 días f.f.) sale abajo como DD/MM/AAAA.",
+      "Escaneo con marcas de bolígrafo, sombras y manchas; el texto del reverso se transparenta."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = cantidad × precio × (1 − dto/100) (4 × 64,80 = 259,20; la línea con 100 % vale 0)",
+    "Total EUR IVA+RE excl. = suma de importes de línea",
+    "IVA = base × 21 % (259,20 → 54,43); total incl. = 313,63",
+    "Vencimiento = fecha + 60 días, por el importe total"
+  ],
+
+  "guia_ocr": "Factura 'Ventas - Factura' de Orowines Levante (ORO Wines). Número = 'Nº factura VFOL26…' (no el 'Nº pedido VPOL…'). La fecha está en texto bajo el Nº pedido (p. ej. '25. mayo 2026'). Cantidad con U.M. 'Unidad' en 'C.x06 BOT.0,75 L' son CAJAS de 6 botellas; precio por caja sin IVA (64,80). Una línea 'BOTELLA' con 100 % de descuento es regalo con importe vacío. IVA 21 %, sin recargo. Pago a 60 días: vencimiento al pie. Ignora IBAN y 'Operación asegurada en Crédito y Caución'.",
+
+  "productos": [
+    {
+      "nombre_impreso": "JUAN GIL NACAR C.x06 BOT.0,75 L ES-ECO-024-MU",
+      "nombre_normalizado": "Juan Gil Nácar 75 cl (caja 6)",
+      "familia": "vino",
+      "presentacion": "botella 75 cl, ecológico (ES-ECO-024-MU)",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 64.8, "max": 64.8, "por": "caja", "ejemplos": [["2026-01-28", 64.8], ["2026-03-04", 64.8], ["2026-04-29", 64.8], ["2026-05-25", 64.8], ["2026-08-03", 64.8], ["2026-08-26", 64.8]] },
+      "iva_pct": 21,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "JUAN GIL NACAR BOTELLA 0,75 L ES-ECO-024-MU",
+      "nombre_normalizado": "Juan Gil Nácar 75 cl (botella suelta)",
+      "familia": "vino",
+      "presentacion": "botella 75 cl, ecológico (ES-ECO-024-MU)",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 10.8, "max": 10.8, "por": "botella", "ejemplos": [["2026-05-25", 10.8]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "La factura no dice si Juan Gil Nácar es tinto, blanco o rosado.",
+    "Solo escaneos (6 de 6 vistos): el único artículo es Juan Gil Nácar, siempre 4 cajas (259,20 + 54,43 = 313,63).",
+    "Solo en R773 se regalan 4 botellas sueltas (100 % dto.); en las demás no hay bonificación."
+  ]
+}

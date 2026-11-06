@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  14
+ ],
+ "tipo": "factura",
+ "proveedor": "MOLINA MIRA, JOSE IVAN",
+ "cif": "33481277Q",
+ "local": "casa_tomas",
+ "numero_documento": "443/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 14,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.9,
+   "descuento_pct": null,
+   "total": 107.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 107.6,
+ "desglose_iva": [
+  {
+   "base": 107.6,
+   "pct": 10,
+   "cuota": 10.76
+  }
+ ],
+ "iva": 10.76,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 118.36,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

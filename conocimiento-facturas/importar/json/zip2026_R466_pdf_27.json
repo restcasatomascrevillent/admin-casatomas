@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  28
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ RUIZ, JOAQUIN",
+ "cif": "77756928T",
+ "local": "casa_tomas",
+ "numero_documento": "69/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 28,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 0.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.9,
+   "descuento_pct": null,
+   "total": 4.76,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 4.76,
+ "desglose_iva": [
+  {
+   "base": 4.76,
+   "pct": 10.0,
+   "cuota": 0.48
+  }
+ ],
+ "iva": 0.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 5.24,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 5317. Embarcaciones: ninguna.",
+ "alertas": []
+}

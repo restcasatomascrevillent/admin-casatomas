@@ -1,0 +1,48 @@
+{
+ "archivo": "R1338.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 4856",
+ "fecha": "2026-08-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA EXTRA LORETO",
+   "producto_ficha": "Quisquilla extra Loreto",
+   "cantidad": 25.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 80.0,
+   "descuento_pct": null,
+   "total": 2000.0,
+   "iva_pct": 10,
+   "albaran_ref": "20268501",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 2000.0,
+ "desglose_iva": [
+  {
+   "base": 2000.0,
+   "pct": 10,
+   "cuota": 200.0
+  }
+ ],
+ "iva": 200.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2200.0,
+ "observaciones": "Transferencia a 30 dias, vencimiento 13/09/2026. Albaran 20268501 de 10/08/2026, sin numero de pedido. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": [
+  "QUISQUILLA EXTRA LORETO a 80,00 €/kg; la ficha tiene 78,00 €/kg como precio habitual. Se deja lo impreso."
+ ]
+}

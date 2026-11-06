@@ -1,0 +1,63 @@
+{
+ "archivo": "R440.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUMT LEVANTE, S.L.U.",
+ "cif": "B53971560",
+ "local": "casa_tomas",
+ "numero_documento": "1328",
+ "fecha": "2026-03-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ATUN EN ACEITE RO-1000 CORTIZO",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.97,
+   "descuento_pct": null,
+   "total": 167.28,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SARDINILLAS PREMIUN E.ESPECIAL J.",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.12,
+   "descuento_pct": null,
+   "total": 55.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 222.88,
+ "desglose_iva": [
+  {
+   "base": 222.88,
+   "pct": 10,
+   "cuota": 22.29
+  }
+ ],
+ "iva": 22.29,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 245.17,
+ "observaciones": "Pago al CONTADO; entrega Restaurante Casa Tomas; cantidad = kg (peso)",
+ "alertas": []
+}

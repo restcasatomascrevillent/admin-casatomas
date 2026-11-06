@@ -1,0 +1,82 @@
+{
+ "archivo": "R626.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260200",
+ "fecha": "2026-04-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000200",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LONGUEIRON",
+   "producto_ficha": "Longueirón",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.5,
+   "descuento_pct": null,
+   "total": 61.5,
+   "iva_pct": 10,
+   "albaran_ref": "1-000200",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 115.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000200",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 234.7,
+ "desglose_iva": [
+  {
+   "base": 234.7,
+   "pct": 10,
+   "cuota": 23.47
+  }
+ ],
+ "iva": 23.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 258.17,
+ "observaciones": "Transferencia CaixaBank; vencimiento 28/04/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: LONGUEIRON 20,50 (ficha 21,50)"
+ ]
+}

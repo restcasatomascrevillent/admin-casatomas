@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "MISTA PESCA, C.B.",
+ "cif": "E03356144",
+ "local": "casa_tomas",
+ "numero_documento": "331/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.5,
+   "descuento_pct": null,
+   "total": 50.93,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 50.93,
+ "desglose_iva": [
+  {
+   "base": 50.93,
+   "pct": 10.0,
+   "cuota": 5.09
+  }
+ ],
+ "iva": 5.09,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 56.02,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9454. Embarcaciones: ninguna.",
+ "alertas": []
+}

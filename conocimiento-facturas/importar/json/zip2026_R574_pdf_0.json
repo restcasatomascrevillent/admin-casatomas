@@ -1,0 +1,46 @@
+{
+ "archivo": "R574.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0051/(2026)002273",
+ "fecha": "2026-04-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GALLETA TOSTADA ARO 200GX4",
+   "producto_ficha": null,
+   "cantidad": -1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.1,
+   "descuento_pct": null,
+   "total": -2.1,
+   "iva_pct": 10,
+   "albaran_ref": "9-173444701",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -2.1,
+ "desglose_iva": [
+  {
+   "base": -2.1,
+   "pct": 10,
+   "cuota": -0.21
+  }
+ ],
+ "iva": -0.21,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -2.31,
+ "observaciones": "Pago en entrega (factura de reparto). Abono (devolución) de la factura 0/0(063)0052/(2026)020055 de 21/04/2026. Factura de entrega. Número(s) de pedido: 9-173444701.",
+ "alertas": []
+}

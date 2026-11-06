@@ -1,0 +1,86 @@
+{
+ "archivo": "R310.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "AVATEL TELECOM, S.A.",
+ "cif": "A93135218",
+ "local": "casa_tomas",
+ "numero_documento": "CURF26/073055",
+ "fecha": "2026-03-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Telefonía Fija Empresas 1-28 Feb 966107887",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Pack Negocio PLUS 1-31 Mar",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.04,
+   "descuento_pct": null,
+   "total": 35.04,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Promo 15 meses Pack Negocio PLUS 1-31 Mar",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -5.16,
+   "descuento_pct": null,
+   "total": -5.16,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 29.89,
+ "desglose_iva": [
+  {
+   "base": 29.89,
+   "pct": 21,
+   "cuota": 6.28
+  }
+ ],
+ "iva": 6.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 36.17,
+ "observaciones": "Consumo 01/02/2026-28/02/2026. Domiciliación bancaria, vence 03/03/2026. Pack Negocio PLUS va como una sola línea. Páginas 2-4: detalle de llamadas.",
+ "alertas": [
+  "La línea Telefonía Fija Empresas 1-28 Feb no muestra importe en el texto extraído; precio y total quedan en null. La suma de las líneas visibles (35,04 - 5,16 = 29,88) difiere en 0,01 € de la base imponible impresa (29,89). Revisar el PDF original.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

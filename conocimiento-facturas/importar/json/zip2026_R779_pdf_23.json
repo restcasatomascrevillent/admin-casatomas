@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  24
+ ],
+ "tipo": "factura",
+ "proveedor": "INNAZ PESCA, SL",
+ "cif": "B19393974",
+ "local": "casa_tomas",
+ "numero_documento": "531/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 24,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 52.6,
+   "descuento_pct": null,
+   "total": 68.38,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 68.38,
+ "desglose_iva": [
+  {
+   "base": 68.38,
+   "pct": 10.0,
+   "cuota": 6.84
+  }
+ ],
+ "iva": 6.84,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 75.22,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9950. Embarcaciones: ninguna.",
+ "alertas": []
+}

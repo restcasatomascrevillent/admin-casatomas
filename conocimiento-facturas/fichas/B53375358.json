@@ -1,0 +1,244 @@
+{
+  "cif": "B53375358",
+  "nombre": "BODEGA CAMPOLUZ, S.L.",
+  "nombres_impresos": ["BODEGA CAMPOLUZ, S.L.", "BODEGA CAMPOLUZ", "CAMPOLUZ ENOTECA", "campoluzenoteca.com"],
+  "categoria": "vino",
+  "locales": ["casa_tomas"],
+  "muestras": ["R152.pdf", "R525.pdf", "R1205.pdf", "R1580.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes (1-3 albaranes por factura); también facturas muy cortas de 'gastos devolución recibo' y abonos con cantidades negativas",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["FA2025/0024803", "FA2026/0006016", "FA2026/0015652", "FA2026/0020158"],
+      "patron": "^FA20\\d{2}/\\d{7}$",
+      "donde": "arriba a la izquierda, 'Factura nº FA2026/0006016'"
+    },
+    "fecha": "'Fecha de emisión' justo debajo del número, DD/MM/AA (31/03/26). Es el último día del mes; la fecha de cada albarán va en su cabecera.",
+    "albaranes": "cabecera 'Albarán Nº 2026/0001673 Fecha: 11/03/26' antes de sus líneas"
+  },
+
+  "lectura": {
+    "columnas": ["Cant.", "Productos", "Lote", "Iva %", "Importe (€)", "Dto.", "Total (€)"],
+    "cantidad_es": "botellas sueltas (una unidad = una botella 70/75 cl o 1 L); no hay cajas en la factura",
+    "columna_peso": null,
+    "precio_es_por": "botella (ud). 'Importe (€)' es el precio unitario; 'Total (€)' = cant × importe × (1 − dto)",
+    "descuento_por_linea": { "existe": true, "columna": "Dto. (solo aparece cuando hay; p. ej. '100 %' = línea regalada)", "valores_habituales": [100] },
+    "iva_por_linea": true,
+    "tipos_iva": [10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [
+      "'GESTION Y LOGISTICA' como línea de cada albarán: 2,37 € (2,63 € desde sept-26), IVA 21 %; a veces con Dto. 100 % (importe 0,00)",
+      "'Total' del pie = suma de importes brutos (antes de Dto.); 'Total Descuentos' = descuentos de las líneas bonificadas",
+      "'P.V.' (punto verde) = importe desglosado por tipo de IVA, YA incluido en la base imponible (no se suma otra vez)",
+      "'GASTOS DEVOLUCION RECIBO DIA dd/mm/aa FA.nnnn' = cargo (2,00 o 6,81 €, IVA 21 %) por recibo devuelto, en facturas sueltas"
+    ],
+    "trampas": [
+      "El Lote es una cadena pegada al nombre (p. ej. '6494MD00020251128') y se confunde con cifras: no es cantidad ni precio.",
+      "'Importe (€)' no es el total de la línea: el total es la última columna. Si hay Dto. 100 %, el total es 0,00.",
+      "Fila de pie con dos columnas de bases/IVA (21 % y 10 %): los puré y siropes Monin son 10 %, vinos, licores y logística 21 %.",
+      "'Total' (arriba) ≠ base: base = Total − Total Descuentos + P.V.",
+      "El renglón del pie con la base al 21 % puede llevar un número de pedido pegado ('… | 0004448'): ignorarlo.",
+      "Texto 'Página 0 / 1' siempre; no es un número de página real."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_línea = cantidad × importe × (1 − dto/100)",
+    "Total (pie) = suma de cantidad × importe sin descuento; base imponible = Total − Total Descuentos + P.V.",
+    "base_21 y base_10 incluyen su parte de P.V.; IVA = base × %; Total Factura = suma de bases + suma de IVA",
+    "R1205: 792,99 − 2,37 + 1,02 = 791,64 (701,22 al 21 % + 90,42 al 10 %); IVA 147,26 + 9,04; total 947,94",
+    "R525: 280,98 + 0,35 = 281,33; IVA 59,08; total 340,41"
+  ],
+
+  "guia_ocr": "Factura de Bodega Campoluz. Número 'Factura nº FA2026/…' y 'Fecha de emisión' DD/MM/AA arriba. Líneas: Cant. (botellas sueltas), Producto, Lote pegado (ignóralo), Iva %, Importe = precio por botella, Dto. (solo si hay, p. ej. 100 %) y Total = cant × precio × (1−dto). Cada albarán tiene su cabecera 'Albarán Nº … Fecha:' y una línea 'GESTION Y LOGISTICA' (2,37 €). Monin 10 % IVA; vinos y licores 21 %. Pie: Total bruto, Total Descuentos, P.V. incluido en la base, bases e IVA por tipo, Total Factura.",
+
+  "productos": [
+    {
+      "nombre_impreso": "GRAN RODMA TINTO 2022 75CL.",
+      "nombre_normalizado": "Gran Rodma Tinto 2022 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "vino tinto 2022, botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 38.95, "max": 41.85, "por": "botella", "ejemplos": [["2026-03-11", 41.85], ["2026-07-27", 38.95]] },
+      "iva_pct": 21,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "FINCA RODMA AVIZOR TINTO 2021 75CL.",
+      "nombre_normalizado": "Finca Rodma Avizor Tinto 2021 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "vino tinto 2021, botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 25.51, "max": 25.51, "por": "botella", "ejemplos": [["2026-03-11", 25.51], ["2026-07-27", 25.51]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "FINCA RODMA SELECCION TINTO 2023 75CL.",
+      "nombre_normalizado": "Finca Rodma Selección Tinto 2023 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "vino tinto 2023, botella 75 cl; visto una vez con Dto. 100 % (regalo)",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 18.9, "max": 18.9, "por": "botella", "ejemplos": [["2026-05-18", 18.9]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BRION CEPAS VELLAS BLANCO GODELLO 2024 75CL. (EQ)",
+      "nombre_normalizado": "Brión Cepas Vellas blanco Godello 2024 75 cl",
+      "familia": "vino blanco",
+      "presentacion": "vino blanco godello 2024, botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 18.9, "max": 18.9, "por": "botella", "ejemplos": [["2026-05-18", 18.9]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BRION CEPAS VELLAS TINTO BRANCELLAO 2023 75CL. (EQ)",
+      "nombre_normalizado": "Brión Cepas Vellas tinto Brancellao 2023 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "vino tinto brancellao 2023, botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 18.9, "max": 18.9, "por": "botella", "ejemplos": [["2026-05-18", 18.9]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "MACALLAN DIAMOND SII 70CL. / MACALLAN DIAMOND SII 2026 70CL.",
+      "nombre_normalizado": "Macallan Diamond Single Malt 70 cl",
+      "familia": "destilado",
+      "presentacion": "whisky, botella 70 cl; el nombre cambia a '… SII 2026' en otra factura pero mismo precio y lote 23227MD20260429",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 543.43, "max": 543.43, "por": "botella", "ejemplos": [["2026-04-29", 543.43]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CHARTREUSE AMARILLO 70 CL.",
+      "nombre_normalizado": "Chartreuse amarillo 70 cl",
+      "familia": "licor",
+      "presentacion": "licor, botella 70 cl",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 27.38, "max": 27.38, "por": "botella", "ejemplos": [["2026-05-26", 27.38]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "SAINT GERMAIN EDELFLOWERS LIQUEUR 70 CL.",
+      "nombre_normalizado": "Saint Germain licor de flor de saúco 70 cl",
+      "familia": "licor",
+      "presentacion": "licor, botella 70 cl",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 25.21, "max": 25.21, "por": "botella", "ejemplos": [["2026-06-22", 25.21]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CAPITAN MORGAN DARK 1L",
+      "nombre_normalizado": "Ron Capitán Morgan Dark 1 L",
+      "familia": "destilado",
+      "presentacion": "ron, botella 1 L; visto solo en un abono (cantidad -16)",
+      "formato": { "envase": "botella", "contenido": 100, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 16.7, "max": 16.7, "por": "botella", "ejemplos": [["R153", 16.7]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "MONIN PUREE LE FRUIT FRUTA PASION 1LTO.",
+      "nombre_normalizado": "Monin puré Le Fruit fruta de la pasión 1 L",
+      "familia": "puré de fruta / bar",
+      "presentacion": "puré de fruta para coctelería, botella 1 L",
+      "formato": { "envase": "botella", "contenido": 100, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 17.29, "max": 17.64, "por": "botella", "ejemplos": [["2025-11-12", 17.29], ["2026-07-22", 17.64]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "MONIN PUREE LE FRUIT MANGO LTO.",
+      "nombre_normalizado": "Monin puré Le Fruit mango 1 L",
+      "familia": "puré de fruta / bar",
+      "presentacion": "puré de fruta para coctelería, botella 1 L",
+      "formato": { "envase": "botella", "contenido": 100, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 17.64, "max": 17.64, "por": "botella", "ejemplos": [["2025-11-12", 17.64], ["2026-09-24", 17.64]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "SIROPE MONIN MELOCOTON 70CL.",
+      "nombre_normalizado": "Sirope Monin melocotón 70 cl",
+      "familia": "sirope",
+      "presentacion": "sirope, botella 70 cl",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 9.85, "max": 9.85, "por": "botella", "ejemplos": [["2026-07-22", 9.85]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "SIROPE MONIN MANZANA VERDE 70 CL.",
+      "nombre_normalizado": "Sirope Monin manzana verde 70 cl",
+      "familia": "sirope",
+      "presentacion": "sirope, botella 70 cl",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 10.5, "max": 10.5, "por": "botella", "ejemplos": [["2026-05-18", 10.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "SIROPE MONIN SPICY MANGO 70CL.",
+      "nombre_normalizado": "Sirope Monin mango picante 70 cl",
+      "familia": "sirope",
+      "presentacion": "sirope, botella 70 cl",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 10.5, "max": 10.5, "por": "botella", "ejemplos": [["2026-05-18", 10.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GESTION Y LOGISTICA",
+      "nombre_normalizado": "Gestión y logística",
+      "familia": "servicio",
+      "presentacion": "cargo fijo por albarán; a veces Dto. 100 %",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.37, "max": 2.63, "por": "ud", "ejemplos": [["2025-11-12", 2.37], ["2026-09-24", 2.63]] },
+      "iva_pct": 21,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "GASTOS DEVOLUCION RECIBO DIA dd/mm/aa FA.nnnn",
+      "nombre_normalizado": "Gastos por devolución de recibo",
+      "familia": "servicio",
+      "presentacion": "cargo por recibo bancario devuelto, factura suelta de 1 línea",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 2, "max": 6.81, "por": "ud", "ejemplos": [["R189", 2], ["R526", 6.81]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    }
+  ],
+
+  "dudas": [
+    "Cantidad = botellas sueltas: lo confirman los precios (Macallan 543,43 por botella; Gran Rodma 38,95-41,85 por botella de 75 cl). No se imprime ninguna caja ni nº de botellas por caja.",
+    "El envase de los puré Monin (plástico/vidrio) no está impreso; se pone 'botella' por el precio unitario; 'LTO.' = 1 litro.",
+    "Los Monin son 10 % de IVA (verificado en las bases de R152 y R1205); si algún día aparece un Monin al 21 % revisar.",
+    "Hay un abono (R153) con cantidad negativa y facturas de solo gastos de devolución (R189, R526): se ven en el catálogo de líneas pero no se han podido leer en detalle como muestra."
+  ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R657.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0018874",
+ "fecha": "2026-05-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "YEMA LIQUIDA PASTEURIZADA ELOW 1 L",
+   "producto_ficha": "Yema líquida pasteurizada Elow 1 L",
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.118,
+   "descuento_pct": null,
+   "total": 18.24,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 18.24,
+ "desglose_iva": [
+  {
+   "base": 18.24,
+   "pct": 10,
+   "cuota": 1.82
+  }
+ ],
+ "iva": 1.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 20.06,
+ "observaciones": "DUPLICADO DE FACTURA. Crédito a 30 días. Escaneo CamScanner.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  6
+ ],
+ "tipo": "factura",
+ "proveedor": "RAJMA, S.C.",
+ "cif": "J54331780",
+ "local": "casa_tomas",
+ "numero_documento": "318/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 6,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 84.3,
+   "descuento_pct": null,
+   "total": 181.25,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 181.25,
+ "desglose_iva": [
+  {
+   "base": 181.25,
+   "pct": 10.0,
+   "cuota": 18.13
+  }
+ ],
+ "iva": 18.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 199.38,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: ninguna.",
+ "alertas": []
+}

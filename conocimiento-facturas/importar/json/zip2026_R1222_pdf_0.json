@@ -1,0 +1,74 @@
+{
+ "archivo": "R1222.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/003892",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG",
+   "producto_ficha": "Calamar patagonico limpio 9-12 cm (caja 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.34,
+   "descuento_pct": null,
+   "total": 113.37,
+   "iva_pct": 10,
+   "albaran_ref": "LA/7373",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "POLLO MUSLO RELLENO CIRUELAS PIÑON (30x200G) 6KG",
+   "producto_ficha": "Muslo de pollo relleno de ciruelas y piñones (30x200 g)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 200,
+   "contenido_unidad": "g",
+   "precio_unitario": 8.26,
+   "descuento_pct": null,
+   "total": 99.07,
+   "iva_pct": 10,
+   "albaran_ref": "LA/7373",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/7373)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 213.94,
+ "desglose_iva": [
+  {
+   "base": 212.44,
+   "pct": 10,
+   "cuota": 21.24
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 21.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 235.5,
+ "observaciones": "Transferencia a 10 dias, vencimiento 10/08/2026. Albaran LA/7373 de 16/07/2026 (4 bultos, 22 kg). FTV-7157219 es una referencia del encabezado, no el numero de factura. Diferencias de centimos dentro de tolerancia: pollo 12 x 8,26 = 99,12 frente a 99,07; calamar 113,40 frente a 113,37.",
+ "alertas": []
+}

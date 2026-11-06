@@ -1,0 +1,48 @@
+{
+ "archivo": "R758.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ARTEFLOR (José Miguel Riquelme Belén)",
+ "cif": "74187755J",
+ "local": "casa_tomas",
+ "numero_documento": "14/26",
+ "fecha": "2026-05-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Centros de flores tanatorio - Dif. Yolanda",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 120.0,
+   "descuento_pct": null,
+   "total": 360.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 360.0,
+ "desglose_iva": [
+  {
+   "base": 360.0,
+   "pct": 10,
+   "cuota": 36.0
+  }
+ ],
+ "iva": 36.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 396.0,
+ "observaciones": "IBAN ES** **** **** **** **** 8022",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

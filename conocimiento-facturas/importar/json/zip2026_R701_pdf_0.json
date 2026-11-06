@@ -1,0 +1,97 @@
+{
+ "archivo": "R701.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TEXDECOLAN, S.L (Dani Uniformes)",
+ "cif": "B54942107",
+ "local": "casa_tomas",
+ "numero_documento": "FAC08738",
+ "fecha": "2026-04-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Camiseta técnica manga corta",
+   "producto_ficha": null,
+   "cantidad": 50.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.25,
+   "descuento_pct": null,
+   "total": 162.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Estampación pecho 1 color (pequeño)",
+   "producto_ficha": null,
+   "cantidad": 50.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.15,
+   "descuento_pct": null,
+   "total": 57.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Pantalón unisex goma+cordón exterior microfibra",
+   "producto_ficha": null,
+   "cantidad": 20.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.24,
+   "descuento_pct": null,
+   "total": 364.8,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Gorro gran chef con velcro",
+   "producto_ficha": null,
+   "cantidad": 20.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.25,
+   "descuento_pct": null,
+   "total": 165.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 749.8,
+ "desglose_iva": [
+  {
+   "base": 749.8,
+   "pct": 21,
+   "cuota": 157.46
+  }
+ ],
+ "iva": 157.46,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 907.26,
+ "observaciones": "",
+ "alertas": []
+}

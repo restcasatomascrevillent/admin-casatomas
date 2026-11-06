@@ -1,0 +1,88 @@
+{
+ "archivo": "R594.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Mª CARMEN VIROLA BALCERA",
+ "cif": "74174065P",
+ "local": "casa_tomas",
+ "numero_documento": "8",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Barras grandes",
+   "producto_ficha": null,
+   "cantidad": 239,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.58,
+   "descuento_pct": null,
+   "total": 138.62,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Bocadillos",
+   "producto_ficha": null,
+   "cantidad": 352,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.31,
+   "descuento_pct": null,
+   "total": 109.12,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Barras integrales",
+   "producto_ficha": null,
+   "cantidad": 106,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.52,
+   "descuento_pct": null,
+   "total": 55.12,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento 20% (sobre total con IVA)",
+   "importe": -63,
+   "iva_pct": null
+  }
+ ],
+ "subtotal": 239.86,
+ "desglose_iva": [
+  {
+   "base": 302.86,
+   "pct": 4,
+   "cuota": 12.11
+  }
+ ],
+ "iva": 12.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 251.97,
+ "observaciones": "Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 diciembre al 31 enero 2026. Corrección 06/11/2026: la base impresa 302,86 es anterior al descuento del 20 % (aplicado sobre el total con IVA); subtotal guardado = total − IVA = 239,86",
+ "alertas": [
+  "Descuento 20% sobre total con IVA: 20% de 314,97 = 62,99, el papel imprime total 251,97 (diferencia 0,01); cargo de descuento puesto como -63,00 para cuadrar con el total impreso. IVA 4% no impreso como cuota."
+ ]
+}

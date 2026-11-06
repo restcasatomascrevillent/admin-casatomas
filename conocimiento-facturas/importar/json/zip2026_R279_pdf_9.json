@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  10
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO CARRILLO C.B.",
+ "cif": "E54234778",
+ "local": "casa_tomas",
+ "numero_documento": "169/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 10,
+   "nombre": "PLEURONECTIFORMES",
+   "producto_ficha": null,
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 50.4,
+   "iva_pct": 10,
+   "albaran_ref": "2811",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 50.4,
+ "desglose_iva": [
+  {
+   "base": 50.4,
+   "pct": 10,
+   "cuota": 5.04
+  }
+ ],
+ "iva": 5.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 55.44,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 220. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

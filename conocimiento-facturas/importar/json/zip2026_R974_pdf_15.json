@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  16
+ ],
+ "tipo": "factura",
+ "proveedor": "GUILLO ORTS, ANDRES",
+ "cif": "48571389N",
+ "local": "casa_tomas",
+ "numero_documento": "290/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 16,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.7,
+   "descuento_pct": null,
+   "total": 53.73,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 53.73,
+ "desglose_iva": [
+  {
+   "base": 53.73,
+   "pct": 10,
+   "cuota": 5.37
+  }
+ ],
+ "iva": 5.37,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 59.1,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 13495.",
+ "alertas": []
+}

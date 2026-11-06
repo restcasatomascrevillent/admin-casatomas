@@ -1,0 +1,80 @@
+{
+  "cif": "B08057531",
+  "nombre": "GARCIMAR, SL",
+  "nombres_impresos": ["GARCIMAR, SL", "Garcimar"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R698.pdf", "R835.pdf", "R1090.pdf", "R1611.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura que agrupa albaranes (1 a 2 entregas); distribuidor de congelados desde Getafe/Valencia",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["L/002290", "L/002573", "L/003533", "L/005019"], "patron": "^L/\\d{6}$", "donde": "columna 'Número' de la barra Hoja|Número|Fecha|Cliente|Agente|Forma de Pago; ojo: arriba hay otra referencia 'FTV-7097789' que NO es el número de factura" },
+    "fecha": "columna 'Fecha' de esa misma barra, DD/MM/AAAA",
+    "albaranes": "cabecera 'Folio | Albarán: LA/7155 | Fecha: 09/07/2026 | 56,72 EUR' (el importe es la suma del albarán sin el cargo logístico), seguida de 'Bultos: n | Peso: n | Matrícula'"
+  },
+
+  "lectura": {
+    "columnas": ["Artículo", "Descripción", "Cantidad", "Precio", "Importe"],
+    "cantidad_es": "kg en los productos pesados (ej. '10,000 KG'); 'UD' en trufas, gildas y cajas porex",
+    "columna_peso": null,
+    "precio_es_por": "kg (EUR/kg) o ud según la unidad de la cantidad; el precio sale redondeado a 2 decimales",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "'CAJA POREX 1,000 UD 0,00' (sin coste)",
+    "cargos_y_descuentos_pie": [
+      "'CARGO LOGISTICO EXTRAORDINARIO | 1,50 EUR' una vez por albarán, sin cantidad ni precio, IVA 21 %",
+      "Abonos: línea con cantidad e importe negativos (ej. -10,000 KG, -113,37 EUR)"
+    ],
+    "trampas": [
+      "La descripción acaba en el peso del bulto ('CEBOLLA PERLA (4X2,5KG) 10KG'): es formato, no la cantidad",
+      "Precio × cantidad puede diferir 1-5 céntimos del importe (10 kg × 2,21 = 22,10 pero importe 22,05); manda el importe",
+      "La cabecera del pie dice 'Dto. Clientes' pero no hay descuento; los '10%', '4%', '21%' son tipos de IVA con su cuota ('10% 3,47 EUR')",
+      "El texto del escáner/PDF entrelaza basura del margen (Madrid, Getafe, Reg. Merc.…) entre líneas; ignórala",
+      "El importe de la línea 'Folio | Albarán' es un subtotal, no un producto"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea ≈ cantidad × precio (±0,05; manda el importe impreso)",
+    "total albarán = suma de líneas sin el cargo logístico; 'Total Centro' = suma de albaranes",
+    "base por tipo de IVA: 4 % (cebolla, haba), 10 % (carne, pescado, surimi, trufas…), 21 % (cargo logístico, 1,50 por albarán)",
+    "total = bases + IVA. R1090: 22,05 al 4 % (0,88), 34,67 al 10 % (3,47), 1,50 al 21 % (0,32): 58,22 + 4,67 = 62,89",
+    "R1611: 36,67 al 4 % (1,47) + 111,62 al 10 % (11,16) + 1,50 al 21 % (0,32) = 149,79 + 12,95 = 162,74"
+  ],
+
+  "guia_ocr": "Factura Garcimar (congelados). Número en la barra superior, columna 'Número' (L/00xxxx), no el 'FTV-…'. Columnas: Artículo | Descripción | Cantidad (KG o UD) | Precio | Importe. El '10KG' del final de la descripción es el peso del bulto. Cada albarán abre con 'Albarán: LA/… | Fecha' y su subtotal; no lo leas como producto. 'CARGO LOGISTICO EXTRAORDINARIO 1,50' va por albarán. Pie: bases por tipo de IVA (4, 10, 21 %); 'Dto. Clientes' no es un descuento. Cantidades negativas = abono. Ignora texto suelto del margen.",
+
+  "productos": [
+    { "nombre_impreso": "CARGO LOGISTICO EXTRAORDINARIO", "nombre_normalizado": "Cargo logístico extraordinario", "familia": "cargo", "presentacion": "servicio", "formato": null, "unidad_factura": "albarán", "precio": { "min": 1.5, "max": 1.5, "por": "albarán", "ejemplos": [["2026-07-11", 1.5]] }, "iva_pct": 21, "veces_visto": 12 },
+    { "nombre_impreso": "CEBOLLA PERLA (4X2,5KG) 10KG", "nombre_normalizado": "Cebolla perla (bolsas 4×2,5 kg)", "familia": "verdura", "presentacion": "congelada (deducido: distribuidor de congelados; no impreso)", "formato": { "envase": "bolsa", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja 10 kg" }, "unidad_factura": "kg", "precio": { "min": 2.14, "max": 2.21, "por": "kg", "ejemplos": [["2026-05-28", 2.14], ["2026-07-09", 2.21]] }, "iva_pct": 4, "veces_visto": 6 },
+    { "nombre_impreso": "CEBOLLA CUBO (10X10)MM (4X2,5KG) 10KG", "nombre_normalizado": "Cebolla en cubo 10×10 mm (bolsas 4×2,5 kg)", "familia": "verdura", "presentacion": "congelada (deducido)", "formato": { "envase": "bolsa", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja 10 kg" }, "unidad_factura": "kg", "precio": { "min": 1.46, "max": 1.46, "por": "kg", "ejemplos": [["2026-09-10", 1.46]] }, "iva_pct": 4, "veces_visto": 1 },
+    { "nombre_impreso": "HABA FINA PEQUEÑA (4X2,5KG) 10KG", "nombre_normalizado": "Haba fina pequeña (bolsas 4×2,5 kg)", "familia": "verdura", "presentacion": "congelada (deducido)", "formato": { "envase": "bolsa", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja 10 kg" }, "unidad_factura": "kg", "precio": { "min": 1.83, "max": 1.83, "por": "kg", "ejemplos": [] }, "iva_pct": 4, "veces_visto": 1 },
+    { "nombre_impreso": "HABA BABY (4X2,5KG) 10KG", "nombre_normalizado": "Haba baby (bolsas 4×2,5 kg)", "familia": "verdura", "presentacion": "congelada (deducido)", "formato": { "envase": "bolsa", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja 10 kg" }, "unidad_factura": "kg", "precio": { "min": 3.28, "max": 3.28, "por": "kg", "ejemplos": [] }, "iva_pct": null, "veces_visto": 1 },
+    { "nombre_impreso": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG", "nombre_normalizado": "Calamar patagónico limpio 9-12 cm (caja 5 kg)", "familia": "pescado/cefalópodo", "presentacion": "congelado (deducido); limpio", "formato": { "envase": "caja", "contenido": 5, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "caja 5 kg" }, "unidad_factura": "kg", "precio": { "min": 11.34, "max": 11.34, "por": "kg", "ejemplos": [["2026-05-28", 11.34]] }, "iva_pct": 10, "veces_visto": 7 },
+    { "nombre_impreso": "BOQUERON FILETE MARIPOSA TEMPURA (3X1KG) 3KG", "nombre_normalizado": "Boquerón filete mariposa en tempura (3×1 kg)", "familia": "pescado rebozado", "presentacion": "congelado rebozado (deducido)", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 3, "bulto": "caja 3 kg" }, "unidad_factura": "kg", "precio": { "min": 5.93, "max": 5.93, "por": "kg", "ejemplos": [["2026-09-10", 5.93]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "VARITA SURIMI (6X1KG) 6KG", "nombre_normalizado": "Varita de surimi (6×1 kg)", "familia": "pescado procesado", "presentacion": "congelado (deducido)", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 6, "bulto": "caja 6 kg" }, "unidad_factura": "kg", "precio": { "min": 3.78, "max": 3.78, "por": "kg", "ejemplos": [["2026-09-10", 3.78]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "HAMBURGUESA MINI LANGOSTINO 31G (3X1KG) 3KG", "nombre_normalizado": "Mini hamburguesa de langostino 31 g (3×1 kg)", "familia": "pescado procesado", "presentacion": "congelado (deducido)", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 3, "bulto": "caja 3 kg" }, "unidad_factura": "kg", "precio": { "min": 12.74, "max": 12.74, "por": "kg", "ejemplos": [["2026-08-27", 12.74]] }, "iva_pct": null, "veces_visto": 1 },
+    { "nombre_impreso": "CERDO COSTILLA TACO IQF 8KG", "nombre_normalizado": "Costilla de cerdo en taco IQF (8 kg)", "familia": "carne", "presentacion": "congelada IQF", "formato": { "envase": "caja", "contenido": 8, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "caja 8 kg" }, "unidad_factura": "kg", "precio": { "min": 4.33, "max": 4.33, "por": "kg", "ejemplos": [["2026-07-09", 4.33]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "CERDO PINCHO ROJO MINI GRANEL (40G) 6KG", "nombre_normalizado": "Mini pincho rojo de cerdo 40 g, granel (caja 6 kg)", "familia": "carne", "presentacion": "granel; congelado (deducido)", "formato": { "envase": "caja", "contenido": 6, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "caja 6 kg" }, "unidad_factura": "kg", "precio": { "min": 5.95, "max": 5.95, "por": "kg", "ejemplos": [["2026-05-07", 5.95]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "CERDO CHULETA CENTRO FIL. (180-220)G 10KG", "nombre_normalizado": "Chuleta de cerdo centro filete 180-220 g (caja 10 kg)", "familia": "carne", "presentacion": "congelada (deducido)", "formato": { "envase": "caja", "contenido": 10, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "caja 10 kg" }, "unidad_factura": "kg", "precio": { "min": 4.36, "max": 4.36, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "CERDO SOLOMILLO HOST 6KG", "nombre_normalizado": "Solomillo de cerdo (caja 6 kg)", "familia": "carne", "presentacion": "congelado (deducido)", "formato": { "envase": "caja", "contenido": 6, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "caja 6 kg" }, "unidad_factura": "kg", "precio": { "min": 6.16, "max": 6.16, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "POLLO MUSLO RELLENO CIRUELAS PIÑON (30x200G) 6KG", "nombre_normalizado": "Muslo de pollo relleno de ciruelas y piñones (30×200 g)", "familia": "carne elaborada", "presentacion": "congelado (deducido)", "formato": { "envase": "pieza", "contenido": 200, "unidad_contenido": "g", "unidades_por_bulto": 30, "bulto": "caja 6 kg" }, "unidad_factura": "kg", "precio": { "min": 8.26, "max": 8.26, "por": "kg", "ejemplos": [["2026-06-12", 8.26]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "FLAMENQUIN AVE 47% 6 KG", "nombre_normalizado": "Flamenquín de ave 47 % (caja 6 kg)", "familia": "carne elaborada", "presentacion": "congelado rebozado (deducido)", "formato": { "envase": "caja", "contenido": 6, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "caja 6 kg" }, "unidad_factura": "kg", "precio": { "min": 3.08, "max": 3.08, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "TRUFAS DE CHOCOLATE 50UD 750G", "nombre_normalizado": "Trufas de chocolate (50 ud, 750 g)", "familia": "postre", "presentacion": "congelado (deducido)", "formato": { "envase": "caja", "contenido": 750, "unidad_contenido": "g", "unidades_por_bulto": 50, "bulto": "caja 50 ud" }, "unidad_factura": "ud (caja de 50)", "precio": { "min": 12.99, "max": 12.99, "por": "ud (caja)", "ejemplos": [["2026-05-28", 12.99]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "SM B5 MANGO MELON PIÑA KIWI (20X150G) 3KG", "nombre_normalizado": "Base smoothie mango-melón-piña-kiwi (20×150 g)", "familia": "fruta", "presentacion": "congelado (deducido)", "formato": { "envase": "bolsa", "contenido": 150, "unidad_contenido": "g", "unidades_por_bulto": 20, "bulto": "caja 3 kg" }, "unidad_factura": "kg", "precio": { "min": 9.0, "max": 9.0, "por": "kg", "ejemplos": [["2026-08-27", 9.0]] }, "iva_pct": null, "veces_visto": 1 },
+    { "nombre_impreso": "GILDAS ANCHOA GIRASOL PREM 25UD", "nombre_normalizado": "Gildas de anchoa premium (25 ud)", "familia": "aperitivo", "presentacion": "conserva/refrigerado (no impreso)", "formato": { "envase": "caja", "contenido": 25, "unidad_contenido": "ud", "unidades_por_bulto": 25, "bulto": "caja 25 ud" }, "unidad_factura": "ud (caja de 25)", "precio": { "min": 23.66, "max": 23.66, "por": "ud (caja)", "ejemplos": [["2026-08-27", 23.66]] }, "iva_pct": null, "veces_visto": 1 },
+    { "nombre_impreso": "CAJA POREX", "nombre_normalizado": "Caja de porex (envase)", "familia": "envase", "presentacion": "envase sin coste", "formato": null, "unidad_factura": "ud", "precio": { "min": 0.0, "max": 0.0, "por": "ud", "ejemplos": [["2026-08-27", 0.0]] }, "iva_pct": null, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "La factura no dice 'congelado'. Se deduce de ser distribuidor de congelados y de 'IQF'; confirmar con el dueño, sobre todo calamar, cerdo y gildas.",
+    "IVA de haba baby, mini hamburguesa de langostino, base smoothie, gildas y caja porex no se pudo comprobar en las muestras (las de haba fina y cebolla sí: 4 %).",
+    "Hay un abono (R946): calamar -10 kg / -113,37 EUR con importe negativo; el IVA del abono sigue el del producto.",
+    "Los rangos de precio salen de las muestras y los 4 ejemplos del catálogo; el precio impreso va redondeado a 2 decimales."
+  ]
+}

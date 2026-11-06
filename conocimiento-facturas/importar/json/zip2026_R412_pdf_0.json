@@ -1,0 +1,46 @@
+{
+ "archivo": "R412.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A132/26",
+ "fecha": "2026-03-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRUFA TUBER MELANSPORUM",
+   "producto_ficha": "Trufa negra (Tuber melanosporum)",
+   "cantidad": 0.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 850.0,
+   "descuento_pct": null,
+   "total": 170.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 170.0,
+ "desglose_iva": [
+  {
+   "base": 170.0,
+   "pct": 4,
+   "cuota": 6.8
+  }
+ ],
+ "iva": 6.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 176.8,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 132. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás).",
+ "alertas": []
+}

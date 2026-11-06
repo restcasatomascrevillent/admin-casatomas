@@ -1,0 +1,46 @@
+{
+ "archivo": "R282.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SALVADOR MAS MAS",
+ "cif": "21411858P",
+ "local": "casa_tomas",
+ "numero_documento": "3-26",
+ "fecha": "2026-03-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Alquiler local C/ Santa María de la Cabeza 2, local 2 (mes de marzo)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "mes",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1100.0,
+   "descuento_pct": null,
+   "total": 1100.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1100.0,
+ "desglose_iva": [
+  {
+   "base": 1100.0,
+   "pct": 21,
+   "cuota": 231.0
+  }
+ ],
+ "iva": 231.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": 209.0,
+ "total": 1122.0,
+ "observaciones": "Alquiler mensual de local. Retención IRPF 19%. Destinatario MASIDE 2011 SL (B54583356).",
+ "alertas": []
+}

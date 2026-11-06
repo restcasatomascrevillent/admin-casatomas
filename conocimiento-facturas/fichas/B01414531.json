@@ -1,0 +1,379 @@
+{
+  "cif": "B01414531",
+  "nombre": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+  "nombres_impresos": ["BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.", "MARQUÉS DE RISCAL", "VINOS FLORES (CODITRAL)"],
+  "categoria": "vino",
+  "locales": ["casa_tomas"],
+  "muestras": ["R226.pdf", "R229.pdf", "R1079.pdf", "R1578.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán 'VAL' por factura), con pocas líneas de vino/champán en cajas; las digitales traen 2-3 páginas, la 2ª/3ª solo con pie y datos de envío",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-3",
+    "numero_factura": {
+      "ejemplos": ["VFN 26/000830", "VFN 26/000953", "VFN 26/004765", "VFN 26/008345"],
+      "patron": "^VFN \\d{2}/\\d{6}$",
+      "donde": "casilla FACTURA de la tabla FECHA | FACTURA | ALBARAN | EXPEDIDO POR | FORMA DE PAGO (el nº de albarán 'VAL 26/…' es otra casilla)"
+    },
+    "fecha": "casilla FECHA de esa tabla, DD/MM/AA (30/01/26)",
+    "albaranes": "un solo albarán por factura: casilla ALBARAN 'VAL 26/000885'; no hay cabeceras de albarán dentro de las líneas"
+  },
+
+  "lectura": {
+    "columnas": ["CAJAS", "TOTAL BOTELLAS", "GRADUACION ALCOHOL", "CLASES (descripción)", "PRECIO", "IMPORTE"],
+    "cantidad_es": "cajas. La columna TOTAL BOTELLAS es el nº de botellas de esas cajas (cajas × botellas por caja); en la descripción 'C/6B' = caja de 6 botellas, 'C/3B' = caja de 3, 'C/1B' = 1 botella suelta",
+    "columna_peso": null,
+    "precio_es_por": "caja (NO por botella): importe = cajas × precio; precio por botella = precio / botellas por caja",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [
+      "'- 20 % BONIFICAC S/ <total>' = descuento del 20 % sobre el TOTAL de las líneas, restado en el pie (no por línea)",
+      "'TOTAL PUNTO VERDE INCLUIDO EN FACTURA' = informativo, ya incluido en la base; no se suma",
+      "VENCIMIENTOS: importe al vencimiento (giro 60 días), puede coincidir con el total o desglosarse"
+    ],
+    "trampas": [
+      "El número de la columna GRADUACION ALCOHOL (12,00; 13,00; 14,50; 15,00 %vol) queda pegado a la descripción al extraer el texto ('12,00 C/6B LP LA CUVEE 0,75L'): no es un precio ni una cantidad.",
+      "Líneas 'Sin Cargo' (en el nombre) y líneas de merchandising (DROP STOP, SACACORCHOS, COPA, CHAMPANERA con asa de cuero) llevan precio 0 e importe 0: son regalo; en las de merchandising solo hay un número a la izquierda (unidades).",
+      "Descripción con formato abreviado: '0,75L', '1,5L', '3 LTS', '6L', '9L', '12L' = contenido de la botella; magnum = 1,5 L, doble magnum 3 L; sin volumen impreso (GRAND SIECLE C/3B, TINTO XR) se asume 75 cl pero no está escrito.",
+      "El mismo vino cambia de precio entre facturas (La Cuvée 236,40 → 241,14; Chirel Verdejo 186,00 → 223,20): comparar siempre contra el precio de caja.",
+      "El escaneo (foto/PDF imagen) tiene las mismas columnas y valores en formato español (coma decimal).",
+      "El mail 'touza.maside@gmail.com' de la última página es el de contacto del cliente, no un local distinto en las líneas."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = cajas × precio_por_caja (40 × 236,40 = 9.456,00; 14 × 241,14 = 3.375,96)",
+    "TOTAL = suma de importes; bonificación = 20 % del TOTAL; base = TOTAL − bonificación",
+    "IVA 21 % = base × 0,21; Total Factura = base + IVA (el punto verde ya va dentro)",
+    "R226: 9.456,00 − 1.891,20 = 7.564,80; IVA 1.588,61; total 9.153,41",
+    "R229: líneas suman 12.975,50 − 2.595,10 = 10.380,40; IVA 2.179,88; total 12.560,28",
+    "R1578 (escaneo): 223,20 − 44,64 = 178,56; IVA 37,50; total 216,06"
+  ],
+
+  "guia_ocr": "Factura de Bodegas Marqués de Riscal (CIF B01414531, proveedor de vino y champán). Número en casilla FACTURA ('VFN 26/000830'), fecha DD/MM/AA. Columnas: CAJAS, TOTAL BOTELLAS, GRADUACION ALCOHOL (% vol, no es precio), CLASES, PRECIO por CAJA, IMPORTE = cajas × precio. 'C/6B' = caja de 6 botellas; 0,75L/1,5L/3 LTS = formato. Líneas 'Sin Cargo' o sin precio son regalo. Al pie: TOTAL, '- 20 % BONIFICAC', base, IVA 21 %, punto verde incluido (no sumar) y Total Factura. Cliente: Restaurante Casa Tomas / Maside 2011.",
+
+  "productos": [
+    {
+      "nombre_impreso": "C/6B LP LA CUVEE 0,75L",
+      "nombre_normalizado": "LP La Cuvée 75 cl (caja 6)",
+      "familia": "espumoso/champán",
+      "presentacion": "botella 75 cl; 12 % vol; caja de 6",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 236.4, "max": 241.14, "por": "caja", "ejemplos": [["2026-01-30", 236.4], ["2026-05-15", 241.14]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "C/6B LP ROSE 0,75",
+      "nombre_normalizado": "LP Rosé 75 cl (caja 6)",
+      "familia": "espumoso/champán",
+      "presentacion": "rosado, botella 75 cl; 12 % vol; caja de 6",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 430.8, "max": 430.8, "por": "caja", "ejemplos": [["R227", 430.8], ["R581", 430.8]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "C/3B MAGNUM LA CUVEE",
+      "nombre_normalizado": "LP La Cuvée magnum 150 cl (caja 3)",
+      "familia": "espumoso/champán",
+      "presentacion": "magnum 1,5 L (por TOTAL BOTELLAS = 3 por caja); 12 % vol",
+      "formato": { "envase": "botella", "contenido": 150, "unidad_contenido": "cl", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 262.8, "max": 268.2, "por": "caja", "ejemplos": [["R227", 262.8], ["R1374", 268.2]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "C/3 MAGNUM ROSE LP",
+      "nombre_normalizado": "LP Rosé magnum 150 cl (caja 3)",
+      "familia": "espumoso/champán",
+      "presentacion": "magnum rosado 1,5 L; caja de 3",
+      "formato": { "envase": "botella", "contenido": 150, "unidad_contenido": "cl", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 524.4, "max": 524.4, "por": "caja", "ejemplos": [["R227", 524.4], ["R1087", 524.4]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "C/6B ULTRABRUT LP",
+      "nombre_normalizado": "LP Ultrabrut (caja 6)",
+      "familia": "espumoso/champán",
+      "presentacion": "caja de 6 botellas; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 350.4, "max": 350.4, "por": "caja", "ejemplos": [["R1579", 350.4]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6B LP HERITAGE",
+      "nombre_normalizado": "LP Héritage (caja 6)",
+      "familia": "espumoso/champán",
+      "presentacion": "caja de 6 botellas; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 360, "max": 360, "por": "caja", "ejemplos": [["R228", 360]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6 MILLESIME 0,75 (EI) 2015",
+      "nombre_normalizado": "LP Millésimé 2015 75 cl (caja 6)",
+      "familia": "espumoso/champán",
+      "presentacion": "añada 2015, botella 75 cl; caja de 6",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 482.4, "max": 482.4, "por": "caja", "ejemplos": [["R1374", 482.4]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/3B MILLESIME MG 1,5L 2015",
+      "nombre_normalizado": "LP Millésimé 2015 magnum 150 cl (caja 3)",
+      "familia": "espumoso/champán",
+      "presentacion": "añada 2015, magnum 1,5 L; caja de 3",
+      "formato": { "envase": "botella", "contenido": 150, "unidad_contenido": "cl", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 571.8, "max": 571.8, "por": "caja", "ejemplos": [["R1374", 571.8]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/3B GRAND SIECLE IT. 26",
+      "nombre_normalizado": "Grand Siècle itération nº 26 (caja 3)",
+      "familia": "espumoso/champán",
+      "presentacion": "caja de 3 botellas; volumen no impreso (75 cl por el precio)",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 552, "max": 552, "por": "caja", "ejemplos": [["2026-02-04", 552]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/1B G.SIECLE IT.24 1,5L",
+      "nombre_normalizado": "Grand Siècle itération nº 24 magnum 150 cl",
+      "familia": "espumoso/champán",
+      "presentacion": "magnum 1,5 L, 1 botella por caja",
+      "formato": { "envase": "botella", "contenido": 150, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 414.2, "max": 414.2, "por": "caja", "ejemplos": [["2026-02-04", 414.2]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/3B ALEXANDRA ROSE 2012",
+      "nombre_normalizado": "Alexandra Rosé 2012 (caja 3)",
+      "familia": "espumoso/champán",
+      "presentacion": "rosado añada 2012, caja de 3; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 1014, "max": 1014, "por": "caja", "ejemplos": [["R228", 1014]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/1BS 6L LP LA CUVEE MATUSALEM",
+      "nombre_normalizado": "LP La Cuvée Matusalén 6 L",
+      "familia": "espumoso/champán",
+      "presentacion": "botella 6 L, 1 por caja",
+      "formato": { "envase": "botella", "contenido": 600, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 530, "max": 530, "por": "caja", "ejemplos": [["R227", 530]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/1B 9L LP LA CUVEE SALMANAZAR",
+      "nombre_normalizado": "LP La Cuvée Salmanazar 9 L",
+      "familia": "espumoso/champán",
+      "presentacion": "botella 9 L, 1 por caja",
+      "formato": { "envase": "botella", "contenido": 900, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 822, "max": 822, "por": "caja", "ejemplos": [["R227", 822]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/1BS 12L LP LA CUVEE BALTASAR",
+      "nombre_normalizado": "LP La Cuvée Baltasar 12 L",
+      "familia": "espumoso/champán",
+      "presentacion": "botella 12 L, 1 por caja",
+      "formato": { "envase": "botella", "contenido": 1200, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 1124, "max": 1124, "por": "caja", "ejemplos": [["R227", 1124]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6 ARIENZO 0,75L 2022",
+      "nombre_normalizado": "Arienzo 2022 75 cl (caja 6)",
+      "familia": "vino tinto",
+      "presentacion": "tinto 2022, 14,5 % vol, botella 75 cl; también líneas '- Sin Cargo' con precio 0 (regalo, 45 cajas)",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 42.6, "max": 42.6, "por": "caja", "ejemplos": [["2026-02-04", 42.6]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "C/6B TINTO XR 2021",
+      "nombre_normalizado": "Tinto XR 2021 (caja 6)",
+      "familia": "vino tinto",
+      "presentacion": "tinto 2021, 15 % vol, caja de 6; volumen no impreso. La cosecha 2022 (C/6B TINTO XR 2022, 14,5 % vol) es otro artículo a 105,06 € la caja",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 102, "max": 102, "por": "caja", "ejemplos": [["2026-02-04", 102]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6B TINTO XR 2022",
+      "nombre_normalizado": "Tinto XR 2022 (caja 6)",
+      "familia": "vino tinto",
+      "presentacion": "tinto 2022, 14,5 % vol, caja de 6; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 105.06, "max": 105.06, "por": "caja", "ejemplos": [["R1374", 105.06]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/2B BCHIREL TINTO 2020 MADERA",
+      "nombre_normalizado": "Barón de Chirel tinto 2020 (caja de madera 2)",
+      "familia": "vino tinto",
+      "presentacion": "tinto 2020, caja de madera de 2 botellas; 15,5 % vol; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 138, "max": 138, "por": "caja", "ejemplos": [["2026-02-04", 138]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/1 CHIREL TINTO 1,5L 2020 MAD",
+      "nombre_normalizado": "Barón de Chirel tinto 2020 magnum 150 cl (caja madera)",
+      "familia": "vino tinto",
+      "presentacion": "magnum 1,5 L, 1 por caja de madera",
+      "formato": { "envase": "botella", "contenido": 150, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 140, "max": 140, "por": "caja", "ejemplos": [["2026-02-04", 140]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/1B BARON CHIREL 2020 3 LTS",
+      "nombre_normalizado": "Barón de Chirel 2020 3 L",
+      "familia": "vino tinto",
+      "presentacion": "botella 3 L (doble magnum), 1 por caja",
+      "formato": { "envase": "botella", "contenido": 300, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 297, "max": 297, "por": "caja", "ejemplos": [["2026-02-04", 297]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6B LIMOUSIN GRAN VINO 2024",
+      "nombre_normalizado": "Limousin Gran Vino 2024 (caja 6)",
+      "familia": "vino blanco",
+      "presentacion": "13 % vol, caja de 6; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 75.6, "max": 75.6, "por": "caja", "ejemplos": [["2026-02-04", 75.6]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6 B.CHIREL VERDEJO EST.2023 / C/6 B.CHIREL VERDEJO 2023",
+      "nombre_normalizado": "Barón de Chirel Verdejo 2023 (caja 6)",
+      "familia": "vino blanco",
+      "presentacion": "blanco verdejo 2023, 13 % vol, caja de 6 (la caja de 1 botella 'C/1 B.CHIREL VERDEJO 2023-Sin Cargo' va regalada)",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 186, "max": 223.2, "por": "caja", "ejemplos": [["2026-02-04", 186], ["2026-07-31", 223.2]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "C/6B F. MONTICO GRAN VINO 2024",
+      "nombre_normalizado": "Finca Montico Gran Vino 2024 (caja 6)",
+      "familia": "vino blanco",
+      "presentacion": "13 % vol, caja de 6; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 62.4, "max": 62.4, "por": "caja", "ejemplos": [["2026-02-04", 62.4]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6B VERDEJO S/LIAS FINAS 2025",
+      "nombre_normalizado": "Verdejo sobre lías finas 2025 (caja 6)",
+      "familia": "vino blanco",
+      "presentacion": "13 % vol, caja de 6; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 45.78, "max": 45.78, "por": "caja", "ejemplos": [["2026-02-04", 45.78]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6B GRVA 2019 150 ANIVERSARIO",
+      "nombre_normalizado": "Gran Reserva 2019 150 Aniversario (caja 6)",
+      "familia": "vino tinto",
+      "presentacion": "Gran Reserva 2019 edición 150 aniversario, 15 % vol, caja de 6; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 361.08, "max": 361.08, "por": "caja", "ejemplos": [["R1374", 361.08]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "C/6BS CHIREL BLANCO RIOJA 2024",
+      "nombre_normalizado": "Chirel blanco Rioja 2024 (caja 6)",
+      "familia": "vino blanco",
+      "presentacion": "blanco Rioja 2024, 12,5 % vol, caja de 6; volumen no impreso",
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 223.2, "max": 223.2, "por": "caja", "ejemplos": [["R1374", 223.2]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BOT. MILLESIME LP 2015-Sin Cargo / BOT. LP LA CUVEE 0,75L-Sin Cargo / BOT. ROSE LP 0,75-Sin Cargo",
+      "nombre_normalizado": "Botellas sueltas LP regaladas (sin cargo)",
+      "familia": "espumoso/champán",
+      "presentacion": "botellas sueltas a precio 0 (Millésimé 2015 y 2018, La Cuvée 75 cl, Rosé 75 cl); la columna CAJAS cuenta botellas",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 0, "max": 0, "por": "botella", "ejemplos": [["R1374", 0]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "DROP STOP MARQUES DE RISCAL / SACACORCHOS MdR / LP COPA 16 cls. pequeña / LP CHAMPANERA GRANDE ASA CUERO",
+      "nombre_normalizado": "Merchandising regalado (drop stop, sacacorchos, copas, champanera)",
+      "familia": "merchandising",
+      "presentacion": "artículos sin cargo con solo unidades a la izquierda e importe 0",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 0, "max": 0, "por": "ud", "ejemplos": [["2026-02-04", 0], ["2026-05-15", 0]] },
+      "iva_pct": null,
+      "veces_visto": 4
+    }
+  ],
+
+  "dudas": [
+    "El nombre del proveedor en la base ('VINOS FLORES (CODITRAL)') no coincide con el CIF: B01414531 y el membrete de TODAS las facturas es BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U. (Elciego, Álava). 'ENTREGADO: VINOS FLORES (CODITRAL)' solo aparece en OBSERVACIONES de R1079: es quien entrega la mercancía (distribuidor), no el emisor.",
+    "'LP' no se explica en la factura; por los nombres (La Cuvée, Ultrabrut, Millésimé, Grand Siècle, Alexandra Rosé, Héritage) parece champán Laurent-Perrier, pero es una inferencia.",
+    "Cantidad = cajas, precio = por caja: confirmado con importes (6 × 552,00 = 3.312,00; 75 × 42,60 = 3.195,00). El nº de botellas por caja sale de TOTAL BOTELLAS ÷ CAJAS y de 'C/nB'.",
+    "En varios vinos (Grand Siècle It.26, Tinto XR, Chirel, Limousin, Montico, Verdejo, GRVA, Ultrabrut, Héritage, Alexandra) no se imprime el volumen de la botella; se asume 75 cl pero no está escrito.",
+    "Significado de 'S' en 'C/6BS', 'C/1BS' y de '(EI)' no consta.",
+    "Los ejemplos 'R227', 'R581', 'R1374'… son facturas del año vistas solo en el catálogo de líneas; su fecha no se conoce.",
+    "El catálogo cubre todos los artículos vistos (28 entradas, algunas agrupan variantes 'Sin Cargo'); no hay artículos fuera por tope."
+  ]
+}

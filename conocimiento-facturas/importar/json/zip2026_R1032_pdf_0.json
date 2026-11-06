@@ -1,0 +1,79 @@
+{
+ "archivo": "R1032.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/003158",
+ "fecha": "2026-06-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG",
+   "producto_ficha": "Calamar patagonico limpio 9-12 cm (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.34,
+   "descuento_pct": null,
+   "total": 56.69,
+   "iva_pct": 10,
+   "albaran_ref": "LA/6407",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HABA BABY (4X2,5KG) 10KG",
+   "producto_ficha": "Haba baby (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.28,
+   "descuento_pct": null,
+   "total": 32.79,
+   "iva_pct": 4,
+   "albaran_ref": "LA/6407",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/6407)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 90.98,
+ "desglose_iva": [
+  {
+   "base": 56.69,
+   "pct": 10,
+   "cuota": 5.67
+  },
+  {
+   "base": 32.79,
+   "pct": 4,
+   "cuota": 1.31
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 7.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 98.28,
+ "observaciones": "Transferencia a 10 dias, vencimiento 07/07/2026. Albaran LA/6407 de 18/06/2026 (2 bultos, 15 kg). El IVA 4 % de la haba baby no estaba en la ficha: queda confirmado por el desglose del pie (32,79 en el tipo 4 %). FTV-7050357 es una referencia del encabezado.",
+ "alertas": []
+}

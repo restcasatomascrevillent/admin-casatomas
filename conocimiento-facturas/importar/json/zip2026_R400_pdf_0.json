@@ -1,0 +1,48 @@
+{
+ "archivo": "R400.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PLUXEE ESPAÑA, S.A.U.",
+ "cif": "A78604113",
+ "local": "casa_tomas",
+ "numero_documento": "5304575",
+ "fecha": "2026-03-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Comisión gestión cheques restaurante",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.7,
+   "descuento_pct": null,
+   "total": 5.7,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 5.7,
+ "desglose_iva": [
+  {
+   "base": 5.7,
+   "pct": 21,
+   "cuota": 1.2
+  }
+ ],
+ "iva": 1.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 6.9,
+ "observaciones": "Transferencia. Importe operaciones no sujetas -44,00. Importe facturado 6,90; importe a pagar -37,10. | Liquidación de cheques: importe a pagar -37.1 (no es gasto); se registra solo la comisión facturada.",
+ "alertas": [
+  "Total a pagar -37,10 = -44,00 + 6,90; el importe facturado (comisión + IVA) es 6,90."
+ ]
+}

@@ -1,0 +1,83 @@
+{
+ "archivo": "R1512.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "COOPERATIVA ELÉCTRICA BENÉFICA SAN FRANCISCO DE ASÍS, COOP. V.",
+ "cif": "F03013257",
+ "local": "casa_tomas",
+ "numero_documento": "FPL2026000727",
+ "fecha": "2026-09-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Derechos de enganche (10/08/2026)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.04476,
+   "descuento_pct": null,
+   "total": 9.04,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Derechos de acceso (10/08/2026)",
+   "producto_ficha": null,
+   "cantidad": 14.61,
+   "unidad": "kW",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.703137,
+   "descuento_pct": null,
+   "total": 287.86,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Derechos de extensión (10/08/2026)",
+   "producto_ficha": null,
+   "cantidad": 14.61,
+   "unidad": "kW",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.374714,
+   "descuento_pct": null,
+   "total": 253.84,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 550.74,
+ "desglose_iva": [
+  {
+   "base": 550.74,
+   "pct": 21,
+   "cuota": 115.66
+  }
+ ],
+ "iva": 115.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 666.4,
+ "observaciones": "Derechos de conexión por aumento de potencia de 10,39 a 25,00 kW (comentario impreso: «AUMENTO POTENCIA DE 10.39 A 25.00 KW»). Cargo único, no es consumo periódico. Suministro CUPS ES0073000002030073MF, Calle Sta. María Cabeza 4 LO, Crevillent. Destinatario MASIDE 2011 S.L.; local no_consta. Cargo domiciliado 25/09/2026. Página 2 en blanco.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

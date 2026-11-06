@@ -1,0 +1,46 @@
+{
+ "archivo": "R721.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904161-0000681",
+ "fecha": "2026-05-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOMATE CHERRY RAMA KILO",
+   "producto_ficha": "Tomate cherry en rama",
+   "cantidad": -3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.061,
+   "descuento_pct": null,
+   "total": -24.18,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -24.18,
+ "desglose_iva": [
+  {
+   "base": -24.18,
+   "pct": 4,
+   "cuota": -0.97
+  }
+ ],
+ "iva": -0.97,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -25.15,
+ "observaciones": "DUPLICADO DE FACTURA. Anula la factura 99041600017803 de 29-04-2026. Vencimiento 05-06-2026.",
+ "alertas": []
+}

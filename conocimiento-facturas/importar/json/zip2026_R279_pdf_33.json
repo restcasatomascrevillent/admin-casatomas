@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  34
+ ],
+ "tipo": "factura",
+ "proveedor": "PALOMAR RODRIGUEZ, FRANCISCO ANTONIO",
+ "cif": "22007622A",
+ "local": "casa_tomas",
+ "numero_documento": "11/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 34,
+   "nombre": "PERCIFORMES Y A. (emb. BARTOLO)",
+   "producto_ficha": null,
+   "cantidad": 1.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 32.03,
+   "iva_pct": 10,
+   "albaran_ref": "3903",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 32.03,
+ "desglose_iva": [
+  {
+   "base": 32.03,
+   "pct": 10,
+   "cuota": 3.2
+  }
+ ],
+ "iva": 3.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 35.23,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 911. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

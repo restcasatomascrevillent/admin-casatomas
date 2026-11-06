@@ -1,0 +1,48 @@
+{
+ "archivo": "R648.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170762648",
+ "fecha": "2026-05-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 20K ES",
+   "producto_ficha": "Patata agria (saco 20 kg)",
+   "cantidad": 80.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 20,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.95,
+   "descuento_pct": null,
+   "total": 76.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 76.0,
+ "desglose_iva": [
+  {
+   "base": 76.0,
+   "pct": 4,
+   "cuota": 3.04
+  }
+ ],
+ "iva": 3.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 79.04,
+ "observaciones": "Entrega 06.05.2026. Línea con GLOBALG.A.P. (asterisco quitado). Anotación (CP) ignorada. Total BT 4.",
+ "alertas": [
+  "PATATA AGRIA 20K ES a 0,950 €/kg; la ficha tiene 0,62-0,64 €/kg habituales."
+ ]
+}

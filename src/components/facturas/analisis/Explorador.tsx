@@ -366,6 +366,11 @@ function Totales({
         <dd className="text-sm font-semibold tabular-nums">
           {formatEntero(ex.total.documentos)}
           {ex.total.lineas !== null && <span className="font-normal text-muted-foreground"> · {formatEntero(ex.total.lineas)} líneas</span>}
+          {!!ex.total.lineasSinConvertir && (
+            <span className="font-normal text-amber-800 dark:text-amber-400" data-testid="lineas-sin-convertir" title="No se sabe cuánto lleva cada unidad (p. ej. una caja sin el número de botellas): no suman.">
+              {" "}· {formatEntero(ex.total.lineasSinConvertir)} sin convertir
+            </span>
+          )}
         </dd>
       </div>
       <div className="min-w-0">

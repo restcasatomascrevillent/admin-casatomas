@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  14
+ ],
+ "tipo": "factura",
+ "proveedor": "LA RANCHERA 2018 S.L.",
+ "cif": "B42573030",
+ "local": "casa_tomas",
+ "numero_documento": "1.241/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 14,
+   "nombre": "33 CEFALOPODOS",
+   "producto_ficha": "Cefalópodos (familia 33)",
+   "cantidad": 8.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.21,
+   "descuento_pct": null,
+   "total": 156.59,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 156.59,
+ "desglose_iva": [
+  {
+   "base": 156.59,
+   "pct": 10,
+   "cuota": 15.66
+  }
+ ],
+ "iva": 15.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 172.25,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18578, 18463.",
+ "alertas": []
+}

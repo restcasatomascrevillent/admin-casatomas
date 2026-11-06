@@ -1,0 +1,152 @@
+{
+  "cif": "B30341598",
+  "nombre": "FRUTOS SECOS EL LLANO, S.L.",
+  "nombres_impresos": ["Frutos secos el llano, s.l.", "El Llano"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R230.pdf", "R649.pdf", "R1227.pdf", "R878.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega con un albarán por factura (cabecera '* * * Albarán N /26 del fecha * * *'); en el PDF digital el texto trae el albarán y los totales",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["13685/25"],
+      "patron": "^\\d{4,6}/\\d{2}$",
+      "donde": "casilla 'Factura:' del recuadro superior derecho (junto a Fecha y Cod. Cliente 2133). En los digitales el texto extraído no la trae: aparece solo el nº de albarán"
+    },
+    "fecha": "casilla 'Fecha:' DD/MM/AA (10/06/26). En los digitales solo sale la fecha del albarán 'del DD/MM/AAAA'",
+    "albaranes": "línea '* * * Albarán 10169 /26 del 10/06/2026 * * *' antes de las líneas (número del albarán con espacio antes de /26)"
+  },
+
+  "lectura": {
+    "columnas": ["Descripción", "Lote", "Bultos", "Kg", "Tot. Kg", "Precio", "%I.V.A.", "Importe"],
+    "cantidad_es": "bultos (bolsas de 1 kg, o 1 bulto de 12 kg en el Fini Mix)",
+    "columna_peso": "Kg = kilos por bulto; Tot. Kg = Bultos x Kg",
+    "precio_es_por": "kg",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": true,
+    "tipos_iva": [4, 10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "'ENV/2023/000028903' en la cabecera es el registro de envases del proveedor, NO el número de factura.",
+      "'B/ 1 KG' en la descripción significa bolsa de 1 kg (producto envasado), no 'Bultos'.",
+      "El Lote (p. ej. 2621798, 052816, 25257H) es un código alfanumérico y no es cantidad ni precio.",
+      "Importe = Tot. Kg x Precio, con precio a 3 decimales; puede haber 1 céntimo de diferencia por redondeo (12 kg x 4,369 = 52,42).",
+      "IVA mixto: la cabecera de pie tiene una fila por tipo (10 % y 4 %); el TOTAL solo se imprime en la primera fila y suma ambas.",
+      "Pie: Neto | Base | %IVA | Imp. IVA | %Rec | Imp. Rec | Total; el recargo va siempre 0.",
+      "Cliente impreso: MASIDE 2011, S.L., Nif B54583356; Cod. Cliente 2133."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "tot_kg = bultos x kg_por_bulto",
+    "importe_linea = tot_kg x precio_kg",
+    "neto = suma de importes; base de cada fila de pie = suma de importes con ese IVA",
+    "cuota = base x iva% por fila (111,72 x 10 % = 11,17; 44,75 x 4 % = 1,79)",
+    "total = suma de bases + suma de cuotas (111,72 + 11,17 + 44,75 + 1,79 = 169,43; 167,52 + 16,75 = 184,27)"
+  ],
+
+  "guia_ocr": "Escaneo de albarán/factura de Frutos Secos El Llano. Número de factura: casilla 'Factura:' arriba derecha (formato 13685/25); ignora 'ENV/2023/…'. Fecha DD/MM/AA. Columnas: Descripción, Lote (no es cantidad), Bultos, Kg por bulto, Tot. Kg, Precio €/kg (3 decimales), %I.V.A. (10 o 4), Importe = Tot. Kg x Precio. Albarán N /26 arriba de las líneas. Pie: NETO, BASE, %IVA, IMP. IVA, %REC (0), TOTAL; con dos IVA hay dos filas y el total solo en la primera. Cliente MASIDE 2011, B54583356.",
+
+  "productos": [
+    {
+      "nombre_impreso": "FINI MIX GOMA PICA B/ 1 KG",
+      "nombre_normalizado": "Fini Mix golosinas goma picante, bolsas de 1 kg (bulto 12 kg)",
+      "familia": "golosinas",
+      "presentacion": "envasado (bolsas de 1 kg en bulto de 12 kg)",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "bulto (12 kg)",
+      "precio": { "min": 4.369, "max": 4.369, "por": "kg", "ejemplos": [["2026-02-17", 4.369], ["2026-06-10", 4.369]] },
+      "iva_pct": 10,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "JAKE MINI MAX AZUCAR B/ 1 KG",
+      "nombre_normalizado": "Jake Mini Max azúcar (golosina), bolsas de 1 kg (bulto 12 kg)",
+      "familia": "golosinas",
+      "presentacion": "envasado (bolsas de 1 kg en bulto de 12 kg)",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "bulto (12 kg)",
+      "precio": { "min": 3.38, "max": 3.38, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COKTEL REF.23 B/ 1 KG",
+      "nombre_normalizado": "Cóctel de frutos secos ref. 23, bolsa 1 kg",
+      "familia": "frutos secos",
+      "presentacion": "envasado en bolsa",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "bolsa" },
+      "unidad_factura": "bolsa de 1 kg",
+      "precio": { "min": 4.65, "max": 4.65, "por": "kg", "ejemplos": [["2026-02-17", 4.65], ["2026-06-10", 4.65]] },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "MIXENSALADA B/ 1 KG",
+      "nombre_normalizado": "Mix para ensalada, bolsa 1 kg",
+      "familia": "frutos secos y semillas",
+      "presentacion": "envasado en bolsa",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "bolsa" },
+      "unidad_factura": "bolsa de 1 kg",
+      "precio": { "min": 8.5, "max": 8.5, "por": "kg", "ejemplos": [["2026-02-17", 8.5], ["2026-05-05", 8.5], ["2026-06-10", 8.5], ["2026-08-03", 8.5]] },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "FLOR DE HIBISCUS",
+      "nombre_normalizado": "Flor de hibisco (seca)",
+      "familia": "infusión/flor seca",
+      "presentacion": "bulto de 1,5 kg sin indicar bolsa (se factura por kg)",
+      "formato": { "envase": "bulto", "contenido": 1.5, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "bulto" },
+      "unidad_factura": "bulto (1,5 kg)",
+      "precio": { "min": 11.2, "max": 11.2, "por": "kg", "ejemplos": [["2026-05-05", 11.2], ["2026-08-03", 11.2]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "ALMENDRA MOLIDA REPELADA B/ 1 KG",
+      "nombre_normalizado": "Almendra molida repelada, bolsa 1 kg",
+      "familia": "frutos secos",
+      "presentacion": "envasado en bolsa, molida",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "bolsa" },
+      "unidad_factura": "bolsa de 1 kg",
+      "precio": { "min": 8.95, "max": 8.95, "por": "kg", "ejemplos": [["2026-08-03", 8.95]] },
+      "iva_pct": 4,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "BAYAS DE GOJI B/ 900 GRMS",
+      "nombre_normalizado": "Bayas de goji, bolsa 900 g",
+      "familia": "frutos secos y bayas",
+      "presentacion": "envasado en bolsa de 900 g",
+      "formato": { "envase": "bolsa", "contenido": 900, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "bolsa" },
+      "unidad_factura": "bolsa",
+      "precio": { "min": 9.15, "max": 9.15, "por": "bolsa (facturada como 1,00 kg)", "ejemplos": [] },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "PIÑONES B/ 1 KG.",
+      "nombre_normalizado": "Piñones, bolsa 1 kg",
+      "familia": "frutos secos",
+      "presentacion": "envasado en bolsa",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "bolsa" },
+      "unidad_factura": "bolsa de 1 kg",
+      "precio": { "min": 84.95, "max": 84.95, "por": "kg", "ejemplos": [] },
+      "iva_pct": 4,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "En los PDF digitales el texto no incluye número de factura ni fecha de factura (solo albarán y su fecha); el escaneo R878 sí los muestra (13685/25, 10/06/26). El sufijo /25 del número en un documento de 2026 es sospechoso pero se lee así.",
+    "Las bayas de goji se anuncian de 900 g pero la columna Kg indica 1,00 y el precio 9,15: no queda claro si el precio es por bolsa o por kg.",
+    "El 'Jake Mini Max' no tiene código de lote en la línea vista; la ficha no confirma su IVA más allá del 10 % impreso.",
+    "Un 'Fini Mix' de 12 kg cuenta 1 bulto y no 12 bolsas: la cantidad real de bolsas se deduce del 'B/ 1 KG' y del Kg 12,00."
+  ]
+}

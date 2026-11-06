@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "RAJMA, S.C.",
+ "cif": "J54331780",
+ "local": "casa_tomas",
+ "numero_documento": "473/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 0.65,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 80.11,
+   "descuento_pct": null,
+   "total": 52.07,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 52.07,
+ "desglose_iva": [
+  {
+   "base": 52.07,
+   "pct": 10,
+   "cuota": 5.21
+  }
+ ],
+ "iva": 5.21,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 57.28,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 17909.",
+ "alertas": []
+}

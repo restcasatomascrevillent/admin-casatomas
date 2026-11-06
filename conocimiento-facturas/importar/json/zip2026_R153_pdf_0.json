@@ -1,0 +1,55 @@
+{
+ "archivo": "R153.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "AB2025/0000455",
+ "fecha": "2025-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAPITAN MORGAN DARK 1L",
+   "producto_ficha": "Ron Capitán Morgan Dark 1 L",
+   "cantidad": -16,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.7,
+   "descuento_pct": null,
+   "total": -267.24,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Punto verde (P.V.) 21 %",
+   "importe": 0.48,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": -267.72,
+ "desglose_iva": [
+  {
+   "base": -267.72,
+   "pct": 21,
+   "cuota": -56.22
+  }
+ ],
+ "iva": -56.22,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -323.94,
+ "observaciones": "Fra. rectificativa (abono) de la devolución de 16 botellas. Comentario impreso: RECOGIDA Nº15863. Destino CASA TOMAS. Pago: remesa bancaria, vencimiento 10/03/25. P.V. -0,48 incluido en la base. Cabecera impresa con NIF B54583356 (E MASIDE 2011, S.L.U.); el pie y la ficha dan CIF B53375358 (usado).",
+ "alertas": [
+  "Línea no cuadra: 16 × 16,70 = 267,20, pero el total impreso de la línea es -267,24 (diferencia 0,04). Se deja lo impreso; posiblemente el precio real tiene más decimales.",
+  "Número AB2025/0000455 (serie de rectificativa), no encaja con el patrón FA20xx/nnnnnnn de la ficha. Es un abono."
+ ]
+}

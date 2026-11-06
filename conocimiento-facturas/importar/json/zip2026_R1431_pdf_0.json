@@ -1,0 +1,46 @@
+{
+ "archivo": "R1431.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SUMINISTROS HOSTELEROS BENISSA, S.L.U.",
+ "cif": "B53414637",
+ "local": "casa_tomas",
+ "numero_documento": "SCF 142899",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CONGELADOR TAPA ABATIBLE (-60ºC)",
+   "producto_ficha": "Congelador de tapa abatible -60 ºC",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3320.0,
+   "descuento_pct": null,
+   "total": 3320.0,
+   "iva_pct": 21,
+   "albaran_ref": "SCA / 205476",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3320.0,
+ "desglose_iva": [
+  {
+   "base": 3320.0,
+   "pct": 21,
+   "cuota": 697.2
+  }
+ ],
+ "iva": 697.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 4017.2,
+ "observaciones": "Albarán SCA / 205476 de 03/08/2026. Forma de pago PENDIENTE. Las líneas «**» y «** PRECIO ESPECIAL **» (0 uds, 0,00) son notas, no productos.",
+ "alertas": []
+}

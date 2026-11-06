@@ -1,0 +1,116 @@
+{
+ "archivo": "R787.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HEREDEROS ANGEL MARIÑO HERMO C.B.",
+ "cif": "E13781760",
+ "local": "casa_tomas",
+ "numero_documento": "2600680",
+ "fecha": "2026-05-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Rodaballo Salvaje 1.5-2 kg.",
+   "producto_ficha": "Rodaballo salvaje pieza entera (5-6 kg; también 700 gr), por kg",
+   "cantidad": 3.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39.0,
+   "descuento_pct": null,
+   "total": 144.3,
+   "iva_pct": 10,
+   "albaran_ref": "26001407",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Rodaballo Salvaje 3 kg.",
+   "producto_ficha": "Rodaballo salvaje pieza entera (5-6 kg; también 700 gr), por kg",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39.0,
+   "descuento_pct": null,
+   "total": 117.0,
+   "iva_pct": 10,
+   "albaran_ref": "26001407",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Lenguado Salvaje 0.8-1 kg.",
+   "producto_ficha": "Lenguado salvaje pieza entera (600 g a 1 kg), por kg",
+   "cantidad": 1.67,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 70.14,
+   "iva_pct": 10,
+   "albaran_ref": "26001407",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Buey de mar gallego hembra 0.8-1 kg.",
+   "producto_ficha": "Buey de mar gallego hembra vivo (también 700-900 gr y 0.8-1.2 kg), por kg",
+   "cantidad": 1.94,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.5,
+   "descuento_pct": null,
+   "total": 53.35,
+   "iva_pct": 10,
+   "albaran_ref": "26001407",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "Portes",
+   "producto_ficha": "Portes (transporte) por albarán",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.0,
+   "descuento_pct": null,
+   "total": 28.0,
+   "iva_pct": 10,
+   "albaran_ref": "26001407",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 412.79,
+ "desglose_iva": [
+  {
+   "base": 412.79,
+   "pct": 10,
+   "cuota": 41.28
+  }
+ ],
+ "iva": 41.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 454.07,
+ "observaciones": "Forma de pago GIRO 30, vencimiento 29/06/2026. Albarán 26001407 de 27-05-26.",
+ "alertas": [
+  "Rodaballo a 39,00 €/kg (líneas 1 y 2), por encima del rango de la ficha (34-36 €/kg). Se extrae tal cual."
+ ]
+}

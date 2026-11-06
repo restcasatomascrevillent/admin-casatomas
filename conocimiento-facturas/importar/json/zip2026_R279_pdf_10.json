@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  11
+ ],
+ "tipo": "factura",
+ "proveedor": "SEMPERE ANDREU, EVA",
+ "cif": "48348526L",
+ "local": "casa_tomas",
+ "numero_documento": "119/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 11,
+   "nombre": "PERCIFORMES Y A. (emb. LA EVA)",
+   "producto_ficha": null,
+   "cantidad": 1.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 37.95,
+   "iva_pct": 10,
+   "albaran_ref": "2811",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 37.95,
+ "desglose_iva": [
+  {
+   "base": 37.95,
+   "pct": 10,
+   "cuota": 3.8
+  }
+ ],
+ "iva": 3.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 41.75,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 225. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

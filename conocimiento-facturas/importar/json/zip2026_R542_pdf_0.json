@@ -1,0 +1,63 @@
+{
+ "archivo": "R542.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 1815",
+ "fecha": "2026-04-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 30/50",
+   "producto_ficha": "Pez espada 30/50 (FAO 87 Pacífico)",
+   "cantidad": 6.16,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.0,
+   "descuento_pct": null,
+   "total": 55.44,
+   "iva_pct": 10,
+   "albaran_ref": "20263144",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CABEZA ALISTADO",
+   "producto_ficha": "Cabeza de alistado (listado)",
+   "cantidad": 2.14,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": null,
+   "total": 29.96,
+   "iva_pct": 10,
+   "albaran_ref": "20263144",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 85.4,
+ "desglose_iva": [
+  {
+   "base": 85.4,
+   "pct": 10,
+   "cuota": 8.54
+  }
+ ],
+ "iva": 8.54,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 93.94,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 09/05/2026, transferencia a 30 días. Albarán 20263144 del 07/04/2026, pedido 17952. Notas 'Centro en rodajas' e 'Itas' ignoradas. La fila Total (3 cajas, 8,30 kg) no son euros.",
+ "alertas": []
+}

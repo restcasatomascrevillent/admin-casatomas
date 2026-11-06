@@ -1,0 +1,67 @@
+{
+ "archivo": "R720.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "H. SANTOS D, S.L. (Hotel Saray, Granada)",
+ "cif": "B02826881",
+ "local": "casa_tomas",
+ "numero_documento": "10426007307",
+ "fecha": "2026-04-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ACCOMMODATION AND BREAKFAST",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 102.7273,
+   "descuento_pct": null,
+   "total": 102.73,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GUEST PARKING",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 20.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 122.73,
+ "desglose_iva": [
+  {
+   "base": 122.73,
+   "pct": 10,
+   "cuota": 12.27
+  }
+ ],
+ "iva": 12.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 135.0,
+ "observaciones": "Factura de hotel a MASIDE 2011 S.L. (NIF B54583356). Huésped Vazquez Gonzalez, Tomas, hab. 521, 17-18/04/2026. Pagado con VISA (total a pagar 0,00).",
+ "alertas": [
+  "Parking impreso con IVA 10% agrupado en el mismo desglose (base total 122,73).",
+  "Las líneas venían impresas con IVA incluido: se han pasado a base imponible",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

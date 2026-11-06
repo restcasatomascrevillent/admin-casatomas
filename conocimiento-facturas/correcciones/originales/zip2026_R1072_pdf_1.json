@@ -1,0 +1,54 @@
+{
+ "archivo": "R1072.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "abono",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900006392",
+ "fecha": "2026-06-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "LC. PACHARAN BEREZKO LITRO",
+   "producto_ficha": "Pacharán Berezko 1 litro",
+   "cantidad": -33,
+   "unidad": "botella",
+   "bultos": -5,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 11.088,
+   "descuento_pct": null,
+   "total": -365.9,
+   "iva_pct": 21,
+   "albaran_ref": "2900001984",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (impreso en el pie como -32,93)",
+   "importe": 32.93,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": -332.97,
+ "desglose_iva": [
+  {
+   "base": -332.97,
+   "pct": 21,
+   "cuota": -69.92
+  }
+ ],
+ "iva": -69.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -402.89,
+ "observaciones": "Abono del albarán 2900001984 (02/06/2026). Cantidades y totales en negativo. Total unidades -33. Página 2 de 3.",
+ "alertas": [
+  "Precio del abono 11,088 frente a 11,090 de la factura 2900005612: diferencia de 2 milésimas por unidad, se deja lo impreso."
+ ]
+}

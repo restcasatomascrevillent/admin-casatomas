@@ -1,0 +1,80 @@
+{
+ "archivo": "R1021.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINÍCOLAS VINOS DE CALIDAD, S.L.",
+ "cif": "B53882460",
+ "local": "casa_tomas",
+ "numero_documento": "26FV/978",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOSCATO D'ASTI DUCHESSALIA 2025 (art. 52.343)",
+   "producto_ficha": null,
+   "cantidad": 18.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 135.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/1739",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PAZO LA CUESTA MENCIA 2022 (art. 99.155), sin cargo",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/2015",
+   "bonificada": true
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PAZO LA CUESTA GODELLO 2024 (art. 99.159), sin cargo",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/2015",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 135.0,
+ "desglose_iva": [
+  {
+   "base": 135.0,
+   "pct": 21,
+   "cuota": 28.35
+  }
+ ],
+ "iva": 28.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 163.35,
+ "observaciones": "Cliente 1813. Facturar a MASIDE 2011, S.L.U. / CASA TOMÁS. Recibo a 30 días, vencimiento 30/07/2026 por 163,35 €. Albaranes A26/1739 (02/06/2026) y A26/2015 (16/06/2026).",
+ "alertas": []
+}

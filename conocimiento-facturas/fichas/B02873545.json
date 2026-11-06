@@ -1,0 +1,156 @@
+{
+  "cif": "B02873545",
+  "nombre": "ROMÁN Y MARTOS ALIMENTACIÓN, S.L.",
+  "nombres_impresos": ["ROMAN Y MARTOS ALIMENTACION", "ROMÁN Y MARTOS ALIMENTACIÓN, S.L."],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R336.pdf", "R651.pdf", "R837.pdf", "R1465.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega: una factura por albarán ('A 30 DIAS con albarán'), con 1 a 3 líneas de pescado fresco al peso",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1 (en el texto extraído la misma página sale repetida como 1/2 y 2/2; es la misma factura duplicada, no contar dos veces; cada hoja dice 'Página 1 de 1')",
+    "numero_factura": { "ejemplos": ["26/4479", "26/9074", "26/14058", "26/25052"], "patron": "^26/\\d{4,5}$", "donde": "casilla 'Número:' bajo 'Factura de Venta', junto a 'Fecha:'" },
+    "fecha": "casilla 'Fecha:' a la derecha del número, DD/MM/AAAA. La fecha del albarán ('Albarán: 26/57933 Fecha: 27/08/2026') es 1-4 días anterior; el vencimiento (a 30 días) sale abajo con el importe.",
+    "albaranes": "una sola cabecera 'Albarán: 26/xxxxx Fecha: DD/MM/AAAA Cliente 008121' antes de las líneas. El número del albarán no es el de la factura. 'FTV-2747844' junto al teléfono es una referencia de plantilla, no el número."
+  },
+
+  "lectura": {
+    "columnas": ["Lote", "Artículo", "Descripción", "CAJA", "KILOS", "UDS.", "Precio", "Importe"],
+    "cantidad_es": "KILOS (peso real, con coma decimal). Debajo de cada línea sale '1 CAJA' o '3 PIEZAS' = nº de cajas o piezas, informativo. UDS. solo se rellena a veces (Palometa '6' piezas) y no se factura.",
+    "columna_peso": "KILOS: 13,14 / 4,90 / 9,60. La fila 'Total | 13,14' es el TOTAL DE KILOS, no dinero.",
+    "precio_es_por": "kg (impreso como '15 €/KG', '26 €/KG', '11.6 €/KG', '23.95 €/KG')",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "no hay",
+    "cargos_y_descuentos_pie": ["'Cargos' y 'Descuentos' del pie vacíos en las muestras"],
+    "trampas": [
+      "El precio va con PUNTO decimal ('11.6 €/KG', '23.95 €/KG') y el resto de números con COMA (4,90; 62,64€; 1.xxx). No leer 11.6 como 116 ni 23.95 como 2395.",
+      "En la línea, lote y código (21022026 | 006896) van antes del nombre; el número de 6 cifras (006896, 000175) es el código de artículo, no cantidad. A veces el lote lleva 'TUR030426' o un prefijo 'ROMÁN' que se cuela del texto de fondo.",
+      "Texto de marca de agua suelto y en vertical ('MARTOS', 'Y', 'ROMÁN', 'de', 'nombre', 'el', 'con', 'Málaga', 'R.M.', 'ALIMENTACION', 'SL', 'B02873545') aparece mezclado con las líneas: ignorarlo.",
+      "'Fecha Caducidad: …' debajo de la línea es la caducidad del lote, no la fecha de factura.",
+      "El mismo artículo puede venir en dos calibres/lotes en líneas separadas (Rodaballo salvaje 2000/3000 dos veces con lotes distintos): son dos líneas.",
+      "Todas las hojas se repiten dos veces en el PDF: leer una sola vez."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = kilos × precio €/kg (redondeado a céntimos). Comprobado: 13,14 × 15 = 197,10; 4,90 × 26 = 127,40; 5,40 × 11,6 = 62,64; 9,60 × 23,95 = 229,92; 2,60 × 23,95 = 62,27; 6,00 × 36 = 216,00",
+    "Total Bruto = Base Imponible = suma de importes",
+    "IVA = base × 10 %; total = base + IVA. Comprobado: 512,53 + 51,25 = 563,78; 296,64 + 29,66 = 326,30; 367,20 + 36,72 = 403,92; 197,10 + 19,71 = 216,81"
+  ],
+
+  "guia_ocr": "Pescado fresco al peso, una factura por albarán. Línea: Lote | Código | Descripción (con calibre, p. ej. 2000/3000) | KILOS | Precio €/KG | Importe. Importe = kilos × precio. Cantidad = kilos con coma decimal; el precio sale con PUNTO ('23.95 €/KG'). 'Total | 13,14' son kilos, no euros. '1 CAJA' / '3 PIEZAS' bajo la línea es informativo. Ignora el texto vertical suelto (MARTOS, ROMÁN, Málaga…). La hoja viene duplicada: lee una vez. IVA único 10 %. Número 'Número: 26/xxxxx'; fecha en 'Fecha:' a su derecha.",
+
+  "productos": [
+    {
+      "nombre_impreso": "ATUN ROJO PARPATANA CARNE",
+      "nombre_normalizado": "Atún rojo, parpatana (carne), pieza",
+      "familia": "pescado",
+      "presentacion": "fresco (caducidad a 6 días del albarán), piezas enteras (3 piezas en R1465)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 15, "max": 15, "por": "kg", "ejemplos": [["2026-08-28", 15]] },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "FALSO RODABALLO 2000/3000",
+      "nombre_normalizado": "Falso rodaballo 2-3 kg/pieza",
+      "familia": "pescado",
+      "presentacion": "fresco, entero, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 26, "max": 26, "por": "kg", "ejemplos": [["2026-02-27", 26]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "FALSO RODABALLO 800/1000",
+      "nombre_normalizado": "Falso rodaballo 0,8-1 kg/pieza",
+      "familia": "pescado",
+      "presentacion": "fresco, entero, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 26, "max": 26, "por": "kg", "ejemplos": [["2026-02-27", 26]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "RAPE NEGRO 5/6",
+      "nombre_normalizado": "Rape negro calibre 5/6",
+      "familia": "pescado",
+      "presentacion": "fresco, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 11.6, "max": 11.6, "por": "kg", "ejemplos": [["2026-02-27", 11.6]] },
+      "iva_pct": 10,
+      "veces_visto": null
+    },
+    {
+      "nombre_impreso": "RAPE NEGRO 9/10",
+      "nombre_normalizado": "Rape negro calibre 9/10",
+      "familia": "pescado",
+      "presentacion": "fresco, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 11.6, "max": 11.6, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": null
+    },
+    {
+      "nombre_impreso": "RODABALLO SALVAJE 2000/3000",
+      "nombre_normalizado": "Rodaballo salvaje 2-3 kg/pieza",
+      "familia": "pescado",
+      "presentacion": "fresco, salvaje, entero, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 23.95, "max": 23.95, "por": "kg", "ejemplos": [["2026-04-10", 23.95]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "RODABALLO SALVAJE 1000/2000",
+      "nombre_normalizado": "Rodaballo salvaje 1-2 kg/pieza",
+      "familia": "pescado",
+      "presentacion": "fresco, salvaje, entero, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 23.95, "max": 23.95, "por": "kg", "ejemplos": [["2026-04-10", 23.95]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "PALOMETA ROJA (VIRREY) 1000/2000",
+      "nombre_normalizado": "Palometa roja (virrey) 1-2 kg/pieza",
+      "familia": "pescado",
+      "presentacion": "fresco, entero, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 36, "max": 36, "por": "kg", "ejemplos": [["2026-05-26", 36]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "PALOMETA ROJA (VIRREY) 2000/3000",
+      "nombre_normalizado": "Palometa roja (virrey) 2-3 kg/pieza",
+      "familia": "pescado",
+      "presentacion": "fresco, entero, en caja",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 36, "max": 36, "por": "kg", "ejemplos": [["2026-05-26", 36]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    }
+  ],
+
+  "dudas": [
+    "Los calibres 2000/3000, 800/1000 y 1000/2000 se leen como gramos por pieza; el 5/6 y 9/10 del rape no está claro si son kg por pieza (parece, por 5,40 kg y 18,90 kg por caja) o cola/entero.",
+    "El rape negro sale 4 veces en el catálogo con números quitados, sin separar los calibres 5/6 y 9/10; veces_visto va a null.",
+    "El catálogo de 6 PDF incluye otras dos facturas (R337, R1464) sin muestra: el atún rojo sale a 15 €/kg con 18,37 kg y el rape 9/10 con 18,90 kg.",
+    "'Fresco' se deduce de la fecha de caducidad corta (2 a 6 días) y de ser pescado al peso; no lo pone la factura."
+  ]
+}

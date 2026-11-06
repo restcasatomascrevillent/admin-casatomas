@@ -1,0 +1,97 @@
+{
+ "archivo": "R586.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CODIPAN S.L.",
+ "cif": "B03730405",
+ "local": "casa_tomas",
+ "numero_documento": "426/2.004",
+ "fecha": "2026-04-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOLSA PAPEL KRAF ASA BAND.RIZO R.1KR S/IMP. (32x21x33) C.250 UN",
+   "producto_ficha": null,
+   "cantidad": 0.25,
+   "unidad": "millar",
+   "bultos": 1,
+   "contenido_cantidad": 250,
+   "contenido_unidad": "ud",
+   "precio_unitario": 210.031,
+   "descuento_pct": null,
+   "total": 52.51,
+   "iva_pct": 21,
+   "albaran_ref": "126/12.905",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CAJA ASA BLANCA 10.5x10.5x4.5 (PQ. 50 UNID.)",
+   "producto_ficha": null,
+   "cantidad": 0.05,
+   "unidad": "millar",
+   "bultos": 1,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "ud",
+   "precio_unitario": 268.824,
+   "descuento_pct": null,
+   "total": 13.44,
+   "iva_pct": 21,
+   "albaran_ref": "126/12.905",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PAPEL PERG.KRAFT ANTIGRASA PERIODICO 40 GR. 28x31cm. (PQ. 1 M)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "millar",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.231,
+   "descuento_pct": null,
+   "total": 24.23,
+   "iva_pct": 21,
+   "albaran_ref": "126/12.905",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CAJA 22x8 CUADRADA BLANCA C/TAPA (PQ. 50 UND.)",
+   "producto_ficha": null,
+   "cantidad": 0.05,
+   "unidad": "millar",
+   "bultos": 1,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "ud",
+   "precio_unitario": 415.0,
+   "descuento_pct": null,
+   "total": 20.75,
+   "iva_pct": 21,
+   "albaran_ref": "126/12.905",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 110.93,
+ "desglose_iva": [
+  {
+   "base": 110.93,
+   "pct": 21,
+   "cuota": 23.3
+  }
+ ],
+ "iva": 23.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 134.23,
+ "observaciones": "Forma de pago impresa: pago en efectivo (texto cortado en el PDF). Sin vencimiento impreso. Albarán 126/12.905 de 20/04/2026. Dirección de envío: Codipan, Pol. Carrus, Elche.",
+ "alertas": []
+}

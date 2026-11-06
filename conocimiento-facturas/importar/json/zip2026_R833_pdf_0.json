@@ -1,0 +1,100 @@
+{
+ "archivo": "R833.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ZAMBU HIGIENE, S.L.",
+ "cif": "B73056269",
+ "local": "casa_tomas",
+ "numero_documento": "FVA+26/038814",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SATIC INSTALACION DISPENSADORES",
+   "producto_ficha": "Servicio de instalación de dispensadores (gratis)",
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.07,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/058812",
+   "bonificada": true
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PORTA CHEMI BLANCO SERIE DYNAMIC",
+   "producto_ficha": "Portabobinas Chemi blanco serie Dynamic (gratis, -100 %)",
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/058812",
+   "bonificada": true
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CONO SUPLEMENTO PORTA CHEMI CORELESS",
+   "producto_ficha": "Cono suplemento portabobinas Chemi Coreless (gratis, -100 %)",
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/058812",
+   "bonificada": true
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud",
+   "producto_ficha": "Toallas secamanos zig-zag laminada 22x21 cm (paquete 180)",
+   "cantidad": 40.0,
+   "unidad": "paquete",
+   "bultos": 2,
+   "contenido_cantidad": 180,
+   "contenido_unidad": "ud",
+   "precio_unitario": 0.95,
+   "descuento_pct": null,
+   "total": 37.88,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/067676",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 37.88,
+ "desglose_iva": [
+  {
+   "base": 37.88,
+   "pct": 21,
+   "cuota": 7.95
+  }
+ ],
+ "iva": 7.95,
+ "recargo_equivalencia": 0.0,
+ "retencion_irpf": null,
+ "total": 45.83,
+ "observaciones": "Transferencia a 45 días (T.P. 4). Pie: base, IVA 21 %, recargo 0,00. Zambú avisa de que incluirá la contribución Ecoembes en una factura futura (aún no aparece). Albaranes: ALB+26/058812, ALB+26/067676. Líneas -100 % = regalo, importe 0,00. Factura de 2 páginas: totales y datos bancarios repetidos en la 2.",
+ "alertas": [
+  "Línea «TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud»: 40 × 0,95 = 38,00 pero el importe impreso es 37,88; se deja lo impreso (precio redondeado en la factura)."
+ ]
+}

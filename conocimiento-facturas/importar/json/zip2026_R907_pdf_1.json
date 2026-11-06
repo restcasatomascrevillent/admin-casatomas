@@ -1,0 +1,97 @@
+{
+ "archivo": "R907.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 03753",
+ "fecha": "2026-05-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "ROLLITO CARRILLADA Y SETAS 25.UND",
+   "producto_ficha": "Rollito de carrillada y setas (caja 25 uds)",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 50,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 10,
+   "albaran_ref": "F571157",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 2,
+   "nombre": "FLT.CORVINA S/ESPINA X7",
+   "producto_ficha": "Filete de corvina sin espina (caja 7 kg)",
+   "cantidad": 7,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 66.5,
+   "iva_pct": 10,
+   "albaran_ref": "F571157",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 2,
+   "nombre": "TORPEDO LANGOSTINOS 1KG",
+   "producto_ficha": "Torpedo de langostinos (bolsa 1 kg)",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.0,
+   "descuento_pct": null,
+   "total": 22.0,
+   "iva_pct": 10,
+   "albaran_ref": "F571157",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 2,
+   "nombre": "RD.ESPADA EXT.",
+   "producto_ficha": "Rodaja de pez espada extra",
+   "cantidad": 3.97,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.0,
+   "descuento_pct": null,
+   "total": 39.7,
+   "iva_pct": 10,
+   "albaran_ref": "F571157",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 178.2,
+ "desglose_iva": [
+  {
+   "base": 178.2,
+   "pct": 10,
+   "cuota": 17.82
+  }
+ ],
+ "iva": 17.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 196.02,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F571157. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

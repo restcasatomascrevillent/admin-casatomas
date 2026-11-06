@@ -1,0 +1,46 @@
+{
+ "archivo": "R523.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0013705",
+ "fecha": "2026-04-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SOLOMILLO DE CERDO KG",
+   "producto_ficha": null,
+   "cantidad": 5.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.257,
+   "descuento_pct": null,
+   "total": 32.54,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 32.54,
+ "desglose_iva": [
+  {
+   "base": 32.54,
+   "pct": 10,
+   "cuota": 3.25
+  }
+ ],
+ "iva": 3.25,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 35.79,
+ "observaciones": "Factura de una sola línea. Lote 020326 (sin importe). Crédito. Vencimiento 02-04-2026. Aviso de horario de Semana Santa en el pie. Cajero distinto (2081682).",
+ "alertas": []
+}

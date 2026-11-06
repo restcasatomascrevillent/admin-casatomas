@@ -1,0 +1,71 @@
+{
+ "archivo": "R1157.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "Tecnomar Viveros S.L.",
+ "cif": "B83719351",
+ "local": "casa_tomas",
+ "numero_documento": "26/1206",
+ "fecha": "2026-07-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VISITA MANTENIMIENTO VIVERO",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 146.4,
+   "descuento_pct": null,
+   "total": 146.4,
+   "iva_pct": 21,
+   "albaran_ref": "2603/18808",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "AMPOLLAS NITRIFICANTES (CAJA AMPOLLAS 24 UNIDADES)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 24,
+   "contenido_unidad": "ud",
+   "precio_unitario": 70.1,
+   "descuento_pct": null,
+   "total": 70.1,
+   "iva_pct": 21,
+   "albaran_ref": "2603/18809",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 216.5,
+ "desglose_iva": [
+  {
+   "base": 216.5,
+   "pct": 21,
+   "cuota": 45.46
+  }
+ ],
+ "iva": 45.46,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 261.96,
+ "observaciones": "Pago por transferencia a CaixaBank, vencimiento 10/07/2026. Albaran 2603/18808 (07/07/2026), pagina 3: revision de equipos; se quitan cerraduras de tapas para que las cambie el cliente y se deja 1 caja de ampollas. Albaran 2603/18809, pagina 6: 1 caja de ampollas.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

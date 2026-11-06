@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  14
+ ],
+ "tipo": "factura",
+ "proveedor": "EXPLOTACION PESQUERA CORISCO,S.L.",
+ "cif": "B42500702",
+ "local": "casa_tomas",
+ "numero_documento": "24/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 14,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 3.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.8,
+   "descuento_pct": null,
+   "total": 235.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 235.5,
+ "desglose_iva": [
+  {
+   "base": 235.5,
+   "pct": 10,
+   "cuota": 23.55
+  }
+ ],
+ "iva": 23.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 259.05,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): JOSE Y RAFAELA. Albaranes de subasta (informativo): 15155.",
+ "alertas": []
+}

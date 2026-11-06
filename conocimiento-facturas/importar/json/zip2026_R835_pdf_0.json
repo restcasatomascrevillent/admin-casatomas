@@ -1,0 +1,101 @@
+{
+ "archivo": "R835.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/002573",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRUFAS DE CHOCOLATE 50UD 750G",
+   "producto_ficha": "Trufas de chocolate (50 ud, 750 g)",
+   "cantidad": 2.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "ud",
+   "precio_unitario": 12.99,
+   "descuento_pct": null,
+   "total": 25.98,
+   "iva_pct": 10,
+   "albaran_ref": "LA/5545",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG",
+   "producto_ficha": "Calamar patagonico limpio 9-12 cm (caja 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.34,
+   "descuento_pct": null,
+   "total": 113.37,
+   "iva_pct": 10,
+   "albaran_ref": "LA/5551",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CEBOLLA PERLA (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla perla (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.14,
+   "descuento_pct": null,
+   "total": 21.41,
+   "iva_pct": 4,
+   "albaran_ref": "LA/5551",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/5545)",
+   "importe": 1.5,
+   "iva_pct": 21
+  },
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/5551)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 163.76,
+ "desglose_iva": [
+  {
+   "base": 139.35,
+   "pct": 10,
+   "cuota": 13.94
+  },
+  {
+   "base": 21.41,
+   "pct": 4,
+   "cuota": 0.86
+  },
+  {
+   "base": 3.0,
+   "pct": 21,
+   "cuota": 0.63
+  }
+ ],
+ "iva": 15.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 179.19,
+ "observaciones": "Transferencia a 10 dias, vencimiento 10/06/2026. Dos albaranes: LA/5545 (28/05/2026, 25,98 EUR) y LA/5551 (28/05/2026, 134,78 EUR). Un cargo logistico de 1,50 EUR por albaran, en el pie. FTV-6968267 es una referencia del encabezado, no el numero de factura. Total Centro 160,76 = suma de albaranes sin cargos.",
+ "alertas": []
+}

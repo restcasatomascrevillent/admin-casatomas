@@ -1,0 +1,63 @@
+{
+ "archivo": "R375.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/4371",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GIN.MOMBASA CLUB 70CL 41,5º C6",
+   "producto_ficha": "Ginebra Mombasa Club 70 cl (caja 6)",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 13.375,
+   "descuento_pct": 0.0,
+   "total": 80.25,
+   "iva_pct": 21,
+   "albaran_ref": "26/4.298",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RON MATUSALEM 7A 70CL 40º C6",
+   "producto_ficha": "Ron Matusalem 7 años 70 cl (caja 6)",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 11.0,
+   "descuento_pct": 0.0,
+   "total": 66.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/4.298",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 146.25,
+ "desglose_iva": [
+  {
+   "base": 146.25,
+   "pct": 21,
+   "cuota": 30.71
+  }
+ ],
+ "iva": 30.71,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 176.96,
+ "observaciones": "Giro/B2B, vencimiento 13/03/26. Albarán 26/4.298 (12/03/26). IVA por línea deducido de las bases impresas.",
+ "alertas": []
+}

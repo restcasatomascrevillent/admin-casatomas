@@ -1,0 +1,46 @@
+{
+ "archivo": "R1516.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "DISTRIBUCIONES DE BEBIDAS CATRAL, S.L.",
+ "cif": "B53167433",
+ "local": "casa_tomas",
+ "numero_documento": "A00053",
+ "fecha": "2026-09-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPPEL BARRIL CRUZCAMPO 50 L.",
+   "producto_ficha": "Rappel (abono trimestral) barril Cruzcampo 50 L",
+   "cantidad": 1,
+   "unidad": "barril",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "l",
+   "precio_unitario": -3000.0,
+   "descuento_pct": null,
+   "total": -3000.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -3000.0,
+ "desglose_iva": [
+  {
+   "base": -3000.0,
+   "pct": 21,
+   "cuota": -630.0
+  }
+ ],
+ "iva": -630.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -3630.0,
+ "observaciones": "Abono por rappel de barril Cruzcampo 50 L (cliente 03393 BARRA RESTAURANTE CASA TOMAS, forma de pago REPOSICION). Tras la línea de rappel hay 2 filas basura con código 0, cantidad 1 y precio 0,00: una sin descripción y otra con el texto 'APOYO COMERCIAL'; no se extraen como producto. Sello manuscrito 'PAGADO 16-09-2026 Transf x C. Rural'. La página 2 del PDF es el justificante de transferencia Ruralvía (16/09/2026, 3.630 EUR, concepto 'PAGO FACT. A00053') y NO es factura: no se extrae.",
+ "alertas": []
+}

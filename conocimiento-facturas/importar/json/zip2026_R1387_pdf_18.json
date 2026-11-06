@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  19
+ ],
+ "tipo": "factura",
+ "proveedor": "RUIZ VALENCIANO, JOSE LUIS",
+ "cif": "74226462B",
+ "local": "casa_tomas",
+ "numero_documento": "286/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 19,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.5,
+   "descuento_pct": null,
+   "total": 41.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 41.4,
+ "desglose_iva": [
+  {
+   "base": 41.4,
+   "pct": 10,
+   "cuota": 4.14
+  }
+ ],
+ "iva": 4.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 45.54,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): HELIOS Y MARIA. Albaranes de subasta (informativo): 16859.",
+ "alertas": []
+}

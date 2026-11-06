@@ -1,0 +1,79 @@
+{
+ "archivo": "R1090.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/003533",
+ "fecha": "2026-07-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CEBOLLA PERLA (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla perla (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.21,
+   "descuento_pct": null,
+   "total": 22.05,
+   "iva_pct": 4,
+   "albaran_ref": "LA/7155",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CERDO COSTILLA TACO IQF 8KG",
+   "producto_ficha": "Costilla de cerdo en taco IQF (8 kg)",
+   "cantidad": 8.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.33,
+   "descuento_pct": null,
+   "total": 34.67,
+   "iva_pct": 10,
+   "albaran_ref": "LA/7155",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/7155)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 58.22,
+ "desglose_iva": [
+  {
+   "base": 34.67,
+   "pct": 10,
+   "cuota": 3.47
+  },
+  {
+   "base": 22.05,
+   "pct": 4,
+   "cuota": 0.88
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 4.67,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 62.89,
+ "observaciones": "Transferencia a 10 dias, vencimiento 21/07/2026. Albaran LA/7155 de 09/07/2026 (2 bultos, 18 kg). FTV-7097789 es una referencia del encabezado, no el numero de factura. Diferencias de centimos dentro de tolerancia: cebolla 10 x 2,21 = 22,10 frente a 22,05 impreso; costilla 8 x 4,33 = 34,64 frente a 34,67.",
+ "alertas": []
+}

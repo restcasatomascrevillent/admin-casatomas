@@ -1,0 +1,82 @@
+{
+ "archivo": "R1117.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/13358",
+ "fecha": "2026-07-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "B.CARDENAL MENDOZA 70CL 40º C6",
+   "producto_ficha": "Brandy Cardenal Mendoza 70 cl (caja 6)",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.82,
+   "descuento_pct": 0.0,
+   "total": 100.92,
+   "iva_pct": 21,
+   "albaran_ref": "26/13.407",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "VODKA ABSOLUT 70CL 40º C12 N/REF",
+   "producto_ficha": null,
+   "cantidad": 36,
+   "unidad": "botella",
+   "bultos": 3,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 9.65,
+   "descuento_pct": 0.0,
+   "total": 347.4,
+   "iva_pct": 21,
+   "albaran_ref": "26/13.407",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "W.JOHNNIE WALKER E/AZUL 70CL 40º C6",
+   "producto_ficha": "Whisky Johnnie Walker Etiqueta Azul 70 cl (caja 6)",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 116.0,
+   "descuento_pct": 0.0,
+   "total": 2784.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/13.407",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3232.32,
+ "desglose_iva": [
+  {
+   "base": 3232.32,
+   "pct": 21,
+   "cuota": 678.79
+  }
+ ],
+ "iva": 678.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3911.11,
+ "observaciones": "Giro/B2B, vencimiento 11/07/26. Albarán 26/13.407 (10/07/26). Todas las líneas al 21 %.",
+ "alertas": [
+  "VODKA ABSOLUT 70CL 40º C12 N/REF: la ficha solo recoge la caja de 6; producto_ficha en null. Confirmar si es la misma referencia."
+ ]
+}

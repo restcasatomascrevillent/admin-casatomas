@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  11
+ ],
+ "tipo": "factura",
+ "proveedor": "RODRIGUEZ JIMENEZ. JUAN FRANCISCO",
+ "cif": "75233388C",
+ "local": "casa_tomas",
+ "numero_documento": "20/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 11,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 10.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.47,
+   "descuento_pct": null,
+   "total": 276.1,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 276.1,
+ "desglose_iva": [
+  {
+   "base": 276.1,
+   "pct": 10,
+   "cuota": 27.61
+  }
+ ],
+ "iva": 27.61,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 303.71,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 17803.",
+ "alertas": []
+}

@@ -1,0 +1,80 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  28
+ ],
+ "tipo": "factura",
+ "proveedor": "DIAZ FUENTES, ANGELES MARIA",
+ "cif": "15425219Q",
+ "local": "casa_tomas",
+ "numero_documento": "36/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 28,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 17.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.3,
+   "descuento_pct": null,
+   "total": 492.41,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 28,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.3,
+   "descuento_pct": null,
+   "total": 32.62,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 28,
+   "nombre": "17 GADIFORMES",
+   "producto_ficha": "Gadiformes (familia 17)",
+   "cantidad": 1.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.19,
+   "descuento_pct": null,
+   "total": 6.81,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 531.84,
+ "desglose_iva": [
+  {
+   "base": 531.84,
+   "pct": 10.0,
+   "cuota": 53.18
+  }
+ ],
+ "iva": 53.18,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 585.02,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 870, 299. Embarcaciones: ninguna.",
+ "alertas": []
+}

@@ -1,0 +1,49 @@
+{
+ "archivo": "R1068.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "7150",
+ "fecha": "2026-07-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": null,
+   "nombre": "Envase PETIT SUIS (1 x 0,826)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.83,
+   "descuento_pct": null,
+   "total": 0.83,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 0.83,
+ "desglose_iva": [
+  {
+   "base": 0.83,
+   "pct": 21,
+   "cuota": 0.17
+  }
+ ],
+ "iva": 0.17,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1.0,
+ "observaciones": "Factura solo de envases (albarán ENV 1825/26 del 10/07/2026), sin líneas de fruta. Transferencia 30 días. Destinatario no impreso en el texto del PDF (la ficha asigna casa_tomas).",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

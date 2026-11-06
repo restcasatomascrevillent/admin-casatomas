@@ -1,0 +1,97 @@
+{
+ "archivo": "R150.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BENEOLIVA, S.COOP. V.L.",
+ "cif": "F54450895",
+ "local": "casa_tomas",
+ "numero_documento": "26/ 539",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAPRI PICUAL 1ER DIA COSECHA AOVE 500 ML",
+   "producto_ficha": "AOVE Capri Picual primer día de cosecha 500 ml",
+   "cantidad": 27.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "ml",
+   "precio_unitario": 9.2,
+   "descuento_pct": null,
+   "total": 248.4,
+   "iva_pct": 4,
+   "albaran_ref": "COM 219 /26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OLIBEN ORUJO 5L. (ENVASADO)",
+   "producto_ficha": "Aceite de orujo de oliva Beneolive 5 L (garrafa)",
+   "cantidad": 6.0,
+   "unidad": "garrafa",
+   "bultos": null,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "L",
+   "precio_unitario": 14.95,
+   "descuento_pct": null,
+   "total": 89.7,
+   "iva_pct": 4,
+   "albaran_ref": "COM 219 /26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OLIBEN VIRGEN 5L. (ENVASADO)",
+   "producto_ficha": "Aceite de oliva virgen Beneolive 5 L (garrafa)",
+   "cantidad": 9.0,
+   "unidad": "garrafa",
+   "bultos": null,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "L",
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 197.1,
+   "iva_pct": 4,
+   "albaran_ref": "COM 219 /26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "OLIBEN VIRGEN 5L. (ENVASADO)",
+   "producto_ficha": "Aceite de oliva virgen Beneolive 5 L (garrafa)",
+   "cantidad": 9.0,
+   "unidad": "garrafa",
+   "bultos": null,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "L",
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 197.1,
+   "iva_pct": 4,
+   "albaran_ref": "COM 512 /26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 732.3,
+ "desglose_iva": [
+  {
+   "base": 732.3,
+   "pct": 4.0,
+   "cuota": 29.29
+  }
+ ],
+ "iva": 29.29,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 761.59,
+ "observaciones": "Forma de pago: Transfer. 30 days; vencimiento 2026-03-02, total 761.59; Albaranes: COM 219 /26, COM 512 /26; CIF del emisor no impreso en el texto; se identifica por el nombre Beneoliva (ficha).",
+ "alertas": []
+}

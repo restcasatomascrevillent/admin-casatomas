@@ -1,0 +1,99 @@
+{
+ "archivo": "R1261.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EQUIPALIA SUMINISTROS HOSTELEROS, S.L.",
+ "cif": "B42568519",
+ "local": "casa_tomas",
+ "numero_documento": "VTAF/26-03856",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PLATO PASTA NATURA Ø 23 CM (6) (cód. QU18113)",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.39,
+   "descuento_pct": null,
+   "total": 30.78,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-05360",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOL RIPPLE MIRAGE 13X5 CM (12) BONNA (cód. B928360A)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.9,
+   "descuento_pct": null,
+   "total": 58.8,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-05623",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BANDEJA OVAL MIRAGE Ø 37 cm (6) BONNA (cód. B928459AZ)",
+   "producto_ficha": null,
+   "cantidad": 18.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.99,
+   "descuento_pct": null,
+   "total": 251.86,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-05623",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PLATO OVALADO SAHARA CRESTA 19X13 CM (6) BONNA VIP (cód. SHACRS19OV)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.97,
+   "descuento_pct": null,
+   "total": 71.64,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-05623",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 413.08,
+ "desglose_iva": [
+  {
+   "base": 413.08,
+   "pct": 21,
+   "cuota": 86.75
+  }
+ ],
+ "iva": 86.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 499.83,
+ "observaciones": "Dirección de envío: RESTAURANTE CASA TOMAS / MASIDE 2011, S.L. Forma de pago: GIRO. Importe pendiente 499,83 €.",
+ "alertas": [
+  "Línea B928459AZ: 18 x 13,99 = 251,82, pero el importe impreso es 251,86 (precio redondeado en el PDF). Se deja el importe impreso."
+ ]
+}

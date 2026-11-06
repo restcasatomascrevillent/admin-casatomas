@@ -1,0 +1,93 @@
+{
+ "archivo": "R1402.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "FA2026/0017886",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GESTION Y LOGISTICA",
+   "producto_ficha": "Gestión y logística",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.63,
+   "descuento_pct": null,
+   "total": 2.63,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0006635",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MONIN PUREE LE FRUIT MANGO LTO.",
+   "producto_ficha": "Monin puré Le Fruit mango 1 L",
+   "cantidad": 2,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 17.64,
+   "descuento_pct": null,
+   "total": 35.28,
+   "iva_pct": 10,
+   "albaran_ref": "2026/0006635",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MONIN PUREE LE FRUIT FRUTA PASION 1LTO.",
+   "producto_ficha": "Monin puré Le Fruit fruta de la pasión 1 L",
+   "cantidad": 5,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 17.64,
+   "descuento_pct": null,
+   "total": 88.2,
+   "iva_pct": 10,
+   "albaran_ref": "2026/0006635",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Punto verde (P.V.) 10 %",
+   "importe": 0.19,
+   "iva_pct": 10
+  }
+ ],
+ "subtotal": 126.3,
+ "desglose_iva": [
+  {
+   "base": 2.63,
+   "pct": 21,
+   "cuota": 0.55
+  },
+  {
+   "base": 123.67,
+   "pct": 10,
+   "cuota": 12.37
+  }
+ ],
+ "iva": 12.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 139.22,
+ "observaciones": "Albarán 2026/0006635 de 13/08/26. Destino CASA TOMAS. Pago: remesa bancaria, vencimiento 10/09/26. Total bruto 126,11; P.V. 0,19 incluido en la base. Cabecera impresa con NIF B54583356; el pie y la ficha dan CIF B53375358 (usado).",
+ "alertas": [
+  "Gestión y logística a 2,63 € en un albarán de 13/08/26. La ficha dice que 2,63 € rige desde sept-26 (2,37 € antes). Se deja lo impreso; revisar si el cambio de tarifa se aplicó antes de tiempo."
+ ]
+}

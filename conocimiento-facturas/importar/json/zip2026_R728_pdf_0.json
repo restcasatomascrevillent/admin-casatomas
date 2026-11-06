@@ -1,0 +1,82 @@
+{
+ "archivo": "R728.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "3413",
+ "fecha": "2026-05-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TELLINA",
+   "producto_ficha": "Tellina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.8,
+   "descuento_pct": null,
+   "total": 59.6,
+   "iva_pct": 10,
+   "albaran_ref": "10231",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CLOCHINA",
+   "producto_ficha": "Clóchina",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 22.5,
+   "iva_pct": 10,
+   "albaran_ref": "10231",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CLOCHINA",
+   "producto_ficha": "Clóchina",
+   "cantidad": 7.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.75,
+   "descuento_pct": null,
+   "total": 40.25,
+   "iva_pct": 10,
+   "albaran_ref": "10231",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 122.35,
+ "desglose_iva": [
+  {
+   "base": 122.35,
+   "pct": 10,
+   "cuota": 12.24
+  }
+ ],
+ "iva": 12.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 134.59,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Serie no impresa en la cabecera. Un albarán (10231, 15/05/2026).",
+ "alertas": [
+  "Clóchina aparece en la misma factura a 4,50 €/kg (línea 2) y a 5,75 €/kg (línea 3). La ficha solo tiene 4,50 €/kg; 5,75 supone +28 %."
+ ]
+}

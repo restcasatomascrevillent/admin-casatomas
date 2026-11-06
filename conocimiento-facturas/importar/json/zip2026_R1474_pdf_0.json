@@ -1,0 +1,48 @@
+{
+ "archivo": "R1474.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "289",
+ "fecha": "2026-08-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "kg Capellán seco",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 84.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 84.0,
+ "desglose_iva": [
+  {
+   "base": 84.0,
+   "pct": 10,
+   "cuota": 8.4
+  }
+ ],
+ "iva": 8.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 92.4,
+ "observaciones": "Pago: Alicante. Factura manuscrita de talonario; cliente MASIDE 2011 S.L. B54583356, R.E. y descuento vacíos.",
+ "alertas": [
+  "Fecha manuscrita 3 de 8 de 2026, pero el nº 289 queda entre el 272 (20/8) y el 298 (10/9) y el precio 10,50 es el de septiembre: probablemente sea 3/9/2026. Se deja lo impreso."
+ ]
+}

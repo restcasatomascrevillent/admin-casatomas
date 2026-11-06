@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  22
+ ],
+ "tipo": "factura",
+ "proveedor": "MARINA MONLLOR CB",
+ "cif": "E70931498",
+ "local": "casa_tomas",
+ "numero_documento": "609/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 22,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.3,
+   "descuento_pct": null,
+   "total": 74.76,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 74.76,
+ "desglose_iva": [
+  {
+   "base": 74.76,
+   "pct": 10.0,
+   "cuota": 7.48
+  }
+ ],
+ "iva": 7.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 82.24,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 11394. Embarcaciones: ninguna.",
+ "alertas": []
+}

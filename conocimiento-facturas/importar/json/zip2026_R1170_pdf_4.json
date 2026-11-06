@@ -1,0 +1,63 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO RUSO AMBIT Y OTROS, C.B.",
+ "cif": "E03306933",
+ "local": "casa_tomas",
+ "numero_documento": "521/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 5,
+   "nombre": "17 GADIFORMES",
+   "producto_ficha": "Gadiformes (familia 17)",
+   "cantidad": 7.35,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.8,
+   "descuento_pct": null,
+   "total": 64.68,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 5,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 64.0,
+   "descuento_pct": null,
+   "total": 96.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 160.68,
+ "desglose_iva": [
+  {
+   "base": 160.68,
+   "pct": 10,
+   "cuota": 16.07
+  }
+ ],
+ "iva": 16.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 176.75,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 15519, 15037.",
+ "alertas": []
+}

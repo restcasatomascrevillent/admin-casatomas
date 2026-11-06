@@ -1,0 +1,120 @@
+{
+ "archivo": "R955.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0203/(2026)000875",
+ "fecha": "2026-06-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ARANDANOS MC TA 125G",
+   "producto_ficha": "Arándanos tarrina 125 g",
+   "cantidad": 2.0,
+   "unidad": "tarrina",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.25,
+   "descuento_pct": null,
+   "total": 2.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FRUTA DE LA PASION BJ 500 G",
+   "producto_ficha": "Fruta de la pasión bandeja 500 g",
+   "cantidad": 1.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.79,
+   "descuento_pct": null,
+   "total": 6.79,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LIMAS CJ 4KG",
+   "producto_ficha": "Limas caja 4 kg",
+   "cantidad": 2.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.89,
+   "descuento_pct": null,
+   "total": 19.78,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "JENGIBRE BJ 400G/500G",
+   "producto_ficha": "Jengibre fresco bandeja 400-500 g",
+   "cantidad": 1.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.99,
+   "descuento_pct": null,
+   "total": 1.99,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "ZUMO NARANJ ZANAH JENGIB 750 M",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.95,
+   "descuento_pct": null,
+   "total": 3.95,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 35.01,
+ "desglose_iva": [
+  {
+   "base": 5.94,
+   "pct": 10,
+   "cuota": 0.59
+  },
+  {
+   "base": 29.07,
+   "pct": 4,
+   "cuota": 1.16
+  }
+ ],
+ "iva": 1.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 36.76,
+ "observaciones": "Forma de pago: tarjeta. Ticket de compra en Makro Elche (cash & carry). Documento de 2 paginas; las paginas siguientes repiten cabecera y recibo del datafono.",
+ "alertas": []
+}

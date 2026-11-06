@@ -1,0 +1,63 @@
+{
+ "archivo": "R1503.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "6394",
+ "fecha": "2026-09-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLA RAPE 2/3",
+   "producto_ficha": "Cola de rape 2/3 kg (Lophius budegassa)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.8,
+   "descuento_pct": null,
+   "total": 198.0,
+   "iva_pct": 10,
+   "albaran_ref": "22173",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "COLA RAPE 2/3",
+   "producto_ficha": "Cola de rape 2/3 kg (Lophius budegassa)",
+   "cantidad": 10.8,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.8,
+   "descuento_pct": null,
+   "total": 235.44,
+   "iva_pct": 10,
+   "albaran_ref": "22442",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 433.44,
+ "desglose_iva": [
+  {
+   "base": 433.44,
+   "pct": 10,
+   "cuota": 43.34
+  }
+ ],
+ "iva": 43.34,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 476.78,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura.",
+ "alertas": []
+}

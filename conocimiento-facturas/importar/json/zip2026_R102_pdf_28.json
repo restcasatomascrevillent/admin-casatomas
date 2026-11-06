@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  29
+ ],
+ "tipo": "factura",
+ "proveedor": "MAMADOU MACOUMB NDOUR",
+ "cif": "Y1341188A",
+ "local": "casa_tomas",
+ "numero_documento": "38/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 29,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.4,
+   "descuento_pct": null,
+   "total": 14.26,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 14.26,
+ "desglose_iva": [
+  {
+   "base": 14.26,
+   "pct": 10.0,
+   "cuota": 1.43
+  }
+ ],
+ "iva": 1.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 15.69,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 751. Embarcaciones: ninguna.",
+ "alertas": []
+}

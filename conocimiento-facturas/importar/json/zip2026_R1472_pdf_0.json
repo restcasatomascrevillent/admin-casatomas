@@ -1,0 +1,46 @@
+{
+ "archivo": "R1472.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EXCLUSIVAS GALICIA, S.L.",
+ "cif": "B30055404",
+ "local": "casa_tomas",
+ "numero_documento": "FV26/ 9795",
+ "fecha": "2026-09-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COVCOOK1250TP TAPA PP (PARA COOK1250N) 189X255X20 F",
+   "producto_ficha": "Tapa PP para Cook1250N 189x255x20",
+   "cantidad": 320.0,
+   "unidad": "ud",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.173,
+   "descuento_pct": null,
+   "total": 55.36,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 55.36,
+ "desglose_iva": [
+  {
+   "base": 55.36,
+   "pct": 21,
+   "cuota": 11.63
+  }
+ ],
+ "iva": 11.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 66.99,
+ "observaciones": "Pedido nº 40607 (fecha del pedido anterior a la factura). Forma de pago CONTADO, vencimiento = fecha factura. Albaran nº vacio. Descuento, portes, anticipo y R.E. 0,00. Descripciones truncadas por el borde de columna en el original.",
+ "alertas": []
+}

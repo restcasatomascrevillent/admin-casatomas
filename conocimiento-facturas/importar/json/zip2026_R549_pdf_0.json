@@ -1,0 +1,121 @@
+{
+ "archivo": "R549.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-2575",
+ "fecha": "2026-04-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHOCO G ENV MARRUECOS",
+   "producto_ficha": "Choco grande envasado, Marruecos",
+   "cantidad": 7.3,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 76.65,
+   "iva_pct": 10,
+   "albaran_ref": "B 5.270",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "POLLO MUSLO DESH. 4X2.5",
+   "producto_ficha": "Muslo de pollo deshuesado sin piel (4 x 2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.95,
+   "descuento_pct": null,
+   "total": 49.5,
+   "iva_pct": 10,
+   "albaran_ref": "B 5.270",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 5.270",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BACALAO DADO PCS 1X2",
+   "producto_ficha": "Bacalao desalado en dados (2 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.85,
+   "descuento_pct": null,
+   "total": 51.4,
+   "iva_pct": 10,
+   "albaran_ref": "B 5.371",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL M 400/600",
+   "producto_ficha": "Bogavante azul M 400/600 g",
+   "cantidad": 6.03,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.0,
+   "descuento_pct": null,
+   "total": 198.99,
+   "iva_pct": 10,
+   "albaran_ref": "B 5.431",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 385.29,
+ "desglose_iva": [
+  {
+   "base": 376.54,
+   "pct": 10,
+   "cuota": 37.65
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  }
+ ],
+ "iva": 38.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 423.29,
+ "observaciones": "Remesa semanal, vencimiento 19/04/2026. Nota «1 caja» no es línea. Cuadra al céntimo con el pie.",
+ "alertas": [
+  "CHOCO G ENV MARRUECOS (1023): precio 10,50 €/kg; la ficha registra 8,95 €/kg en las facturas anteriores. Se deja el precio impreso, que cuadra con el total."
+ ]
+}

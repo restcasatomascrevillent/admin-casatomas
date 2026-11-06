@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  25
+ ],
+ "tipo": "factura",
+ "proveedor": "CASTEJON HENAREJOS, JACINTO",
+ "cif": "48841985J",
+ "local": "casa_tomas",
+ "numero_documento": "98/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 25,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 7.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 134.89,
+   "iva_pct": 10,
+   "albaran_ref": "2811, 4407, 3903",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 134.89,
+ "desglose_iva": [
+  {
+   "base": 134.89,
+   "pct": 10,
+   "cuota": 13.49
+  }
+ ],
+ "iva": 13.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 148.38,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 811. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

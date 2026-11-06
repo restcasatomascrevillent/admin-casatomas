@@ -1,0 +1,100 @@
+{
+ "archivo": "R699.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VESCEL PACKAGING S.L.U.",
+ "cif": "B10804714",
+ "local": "casa_tomas",
+ "numero_documento": "1179",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Bob. aluminio industrial K-AZUL 30x1,8 kg 18 my (cód. 004628)",
+   "producto_ficha": null,
+   "cantidad": 42.0,
+   "unidad": "ud",
+   "bultos": 7,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 375.9,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.198",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Bobina Film PVC 3 uds embolsado 30x300 (T-220g) (cód. 004536)",
+   "producto_ficha": null,
+   "cantidad": 18.0,
+   "unidad": "ud",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.54,
+   "descuento_pct": null,
+   "total": 63.72,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.198",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Bobina Film PVC 3 uds embolsado 45x300 (T-330g) (cód. 004539)",
+   "producto_ficha": null,
+   "cantidad": 18.0,
+   "unidad": "ud",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.43,
+   "descuento_pct": null,
+   "total": 97.74,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.198",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "B.Basura 85x105 Negra 100 Lt. G.130 (caja 10 rollos de 10 uds) (cód. 004641)",
+   "producto_ficha": null,
+   "cantidad": 60.0,
+   "unidad": "ud",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.09,
+   "descuento_pct": null,
+   "total": 65.4,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.198",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 602.76,
+ "desglose_iva": [
+  {
+   "base": 602.76,
+   "pct": 21,
+   "cuota": 126.58
+  }
+ ],
+ "iva": 126.58,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 729.34,
+ "observaciones": "Cliente 0000003398. Forma de pago: giro a 15 días fecha factura, vencimiento 15/05/2026 por 729,34 €. Registro RD de envases ENV/2025/000054866.",
+ "alertas": [
+  "Destinatario impreso: MASIDE 2011, S.L. sin nombre de local: se deja no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

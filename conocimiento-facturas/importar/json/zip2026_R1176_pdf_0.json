@@ -1,0 +1,68 @@
+{
+ "archivo": "R1176.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170774291",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA GRANEL ES",
+   "producto_ficha": "Patata agria a granel",
+   "cantidad": 1152.0,
+   "unidad": "kg",
+   "bultos": 80,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.7,
+   "descuento_pct": null,
+   "total": 806.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ALMENDRA FRITA I BONGUST 1X950GR 10% ES",
+   "producto_ficha": "Almendra frita Bongust (bolsa 950 g)",
+   "cantidad": 18.0,
+   "unidad": "bt",
+   "bultos": 18,
+   "contenido_cantidad": 950,
+   "contenido_unidad": "g",
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 288.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1094.4,
+ "desglose_iva": [
+  {
+   "base": 806.4,
+   "pct": 4,
+   "cuota": 32.26
+  },
+  {
+   "base": 288.0,
+   "pct": 10,
+   "cuota": 28.8
+  }
+ ],
+ "iva": 61.06,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1155.46,
+ "observaciones": "Fecha entrega 29.07.2026. Referencia impresa 0809910801. Total BT 98. Tara de granel 36 kg. Dos tipos de IVA impresos (4 % y 10 %).",
+ "alertas": []
+}

@@ -1,0 +1,65 @@
+{
+  "cif": "B54977780",
+  "nombre": "Racionalismo Dulce, S.L.",
+  "nombres_impresos": ["Racionalismo Dulce, S.L.", "3335"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R130.pdf", "R597.pdf", "R998.pdf", "R493.pdf", "R1620.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes semanales; helado artesano en cubetas",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["FV2600067"], "patron": "^FV26\\d{5}$", "donde": "casilla 'Nº FACTURA' arriba, junto a los datos del cliente" },
+    "fecha": "casilla 'FECHA', D/M/AAAA sin ceros a la izquierda (31/1/2026); suele ser fin de mes. Vencimiento 10 días: giro bancario",
+    "albaranes": "fila de cabecera 'AL2600008 | 07/01/2026 | 10 | 195,60 €' = nº albarán | fecha | %IVA | importe base del albarán; debajo van sus líneas hasta el siguiente albarán"
+  },
+
+  "lectura": {
+    "columnas": ["Referencia de lote/cubeta", "Descripción (sabor)", "Formato", "Cantidad", "Precio", "Importe"],
+    "cantidad_es": "cubetas (cada una de 2400 ml = 2,4 L)",
+    "columna_peso": null,
+    "precio_es_por": "cubeta de 2,4 L",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "La 1ª columna es un código de lote tipo '522171/1[2]' (el número entre corchetes coincide con las cubetas de ese lote): no es el artículo ni la cantidad.",
+      "Si una línea junta dos lotes ('522113/1[2], 522171/1[2]') el texto salta de línea y la cantidad es la suma (4); la 2ª línea del lote no tiene precio.",
+      "El importe de cada albarán va en su cabecera (195,60 €), no en el pie.",
+      "En la fila de totales el '10' es el % de IVA, no un descuento aunque la cabecera diga '% DTO.': 'neto | 10 | cuota IVA | total'.",
+      "El IBAN y 'www.3335.es' del pie no son datos de producto."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio (2 × 28,80 = 57,60)",
+    "importe del albarán (cabecera) = suma de sus líneas (57,60+86,40+19,20+32,40 = 195,60)",
+    "TOTAL NETO = suma de los importes de albarán (195,60+211,96+310,26 = 717,82)",
+    "TOTAL = neto + 10 % IVA (717,82 + 71,78 = 789,60)"
+  ],
+
+  "guia_ocr": "Factura mensual de Racionalismo Dulce (helados 3335) a Casa Tomás. Número 'FVxxxxxxx' y fecha D/M/AAAA arriba. Se agrupa por albaranes: cabecera 'ALxxxxxxx | fecha | 10 | importe' y luego líneas: código de lote 'nnnnnn/n[n]' | sabor | 2400 ml | cantidad de cubetas | precio por cubeta | importe. Si dos lotes comparten línea, suma las cantidades. IVA 10 % sobre el total neto; en los totales el '10' es IVA, no descuento. Ignora IBAN y web.",
+
+  "productos": [
+    { "nombre_impreso": "Vainilla Bourbon 2400 ml", "nombre_normalizado": "Helado de vainilla Bourbon, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 28.80, "max": 29.52, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-07", 28.80], ["2026-06-09", 29.52]] }, "iva_pct": 10, "veces_visto": 33 },
+    { "nombre_impreso": "Frambuesa 2400 ml", "nombre_normalizado": "Helado de frambuesa, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 28.80, "max": 32.40, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-07", 28.80], ["2026-06-09", 32.40]] }, "iva_pct": 10, "veces_visto": 32 },
+    { "nombre_impreso": "Limón del limonero 2400 ml", "nombre_normalizado": "Sorbete de limón del limonero, cubeta 2,4 L", "familia": "helado", "presentacion": "sorbete artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 19.20, "max": 20.40, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-07", 19.20], ["2026-06-09", 20.40]] }, "iva_pct": 10, "veces_visto": 30 },
+    { "nombre_impreso": "Turrón Jijona Artesanía 2400 ml", "nombre_normalizado": "Helado de turrón de Jijona artesano, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 28.22, "max": 30.50, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-13", 28.22], ["2026-06-09", 30.50]] }, "iva_pct": 10, "veces_visto": 30 },
+    { "nombre_impreso": "Cobertura negra 70% 2400 ml", "nombre_normalizado": "Helado de chocolate negro 70 %, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 31.20, "max": 32.40, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-07", 32.40], ["2026-06-16", 31.20]] }, "iva_pct": 10, "veces_visto": 23 },
+    { "nombre_impreso": "Yema quemada 2400 ml", "nombre_normalizado": "Helado de yema quemada, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 24.96, "max": 29.52, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-13", 24.96], ["2026-06-09", 29.52]] }, "iva_pct": 10, "veces_visto": 20 },
+    { "nombre_impreso": "Yogourt 2400 ml", "nombre_normalizado": "Helado de yogur, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 21.60, "max": 22.68, "por": "cubeta de 2,4 L", "ejemplos": [["2026-01-27", 21.60], ["2026-06-16", 22.68]] }, "iva_pct": 10, "veces_visto": 16 },
+    { "nombre_impreso": "Crema coco 2400 ml", "nombre_normalizado": "Helado de crema de coco, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 30.10, "max": 30.10, "por": "cubeta de 2,4 L", "ejemplos": [["2026-06-16", 30.10]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "Queso 2400 ml", "nombre_normalizado": "Helado de queso, cubeta 2,4 L", "familia": "helado", "presentacion": "helado artesano congelado, cubeta", "formato": { "envase": "cubeta", "contenido": 2.4, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" }, "unidad_factura": "cubeta", "precio": { "min": 33.60, "max": 33.60, "por": "cubeta de 2,4 L", "ejemplos": [["2026-06-09", 33.60]] }, "iva_pct": 10, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Los sabores suben de precio a lo largo del año (p. ej. Yema quemada 24,96 a 29,52, Frambuesa 28,80 a 32,40); Cobertura negra baja de 32,40 a 31,20.",
+    "El número entre corchetes del código de lote coincide con la cantidad en las muestras, pero no está confirmado que lo signifique.",
+    "El formato '2400 ml' se interpreta como cubeta de 2,4 L; la factura no dice 'cubeta'."
+  ]
+}

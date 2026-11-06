@@ -1,0 +1,80 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE FEBRERO, C.B.",
+ "cif": "E54312830",
+ "local": "casa_tomas",
+ "numero_documento": "624/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.35,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.9,
+   "descuento_pct": null,
+   "total": 60.87,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 4,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 0.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 60.8,
+   "descuento_pct": null,
+   "total": 24.32,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 4,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.65,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.4,
+   "descuento_pct": null,
+   "total": 38.16,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 123.35,
+ "desglose_iva": [
+  {
+   "base": 123.35,
+   "pct": 10.0,
+   "cuota": 12.34
+  }
+ ],
+ "iva": 12.34,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 135.69,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403, 9215. Embarcaciones: PUNTA ALJIBE, PUNTA ALJIBE TRES.",
+ "alertas": []
+}

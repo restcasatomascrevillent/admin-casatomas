@@ -1,0 +1,46 @@
+{
+ "archivo": "R869.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ILISAL LEVANTE, S.L.U. (Esclapez)",
+ "cif": "B54976311",
+ "local": "casa_tomas",
+ "numero_documento": "R-1285",
+ "fecha": "2026-06-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SACO SAL FOMUTA",
+   "producto_ficha": "Sal (variedad manuscrita 'fomuta'), saco",
+   "cantidad": 5.0,
+   "unidad": "saco",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.75,
+   "descuento_pct": null,
+   "total": 33.75,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 33.75,
+ "desglose_iva": [
+  {
+   "base": 33.75,
+   "pct": 10,
+   "cuota": 3.38
+  }
+ ],
+ "iva": 3.38,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 37.13,
+ "observaciones": "Talonario manuscrito. Cliente manuscrito Maside 2011 SL B-54583356. Columna NUM. LOTE ignorada.",
+ "alertas": []
+}

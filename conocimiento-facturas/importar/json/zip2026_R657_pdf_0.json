@@ -1,0 +1,46 @@
+{
+ "archivo": "R657.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904161-0000612",
+ "fecha": "2026-04-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HARINA TRIGO ALTEZA 1 KG",
+   "producto_ficha": "Harina de trigo Alteza 1 kg",
+   "cantidad": -1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.572,
+   "descuento_pct": null,
+   "total": -0.57,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -0.57,
+ "desglose_iva": [
+  {
+   "base": -0.57,
+   "pct": 4,
+   "cuota": -0.02
+  }
+ ],
+ "iva": -0.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -0.59,
+ "observaciones": "DUPLICADO DE FACTURA; anula la factura 99041600016707 de 22-04-2026. Serie 9904161 = abono. Crédito a 30 días, vencimiento 22-05-2026. Escaneo CamScanner.",
+ "alertas": []
+}

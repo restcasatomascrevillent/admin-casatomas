@@ -1,0 +1,81 @@
+{
+ "archivo": "R1404.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CIELO DE BOCA, S.L.",
+ "cif": "B73915944",
+ "local": "casa_tomas",
+ "numero_documento": "A26/12938",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CP-LOMO C/H DE AÑOJO TERNERA",
+   "producto_ficha": "Lomo de añojo/ternera con hueso (pieza, precio por kg)",
+   "cantidad": 23.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.95,
+   "descuento_pct": 0.0,
+   "total": 412.85,
+   "iva_pct": 10,
+   "albaran_ref": "A26/17675",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GG-PLUMA IBERICA",
+   "producto_ficha": "Pluma de cerdo ibérico (pieza, precio por kg)",
+   "cantidad": 10.71,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.95,
+   "descuento_pct": 0.0,
+   "total": 235.09,
+   "iva_pct": 10,
+   "albaran_ref": "A26/17675",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CP-LOMO C/H DE AÑOJO TERNERA",
+   "producto_ficha": "Lomo de añojo/ternera con hueso (pieza, precio por kg)",
+   "cantidad": 24.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.45,
+   "descuento_pct": 0.0,
+   "total": 453.87,
+   "iva_pct": 10,
+   "albaran_ref": "A26/18799",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1101.81,
+ "desglose_iva": [
+  {
+   "base": 1101.81,
+   "pct": 10,
+   "cuota": 110.18
+  }
+ ],
+ "iva": 110.18,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1211.99,
+ "observaciones": "Factura de agosto con dos albaranes (A26/17675 y A26/18799). Carnes por peso: cantidad = kg, bultos = piezas. Número impreso 'A26/ 12,938' normalizado a A26/12938. Pluma: 10,71 x 21,95 = 235,08 frente a 235,09 impreso (diferencia de 0,01 por redondeo; la base impresa cuadra con la línea tal como viene). Dirección del cliente con un número distinto (107). Pago por giro a 5 días.",
+ "alertas": []
+}

@@ -1,0 +1,101 @@
+{
+ "archivo": "R1482.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170779871",
+ "fecha": "2026-09-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I 3K ES",
+   "producto_ficha": "Guindilla piparra (bulto 3 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 5.1,
+   "descuento_pct": null,
+   "total": 15.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 5 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 5 (Costa Rica)",
+   "cantidad": 12.05,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 21.69,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "KIWI SUNGOLD 22 I ZESPRI 5,8K NZ",
+   "producto_ficha": "Kiwi Sungold Zespri (caja 5,8 kg)",
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": 5.8,
+   "contenido_unidad": "kg",
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 26.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 15K ES",
+   "producto_ficha": null,
+   "cantidad": 495.0,
+   "unidad": "kg",
+   "bultos": 33,
+   "contenido_cantidad": 15,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.62,
+   "descuento_pct": null,
+   "total": 306.9,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 369.89,
+ "desglose_iva": [
+  {
+   "base": 369.89,
+   "pct": 4,
+   "cuota": 14.8
+  }
+ ],
+ "iva": 14.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 384.69,
+ "observaciones": "Fecha entrega 10.09.2026. Referencia impresa 0810015499. Total BT 36.",
+ "alertas": [
+  "Guindilla piparra 3K a 5,10 €/kg; la ficha tiene 15,1-23,1 €/kg. El total 15,30 cuadra con 3 kg. Se deja lo impreso; conviene revisarlo.",
+  "Patata agria 15K no está en el catálogo (hay 20K y granel; el 15K del catálogo es cat. I). producto_ficha null.",
+  "Kiwi Sungold con calibre 22 y precio 26,00 por bulto; la ficha tiene calibre 18 a 32,00."
+ ]
+}

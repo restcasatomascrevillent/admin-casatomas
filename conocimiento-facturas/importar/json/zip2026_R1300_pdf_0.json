@@ -1,0 +1,63 @@
+{
+ "archivo": "R1300.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260388",
+ "fecha": "2026-07-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DORADA",
+   "producto_ficha": "Dorada",
+   "cantidad": 10.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.0,
+   "descuento_pct": null,
+   "total": 675.8,
+   "iva_pct": 10,
+   "albaran_ref": "1-000388",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CABRACHO",
+   "producto_ficha": "Cabracho",
+   "cantidad": 1.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 37.0,
+   "descuento_pct": null,
+   "total": 70.3,
+   "iva_pct": 10,
+   "albaran_ref": "1-000388",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 746.1,
+ "desglose_iva": [
+  {
+   "base": 746.1,
+   "pct": 10,
+   "cuota": 74.61
+  }
+ ],
+ "iva": 74.61,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 820.71,
+ "observaciones": "Albarán 1-000388 del 16/07/2026. Forma de pago: transferencia CaixaBank; vencimiento 16/07/2026 por 820,71. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": []
+}

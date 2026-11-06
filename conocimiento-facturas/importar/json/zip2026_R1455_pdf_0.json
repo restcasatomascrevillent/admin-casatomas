@@ -1,0 +1,84 @@
+{
+ "archivo": "R1455.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "Winterhalter Iberica S.L.U.",
+ "cif": "B92282029",
+ "local": "casa_tomas",
+ "numero_documento": "7100185500",
+ "fecha": "2026-09-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Mano de obra tecnico especialista",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 42.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Desplazamiento zona 1",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 41.0,
+   "descuento_pct": null,
+   "total": 41.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Bomba de desague 220-240V/50HZ",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 186.7,
+   "descuento_pct": null,
+   "total": 186.7,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 270.2,
+ "desglose_iva": [
+  {
+   "base": 270.2,
+   "pct": 21,
+   "cuota": 56.74
+  }
+ ],
+ "iva": 56.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 326.94,
+ "observaciones": "Orden de servicio 351970215 (pedido de 31.08.2026, fecha entrega/instalacion 03.09.2026, tecnico José Francisco Reyes, equipo UC-L v02). Trabajo: reparacion de fuga en el reten de la bomba de desague con sustitucion de bomba. Pedido 6002342714. Unidad MO (mano de obra) tomada como hora. Pago hasta 04.10.2026 sin deduccion, recibo domiciliado. Paginas 3 a 5: condiciones generales.",
+ "alertas": []
+}

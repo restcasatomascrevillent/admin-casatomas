@@ -1,0 +1,86 @@
+{
+ "archivo": "R532.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "AVATEL TELECOM, S.A.",
+ "cif": "A93135218",
+ "local": "casa_tomas",
+ "numero_documento": "CURF26/118858",
+ "fecha": "2026-04-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Telefonía Fija Empresas 1-31 Mar 966107887",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.2,
+   "descuento_pct": null,
+   "total": 3.2,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Pack Negocio PLUS 1-30 Abr",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.04,
+   "descuento_pct": null,
+   "total": 35.04,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Promo 15 meses Pack Negocio PLUS 1-30 Abr",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -5.16,
+   "descuento_pct": null,
+   "total": -5.16,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 33.09,
+ "desglose_iva": [
+  {
+   "base": 33.09,
+   "pct": 21,
+   "cuota": 6.95
+  }
+ ],
+ "iva": 6.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 40.04,
+ "observaciones": "Consumo 01/03/2026-31/03/2026. Domiciliación bancaria, vence 02/04/2026. Pack Negocio PLUS va como una sola línea. Páginas 2-4: detalle de llamadas.",
+ "alertas": [
+  "Las líneas impresas suman 33,08 (3,20 + 35,04 - 5,16) y la base imponible impresa es 33,09: diferencia de 0,01 € en el propio documento. Se deja lo impreso.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

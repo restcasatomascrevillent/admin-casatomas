@@ -1,0 +1,46 @@
+{
+ "archivo": "R1393.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170778649",
+ "fecha": "2026-09-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 334.2,
+   "unidad": "kg",
+   "bultos": 24,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.7,
+   "descuento_pct": null,
+   "total": 233.94,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 233.94,
+ "desglose_iva": [
+  {
+   "base": 233.94,
+   "pct": 4,
+   "cuota": 9.36
+  }
+ ],
+ "iva": 9.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 243.3,
+ "observaciones": "Fecha entrega 01.09.2026. Referencia impresa 0809989853. Total BT 24. Peso bruto de 345 kg para 24 bultos (unos 14,4 kg por bulto; la ficha dice unos 15 kg, sin confirmar).",
+ "alertas": []
+}

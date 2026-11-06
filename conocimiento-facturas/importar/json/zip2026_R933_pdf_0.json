@@ -1,0 +1,85 @@
+{
+ "archivo": "R933.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3382",
+ "fecha": "2026-06-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FTE. DORADA 120/160 X5",
+   "producto_ficha": "Dorada 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.5,
+   "descuento_pct": null,
+   "total": 62.5,
+   "iva_pct": 10,
+   "albaran_ref": "20265948",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "20265948",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "COCOCHAS MERLUZA FRESCO",
+   "producto_ficha": "Cocochas de merluza fresco",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 68.0,
+   "descuento_pct": null,
+   "total": 136.0,
+   "iva_pct": 10,
+   "albaran_ref": "20265948",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 214.0,
+ "desglose_iva": [
+  {
+   "base": 198.5,
+   "pct": 10,
+   "cuota": 19.85
+  },
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  }
+ ],
+ "iva": 20.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 234.47,
+ "observaciones": "Transferencia a 30 dias, vencimiento 18/07/2026. Albaran 20265948 de 16/06/2026, pedido 20026. Nota impresa: NOTA DE ENTREGA 8554. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

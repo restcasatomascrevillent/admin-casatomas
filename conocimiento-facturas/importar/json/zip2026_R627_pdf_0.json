@@ -1,0 +1,104 @@
+{
+ "archivo": "R627.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-3243",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "JUDIA PLANA TROZOS ANEDILCO 2X2.5",
+   "producto_ficha": "Judía plana en trozos Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.7,
+   "descuento_pct": null,
+   "total": 8.5,
+   "iva_pct": 4,
+   "albaran_ref": "B 6.498",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CERDO CARRILLADA (OLIVA)",
+   "producto_ficha": "Carrillada de cerdo Oliva",
+   "cantidad": 19.11,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.65,
+   "descuento_pct": null,
+   "total": 184.41,
+   "iva_pct": 10,
+   "albaran_ref": "B 6.498",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CHOCO G ENV MARRUECOS",
+   "producto_ficha": "Choco grande envasado, Marruecos",
+   "cantidad": 15.95,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 167.48,
+   "iva_pct": 10,
+   "albaran_ref": "B 6.498",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "QUESO FRESCO TEMPURA 4X500 AL VENT",
+   "producto_ficha": "Queso fresco en tempura (4 x 500 g)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 11.35,
+   "descuento_pct": null,
+   "total": 22.7,
+   "iva_pct": 10,
+   "albaran_ref": "B 6.498",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 383.09,
+ "desglose_iva": [
+  {
+   "base": 374.59,
+   "pct": 10,
+   "cuota": 37.46
+  },
+  {
+   "base": 8.5,
+   "pct": 4,
+   "cuota": 0.34
+  }
+ ],
+ "iva": 37.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 420.89,
+ "observaciones": "Remesa semanal, vencimiento 10/05/2026. El lote «R -26026» del queso tempura se imprime con signo menos; se toma como lote. Cuadra al céntimo con el pie.",
+ "alertas": [
+  "CHOCO G ENV MARRUECOS (1023): precio 10,50 €/kg; la ficha registra 8,95 €/kg en las facturas anteriores. Se deja el precio impreso, que cuadra con el total."
+ ]
+}

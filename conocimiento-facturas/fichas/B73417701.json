@@ -1,0 +1,274 @@
+{
+  "cif": "B73417701",
+  "nombre": "SALVADOR PINAR JIMÉNEZ, S.L.U.",
+  "nombres_impresos": ["Salvador Pinar Jiménez, S.L.U", "SALVADOR PINAR JIMÉNEZ"],
+  "categoria": "despensa-congelados-quesos",
+  "locales": ["casa_tomas"],
+  "muestras": ["R167.pdf", "R647.pdf", "R997.pdf", "R1254.pdf", "R1619.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes semanales",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-3",
+    "numero_factura": { "ejemplos": ["A26/2.559", "A26/12.671", "A26/19.457", "A26/23.076", "A26/29.626"], "patron": "^A26/\\d{1,2}\\.\\d{3}$", "donde": "arriba, junto a la palabra FACTURA y 'Página n / m'; el punto es separador de miles" },
+    "fecha": "casilla FECHA arriba a la derecha, DD/MM/AA o DD/MM/AAAA (fin de mes). 'Fecha Emisión' (día 1-3 del mes siguiente) es otra distinta; Vencimiento = día 10 del mes siguiente. Nº de cliente 203348",
+    "albaranes": "cabecera 'Albarán: A26/29.788 | (02/07/26)' (fecha entre paréntesis DD/MM/AA) antes de sus líneas; varias fechas por factura"
+  },
+
+  "lectura": {
+    "columnas": ["Ref.", "C/P", "Lote", "Descripción", "unid.", "Kilos", "Precio", "Promo", "Importe"],
+    "cantidad_es": "C/P = nº de cajas (C) o piezas (P) servidas; 'unid.' = unidades totales (bolsas, tarros, piezas) de esas cajas/piezas",
+    "columna_peso": "Kilos: solo en quesos, ravioli y pieza de vaca (peso real servido); '----' en el resto",
+    "precio_es_por": "unidad (columna unid.) cuando Kilos es '----'; €/kg cuando Kilos trae peso",
+    "descuento_por_linea": { "existe": false, "columna": "Promo", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "No es proveedor de fruta: son congelados, quesos, salsas y despensa (el info.json lo clasificaba como fruta-verdura)",
+      "Con Kilos: importe = kilos x precio/kg (3,005 x 30,71 = 92,28); sin Kilos: importe = unid. x precio (15 x 8,96 = 134,40)",
+      "'3 C' + 'unid. 15' significa 3 cajas de 5 unidades; '1 P' + 'unid. 1' una pieza; no confundir C/P con unid.",
+      "La columna Lote mezcla códigos, fechas (20260103, 30/06/2030, S15/ene2028) y a veces se pega a la descripción ('16/02/26 RVER RAVIOLIS…'); no es cantidad",
+      "Debajo de algunas líneas hay textos sueltos (JESUS, EL PESEBRE, BUENO CG, MISENPLACE IQF, 'Grs SOCCHEF') = marca o continuación de la descripción, y lotes extra (150725007, 160725001): no son líneas nuevas",
+      "El pie va en la última página y mezcla filas con tipos distintos de IVA: '10,04 | 21% | 2,11', '403,52 | 4% | 16,14', y una fila final 'total bruto | base 10% | 10% | IVA | TOTAL'. Las páginas intermedias traen el pie vacío",
+      "El IVA depende del producto y no sale por línea: quesos, tostadas, mantequilla y arroz 4%; salsas, caldo, setas, tomate seco, cocas, croquetón, ravioli, vainilla y vaca 10%; manga pastelera 21%",
+      "Prefijo '-' en descripción (-AZUCAR DE COCO, -VAINAS…): ignorarlo",
+      "El mismo artículo aparece en varias líneas con distinto lote y distinto peso"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "con Kilos: importe línea = kilos x precio; sin Kilos: importe = unid. x precio",
+    "Total Bruto = suma de importes; se reparte en bases por tipo de IVA (4%, 10%, 21%)",
+    "IVA = base 4% x 0,04 + base 10% x 0,10 + base 21% x 0,21",
+    "total = Total Bruto + IVAs. Ej. julio: 10,04 + 403,52 + 395,14 = 808,70; IVA 2,11 + 16,14 + 39,51; total 866,46",
+    "Ej. septiembre: 183,71 (4%) + 358,40 (10%) = 542,11; IVA 7,35 + 35,84; total 585,30",
+    "Ej. enero: 69,40 (4%) + 126,56 (10%) = 195,96; IVA 2,78 + 12,66; total 211,40"
+  ],
+
+  "guia_ocr": "Factura mensual de Salvador Pinar con albaranes (Albarán: A26/nn.nnn (fecha)). Nº factura A26/nn.nnn (el punto es de miles), fecha arriba a la derecha. Columnas: Ref. | C/P (cajas o piezas) | Lote | Descripción | unid. | Kilos | Precio | Promo | Importe. Sin Kilos: unid. x precio. Con Kilos (quesos, ravioli, vaca): kilos x precio por kg. El Lote puede ser fecha o código, no es cantidad; las palabras sueltas bajo la línea (JESUS, EL PESEBRE, BUENO CG) son marca. IVA mixto 4%, 10% y 21%: usa el pie de la última página.",
+
+  "productos": [
+    {
+      "nombre_impreso": "7300560 TOSTADAS CRISTAL 8X5CM 200 GRS PANADERIA",
+      "nombre_normalizado": "Tostadas de cristal 8x5 cm 200 g (marca Jesús)",
+      "familia": "panadería-despensa",
+      "presentacion": "bolsa de tostadas envasada 200 g, caja de 10",
+      "formato": { "envase": "bolsa", "contenido": 200, "unidad_contenido": "g", "unidades_por_bulto": 10, "bulto": "caja" },
+      "unidad_factura": "unidad (bolsa); C/P cuenta cajas",
+      "precio": { "min": 3.47, "max": 3.64, "por": "unidad", "ejemplos": [["2026-01-22", 3.47], ["2026-04-29", 3.64], ["2026-09-10", 3.64]] },
+      "iva_pct": 4,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "7700350 COCA MINI DE ACEITE 20 Grs 20U A. BUENO IQF",
+      "nombre_normalizado": "Coca mini de aceite 20 g (20 ud), congelada",
+      "familia": "congelados",
+      "presentacion": "congelado (IQF), bolsa de 20 piezas de 20 g, caja de 5",
+      "formato": { "envase": "bolsa", "contenido": 20, "unidad_contenido": "ud", "unidades_por_bulto": 5, "bulto": "caja" },
+      "unidad_factura": "unidad (bolsa); C/P cuenta cajas",
+      "precio": { "min": 8.96, "max": 8.96, "por": "unidad", "ejemplos": [["2026-07-02", 8.96], ["2026-09-03", 8.96]] },
+      "iva_pct": 10,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "6602020 QUESO OVEJA CURADO MANCHEGO ARTESANO",
+      "nombre_normalizado": "Queso manchego curado de oveja artesano (El Pesebre)",
+      "familia": "queso",
+      "presentacion": "pieza curada, peso variable (~3 kg), al kg",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg (columna Kilos); unid. = piezas",
+      "precio": { "min": 30.71, "max": 30.71, "por": "kg", "ejemplos": [["2026-07-09", 30.71], ["2026-09-17", 30.71]] },
+      "iva_pct": 4,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "6603680 QUESO VACA STRACCIATELLA 1 Kg PRELIBATA",
+      "nombre_normalizado": "Stracciatella de vaca 1 kg (Prelibata)",
+      "familia": "queso",
+      "presentacion": "fresco, envase de 1 kg, caja de 2",
+      "formato": { "envase": "envase", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "unidad (envase de 1 kg)",
+      "precio": { "min": 16.64, "max": 16.64, "por": "unidad", "ejemplos": [["2026-07-09", 16.64]] },
+      "iva_pct": 4,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "6602005 QUESO OVEJA SEMI MANCHEGO ARTESANO EL",
+      "nombre_normalizado": "Queso manchego semicurado de oveja artesano (El Pesebre)",
+      "familia": "queso",
+      "presentacion": "pieza semicurada, al kg",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 27.57, "max": 27.57, "por": "kg", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "1980252 CALDO GRANULADO DE CARNE 1 Kg BOVIS",
+      "nombre_normalizado": "Caldo granulado de carne 1 kg (Bovis)",
+      "familia": "despensa",
+      "presentacion": "envasado, bote de 1 kg",
+      "formato": { "envase": "bote", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 14.46, "max": 14.46, "por": "unidad", "ejemplos": [["2026-07-16", 14.46]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "1980146 SETAS PERRECHICO NAMEKO 1 Kg BOVIS",
+      "nombre_normalizado": "Setas perrechico nameko 1 kg (Bovis)",
+      "familia": "conserva-verdura",
+      "presentacion": "envasada (conserva), bote de 1 kg",
+      "formato": { "envase": "bote", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 11.17, "max": 11.17, "por": "unidad", "ejemplos": [["2026-07-30", 11.17]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "7700109 SALSA DRESSING ADEREZO THAI 500 Grs A. BUENO CG",
+      "nombre_normalizado": "Salsa dressing aderezo thai 500 g (A. Bueno, congelada)",
+      "familia": "salsas",
+      "presentacion": "envase 500 g, caja de 8",
+      "formato": { "envase": "envase", "contenido": 500, "unidad_contenido": "g", "unidades_por_bulto": 8, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 15.82, "max": 15.82, "por": "unidad", "ejemplos": [["2026-01-22", 15.82]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "7700111 SALSA YAKINIKU 500 Grs A. BUENO CG",
+      "nombre_normalizado": "Salsa yakiniku 500 g (A. Bueno, congelada)",
+      "familia": "salsas",
+      "presentacion": "envase 500 g, caja de 8",
+      "formato": { "envase": "envase", "contenido": 500, "unidad_contenido": "g", "unidades_por_bulto": 8, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 9.55, "max": 9.55, "por": "unidad", "ejemplos": [["2026-04-29", 9.55]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "1981065 -AZUCAR DE COCO 3 Kgs SOCCHEF",
+      "nombre_normalizado": "Azúcar de coco 3 kg (Soc Chef)",
+      "familia": "despensa",
+      "presentacion": "envasado, 3 kg",
+      "formato": { "envase": "bolsa", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 40.47, "max": 40.47, "por": "unidad", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "1981838 -VAINAS VAINILLA BOURBON MADAGASCAR 250 Grs SOCCHEF",
+      "nombre_normalizado": "Vainas de vainilla Bourbon Madagascar 250 g (Soc Chef)",
+      "familia": "despensa",
+      "presentacion": "envasado, 250 g",
+      "formato": { "envase": "envase", "contenido": 250, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 44.86, "max": 45.33, "por": "unidad", "ejemplos": [["2026-07-16", 44.86]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "1980142 TOMATE SEMI SECO 1 Kg BOVIS",
+      "nombre_normalizado": "Tomate semiseco 1 kg (Bovis)",
+      "familia": "conserva-verdura",
+      "presentacion": "envasado, bote de 1 kg, caja de 6",
+      "formato": { "envase": "bote", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 14.94, "max": 14.94, "por": "unidad", "ejemplos": [["2026-06-11", 14.94]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "2010510 RAVIOLIS DE VERDURITAS 6X7 ARTIPASTA IQF",
+      "nombre_normalizado": "Raviolis de verduritas 6x7 (Artipasta), congelados",
+      "familia": "pasta",
+      "presentacion": "congelado (IQF), se factura por kilos",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg (columna Kilos)",
+      "precio": { "min": 12.16, "max": 12.16, "por": "kg", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "2010540 RAVIOLIS DE GAMBAS 5X5 ARTIPASTA IQF",
+      "nombre_normalizado": "Raviolis de gambas 5x5 (Artipasta), congelados",
+      "familia": "pasta",
+      "presentacion": "congelado (IQF), se factura por kilos",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg (columna Kilos)",
+      "precio": { "min": 15.43, "max": 15.43, "por": "kg", "ejemplos": [["2026-06-11", 15.43]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "1980410 ARROZ ALBUFERA 5KG SIVARIS",
+      "nombre_normalizado": "Arroz Albufera 5 kg (Sivaris)",
+      "familia": "arroz",
+      "presentacion": "envasado, saco de 5 kg, caja de 5",
+      "formato": { "envase": "saco", "contenido": 5, "unidad_contenido": "kg", "unidades_por_bulto": 5, "bulto": "caja" },
+      "unidad_factura": "unidad (saco de 5 kg)",
+      "precio": { "min": 18.93, "max": 18.93, "por": "unidad", "ejemplos": [["2026-09-03", 18.93]] },
+      "iva_pct": 4,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "7701120 CROQUETON DE PUCHERO 65 Gr 40 Ud MISENPLACE IQF",
+      "nombre_normalizado": "Croquetón de puchero 65 g (40 ud), congelado",
+      "familia": "congelados",
+      "presentacion": "congelado (IQF), bolsa de 40 piezas de 65 g",
+      "formato": { "envase": "bolsa", "contenido": 40, "unidad_contenido": "ud", "unidades_por_bulto": 1, "bulto": "caja" },
+      "unidad_factura": "unidad (bolsa de 40)",
+      "precio": { "min": 31.88, "max": 31.88, "por": "unidad", "ejemplos": [["2026-06-04", 31.88]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "6910018 MANTEQUILLA DE CABRA 125 Grs HOYA IGLESIA",
+      "nombre_normalizado": "Mantequilla de cabra 125 g (Hoya Iglesia)",
+      "familia": "lácteos",
+      "presentacion": "envasada 125 g",
+      "formato": { "envase": "envase", "contenido": 125, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 7.60, "max": 7.60, "por": "unidad", "ejemplos": [["2026-06-11", 7.60]] },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "2001006 COTE VACA DANISH CROWN",
+      "nombre_normalizado": "Cote de vaca (Danish Crown)",
+      "familia": "carne",
+      "presentacion": "pieza de peso variable, se factura por kilos",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg (columna Kilos)",
+      "precio": { "min": 32.01, "max": 32.01, "por": "kg", "ejemplos": [["2026-06-18", 32.01]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "1981536 MANGA PROFESIONAL 43 Cm 100 Udes SOCCHEF",
+      "nombre_normalizado": "Manga pastelera profesional 43 cm (100 ud, Soc Chef)",
+      "familia": "menaje-desechable",
+      "presentacion": "paquete de 100 unidades",
+      "formato": { "envase": "paquete", "contenido": 100, "unidad_contenido": "ud", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad (paquete)",
+      "precio": { "min": 10.04, "max": 10.04, "por": "unidad", "ejemplos": [["2026-07-09", 10.04]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "No hay fruta ni verdura fresca en las muestras: la categoría fruta-verdura del info.json no coincide; no se ve bruto, tara ni neto en ninguna columna (la columna Kilos parece peso servido)",
+    "Qué es la columna 'Promo' (siempre vacía) y qué cuenta exactamente 'unid.' en cada caja: se deduce del cociente unid./cajas (5, 10, 8, 6, 2, 5 según artículo)",
+    "Contenido de la bolsa de la coca mini: 'Grs 20U' se ha leído como 20 piezas de 20 g por bolsa; no está confirmado",
+    "Precio del ravioli de verduritas, azúcar de coco y queso semicurado: solo hay una muestra, sin tipo de IVA confirmado (null)",
+    "La columna Lote a veces trae fechas (caducidad probable): sin confirmar",
+    "Nombre de marca 'Soc Chef' escrito junto como SOCCHEF; 'EL PESEBRE' cae en la línea siguiente al queso"
+  ]
+}

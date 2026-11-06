@@ -1,0 +1,100 @@
+{
+ "archivo": "R1298.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260456",
+ "fecha": "2026-08-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 116.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000456",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA S.E.",
+   "producto_ficha": "Ostra S.E.",
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 115.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000456",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BOGAVANTE",
+   "producto_ficha": "Bogavante",
+   "cantidad": 10.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": null,
+   "total": 256.25,
+   "iva_pct": 10,
+   "albaran_ref": "1-000456",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "DORADA",
+   "producto_ficha": "Dorada",
+   "cantidad": 3.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 63.0,
+   "descuento_pct": null,
+   "total": 233.1,
+   "iva_pct": 10,
+   "albaran_ref": "1-000456",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 720.55,
+ "desglose_iva": [
+  {
+   "base": 720.55,
+   "pct": 10,
+   "cuota": 72.06
+  }
+ ],
+ "iva": 72.06,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 792.61,
+ "observaciones": "Albarán 1-000456 del 06/08/2026. Forma de pago: transferencia CaixaBank; vencimiento 06/08/2026 por 792,61. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "BOGAVANTE a 25,00 €/kg; la ficha da 26,00 €/kg.",
+  "DORADA a 63,00 €/kg; la ficha da 62,00 €/kg."
+ ]
+}

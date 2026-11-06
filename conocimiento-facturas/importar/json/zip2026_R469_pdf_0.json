@@ -1,0 +1,63 @@
+{
+ "archivo": "R469.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260123",
+ "fecha": "2026-03-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": "Buey (probablemente buey de mar)",
+   "cantidad": 15.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.0,
+   "descuento_pct": null,
+   "total": 294.5,
+   "iva_pct": 10,
+   "albaran_ref": "1-000123",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RODABALLO",
+   "producto_ficha": "Rodaballo",
+   "cantidad": 22.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.5,
+   "descuento_pct": null,
+   "total": 760.73,
+   "iva_pct": 10,
+   "albaran_ref": "1-000123",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1055.23,
+ "desglose_iva": [
+  {
+   "base": 1055.23,
+   "pct": 10,
+   "cuota": 105.52
+  }
+ ],
+ "iva": 105.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1160.75,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 23/03/2026 por 1.160,75. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": []
+}

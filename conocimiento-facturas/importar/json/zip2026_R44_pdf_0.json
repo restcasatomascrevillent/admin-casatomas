@@ -1,0 +1,83 @@
+{
+ "archivo": "R44.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170747684",
+ "fecha": "2026-01-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "KIWI SUNGOLD 25 I ZESPRI 5,8K IT",
+   "producto_ficha": "Kiwi Sungold Zespri (caja 5,8 kg)",
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": 5.8,
+   "contenido_unidad": "kg",
+   "precio_unitario": 32.0,
+   "descuento_pct": null,
+   "total": 32.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CEREZA LAPINS 28+ I RANCO GOLD 2,5K CL",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 42.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 5 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 5 (Costa Rica)",
+   "cantidad": 25.2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.0,
+   "descuento_pct": null,
+   "total": 50.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 124.9,
+ "desglose_iva": [
+  {
+   "base": 124.9,
+   "pct": 4,
+   "cuota": 5.0
+  }
+ ],
+ "iva": 5.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 129.9,
+ "observaciones": "Fecha entrega 22.01.2026, igual que la fecha de factura. Anotacion suelta '(CP)': no es producto. Total BT 5. Asterisco GLOBALG.A.P. quitado del nombre.",
+ "alertas": [
+  "CEREZA LAPINS 28+ no figura en el catalogo (solo Lapins 32+). producto_ficha null. Precio 8,50 EUR/kg por debajo del rango de la ficha (10-12).",
+  "PIÑA GOLD 5 a 2,00 EUR/kg: por encima del rango de la ficha (1,70-1,80). Lo impreso se deja tal cual."
+ ]
+}

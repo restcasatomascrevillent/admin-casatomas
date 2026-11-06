@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  18
+ ],
+ "tipo": "factura",
+ "proveedor": "PUNTA DEL CABO SL",
+ "cif": "B30921001",
+ "local": "casa_tomas",
+ "numero_documento": "405/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 18,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.5,
+   "descuento_pct": null,
+   "total": 48.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 48.3,
+ "desglose_iva": [
+  {
+   "base": 48.3,
+   "pct": 10,
+   "cuota": 4.83
+  }
+ ],
+ "iva": 4.83,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 53.13,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 15155.",
+ "alertas": []
+}

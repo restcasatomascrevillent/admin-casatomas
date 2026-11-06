@@ -1,0 +1,69 @@
+{
+ "archivo": "R865.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MAR MENOR DISTRIBUCIONES ALIMENTARIAS, S.L. (Doria Foods)",
+ "cif": "B73910747",
+ "local": "casa_tomas",
+ "numero_documento": "FRA/2026/14983",
+ "fecha": "2026-05-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CR.VACA MADURADA RIÑONADA BEHIKI AA C/S NETO (cód. 270131)",
+   "producto_ficha": null,
+   "cantidad": 25.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.5,
+   "descuento_pct": null,
+   "total": 567.0,
+   "iva_pct": 10,
+   "albaran_ref": "WH/OUT/241286",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Servicio de Elaboración (por Kg), pedido S319965 (cód. elab)",
+   "producto_ficha": null,
+   "cantidad": 25.2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "WH/OUT/241286",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Gestión de embalajes, punto verde y logística (Art. 78 Ley 37/92), 1,5 €/entrega",
+   "importe": 1.5,
+   "iva_pct": 10
+  }
+ ],
+ "subtotal": 568.5,
+ "desglose_iva": [
+  {
+   "base": 568.5,
+   "pct": 10,
+   "cuota": 56.85
+  }
+ ],
+ "iva": 56.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 625.35,
+ "observaciones": "Pedido S319965. Forma de pago: transferencia, plazo 15 días, vencimiento 14/06/2026 por 625,35 €. Dirección de entrega: Santa María de la Cabeza, 2 (MASIDE 2011 S.L., Restaurante Casa Tomás).",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  16
+ ],
+ "tipo": "factura",
+ "proveedor": "LA RANCHERA 2018 S.L.",
+ "cif": "B42573030",
+ "local": "casa_tomas",
+ "numero_documento": "1.075/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 16,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.55,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.1,
+   "descuento_pct": null,
+   "total": 55.96,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 55.96,
+ "desglose_iva": [
+  {
+   "base": 55.96,
+   "pct": 10,
+   "cuota": 5.6
+  }
+ ],
+ "iva": 5.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 61.56,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 15519.",
+ "alertas": []
+}

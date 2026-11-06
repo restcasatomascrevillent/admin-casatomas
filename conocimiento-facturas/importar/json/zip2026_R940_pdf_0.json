@@ -1,0 +1,97 @@
+{
+ "archivo": "R940.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ASESORES Y CONSULTORES CREVILLENTE, S.L.",
+ "cif": "B54361266",
+ "local": "casa_tomas",
+ "numero_documento": "1 1514",
+ "fecha": "2026-06-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HOJAS RECLAMACIONES",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.0,
+   "descuento_pct": null,
+   "total": 20.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CONTRATO EVENTUAL (nota de cargo 23/06/2026, sin cargo)",
+   "producto_ficha": null,
+   "cantidad": 8,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.93,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CONTRATO INTERINIDAD (nota de cargo 23/06/2026, sin cargo)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.93,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "ASESORAMIENTO FISCAL Y LABORAL (junio 2026)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 400.41,
+   "descuento_pct": null,
+   "total": 400.41,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 420.41,
+ "desglose_iva": [
+  {
+   "base": 420.41,
+   "pct": 21,
+   "cuota": 88.29
+  }
+ ],
+ "iva": 88.29,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 508.7,
+ "observaciones": "Honorarios mensuales de asesoría más hojas de reclamaciones. Los contratos figuran con 100% de descuento (sin importe). Destinatario MASIDE 2011 SL (B-54583356), C/ Santa María de la Cabeza 2. Pago a C.R. Central.",
+ "alertas": []
+}

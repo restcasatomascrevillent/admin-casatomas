@@ -1,0 +1,68 @@
+{
+ "archivo": "R362.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 1074",
+ "fecha": "2026-03-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "20261839",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CABEZA ALISTADO",
+   "producto_ficha": "Cabeza de alistado (listado)",
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": null,
+   "total": 29.4,
+   "iva_pct": 10,
+   "albaran_ref": "20261839",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 44.9,
+ "desglose_iva": [
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  },
+  {
+   "base": 29.4,
+   "pct": 10,
+   "cuota": 2.94
+  }
+ ],
+ "iva": 3.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 48.46,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 04/04/2026, transferencia a 30 días. Albarán 20261839 del 04/03/2026, pedido 17004. Notas 'Itas' ignoradas. La fila Total (3 cajas, 7,10 kg) no son euros.",
+ "alertas": []
+}

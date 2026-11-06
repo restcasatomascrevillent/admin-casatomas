@@ -1,0 +1,63 @@
+{
+ "archivo": "R537.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-2469",
+ "fecha": "2026-04-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CABECERO IBERICO (ALJOMAR)",
+   "producto_ficha": "Cabecero ibérico Aljomar",
+   "cantidad": 10.24,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.25,
+   "descuento_pct": null,
+   "total": 115.2,
+   "iva_pct": 10,
+   "albaran_ref": "B 4.965",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LAGRIMA IBERICA (ALJOMAR)",
+   "producto_ficha": "Lágrima ibérica Aljomar",
+   "cantidad": 8.81,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.15,
+   "descuento_pct": null,
+   "total": 115.85,
+   "iva_pct": 10,
+   "albaran_ref": "B 4.965",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 231.05,
+ "desglose_iva": [
+  {
+   "base": 231.05,
+   "pct": 10,
+   "cuota": 23.11
+  }
+ ],
+ "iva": 23.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 254.16,
+ "observaciones": "Remesa semanal, vencimiento 13/04/2026. Notas «1 caja» no son líneas. Cuadra al céntimo con el pie.",
+ "alertas": []
+}

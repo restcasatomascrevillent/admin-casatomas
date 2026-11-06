@@ -1,0 +1,46 @@
+{
+ "archivo": "R932.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90281684",
+ "fecha": "2026-06-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Real Conservera Española Berberechos al Natural",
+   "producto_ficha": "Berberechos al natural Real Conservera Española",
+   "cantidad": 24,
+   "unidad": "lata",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.3,
+   "descuento_pct": null,
+   "total": 559.2,
+   "iva_pct": 10,
+   "albaran_ref": "40321084",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 559.2,
+ "desglose_iva": [
+  {
+   "base": 559.2,
+   "pct": 10,
+   "cuota": 55.92
+  }
+ ],
+ "iva": 55.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 615.12,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 15/08/2026. Punto verde 0,00 EUR. Albarán 40321084 del 10/06/2026.",
+ "alertas": []
+}

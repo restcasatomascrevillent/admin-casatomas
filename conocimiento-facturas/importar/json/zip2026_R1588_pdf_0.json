@@ -1,0 +1,48 @@
+{
+ "archivo": "R1588.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "R-262",
+ "fecha": "2026-09-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CERDO MANITAS 1X5",
+   "producto_ficha": "Manitas de cerdo (5 kg)",
+   "cantidad": -5.0,
+   "unidad": "kg",
+   "bultos": -1.0,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.95,
+   "descuento_pct": null,
+   "total": -14.75,
+   "iva_pct": 10,
+   "albaran_ref": "R 267",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -14.75,
+ "desglose_iva": [
+  {
+   "base": -14.75,
+   "pct": 10,
+   "cuota": -1.48
+  }
+ ],
+ "iva": -1.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -16.23,
+ "observaciones": "RECTIFICATIVA (abono) R-262 sobre albarán R 267 de 23/09/2026; importes negativos tal cual impresos. Vencimiento 04/10/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": [
+  "Rectificativa sin número de factura original impreso. El lote 26-179 coincide con el de CERDO MANITAS 1X5 de B-7718 (R1559): posible abono parcial de esa línea."
+ ]
+}

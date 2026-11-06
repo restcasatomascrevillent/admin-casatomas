@@ -1,0 +1,70 @@
+{
+ "archivo": "R370.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Exclusivas Uriarte, S.L.",
+ "cif": "B03821576",
+ "local": "casa_tomas",
+ "numero_documento": "A26/2355",
+ "fecha": "2026-03-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ARROZ MOLINO ROCA CARNAROLI OLD 2K",
+   "producto_ficha": "Arroz Molino Roca Carnaroli Old 2 kg",
+   "cantidad": 16.0,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.2,
+   "descuento_pct": null,
+   "total": 131.2,
+   "iva_pct": 4,
+   "albaran_ref": "A26/3470",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ESCALOPAS FOIE GRAS CONG. 50gr (20U) B",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "g",
+   "precio_unitario": 44.95,
+   "descuento_pct": 10.0,
+   "total": 202.28,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3470",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 333.48,
+ "desglose_iva": [
+  {
+   "base": 131.2,
+   "pct": 4,
+   "cuota": 5.25
+  },
+  {
+   "base": 202.28,
+   "pct": 10,
+   "cuota": 20.23
+  }
+ ],
+ "iva": 25.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 358.96,
+ "observaciones": "Forma de pago: recibo 45 días domiciliado. Nº cliente 4,027.",
+ "alertas": [
+  "Foie: 5 x 44,95 con 10% dto = 202,275, impreso 202,28 (redondeo)."
+ ]
+}

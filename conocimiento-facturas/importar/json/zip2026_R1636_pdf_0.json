@@ -1,0 +1,48 @@
+{
+ "archivo": "R1636.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MARIA ASUNCIÓN VELAR VILLAR",
+ "cif": "13697919Q",
+ "local": "casa_tomas",
+ "numero_documento": "9647",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ANCHOAS XL. ALTA REST. 00 10UND",
+   "producto_ficha": null,
+   "cantidad": 64,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 608,
+   "iva_pct": 10,
+   "albaran_ref": "202545",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 608,
+ "desglose_iva": [
+  {
+   "base": 608,
+   "pct": 10,
+   "cuota": 60.8
+  }
+ ],
+ "iva": 60.8,
+ "recargo_equivalencia": 0,
+ "retencion_irpf": null,
+ "total": 668.8,
+ "observaciones": "Conservas Mª Asun Velar. Cliente 329. Destinatario impreso MASIDE 2011 S.L.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

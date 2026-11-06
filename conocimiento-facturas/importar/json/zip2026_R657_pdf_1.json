@@ -1,0 +1,46 @@
+{
+ "archivo": "R657.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "abono",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904161-0000123",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "GALLETA TOSTADA PETIT RIO 800 G",
+   "producto_ficha": "Galleta tostada Petit Río 800 g",
+   "cantidad": -22,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.036,
+   "descuento_pct": null,
+   "total": -66.79,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -66.79,
+ "desglose_iva": [
+  {
+   "base": -66.79,
+   "pct": 10,
+   "cuota": -6.68
+  }
+ ],
+ "iva": -6.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -73.47,
+ "observaciones": "DUPLICADO DE FACTURA; anula la factura 99041600003818 de 27-01-2026. Serie 9904161 = abono. Crédito. Escaneo CamScanner.",
+ "alertas": []
+}

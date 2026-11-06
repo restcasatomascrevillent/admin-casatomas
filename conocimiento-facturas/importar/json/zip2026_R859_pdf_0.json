@@ -1,0 +1,46 @@
+{
+ "archivo": "R859.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3059",
+ "fecha": "2026-06-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 50/70",
+   "producto_ficha": "Pez espada 50/70 (FAO 87 Pacífico)",
+   "cantidad": 5.3,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 50.35,
+   "iva_pct": 10,
+   "albaran_ref": "20265351",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 50.35,
+ "desglose_iva": [
+  {
+   "base": 50.35,
+   "pct": 10,
+   "cuota": 5.04
+  }
+ ],
+ "iva": 5.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 55.39,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 04/07/2026, transferencia a 30 días. Albarán 20265351 del 02/06/2026, pedido 19575. Nota 'Centro en rodajas' ignorada. La fila Total (1 caja, 5,30 kg) no son euros.",
+ "alertas": []
+}
