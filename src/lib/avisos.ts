@@ -79,3 +79,31 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   instagram_encargo: KanbanSquare,
   sistema: Info,
 };
+
+/**
+ * Avisos de cada sección, para el botón rojo «Avisos» de Reservas y Facturas (06/11/2026, petición
+ * del dueño: «avisos en vez de ser una pestaña de la barra lateral, que sean botones en sus
+ * secciones»). Los tipos son los mismos que el filtro de la página /avisos (`TIPOS_POR_FILTRO`).
+ */
+export type SeccionAvisos = "reservas" | "facturas";
+
+export const SECCIONES_AVISOS: Record<SeccionAvisos, { titulo: string; tipos: { tipo: string; etiqueta: string }[] }> = {
+  reservas: {
+    titulo: "Avisos de reservas",
+    tipos: [
+      { tipo: "solicitud_pendiente", etiqueta: "Solicitudes" },
+      { tipo: "reserva_nueva", etiqueta: "Reservas nuevas" },
+      { tipo: "reserva_sin_asignar", etiqueta: "Sin sala o mesa" },
+    ],
+  },
+  facturas: {
+    titulo: "Avisos de facturas",
+    tipos: [
+      { tipo: "facturas_subida", etiqueta: "Subidas de facturas" },
+      { tipo: "subida_precio", etiqueta: "Subidas de precio" },
+      { tipo: "original_sin_drive", etiqueta: "Originales sin Drive" },
+    ],
+  },
+};
+
+export const tiposDeSeccion = (seccion: SeccionAvisos) => SECCIONES_AVISOS[seccion].tipos.map((t) => t.tipo);

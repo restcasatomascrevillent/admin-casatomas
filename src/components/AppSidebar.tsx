@@ -9,7 +9,6 @@ import {
   Shield,
   Settings,
   HelpCircle,
-  Bell,
   Instagram,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
@@ -125,7 +124,8 @@ const menuItems: {
     sectionKey: "usuarios",
     toggleKey: "usuarios",
   },
-  { title: "Avisos", url: "/avisos", icon: Bell },
+  // «Avisos» ya no va aquí (06/11/2026, petición del dueño): cada sección tiene su botón rojo (BotonAvisosSeccion)
+  // y la campana de arriba enlaza a /avisos con todos.
   { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
 ];
 

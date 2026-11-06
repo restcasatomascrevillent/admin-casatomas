@@ -7,6 +7,7 @@ import { TabCompras } from "@/components/facturas/compras/TabCompras";
 import { GastoIaPestana } from "@/components/facturas/GastoIaPestana";
 import { MonitorGastoIA } from "@/components/facturas/MonitorGastoIA";
 import { BotonAyuda } from "@/components/ayuda/BotonAyuda";
+import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { MODOS_COMPRAS, PARAMS_ENLACE_COMPRAS, esNavegacionDeFicha, type ModoCompras } from "@/lib/facturas/compras";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
@@ -162,6 +163,8 @@ const Facturas = () => {
             acciones={
               <>
                 <GastoIaPestana className="ml-auto" />
+                {/* Avisos de facturas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
+                <BotonAvisosSeccion seccion="facturas" />
                 <BotonAyuda seccion="facturas" />
               </>
             }
