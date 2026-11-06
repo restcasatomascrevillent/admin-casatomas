@@ -1,0 +1,46 @@
+{
+ "archivo": "R408.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "2989",
+ "fecha": "2026-03-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BATEA PAQUITO MARTIN",
+   "producto_ficha": "Envase retornable: batea Paquito Martín",
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.65,
+   "descuento_pct": null,
+   "total": 3.3,
+   "iva_pct": 21,
+   "albaran_ref": "ENV 731 /26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3.3,
+ "desglose_iva": [
+  {
+   "base": 3.3,
+   "pct": 21,
+   "cuota": 0.69
+  }
+ ],
+ "iva": 0.69,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3.99,
+ "observaciones": "Factura solo de envases (sin líneas de producto). Transferencia 30 días. Albarán ENV 731 /26. Local casa_tomas según ficha (el texto no imprime destinatario).",
+ "alertas": []
+}

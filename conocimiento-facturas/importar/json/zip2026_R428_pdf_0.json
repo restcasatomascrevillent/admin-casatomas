@@ -1,0 +1,64 @@
+{
+ "archivo": "R428.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+ "cif": "B30224109",
+ "local": "casa_tomas",
+ "numero_documento": "2496",
+ "fecha": "2026-03-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BLANCO VALDEORRAS GODEVAL CEPAS VELLAS 75 CL.",
+   "producto_ficha": "Godello Valdeorras Godeval Cepas Vellas 75 cl",
+   "cantidad": 24.0,
+   "unidad": "botella",
+   "bultos": 4.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.85,
+   "descuento_pct": null,
+   "total": 404.4,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BLANCO VALDEORRAS GODEVAL CEPAS VELLAS 75 CL.",
+   "producto_ficha": "Godello Valdeorras Godeval Cepas Vellas 75 cl",
+   "cantidad": 12.0,
+   "unidad": "botella",
+   "bultos": 2.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true,
+   "precio_referencia": 16.85
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 404.4,
+ "desglose_iva": [
+  {
+   "base": 404.4,
+   "pct": 21,
+   "cuota": 84.92
+  }
+ ],
+ "iva": 84.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 489.32,
+ "observaciones": "Sin forma de pago impresa. 12 botellas regaladas (linea a .00). Observaciones: CERRADO LUNES.",
+ "alertas": []
+}

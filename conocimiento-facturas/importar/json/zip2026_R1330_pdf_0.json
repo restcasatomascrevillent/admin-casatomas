@@ -1,0 +1,46 @@
+{
+ "archivo": "R1330.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/16180",
+ "fecha": "2026-08-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "R.RED BULL ENERGY DRINK 25CL C24",
+   "producto_ficha": "Red Bull Energy Drink 25 cl (caja 24)",
+   "cantidad": 480,
+   "unidad": "lata",
+   "bultos": 20,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.8,
+   "descuento_pct": 0.0,
+   "total": 384.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/16.217",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 384.0,
+ "desglose_iva": [
+  {
+   "base": 384.0,
+   "pct": 21,
+   "cuota": 80.64
+  }
+ ],
+ "iva": 80.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 464.64,
+ "observaciones": "Giro/B2B, vencimiento 15/08/26. Albarán 26/16.217 (13/08/26). IVA por línea deducido de las bases impresas.",
+ "alertas": []
+}

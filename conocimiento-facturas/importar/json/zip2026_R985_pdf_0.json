@@ -1,0 +1,80 @@
+{
+ "archivo": "R985.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3588",
+ "fecha": "2026-06-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 50/70",
+   "producto_ficha": "Pez espada 50/70 (FAO 87 Pacífico)",
+   "cantidad": 5.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 49.4,
+   "iva_pct": 10,
+   "albaran_ref": "20266388",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SOLOMILLO CERDO EXTRA",
+   "producto_ficha": "Solomillo de cerdo extra",
+   "cantidad": 6.93,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.75,
+   "descuento_pct": null,
+   "total": 39.85,
+   "iva_pct": 10,
+   "albaran_ref": "20266388",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CABEZA ALISTADO",
+   "producto_ficha": "Cabeza de alistado (listado)",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": null,
+   "total": 30.8,
+   "iva_pct": 10,
+   "albaran_ref": "20266388",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 120.05,
+ "desglose_iva": [
+  {
+   "base": 120.05,
+   "pct": 10,
+   "cuota": 12.01
+  }
+ ],
+ "iva": 12.01,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 132.06,
+ "observaciones": "Transferencia a 30 dias, vencimiento 26/07/2026. Albaran 20266388 de 25/06/2026, pedido 20288. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

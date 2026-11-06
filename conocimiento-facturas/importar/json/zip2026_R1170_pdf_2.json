@@ -1,0 +1,63 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE FEBRERO, C.B.",
+ "cif": "E54312830",
+ "local": "casa_tomas",
+ "numero_documento": "1.123/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 10.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.7,
+   "descuento_pct": null,
+   "total": 58.43,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 3,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.85,
+   "descuento_pct": null,
+   "total": 24.57,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 83.0,
+ "desglose_iva": [
+  {
+   "base": 83.0,
+   "pct": 10,
+   "cuota": 8.3
+  }
+ ],
+ "iva": 8.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 91.3,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): PUNTA ALJIBE, ARNAUIMARC NOU. Albaranes de subasta (informativo): 15994, 16620.",
+ "alertas": []
+}

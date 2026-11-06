@@ -1,0 +1,100 @@
+{
+ "archivo": "R567.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": null,
+ "fecha": "2026-04-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "kg Capellans secs",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.3,
+   "descuento_pct": null,
+   "total": 82.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L. Gordal DH 60/80 2kg",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "T Chupadedos T3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.3,
+   "descuento_pct": null,
+   "total": 10.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "L. Gazpachos +3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 10.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 168.9,
+ "desglose_iva": [
+  {
+   "base": 168.9,
+   "pct": 10,
+   "cuota": 16.89
+  }
+ ],
+ "iva": 16.89,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 185.79,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": [
+  "Nº de factura cortado por el borde superior de la foto (empieza por '1', resto ilegible); por correlativo estaría entre 113 y 132.",
+  "'L. Gazpachos +3' y 'T Chupadedos T3' se leen con dudas; los precios 10,30 (chupadedos) y 10,50 (gazpachos) se han leído tal cual de las columnas y cuadran con el importe."
+ ]
+}

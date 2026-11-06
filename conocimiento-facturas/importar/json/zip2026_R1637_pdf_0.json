@@ -1,0 +1,48 @@
+{
+ "archivo": "R1637.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900011111",
+ "fecha": "2026-09-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LC. SAMBUCA MOLINARI EXTRA LITRO",
+   "producto_ficha": "Sambuca Molinari Extra 1 litro",
+   "cantidad": 2,
+   "unidad": "botella",
+   "bultos": 0,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 14.48,
+   "descuento_pct": 9.0,
+   "total": 26.35,
+   "iva_pct": 21,
+   "albaran_ref": "2904002611",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 26.35,
+ "desglose_iva": [
+  {
+   "base": 26.35,
+   "pct": 21,
+   "cuota": 5.53
+  }
+ ],
+ "iva": 5.53,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 31.88,
+ "observaciones": "Albarán 2904002611 del 29/09/2026. Forma de pago no impresa. Total unidades 2. El 9 % va en la línea, no en el pie.",
+ "alertas": [
+  "Sambuca a 14,48 con 9 % de descuento en línea; en R1238 el mismo artículo sale a 14,27 sin descuento de línea. Se deja lo impreso."
+ ]
+}

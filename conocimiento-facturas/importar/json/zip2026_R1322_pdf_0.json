@@ -1,0 +1,80 @@
+{
+ "archivo": "R1322.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TEXDECOLAN, S.L (Dani Uniformes)",
+ "cif": "B54942107",
+ "local": "casa_tomas",
+ "numero_documento": "FAC08787",
+ "fecha": "2026-07-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Camiseta m/corta negra poliéster",
+   "producto_ficha": null,
+   "cantidad": 50.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.25,
+   "descuento_pct": null,
+   "total": 162.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Estampación pecho 1 color (pequeño)",
+   "producto_ficha": null,
+   "cantidad": 50.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.15,
+   "descuento_pct": null,
+   "total": 57.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Gorro alto negro",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.25,
+   "descuento_pct": null,
+   "total": 16.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 236.5,
+ "desglose_iva": [
+  {
+   "base": 236.5,
+   "pct": 21,
+   "cuota": 49.67
+  }
+ ],
+ "iva": 49.67,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 286.17,
+ "observaciones": "",
+ "alertas": []
+}

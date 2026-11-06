@@ -1,0 +1,82 @@
+{
+ "archivo": "R1527.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170781269",
+ "fecha": "2026-09-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AGUACATE HASS 14 I PE",
+   "producto_ficha": "Aguacate Hass calibre 14 (caja 4 kg)",
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.5,
+   "descuento_pct": null,
+   "total": 17.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 PRE ORSERO STD CR",
+   "producto_ficha": null,
+   "cantidad": 11.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.35,
+   "descuento_pct": null,
+   "total": 14.85,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "JINJOL I ES",
+   "producto_ficha": "Azufaifa (jínjol)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.6,
+   "descuento_pct": null,
+   "total": 13.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 45.35,
+ "desglose_iva": [
+  {
+   "base": 45.35,
+   "pct": 4,
+   "cuota": 1.81
+  }
+ ],
+ "iva": 1.81,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 47.16,
+ "observaciones": "Fecha entrega 18.09.2026. Referencia impresa 0810037483. Total BT 3. Aguacate Hass 14 con origen PE (la ficha lo tiene como MX).",
+ "alertas": [
+  "Piña Gold 6 PRE ORSERO STD no está en el catálogo (solo «PIÑA GOLD 6 I ORO ORSERO CR»). producto_ficha null."
+ ]
+}

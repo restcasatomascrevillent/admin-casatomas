@@ -1,0 +1,81 @@
+{
+ "archivo": "R755.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "MAKRO DISTRIBUCION MAYORISTA, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0003/(2026)012811",
+ "fecha": "2026-05-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PAN MINI HAMBURGUE ROBERTO 8UD",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "bolsa",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.79,
+   "descuento_pct": null,
+   "total": 10.74,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATA VIOLETA MC BL 1,5 KG",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "malla",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.35,
+   "descuento_pct": null,
+   "total": 10.7,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "COMPRA MAS PAGA MENOS",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -1.2,
+   "descuento_pct": null,
+   "total": -1.2,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 20.24,
+ "desglose_iva": [
+  {
+   "base": 20.24,
+   "pct": 4,
+   "cuota": 0.81
+  }
+ ],
+ "iva": 0.81,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 21.05,
+ "observaciones": "Ticket de compra cash & carry (Makro Elche), pagado con tarjeta. Pags. 2-2: cabecera, 'Fin de factura' y recibo del datafono, sin lineas. Descuentos de pie impresos como lineas negativas (COMPRA MAS PAGA MENOS / DESCUENTO VENTA PROACTIVA).",
+ "alertas": []
+}

@@ -1,0 +1,106 @@
+{
+ "archivo": "R535.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRUTOS SECOS EL LLANO, S.L.",
+ "cif": "B30341598",
+ "local": "casa_tomas",
+ "numero_documento": "5950/26",
+ "fecha": "2026-04-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMENDRA MOLIDA REPELADA B/ 1 KG",
+   "producto_ficha": "Almendra molida repelada, bolsa 1 kg",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 44.75,
+   "iva_pct": 4,
+   "albaran_ref": "5950/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "COKTEL REF.23 B/ 1 KG",
+   "producto_ficha": "Cóctel de frutos secos ref. 23, bolsa 1 kg",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.65,
+   "descuento_pct": null,
+   "total": 55.8,
+   "iva_pct": 10,
+   "albaran_ref": "5950/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FINI MIX GOMA PICA B/ 1 KG",
+   "producto_ficha": "Fini Mix golosinas goma picante, bolsas de 1 kg (bulto 12 kg)",
+   "cantidad": 24.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.369,
+   "descuento_pct": null,
+   "total": 104.84,
+   "iva_pct": 10,
+   "albaran_ref": "5950/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MIXENSALADA B/ 1 KG",
+   "producto_ficha": "Mix para ensalada, bolsa 1 kg",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 42.5,
+   "iva_pct": 10,
+   "albaran_ref": "5950/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 247.89,
+ "desglose_iva": [
+  {
+   "base": 203.14,
+   "pct": 10,
+   "cuota": 20.31
+  },
+  {
+   "base": 44.75,
+   "pct": 4,
+   "cuota": 1.79
+  }
+ ],
+ "iva": 22.1,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 269.99,
+ "observaciones": "Albarán 5950/26 del 08/04/2026. Vencimiento giro 15/04/26. No se admiten devoluciones pasados 15 días.",
+ "alertas": [
+  "PDF digital: el texto no trae nº ni fecha de factura; numero_documento y fecha son los del albarán 5950/26 (08/04/2026).",
+  "FINI MIX: 24 kg x 4,369 = 104,86 y el importe impreso es 104,84 (2 céntimos menos). Se deja lo impreso.",
+  "Posible duplicado de R551 (escaneo): mismo albarán 5950/26 y mismo total 269,99."
+ ]
+}

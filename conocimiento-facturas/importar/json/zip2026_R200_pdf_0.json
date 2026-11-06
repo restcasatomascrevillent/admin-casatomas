@@ -1,0 +1,46 @@
+{
+ "archivo": "R200.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/2402",
+ "fecha": "2026-02-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "V.MACAN COSECHA 75CL 14º C6 CAJA MADERA",
+   "producto_ficha": "Vino tinto Macán Cosecha 75 cl (caja de madera de 6)",
+   "cantidad": 36,
+   "unidad": "botella",
+   "bultos": 6,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 52.25,
+   "descuento_pct": 0.0,
+   "total": 1881.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/1.641",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1881.0,
+ "desglose_iva": [
+  {
+   "base": 1881.0,
+   "pct": 21,
+   "cuota": 395.01
+  }
+ ],
+ "iva": 395.01,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2276.01,
+ "observaciones": "Giro/B2B, vencimiento 12/02/26. Albarán 26/1.641 (02/02/26). IVA por línea deducido de las bases impresas.",
+ "alertas": []
+}

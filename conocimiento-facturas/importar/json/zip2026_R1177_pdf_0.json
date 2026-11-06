@@ -1,0 +1,117 @@
+{
+ "archivo": "R1177.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170774442",
+ "fecha": "2026-07-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I 3K ES",
+   "producto_ficha": "Guindilla piparra (bulto 3 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.1,
+   "descuento_pct": null,
+   "total": 33.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ROSIÑOL I LAUMONT 3K RU",
+   "producto_ficha": "Rosiñol (bulto 3 kg, Rusia según código de lote)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 13.1,
+   "descuento_pct": null,
+   "total": 39.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 12.25,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.5,
+   "descuento_pct": null,
+   "total": 18.38,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "FRESA I 10X500GR TARRINA ES",
+   "producto_ficha": "Fresa (10 tarrinas de 500 g)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 5.0,
+   "descuento_pct": null,
+   "total": 25.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CEREZA LAPINS 30 I I LOVE 5K CA",
+   "producto_ficha": "Cereza Lapins/Skeena 30 (caja 5 kg, Canadá)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 65.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 180.98,
+ "desglose_iva": [
+  {
+   "base": 180.98,
+   "pct": 4,
+   "cuota": 7.24
+  }
+ ],
+ "iva": 7.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 188.22,
+ "observaciones": "Fecha entrega 30.07.2026. Referencia impresa 0809913413. Total BT 5.",
+ "alertas": [
+  "Guindilla piparra 3K a 11,10 €/kg; la ficha tiene 12,90-69,25 (y 15,1-23,1 por kg en otras facturas). Se deja lo impreso.",
+  "Fresa 10X500GR a 5,00 €/kg; la ficha tiene 7,00."
+ ]
+}

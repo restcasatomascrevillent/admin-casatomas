@@ -1,0 +1,140 @@
+{
+ "archivo": "R1658.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  9,
+  10,
+  11,
+  12,
+  13,
+  14
+ ],
+ "tipo": "factura",
+ "proveedor": "ORANGE ESPAGNE S.A.U.",
+ "cif": "A82009812",
+ "local": "casa_tomas",
+ "numero_documento": "E10011479099-1026",
+ "fecha": "2026-10-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Pack Love Empresa Impulsa 3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.5,
+   "descuento_pct": null,
+   "total": 99.55,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Fibra + llamadas",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 40.95,
+   "descuento_pct": null,
+   "total": 27.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Línea Smartph Neg Sin Lim",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 23.72,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Orange TV",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.0,
+   "descuento_pct": null,
+   "total": 62.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "Compra de dispositivos a plazos",
+   "producto_ficha": null,
+   "cantidad": 5,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 100.83,
+   "iva_pct": 0,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 313.6,
+ "desglose_iva": [
+  {
+   "base": 197.27,
+   "pct": 21,
+   "cuota": 41.43
+  },
+  {
+   "base": 15.5,
+   "pct": 0,
+   "cuota": 0
+  },
+  {
+   "base": 100.83,
+   "pct": 0,
+   "cuota": 0
+  }
+ ],
+ "iva": 41.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 355.03,
+ "observaciones": "Telefonía, fibra y TV. Periodo 01/09/2026-30/09/2026. Vencimiento 06/10/2026, domiciliación bancaria. Pack: cuota 95,50 + adicional 4,05 (sube desde 73,71: termina el descuento del 20 % de 12 meses). Fibra: cuota 40,95 con descuento -13,45. Línea Smartph: cuota 13,00 + adicional 10,72. Total exento de impuestos 15,50 (seguro móvil). Dispositivos: 5 equipos a plazos, sin IVA desglosado (base 0 %). Subtotal = suma de bases (21 %: 197,27; exento: 15,50; 0 %: 100,83). Destinatario impreso: TOMAS VAZQUEZ GONZALEZ MASIDE 2011 SL.",
+ "alertas": [
+  "La línea Línea Smartph Neg Sin Lim (23,72) incluye 15,50 exentos de IVA (seguro móvil según «Total exento de impuestos»); el IVA 21 % se aplica a la base imponible impresa de 197,27.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

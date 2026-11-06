@@ -1,0 +1,63 @@
+{
+ "archivo": "R56.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "115",
+ "fecha": "2026-01-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLA RAPE G 500/1800",
+   "producto_ficha": "Cola de rape grande 500/1800 g",
+   "cantidad": 14.55,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.8,
+   "descuento_pct": null,
+   "total": 229.89,
+   "iva_pct": 10,
+   "albaran_ref": "231",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOGAVANTE CANADA",
+   "producto_ficha": "Bogavante de Canadá",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.95,
+   "descuento_pct": null,
+   "total": 94.75,
+   "iva_pct": 10,
+   "albaran_ref": "231",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 324.64,
+ "desglose_iva": [
+  {
+   "base": 324.64,
+   "pct": 10,
+   "cuota": 32.46
+  }
+ ],
+ "iva": 32.46,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 357.1,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Factura sin serie. Destinatario Casa Tomás (cliente 1607).",
+ "alertas": []
+}

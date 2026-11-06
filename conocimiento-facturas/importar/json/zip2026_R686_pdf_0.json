@@ -1,0 +1,65 @@
+{
+ "archivo": "R686.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS GALMAR, S.L.",
+ "cif": "B36475416",
+ "local": "casa_tomas",
+ "numero_documento": "202601933",
+ "fecha": "2026-05-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PULPO P3 SHANDONG26 FAO34 (origen Marruecos, lote 0226)",
+   "producto_ficha": null,
+   "cantidad": 38.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.0,
+   "descuento_pct": 0,
+   "total": 570.0,
+   "iva_pct": 10,
+   "albaran_ref": "009809",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "VIEIRA PACIFICO M/C 20/30 FAO87 CHILE (lote O26016)",
+   "producto_ficha": null,
+   "cantidad": 8.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": 0,
+   "total": 112.0,
+   "iva_pct": 10,
+   "albaran_ref": "009809",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 682.0,
+ "desglose_iva": [
+  {
+   "base": 682.0,
+   "pct": 10,
+   "cuota": 68.2
+  }
+ ],
+ "iva": 68.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 750.2,
+ "observaciones": "Forma de pago: pagaré 90 días F.F. Vencimiento 06/08/2026 por 750,20 €. Albarán 009809 (05/05/2026). Pie: R.E. 1,40 % con cuota 0,00. Columnas del albarán: caja = 2.ª cifra, kg = 3.ª cifra, precio por kg = 4.ª, importe = última (kg x precio = importe).",
+ "alertas": [
+  "La primera cifra de la línea (38,00 y 8,00) no se identifica; se usa la 3.ª cifra como kg. El importe cuadra con kg x precio (38 x 15 = 570; 8 x 14 = 112)."
+ ]
+}

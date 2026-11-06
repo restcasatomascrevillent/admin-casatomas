@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  27
+ ],
+ "tipo": "factura",
+ "proveedor": "CASTEJON HENAREJOS, JACINTO",
+ "cif": "48841985J",
+ "local": "casa_tomas",
+ "numero_documento": "158/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 27,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.64,
+   "descuento_pct": null,
+   "total": 87.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 87.4,
+ "desglose_iva": [
+  {
+   "base": 87.4,
+   "pct": 10.0,
+   "cuota": 8.74
+  }
+ ],
+ "iva": 8.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 96.14,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 4952. Embarcaciones: ninguna.",
+ "alertas": []
+}

@@ -1,0 +1,49 @@
+{
+ "archivo": "R1139.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Instalaciones Electricas Candela, S.L.",
+ "cif": "B53149829",
+ "local": "casa_tomas",
+ "numero_documento": "00140",
+ "fecha": "2026-07-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRABAJOS AVERIA EN FOCO COLGANTE EN SALON PRINCIPAL",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": null,
+   "total": 35.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 35.0,
+ "desglose_iva": [
+  {
+   "base": 35.0,
+   "pct": 21,
+   "cuota": 7.35
+  }
+ ],
+ "iva": 7.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 42.35,
+ "observaciones": "Transferencia a la cuenta del proveedor impresa en la factura.",
+ "alertas": [
+  "Destinatario impreso solo MASIDE 2011: local no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

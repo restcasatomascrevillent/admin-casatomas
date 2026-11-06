@@ -1,0 +1,102 @@
+{
+ "archivo": "R996.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-5203",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LUBINA FILETE C/P (CAJA BLANCA) ISOLA 1X5",
+   "producto_ficha": "Filete de lubina con piel Isola (caja blanca, 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 15.95,
+   "descuento_pct": null,
+   "total": 159.5,
+   "iva_pct": 10,
+   "albaran_ref": "B 10.540",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 10.540",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "POLLO MUSLO DESH. CON PIEL 4X2,5KG",
+   "producto_ficha": "Muslo de pollo deshuesado con piel (4 x 2,5 kg)",
+   "cantidad": 20.0,
+   "unidad": "kg",
+   "bultos": 8.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.9,
+   "descuento_pct": null,
+   "total": 98.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 10.540",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CERDO CARRILLADA (OLIVA)",
+   "producto_ficha": "Carrillada de cerdo Oliva",
+   "cantidad": 20.74,
+   "unidad": "kg",
+   "bultos": 3.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.65,
+   "descuento_pct": null,
+   "total": 200.14,
+   "iva_pct": 10,
+   "albaran_ref": "B 10.540",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 466.39,
+ "desglose_iva": [
+  {
+   "base": 457.64,
+   "pct": 10,
+   "cuota": 45.76
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  }
+ ],
+ "iva": 46.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 512.5,
+ "observaciones": "Vencimiento 06/07/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R1056.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170770969",
+ "fecha": "2026-07-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FRESON I 8X500GR BE",
+   "producto_ficha": "Fresón (8 tarrinas de 500 g, Bélgica)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 7.0,
+   "descuento_pct": null,
+   "total": 28.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 28.0,
+ "desglose_iva": [
+  {
+   "base": 28.0,
+   "pct": 4,
+   "cuota": 1.12
+  }
+ ],
+ "iva": 1.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 29.12,
+ "observaciones": "Fecha entrega 03.07.2026. Origen impreso BE. Referencia impresa 0809846543. Total BT 1.",
+ "alertas": []
+}

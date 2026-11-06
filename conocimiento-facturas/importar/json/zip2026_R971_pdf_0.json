@@ -1,0 +1,49 @@
+{
+ "archivo": "R971.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Instalaciones Electricas Candela, S.L.",
+ "cif": "B53149829",
+ "local": "casa_tomas",
+ "numero_documento": "00120",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRABAJOS COMPROBAR LUCES QUE HACEN INTERMITENTE EN ALTAVOCES",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 92.0,
+   "descuento_pct": null,
+   "total": 92.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 92.0,
+ "desglose_iva": [
+  {
+   "base": 92.0,
+   "pct": 21,
+   "cuota": 19.32
+  }
+ ],
+ "iva": 19.32,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 111.32,
+ "observaciones": "Transferencia a la cuenta del proveedor impresa en la factura. Trabajos marcados TOUZA - 25/6/26.",
+ "alertas": [
+  "Destinatario impreso solo MASIDE 2011: local no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

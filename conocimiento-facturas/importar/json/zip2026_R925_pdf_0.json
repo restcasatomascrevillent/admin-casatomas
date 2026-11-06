@@ -1,0 +1,160 @@
+{
+ "archivo": "R925.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-4774",
+ "fecha": "2026-06-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CANELON CARNE/TRUFA/FOIE AUDENS",
+   "producto_ficha": "Canelón de carne, trufa y foie Audens",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 38.0,
+   "descuento_pct": null,
+   "total": 114.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 9.604",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CERDO SOLOMILLO OLIVA",
+   "producto_ficha": "Solomillo de cerdo Oliva",
+   "cantidad": 7.25,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.7,
+   "descuento_pct": null,
+   "total": 63.08,
+   "iva_pct": 10,
+   "albaran_ref": "B 9.604",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CABECERO IBERICO (ALJOMAR)",
+   "producto_ficha": "Cabecero ibérico Aljomar",
+   "cantidad": 10.56,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.25,
+   "descuento_pct": null,
+   "total": 118.8,
+   "iva_pct": 10,
+   "albaran_ref": "B 9.604",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 9.604",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TORTITAS CAMARON MAXI VIANDAS 3X1",
+   "producto_ficha": "Tortitas de camarón maxi Viandas (3 x 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.2,
+   "descuento_pct": null,
+   "total": 41.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 9.859",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "TARTA QUESO/PISTACHO ANEDILCO 1,5KG",
+   "producto_ficha": "Tarta de queso y pistacho Anedilco (1,5 kg)",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": 1.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 23.95,
+   "descuento_pct": null,
+   "total": 23.95,
+   "iva_pct": 10,
+   "albaran_ref": "B 9.859",
+   "bonificada": false
+  },
+  {
+   "orden": 7,
+   "pagina": 1,
+   "nombre": "TORTITAS CAMARON VIANDAS 3X25",
+   "producto_ficha": "Tortitas de camarón Viandas (3 x 25)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.2,
+   "descuento_pct": null,
+   "total": 24.6,
+   "iva_pct": 10,
+   "albaran_ref": "B 9.859",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 394.18,
+ "desglose_iva": [
+  {
+   "base": 271.43,
+   "pct": 10,
+   "cuota": 27.14
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  },
+  {
+   "base": 114.0,
+   "pct": 10,
+   "cuota": 11.4
+  }
+ ],
+ "iva": 38.89,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 433.07,
+ "observaciones": "Vencimiento 28/06/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": [
+  "Letra de IVA X en «CANELON CARNE/TRUFA/FOIE AUDENS»: el pie suma su base al 10 %; se usa 10 %, la ficha no lo confirma."
+ ]
+}

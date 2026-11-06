@@ -1,0 +1,82 @@
+{
+ "archivo": "R1031.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "3312",
+ "fecha": "2026-06-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA X/P/M",
+   "producto_ficha": "Quisquilla (Plesionika edwardsii) tamaño X/P/M, por kg",
+   "cantidad": 9.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 75,
+   "descuento_pct": null,
+   "total": 735,
+   "iva_pct": 10,
+   "albaran_ref": "9.086",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CARABINERO",
+   "producto_ficha": "Carabinero, por kg",
+   "cantidad": 7.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 80,
+   "descuento_pct": null,
+   "total": 584,
+   "iva_pct": 10,
+   "albaran_ref": "9.086",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BONITO",
+   "producto_ficha": null,
+   "cantidad": 30.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.8,
+   "descuento_pct": null,
+   "total": 299.88,
+   "iva_pct": 10,
+   "albaran_ref": "9.086",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1618.88,
+ "desglose_iva": [
+  {
+   "base": 1618.88,
+   "pct": 10,
+   "cuota": 161.89
+  }
+ ],
+ "iva": 161.89,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1780.77,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 29/06/2026 por 1780.77. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": [
+  "IVA impreso 161,89 sobre base 1.618,88 (161,888 redondeado)."
+ ]
+}

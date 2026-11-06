@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  26
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SOLER MOLNA SL",
+ "cif": "B10669950",
+ "local": "casa_tomas",
+ "numero_documento": "243/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 26,
+   "nombre": "MACRUROS (emb. PACO Y CARMEN)",
+   "producto_ficha": null,
+   "cantidad": 1.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 177.41,
+   "iva_pct": 10,
+   "albaran_ref": "3654, 3521",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 177.41,
+ "desglose_iva": [
+  {
+   "base": 177.41,
+   "pct": 10,
+   "cuota": 17.74
+  }
+ ],
+ "iva": 17.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 195.15,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 831. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

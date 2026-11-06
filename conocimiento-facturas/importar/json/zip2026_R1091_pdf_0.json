@@ -1,0 +1,119 @@
+{
+ "archivo": "R1091.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170772711",
+ "fecha": "2026-07-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 20K ES",
+   "producto_ficha": "Patata agria (saco 20 kg)",
+   "cantidad": 480.0,
+   "unidad": "kg",
+   "bultos": 24,
+   "contenido_cantidad": 20,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.6,
+   "descuento_pct": null,
+   "total": 288.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 5 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 5 (Costa Rica)",
+   "cantidad": 11.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.5,
+   "descuento_pct": null,
+   "total": 16.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIM PADRON I 10UN ES",
+   "producto_ficha": "Pimiento de Padrón (bandeja, 10 ud por bulto)",
+   "cantidad": 10.0,
+   "unidad": "un",
+   "bultos": 1,
+   "contenido_cantidad": 10,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 17.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I ES",
+   "producto_ficha": null,
+   "cantidad": 3.9,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 50.31,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "AGUACATE HASS 16 I PE",
+   "producto_ficha": "Aguacate Hass calibre 16 (caja 4 kg)",
+   "cantidad": 2.0,
+   "unidad": "bt",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.5,
+   "descuento_pct": null,
+   "total": 29.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 401.31,
+ "desglose_iva": [
+  {
+   "base": 401.31,
+   "pct": 4,
+   "cuota": 16.05
+  }
+ ],
+ "iva": 16.05,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 417.36,
+ "observaciones": "Fecha entrega 17.07.2026. Referencia impresa 0809881771. Total BT 29. Sin cargos de envases.",
+ "alertas": [
+  "Patata agria 20K a 0,60 €/kg; la ficha tiene 0,62-0,64. Se deja lo impreso.",
+  "Piña Gold 5 a 1,50 €/kg; la ficha tiene 1,70-1,80 €/kg.",
+  "Pimiento de Padrón 10UN a 1,75 €/ud; la ficha tiene 1,70.",
+  "Guindilla piparra sin peso impreso (“I ES”); el catálogo solo tiene 3K. producto_ficha null."
+ ]
+}

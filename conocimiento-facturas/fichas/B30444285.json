@@ -1,0 +1,207 @@
+{
+  "cif": "B30444285",
+  "nombre": "PRODUCTOS CONTINENTAL, S.L. (Cafés Salzillo)",
+  "nombres_impresos": ["PRODUCTOS CONTINENTAL, S.L.", "Cafés Salzillo", "SALZILLO"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R144.pdf", "R640.pdf", "R1022.pdf", "R1634.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fin de mes) que agrupa los albaranes semanales; café y consumibles de cafetería",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-3",
+    "numero_factura": {
+      "ejemplos": ["P00VN2600427", "P00VN2602126", "P00VN2603078", "P00VN2604652"],
+      "patron": "^P00VN26\\d{5}$",
+      "donde": "'FACTURA Nº P00VN...' en el encabezado de cada página"
+    },
+    "fecha": "'Fecha factura: 30/01/2026' en el encabezado, DD/MM/AAAA",
+    "albaranes": "Fila 'Albarán PR03OUT2600093 Fecha 08/01/2026' antes de sus líneas (también P00OUT... y PR04OUT... para cesiones de material)."
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Descripción", "Nº Env.", "Ct.Env", "Cantidad", "Precio", "IVA", "Importe"],
+    "cantidad_es": "unidades del envase indicado en la descripción (latas de 3 kg, cajas de 100 bolsitas, tubos, botes); cuenta en la cifra seguida de 'Und'",
+    "columna_peso": null,
+    "precio_es_por": "unidad (envase tal como se describe)",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": true,
+    "tipos_iva": [10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin líneas de envase; sí hay líneas a 0 € de material cedido (tazas, mercancía en depósito) y 'Visita Comercial'",
+    "cargos_y_descuentos_pie": ["Sin descuentos ni cargos en el pie"],
+    "trampas": [
+      "Bajo cada línea hay 'Lote | Fecha. Cad | Cantidad' y filas como '0540751255 | 2,00 Und' o '35225 | 18/08/2026 | 6,00 Und': son lotes, no productos ni cantidades extra.",
+      "Los códigos largos se parten: '1020800 ... | IVA | 01' o '1010500 ... 23': el '01'/'23'/'04' de la fila siguiente es el final del código (102080001, 101050023, 999000004).",
+      "Líneas a 0,00 € (Taza y Plato Solo/Cortado Barrocco, Taza Mug, Mercancía en Depósito, Visita Comercial) llevan IVA 21 % o 0 % pero importe 0: no son compras.",
+      "Hay abonos: cantidad negativa (-2,00 Und de Té Salzillo, -7,80 €) resta del total.",
+      "En páginas 2 y 3 el encabezado sale con palabras repetidas ('FACTURA FACTURA Nº Nº'): es ruido.",
+      "El NIF va con prefijo ES (ESB30444285 el proveedor, ESB54583356 el cliente) y las dos columnas de dirección se mezclan en las mismas filas. Proveedor = Productos Continental (Av. de Murcia 106C, Nonduermas); cliente = MASIDE 2011 (Casa Tomás).",
+      "La factura de enero no trae la columna IVA por línea (solo el desglose final); las demás sí.",
+      "El desglose final pierde filas: 'Base Imponible | Impuesto | Importe' con 'IVA 21 % (Bienes) 0,00' y 'IVA 10 % (Bienes) …'."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio (sin descuentos). R640: 2 × 95,88 = 191,76",
+    "base = suma de importes; las líneas a 0 € no suman. R640: 191,76 + 8,04 + 383,52 + 8,04 + 21,00 + 14,80 + 15,06 = 642,22",
+    "IVA 10 % = base × 0,10 (R640: 64,22; R1022: 1.007,89 → 100,79); la base al 21 % es 0,00",
+    "total = base + IVA. R640: 642,22 + 64,22 = 706,44; R144: 1.394,70 + 139,47 = 1.534,17; R1022: 1.108,68"
+  ],
+
+  "guia_ocr": "Emisor Productos Continental (café Salzillo), NIF con prefijo ES; cliente MASIDE 2011/Casa Tomás. Nº de factura 'P00VN26nnnnn' y 'Fecha factura' DD/MM/AAAA en el encabezado de cada página. Líneas: código, descripción, cantidad ('2,00 Und'), precio, IVA 10 %, importe. Ignora las filas 'Lote | Fecha. Cad | Cantidad', las líneas a 0,00 (tazas, depósito, visita comercial) y las cifras sueltas '01/23/04' que completan el código. Hay cantidades negativas (abonos). Totales al final: base 10 %, IVA, total.",
+
+  "productos": [
+    {
+      "nombre_impreso": "Café Barrocco Lata 3 kg.",
+      "nombre_normalizado": "Café Barrocco lata 3 kg",
+      "familia": "café",
+      "presentacion": "lata de 3 kg de café (grano o molido no indicado)",
+      "formato": { "envase": "lata", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "lata",
+      "precio": { "min": 95.88, "max": 95.88, "por": "lata", "ejemplos": [["2026-01-08", 95.88], ["2026-04-23", 95.88]] },
+      "iva_pct": 10,
+      "veces_visto": 28
+    },
+    {
+      "nombre_impreso": "Café Descafeinado Esmeralda Lata 2 Kg",
+      "nombre_normalizado": "Café descafeinado Esmeralda lata 2 kg",
+      "familia": "café",
+      "presentacion": "lata de 2 kg de café descafeinado",
+      "formato": { "envase": "lata", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "lata",
+      "precio": { "min": 60.29, "max": 60.29, "por": "lata", "ejemplos": [["2026-01-08", 60.29], ["2026-09-10", 60.29]] },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "Descafeinado Soluble Salzillo 100 Uds.",
+      "nombre_normalizado": "Descafeinado soluble Salzillo (100 sobres)",
+      "familia": "café",
+      "presentacion": "sobres monodosis de descafeinado soluble, caja de 100",
+      "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "uds", "unidades_por_bulto": 100, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 9.44, "max": 9.44, "por": "caja", "ejemplos": [["2026-01-08", 9.44]] },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "Leche Condensada Desnatada Sirve Facil 840 Gr.",
+      "nombre_normalizado": "Leche condensada desnatada Sirve Fácil 840 g",
+      "familia": "lácteo",
+      "presentacion": "envase dosificador Sirve Fácil de 840 g (nombre del envase, no aclara si es bote o tubo)",
+      "formato": { "envase": "envase dosificador", "contenido": 840, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 3.5, "max": 3.5, "por": "ud", "ejemplos": [["2026-01-08", 3.5], ["2026-04-23", 3.5]], "nota": "Se piden de 6 en 6 (6,00 Und = 21,00)" },
+      "iva_pct": 10,
+      "veces_visto": 17
+    },
+    {
+      "nombre_impreso": "Leche Condensada Desnatada Sobre 40 Uds.",
+      "nombre_normalizado": "Leche condensada desnatada en sobres (caja de 40)",
+      "familia": "lácteo",
+      "presentacion": "sobres monodosis, caja de 40",
+      "formato": { "envase": "caja", "contenido": 40, "unidad_contenido": "uds", "unidades_por_bulto": 40, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 7.4, "max": 7.4, "por": "caja", "ejemplos": [["2026-01-08", 7.4], ["2026-09-03", 7.4]], "nota": "Código 102080001 (enero) o 1020800 + '01' en fila siguiente" },
+      "iva_pct": 10,
+      "veces_visto": 20
+    },
+    {
+      "nombre_impreso": "Edulcorante en Polvo Tubo Salzillo 150 Uds.",
+      "nombre_normalizado": "Edulcorante en polvo Salzillo (tubo 150 sobres)",
+      "familia": "azúcar y edulcorante",
+      "presentacion": "tubo dispensador con 150 sobres",
+      "formato": { "envase": "tubo", "contenido": 150, "unidad_contenido": "uds", "unidades_por_bulto": 150, "bulto": "tubo" },
+      "unidad_factura": "tubo",
+      "precio": { "min": 4.02, "max": 4.02, "por": "tubo", "ejemplos": [["2026-01-08", 4.02], ["2026-09-17", 4.02]] },
+      "iva_pct": 10,
+      "veces_visto": 31
+    },
+    {
+      "nombre_impreso": "Azúcar Salzillo Tubo 1000 Und. 6 gr",
+      "nombre_normalizado": "Azúcar Salzillo tubo 1000 sobres de 6 g",
+      "familia": "azúcar y edulcorante",
+      "presentacion": "azúcar blanco en sobres de 6 g, tubo/caja de 1000",
+      "formato": { "envase": "tubo", "contenido": 1000, "unidad_contenido": "uds", "unidades_por_bulto": 1000, "bulto": "tubo" },
+      "unidad_factura": "tubo",
+      "precio": { "min": 15.06, "max": 15.06, "por": "tubo", "ejemplos": [["2026-01-08", 15.06], ["2026-04-23", 15.06]], "nota": "Alguna vez a 0,00 (regalo)" },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "Azucar Salzillo Moreno 6gr. Tubo 300 Stick",
+      "nombre_normalizado": "Azúcar moreno Salzillo tubo 300 sticks de 6 g",
+      "familia": "azúcar y edulcorante",
+      "presentacion": "azúcar moreno en sticks de 6 g, tubo de 300",
+      "formato": { "envase": "tubo", "contenido": 300, "unidad_contenido": "uds", "unidades_por_bulto": 300, "bulto": "tubo" },
+      "unidad_factura": "tubo",
+      "precio": { "min": 7.67, "max": 7.67, "por": "tubo", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "Azucar Corazon 1000 Sobres (San Valentin)",
+      "nombre_normalizado": "Azúcar corazón San Valentín (1000 sobres)",
+      "familia": "azúcar y edulcorante",
+      "presentacion": "sobres de azúcar con motivo San Valentín, caja de 1000",
+      "formato": { "envase": "caja", "contenido": 1000, "unidad_contenido": "uds", "unidades_por_bulto": 1000, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 22.05, "max": 22.05, "por": "caja", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Manzanilla Salzillo 100 Und.",
+      "nombre_normalizado": "Manzanilla Salzillo (100 bolsitas)",
+      "familia": "infusión",
+      "presentacion": "caja de 100 bolsitas de infusión",
+      "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "uds", "unidades_por_bulto": 100, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 3.9, "max": 3.9, "por": "caja", "ejemplos": [["2026-01-08", 3.9]] },
+      "iva_pct": 10,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "Te Salzillo 100 Und.",
+      "nombre_normalizado": "Té Salzillo (100 bolsitas)",
+      "familia": "infusión",
+      "presentacion": "caja de 100 bolsitas de té",
+      "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "uds", "unidades_por_bulto": 100, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 3.9, "max": 3.9, "por": "caja", "ejemplos": [["2026-01-08", 3.9]], "nota": "Una línea con -2 cajas (abono) en una factura" },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Te Verde Salzillo 100 Und.",
+      "nombre_normalizado": "Té verde Salzillo (100 bolsitas)",
+      "familia": "infusión",
+      "presentacion": "caja de 100 bolsitas de té verde",
+      "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "uds", "unidades_por_bulto": 100, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 6.1, "max": 6.1, "por": "caja", "ejemplos": [["2026-01-08", 6.1]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Poleo Salzillo 100 Und.",
+      "nombre_normalizado": "Poleo Salzillo (100 bolsitas)",
+      "familia": "infusión",
+      "presentacion": "caja de 100 bolsitas de poleo",
+      "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "uds", "unidades_por_bulto": 100, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 4.69, "max": 4.69, "por": "caja", "ejemplos": [["2026-06-18", 4.69]] },
+      "iva_pct": 10,
+      "veces_visto": 8
+    }
+  ],
+
+  "dudas": [
+    "El nombre social del proveedor no figura en el listado inicial ('sin nombre'); sale de las facturas: PRODUCTOS CONTINENTAL, S.L., con marca Cafés Salzillo (salzillo@cafes-salzillo.es).",
+    "No consta si el café Barrocco/Esmeralda es en grano o molido.",
+    "Se interpreta 'Und' como una lata, tubo o caja entera según el nombre del artículo; la factura no dice cuántas unidades trae cada una más allá de la descripción.",
+    "Las líneas a 0 € (tazas 510C/511C/510B, taza mug 496, mercancía en depósito 999000004, visita comercial 1010500) no se incluyen en el catálogo de productos."
+  ]
+}

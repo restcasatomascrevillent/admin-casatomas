@@ -1,0 +1,82 @@
+{
+ "archivo": "R352.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260078",
+ "fecha": "2026-02-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PERCEBE",
+   "producto_ficha": "Percebe",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 140.0,
+   "descuento_pct": null,
+   "total": 280.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000078",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000078",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": "Buey (probablemente buey de mar)",
+   "cantidad": 7.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.0,
+   "descuento_pct": null,
+   "total": 148.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000078",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 486.2,
+ "desglose_iva": [
+  {
+   "base": 486.2,
+   "pct": 10,
+   "cuota": 48.62
+  }
+ ],
+ "iva": 48.62,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 534.82,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 27/02/2026 por 534,82. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": [
+  "PERCEBE a 140,00 €/kg; la ficha indica 110,00 €/kg."
+ ]
+}

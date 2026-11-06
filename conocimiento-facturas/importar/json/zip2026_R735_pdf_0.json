@@ -1,0 +1,46 @@
+{
+ "archivo": "R735.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26004200",
+ "fecha": "2026-05-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 18.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 222.0,
+   "iva_pct": 10,
+   "albaran_ref": "26104629",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 222.0,
+ "desglose_iva": [
+  {
+   "base": 222.0,
+   "pct": 10,
+   "cuota": 22.2
+  }
+ ],
+ "iva": 22.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 244.2,
+ "observaciones": "Transferencia Banco Santander, vencimiento 14/06/2026. Albarán 26104629 de 11/05/2026. Línea de consumo preferente (10-06-2026) ignorada.",
+ "alertas": []
+}

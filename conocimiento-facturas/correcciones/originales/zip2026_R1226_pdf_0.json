@@ -1,0 +1,80 @@
+{
+ "archivo": "R1226.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "FA2026/0015630",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BRION CEPAS VELLAS BLANCO GODELLO 2024 75CL. (EQ)",
+   "producto_ficha": "Brión Cepas Vellas blanco Godello 2024 75 cl",
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 18.9,
+   "descuento_pct": null,
+   "total": 226.8,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0005918",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BRION CEPAS VELLAS TINTO BRANCELLAO 2023 75CL. (EQ)",
+   "producto_ficha": "Brión Cepas Vellas tinto Brancellao 2023 75 cl",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 18.9,
+   "descuento_pct": null,
+   "total": 113.4,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0005918",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GESTION Y LOGISTICA",
+   "producto_ficha": "Gestión y logística",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.37,
+   "descuento_pct": null,
+   "total": 2.37,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0005918",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 343.27,
+ "desglose_iva": [
+  {
+   "base": 343.27,
+   "pct": 21,
+   "cuota": 72.09
+  }
+ ],
+ "iva": 72.09,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 415.36,
+ "observaciones": "Albarán 2026/0005918 de 27/07/26. Destino CASA TOMAS. Pago: remesa bancaria, vencimiento 10/08/26. P.V. 0,70 incluido en la base. Cabecera impresa con NIF B54583356; el pie y la ficha dan CIF B53375358 (usado).",
+ "alertas": []
+}

@@ -1,0 +1,97 @@
+{
+ "archivo": "R900.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3210",
+ "fecha": "2026-06-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLA GAMBON 1 6X2 T",
+   "producto_ficha": "Cola de gambón 1 (6 bolsas x 2 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 144.0,
+   "iva_pct": 10,
+   "albaran_ref": "20265678",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. DORADA 120/160 X5",
+   "producto_ficha": "Dorada 120/160 g (caja 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.5,
+   "descuento_pct": null,
+   "total": 125.0,
+   "iva_pct": 10,
+   "albaran_ref": "20265678",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CABEZA ALISTADO",
+   "producto_ficha": "Cabeza de alistado (listado)",
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": null,
+   "total": 29.4,
+   "iva_pct": 10,
+   "albaran_ref": "20265678",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "RASCACIO MIX BORDO MAURITANIA",
+   "producto_ficha": "Rascacio mixto a bordo (Mauritania)",
+   "cantidad": 9.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 43.2,
+   "iva_pct": 10,
+   "albaran_ref": "20265678",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 341.6,
+ "desglose_iva": [
+  {
+   "base": 341.6,
+   "pct": 10,
+   "cuota": 34.16
+  }
+ ],
+ "iva": 34.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 375.76,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 11/07/2026, transferencia a 30 días. Albarán 20265678 del 10/06/2026, pedido 19819. Notas 'Itas' y 'Kilos' ignoradas. La fila Total (5 cajas, 33,70 kg) no son euros.",
+ "alertas": []
+}

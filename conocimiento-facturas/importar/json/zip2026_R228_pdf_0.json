@@ -1,0 +1,138 @@
+{
+ "archivo": "R228.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+ "cif": "B01414531",
+ "local": "casa_tomas",
+ "numero_documento": "VFN 25/015168",
+ "fecha": "2025-12-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "C/6B LP HERITAGE",
+   "producto_ficha": "LP Héritage (caja 6)",
+   "cantidad": 3.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 360.0,
+   "descuento_pct": null,
+   "total": 1080.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 25/016881",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "C/3B ALEXANDRA ROSE 2012",
+   "producto_ficha": "Alexandra Rosé 2012 (caja 3)",
+   "cantidad": 2.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1014.0,
+   "descuento_pct": null,
+   "total": 2028.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 25/016881",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LP CHAMPANERA GRANDE ASA CUERO",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 25/016881",
+   "bonificada": true
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "LP CHAMPANERA MAGNUM ASA CUERO",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 25/016881",
+   "bonificada": true
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "LP CHAMPANERA PEQUEÑA A.CUERO",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 25/016881",
+   "bonificada": true
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "LP COPA 28CL-6 Flute Nº 5",
+   "producto_ficha": null,
+   "cantidad": 114.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 25/016881",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "- 20 % BONIFICAC S/ 3.108",
+   "importe": -621.6,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 2486.4,
+ "desglose_iva": [
+  {
+   "base": 2486.4,
+   "pct": 21,
+   "cuota": 522.14
+  }
+ ],
+ "iva": 522.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3008.54,
+ "observaciones": "Pedido cliente CORREO 13388; pedido bodega VPN-25/013388. Forma de pago GIRO 60 días; vencimiento 20/02/26 por 3.008,54 €. Punto verde 1,11 € incluido en factura (informativo, ya dentro de la base).",
+ "alertas": []
+}

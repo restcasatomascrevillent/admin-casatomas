@@ -1,0 +1,48 @@
+{
+ "archivo": "R733.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90276099",
+ "fecha": "2026-05-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Jamon Bellota 100% Iberico SRC Tramo 8-9 kgs NP",
+   "producto_ficha": null,
+   "cantidad": 34.57,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 45.0,
+   "descuento_pct": null,
+   "total": 1555.65,
+   "iva_pct": 10,
+   "albaran_ref": "40315231",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1555.65,
+ "desglose_iva": [
+  {
+   "base": 1555.65,
+   "pct": 10,
+   "cuota": 155.57
+  }
+ ],
+ "iva": 155.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1711.22,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 14/07/2026. Punto verde 1,49 EUR informativo, no sumado al total. Albarán 40315231 del 13/05/2026.",
+ "alertas": [
+  "Artículo SRC tramo 8-9 kg no figura en el catálogo de la ficha (producto_ficha null)."
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "archivo": "R1437.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A495/26",
+ "fecha": "2026-08-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRUFA DE VERANO TUBER AESTIVUM",
+   "producto_ficha": "Trufa de verano (Tuber aestivum)",
+   "cantidad": 0.303,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 330.0,
+   "descuento_pct": null,
+   "total": 100.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 100.0,
+ "desglose_iva": [
+  {
+   "base": 100.0,
+   "pct": 4,
+   "cuota": 4.0
+  }
+ ],
+ "iva": 4.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 104.0,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 495. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás).",
+ "alertas": [
+  "Importe de línea impreso 100,00; 0,303 kg × 330 €/kg = 99,99. Se transcribe lo impreso (redondeo del proveedor); el pie también suma 100,00."
+ ]
+}

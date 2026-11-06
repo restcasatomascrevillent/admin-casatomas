@@ -1,0 +1,46 @@
+{
+ "archivo": "R1186.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260412",
+ "fecha": "2026-07-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DORADA",
+   "producto_ficha": "Dorada",
+   "cantidad": 5.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 62.0,
+   "descuento_pct": null,
+   "total": 359.6,
+   "iva_pct": 10,
+   "albaran_ref": "1-000412",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 359.6,
+ "desglose_iva": [
+  {
+   "base": 359.6,
+   "pct": 10,
+   "cuota": 35.96
+  }
+ ],
+ "iva": 35.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 395.56,
+ "observaciones": "Albarán 1-000412 del 23/07/2026. Forma de pago: transferencia CaixaBank; vencimiento 23/07/2026 por 395,56. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": []
+}

@@ -1,0 +1,48 @@
+{
+ "archivo": "R1677.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "RECHGO SOLUTIONS SL",
+ "cif": "B16926669",
+ "local": "casa_tomas",
+ "numero_documento": "F.RG260490",
+ "fecha": "2026-10-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Hosting alta velocidad (1 año), incluye compra de dominios y copia de seguridad, att. del servidor, dominio restaurantecasatomascrevillente.es",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 190.0,
+   "descuento_pct": null,
+   "total": 190.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 190.0,
+ "desglose_iva": [
+  {
+   "base": 190.0,
+   "pct": 21,
+   "cuota": 39.9
+  }
+ ],
+ "iva": 39.9,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 229.9,
+ "observaciones": "Hosting anual con periodo impreso marzo 2026 a marzo 2027, facturado en octubre de 2026. Pago por transferencia bancaria. Destinatario MASIDE 2011 SL (B54583356), local Crevillent C/ Santa María de la Cabeza 2.",
+ "alertas": [
+  "Periodo del hosting (marzo 2026 a marzo 2027) anterior a la fecha de factura; revisar si ya estaba cubierto por otra factura"
+ ]
+}

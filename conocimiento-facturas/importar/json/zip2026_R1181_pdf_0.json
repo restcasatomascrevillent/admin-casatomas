@@ -1,0 +1,48 @@
+{
+ "archivo": "R1181.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26006713",
+ "fecha": "2026-07-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 12.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 153.6,
+   "iva_pct": 10,
+   "albaran_ref": "26001950",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 153.6,
+ "desglose_iva": [
+  {
+   "base": 153.6,
+   "pct": 10,
+   "cuota": 15.36
+  }
+ ],
+ "iva": 15.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 168.96,
+ "observaciones": "Transferencia Banco Santander, vencimiento 27/08/2026. Albarán 26001950 con la misma fecha que la factura.",
+ "alertas": [
+  "Albarán 26001950 con numeración fuera de la serie habitual (261xxxxx) y con la misma fecha que la factura (28/07/2026); no encaja con la ficha (albarán 2-4 días antes). Importes cuadran; se deja tal cual."
+ ]
+}

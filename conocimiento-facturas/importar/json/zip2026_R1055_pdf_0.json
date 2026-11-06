@@ -1,0 +1,46 @@
+{
+ "archivo": "R1055.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170770967",
+ "fecha": "2026-07-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FRESA I 10X500GR TARRINA ES",
+   "producto_ficha": "Fresa (10 tarrinas de 500 g)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 7.0,
+   "descuento_pct": null,
+   "total": -35.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -35.0,
+ "desglose_iva": [
+  {
+   "base": -35.0,
+   "pct": 4,
+   "cuota": -1.4
+  }
+ ],
+ "iva": -1.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -36.4,
+ "observaciones": "Abono devolución de la factura 9170770900 (línea FRESA I 10X500GR). Referencia impresa 0060905913. Total BT 1.",
+ "alertas": []
+}

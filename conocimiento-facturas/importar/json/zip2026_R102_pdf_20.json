@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  21
+ ],
+ "tipo": "factura",
+ "proveedor": "RUSO AGULLO, ROQUE",
+ "cif": "48363703Q",
+ "local": "casa_tomas",
+ "numero_documento": "30/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 21,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.6,
+   "descuento_pct": null,
+   "total": 28.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 28.6,
+ "desglose_iva": [
+  {
+   "base": 28.6,
+   "pct": 10.0,
+   "cuota": 2.86
+  }
+ ],
+ "iva": 2.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 31.46,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 751. Embarcaciones: ninguna.",
+ "alertas": []
+}

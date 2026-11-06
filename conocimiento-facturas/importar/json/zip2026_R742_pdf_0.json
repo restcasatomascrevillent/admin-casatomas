@@ -1,0 +1,66 @@
+{
+ "archivo": "R742.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISVALERO, SL",
+ "cif": "B54581632",
+ "local": "casa_tomas",
+ "numero_documento": "F/002669-26",
+ "fecha": "2026-04-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CASAL DE ARMAN BLANCO 2024",
+   "producto_ficha": null,
+   "cantidad": 60,
+   "unidad": "botella",
+   "bultos": 10,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 10.25,
+   "descuento_pct": 10,
+   "total": 553.5,
+   "iva_pct": 21,
+   "albaran_ref": "A/003444-26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CASAL DE ARMAN BLANCO 2024",
+   "producto_ficha": null,
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0,
+   "descuento_pct": null,
+   "total": 0,
+   "iva_pct": 21,
+   "albaran_ref": "A/003444-26",
+   "bonificada": true,
+   "precio_referencia": 10.25
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 553.5,
+ "desglose_iva": [
+  {
+   "base": 553.5,
+   "pct": 21,
+   "cuota": 116.24
+  }
+ ],
+ "iva": 116.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 669.74,
+ "observaciones": "Recibo domiciliado bancario 45 días; vto. 12/06/2026 669,74. Sello COPIA. Anotación manuscrita: FALTAN 2 BOTELLAS. Cliente 001176 CASA TOMÁS.",
+ "alertas": [
+  "Nota manuscrita 'faltan 2 botellas' junto a la línea de 60 botellas (cantidad impresa 60); la línea bonificada de 12 botellas va a precio 0."
+ ]
+}

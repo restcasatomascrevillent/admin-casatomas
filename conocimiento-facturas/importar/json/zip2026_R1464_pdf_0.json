@@ -1,0 +1,47 @@
+{
+ "archivo": "R1464.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ROMAN Y MARTOS ALIMENTACION, S.L.",
+ "cif": "B02873545",
+ "local": "casa_tomas",
+ "numero_documento": "26/24755",
+ "fecha": "2026-08-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ATUN ROJO PARPATANA CARNE",
+   "producto_ficha": "Atún rojo, parpatana (carne), pieza",
+   "cantidad": 18.37,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.0,
+   "descuento_pct": null,
+   "total": 275.55,
+   "iva_pct": 10,
+   "albaran_ref": "26/55958",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 275.55,
+ "desglose_iva": [
+  {
+   "base": 275.55,
+   "pct": 10,
+   "cuota": 27.56
+  }
+ ],
+ "iva": 27.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 303.11,
+ "observaciones": "Albarán 26/55958 de 20/08/2026. A 30 días con albarán (SANTANDER); vencimiento 25/09/2026 por 303,11 €. «4 PIEZAS» bajo la línea es informativo. La caducidad (26/08/2026) y la referencia «EBCD: PT26900347» no son fecha ni producto. Las dos páginas del PDF son la misma factura duplicada (leída una vez).",
+ "alertas": []
+}

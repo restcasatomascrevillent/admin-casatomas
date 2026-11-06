@@ -1,0 +1,46 @@
+{
+ "archivo": "R156.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONFITERIA CERVIÑO S.L.",
+ "cif": "B32106940",
+ "local": "casa_tomas",
+ "numero_documento": "26/0000033",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAJA 400 CAÑAS",
+   "producto_ficha": "Cañas de repostería (caja de 400)",
+   "cantidad": 400,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.48,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": "23",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 192.0,
+ "desglose_iva": [
+  {
+   "base": 192.0,
+   "pct": 10,
+   "cuota": 19.2
+  }
+ ],
+ "iva": 19.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 211.2,
+ "observaciones": "Recibo 30 días, vencimiento 28/02/2026. Líneas 'CONSUMO PREF' y 'LOTE' ignoradas. Albarán 23 de 12/01/2026. Cliente MASIDE 2011.",
+ "alertas": []
+}

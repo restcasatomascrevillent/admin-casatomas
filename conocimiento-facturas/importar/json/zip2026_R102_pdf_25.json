@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  26
+ ],
+ "tipo": "factura",
+ "proveedor": "GUILLO ORTS, ANDRES",
+ "cif": "48571389N",
+ "local": "casa_tomas",
+ "numero_documento": "41/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 26,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 4.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.14,
+   "descuento_pct": null,
+   "total": 124.17,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 124.17,
+ "desglose_iva": [
+  {
+   "base": 124.17,
+   "pct": 10.0,
+   "cuota": 12.42
+  }
+ ],
+ "iva": 12.42,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 136.59,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645, 63. Embarcaciones: ninguna.",
+ "alertas": []
+}

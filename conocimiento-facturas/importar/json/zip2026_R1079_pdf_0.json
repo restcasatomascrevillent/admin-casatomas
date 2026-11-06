@@ -1,0 +1,70 @@
+{
+ "archivo": "R1079.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+ "cif": "B01414531",
+ "local": "casa_tomas",
+ "numero_documento": "VFN 26/004765",
+ "fecha": "2026-05-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "C/6B LP LA CUVEE 0,75L",
+   "producto_ficha": "LP La Cuvée 75 cl (caja 6)",
+   "cantidad": 14.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 241.14,
+   "descuento_pct": null,
+   "total": 3375.96,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 26/005370",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LP CHAMPANERA GRANDE ASA CUERO",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 26/005370",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "- 20 % BONIFICAC S/ 3.375,96",
+   "importe": -675.19,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 2700.77,
+ "desglose_iva": [
+  {
+   "base": 2700.77,
+   "pct": 21,
+   "cuota": 567.16
+  }
+ ],
+ "iva": 567.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3267.93,
+ "observaciones": "Observaciones impresas: ENTREGADO: VINOS FLORES (CODITRAL). Es quien entrega la mercancía; el emisor de la factura es Bodegas de los Herederos del Marqués de Riscal (CIF B01414531). Expedido por agencia. Pedido cliente 68240; pedido bodega VPN-26/004299. Forma de pago GIRO 60 días; vencimiento 14/07/26 por 3.267,93 €. Punto verde 3,79 € incluido en factura (informativo, ya dentro de la base).",
+ "alertas": []
+}

@@ -1,0 +1,102 @@
+{
+ "archivo": "R855.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "LICORES Y DISTRIBUCIONES BELLOD, S.L.",
+ "cif": "B03141165",
+ "local": "casa_tomas",
+ "numero_documento": "3419/026",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MARCHAPAN PICOS CAMPEROS 150G.",
+   "producto_ficha": "Marchapán Picos Camperos 150 g",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "g",
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 40.0,
+   "iva_pct": 4,
+   "albaran_ref": "5121/026",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ESPARRAGO 5 FRUTOS LATA 425ML. EL NAVAR",
+   "producto_ficha": "Espárrago 5 frutos lata 425 ml El Navarrico",
+   "cantidad": 12,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 0.425,
+   "contenido_unidad": "l",
+   "precio_unitario": 6.58,
+   "descuento_pct": null,
+   "total": 78.96,
+   "iva_pct": 10,
+   "albaran_ref": "5236/026",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MARCHAPAN PICOS CAMPEROS 150G.",
+   "producto_ficha": "Marchapán Picos Camperos 150 g",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "g",
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 40.0,
+   "iva_pct": 4,
+   "albaran_ref": "5760/026",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "SAN NICASIO 150g. PATATAS FRITAS BOLSA",
+   "producto_ficha": "Patatas fritas San Nicasio bolsa 150 g",
+   "cantidad": 28,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "g",
+   "precio_unitario": 2.69,
+   "descuento_pct": null,
+   "total": 75.32,
+   "iva_pct": 10,
+   "albaran_ref": "5760/026",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 234.28,
+ "desglose_iva": [
+  {
+   "base": 80.0,
+   "pct": 4,
+   "cuota": 3.2
+  },
+  {
+   "base": 154.28,
+   "pct": 10,
+   "cuota": 15.43
+  }
+ ],
+ "iva": 18.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 252.91,
+ "observaciones": "Número impreso 3.419/026. Transferencia 30 días, vencimiento 30/06/2026.",
+ "alertas": []
+}

@@ -1,0 +1,66 @@
+{
+ "archivo": "R908.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170768579",
+ "fecha": "2026-06-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 1152.0,
+   "unidad": "kg",
+   "bultos": 80,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.95,
+   "descuento_pct": null,
+   "total": 1094.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 330.4,
+   "unidad": "kg",
+   "bultos": 16,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 330.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1424.8,
+ "desglose_iva": [
+  {
+   "base": 1424.8,
+   "pct": 4,
+   "cuota": 56.99
+  }
+ ],
+ "iva": 56.99,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1481.79,
+ "observaciones": "Entrega 16.06.2026. Dos líneas del mismo artículo con precio distinto (0,950 y 1,000). Líneas con GLOBALG.A.P. (asterisco quitado). Cuadro de envases vacío. Total BT 96.",
+ "alertas": [
+  "PATATA I ES a 0,950 y 1,000 €/kg; la ficha tiene 0,60-0,74 €/kg.",
+  "Peso por bulto distinto entre líneas: la de 80 bultos da 14,85 kg brutos por bulto (1.188/80) y la de 16 bultos da 21,25 kg (340/16). Puede ser otro saco o calibre."
+ ]
+}

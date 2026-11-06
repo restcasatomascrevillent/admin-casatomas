@@ -1,0 +1,412 @@
+{
+  "cif": "B75143214",
+  "nombre": "EMBAJADORES MADRID, S.L.U.",
+  "nombres_impresos": ["EMBAJADORES MADRID, S.L.U.", "EMBAJADORES", "CARNES IBÉRICAS DEL NORTE S.L."],
+  "categoria": "carne",
+  "locales": ["casa_tomas"],
+  "muestras": ["R154.pdf", "R670.pdf", "R1023.pdf", "R321.pdf", "R1479.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes de venta (varios por factura, 1-2 páginas). Es una carnicería/distribuidor de carne: NO vende bebidas",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": {
+      "ejemplos": ["01/0001155", "01/0002613", "01/0005146", "01/0007810", "260100018885"],
+      "patron": "^(01/\\d{7}|2601\\d{8})$",
+      "donde": "digital: casilla 'FACTURA | FECHA | COD. CLIENTE' arriba a la izquierda (01/0001155). Escaneo (copia): casilla 'Faktura zenbakia / Factura Número' (260100018885)."
+    },
+    "fecha": "casilla FECHA junto al número, DD/MM/AAAA, último día del mes. Cada albarán trae su fecha en la cabecera 'ALBARÁN DE VENTA: nnnnn | FECHA: dd/mm/aaaa'.",
+    "albaranes": "cabecera 'ALBARÁN DE VENTA: 00864 | FECHA: 08/01/2026' (escaneo: 'Albarán 2026/01/0012206 de Fecha: 13/08/2026') antes de sus líneas"
+  },
+
+  "lectura": {
+    "columnas": ["CÓDIGO", "DESCRIPCIÓN", "UNIDADES", "CANTIDAD", "PRECIO", "IMPORTE"],
+    "cantidad_es": "kg (CANTIDAD = peso en kg con 2 decimales). UNIDADES = nº de piezas y solo aparece en algunas líneas (lomos). Excepción: cochinillo y paletilla de lechal por pieza ('3 | 3.00 | 68.00 | 204.00'), donde UNIDADES = CANTIDAD y el precio es por pieza",
+    "columna_peso": "CANTIDAD",
+    "precio_es_por": "kg (pieza en cochinillo y en PALETILLA LECHAL cuando UNIDADES = CANTIDAD)",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [
+      "Sin cargos ni descuentos en el pie; solo IMPORTE (bruto), BASE IMPONIBLE, % IVA (10 %), cuota, R.EQ. (vacío) y TOTAL",
+      "'Suma / Sigue .... N' al final de la página 1 es un subtotal de arrastre, no una línea",
+      "Vencimiento y forma de pago: 'RECIBO A 60 DIAS' (digital) o 'GIRO 90 DÍAS' (escaneo)"
+    ],
+    "trampas": [
+      "Formato numérico distinto según el documento: las facturas digitales usan punto decimal y coma de millares (3,460.35 = 3.460,35 €); el escaneo usa coma decimal y punto de millares (10.005,13).",
+      "Debajo de cada línea de carne hay una segunda línea tipo '000025 | 03' o '000025 | 3887': es lote/trazabilidad, NO una cantidad ni un importe; ignorarla.",
+      "Número de piezas en UNIDADES (1, 3, 4…) no se multiplica por el precio: importe = kg × precio por kg.",
+      "El escaneo ('COPIA') está emitido por 'CARNES IBÉRICAS DEL NORTE S.L.' (B-20691994 en pie y TBAI) con cabeceras bilingües castellano/euskera; mismos conceptos, otro formato de página.",
+      "Cantidades y totales muy altos en una sola línea (750,20 kg de solomillo = 24.756,60 €) son reales y cuadran con la base; no 'corregirlas'.",
+      "El redondeo por línea es a 2 decimales (83,375 → 83,38)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = CANTIDAD (kg) × PRECIO (€/kg); en cochinillo/paletilla por pieza = piezas × precio",
+    "IMPORTE bruto = BASE IMPONIBLE = suma de líneas (sin descuentos)",
+    "IVA 10 % = base × 0,10; TOTAL = base + IVA",
+    "R154: 12.947,36 + 1.294,74 = 14.242,10",
+    "R670: 31.006,21 + 3.100,62 = 34.106,83",
+    "R1479 (escaneo): 425,75 kg × 23,50 = 10.005,13; IVA 1.000,51; total 11.005,64"
+  ],
+
+  "guia_ocr": "Factura de Embajadores (carne) con albaranes de venta. Cada línea: código, descripción, UNIDADES (piezas, a veces vacío), CANTIDAD en kg, PRECIO en €/kg, IMPORTE = kg × precio. En cochinillo y paletilla por pieza, importe = piezas × precio. Ignora la segunda línea bajo cada artículo ('000025 | 135'): es lote. IVA único 10 %. Cuida el formato numérico: digital con punto decimal (3,460.35 = 3460,35); escaneo con coma decimal. Número de factura arriba a la izquierda (01/000xxxx; escaneo 2601000xxxxx). Fecha DD/MM/AAAA. Ignora 'Suma / Sigue'.",
+
+  "productos": [
+    {
+      "nombre_impreso": "LOMO TERNERA C/H",
+      "nombre_normalizado": "Lomo de ternera con hueso",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, con hueso, pieza entera (1 pieza ≈ 28-59 kg)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 21.5, "max": 23.9, "por": "kg", "ejemplos": [["2026-01-08", 21.5], ["R806", 22.9], ["R1648", 23.9]] },
+      "iva_pct": 10,
+      "veces_visto": 13
+    },
+    {
+      "nombre_impreso": "LOMO TERNERA BLANCA C/H",
+      "nombre_normalizado": "Lomo de ternera blanca con hueso",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, ternera blanca, con hueso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 19.5, "max": 19.5, "por": "kg", "ejemplos": [["2026-06-25", 19.5]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "LOMO TERNERA ALTO SIN HUESO",
+      "nombre_normalizado": "Lomo alto de ternera sin hueso",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, sin hueso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 21.9, "max": 21.9, "por": "kg", "ejemplos": [["2026-06-25", 21.9]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO TERNERA C/H Y S/SOLOMILLO",
+      "nombre_normalizado": "Lomo de ternera con hueso y sin solomillo",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, con hueso, sin el solomillo",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 23.9, "max": 23.9, "por": "kg", "ejemplos": [["R1478", 23.9]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "SOLOMILLO TERNERA",
+      "nombre_normalizado": "Solomillo de ternera",
+      "familia": "carne de ternera",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 33, "max": 33, "por": "kg", "ejemplos": [["2026-02-12", 33], ["2026-04-01", 33]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "CHURRASCO TERNERA",
+      "nombre_normalizado": "Churrasco de ternera",
+      "familia": "carne de ternera",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 11.5, "max": 12.5, "por": "kg", "ejemplos": [["2026-02-05", 11.5], ["2026-06-25", 11.9], ["R1648", 12.5]] },
+      "iva_pct": 10,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "RAGOUT TERNERA",
+      "nombre_normalizado": "Ragú/guiso de ternera (troceado)",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, troceado",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 11.5, "max": 12.5, "por": "kg", "ejemplos": [["2026-04-01", 11.5], ["2026-04-23", 12.5], ["R1648", 11.9]] },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "BABILLA TERNERA",
+      "nombre_normalizado": "Babilla de ternera",
+      "familia": "carne de ternera",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 14.5, "max": 17, "por": "kg", "ejemplos": [["2026-01-08", 17], ["R1478", 14.5]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "AGUJA TERNERA",
+      "nombre_normalizado": "Aguja de ternera",
+      "familia": "carne de ternera",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 11.9, "max": 12.9, "por": "kg", "ejemplos": [["2026-02-12", 12.9], ["R1305", 11.9]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CADERA TERNERA",
+      "nombre_normalizado": "Cadera de ternera",
+      "familia": "carne de ternera",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 18.5, "max": 19.5, "por": "kg", "ejemplos": [["R504", 18.5], ["R806", 19.5]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CADERA TERNERA BLANCA",
+      "nombre_normalizado": "Cadera de ternera blanca",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, ternera blanca",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 19.5, "max": 19.5, "por": "kg", "ejemplos": [["R806", 19.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "FALDA TERNERA BLANCA CON HUESO",
+      "nombre_normalizado": "Falda de ternera blanca con hueso",
+      "familia": "carne de ternera",
+      "presentacion": "fresco, con hueso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 12.5, "max": 14.5, "por": "kg", "ejemplos": [["R806", 14.5], ["R1648", 12.5]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "MOLLEJAS TERNERA CORAZON",
+      "nombre_normalizado": "Mollejas de ternera (corazón)",
+      "familia": "casquería",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 25.9, "max": 26, "por": "kg", "ejemplos": [["2026-06-04", 25.9], ["2026-06-18", 26]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CALLOS VACUNO EN TROZOS",
+      "nombre_normalizado": "Callos de vacuno en trozos",
+      "familia": "casquería",
+      "presentacion": "en trozos",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 9.9, "max": 9.9, "por": "kg", "ejemplos": [["R1648", 9.9]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CALLOS CON PATA Y MORRO FRESCO",
+      "nombre_normalizado": "Callos con pata y morro, frescos",
+      "familia": "casquería",
+      "presentacion": "fresco, con pata y morro",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 9.8, "max": 9.8, "por": "kg", "ejemplos": [["R1648", 9.8]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO VACA C/H C/SOLOMILLO",
+      "nombre_normalizado": "Lomo de vaca con hueso y con solomillo",
+      "familia": "carne de vaca",
+      "presentacion": "fresco, con hueso y solomillo (1 pieza ≈ 25-30 kg: 4 uds = 100-122 kg)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 34, "max": 34.5, "por": "kg", "ejemplos": [["2026-01-29", 34.5], ["R1305", 34]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "LOMO VACA MADURADA",
+      "nombre_normalizado": "Lomo de vaca madurada",
+      "familia": "carne de vaca",
+      "presentacion": "madurada",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 34, "max": 34, "por": "kg", "ejemplos": [["2026-06-11", 34]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO VACA C/H MADURADA",
+      "nombre_normalizado": "Lomo de vaca con hueso madurada",
+      "familia": "carne de vaca",
+      "presentacion": "madurada, con hueso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 34, "max": 34, "por": "kg", "ejemplos": [["R1648", 34]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "TROZO LOMO ALTO VACIO",
+      "nombre_normalizado": "Trozo de lomo alto (vacío)",
+      "familia": "carne de vaca",
+      "presentacion": "trozo; 'VACIO' impreso (probable envasado al vacío)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 23.5, "max": 23.5, "por": "kg", "ejemplos": [["2026-01-29", 23.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO VACA BAJO VACIO 5+",
+      "nombre_normalizado": "Lomo de vaca bajo, vacío 5+",
+      "familia": "carne de vaca",
+      "presentacion": "envasado al vacío; '5+' sin explicar",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 13, "max": 13, "por": "kg", "ejemplos": [["R504", 13]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ENTRECOT VACA LOMO ALTO",
+      "nombre_normalizado": "Entrecot de vaca (lomo alto)",
+      "familia": "carne de vaca",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 23.9, "max": 23.9, "por": "kg", "ejemplos": [["R806", 23.9]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO BUEY GALLEGO C/H",
+      "nombre_normalizado": "Lomo de buey gallego con hueso",
+      "familia": "carne de buey",
+      "presentacion": "fresco, con hueso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 50, "max": 50, "por": "kg", "ejemplos": [["R806", 50]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO BAJO WAGYU",
+      "nombre_normalizado": "Lomo bajo de wagyu",
+      "familia": "carne de vacuno premium",
+      "presentacion": "fresco, 2 piezas ≈ 6,5 kg",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 98, "max": 98, "por": "kg", "ejemplos": [["R806", 98]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LOMO ANGUS BAJO",
+      "nombre_normalizado": "Lomo bajo de Angus",
+      "familia": "carne de vacuno premium",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 59, "max": 59, "por": "kg", "ejemplos": [["R1648", 59]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COCHINILLO 3-5 KG",
+      "nombre_normalizado": "Cochinillo de 3-5 kg",
+      "familia": "carne de cerdo",
+      "presentacion": "fresco, pieza entera de 3-5 kg; se factura por PIEZA",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "pieza",
+      "precio": { "min": 45, "max": 70, "por": "pieza", "ejemplos": [["2026-02-12", 68], ["R806", 70], ["R1305", 65], ["R1478", 45]] },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "SECRETO CERDO BLANCO",
+      "nombre_normalizado": "Secreto de cerdo blanco",
+      "familia": "carne de cerdo",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 7.2, "max": 7.5, "por": "kg", "ejemplos": [["2026-02-05", 7.2], ["2026-06-18", 7.5]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "AGUJA CERDO DESHUESADA",
+      "nombre_normalizado": "Aguja de cerdo deshuesada",
+      "familia": "carne de cerdo",
+      "presentacion": "fresco, sin hueso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 6.3, "max": 6.3, "por": "kg", "ejemplos": [["2026-02-05", 6.3]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COSTILLAS TIRAS S/C",
+      "nombre_normalizado": "Costillas de cerdo en tiras",
+      "familia": "carne de cerdo",
+      "presentacion": "fresco, en tiras; 'S/C' sin explicar",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 7.5, "max": 9.5, "por": "kg", "ejemplos": [["2026-02-05", 9.5], ["R1648", 7.5]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "PALETILLA LECHAL",
+      "nombre_normalizado": "Paletilla de lechal",
+      "familia": "carne de cordero",
+      "presentacion": "fresco; casi siempre por kg a 10,50; una vez por pieza (7 uds × 16,00)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 10.5, "max": 16, "por": "kg", "ejemplos": [["2026-04-29", 10.5], ["R504", 16]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "CUELLO LECHAL",
+      "nombre_normalizado": "Cuello de lechal",
+      "familia": "carne de cordero",
+      "presentacion": "fresco",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 5.9, "max": 5.9, "por": "kg", "ejemplos": [["R504", 5.9]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CORDERO LECHAL PALETILLA 450-595 GR CONG.",
+      "nombre_normalizado": "Paletilla de cordero lechal congelada 450-595 g",
+      "familia": "carne de cordero",
+      "presentacion": "congelada, piezas de 450-595 g (solo en el escaneo, código 83021002)",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 23.5, "max": 23.5, "por": "kg", "ejemplos": [["2026-08-13", 23.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "La base marcaba la categoría como 'bebidas', pero TODAS las facturas son de carne (ternera, vaca, cerdo, cordero, casquería); se ha puesto 'carne'.",
+    "El escaneo R1479 está emitido por CARNES IBÉRICAS DEL NORTE S.L. (B20691994, Astigarraga, Gipuzkoa) y no por EMBAJADORES MADRID, S.L.U. (B75143214, Mercamadrid) como las digitales: probablemente grupo/marca Embajadores, pero el CIF impreso en el pie del escaneo es otro.",
+    "PALETILLA LECHAL: en una línea ('7 | 7.00 | 16.00 | 112.00') parece por pieza (UNIDADES = CANTIDAD); en las demás es por kg a 10,50. Es la misma pauta que cochinillo.",
+    "Significado de 'S/C' (costillas) y '5+' (lomo bajo vacío) no consta; el código 'LOMO VACA BAJO VACIO' y 'TROZO LOMO ALTO VACIO' podrían referirse al corte 'vacío' y no al envasado.",
+    "La segunda línea de cada artículo ('000025 | 03') se interpreta como lote/trazabilidad por su posición, pero no hay cabecera que lo confirme.",
+    "Ejemplos con 'R806', 'R504', 'R1305', 'R1478', 'R1648' son facturas vistas solo en el catálogo de líneas; su fecha no se conoce.",
+    "El catálogo cubre todos los artículos vistos (31 entradas); no hay artículos fuera por tope."
+  ]
+}

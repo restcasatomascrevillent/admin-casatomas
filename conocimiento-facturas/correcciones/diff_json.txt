@@ -1,0 +1,131 @@
+zip2026_R1002_pdf_0.json observaciones 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 3 febrero al 31  -> 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 3 febrero al 31 marzo 2026. Corrección 06/11/2026: la base impresa
+zip2026_R1002_pdf_0.json subtotal 271.22 -> 214.81
+zip2026_R1009_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 21 %'
+zip2026_R1009_pdf_0.json cargos_pie[0].importe '∅' -> 0.59
+zip2026_R1009_pdf_0.json cargos_pie[0].iva_pct '∅' -> 21
+zip2026_R1009_pdf_0.json cargos_pie[1].concepto '∅' -> 'Punto verde (P.V.) 10 %'
+zip2026_R1009_pdf_0.json cargos_pie[1].importe '∅' -> 0.49
+zip2026_R1009_pdf_0.json cargos_pie[1].iva_pct '∅' -> 10
+zip2026_R1017_pdf_0.json productos[1].bonificada False -> True
+zip2026_R1017_pdf_0.json productos[1].descuento_pct None -> 100
+zip2026_R1017_pdf_0.json productos[1].total None -> 0.0
+zip2026_R1017_pdf_0.json productos[3].bonificada False -> True
+zip2026_R1017_pdf_0.json productos[3].descuento_pct None -> 100
+zip2026_R1017_pdf_0.json productos[3].total None -> 0.0
+zip2026_R1042_pdf_0.json observaciones 'Forma de pago: efectivo. Ticket de compra en Makro Elche (cash & carry). Abono que anula  -> 'Forma de pago: efectivo. Ticket de compra en Makro Elche (cash & carry). Abono que anula la factura 0/0(063)0010/(2026)014376. Linea de ofe
+zip2026_R1042_pdf_0.json tipo 'abono' -> 'factura'
+zip2026_R1072_pdf_1.json observaciones 'Abono del albarán 2900001984 (02/06/2026). Cantidades y totales en negativo. Total unidad -> 'Abono del albarán 2900001984 (02/06/2026). Cantidades y totales en negativo. Total unidades -33. Página 2 de 3. Abono (factura rectificativ
+zip2026_R1072_pdf_1.json tipo 'abono' -> 'factura'
+zip2026_R1205_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 21 %'
+zip2026_R1205_pdf_0.json cargos_pie[0].importe '∅' -> 0.86
+zip2026_R1205_pdf_0.json cargos_pie[0].iva_pct '∅' -> 21
+zip2026_R1205_pdf_0.json cargos_pie[1].concepto '∅' -> 'Punto verde (P.V.) 10 %'
+zip2026_R1205_pdf_0.json cargos_pie[1].importe '∅' -> 0.16
+zip2026_R1205_pdf_0.json cargos_pie[1].iva_pct '∅' -> 10
+zip2026_R1226_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 21 %'
+zip2026_R1226_pdf_0.json cargos_pie[0].importe '∅' -> 0.7
+zip2026_R1226_pdf_0.json cargos_pie[0].iva_pct '∅' -> 21
+zip2026_R1293_pdf_0.json observaciones 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 abril al 30 ma -> 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 abril al 30 mayo 2026. Nota manual: Restaurante Tomás cerrado po
+zip2026_R1293_pdf_0.json subtotal 223.84 -> 177.28
+zip2026_R1402_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 10 %'
+zip2026_R1402_pdf_0.json cargos_pie[0].importe '∅' -> 0.19
+zip2026_R1402_pdf_0.json cargos_pie[0].iva_pct '∅' -> 10
+zip2026_R1439_pdf_0.json observaciones 'Cliente 170204. Forma de pago: giro bancario. Albaranes 2617608 (07/08/2026) y 2618212 (1 -> 'Cliente 170204. Forma de pago: giro bancario. Albaranes 2617608 (07/08/2026) y 2618212 (14/08/2026). Aceite de oliva al 4 %; resto al 21 %.
+zip2026_R1439_pdf_0.json productos[10].bultos 1.0 -> 0.17
+zip2026_R1439_pdf_0.json productos[10].contenido_cantidad 300 -> 150
+zip2026_R1439_pdf_0.json productos[10].nombre 'EL PUNTIDO 21 1EMa.x3Lx1b (cód. SC54N, trazab. 9140224), sin cargo' -> 'SAN VICENTE 19 MAGNUMx6b (cód. SC42, trazab. 1020523), sin cargo'
+zip2026_R1439_pdf_0.json productos[10].orden 11 -> 12
+zip2026_R1439_pdf_0.json productos[11].albaran_ref '2618212' -> '∅'
+zip2026_R1439_pdf_0.json productos[11].bonificada True -> '∅'
+zip2026_R1439_pdf_0.json productos[11].bultos 0.17 -> '∅'
+zip2026_R1439_pdf_0.json productos[11].cantidad 1.0 -> '∅'
+zip2026_R1439_pdf_0.json productos[11].contenido_cantidad 150 -> '∅'
+zip2026_R1439_pdf_0.json productos[11].contenido_unidad 'cl' -> '∅'
+zip2026_R1439_pdf_0.json productos[11].descuento_pct None -> '∅'
+zip2026_R1439_pdf_0.json productos[11].iva_pct 21 -> '∅'
+zip2026_R1439_pdf_0.json productos[11].nombre 'SAN VICENTE 19 MAGNUMx6b (cód. SC42, trazab. 1020523), sin cargo' -> '∅'
+zip2026_R1439_pdf_0.json productos[11].orden 12 -> '∅'
+zip2026_R1439_pdf_0.json productos[11].pagina 1 -> '∅'
+zip2026_R1439_pdf_0.json productos[11].precio_unitario None -> '∅'
+zip2026_R1439_pdf_0.json productos[11].producto_ficha None -> '∅'
+zip2026_R1439_pdf_0.json productos[11].total None -> '∅'
+zip2026_R1439_pdf_0.json productos[11].unidad 'botella' -> '∅'
+zip2026_R1439_pdf_0.json productos[9].bultos None -> 1.0
+zip2026_R1439_pdf_0.json productos[9].contenido_cantidad None -> 300
+zip2026_R1439_pdf_0.json productos[9].contenido_unidad None -> 'cl'
+zip2026_R1439_pdf_0.json productos[9].nombre 'OBSEQUIO SIERRA CANTABRIA' -> 'EL PUNTIDO 21 1EMa.x3Lx1b (cód. SC54N, trazab. 9140224), sin cargo'
+zip2026_R1439_pdf_0.json productos[9].orden 10 -> 11
+zip2026_R1439_pdf_0.json productos[9].unidad 'ud' -> 'botella'
+zip2026_R1500_pdf_0.json productos[0].cantidad 118.0 -> 2.4
+zip2026_R1500_pdf_0.json productos[0].precio_unitario 2.4 -> 118.0
+zip2026_R1500_pdf_0.json productos[1].cantidad 89.5 -> 6.9
+zip2026_R1500_pdf_0.json productos[1].precio_unitario 6.9 -> 89.5
+zip2026_R152_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 10 %'
+zip2026_R152_pdf_0.json cargos_pie[0].importe '∅' -> 0.55
+zip2026_R152_pdf_0.json cargos_pie[0].iva_pct '∅' -> 10
+zip2026_R153_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 21 %'
+zip2026_R153_pdf_0.json cargos_pie[0].importe '∅' -> 0.48
+zip2026_R153_pdf_0.json cargos_pie[0].iva_pct '∅' -> 21
+zip2026_R1580_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 10 %'
+zip2026_R1580_pdf_0.json cargos_pie[0].importe '∅' -> 0.44
+zip2026_R1580_pdf_0.json cargos_pie[0].iva_pct '∅' -> 10
+zip2026_R1650_pdf_0.json observaciones 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 02-06 al 31-07-2 -> 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 02-06 al 31-07-2026. Corrección 06/11/2026: la base impresa 278,32
+zip2026_R1650_pdf_0.json subtotal 278.32 -> 220.43
+zip2026_R185_pdf_0.json productos[0].cantidad 99.0 -> 5.4
+zip2026_R185_pdf_0.json productos[0].precio_unitario 5.4 -> 99.0
+zip2026_R224_pdf_0.json productos[0].cantidad 99.0 -> 3.6
+zip2026_R224_pdf_0.json productos[0].precio_unitario 3.6 -> 99.0
+zip2026_R267_pdf_0.json observaciones 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 octubre al 30  -> 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 octubre al 30 noviembre 2025. Corrección 06/11/2026: la base imp
+zip2026_R267_pdf_0.json subtotal 252.94 -> 200.33
+zip2026_R34_pdf_0.json productos[1].precio_unitario -34.05 -> 6.81
+zip2026_R34_pdf_0.json productos[2].precio_unitario -157.82 -> 31.564
+zip2026_R34_pdf_0.json productos[3].precio_unitario -84.34 -> 16.868
+zip2026_R360_pdf_0.json productos[0].cantidad 99.0 -> 3.7
+zip2026_R360_pdf_0.json productos[0].precio_unitario 3.7 -> 99.0
+zip2026_R415_pdf_0.json productos[0].cantidad 104.0 -> 5.0
+zip2026_R415_pdf_0.json productos[0].precio_unitario 5.0 -> 104.0
+zip2026_R415_pdf_0.json productos[1].cantidad 85.0 -> 2.7
+zip2026_R415_pdf_0.json productos[1].precio_unitario 2.7 -> 85.0
+zip2026_R431_pdf_0.json productos[0].cantidad 104.0 -> 3.9
+zip2026_R431_pdf_0.json productos[0].precio_unitario 3.9 -> 104.0
+zip2026_R455_pdf_0.json productos[0].cantidad 106.0 -> 3.7
+zip2026_R455_pdf_0.json productos[0].precio_unitario 3.7 -> 106.0
+zip2026_R525_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 21 %'
+zip2026_R525_pdf_0.json cargos_pie[0].importe '∅' -> 0.35
+zip2026_R525_pdf_0.json cargos_pie[0].iva_pct '∅' -> 21
+zip2026_R578_pdf_0.json productos[0].cantidad 106.0 -> 3.3
+zip2026_R578_pdf_0.json productos[0].precio_unitario 3.3 -> 106.0
+zip2026_R578_pdf_0.json productos[1].cantidad 88.0 -> 3.6
+zip2026_R578_pdf_0.json productos[1].precio_unitario 3.6 -> 88.0
+zip2026_R594_pdf_0.json observaciones 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 diciembre al 3 -> 'Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 diciembre al 31 enero 2026. Corrección 06/11/2026: la base impre
+zip2026_R594_pdf_0.json subtotal 302.86 -> 239.86
+zip2026_R704_pdf_0.json productos[0].cantidad 106.0 -> 3.6
+zip2026_R704_pdf_0.json productos[0].precio_unitario 3.6 -> 106.0
+zip2026_R718_pdf_0.json productos[3].nombre 'BO' -> 'LA ESPECIERA DEL NORTE Ñora en bote 380g'
+zip2026_R760_pdf_0.json productos[0].cantidad 110.0 -> 3.3
+zip2026_R760_pdf_0.json productos[0].precio_unitario 3.3 -> 110.0
+zip2026_R760_pdf_0.json productos[1].cantidad 55.0 -> 2.4
+zip2026_R760_pdf_0.json productos[1].precio_unitario 2.4 -> 55.0
+zip2026_R797_pdf_0.json cargos_pie[0].concepto '∅' -> 'Punto verde (P.V.) 21 %'
+zip2026_R797_pdf_0.json cargos_pie[0].importe '∅' -> 0.04
+zip2026_R797_pdf_0.json cargos_pie[0].iva_pct '∅' -> 21
+zip2026_R824_pdf_0.json productos[0].cantidad 110.0 -> 3.7
+zip2026_R824_pdf_0.json productos[0].precio_unitario 3.7 -> 110.0
+zip2026_R824_pdf_0.json productos[1].cantidad 49.0 -> 4.2
+zip2026_R824_pdf_0.json productos[1].precio_unitario 4.2 -> 49.0
+zip2026_R824_pdf_0.json productos[2].cantidad 57.0 -> 1.0
+zip2026_R824_pdf_0.json productos[2].precio_unitario 1.0 -> 57.0
+zip2026_R84_pdf_0.json productos[0].cantidad 95.0 -> 4.6
+zip2026_R84_pdf_0.json productos[0].precio_unitario 4.6 -> 95.0
+zip2026_R860_pdf_0.json productos[1].bonificada False -> True
+zip2026_R860_pdf_0.json productos[1].descuento_pct None -> 100
+zip2026_R860_pdf_0.json productos[1].total None -> 0.0
+zip2026_R891_pdf_0.json productos[8].nombre 'BJ' -> 'METRO Chef Pimiento California amarillo ristra 500g'
+zip2026_R950_pdf_0.json productos[0].cantidad 49.0 -> 3.0
+zip2026_R950_pdf_0.json productos[0].precio_unitario 3.0 -> 49.0
+zip2026_R950_pdf_0.json productos[1].cantidad 110.0 -> 2.5
+zip2026_R950_pdf_0.json productos[1].precio_unitario 2.5 -> 110.0
+zip2026_R986_pdf_0.json productos[0].cantidad 110.0 -> 2.6
+zip2026_R986_pdf_0.json productos[0].precio_unitario 2.6 -> 110.0
+zip2026_R986_pdf_0.json productos[2].cantidad 68.0 -> 5.2
+zip2026_R986_pdf_0.json productos[2].precio_unitario 5.2 -> 68.0

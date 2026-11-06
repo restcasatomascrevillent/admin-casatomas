@@ -1,0 +1,46 @@
+{
+ "archivo": "R108.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISVALERO, SL",
+ "cif": "B54581632",
+ "local": "casa_tomas",
+ "numero_documento": "F/000479-26",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LA HORMIGA DE ANTIDOTO 2022",
+   "producto_ficha": null,
+   "cantidad": 48,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 20.9,
+   "descuento_pct": 5,
+   "total": 953.04,
+   "iva_pct": 21,
+   "albaran_ref": "A/000697-26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 953.04,
+ "desglose_iva": [
+  {
+   "base": 953.04,
+   "pct": 21,
+   "cuota": 200.14
+  }
+ ],
+ "iva": 200.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1153.18,
+ "observaciones": "Recibo domiciliado bancario 45 días; vto. 15/03/2026 1.153,18. Sello COPIA. Cliente 001176 CASA TOMÁS.",
+ "alertas": []
+}

@@ -1,0 +1,48 @@
+{
+ "archivo": "R1520.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "COLEGIO DE REGISTRADORES DE ESPAÑA",
+ "cif": "Q2863012G",
+ "local": "casa_tomas",
+ "numero_documento": "2025/62562",
+ "fecha": "2025-11-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Renovación LEI 100924222 de la entidad MASIDE 2011 SL",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 56.08,
+   "descuento_pct": null,
+   "total": 56.08,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 56.08,
+ "desglose_iva": [
+  {
+   "base": 56.08,
+   "pct": 21,
+   "cuota": 11.78
+  }
+ ],
+ "iva": 11.78,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 67.86,
+ "observaciones": "Serie CRPML. Interesado: MASIDE 2011 SL (NIF B54583356). Total a pagar impreso: 67,86 €. Sin forma de pago impresa.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

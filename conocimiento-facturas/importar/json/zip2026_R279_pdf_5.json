@@ -1,0 +1,63 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  6
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS ISLA TABARCA, S.L.",
+ "cif": "B54006085",
+ "local": "casa_tomas",
+ "numero_documento": "260/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 6,
+   "nombre": "MACRUROS (emb. MARUFINA)",
+   "producto_ficha": null,
+   "cantidad": 12.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 793.18,
+   "iva_pct": 10,
+   "albaran_ref": "4283, 2186",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 6,
+   "nombre": "PERCIFORMES Y A. (emb. EL CUCHARON)",
+   "producto_ficha": null,
+   "cantidad": 5.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 43.06,
+   "iva_pct": 10,
+   "albaran_ref": "4283, 2186",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 836.24,
+ "desglose_iva": [
+  {
+   "base": 836.24,
+   "pct": 10,
+   "cuota": 83.62
+  }
+ ],
+ "iva": 83.62,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 919.86,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 110. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

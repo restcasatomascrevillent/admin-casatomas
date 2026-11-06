@@ -1,0 +1,139 @@
+{
+ "archivo": "R1129.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Exclusivas Uriarte, S.L.",
+ "cif": "B03821576",
+ "local": "casa_tomas",
+ "numero_documento": "A26/7591",
+ "fecha": "2026-07-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "JOSE PARIENTE SAUVIGNON BLANC",
+   "producto_ficha": null,
+   "cantidad": 36.0,
+   "unidad": "botella",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.75,
+   "descuento_pct": null,
+   "total": 243.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/11660",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ARROZ MOLINO ROCA CARNAROLI OLD 2K",
+   "producto_ficha": "Arroz Molino Roca Carnaroli Old 2 kg",
+   "cantidad": 16.0,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.2,
+   "descuento_pct": null,
+   "total": 131.2,
+   "iva_pct": 4,
+   "albaran_ref": "A26/11660",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TERRAS GAUDA",
+   "producto_ficha": null,
+   "cantidad": 48.0,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.1,
+   "descuento_pct": null,
+   "total": 436.8,
+   "iva_pct": 21,
+   "albaran_ref": "A26/11660",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "JOSE PARIENTE SAUVIGNON BLANC MAGN",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.15,
+   "descuento_pct": null,
+   "total": 90.9,
+   "iva_pct": 21,
+   "albaran_ref": "A26/11660",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TERRAS GAUDA MAGNUM",
+   "producto_ficha": null,
+   "cantidad": 10.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.5,
+   "descuento_pct": null,
+   "total": 225.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/11660",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "TERRAS GAUDA MAGNUM",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/11660",
+   "bonificada": true,
+   "precio_referencia": 22.5
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1126.9,
+ "desglose_iva": [
+  {
+   "base": 995.7,
+   "pct": 21,
+   "cuota": 209.1
+  },
+  {
+   "base": 131.2,
+   "pct": 4,
+   "cuota": 5.25
+  }
+ ],
+ "iva": 214.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1341.25,
+ "observaciones": "Forma de pago: recibo 45 días domiciliado. Nº cliente 4,027.",
+ "alertas": [
+  "Terras Gauda Magnum: 10 a 22,50 y 3 más a 0,00 (bonificadas); formato magnum (cl) no impreso."
+ ]
+}

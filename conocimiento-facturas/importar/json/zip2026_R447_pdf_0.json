@@ -1,0 +1,48 @@
+{
+ "archivo": "R447.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "44 S",
+ "fecha": "2026-03-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.29,
+   "descuento_pct": null,
+   "total": 109.92,
+   "iva_pct": 10,
+   "albaran_ref": "69 S",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 109.92,
+ "desglose_iva": [
+  {
+   "base": 109.92,
+   "pct": 10,
+   "cuota": 10.99
+  }
+ ],
+ "iva": 10.99,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 120.91,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Destinatario Casa Tomás (cliente 1607). Ostras: la columna Kilos son piezas.",
+ "alertas": [
+  "Ostra Royale nº 2 en albarán 69 S a 2,29 €/pieza; la ficha y el resto de facturas la tienen a 2,19 €/pieza. Se deja lo impreso."
+ ]
+}

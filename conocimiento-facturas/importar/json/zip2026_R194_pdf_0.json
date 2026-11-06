@@ -1,0 +1,80 @@
+{
+ "archivo": "R194.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170750444",
+ "fecha": "2026-02-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 5 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 5 (Costa Rica)",
+   "cantidad": 25.5,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 45.9,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CEREZA FINAL 13 30+ I CERASUS 2,5K CL",
+   "producto_ficha": "Cereza final de campaña 30+ (caja 2,5 kg, Chile)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 10.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "UVA JACKS SALUTE JJ I VANGUARD 4K PE",
+   "producto_ficha": "Uva Jack's Salute (caja 4 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.6,
+   "descuento_pct": null,
+   "total": 18.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 114.3,
+ "desglose_iva": [
+  {
+   "base": 114.3,
+   "pct": 4,
+   "cuota": 4.57
+  }
+ ],
+ "iva": 4.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 118.87,
+ "observaciones": "Fecha entrega 12.02.2026, igual que la fecha de factura. Anotacion suelta '(CP)': no es producto. Total BT 5. Asterisco GLOBALG.A.P. quitado del nombre.",
+ "alertas": []
+}

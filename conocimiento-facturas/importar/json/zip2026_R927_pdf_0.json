@@ -1,0 +1,99 @@
+{
+ "archivo": "R927.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260262",
+ "fecha": "2026-06-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 87.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000262",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": "Buey (probablemente buey de mar)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.0,
+   "descuento_pct": null,
+   "total": 95.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000262",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA S.E.",
+   "producto_ficha": "Ostra S.E.",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 86.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000262",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PERCEBE",
+   "producto_ficha": "Percebe",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.0,
+   "descuento_pct": null,
+   "total": 95.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000262",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 363.4,
+ "desglose_iva": [
+  {
+   "base": 363.4,
+   "pct": 10,
+   "cuota": 36.34
+  }
+ ],
+ "iva": 36.34,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 399.74,
+ "observaciones": "Transferencia CaixaBank; vencimiento 02/06/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: PERCEBE 95,00 (ficha 110,00)"
+ ]
+}

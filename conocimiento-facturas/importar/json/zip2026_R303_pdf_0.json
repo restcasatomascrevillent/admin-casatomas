@@ -1,0 +1,63 @@
+{
+ "archivo": "R303.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 880",
+ "fecha": "2026-02-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 50/70 FAO 87 PACIFICO",
+   "producto_ficha": "Pez espada 50/70 (FAO 87 Pacífico)",
+   "cantidad": 5.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 53.2,
+   "iva_pct": 10,
+   "albaran_ref": "20261380",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. LUBINA X5 120/160",
+   "producto_ficha": "Lubina 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 14.5,
+   "descuento_pct": null,
+   "total": 72.5,
+   "iva_pct": 10,
+   "albaran_ref": "20261380",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 125.7,
+ "desglose_iva": [
+  {
+   "base": 125.7,
+   "pct": 10,
+   "cuota": 12.57
+  }
+ ],
+ "iva": 12.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 138.27,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 29/03/2026, transferencia a 30 días. Albarán 20261380 del 18/02/2026, pedido 16684. Nota 'Centro en rodajas' ignorada. La fila Total (2 cajas, 10,60 kg) no son euros.",
+ "alertas": []
+}

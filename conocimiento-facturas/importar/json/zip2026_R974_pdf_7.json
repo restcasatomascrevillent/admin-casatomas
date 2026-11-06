@@ -1,0 +1,63 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS ISLA TABARCA, S.L.",
+ "cif": "B54006085",
+ "local": "casa_tomas",
+ "numero_documento": "743/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.6,
+   "descuento_pct": null,
+   "total": 32.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 8,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 68.22,
+   "descuento_pct": null,
+   "total": 177.38,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 209.68,
+ "desglose_iva": [
+  {
+   "base": 209.68,
+   "pct": 10,
+   "cuota": 20.97
+  }
+ ],
+ "iva": 20.97,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 230.65,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): EL CUCHARON. Albaranes de subasta (informativo): 13495, 12947, 11871.",
+ "alertas": []
+}

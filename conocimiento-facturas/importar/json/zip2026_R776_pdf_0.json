@@ -1,0 +1,48 @@
+{
+ "archivo": "R776.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170766045",
+ "fecha": "2026-05-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CEREZA 30 I 2K ES",
+   "producto_ficha": "Cereza calibre 30/32 (bulto 2 kg)",
+   "cantidad": 8.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 7.0,
+   "descuento_pct": null,
+   "total": 56.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 56.0,
+ "desglose_iva": [
+  {
+   "base": 56.0,
+   "pct": 4,
+   "cuota": 2.24
+  }
+ ],
+ "iva": 2.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 58.24,
+ "observaciones": "Entrega 29.05.2026. Línea con GLOBALG.A.P. (asterisco quitado). Anotación (CP) ignorada. Cuadro de envases vacío. Total BT 4.",
+ "alertas": [
+  "CEREZA 30 I 2K ES a 7,000 €/kg; la ficha tiene 5,00 €/kg para la cereza 30/32."
+ ]
+}

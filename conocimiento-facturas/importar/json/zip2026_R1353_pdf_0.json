@@ -1,0 +1,101 @@
+{
+ "archivo": "R1353.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170777329",
+ "fecha": "2026-08-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 20K ES",
+   "producto_ficha": "Patata agria (saco 20 kg)",
+   "cantidad": 171.0,
+   "unidad": "kg",
+   "bultos": 10,
+   "contenido_cantidad": 20,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.83,
+   "descuento_pct": null,
+   "total": 141.93,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 11.45,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.5,
+   "descuento_pct": null,
+   "total": 17.18,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "AGUACATE HASS 12 I 4K PE",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 18.0,
+   "descuento_pct": null,
+   "total": 18.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "ARANDANO I 1K ES",
+   "producto_ficha": "Arándano (bulto 1 kg)",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 8.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 185.61,
+ "desglose_iva": [
+  {
+   "base": 185.61,
+   "pct": 4,
+   "cuota": 7.42
+  }
+ ],
+ "iva": 7.42,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 193.03,
+ "observaciones": "Fecha entrega 21.08.2026. Referencias impresas 0809966242 y 0809966390. Total BT 13.",
+ "alertas": [
+  "Patata agria 20K a 0,83 €/kg; la ficha tiene 0,62-0,64. Se deja lo impreso.",
+  "Aguacate Hass 12 no está en el catálogo (solo 14 y 16). producto_ficha null.",
+  "Arándano 1K a 8,50 €/kg; la ficha tiene 7,00."
+ ]
+}

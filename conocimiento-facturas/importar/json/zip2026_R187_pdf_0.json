@@ -1,0 +1,46 @@
+{
+ "archivo": "R187.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 535",
+ "fecha": "2026-02-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "2026931",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 15.5,
+ "desglose_iva": [
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  }
+ ],
+ "iva": 0.62,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 16.12,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 08/03/2026, transferencia a 30 días. Albarán 2026931 del 03/02/2026, pedido 16343. La fila Total (1 caja, 5,00 kg) no son euros.",
+ "alertas": []
+}

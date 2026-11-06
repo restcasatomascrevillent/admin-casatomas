@@ -1,0 +1,80 @@
+{
+ "archivo": "R1004.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Restaurant Booking & Distribution Services S.L.",
+ "cif": "B90227976",
+ "local": "casa_tomas",
+ "numero_documento": "2026066984",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CoverBookings - Servicios (June 2026)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 99.0,
+   "descuento_pct": null,
+   "total": 99.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Servicio de Reconfirmacion (June 2026)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 60.0,
+   "descuento_pct": null,
+   "total": 60.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Web booking engine (Pax) (June 2026)",
+   "producto_ficha": null,
+   "cantidad": 160,
+   "unidad": "pax",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 159.0,
+ "desglose_iva": [
+  {
+   "base": 159.0,
+   "pct": 21,
+   "cuota": 33.39
+  }
+ ],
+ "iva": 33.39,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 192.39,
+ "observaciones": "Recibo domiciliado. Vencimiento 05/07/2026. Licencia Casa Tomas Crevillent. Reconfirmacion: PVP de referencia 225,00 EUR, bruto 60,00 EUR.",
+ "alertas": []
+}

@@ -1,0 +1,82 @@
+{
+ "archivo": "R962.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "205",
+ "fecha": "2026-06-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "L/ Gordal DH 60/80 F5kg 2kg N",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L/ Rellenas anchoa F5kg 2kg N",
+   "producto_ficha": "Aceituna rellena de anchoa FSY 180 (lata)",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 38.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "T/ Cuquillo T3",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 12.9,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 117.3,
+ "desglose_iva": [
+  {
+   "base": 117.3,
+   "pct": 10,
+   "cuota": 11.73
+  }
+ ],
+ "iva": 11.73,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 129.03,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": [
+  "Precio de la línea 3 (Cuquillo T3) 12,90 difiere de 15,50/14,50/13,90 de otras facturas; importe 12,90 cuadra con base."
+ ]
+}

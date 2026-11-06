@@ -1,0 +1,97 @@
+{
+ "archivo": "R978.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MR FRIO SOLUCIONES TERMICAS, S.L.",
+ "cif": "B24831901",
+ "local": "casa_tomas",
+ "numero_documento": "000172",
+ "fecha": "2026-06-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CIERRE CAMARA (reparación cierre cava de vinos)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 204.9,
+   "descuento_pct": 15,
+   "total": 174.17,
+   "iva_pct": 21,
+   "albaran_ref": "P-168",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PRESOSTATO VAPOR ORIGINAL (horno Repagas)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 98.5,
+   "descuento_pct": 15,
+   "total": 83.73,
+   "iva_pct": 21,
+   "albaran_ref": "P-168",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CIERRE MUELLE NARIZ ORIGINAL",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 43.15,
+   "descuento_pct": 15,
+   "total": 36.68,
+   "iva_pct": 21,
+   "albaran_ref": "P-168",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA OFICIAL",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": 15,
+   "total": 59.5,
+   "iva_pct": 21,
+   "albaran_ref": "P-168",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 354.08,
+ "desglose_iva": [
+  {
+   "base": 354.08,
+   "pct": 21,
+   "cuota": 74.36
+  }
+ ],
+ "iva": 74.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 428.44,
+ "observaciones": "Reparaciones de cava de vinos y horno Repagas (albarán P-168, 04/06/2026). Forma de pago: transferencia bancaria Santander. Garantía 3 meses. Destinatario RESTAURANTE CASA TOMÁS / MASIDE 2011 SL (B-54583356), C/ Santa María de la Cabeza 2.",
+ "alertas": []
+}

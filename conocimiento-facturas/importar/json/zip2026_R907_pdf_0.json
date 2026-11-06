@@ -1,0 +1,46 @@
+{
+ "archivo": "R907.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 03523",
+ "fecha": "2026-05-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLAS ALISTAO 1",
+   "producto_ficha": "Colas alistao 1",
+   "cantidad": 3.04,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 77.52,
+   "iva_pct": 10,
+   "albaran_ref": "F570866",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 77.52,
+ "desglose_iva": [
+  {
+   "base": 77.52,
+   "pct": 10,
+   "cuota": 7.75
+  }
+ ],
+ "iva": 7.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 85.27,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F570866. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

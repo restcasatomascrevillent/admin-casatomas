@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  18
+ ],
+ "tipo": "factura",
+ "proveedor": "SANTACREU LUCHORO, DIEGO",
+ "cif": "21275435K",
+ "local": "casa_tomas",
+ "numero_documento": "126/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 18,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 2.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.78,
+   "descuento_pct": null,
+   "total": 61.59,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 61.59,
+ "desglose_iva": [
+  {
+   "base": 61.59,
+   "pct": 10.0,
+   "cuota": 6.16
+  }
+ ],
+ "iva": 6.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 67.75,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6830. Embarcaciones: ninguna.",
+ "alertas": []
+}

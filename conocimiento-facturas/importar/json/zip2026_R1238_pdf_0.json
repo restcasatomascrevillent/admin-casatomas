@@ -1,0 +1,69 @@
+{
+ "archivo": "R1238.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900008311",
+ "fecha": "2026-07-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LS. GRANADINA RIVES SIN",
+   "producto_ficha": "Granadina Rives sin alcohol",
+   "cantidad": 3,
+   "unidad": "botella",
+   "bultos": 0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.71,
+   "descuento_pct": null,
+   "total": 11.13,
+   "iva_pct": 21,
+   "albaran_ref": "2904002068",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LC. SAMBUCA MOLINARI EXTRA LITRO",
+   "producto_ficha": "Sambuca Molinari Extra 1 litro",
+   "cantidad": 2,
+   "unidad": "botella",
+   "bultos": 0,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 14.27,
+   "descuento_pct": null,
+   "total": 28.54,
+   "iva_pct": 21,
+   "albaran_ref": "2904002068",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (importe impreso en la casilla % DTO. del pie)",
+   "importe": -3.57,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 36.1,
+ "desglose_iva": [
+  {
+   "base": 36.1,
+   "pct": 21,
+   "cuota": 7.58
+  }
+ ],
+ "iva": 7.58,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 43.68,
+ "observaciones": "Albarán 2904002068 del 28/07/2026. Forma de pago no impresa. Total unidades 5.",
+ "alertas": []
+}

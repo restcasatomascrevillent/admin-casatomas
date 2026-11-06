@@ -1,0 +1,105 @@
+{
+  "cif": "F54450895",
+  "nombre": "BENEOLIVA, S. COOP. V.L.",
+  "nombres_impresos": ["Beneoliva, S.Coop. V.L.", "BENEOLIVA S.COOP.", "BENEOLIVE", "OLIBEN"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R150.pdf", "R644.pdf", "R1008.pdf", "R1644.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fecha fin de mes) que agrupa los albaranes del mes (normalmente 2 o 3); solo aceite de oliva",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["26/ 539", "26/ 2725", "26/ 4205", "26/ 6647"],
+      "patron": "^26/ ?\\d{3,5}$",
+      "donde": "Fila bajo la cabecera 'Nº | Fecha | Forma de Pago | Moneda | Vendedor | Su Referencia | Página': primera celda (hay un espacio tras la barra)."
+    },
+    "fecha": "Segunda celda de esa misma fila, DD/MM/AA (ej. 30/06/26). Es la fecha de factura (fin de mes), no la de los albaranes.",
+    "albaranes": "Fila '* * * Albarán COM 3809 /26 del 03/06/2026 * * *' antes de sus líneas. Ese número NO es el de factura. Varios albaranes pueden repetir el mismo artículo."
+  },
+
+  "lectura": {
+    "columnas": ["Artículo (código 4 cifras)", "Descripción", "Lote", "Cajas Unidades", "Precio", "Dto", "Importe"],
+    "cantidad_es": "unidades sueltas facturadas: garrafas de 5 L o botellas de 500 ml (la cabecera dice 'Cajas Unidades' pero el precio es por garrafa/botella, no por caja)",
+    "columna_peso": null,
+    "precio_es_por": "garrafa de 5 L (o botella de 500 ml en el Capri)",
+    "descuento_por_linea": { "existe": false, "columna": "Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin líneas de envase",
+    "cargos_y_descuentos_pie": ["Portes : 0,00 | Gastos : 0,00 en todas las muestras", "Dto. P.P. vacío"],
+    "trampas": [
+      "El Lote (LW05038, L-016, 2512LPST10, LV14230) está entre la descripción y la cantidad: no es cantidad ni precio.",
+      "En el pie 'Total Neto | % | Dto. P.P. | Base Imp. | % Cuota I.V.A. ...' el '4' es el % de IVA, no un descuento pronto pago (Dto. P.P. y R.E. salen vacíos).",
+      "El mismo aceite cambia de nombre a lo largo del año: 'OLIBEN VIRGEN 5L. (ENVASADO)' (ene-abr) y 'VIRGEN BENEOLIVE 5L. (ENVASADO)' (abr en adelante) son el mismo artículo 0887; igual 0743 'OLIBEN ORUJO' / 'ORUJO BENEOLIVE'.",
+      "El CIF del emisor no aparece impreso en el texto: arriba solo sale el cliente (MASIDE 2011 SLU, Nif B54583356, Código 608). Beneoliva aparece abajo con los datos bancarios.",
+      "Precio del orujo 14,95 hasta agosto y 14,50 en septiembre."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio (no hay descuentos por línea). Ej. R1644: 3 × 14,50 = 43,50",
+    "Total Neto = Base Imp. = suma de importes de todas las líneas de todos los albaranes",
+    "cuota IVA = base × 4 % (redondeada); R.E. = 0",
+    "total = base + IVA. Ej. R1008: 720,60 + 28,82 = 749,42; R150: 732,30 + 29,29 = 761,59; R644: 319,80 + 12,79 = 332,59; R1644: 638,20 + 25,53 = 663,73"
+  ],
+
+  "guia_ocr": "Emisor Beneoliva (aceite de oliva); cliente MASIDE 2011/Casa Tomás. Número de factura en la fila 'Nº | Fecha' (formato 26/ 539), fecha DD/MM/AA. Cada línea: código de 4 cifras, descripción, Lote (ignóralo), cantidad, precio, importe. La cantidad son garrafas de 5 L o botellas de 500 ml, no cajas. Cabeceras '* * * Albarán COM ... * * *' no son líneas. IVA único 4 %: en el pie el '4' es el IVA, no un descuento. Lee 'Base Imp.' = suma de líneas y Total = base + IVA.",
+
+  "productos": [
+    {
+      "nombre_impreso": "VIRGEN BENEOLIVE 5L. (ENVASADO)",
+      "nombre_normalizado": "Aceite de oliva virgen Beneolive 5 L (garrafa)",
+      "familia": "aceite",
+      "presentacion": "aceite de oliva virgen envasado, garrafa grande (no es botella)",
+      "formato": { "envase": "garrafa", "contenido": 5, "unidad_contenido": "L", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "garrafa",
+      "precio": { "min": 21.9, "max": 21.9, "por": "garrafa 5 L", "ejemplos": [["2026-01-14", 21.9], ["2026-06-03", 21.9]], "nota": "Antes de abril salía como 'OLIBEN VIRGEN 5L. (ENVASADO)', mismo código 0887. Ver dudas." },
+      "iva_pct": 4,
+      "veces_visto": 19
+    },
+    {
+      "nombre_impreso": "ORUJO BENEOLIVE 5L.",
+      "nombre_normalizado": "Aceite de orujo de oliva Beneolive 5 L (garrafa)",
+      "familia": "aceite",
+      "presentacion": "aceite de orujo de oliva envasado, garrafa grande",
+      "formato": { "envase": "garrafa", "contenido": 5, "unidad_contenido": "L", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "garrafa",
+      "precio": { "min": 14.5, "max": 14.95, "por": "garrafa 5 L", "ejemplos": [["2026-01-14", 14.95], ["2026-06-03", 14.95], ["2026-09-09", 14.5]], "nota": "Antes se imprimía 'OLIBEN ORUJO 5L. (ENVASADO)'; código 0743. Bajó de 14,95 a 14,50 en septiembre." },
+      "iva_pct": 4,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "ALMORSAERO 5L. PET AOVE PICUAL T",
+      "nombre_normalizado": "AOVE Picual Almorsaero 5 L (garrafa PET)",
+      "familia": "aceite",
+      "presentacion": "aceite de oliva virgen extra picual, garrafa de plástico PET (la 'T' final está cortada, probablemente 'temprano')",
+      "formato": { "envase": "garrafa PET", "contenido": 5, "unidad_contenido": "L", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "garrafa",
+      "precio": { "min": 28.5, "max": 28.5, "por": "garrafa 5 L", "ejemplos": [["2026-04-22", 28.5], ["2026-09-23", 28.5]] },
+      "iva_pct": 4,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "CAPRI PICUAL 1ER DIA COSECHA AOVE 500 ML",
+      "nombre_normalizado": "AOVE Capri Picual primer día de cosecha 500 ml",
+      "familia": "aceite",
+      "presentacion": "aceite de oliva virgen extra picual, botella pequeña",
+      "formato": { "envase": "botella", "contenido": 500, "unidad_contenido": "ml", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 9.2, "max": 9.2, "por": "botella 500 ml", "ejemplos": [["2026-01-14", 9.2]] },
+      "iva_pct": 4,
+      "veces_visto": 4
+    }
+  ],
+
+  "dudas": [
+    "La cabecera dice 'Cajas Unidades' pero 27 x 9,20 = 248,40 y 3 x 14,95 = 44,85 indican que la cantidad son botellas/garrafas sueltas. Las cantidades del Capri (27, 18, 9, 18) son múltiplos de 9: ¿caja de 9 botellas? No consta en la factura.",
+    "Las líneas OLIBEN (hasta abril) y BENEOLIVE (desde abril) comparten código y precio: se tratan como el mismo producto; las líneas 'OLIBEN' se cuentan dentro de veces_visto.",
+    "Falta saber si 'T' en 'PICUAL T' es 'temprano'. El Virgen y el Orujo no indican si el virgen es extra.",
+    "El CIF F54450895 no figura en el texto de las facturas digitales: se identifica por el nombre Beneoliva."
+  ]
+}

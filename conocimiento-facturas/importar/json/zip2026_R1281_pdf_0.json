@@ -1,0 +1,83 @@
+{
+ "archivo": "R1281.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASAR DE BURBIA S.L.",
+ "cif": "B24092223",
+ "local": "casa_tomas",
+ "numero_documento": "26000258",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BLANCO CASAR DE BURBIA GODELLO 2025",
+   "producto_ficha": null,
+   "cantidad": 264.0,
+   "unidad": "botella",
+   "bultos": 44,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.2,
+   "descuento_pct": null,
+   "total": 1636.8,
+   "iva_pct": 21,
+   "albaran_ref": "26000271",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BLANCO CASAR DE BURBIA GODELLO 2024 MAGNUM ECOLOGICO",
+   "producto_ficha": null,
+   "cantidad": 48.0,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.7,
+   "descuento_pct": null,
+   "total": 657.6,
+   "iva_pct": 21,
+   "albaran_ref": "26000271",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TINTO EL CASTAÑAL 2023 ECOLOGICO",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 56.25,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "26000271",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 2294.4,
+ "desglose_iva": [
+  {
+   "base": 2294.4,
+   "pct": 21,
+   "cuota": 481.82
+  }
+ ],
+ "iva": 481.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2776.22,
+ "observaciones": "Forma de pago: domiciliación bancaria a 60 días de factura. Vencimiento 29/09/2026 (2.776,22 €). Albarán 26000271 de 17/07/2026. Lotes no incluidos. Documento firmado electrónicamente por el representante del emisor.",
+ "alertas": [
+  "Carpeta de origen 10086675W, que es el NIF del firmante del PDF; el emisor es CASAR DE BURBIA S.L. (B24092223). Comprobar la carpeta.",
+  "Línea TINTO EL CASTAÑAL con 100 % de dto (importe 0,00): se registra como bonificada; la base 2.294,40 cuadra sin ella."
+ ]
+}

@@ -1,0 +1,319 @@
+{
+  "cif": "B30321574",
+  "nombre": "CORPORACIÓN DIPER (Exclusivas Diper, S.L.)",
+  "nombres_impresos": ["CORPORACIÓN DIPER", "Exclusivas Diper, S.L.", "exclusivasdiper.com"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R114.pdf", "R633.pdf", "R992.pdf", "R805.pdf", "R1608.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fin de mes) que agrupa los albaranes semanales; congelados, precocinados, salsas y charcutería",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": {
+      "ejemplos": ["M00060", "M04362", "M05825", "M07308", "M11569"],
+      "patron": "^M\\d{5}$",
+      "donde": "Bloque 'Datos de cabecera', fila bajo 'FACTURA | Fecha | N.I.F. | Repr./Zona | Orden / Bultos': primera celda"
+    },
+    "fecha": "Segunda celda de esa fila con puntos en el año: '30/01/2.026' = 30/01/2026 (DD/MM/AAAA)",
+    "albaranes": "Fila '** Albaran: 003204 de fecha : 14/01/2026 **N/R: 159813' antes de sus líneas"
+  },
+
+  "lectura": {
+    "columnas": ["ARTICULO", "DESCRIPCION", "Nº LOTE", "IVA", "BTS", "UDS", "KGS", "PRECIO", "BONIF", "DTO", "NETO", "IMPORTE"],
+    "cantidad_es": "depende del sufijo del NETO: 'U' = unidades (UDS), 'K' = kilos (KGS). BTS son bultos (cajas) y no multiplican",
+    "columna_peso": "KGS, solo cuando el NETO acaba en K (3,00 / 6,00 / 4,25...)",
+    "precio_es_por": "ud (si NETO acaba en U) o kg (si NETO acaba en K)",
+    "descuento_por_linea": { "existe": true, "columna": "BONIF y DTO", "valores_habituales": [5, 8, 9, 10, 14.5, 14.9, 22, 28, 30, 32.5, 36] },
+    "iva_por_linea": true,
+    "tipos_iva": [10, 4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin líneas de envase",
+    "cargos_y_descuentos_pie": ["Columna DESCUENTOS del pie vacía: el descuento está en cada línea"],
+    "trampas": [
+      "El IVA va en una celda de 4 cifras: 1000 = 10,00 %, 0400 = 4,00 %. No es una cantidad.",
+      "Las líneas empiezan con basura de un texto vertical del Registro Mercantil pegado al código: 'NIF 52003', 'hoja 32870', 'tomo 61001', '73, 55523', '202, 80415', 'folio 80454', '09/03/92, 36110'. El código real es el número de 4-5 cifras justo antes de la descripción; ignora esas palabras. Líneas sueltas '1ª.', 'inscripción', '4.198,', 'B-30321574/nº' son ruido.",
+      "El número suelto al final de la descripción es lote, no cantidad: 'CALLOS PREPARADOS 2,5K.ROGUSA 605', 'LASA%A FLORENTINA 3 KG VAMOS 3035617', 'CHORIZO CHISTORRA VAC 220G GAL 0059'. 'LASA%A' es LASAÑA.",
+      "Hay dos columnas de importe: NETO es el precio unitario ya descontado (32,976U) e IMPORTE es la línea (131,90). No confundas ni sumes los dos.",
+      "Con BONIF y DTO vacíos (callos desde febrero, tomate seco) falta el hueco: '| 23,134 | 23,134U | 46,27'. Si solo hay una cifra tras el precio, mira el NETO para saber si es bonificación (en €) o descuento (en %).",
+      "Una línea con una sola cifra entera ('| 2 | 23,134 |') es UDS (sin bultos).",
+      "Pie: 'SUMA IMPORTES' incluye todas las líneas (4 % y 10 %); el primer par '37,39 | 4,0 | 1,50' es el grupo al 4 % (base, tipo, cuota) y luego viene el grupo al 10 %.",
+      "El texto vertical del registro Mercantil y 'Cliente: 00382', 'Orden/Bultos' no son líneas."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "NETO = (PRECIO − BONIF) × (1 − DTO/100). R114 pomodoraccino: (48,590 − 11,950) × 0,90 = 32,976",
+    "IMPORTE = UDS × NETO si NETO acaba en U (4 × 32,976 = 131,90); IMPORTE = KGS × NETO si acaba en K (4,00 × 19,310 = 77,24)",
+    "SUMA IMPORTES = suma de IMPORTE de todas las líneas (R114: 651,05)",
+    "Base 4 % = suma de líneas con IVA 0400; base 10 % = resto. R114: 77,24 al 4 % (cuota 3,09) y 573,81 al 10 % (cuota 57,38)",
+    "total = bases + cuotas. R114: 573,81 + 57,38 + 77,24 + 3,09 = 711,52; R805: 465,46 + 46,55 + 37,39 + 1,50 = 550,90; R633: 519,47 + 51,95 = 571,42; R1608: 1.219,66 + 121,97 = 1.341,63"
+  ],
+
+  "guia_ocr": "Emisor Corporación Diper / Exclusivas Diper (Ceutí); cliente Maside 2011/Casa Tomás, cliente 00382. Nº 'Mnnnnn' y fecha '30/01/2.026' en la fila bajo 'Datos de cabecera'. Ignora palabras pegadas al código ('NIF', 'hoja', 'tomo', 'folio', '73,', '202,') y las líneas '1ª.'/'inscripción'. IVA: 1000 = 10 %, 0400 = 4 %. NETO acabado en U: importe = UDS × NETO; en K: importe = KGS × NETO. El número final de la descripción es lote. Pie: 'SUMA IMPORTES', bases e IVA al 4 % y 10 %.",
+
+  "productos": [
+    {
+      "nombre_impreso": "POMODORACCINO EUROPI",
+      "nombre_normalizado": "Pomodoraccino Europi (4 uds por bulto)",
+      "familia": "salsa / condimento",
+      "presentacion": "producto Europi; formato y conservación no indicados",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 4, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 32.976, "max": 35.037, "por": "ud (NETO)", "ejemplos": [["2026-01-14", 32.976], ["2026-06-03", 35.037]], "nota": "Lista 48,59 → 51,63; bonif 11,95 → 12,70; dto 10 %. Importe línea 131,90 → 140,15 (4 uds)" },
+      "iva_pct": 10,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "LASA%A FLORENTINA 3 KG VAMOS",
+      "nombre_normalizado": "Lasaña Florentina 3 kg Vamos",
+      "familia": "pasta/precocinado",
+      "presentacion": "lasaña precocinada, bandeja de 3 kg; congelada no indicado",
+      "formato": { "envase": "bandeja", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "ud" },
+      "unidad_factura": "kg",
+      "precio": { "min": 10.629, "max": 10.629, "por": "kg (NETO)", "ejemplos": [["2026-04-22", 10.629]], "nota": "Lista 15,71, bonif 3,90, dto 10 %. 6,00 kg (2 uds) = 63,77; 1 ud de 3 kg = 31,89" },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "CALLOS PREPARADOS 2,5K.ROGUSA",
+      "nombre_normalizado": "Callos preparados Rogusa 2,5 kg",
+      "familia": "plato preparado",
+      "presentacion": "callos cocinados, envase de 2,5 kg",
+      "formato": { "envase": "envase", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 23.134, "max": 25.147, "por": "ud (NETO)", "ejemplos": [["2026-01-14", 25.147], ["2026-06-17", 23.134]], "nota": "Enero-febrero: lista 38,98, bonif 9,43, dto 14,9 %. Desde mayo sin descuentos: 23,134" },
+      "iva_pct": 10,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "KEBAB POLLO LONC 2K MALACITANA",
+      "nombre_normalizado": "Kebab de pollo en loncha Malacitana 2 kg",
+      "familia": "charcutería/carne",
+      "presentacion": "kebab de pollo laminado, pieza de 2 kg",
+      "formato": { "envase": "pieza", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "ud" },
+      "unidad_factura": "kg",
+      "precio": { "min": 14.535, "max": 14.904, "por": "kg (NETO)", "ejemplos": [["2026-01-28", 14.535], ["2026-06-03", 14.904]], "nota": "2 kg = 29,07/29,81" },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "CHORIZO EXTRA DULCE MAYBE",
+      "nombre_normalizado": "Chorizo extra dulce Maybe (pieza, por kg)",
+      "familia": "embutido",
+      "presentacion": "chorizo dulce, pieza de peso variable (3,8 a 4,6 kg por línea)",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 13.766, "max": 13.766, "por": "kg (NETO)", "ejemplos": [["2026-06-03", 13.766]], "nota": "Lista 22,13, bonif 6,03, dto 14,5 %" },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "CHORIZO CHISTORRA VAC 220G GAL",
+      "nombre_normalizado": "Chistorra envasada al vacío 220 g (Gal)",
+      "familia": "embutido",
+      "presentacion": "chistorra al vacío, envase de 220 g",
+      "formato": { "envase": "paquete al vacío", "contenido": 220, "unidad_contenido": "g", "unidades_por_bulto": 15, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.264, "max": 2.66, "por": "ud (NETO)", "ejemplos": [["2026-01-14", 2.264], ["2026-09-16", 2.66]], "nota": "Lista 3,57, bonif 0,91; dto 14,9 % hasta agosto; en septiembre sin dto (2,660)" },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "MORCON BLANCO BOLA DE BANDERA",
+      "nombre_normalizado": "Morcón blanco bola de bandera (pieza, por kg)",
+      "familia": "embutido",
+      "presentacion": "morcón blanco curado/cocido, pieza de 1,5 a 2,3 kg",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 6.312, "max": 7.463, "por": "kg (NETO)", "ejemplos": [["2026-05-13", 7.463]], "nota": "6,312 en una línea sin bonif y dto 28 % sobre 8,766" },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "TORREZNOS SORIA N%5 1.5KG 5-6",
+      "nombre_normalizado": "Torreznos de Soria 1,5 kg (5-6 uds)",
+      "familia": "embutido/aperitivo",
+      "presentacion": "torreznos de Soria, envase de 1,5 kg con 5-6 piezas",
+      "formato": { "envase": "envase", "contenido": 1.5, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 19.42, "max": 19.42, "por": "kg (NETO)", "ejemplos": [["2026-01-28", 19.42]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Q.CABRA MEDALLON IQF 44MM 6GR",
+      "nombre_normalizado": "Queso de cabra medallón IQF 44 mm 6 g",
+      "familia": "queso",
+      "presentacion": "medallones congelados individualmente (IQF)",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "ud" },
+      "unidad_factura": "kg",
+      "precio": { "min": 18.694, "max": 19.384, "por": "kg (NETO)", "ejemplos": [["2026-01-14", 19.31], ["2026-05-06", 18.694]], "nota": "IVA 4 % (código 0400). Con 4 uds = 4,00 kg o 2 uds = 2,00 kg: 1 ud = 1 kg" },
+      "iva_pct": 4,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "SALSA TOMATE FRI POUCHE 3.4K TF5318",
+      "nombre_normalizado": "Salsa de tomate frito pouche 3,4 kg",
+      "familia": "salsa",
+      "presentacion": "tomate frito en bolsa pouche de 3,4 kg",
+      "formato": { "envase": "pouche", "contenido": 3.4, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 13.653, "max": 14.058, "por": "ud (NETO)", "ejemplos": [["2026-04-29", 13.653], ["2026-06-10", 14.058]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "SALSA TOMATE FRI POUCHE 2.5K TF5318",
+      "nombre_normalizado": "Salsa de tomate frito pouche 2,5 kg",
+      "familia": "salsa",
+      "presentacion": "tomate frito en bolsa pouche de 2,5 kg (solo en enero)",
+      "formato": { "envase": "pouche", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 7.2, "max": 7.2, "por": "ud (NETO)", "ejemplos": [["2026-01-28", 7.2]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ACEITE GIRASOL C-TRUFA BLANCA",
+      "nombre_normalizado": "Aceite de girasol con trufa blanca",
+      "familia": "aceite",
+      "presentacion": "aceite de girasol aromatizado con trufa blanca; contenido no indicado",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 8.721, "max": 9.196, "por": "ud (NETO)", "ejemplos": [["2026-01-28", 8.721], ["2026-06-03", 9.196]], "nota": "Lista 12,17 → 12,83, bonif 2,99 → 3,15, dto 5 %. El número al final de la descripción es caducidad/lote" },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "PESTO FRESCO 1K NEGRINI",
+      "nombre_normalizado": "Pesto fresco Negrini 1 kg",
+      "familia": "salsa",
+      "presentacion": "pesto fresco refrigerado, tarro/envase de 1 kg",
+      "formato": { "envase": "envase", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "ud" },
+      "unidad_factura": "ud",
+      "precio": { "min": 11.752, "max": 12.54, "por": "ud (NETO)", "ejemplos": [["2026-04-01", 11.752], ["2026-05-06", 12.54]], "nota": "Lista 16,41 → 17,50, bonif 4,04 → 4,30, dto 5 %" },
+      "iva_pct": 10,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "FOCACCIA CLASSICA 600GR SAPORE",
+      "nombre_normalizado": "Focaccia clásica Sapore 600 g",
+      "familia": "pan/masa",
+      "presentacion": "focaccia de 600 g; congelada no indicado",
+      "formato": { "envase": "pieza", "contenido": 600, "unidad_contenido": "g", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 4.878, "max": 5.4, "por": "ud (NETO)", "ejemplos": [["2026-05-06", 5.4]], "nota": "1 bulto = 6 uds (29,27 / 32,40); 2 bultos = 12 uds = 64,80" },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "TOMATE SECO ACEITE TIRAS",
+      "nombre_normalizado": "Tomate seco en aceite, tiras",
+      "familia": "conserva",
+      "presentacion": "tomate seco en tiras en aceite; contenido no indicado",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 14.12, "max": 14.12, "por": "ud (NETO)", "ejemplos": [["2026-01-21", 14.12]], "nota": "Lista 18,93, bonif 4,81, sin dto" },
+      "iva_pct": 10,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "CROQUETAS DE ALCACHOFA 48U EL",
+      "nombre_normalizado": "Croquetas de alcachofa (48 uds por bolsa)",
+      "familia": "precocinado",
+      "presentacion": "croquetas congeladas, 48 uds por envase de ~2,2 kg",
+      "formato": { "envase": "bolsa", "contenido": 48, "unidad_contenido": "uds", "unidades_por_bulto": 4, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 9.672, "max": 10.552, "por": "kg (NETO)", "ejemplos": [["2026-05-27", 9.672]], "nota": "4 uds = 8,80 kg (2,2 kg cada una)" },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "CRACKER PERGAMENA GUTTIAU",
+      "nombre_normalizado": "Cracker Pergamena Guttiau",
+      "familia": "pan/snack",
+      "presentacion": "cracker Pergamena; formato no indicado",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 6.417, "max": 6.786, "por": "ud (NETO)", "ejemplos": [["2026-06-25", 6.786]], "nota": "Lista 9,46 → 10,00, dto 10 %; 12 uds = 77,00 / 81,43" },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "DATILES C-ALMENDRA Y BACON 500",
+      "nombre_normalizado": "Dátiles con almendra y bacon 500 g",
+      "familia": "aperitivo",
+      "presentacion": "dátiles rellenos de almendra y envueltos en bacon, envase de 500 g",
+      "formato": { "envase": "envase", "contenido": 500, "unidad_contenido": "g", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 7.717, "max": 7.717, "por": "ud (NETO)", "ejemplos": [], "nota": "3 bultos / 6 uds = 46,30. Lista 10,71, bonif 2,23, dto 9 %" },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "TORTILLITA LANGOSTINO 1KG 20U",
+      "nombre_normalizado": "Tortillita de langostino 1 kg (20 uds)",
+      "familia": "precocinado",
+      "presentacion": "tortillitas de langostino, envase de 1 kg con 20 uds",
+      "formato": { "envase": "envase", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 16.084, "max": 16.084, "por": "kg (NETO)", "ejemplos": [], "nota": "12 uds = 12,00 kg = 193,01. Lista 24,69, bonif 5,79, dto 14,9 %" },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "MAGRA C-TOMATE Y PIMIENTOS",
+      "nombre_normalizado": "Magra con tomate y pimientos",
+      "familia": "embutido/cocinado",
+      "presentacion": "magra de cerdo con tomate y pimiento, pieza de peso variable",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 8.891, "max": 8.891, "por": "kg (NETO)", "ejemplos": [], "nota": "Lista 13,892, sin bonif, dto 36 %; 2,40 kg = 21,34" },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CALAMAR INDIO LIMPIO TROCEAD",
+      "nombre_normalizado": "Calamar indio limpio troceado",
+      "familia": "pescado/marisco",
+      "presentacion": "calamar limpio y troceado; fresco/congelado no indicado",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 4.972, "max": 6.042, "por": "kg (NETO)", "ejemplos": [["2026-09-09", 6.042]], "nota": "6,00 kg = 29,83 / 36,25. 4,972 con precio 7,103 y dto 30 %" },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "QUESILLO MALACITANO",
+      "nombre_normalizado": "Quesillo Malacitano",
+      "familia": "postre",
+      "presentacion": "quesillo Malacitano; formato no indicado",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 9.979, "max": 9.979, "por": "ud (NETO)", "ejemplos": [["2026-06-17", 9.979]], "nota": "6 bultos / 12 uds = 119,74. Lista 14,783, dto 32,5 %" },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GILDA SALMON-QUESO 30U BOKAZAS",
+      "nombre_normalizado": "Gilda de salmón y queso 30 uds Bokazas",
+      "familia": "aperitivo / pincho",
+      "presentacion": "pinchos gilda de salmón y queso, 30 uds por bandeja",
+      "formato": { "envase": "bandeja", "contenido": 30, "unidad_contenido": "uds", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 42.37, "max": 42.37, "por": "ud (NETO)", "ejemplos": [["2026-09-23", 42.37]], "nota": "6 uds (2 bultos) = 254,22; sin descuento" },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "El nombre del listado era 'CORPORACIÓN DIPER' y las facturas imprimen 'Exclusivas Diper, S.L.' en el texto vertical del Registro Mercantil: se asume la misma empresa.",
+    "Los envases de pomodoraccino, tomate seco, cracker, quesillo, aceite de trufa y salsas no indican contenido; los 'unidades_por_bulto' (4, 2, 12, 6) se deducen de las columnas BTS/UDS de las líneas y no de una etiqueta.",
+    "No consta si las lasañas, focaccia, croquetas, calamar y Q. cabra son congelados o refrigerados.",
+    "Para algunas líneas con una sola cifra entre PRECIO y NETO no se distingue BONIF de DTO a simple vista; solo el NETO lo confirma.",
+    "Ejemplos de precio con fecha solo en las líneas de las 5 muestras; el resto de rangos vienen del catálogo anual de 9 PDF."
+  ]
+}

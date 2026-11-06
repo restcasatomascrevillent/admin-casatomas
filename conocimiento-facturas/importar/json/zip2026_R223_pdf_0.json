@@ -1,0 +1,46 @@
+{
+ "archivo": "R223.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Juan Manuel Hernandez, S.A.",
+ "cif": "A37015971",
+ "local": "casa_tomas",
+ "numero_documento": "F26000246",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Pluma ibérica",
+   "producto_ficha": null,
+   "cantidad": 15.52,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.15,
+   "descuento_pct": null,
+   "total": 374.81,
+   "iva_pct": 10,
+   "albaran_ref": "ALB26000087",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 374.81,
+ "desglose_iva": [
+  {
+   "base": 374.81,
+   "pct": 10,
+   "cuota": 37.48
+  }
+ ],
+ "iva": 37.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 412.29,
+ "observaciones": "Pago a 30 días transferencia, vto 28/02/2026, Caja Rural de Salamanca",
+ "alertas": []
+}

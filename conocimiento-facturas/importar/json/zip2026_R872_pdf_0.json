@@ -1,0 +1,48 @@
+{
+ "archivo": "R872.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SITVAL (Societat Valenciana d'Inspecció Tècnica de Vehicles SA)",
+ "cif": "A72599418",
+ "local": "casa_tomas",
+ "numero_documento": "2026-0302M/08167",
+ "fecha": "2026-06-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Seguridad (ITV periódica 8384GZL)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.8,
+   "descuento_pct": null,
+   "total": 18.8,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 18.8,
+ "desglose_iva": [
+  {
+   "base": 18.8,
+   "pct": 21,
+   "cuota": 3.95
+  }
+ ],
+ "iva": 3.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 22.75,
+ "observaciones": "ITV periódica (reinspección), 09/06/2026, pago contado. Tasas 0,00.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

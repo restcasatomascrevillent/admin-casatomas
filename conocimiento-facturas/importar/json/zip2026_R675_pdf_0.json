@@ -1,0 +1,63 @@
+{
+ "archivo": "R675.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Juan Manuel Hernandez, S.A.",
+ "cif": "A37015971",
+ "local": "casa_tomas",
+ "numero_documento": "F26001507",
+ "fecha": "2026-04-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Pluma ibérica",
+   "producto_ficha": null,
+   "cantidad": 15.78,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.15,
+   "descuento_pct": null,
+   "total": 381.09,
+   "iva_pct": 10,
+   "albaran_ref": "ALB26001695",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Pluma ibérica",
+   "producto_ficha": null,
+   "cantidad": 12.02,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.15,
+   "descuento_pct": null,
+   "total": 290.28,
+   "iva_pct": 10,
+   "albaran_ref": "ALB26001909",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 671.37,
+ "desglose_iva": [
+  {
+   "base": 671.37,
+   "pct": 10,
+   "cuota": 67.14
+  }
+ ],
+ "iva": 67.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 738.51,
+ "observaciones": "Pago a 30 días transferencia, vto 29/05/2026, Caja Rural de Salamanca",
+ "alertas": []
+}

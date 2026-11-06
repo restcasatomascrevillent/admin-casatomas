@@ -1,0 +1,48 @@
+{
+ "archivo": "R612.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0052/(2026)023009",
+ "fecha": "2026-05-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PIMIENTO TIRAS MC LT 1650GNE",
+   "producto_ficha": "Pimiento en tiras en conserva lata 1650 g neto",
+   "cantidad": -6.0,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.45,
+   "descuento_pct": null,
+   "total": -44.7,
+   "iva_pct": 10,
+   "albaran_ref": "9-175158621",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -44.7,
+ "desglose_iva": [
+  {
+   "base": -44.7,
+   "pct": 10,
+   "cuota": -4.47
+  }
+ ],
+ "iva": -4.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -49.17,
+ "observaciones": "Pago en entrega (factura de reparto). Abono (devolución) de la factura 0/0(063)0052/(2026)022980 de 05/05/2026. Factura de entrega. Número(s) de pedido: 9-175158621.",
+ "alertas": [
+  "'PIMIENTO TIRAS MC LT 1650GNE': precio 7.45 fuera del rango de la ficha (6.09-6.21, por lata)"
+ ]
+}

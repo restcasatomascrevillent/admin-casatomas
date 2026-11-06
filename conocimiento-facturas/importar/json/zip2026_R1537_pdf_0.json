@@ -1,0 +1,46 @@
+{
+ "archivo": "R1537.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260595",
+ "fecha": "2026-09-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.8,
+   "descuento_pct": null,
+   "total": 100.8,
+   "iva_pct": 10,
+   "albaran_ref": "1-000595",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 100.8,
+ "desglose_iva": [
+  {
+   "base": 100.8,
+   "pct": 10,
+   "cuota": 10.08
+  }
+ ],
+ "iva": 10.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 110.88,
+ "observaciones": "Albarán 1-000595 del 18/09/2026. Forma de pago: transferencia CaixaBank; vencimiento 18/09/2026 por 110,88. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": []
+}

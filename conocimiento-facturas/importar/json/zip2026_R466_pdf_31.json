@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  32
+ ],
+ "tipo": "factura",
+ "proveedor": "DIAZ FUENTES, ANGELES MARIA",
+ "cif": "15425219Q",
+ "local": "casa_tomas",
+ "numero_documento": "165/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 32,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 8.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.89,
+   "descuento_pct": null,
+   "total": 286.18,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 286.18,
+ "desglose_iva": [
+  {
+   "base": 286.18,
+   "pct": 10.0,
+   "cuota": 28.62
+  }
+ ],
+ "iva": 28.62,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 314.8,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 4952. Embarcaciones: ninguna.",
+ "alertas": []
+}

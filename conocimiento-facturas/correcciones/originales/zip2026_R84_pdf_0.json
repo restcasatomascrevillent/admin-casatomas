@@ -1,0 +1,67 @@
+{
+ "archivo": "R84.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Pescados y Mariscos Colorao, S.L.U",
+ "cif": "B21523261",
+ "local": "casa_tomas",
+ "numero_documento": "92",
+ "fecha": "2026-01-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BRILLANTE",
+   "producto_ficha": null,
+   "cantidad": 95.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.6,
+   "descuento_pct": null,
+   "total": 437.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ENVASES C0SA",
+   "producto_ficha": null,
+   "cantidad": 0.0,
+   "unidad": "ud",
+   "bultos": 0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 437.0,
+ "desglose_iva": [
+  {
+   "base": 437.0,
+   "pct": 10,
+   "cuota": 43.7
+  }
+ ],
+ "iva": 43.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 480.7,
+ "observaciones": "Sin vencimiento ni forma de pago impresos.",
+ "alertas": [
+  "Nombre del emisor no aparece en el texto del PDF; CIF tomado de la carpeta del lote.",
+  "Numero de documento sin etiqueta impresa; se toma el numero de cabecera.",
+  "Linea ENVASES con cantidad 0 e importe 0,00 (no suma; el precio unitario no se aplica)."
+ ]
+}

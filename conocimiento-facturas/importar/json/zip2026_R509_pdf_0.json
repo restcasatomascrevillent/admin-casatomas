@@ -1,0 +1,49 @@
+{
+ "archivo": "R509.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TOLDOS Y PROYECTOS ÑAOGAR SLU",
+ "cif": "B13724414",
+ "local": "casa_tomas",
+ "numero_documento": "A/29",
+ "fecha": "2026-03-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Reparación de carrucha y trabajos",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 75.0,
+   "descuento_pct": null,
+   "total": 75.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 75.0,
+ "desglose_iva": [
+  {
+   "base": 75.0,
+   "pct": 21,
+   "cuota": 15.75
+  }
+ ],
+ "iva": 15.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 90.75,
+ "observaciones": "Transferencia ES** **** **** **** **** 9896",
+ "alertas": [
+  "Documento idéntico a R679 (misma factura A/29), posible duplicado",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

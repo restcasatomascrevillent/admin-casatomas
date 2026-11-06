@@ -1,0 +1,63 @@
+{
+ "archivo": "R81.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260019",
+ "fecha": "2026-01-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LUBINA",
+   "producto_ficha": "Lubina",
+   "cantidad": 14.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.5,
+   "descuento_pct": null,
+   "total": 371.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000019",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CENTOLLA",
+   "producto_ficha": "Centolla",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": null,
+   "total": 125.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000019",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 496.0,
+ "desglose_iva": [
+  {
+   "base": 496.0,
+   "pct": 10,
+   "cuota": 49.6
+  }
+ ],
+ "iva": 49.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 545.6,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 15/01/2026 por 545,60. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": []
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R231.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "1015",
+ "fecha": "2026-02-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 8.9,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.8,
+   "descuento_pct": null,
+   "total": 238.52,
+   "iva_pct": 10,
+   "albaran_ref": "2645",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 15.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.8,
+   "descuento_pct": null,
+   "total": 402.0,
+   "iva_pct": 10,
+   "albaran_ref": "2865",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 640.52,
+ "desglose_iva": [
+  {
+   "base": 640.52,
+   "pct": 10,
+   "cuota": 64.05
+  }
+ ],
+ "iva": 64.05,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 704.57,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Factura sin serie. Destinatario Casa Tomás (cliente 1607). Agrupa los albaranes 2645 y 2865.",
+ "alertas": []
+}

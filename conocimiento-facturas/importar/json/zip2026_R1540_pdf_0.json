@@ -1,0 +1,140 @@
+{
+ "archivo": "R1540.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRUTOS SECOS EL LLANO, S.L.",
+ "cif": "B30341598",
+ "local": "casa_tomas",
+ "numero_documento": "15471/26",
+ "fecha": "2026-09-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMENDRA MOLIDA REPELADA B/ 1 KG",
+   "producto_ficha": "Almendra molida repelada, bolsa 1 kg",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 9.65,
+   "descuento_pct": null,
+   "total": 48.25,
+   "iva_pct": 4,
+   "albaran_ref": "15471/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BAYAS DE GOJI B/ 900 GRMS",
+   "producto_ficha": "Bayas de goji, bolsa 900 g",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 900,
+   "contenido_unidad": "g",
+   "precio_unitario": 9.15,
+   "descuento_pct": null,
+   "total": 9.15,
+   "iva_pct": 4,
+   "albaran_ref": "15471/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "COKTEL REF.23 B/ 1 KG",
+   "producto_ficha": "Cóctel de frutos secos ref. 23, bolsa 1 kg",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.65,
+   "descuento_pct": null,
+   "total": 55.8,
+   "iva_pct": 10,
+   "albaran_ref": "15471/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "FINI MIX GOMA PICA B/ 1 KG",
+   "producto_ficha": "Fini Mix golosinas goma picante, bolsas de 1 kg (bulto 12 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.369,
+   "descuento_pct": null,
+   "total": 52.42,
+   "iva_pct": 10,
+   "albaran_ref": "15471/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MIXENSALADA B/ 1 KG",
+   "producto_ficha": "Mix para ensalada, bolsa 1 kg",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 42.5,
+   "iva_pct": 10,
+   "albaran_ref": "15471/26",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "PIÑONES B/ 1 KG.",
+   "producto_ficha": "Piñones, bolsa 1 kg",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 84.95,
+   "descuento_pct": null,
+   "total": 84.95,
+   "iva_pct": 4,
+   "albaran_ref": "15471/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 293.07,
+ "desglose_iva": [
+  {
+   "base": 150.72,
+   "pct": 10,
+   "cuota": 15.07
+  },
+  {
+   "base": 142.35,
+   "pct": 4,
+   "cuota": 5.69
+  }
+ ],
+ "iva": 20.76,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 313.83,
+ "observaciones": "Albarán 15471/26 del 22/09/2026. Vencimiento giro 29/09/26. Líneas de horario no son productos.",
+ "alertas": [
+  "PDF digital: el texto no trae nº ni fecha de factura; numero_documento y fecha son los del albarán 15471/26 (22/09/2026).",
+  "ALMENDRA MOLIDA a 9,650 €/kg; la ficha tiene 8,95 €/kg como precio habitual. Subida de precio, se deja lo impreso.",
+  "BAYAS DE GOJI: el envase es de 900 g pero la columna Kg marca 1,00 y el precio 9,150. No queda claro si el precio es por bolsa o por kg; se deja lo impreso."
+ ]
+}

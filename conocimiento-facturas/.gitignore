@@ -1,0 +1,21 @@
+# Originales de facturas y recortes: NUNCA en el repo (viven en Google Drive y en la
+# carpeta local facturas-conocimiento/ del dueño). Ver docs/facturas/README.md.
+pdf/
+img/
+**/pdf/
+**/img/
+*.pdf
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.heic
+*.zip
+__pycache__/
+*.pyc
+# Carpetas de trabajo de los lotes (texto y escaneos de cada PDF)
+/lote[0-9]*/
+/fase2/
+/piloto/
+/importar_prueba/
+/inventario.json

@@ -1,0 +1,46 @@
+{
+ "archivo": "R1105.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 4001",
+ "fecha": "2026-07-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COCOCHAS MERLUZA FRESCO",
+   "producto_ficha": "Cocochas de merluza fresco",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 68.0,
+   "descuento_pct": null,
+   "total": 136.0,
+   "iva_pct": 10,
+   "albaran_ref": "20267073",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 136.0,
+ "desglose_iva": [
+  {
+   "base": 136.0,
+   "pct": 10,
+   "cuota": 13.6
+  }
+ ],
+ "iva": 13.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 149.6,
+ "observaciones": "Transferencia a 30 dias, vencimiento 09/08/2026. Albaran 20267073 de 09/07/2026, sin numero de pedido. Nota impresa: NOTA DE ENTREGA 8629. El lote 2511220131746-2 tiene otro formato que el resto y no se usa. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

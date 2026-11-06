@@ -1,0 +1,63 @@
+{
+ "archivo": "R866.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26004952",
+ "fecha": "2026-06-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 11.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 139.2,
+   "iva_pct": 10,
+   "albaran_ref": "26105485",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE MUJOL MEDIANA 100/140 gramos",
+   "producto_ficha": "Hueva de mújol mediana (pieza 100-140 g)",
+   "cantidad": 0.88,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 70.0,
+   "descuento_pct": null,
+   "total": 61.6,
+   "iva_pct": 10,
+   "albaran_ref": "26105485",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 200.8,
+ "desglose_iva": [
+  {
+   "base": 200.8,
+   "pct": 10,
+   "cuota": 20.08
+  }
+ ],
+ "iva": 20.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 220.88,
+ "observaciones": "Transferencia Banco Santander, vencimiento 05/07/2026. Albarán 26105485 de 02/06/2026. Líneas de consumo preferente (28-11-2026) ignoradas.",
+ "alertas": []
+}

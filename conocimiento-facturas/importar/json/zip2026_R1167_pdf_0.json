@@ -1,0 +1,46 @@
+{
+ "archivo": "R1167.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/14567",
+ "fecha": "2026-07-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AZUCAR AZUCARERA BOLSA PAPEL 1KG C10",
+   "producto_ficha": "Azúcar Azucarera bolsa de papel 1 kg (caja 10)",
+   "cantidad": 100,
+   "unidad": "bolsa",
+   "bultos": 10,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.749,
+   "descuento_pct": 0.0,
+   "total": 74.9,
+   "iva_pct": 10,
+   "albaran_ref": "26/14.519",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 74.9,
+ "desglose_iva": [
+  {
+   "base": 74.9,
+   "pct": 10,
+   "cuota": 7.49
+  }
+ ],
+ "iva": 7.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 82.39,
+ "observaciones": "Giro/B2B, vencimiento 25/07/26. Albarán 26/14.519 (23/07/26). IVA 10 % deducido de las bases impresas.",
+ "alertas": []
+}

@@ -1,0 +1,85 @@
+{
+ "archivo": "R386.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 01262",
+ "fecha": "2026-02-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 18.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.9,
+   "descuento_pct": null,
+   "total": 351.54,
+   "iva_pct": 10,
+   "albaran_ref": "F567949",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 3,
+   "nombre": "VIEIRA MED/CONCHA 20/30 X1 CHILE",
+   "producto_ficha": "Vieira media concha 20/30 (Chile)",
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.25,
+   "descuento_pct": null,
+   "total": 122.0,
+   "iva_pct": 10,
+   "albaran_ref": "F567949",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 3,
+   "nombre": "REVUELTO SETAS X1",
+   "producto_ficha": "Revuelto de setas (bolsa 1 kg)",
+   "cantidad": 12,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.25,
+   "descuento_pct": null,
+   "total": 51.0,
+   "iva_pct": 4,
+   "albaran_ref": "F567949",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 524.54,
+ "desglose_iva": [
+  {
+   "base": 473.54,
+   "pct": 10,
+   "cuota": 47.35
+  },
+  {
+   "base": 51.0,
+   "pct": 4,
+   "cuota": 2.04
+  }
+ ],
+ "iva": 49.39,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 573.93,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F567949. Recargo de equivalencia impreso 1,4 % / 0,5 %: no se suma al total.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R1568.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO-GARZON SL",
+ "cif": "B42678672",
+ "local": "casa_tomas",
+ "numero_documento": "1.380/A",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "33 CEFALOPODOS",
+   "producto_ficha": "Cefalópodos (familia 33)",
+   "cantidad": 1.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39.8,
+   "descuento_pct": null,
+   "total": 71.64,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 71.64,
+ "desglose_iva": [
+  {
+   "base": 71.64,
+   "pct": 10,
+   "cuota": 7.16
+  }
+ ],
+ "iva": 7.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 78.8,
+ "observaciones": "Periodo 01/09/2026 a 30/09/2026. Embarcación(es): NUEVO ALBOR. Albaranes de subasta (informativo): 19501.",
+ "alertas": []
+}

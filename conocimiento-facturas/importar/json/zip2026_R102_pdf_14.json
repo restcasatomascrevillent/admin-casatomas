@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  15
+ ],
+ "tipo": "factura",
+ "proveedor": "CASTELLO RUSO, C.B.",
+ "cif": "E53516464",
+ "local": "casa_tomas",
+ "numero_documento": "21/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 15,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.5,
+   "descuento_pct": null,
+   "total": 60.35,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 60.35,
+ "desglose_iva": [
+  {
+   "base": 60.35,
+   "pct": 10.0,
+   "cuota": 6.04
+  }
+ ],
+ "iva": 6.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 66.39,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 63. Embarcaciones: CAYETANO RUSO.",
+ "alertas": []
+}

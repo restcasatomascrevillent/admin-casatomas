@@ -1,0 +1,63 @@
+{
+ "archivo": "R80.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260017",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 86.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000017",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ALMEJA FINA",
+   "producto_ficha": "Almeja fina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 100.0,
+   "descuento_pct": null,
+   "total": 200.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000017",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 286.4,
+ "desglose_iva": [
+  {
+   "base": 286.4,
+   "pct": 10,
+   "cuota": 28.64
+  }
+ ],
+ "iva": 28.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 315.04,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 14/01/2026 por 315,04. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": []
+}

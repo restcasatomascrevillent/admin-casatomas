@@ -1,0 +1,63 @@
+{
+ "archivo": "R225.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HEREDEROS ANGEL MARIÑO HERMO C.B.",
+ "cif": "E13781760",
+ "local": "casa_tomas",
+ "numero_documento": "2600146",
+ "fecha": "2026-02-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Erizo de Mar",
+   "producto_ficha": "Erizo de mar grande, por kg",
+   "cantidad": 8.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.9,
+   "descuento_pct": null,
+   "total": 223.2,
+   "iva_pct": 10,
+   "albaran_ref": "26000293",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Portes",
+   "producto_ficha": "Portes (transporte) por albarán",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.0,
+   "descuento_pct": null,
+   "total": 22.0,
+   "iva_pct": 10,
+   "albaran_ref": "26000293",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 245.2,
+ "desglose_iva": [
+  {
+   "base": 245.2,
+   "pct": 10,
+   "cuota": 24.52
+  }
+ ],
+ "iva": 24.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 269.72,
+ "observaciones": "Forma de pago GIRO 30, vencimiento 16/03/2026. Albarán 26000293 de 09-02-26.",
+ "alertas": []
+}

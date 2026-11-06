@@ -1,0 +1,49 @@
+{
+ "archivo": "R342.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170753698",
+ "fecha": "2026-03-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CEREZA FINAL 12 32+ I RANCO GOLD 2,5K CL",
+   "producto_ficha": null,
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 30.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 30.0,
+ "desglose_iva": [
+  {
+   "base": 30.0,
+   "pct": 4,
+   "cuota": 1.2
+  }
+ ],
+ "iva": 1.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 31.2,
+ "observaciones": "Lectura de escaneo (img/R342_p1.png), una sola pagina. Lote CL 921233. Fecha entrega 06.03.2026, igual que la fecha de factura. Anotacion suelta '(CP)': no es producto. Total BT 1.",
+ "alertas": [
+  "Calibre 32+ de cereza final no figura en el catalogo; producto_ficha null. Precio 12,00 EUR/kg por encima del rango de la ficha para cereza final 30+ (10-11,5).",
+  "La misma linea (lote CL 921233, 2,50 kg, 12,000 x KG, 30,00) aparece tambien en R343 (factura 9170753696, misma fecha). Comprobar si es duplicado."
+ ]
+}

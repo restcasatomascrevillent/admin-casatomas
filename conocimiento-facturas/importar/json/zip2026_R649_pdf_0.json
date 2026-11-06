@@ -1,0 +1,82 @@
+{
+ "archivo": "R649.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRUTOS SECOS EL LLANO, S.L.",
+ "cif": "B30341598",
+ "local": "casa_tomas",
+ "numero_documento": "7830/26",
+ "fecha": "2026-05-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FINI MIX GOMA PICA B/ 1 KG",
+   "producto_ficha": "Fini Mix golosinas goma picante, bolsas de 1 kg (bulto 12 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.369,
+   "descuento_pct": null,
+   "total": 52.42,
+   "iva_pct": 10,
+   "albaran_ref": "7830/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FLOR DE HIBISCUS",
+   "producto_ficha": "Flor de hibisco (seca)",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.2,
+   "descuento_pct": null,
+   "total": 16.8,
+   "iva_pct": 10,
+   "albaran_ref": "7830/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MIXENSALADA B/ 1 KG",
+   "producto_ficha": "Mix para ensalada, bolsa 1 kg",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 102.0,
+   "iva_pct": 10,
+   "albaran_ref": "7830/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 171.22,
+ "desglose_iva": [
+  {
+   "base": 171.22,
+   "pct": 10,
+   "cuota": 17.12
+  }
+ ],
+ "iva": 17.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 188.34,
+ "observaciones": "Albarán 7830/26 del 05/05/2026. Vencimiento giro 12/05/26. No se admiten devoluciones pasados 15 días.",
+ "alertas": [
+  "PDF digital: el texto no trae nº ni fecha de factura; numero_documento y fecha son los del albarán 7830/26 (05/05/2026)."
+ ]
+}

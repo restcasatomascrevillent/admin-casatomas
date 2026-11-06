@@ -1,0 +1,87 @@
+{
+ "archivo": "R166.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENCHENTA SLU",
+ "cif": "B94186988",
+ "local": "casa_tomas",
+ "numero_documento": "1-4856",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 37.0,
+   "descuento_pct": 0,
+   "total": 74.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-16",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA PLANA",
+   "producto_ficha": "Ostra plana",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.75,
+   "descuento_pct": 0,
+   "total": 99.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-16",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.1,
+   "descuento_pct": 0,
+   "total": 19.1,
+   "iva_pct": 21,
+   "albaran_ref": "3-16",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 192.1,
+ "desglose_iva": [
+  {
+   "base": 173.0,
+   "pct": 10,
+   "cuota": 17.3
+  },
+  {
+   "base": 19.1,
+   "pct": 21,
+   "cuota": 4.01
+  }
+ ],
+ "iva": 21.31,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 213.41,
+ "observaciones": "Transferencia BBVA. Vencimiento igual a la fecha de la factura. Albarán 3-16.",
+ "alertas": [
+  "Precio fuera del rango de la ficha: NAVAJA 37,00 € (rango 20–29)."
+ ]
+}

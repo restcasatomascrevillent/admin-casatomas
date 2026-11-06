@@ -1,0 +1,49 @@
+{
+ "archivo": "R1576.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904161-0001522",
+ "fecha": "2026-09-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AGUA CON GAS SAN PELLEGRINO 50 CL",
+   "producto_ficha": null,
+   "cantidad": -72,
+   "unidad": "ud",
+   "bultos": -3,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.82,
+   "descuento_pct": null,
+   "total": -59.04,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -59.04,
+ "desglose_iva": [
+  {
+   "base": -59.04,
+   "pct": 10,
+   "cuota": -5.9
+  }
+ ],
+ "iva": -5.9,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -64.94,
+ "observaciones": "Abono (serie 9904161, importes negativos) aunque el rótulo impreso dice FACTURA; la línea lleva la letra D. Anotación manuscrita '398,02 €' en la cabecera (no impresa). Crédito a 30 días, vencimiento 24-10-2026.",
+ "alertas": [
+  "El rótulo impreso es 'FACTURA' pero la serie 9904161 y los importes negativos indican abono.",
+  "Anotación manuscrita '398,02 €' sin relación clara con los importes impresos."
+ ]
+}

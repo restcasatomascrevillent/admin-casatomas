@@ -1,0 +1,50 @@
+{
+ "archivo": "R1493.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MANBO BAKERY SL",
+ "cif": "B70717194",
+ "local": "casa_tomas",
+ "numero_documento": "1 000996",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MINI MOLLETE ANDALUZ DYL 38 GR 90 UD (art. 12647)",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.68,
+   "descuento_pct": null,
+   "total": 80.04,
+   "iva_pct": 4,
+   "albaran_ref": "1-002756",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 80.04,
+ "desglose_iva": [
+  {
+   "base": 80.04,
+   "pct": 4,
+   "cuota": 3.2
+  }
+ ],
+ "iva": 3.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 83.24,
+ "observaciones": "Cabecera: «Factura | 1 | 000996 | 1 | 31/08/2026». Albarán 1-002756 (06/08/2026), servicio 800485607. Forma de pago y vencimientos sin datos impresos. El pie muestra tipos 21/10/4 y solo tiene importe en el tipo 4%.",
+ "alertas": [
+  "El nº de factura se toma como «1 000996» porque la cabecera trae dos cifras (1 y 000996); confirmar en el PDF original.",
+  "El artículo indica «90 UD» en el nombre; no consta si el precio es por unidad o por paquete.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

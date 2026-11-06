@@ -1,0 +1,46 @@
+{
+ "archivo": "R1297.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260462",
+ "fecha": "2026-08-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LANGOSTA",
+   "producto_ficha": "Langosta",
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 60.0,
+   "descuento_pct": null,
+   "total": 150.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000462",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 150.0,
+ "desglose_iva": [
+  {
+   "base": 150.0,
+   "pct": 10,
+   "cuota": 15.0
+  }
+ ],
+ "iva": 15.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 165.0,
+ "observaciones": "Albarán 1-000462 del 07/08/2026. Forma de pago: transferencia CaixaBank; vencimiento 07/08/2026 por 165,00. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": []
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R797.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "FA2026/0010723",
+ "fecha": "2026-05-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MACALLAN DIAMOND SII 70CL.",
+   "producto_ficha": "Macallan Diamond Single Malt 70 cl",
+   "cantidad": 1,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 543.43,
+   "descuento_pct": null,
+   "total": 543.43,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0003238",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GESTION Y LOGISTICA",
+   "producto_ficha": "Gestión y logística",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.37,
+   "descuento_pct": null,
+   "total": 2.37,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0003238",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 545.84,
+ "desglose_iva": [
+  {
+   "base": 545.84,
+   "pct": 21,
+   "cuota": 114.63
+  }
+ ],
+ "iva": 114.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 660.47,
+ "observaciones": "Albarán 2026/0003238 de 04/05/26. Destino CASA TOMAS. Pago: remesa bancaria, vencimiento 10/06/26. P.V. 0,04 incluido en la base. Cabecera impresa con NIF B54583356; el pie y la ficha dan CIF B53375358 (usado).",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R9.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170745195",
+ "fecha": "2026-01-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CEREZA LAPINS 32 I PATAGONIA 2,5K AR",
+   "producto_ficha": "Cereza Lapins 32 (caja 2,5 kg, Argentina)",
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.5,
+   "descuento_pct": null,
+   "total": 28.75,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 28.75,
+ "desglose_iva": [
+  {
+   "base": 28.75,
+   "pct": 4,
+   "cuota": 1.15
+  }
+ ],
+ "iva": 1.15,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 29.9,
+ "observaciones": "Fecha entrega 05.01.2026, igual que la fecha de factura. Total BT 1. Asterisco GLOBALG.A.P. quitado del nombre.",
+ "alertas": []
+}

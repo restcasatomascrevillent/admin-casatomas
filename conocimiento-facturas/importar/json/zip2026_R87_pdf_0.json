@@ -1,0 +1,68 @@
+{
+ "archivo": "R87.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 246",
+ "fecha": "2026-01-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 50/70 FAO 87 PACIFICO",
+   "producto_ficha": "Pez espada 50/70 (FAO 87 Pacífico)",
+   "cantidad": 7.34,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 69.73,
+   "iva_pct": 10,
+   "albaran_ref": "2026484",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "2026484",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 85.23,
+ "desglose_iva": [
+  {
+   "base": 69.73,
+   "pct": 10,
+   "cuota": 6.97
+  },
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  }
+ ],
+ "iva": 7.59,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 92.82,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 22/02/2026, transferencia a 30 días. Albarán 2026484 del 20/01/2026, pedido 16027. Nota 'Centro en rodajas' ignorada. La fila Total (2 cajas, 12,34 kg) no son euros.",
+ "alertas": []
+}

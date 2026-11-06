@@ -1,0 +1,46 @@
+{
+ "archivo": "R1101.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90285888",
+ "fecha": "2026-07-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Lomo 100% Iberico 5J Reserva Caña de Lomo C/3",
+   "producto_ficha": "Caña de lomo 100% ibérico 5J Reserva (caja de 3)",
+   "cantidad": 12,
+   "unidad": "pieza",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 58.6,
+   "descuento_pct": null,
+   "total": 703.2,
+   "iva_pct": 10,
+   "albaran_ref": "40325498",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 703.2,
+ "desglose_iva": [
+  {
+   "base": 703.2,
+   "pct": 10,
+   "cuota": 70.32
+  }
+ ],
+ "iva": 70.32,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 773.52,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 05/09/2026. Punto verde 0,89 EUR informativo, no sumado al total. CANTIDAD impresa 4,000 UN; PESO/UNIDAD 12,000 PI. Albarán 40325498 del 01/07/2026. Margen: 'Precio Pieza N24'.",
+ "alertas": []
+}

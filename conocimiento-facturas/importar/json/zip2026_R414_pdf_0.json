@@ -1,0 +1,46 @@
+{
+ "archivo": "R414.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260109",
+ "fecha": "2026-03-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 116.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000109",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 116.0,
+ "desglose_iva": [
+  {
+   "base": 116.0,
+   "pct": 10,
+   "cuota": 11.6
+  }
+ ],
+ "iva": 11.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 127.6,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 13/03/2026 por 127,60. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": []
+}

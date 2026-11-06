@@ -1,0 +1,63 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  11
+ ],
+ "tipo": "factura",
+ "proveedor": "ARLANDIZ LLORCA, S.L.",
+ "cif": "B54490115",
+ "local": "casa_tomas",
+ "numero_documento": "22/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 11,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 8.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.64,
+   "descuento_pct": null,
+   "total": 58.07,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 11,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 68.65,
+   "descuento_pct": null,
+   "total": 274.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 332.67,
+ "desglose_iva": [
+  {
+   "base": 332.67,
+   "pct": 10.0,
+   "cuota": 33.27
+  }
+ ],
+ "iva": 33.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 365.94,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 751. Embarcaciones: PEPE ARMONIA.",
+ "alertas": []
+}

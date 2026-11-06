@@ -1,0 +1,80 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  23
+ ],
+ "tipo": "factura",
+ "proveedor": "CASTEJON HENAREJOS, JACINTO",
+ "cif": "48841985J",
+ "local": "casa_tomas",
+ "numero_documento": "202/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 23,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 6.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.6,
+   "descuento_pct": null,
+   "total": 100.44,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 23,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.3,
+   "descuento_pct": null,
+   "total": 26.08,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 23,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 0.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 58.91,
+   "descuento_pct": null,
+   "total": 26.51,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 153.03,
+ "desglose_iva": [
+  {
+   "base": 153.03,
+   "pct": 10.0,
+   "cuota": 15.3
+  }
+ ],
+ "iva": 15.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 168.33,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: ninguna.",
+ "alertas": []
+}

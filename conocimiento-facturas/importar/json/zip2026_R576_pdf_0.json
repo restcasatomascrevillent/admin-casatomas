@@ -1,0 +1,63 @@
+{
+ "archivo": "R576.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "2772",
+ "fecha": "2026-04-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.8,
+   "descuento_pct": null,
+   "total": 134.0,
+   "iva_pct": 10,
+   "albaran_ref": "8152",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TELLINA",
+   "producto_ficha": "Tellina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.8,
+   "descuento_pct": null,
+   "total": 59.6,
+   "iva_pct": 10,
+   "albaran_ref": "8594",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 193.6,
+ "desglose_iva": [
+  {
+   "base": 193.6,
+   "pct": 10,
+   "cuota": 19.36
+  }
+ ],
+ "iva": 19.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 212.96,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Serie no impresa en la cabecera. Dos albaranes: 8152 (21/04/2026) y 8594 (25/04/2026).",
+ "alertas": []
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R832.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170766397",
+ "fecha": "2026-06-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPARRAGO BLANCO I 5K ES",
+   "producto_ficha": "Espárrago blanco (bulto 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 13.65,
+   "descuento_pct": null,
+   "total": 68.25,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I 3K ES",
+   "producto_ficha": "Guindilla piparra (bulto 3 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 18.1,
+   "descuento_pct": null,
+   "total": 54.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 122.55,
+ "desglose_iva": [
+  {
+   "base": 122.55,
+   "pct": 4,
+   "cuota": 4.9
+  }
+ ],
+ "iva": 4.9,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 127.45,
+ "observaciones": "Entrega 02.06.2026. La fila «SÁBADO 30.05.26» es anotación de reparto, no producto. Anotación (CP) no aplica. Cuadro de envases vacío. Total BT 2.",
+ "alertas": []
+}

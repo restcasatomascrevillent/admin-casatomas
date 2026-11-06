@@ -1,0 +1,80 @@
+{
+ "archivo": "R508.pdf",
+ "paginas_pdf": [
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 02248",
+ "fecha": "2026-03-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 5,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 56.2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.9,
+   "descuento_pct": null,
+   "total": 893.58,
+   "iva_pct": 10,
+   "albaran_ref": "F569253",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 5,
+   "nombre": "ROLLITO CARRILLADA Y SETAS 25.UND",
+   "producto_ficha": "Rollito de carrillada y setas (caja 25 uds)",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 50,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 10,
+   "albaran_ref": "F569253",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 5,
+   "nombre": "VIEIRA CARNE 30/40 X1",
+   "producto_ficha": "Vieira carne (sin concha) 30/40",
+   "cantidad": 10,
+   "unidad": "ud",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 200.0,
+   "iva_pct": 10,
+   "albaran_ref": "F569253",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1143.58,
+ "desglose_iva": [
+  {
+   "base": 1143.58,
+   "pct": 10,
+   "cuota": 114.36
+  }
+ ],
+ "iva": 114.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1257.94,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F569253. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

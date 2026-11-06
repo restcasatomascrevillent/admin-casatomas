@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  27
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO MYT, C.B.",
+ "cif": "E24948994",
+ "local": "casa_tomas",
+ "numero_documento": "500/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 27,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 113.3,
+   "descuento_pct": null,
+   "total": 317.24,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 317.24,
+ "desglose_iva": [
+  {
+   "base": 317.24,
+   "pct": 10.0,
+   "cuota": 31.72
+  }
+ ],
+ "iva": 31.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 348.96,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 11048. Embarcaciones: ninguna.",
+ "alertas": []
+}

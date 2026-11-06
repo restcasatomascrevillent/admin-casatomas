@@ -1,0 +1,138 @@
+{
+ "archivo": "R487.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SALVA",
+ "cif": null,
+ "local": "casa_tomas",
+ "numero_documento": "000609F2",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "A.SADABA PIPARRAS PICANTES - SABOR DULCE 370ML",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 0.37,
+   "contenido_unidad": "l",
+   "precio_unitario": 4.45,
+   "descuento_pct": null,
+   "total": 53.4,
+   "iva_pct": 10,
+   "albaran_ref": "0001572",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LA GULA DEL NORTE PACK 2X150G - CONG",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.99,
+   "descuento_pct": null,
+   "total": 71.88,
+   "iva_pct": 10,
+   "albaran_ref": "0001572",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "VIÑA ARDANZA 75CL RVA. C/6",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 19.85,
+   "descuento_pct": null,
+   "total": 238.2,
+   "iva_pct": 21,
+   "albaran_ref": "0001765",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "FEVER TREE TONICA INDIAN 20 CL HORECA",
+   "producto_ficha": null,
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 0.2,
+   "contenido_unidad": "l",
+   "precio_unitario": 1.4,
+   "descuento_pct": null,
+   "total": 67.2,
+   "iva_pct": 21,
+   "albaran_ref": "0002016",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "FEVER TREE GINGER BEER 20CL",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 0.2,
+   "contenido_unidad": "l",
+   "precio_unitario": 1.44,
+   "descuento_pct": null,
+   "total": 34.56,
+   "iva_pct": 21,
+   "albaran_ref": "0002016",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "FEVER TREE RASPBERRY 20CL",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 0.2,
+   "contenido_unidad": "l",
+   "precio_unitario": 1.44,
+   "descuento_pct": null,
+   "total": 34.56,
+   "iva_pct": 21,
+   "albaran_ref": "0002016",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 499.8,
+ "desglose_iva": [
+  {
+   "base": 125.28,
+   "pct": 10,
+   "cuota": 12.53
+  },
+  {
+   "base": 374.52,
+   "pct": 21,
+   "cuota": 78.65
+  }
+ ],
+ "iva": 91.18,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 590.98,
+ "observaciones": "Transferencia a 30 dias, vencimiento 30/04/26. Destinatario CASA TOMAS RESTAURANTE (MASIDE 2011, S.L.). Agente 150 - SALVA.",
+ "alertas": [
+  "Razon social y CIF del emisor no aparecen en el texto del PDF; proveedor tomado de la carpeta y del agente '150 - SALVA'. CIF no consta."
+ ]
+}

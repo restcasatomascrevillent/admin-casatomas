@@ -1,0 +1,107 @@
+{
+  "cif": "33288687M",
+  "nombre": "ELADIO PAZOS BREA",
+  "nombres_impresos": ["Panaderia DIVINA - ELADIO PAZOS", "ELADIO PAZOS BREA"],
+  "categoria": "panaderia",
+  "locales": ["casa_tomas"],
+  "muestras": ["R138.pdf", "R635.pdf", "R1016.pdf", "R307.pdf", "R1606.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes (uno o dos por semana)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": { "ejemplos": ["2026-C-31", "2026-C-68", "2026-C-132", "2026-C-211", "2026-C-355"], "patron": "^2026-C-\\d+$", "donde": "casilla NÚMERO bajo 'FECHA | NÚMERO | CLIENTE'; el siguiente dato (0000051) es el nº de cliente y después va el CIF B54583356 del comprador" },
+    "fecha": "casilla FECHA junto al número, DD/MM/AAAA, último día del mes",
+    "albaranes": "cabecera 'NºAlbarán: 2026.C.18 Fecha: 13/01/2026' antes de sus líneas; el nº de albarán se repite entre fechas distintas, no es único"
+  },
+
+  "lectura": {
+    "columnas": ["Artículo (código)", "Descripción (con lote 'L:DDMMAA')", "Caducidad (a veces vacía)", "Cant.", "Neto", "Importe"],
+    "cantidad_es": "kg (pan al peso)",
+    "columna_peso": null,
+    "precio_es_por": "kg: la columna NETO es el precio por kg (3,00 € el pan, 1,00 € los portes); importe = Cant. x Neto",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["PORTES (PORTESNA nacionales / PORTESGA Galicia): una línea de portes tras cada línea de pan, a 1,00 € por kg del albarán, con IVA 21%"],
+    "trampas": [
+      "En el texto digital cada palabra de la descripción sale duplicada (PAN PAN TRIGO TRIGO...): la descripción real es 'PAN TRIGO PAIS BLANCO \"L\" *KG'",
+      "Tres números por línea: Cant. (kg) | Neto (precio/kg) | Importe; la fecha de la columna Caducidad a veces aparece delante y no es una cantidad",
+      "Algunas líneas de portes traen solo un número (ej. 33,40 o 34,50) y sin importe: no se cobran y no entran en la base",
+      "Los portes llevan IVA 21% y el pan 4%: el pie tiene dos filas de base/IVA",
+      "El pan se factura por kg, no por pieza; no hay nº de piezas en la línea",
+      "Lote 'L:.' (punto) = lote ilegible o vacío; 'L:DDMMAA' es una fecha de lote de un día antes del albarán",
+      "Los códigos salen 306l / 306L, 300L / 300l con minúscula y mayúscula según la línea: es el mismo artículo",
+      "Importe total solo en la última página; la página 1 trae un pie de IVA parcial"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe línea = Cant. x Neto (52,30 kg x 3,00 = 156,90; portes 52,30 x 1,00 = 52,30)",
+    "base 4% = suma de las líneas de pan; base 21% = suma de las líneas de PORTES con importe",
+    "IVA = base 4% x 0,04 + base 21% x 0,21",
+    "total = base 4% + base 21% + IVA. Ej. enero: 798,90 + 266,30 + 31,96 + 55,92 = 1.153,08",
+    "Ej. septiembre: 629,40 + 165,30 + 25,18 + 34,71 = 854,59 (la línea PORTESNA de 34,50 sin importe no suma)"
+  ],
+
+  "guia_ocr": "Factura mensual de pan gallego al peso con albaranes. Número 2026-C-nnn, fecha DD/MM/AAAA. Cada línea: código, descripción (lote L:DDMMAA), cant. en kg, NETO = precio por kg (3,00 el pan) e importe = cant. x neto. Tras cada línea de pan va una línea PORTES (PORTESNA o PORTESGA) a 1,00 € por kg; si trae un solo número sin importe, no se cobra. Pan con IVA 4% y portes con 21%. Ignora el nº de cliente 0000051 y el nº de albarán (se repite). Los totales solo aparecen en la última página.",
+
+  "productos": [
+    {
+      "nombre_impreso": "306L PAN TRIGO PAIS BLANCO \"L\" *KG",
+      "nombre_normalizado": "Pan gallego de trigo blanco (país), al kg",
+      "familia": "pan",
+      "presentacion": "pan fresco de trigo blanco, al peso (kg)",
+      "formato": { "envase": "granel", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 3.00, "max": 3.00, "por": "kg", "ejemplos": [["2026-04-07", 3.00], ["2026-06-02", 3.00], ["2026-09-03", 3.00]] },
+      "iva_pct": 4,
+      "veces_visto": 50
+    },
+    {
+      "nombre_impreso": "300L PAN TRIGO MORENO PAIS \"L\" \"BRAZO\" *KG",
+      "nombre_normalizado": "Pan gallego de trigo moreno (país, brazo), al kg",
+      "familia": "pan",
+      "presentacion": "pan fresco de trigo moreno, al peso (kg)",
+      "formato": { "envase": "granel", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 3.00, "max": 3.00, "por": "kg", "ejemplos": [["2026-01-13", 3.00], ["2026-02-03", 3.00], ["2026-05-28", 3.00]] },
+      "iva_pct": 4,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "PORTESNA PORTES NACIONALES",
+      "nombre_normalizado": "Portes nacionales",
+      "familia": "portes",
+      "presentacion": "cargo de transporte",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg transportados (cantidad = kg del pan del albarán)",
+      "precio": { "min": 1.00, "max": 1.00, "por": "kg", "ejemplos": [["2026-01-13", 1.00], ["2026-06-02", 1.00]] },
+      "iva_pct": 21,
+      "veces_visto": 58
+    },
+    {
+      "nombre_impreso": "PORTESGA PORTES GALICIA",
+      "nombre_normalizado": "Portes Galicia",
+      "familia": "portes",
+      "presentacion": "cargo de transporte",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg transportados",
+      "precio": { "min": 1.00, "max": 1.00, "por": "kg", "ejemplos": [["2026-04-09", 1.00], ["2026-09-03", 1.00]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    }
+  ],
+
+  "dudas": [
+    "No se ve si hay piezas: la cantidad es siempre kg (de 12,50 a 59 kg por albarán)",
+    "La unidad de la cantidad de portes parece kg de pan (coincide con el albarán casi siempre) pero el 28/09/2026 el pan son 35,60 kg y los portes 25,60: puede ser error del original",
+    "Líneas PORTESNA con un solo número y sin importe (03/06/2026: 33,40; 31/08/2026: 34,50): se deduce que no se cobran porque no entran en la base, no está confirmado",
+    "Cuando aparece PORTESGA frente a PORTESNA (Galicia vs nacionales) el precio es el mismo; no se sabe por qué cambia",
+    "Significado de las comillas \"L\" y \"BRAZO\" en la descripción: no consta en las facturas",
+    "No se han visto fechas de caducidad útiles: la columna sale vacía o repite la fecha del lote"
+  ]
+}

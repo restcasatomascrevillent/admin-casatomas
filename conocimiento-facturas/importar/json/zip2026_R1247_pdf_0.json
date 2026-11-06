@@ -1,0 +1,49 @@
+{
+ "archivo": "R1247.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SERGIO CANDELA SOLER, S.L.",
+ "cif": "B53076287",
+ "local": "casa_tomas",
+ "numero_documento": "A 4.007",
+ "fecha": "2026-08-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TELEFONO DECT PHILIPS D2702 DUO BLACK",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 41.24,
+   "descuento_pct": null,
+   "total": 41.24,
+   "iva_pct": 21,
+   "albaran_ref": "6607",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 41.24,
+ "desglose_iva": [
+  {
+   "base": 41.24,
+   "pct": 21,
+   "cuota": 8.66
+  }
+ ],
+ "iva": 8.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 49.9,
+ "observaciones": "Documento marcado como DUPLICADO. Forma de pago: pendiente de pago en tienda. Gestión de residuos de aparatos eléctricos incluida en precios (RD 110/2015). Cliente nº 00006084.",
+ "alertas": [
+  "El documento está marcado como «DUPLICADO»; comprobar que no existe el original ya registrado.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

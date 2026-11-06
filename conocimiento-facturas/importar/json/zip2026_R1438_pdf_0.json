@@ -1,0 +1,80 @@
+{
+ "archivo": "R1438.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26007721",
+ "fecha": "2026-08-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 12.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 145.2,
+   "iva_pct": 10,
+   "albaran_ref": "26109281",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 3.06,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 128.52,
+   "iva_pct": 10,
+   "albaran_ref": "26109281",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MOJAMA DE ATUN ALETA AMARILLA SELECCION EXTRA",
+   "producto_ficha": "Mojama de atún aleta amarilla selección extra",
+   "cantidad": 6.46,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 232.56,
+   "iva_pct": 10,
+   "albaran_ref": "26109281",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 506.28,
+ "desglose_iva": [
+  {
+   "base": 506.28,
+   "pct": 10,
+   "cuota": 50.63
+  }
+ ],
+ "iva": 50.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 556.91,
+ "observaciones": "Transferencia Banco Santander, vencimiento 26/09/2026. Albarán 26109281 de 24/08/2026.",
+ "alertas": []
+}

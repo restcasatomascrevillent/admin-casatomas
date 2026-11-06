@@ -1,0 +1,85 @@
+{
+ "archivo": "R980.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENCHENTA SLU",
+ "cif": "B94186988",
+ "local": "casa_tomas",
+ "numero_documento": "1-5249",
+ "fecha": "2026-06-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": 0,
+   "total": 40.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-104",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ESCARAPOTA",
+   "producto_ficha": "Escarapota",
+   "cantidad": 6.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": 0,
+   "total": 167.5,
+   "iva_pct": 10,
+   "albaran_ref": "3-104",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.45,
+   "descuento_pct": 0,
+   "total": 32.45,
+   "iva_pct": 21,
+   "albaran_ref": "3-104",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 239.95,
+ "desglose_iva": [
+  {
+   "base": 207.5,
+   "pct": 10,
+   "cuota": 20.75
+  },
+  {
+   "base": 32.45,
+   "pct": 21,
+   "cuota": 6.81
+  }
+ ],
+ "iva": 27.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 267.52,
+ "observaciones": "Transferencia BBVA. Vencimiento igual a la fecha de la factura. Albarán 3-104.",
+ "alertas": []
+}

@@ -1,0 +1,97 @@
+{
+ "archivo": "R871.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SALVADOR PINAR JIMÉNEZ, S.L.U",
+ "cif": "B73417701",
+ "local": "casa_tomas",
+ "numero_documento": "A26/15.944",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ARROZ ALBUFERA 5KG SIVARIS",
+   "producto_ficha": "Arroz Albufera 5 kg (Sivaris)",
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 18.93,
+   "descuento_pct": null,
+   "total": 94.65,
+   "iva_pct": 4,
+   "albaran_ref": "A26/21.330",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TOSTADAS CRISTAL 8X5CM 200 GRS PANADERIA JESUS",
+   "producto_ficha": "Tostadas de cristal 8x5 cm 200 g (marca Jesús)",
+   "cantidad": 20.0,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 200,
+   "contenido_unidad": "g",
+   "precio_unitario": 3.64,
+   "descuento_pct": null,
+   "total": 72.8,
+   "iva_pct": 4,
+   "albaran_ref": "A26/21.330",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TOSTADAS CRISTAL 8X5CM 200 GRS PANADERIA JESUS",
+   "producto_ficha": "Tostadas de cristal 8x5 cm 200 g (marca Jesús)",
+   "cantidad": 10.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 200,
+   "contenido_unidad": "g",
+   "precio_unitario": 3.64,
+   "descuento_pct": null,
+   "total": 36.4,
+   "iva_pct": 4,
+   "albaran_ref": "A26/22.535",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "QUESO OVEJA CURADO MANCHEGO ARTESANO EL PESEBRE",
+   "producto_ficha": "Queso manchego curado de oveja artesano (El Pesebre)",
+   "cantidad": 3.175,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.71,
+   "descuento_pct": null,
+   "total": 97.5,
+   "iva_pct": 4,
+   "albaran_ref": "A26/22.535",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 301.35,
+ "desglose_iva": [
+  {
+   "base": 301.35,
+   "pct": 4,
+   "cuota": 12.05
+  }
+ ],
+ "iva": 12.05,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 313.4,
+ "observaciones": "Forma de pago 31. Vencimiento 10/06/2026.",
+ "alertas": []
+}

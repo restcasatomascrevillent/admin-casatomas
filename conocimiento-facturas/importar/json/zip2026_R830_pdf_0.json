@@ -1,0 +1,46 @@
+{
+ "archivo": "R830.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "2637",
+ "fecha": "2026-05-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GAMBA ROJA",
+   "producto_ficha": "Gamba roja, por kg",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 144,
+   "descuento_pct": null,
+   "total": 288,
+   "iva_pct": 10,
+   "albaran_ref": "6.895",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 288.0,
+ "desglose_iva": [
+  {
+   "base": 288.0,
+   "pct": 10,
+   "cuota": 28.8
+  }
+ ],
+ "iva": 28.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 316.8,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 25/05/2026 por 316.8. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

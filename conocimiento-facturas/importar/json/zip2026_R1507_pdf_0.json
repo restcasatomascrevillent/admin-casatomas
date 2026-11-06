@@ -1,0 +1,46 @@
+{
+ "archivo": "R1507.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0052/(2026)049434",
+ "fecha": "2026-09-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PETALOS NEGROS SAL 300GR",
+   "producto_ficha": null,
+   "cantidad": -1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.82,
+   "descuento_pct": null,
+   "total": -5.82,
+   "iva_pct": 10,
+   "albaran_ref": "9-234556423",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -5.82,
+ "desglose_iva": [
+  {
+   "base": -5.82,
+   "pct": 10,
+   "cuota": -0.58
+  }
+ ],
+ "iva": -0.58,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -6.4,
+ "observaciones": "Factura de devolucion (abono) de la factura 0/0(063)0052/(2026)049428 de 08/09/2026 (pedido 9-234556423). Cantidad y total en negativo. Pago en entrega.",
+ "alertas": []
+}

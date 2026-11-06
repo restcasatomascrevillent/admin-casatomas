@@ -1,0 +1,121 @@
+{
+ "archivo": "R1339.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 4868",
+ "fecha": "2026-08-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA PELADA LUNA DE MAR",
+   "producto_ficha": "Quisquilla pelada Luna de Mar",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 80.0,
+   "iva_pct": 10,
+   "albaran_ref": "20268614",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "20268614",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CHOCO LIMPIO 0% 400-600 LUNA DE MAR",
+   "producto_ficha": null,
+   "cantidad": 6.3,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.4,
+   "descuento_pct": null,
+   "total": 65.52,
+   "iva_pct": 10,
+   "albaran_ref": "20268614",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "COLA ALISTADO 1 ANGOLA ( PEIX )",
+   "producto_ficha": "Cola de alistado 1 Angola",
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.5,
+   "descuento_pct": null,
+   "total": 59.85,
+   "iva_pct": 10,
+   "albaran_ref": "20268614",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "COLA GAMBON 1 6X2 T",
+   "producto_ficha": "Cola de gambón 1 (6 bolsas x 2 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 144.0,
+   "iva_pct": 10,
+   "albaran_ref": "20268614",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 364.87,
+ "desglose_iva": [
+  {
+   "base": 349.37,
+   "pct": 10,
+   "cuota": 34.94
+  },
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  }
+ ],
+ "iva": 35.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 400.43,
+ "observaciones": "Transferencia a 30 dias, vencimiento 13/09/2026. Albaran 20268614 de 12/08/2026, pedido 21945. Nota impresa en choco: Ita. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": [
+  "CHOCO LIMPIO 0% 400-600 LUNA DE MAR: no esta en la ficha (solo figura el 600-800). Se extrae como viene impreso, sin producto_ficha."
+ ]
+}

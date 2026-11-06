@@ -1,0 +1,82 @@
+{
+ "archivo": "R1552.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GLOBAL ECOVAC SL.",
+ "cif": "B75676957",
+ "local": "casa_tomas",
+ "numero_documento": "F260183",
+ "fecha": "2026-09-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Bolsas de vacío de 90 micras 400x500mm (precio millar, caja de 500 uds, 3 cajas)",
+   "producto_ficha": null,
+   "cantidad": 1.5,
+   "unidad": "millar",
+   "bultos": 3,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "ud",
+   "precio_unitario": 197.44,
+   "descuento_pct": null,
+   "total": 296.16,
+   "iva_pct": 21,
+   "albaran_ref": "A260149",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Bolsas de vacío de 90 micras 200x300mm (precio millar, caja de 1.000 uds, 3 cajas)",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "millar",
+   "bultos": 3,
+   "contenido_cantidad": 1000,
+   "contenido_unidad": "ud",
+   "precio_unitario": 54.0,
+   "descuento_pct": null,
+   "total": 162.0,
+   "iva_pct": 21,
+   "albaran_ref": "A260149",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Impuesto sobre envases de plástico no reutilizables (0,45 €/kg x 81,30 kg)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A260149",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 458.16,
+ "desglose_iva": [
+  {
+   "base": 458.16,
+   "pct": 21,
+   "cuota": 96.21
+  }
+ ],
+ "iva": 96.21,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 554.37,
+ "observaciones": "Banco Sabadell ES** **** **** **** **** 4155; vencimiento 18/09/2026. Sello Barra Casa Tomás",
+ "alertas": [
+  "Totales de línea impresos con IVA (358,35 y 196,02); se anotan los subtotales sin IVA"
+ ]
+}

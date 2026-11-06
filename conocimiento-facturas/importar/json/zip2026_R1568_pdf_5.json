@@ -1,0 +1,46 @@
+{
+ "archivo": "R1568.pdf",
+ "paginas_pdf": [
+  6
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SOLER MOLNA SL",
+ "cif": "B10669950",
+ "local": "casa_tomas",
+ "numero_documento": "1.197/A",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 6,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 6.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.68,
+   "descuento_pct": null,
+   "total": 120.06,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 120.06,
+ "desglose_iva": [
+  {
+   "base": 120.06,
+   "pct": 10,
+   "cuota": 12.01
+  }
+ ],
+ "iva": 12.01,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 132.07,
+ "observaciones": "Periodo 01/09/2026 a 30/09/2026. Embarcación(es): PACO Y CARMEN. Albaranes de subasta (informativo): 19414, 19603.",
+ "alertas": []
+}

@@ -1,0 +1,82 @@
+{
+ "archivo": "R1491.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 06603",
+ "fecha": "2026-08-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TORT. CAMARON PREMIUM 30.UNI",
+   "producto_ficha": "Tortita de camarón premium (pack 30 uds)",
+   "cantidad": 60,
+   "unidad": "ud",
+   "bultos": 60,
+   "contenido_cantidad": 30,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 60.0,
+   "iva_pct": 10,
+   "albaran_ref": "F574737",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ROLLITO CARRILLADA Y SETAS 25.UND",
+   "producto_ficha": "Rollito de carrillada y setas (caja 25 uds)",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 50,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 10,
+   "albaran_ref": "F574737",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FLT.CORVINA S/ESPINA X7",
+   "producto_ficha": "Filete de corvina sin espina (caja 7 kg)",
+   "cantidad": 7,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 66.5,
+   "iva_pct": 10,
+   "albaran_ref": "F574737",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 176.5,
+ "desglose_iva": [
+  {
+   "base": 176.5,
+   "pct": 10,
+   "cuota": 17.65
+  }
+ ],
+ "iva": 17.65,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 194.15,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F574737. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": [
+  "Texto idéntico al de R1492.pdf (mismo nº de factura y mismo contenido): posible PDF duplicado; no cargar dos veces"
+ ]
+}

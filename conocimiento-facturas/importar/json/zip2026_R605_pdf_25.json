@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  26
+ ],
+ "tipo": "factura",
+ "proveedor": "PALOMAR RODRIGUEZ, FRANCISCO ANTONIO",
+ "cif": "22007622A",
+ "local": "casa_tomas",
+ "numero_documento": "86/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 26,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.1,
+   "descuento_pct": null,
+   "total": 32.01,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 32.01,
+ "desglose_iva": [
+  {
+   "base": 32.01,
+   "pct": 10.0,
+   "cuota": 3.2
+  }
+ ],
+ "iva": 3.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 35.21,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: BARTOLO.",
+ "alertas": []
+}

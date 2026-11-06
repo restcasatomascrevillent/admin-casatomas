@@ -1,0 +1,70 @@
+{
+  "cif": "B73056269",
+  "nombre": "ZAMBU HIGIENE, S.L.",
+  "nombres_impresos": ["ZAMBU", "ZAMBÚ", "ZAMBU HIGIENE"],
+  "categoria": "limpieza",
+  "locales": ["casa_tomas"],
+  "muestras": ["R135.pdf", "R642.pdf", "R999.pdf", "R833.pdf", "R1616.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes (una por PDF, 1-2 páginas)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": { "ejemplos": ["FVA+26/005421", "FVA+26/030443", "FVA+26/038814", "FVA+26/045978", "FVA+26/066908"], "patron": "^FVA\\+26/\\d{6}$", "donde": "arriba, escrito entre asteriscos como código de barras (*FVA+26/005421*) y otra vez en la fila de datos 'fecha | número | vendedor | NIF cliente | código cliente | página'" },
+    "fecha": "primer campo de esa fila de datos, DD/MM/AA con año de 2 cifras (31/01/26); es fin de mes (31/01, 30/04, 31/05, 30/06, 30/09)",
+    "albaranes": "cabecera 'Albarán: ALB+26/004755 | Fecha: 14/01/26' antes de sus líneas; hay uno o varios por factura"
+  },
+
+  "lectura": {
+    "columnas": ["Bultos", "Descripción", "Unidades", "Precio", "Importe"],
+    "cantidad_es": "dos números antes del precio: el primero son los bultos/cajas (a veces vacío), el segundo son las UNIDADES facturadas. Importe = unidades × precio. Ej.: '3 | TOALLAS ... 180ud | 60 | 0,89 | 53,40' = 60 paquetes × 0,89 (3 cajas de 20).",
+    "columna_peso": null,
+    "precio_es_por": "unidad de la segunda columna (paquete de toallas, bote, bobina, caja de toallitas…)",
+    "descuento_por_linea": { "existe": true, "columna": "en la columna Importe aparece '-100%' en artículos regalados (instalación, dispensadores, soportes)", "valores_habituales": [100] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin envases. Zambú avisa de que más adelante incluirá en factura la contribución a Ecoembes (no ha salido aún).",
+    "cargos_y_descuentos_pie": ["Sin portes ni descuentos en el pie. El pie tiene solo base, % IVA, cuota IVA, total y recargo (0,00)."],
+    "trampas": [
+      "El rótulo del pie dice 'RE | Importe RE' pero debajo van base, '21', cuota IVA; luego el TOTAL en la línea siguiente y 0,00 (recargo): '548,4 | 21 | 115,16' / '663,56' / '0,00'.",
+      "Líneas gratuitas con '-100%' en lugar del importe: 'SATIC INSTALACION DISPENSADORES | 3 | 7,07 | -100%', 'PORTA CHEMI BLANCO SERIE DYNAMIC | 3 | -100%' (sin precio), 'DISPENSADOR CARGAS BAJAS A PILAS | 2 | -100%'. Importe real = 0,00; no son error de lectura.",
+      "La factura puede ocupar 2 páginas y repetir bloque de totales y datos bancarios en cada una: contar los totales UNA sola vez.",
+      "Aparecen 9 cuentas bancarias con IBAN y números largos: no son importes. 'T.P. 4' y 'TRANSFERENCIA 45 Dias' tampoco.",
+      "En la fila de datos hay números sueltos ('3 RAFAEL PEREZ NAVARR', '43040', '1'): son vendedor, código cliente y página, no cantidades.",
+      "Fechas con año de 2 cifras (14/01/26)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = unidades × precio (líneas con -100% = 0,00)",
+    "base = suma de importes de líneas; IVA 21 % = base × 0,21 (redondeado); total = base + IVA",
+    "R135: 495,00 + 53,40 = 548,40; IVA 115,16; total 663,56",
+    "R642: 25,80 + 35,60 + 37,88 = 99,28; IVA 20,85; total 120,13",
+    "R999: 37,88 + 27,22 + 26,40 + 26,40 + 56,82 = 174,72; IVA 36,69; total 211,41",
+    "R833: 37,88 (resto 0,00 por -100%); IVA 7,95; total 45,83"
+  ],
+
+  "guia_ocr": "Factura mensual Zambú (FVA+26/NNNNNN, número entre asteriscos arriba; fecha DD/MM/AA en la fila de datos). Líneas: Bultos | Descripción | Unidades | Precio | Importe, con Importe = Unidades × Precio; ignora el primer número (bultos). Artículos con '-100%' en vez de importe son gratis: importe 0, sin precio a veces. Albaranes 'Albarán: ALB+26/... | Fecha: dd/mm/aa'. IVA 21 %. En el pie, tras el rótulo 'RE | Importe RE', van base, 21, cuota IVA y el total debajo; el 0,00 final es el recargo. Ignora cuentas bancarias, IBAN y totales repetidos en la página 2.",
+
+  "productos": [
+    { "nombre_impreso": "TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud", "nombre_normalizado": "Toallas secamanos zig-zag laminada 22x21 cm (paquete 180)", "familia": "papel", "presentacion": "paquete de toallas de papel secamanos", "formato": { "envase": "paquete", "contenido": 180, "unidad_contenido": "uds", "unidades_por_bulto": 20, "bulto": "caja" }, "unidad_factura": "paquete de 180", "precio": { "min": 0.89, "max": 0.95, "por": "paquete", "ejemplos": [["2026-01-16", 0.89], ["2026-04-29", 0.95]] }, "iva_pct": 21, "veces_visto": 14 },
+    { "nombre_impreso": "BOB. CEL. CHEMI 2cp. TISSU LAMINADO 800 gr", "nombre_normalizado": "Bobina celulosa Chemi 2 capas tissu laminado 800 g", "familia": "papel", "presentacion": "bobina de celulosa industrial", "formato": { "envase": "bobina", "contenido": 800, "unidad_contenido": "g", "unidades_por_bulto": 6, "bulto": "caja" }, "unidad_factura": "bobina", "precio": { "min": 2.2, "max": 2.2, "por": "bobina", "ejemplos": [["2026-06-05", 2.2]] }, "iva_pct": 21, "veces_visto": 9 },
+    { "nombre_impreso": "AMBIENTADOR CARGA BAJA SPA AIR FRESHENER 250ml", "nombre_normalizado": "Ambientador carga baja Spa Air Freshener 250 ml", "familia": "limpieza_quimica", "presentacion": "bote recambio dispensador", "formato": { "envase": "bote", "contenido": 250, "unidad_contenido": "ml", "unidades_por_bulto": 1, "bulto": "bulto" }, "unidad_factura": "bote", "precio": { "min": 4.3, "max": 4.54, "por": "bote", "ejemplos": [["2026-04-01", 4.3], ["2026-06-03", 4.54]] }, "iva_pct": 21, "veces_visto": 6 },
+    { "nombre_impreso": "TOALLITA PERFUMADA LUXE PERS. A:2col UC:12 K TE BLANC", "nombre_normalizado": "Toallita perfumada Luxe personalizada, té blanco (caja de 12)", "familia": "higiene", "presentacion": "toallitas perfumadas envasadas individualmente", "formato": { "envase": "caja", "contenido": 12, "unidad_contenido": "k (según 'UC:12 K')", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "caja (probable; unidades 5 o 8 por bulto 1)", "precio": { "min": 99.0, "max": 104.22, "por": "caja/unidad facturada", "ejemplos": [["2026-01-14", 99.0]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "INSECTICIDA CARGAS BAJAS ESTANDAR 250 ml", "nombre_normalizado": "Insecticida carga baja estándar 250 ml", "familia": "limpieza_quimica", "presentacion": "bote recambio dispensador", "formato": { "envase": "bote", "contenido": 250, "unidad_contenido": "ml", "unidades_por_bulto": 6, "bulto": "bulto" }, "unidad_factura": "bote", "precio": { "min": 6.95, "max": 6.95, "por": "bote", "ejemplos": [["2026-09-11", 6.95]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "ALFOMBRILLA DESODORIZANTE W.C URINARIO HIGIENIZAN", "nombre_normalizado": "Alfombrilla desodorizante WC/urinario higienizante", "familia": "limpieza_quimica", "presentacion": "alfombrilla/pastilla urinario", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 12, "bulto": "bulto" }, "unidad_factura": "unidad", "precio": { "min": 3.13, "max": 3.13, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "SATIC INSTALACION DISPENSADORES", "nombre_normalizado": "Servicio de instalación de dispensadores (gratis)", "familia": "servicio", "presentacion": "servicio", "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "servicio", "precio": { "min": 7.07, "max": 7.07, "por": "servicio", "ejemplos": [["2026-05-06", 7.07]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "PORTA CHEMI BLANCO SERIE DYNAMIC", "nombre_normalizado": "Portabobinas Chemi blanco serie Dynamic (gratis, -100 %)", "familia": "dispensador", "presentacion": "dispensador", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": null, "max": null, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "CONO SUPLEMENTO PORTA CHEMI CORELESS", "nombre_normalizado": "Cono suplemento portabobinas Chemi Coreless (gratis, -100 %)", "familia": "dispensador", "presentacion": "accesorio dispensador", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": null, "max": null, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "DISPENSADOR CARGAS BAJAS A PILAS", "nombre_normalizado": "Dispensador de cargas bajas a pilas (gratis, -100 %)", "familia": "dispensador", "presentacion": "dispensador", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": null, "max": null, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "No se sabe qué cuenta exactamente el primer número (bultos): en toallas es 20 paquetes por caja, en bobinas 6, pero en ambientador sale 6 bultos con 6 unidades. Para cuadrar solo vale Unidades × Precio.",
+    "Toallita perfumada Luxe: 1 bulto con 5 u. a 99,00 y 1 bulto con 8 u. a 104,22; no queda claro si la unidad es la caja de 12 o un bote; el precio unitario (~100 €) sugiere caja o lote grande.",
+    "Los '-100%' no traen precio en las líneas de dispensadores: confirmar que el importe es 0,00.",
+    "Los precios de catálogo salen de 9 PDF digitales (varios con una sola referencia repetida); el catálogo es pequeño (10 entradas, 4 de ellas gratuitas o de servicio)."
+  ]
+}

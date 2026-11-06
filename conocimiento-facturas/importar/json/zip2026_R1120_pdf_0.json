@@ -1,0 +1,63 @@
+{
+ "archivo": "R1120.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "3492",
+ "fecha": "2026-07-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GAMBA ROJA",
+   "producto_ficha": "Gamba roja, por kg",
+   "cantidad": 1.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 140,
+   "descuento_pct": null,
+   "total": 266,
+   "iva_pct": 10,
+   "albaran_ref": "9.560",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "QUISQUILLA X/P/M",
+   "producto_ficha": "Quisquilla (Plesionika edwardsii) tamaño X/P/M, por kg",
+   "cantidad": 28.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 75,
+   "descuento_pct": null,
+   "total": 2160,
+   "iva_pct": 10,
+   "albaran_ref": "9.586",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 2426.0,
+ "desglose_iva": [
+  {
+   "base": 2426.0,
+   "pct": 10,
+   "cuota": 242.6
+  }
+ ],
+ "iva": 242.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2668.6,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 06/07/2026 por 2668.6. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

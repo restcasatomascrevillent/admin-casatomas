@@ -1,0 +1,46 @@
+{
+ "archivo": "R116.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES GUTI E HIJOS S.L",
+ "cif": "B72748676",
+ "local": "casa_tomas",
+ "numero_documento": "B 63",
+ "fecha": "2026-01-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CECINA DE WAGYU (SIN LIMPIAR)",
+   "producto_ficha": "Cecina de wagyu, sin limpiar",
+   "cantidad": 4.73,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 114.75,
+   "descuento_pct": null,
+   "total": 542.77,
+   "iva_pct": 10,
+   "albaran_ref": "80",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 542.77,
+ "desglose_iva": [
+  {
+   "base": 542.77,
+   "pct": 10,
+   "cuota": 54.28
+  }
+ ],
+ "iva": 54.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 597.05,
+ "observaciones": "Pago 30 días vista. Albarán 80. Cantidad impresa = piezas (bultos); cantidad JSON = kilos.",
+ "alertas": []
+}

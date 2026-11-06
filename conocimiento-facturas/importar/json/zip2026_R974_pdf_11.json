@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO-GARZON SL",
+ "cif": "B42678672",
+ "local": "casa_tomas",
+ "numero_documento": "925/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 12,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 75.2,
+   "descuento_pct": null,
+   "total": 105.28,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 105.28,
+ "desglose_iva": [
+  {
+   "base": 105.28,
+   "pct": 10,
+   "cuota": 10.53
+  }
+ ],
+ "iva": 10.53,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 115.81,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): NUEVO ALBOR. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

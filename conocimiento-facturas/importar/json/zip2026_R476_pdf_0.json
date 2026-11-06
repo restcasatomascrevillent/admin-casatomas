@@ -1,0 +1,63 @@
+{
+ "archivo": "R476.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-2343",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHOCO G ENV MARRUECOS",
+   "producto_ficha": "Choco grande envasado, Marruecos",
+   "cantidad": 6.8,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 60.86,
+   "iva_pct": 10,
+   "albaran_ref": "B 4.919",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BACALAO DADO PCS 1X2",
+   "producto_ficha": "Bacalao desalado en dados (2 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.85,
+   "descuento_pct": null,
+   "total": 51.4,
+   "iva_pct": 10,
+   "albaran_ref": "B 4.919",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 112.26,
+ "desglose_iva": [
+  {
+   "base": 112.26,
+   "pct": 10,
+   "cuota": 11.23
+  }
+ ],
+ "iva": 11.23,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 123.49,
+ "observaciones": "Remesa semanal, vencimiento 06/04/2026. Factura sin tramo al 4 %. Cuadra al céntimo con el pie.",
+ "alertas": []
+}

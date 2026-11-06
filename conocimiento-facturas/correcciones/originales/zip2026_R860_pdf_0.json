@@ -1,0 +1,65 @@
+{
+ "archivo": "R860.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "D. PRIMERAS MARCAS, S.A.U.",
+ "cif": "A58172685",
+ "local": "casa_tomas",
+ "numero_documento": "FV26053178",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Fefiñanes 2025 (cód. 198068)",
+   "producto_ficha": null,
+   "cantidad": 60.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 13.95,
+   "descuento_pct": null,
+   "total": 837.0,
+   "iva_pct": 21,
+   "albaran_ref": "AR2614559",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Fefiñanes 2025 (cód. 198068), segunda línea",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 13.95,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 21,
+   "albaran_ref": "AR2614559",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 837.0,
+ "desglose_iva": [
+  {
+   "base": 837.0,
+   "pct": 21,
+   "cuota": 175.77
+  }
+ ],
+ "iva": 175.77,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1012.77,
+ "observaciones": "Pedido PV2614612, albarán AR2614559 (07/05/26). Pago domiciliado, Banco Sabadell, vencimiento 30/06/2026 por 1.012,77 €. Impuesto punto verde 0,00.",
+ "alertas": [
+  "La segunda línea (6 botellas a 13,95, código 198068) no tiene importe legible en el texto. El subtotal 837,00 y el total cuadran solo con la primera línea (60 x 13,95 = 837,00); la segunda no está incluida en los totales. Revisar el PDF original: puede ser un abono, una línea mal extraída o un error de la factura."
+ ]
+}

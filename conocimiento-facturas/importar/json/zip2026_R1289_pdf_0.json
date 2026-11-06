@@ -1,0 +1,66 @@
+{
+ "archivo": "R1289.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA SELECCION - VINOS CALDERON S.L.U.",
+ "cif": "B53804522",
+ "local": "casa_tomas",
+ "numero_documento": "F26000438",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PAZO DE BARRA GRAN VINO PAZO DE BARRANTES",
+   "producto_ficha": "Pazo de Barrantes Gran Vino (nombre incompleto)",
+   "cantidad": 18,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.0,
+   "descuento_pct": null,
+   "total": 486.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000743",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LA COMTESSE | PAZO DE BARRANTES LA COMTESSE",
+   "producto_ficha": "Pazo de Barrantes La Comtessa",
+   "cantidad": 9,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 80.0,
+   "descuento_pct": null,
+   "total": 720.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000743",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1206.0,
+ "desglose_iva": [
+  {
+   "base": 1206.0,
+   "pct": 21,
+   "cuota": 253.26
+  }
+ ],
+ "iva": 253.26,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1459.26,
+ "observaciones": "Giro 30 días, vencimiento 30/08/2026 (1.459,26). Albarán A26000743 de 31/07/2026.",
+ "alertas": [
+  "Formato (cl) no impreso en PAZO DE BARRA GRAN VINO ni en LA COMTESSE; contenido_cantidad a null.",
+  "LA COMTESSE a 80,00 € por botella: alto para 75 cl (¿magnum?). La factura no lo indica; contrastar. La cantidad (9) son botellas, no cajas de 6."
+ ]
+}

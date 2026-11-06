@@ -1,0 +1,85 @@
+{
+ "archivo": "R1580.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "FA2026/0020158",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MONIN PUREE LE FRUIT MANGO LTO.",
+   "producto_ficha": "Monin puré Le Fruit mango 1 L",
+   "cantidad": 8,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 17.64,
+   "descuento_pct": null,
+   "total": 141.12,
+   "iva_pct": 10,
+   "albaran_ref": "2026/0007821",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MONIN PUREE LE FRUIT FRUTA PASION 1LTO.",
+   "producto_ficha": "Monin puré Le Fruit fruta de la pasión 1 L",
+   "cantidad": 8,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 17.64,
+   "descuento_pct": null,
+   "total": 141.12,
+   "iva_pct": 10,
+   "albaran_ref": "2026/0007821",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GESTION Y LOGISTICA",
+   "producto_ficha": "Gestión y logística",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.63,
+   "descuento_pct": null,
+   "total": 2.63,
+   "iva_pct": 21,
+   "albaran_ref": "2026/0007821",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 285.31,
+ "desglose_iva": [
+  {
+   "base": 2.63,
+   "pct": 21,
+   "cuota": 0.55
+  },
+  {
+   "base": 282.68,
+   "pct": 10,
+   "cuota": 28.27
+  }
+ ],
+ "iva": 28.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 314.13,
+ "observaciones": "Albarán 2026/0007821 de 24/09/26. Destino CASA TOMAS. Pago: remesa bancaria, vencimiento 10/10/26. Total bruto 284,87; P.V. 0,44 incluido en la base. Cabecera impresa con NIF B54583356; el pie y la ficha dan CIF B53375358 (usado).",
+ "alertas": []
+}

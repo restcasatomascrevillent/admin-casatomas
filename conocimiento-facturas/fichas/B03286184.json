@@ -1,0 +1,345 @@
+{
+  "cif": "B03286184",
+  "nombre": "COMERCIAL TABARCA, S.L.",
+  "nombres_impresos": ["COMERCIAL TABARCA, S.L.", "COMERCIAL TABARCA", "comercialtabarca.com"],
+  "categoria": "bebidas",
+  "locales": ["casa_tomas", "touza"],
+  "muestras": ["R121.pdf", "R296.pdf", "R1013.pdf", "R475.pdf", "R1592.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fecha = último día del mes) que agrupa los albaranes semanales; una factura por local (CASA TOMAS BARRA cliente 013530, TOUZA cliente 022288), ambos a nombre de MASIDE 2011 S.L.U. (B54583356). También hay facturas de abono con total negativo (rappel, envases devueltos)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": {
+      "ejemplos": ["70.064955", "70.073373", "70.089454", "70.106052"],
+      "patron": "^70\\.\\d{6}$",
+      "donde": "casilla 'Factura N.º' de la fila Factura N.º | Fecha | Núm.Vend. | … | Forma de Pago | Pagina. Arriba también sale 'FACTURA:#04/0100700064955#': es el mismo número con prefijo (no usarlo)."
+    },
+    "fecha": "casilla 'Fecha' junto al número, DD/MM/AAAA (normalmente 31/01, 28/02, 31/03…). Las líneas llevan además la fecha de su albarán en DD/MM/AA.",
+    "albaranes": "cada línea empieza con el nº de albarán (2.066858) y la fecha del albarán (12/01/26); no hay cabecera de albarán separada"
+  },
+
+  "lectura": {
+    "columnas": ["Albarán", "Fecha", "Producto", "Unid.", "Cantidad", "Precio", "DTO", "Importe"],
+    "cantidad_es": "depende de la línea aunque la columna Unid. diga CJ: en Schweppes, La Casera, Seven Up y Beefeater/whisky son cajas o botellas enteras a precio de caja/botella; en AGUA VICHY CATALAN (0,30 L*24) la cantidad son BOTELLAS (120 = 5 cajas de 24) y el precio es por botella aunque ponga CJ; en PULEVA (1 L y 1,5 L) la cantidad son BRIKS sueltos (24 = 4 cajas de 6) y el precio es por brik aunque ponga CJ; en envases/jaulas (UN) son unidades",
+    "columna_peso": null,
+    "precio_es_por": "caja en Schweppes, Seven Up, La Casera; botella en Vichy; brik en Puleva; ud en envases, jaulas y licores (botella 70 cl)",
+    "descuento_por_linea": { "existe": true, "columna": "DTO (sale pegado al precio en la misma celda: '23,280 50,00' = precio 23,280, dto 50 %)", "valores_habituales": [40, 47, 50] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "depósito de envases retornables como líneas propias: BOTELLA ALICE SCHWEPPES 200ml (0,10 €/botella), JAULA SCHWEPPES 200ml*28 (2,40), ENVASE COMPLETO PREMIUM MIX 0.30L*24 (5,47 por caja de Vichy), ENVASE BOTELLA 1/2L 500 PERSONALIZADA (0,10), JAULA LA CASERA AZUL 500ml (2,404), CAJA C/BOT SEVEN-UP 200ml (4,80), etc. Se cargan con cantidad positiva al entregar y con cantidad NEGATIVA al devolver vacío (importe negativo). Siguen al IVA del producto: premium mix de Vichy 10 %, el resto 21 %.",
+    "cargos_y_descuentos_pie": [
+      "SERVICIO DE MANIPULACION Y ACARREOS: 1,86 € por albarán (línea normal, IVA 21 %)",
+      "RAPPEL SOBRE VENTAS (21): línea con cantidad -1 e importe negativo (p. ej. -494,81) en facturas de abono; 'RAPPELS ANUAL 2025 SCHWEPPES' es solo el texto asociado, importe 0",
+      "Dto 1 / Dto 2 del pie salen a 0,00; 'Rec.' (recargo) siempre 0,00",
+      "'Suma y Sigue ... X' al final de la página 1 es un subtotal de arrastre, NO una línea ni el total"
+    ],
+    "trampas": [
+      "Mercancía bonificada: la línea repetida con precio 0,000 e importe 0,00 (p. ej. SCHWEPPES TONICA 10 CJ a 0,000) es género gratis, no un error; el envase de esa caja sí se cobra.",
+      "Con descuento, el precio y el % se ven pegados ('31,920 40,00'): el importe es cantidad × precio × (1 − dto/100) (20 × 31,920 × 0,60 = 383,04).",
+      "Las líneas de envases devueltos son negativas y pueden hacer que una base o una factura entera salga negativa (R475: base 21 % = -173,58).",
+      "Pie con tres columnas de IVA cuyo orden cambia entre facturas (4/10/21, 21/4/10…): empareja cada base con el tipo escrito en la fila IVA en la misma posición.",
+      "Una misma factura puede traer 20-40 líneas repetidas del mismo artículo (una por albarán): no deduplicar."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = cantidad × precio × (1 − dto/100), redondeo a 2 decimales (4 × 23,280 × 0,50 = 46,56)",
+    "las líneas de envase devuelto restan (cantidad negativa)",
+    "fila Base del pie: una base por tipo de IVA (más la suma en la última columna); base_4 = leche Puleva, base_10 = Vichy + su envase completo, base_21 = todo lo demás (refrescos, jaulas, botellas Alice, manipulación, licores)",
+    "IVA de cada tipo = base × %; TOTAL FACTURA = suma de bases + suma de IVA (R121: 463,12 + 58,82 = 521,94; R1592: 1.272,33 + 196,95 = 1.469,28)",
+    "R121: 4 % 226,08 → 9,04; 21 % 237,04 → 49,78. R1013: 4 % 274,44 → 10,98; 10 % 186,43 → 18,64; 21 % 601,21 → 126,25 = 1.217,95"
+  ],
+
+  "guia_ocr": "Factura mensual de Comercial Tabarca con líneas de albarán: nº albarán, fecha, producto, Unid. (CJ/UN), cantidad, precio, DTO opcional pegado al precio, importe. Número en 'Factura N.º' (70.xxxxxx). Importe = cantidad × precio × (1−dto). En AGUA VICHY la cantidad son botellas y en PULEVA briks aunque ponga CJ. Las líneas JAULA, BOTELLA, ENVASE y CAJA C/BOT son depósitos retornables: cantidad negativa = devolución. Líneas a 0,00 son bonificaciones. Ignora 'Suma y Sigue'. Pie: una base e IVA por tipo (4, 10, 21) en el orden que se imprima. Hay dos clientes: CASA TOMAS BARRA y TOUZA.",
+
+  "productos": [
+    {
+      "nombre_impreso": "SCHWEPPES TONICA E/R 200ml*28",
+      "nombre_normalizado": "Schweppes Tónica 20 cl retornable (caja 28)",
+      "familia": "refresco",
+      "presentacion": "botella vidrio retornable (E/R); caja de 28 botellas",
+      "formato": { "envase": "botella", "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": 28, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 30.8, "max": 31.92, "por": "caja", "ejemplos": [["2026-01-12", 30.8], ["2026-06-02", 31.92]] },
+      "iva_pct": 21,
+      "veces_visto": 17
+    },
+    {
+      "nombre_impreso": "SCHWEPPES LIMON ZERO E/R 200ml*28",
+      "nombre_normalizado": "Schweppes Limón Zero 20 cl retornable (caja 28)",
+      "familia": "refresco",
+      "presentacion": "botella vidrio retornable (E/R); caja de 28 botellas",
+      "formato": { "envase": "botella", "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": 28, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 26.04, "max": 26.04, "por": "caja", "ejemplos": [["2026-06-19", 26.04]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "LA CASERA TINTO GASEOSA SR 275ml*24",
+      "nombre_normalizado": "La Casera tinto de verano/gaseosa 27,5 cl (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella 27,5 cl; caja de 24 (el 'SR' no está explicado en la factura)",
+      "formato": { "envase": "botella", "contenido": 27.5, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 37.75, "max": 37.75, "por": "caja", "ejemplos": [["2026-05-11", 37.75], ["2026-07-24", 37.75]] },
+      "iva_pct": 21,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "CASERA GASEOSA PERSONAL.RET 500ml",
+      "nombre_normalizado": "La Casera gaseosa personalizada 50 cl retornable (caja 20)",
+      "familia": "refresco",
+      "presentacion": "botella retornable personalizada 50 cl; 20 botellas por caja (deducido: 1 caja ↔ 20 'ENVASE BOTELLA 1/2L')",
+      "formato": { "envase": "botella", "contenido": 50, "unidad_contenido": "cl", "unidades_por_bulto": 20, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 15.8, "max": 16.6, "por": "caja", "ejemplos": [["2026-02-02", 15.8], ["2026-03-09", 16.6]] },
+      "iva_pct": 21,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "REFRESCO SEVEN UP ZERO RETORNABLE 200",
+      "nombre_normalizado": "Seven Up Zero 20 cl retornable (caja)",
+      "familia": "refresco",
+      "presentacion": "botella retornable 20 cl; unidades por caja no impresas",
+      "formato": { "envase": "botella", "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 23.28, "max": 23.28, "por": "caja", "ejemplos": [["2026-03-09", 23.28], ["2026-09-04", 23.28]] },
+      "iva_pct": 21,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "AGUA VICHY CATALAN E/R 0,30 L.*24",
+      "nombre_normalizado": "Agua Vichy Catalán 30 cl retornable (caja 24)",
+      "familia": "agua",
+      "presentacion": "agua con gas, botella vidrio retornable; caja de 24. La cantidad facturada son BOTELLAS aunque ponga CJ",
+      "formato": { "envase": "botella", "contenido": 30, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 0.67, "max": 0.838, "por": "botella", "ejemplos": [["2026-03-09", 0.814], ["2026-04-27", 0.838], ["2026-06-26", 0.67]] },
+      "iva_pct": 10,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "PULEVA Esp.HOSTELERIA UHT PVC 1,5L",
+      "nombre_normalizado": "Puleva Hostelería UHT 1,5 L (brik)",
+      "familia": "lácteo",
+      "presentacion": "leche UHT en envase de 1,5 L (tipo de leche no impreso); también escrito 'PULEVA HOSTELERIA PVC 1,5L'; cantidad = briks sueltos (múltiplos de 6)",
+      "formato": { "envase": "brik", "contenido": 1.5, "unidad_contenido": "l", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "brik",
+      "precio": { "min": 1.3, "max": 1.51, "por": "brik", "ejemplos": [["2026-01-05", 1.51], ["2026-06-12", 1.46], ["2026-09-04", 1.3]] },
+      "iva_pct": 4,
+      "veces_visto": 29
+    },
+    {
+      "nombre_impreso": "PULEVA LECHE SEMI BRICK 1L",
+      "nombre_normalizado": "Puleva leche semidesnatada 1 L (brik)",
+      "familia": "lácteo",
+      "presentacion": "leche semidesnatada en brik de 1 L; cantidad = briks sueltos (múltiplos de 6)",
+      "formato": { "envase": "brik", "contenido": 1, "unidad_contenido": "l", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "brik",
+      "precio": { "min": 1.05, "max": 1.05, "por": "brik", "ejemplos": [["2026-01-05", 1.05], ["2026-09-25", 1.05]] },
+      "iva_pct": 4,
+      "veces_visto": 25
+    },
+    {
+      "nombre_impreso": "GIN BEEFEATER BLACK 70cl",
+      "nombre_normalizado": "Ginebra Beefeater Black 70 cl",
+      "familia": "destilado",
+      "presentacion": "botella 70 cl",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 13.19, "max": 13.19, "por": "botella", "ejemplos": [["2026-02-02", 13.19]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "WHISKY JOHNNIE WALKER RED SOUL 70cl",
+      "nombre_normalizado": "Whisky Johnnie Walker (Red) 70 cl",
+      "familia": "destilado",
+      "presentacion": "botella 70 cl; en la misma factura 2 botellas más a 0,00 (bonificadas). Nombre tal como se imprime, 'RED SOUL' sin confirmar",
+      "formato": { "envase": "botella", "contenido": 70, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "botella" },
+      "unidad_factura": "botella",
+      "precio": { "min": 13.7, "max": 13.7, "por": "botella", "ejemplos": [["2026-06-19", 13.7]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "ZUMO VIDA SELEC.MELOCOTON 200ml E/P(CJ)",
+      "nombre_normalizado": "Zumo Vida Selección melocotón 20 cl (caja)",
+      "familia": "zumo",
+      "presentacion": "formato 20 cl, unidades por caja no impresas; visto solo bonificado a 0,00",
+      "formato": { "envase": null, "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 0, "max": 0, "por": "caja", "ejemplos": [["2026-02-02", 0]] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ZUMO VIDA SELEC.PIÑA 200ml E/P(CJ.24u.)",
+      "nombre_normalizado": "Zumo Vida Selección piña 20 cl (caja 24)",
+      "familia": "zumo",
+      "presentacion": "caja de 24 unidades de 20 cl; visto solo bonificado a 0,00",
+      "formato": { "envase": null, "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 0, "max": 0, "por": "caja", "ejemplos": [["2026-02-02", 0]] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BOTELLA ALICE SCHWEPPES 200ml",
+      "nombre_normalizado": "Depósito botella Schweppes 20 cl",
+      "familia": "envase",
+      "presentacion": "depósito retornable por botella vacía; 28 por caja; cantidad negativa = devolución",
+      "formato": { "envase": "botella", "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 0.1, "max": 0.1, "por": "ud", "ejemplos": [["2026-01-12", 0.1]] },
+      "iva_pct": 21,
+      "veces_visto": 38
+    },
+    {
+      "nombre_impreso": "JAULA SCHWEPPES 200ml*28",
+      "nombre_normalizado": "Depósito jaula/caja Schweppes 20 cl (28)",
+      "familia": "envase",
+      "presentacion": "depósito de la jaula de plástico de 28 botellas; negativa = devolución",
+      "formato": { "envase": "jaula", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 28, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.4, "max": 2.4, "por": "ud", "ejemplos": [["2026-01-12", 2.4]] },
+      "iva_pct": 21,
+      "veces_visto": 38
+    },
+    {
+      "nombre_impreso": "ENVASE COMPLETO PREMIUM MIX 0.30L*24",
+      "nombre_normalizado": "Depósito caja completa Vichy 30 cl (24)",
+      "familia": "envase",
+      "presentacion": "depósito de caja con 24 botellas de 30 cl (Vichy); una unidad por cada 24 botellas; también impreso 'ENVASE COMPLETO PREMIUM MIX *24'",
+      "formato": { "envase": "caja", "contenido": 30, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 5.47, "max": 5.47, "por": "ud", "ejemplos": [["2026-03-09", 5.47], ["2026-06-02", 5.47]] },
+      "iva_pct": 10,
+      "veces_visto": 22
+    },
+    {
+      "nombre_impreso": "CAJA C/BOT SEVEN-UP 200ml",
+      "nombre_normalizado": "Depósito caja con botellas Seven Up 20 cl",
+      "familia": "envase",
+      "presentacion": "depósito por caja de Seven Up retornable; negativa = devolución",
+      "formato": { "envase": "caja", "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 4.8, "max": 4.8, "por": "ud", "ejemplos": [["2026-03-09", 4.8]] },
+      "iva_pct": 21,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "ENVASE BOTELLA 1/2L 500 PERSONALIZADA",
+      "nombre_normalizado": "Depósito botella La Casera personalizada 50 cl",
+      "familia": "envase",
+      "presentacion": "depósito por botella de 50 cl; 20 por caja",
+      "formato": { "envase": "botella", "contenido": 50, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 0.1, "max": 0.1, "por": "ud", "ejemplos": [["2026-02-02", 0.1]] },
+      "iva_pct": 21,
+      "veces_visto": 13
+    },
+    {
+      "nombre_impreso": "JAULA LA CASERA AZUL 500ml",
+      "nombre_normalizado": "Depósito jaula La Casera azul 50 cl",
+      "familia": "envase",
+      "presentacion": "depósito de la jaula (una por caja de 20)",
+      "formato": { "envase": "jaula", "contenido": 50, "unidad_contenido": "cl", "unidades_por_bulto": 20, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.404, "max": 2.404, "por": "ud", "ejemplos": [["2026-02-02", 2.404]] },
+      "iva_pct": 21,
+      "veces_visto": 13
+    },
+    {
+      "nombre_impreso": "JAULA TDV PAOLO 27,5 CL",
+      "nombre_normalizado": "Depósito jaula 27,5 cl (Paolo)",
+      "familia": "envase",
+      "presentacion": "depósito de jaula; solo visto como devolución (cantidad negativa)",
+      "formato": { "envase": "jaula", "contenido": 27.5, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.4, "max": 2.4, "por": "ud", "ejemplos": [["2026-01-12", 2.4]] },
+      "iva_pct": 21,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "ENVASE BOTELLA PAOLO 27,5 CL.",
+      "nombre_normalizado": "Depósito botella 27,5 cl (Paolo)",
+      "familia": "envase",
+      "presentacion": "depósito por botella; solo visto como devolución",
+      "formato": { "envase": "botella", "contenido": 27.5, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 0.1, "max": 0.1, "por": "ud", "ejemplos": [["2026-01-12", 0.1]] },
+      "iva_pct": 21,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "CAJA C/BOT. AXL 350ml",
+      "nombre_normalizado": "Depósito caja con botellas AXL 35 cl",
+      "familia": "envase",
+      "presentacion": "depósito de caja; solo visto como devolución",
+      "formato": { "envase": "caja", "contenido": 35, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 6.5, "max": 6.5, "por": "ud", "ejemplos": [["2026-03-16", 6.5]] },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CAJA ESTUCHE TERMICA 3 BOTELLAS",
+      "nombre_normalizado": "Estuche térmico 3 botellas (depósito)",
+      "familia": "envase",
+      "presentacion": "estuche térmico retornable para 3 botellas",
+      "formato": { "envase": "estuche", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 3, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 4.5, "max": 4.5, "por": "ud", "ejemplos": [["2026-02-02", 4.5]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "SERVICIO DE MANIPULACION Y ACARREOS",
+      "nombre_normalizado": "Servicio de manipulación y acarreos",
+      "familia": "servicio",
+      "presentacion": "cargo fijo por albarán",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 1.86, "max": 1.86, "por": "ud", "ejemplos": [["2026-01-05", 1.86]] },
+      "iva_pct": 21,
+      "veces_visto": 35
+    },
+    {
+      "nombre_impreso": "RAPPEL SOBRE VENTAS (21)",
+      "nombre_normalizado": "Rappel sobre ventas (abono)",
+      "familia": "descuento",
+      "presentacion": "línea de abono con cantidad -1 e importe negativo; sale en facturas de rappel anual Schweppes",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 354.63, "max": 494.81, "por": "ud", "ejemplos": [["2026-02-12", 494.81], ["2026-02-12", 354.63]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "GESTION DE RETIRADA DE PRODUCTOS",
+      "nombre_normalizado": "Gestión de retirada de productos",
+      "familia": "servicio",
+      "presentacion": "línea informativa a 0,00",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "ud",
+      "precio": { "min": 0, "max": 0, "por": "ud", "ejemplos": [["2026-07-31", 0]] },
+      "iva_pct": null,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "El proveedor venía sin nombre en la base; el nombre sale del pie de las facturas: 'CIF B03286184 - COMERCIAL TABARCA, S.L.' (Polígono Pla de la Vallonga, Alicante).",
+    "Cantidad vs precio en la columna Unid. 'CJ': confirmado con importes que en Vichy (0,30 L*24) y Puleva la cantidad son botellas/briks y el precio es por unidad (48 × 0,814 = 39,07; 36 × 1,51 = 54,36). En Schweppes, Seven Up y La Casera el precio es por caja.",
+    "Briks por caja de Puleva (1 L y 1,5 L): todas las cantidades vistas son múltiplos de 6 (12, 24, 36, 60), pero la factura no lo dice.",
+    "Unidades por caja de Seven Up Zero 20 cl y significado de 'SR' (La Casera tinto 275): no impresos.",
+    "El IVA de AXL 350ml y de los zumos no se ha podido comprobar contra una base de pie.",
+    "Los precios con descuento: el precio impreso es el de tarifa y el dto 40-50 % se aplica después; el coste real por caja es precio × (1 − dto), p. ej. tónica 31,92 → 19,15.",
+    "El catálogo incluye 25 entradas; no hay artículos fuera por tope."
+  ]
+}

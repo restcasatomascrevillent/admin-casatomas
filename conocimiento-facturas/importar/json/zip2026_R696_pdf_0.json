@@ -1,0 +1,46 @@
+{
+ "archivo": "R696.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "62/1167",
+ "fecha": "2026-05-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "L.BITTER CAMPARI 70CL 25º C6",
+   "producto_ficha": "Bitter Campari 70 cl (caja 6)",
+   "cantidad": -1,
+   "unidad": "botella",
+   "bultos": -1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 8.5,
+   "descuento_pct": 0.0,
+   "total": -8.5,
+   "iva_pct": 21,
+   "albaran_ref": "62/1.171",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -8.5,
+ "desglose_iva": [
+  {
+   "base": -8.5,
+   "pct": 21,
+   "cuota": -1.79
+  }
+ ],
+ "iva": -1.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -10.29,
+ "observaciones": "Abono por devolución de mercancía en mal estado (alb. 269/8422, transportado por Francisco Solana). Rectifica la factura 26/8590 (R695). Giro/B2B, vencimiento 09/05/26.",
+ "alertas": []
+}

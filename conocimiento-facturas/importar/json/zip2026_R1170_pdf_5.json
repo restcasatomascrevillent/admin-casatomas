@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  6
+ ],
+ "tipo": "factura",
+ "proveedor": "MISTA PESCA, C.B.",
+ "cif": "E03356144",
+ "local": "casa_tomas",
+ "numero_documento": "626/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 6,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.2,
+   "descuento_pct": null,
+   "total": 59.59,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 59.59,
+ "desglose_iva": [
+  {
+   "base": 59.59,
+   "pct": 10,
+   "cuota": 5.96
+  }
+ ],
+ "iva": 5.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 65.55,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 14658.",
+ "alertas": []
+}

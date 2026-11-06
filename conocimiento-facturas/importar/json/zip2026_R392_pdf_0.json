@@ -1,0 +1,82 @@
+{
+ "archivo": "R392.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EL CAPRICHO DE LOREN SL",
+ "cif": "B09707274",
+ "local": "casa_tomas",
+ "numero_documento": "F26 - 191",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GILDA TRADICIONAL BANDEJA 18 UDS.",
+   "producto_ficha": "Gilda tradicional (bandeja de 18 uds)",
+   "cantidad": 8.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": 18,
+   "contenido_unidad": "ud",
+   "precio_unitario": 22.91,
+   "descuento_pct": 35,
+   "total": 119.13,
+   "iva_pct": 10,
+   "albaran_ref": "2600247",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GILDA TRADICIONAL BANDEJA 18 UDS.",
+   "producto_ficha": "Gilda tradicional (bandeja de 18 uds)",
+   "cantidad": 8.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": 18,
+   "contenido_unidad": "ud",
+   "precio_unitario": 22.91,
+   "descuento_pct": 35,
+   "total": 119.13,
+   "iva_pct": 10,
+   "albaran_ref": "2600367",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GILDA TRADICIONAL BANDEJA 18 UDS.",
+   "producto_ficha": "Gilda tradicional (bandeja de 18 uds)",
+   "cantidad": 8.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": 18,
+   "contenido_unidad": "ud",
+   "precio_unitario": 22.91,
+   "descuento_pct": 35,
+   "total": 119.13,
+   "iva_pct": 10,
+   "albaran_ref": "2600438",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 357.4,
+ "desglose_iva": [
+  {
+   "base": 357.4,
+   "pct": 10,
+   "cuota": 35.74
+  }
+ ],
+ "iva": 35.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 393.14,
+ "observaciones": "Factura mensual que agrupa los albaranes 2600247, 2600367, 2600438. Cliente 130 (Restaurante Casa Tomás). Forma de pago: giro a 12 días. Suma bruta 549,84 €, dtos. lineales 192,44 €. El código TBAI del pie no es producto.",
+ "alertas": [
+  "Suma de las líneas 357,39 € frente a base imponible impresa 357,40 € (diferencia 0,01 € por redondeo del dto.). Se deja lo impreso."
+ ]
+}
