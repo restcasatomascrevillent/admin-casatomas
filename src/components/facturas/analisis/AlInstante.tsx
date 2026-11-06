@@ -39,7 +39,7 @@ import { EstadoError, EstadoVacio } from "@/components/facturas/compras/estilo";
 import { useBuscarProductosComprados } from "@/hooks/useTableroCompras";
 import { leerUmbralSubidaPrecio, llamarRpcSupabase } from "@/hooks/usePreguntasRapidas";
 import {
-  CHIPS_AL_INSTANTE,
+  CHIPS_VISIBLES,
   chipAlInstante,
   consultarAlInstante,
     exploracionCategorias,
@@ -124,7 +124,6 @@ export function FilaAlInstante({
   /** El chip cuyo resultado se está consultando. */
   cargando?: boolean;
 }) {
-  const idTitulo = useId();
   const idAyuda = useId();
   const { ref, bordes } = useBordes();
   // El chip activo, a la vista en la tira del móvil.
@@ -139,20 +138,16 @@ export function FilaAlInstante({
   }, [activo, ref]);
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-card to-transparent sm:hidden";
   return (
-    <div className="flex min-w-0 flex-col gap-1 border-t border-border/60 pt-2" data-testid="al-instante" data-tour="facturas-analisis-al-instante">
-      <p id={idTitulo} className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <Zap className="h-3.5 w-3.5" aria-hidden /> Al instante
-        <span className="font-normal normal-case tracking-normal">· sin IA, ocupa el sitio de la gráfica</span>
-      </p>
+    <div className="flex min-w-0 flex-col border-t border-border/60 pt-3" data-testid="al-instante" data-tour="facturas-analisis-al-instante">
       <TooltipProvider delayDuration={300}>
         <div className="relative min-w-0">
           <div
             ref={ref}
             role="group"
-            aria-labelledby={idTitulo}
+            aria-label="Más consultas"
             className="-mx-1 flex snap-x gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible"
           >
-            {CHIPS_AL_INSTANTE.map((c) => {
+            {CHIPS_VISIBLES.map((c) => {
               const Icono = ICONOS[c.id];
               const pulsado = activo === c.id;
               return (
@@ -161,15 +156,14 @@ export function FilaAlInstante({
                     <button
                       type="button"
                       data-chip={c.id}
-                      // «Al instante: Top proveedores»: que no se confunda con los presets del mismo nombre de arriba.
-                      aria-label={`Al instante: ${c.etiqueta}`}
                       aria-pressed={pulsado}
                       aria-describedby={`${idAyuda}-${c.id}`}
                       aria-busy={(pulsado && cargando) || undefined}
                       onClick={() => onElegir(pulsado ? null : c.id)}
                       className={cn(
-                        "inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 whitespace-nowrap rounded-full border border-border bg-background px-3.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground motion-reduce:transition-none",
-                        "aria-pressed:border-primary/50 aria-pressed:bg-primary/10 aria-pressed:pr-2 aria-pressed:text-foreground",
+                        // Más discretos que los presets de arriba: sin borde, fondo suave e icono en dorado.
+                        "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-transparent bg-muted/50 px-3.5 text-sm text-foreground/80 transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none sm:min-h-9 pointer-coarse:min-h-11",
+                        "[&>svg]:text-[hsl(38,59%,38%)] aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:pr-2 aria-pressed:font-medium aria-pressed:text-foreground",
                         FOCO,
                       )}
                     >
@@ -196,7 +190,7 @@ export function FilaAlInstante({
       </TooltipProvider>
       {/* La explicación de cada chip para lectores de pantalla (el tooltip es solo visual). */}
       <div className="sr-only">
-        {CHIPS_AL_INSTANTE.map((c) => (
+        {CHIPS_VISIBLES.map((c) => (
           <span key={c.id} id={`${idAyuda}-${c.id}`}>
             {c.descripcion}
             {activo === c.id ? ". Pulsa otra vez para volver a la gráfica del explorador." : "."}
@@ -740,7 +734,7 @@ export function ResultadoAlInstante({
   const q = useAlInstante(id, periodo, hoy, producto);
   const datos = q.data && q.data.id === id ? q.data : undefined;
   const pideProducto = chip.pide === "producto" && !producto;
-  const subtitulo = chip.usaPeriodo ? `${textoPeriodo} · al instante, sin IA` : "Al instante, sin IA";
+  const subtitulo = chip.usaPeriodo ? textoPeriodo : "Mes en curso";
 
   let cuerpo: ReactNode;
   if (pideProducto) cuerpo = <ElegirProducto onElegir={onProducto} />;

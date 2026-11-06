@@ -117,6 +117,18 @@ export const CHIPS_AL_INSTANTE: ChipAlInstante[] = [
 
 export const chipAlInstante = (id: IdAlInstante): ChipAlInstante => CHIPS_AL_INSTANTE.find((c) => c.id === id) ?? CHIPS_AL_INSTANTE[0];
 
+/**
+ * Los que ya están arriba, en los presets del explorador (06/11/2026, dueño:
+ * «estás duplicando los botones»): «Gasto por mes» y «Top proveedores» son el
+ * mismo preset; «Gasto por categoría» ≈ «Por familia»; «Evolución de precio» ≈
+ * «Precio de un producto». No salen como botón; «Evolución de precio» se sigue
+ * abriendo desde «Qué ha subido de precio».
+ */
+export const IDS_YA_EN_EL_EXPLORADOR: ReadonlySet<IdAlInstante> = new Set<IdAlInstante>(["gasto-por-mes", "top-proveedores", "gasto-categoria", "evolucion-precio"]);
+
+/** Los botones que se ven bajo la gráfica. */
+export const CHIPS_VISIBLES: ChipAlInstante[] = CHIPS_AL_INSTANTE.filter((c) => !IDS_YA_EN_EL_EXPLORADOR.has(c.id));
+
 /** «Con avisos: Documentos con avisos de lectura o de importes». */
 export const textoAyudaChip = (c: ChipAlInstante) => `${c.etiqueta}: ${c.descripcion}`;
 
