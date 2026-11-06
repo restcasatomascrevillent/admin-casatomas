@@ -1,0 +1,63 @@
+{
+ "archivo": "R119.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 00166",
+ "fecha": "2026-01-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 56.9,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.9,
+   "descuento_pct": null,
+   "total": 1075.41,
+   "iva_pct": 10,
+   "albaran_ref": "F566502",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TWISTER DE LANGOSTINOS 800GR",
+   "producto_ficha": "Twister de langostinos 800 g",
+   "cantidad": 3,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": 800,
+   "contenido_unidad": "g",
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 39.0,
+   "iva_pct": 10,
+   "albaran_ref": "F566502",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1114.41,
+ "desglose_iva": [
+  {
+   "base": 1114.41,
+   "pct": 10,
+   "cuota": 111.44
+  }
+ ],
+ "iva": 111.44,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1225.85,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F566502. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R579.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 2089",
+ "fecha": "2026-04-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA EXTRA ONCE DE ENERO",
+   "producto_ficha": "Quisquilla extra Once de Enero",
+   "cantidad": 12.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 78.0,
+   "descuento_pct": null,
+   "total": 975.0,
+   "iva_pct": 10,
+   "albaran_ref": "20263527",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 975.0,
+ "desglose_iva": [
+  {
+   "base": 975.0,
+   "pct": 10,
+   "cuota": 97.5
+  }
+ ],
+ "iva": 97.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1072.5,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 24/05/2026, transferencia a 30 días. Albarán 20263527 del 16/04/2026, pedido 18190. Observación impresa 'CAMARA'. El lote QEX/120/2608 aparece pegado a la descripción en el texto del PDF y no se usa como dato. Nota 'Baul' ignorada. La fila Total (1 caja, 12,50 kg) no son euros.",
+ "alertas": []
+}

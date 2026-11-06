@@ -1,0 +1,46 @@
+{
+ "archivo": "R173.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260023",
+ "fecha": "2026-01-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPE",
+   "producto_ficha": "Rape",
+   "cantidad": 62.35,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.95,
+   "descuento_pct": null,
+   "total": 1056.83,
+   "iva_pct": 10,
+   "albaran_ref": "1-000023",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1056.83,
+ "desglose_iva": [
+  {
+   "base": 1056.83,
+   "pct": 10,
+   "cuota": 105.68
+  }
+ ],
+ "iva": 105.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1162.51,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 20/01/2026 por 1.162,51. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": []
+}

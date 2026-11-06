@@ -1,0 +1,1780 @@
+{
+ "uniones": {
+  "Pescado variado de lonja": {
+   "origenes": [
+    "Gadiformes",
+    "Perciformes",
+    "Pleuronectiformes"
+   ],
+   "fam": 17,
+   "n": 18,
+   "gasto": 12308.59
+  },
+  "Marisco variado de lonja": {
+   "origenes": [
+    "Cefalópodos",
+    "Macruros",
+    "Varios (pescado y marisco)"
+   ],
+   "fam": 18,
+   "n": 14,
+   "gasto": 32624.6
+  },
+  "Anchoa en aceite de oliva": {
+   "origenes": [
+    "Anchoa en aceite de oliva",
+    "Anchoas en conserva 500 g"
+   ],
+   "fam": 17,
+   "n": 2,
+   "gasto": 258.13
+  },
+  "#251 Atún claro en aceite Diamir": {
+   "origenes": [
+    "Atún claro en aceite Claramar 1 kg",
+    "Atún claro en aceite Montey 900 g",
+    "Atún claro en aceite de girasol Navegante 900 g",
+    "Atún claro en aceite vegetal Arroyabe 900 g",
+    "Atún en aceite RO-1000 Cortizo",
+    "Atún en aceite de girasol Bachi 650 g"
+   ],
+   "fam": 6,
+   "n": 6,
+   "gasto": 2180.06
+  },
+  "Costilla de cerdo barbacoa": {
+   "origenes": [
+    "Costilla de cerdo barbacoa",
+    "Costillar de cerdo troceado BBQ"
+   ],
+   "fam": 19,
+   "n": 2,
+   "gasto": 281.63
+  },
+  "Guacamole": {
+   "origenes": [
+    "Guacamole 1 kg",
+    "Guacamole 500 g"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 118.79
+  },
+  "Mantequilla": {
+   "origenes": [
+    "Mantequilla",
+    "Mantequilla Albiero 1 kg",
+    "Mantequilla Pont Morin 1 kg",
+    "Mantequilla Soresina 1 kg"
+   ],
+   "fam": 4,
+   "n": 7,
+   "gasto": 646.75
+  },
+  "Mantequilla en monodosis": {
+   "origenes": [
+    "Mantequilla en porciones 10 g",
+    "Mantequilla en tarrina 10 g Reny Picot"
+   ],
+   "fam": 4,
+   "n": 2,
+   "gasto": 29.3
+  },
+  "Pan de molde sin gluten": {
+   "origenes": [
+    "Pan de molde sin gluten",
+    "Pan de molde sin gluten Dr. Schär"
+   ],
+   "fam": 7,
+   "n": 3,
+   "gasto": 100.27
+  },
+  "Patatas fritas congeladas": {
+   "origenes": [
+    "Patatas fritas congeladas 3/8",
+    "Patatas prefritas 7/7"
+   ],
+   "fam": 8,
+   "n": 2,
+   "gasto": 97.37
+  },
+  "Ron Capitán Morgan Dark 1 l": {
+   "origenes": [
+    "Ron Capitán Morgan Dark 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": -267.24
+  },
+  "Monin puré de fruta de la pasión 1 l": {
+   "origenes": [
+    "Monin puré de fruta de la pasión 1 L"
+   ],
+   "fam": 6,
+   "n": 1,
+   "gasto": 613.2
+  },
+  "Monin puré de mango 1 l": {
+   "origenes": [
+    "Monin puré de mango 1 L"
+   ],
+   "fam": 6,
+   "n": 1,
+   "gasto": 317.52
+  },
+  "Altramuces": {
+   "origenes": [
+    "Altramuces",
+    "Altramuces Juferna 2 kg"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 50.0
+  },
+  "Colorante alimentario": {
+   "origenes": [
+    "Colorante alimentario 900 g",
+    "Colorante alimentario BT-1 Sheros",
+    "Colorante alimentario Primera 900 g"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 13.08
+  },
+  "Hierbas provenzales": {
+   "origenes": [
+    "Hierbas provenzales",
+    "Hierbas provenzales Juferna 250 g"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 8.86
+  },
+  "Salsa barbacoa": {
+   "origenes": [
+    "Salsa barbacoa",
+    "Salsa barbacoa Chovi 1,9 kg",
+    "Salsa barbacoa Millás 1,85 L"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 32.45
+  },
+  "Tomate pelado en lata": {
+   "origenes": [
+    "Tomate entero pelado 1,6 kg",
+    "Tomate pelado en lata"
+   ],
+   "fam": 6,
+   "n": 6,
+   "gasto": 181.34
+  },
+  "Tomate troceado en conserva": {
+   "origenes": [
+    "Tomate troceado 2,65 kg",
+    "Tomate troceado Éxito 3 kg"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 435.52
+  },
+  "Château Giscours 75 cl": {
+   "origenes": [
+    "Château Giscours",
+    "Château Giscours 75 cl"
+   ],
+   "fam": 12,
+   "n": 3,
+   "gasto": 6855.99
+  },
+  "Paletilla de cordero lechal congelada": {
+   "origenes": [
+    "Paletilla de cordero lechal"
+   ],
+   "fam": 19,
+   "n": 1,
+   "gasto": 10005.13
+  },
+  "#107 Buey de mar gallego hembra 1-1,5 kg": {
+   "origenes": [
+    "#107 Buey de mar gallego hembra 1-1,5 kg",
+    "Buey de mar hembra"
+   ],
+   "fam": 18,
+   "n": 17,
+   "gasto": 5293.79
+  },
+  "Escalope de foie gras de pato congelado": {
+   "origenes": [
+    "Escalopa de foie gras congelada 50 g",
+    "Escalopa de foie gras de pato",
+    "Escalope de foie gras"
+   ],
+   "fam": 19,
+   "n": 4,
+   "gasto": 2610.96
+  },
+  "Agua de azahar 1 l": {
+   "origenes": [
+    "Agua de azahar 1 L"
+   ],
+   "fam": 6,
+   "n": 1,
+   "gasto": 8.6
+  },
+  "#321 Azúcar Alteza 1 kg": {
+   "origenes": [
+    "Azúcar Azucarera 1 kg",
+    "Azúcar blanco 1 kg",
+    "Azúcar blanco Sucrebo 1 kg"
+   ],
+   "fam": 6,
+   "n": 6,
+   "gasto": 373.33
+  },
+  "Huevo líquido pasteurizado": {
+   "origenes": [
+    "Huevo entero líquido pasteurizado Ovopak",
+    "Huevo líquido pasteurizado 1 l"
+   ],
+   "fam": 4,
+   "n": 2,
+   "gasto": 69.42
+  },
+  "Papel antigrasa": {
+   "origenes": [
+    "Papel antigrasa",
+    "Papel antigrasa blanco 500 ud"
+   ],
+   "fam": 9,
+   "n": 3,
+   "gasto": 39.18
+  },
+  "Descuento comercial": {
+   "origenes": [
+    "#341 Aceite de girasol alto oleico",
+    "Descuento 20 %",
+    "Descuento comercial",
+    "Descuento por promoción (caja completa)",
+    "Promoción especial",
+    "Venta por volumen"
+   ],
+   "fam": 11,
+   "n": 40,
+   "gasto": -43036.48
+  },
+  "Leche de hostelería 1,5 l": {
+   "origenes": [
+    "Leche Asturiana hostelería 1,5 l",
+    "Leche Puleva hostelería 1,5 l"
+   ],
+   "fam": 4,
+   "n": 3,
+   "gasto": 1524.97
+  },
+  "Leche semidesnatada": {
+   "origenes": [
+    "Leche Puleva semidesnatada 1 l",
+    "Leche semidesnatada Asturiana 1 l"
+   ],
+   "fam": 4,
+   "n": 2,
+   "gasto": 485.28
+  },
+  "Calamar limpio": {
+   "origenes": [
+    "#221 Calamar",
+    "Calamar limpio"
+   ],
+   "fam": 18,
+   "n": 2,
+   "gasto": 274.5
+  },
+  "Chistorra": {
+   "origenes": [
+    "Chistorra",
+    "Chistorra extra"
+   ],
+   "fam": 20,
+   "n": 3,
+   "gasto": 227.5
+  },
+  "Tomate frito": {
+   "origenes": [
+    "Salsa de tomate frito pouch 2,5 kg",
+    "Tomate frito"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 63.9
+  },
+  "Tomate seco en aceite": {
+   "origenes": [
+    "Tomate seco El Labrador 370 ml",
+    "Tomate seco en tiras en aceite"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 281.7
+  },
+  "Bacon entero": {
+   "origenes": [
+    "Bacon entero",
+    "Bacón ahumado"
+   ],
+   "fam": 20,
+   "n": 3,
+   "gasto": 147.22
+  },
+  "#218 Bogavante": {
+   "origenes": [
+    "#218 Bogavante",
+    "Bogavante azul"
+   ],
+   "fam": 18,
+   "n": 3,
+   "gasto": 4386.75
+  },
+  "Coquina congelada": {
+   "origenes": [
+    "Coquina"
+   ],
+   "fam": 18,
+   "n": 1,
+   "gasto": 330.9
+  },
+  "Mejillón media concha congelado": {
+   "origenes": [
+    "Mejillón media concha"
+   ],
+   "fam": 18,
+   "n": 1,
+   "gasto": 16
+  },
+  "Molla de mejillón congelada": {
+   "origenes": [
+    "Carne de mejillón"
+   ],
+   "fam": 18,
+   "n": 1,
+   "gasto": 22.5
+  },
+  "Cocochas de merluza congeladas": {
+   "origenes": [
+    "Cocochas de merluza"
+   ],
+   "fam": 17,
+   "n": 1,
+   "gasto": 576
+  },
+  "Setas variadas congeladas": {
+   "origenes": [
+    "Mezcla de setas",
+    "Salteado de setas congelado",
+    "Setas variadas congeladas"
+   ],
+   "fam": 5,
+   "n": 4,
+   "gasto": 212.19
+  },
+  "Lomo bajo de vaca": {
+   "origenes": [
+    "Lomo bajo de vaca",
+    "Lomo de vaca"
+   ],
+   "fam": 19,
+   "n": 2,
+   "gasto": 823.72
+  },
+  "Morcilla de Burgos": {
+   "origenes": [
+    "Morcilla de Burgos",
+    "Morcilla de arroz de Burgos"
+   ],
+   "fam": 20,
+   "n": 2,
+   "gasto": 7.87
+  },
+  "Bitter Kas 20 cl": {
+   "origenes": [
+    "Bitter Kas",
+    "Bitter Kas 20 cl"
+   ],
+   "fam": 15,
+   "n": 2,
+   "gasto": 182.87
+  },
+  "Aperol 1 l": {
+   "origenes": [
+    "Aperol 1 L"
+   ],
+   "fam": 14,
+   "n": 2,
+   "gasto": 184.32
+  },
+  "Whisky J&B 70 cl": {
+   "origenes": [
+    "J&B 70 cl",
+    "Whisky J&B 70 cl"
+   ],
+   "fam": 14,
+   "n": 2,
+   "gasto": 94.2
+  },
+  "Queso manchego curado": {
+   "origenes": [
+    "Queso de oveja curado manchego artesano El Pesebre",
+    "Queso manchego curado Adiano"
+   ],
+   "fam": 4,
+   "n": 2,
+   "gasto": 1929.97
+  },
+  "Queso manchego semicurado": {
+   "origenes": [
+    "Queso de oveja semicurado manchego artesano El Pesebre",
+    "Queso manchego semicurado Adiano",
+    "Queso manchego semicurado Arquero"
+   ],
+   "fam": 4,
+   "n": 3,
+   "gasto": 385.95
+  },
+  "Balbás Ancestral 75 cl": {
+   "origenes": [
+    "Ancestral",
+    "Balbás Ancestral 75 cl"
+   ],
+   "fam": 12,
+   "n": 2,
+   "gasto": 965.46
+  },
+  "Salsa de soja sin gluten": {
+   "origenes": [
+    "Salsa de soja Kikkoman sin gluten 1 l",
+    "Salsa de soja sin gluten 1 l"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 101.12
+  },
+  "Boquerón fresco": {
+   "origenes": [
+    "Boquerón",
+    "Boquerón fresco"
+   ],
+   "fam": 17,
+   "n": 3,
+   "gasto": 150.0
+  },
+  "Boquerón en vinagre": {
+   "origenes": [
+    "Boquerones en vinagre",
+    "Boquerón en vinagre alineado"
+   ],
+   "fam": 17,
+   "n": 5,
+   "gasto": 401.56
+  },
+  "Lubina de crianza": {
+   "origenes": [
+    "#228 Lubina"
+   ],
+   "fam": 17,
+   "n": 1,
+   "gasto": 392.62
+  },
+  "Lomo de salmón fresco": {
+   "origenes": [
+    "Filete de salmón",
+    "Lomo de salmón fresco"
+   ],
+   "fam": 17,
+   "n": 4,
+   "gasto": 657.52
+  },
+  "Jamón serrano deshuesado": {
+   "origenes": [
+    "Jamón deshuesado Castillo de Magaña",
+    "Jamón deshuesado gran reserva Altos de Iberia",
+    "Jamón serrano reserva deshuesado"
+   ],
+   "fam": 20,
+   "n": 3,
+   "gasto": 264.44
+  },
+  "Trufa negra de invierno fresca": {
+   "origenes": [
+    "Trufa negra (Tuber melanosporum)",
+    "Trufa negra de invierno fresca"
+   ],
+   "fam": 5,
+   "n": 3,
+   "gasto": 1772.38
+  },
+  "Trufa de verano fresca": {
+   "origenes": [
+    "Trufa de verano (Tuber aestivum)",
+    "Trufa de verano fresca"
+   ],
+   "fam": 5,
+   "n": 2,
+   "gasto": 773.43
+  },
+  "Langostino": {
+   "origenes": [
+    "Langostino",
+    "Langostino nacional"
+   ],
+   "fam": 18,
+   "n": 2,
+   "gasto": 548
+  },
+  "Lomo alto de vaca": {
+   "origenes": [
+    "Entrecot de vaca",
+    "Lomo alto de vaca",
+    "Lomo de vaca"
+   ],
+   "fam": 19,
+   "n": 3,
+   "gasto": 9296.71
+  },
+  "Pasta de wasabi": {
+   "origenes": [
+    "Pasta de wasabi",
+    "Wasabi en pasta Neri 43 g"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 56.94
+  },
+  "Anchoa en salazón": {
+   "origenes": [
+    "Anchoa en salazón 200 g"
+   ],
+   "fam": 17,
+   "n": 1,
+   "gasto": 57.7
+  },
+  "Palometa": {
+   "origenes": [
+    "Palometa roja"
+   ],
+   "fam": 17,
+   "n": 1,
+   "gasto": 142.8
+  },
+  "Pan bao": {
+   "origenes": [
+    "Pan bao",
+    "Pan bao blanco 60 g"
+   ],
+   "fam": 7,
+   "n": 2,
+   "gasto": 106.75
+  },
+  "Ventresca de atún claro en conserva": {
+   "origenes": [
+    "Ventresca de atún El Capricho 115 g",
+    "Ventresca de atún claro en conserva"
+   ],
+   "fam": 17,
+   "n": 2,
+   "gasto": 1048.16
+  },
+  "Gilda de anchoa": {
+   "origenes": [
+    "Gilda de anchoa 25 ud",
+    "Gilda tradicional"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 2944.52
+  },
+  "Aguja de cerdo sin hueso": {
+   "origenes": [
+    "Aguja de cerdo deshuesada",
+    "Aguja de cerdo sin hueso"
+   ],
+   "fam": 19,
+   "n": 2,
+   "gasto": 154.1
+  },
+  "Costilla de cerdo en tiras": {
+   "origenes": [
+    "Costilla de cerdo",
+    "Costillas de cerdo en tiras"
+   ],
+   "fam": 19,
+   "n": 2,
+   "gasto": 283.71
+  },
+  "Lomo de vaca con hueso": {
+   "origenes": [
+    "Lomo de vaca"
+   ],
+   "fam": 19,
+   "n": 1,
+   "gasto": 18642.75
+  },
+  "El Puntido 3 l": {
+   "origenes": [
+    "El Puntido 3 L"
+   ],
+   "fam": 12,
+   "n": 1,
+   "gasto": 0
+  },
+  "Anchoa del Cantábrico en aceite": {
+   "origenes": [
+    "Anchoa del Cantábrico en aceite de girasol",
+    "Anchoa en aceite Hansa 14/16 filetes",
+    "Anchoas XL alta restauración"
+   ],
+   "fam": 17,
+   "n": 3,
+   "gasto": 7621.13
+  },
+  "Lomo de cerdo adobado": {
+   "origenes": [
+    "Lomo adobado",
+    "Lomo de cerdo adobado"
+   ],
+   "fam": 19,
+   "n": 4,
+   "gasto": 173.48
+  },
+  "Mantequilla con sal": {
+   "origenes": [
+    "Mantequilla Kerrygold con sal 200 g"
+   ],
+   "fam": 4,
+   "n": 3,
+   "gasto": 113.68
+  },
+  "Queso crema": {
+   "origenes": [
+    "Queso Philadelphia original",
+    "Queso crema",
+    "Queso cremoso de untar cubo 3 kg"
+   ],
+   "fam": 4,
+   "n": 6,
+   "gasto": 1241.44
+  },
+  "Queso provolone": {
+   "origenes": [
+    "Queso provolone",
+    "Queso provolone Albiero"
+   ],
+   "fam": 4,
+   "n": 4,
+   "gasto": 288.27
+  },
+  "#330 Queso de rulo mezcla 1 kg": {
+   "origenes": [
+    "#330 Queso de rulo mezcla 1 kg",
+    "Queso de rulo Mont de France"
+   ],
+   "fam": 4,
+   "n": 3,
+   "gasto": 612.78
+  },
+  "Queso mezcla semicurado": {
+   "origenes": [
+    "Queso mezcla semicurado",
+    "Queso semicurado mezcla Dialse"
+   ],
+   "fam": 4,
+   "n": 2,
+   "gasto": 73.04
+  },
+  "Salmorreta": {
+   "origenes": [
+    "Salmorreta",
+    "Salmorreta Paellalia 140 g",
+    "Salmorreta Paellalia 380 g"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 2194.98
+  },
+  "Tomate rallado": {
+   "origenes": [
+    "Tomate rallado",
+    "Tomate rallado El Labrador 720 ml"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 30.51
+  },
+  "#298 Ventresca de bonito Ortiz 1/4": {
+   "origenes": [
+    "Ventresca de bonito en aceite de oliva 1/4",
+    "Ventresca de bonito en conserva"
+   ],
+   "fam": 6,
+   "n": 4,
+   "gasto": 3315.68
+  },
+  "Salado de cerdo para cocido": {
+   "origenes": [
+    "Salados de cerdo"
+   ],
+   "fam": 19,
+   "n": 1,
+   "gasto": 21.15
+  },
+  "Gominolas": {
+   "origenes": [
+    "Golosinas Fini mix goma pica",
+    "Golosinas Jake mini max azúcar",
+    "Gominolas"
+   ],
+   "fam": 7,
+   "n": 4,
+   "gasto": 692.52
+  },
+  "Kiwi Sungold": {
+   "origenes": [
+    "Kiwi Gold",
+    "Kiwi Sungold"
+   ],
+   "fam": 5,
+   "n": 8,
+   "gasto": 231.18
+  },
+  "Cebolla en cubos congelada": {
+   "origenes": [
+    "Cebolla en cubos"
+   ],
+   "fam": 5,
+   "n": 3,
+   "gasto": 59.59
+  },
+  "#226 Trufa de chocolate Anedilco": {
+   "origenes": [
+    "Trufas de chocolate 50 ud"
+   ],
+   "fam": 7,
+   "n": 1,
+   "gasto": 38.97
+  },
+  "Sardinillas en aceite de oliva": {
+   "origenes": [
+    "Sardinillas en aceite de oliva 14/18",
+    "Sardinillas en aceite extra especial"
+   ],
+   "fam": 17,
+   "n": 2,
+   "gasto": 247.6
+  },
+  "Mejillón en escabeche": {
+   "origenes": [
+    "Mejillón en escabeche Ramón Franco 8/12",
+    "Mejillón en escabeche Real Conservera"
+   ],
+   "fam": 18,
+   "n": 3,
+   "gasto": 1128.48
+  },
+  "Rebozuelo": {
+   "origenes": [
+    "Rosiñol"
+   ],
+   "fam": 5,
+   "n": 1,
+   "gasto": 39.3
+  },
+  "#219 Bonito entero en lomos": {
+   "origenes": [
+    "#219 Bonito entero en lomos",
+    "Bonito"
+   ],
+   "fam": 17,
+   "n": 2,
+   "gasto": 4169.28
+  },
+  "#303 Centolla": {
+   "origenes": [
+    "#106 Centolla hembra 1-1,5 kg",
+    "#303 Centolla"
+   ],
+   "fam": 18,
+   "n": 13,
+   "gasto": 2714.98
+  },
+  "Virutas de chocolate con leche": {
+   "origenes": [
+    "Viruta pequeña de chocolate con leche",
+    "Virutas de chocolate con leche"
+   ],
+   "fam": 7,
+   "n": 4,
+   "gasto": 469.15
+  },
+  "#339 Gestión de residuos": {
+   "origenes": [
+    "Gestión de residuos RGA por albarán"
+   ],
+   "fam": 11,
+   "n": 1,
+   "gasto": 56.89
+  },
+  "Salmón fresco entero": {
+   "origenes": [
+    "Salmón fresco",
+    "Salmón fresco entero"
+   ],
+   "fam": 17,
+   "n": 7,
+   "gasto": 999.26
+  },
+  "Carbón vegetal en saco": {
+   "origenes": [
+    "Sacos de carbón"
+   ],
+   "fam": 11,
+   "n": 1,
+   "gasto": 2040
+  },
+  "Agua San Pellegrino con gas 50 cl": {
+   "origenes": [
+    "Agua San Pellegrino 50 cl",
+    "Agua San Pellegrino con gas 50 cl"
+   ],
+   "fam": 15,
+   "n": 4,
+   "gasto": 1052.29
+  },
+  "#324 Ajo blanco 1 kg": {
+   "origenes": [
+    "#324 Ajo blanco 1 kg",
+    "Ajo pelado"
+   ],
+   "fam": 5,
+   "n": 4,
+   "gasto": 666.63
+  },
+  "Cebolla en tiras congelada": {
+   "origenes": [
+    "Cebolla en tiras"
+   ],
+   "fam": 5,
+   "n": 1,
+   "gasto": 15.77
+  },
+  "Harina para freír": {
+   "origenes": [
+    "Harina para freír",
+    "Harina para fritura 5 kg"
+   ],
+   "fam": 6,
+   "n": 9,
+   "gasto": 179.87
+  },
+  "Mermelada de arándanos": {
+   "origenes": [
+    "Mermelada de arándanos",
+    "Mermelada de arándanos La Vieja Fábrica 800 g"
+   ],
+   "fam": 6,
+   "n": 5,
+   "gasto": 238.42
+  },
+  "Pimienta negra molida": {
+   "origenes": [
+    "Pimienta negra molida 800 g",
+    "Pimienta negra molida BT-1 Sheros"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 22.84
+  },
+  "Pimiento del piquillo entero": {
+   "origenes": [
+    "Pimiento del piquillo entero",
+    "Pimiento del piquillo entero Don Molinico 1,9 kg"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 202.39
+  },
+  "Pimiento rojo": {
+   "origenes": [
+    "Pimiento rojo",
+    "Pimiento rojo italiano"
+   ],
+   "fam": 5,
+   "n": 5,
+   "gasto": 123.0
+  },
+  "Preparado para rebozar sin gluten": {
+   "origenes": [
+    "Preparado para rebozados sin gluten",
+    "Preparado para rebozar sin gluten Dani 3 kg",
+    "Preparado para rebozar sin gluten Dani 470 g"
+   ],
+   "fam": 6,
+   "n": 4,
+   "gasto": 311.47
+  },
+  "Mayonesa japonesa": {
+   "origenes": [
+    "Mayonesa japonesa Allgroo 520 ml",
+    "Mayonesa japonesa Kewpie 2,4 l"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 29.33
+  },
+  "Alubia cocida": {
+   "origenes": [
+    "Alubia cocida",
+    "Alubias cocidas Luengo 2,6 kg"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 165.51
+  },
+  "Leche entera": {
+   "origenes": [
+    "Leche entera 1 l",
+    "Leche entera Covap 1,5 l"
+   ],
+   "fam": 4,
+   "n": 3,
+   "gasto": 71.48
+  },
+  "#327 Leche semidesnatada sin lactosa Asturiana 1 L": {
+   "origenes": [
+    "#327 Leche semidesnatada sin lactosa Asturiana 1 L",
+    "Leche semidesnatada sin lactosa Puleva 1 l"
+   ],
+   "fam": 4,
+   "n": 5,
+   "gasto": 196.37
+  },
+  "Arroz de grano medio": {
+   "origenes": [
+    "Arroz de grano medio",
+    "Arroz extra 5 kg"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 63.01
+  },
+  "Arroz de grano largo": {
+   "origenes": [
+    "Arroz de grano largo 5 kg"
+   ],
+   "fam": 6,
+   "n": 1,
+   "gasto": 6.05
+  },
+  "Lomo de atún limpio": {
+   "origenes": [
+    "Atún lomo central",
+    "Lomo de atún limpio"
+   ],
+   "fam": 17,
+   "n": 2,
+   "gasto": 82.72
+  },
+  "Brócoli congelado": {
+   "origenes": [
+    "Brócoli congelado 2,25 kg"
+   ],
+   "fam": 5,
+   "n": 1,
+   "gasto": 7.44
+  },
+  "Callos de vacuno congelados": {
+   "origenes": [
+    "Callo de vacuno"
+   ],
+   "fam": 19,
+   "n": 1,
+   "gasto": 19.32
+  },
+  "Vino blanco Cerro de la Cruz brik 1 l": {
+   "origenes": [
+    "Vino blanco Cerro Cruz brick 1 l",
+    "Vino blanco Cerro de la Cruz brik 1 l"
+   ],
+   "fam": 12,
+   "n": 2,
+   "gasto": 60.22
+  },
+  "Miel de caña": {
+   "origenes": [
+    "Concentrado de caña Carmen 920 g",
+    "Miel de caña"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 43.97
+  },
+  "Migas de atún en aceite": {
+   "origenes": [
+    "Migas de atún en aceite vegetal 650 g"
+   ],
+   "fam": 17,
+   "n": 1,
+   "gasto": 30.57
+  },
+  "Queso feta": {
+   "origenes": [
+    "Queso feta",
+    "Queso feta DOP Dodoni",
+    "Queso feta en salmuera"
+   ],
+   "fam": 4,
+   "n": 4,
+   "gasto": 58.1
+  },
+  "Salsa romesco": {
+   "origenes": [
+    "Salsa romesco",
+    "Salsa romesco Ferrer 645 g"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 230.7
+  },
+  "Fideo chino": {
+   "origenes": [
+    "Fideo chino",
+    "Fideos chinos Soubry 250 g"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 22.38
+  },
+  "Pimentón dulce": {
+   "origenes": [
+    "Pimentón dulce DOP",
+    "Pimentón dulce La Dalia 800 g"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 40.6
+  },
+  "Mermelada de higos": {
+   "origenes": [
+    "Mermelada de higos La Vieja Fábrica 800 g"
+   ],
+   "fam": 6,
+   "n": 1,
+   "gasto": 21.21
+  },
+  "Lavavajillas a mano 5 l": {
+   "origenes": [
+    "Lavavajillas a mano 5 l",
+    "Lavavajillas a mano Fairy 5 l"
+   ],
+   "fam": 9,
+   "n": 2,
+   "gasto": 30.76
+  },
+  "#325 Pimiento del piquillo en tiras Don Molinico 1,9 kg": {
+   "origenes": [
+    "#325 Pimiento del piquillo en tiras Don Molinico 1,9 kg",
+    "Pimiento del piquillo en tiras 1,9 kg"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 422.86
+  },
+  "Papel vegetal 40x60 cm": {
+   "origenes": [
+    "Papel vegetal",
+    "Papel vegetal 40x60 cm"
+   ],
+   "fam": 9,
+   "n": 2,
+   "gasto": 88.44
+  },
+  "Piparra en conserva": {
+   "origenes": [
+    "Piparra en conserva",
+    "Piparras picantes sabor dulce A. Sádaba 370 ml"
+   ],
+   "fam": 6,
+   "n": 3,
+   "gasto": 506.15
+  },
+  "Cocochas de merluza frescas": {
+   "origenes": [
+    "Cocochas de merluza"
+   ],
+   "fam": 17,
+   "n": 1,
+   "gasto": 612
+  },
+  "Gamba blanca congelada": {
+   "origenes": [
+    "Gamba blanca"
+   ],
+   "fam": 18,
+   "n": 1,
+   "gasto": 16
+  },
+  "#291 Quisquilla extra Loreto": {
+   "origenes": [
+    "Quisquilla extra"
+   ],
+   "fam": 18,
+   "n": 2,
+   "gasto": 2437.88
+  },
+  "Gorro alto negro": {
+   "origenes": [
+    "Gorro alto de popelín negro",
+    "Gorro alto negro"
+   ],
+   "fam": 10,
+   "n": 2,
+   "gasto": 24.4
+  },
+  "Azúcar en sobres": {
+   "origenes": [
+    "Azúcar Salzillo sobres 6 g",
+    "Azúcar en sobres corazón San Valentín"
+   ],
+   "fam": 6,
+   "n": 2,
+   "gasto": 232.89
+  },
+  "Azúcar moreno en sobres": {
+   "origenes": [
+    "Azúcar moreno Salzillo stick 6 g"
+   ],
+   "fam": 6,
+   "n": 1,
+   "gasto": 46.02
+  },
+  "Langostino cocido": {
+   "origenes": [
+    "Langostino cocido 30/40"
+   ],
+   "fam": 18,
+   "n": 1,
+   "gasto": 37.5
+  },
+  "#230 Bobina mecha grada Muro 800 g": {
+   "origenes": [
+    "#230 Bobina mecha grada Muro 800 g",
+    "Bobina de mecha gofrada Karme 800 g"
+   ],
+   "fam": 9,
+   "n": 2,
+   "gasto": 422.9
+  },
+  "Bolsa de basura 55x60 cm 30 l": {
+   "origenes": [
+    "Bolsa de basura 55x60 cm 30 L"
+   ],
+   "fam": 9,
+   "n": 4,
+   "gasto": 199.79
+  },
+  "Saco de basura negro 85x105 cm 120 l": {
+   "origenes": [
+    "Saco de basura negro 85x105 cm 120 L"
+   ],
+   "fam": 9,
+   "n": 3,
+   "gasto": 298.78
+  },
+  "Lejía 2 l": {
+   "origenes": [
+    "Lejía Caprichosa 2 l",
+    "Lejía amarilla Kiriko 2 L"
+   ],
+   "fam": 9,
+   "n": 2,
+   "gasto": 166.82
+  },
+  "#246 Cuchara moka Paladium": {
+   "origenes": [
+    "Cuchara de café Paladium"
+   ],
+   "fam": 10,
+   "n": 1,
+   "gasto": 41.86
+  },
+  "Bebida espirituosa 1715 1 l": {
+   "origenes": [
+    "Bebida espirituosa 1715 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 13.5
+  },
+  "Lomo de cerdo": {
+   "origenes": [
+    "Lomo de cerdo extra tierno ElPozo"
+   ],
+   "fam": 19,
+   "n": 1,
+   "gasto": 16.16
+  },
+  "Bolsa de basura negra 85x105 cm 100 l": {
+   "origenes": [
+    "Bolsa de basura negra 85x105 cm 100 L"
+   ],
+   "fam": 9,
+   "n": 1,
+   "gasto": 174.4
+  },
+  "Anís Marie Brizard 1 l": {
+   "origenes": [
+    "Anís Marie Brizard 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 42
+  },
+  "Anís Tenis seco 1 l": {
+   "origenes": [
+    "Anís Tenis seco 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 61.5
+  },
+  "Baileys 1 l": {
+   "origenes": [
+    "Baileys 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 260.4
+  },
+  "Campari 1 l": {
+   "origenes": [
+    "Campari 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 142.2
+  },
+  "Licor de manzana sin alcohol Drols 1 l": {
+   "origenes": [
+    "Licor de manzana sin alcohol Drols 1 L"
+   ],
+   "fam": 15,
+   "n": 1,
+   "gasto": 16.92
+  },
+  "Licor de mora sin alcohol Drols 1 l": {
+   "origenes": [
+    "Licor de mora sin alcohol Drols 1 L"
+   ],
+   "fam": 15,
+   "n": 1,
+   "gasto": 16.92
+  },
+  "Ponche Caballero 1 l": {
+   "origenes": [
+    "Ponche Caballero 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 135
+  },
+  "Ron Bacardi 1 l": {
+   "origenes": [
+    "Ron Bacardi 1 L"
+   ],
+   "fam": 14,
+   "n": 1,
+   "gasto": 392.4
+  },
+  "Mistela La Manchega Extra 1 l": {
+   "origenes": [
+    "Mistela La Manchega Extra 1 L"
+   ],
+   "fam": 12,
+   "n": 1,
+   "gasto": 26.4
+  },
+  "Vermut Martini Blanco 1 l": {
+   "origenes": [
+    "Vermut Martini Blanco 1 L"
+   ],
+   "fam": 12,
+   "n": 1,
+   "gasto": 325.2
+  },
+  "Vermut Martini Rojo 1 l": {
+   "origenes": [
+    "Vermut Martini Rojo 1 L"
+   ],
+   "fam": 12,
+   "n": 1,
+   "gasto": 370.5
+  }
+ },
+ "familia_cambiada": [
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "21 MACRUROS",
+   26040.62
+  ],
+  [
+   "Monin puré de fruta de la pasión 1 L",
+   15,
+   "Monin puré de fruta de la pasión 1 l",
+   6,
+   "MONIN PUREE LE FRUIT FRUTA PASION 1LTO.",
+   613.2
+  ],
+  [
+   "Monin puré de mango 1 L",
+   15,
+   "Monin puré de mango 1 l",
+   6,
+   "MONIN PUREE LE FRUIT MANGO LTO.",
+   317.52
+  ],
+  [
+   "Sirope Monin manzana verde 70 cl",
+   15,
+   "Sirope Monin manzana verde 70 cl",
+   6,
+   "SIROPE MONIN MANZANA VERDE 70 CL.",
+   63
+  ],
+  [
+   "Sirope Monin melocotón 70 cl",
+   15,
+   "Sirope Monin melocotón 70 cl",
+   6,
+   "SIROPE MONIN MELOCOTON 70CL.",
+   19.7
+  ],
+  [
+   "Sirope Monin spicy mango 70 cl",
+   15,
+   "Sirope Monin spicy mango 70 cl",
+   6,
+   "SIROPE MONIN SPICY MANGO 70CL.",
+   63
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. NUEVO ALBOR)",
+   69.84
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. NUEVO RAMON Y DOLORES)",
+   225.37
+  ],
+  [
+   "Cola de alistado",
+   17,
+   "Cola de alistado",
+   18,
+   "COLAS ALISTAO 1",
+   410.05
+  ],
+  [
+   "Cola de alistado",
+   17,
+   "Cola de alistado",
+   18,
+   "COLAS ALISTAO 2 CARABELAS",
+   109.8
+  ],
+  [
+   "Cabezas de alistado",
+   17,
+   "Cabezas de alistado",
+   18,
+   "ALISTADO CABEZAS",
+   28.13
+  ],
+  [
+   "Tanqueray 0,0 70 cl",
+   14,
+   "Tanqueray 0,0 70 cl",
+   15,
+   "GIN TANQUERAY O,Oº",
+   0
+  ],
+  [
+   "Granadina Rives sin alcohol",
+   15,
+   "Granadina Rives sin alcohol",
+   6,
+   "LS. GRANADINA RIVES SIN",
+   11.13
+  ],
+  [
+   "Ventresca de atún claro en conserva",
+   6,
+   "Ventresca de atún claro en conserva",
+   17,
+   "RP-VENTRESCA DE ATUN CLARO-280 LP AO RO-280 LP C/16U",
+   912.16
+  ],
+  [
+   "Lomo adobado",
+   20,
+   "Lomo de cerdo adobado",
+   19,
+   "Lomo Adobado Extra Mtades (2kg)x6 RODRIGUEZ (KG)",
+   58.14
+  ],
+  [
+   "Lomo adobado",
+   20,
+   "Lomo de cerdo adobado",
+   19,
+   "Lomo Adobado MITADES (2kg)x4 FRMANCHA (KG)",
+   42.74
+  ],
+  [
+   "Ventresca de atún El Capricho 115 g",
+   6,
+   "Ventresca de atún claro en conserva",
+   17,
+   "Ventresca Atún 115grsx10 EL CAPRICHO (UD)",
+   136
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS",
+   1751.99
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. NUEVO MAGU)",
+   679.15
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. SENMAR)",
+   259.09
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. TAPILU)",
+   392.55
+  ],
+  [
+   "Twist green",
+   6,
+   "Twist green",
+   7,
+   "TWIST GREEN (80 U) -DOBLA-",
+   17.13
+  ],
+  [
+   "Sacos de carbón",
+   6,
+   "Carbón vegetal en saco",
+   11,
+   "Sacos de carbón",
+   2040
+  ],
+  [
+   "Alcachofa cortada congelada",
+   8,
+   "Alcachofa cortada congelada",
+   5,
+   "ALCACHOFA CORTADA MC 1KG",
+   5.19
+  ],
+  [
+   "Brócoli congelado 2,25 kg",
+   8,
+   "Brócoli congelado",
+   5,
+   "BROCOLI MC 2,25 KG",
+   7.44
+  ],
+  [
+   "Migas de atún en aceite vegetal 650 g",
+   6,
+   "Migas de atún en aceite",
+   17,
+   "Consorcio migas atún en aceite vegetal lata 650 gne (780 g)",
+   30.57
+  ],
+  [
+   "Edamame congelado",
+   8,
+   "Edamame congelado",
+   5,
+   "EDAMAME HABA MC 1KG",
+   40.57
+  ],
+  [
+   "Lana de madera para encendido 1 kg",
+   9,
+   "Lana de madera para encendido 1 kg",
+   11,
+   "LANA LEÑA ENCENDIDO 1KG MPRO",
+   33.75
+  ],
+  [
+   "Mango en cubos congelado",
+   8,
+   "Mango en cubos congelado",
+   5,
+   "MANGO EN CUBOS MC 1KG",
+   5.69
+  ],
+  [
+   "Edamame congelado",
+   8,
+   "Edamame congelado",
+   5,
+   "METRO Chef Greens Edamame haba 1Kg",
+   31.86
+  ],
+  [
+   "Guisantes congelados",
+   8,
+   "Guisantes congelados",
+   5,
+   "METRO Chef Guisantes 2,5Kg",
+   4.14
+  ],
+  [
+   "Mango en cubos congelado",
+   8,
+   "Mango en cubos congelado",
+   5,
+   "METRO Chef Mango en cubos 1Kg",
+   12.74
+  ],
+  [
+   "Mezcla de frutas del bosque congelada",
+   8,
+   "Mezcla de frutas del bosque congelada",
+   5,
+   "MIX FRUTAS DEL BOSQUE MC 1KG",
+   5.85
+  ],
+  [
+   "#341 Aceite de girasol alto oleico",
+   6,
+   "Descuento comercial",
+   11,
+   "Oferta Calendario adviento verano ACT GIRASOL AOLEICO MC 5L (225545)",
+   -0.95
+  ],
+  [
+   "#341 Aceite de girasol alto oleico",
+   6,
+   "Descuento comercial",
+   11,
+   "Oferta Calendario adviento verano ACT GIRASOL AOLEICO MC 5L (225545) 8,55€",
+   -0.95
+  ],
+  [
+   "Pastillas de encendido",
+   9,
+   "Pastillas de encendido",
+   11,
+   "PASTILLAS ENC 3X32 WHITE MPRO",
+   12.6
+  ],
+  [
+   "Pastillas de encendido",
+   9,
+   "Pastillas de encendido",
+   11,
+   "PASTILLAS ENCEN OUDORLESS 96UD",
+   5.9
+  ],
+  [
+   "Sucedáneo de caviar de mújol",
+   6,
+   "Sucedáneo de caviar de mújol",
+   17,
+   "SUCEDANEO CAVIAR MUJJOL 550G",
+   45.44
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. JUAREZ HERMANOS)",
+   599.62
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. MARUFINA)",
+   793.18
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. PACO Y CARMEN)",
+   177.41
+  ],
+  [
+   "Macruros",
+   17,
+   "Marisco variado de lonja",
+   18,
+   "MACRUROS (emb. ESTELA NOVA)",
+   84.65
+  ],
+  [
+   "Cabezas de alistado",
+   17,
+   "Cabezas de alistado",
+   18,
+   "CABEZA ALISTADO",
+   173.46
+  ],
+  [
+   "Cola de alistado",
+   17,
+   "Cola de alistado",
+   18,
+   "COLA ALISTADO 1 ANGOLA ( PEIX )",
+   120.35
+  ],
+  [
+   "Cola de alistado",
+   17,
+   "Cola de alistado",
+   18,
+   "COLA ALISTADO 14X1 PESCANOVA",
+   141.7
+  ],
+  [
+   "Licor de manzana sin alcohol Drols 1 L",
+   14,
+   "Licor de manzana sin alcohol Drols 1 l",
+   15,
+   "L.MANZANA DROLS S/A 1L C6",
+   16.92
+  ],
+  [
+   "Licor de mora sin alcohol Drols 1 L",
+   14,
+   "Licor de mora sin alcohol Drols 1 l",
+   15,
+   "L.MORA DROLS S/A 1L C6",
+   16.92
+  ],
+  [
+   "Cono suplemento porta chemi coreless",
+   9,
+   "Cono suplemento porta chemi coreless",
+   10,
+   "CONO SUPLEMENTO PORTA CHEMI CORELESS",
+   0
+  ],
+  [
+   "Dispensador de ambientador a pilas",
+   9,
+   "Dispensador de ambientador a pilas",
+   10,
+   "DISPENSADOR CARGAS BAJAS A PILAS",
+   0
+  ],
+  [
+   "Portarrollos Chemi blanco serie Dynamic",
+   9,
+   "Portarrollos Chemi blanco serie Dynamic",
+   10,
+   "PORTA CHEMI BLANCO SERIE DYNAMIC",
+   0
+  ]
+ ],
+ "gasto_fam": {
+  "4": 16143.76,
+  "5": 32486.43,
+  "6": 49287.62,
+  "7": 27154.62,
+  "8": 12330.65,
+  "9": 16411.91,
+  "10": 48249.67,
+  "11": 76774.74,
+  "12": 166971.69,
+  "13": 94579.58,
+  "14": 33307.56,
+  "15": 30770.92,
+  "16": 8044.92,
+  "17": 90863.69,
+  "18": 138900.8,
+  "19": 156405.38,
+  "20": 37823.78
+ },
+ "textos_fam": {
+  "4": 108,
+  "5": 388,
+  "6": 488,
+  "7": 149,
+  "8": 64,
+  "9": 165,
+  "10": 372,
+  "11": 917,
+  "12": 243,
+  "13": 21,
+  "14": 142,
+  "15": 61,
+  "16": 20,
+  "17": 203,
+  "18": 170,
+  "19": 180,
+  "20": 89
+ },
+ "prod_fam": {
+  "4": 62,
+  "5": 174,
+  "6": 301,
+  "7": 123,
+  "8": 59,
+  "9": 129,
+  "10": 345,
+  "11": 167,
+  "12": 198,
+  "13": 20,
+  "14": 121,
+  "15": 56,
+  "16": 20,
+  "17": 90,
+  "18": 61,
+  "19": 115,
+  "20": 62
+ }
+}

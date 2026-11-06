@@ -1,0 +1,48 @@
+{
+ "archivo": "R885.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TELEFÓNICA DE ESPAÑA, S.A.U.",
+ "cif": "A82018474",
+ "local": "casa_tomas",
+ "numero_documento": "FLJIN260000004918",
+ "fecha": "2026-04-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Mensualidad Movistar Plus+ Bar Fútbol (ZONA 2)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "mes",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 366.12,
+   "descuento_pct": null,
+   "total": 366.12,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 366.12,
+ "desglose_iva": [
+  {
+   "base": 366.12,
+   "pct": 21,
+   "cuota": 76.88
+  }
+ ],
+ "iva": 76.88,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 443.0,
+ "observaciones": "Cuota mensual de servicio de televisión para bar. Nº cliente 13064050 / 1. Titular MASIDE, C/ Santa María de la Cabeza 2 local 2.",
+ "alertas": [
+  "Cuota de IVA impresa 76,88 €; el 21% de 366,12 € da 76,89 €. Se deja lo impreso"
+ ]
+}

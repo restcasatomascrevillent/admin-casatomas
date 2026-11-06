@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  9
+ ],
+ "tipo": "factura",
+ "proveedor": "FERRANDO PEREZ ANTONIO",
+ "cif": "79100535Q",
+ "local": "casa_tomas",
+ "numero_documento": "51/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 9,
+   "nombre": "CEFALOPODOS",
+   "producto_ficha": null,
+   "cantidad": 0.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 31.05,
+   "iva_pct": 10,
+   "albaran_ref": "2691",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 31.05,
+ "desglose_iva": [
+  {
+   "base": 31.05,
+   "pct": 10,
+   "cuota": 3.11
+  }
+ ],
+ "iva": 3.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 34.16,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 159. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

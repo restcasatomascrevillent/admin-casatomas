@@ -1,0 +1,63 @@
+{
+ "archivo": "R1241.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Floristería Lucía (Inés Castelló Soriano)",
+ "cif": "74161401V",
+ "local": "casa_tomas",
+ "numero_documento": "032",
+ "fecha": "2026-07-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Centro flores con cinta Casa Tomás y trabajadores",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 90.0,
+   "descuento_pct": null,
+   "total": 90.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Centro flores con cinta de Tomás y Hugo",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 90.0,
+   "descuento_pct": null,
+   "total": 90.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 180.0,
+ "desglose_iva": [
+  {
+   "base": 180.0,
+   "pct": 10,
+   "cuota": 18.0
+  }
+ ],
+ "iva": 18.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 198.0,
+ "observaciones": "Pago por transferencia Banc Sabadell ES** **** **** **** **** 2706",
+ "alertas": []
+}

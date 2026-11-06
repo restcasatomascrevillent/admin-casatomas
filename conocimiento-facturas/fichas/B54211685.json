@@ -1,0 +1,65 @@
+{
+  "cif": "B54211685",
+  "nombre": "CREVI-GELATS, S.L.",
+  "nombres_impresos": ["CREVI-GELATS, S.L."],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R158.pdf", "R624.pdf", "R1010.pdf", "R1590.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán por factura); helado artesano, producto congelado",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["21/26", "1805/26"], "patron": "^\\d{1,4}/26$", "donde": "casilla NUMERO FACTURA, bajo la cabecera, junto al CIF del cliente" },
+    "fecha": "casilla FECHA arriba a la derecha, DD/MM/AAAA (la misma que FECHA VENCI.: pago contado)",
+    "albaranes": "línea 'Albarán Nº 15/26 de 14/01/2026' antes de las líneas; el albarán lleva otra numeración (9471/26) distinta de la factura"
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Descripción", "Lote", "Unidades", "Unidades2", "Precio U.", "Dto", "Importe"],
+    "cantidad_es": "cubetas de 6 L (la columna Unidades cuenta cubetas)",
+    "columna_peso": null,
+    "precio_es_por": "cubeta de 6 L",
+    "descuento_por_linea": { "existe": false, "columna": "Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "Entre la descripción y la cantidad hay una columna Lote (4 dígitos, p. ej. 5238, 6260): no es la cantidad ni el precio.",
+      "La cantidad viene con coma decimal '2,00'.",
+      "Número de factura corto tipo 21/26 y número de albarán tipo 15/26: no confundirlos.",
+      "Las cabeceras de la fila de totales están pegadas (TOTAL PREVIO DESCUENTO BASE IMPONIBLE % IVA IMPORTE IVA…): la fila de valores es 'base | base 10,00 | cuota | total'."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = unidades × precio U. (2,00 × 26,42 = 52,84)",
+    "base = suma de importes (no hay descuento)",
+    "total = base + 10 % IVA (56,10 + 5,61 = 61,71)"
+  ],
+
+  "guia_ocr": "Factura de Crevi-Gelats (helado artesano) a Maside 2011. Número de factura 'NN/26' en la casilla NUMERO FACTURA y fecha DD/MM/AAAA. Línea: código | descripción | lote (4 dígitos, ignorar como cantidad) | unidades (cubetas de 6 L, con coma decimal) | precio por cubeta | importe. Sin descuento ni recargo. IVA 10 % único; pie con base, 10,00, cuota y total. Pago contado. El albarán 'Albarán Nº x/26 de fecha' va antes de la línea y no es el número de factura.",
+
+  "productos": [
+    {
+      "nombre_impreso": "MANTECADO 6 L",
+      "nombre_normalizado": "Helado de mantecado, cubeta 6 L",
+      "familia": "helado",
+      "presentacion": "helado artesano congelado, granel en cubeta",
+      "formato": { "envase": "cubeta", "contenido": 6, "unidad_contenido": "L", "unidades_por_bulto": 1, "bulto": "cubeta" },
+      "unidad_factura": "cubeta",
+      "precio": { "min": 26.42, "max": 28.05, "por": "cubeta de 6 L", "ejemplos": [["2026-01-14", 26.42], ["2026-09-22", 28.05]] },
+      "iva_pct": 10,
+      "veces_visto": 14
+    }
+  ],
+
+  "dudas": [
+    "Un único producto en todas las facturas; el precio sube de 26,42 a 28,05 en el año.",
+    "No se sabe qué es la columna Unidades2 (vacía en todas las muestras).",
+    "Los PDF son de una sola factura: no hay agrupación mensual."
+  ]
+}

@@ -1,0 +1,98 @@
+{
+ "archivo": "R615.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "MAKRO DISTRIBUCION MAYORISTA, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0002/(2026)007145",
+ "fecha": "2026-05-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QSO ESCAMAS CURADO ARO 500G",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "bolsa",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.95,
+   "descuento_pct": null,
+   "total": 47.7,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FRAMBUESA MC TA 125G",
+   "producto_ficha": "Frambuesa tarrina 125 g",
+   "cantidad": 2.0,
+   "unidad": "tarrina",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.99,
+   "descuento_pct": null,
+   "total": 3.98,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CHERRY MC PT C-M 2,5KG",
+   "producto_ficha": "Tomate cherry caja 2,5 kg",
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.99,
+   "descuento_pct": null,
+   "total": 10.99,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "COMPRA MÁS PAGA MENOS",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -7.2,
+   "descuento_pct": null,
+   "total": -7.2,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 55.47,
+ "desglose_iva": [
+  {
+   "base": 55.47,
+   "pct": 4,
+   "cuota": 2.22
+  }
+ ],
+ "iva": 2.22,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 57.69,
+ "observaciones": "Ticket de compra cash & carry (Makro Elche), pagado con tarjeta. Pags. 2-2: cabecera, 'Fin de factura' y recibo del datafono, sin lineas. Descuentos de pie impresos como lineas negativas (COMPRA MAS PAGA MENOS / DESCUENTO VENTA PROACTIVA).",
+ "alertas": []
+}

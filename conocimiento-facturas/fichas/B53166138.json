@@ -1,0 +1,315 @@
+{
+  "cif": "B53166138",
+  "nombre": "EXCLUSIVAS DIALSE, S.L.",
+  "nombres_impresos": ["Exclusivas Dialse S.L", "DIALSE"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R172.pdf", "R671.pdf", "R991.pdf", "R319.pdf", "R1609.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fecha = último día del mes) que agrupa los albaranes del mes; cada albarán abre con su cabecera y sus líneas debajo",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": { "ejemplos": ["FV26 000550", "FV26 001271", "FV26 002802", "FV26 004348", "FV26 006612"], "patron": "^FV26 \\d{6}$", "donde": "fila bajo 'Fecha | Núm. factura | Cód. cliente | Descuentos | Dto. PP.', segunda casilla (junto a la fecha y al cód. cliente 3.961)" },
+    "fecha": "primera casilla de esa misma fila, DD/MM/AAAA (30/09/2026). No confundir con las fechas de cada albarán ni con el vencimiento del pie.",
+    "albaranes": "línea 'Albarán AV26 007697 con fecha 01-09-2026' (fecha con guiones) antes de sus líneas. Una factura trae de 4 a 6. Un albarán puede seguir en la página 2 sin repetir su cabecera."
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Descripción", "Cant", "Ud. (bulto)", "Ud.Ec.", "Precio", "Dto.", "Importe"],
+    "cantidad_es": "Dos cantidades: 'Cant Ud.' = bultos (1 C9 = 1 caja de 9; 1 Pz = 1 pieza; 6 U = 6 unidades) y 'Ud.Ec.' = unidades económicas que son las que se multiplican por el precio (9,000 U = 9 tarros; 3,509 Kg = peso real de la pieza).",
+    "columna_peso": "'Ud.Ec.' en Kg en las líneas de pieza/peso variable (quesos, bacón, lacón, lomo, jamón, mantequilla de 1 kg); '(KG)' al final de la descripción lo marca.",
+    "precio_es_por": "ud (tarro, lata, brik, bote) en las líneas de caja; kg en las líneas de pieza con '(KG)'. Siempre importe = Ud.Ec. × Precio",
+    "descuento_por_linea": { "existe": false, "columna": "Dto.", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10, 4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "no hay",
+    "cargos_y_descuentos_pie": ["Portes, Gastos e Imp. Dtos. siempre vacíos en las muestras", "'Descuentos' y 'Dto. PP.' de la cabecera vacíos"],
+    "trampas": [
+      "Los números salen con COMA decimal y PUNTO de millar (1.097,53; 6,930; 17,340). Cantidades con 2 o 3 decimales según la factura (9,00 U / 9,000 U).",
+      "Cada línea de producto lleva debajo 'LOTE: … CAD.: …' y a veces '(UD)' o '(KG)' en otra fila: es parte de la línea anterior, no un artículo. Esas fechas de caducidad no son fechas de factura.",
+      "Las descripciones largas se parten ('FRIMANCHA(' / 'KG)'; 'LABRADOR (UD' / ')'). Una línea suelta '(KG)' o '(UD)' al inicio de la página 2 cierra la línea del final de la página 1.",
+      "Aparecen devoluciones con cantidad e importe negativos (-1,000 C15 | -15,00 U | -40,95) y regularizaciones: un lomo se anula con -2 Pz / -4,575 Kg SIN precio ni importe y se vuelve a facturar con precio; la línea de texto 'DIF PRECIO ALB AV26 …' no tiene importe. En el cuadre cuentan solo las filas con importe.",
+      "El pie con base, IVA y total solo está en la ÚLTIMA página (la primera termina en 'CONTINÚA EN LA PÁGINA SIGUIENTE').",
+      "El pie tiene hasta dos tramos de IVA: 10 % (casi todo) y 4 % (quesos y mantequilla). Cada tramo trae su base y su cuota; el 'Bruto' es la suma de ambas bases.",
+      "El mismo artículo aparece varias veces en una factura con distinto lote: son líneas distintas, no duplicadas.",
+      "Cliente impreso: MASIDE 2011 SLU (B54583356), envío a CASA TOMAS."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = Ud.Ec. × precio (nunca Cant × precio en las líneas de caja: 1 C9 × 6,930 = 62,37 porque Ud.Ec. = 9)",
+    "bruto = suma de importes (con las devoluciones en negativo) = base 10 % + base 4 %",
+    "cuota = base × 10 % + base × 4 %",
+    "total = bruto + cuotas. Comprobado en R1609: 1.068,41 + 29,12 = 1.097,53; cuotas 106,84 + 1,16; total 1.205,53. En R319: 1.116,25 + 99,09; cuotas 111,63 + 3,96; total 1.330,93.",
+    "El tramo 4 % = quesos y mantequillas (R319: 21,47 + 21,46 + 20,76 + 35,40 = 99,09)"
+  ],
+
+  "guia_ocr": "Factura mensual con albaranes: 'Albarán AV26 … con fecha …' abre cada bloque. Por línea: Código | Descripción | Cant (1 C9 = caja de 9) | Ud.Ec. (9,000 U o Kg) | Precio | Importe; importe = Ud.Ec. × precio, no Cant × precio. Decimales con coma, millares con punto. Las filas 'LOTE: … CAD.: …', '(UD)' y '(KG)' pertenecen a la línea anterior; no son productos. Conserva cantidades y importes negativos (devoluciones). 'DIF PRECIO ALB…' no tiene importe. El pie (bruto, bases 10 % y 4 %, total) está solo en la última página. Número 'FV26 xxxxxx' y fecha junto al cód. cliente 3.961.",
+
+  "productos": [
+    {
+      "nombre_impreso": "Salmorreta Tarro GRANDE (380grsx9)x1 PAELLALIA",
+      "nombre_normalizado": "Salmorreta Paellalia tarro 380 g (caja 9)",
+      "familia": "conserva-salsa",
+      "presentacion": "envasada, tarro",
+      "formato": { "envase": "tarro", "contenido": 380, "unidad_contenido": "g", "unidades_por_bulto": 9, "bulto": "caja" },
+      "unidad_factura": "tarro (Ud.Ec.; la caja de 9 aparece en 'Cant')",
+      "precio": { "min": 6.93, "max": 6.93, "por": "ud", "ejemplos": [["2026-01-31", 6.93]] },
+      "iva_pct": 10,
+      "veces_visto": 30
+    },
+    {
+      "nombre_impreso": "Salmorreta Tarro (140grx15)x1 PAELLALIA (UD)",
+      "nombre_normalizado": "Salmorreta Paellalia tarro 140 g (caja 15)",
+      "familia": "conserva-salsa",
+      "presentacion": "envasada, tarro",
+      "formato": { "envase": "tarro", "contenido": 140, "unidad_contenido": "g", "unidades_por_bulto": 15, "bulto": "caja" },
+      "unidad_factura": "tarro",
+      "precio": { "min": 2.73, "max": 2.73, "por": "ud", "ejemplos": [["2026-01-31", 2.73]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Fondo de Pescado Lata (410grsx12)x1 PAELLALIA",
+      "nombre_normalizado": "Fondo de pescado Paellalia lata 410 g (caja 12)",
+      "familia": "conserva-caldo",
+      "presentacion": "envasado, lata",
+      "formato": { "envase": "lata", "contenido": 410, "unidad_contenido": "g", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "lata",
+      "precio": { "min": 4.31, "max": 4.31, "por": "ud", "ejemplos": [["2026-01-31", 4.31]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "Fondo de Montaña (410grsx12)x1 PAELLALIA (UD)",
+      "nombre_normalizado": "Fondo de montaña Paellalia 410 g (caja 12)",
+      "familia": "conserva-caldo",
+      "presentacion": "envasado",
+      "formato": { "envase": null, "contenido": 410, "unidad_contenido": "g", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 4.31, "max": 4.31, "por": "ud", "ejemplos": [["2026-01-31", 4.31]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Anchoa HANSA 14/16 filetes Acte G. x10 CAPRICHO",
+      "nombre_normalizado": "Anchoa Hansa 14/16 filetes en aceite El Capricho (caja 10)",
+      "familia": "conserva-pescado",
+      "presentacion": "conserva en aceite, filetes calibre 14/16",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 10, "bulto": "caja" },
+      "unidad_factura": "ud (1 C10 = 10 unidades)",
+      "precio": { "min": 17.34, "max": 17.34, "por": "ud", "ejemplos": [["2026-02-27", 17.34], ["2026-09-30", 17.34]] },
+      "iva_pct": 10,
+      "veces_visto": 17
+    },
+    {
+      "nombre_impreso": "Ventresca Atún 115grsx10 EL CAPRICHO (UD)",
+      "nombre_normalizado": "Ventresca de atún El Capricho 115 g (caja 10)",
+      "familia": "conserva-pescado",
+      "presentacion": "conserva",
+      "formato": { "envase": null, "contenido": 115, "unidad_contenido": "g", "unidades_por_bulto": 10, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 6.80, "max": 6.80, "por": "ud", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Boquerones en Vinagreta (1000Grs)x12 CORPA (UD)",
+      "nombre_normalizado": "Boquerones en vinagre Corpa 1 kg (caja 12)",
+      "familia": "conserva-pescado",
+      "presentacion": "en vinagre, envase de 1 kg",
+      "formato": { "envase": null, "contenido": 1000, "unidad_contenido": "g", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "envase de 1 kg (se factura suelto: Cant 1,000 U)",
+      "precio": { "min": 31.07, "max": 31.07, "por": "ud", "ejemplos": [["2026-02-27", 31.07]] },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "Tomate Asado y Pimiento (465grx12)x1 HORTAMED",
+      "nombre_normalizado": "Tomate asado y pimiento Hortamed 465 g (caja 12)",
+      "familia": "conserva-vegetal",
+      "presentacion": "conserva",
+      "formato": { "envase": null, "contenido": 465, "unidad_contenido": "g", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 3.64, "max": 3.64, "por": "ud", "ejemplos": [["2026-01-31", 3.64]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Tomate Rallado esp, tostadas (720mlx12)x1 LABRADOR (UD)",
+      "nombre_normalizado": "Tomate rallado para tostadas El Labrador 720 ml (caja 12)",
+      "familia": "conserva-vegetal",
+      "presentacion": "tomate rallado envasado",
+      "formato": { "envase": null, "contenido": 720, "unidad_contenido": "ml", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.28, "max": 2.28, "por": "ud", "ejemplos": [["2026-09-30", 2.28]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Tomate Asado Leña (720mlx12)x1 EL LABRADOR (UD)",
+      "nombre_normalizado": "Tomate asado a la leña El Labrador 720 ml (caja 12)",
+      "familia": "conserva-vegetal",
+      "presentacion": "tomate asado envasado",
+      "formato": { "envase": null, "contenido": 720, "unidad_contenido": "ml", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 2.28, "max": 2.28, "por": "ud", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Tomate Seco (370mlx6)x1 EL LABRADOR (UD)",
+      "nombre_normalizado": "Tomate seco El Labrador 370 ml (caja 6)",
+      "familia": "conserva-vegetal",
+      "presentacion": "tomate seco envasado",
+      "formato": { "envase": null, "contenido": 370, "unidad_contenido": "ml", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 4.59, "max": 4.59, "por": "ud", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Bacón Ahumado (3,5Kg)x3 FRIMANCHA (KG) / (4,2Kg)x3",
+      "nombre_normalizado": "Bacón ahumado Frimancha (pieza, peso variable)",
+      "familia": "charcutería",
+      "presentacion": "ahumado, pieza",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "kg (Cant 1,000 Pz; Ud.Ec. = kg reales, 2,43-3,72)",
+      "precio": { "min": 6.60, "max": 6.60, "por": "kg", "ejemplos": [["2026-09-30", 6.60]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "Lacón Cocido Ahumado Extra (6kg)x1 FRIMANCHA(KG)",
+      "nombre_normalizado": "Lacón cocido ahumado extra Frimancha (pieza 6 kg)",
+      "familia": "charcutería",
+      "presentacion": "cocido y ahumado, pieza",
+      "formato": { "envase": "pieza", "contenido": 6, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 6.97, "max": 6.97, "por": "kg", "ejemplos": [["2026-04-30", 6.97]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Lomo Adobado Extra Mtades (2kg)x6 RODRIGUEZ (KG)",
+      "nombre_normalizado": "Lomo adobado extra en mitades Rodríguez (pieza 2 kg aprox.)",
+      "familia": "charcutería",
+      "presentacion": "adobado, mitades",
+      "formato": { "envase": "pieza", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "kg (Cant en Pz, Ud.Ec. en kg)",
+      "precio": { "min": 6.90, "max": 6.90, "por": "kg", "ejemplos": [["2026-04-30", 6.90]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Lomo Adobado MITADES (2kg)x4 FRMANCHA (KG)",
+      "nombre_normalizado": "Lomo adobado en mitades Frimancha (pieza 2 kg aprox.)",
+      "familia": "charcutería",
+      "presentacion": "adobado, mitades",
+      "formato": { "envase": "pieza", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 6.90, "max": 6.90, "por": "kg", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Jamón Desh. V Gran Reserva ALTOS DE IBERIA",
+      "nombre_normalizado": "Jamón deshuesado Gran Reserva Altos de Iberia",
+      "familia": "charcutería",
+      "presentacion": "deshuesado, pieza",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg (Cant 1,000 Pz; 5,470 Kg)",
+      "precio": { "min": 12.81, "max": 12.81, "por": "kg", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Queso Semicurado Mez (3kg)x2 DIALSE (KG)",
+      "nombre_normalizado": "Queso semicurado mezcla Dialse (pieza 3 kg aprox.)",
+      "familia": "lácteo-queso",
+      "presentacion": "semicurado, pieza",
+      "formato": { "envase": "pieza", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 8.30, "max": 8.97, "por": "kg", "ejemplos": [["2026-02-27", 8.97], ["2026-09-30", 8.30]] },
+      "iva_pct": 4,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Queso Provolone Albiero Pieza 5kgx1 (KG) / (5,8kg)x1",
+      "nombre_normalizado": "Queso provolone Albiero (pieza 5-6 kg)",
+      "familia": "lácteo-queso",
+      "presentacion": "pieza entera, peso variable",
+      "formato": { "envase": "pieza", "contenido": 5.8, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 11.41, "max": 11.41, "por": "kg", "ejemplos": [["2026-01-31", 11.41]] },
+      "iva_pct": 4,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Queso Azul Redondo Paladin (2,6Kg)x2 (KG)",
+      "nombre_normalizado": "Queso azul redondo Paladín (pieza 2,6 kg)",
+      "familia": "lácteo-queso",
+      "presentacion": "azul, pieza redonda",
+      "formato": { "envase": "pieza", "contenido": 2.6, "unidad_contenido": "kg", "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 9.60, "max": 9.60, "por": "kg", "ejemplos": [["2026-02-27", 9.60]] },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Queso Rulo Cabra/Vaca Mont de France (UD)",
+      "nombre_normalizado": "Queso rulo cabra/vaca Mont de France",
+      "familia": "lácteo-queso",
+      "presentacion": "rulo, unidad",
+      "formato": { "envase": "rulo", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 2, "bulto": "caja" },
+      "unidad_factura": "ud (1 C2 = 2 uds)",
+      "precio": { "min": 10.38, "max": 10.38, "por": "ud", "ejemplos": [["2026-02-27", 10.38]] },
+      "iva_pct": 4,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "OLD-1684485 Queso de Untar Cubo 3kg (UD)",
+      "nombre_normalizado": "Queso de untar cubo 3 kg",
+      "familia": "lácteo-queso",
+      "presentacion": "untar, cubo",
+      "formato": { "envase": "cubo", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "cubo" },
+      "unidad_factura": "kg (Cant 1 Pz; Ud.Ec. 3,000 Kg)",
+      "precio": { "min": 6.90, "max": 6.90, "por": "kg", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Mantequilla Kerrygold CON sal (200grsx10)x1 (UD)",
+      "nombre_normalizado": "Mantequilla Kerrygold con sal 200 g (caja 10)",
+      "familia": "lácteo-mantequilla",
+      "presentacion": "con sal, pastilla",
+      "formato": { "envase": "pastilla", "contenido": 200, "unidad_contenido": "g", "unidades_por_bulto": 10, "bulto": "caja" },
+      "unidad_factura": "ud (1 C10 = 10 pastillas)",
+      "precio": { "min": 3.54, "max": 3.57, "por": "ud", "ejemplos": [["2026-02-27", 3.54], ["2026-06-30", 3.57]] },
+      "iva_pct": 4,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "Mantequilla Laiterie du Pont Morin (1Kg)x10 (KG)",
+      "nombre_normalizado": "Mantequilla Laiterie du Pont Morin 1 kg (caja 10)",
+      "familia": "lácteo-mantequilla",
+      "presentacion": "pan de 1 kg",
+      "formato": { "envase": "pan", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 10, "bulto": "caja" },
+      "unidad_factura": "kg (1 Pz = 1,000 Kg)",
+      "precio": { "min": 8.89, "max": 8.89, "por": "kg", "ejemplos": [["2026-06-30", 8.89]] },
+      "iva_pct": 4,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Anchoa Hansa, ventresca, boquerones y conservas de tomate: la descripción da cajas de N y el peso/volumen del envase, pero no dice si es lata, tarro o bote; envase queda null salvo en Salmorreta (tarro) y Fondo de pescado (lata). En la anchoa ni siquiera se sabe el contenido por unidad.",
+    "IVA no comprobado (iva_pct null) en ventresca, tomate seco, tomate asado leña, lomo mitades Frimancha, jamón y queso de untar porque salen solo en facturas no muestreadas; se deja por no inventar.",
+    "Queso de untar OLD-1684485: el prefijo OLD- parece un código descatalogado; solo una aparición.",
+    "En R671 hay líneas de lomo con kilos pero sin precio ni importe (la original y su anulación) y textos 'DIF PRECIO ALB…'; comprobado que el bruto 595,79 sale sumando solo las filas con importe (31,07+124,74+42,03+104,04+31,57+26,57+173,40+62,37).",
+    "Fondo de Montaña solo visto una vez (R172)."
+  ]
+}

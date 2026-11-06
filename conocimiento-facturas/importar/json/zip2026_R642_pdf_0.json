@@ -1,0 +1,82 @@
+{
+ "archivo": "R642.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ZAMBU HIGIENE, S.L.",
+ "cif": "B73056269",
+ "local": "casa_tomas",
+ "numero_documento": "FVA+26/030443",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AMBIENTADOR CARGA BAJA SPA AIR FRESHENER 250ml",
+   "producto_ficha": "Ambientador carga baja Spa Air Freshener 250 ml",
+   "cantidad": 6.0,
+   "unidad": "bote",
+   "bultos": 6,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "cl",
+   "precio_unitario": 4.3,
+   "descuento_pct": null,
+   "total": 25.8,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/041868",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud",
+   "producto_ficha": "Toallas secamanos zig-zag laminada 22x21 cm (paquete 180)",
+   "cantidad": 40.0,
+   "unidad": "paquete",
+   "bultos": 2,
+   "contenido_cantidad": 180,
+   "contenido_unidad": "ud",
+   "precio_unitario": 0.89,
+   "descuento_pct": null,
+   "total": 35.6,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/041868",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud",
+   "producto_ficha": "Toallas secamanos zig-zag laminada 22x21 cm (paquete 180)",
+   "cantidad": 40.0,
+   "unidad": "paquete",
+   "bultos": 2,
+   "contenido_cantidad": 180,
+   "contenido_unidad": "ud",
+   "precio_unitario": 0.95,
+   "descuento_pct": null,
+   "total": 37.88,
+   "iva_pct": 21,
+   "albaran_ref": "ALB+26/055182",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 99.28,
+ "desglose_iva": [
+  {
+   "base": 99.28,
+   "pct": 21,
+   "cuota": 20.85
+  }
+ ],
+ "iva": 20.85,
+ "recargo_equivalencia": 0.0,
+ "retencion_irpf": null,
+ "total": 120.13,
+ "observaciones": "Transferencia a 45 días (T.P. 4). Pie: base, IVA 21 %, recargo 0,00. Zambú avisa de que incluirá la contribución Ecoembes en una factura futura (aún no aparece). Albaranes: ALB+26/041868, ALB+26/055182. Líneas -100 % = regalo, importe 0,00.",
+ "alertas": [
+  "Línea «TOALLAS SECAMANOS ZIG-ZAG LAMINADA 22x21cm 180ud»: 40 × 0,95 = 38,00 pero el importe impreso es 37,88; se deja lo impreso (precio redondeado en la factura)."
+ ]
+}

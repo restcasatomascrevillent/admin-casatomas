@@ -1,0 +1,63 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  17
+ ],
+ "tipo": "factura",
+ "proveedor": "EMERGE ACTIVOS SL",
+ "cif": "B67939538",
+ "local": "casa_tomas",
+ "numero_documento": "527/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 17,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 3.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.1,
+   "descuento_pct": null,
+   "total": 83.52,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 17,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 0.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.54,
+   "descuento_pct": null,
+   "total": 33.98,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 117.5,
+ "desglose_iva": [
+  {
+   "base": 117.5,
+   "pct": 10,
+   "cuota": 11.75
+  }
+ ],
+ "iva": 11.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 129.25,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 16980, 18463.",
+ "alertas": []
+}

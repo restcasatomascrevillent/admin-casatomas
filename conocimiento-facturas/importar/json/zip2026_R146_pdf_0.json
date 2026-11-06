@@ -1,0 +1,48 @@
+{
+ "archivo": "R146.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA SELECCION - VINOS CALDERON S.L.U.",
+ "cif": "B53804522",
+ "local": "casa_tomas",
+ "numero_documento": "F26000032",
+ "fecha": "2026-01-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "M.MURRIETA RV MARQUES DE MURRIETA RVA 2021",
+   "producto_ficha": "Marqués de Murrieta Reserva 2021 75 cl",
+   "cantidad": 60,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 18.181,
+   "descuento_pct": null,
+   "total": 1090.908,
+   "iva_pct": 21,
+   "albaran_ref": "A26000074",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1090.91,
+ "desglose_iva": [
+  {
+   "base": 1090.91,
+   "pct": 21,
+   "cuota": 229.09
+  }
+ ],
+ "iva": 229.09,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1320.0,
+ "observaciones": "Forma de pago: 001 contado / domiciliación. Vencimiento 27/01/2026 (1.320,00). Lote 126105 ignorado. Contenido 75 cl tomado de la ficha (no impreso).",
+ "alertas": [
+  "Importe de línea impreso 1.090,908 (60 x 18,181 = 1.090,86): diferencia de redondeo de 0,05; se mantiene el impreso. Base 1.090,91 impresa en el pie."
+ ]
+}

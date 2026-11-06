@@ -1,0 +1,46 @@
+{
+ "archivo": "R1284.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ACEITES HACIENDA EL PALO, S.L.",
+ "cif": "B23532823",
+ "local": "casa_tomas",
+ "numero_documento": "0A/3219",
+ "fecha": "2026-08-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HACIENDA EL PALO PREMIUM 500ML (N)",
+   "producto_ficha": null,
+   "cantidad": 120.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "cl",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 1020.0,
+   "iva_pct": 4,
+   "albaran_ref": "0T-3219",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1020.0,
+ "desglose_iva": [
+  {
+   "base": 1020.0,
+   "pct": 4,
+   "cuota": 40.8
+  }
+ ],
+ "iva": 40.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1060.8,
+ "observaciones": "Forma de pago: contado. Portes incluidos. Lote 26BF029-1/08-5A (caducidad 08/2028). Albarán 0T-3219 de 10/08/2026. Cliente impreso: MASIDE 2011, SL (REST. CASA TOMAS). Código de artículo no incluido en el nombre.",
+ "alertas": []
+}

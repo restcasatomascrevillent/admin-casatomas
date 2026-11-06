@@ -1,0 +1,48 @@
+{
+ "archivo": "R593.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO CANDELA MURCIA (Maestro de obras)",
+ "cif": "20084418J",
+ "local": "casa_tomas",
+ "numero_documento": "59",
+ "fecha": "2026-04-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Trabajos realizados en sustituir losas de piso rotas en cocina y arreglo de pladur",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 693.0,
+   "descuento_pct": null,
+   "total": 693.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 693.0,
+ "desglose_iva": [
+  {
+   "base": 693.0,
+   "pct": 21,
+   "cuota": 145.53
+  }
+ ],
+ "iva": 145.53,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 838.53,
+ "observaciones": "Factura manuscrita a MASIDE 2011 S.L.U. IBAN ES** **** **** **** **** 9612. Se transparenta otra factura por el reverso.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

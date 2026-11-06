@@ -1,0 +1,63 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  9
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO ISABEL Y ANDRES,C.B.",
+ "cif": "E73170599",
+ "local": "casa_tomas",
+ "numero_documento": "41/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 9,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 13.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.2,
+   "descuento_pct": null,
+   "total": 82.17,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 9,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 3.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 106.29,
+   "descuento_pct": null,
+   "total": 361.37,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 443.54,
+ "desglose_iva": [
+  {
+   "base": 443.54,
+   "pct": 10.0,
+   "cuota": 44.35
+  }
+ ],
+ "iva": 44.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 487.89,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 870, 645, 299. Embarcaciones: ninguna.",
+ "alertas": []
+}

@@ -1,0 +1,80 @@
+{
+ "archivo": "R1443.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 5168",
+ "fecha": "2026-08-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA PELADA LUNA DE MAR",
+   "producto_ficha": "Quisquilla pelada Luna de Mar",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 80.0,
+   "iva_pct": 10,
+   "albaran_ref": "20269282",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. LUBINA X5 120/160",
+   "producto_ficha": "Lubina 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.75,
+   "descuento_pct": null,
+   "total": 68.75,
+   "iva_pct": 10,
+   "albaran_ref": "20269282",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "COLA GAMBON 1 6X2 T",
+   "producto_ficha": "Cola de gambón 1 (6 bolsas x 2 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 144.0,
+   "iva_pct": 10,
+   "albaran_ref": "20269282",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 292.75,
+ "desglose_iva": [
+  {
+   "base": 292.75,
+   "pct": 10,
+   "cuota": 29.28
+  }
+ ],
+ "iva": 29.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 322.03,
+ "observaciones": "Transferencia a 30 dias, vencimiento 27/09/2026. Albaran 20269282 de 25/08/2026, pedido 22420. Codigo impreso de la quisquilla: QPL. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

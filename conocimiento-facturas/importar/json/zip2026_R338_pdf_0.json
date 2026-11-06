@@ -1,0 +1,65 @@
+{
+ "archivo": "R338.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Antonio Miguel Rodriguez Perez (Alquileres El Redondo)",
+ "cif": "29016276M",
+ "local": "casa_tomas",
+ "numero_documento": "S15/2026",
+ "fecha": "2026-02-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PLATO TRINCHERO DECORADO",
+   "producto_ficha": null,
+   "cantidad": 450,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.3,
+   "descuento_pct": null,
+   "total": 135.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PLATO TRINCHERO DECORADO (faltas)",
+   "producto_ficha": null,
+   "cantidad": 4,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.96,
+   "descuento_pct": null,
+   "total": 15.84,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 150.84,
+ "desglose_iva": [
+  {
+   "base": 150.84,
+   "pct": 21,
+   "cuota": 31.68
+  }
+ ],
+ "iva": 31.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 182.52,
+ "observaciones": "Facturacion de faltas (platos no devueltos). Filas 'DIA 31 DE DICIEMBRE' y 'FALTAS' sin importe, no son productos",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

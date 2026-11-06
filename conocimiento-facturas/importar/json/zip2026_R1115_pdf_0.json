@@ -1,0 +1,140 @@
+{
+ "archivo": "R1115.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENCHENTA SLU",
+ "cif": "B94186988",
+ "local": "casa_tomas",
+ "numero_documento": "1-5326",
+ "fecha": "2026-07-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": 0,
+   "total": 26.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-109",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RAPE",
+   "producto_ficha": "Rape",
+   "cantidad": 4.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.0,
+   "descuento_pct": 0,
+   "total": 52.8,
+   "iva_pct": 10,
+   "albaran_ref": "3-109",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.7,
+   "descuento_pct": 0,
+   "total": 20.7,
+   "iva_pct": 21,
+   "albaran_ref": "3-109",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CABRACHO",
+   "producto_ficha": "Cabracho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": 0,
+   "total": 0.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-112",
+   "bonificada": true,
+   "precio_referencia": 33.0
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.0,
+   "descuento_pct": 0,
+   "total": 42.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-112",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.25,
+   "descuento_pct": 0,
+   "total": 18.25,
+   "iva_pct": 21,
+   "albaran_ref": "3-112",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 159.75,
+ "desglose_iva": [
+  {
+   "base": 120.8,
+   "pct": 10,
+   "cuota": 12.08
+  },
+  {
+   "base": 38.95,
+   "pct": 21,
+   "cuota": 8.18
+  }
+ ],
+ "iva": 20.26,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 180.01,
+ "observaciones": "Transferencia BBVA. Vencimiento igual a la fecha de la factura. Albaranes 3-109 y 3-112.",
+ "alertas": [
+  "CABRACHO 3,00 kg a 0,00 € (3-112): línea sin cargo, la marco como bonificada; la ficha dice que puede ser regalo o abono y que el precio real ronda 33 €. Confirmar.",
+  "Precio fuera del rango de la ficha: RAPE 11,00 € (rango 14–20,5)."
+ ]
+}

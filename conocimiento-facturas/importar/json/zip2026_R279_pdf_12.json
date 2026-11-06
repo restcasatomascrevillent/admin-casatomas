@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  13
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO PIANELO, ANTONIO",
+ "cif": "48322439Z",
+ "local": "casa_tomas",
+ "numero_documento": "106/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 13,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 1.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 67.68,
+   "iva_pct": 10,
+   "albaran_ref": "3521",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 67.68,
+ "desglose_iva": [
+  {
+   "base": 67.68,
+   "pct": 10,
+   "cuota": 6.77
+  }
+ ],
+ "iva": 6.77,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 74.45,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 530. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

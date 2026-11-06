@@ -1,0 +1,116 @@
+{
+ "archivo": "R411.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CRBY64, S.L. (By64 Cartas)",
+ "cif": "B75743229",
+ "local": "casa_tomas",
+ "numero_documento": "26050.C",
+ "fecha": "2026-03-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CARTA DOBLE A4 ALFA NEG RECOSIDO + BLOC 13 VISTAS PF",
+   "producto_ficha": null,
+   "cantidad": 8.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 50.15,
+   "descuento_pct": null,
+   "total": 401.2,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LOGO CLIENTE + LOGO \"COLECCIÓN DE VINOS\"",
+   "producto_ficha": null,
+   "cantidad": null,
+   "unidad": null,
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CARTA DOBLE A4 ALFA NEG RECOSIDO + BLOC 7 VISTAS PF",
+   "producto_ficha": null,
+   "cantidad": 8.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39.05,
+   "descuento_pct": null,
+   "total": 312.4,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "LOGO CLIENTE + LOGO \"CARTA\"",
+   "producto_ficha": null,
+   "cantidad": null,
+   "unidad": null,
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PORTACUENTAS ALFA NEG RECOSIDO DM 12X8",
+   "producto_ficha": null,
+   "cantidad": 10.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 713.6,
+ "desglose_iva": [
+  {
+   "base": 713.6,
+   "pct": 21,
+   "cuota": 149.86
+  }
+ ],
+ "iva": 149.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 863.46,
+ "observaciones": "Pedido 120421. Comercial M.Angel. Forma de pago: transferencia bancaria (cuenta no transcrita). Sin vencimiento impreso. Cliente impreso: RESTAURANTE CASA TOMAS, MASIDE 2011, SL.",
+ "alertas": [
+  "Las líneas de logo aparecen a 0,00 € y sin cantidad impresa; se registran como sin cargo (la base 713,60 cuadra así)."
+ ]
+}

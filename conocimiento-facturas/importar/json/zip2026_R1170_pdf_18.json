@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  19
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO CARRILLO, JOSE TOMAS",
+ "cif": "74386669T",
+ "local": "casa_tomas",
+ "numero_documento": "1.010/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 19,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 3.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.69,
+   "descuento_pct": null,
+   "total": 120.42,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 120.42,
+ "desglose_iva": [
+  {
+   "base": 120.42,
+   "pct": 10,
+   "cuota": 12.04
+  }
+ ],
+ "iva": 12.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 132.46,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 16620.",
+ "alertas": []
+}

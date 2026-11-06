@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  23
+ ],
+ "tipo": "factura",
+ "proveedor": "DORADO BONMATI, EMILIO MANUEL",
+ "cif": "48578223S",
+ "local": "casa_tomas",
+ "numero_documento": "65/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 23,
+   "nombre": "PERCIFORMES Y A. (emb. ANTOÑITA AGUADO)",
+   "producto_ficha": null,
+   "cantidad": 6.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 214.94,
+   "iva_pct": 10,
+   "albaran_ref": "3654, 2073",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 214.94,
+ "desglose_iva": [
+  {
+   "base": 214.94,
+   "pct": 10,
+   "cuota": 21.49
+  }
+ ],
+ "iva": 21.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 236.43,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 761. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

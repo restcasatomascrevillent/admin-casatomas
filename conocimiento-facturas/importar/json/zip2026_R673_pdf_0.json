@@ -1,0 +1,63 @@
+{
+ "archivo": "R673.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 2422",
+ "fecha": "2026-05-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLA GAMBON 1 6X2 T",
+   "producto_ficha": "Cola de gambón 1 (6 bolsas x 2 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 144.0,
+   "iva_pct": 10,
+   "albaran_ref": "20264250",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. LUBINA X5 120/160",
+   "producto_ficha": "Lubina 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 13.75,
+   "descuento_pct": null,
+   "total": 68.75,
+   "iva_pct": 10,
+   "albaran_ref": "20264250",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 212.75,
+ "desglose_iva": [
+  {
+   "base": 212.75,
+   "pct": 10,
+   "cuota": 21.28
+  }
+ ],
+ "iva": 21.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 234.03,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 07/06/2026, transferencia a 30 días. Albarán 20264250 del 05/05/2026, pedido 18753. Nota 'Baul' ignorada. La fila Total (2 cajas, 17,00 kg) no son euros.",
+ "alertas": []
+}

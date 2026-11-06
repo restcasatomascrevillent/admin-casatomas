@@ -1,0 +1,66 @@
+{
+ "archivo": "R463.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GLOBAL ECOVAC SL.",
+ "cif": "B75676957",
+ "local": "casa_tomas",
+ "numero_documento": "F260058",
+ "fecha": "2026-03-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Bolsas de vacío de 90 micras 150x200 (precio millar)",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "millar",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.75,
+   "descuento_pct": null,
+   "total": 123.0,
+   "iva_pct": 21,
+   "albaran_ref": "A260048",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Impuesto sobre envases de plástico no reutilizables (0,45 €/kg x 20 kg incluido en el precio)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A260048",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 123.0,
+ "desglose_iva": [
+  {
+   "base": 123.0,
+   "pct": 21,
+   "cuota": 25.83
+  }
+ ],
+ "iva": 25.83,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 148.83,
+ "observaciones": "Banco Sabadell ES** **** **** **** **** 4155; vencimiento 27/03/2026. En la columna TOTAL de la línea 1 se imprime 148,83 (con IVA), subtotal 123,00",
+ "alertas": [
+  "Total impreso en la línea 1 (148,83) incluye IVA; se anota el subtotal 123,00 como total de línea",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

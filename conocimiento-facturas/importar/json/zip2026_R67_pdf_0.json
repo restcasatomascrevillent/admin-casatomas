@@ -1,0 +1,46 @@
+{
+ "archivo": "R67.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170747736",
+ "fecha": "2026-01-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FRESON I 1K ES",
+   "producto_ficha": "Fresón (tarrina 1 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 5.0,
+   "descuento_pct": null,
+   "total": 15.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 15.0,
+ "desglose_iva": [
+  {
+   "base": 15.0,
+   "pct": 4,
+   "cuota": 0.6
+  }
+ ],
+ "iva": 0.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 15.6,
+ "observaciones": "Fecha entrega 23.01.2026, igual que la fecha de factura. Anotacion suelta '(CP)': no es producto. Total BT 3. Asterisco GLOBALG.A.P. quitado del nombre.",
+ "alertas": []
+}

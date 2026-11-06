@@ -1,0 +1,99 @@
+{
+ "archivo": "R1653.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "9441",
+ "fecha": "2026-10-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOMATE DANIELA",
+   "producto_ficha": "Tomate Daniela (sin calibre)",
+   "cantidad": 27.75,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.2,
+   "descuento_pct": null,
+   "total": 61.05,
+   "iva_pct": 4,
+   "albaran_ref": "A 7215/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TOMATE RAF",
+   "producto_ficha": "Tomate Raf",
+   "cantidad": 9.54,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 71.55,
+   "iva_pct": 4,
+   "albaran_ref": "A 7215/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LIMON FINO",
+   "producto_ficha": "Limón Fino",
+   "cantidad": 20.5,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.1,
+   "descuento_pct": null,
+   "total": 22.55,
+   "iva_pct": 4,
+   "albaran_ref": "A 7215/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PATATAS MINI 2,700KG",
+   "producto_ficha": "Patata mini (bolsa 2,7 kg)",
+   "cantidad": 5.4,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.4,
+   "descuento_pct": null,
+   "total": 18.36,
+   "iva_pct": 4,
+   "albaran_ref": "A 7215/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 173.51,
+ "desglose_iva": [
+  {
+   "base": 173.51,
+   "pct": 4,
+   "cuota": 6.94
+  }
+ ],
+ "iva": 6.94,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 180.45,
+ "observaciones": "Transferencia 30 días. Albarán A 7215/26 del 08/10/2026. Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

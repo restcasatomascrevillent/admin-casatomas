@@ -1,0 +1,99 @@
+{
+ "archivo": "R1370.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "4556",
+ "fecha": "2026-08-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": null,
+   "cantidad": 11.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.5,
+   "descuento_pct": null,
+   "total": 147.5,
+   "iva_pct": 10,
+   "albaran_ref": "12.720",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MEJILLONES",
+   "producto_ficha": "Mejillón gallego vivo, por kg",
+   "cantidad": 10,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 45,
+   "iva_pct": 10,
+   "albaran_ref": "12.720",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CAÑAILLA",
+   "producto_ficha": "Cañaílla (busano), por kg",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28,
+   "descuento_pct": null,
+   "total": 56,
+   "iva_pct": 10,
+   "albaran_ref": "12.720",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": null,
+   "cantidad": 8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.5,
+   "descuento_pct": null,
+   "total": 100,
+   "iva_pct": 10,
+   "albaran_ref": "12.801",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 348.5,
+ "desglose_iva": [
+  {
+   "base": 348.5,
+   "pct": 10,
+   "cuota": 34.85
+  }
+ ],
+ "iva": 34.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 383.35,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 24/08/2026 por 383.35. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": [
+  "BUEY (ref 122) sin nombre científico; la unidad no se imprime (se asume kg por el cuadre)."
+ ]
+}

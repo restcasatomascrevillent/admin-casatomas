@@ -1,0 +1,133 @@
+{
+ "archivo": "R1192.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CETAREA ANGEL MAR S.L.",
+ "cif": "B88665229",
+ "local": "casa_tomas",
+ "numero_documento": "260110",
+ "fecha": "2026-07-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "San Martiño 2 kg.",
+   "producto_ficha": "San Martín (pez de San Pedro)",
+   "cantidad": 9.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.8,
+   "descuento_pct": null,
+   "total": 289.06,
+   "iva_pct": 10,
+   "albaran_ref": "2600251",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Buey de mar hembra 0.9-1.4 kg.",
+   "producto_ficha": "Buey de mar hembra",
+   "cantidad": 5.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.1,
+   "descuento_pct": null,
+   "total": 135.72,
+   "iva_pct": 10,
+   "albaran_ref": "2600251",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Bonito del norte 6-8 kg.",
+   "producto_ficha": "Bonito del norte",
+   "cantidad": 15.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.9,
+   "descuento_pct": null,
+   "total": 151.47,
+   "iva_pct": 10,
+   "albaran_ref": "2600251",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Camaron Cocido Extra",
+   "producto_ficha": "Camarón cocido extra",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 94.0,
+   "descuento_pct": null,
+   "total": 188.0,
+   "iva_pct": 10,
+   "albaran_ref": "2600251",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "Necora Galega hembra G",
+   "producto_ficha": "Necora gallega hembra G",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.9,
+   "descuento_pct": null,
+   "total": 107.58,
+   "iva_pct": 10,
+   "albaran_ref": "2600251",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "Portes",
+   "producto_ficha": "Portes",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 79.0,
+   "descuento_pct": null,
+   "total": 79.0,
+   "iva_pct": 10,
+   "albaran_ref": "2600251",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 950.83,
+ "desglose_iva": [
+  {
+   "base": 950.83,
+   "pct": 10,
+   "cuota": 95.08
+  }
+ ],
+ "iva": 95.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1045.91,
+ "observaciones": "Forma de pago GIRO 30; vencimiento 24/08/2026. Un albarán: 2600251 (22-07-26).",
+ "alertas": [
+  "Portes de 79,00 € en el albarán 2600251: fuera del rango habitual de la ficha (33-69 €). Se extrae lo impreso."
+ ]
+}

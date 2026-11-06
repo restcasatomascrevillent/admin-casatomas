@@ -1,0 +1,65 @@
+{
+ "archivo": "R1623.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "LOGISTICA FRISECO, S.L.",
+ "cif": "B54787213",
+ "local": "casa_tomas",
+ "numero_documento": "26/0412",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOVIMIENTOS DE SALIDA (01/09/26)",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.1659,
+   "descuento_pct": null,
+   "total": 6.33,
+   "iva_pct": 21,
+   "albaran_ref": "570",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "POSICION FIJA PICKING CONGELADO (01/09/26)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.1528,
+   "descuento_pct": null,
+   "total": 2.15,
+   "iva_pct": 21,
+   "albaran_ref": "570",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 8.48,
+ "desglose_iva": [
+  {
+   "base": 8.48,
+   "pct": 21,
+   "cuota": 1.78
+  }
+ ],
+ "iva": 1.78,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 10.26,
+ "observaciones": "Giro 30 dias. Vencimiento 2026-10-30.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

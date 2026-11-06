@@ -1,0 +1,48 @@
+{
+ "archivo": "R1484.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "J CARBO (nombre según texto)",
+ "cif": "A79393179",
+ "local": "casa_tomas",
+ "numero_documento": "211201671",
+ "fecha": "2026-08-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOLLEJAS CORDERO NACIONAL -C- (art. 250098)",
+   "producto_ficha": null,
+   "cantidad": 9.94,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.5,
+   "descuento_pct": null,
+   "total": 263.41,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 263.41,
+ "desglose_iva": [
+  {
+   "base": 263.41,
+   "pct": 10,
+   "cuota": 26.34
+  }
+ ],
+ "iva": 26.34,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 289.75,
+ "observaciones": "Pedido 6976010, forma de pago RECIBO. Peso neto total 9,940 kg. Costes de subproductos no incluidos (Orden APA 1556/2002).",
+ "alertas": [
+  "El nombre del emisor no aparece en la cabecera; en el pie solo figura «J CARBO». El CIF se toma de la carpeta (A79393179). Revisar el PDF original."
+ ]
+}

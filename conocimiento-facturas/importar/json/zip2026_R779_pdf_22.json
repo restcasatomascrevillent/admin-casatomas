@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  23
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ MENDEZ, JUAN PEDRO",
+ "cif": "77715200V",
+ "local": "casa_tomas",
+ "numero_documento": "32/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 23,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.6,
+   "descuento_pct": null,
+   "total": 42.78,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 42.78,
+ "desglose_iva": [
+  {
+   "base": 42.78,
+   "pct": 10.0,
+   "cuota": 4.28
+  }
+ ],
+ "iva": 4.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 47.06,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 11164. Embarcaciones: CRISTINA.",
+ "alertas": []
+}

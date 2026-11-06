@@ -1,0 +1,46 @@
+{
+ "archivo": "R47.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260007",
+ "fecha": "2026-01-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PERCEBE",
+   "producto_ficha": "Percebe",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 110.0,
+   "descuento_pct": null,
+   "total": 165.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000007",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 165.0,
+ "desglose_iva": [
+  {
+   "base": 165.0,
+   "pct": 10,
+   "cuota": 16.5
+  }
+ ],
+ "iva": 16.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 181.5,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 07/01/2026 por 181,50. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": []
+}

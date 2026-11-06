@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  22
+ ],
+ "tipo": "factura",
+ "proveedor": "PUIGCERVER GOMEZ, MARIA PAZ",
+ "cif": "48320780B",
+ "local": "casa_tomas",
+ "numero_documento": "39/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 22,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.1,
+   "descuento_pct": null,
+   "total": 55.56,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 55.56,
+ "desglose_iva": [
+  {
+   "base": 55.56,
+   "pct": 10.0,
+   "cuota": 5.56
+  }
+ ],
+ "iva": 5.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 61.12,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 751. Embarcaciones: LERO.",
+ "alertas": []
+}

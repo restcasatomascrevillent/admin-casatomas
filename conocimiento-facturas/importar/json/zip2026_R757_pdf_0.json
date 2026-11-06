@@ -1,0 +1,65 @@
+{
+ "archivo": "R757.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0020275",
+ "fecha": "2026-05-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SOLOMILLO DE CERDO KG",
+   "producto_ficha": null,
+   "cantidad": 4.46,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.257,
+   "descuento_pct": null,
+   "total": 27.87,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SOLOMILLO DE CERDO KG",
+   "producto_ficha": null,
+   "cantidad": 3.98,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.257,
+   "descuento_pct": null,
+   "total": 24.9,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 52.77,
+ "desglose_iva": [
+  {
+   "base": 52.77,
+   "pct": 10,
+   "cuota": 5.28
+  }
+ ],
+ "iva": 5.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 58.05,
+ "observaciones": "DUPLICADO DE FACTURA (no es abono). Dos líneas mismo código 0007186, lote 61316. Crédito a 30 días, vencimiento 13-06-2026.",
+ "alertas": [
+  "Línea 1: 4,46 kg × 6,257 = 27,91 pero el impreso dice 27,87 (peso probablemente redondeado); se deja lo impreso y la suma 52,77 cuadra con el impreso."
+ ]
+}

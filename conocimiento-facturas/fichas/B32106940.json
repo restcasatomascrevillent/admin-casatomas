@@ -1,0 +1,124 @@
+{
+  "cif": "B32106940",
+  "nombre": "CONFITERÍA CERVIÑO, S.L.",
+  "nombres_impresos": ["CONFITERIA CERVIÑO S.L.", "Confiteria Cerviño S.L."],
+  "categoria": "panaderia",
+  "locales": ["casa_tomas"],
+  "muestras": ["R156.pdf", "R623.pdf", "R1025.pdf", "R1645.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["26/0000033", "26/0000186", "26/0000342", "26/0000469"], "patron": "^26/\\d{7}$", "donde": "cabecera 'Fecha | Forma de pago | Vencimiento | Agt. | Página | Número', última casilla: '26 / 0000342' (26 = año; el 1 anterior es la página)" },
+    "fecha": "primera casilla de esa cabecera, DD/MM/AAAA, fin de mes; Vencimiento = +30 días (RECIBO 30 DIAS)",
+    "albaranes": "antes de sus líneas: 'DD/MM/AAAA | Albarán: 482'. Tras la línea puede haber 'CONSUMO PREF MES AAAA' y 'LOTE nnnnnnnn'"
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Descripción", "Cant.", "Precio", "% Dto", "Total"],
+    "cantidad_es": "unidades sueltas (cañas, palmeras, bombas…), con 3 decimales; 'CAJA 400 CAÑAS' = 400 cañas, no 400 cajas",
+    "columna_peso": null,
+    "precio_es_por": "unidad (caña, palmera, bomba…)",
+    "descuento_por_linea": { "existe": true, "columna": "% Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "La cabecera mezcla en dos columnas al cliente (MASIDE 2011 / Barra Restaurante Casa Tomás, Santa María de la Cabeza, Crevillente) y al proveedor (Tomás Mosquera 38, O Carballiño): no confundir direcciones ni NIF",
+      "En 'CAJA 400 CAÑAS' la cantidad es 400,000 y el precio 0,480 por caña (192,00 la caja entera)",
+      "'LOTE 26042905' y 'CONSUMO PREF AGOSTO 2026' van en líneas sueltas debajo del artículo: no son cantidades ni artículos",
+      "El código 123 sirve para BOMBAS y BOMBAS CON CREMA (mismo precio 1,45)",
+      "Hay una línea CREMA (código 111) con cantidad 1 y precio 0,000: sin cargo",
+      "Los rótulos 'Neto' y 'Total' salen separados de sus cifras; la base y el IVA están en la fila 'Base | %IVA | Total IVA'"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total línea = cantidad x precio (400 x 0,480 = 192,00; 6 x 2,090 = 12,54)",
+    "Neto = suma de los totales de línea (413,94 = 192,00 + 192,00 + 12,54 + 17,40)",
+    "IVA = Neto x 10% (413,94 -> 41,39)",
+    "Total = Neto + IVA (204,88 + 20,49 = 225,37; 413,94 + 41,39 = 455,33)"
+  ],
+
+  "guia_ocr": "Factura mensual de confitería con albaranes. Número tras 'Número' como 26/0000342, fecha DD/MM/AAAA arriba a la izquierda. Cada albarán empieza con 'fecha | Albarán: nº'. Columnas Código | Descripción | Cant. | Precio | %Dto | Total, cantidad en unidades con 3 decimales (CAJA 400 CAÑAS = 400 cañas a 0,480 €). Ignora las líneas 'CONSUMO PREF…' y 'LOTE…'. IVA 10% sin recargo. Cliente = MASIDE 2011 (B54583356); no tomes la dirección de O Carballiño como cliente. Línea CREMA a 0,000 es gratis.",
+
+  "productos": [
+    {
+      "nombre_impreso": "G CAJA 400 CAÑAS",
+      "nombre_normalizado": "Cañas de repostería (caja de 400)",
+      "familia": "bollería-repostería",
+      "presentacion": "caña (hojaldre/masa) en caja de 400, precio por caña",
+      "formato": { "envase": "caña", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 400, "bulto": "caja" },
+      "unidad_factura": "caña (cantidad 400,000 = una caja)",
+      "precio": { "min": 0.48, "max": 0.48, "por": "caña", "ejemplos": [["2026-01-12", 0.48], ["2026-04-06", 0.48], ["2026-09-03", 0.48]] },
+      "iva_pct": 10,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "11 PALMERA CON CHOCO",
+      "nombre_normalizado": "Palmera con chocolate",
+      "familia": "bollería-repostería",
+      "presentacion": "pieza individual",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 2.09, "max": 2.09, "por": "unidad", "ejemplos": [["2026-04-30", 2.09], ["2026-06-30", 2.09]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "123 BOMBAS",
+      "nombre_normalizado": "Bombas",
+      "familia": "bollería-repostería",
+      "presentacion": "pieza individual",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 1.45, "max": 1.45, "por": "unidad", "ejemplos": [["2026-06-30", 1.45]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "123 BOMBAS CON CREMA",
+      "nombre_normalizado": "Bombas con crema",
+      "familia": "bollería-repostería",
+      "presentacion": "pieza individual rellena de crema",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 1.45, "max": 1.45, "por": "unidad", "ejemplos": [["2026-04-30", 1.45]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BOQ BOQUILLAS",
+      "nombre_normalizado": "Boquillas",
+      "familia": "bollería-repostería",
+      "presentacion": "pieza individual",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 2.89, "max": 2.89, "por": "unidad", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "111 CREMA",
+      "nombre_normalizado": "Crema (sin cargo)",
+      "familia": "otros",
+      "presentacion": "cantidad 1 a precio 0,000",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "unidad",
+      "precio": { "min": 0.0, "max": 0.0, "por": "unidad", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Qué significan 'Agt.' y la segunda cifra de 'Página' en la cabecera: se ha deducido que el número es 26/0000nnn y que la página es 1",
+    "Boquillas, azúcar de coco, queso semicurado y ravioli de verduritas solo salen en PDF sin texto de muestra: sin fecha, sin ejemplos de precio",
+    "Si BOMBAS y BOMBAS CON CREMA son artículos distintos (mismo código 123 y mismo precio)",
+    "Qué producto exacto es una 'caña' (hojaldre relleno o de masa): la factura no lo dice; el precio por unidad es 0,48 €"
+  ]
+}

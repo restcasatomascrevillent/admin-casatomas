@@ -1,0 +1,124 @@
+{
+ "archivo": "R1558.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Transgourmet Ibérica, S.A.U.",
+ "cif": "A17371758",
+ "local": "casa_tomas",
+ "numero_documento": "260041046015593",
+ "fecha": "2026-09-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Harina Quality esp. fritura 5K",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.77,
+   "descuento_pct": null,
+   "total": 5.77,
+   "iva_pct": 4,
+   "albaran_ref": "000277066",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Mermelada La V. Fábrica arand. 800g",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.19,
+   "descuento_pct": null,
+   "total": 6.19,
+   "iva_pct": 10,
+   "albaran_ref": "000277066",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Pimiento piq. Quality tira lata 1,9K",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.93,
+   "descuento_pct": null,
+   "total": 131.16,
+   "iva_pct": 10,
+   "albaran_ref": "000277066",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Beb. esp. 1715 1L 30º",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.75,
+   "descuento_pct": null,
+   "total": 6.75,
+   "iva_pct": 21,
+   "albaran_ref": "000277066",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "Ajo pelado bco. bol. 1K",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.49,
+   "descuento_pct": null,
+   "total": 12.98,
+   "iva_pct": 4,
+   "albaran_ref": "000277066",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 162.85,
+ "desglose_iva": [
+  {
+   "base": 18.75,
+   "pct": 4,
+   "cuota": 0.75
+  },
+  {
+   "base": 137.35,
+   "pct": 10,
+   "cuota": 13.74
+  },
+  {
+   "base": 6.75,
+   "pct": 21,
+   "cuota": 1.42
+  }
+ ],
+ "iva": 15.91,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 178.76,
+ "observaciones": "Albarán 000277066, cliente 2002989, vencimiento 24/09/2026",
+ "alertas": []
+}

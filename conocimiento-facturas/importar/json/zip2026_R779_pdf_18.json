@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  19
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SOLER MOLNA SL",
+ "cif": "B10669950",
+ "local": "casa_tomas",
+ "numero_documento": "728/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 19,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 117.88,
+   "descuento_pct": null,
+   "total": 294.71,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 294.71,
+ "desglose_iva": [
+  {
+   "base": 294.71,
+   "pct": 10.0,
+   "cuota": 29.47
+  }
+ ],
+ "iva": 29.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 324.18,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9454. Embarcaciones: PACO Y CARMEN.",
+ "alertas": []
+}

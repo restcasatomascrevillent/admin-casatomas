@@ -1,0 +1,48 @@
+{
+ "archivo": "R707.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "MAKRO DISTRIBUCION MAYORISTA, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0052/(2026)024531",
+ "fecha": "2026-05-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ZANAHORIA 2A ARO BL 10 KG",
+   "producto_ficha": null,
+   "cantidad": -1.0,
+   "unidad": "bolsa",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.41,
+   "descuento_pct": null,
+   "total": -9.41,
+   "iva_pct": 4,
+   "albaran_ref": "9-175766295",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -9.41,
+ "desglose_iva": [
+  {
+   "base": -9.41,
+   "pct": 4,
+   "cuota": -0.38
+  }
+ ],
+ "iva": -0.38,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -9.79,
+ "observaciones": "Factura de devolucion (abono) que rectifica la factura 0/0(063)0052/(2026)024504 de 12/05/2026 (pedido 9-175766295). Pago en entrega. Pag. 1 de 1.",
+ "alertas": [
+  "Abono (factura de devolucion): tipo no contemplado en la ficha; se extrae lo impreso, con importes negativos."
+ ]
+}

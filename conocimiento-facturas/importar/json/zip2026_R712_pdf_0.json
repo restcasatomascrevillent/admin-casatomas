@@ -1,0 +1,117 @@
+{
+ "archivo": "R712.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170763967",
+ "fecha": "2026-05-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 20K ES",
+   "producto_ficha": "Patata agria (saco 20 kg)",
+   "cantidad": 400.0,
+   "unidad": "kg",
+   "bultos": 20,
+   "contenido_cantidad": 20,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.7,
+   "descuento_pct": null,
+   "total": 280.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "(ENV)-AGUACATE 16 ORSERO 4K",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "bulto",
+   "bultos": 2,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 32.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FRESON I 1K ES",
+   "producto_ficha": "Fresón (tarrina 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.0,
+   "descuento_pct": null,
+   "total": 15.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MANGO KENT 12 I AVION NAO 5,5K MX",
+   "producto_ficha": "Mango Kent calibre 12 (caja 5,5 kg)",
+   "cantidad": 1,
+   "unidad": "bulto",
+   "bultos": 1,
+   "contenido_cantidad": 5.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 44.0,
+   "descuento_pct": null,
+   "total": 44.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 12.65,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.7,
+   "descuento_pct": null,
+   "total": 21.51,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 392.51,
+ "desglose_iva": [
+  {
+   "base": 392.51,
+   "pct": 4,
+   "cuota": 15.7
+  }
+ ],
+ "iva": 15.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 408.21,
+ "observaciones": "Entrega 15.05.2026. Líneas con GLOBALG.A.P. (asterisco quitado). Anotación (CP) ignorada. Cuadro de envases vacío. Total BT 29.",
+ "alertas": [
+  "(ENV)-AGUACATE 16 ORSERO 4K: calibre 16 Orsero no está en la ficha (solo hay calibres 14 y 12). Sin producto_ficha.",
+  "FRESON I 1K ES a 3,000 €/kg; la ficha tiene 4,5-6,5 €/kg."
+ ]
+}

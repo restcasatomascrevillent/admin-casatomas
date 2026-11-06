@@ -1,0 +1,82 @@
+{
+ "archivo": "R1496.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260558",
+ "fecha": "2026-09-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMEJA FINA",
+   "producto_ficha": "Almeja fina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 90.0,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000558",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000558",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.6,
+   "descuento_pct": null,
+   "total": 38.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000558",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 276.4,
+ "desglose_iva": [
+  {
+   "base": 276.4,
+   "pct": 10,
+   "cuota": 27.64
+  }
+ ],
+ "iva": 27.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 304.04,
+ "observaciones": "Albarán 1-000558 del 09/09/2026. Forma de pago: transferencia CaixaBank; vencimiento 09/09/2026 por 304,04. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "OSTRA a 1,60 €/ud; la ficha da 2,40-2,80 €/ud. Cuadra con cantidad x precio = total; revisar el precio."
+ ]
+}

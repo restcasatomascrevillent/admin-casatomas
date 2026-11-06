@@ -1,0 +1,46 @@
+{
+ "archivo": "R1568.pdf",
+ "paginas_pdf": [
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "GUTIERREZ GOMEZ, CARLOS",
+ "cif": "48572263N",
+ "local": "casa_tomas",
+ "numero_documento": "232/A",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 5,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.5,
+   "descuento_pct": null,
+   "total": 59.85,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 59.85,
+ "desglose_iva": [
+  {
+   "base": 59.85,
+   "pct": 10,
+   "cuota": 5.99
+  }
+ ],
+ "iva": 5.99,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 65.84,
+ "observaciones": "Periodo 01/09/2026 a 30/09/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 19115.",
+ "alertas": []
+}

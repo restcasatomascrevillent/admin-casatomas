@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  18
+ ],
+ "tipo": "factura",
+ "proveedor": "LA RANCHERA 2018 S.L.",
+ "cif": "B42573030",
+ "local": "casa_tomas",
+ "numero_documento": "237/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 18,
+   "nombre": "PLEURONECTIFORMES",
+   "producto_ficha": null,
+   "cantidad": 1.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 44.95,
+   "iva_pct": 10,
+   "albaran_ref": "2691",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 44.95,
+ "desglose_iva": [
+  {
+   "base": 44.95,
+   "pct": 10,
+   "cuota": 4.5
+  }
+ ],
+ "iva": 4.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 49.45,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 705. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

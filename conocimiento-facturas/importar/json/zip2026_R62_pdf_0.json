@@ -1,0 +1,63 @@
+{
+ "archivo": "R62.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26000135",
+ "fecha": "2026-01-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 13.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 158.4,
+   "iva_pct": 10,
+   "albaran_ref": "26100046",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 4.62,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 194.04,
+   "iva_pct": 10,
+   "albaran_ref": "26100046",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 352.44,
+ "desglose_iva": [
+  {
+   "base": 352.44,
+   "pct": 10,
+   "cuota": 35.24
+  }
+ ],
+ "iva": 35.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 387.68,
+ "observaciones": "Transferencia Banco Santander, vencimiento 08/02/2026. Albarán 26100046 de 05/01/2026.",
+ "alertas": []
+}

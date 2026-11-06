@@ -1,0 +1,80 @@
+{
+ "archivo": "R265.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "818",
+ "fecha": "2026-02-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GAMBA ROJA",
+   "producto_ficha": "Gamba roja, por kg",
+   "cantidad": 2.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 150,
+   "descuento_pct": null,
+   "total": 420,
+   "iva_pct": 10,
+   "albaran_ref": "1.893",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CAÑAILLA",
+   "producto_ficha": "Cañaílla (busano), por kg",
+   "cantidad": 3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27,
+   "descuento_pct": null,
+   "total": 81,
+   "iva_pct": 10,
+   "albaran_ref": "2.071",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LUBINA PLAYA",
+   "producto_ficha": null,
+   "cantidad": 3.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25,
+   "descuento_pct": null,
+   "total": 87.5,
+   "iva_pct": 10,
+   "albaran_ref": "2.088",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 588.5,
+ "desglose_iva": [
+  {
+   "base": 588.5,
+   "pct": 10,
+   "cuota": 58.85
+  }
+ ],
+ "iva": 58.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 647.35,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 23/02/2026 por 647.35. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

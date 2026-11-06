@@ -1,0 +1,97 @@
+{
+ "archivo": "R1327.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CETAREA ANGEL MAR S.L.",
+ "cif": "B88665229",
+ "local": "casa_tomas",
+ "numero_documento": "260182",
+ "fecha": "2026-08-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Buey de mar hembra 0.8-1kg.",
+   "producto_ficha": "Buey de mar hembra",
+   "cantidad": 7.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.9,
+   "descuento_pct": null,
+   "total": 212.51,
+   "iva_pct": 10,
+   "albaran_ref": "2600459",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Necora Galega hembra M",
+   "producto_ficha": "Necora gallega hembra M",
+   "cantidad": 3.85,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 49.8,
+   "descuento_pct": null,
+   "total": 191.73,
+   "iva_pct": 10,
+   "albaran_ref": "2600459",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Berberecho extra",
+   "producto_ficha": "Berberecho extra",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.9,
+   "descuento_pct": null,
+   "total": 131.6,
+   "iva_pct": 10,
+   "albaran_ref": "2600459",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Portes",
+   "producto_ficha": "Portes",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.0,
+   "descuento_pct": null,
+   "total": 33.0,
+   "iva_pct": 10,
+   "albaran_ref": "2600459",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 568.84,
+ "desglose_iva": [
+  {
+   "base": 568.84,
+   "pct": 10,
+   "cuota": 56.88
+  }
+ ],
+ "iva": 56.88,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 625.72,
+ "observaciones": "Forma de pago GIRO 30; vencimiento 07/09/2026. Un albarán: 2600459 (06-08-26).",
+ "alertas": []
+}

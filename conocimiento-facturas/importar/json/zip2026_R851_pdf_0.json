@@ -1,0 +1,116 @@
+{
+ "archivo": "R851.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "NOARA MEDITERRANEAN DISTILLERY, S.L.U.",
+ "cif": "B10600419",
+ "local": "casa_tomas",
+ "numero_documento": "FR26-00649",
+ "fecha": "2026-06-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CREMA ORUJO QUEMEIRA 0,70 LT. 15º",
+   "producto_ficha": null,
+   "cantidad": 48,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 5.96,
+   "descuento_pct": null,
+   "total": 286.08,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LICOR HIERBAS QUEMEIRA 0,70 LT. 25º",
+   "producto_ficha": null,
+   "cantidad": 48,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 5.96,
+   "descuento_pct": null,
+   "total": 286.08,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "AGUARDIENTE ORUJO QUEMEIRA 0,70 LT. 40º",
+   "producto_ficha": null,
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 7.278,
+   "descuento_pct": null,
+   "total": 43.67,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CREMA ORUJO QUEMEIRA 0,70 LT. 15º",
+   "producto_ficha": null,
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 1.006667,
+   "descuento_pct": null,
+   "total": 12.08,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PROMOCIÓN ESPECIAL",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.08,
+   "descuento_pct": null,
+   "total": -12.08,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 615.83,
+ "desglose_iva": [
+  {
+   "base": 615.83,
+   "pct": 21,
+   "cuota": 129.32
+  }
+ ],
+ "iva": 129.32,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 745.15,
+ "observaciones": "Pago por giro, vencimiento 18/07/2026 (745,15). Cliente 430090004. Pie: bases tarifa 470,84 + impuesto especial 157,07 = 627,91; total importes 615,83 (tras promoción). Servir a Barra Rte. Casa Tomás. | Impuesto especial 157.07 ya incluido en el precio de las líneas (no se suma aparte).",
+ "alertas": [
+  "El precio unitario por línea parece incluir el impuesto especial (suma de líneas 627,91 menos promoción 12,08 = 615,83). Pie imprime descuento 0,00 y bases 470,84 + II.EE. 157,07 = 627,91, no 615,83; el 'Promoción especial' de -12,08 anula la 4ª línea (12 botellas de crema regalo)."
+ ]
+}

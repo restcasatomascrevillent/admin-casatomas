@@ -1,0 +1,88 @@
+{
+ "archivo": "R1293.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Mª CARMEN VIROLA BALCERA",
+ "cif": "74174065P",
+ "local": "casa_tomas",
+ "numero_documento": "10",
+ "fecha": "2026-05-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Barras grandes",
+   "producto_ficha": null,
+   "cantidad": 172,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.58,
+   "descuento_pct": null,
+   "total": 99.76,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Bocadillos",
+   "producto_ficha": null,
+   "cantidad": 256,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.31,
+   "descuento_pct": null,
+   "total": 79.36,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Barras integrales",
+   "producto_ficha": null,
+   "cantidad": 86,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.52,
+   "descuento_pct": null,
+   "total": 44.72,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento 20% (sobre total con IVA)",
+   "importe": -46.56,
+   "iva_pct": null
+  }
+ ],
+ "subtotal": 223.84,
+ "desglose_iva": [
+  {
+   "base": 223.84,
+   "pct": 4,
+   "cuota": 8.95
+  }
+ ],
+ "iva": 8.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 186.23,
+ "observaciones": "Factura manuscrita a MASIDE 2011 S.L. (restaurante Casa Tomás). Periodo: 1 abril al 30 mayo 2026. Nota manual: Restaurante Tomás cerrado por descanso del lunes 13/04 al martes 21/04",
+ "alertas": [
+  "Descuento 20% sobre total con IVA; IVA 4% no impreso como cuota."
+ ]
+}

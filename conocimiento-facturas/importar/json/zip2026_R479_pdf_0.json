@@ -1,0 +1,80 @@
+{
+ "archivo": "R479.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PANADERIA GARCIA S.L.",
+ "cif": "B03354073",
+ "local": "casa_tomas",
+ "numero_documento": "0073",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PAN DE CRISTAL",
+   "producto_ficha": "Pan de cristal (barra, caja de 21)",
+   "cantidad": 315,
+   "unidad": "ud",
+   "bultos": 15,
+   "contenido_cantidad": 21,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.4,
+   "descuento_pct": null,
+   "total": 441.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BARRAS DE 1/2 KILO",
+   "producto_ficha": "Barra de pan de 1/2 kilo",
+   "cantidad": 0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 2.45,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PANES DE 1 KILO",
+   "producto_ficha": "Pan de 1 kilo",
+   "cantidad": 0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.38,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 441.0,
+ "desglose_iva": [
+  {
+   "base": 441.0,
+   "pct": 4,
+   "cuota": 17.64
+  }
+ ],
+ "iva": 17.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 458.64,
+ "observaciones": "Maqueta antigua. CANTIDAD = cajas (15), UNIDADES = barras (315 = 15 x 21), precio por barra. Filas de 1/2 kilo y 1 kilo con cantidad 0 e importe '-', incluidas con total 0. Etiqueta '10%' vacía en el pie; IVA 4%. Sin fecha de vencimiento impresa.",
+ "alertas": []
+}

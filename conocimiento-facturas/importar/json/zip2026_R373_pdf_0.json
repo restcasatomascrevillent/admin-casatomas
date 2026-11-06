@@ -1,0 +1,46 @@
+{
+ "archivo": "R373.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/4369",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHA.RUINART BRUT RESERVA 75CL 12,5º C6",
+   "producto_ficha": "Champagne Ruinart Brut Réserve 75 cl (caja 6)",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 47.5,
+   "descuento_pct": 0.0,
+   "total": 285.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/4.296",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 285.0,
+ "desglose_iva": [
+  {
+   "base": 285.0,
+   "pct": 21,
+   "cuota": 59.85
+  }
+ ],
+ "iva": 59.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 344.85,
+ "observaciones": "Giro/B2B, vencimiento 13/03/26. Albarán 26/4.296 (12/03/26). IVA por línea deducido de las bases impresas.",
+ "alertas": []
+}

@@ -1,0 +1,181 @@
+{
+ "archivo": "R739.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/002384",
+ "fecha": "2026-05-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG",
+   "producto_ficha": "Calamar patagonico limpio 9-12 cm (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.34,
+   "descuento_pct": null,
+   "total": 56.69,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CEBOLLA PERLA (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla perla (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.14,
+   "descuento_pct": null,
+   "total": 21.41,
+   "iva_pct": 4,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "HABA FINA PEQUEÑA (4X2,5KG) 10KG",
+   "producto_ficha": "Haba fina pequena (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.83,
+   "descuento_pct": null,
+   "total": 18.33,
+   "iva_pct": 4,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "POLLO MUSLO RELLENO CIRUELAS PIÑON (30x200G) 6KG",
+   "producto_ficha": "Muslo de pollo relleno de ciruelas y piñones (30x200 g)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 200,
+   "contenido_unidad": "g",
+   "precio_unitario": 8.26,
+   "descuento_pct": null,
+   "total": 49.54,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CERDO CHULETA CENTRO FIL. (180-220)G 10KG",
+   "producto_ficha": "Chuleta de cerdo centro filete 180-220 g (caja 10 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.36,
+   "descuento_pct": null,
+   "total": 43.6,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "CERDO SOLOMILLO HOST 6KG",
+   "producto_ficha": "Solomillo de cerdo (caja 6 kg)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.16,
+   "descuento_pct": null,
+   "total": 36.98,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 7,
+   "pagina": 1,
+   "nombre": "FLAMENQUIN AVE 47% 6 KG",
+   "producto_ficha": "Flamenquin de ave 47 % (caja 6 kg)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.08,
+   "descuento_pct": null,
+   "total": 18.49,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  },
+  {
+   "orden": 8,
+   "pagina": 1,
+   "nombre": "TRUFAS DE CHOCOLATE 50UD 750G",
+   "producto_ficha": "Trufas de chocolate (50 ud, 750 g)",
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 50,
+   "contenido_unidad": "ud",
+   "precio_unitario": 12.99,
+   "descuento_pct": null,
+   "total": 12.99,
+   "iva_pct": 10,
+   "albaran_ref": "LA/4953",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/4953)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 259.53,
+ "desglose_iva": [
+  {
+   "base": 218.29,
+   "pct": 10,
+   "cuota": 21.83
+  },
+  {
+   "base": 39.74,
+   "pct": 4,
+   "cuota": 1.59
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 23.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 283.27,
+ "observaciones": "Transferencia a 10 dias, vencimiento 26/05/2026. Albaran LA/4953 de 13/05/2026 (8 bultos, 54 kg). FTV-6912213 es una referencia del encabezado, no el numero de factura. La columna 'Dto. Clientes' del pie es la base del 4 %, no un descuento. Diferencias de 1-3 centimos entre cantidad x precio e importe en haba fina, pollo, solomillo y flamenquin: dentro de tolerancia, se deja lo impreso.",
+ "alertas": []
+}

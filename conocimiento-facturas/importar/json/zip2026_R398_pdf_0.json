@@ -1,0 +1,63 @@
+{
+ "archivo": "R398.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "D. PRIMERAS MARCAS, S.A.U.",
+ "cif": "A58172685",
+ "local": "casa_tomas",
+ "numero_documento": "FV26022433",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Ch.Giscours 2022 (cód. 782627)",
+   "producto_ficha": null,
+   "cantidad": 7.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 63.0,
+   "descuento_pct": null,
+   "total": 441.0,
+   "iva_pct": 21,
+   "albaran_ref": "AR2605115",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Moueix Ch.Pindefleurs 2022 (cód. 720877)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 0.75,
+   "contenido_unidad": "l",
+   "precio_unitario": 25.0,
+   "descuento_pct": null,
+   "total": 300.0,
+   "iva_pct": 21,
+   "albaran_ref": "AR2605115",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 741.0,
+ "desglose_iva": [
+  {
+   "base": 741.0,
+   "pct": 21,
+   "cuota": 155.61
+  }
+ ],
+ "iva": 155.61,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 896.61,
+ "observaciones": "Pedido PV2605197, albarán AR2605115 (20/02/26). Pago domiciliado, Banco Sabadell, vencimiento 30/03/2026 por 896,61 €. Impuesto punto verde 0,00.",
+ "alertas": []
+}

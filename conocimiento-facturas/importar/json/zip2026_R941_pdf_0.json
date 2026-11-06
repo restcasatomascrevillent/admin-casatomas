@@ -1,0 +1,87 @@
+{
+ "archivo": "R941.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0026148",
+ "fecha": "2026-06-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SECRETO CERDO VC POZO KG",
+   "producto_ficha": "Secreto de cerdo (Pozo)",
+   "cantidad": 8.32,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.25,
+   "descuento_pct": null,
+   "total": 43.66,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "AJO BLANCO PELADO 1 KG UNIDAD",
+   "producto_ficha": "Ajo blanco pelado 1 kg",
+   "cantidad": 4,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.6,
+   "descuento_pct": null,
+   "total": 18.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIMIENTO PIQUILLO TIRAS DON MOLINICO 1,9 KG",
+   "producto_ficha": "Pimiento piquillo en tiras Don Molinico 1,9 kg",
+   "cantidad": 11,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1.9,
+   "contenido_unidad": "kg",
+   "precio_unitario": 7.95,
+   "descuento_pct": null,
+   "total": 87.45,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 149.51,
+ "desglose_iva": [
+  {
+   "base": 18.4,
+   "pct": 4,
+   "cuota": 0.74
+  },
+  {
+   "base": 131.11,
+   "pct": 10,
+   "cuota": 13.11
+  }
+ ],
+ "iva": 13.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 163.36,
+ "observaciones": "Crédito a 30 días, vencimiento 19-07-2026. Secreto cerdo con dos líneas 'Lote' (61666) bajo una sola línea de importe. Columna Cajas muestra 8 en el secreto (no fiable en productos a peso).",
+ "alertas": [
+  "Secreto de cerdo: 8,32 kg × 5,25 = 43,68 pero impreso 43,66 (peso redondeado); se deja lo impreso, las bases cuadran con el pie."
+ ]
+}

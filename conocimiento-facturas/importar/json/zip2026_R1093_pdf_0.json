@@ -1,0 +1,46 @@
+{
+ "archivo": "R1093.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170772926",
+ "fecha": "2026-07-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA I 15K ES",
+   "producto_ficha": "Patata cat. I (saco 15 kg)",
+   "cantidad": 240.0,
+   "unidad": "kg",
+   "bultos": 16,
+   "contenido_cantidad": 15,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 192.0,
+ "desglose_iva": [
+  {
+   "base": 192.0,
+   "pct": 4,
+   "cuota": 7.68
+  }
+ ],
+ "iva": 7.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 199.68,
+ "observaciones": "Fecha entrega 20.07.2026. Referencia impresa 0809885264. Total BT 16. Línea «18.07.26» impresa bajo el total de bultos: no es producto.",
+ "alertas": []
+}

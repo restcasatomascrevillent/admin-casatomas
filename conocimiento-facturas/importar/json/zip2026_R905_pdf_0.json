@@ -1,0 +1,97 @@
+{
+ "archivo": "R905.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENOLÓGICA LA BOHEMIA, S.L.",
+ "cif": "B73380297",
+ "local": "casa_tomas",
+ "numero_documento": "M018487",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AALTO TINTO FINO 23 3/4x6b (trazab. AA23/01)",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 30.1,
+   "descuento_pct": null,
+   "total": 180.6,
+   "iva_pct": 21,
+   "albaran_ref": "2611449",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "AALTO PS TINTO FINO V.V. 23 1CMa.x3/4x3b (trazab. PS23/01)",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 69.5,
+   "descuento_pct": null,
+   "total": 417.0,
+   "iva_pct": 21,
+   "albaran_ref": "2611449",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "AALTO PS TINTO FINO V.V. 22 1EMa.x1,5x1b",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "cl",
+   "precio_unitario": 164.5,
+   "descuento_pct": null,
+   "total": 164.5,
+   "iva_pct": 21,
+   "albaran_ref": "2611449",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "AALTO TINTO FINO 22 1EMa.x MAGNUM x1b",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "cl",
+   "precio_unitario": 65.0,
+   "descuento_pct": null,
+   "total": 65.0,
+   "iva_pct": 21,
+   "albaran_ref": "2611449",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 827.1,
+ "desglose_iva": [
+  {
+   "base": 827.1,
+   "pct": 21,
+   "cuota": 173.69
+  }
+ ],
+ "iva": 173.69,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1000.79,
+ "observaciones": "Cliente 170204. Forma de pago: giro bancario. Albarán 2611449 (28/05/2026). Destinatario: CASA TOMAS RTE. / Crevillente.",
+ "alertas": []
+}

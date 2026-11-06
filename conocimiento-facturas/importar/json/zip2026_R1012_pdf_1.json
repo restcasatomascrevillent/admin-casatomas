@@ -1,0 +1,63 @@
+{
+ "archivo": "R1012.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 04821",
+ "fecha": "2026-06-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "TORT. CAMARON PREMIUM 30.UNI",
+   "producto_ficha": "Tortita de camarón premium (pack 30 uds)",
+   "cantidad": 90,
+   "unidad": "ud",
+   "bultos": 90,
+   "contenido_cantidad": 30,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 90.0,
+   "iva_pct": 10,
+   "albaran_ref": "F572515",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 2,
+   "nombre": "COLAS ALISTAO 1",
+   "producto_ficha": "Colas alistao 1",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 51.0,
+   "iva_pct": 10,
+   "albaran_ref": "F572515",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 141.0,
+ "desglose_iva": [
+  {
+   "base": 141.0,
+   "pct": 10,
+   "cuota": 14.1
+  }
+ ],
+ "iva": 14.1,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 155.1,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F572515. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

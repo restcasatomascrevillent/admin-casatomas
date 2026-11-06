@@ -1,0 +1,141 @@
+{
+ "archivo": "R1381.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "8375",
+ "fecha": "2026-08-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LIMON RODREJO",
+   "producto_ficha": "Limón Rodrejo",
+   "cantidad": 21.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 16.8,
+   "iva_pct": 4,
+   "albaran_ref": "A 6446/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "NARANJA VALENCIA LATE",
+   "producto_ficha": "Naranja Valencia Late",
+   "cantidad": 9.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.1,
+   "descuento_pct": null,
+   "total": 10.45,
+   "iva_pct": 4,
+   "albaran_ref": "A 6446/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PATATAS MINI 2,700KG",
+   "producto_ficha": "Patata mini (bolsa 2,7 kg)",
+   "cantidad": 10.8,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 2.7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.4,
+   "descuento_pct": null,
+   "total": 36.72,
+   "iva_pct": 4,
+   "albaran_ref": "A 6446/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "TOMATE BOLA",
+   "producto_ficha": "Tomate bola",
+   "cantidad": 28.5,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.3,
+   "descuento_pct": null,
+   "total": 37.05,
+   "iva_pct": 4,
+   "albaran_ref": "A 6446/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TOMATE DULCE II",
+   "producto_ficha": "Tomate dulce categoría II",
+   "cantidad": 15.06,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 240.96,
+   "iva_pct": 4,
+   "albaran_ref": "A 6446/26",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (-2 x 1,6500, devolución)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -3.3,
+   "descuento_pct": null,
+   "total": -3.3,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 338.68,
+ "desglose_iva": [
+  {
+   "base": 341.98,
+   "pct": 4,
+   "cuota": 13.68
+  },
+  {
+   "base": -3.3,
+   "pct": 21,
+   "cuota": -0.69
+  }
+ ],
+ "iva": 12.99,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 351.67,
+ "observaciones": "Transferencia 30 días. Albarán A 6446/26 del 28/08/2026. Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "TOMATE DULCE II a 16,00 €/kg; la ficha da 2,50-7,50 €/kg. Se deja lo impreso, revisar.",
+  "LIMON RODREJO a 0,80 €/kg; la ficha da 1,00-1,20 €/kg. Se deja lo impreso.",
+  "local tomado de la ficha (no impreso)"
+ ]
+}

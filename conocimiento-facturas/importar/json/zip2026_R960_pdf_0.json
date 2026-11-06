@@ -1,0 +1,117 @@
+{
+ "archivo": "R960.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "LOZAR TRATAMIENTOS DEL AGUA, S.L.U.",
+ "cif": "B53472122",
+ "local": "casa_tomas",
+ "numero_documento": "F26/0327",
+ "fecha": "2026-06-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DESPLAZAMIENTO TIEMPO + KM CREVILLENTE",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.89,
+   "descuento_pct": null,
+   "total": 20.89,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CARTUCHO DE SEDIMENTOS COMPACTO 69 MM 10\" 5 MC NSF",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.71,
+   "descuento_pct": null,
+   "total": 13.42,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CARTUCHO DE CARBON COMPACTO 69 MM DE 10\" 5 MC.",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.5,
+   "descuento_pct": null,
+   "total": 42.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "ANALISIS OSMOSIS DOMESTICA COMPLETO Y DESINFECCION",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.63,
+   "descuento_pct": null,
+   "total": 17.63,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA TECNICO JOSE ANTONIO",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 72.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 165.94,
+ "desglose_iva": [
+  {
+   "base": 165.94,
+   "pct": 21,
+   "cuota": 34.85
+  }
+ ],
+ "iva": 34.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 200.79,
+ "observaciones": "Orden de trabajo 4488. Mantenimiento de máquinas de ósmosis y descalcificador. Giro a 45 días f.f. Vencimiento 10/08/2026 (200,79 €). La columna «RETENCIÓN» del pie contiene la cuota de IVA (34,85), no hay retención IRPF. Destinatario impreso: MASIDE 2011, S.L. (sin marca Casa Tomás).",
+ "alertas": [
+  "Línea «MOBRA» de mano de obra de Tomás (12/06/2026) sin cantidad ni importe impresos; no se registra como línea (la base 165,94 cuadra sin ella).",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

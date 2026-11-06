@@ -1,0 +1,63 @@
+{
+ "archivo": "R541.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CENTRAL HISUMER, S.L.",
+ "cif": "B03927175",
+ "local": "casa_tomas",
+ "numero_documento": "A26/2600751",
+ "fecha": "2026-04-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHAMPAGNE CUVEE VICTOIRE MILLESIME 2005 SPECIAL BOTTLE 75CL 12%",
+   "producto_ficha": null,
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 53.32,
+   "descuento_pct": null,
+   "total": 319.92,
+   "iva_pct": 21,
+   "albaran_ref": "2600915",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CHAMPAGNE VICTOIRE BRUT CELEBRATION MILLESIME 2012 \"150 ANIVERSARIO\" 75CL 12%",
+   "producto_ficha": null,
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 46.15,
+   "descuento_pct": null,
+   "total": 276.9,
+   "iva_pct": 21,
+   "albaran_ref": "2600915",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 596.82,
+ "desglose_iva": [
+  {
+   "base": 596.82,
+   "pct": 21,
+   "cuota": 125.33
+  }
+ ],
+ "iva": 125.33,
+ "recargo_equivalencia": 0,
+ "retencion_irpf": null,
+ "total": 722.15,
+ "observaciones": "Aplicado precio neto de promoción 4+1. Transferencia 60 días FF; vencimiento 07/06/2026 722,15. Albarán 2600915 de 08/04/2026. Nº bultos 2.",
+ "alertas": []
+}

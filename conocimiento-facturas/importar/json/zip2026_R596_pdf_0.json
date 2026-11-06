@@ -1,0 +1,65 @@
+{
+ "archivo": "R596.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO INSULA ROMA S.L.",
+ "cif": "B73423998",
+ "local": "casa_tomas",
+ "numero_documento": "1-900389",
+ "fecha": "2026-04-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TEBAIDA 2023",
+   "producto_ficha": null,
+   "cantidad": 11,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.72,
+   "descuento_pct": null,
+   "total": 227.92,
+   "iva_pct": 21,
+   "albaran_ref": "1-712759",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TEBAIDA 2023",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.72,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-712759",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 227.92,
+ "desglose_iva": [
+  {
+   "base": 227.92,
+   "pct": 21,
+   "cuota": 47.86
+  }
+ ],
+ "iva": 47.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 275.78,
+ "observaciones": "Domiciliación 45 días, vencimiento 06/06/2026. Servir a Casa Tomás Crevillente.",
+ "alertas": [
+  "Dirección del emisor impresa: Madrid (Alcalá 209), distinta de la factura R435 (Murcia); IBAN distinto."
+ ]
+}

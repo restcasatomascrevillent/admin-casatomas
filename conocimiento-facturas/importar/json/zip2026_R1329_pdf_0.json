@@ -1,0 +1,46 @@
+{
+ "archivo": "R1329.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/16179",
+ "fecha": "2026-08-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "T.CLASE AZUL REPOSADO 70CL 40º C6",
+   "producto_ficha": "Tequila Clase Azul Reposado 70 cl (caja 6)",
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 152.0,
+   "descuento_pct": 0.0,
+   "total": 1824.0,
+   "iva_pct": 21,
+   "albaran_ref": "26/16.114",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1824.0,
+ "desglose_iva": [
+  {
+   "base": 1824.0,
+   "pct": 21,
+   "cuota": 383.04
+  }
+ ],
+ "iva": 383.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2207.04,
+ "observaciones": "Giro/B2B, vencimiento 15/08/26. Albarán 26/16.114 (12/08/26). IVA por línea deducido de las bases impresas.",
+ "alertas": []
+}

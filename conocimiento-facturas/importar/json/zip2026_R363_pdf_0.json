@@ -1,0 +1,83 @@
+{
+ "archivo": "R363.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260082",
+ "fecha": "2026-03-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LUBINA",
+   "producto_ficha": "Lubina",
+   "cantidad": 24.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 595.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000082",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LENGUADO 0.8/1KG",
+   "producto_ficha": "Lenguado de 0,8 a 1 kg la pieza",
+   "cantidad": 33.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 795.6,
+   "iva_pct": 10,
+   "albaran_ref": "1-000082",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LENGUADO 0.5/0.7KG",
+   "producto_ficha": null,
+   "cantidad": 36.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.0,
+   "descuento_pct": null,
+   "total": 775.95,
+   "iva_pct": 10,
+   "albaran_ref": "1-000082",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 2166.75,
+ "desglose_iva": [
+  {
+   "base": 2166.75,
+   "pct": 10,
+   "cuota": 216.68
+  }
+ ],
+ "iva": 216.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2383.43,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 02/03/2026 por 2.383,43. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": [
+  "LENGUADO 0.5/0.7KG no está en la ficha (el catálogo solo tiene 0.8/1KG); extraído tal cual con producto_ficha null. Pedir al dueño que lo añada a la ficha.",
+  "LUBINA a 24,00 €/kg; la ficha indica 26,50 €/kg."
+ ]
+}

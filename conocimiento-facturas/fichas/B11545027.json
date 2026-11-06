@@ -1,0 +1,61 @@
+{
+  "cif": "B11545027",
+  "nombre": "PRODUCTOS DE ALMADRABA, S.L.",
+  "nombres_impresos": ["PRODUCTOS DE ALMADRABA S.L.", "PRODUCTOS DE ALMADRABA, S.L."],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R64.pdf", "R689.pdf", "R786.pdf", "R1449.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega: un albarán por factura (ventresca de atún rojo de almadraba, Barbate)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["23A/26000513", "23A/26007044", "23A/26008868", "23A/26017473"], "patron": "^23A/26\\d{6}$", "donde": "fila DOCUMENTO | NÚMERO | PÁG. | FECHA, junto a la palabra 'Factura'" },
+    "fecha": "última columna de esa fila, DD/MM/AAAA (igual a la fecha del albarán)",
+    "albaranes": "'Albarán 26026306, Fecha: 25/08/2026' justo antes de las líneas"
+  },
+
+  "lectura": {
+    "columnas": ["Artículo", "Descripción", "Cantidad", "Precio", "% Dto.", "% IVA", "Importe"],
+    "cantidad_es": "kg con 4 decimales (26,8400 = 26,84 kg); en PORTES es 1",
+    "columna_peso": null,
+    "precio_es_por": "kg (€/kg)",
+    "descuento_por_linea": { "existe": true, "columna": "% Dto.", "valores_habituales": [0, 100] },
+    "iva_por_linea": true,
+    "tipos_iva": [10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [
+      "PORTES (V040): precio 14 a 33,82 € pero con 100 % de descuento, importe 0,00: se regalan",
+      "'Gest. residuos / Contribución SCRAP': líneas informativas de gestión de residuos de envase, cuota 0,00, no se cobran"
+    ],
+    "trampas": [
+      "Tras cada línea de producto hay una línea 'Gest. residuos:…' y otra '26,8400 Lote: CO200525': NO son productos ni cantidades nuevas (el número repetido es el kg del lote)",
+      "La línea PORTES parece cobrar 33,82 € pero su importe es 0,00 por el 100 % de descuento y por tanto el tipo 21 % no genera cuota",
+      "La cabecera del pie 'IMPORTE | DESCUENTO | PRONTO PAGO | TIPO | BASE | I.V.A. | R.E.' desalinea los valores: en la fila principal '1.288,32 | 10,00% | 1.288,32 | 128,83' el 10,00 % es el TIPO de IVA, no un descuento; la base es 1.288,32 y la cuota 128,83",
+      "El total aparece dos veces ('TOTAL | 1417.15' y en Vencimientos, a veces con punto decimal y sin €)"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = cantidad(kg) × precio × (1 − dto/100): 26,84 × 48,00 = 1.288,32; PORTES con dto 100 % = 0,00",
+    "base = suma de importes (solo la ventresca; portes 0)",
+    "IVA = base × 10 % (1.288,32 → 128,83; 446,25 → 44,63)",
+    "total = base + IVA (R1449: 1.417,15; R689: 490,88; R64: 1.239,74; R786: 575,58); sin R.E. ni retención"
+  ],
+
+  "guia_ocr": "Factura de Productos de Almadraba (atún rojo, Barbate). Columnas: Artículo | Descripción | Cantidad (kg, 4 decimales) | Precio €/kg | % Dto. | % IVA | Importe. Número 23A/26xxxxxx y fecha en la fila DOCUMENTO/NÚMERO/PÁG./FECHA. Hay una línea V040 PORTES con 100 % de descuento e importe 0,00: no suma. Ignora las líneas 'Gest. residuos', 'Contribución SCRAP' y 'Lote' (el kg repetido no es otra línea). En el pie el 10,00 % es el tipo de IVA, no un descuento. Total = base + 10 %.",
+
+  "productos": [
+    { "nombre_impreso": "C015 VENTRESCA ATÚN ROJO SALVAJE ALM. MÁX. CA", "nombre_normalizado": "Ventresca de atún rojo salvaje de almadraba (calidad máxima)", "familia": "pescado/atún", "presentacion": "ventresca de atún rojo salvaje; estado (fresco/congelado) no impreso", "formato": null, "unidad_factura": "kg", "precio": { "min": 48.0, "max": 48.0, "por": "kg", "ejemplos": [["2026-01-15", 48.0], ["2026-08-25", 48.0]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "F015 VENTRESCA ATUN ALMADRABA", "nombre_normalizado": "Ventresca de atún de almadraba", "familia": "pescado/atún", "presentacion": "ventresca de atún de almadraba; estado no impreso", "formato": null, "unidad_factura": "kg", "precio": { "min": 35.0, "max": 35.0, "por": "kg", "ejemplos": [["2026-05-05", 35.0], ["2026-05-28", 35.0]] }, "iva_pct": 10, "veces_visto": 5 },
+    { "nombre_impreso": "V040 PORTES", "nombre_normalizado": "Portes (gratuitos)", "familia": "cargo", "presentacion": "servicio", "formato": null, "unidad_factura": "servicio", "precio": { "min": 14.0, "max": 33.82, "por": "servicio (100 % dto, importe 0,00)", "ejemplos": [["2026-01-15", 25.0], ["2026-05-05", 18.0], ["2026-05-28", 14.0], ["2026-08-25", 33.82]] }, "iva_pct": 21, "veces_visto": 7 }
+  ],
+
+  "dudas": [
+    "No se sabe si la ventresca llega fresca o congelada: la factura solo dice 'ATÚN ROJO SALVAJE' o 'ATUN ALMADRABA'.",
+    "Dos artículos de ventresca (C015 a 48 €/kg 'salvaje máx. CA' y F015 a 35 €/kg) distintos en precio; no se sabe si es calidad o tipo de pesca.",
+    "Con tantos pocos PDF (7), el rango de precios es solo de dos precios fijos."
+  ]
+}

@@ -1,0 +1,98 @@
+{
+  "cif": "B54976311",
+  "nombre": "ILISAL LEVANTE, S.L.U. (Esclapez)",
+  "nombres_impresos": ["ILISAL LEVANTE, S.L.U.", "ESCLAPEZ", "SALES MARINAS Y MINERALES"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R94.pdf", "R277.pdf", "R558.pdf", "R869.pdf", "R1075.pdf", "R1513.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega, talonario preimpreso con TODO escrito a mano (escaneo, sin versión digital)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["R-214", "R-491", "R-886", "R-1285", "R-1490", "R-1855"],
+      "patron": "^R-?\\d{3,4}$",
+      "donde": "casilla 'FACTURA N.º' arriba a la derecha, escrita a mano con prefijo R- (secuencia creciente en el año)"
+    },
+    "fecha": "escrita a mano a la derecha del número, formato 'DD de <mes en letra> de 2026' (p. ej. '29 de Enero de 2026'). Pasar a DD/MM/AAAA",
+    "albaranes": "no hay albarán aparte: una sola entrega por factura"
+  },
+
+  "lectura": {
+    "columnas": ["CANTIDAD", "NÚM. LOTE", "CONCEPTO", "PRECIO", "IMPORTE"],
+    "cantidad_es": "sacos",
+    "columna_peso": null,
+    "precio_es_por": "saco",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "Todo va manuscrito: cantidades, concepto, precios, base, IVA y total; las cifras de la casilla de IVA y el total a veces se leen mal (7 y 1, 1 y 4).",
+      "Un solo tipo de IVA por factura: 21 % si es 'sal pastillas' y 10 % si es sal Tipo I o 'fomuta'; si hay varias líneas todas llevan el mismo IVA en la casilla.",
+      "El importe de línea y la base se escriben redondeados al euro o al céntimo (p. ej. 4 x 6,75 = 27); fiarse del IMPORTE escrito, no de recalcular con el precio leído.",
+      "La columna NÚM. LOTE es un número de 5-8 cifras que NO es cantidad ni precio.",
+      "El cliente se escribe a mano: 'Maride 2011 SL', NIF B-54583356 (grafías variables de MASIDE 2011, S.L.).",
+      "El IVA y el total son casillas aparte en el pie; el recuadro '% R.E.' va siempre vacío.",
+      "Los números de factura llevan prefijo 'R-' escrito a mano; no confundir con el nombre del PDF (Rxxx.pdf)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad x precio (escrito a mano, puede ir redondeado al euro)",
+    "base_imponible = suma de los importes de línea",
+    "cuota_iva = base x iva% (21 % o 10 %), redondeada a céntimos (p. ej. 14,75 x 10 % = 1,48; 33,75 x 10 % = 3,38)",
+    "total = base + cuota_iva (p. ej. 68 + 14,28 = 82,28; 39 + 3,90 = 42,90; 14,75 + 1,48 = 16,23)"
+  ],
+
+  "guia_ocr": "Escaneo de talonario Esclapez/Ilisal Levante (sal), TODO manuscrito. Número: casilla FACTURA N.º arriba derecha, con prefijo 'R-'. Fecha manuscrita DD de mes de 2026 junto al número. Columnas: CANTIDAD (sacos), NÚM. LOTE (no es cantidad), CONCEPTO, PRECIO (por saco), IMPORTE. Abajo: BASE IMPONIBLE, % I.V.A. con su importe y TOTAL EUROS; % R.E. vacío. IVA 21 % para sal pastillas, 10 % para sal Tipo I o fomuta. Cliente manuscrito: Maside 2011 SL (B54583356). El importe puede ir redondeado: copia el importe escrito.",
+
+  "productos": [
+    {
+      "nombre_impreso": "Saco sal pastillas 25 kg s/…",
+      "nombre_normalizado": "Sal en pastillas, saco 25 kg",
+      "familia": "sal",
+      "presentacion": "pastillas (sal prensada), envasada en saco",
+      "formato": { "envase": "saco", "contenido": 25, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": "saco" },
+      "unidad_factura": "saco",
+      "precio": { "min": 8.5, "max": 8.5, "por": "saco", "ejemplos": [["2026-01-29", 8.5], ["2026-02-26", 8.5], ["2026-04-21", 8.5]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Saco sal Tipo I",
+      "nombre_normalizado": "Sal Tipo I, saco",
+      "familia": "sal",
+      "presentacion": "envasada en saco",
+      "formato": { "envase": "saco", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": "saco" },
+      "unidad_factura": "saco",
+      "precio": { "min": 6, "max": 8, "por": "saco", "ejemplos": [["2026-07-07", 8], ["2026-09-11", 6]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Saco sal fomuta (grafía manuscrita dudosa)",
+      "nombre_normalizado": "Sal (variedad manuscrita 'fomuta'), saco",
+      "familia": "sal",
+      "presentacion": "envasada en saco",
+      "formato": { "envase": "saco", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": "saco" },
+      "unidad_factura": "saco",
+      "precio": { "min": 6.75, "max": 6.75, "por": "saco", "ejemplos": [["2026-06-09", 6.75], ["2026-07-07", 6.75], ["2026-09-11", 6.75]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    }
+  ],
+
+  "dudas": [
+    "Solo hay escaneos manuscritos: el nombre exacto de la tercera sal se lee 'fomuta/fonuta/pomuta' y no se puede confirmar.",
+    "La abreviatura tras '25 kg' en las sal pastillas ('s/imp…') no se lee con seguridad.",
+    "No se sabe el peso del saco de sal Tipo I ni del de 'fomuta' (solo se indica 25 kg en las pastillas).",
+    "En R1855 el precio de la 'fomuta' parece 6,71 pero el importe (27 por 4 sacos) implica 6,75.",
+    "El IVA 21 % en pastillas y 10 % en las otras sales sale de las muestras; se supone que las pastillas son de uso no alimentario (descalcificador/lavavajillas) pero no lo pone la factura.",
+    "Solo 6 de 14 PDF vistos; puede haber otros productos del proveedor (sal gorda, sal para piscina, etc.)."
+  ]
+}

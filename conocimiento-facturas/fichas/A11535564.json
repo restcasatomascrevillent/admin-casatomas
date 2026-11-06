@@ -1,0 +1,425 @@
+{
+  "cif": "A11535564",
+  "nombre": "GRUPO OSBORNE, S.A.",
+  "nombres_impresos": [
+    "GRUPO OSBORNE, S.A.",
+    "OSBORNE"
+  ],
+  "categoria": "charcuteria",
+  "locales": [
+    "casa_tomas"
+  ],
+  "muestras": [
+    "R88.pdf",
+    "R361.pdf",
+    "R1160.pdf",
+    "R1631.pdf"
+  ],
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán por factura, una sola línea de producto en las muestras)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": [
+        "90257812",
+        "90263281",
+        "90288913",
+        "90298800"
+      ],
+      "patron": "^9\\d{7}$",
+      "donde": "casilla Nº FACTURA arriba a la izquierda, fila bajo la cabecera 'Nº FACTURA | FECHA | FACTURA ORIGINAL | PÁGINA'"
+    },
+    "fecha": "casilla FECHA junto al número, DD/MM/AAAA. No confundir con FECHA ALBARÁN (anterior, a veces el mismo día) ni con VENCIMIENTO (+60 días)",
+    "albaranes": "fila 'ALBARÁN | FECHA ALBARÁN | PEDIDO' con nº de albarán de 8 dígitos (40xxxxxx) y nº de pedido (10xxxxxx); no es el nº de factura"
+  },
+  "lectura": {
+    "columnas": [
+      "NIF",
+      "CÓDIGO",
+      "DESCRIPCIÓN",
+      "CANTIDAD (n + unidad)",
+      "PESO/UNIDAD (n + unidad)",
+      "PRECIO (EUR/unidad)",
+      "TOTAL"
+    ],
+    "cantidad_es": "cajas (marca 'CA'; en el lomo 'UN' = unidades). Es el bulto de envío, NO el dato para el precio",
+    "columna_peso": "PESO/UNIDAD: la cantidad real que se cobra, con su unidad: PI = piezas (jamones/paletas/lomos enteros), KG = kilos (pesada real), UN = latas/unidades sueltas",
+    "precio_es_por": "la unidad que acompaña al precio: EUR/PI, EUR/KG o EUR/UN (casi siempre igual a la unidad de PESO/UNIDAD)",
+    "descuento_por_linea": {
+      "existe": false,
+      "columna": null,
+      "valores_habituales": []
+    },
+    "iva_por_linea": false,
+    "tipos_iva": [
+      10
+    ],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin líneas de envase; el aviso 'ENV/2023/000005622' es solo el registro de envases del proveedor",
+    "cargos_y_descuentos_pie": [
+      "TOTAL PUNTO VERDE (p. ej. 0,50 EUR, 0,66 EUR, 0,48 EUR, 1,49 EUR): informativo, NO se suma al total ni a la base",
+      "TOTAL IMPUESTOS ESPECIALES: vacío"
+    ],
+    "trampas": [
+      "Salvo el aviso legal, el texto vertical del margen izquierdo (S.A., Cádiz, OSBORNE, María, GRUPO de, Puerto, Santa, R.M.CADIZ, TOMO...) se cuela en la línea del producto: ignorarlo; el código es el número de 4-5 dígitos antes de la descripción",
+      "Para ventresca/mejillón/sardinilla/berberecho 'CANTIDAD' es el nº de cajas y PESO/UNIDAD las latas (UN): el total es latas × precio, no cajas × precio",
+      "Jamones y paletas a pieza (EUR/PI) o a peso (EUR/KG): mirar la unidad que sigue al precio",
+      "Descripciones largas se truncan ('Ventresca de Bonito en', 'Mejillones en Escabeche'): el formato de la lata no sale",
+      "Cliente impreso como MASIDE 2011, S.L. (ESB54583356) con 'BARRA CASA TOMAS'; el NIF A11535564 del proveedor aparece suelto en la cabecera de la tabla"
+    ]
+  },
+  "reglas_cuadre": [
+    "total_linea = cantidad_de_PESO/UNIDAD (PI, KG o UN) × precio. Ej.: 26,905 KG × 34,00 = 914,77; 24 UN × 23,30 = 559,20; 10 PI × 519,40 = 5.194,00",
+    "base = suma de las líneas (sin descuentos globales en las muestras)",
+    "IVA = base × 10 %; total = base + IVA. Ej.: 5.194,00 + 519,40 = 5.713,40; 914,77 + 91,48 = 1.006,25",
+    "El punto verde no entra en el total (5.194,00 + 519,40 = 5.713,40 ya sin él)",
+    "Número con miles en punto y decimales en coma (5.194,00); cantidades con 3 decimales (10,000); precio con 4 (519,4000)"
+  ],
+  "guia_ocr": "Factura de Grupo Osborne (jamón, paleta, lomo, conservas) para MASIDE 2011. Nº FACTURA y FECHA (DD/MM/AAAA) arriba izquierda; ALBARÁN es otro número. Línea: CÓDIGO | DESCRIPCIÓN | CANTIDAD (cajas, 'CA') | PESO/UNIDAD (n + PI piezas, KG kilos o UN latas) | PRECIO EUR/(PI|KG|UN) | TOTAL. Total = PESO/UNIDAD × precio, no cajas × precio. Una sola línea suele bastar. Ignora el texto vertical del margen (S.A., Cádiz, GRUPO de, R.M.CADIZ…) que se cuela en la línea. Un solo IVA del 10 %. 'TOTAL PUNTO VERDE' es informativo: no lo sumes. El total final está en la fila 'ORIGINAL'.",
+  "productos": [
+    {
+      "nombre_impreso": "Jamón Bellota 100% Ibérico 5J 9-10 kg N24",
+      "nombre_normalizado": "Jamón de bellota 100% ibérico 5J, pieza de 9-10 kg",
+      "familia": "charcutería - jamón",
+      "presentacion": "pieza entera con hueso, curado, bellota 100% ibérico",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "pieza (PI); 1 pieza por caja",
+      "precio": {
+        "min": 519.171,
+        "max": 519.4,
+        "por": "pieza",
+        "ejemplos": [
+          [
+            "2026-01-22",
+            519.4
+          ],
+          [
+            "2026-07-24",
+            519.171
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "Jamón Bellota 100% Ibérico 5J 7-8 kg N24",
+      "nombre_normalizado": "Jamón de bellota 100% ibérico 5J, pieza de 7-8 kg",
+      "familia": "charcutería - jamón",
+      "presentacion": "pieza entera con hueso, curado, bellota 100% ibérico, cobrado al peso",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg (PESO/UNIDAD en KG; CANTIDAD son cajas)",
+      "precio": {
+        "min": 54.7992,
+        "max": 54.7992,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "R1159",
+            54.7992
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Jamón Bellota 100% Iberico 5J 8-9 kg N24",
+      "nombre_normalizado": "Jamón de bellota 100% ibérico 5J, pieza de 8-9 kg",
+      "familia": "charcutería - jamón",
+      "presentacion": "pieza entera con hueso, curado, bellota 100% ibérico; se factura a pieza (EUR/PI) o a peso (EUR/KG) según el albarán",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "pieza o kg según la unidad impresa tras el precio",
+      "precio": {
+        "min": 54.7998,
+        "max": 466.714,
+        "por": "kg (54,80) o pieza (466,71)",
+        "ejemplos": [
+          [
+            "R1235",
+            54.7998
+          ],
+          [
+            "R1361",
+            466.714
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Jamon Bellota 100% Iberico SRC Tramo 7-8 kgs NP",
+      "nombre_normalizado": "Jamón de bellota 100% ibérico SRC, tramo 7-8 kg",
+      "familia": "charcutería - jamón",
+      "presentacion": "pieza entera con hueso, curado, bellota 100% ibérico, cobrado al peso",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg (PESO/UNIDAD en KG; 2 cajas = 16,100 kg, 4 cajas = 31,200 kg)",
+      "precio": {
+        "min": 45.0,
+        "max": 45.0,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-24",
+            45.0
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "Paleta Bellota 100% Ibérica 5J 5-6 kg",
+      "nombre_normalizado": "Paleta de bellota 100% ibérica 5J, pieza de 5-6 kg",
+      "familia": "charcutería - paleta",
+      "presentacion": "pieza entera con hueso, curada, bellota 100% ibérico",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "pieza (PI)",
+      "precio": {
+        "min": 171.05,
+        "max": 171.05,
+        "por": "pieza",
+        "ejemplos": [
+          [
+            "R129",
+            171.05
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Paleta Bellota 100% Ibérica 5J 5-6 kg N24",
+      "nombre_normalizado": "Paleta de bellota 100% ibérica 5J, pieza de 5-6 kg (cobrada al peso)",
+      "familia": "charcutería - paleta",
+      "presentacion": "pieza entera con hueso, curada, bellota 100% ibérico, cobrada al peso",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg (5,650 kg × 31,0991 = 175,71)",
+      "precio": {
+        "min": 31.0991,
+        "max": 31.0991,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "R1235",
+            31.0991
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Pluma Bellota 100% Iberica 5J",
+      "nombre_normalizado": "Pluma de bellota 100% ibérica 5J",
+      "familia": "carne - cerdo ibérico",
+      "presentacion": "corte fresco/envasado, cobrado al peso (6 cajas = 26,905 kg)",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg (PESO/UNIDAD en KG; CANTIDAD son cajas)",
+      "precio": {
+        "min": 34.0,
+        "max": 34.0,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-02",
+            34.0
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Lomo 100% Iberico 5J Reserva Caña de Lomo C/3",
+      "nombre_normalizado": "Caña de lomo 100% ibérico 5J Reserva (caja de 3)",
+      "familia": "charcutería - lomo",
+      "presentacion": "pieza entera curada; 3 piezas por caja",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 3,
+        "bulto": "caja"
+      },
+      "unidad_factura": "pieza (4 UN en CANTIDAD = 12 PI en PESO/UNIDAD; se factura por PI)",
+      "precio": {
+        "min": 58.6,
+        "max": 58.6,
+        "por": "pieza",
+        "ejemplos": [
+          [
+            "R1101",
+            58.6
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Real Conservera Española Berberechos al Natural",
+      "nombre_normalizado": "Berberechos al natural Real Conservera Española",
+      "familia": "conserva - marisco",
+      "presentacion": "en conserva, lata (formato de lata no impreso)",
+      "formato": {
+        "envase": "lata",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 12,
+        "bulto": "caja"
+      },
+      "unidad_factura": "lata (UN): 2 CA = 24 UN",
+      "precio": {
+        "min": 23.3,
+        "max": 23.3,
+        "por": "lata",
+        "ejemplos": [
+          [
+            "R932",
+            23.3
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Real Conservera Española Ventresca de Bonito en",
+      "nombre_normalizado": "Ventresca de bonito en aceite, Real Conservera Española",
+      "familia": "conserva - pescado",
+      "presentacion": "en conserva, lata; nombre truncado (probablemente en aceite)",
+      "formato": {
+        "envase": "lata",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 12,
+        "bulto": "caja"
+      },
+      "unidad_factura": "lata (UN): 5 CA = 60 UN, 3 CA = 36 UN",
+      "precio": {
+        "min": 10.55,
+        "max": 11.4,
+        "por": "lata",
+        "ejemplos": [
+          [
+            "R204",
+            10.55
+          ],
+          [
+            "R731",
+            11.4
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Real Conservera Española Sardinillas en A.O. 14/18",
+      "nombre_normalizado": "Sardinillas en aceite de oliva 14/18, Real Conservera Española",
+      "familia": "conserva - pescado",
+      "presentacion": "en conserva, lata, calibre 14/18 piezas",
+      "formato": {
+        "envase": "lata",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 12,
+        "bulto": "caja"
+      },
+      "unidad_factura": "lata (UN): 2 CA = 24 UN",
+      "precio": {
+        "min": 8.0,
+        "max": 8.0,
+        "por": "lata",
+        "ejemplos": [
+          [
+            "R731",
+            8.0
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Real Conservera Española Mejillones en Escabeche",
+      "nombre_normalizado": "Mejillones en escabeche, Real Conservera Española",
+      "familia": "conserva - marisco",
+      "presentacion": "en conserva (escabeche), lata",
+      "formato": {
+        "envase": "lata",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 12,
+        "bulto": "caja"
+      },
+      "unidad_factura": "lata (UN): 5 CA = 60 UN",
+      "precio": {
+        "min": 12.7,
+        "max": 12.7,
+        "por": "lata",
+        "ejemplos": [
+          [
+            "R1340",
+            12.7
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+  "dudas": [
+    "Osborne NO es proveedor de bebida: en las 26 facturas solo salen jamón, paleta, lomo, pluma y conservas Real Conservera Española. La categoría 'bebidas' del info.json parece mal asignada.",
+    "Cajas de conserva de 12 latas deducidas de CANTIDAD × latas (2 CA = 24 UN, 5 CA = 60 UN); la factura no lo dice. Peso/formato de la lata tampoco figura (nombre truncado).",
+    "Jamón de 7-8 y 8-9 kg: se factura unas veces por PI (pieza) y otras por KG; el precio por kg del jamón N24 (54,80) y SRC (45,00) es coherente con ~520 EUR por pieza de 9-10 kg.",
+    "Solo se han podido leer 4 muestras; los precios min/max salen de las líneas agrupadas del catálogo (un único ejemplo por artículo, sin fecha excepto los de las muestras).",
+    "Punto verde aparece en las 26 facturas pero no está en el total en las muestras; falta comprobar si alguna factura lo suma."
+  ]
+}

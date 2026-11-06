@@ -1,0 +1,266 @@
+{
+  "cif": "B54968045",
+  "nombre": "SERVICIOS HOSTELEROS DISBEYA, S.L.",
+  "nombres_impresos": ["SERVICIOS HOSTELEROS DISBEYA, S.L.", "DISBEYA"],
+  "categoria": "bebidas",
+  "locales": ["casa_tomas", "touza"],
+  "muestras": ["R164.pdf", "R666.pdf", "R1029.pdf", "R1216.pdf", "R1601.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa albaranes (solo escaneos, de cierre de mes). Casa Tomás: BARRA RESTAURANTE CASA TOMAS / MASIDE 2011 S.L. (B54583356), cliente 03393, ruta MMR1. Touza: TOUZA COCKTAIL BAR / MASIDE 2011, S.L., C/ Santa María de la Cabeza Nº 4, cliente 03397, ruta MXT. Forma de pago REPOSICION",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "2-5 hojas (HOJA Nº n/N). Las hojas llegan en ORDEN INVERSO en el PDF: la última hoja (con el pie de totales) es la página 1. La página tiene mucho espacio en blanco debajo de la tabla",
+    "numero_factura": {
+      "ejemplos": ["2026/000178", "2026/000827", "2026/001261", "2026/001512", "2026/001873"],
+      "patron": "^2026/\\d{6}$",
+      "donde": "casilla Nº FACTURA arriba a la izquierda, bajo el membrete"
+    },
+    "fecha": "casilla Fecha junto al número, DD/MM/AAAA: último día del mes (30/01, 30/04, 30/06, 31/07, 30/09/2026). No es la fecha de los albaranes",
+    "albaranes": "cabecera en negrita 'ALBARAN Nº : 2026/000152 DE FECHA : 22/01/2026' antes de sus líneas. Un albarán puede continuar en la hoja siguiente repitiendo su cabecera: son líneas distintas, no duplicados. A veces la cabecera queda sola al final de una hoja y las líneas empiezan en la siguiente"
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Cantidad", "Descripción", "Precio", "%IVA", "Dto", "TOTAL NETO"],
+    "cantidad_es": "cajas (la descripción termina en *24, *12 o *20 = botellas/unidades por caja). Los envases (código -E) se cuentan en cajas igual que el producto. NO son botellas",
+    "columna_peso": null,
+    "precio_es_por": "caja, a precio de lista, antes del descuento de la columna Dto",
+    "descuento_por_linea": {
+      "existe": true,
+      "columna": "Dto (porcentaje entero, sin signo %)",
+      "valores_habituales": [10, 17, 20, 29, 45]
+    },
+    "iva_por_linea": true,
+    "tipos_iva": [21, 10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "Líneas 'ENVASE …' con código acabado en -E (6200-E Coca-Cola 237 caja 24 a 4,80; 3150-E Coca-Cola 350 caja 24 a 7,50; 10511-E Lanjarón 1 L caja 12 a 5,47; 10504-E Lanjarón 0,50 L caja 20 a 5,95). Sin descuento. Cantidad positiva = envase cobrado; negativa = envase devuelto y abonado. IVA igual que su producto: 21 % Coca-Cola, 10 % Lanjarón",
+    "cargos_y_descuentos_pie": [
+      "Pie solo en la última hoja: IMPORTE BRUTO | Base Imponible por tipo (21,00 y 10,00) | Importe I.V.A. | % e Importe Rec. (vacíos) | TOTAL FACTURA",
+      "Sin punto verde, portes ni pronto pago en las muestras"
+    ],
+    "trampas": [
+      "El escáner tuerce la hoja: Precio, %IVA, Dto y TOTAL NETO quedan media fila por debajo de su artículo (en R1216 hoja 4/5 y R1601 hoja 3/5 se ve claro). Emparejar cada fila de números con su artículo comprobando cantidad × precio × (1 − Dto/100) = total neto",
+      "Los números del Dto aparecen en letra pequeña entre %IVA y TOTAL; las líneas ENVASE no tienen Dto",
+      "Redondeo: el total neto parece truncado en el céntimo (5 × 25,66 × 0,83 = 106,489 → 106,48; 2 × 19,89 × 0,55 = 21,879 → 21,87). Tolerar ±0,01",
+      "Cambios de precio durante el año: Lanjarón 1 L 5,42 → 5,63 y Lanjarón 0,50 L 5,31 (sin Dto) → 6,12 (Dto 10) entre julio y septiembre. No es un error",
+      "Las líneas ENVASE cambian de signo según se entreguen o devuelvan (10 cajas −52,50 y +75,00 en la misma factura)",
+      "Dos tipos de IVA: el agua Lanjarón y su envase al 10 %, el resto al 21 %. Las bases del pie se calculan por separado",
+      "Líneas con código 0 y precio 0,00 ('------------', 'RETIRADO ALB. MANUAL 29/7/26'): ignorar",
+      "Un albarán se reparte entre hojas: una hoja puede traer solo una línea ENVASE de su albarán",
+      "Las muestras escaneadas solo llegan a la hoja 3 o 4 de factura de 5 hojas: faltan hojas y la suma no cuadra con el bruto del pie (R164 tiene 949,46 en 3 hojas frente a 1.303,08 de bruto, falta la hoja 1/4)"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = cantidad × precio × (1 − dto/100), truncado/redondeado al céntimo (±0,01). En líneas ENVASE y sin Dto: cantidad × precio",
+    "IMPORTE BRUTO = suma de TOTAL NETO de todas las líneas de todas las hojas (productos + envases ±)",
+    "Base 21 % + Base 10 % = IMPORTE BRUTO (bases por separado; envase Lanjarón en la base del 10 %)",
+    "IVA = base_21 × 21 % + base_10 × 10 %; sin recargo de equivalencia",
+    "TOTAL FACTURA = bruto + IVA. Ejemplos reales: R666 539,54 + 391,14 = 930,68; IVA 113,30 + 39,11 = 152,41; total 1.083,09. R1601 1.165,53 + 740,25 = 1.905,78; IVA 244,76 + 74,03; total 2.224,57. R1029 (Touza) 532,98 + 111,93 = 644,91",
+    "Cuadre de hojas R666 comprobado: 276,36 (hoja 1) + 622,73 (hoja 2) + 31,59 (hoja 3) = 930,68"
+  ],
+
+  "guia_ocr": "Factura mensual de Disbeya a Casa Tomás o Touza que agrupa albaranes. Columnas: Código | Cantidad | Descripción | Precio | %IVA | Dto | Total neto. El escáner tuerce la hoja: precio, IVA, Dto y total quedan media fila por debajo del nombre; empareja cada fila con su artículo comprobando cantidad×precio×(1−Dto/100). Cantidad = cajas (*24, *12, *20); precio = por caja antes del Dto (10, 17, 20, 29 ó 45). Líneas ENVASE (código -E): sin Dto, cantidad negativa = devolución. IVA 10 % en Lanjarón y su envase; 21 % el resto. Hojas en orden inverso, totales solo en la última. Ignora líneas con código 0 (RETIRADO ALB. MANUAL). La cabecera de albarán repetida en la hoja siguiente no es un duplicado.",
+
+  "productos": [
+    {
+      "nombre_impreso": "LANJARON VIDRIO RET. 1 L. * 12",
+      "nombre_normalizado": "Lanjarón agua 1 L vidrio retornable (caja 12)",
+      "familia": "agua",
+      "presentacion": "botella de vidrio retornable",
+      "formato": { "envase": "botella", "contenido": 1, "unidad_contenido": "L", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 5.42, "max": 5.63, "por": "caja de 12 (lista), Dto 20 %", "ejemplos": [["2026-01-14", 5.42], ["2026-09-22", 5.63]] },
+      "iva_pct": 10,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "LANJARON VIDRIO RET. 0'50 L. * 20",
+      "nombre_normalizado": "Lanjarón agua 50 cl vidrio retornable (caja 20)",
+      "familia": "agua",
+      "presentacion": "botella de vidrio retornable",
+      "formato": { "envase": "botella", "contenido": 50, "unidad_contenido": "cl", "unidades_por_bulto": 20, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 5.31, "max": 6.12, "por": "caja de 20 (lista); sin Dto hasta julio (5,31), Dto 10 % en septiembre (6,12)", "ejemplos": [["2026-01-14", 5.31], ["2026-09-30", 6.12]] },
+      "iva_pct": 10,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "COCA COLA 350 CL. E.R. *24",
+      "nombre_normalizado": "Coca-Cola 35 cl retornable (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella de vidrio retornable (E.R.; cobra ENVASE 3150-E aparte)",
+      "formato": { "envase": "botella", "contenido": 35, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 29.49, "max": 29.49, "por": "caja de 24 (lista), Dto 29 %", "ejemplos": [["2026-01-22", 29.49], ["2026-09-24", 29.49]] },
+      "iva_pct": 21,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "COCA COLA ZERO 350 CL. E.R. *24",
+      "nombre_normalizado": "Coca-Cola Zero 35 cl retornable (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella de vidrio retornable (E.R.; envase 3150-E)",
+      "formato": { "envase": "botella", "contenido": 35, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 29.49, "max": 29.49, "por": "caja de 24 (lista), Dto 29 %", "ejemplos": [["2026-01-28", 29.49], ["2026-09-30", 29.49]] },
+      "iva_pct": 21,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "COCA COLA 237 CL. * 24",
+      "nombre_normalizado": "Coca-Cola 23,7 cl (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella de vidrio retornable (cobra ENVASE 6200-E aparte)",
+      "formato": { "envase": "botella", "contenido": 23.7, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 25.66, "max": 25.66, "por": "caja de 24 (lista), Dto 17 %", "ejemplos": [["2026-01-28", 25.66], ["2026-06-18", 25.66]] },
+      "iva_pct": 21,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "COCA COLA ZERO 237 CL. * 24",
+      "nombre_normalizado": "Coca-Cola Zero 23,7 cl (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella de vidrio retornable (envase 6200-E)",
+      "formato": { "envase": "botella", "contenido": 23.7, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 25.66, "max": 25.66, "por": "caja de 24 (lista), Dto 17 %", "ejemplos": [["2026-01-28", 25.66], ["2026-06-18", 25.66]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "FANTA LIMON 237 CL. * 24",
+      "nombre_normalizado": "Fanta limón 23,7 cl (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella de vidrio retornable (envase 6200-E)",
+      "formato": { "envase": "botella", "contenido": 23.7, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 25.66, "max": 25.66, "por": "caja de 24 (lista), Dto 17 %", "ejemplos": [["2026-01-08", 25.66], ["2026-06-25", 25.66]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "FANTA NARANJA 237 CL*24",
+      "nombre_normalizado": "Fanta naranja 23,7 cl (caja 24)",
+      "familia": "refresco",
+      "presentacion": "botella de vidrio retornable (envase 6200-E)",
+      "formato": { "envase": "botella", "contenido": 23.7, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 25.66, "max": 25.66, "por": "caja de 24 (lista), Dto 17 %", "ejemplos": [["2026-06-18", 25.66]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "FANTA NARANJA ZERO LATAS * 24",
+      "nombre_normalizado": "Fanta naranja zero lata (caja 24)",
+      "familia": "refresco",
+      "presentacion": "lata",
+      "formato": { "envase": "lata", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 14.82, "max": 14.82, "por": "caja de 24, sin Dto", "ejemplos": [["2026-01-08", 14.82]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AQUARIUS LIMON 300 CL. E.R.* 24",
+      "nombre_normalizado": "Aquarius limón 30 cl (caja 24)",
+      "familia": "refresco isotónico",
+      "presentacion": "botella (E.R.)",
+      "formato": { "envase": "botella", "contenido": 30, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 35.20, "max": 35.20, "por": "caja de 24 (lista), Dto 29 %", "ejemplos": [["2026-01-08", 35.20], ["2026-09-22", 35.20]] },
+      "iva_pct": 21,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "AQUARIUS NARANJA 300 CL. E.R. *24",
+      "nombre_normalizado": "Aquarius naranja 30 cl (caja 24)",
+      "familia": "refresco isotónico",
+      "presentacion": "botella (E.R.)",
+      "formato": { "envase": "botella", "contenido": 30, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 35.20, "max": 35.20, "por": "caja de 24 (lista), Dto 29 %", "ejemplos": [["2026-06-04", 35.20], ["2026-09-22", 35.20]] },
+      "iva_pct": 21,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "FUZE TEA LIMON 300 CL. E.R. *24",
+      "nombre_normalizado": "Fuze Tea limón 30 cl (caja 24)",
+      "familia": "té frío",
+      "presentacion": "botella (E.R.)",
+      "formato": { "envase": "botella", "contenido": 30, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 33.10, "max": 33.10, "por": "caja de 24 (lista), Dto 29 %", "ejemplos": [["2026-01-08", 33.10], ["2026-09-30", 33.10]] },
+      "iva_pct": 21,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "ZUMO PIÑA TUAREG 200CL. 24 UNID*1",
+      "nombre_normalizado": "Zumo de piña Tuareg 20 cl (caja 24)",
+      "familia": "zumo",
+      "presentacion": "envase individual (sin determinar si brik o botella)",
+      "formato": { "envase": null, "contenido": 20, "unidad_contenido": "cl", "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 19.89, "max": 19.89, "por": "caja de 24 (lista), Dto 45 %", "ejemplos": [["2026-06-25", 19.89]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ENVASE COCA COLA 237 CL.* 24",
+      "nombre_normalizado": "Envase (depósito) caja Coca-Cola/Fanta 23,7 cl 24",
+      "familia": "envase",
+      "presentacion": "depósito de caja con botellas; + cobrado, − devuelto. Común a Coca-Cola, Zero y Fanta de 237",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 4.80, "max": 4.80, "por": "caja", "ejemplos": [["2026-01-22", 4.80], ["2026-06-18", 4.80]] },
+      "iva_pct": 21,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "ENVASE COCA COLA 350 CL. *24",
+      "nombre_normalizado": "Envase (depósito) caja Coca-Cola 35 cl 24",
+      "familia": "envase",
+      "presentacion": "depósito de caja con botellas; + cobrado, − devuelto. Común a Coca-Cola y Zero de 350",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 7.50, "max": 7.50, "por": "caja", "ejemplos": [["2026-01-08", 7.50], ["2026-09-30", 7.50]] },
+      "iva_pct": 21,
+      "veces_visto": 16
+    },
+    {
+      "nombre_impreso": "ENVASE LANJARON VIDRIO 1 L.* 12",
+      "nombre_normalizado": "Envase (depósito) caja Lanjarón 1 L 12",
+      "familia": "envase",
+      "presentacion": "depósito de caja con botellas; + cobrado, − devuelto",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 5.47, "max": 5.47, "por": "caja", "ejemplos": [["2026-01-14", 5.47], ["2026-09-30", 5.47]] },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "ENVASE LANJARON 0'50 L. * 20",
+      "nombre_normalizado": "Envase (depósito) caja Lanjarón 50 cl 20",
+      "familia": "envase",
+      "presentacion": "depósito de caja con botellas; + cobrado, − devuelto",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 20, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 5.95, "max": 5.95, "por": "caja", "ejemplos": [["2026-01-14", 5.95], ["2026-09-30", 5.95]] },
+      "iva_pct": 10,
+      "veces_visto": 8
+    }
+  ],
+
+  "dudas": [
+    "El proveedor tiene 19 PDF solo escaneados; no hay PDF digitales, así que el catálogo sale de las 5 muestras y solo de las hojas visibles (las muestras muestran como mucho las 3 últimas hojas: faltan p. ej. las hojas 1/4 de R164 y 1-2/5 de R1216 y R1601). Pueden existir artículos no vistos; veces_visto es aproximado y solo de esas hojas",
+    "No se han visto barriles ni líneas de barril en las muestras de Disbeya (sí en Catral)",
+    "Contenidos: la factura imprime '350 CL', '237 CL', '300 CL' y '200CL'; se interpretan como 35 cl, 23,7 cl, 30 cl y 20 cl (escala de décimas de cl del proveedor). Coincide con 'LANJARON 0'50 L' = 50 cl y 1 L",
+    "E.R. se interpreta como envase retornable, pero los Aquarius y Fuze Tea 'E.R.' no tienen línea ENVASE propia en las muestras: no se sabe si son retornables o PET",
+    "ZUMO PIÑA TUAREG '200CL. 24 UNID*1': no se sabe si es brik o botella de 20 cl; solo aparece una vez (Touza, R1029)",
+    "FANTA NARANJA ZERO LATAS: no consta el contenido de la lata (se supone 33 cl, no confirmado)",
+    "Las líneas ENVASE se detectan por el código -E, pero no se ve si en la factura aparecen para toda botella retornable: se asume que cada caja 237/350/Lanjarón retornable lleva su envase y se abona con cantidad negativa al devolverla",
+    "Lanjarón 0,50 L en septiembre pasa a 6,12 con Dto 10 % (antes 5,31 sin Dto): precio y descuento confirmados en R1601, pero faltan datos de agosto para saber cuándo cambió",
+    "R1029 (Touza) es la única factura de Touza en las muestras (cliente 03397, ruta MXT); el resto de la muestra es de Casa Tomás"
+  ]
+}

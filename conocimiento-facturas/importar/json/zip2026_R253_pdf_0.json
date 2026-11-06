@@ -1,0 +1,71 @@
+{
+ "archivo": "R253.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "Tecnomar Viveros S.L.",
+ "cif": "B83719351",
+ "local": "casa_tomas",
+ "numero_documento": "26/0221",
+ "fecha": "2026-02-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VISITA MANTENIMIENTO VIVERO",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 146.4,
+   "descuento_pct": null,
+   "total": 146.4,
+   "iva_pct": 21,
+   "albaran_ref": "2603/17306",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOMBA SKIMMER OCTO AQ1800",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 193.7,
+   "descuento_pct": null,
+   "total": 193.7,
+   "iva_pct": 21,
+   "albaran_ref": "2603/17307",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 340.1,
+ "desglose_iva": [
+  {
+   "base": 340.1,
+   "pct": 21,
+   "cuota": 71.42
+  }
+ ],
+ "iva": 71.42,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 411.52,
+ "observaciones": "Pago por transferencia a CaixaBank, vencimiento 19/02/2026. Albaranes 2603/17306 (visita) y 2603/17307 (bomba instalada, por estar rota la anterior) en las paginas 3 y 6.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

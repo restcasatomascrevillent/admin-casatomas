@@ -1,0 +1,90 @@
+{
+  "cif": "B30224109",
+  "nombre": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+  "nombres_impresos": ["D.I.B.O.S.", "Distribuidoras de Bodegas, S.L.", "DIBOS"],
+  "categoria": "vino",
+  "locales": ["casa_tomas"],
+  "muestras": ["R428.pdf", "R1304.pdf", "R1539.pdf", "R963.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (una a tres líneas); cliente impreso como 'RESTAURANTE BARRA CASA TOMAS' a nombre de Maside 2011",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["2496", "7675", "8754", "5970"], "patron": "^\\d{4}$", "donde": "casilla 'Nº de Factura': trae '1/2026' (serie/año) y a su lado el número de 4 cifras" },
+    "fecha": "casilla Fecha, DD-MM-AAAA con guiones (18-03-2026)",
+    "albaranes": null
+  },
+
+  "lectura": {
+    "columnas": ["Referencia", "Descripción", "Bultos", "Cantidad", "Precio", "Dto", "Importe"],
+    "cantidad_es": "botellas (columna Cantidad); Bultos = cajas",
+    "columna_peso": null,
+    "precio_es_por": "botella",
+    "descuento_por_linea": { "existe": true, "columna": "Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Pie: Bruto | Dto | Imp. Dto. | Base I.V.A. | I.V.A. | Imp. I.V.A. | Rec. | Imp.Rec. | TOTAL; total impreso como '776.82 Euros'"],
+    "trampas": [
+      "Decimales con PUNTO (32.10, 642.00), al revés que el resto de proveedores.",
+      "Bonificación en botellas: la misma referencia sale dos veces y la segunda con precio .00 e importe .00 (12+6 y 24+12 botellas). No es duplicado ni error: son botellas gratis.",
+      "Bultos × botellas por caja: Godeval y Gramona 6 por caja; Balbás Ancestral 5 bultos = 20 botellas (4 por caja).",
+      "La casilla Nº de Factura mezcla '1/2026' con el número real; el número no es '1/2026'.",
+      "En el texto digital el pie (Registro Mercantil, Hoja, Folio, Tomo) sale desordenado y mezclado con los totales; en el escaneo aparece 'COPIA FACTURA' y un texto vertical.",
+      "'Forma de Pago' (REPOSICION) puede faltar."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = cantidad × precio (24 × 16,85 = 404,40; 48 × 16,92 = 812,16; 20 × 32,10 = 642,00); línea .00 = 0",
+    "Bruto = suma de importes = Base I.V.A. (Dto 0)",
+    "IVA = base × 21 %; total = base + IVA (642,00 + 134,82 = 776,82; 202,20 + 42,46 = 244,66; 404,40 + 84,92 = 489,32)"
+  ],
+
+  "guia_ocr": "Factura de vino de DIBOS (Alcantarilla, Murcia). Número de 4 cifras junto a '1/2026' en la casilla Nº de Factura; fecha DD-MM-AAAA. Decimales con PUNTO. Cantidad = botellas, Bultos = cajas, Precio = por botella sin IVA; importe = cantidad × precio. Si una referencia se repite con precio .00 son botellas de regalo: consérvalas con importe 0. IVA 21 %, sin recargo ni dto. Total al pie seguido de 'Euros'. Ignora 'COPIA FACTURA' y el texto vertical del Registro Mercantil.",
+
+  "productos": [
+    {
+      "nombre_impreso": "BLANCO VALDEORRAS GODEVAL CEPAS VELLAS 75 CL.",
+      "nombre_normalizado": "Godello Valdeorras Godeval Cepas Vellas 75 cl",
+      "familia": "vino blanco",
+      "presentacion": "botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 16.85, "max": 16.85, "por": "botella", "ejemplos": [["2026-03-18", 16.85], ["2026-06-23", 16.85]] },
+      "iva_pct": 21,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "TINTO R.DUERO BALBAS ANCESTRAL 75 CL.",
+      "nombre_normalizado": "Ribera del Duero Balbás Ancestral 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 4, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 32.1, "max": 32.1, "por": "botella", "ejemplos": [["2026-08-12", 32.1]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GRAMONA BRUT IMPERIAL GRVA 75 CL.",
+      "nombre_normalizado": "Gramona Imperial Brut Gran Reserva 75 cl (cava)",
+      "familia": "espumoso",
+      "presentacion": "botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella",
+      "precio": { "min": 16.92, "max": 16.92, "por": "botella", "ejemplos": [["2026-09-16", 16.92]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Botellas por caja deducidas de Bultos/Cantidad (Godeval 6, Gramona 6, Balbás 4); la descripción no lo dice.",
+    "Godeval: se regala 1 botella por cada 2 pagadas (24+12, 12+6); no se sabe si es regla fija.",
+    "Solo 4 muestras vistas de 7 PDF (3 digitales + 1 escaneo); 3 escaneos más sin ver, pueden traer otros vinos.",
+    "Se asume que el número de factura es el de 4 cifras y que '1/2026' es serie/ejercicio."
+  ]
+}

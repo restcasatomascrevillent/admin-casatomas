@@ -1,0 +1,51 @@
+{
+ "archivo": "R246.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "80013671",
+ "fecha": "2026-02-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Jamon Bellota 100% Iberico SRC Tramo 8-9 kgs NP",
+   "producto_ficha": null,
+   "cantidad": 8.48,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 44.5,
+   "descuento_pct": null,
+   "total": -377.36,
+   "iva_pct": 10,
+   "albaran_ref": "20018126",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -377.36,
+ "desglose_iva": [
+  {
+   "base": -377.36,
+   "pct": 10,
+   "cuota": -37.74
+  }
+ ],
+ "iva": -37.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -415.1,
+ "observaciones": "Factura rectificativa-abono que rectifica la factura 90237946 (no está en este lote). Pagadero 60 días, adeudo SEPA anticipo. Punto verde 0,37 EUR informativo, no sumado al total.",
+ "alertas": [
+  "Artículo SRC tramo 8-9 kg no figura en el catálogo de la ficha (producto_ficha null).",
+  "Abono con importes impresos sin signo negativo; se dejan positivos tal como salen.",
+  "Vencimiento impreso 30/01/2026, anterior a la fecha del abono (19/02/2026); se deja tal cual.",
+  "Sin fecha de albarán ni pedido impresos; el nº de albarán 20018126 tiene formato distinto (no 40xxxxxx)."
+ ]
+}

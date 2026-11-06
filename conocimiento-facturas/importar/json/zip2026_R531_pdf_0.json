@@ -1,0 +1,117 @@
+{
+ "archivo": "R531.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170757686",
+ "fecha": "2026-04-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MELON PIEL SAPO 4 XTRA EL ABUELO SN",
+   "producto_ficha": "Melón piel de sapo calibre 4-5 extra",
+   "cantidad": 14.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.95,
+   "descuento_pct": null,
+   "total": 27.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ESPARRAGO VERDE I GRANEL ES",
+   "producto_ficha": "Espárrago verde a granel",
+   "cantidad": 2.87,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 12.89,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FRESON I 1K ES",
+   "producto_ficha": "Fresón (tarrina 1 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.5,
+   "descuento_pct": null,
+   "total": 10.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "DATIL BARHI I 2K PE",
+   "producto_ficha": "Dátil Barhi (bulto 2 kg)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 24.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "UVA AUTUMN CRISP JJ I VANGUARD 4K PE",
+   "producto_ficha": "Uva Autumn Crisp (caja 4 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.7,
+   "descuento_pct": null,
+   "total": 18.8,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 92.99,
+ "desglose_iva": [
+  {
+   "base": 92.99,
+   "pct": 4,
+   "cuota": 3.72
+  }
+ ],
+ "iva": 3.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 96.71,
+ "observaciones": "Fecha entrega 01.04.2026, igual que la fecha de factura. Total BT 8. Anotacion suelta '(CP)': no es producto. Asterisco GLOBALG.A.P. quitado del nombre. Neto de MELON = bruto - tara (15,00 - 1,00).",
+ "alertas": [
+  "ESPARRAGO VERDE GRANEL: 2,87 kg x 4,500 EUR/kg = 12,915, pero la factura imprime 12,89. Se deja lo impreso (la base total si cuadra con 12,89).",
+  "FRESON I 1K a 2,50 EUR/kg: por debajo del rango de la ficha (4,50-6,50). Lo impreso se deja tal cual."
+ ]
+}

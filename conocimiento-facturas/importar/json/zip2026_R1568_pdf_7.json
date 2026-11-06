@@ -1,0 +1,46 @@
+{
+ "archivo": "R1568.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO MYT, C.B.",
+ "cif": "E24948994",
+ "local": "casa_tomas",
+ "numero_documento": "990/A",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 2.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.8,
+   "descuento_pct": null,
+   "total": 64.8,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 64.8,
+ "desglose_iva": [
+  {
+   "base": 64.8,
+   "pct": 10,
+   "cuota": 6.48
+  }
+ ],
+ "iva": 6.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 71.28,
+ "observaciones": "Periodo 01/09/2026 a 30/09/2026. Embarcación(es): MANUEL Y TERESA. Albaranes de subasta (informativo): 19691.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  13
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS GONZALEZ LOPEZ C.B.",
+ "cif": "E42544965",
+ "local": "casa_tomas",
+ "numero_documento": "609/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 13,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.85,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 51.3,
+   "descuento_pct": null,
+   "total": 146.21,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 146.21,
+ "desglose_iva": [
+  {
+   "base": 146.21,
+   "pct": 10.0,
+   "cuota": 14.62
+  }
+ ],
+ "iva": 14.62,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 160.83,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9215. Embarcaciones: NUEVO MAGU.",
+ "alertas": []
+}

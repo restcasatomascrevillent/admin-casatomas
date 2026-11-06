@@ -1,0 +1,66 @@
+{
+ "archivo": "R556.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0016710",
+ "fecha": "2026-04-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SOLOMILLO DE CERDO KG",
+   "producto_ficha": null,
+   "cantidad": 8.61,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.257,
+   "descuento_pct": null,
+   "total": 53.87,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SECRETO CERDO POZO KG",
+   "producto_ficha": "Secreto de cerdo (Pozo)",
+   "cantidad": 7.02,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.093,
+   "descuento_pct": null,
+   "total": 35.73,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 89.6,
+ "desglose_iva": [
+  {
+   "base": 89.6,
+   "pct": 10,
+   "cuota": 8.96
+  }
+ ],
+ "iva": 8.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 98.56,
+ "observaciones": "Factura. Crédito a 30 días, vencimiento 22-05-2026. Lotes 61116 (solomillo) y 61076 (secreto), sin importe.",
+ "alertas": [
+  "Secreto: 7,02 × 5,093 = 35,75 pero el total de línea impreso es 35,73; la suma 53,87 + 35,73 = 89,60 cuadra con la base impresa (se deja lo impreso).",
+  "Línea SECRETO CERDO POZO KG: 7.02×5.093=35.75 != impreso 35.73"
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "archivo": "R988.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A352/26",
+ "fecha": "2026-06-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRUFA DE VERANO TUBER AESTIVUM",
+   "producto_ficha": "Trufa de verano (Tuber aestivum)",
+   "cantidad": 0.368,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 250.0,
+   "descuento_pct": null,
+   "total": 92.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 92.0,
+ "desglose_iva": [
+  {
+   "base": 92.0,
+   "pct": 4,
+   "cuota": 3.68
+  }
+ ],
+ "iva": 3.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 95.68,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 352. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás).",
+ "alertas": [
+  "Número de factura A352/26 repetido en R1165.pdf (fecha 01.07.2026, mismo pedido 352). Revisar si es error de numeración o duplicado."
+ ]
+}

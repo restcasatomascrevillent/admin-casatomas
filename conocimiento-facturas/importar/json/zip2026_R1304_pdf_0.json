@@ -1,0 +1,46 @@
+{
+ "archivo": "R1304.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+ "cif": "B30224109",
+ "local": "casa_tomas",
+ "numero_documento": "7675",
+ "fecha": "2026-08-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TINTO R.DUERO BALBAS ANCESTRAL 75 CL.",
+   "producto_ficha": "Ribera del Duero Balbás Ancestral 75 cl",
+   "cantidad": 20.0,
+   "unidad": "botella",
+   "bultos": 5.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 32.1,
+   "descuento_pct": null,
+   "total": 642.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 642.0,
+ "desglose_iva": [
+  {
+   "base": 642.0,
+   "pct": 21,
+   "cuota": 134.82
+  }
+ ],
+ "iva": 134.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 776.82,
+ "observaciones": "Forma de pago REPOSICION. CERRADO LUNES.",
+ "alertas": []
+}

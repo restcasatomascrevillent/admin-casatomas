@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  27
+ ],
+ "tipo": "factura",
+ "proveedor": "GONZALEZ GARCIA, VICTOR",
+ "cif": "23029497B",
+ "local": "casa_tomas",
+ "numero_documento": "18/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 27,
+   "nombre": "17 GADIFORMES",
+   "producto_ficha": "Gadiformes (familia 17)",
+   "cantidad": 1.55,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.9,
+   "descuento_pct": null,
+   "total": 7.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 7.6,
+ "desglose_iva": [
+  {
+   "base": 7.6,
+   "pct": 10.0,
+   "cuota": 0.76
+  }
+ ],
+ "iva": 0.76,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 8.36,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 751. Embarcaciones: BAHIA DE PALOS.",
+ "alertas": []
+}

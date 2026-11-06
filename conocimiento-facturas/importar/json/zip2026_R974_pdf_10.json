@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  11
+ ],
+ "tipo": "factura",
+ "proveedor": "PUNTA DEL CABO SL",
+ "cif": "B30921001",
+ "local": "casa_tomas",
+ "numero_documento": "311/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 11,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 0.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 53.8,
+   "descuento_pct": null,
+   "total": 32.28,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 32.28,
+ "desglose_iva": [
+  {
+   "base": 32.28,
+   "pct": 10,
+   "cuota": 3.23
+  }
+ ],
+ "iva": 3.23,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 35.51,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

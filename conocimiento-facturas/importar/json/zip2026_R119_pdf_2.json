@@ -1,0 +1,97 @@
+{
+ "archivo": "R119.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 00475",
+ "fecha": "2026-01-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 57.8,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.9,
+   "descuento_pct": null,
+   "total": 1092.42,
+   "iva_pct": 10,
+   "albaran_ref": "F566932",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 3,
+   "nombre": "COLAS ALISTAO 2 CARABELAS",
+   "producto_ficha": "Colas alistao 2 carabelas",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.0,
+   "descuento_pct": null,
+   "total": 59.4,
+   "iva_pct": 10,
+   "albaran_ref": "F566932",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 3,
+   "nombre": "TWISTER DE LANGOSTINOS 800GR",
+   "producto_ficha": "Twister de langostinos 800 g",
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 800,
+   "contenido_unidad": "g",
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 26.0,
+   "iva_pct": 10,
+   "albaran_ref": "F566932",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 3,
+   "nombre": "VIEIRA MED/CONCHA 20/30 X1 CHILE",
+   "producto_ficha": "Vieira media concha 20/30 (Chile)",
+   "cantidad": 16,
+   "unidad": "kg",
+   "bultos": 16,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.25,
+   "descuento_pct": null,
+   "total": 244.0,
+   "iva_pct": 10,
+   "albaran_ref": "F566932",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1421.82,
+ "desglose_iva": [
+  {
+   "base": 1421.82,
+   "pct": 10,
+   "cuota": 142.18
+  }
+ ],
+ "iva": 142.18,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1564.0,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F566932. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

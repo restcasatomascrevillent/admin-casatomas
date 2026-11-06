@@ -1,0 +1,66 @@
+{
+ "archivo": "R209.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "COMERCIAL TABARCA, S.L.",
+ "cif": "B03286184",
+ "local": "casa_tomas",
+ "numero_documento": "6.098838",
+ "fecha": "2026-02-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPPELS ANUAL 2025 SCHWEPPES",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "6.098838",
+   "bonificada": true
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RAPPEL SOBRE VENTAS (21)",
+   "producto_ficha": "Rappel sobre ventas (abono)",
+   "cantidad": -1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 494.81,
+   "descuento_pct": null,
+   "total": -494.81,
+   "iva_pct": 21,
+   "albaran_ref": "6.098838",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -494.81,
+ "desglose_iva": [
+  {
+   "base": -494.81,
+   "pct": 21,
+   "cuota": -103.91
+  }
+ ],
+ "iva": -103.91,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -598.72,
+ "observaciones": "Forma de pago: R/DOMICILIADO 45 DIAS (domiciliación). Vencimiento 27/03/2026. Cliente 013530 (CASA TOMAS BARRA). Factura de abono (total negativo): RAPPEL SOBRE VENTAS (21) con cantidad -1.",
+ "alertas": [
+  "Nº impreso «6.098838» no sigue el patrón 70.xxxxxx de la ficha; se deja lo impreso.",
+  "«RAPPELS ANUAL 2025 SCHWEPPES» a 0,00 es texto asociado al rappel, no artículo; se conserva como fila impresa (total 0)."
+ ]
+}

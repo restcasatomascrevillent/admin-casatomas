@@ -1,0 +1,100 @@
+{
+ "archivo": "R726.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PROMOSAN SL (Hotel Sansi Pedralbes)",
+ "cif": "B58471285",
+ "local": "casa_tomas",
+ "numero_documento": "700.545",
+ "fecha": "2026-05-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HABITACION",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 340.0,
+   "descuento_pct": null,
+   "total": 340.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TASA TURISTICA",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.8,
+   "descuento_pct": null,
+   "total": 16.8,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "HABITACION",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 340.0,
+   "descuento_pct": null,
+   "total": 340.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "TASA TURISTICA",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.4,
+   "descuento_pct": null,
+   "total": 8.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 705.2,
+ "desglose_iva": [
+  {
+   "base": 705.2,
+   "pct": 10,
+   "cuota": 70.52
+  }
+ ],
+ "iva": 70.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 775.72,
+ "observaciones": "Hab. 108, 10-11/05/2026, a nombre de Enrique Ortola a cargo de Maside 2011 SLU. Pagado VISA 11/05/2026 775,72. IVA 10% s/705,20 impreso como línea.",
+ "alertas": [
+  "Fecha de factura impresa truncada ('11/05/202'); se toma 11/05/2026 (salida y cobro). La tasa turística se incluye en la base del IVA 10% según lo impreso.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

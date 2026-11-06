@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  16
+ ],
+ "tipo": "factura",
+ "proveedor": "MOLINA CERDA, MANUELA",
+ "cif": "21398561M",
+ "local": "casa_tomas",
+ "numero_documento": "381/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 16,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 5.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.04,
+   "descuento_pct": null,
+   "total": 484.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 484.7,
+ "desglose_iva": [
+  {
+   "base": 484.7,
+   "pct": 10.0,
+   "cuota": 48.47
+  }
+ ],
+ "iva": 48.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 533.17,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 5317, 5942. Embarcaciones: ninguna.",
+ "alertas": []
+}

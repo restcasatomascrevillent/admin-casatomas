@@ -1,0 +1,132 @@
+{
+  "cif": "B03141165",
+  "nombre": "LICORES Y DISTRIBUCIONES BELLOD, S.L.",
+  "nombres_impresos": ["LICORES Y DISTRIBUCIONES BELLOD, S.L.", "BELLOD", "bellod.com"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R333.pdf", "R855.pdf", "R1252.pdf", "R1643.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual (fecha = último día del mes) que agrupa albaranes; pocas líneas (1-4), una página; pago por transferencia a 30 días",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["1.091/026", "3.419/026", "5.036/026", "6.489/026"],
+      "patron": "^\\d{1,2}\\.\\d{3}/026$",
+      "donde": "casilla 'FACTURA Nº' de la fila AGENTE | FECHA FRA | FACTURA Nº | CÓDIGO DE CLIENTE. El punto es separador de millares (1.091 = 1091) y '/026' es el año: guardar como 1091/026."
+    },
+    "fecha": "casilla 'FECHA FRA', DD/MM/AAAA (28/02/2026). Cada albarán tiene su fecha en la cabecera.",
+    "albaranes": "cabecera 'Albarán Nº 1146 026 de Fecha 04/02/2026' antes de sus líneas"
+  },
+
+  "lectura": {
+    "columnas": ["CAJAS", "CANTD UDD", "Volum (litros por unidad)", "Volum TOTAL (litros)", "CÓDIGO", "DESCRIPCIÓN", "Gº", "PRECIO", "% DTO", "% DTO", "TOTAL"],
+    "cantidad_es": "unidades sueltas (latas, bolsas, botellas) en CANTD UDD; CAJAS es solo informativo (cajas enteras servidas) y puede estar vacío. Importe = unidades × precio",
+    "columna_peso": null,
+    "precio_es_por": "unidad (lata, bolsa, botella)",
+    "descuento_por_linea": { "existe": true, "columna": "% DTO (dos columnas)", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [
+      "Pie con una fila por tipo de IVA: BASE IMPONIBLE | % I.V.A. | IMPORTE I.V.A. | % R.E. | IMPORTE R.E. | TOTAL FACTURA; el TOTAL FACTURA solo se imprime en la primera fila",
+      "Sin portes ni descuentos en el pie en las muestras"
+    ],
+    "trampas": [
+      "En el texto extraído se cuelan fragmentos verticales del registro mercantil entre líneas ('29/3/84.', '1.ª', 'Incripción', 'Hoja', '9,', 'Folio', 'Libro 269', 'Tomo 673', 'Sociedades', 'Sección'): son ruido y un '9,' puede quedar pegado delante de una línea ('9, | 2 | 50 | 2115001 …'). No es cantidad.",
+      "En las líneas de vino aparecen dos volúmenes pegados ('6 0,75 | 4,50 1360360'): 6 botellas, 0,75 litros cada una, 4,50 litros en total, luego el código.",
+      "El código de artículo (7 cifras) va antes de la descripción; no es precio.",
+      "Descripciones recortadas ('ESPARRAGO 5 FRUTOS LATA 425ML. EL NAVAR…').",
+      "El orden de columnas cambia según haya o no cajas: si CAJAS está vacío, la primera cifra ya es la cantidad."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = unidades × precio (marchapán 50 × 0,800 = 40,00; espárrago 12 × 5,380 = 64,56; patatas 28 × 2,690 = 75,32; vino 6 × 15,930 = 95,58)",
+    "una fila de base por tipo de IVA: 4 % marchapán, 10 % espárrago y patatas fritas, 21 % vino",
+    "IVA = base × %; TOTAL FACTURA = suma de bases + suma de IVA",
+    "R333: 40,00 + 1,60 + 64,56 + 6,46 = 112,62",
+    "R855: 80,00 + 3,20 + 154,28 + 15,43 = 252,91 (154,28 = 78,96 + 75,32)"
+  ],
+
+  "guia_ocr": "Factura mensual de Bellod (Castalla): número en 'FACTURA Nº' (3.419/026, el punto es de millares) y 'FECHA FRA' DD/MM/AAAA. Líneas: CAJAS (opcional), CANTD UDD, para vinos también litros por unidad y litros totales, CÓDIGO de 7 cifras, DESCRIPCIÓN, PRECIO por unidad y TOTAL = unidades × precio. Ignora el texto vertical del Registro Mercantil que se mezcla con las líneas ('Folio', 'Hoja', '9,'). Pie con base, % IVA (4, 10 o 21) e importe por tipo; el TOTAL FACTURA solo en la primera fila.",
+
+  "productos": [
+    {
+      "nombre_impreso": "MARCHAPAN PICOS CAMPEROS 150G.",
+      "nombre_normalizado": "Marchapán Picos Camperos 150 g",
+      "familia": "dulce",
+      "presentacion": "envasado 150 g; caja de 25 unidades (2 cajas = 50, 3 = 75)",
+      "formato": { "envase": "paquete", "contenido": 150, "unidad_contenido": "g", "unidades_por_bulto": 25, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 0.8, "max": 0.8, "por": "unidad", "ejemplos": [["2026-02-04", 0.8], ["2026-07-01", 0.8]] },
+      "iva_pct": 4,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "ESPARRAGO 6/8 LATA 425ML. EL NAVARRICO",
+      "nombre_normalizado": "Espárrago 6/8 piezas lata 425 ml El Navarrico",
+      "familia": "conserva vegetal",
+      "presentacion": "espárragos en conserva, calibre 6/8, lata 425 ml; se sirve en cajas de 12 (12 uds sin columna CAJAS)",
+      "formato": { "envase": "lata", "contenido": 425, "unidad_contenido": "ml", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 5.38, "max": 5.38, "por": "unidad", "ejemplos": [["2026-02-04", 5.38]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ESPARRAGO 5 FRUTOS LATA 425ML. EL NAVAR",
+      "nombre_normalizado": "Espárrago 5 frutos lata 425 ml El Navarrico",
+      "familia": "conserva vegetal",
+      "presentacion": "espárragos en conserva, 5 frutos, lata 425 ml; cajas de 12 (2 cajas = 24 uds)",
+      "formato": { "envase": "lata", "contenido": 425, "unidad_contenido": "ml", "unidades_por_bulto": 12, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 6.58, "max": 6.58, "por": "unidad", "ejemplos": [["2026-05-09", 6.58]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "SAN NICASIO 150g. PATATAS FRITAS BOLSA",
+      "nombre_normalizado": "Patatas fritas San Nicasio bolsa 150 g",
+      "familia": "snack",
+      "presentacion": "bolsa 150 g; caja de 14 (2 cajas = 28 uds)",
+      "formato": { "envase": "bolsa", "contenido": 150, "unidad_contenido": "g", "unidades_por_bulto": 14, "bulto": "caja" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 2.69, "max": 2.69, "por": "unidad", "ejemplos": [["2026-05-20", 2.69]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ESTRECHO ENRIQUE MENDOZA 75CL.",
+      "nombre_normalizado": "Estrecho Enrique Mendoza 75 cl",
+      "familia": "vino",
+      "presentacion": "vino, botella 75 cl, sin caja impresa; cantidad = botellas",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 15.93, "max": 15.93, "por": "botella", "ejemplos": [["R489", 15.93]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ENRIQUE MENDOZA ORAVAL 75CL",
+      "nombre_normalizado": "Enrique Mendoza Oraval 75 cl",
+      "familia": "vino",
+      "presentacion": "vino, botella 75 cl, sin caja impresa; cantidad = botellas",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 6.97, "max": 6.97, "por": "botella", "ejemplos": [["R489", 6.97]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "La base marcaba 'bebidas' pero casi todo lo facturado es alimentación (marchapán, espárragos, patatas fritas); solo hay 2 líneas de vino (R489). Se ha puesto 'alimentacion-general'.",
+    "Unidades por caja deducidas de CAJAS y CANTD (50 ÷ 2 = 25; 28 ÷ 2 = 14; 24 ÷ 2 = 12), no impresas como tal.",
+    "El significado de la columna 'Gº' no consta (en las muestras está vacía); podría ser graduación o grupo.",
+    "IVA 21 % del vino deducido de la suma de R489 (137,40 × 1,21 + 41,60 = 207,85), no leído directamente (esa factura solo está en el catálogo de líneas).",
+    "R333/R855: el nombre exacto de la marca de espárrago está cortado ('EL NAVAR…'); en R333 se ve 'EL NAVARRICO'."
+  ]
+}

@@ -1,0 +1,65 @@
+{
+ "archivo": "R602.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260156",
+ "fecha": "2026-04-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPE",
+   "producto_ficha": "Rape",
+   "cantidad": 65.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.5,
+   "descuento_pct": null,
+   "total": 1019.9,
+   "iva_pct": 10,
+   "albaran_ref": "1-000156",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RODABALLO",
+   "producto_ficha": "Rodaballo",
+   "cantidad": 27.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.5,
+   "descuento_pct": null,
+   "total": 924.6,
+   "iva_pct": 10,
+   "albaran_ref": "1-000156",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1944.5,
+ "desglose_iva": [
+  {
+   "base": 1944.5,
+   "pct": 10,
+   "cuota": 194.45
+  }
+ ],
+ "iva": 194.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2138.95,
+ "observaciones": "Transferencia CaixaBank; vencimiento 07/04/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: RAPE 15,50 (ficha 16,95); RODABALLO 33,50 (ficha 34,50)"
+ ]
+}

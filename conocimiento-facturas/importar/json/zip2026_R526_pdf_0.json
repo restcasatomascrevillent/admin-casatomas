@@ -1,0 +1,46 @@
+{
+ "archivo": "R526.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA CAMPOLUZ, S.L.",
+ "cif": "B53375358",
+ "local": "casa_tomas",
+ "numero_documento": "FA2026/0007057",
+ "fecha": "2026-04-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GASTOS DEVOLUCION RECIBO DIA 10/04/26 FA.6016",
+   "producto_ficha": "Gastos por devolución de recibo",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.81,
+   "descuento_pct": null,
+   "total": 6.81,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 6.81,
+ "desglose_iva": [
+  {
+   "base": 6.81,
+   "pct": 21,
+   "cuota": 1.43
+  }
+ ],
+ "iva": 1.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 8.24,
+ "observaciones": "Factura suelta de gastos por recibo devuelto. El texto cita FA.6016 (FA2026/0006016, R525). Destino CASA TOMAS. Pago: remesa bancaria, vencimiento 10/05/26. Cabecera impresa con NIF B54583356; el pie y la ficha dan CIF B53375358 (usado).",
+ "alertas": []
+}

@@ -1,0 +1,49 @@
+{
+ "archivo": "R1123.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "IMPORTACIONES SINGULARES, S.L. (Bermar Spain)",
+ "cif": "B09863796",
+ "local": "casa_tomas",
+ "numero_documento": "CV 260145",
+ "fecha": "2026-07-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LVDV + Tower Portable Edition Dual (cód. BCo6P), nº de serie T07067653TY",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3770.0,
+   "descuento_pct": null,
+   "total": 3770.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3770.0,
+ "desglose_iva": [
+  {
+   "base": 3770.0,
+   "pct": 21,
+   "cuota": 791.7
+  }
+ ],
+ "iva": 791.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 4561.7,
+ "observaciones": "Incluye: 20 eStoppers vino tranquilo, 6 eStoppers vino espumoso, 2 años de garantía y servicio de transporte. Forma de pago: 1 cuota a la fecha de factura y 2 cuotas: 17/07/2026 por 1.520,41 €; 07/08/2026 por 1.520,41 €; 28/08/2026 por 1.520,88 €. Entrega a cuenta 0,00 €. Cliente 43000547.",
+ "alertas": [
+  "Destinatario impreso: MASIDE 2011, S.L. (C/ Santa María de la Cabeza, 2) sin nombre de local: se deja no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

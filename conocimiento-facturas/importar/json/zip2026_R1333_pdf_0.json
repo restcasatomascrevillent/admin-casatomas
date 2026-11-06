@@ -1,0 +1,83 @@
+{
+ "archivo": "R1333.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "J CARBO (nombre según texto)",
+ "cif": "A79393179",
+ "local": "casa_tomas",
+ "numero_documento": "211200693",
+ "fecha": "2026-08-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOLLEJAS CORDERO NACIONAL (art. 350100)",
+   "producto_ficha": null,
+   "cantidad": 5.64,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.5,
+   "descuento_pct": null,
+   "total": 166.38,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LOMO BAJO TERNERA S/H CHARRA (art. 310257)",
+   "producto_ficha": null,
+   "cantidad": 14.36,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 366.18,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TIRAS ASADO TERNERA (art. 310005)",
+   "producto_ficha": null,
+   "cantidad": 5.82,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.8,
+   "descuento_pct": null,
+   "total": 91.96,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 624.52,
+ "desglose_iva": [
+  {
+   "base": 624.52,
+   "pct": 10,
+   "cuota": 62.45
+  }
+ ],
+ "iva": 62.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 686.97,
+ "observaciones": "Pedido 6970084, forma de pago RECIBO. Peso neto total 25,820 kg. Notas: «Parte central selección» (lomo). Costes de subproductos no incluidos (Orden APA 1556/2002).",
+ "alertas": [
+  "El nombre del emisor no aparece en la cabecera; en el pie solo figura «J CARBO». El CIF se toma de la carpeta (A79393179). Revisar el PDF original.",
+  "La línea de mollejas tiene «5,6 KG» en la columna de unidades; no se toma como bultos (queda null) por no ser un número de bultos claro."
+ ]
+}

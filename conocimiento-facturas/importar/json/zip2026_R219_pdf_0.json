@@ -1,0 +1,63 @@
+{
+ "archivo": "R219.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ GALVAÑ CANDELA",
+ "cif": "48368394S",
+ "local": "casa_tomas",
+ "numero_documento": "FACT/005",
+ "fecha": "2026-01-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "T-4240MP Amplificador de megafonía 4 x 240W con matriz de audio",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 632.0,
+   "descuento_pct": null,
+   "total": 632.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Mano de obra, instalación y configuración",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.0,
+   "descuento_pct": null,
+   "total": 96.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 728.0,
+ "desglose_iva": [
+  {
+   "base": 728.0,
+   "pct": 21,
+   "cuota": 152.88
+  }
+ ],
+ "iva": 152.88,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 880.88,
+ "observaciones": "Venta de material e instalación. Destinatario: RESTAURANTE CASA TOMAS / MASIDE 2011 (C/ Santa María de la Cabeza, 2). Pago por transferencia a la cuenta indicada en el pie.",
+ "alertas": []
+}

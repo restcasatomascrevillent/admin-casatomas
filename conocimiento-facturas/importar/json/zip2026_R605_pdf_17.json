@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  18
+ ],
+ "tipo": "factura",
+ "proveedor": "PUNTA DEL CABO SL",
+ "cif": "B30921001",
+ "local": "casa_tomas",
+ "numero_documento": "120/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 18,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.0,
+   "descuento_pct": null,
+   "total": 41.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 41.6,
+ "desglose_iva": [
+  {
+   "base": 41.6,
+   "pct": 10.0,
+   "cuota": 4.16
+  }
+ ],
+ "iva": 4.16,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 45.76,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9215. Embarcaciones: ninguna.",
+ "alertas": []
+}

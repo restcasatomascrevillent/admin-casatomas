@@ -1,0 +1,48 @@
+{
+ "archivo": "R923.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9991714493",
+ "fecha": "2026-06-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPARRAGO BLANCO 26+ I 4,5K ES",
+   "producto_ficha": null,
+   "cantidad": 9.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 4.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 10.75,
+   "descuento_pct": null,
+   "total": -96.75,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -96.75,
+ "desglose_iva": [
+  {
+   "base": -96.75,
+   "pct": 4,
+   "cuota": -3.87
+  }
+ ],
+ "iva": -3.87,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -100.62,
+ "observaciones": "Abono «Abono precio» de la factura 9170769011 (R915), entrega 19.06.2026. Anula la línea de espárrago blanco 26+ (2 bultos, 9,00 kg a 10,750). Importes en negativo; cantidad en positivo. Total BT 2.",
+ "alertas": [
+  "Número 9991714493 fuera del patrón 9170… de las facturas (es un abono, referencia impresa «ABONO FRA.9170769011»). Sin producto_ficha, igual que la línea de R915."
+ ]
+}

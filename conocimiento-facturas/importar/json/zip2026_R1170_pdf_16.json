@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  17
+ ],
+ "tipo": "factura",
+ "proveedor": "POMARES SOLER, S.L.",
+ "cif": "B42585679",
+ "local": "casa_tomas",
+ "numero_documento": "954/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 17,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 66.9,
+   "descuento_pct": null,
+   "total": 127.11,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 127.11,
+ "desglose_iva": [
+  {
+   "base": 127.11,
+   "pct": 10,
+   "cuota": 12.71
+  }
+ ],
+ "iva": 12.71,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 139.82,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): ESTELA NOVA. Albaranes de subasta (informativo): 15629.",
+ "alertas": []
+}

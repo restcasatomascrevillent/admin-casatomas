@@ -1,0 +1,46 @@
+{
+ "archivo": "R747.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Floristería Lucía (Inés Castelló Soriano)",
+ "cif": "74161401V",
+ "local": "casa_tomas",
+ "numero_documento": "018",
+ "fecha": "2026-05-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Centro de flores con cinta dedicada",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 120.0,
+   "descuento_pct": null,
+   "total": 120.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 120.0,
+ "desglose_iva": [
+  {
+   "base": 120.0,
+   "pct": 10,
+   "cuota": 12.0
+  }
+ ],
+ "iva": 12.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 132.0,
+ "observaciones": "Pago por transferencia Banc Sabadell ES** **** **** **** **** 2706",
+ "alertas": []
+}

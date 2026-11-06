@@ -1,0 +1,80 @@
+{
+ "archivo": "R1188.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CECINA DE CEBÓN SELECTIUN, S.L.",
+ "cif": "B24731358",
+ "local": "casa_tomas",
+ "numero_documento": "F2600670",
+ "fecha": "2026-07-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CECINA WAGYU JAPANESE BLACK LIMIT EDITION (lote 2639)",
+   "producto_ficha": null,
+   "cantidad": 8.29,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 100.0,
+   "descuento_pct": null,
+   "total": 829.0,
+   "iva_pct": 10,
+   "albaran_ref": "F2600791",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "WAGYU JAPANESE BLACK LIMIT EDITION (lote 2681)",
+   "producto_ficha": null,
+   "cantidad": 4.27,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 100.0,
+   "descuento_pct": null,
+   "total": 427.0,
+   "iva_pct": 10,
+   "albaran_ref": "F2600791",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "WAGYU JAPANESE BLACK LIMIT EDITION (lote 2608)",
+   "producto_ficha": null,
+   "cantidad": 4.04,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 100.0,
+   "descuento_pct": null,
+   "total": 404.0,
+   "iva_pct": 10,
+   "albaran_ref": "F2600791",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1660.0,
+ "desglose_iva": [
+  {
+   "base": 1660.0,
+   "pct": 10,
+   "cuota": 166.0
+  }
+ ],
+ "iva": 166.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1826.0,
+ "observaciones": "Destinatario: MASIDE 2011 S.LU (REST CASA TOMAS), cliente 0266. Pedido F260813 (albarán F2600791, 21/07/2026). Forma de pago: recibo a 10 días, vencimiento 09/08/2026 por 1.826,00 €. Totales impresos: 4 bultos, 16,600 kg.",
+ "alertas": []
+}

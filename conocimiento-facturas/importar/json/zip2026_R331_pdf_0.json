@@ -1,0 +1,87 @@
+{
+ "archivo": "R331.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO, S.R.L.",
+ "cif": "B06805246",
+ "local": "casa_tomas",
+ "numero_documento": "PS26/248",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "IN-MIX DE PETALOS",
+   "producto_ficha": "Mix de pétalos comestibles",
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.85,
+   "descuento_pct": null,
+   "total": 7.7,
+   "iva_pct": 10,
+   "albaran_ref": "PS26/403",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "IN-BROTE GUISANTE 50 GRS",
+   "producto_ficha": "Brote de guisante 50 g",
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.85,
+   "descuento_pct": null,
+   "total": 7.7,
+   "iva_pct": 4,
+   "albaran_ref": "PS26/403",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "SO-SALSA HOLANDESA 1 LT",
+   "producto_ficha": "Salsa holandesa 1 L",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.9,
+   "descuento_pct": null,
+   "total": 14.9,
+   "iva_pct": 10,
+   "albaran_ref": "PS26/410",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 30.3,
+ "desglose_iva": [
+  {
+   "base": 22.6,
+   "pct": 10,
+   "cuota": 2.26
+  },
+  {
+   "base": 7.7,
+   "pct": 4,
+   "cuota": 0.31
+  }
+ ],
+ "iva": 2.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 32.87,
+ "observaciones": "Giro resumen / forma de pago según cabecera. Albaranes 2; fechas de entrega 20/02/2026 a 20/02/2026. Suma de líneas 30.30; cargo 1,82 €/entrega solo en pie. Factura de pescadería/familia (sin cargo de 1,82 € visible).",
+ "alertas": [
+  "Cuota IVA 4 % (0,31) no impresa en el pie; calculada para cuadrar con el total 32,87."
+ ]
+}

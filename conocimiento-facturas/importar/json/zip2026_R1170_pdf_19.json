@@ -1,0 +1,63 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  20
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SOLER MOLNA SL",
+ "cif": "B10669950",
+ "local": "casa_tomas",
+ "numero_documento": "925/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 20,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 13.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.12,
+   "descuento_pct": null,
+   "total": 84.4,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 20,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 7.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 66.26,
+   "descuento_pct": null,
+   "total": 463.8,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 548.2,
+ "desglose_iva": [
+  {
+   "base": 548.2,
+   "pct": 10,
+   "cuota": 54.82
+  }
+ ],
+ "iva": 54.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 603.02,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): SOLER MOLINA. Albaranes de subasta (informativo): 16620, 14423, 15037.",
+ "alertas": []
+}

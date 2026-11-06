@@ -1,0 +1,46 @@
+{
+ "archivo": "R37.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904161-0000063",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AJO BLANCO PELADO 1 KG UNIDAD",
+   "producto_ficha": "Ajo blanco pelado 1 kg",
+   "cantidad": -8,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.462,
+   "descuento_pct": null,
+   "total": -35.7,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -35.7,
+ "desglose_iva": [
+  {
+   "base": -35.7,
+   "pct": 4,
+   "cuota": -1.43
+  }
+ ],
+ "iva": -1.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -37.13,
+ "observaciones": "Rótulo FACTURA; anula la factura 99041600001677 de 13-01-2026. Serie 9904161 = abono. Crédito, vencimiento 14-01-2026.",
+ "alertas": []
+}

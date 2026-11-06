@@ -1,0 +1,52 @@
+{
+ "archivo": "R243.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900001721",
+ "fecha": "2026-02-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GIN TANQUERAY",
+   "producto_ficha": "Gin Tanqueray",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.48,
+   "descuento_pct": null,
+   "total": 299.52,
+   "iva_pct": 21,
+   "albaran_ref": "2904000479",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (importe impreso en la casilla % DTO. del pie)",
+   "importe": -26.96,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 272.56,
+ "desglose_iva": [
+  {
+   "base": 272.56,
+   "pct": 21,
+   "cuota": 57.24
+  }
+ ],
+ "iva": 57.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 329.8,
+ "observaciones": "Escaneo. Albarán 2904000479 del 19/02/2026. Total unidades 24. Forma de pago no impresa.",
+ "alertas": []
+}

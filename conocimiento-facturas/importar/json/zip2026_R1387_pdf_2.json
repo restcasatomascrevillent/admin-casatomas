@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "AMAFRAN C.B.",
+ "cif": "E54238613",
+ "local": "casa_tomas",
+ "numero_documento": "921/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "33 CEFALOPODOS",
+   "producto_ficha": "Cefalópodos (familia 33)",
+   "cantidad": 1.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.9,
+   "descuento_pct": null,
+   "total": 23.63,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 23.63,
+ "desglose_iva": [
+  {
+   "base": 23.63,
+   "pct": 10,
+   "cuota": 2.36
+  }
+ ],
+ "iva": 2.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 25.99,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18578.",
+ "alertas": []
+}

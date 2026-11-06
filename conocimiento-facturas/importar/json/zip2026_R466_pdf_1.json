@@ -1,0 +1,63 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "NUEVO TOMAS Y CARMEN CB",
+ "cif": "E54588041",
+ "local": "casa_tomas",
+ "numero_documento": "405/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 4.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 94.92,
+   "descuento_pct": null,
+   "total": 455.62,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 2,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 158.6,
+   "descuento_pct": null,
+   "total": 229.97,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 685.59,
+ "desglose_iva": [
+  {
+   "base": 685.59,
+   "pct": 10.0,
+   "cuota": 68.56
+  }
+ ],
+ "iva": 68.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 754.15,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6830, 5687, 5201. Embarcaciones: NUEVO TOMAS Y CARMEN, JUAREZ HERMANOS.",
+ "alertas": []
+}

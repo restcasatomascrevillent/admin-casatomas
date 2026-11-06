@@ -1,0 +1,63 @@
+{
+ "archivo": "R536.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 1719",
+ "fecha": "2026-04-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA EXTRA LORETO",
+   "producto_ficha": "Quisquilla extra Loreto",
+   "cantidad": 12.4,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 78.0,
+   "descuento_pct": null,
+   "total": 967.2,
+   "iva_pct": 10,
+   "albaran_ref": "20262909",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. LUBINA X5 120/160",
+   "producto_ficha": "Lubina 120/160 g (caja 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 13.75,
+   "descuento_pct": null,
+   "total": 137.5,
+   "iva_pct": 10,
+   "albaran_ref": "20262909",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1104.7,
+ "desglose_iva": [
+  {
+   "base": 1104.7,
+   "pct": 10,
+   "cuota": 110.47
+  }
+ ],
+ "iva": 110.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1215.17,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 08/05/2026, transferencia a 30 días. Albarán 20262909 del 01/04/2026, pedido 17779. Nota 'Baul' ignorada. La fila Total (3 cajas, 22,40 kg) no son euros.",
+ "alertas": []
+}

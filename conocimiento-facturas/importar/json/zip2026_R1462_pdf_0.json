@@ -1,0 +1,119 @@
+{
+ "archivo": "R1462.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-7300",
+ "fecha": "2026-09-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CERDO SECRETO (OLIVA)",
+   "producto_ficha": "Secreto de cerdo Oliva",
+   "cantidad": 5.87,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.1,
+   "descuento_pct": null,
+   "total": 41.68,
+   "iva_pct": 10,
+   "albaran_ref": "B 14.313",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CERDO CARRILLADA (OLIVA)",
+   "producto_ficha": "Carrillada de cerdo Oliva",
+   "cantidad": 12.88,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.65,
+   "descuento_pct": null,
+   "total": 124.29,
+   "iva_pct": 10,
+   "albaran_ref": "B 14.313",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 14.313",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CORVINA FILETE EXKIMO 1X7 IQF",
+   "producto_ficha": "Filete de corvina Exkimo IQF (7 kg)",
+   "cantidad": 7.0,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": 7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 84.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 14.313",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CHOCO M ENV (OMP)",
+   "producto_ficha": "Choco mediano envasado OMP",
+   "cantidad": 4.6,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 43.7,
+   "iva_pct": 10,
+   "albaran_ref": "B 14.313",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 302.42,
+ "desglose_iva": [
+  {
+   "base": 293.67,
+   "pct": 10,
+   "cuota": 29.37
+  },
+  {
+   "base": 8.75,
+   "pct": 4,
+   "cuota": 0.35
+  }
+ ],
+ "iva": 29.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 332.14,
+ "observaciones": "Vencimiento 13/09/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": []
+}

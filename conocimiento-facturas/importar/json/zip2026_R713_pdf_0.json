@@ -1,0 +1,46 @@
+{
+ "archivo": "R713.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170764097",
+ "fecha": "2026-05-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I 3K ES",
+   "producto_ficha": "Guindilla piparra (bulto 3 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 23.1,
+   "descuento_pct": null,
+   "total": 69.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 69.3,
+ "desglose_iva": [
+  {
+   "base": 69.3,
+   "pct": 4,
+   "cuota": 2.77
+  }
+ ],
+ "iva": 2.77,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 72.07,
+ "observaciones": "Entrega 18.05.2026. Anotación (CP) ignorada. Cuadro de envases vacío. Total BT 1.",
+ "alertas": []
+}

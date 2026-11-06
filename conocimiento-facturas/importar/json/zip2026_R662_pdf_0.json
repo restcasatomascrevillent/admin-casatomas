@@ -1,0 +1,80 @@
+{
+ "archivo": "R662.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 02672",
+ "fecha": "2026-04-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 28.85,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.9,
+   "descuento_pct": null,
+   "total": 458.72,
+   "iva_pct": 10,
+   "albaran_ref": "F569785",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "COLAS ALISTAO 1",
+   "producto_ficha": "Colas alistao 1",
+   "cantidad": 3.2,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 81.6,
+   "iva_pct": 10,
+   "albaran_ref": "F569785",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ROLLITO CARRILLADA Y SETAS 25.UND",
+   "producto_ficha": "Rollito de carrillada y setas (caja 25 uds)",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 50,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 10,
+   "albaran_ref": "F569785",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 590.32,
+ "desglose_iva": [
+  {
+   "base": 590.32,
+   "pct": 10,
+   "cuota": 59.03
+  }
+ ],
+ "iva": 59.03,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 649.35,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F569785. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

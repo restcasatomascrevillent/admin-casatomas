@@ -1,0 +1,63 @@
+{
+ "archivo": "R592.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-2936",
+ "fecha": "2026-04-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AJOS TIERNOS 5X1",
+   "producto_ficha": "Ajos tiernos congelados (5 x 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.95,
+   "descuento_pct": null,
+   "total": 19.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 6.135",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BROCOLI ANEDILCO 2X2.5",
+   "producto_ficha": "Brócoli congelado Anedilco (2 x 2,5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 8.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 6.135",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 28.5,
+ "desglose_iva": [
+  {
+   "base": 28.5,
+   "pct": 4,
+   "cuota": 1.14
+  }
+ ],
+ "iva": 1.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 29.64,
+ "observaciones": "Remesa semanal, vencimiento 03/05/2026. La segunda línea de lote «26-304» de la línea de brócoli no tiene código ni importe y no es artículo. Cuadra al céntimo con el pie.",
+ "alertas": []
+}

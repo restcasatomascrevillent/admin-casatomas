@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "RAJMA, S.C.",
+ "cif": "J54331780",
+ "local": "casa_tomas",
+ "numero_documento": "82/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "MACRUROS",
+   "producto_ficha": null,
+   "cantidad": 3.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 450.21,
+   "iva_pct": 10,
+   "albaran_ref": "2186, 2073, 3396",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 450.21,
+ "desglose_iva": [
+  {
+   "base": 450.21,
+   "pct": 10,
+   "cuota": 45.02
+  }
+ ],
+ "iva": 45.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 495.23,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 113. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

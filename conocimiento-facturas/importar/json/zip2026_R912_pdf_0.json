@@ -1,0 +1,80 @@
+{
+ "archivo": "R912.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EXCLUSIVAS GALICIA, S.L.",
+ "cif": "B30055404",
+ "local": "casa_tomas",
+ "numero_documento": "FV26/ 7008",
+ "fecha": "2026-06-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOBINA CELULOSA CHEMINE EXTRA 1 KG GOFRADO 2CAPAS",
+   "producto_ficha": "Bobina celulosa Chemine extra 1 kg gofrado 2 capas",
+   "cantidad": 12.0,
+   "unidad": "bobina",
+   "bultos": 2.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.62,
+   "descuento_pct": null,
+   "total": 31.44,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BAYETA MICROFIB. 35X38 1/4 UTLABA7 AMARI 240 GR ( 30X5",
+   "producto_ficha": "Bayeta microfibra 35x38 1/4 amarilla 240 g (Utlaba7)",
+   "cantidad": 20.0,
+   "unidad": "bayeta",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.4141,
+   "descuento_pct": null,
+   "total": 8.28,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "GUANTES NITRILO EXTREME LITE NEGRO T-S 5GR SIN POLV",
+   "producto_ficha": "Guantes nitrilo Extreme Lite negro talla S 5 g sin polvo (caja 1000)",
+   "cantidad": 1000.0,
+   "unidad": "guante",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0436,
+   "descuento_pct": null,
+   "total": 43.6,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 83.32,
+ "desglose_iva": [
+  {
+   "base": 83.32,
+   "pct": 21,
+   "cuota": 17.5
+  }
+ ],
+ "iva": 17.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 100.82,
+ "observaciones": "Pedido nº 11525 (fecha del pedido anterior a la factura). Forma de pago CONTADO, vencimiento = fecha factura. Albaran nº vacio. Descuento, portes, anticipo y R.E. 0,00. Descripciones truncadas por el borde de columna en el original.",
+ "alertas": []
+}

@@ -1,0 +1,121 @@
+{
+ "archivo": "R1596.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 07745",
+ "fecha": "2026-09-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "TORT. CAMARON PREMIUM 30.UNI",
+   "producto_ficha": "Tortita de camarón premium (pack 30 uds)",
+   "cantidad": 30,
+   "unidad": "ud",
+   "bultos": 30,
+   "contenido_cantidad": 30,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 30.0,
+   "iva_pct": 10,
+   "albaran_ref": "F576203",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 3,
+   "nombre": "TORPEDO LANGOSTINOS 1KG",
+   "producto_ficha": "Torpedo de langostinos (bolsa 1 kg)",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.0,
+   "descuento_pct": null,
+   "total": 22.0,
+   "iva_pct": 10,
+   "albaran_ref": "F576203",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 3,
+   "nombre": "REVUELTO SETAS X1",
+   "producto_ficha": "Revuelto de setas (bolsa 1 kg)",
+   "cantidad": 6,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.25,
+   "descuento_pct": null,
+   "total": 25.5,
+   "iva_pct": 4,
+   "albaran_ref": "F576203",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 3,
+   "nombre": "RAPE 300/500",
+   "producto_ficha": "Rape 300/500 (cola)",
+   "cantidad": 13.3,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.25,
+   "descuento_pct": null,
+   "total": 189.53,
+   "iva_pct": 10,
+   "albaran_ref": "F576203",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 3,
+   "nombre": "VIEIRA MED/CONCHA 10/20 X1",
+   "producto_ficha": "Vieira media concha 10/20",
+   "cantidad": 1,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.75,
+   "descuento_pct": null,
+   "total": 15.75,
+   "iva_pct": 10,
+   "albaran_ref": "F576203",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 282.78,
+ "desglose_iva": [
+  {
+   "base": 257.28,
+   "pct": 10,
+   "cuota": 25.73
+  },
+  {
+   "base": 25.5,
+   "pct": 4,
+   "cuota": 1.02
+  }
+ ],
+ "iva": 26.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 309.53,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F576203. Recargo de equivalencia impreso 1,4 % / 0,5 %: no se suma al total.",
+ "alertas": [
+  "Texto idéntico al de R1597.pdf (mismo nº de factura y mismo contenido): posible PDF duplicado; no cargar dos veces"
+ ]
+}

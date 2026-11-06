@@ -1,0 +1,46 @@
+{
+ "archivo": "R916.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170769016",
+ "fecha": "2026-06-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "AGUACATE HASS 16 I 4K PE",
+   "producto_ficha": "Aguacate Hass calibre 16 (caja 4 kg)",
+   "cantidad": 1,
+   "unidad": "bulto",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 15.0,
+   "descuento_pct": null,
+   "total": 15.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 15.0,
+ "desglose_iva": [
+  {
+   "base": 15.0,
+   "pct": 4,
+   "cuota": 0.6
+  }
+ ],
+ "iva": 0.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 15.6,
+ "observaciones": "Entrega 19.06.2026. Anotación (CP) ignorada. Cuadro de envases vacío. Total BT 1.",
+ "alertas": []
+}

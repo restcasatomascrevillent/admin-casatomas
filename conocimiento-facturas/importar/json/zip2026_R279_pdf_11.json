@@ -1,0 +1,63 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "PEREZ MARTINEZ, MARIA",
+ "cif": "21283635X",
+ "local": "casa_tomas",
+ "numero_documento": "252/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 12,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 0.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 23.36,
+   "iva_pct": 10,
+   "albaran_ref": "4283, 3654",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 12,
+   "nombre": "PLEURONECTIFORMES",
+   "producto_ficha": null,
+   "cantidad": 2.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 69.12,
+   "iva_pct": 10,
+   "albaran_ref": "4283, 3654",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 92.48,
+ "desglose_iva": [
+  {
+   "base": 92.48,
+   "pct": 10,
+   "cuota": 9.25
+  }
+ ],
+ "iva": 9.25,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 101.73,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 324. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

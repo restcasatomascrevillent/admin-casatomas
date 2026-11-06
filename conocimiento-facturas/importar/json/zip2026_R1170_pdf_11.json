@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ PEREZ, JOSE",
+ "cif": "77707228A",
+ "local": "casa_tomas",
+ "numero_documento": "416/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 12,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.7,
+   "descuento_pct": null,
+   "total": 71.14,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 71.14,
+ "desglose_iva": [
+  {
+   "base": 71.14,
+   "pct": 10,
+   "cuota": 7.11
+  }
+ ],
+ "iva": 7.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 78.25,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): JASMIN. Albaranes de subasta (informativo): 15629.",
+ "alertas": []
+}

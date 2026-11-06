@@ -1,0 +1,46 @@
+{
+ "archivo": "R71.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CÁRNICAS JOSELITO, S.A.",
+ "cif": "A87934337",
+ "local": "casa_tomas",
+ "numero_documento": "R-2690009",
+ "fecha": "2026-01-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PLUMA JOSELITO CONGELADA (reserva RV-982)",
+   "producto_ficha": null,
+   "cantidad": 350.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.0,
+   "descuento_pct": null,
+   "total": 11200.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 11200.0,
+ "desglose_iva": [
+  {
+   "base": 11200.0,
+   "pct": 10,
+   "cuota": 1120.0
+  }
+ ],
+ "iva": 1120.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 12320.0,
+ "observaciones": "Forma de pago: 8 giros de 1.540,00 € (15/02, 15/03, 15/04, 15/05, 15/06, 15/07, 15/08 y 15/09/2026). Cliente 13608. Observación impresa: «Reserva para retirar máximo en octubre 2026».",
+ "alertas": []
+}

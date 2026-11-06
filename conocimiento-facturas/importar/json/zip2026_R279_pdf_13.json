@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  14
+ ],
+ "tipo": "factura",
+ "proveedor": "AMOROS ESCOLANO,MIGUEL",
+ "cif": "21454240R",
+ "local": "casa_tomas",
+ "numero_documento": "35/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 14,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 1.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 43.56,
+   "iva_pct": 10,
+   "albaran_ref": "4150",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 43.56,
+ "desglose_iva": [
+  {
+   "base": 43.56,
+   "pct": 10,
+   "cuota": 4.36
+  }
+ ],
+ "iva": 4.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 47.92,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 569. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

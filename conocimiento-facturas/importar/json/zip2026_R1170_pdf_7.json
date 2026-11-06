@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "SEMPERE ANDREU, EVA",
+ "cif": "48348526L",
+ "local": "casa_tomas",
+ "numero_documento": "474/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 3.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.2,
+   "descuento_pct": null,
+   "total": 101.43,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 101.43,
+ "desglose_iva": [
+  {
+   "base": 101.43,
+   "pct": 10,
+   "cuota": 10.14
+  }
+ ],
+ "iva": 10.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 111.57,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): LA EVA. Albaranes de subasta (informativo): 16232, 14658.",
+ "alertas": []
+}

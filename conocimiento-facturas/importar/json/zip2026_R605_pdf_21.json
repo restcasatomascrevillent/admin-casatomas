@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  22
+ ],
+ "tipo": "factura",
+ "proveedor": "LOPEZ LOPEZ, ANTONIO RAFAEL",
+ "cif": "48361195S",
+ "local": "casa_tomas",
+ "numero_documento": "181/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 22,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 53.51,
+   "descuento_pct": null,
+   "total": 101.66,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 101.66,
+ "desglose_iva": [
+  {
+   "base": 101.66,
+   "pct": 10.0,
+   "cuota": 10.17
+  }
+ ],
+ "iva": 10.17,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 111.83,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: ninguna.",
+ "alertas": []
+}

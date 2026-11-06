@@ -1,0 +1,124 @@
+{
+ "archivo": "R539.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0014478",
+ "fecha": "2026-04-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BEBIDA ESPIRITUOSA ORGULLO 1 L",
+   "producto_ficha": "Bebida espirituosa Orgullo 1 L",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.61,
+   "descuento_pct": null,
+   "total": 6.61,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "VINO BLANCO BRICK VINA LANZAR 1 L",
+   "producto_ficha": "Vino blanco Viña Lanzar brick 1 L",
+   "cantidad": 12,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.844,
+   "descuento_pct": null,
+   "total": 10.13,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MAYONESA ORIGINAL HELLMANN'S 5 L",
+   "producto_ficha": "Mayonesa Hellmann's original 5 L",
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.248,
+   "descuento_pct": null,
+   "total": 32.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "TOMATE CHERRY RAMA KILO",
+   "producto_ficha": "Tomate cherry en rama",
+   "cantidad": 3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.81,
+   "descuento_pct": null,
+   "total": 17.43,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PIMIENTO PIQUILLO TIRAS DON MOLINICO 1,9 KG",
+   "producto_ficha": "Pimiento piquillo en tiras Don Molinico 1,9 kg",
+   "cantidad": 18,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.712,
+   "descuento_pct": null,
+   "total": 138.82,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 205.49,
+ "desglose_iva": [
+  {
+   "base": 17.43,
+   "pct": 4,
+   "cuota": 0.7
+  },
+  {
+   "base": 171.32,
+   "pct": 10,
+   "cuota": 17.13
+  },
+  {
+   "base": 16.74,
+   "pct": 21,
+   "cuota": 3.52
+  }
+ ],
+ "iva": 21.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 226.84,
+ "observaciones": "Factura. Crédito. Vencimiento 08-04-2026. Tachaduras/rayas de bolígrafo sobre varias líneas y sobre la columna Cajas (cifras manuscritas ilegibles); no se extrae Cajas (bultos null). Texto impreso de las líneas válido.",
+ "alertas": []
+}
