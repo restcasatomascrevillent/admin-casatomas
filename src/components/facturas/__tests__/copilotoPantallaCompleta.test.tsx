@@ -102,6 +102,8 @@ describe("copiloto: «Pantalla completa» en el panel lateral", () => {
     doble.invoke.mockImplementation(() => new Promise((r) => (responder = r)));
     montar("/facturas?tab=chat&local=touza");
     const p = await abrirPanel();
+    // Con el panel abierto se sigue viendo lo gastado del chatbot este mes (06/11/2026).
+    expect(within(within(panel()).getByTestId("copiloto-gasto")).getByTestId("gasto-ia-pestana")).toBeInTheDocument();
     preguntarEn(p, "¿Qué ha subido este mes?");
     await within(panel()).findByText("¿Qué ha subido este mes?");
     await waitFor(() => expect(doble.invoke).toHaveBeenCalled());

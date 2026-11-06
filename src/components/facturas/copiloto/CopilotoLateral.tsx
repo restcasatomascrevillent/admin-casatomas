@@ -18,6 +18,7 @@ import { esClicDeNuevaPestana } from "@/lib/facturas/copilotoCompleto";
 import type { Conversacion, MensajeChat } from "@/hooks/useChatFacturas";
 import type { GraficaIa } from "@/lib/facturas/graficasCopiloto";
 import { ConversacionesList } from "../ConversacionesList";
+import { GastoIaPestana } from "../GastoIaPestana";
 import { PanelCopiloto } from "./PanelCopiloto";
 import { esTactil, useFocoAlCerrar } from "../analisis/desplazar";
 
@@ -139,6 +140,13 @@ export function CopilotoLateral({
             </button>
           </SheetClose>
         </SheetHeader>
+        {/* Lo gastado del chatbot este mes: el panel tapa la parte derecha de la barra de
+            pestañas, donde sale normalmente (06/11/2026, dueño: «que no desaparezca cuando
+            se abra el chat»). */}
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/60 pl-4 pr-1 text-xs text-muted-foreground" data-testid="copiloto-gasto">
+          <span>Coste de la IA</span>
+          <GastoIaPestana />
+        </div>
         {verHistorial ? (
           <div className="min-h-0 flex-1 overflow-y-auto">
             <ConversacionesList
