@@ -19,6 +19,7 @@ import type { Conversacion, MensajeChat } from "@/hooks/useChatFacturas";
 import type { GraficaIa } from "@/lib/facturas/graficasCopiloto";
 import { PARAM_CONVERSACION } from "@/lib/facturas/copilotoCompleto";
 import { ConversacionesList } from "../ConversacionesList";
+import { GastoIaPestana } from "../GastoIaPestana";
 import { PanelCopiloto } from "./PanelCopiloto";
 import { esTactil } from "../analisis/desplazar";
 
@@ -167,6 +168,9 @@ export function ChatPantallaCompleta({
             </p>
           )}
         </div>
+        {/* Lo que va gastado del chatbot este mes: a pantalla completa no están las pestañas,
+            que es donde sale normalmente (06/11/2026, dueño: «ha desaparecido el coste que llevamos»). */}
+        <GastoIaPestana />
         <button type="button" className={cn(BOTON, "hidden sm:inline-flex lg:hidden")} onClick={nueva}>
           <Plus className="h-4 w-4" aria-hidden /> Nueva
         </button>

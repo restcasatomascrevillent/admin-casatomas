@@ -15,7 +15,7 @@ vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), err
 vi.mock("@/components/DashboardLayout", () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock("@/components/facturas/compras/TabCompras", () => ({ TabCompras: () => <p>Compras</p> }));
 vi.mock("@/components/facturas/SubidaFacturas", () => ({ SubidaFacturas: () => <p>Subida</p> }));
-vi.mock("@/components/facturas/GastoIaPestana", () => ({ GastoIaPestana: () => null }));
+vi.mock("@/components/facturas/GastoIaPestana", () => ({ GastoIaPestana: () => <span data-testid="gasto-ia-pestana">0,01 € este mes</span> }));
 vi.mock("@/components/avisos/BotonAvisosSeccion", () => ({ BotonAvisosSeccion: () => null }));
 vi.mock("@/components/ayuda/BotonAyuda", () => ({ BotonAyuda: () => null }));
 vi.mock("@/hooks/useContadorDocumentos", () => ({ useContadorDocumentos: () => ({ data: 3 }) }));
@@ -158,6 +158,8 @@ describe("copiloto: /facturas/ia abierta en otra pestaña", () => {
     expect(within(vista).getByText("Gasto de octubre", { selector: "p" })).toBeInTheDocument();
     const historial = within(vista).getByRole("complementary", { name: "Historial de conversaciones" });
     expect(within(historial).getByText("Proveedores de pescado")).toBeInTheDocument();
+    // Lo gastado del chatbot este mes también a pantalla completa (sin pestañas arriba, 06/11/2026).
+    expect(within(completa()).getByTestId("gasto-ia-pestana")).toBeInTheDocument();
 
     // Cambiar de conversación desde el historial: la URL la sigue (sin apilar historial).
     fireEvent.click(within(historial).getByText("Proveedores de pescado"));
