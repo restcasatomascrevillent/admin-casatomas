@@ -32,10 +32,10 @@ const de = (permisos: PermisoSeccion[], clave: string) => permisos.find((p) => p
 
 describe("SECCIONES_CONFIGURABLES", () => {
   // Tienda incluida en todos los entornos, también en producción: ya no es maqueta (dueño, 04/11/2026).
-  it("son las secciones del panel salvo «usuarios» (que va por rol admin, no por permisos)", () => {
+  it("son todas las secciones del panel, «usuarios» incluida (configurable desde el 06/11/2026)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
     expect(claves).toEqual([
-      "dashboard", "reservas", "reservas_configuracion", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida",
+      "dashboard", "reservas", "reservas_configuracion", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida", "usuarios",
     ]);
   });
 
@@ -104,17 +104,18 @@ describe("permisosParaEditar", () => {
     expect(de(permisos, "reservas")).toEqual(permiso("reservas", true, true));
   });
 
-  it("ignora secciones que ya no se configuran desde aquí (usuarios, retiradas)", () => {
+  it("ignora secciones retiradas; «usuarios» es un solo interruptor («Puede ver», sin edición)", () => {
     const permisos = permisosParaEditar([permiso("usuarios", true, true), permiso("trabajadores", true, true)]);
-    expect(de(permisos, "usuarios")).toBeUndefined();
+    expect(de(permisos, "usuarios")).toEqual(permiso("usuarios", true, false));
     expect(de(permisos, "trabajadores")).toBeUndefined();
   });
 });
 
 describe("«Facturas · Subida»: un solo interruptor («Puede subir», en can_view)", () => {
-  it("solo esa sección lo tiene", () => {
+  it("solo esa sección y «Usuarios» lo tienen", () => {
     expect(interruptorUnico("facturas_subida")).toBe("Puede subir");
-    for (const s of SECCIONES_CONFIGURABLES.filter((x) => x.key !== "facturas_subida")) expect(interruptorUnico(s.key), s.key).toBeNull();
+    expect(interruptorUnico("usuarios")).toBe("Puede ver");
+    for (const s of SECCIONES_CONFIGURABLES.filter((x) => x.key !== "facturas_subida" && x.key !== "usuarios")) expect(interruptorUnico(s.key), s.key).toBeNull();
   });
 
   it("lo guardado en can_view o en can_edit (por SQL) es «sí», y se guarda en can_view sin edición", () => {
@@ -193,3 +194,22 @@ describe("mismosPermisos", () => {
   });
 });
 
+
+
+describe("rol que sigue a los permisos (06/11/2026)", () => {
+  it("edita en todo → admin; en algo → manager; solo ve → staff", async () => {
+    const { rolSegunPermisos } = await import("@/components/usuarios/permisosSecciones");
+    const todas = SECCIONES_CONFIGURABLES.map((s) => permiso(s.key, true, true));
+    expect(rolSegunPermisos(todas)).toBe("admin");
+    expect(rolSegunPermisos([permiso("reservas", true, true), permiso("facturas", true, false)])).toBe("manager");
+    expect(rolSegunPermisos([permiso("reservas", true, false), permiso("usuarios", true, false)])).toBe("staff");
+    expect(rolSegunPermisos([])).toBe("staff");
+  });
+  it("con un rol preconfigurado elegido, su rol; a mano, el de un preconfigurado igual o el calculado", async () => {
+    const { rolAlGuardar } = await import("@/components/usuarios/permisosSecciones");
+    const presets = [{ id: "p1", base_role: "manager" as const, permissions: [permiso("reservas", true, false)] }];
+    expect(rolAlGuardar([permiso("facturas", true, false)], presets, "p1")).toBe("manager");
+    expect(rolAlGuardar([permiso("reservas", true, false)], presets, null)).toBe("manager");
+    expect(rolAlGuardar([permiso("facturas", true, false)], presets, null)).toBe("staff");
+  });
+});

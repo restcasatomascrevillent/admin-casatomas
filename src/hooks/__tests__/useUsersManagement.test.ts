@@ -206,7 +206,8 @@ const GUARDADAS: Fila[] = [
   { section_key: "asistente_telefonico", can_view: true, can_edit: true },
   { section_key: "usuarios", can_view: true, can_edit: false },
 ];
-const NO_GESTIONADAS = ["gestion_bot", "asistente_telefonico", "usuarios"];
+// «usuarios» la gestiona el diálogo desde el 06/11/2026 (un solo interruptor, «Puede ver»).
+const NO_GESTIONADAS = ["gestion_bot", "asistente_telefonico"];
 /** Fila de OTRO usuario: un guardado de USUARIO no la toca nunca. */
 const DE_OTRO: FilaBd = { user_id: OTRO, section_key: "reservas", can_view: true, can_edit: true, updated_at: "2026-09-01T10:00:00Z" };
 
@@ -255,7 +256,7 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
     const escrituras = doble.escriturasEn("user_permissions");
     expect(escrituras.map((o) => o.tipo)).toEqual(["upsert", "delete"]);
     expect(escrituras[0].opciones).toEqual({ onConflict: "user_id,section_key" });
-    expect(escrituras[0].payload!.map((f) => f.section_key).sort()).toEqual(["dashboard", "gestor_carta", "reservas"]);
+    expect(escrituras[0].payload!.map((f) => f.section_key).sort()).toEqual(["dashboard", "gestor_carta", "reservas", "usuarios"]);
     expect(escrituras[1].filtros).toEqual([
       ["eq", "user_id", USUARIO],
       ["in", "section_key", ["reservas_configuracion", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida"]],
@@ -362,7 +363,6 @@ describe("useUsersManagement · setAllPermissions guarda sin dejar al usuario co
       ...dialogo(),
       { section_key: "gestion_bot", can_view: false, can_edit: false },
       { section_key: "asistente_telefonico", can_view: true, can_edit: false },
-      { section_key: "usuarios", can_view: false, can_edit: false },
       { section_key: "espacios", can_view: true, can_edit: true },
     ];
 

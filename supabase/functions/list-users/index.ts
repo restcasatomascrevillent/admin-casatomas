@@ -11,8 +11,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
-// Quién puede ver la lista: rol admin (is_admin) o fila en super_admins
-// (is_super_admin), siempre según la BD. El email del JWT ya no basta aunque
+// Quién puede ver la lista: «Ver» en la sección «usuarios» (has_section_permission;
+// desde el 06/11/2026, antes el rol admin) o fila en super_admins (is_super_admin),
+// siempre según la BD. El email del JWT ya no basta aunque
 // esté en SUPER_ADMIN_EMAILS (CT-REM-FN-12). is_admin solo mira user_roles, así
 // que un super admin sin rol admin entra por is_super_admin (antes entraba por
 // su email). Si alguna RPC falla se responde 503 (fail-closed).
@@ -71,10 +72,12 @@ Deno.serve(
       }
 
       let puedeVer = false;
-      for (const rpc of ["is_admin", "is_super_admin"] as const) {
-        const { data, error } = (await supabaseAdmin.rpc(rpc, {
-          _user_id: currentUser.id,
-        })) as RespuestaRpc;
+      const comprobaciones = [
+        { rpc: "has_section_permission", args: { _user_id: currentUser.id, _section: "usuarios", _permission: "view" } },
+        { rpc: "is_super_admin", args: { _user_id: currentUser.id } },
+      ] as const;
+      for (const { rpc, args } of comprobaciones) {
+        const { data, error } = (await supabaseAdmin.rpc(rpc, args)) as RespuestaRpc;
         if (error) {
           console.error(`Error comprobando ${rpc}:`, error);
           return respuestaJson(
@@ -90,7 +93,7 @@ Deno.serve(
 
       if (!puedeVer) {
         return respuestaJson(
-          { error: "Solo administradores pueden ver usuarios" },
+          { error: "No tienes permiso para ver los usuarios" },
           403,
         );
       }

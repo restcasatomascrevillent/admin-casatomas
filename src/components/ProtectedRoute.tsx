@@ -90,12 +90,7 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
       )?.ruta ?? "/ayuda"; // /ayuda no exige permisos: nunca rebota
       navigate(destino, { replace: true });
     };
-    // La sección de usuarios es solo para admins (no configurable por
-    // permisos, igual que antes).
-    if (sectionKeys.includes("usuarios")) {
-      if (!isAdmin) rechazar();
-      return;
-    }
+    // «Usuarios» se configura por permisos como las demás (06/11/2026; antes, rol admin).
 
     // Verificar permiso de visualización (basta con una de las secciones:
     // p. ej. el Gestor Web agrupa carta, contenido web y bot, y cada pestaña
@@ -122,6 +117,6 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
 
   const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
   const keys = Array.isArray(required) ? required : required ? [required] : [];
-  if (!isSuperAdmin && keys.length && (keys.includes("usuarios") ? !isAdmin : !keys.some(key => permissions.some(p => p.section_key === key && p.can_view)))) return null;
+  if (!isSuperAdmin && keys.length && !keys.some(key => permissions.some(p => p.section_key === key && p.can_view))) return null;
   return <>{children}</>;
 };

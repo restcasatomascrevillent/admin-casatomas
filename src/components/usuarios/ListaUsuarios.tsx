@@ -66,7 +66,9 @@ import {
   cambiarEditar,
   cambiarVer,
   mismosPermisos,
+  NOMBRE_ROL,
   permisosParaEditar,
+  rolAlGuardar,
   SOLO_SUPER_ADMIN_CAMBIA_PERMISOS,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
@@ -194,17 +196,12 @@ export function ListaUsuarios({
       },
     );
     if (!guardado) return;
-    if (selectedPresetId !== "manual") {
-      const selectedPreset = presets.find(
-        (preset) => preset.id === selectedPresetId,
-      );
-      if (selectedPreset) {
-        const actualizado = await updateUserRole(
-          selectedUser.id,
-          selectedPreset.base_role,
-        );
-        if (!actualizado) return;
-      }
+    // El rol sigue a los permisos (06/11/2026): el del preconfigurado elegido o, si se han
+    // tocado a mano, el que corresponde a lo marcado (ver rolAlGuardar).
+    const rolNuevo = rolAlGuardar(editingPermissions, presets, selectedPresetId === "manual" ? null : selectedPresetId);
+    if (rolNuevo !== selectedUser.role) {
+      const actualizado = await updateUserRole(selectedUser.id, rolNuevo);
+      if (!actualizado) return;
     }
     closePermissionsDialog();
     } finally {
@@ -484,6 +481,15 @@ export function ListaUsuarios({
               </SelectContent>
             </Select>
           </div>
+          {selectedUser && !selectedUser.is_super_admin && (
+            <p className="text-xs text-muted-foreground" data-testid="rol-al-guardar">
+              Rol al guardar:{" "}
+              <span className="font-medium text-foreground">
+                {NOMBRE_ROL[rolAlGuardar(editingPermissions, presets, selectedPresetId === "manual" ? null : selectedPresetId)]}
+              </span>
+              {selectedPresetId === "manual" && " · sale de los permisos: edita en todo → Admin; en algo → Manager; solo ve → Staff"}
+            </p>
+          )}
           <div className="max-h-[52dvh] overflow-y-auto pr-1">
             <TablaPermisosSecciones
               permisos={editingPermissions}

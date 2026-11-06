@@ -159,8 +159,7 @@ export function AppSidebar() {
     const keys = Array.isArray(item.sectionKey)
       ? item.sectionKey
       : [item.sectionKey];
-    // Usuarios es solo para admins, no configurable por permisos (2026-09-26).
-    if (keys.includes("usuarios")) return isAdmin;
+    // Usuarios se configura por permisos como las demás desde el 06/11/2026 (antes, rol admin).
     // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
     // todo pase lo que pase en la tabla de permisos.
     if (isSuperAdmin) return true;

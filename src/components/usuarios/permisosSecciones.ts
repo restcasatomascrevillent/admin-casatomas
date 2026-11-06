@@ -15,7 +15,7 @@
  *     (`puedeConcederEdicion` en los componentes; en la BD, la RLS de
  *     user_permissions solo deja escribir a super admins).
  */
-import { SECTIONS } from "@/hooks/useUserRole";
+import { SECTIONS, type AppRole } from "@/hooks/useUserRole";
 import type { ManagedUser } from "@/hooks/useUsersManagement";
 
 export interface PermisoSeccion {
@@ -25,15 +25,14 @@ export interface PermisoSeccion {
 }
 
 type Seccion = (typeof SECTIONS)[number];
-type SeccionConfigurable = Exclude<Seccion, { key: "usuarios" }>;
+type SeccionConfigurable = Seccion;
 
 /**
- * Secciones que se configuran desde Usuarios. «usuarios» no: esa sección va por
- * rol admin, no por permisos (ProtectedRoute / AppSidebar).
+ * Secciones que se configuran desde Usuarios. Desde el 06/11/2026 también
+ * «usuarios» (antes iba por el rol admin): un solo interruptor, «Puede ver», que
+ * deja consultar la lista en el admin panel; gestionarla es solo del super admin.
  */
-export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
-  (seccion): seccion is SeccionConfigurable => seccion.key !== "usuarios",
-);
+export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = [...SECTIONS];
 
 /**
  * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,
@@ -62,6 +61,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
     "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y usar la IA; también subir (pestaña Cargar). Con solo «Ver» se consultan Análisis y Compras.",
   facturas_subida:
     "pestaña Cargar: subir facturas y albaranes, decidir sobre los repetidos y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
+  usuarios:
+    "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };
 
 /**
@@ -73,6 +74,7 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
  */
 export const SECCIONES_UN_INTERRUPTOR: Partial<Record<SeccionConfigurable["key"], { etiqueta: string }>> = {
   facturas_subida: { etiqueta: "Puede subir" },
+  usuarios: { etiqueta: "Puede ver" },
 };
 
 /** Etiqueta del único interruptor de la sección («Puede subir»), o null si tiene «Ver» y «Puede editar». */
@@ -121,6 +123,49 @@ export function sinEdicion(permisos: PermisoSeccion[]): PermisoSeccion[] {
   return permisos.map((p) => (p.can_edit ? { ...p, can_edit: false } : p));
 }
 
+/**
+ * Secciones que NO cuentan para decidir el rol por los permisos: el Dashboard («Editar»
+ * no hace nada), los dos perfiles especiales de Instagram, «Facturas · Subida» y
+ * «Usuarios» (un solo interruptor cada una).
+ */
+const SECCIONES_FUERA_DEL_ROL = new Set(["dashboard", "instagram_agencia", "instagram_render", "facturas_subida", "usuarios"]);
+
+/**
+ * Rol base que corresponde a unos permisos (06/11/2026, dueño: «cuando cambias los
+ * permisos no se actualiza bien el rol»). Antes el rol solo cambiaba al elegir un rol
+ * preconfigurado: al tocar los permisos a mano, alguien que era «Admin» seguía
+ * saliendo como «Admin» con solo «Ver». Regla:
+ *   - edita en TODAS las secciones que cuentan → admin;
+ *   - edita en alguna → manager;
+ *   - solo ve (o nada) → staff.
+ */
+export function rolSegunPermisos(origen: ReadonlyArray<PermisoGuardado>): AppRole {
+  const permisos = permisosParaEditar(origen);
+  const cuentan = permisos.filter((p) => !SECCIONES_FUERA_DEL_ROL.has(p.section_key));
+  if (cuentan.length > 0 && cuentan.every((p) => p.can_edit)) return "admin";
+  if (permisos.some((p) => p.can_edit)) return "manager";
+  return "staff";
+}
+
+/**
+ * Rol que se guarda con unos permisos: el del rol preconfigurado elegido o, si se han
+ * tocado a mano, el de un preconfigurado con esos mismos permisos; si no hay ninguno,
+ * el que sale de `rolSegunPermisos`.
+ */
+export function rolAlGuardar(
+  permisos: ReadonlyArray<PermisoGuardado>,
+  presets: ReadonlyArray<{ id: string; base_role: AppRole; permissions: ReadonlyArray<PermisoGuardado> }>,
+  presetElegido: string | null,
+): AppRole {
+  const elegido = presetElegido ? presets.find((p) => p.id === presetElegido) : undefined;
+  if (elegido) return elegido.base_role;
+  const igual = presets.find((p) => mismosPermisos(permisos, p.permissions));
+  return igual ? igual.base_role : rolSegunPermisos(permisos);
+}
+
+/** Nombre legible de un rol base. */
+export const NOMBRE_ROL: Record<AppRole, string> = { admin: "Admin", manager: "Manager", staff: "Staff" };
+
 /** ¿Coinciden «Ver» y «Puede editar» en todas las secciones configurables? */
 export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArray<PermisoGuardado>): boolean {
   const pb = permisosParaEditar(b);
@@ -161,12 +206,5 @@ export function seccionesConPermisos(user: DatosPermisos): Array<{
         editar: user.is_super_admin || Boolean(permiso?.can_edit),
       };
     }),
-    {
-      key: "usuarios",
-      label: "Usuarios",
-      ayuda: "Consulta en el admin panel; gestión en el superadmin.",
-      ver: user.is_super_admin || user.role === "admin",
-      editar: user.is_super_admin,
-    },
   ];
 }

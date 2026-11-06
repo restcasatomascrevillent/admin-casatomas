@@ -227,6 +227,23 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     expect(within(actualizada).queryByText("Gestiona usuarios")).toBeNull();
   });
 
+  it("al tocar los permisos a mano el rol sigue a los permisos: un admin con solo «Ver» pasa a Staff (06/11/2026)", async () => {
+    doble.bd.tablas.user_roles.find((f) => f.user_id === CAMARERO)!.role = "admin";
+    h.presets = [];
+    render(<ListaUsuarios canManageSuperAdmins />);
+    const fila = (await screen.findByText("camarero1")).closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    // Con solo «Ver» en lo que tenga, el diálogo avisa del rol que se guardará.
+    for (const sw of within(dialogo).queryAllByRole("switch", { name: /^Puede editar / })) {
+      if (sw.getAttribute("aria-checked") === "true") fireEvent.click(sw);
+    }
+    expect(within(dialogo).getByTestId("rol-al-guardar")).toHaveTextContent("Rol al guardar: Staff");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.filasDe("user_roles", CAMARERO)[0].role).toBe("staff");
+  });
+
   it("el acceso completo solo se muestra a los super admins", async () => {
     render(<ListaUsuarios canManageSuperAdmins />);
     const fila = (await screen.findByText("Dueño")).closest("tr")!;
