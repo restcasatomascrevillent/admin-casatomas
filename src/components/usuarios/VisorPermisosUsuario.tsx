@@ -18,24 +18,36 @@ export function ListaPermisosUsuario({ user }: { user: DatosPermisos }) {
         <span>Sección</span><span className="text-center">Ver</span><span className="text-center">Editar</span>
       </div>
       <ul aria-label="Permisos por sección" className="divide-y">
-        {secciones.map(({ key, label, ayuda, ver: verGuardado, editar }) => {
+        {secciones.map(({ key, label, ayuda, ver: verGuardado, editar, unInterruptor }) => {
           // «Reservas · Configuración»: «Ver» sin «Editar» no da acceso, así que se enseña como «No».
           const ver = esSeccionSoloEdicion(key) ? editar : verGuardado;
           return (
-            <li key={key} className="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_4rem_4rem] sm:items-center sm:gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{label}</p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{ayuda}</p>
-              </div>
-              <div className="flex flex-wrap gap-2 sm:contents">
-                <span aria-label={`Ver ${label}: ${ver ? "Sí" : "No"}`} className={cn("rounded-md px-2 py-1 text-center text-xs font-medium", ver ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
-                  <span className="sm:sr-only">Ver: </span>{ver ? "Sí" : "No"}
-                </span>
-                <span aria-label={`Editar ${label}: ${editar ? "Sí" : "No"}`} className={cn("rounded-md px-2 py-1 text-center text-xs font-medium", editar ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
-                  <span className="sm:sr-only">Editar: </span>{editar ? "Sí" : "No"}
-                </span>
-              </div>
-            </li>
+          <li key={key} className="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_4rem_4rem] sm:items-center sm:gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{label}</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{ayuda}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 sm:contents">
+              {unInterruptor ? (
+                // «Facturas · Subida»: un solo permiso («Puede subir»), en la columna «Ver».
+                <>
+                  <span aria-label={`${unInterruptor} ${label}: ${ver ? "Sí" : "No"}`} className={cn("rounded-md px-2 py-1 text-center text-xs font-medium", ver ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+                    <span className="sm:sr-only">{unInterruptor}: </span>{ver ? "Sí" : "No"}
+                  </span>
+                  <span aria-hidden="true" className="hidden text-center text-xs text-muted-foreground sm:block">—</span>
+                </>
+              ) : (
+                <>
+                  <span aria-label={`Ver ${label}: ${ver ? "Sí" : "No"}`} className={cn("rounded-md px-2 py-1 text-center text-xs font-medium", ver ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+                    <span className="sm:sr-only">Ver: </span>{ver ? "Sí" : "No"}
+                  </span>
+                  <span aria-label={`Editar ${label}: ${editar ? "Sí" : "No"}`} className={cn("rounded-md px-2 py-1 text-center text-xs font-medium", editar ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground")}>
+                    <span className="sm:sr-only">Editar: </span>{editar ? "Sí" : "No"}
+                  </span>
+                </>
+              )}
+            </div>
+          </li>
           );
         })}
       </ul>

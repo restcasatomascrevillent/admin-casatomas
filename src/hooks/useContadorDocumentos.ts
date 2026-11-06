@@ -5,9 +5,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useContadorDocumentos() {
+export function useContadorDocumentos({ enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ["facturas", "contador-pestana"],
+    // Sin la pestaña Compras (solo «Facturas · Subida») no se pide.
+    enabled,
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<number> => {
       const { count, error } = await supabase.from("facturas").select("id", { count: "exact", head: true }).in("tipo", ["factura", "albaran"]);

@@ -3,7 +3,7 @@
 //   registrar-metrica    → cualquier usuario, pero usuario_id/email SALEN DEL JWT
 //   vapi-analytics       → sección dashboard (view), solo presets
 //   sync-google-reviews  → gestion_web (edit) o service role
-//   buscar-precios-mercado → facturas (view), query ≤ 200, uso registrado
+//   buscar-precios-mercado → facturas (edit: es IA, 06/11/2026), query ≤ 200, uso registrado
 // Sin red: Supabase, VAPI, Google y Perplexity simulados.
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,6 +15,7 @@ const h = vi.hoisted(() => {
     "jwt-webver": { id: "44444444-4444-4444-8444-444444444444", email: "webver@staff.local", permisos: { gestion_web: "view" } },
     "jwt-webedit": { id: "55555555-5555-4555-8555-555555555555", email: "webedit@staff.local", permisos: { gestion_web: "edit" } },
     "jwt-fact": { id: "66666666-6666-4666-8666-666666666666", email: "fact@staff.local", permisos: { facturas: "view" } },
+    "jwt-factedit": { id: "77777777-7777-4777-8777-777777777777", email: "factedit@staff.local", permisos: { facturas: "edit" } },
   };
   const estado = {
     handlers: {} as Record<string, (req: Request) => Promise<Response>>,
@@ -197,14 +198,18 @@ describe("sync-google-reviews", () => {
 });
 
 describe("buscar-precios-mercado", () => {
-  it("facturas:view busca y registra el uso", async () => {
-    const res = await llamar("buscar-precios-mercado", "jwt-fact", { query: "merluza" });
+  it("facturas:edit busca y registra el uso", async () => {
+    const res = await llamar("buscar-precios-mercado", "jwt-factedit", { query: "merluza" });
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ content: "1 €/kg", query: "merluza" });
     expect(h.estado.rpcs).toContain("ia_registrar_uso");
   });
+  it("con solo facturas:view → 403 sin llamar a Perplexity (la IA de Facturas exige «Editar»)", async () => {
+    expect((await llamar("buscar-precios-mercado", "jwt-fact", { query: "merluza" })).status).toBe(403);
+    expect(h.estado.fetchs).toEqual([]);
+  });
   it("consulta demasiado larga → 400 sin llamar a Perplexity", async () => {
-    expect((await llamar("buscar-precios-mercado", "jwt-fact", { query: "a".repeat(201) })).status).toBe(400);
+    expect((await llamar("buscar-precios-mercado", "jwt-factedit", { query: "a".repeat(201) })).status).toBe(400);
     expect(h.estado.fetchs).toEqual([]);
   });
 });

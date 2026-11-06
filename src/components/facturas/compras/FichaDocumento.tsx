@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefO
 import { Package, Pencil, Plus, Sparkles, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AlertaValidacion, Factura, ProductoFactura } from "@/hooks/useFacturas";
-import { useCanAccessSection } from "@/hooks/useUserRole";
+import { usePuedeCorregirDocumento } from "@/hooks/usePermisosFacturas";
 import { formatDate, formatDateTime, formatImporte, type MediaPrecioLinea } from "@/components/facturas/shared/formatters";
 import { etiquetaRetencion } from "@/lib/facturas/retencion";
 import { BotonOriginal } from "@/components/facturas/shared/BotonOriginal";
@@ -132,7 +132,9 @@ export function FichaDocumento({
   onAbrirProveedor: (nombre: string) => void;
   onAbrirDocumento: (id: number) => void;
 }) {
-  const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
+  // Corregir este documento: con «Editar» en Facturas, cualquiera; con «Facturas · Subida»,
+  // solo si lo subió él (06/11/2026). Vincular albaranes, etc., lo deciden sus piezas («Editar»).
+  const puedeEditar = usePuedeCorregirDocumento(doc.id);
   const [añadiendo, setAñadiendo] = useState(false);
   // Al cambiar de documento se cierra el formulario de línea nueva.
   useEffect(() => setAñadiendo(false), [doc.id]);
@@ -281,7 +283,7 @@ export function FichaDocumento({
             <span />
           </div>
           {doc.productos.map((p) => (
-            <FilaProducto key={p.id} p={p} isMobile mediaReferencia={mediaPrecio?.(p, doc)} onAbrirProducto={onAbrirProducto} />
+            <FilaProducto key={p.id} p={p} isMobile mediaReferencia={mediaPrecio?.(p, doc)} onAbrirProducto={onAbrirProducto} editable={puedeEditar} />
           ))}
         </div>
       )}

@@ -252,14 +252,17 @@ proveedor + número). Coste orientativo: ~11 k tokens de subagente por PDF.
 16. `20261106200000_facturas_cargar_qa`
 17. `20261106300000_facturas_retencion_irpf`
 18. `20261106310000_compras_meses_incompletos`
-19. **Otra vez** `20261105200000_rls_permisos_una_vez` (idempotente) para envolver las políticas creadas
+19. `20261106510000_permisos_facturas_subida` («Ver» solo consulta y permiso «Facturas · Subida»; a la vez
+    que `procesar-factura`, `chat-facturas` y `buscar-precios-mercado` y el panel nuevo)
+20. **Otra vez** `20261105200000_rls_permisos_una_vez` (idempotente) para envolver las políticas creadas
     después.
 
 Comprobar además que `20261104120000_productos_factura_alertas_al_anadir_borrar` (ya en `main`) está
 aplicada en producción. Las migraciones de Instagram, vinos, etc. de esa tanda son de otras secciones.
 
 **B. Funciones** a desplegar en producción: `procesar-factura`, `ocr-trabajo`, `chat-facturas`,
-`importar-factura-historica` (nueva), `facturas-originales-drive` (nueva). `clasificar-productos` no
+`importar-factura-historica` (nueva), `facturas-originales-drive` (nueva), `buscar-precios-mercado`
+(exige «Editar» desde el 06/11/2026). `clasificar-productos` no
 cambió, pero comparte `_shared/`: redesplegarla también es lo seguro.
 
 **C. Datos** (después de A y B):

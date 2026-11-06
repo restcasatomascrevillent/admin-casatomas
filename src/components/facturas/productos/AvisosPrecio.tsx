@@ -14,7 +14,8 @@ import { mensajeUsuario } from "@/lib/mensaje-usuario";
  * Facturas › Productos: umbral del aviso automático de subida de precio
  * (migración 20261007170000, tabla `configuracion_facturas`). Si la migración
  * no está aplicada (no hay fila) no se pinta nada. Sin permiso de edición se
- * ve el valor pero no se cambia (la RLS lo impide igualmente).
+ * ve el valor como texto, sin controles (06/11/2026: lo que no se puede usar se
+ * oculta; la RLS lo impide igualmente).
  */
 interface ConfigAvisos {
   umbral_subida_precio_pct: number;
@@ -100,27 +101,36 @@ export function AvisosPrecio({ puedeEditar, soloIcono = false }: { puedeEditar: 
           Aviso en la campana cuando llega un producto más caro que su precio de referencia (media de las compras
           anteriores, sin IVA).
         </p>
-        <div className="flex items-center justify-between gap-2">
-          <Label htmlFor="avisos-precio-activos">Avisar</Label>
-          <Switch id="avisos-precio-activos" checked={activos} onCheckedChange={setActivos} disabled={!puedeEditar} />
-        </div>
-        <div className="flex items-center gap-2">
-          <Label htmlFor="avisos-precio-umbral" className="flex-1">Si sube más de</Label>
-          <Input
-            id="avisos-precio-umbral"
-            inputMode="decimal"
-            value={umbral}
-            onChange={(e) => setUmbral(e.target.value)}
-            disabled={!puedeEditar || !activos}
-            aria-invalid={!valido}
-            className="w-20 text-right tabular-nums"
-          />
-          <span className="text-sm">%</span>
-        </div>
-        {puedeEditar && (
-          <Button className="w-full" disabled={!valido || guardar.isPending} onClick={() => guardar.mutate()}>
-            {guardar.isPending ? "Guardando…" : "Guardar"}
-          </Button>
+        {puedeEditar ? (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="avisos-precio-activos">Avisar</Label>
+              <Switch id="avisos-precio-activos" checked={activos} onCheckedChange={setActivos} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="avisos-precio-umbral" className="flex-1">Si sube más de</Label>
+              <Input
+                id="avisos-precio-umbral"
+                inputMode="decimal"
+                value={umbral}
+                onChange={(e) => setUmbral(e.target.value)}
+                disabled={!activos}
+                aria-invalid={!valido}
+                className="w-20 text-right tabular-nums"
+              />
+              <span className="text-sm">%</span>
+            </div>
+            <Button className="w-full" disabled={!valido || guardar.isPending} onClick={() => guardar.mutate()}>
+              {guardar.isPending ? "Guardando…" : "Guardar"}
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm font-medium" data-testid="avisos-precio-solo-lectura">
+            {config.data.avisos_subida_precio
+              ? `Avisa si sube más de ${String(config.data.umbral_subida_precio_pct).replace(".", ",")} %.`
+              : "Los avisos están desactivados."}{" "}
+            <span className="font-normal text-muted-foreground">Cambiarlo exige «Editar» en Facturas.</span>
+          </p>
         )}
       </PopoverContent>
     </Popover>

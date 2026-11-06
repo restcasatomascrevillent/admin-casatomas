@@ -79,6 +79,7 @@ export const FilaProducto = ({
   onAbrirProducto,
   nuevaEnFacturaId,
   onCerrarNueva,
+  editable = false,
 }: {
   p: ProductoFactura;
   isMobile?: boolean;
@@ -93,6 +94,11 @@ export const FilaProducto = ({
   nuevaEnFacturaId?: number;
   /** En modo «línea nueva»: se llama al guardar o cancelar. */
   onCerrarNueva?: () => void;
+  /**
+   * Se puede corregir (el lápiz): «Editar» en Facturas, o «Facturas · Subida» si el
+   * documento es suyo (06/11/2026). Sin él, el lápiz no sale. Por defecto, no.
+   */
+  editable?: boolean;
 }) => {
   const esNueva = nuevaEnFacturaId != null;
   const [isEditing, setIsEditing] = useState(esNueva);
@@ -203,15 +209,20 @@ export const FilaProducto = ({
           {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-600" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatImporte(avgPrice ?? null)})</AyudaPopover>}
           {formatImporte(p.precio)}
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="-my-1.5 h-11 w-11 shrink-0 text-muted-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prod:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
-          onClick={() => setIsEditing(true)}
-          aria-label={`Editar ${p.producto_nombre}`}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        {editable ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-my-1.5 h-11 w-11 shrink-0 text-muted-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prod:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
+            onClick={() => setIsEditing(true)}
+            aria-label={`Editar ${p.producto_nombre}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : (
+          // Sin lápiz el hueco se queda: las columnas siguen alineadas con la cabecera.
+          <span aria-hidden="true" />
+        )}
       </div>
     );
   }
@@ -272,9 +283,11 @@ export const FilaProducto = ({
           segundo scroll horizontal dentro de la fila desplegada. */}
       <TableCell className="py-2.5 font-medium">
         <div className="flex min-w-0 items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
-            <Pencil className="h-4 w-4" />
-          </Button>
+          {editable && (
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
           <NombreLinea p={p} onAbrirProducto={onAbrirProducto} className="truncate" />
           <EtiquetaCategoria p={p} />
         </div>

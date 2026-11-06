@@ -431,6 +431,11 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
       expect(
         within(dialogo).getByLabelText("Editar Facturas: No"),
       ).toHaveTextContent("No");
+      // «Facturas · Subida» (06/11/2026): un solo permiso, «Puede subir».
+      expect(
+        within(dialogo).getByLabelText("Puede subir Facturas · Subida: No"),
+      ).toHaveTextContent("No");
+      expect(within(dialogo).queryByLabelText(/^Editar Facturas · Subida/)).toBeNull();
       expect(within(dialogo).queryByRole("switch")).toBeNull();
       expect(within(dialogo).queryByRole("combobox")).toBeNull();
       expect(

@@ -31,7 +31,11 @@ export interface MensajeChat {
   adjuntos?: AdjuntoChat[];
 }
 
-export function useChatFacturas() {
+/**
+ * `activo` = false (quien no tiene «Editar» en Facturas: sin IA, 06/11/2026):
+ * no se pide el historial de conversaciones.
+ */
+export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [conversacionActiva, setConversacionActiva] = useState<Conversacion | null>(null);
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
@@ -368,8 +372,9 @@ export function useChatFacturas() {
 
   // ─── Cargar conversaciones al montar ─────────────────────────────────────
   useEffect(() => {
+    if (!activo) return;
     cargarConversaciones();
-  }, [cargarConversaciones]);
+  }, [cargarConversaciones, activo]);
 
   return {
     conversaciones,

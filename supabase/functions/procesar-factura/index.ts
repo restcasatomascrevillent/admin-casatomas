@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
-import { autenticar, type ConfigAuth, corsHeaders, jsonResponse } from "./auth.ts";
+import { autenticar, type ConfigAuth, corsHeaders, esDocumentoPropio, jsonResponse, MENSAJE_SOLO_LO_PROPIO } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
 import { crearClienteOpenAI } from "./openai.ts";
 import { cargarIndicaciones, conIndicaciones } from "./indicaciones.ts";
@@ -32,11 +32,15 @@ const createClient = clienteConAuditoria(createClientBase, "procesar-factura");
 //     lee con el MISMO código y modelo que el camino síncrono (unico.ts).
 //
 //   · `modo: "sustituir"`: reemplaza EN SITIO la factura duplicada por el
-//     documento nuevo ya leído (exige permiso de EDICIÓN en Facturas).
+//     documento nuevo ya leído (permiso de EDICIÓN en Facturas o, con
+//     «Facturas · Subida», solo si la factura y el trabajo son suyos).
 //
 //   · `modo: "anadir_pagina"` (10-oct-2026): el documento nuevo es OTRA
 //     página («página x/y») de una factura que ya existe: le AÑADE sus
 //     líneas sin borrar nada y recalcula (mismo permiso que sustituir).
+//
+//  Permisos (06/11/2026, dueño): subir exige «Facturas · Subida» o «Editar»
+//  en Facturas; con solo «Ver» ya no se sube (ver auth.ts).
 //
 //  Desde el 05-oct-2026 el código vive en módulos (prompts, modelo, openai,
 //  extraccion, guardado, archivo, auth, pagina, pieza, consolidacion,
@@ -90,7 +94,7 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   // Autenticación ANTES de tocar OpenAI, Drive o la base de datos.
-  const auth = await autenticar(req, cfgAuth, "view");
+  const auth = await autenticar(req, cfgAuth, "subir");
   if (!auth.ok) return auth.response;
 
   try {
@@ -110,12 +114,17 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
     // ── Sustituir la factura existente por el documento nuevo, o añadirle
     //    el documento nuevo como otra página (20261010150000) ──
     if (payload?.modo === "sustituir" || payload?.modo === "anadir_pagina") {
-      const authEdit = await autenticar(req, cfgAuth, "edit");
-      if (!authEdit.ok) return authEdit.response;
       const facturaId = Number(payload.factura_id);
       const trabajoId = String(payload.trabajo_id ?? "");
       if (!Number.isInteger(facturaId) || facturaId <= 0 || !trabajoId) {
         return jsonResponse({ success: false, error: "Faltan factura_id o trabajo_id" });
+      }
+      // Sin «Editar», solo sobre lo propio (factura y trabajo subidos por él).
+      if (!auth.editar) {
+        const admin = createClient(cfgAuth.supabaseUrl, cfgAuth.serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+        if (!(await esDocumentoPropio(admin, facturaId, trabajoId, auth.userId))) {
+          return jsonResponse({ success: false, error: MENSAJE_SOLO_LO_PROPIO }, 403);
+        }
       }
       const esperado = payload.esperado && typeof payload.esperado === "object"
         ? {
@@ -125,7 +134,7 @@ serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) =
         : {};
       const ctx = contexto(`trabajo:${trabajoId.slice(0, 36)}`);
       try {
-        const args = { trabajoId, facturaId, userId: authEdit.userId, esperado };
+        const args = { trabajoId, facturaId, userId: auth.userId, esperado };
         return jsonResponse(
           payload.modo === "anadir_pagina" ? await anadirPagina(ctx, args) : await sustituirFactura(ctx, args),
         );

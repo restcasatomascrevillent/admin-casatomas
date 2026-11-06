@@ -59,7 +59,11 @@ vi.mock("@/hooks/useGastoIa", () => ({
 vi.mock("@/hooks/useEstadisticasLectura", () => ({ useEstadisticasLectura: () => ({ data: null }) }));
 
 const rol = { isAdmin: false };
-vi.mock("@/hooks/useUserRole", () => ({ useUserRole: () => ({ role: null, isAdmin: rol.isAdmin, permissions: [], loading: false }) }));
+// Con «Editar» en Facturas (todo, como siempre); los perfiles de permisos, en Facturas.permisos.test.tsx.
+vi.mock("@/hooks/useUserRole", () => ({
+  useUserRole: () => ({ role: null, isAdmin: rol.isAdmin, permissions: [], loading: false }),
+  useCanAccessSection: () => ({ canAccess: true, loading: false }),
+}));
 vi.mock("@/components/facturas/ImportacionHistoricaDialog", () => ({
   ImportacionHistoricaDialog: ({ open }: { open: boolean }) => (open ? <p>Diálogo de importación histórica</p> : null),
 }));

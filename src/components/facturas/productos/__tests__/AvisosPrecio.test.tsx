@@ -69,7 +69,7 @@ describe("AvisosPrecio", () => {
     expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled();
   });
 
-  it("sin permiso de edición se ve pero no se cambia", async () => {
+  it("sin permiso de edición se ve como texto, sin controles (se ocultan, no se desactivan)", async () => {
     doble.fijarTabla("configuracion_facturas", {
       data: { umbral_subida_precio_pct: 15, avisos_subida_precio: false },
       error: null,
@@ -78,8 +78,21 @@ describe("AvisosPrecio", () => {
     const boton = await screen.findByRole("button", { name: "Avisos de subida de precio" });
     expect(boton).toHaveTextContent("Avisos de precio: no");
     fireEvent.click(boton);
-    expect(await screen.findByLabelText("Si sube más de")).toBeDisabled();
-    expect(screen.getByRole("switch")).toBeDisabled();
+    expect(await screen.findByTestId("avisos-precio-solo-lectura")).toHaveTextContent("Los avisos están desactivados.");
+    expect(screen.getByTestId("avisos-precio-solo-lectura")).toHaveTextContent("exige «Editar» en Facturas");
+    expect(screen.queryByLabelText("Si sube más de")).not.toBeInTheDocument();
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Guardar" })).not.toBeInTheDocument();
+  });
+
+  it("sin permiso de edición y con avisos activos, dice el umbral", async () => {
+    doble.fijarTabla("configuracion_facturas", {
+      data: { umbral_subida_precio_pct: 12.5, avisos_subida_precio: true },
+      error: null,
+    });
+    montar(false);
+    fireEvent.click(await screen.findByRole("button", { name: "Avisos de subida de precio" }));
+    expect(await screen.findByTestId("avisos-precio-solo-lectura")).toHaveTextContent("Avisa si sube más de 12,5 %.");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 });

@@ -39,6 +39,7 @@ import {
   Tarjeta,
   type AccionMenu,
 } from "./piezas";
+import { usePuedeEditarFacturas } from "./edicionFacturas";
 
 interface Comunes {
   tamano?: Tamano;
@@ -115,6 +116,8 @@ export function GastoPorFamilia({
   acciones: (f: Familia) => AccionMenu[];
 } & Comunes) {
   const { sinClasificar, importeTotal } = familias;
+  // «Clasificar con IA» cambia datos: solo con «Editar» en Facturas (06/11/2026).
+  const puedeEditar = usePuedeEditarFacturas();
   const [todas, setTodas] = useState(false);
   const idLista = useId();
   const limite = FILAS_TAMANO[tamano];
@@ -144,6 +147,7 @@ export function GastoPorFamilia({
               ({formatCurrency(sinClasificar.importe)}, {textoPct(pctSin, false)} del gasto): no cuentan en ninguna familia.
             </span>
           </span>
+          {puedeEditar && (
           <button
             type="button"
             onClick={onClasificar}
@@ -154,6 +158,7 @@ export function GastoPorFamilia({
           >
             <Sparkles className="h-4 w-4 text-primary" aria-hidden /> Clasificar con IA
           </button>
+          )}
         </div>
       )}
       {familias.familias.length === 0 ? (

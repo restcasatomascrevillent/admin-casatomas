@@ -14,8 +14,10 @@ import {
   SECCIONES_CONFIGURABLES,
   cambiarEditar,
   cambiarVer,
+  interruptorUnico,
   mismosPermisos,
   permisosParaEditar,
+  seccionesConPermisos,
   sinEdicion,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
@@ -33,8 +35,12 @@ describe("SECCIONES_CONFIGURABLES", () => {
   it("son las secciones del panel salvo «usuarios» (que va por rol admin, no por permisos)", () => {
     const claves = SECCIONES_CONFIGURABLES.map((s) => s.key);
     expect(claves).toEqual([
-      "dashboard", "reservas", "reservas_configuracion", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas",
+      "dashboard", "reservas", "reservas_configuracion", "gestor_carta", "gestion_web", "marketing", "instagram_agencia", "instagram_render", "cheques", "tienda", "facturas", "facturas_subida",
     ]);
+  });
+
+  it("«Facturas · Subida» va justo después de Facturas (06/11/2026)", () => {
+    expect(SECCIONES_CONFIGURABLES.find((s) => s.key === "facturas_subida")?.label).toBe("Facturas · Subida");
   });
 
   it("«Reservas · Configuración» va justo después de Reservas, como las pestañas del Gestor Web (04/11/2026)", () => {
@@ -56,6 +62,19 @@ describe("AYUDA_EDICION", () => {
     expect(AYUDA_EDICION.reservas_configuracion).toMatch(/turnos/);
     expect(AYUDA_EDICION.reservas_configuracion).toMatch(/plantillas de correo/);
     expect(AYUDA_EDICION.reservas_configuracion).toMatch(/«Ver» en Reservas/);
+  });
+
+  it("en Facturas ya no dice que «Ver» basta: «Editar» modifica, clasifica, ajusta y usa la IA; «Ver» solo consulta", () => {
+    expect(AYUDA_EDICION.facturas).not.toMatch(/aún no se usa/);
+    expect(AYUDA_EDICION.facturas).toMatch(/verificar/);
+    expect(AYUDA_EDICION.facturas).toMatch(/IA/);
+    expect(AYUDA_EDICION.facturas).toMatch(/solo «Ver» se consultan Análisis y Compras/);
+  });
+
+  it("en Facturas · Subida explica Cargar, lo propio y que no necesita «Ver»", () => {
+    expect(AYUDA_EDICION.facturas_subida).toMatch(/Cargar/);
+    expect(AYUDA_EDICION.facturas_subida).toMatch(/sube él mismo/);
+    expect(AYUDA_EDICION.facturas_subida).toMatch(/No necesita «Ver» en Facturas/);
   });
 
   it("en Reservas explica lo que de verdad desbloquea: crear/modificar, llegadas y mover de sala", () => {
@@ -89,6 +108,36 @@ describe("permisosParaEditar", () => {
     const permisos = permisosParaEditar([permiso("usuarios", true, true), permiso("trabajadores", true, true)]);
     expect(de(permisos, "usuarios")).toBeUndefined();
     expect(de(permisos, "trabajadores")).toBeUndefined();
+  });
+});
+
+describe("«Facturas · Subida»: un solo interruptor («Puede subir», en can_view)", () => {
+  it("solo esa sección lo tiene", () => {
+    expect(interruptorUnico("facturas_subida")).toBe("Puede subir");
+    for (const s of SECCIONES_CONFIGURABLES.filter((x) => x.key !== "facturas_subida")) expect(interruptorUnico(s.key), s.key).toBeNull();
+  });
+
+  it("lo guardado en can_view o en can_edit (por SQL) es «sí», y se guarda en can_view sin edición", () => {
+    expect(de(permisosParaEditar([permiso("facturas_subida", true, false)]), "facturas_subida")).toEqual(permiso("facturas_subida", true, false));
+    expect(de(permisosParaEditar([permiso("facturas_subida", false, true)]), "facturas_subida")).toEqual(permiso("facturas_subida", true, false));
+    expect(de(permisosParaEditar([permiso("facturas_subida", true, true)]), "facturas_subida")).toEqual(permiso("facturas_subida", true, false));
+  });
+
+  it("«Puede editar» no se activa nunca; «Ver» (= «Puede subir») sí, y va por libre de Facturas", () => {
+    let permisos = cambiarVer(permisosParaEditar([]), "facturas_subida", true);
+    permisos = cambiarEditar(permisos, "facturas_subida", true);
+    expect(de(permisos, "facturas_subida")).toEqual(permiso("facturas_subida", true, false));
+    expect(de(permisos, "facturas")).toEqual(permiso("facturas", false, false));
+  });
+
+  it("en «Ver permisos» / «Mi cuenta» sale con su interruptor y su ayuda", () => {
+    const filas = seccionesConPermisos({ is_super_admin: false, role: "staff", permissions: [permiso("facturas_subida", true, false)] } as never);
+    expect(filas.find((f) => f.key === "facturas_subida")).toMatchObject({
+      label: "Facturas · Subida", unInterruptor: "Puede subir", ver: true, ayuda: expect.stringMatching(/^Puede subir: pestaña Cargar/),
+    });
+    expect(filas.find((f) => f.key === "facturas")).toMatchObject({ ver: false, editar: false, ayuda: expect.stringMatching(/^Editar: /) });
+    const sa = seccionesConPermisos({ is_super_admin: true, role: "admin", permissions: [] } as never);
+    expect(sa.find((f) => f.key === "facturas_subida")).toMatchObject({ ver: true });
   });
 });
 

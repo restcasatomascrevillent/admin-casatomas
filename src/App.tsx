@@ -139,8 +139,9 @@ const App = () => (
                   <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
                   {/* «Pregúntale a la IA» a pantalla completa (06/11/2026): la MISMA página de Facturas
-                      (mismo árbol, no se desmonta al ir y volver), con el permiso de Facturas. */}
-                  <Route path="/facturas/ia" element={pagina(<Facturas />, "facturas")} />
+                      (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
+                      página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
+                  <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
                   {/* Historial de avisos (campana): para todos los roles. */}

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, AlertTriangle, Copy,
   Camera, FolderOpen, Replace, RotateCcw, Clock, Image as ImageIcon, File as FileIcon,
-  Layers, ChevronUp, ChevronDown, FilePlus2, Ungroup,
+  Layers, ChevronUp, ChevronDown, FilePlus2, Ungroup, Pencil,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useColaSubida } from "@/hooks/useColaSubida";
@@ -33,7 +33,8 @@ import { cn } from "@/lib/utils";
 import { FotoExistente } from "./AvisoDuplicadoDialog";
 import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
 import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
-import { useCanAccessSection } from "@/hooks/useUserRole";
+import { CorregirDocumentoDialog } from "./CorregirDocumentoDialog";
+import { useCorreccionDocumento, usePermisosFacturas } from "@/hooks/usePermisosFacturas";
 import { useDecisionDuplicado } from "./useDecisionDuplicado";
 
 /** Título del aviso de un fichero que no se admite. */
@@ -63,9 +64,15 @@ const DORADO = "bg-[hsl(38,59%,34%)] text-white hover:bg-[hsl(38,59%,28%)] focus
  * exterior, filas con separador fino y el dorado solo en «Enviar». Ocupa el
  * alto que le da la página (sin scroll de página): zona de subida, barra y
  * botones fijos; la lista hace scroll por dentro.
+ *
+ * Permisos (06/11/2026): la ve quien tiene «Facturas · Subida» o «Editar». Quien
+ * consulta Compras («Ver») abre lo subido allí («Ver»); quien solo sube lo
+ * corrige aquí mismo («Corregir», CorregirDocumentoDialog), y solo lo suyo.
  */
 export function SubidaFacturas() {
   const { cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina } = useColaSubida();
+  const permisos = usePermisosFacturas();
+  const [corrigiendo, setCorrigiendo] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Segundo input solo para la cámara de la tablet/móvil (`capture`): abre la
@@ -320,9 +327,11 @@ export function SubidaFacturas() {
                   <FilaEnviado
                     key={e.id}
                     e={e}
+                    consultar={permisos.consultar}
                     onReintentar={() => cola.reintentar(e.id)}
                     onVolverASubir={() => cola.volverASubir(e.id)}
                     onCancelar={() => void cancelarEnvio(e)}
+                    onCorregir={setCorrigiendo}
                   />
                 ))}
               </ul>
@@ -358,6 +367,7 @@ export function SubidaFacturas() {
         onDejar={dejar}
         onConfirmar={confirmarDecision}
       />
+      {!permisos.consultar && <CorregirDocumentoDialog facturaId={corrigiendo} onCerrar={() => setCorrigiendo(null)} />}
     </div>
   );
 }
@@ -463,8 +473,6 @@ function SeccionPendientes({
   onDecidir: (p: PendienteDecidir) => void;
   onDescartar: (p: PendienteDecidir) => void;
 }) {
-  // Sustituir o añadir página cambia una factura: solo con permiso de edición (QA C-09).
-  const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
   return (
     <section aria-label="Pendientes de decidir">
       <h3 className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -473,48 +481,74 @@ function SeccionPendientes({
       </h3>
       <ul className="divide-y divide-border/60">
         {pendientes.map((p) => (
-          <li key={p.trabajoId} className="space-y-2 py-3">
-            <p className="text-sm">
-              <span className="font-medium">{p.nombre}</span>
-              {p.anadible ? (
-                <span className="block text-xs text-muted-foreground">
-                  Es la página {p.anadible.pagina.actual} de {p.anadible.pagina.total} de la factura{" "}
-                  {p.anadible.existente.numero_documento}, que ya existe con {p.anadible.existente.lineas} líneas. Añádela
-                  para completarla (no se borra nada).
-                </span>
-              ) : p.sustituible ? (
-                <span className="block text-xs text-muted-foreground">
-                  Ya existe la factura {p.sustituible.existente.numero_documento} ({p.sustituible.existente.lineas} líneas):
-                  no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.
-                </span>
-              ) : null}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {!puedeEditar ? null : p.anadible ? (
-                <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
-                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                  Añadir como página {p.anadible.pagina.actual} a la factura {p.anadible.existente.numero_documento}
-                </Button>
-              ) : (
-                <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
-                  <Replace className="h-4 w-4" aria-hidden="true" />
-                  Sustituir la existente
-                </Button>
-              )}
-              {p.sustituible?.existente?.id ? (
-                <div className="min-w-0">
-                  <FotoExistente id={p.sustituible.existente.id} />
-                </div>
-              ) : null}
-              <Button type="button" variant="ghost" className="h-11 text-muted-foreground hover:text-foreground" onClick={() => onDescartar(p)}>
-                {/* Una página suelta no «deja» nada: se decide no añadirla. */}
-                {p.anadible ? "No añadirla" : "Dejar la que hay"}
-              </Button>
-            </div>
-          </li>
+          <FilaPendiente key={p.trabajoId} p={p} onDecidir={onDecidir} onDescartar={onDescartar} />
         ))}
       </ul>
     </section>
+  );
+}
+
+function FilaPendiente({
+  p,
+  onDecidir,
+  onDescartar,
+}: {
+  p: PendienteDecidir;
+  onDecidir: (p: PendienteDecidir) => void;
+  onDescartar: (p: PendienteDecidir) => void;
+}) {
+  // Sustituir o añadir página cambia una factura (QA C-09): con «Editar», cualquiera;
+  // con «Facturas · Subida», solo si la que ya existe la subió él (06/11/2026).
+  // «Dejar la que hay» / «No añadirla» descarta lo suyo: siempre.
+  const existenteId = (p.anadible ?? p.sustituible)?.existente?.id ?? null;
+  const { puede: puedeCambiarla, comprobando } = useCorreccionDocumento(existenteId);
+  const { consultar } = usePermisosFacturas();
+  return (
+    <li className="space-y-2 py-3">
+      <p className="text-sm">
+        <span className="font-medium">{p.nombre}</span>
+        {p.anadible ? (
+          <span className="block text-xs text-muted-foreground">
+            Es la página {p.anadible.pagina.actual} de {p.anadible.pagina.total} de la factura{" "}
+            {p.anadible.existente.numero_documento}, que ya existe con {p.anadible.existente.lineas} líneas. Añádela
+            para completarla (no se borra nada).
+          </span>
+        ) : p.sustituible ? (
+          <span className="block text-xs text-muted-foreground">
+            Ya existe la factura {p.sustituible.existente.numero_documento} ({p.sustituible.existente.lineas} líneas):
+            no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.
+          </span>
+        ) : null}
+        {!puedeCambiarla && !comprobando && (
+          <span className="block text-xs text-muted-foreground">
+            La que ya existe la subió otra persona: sustituirla o completarla lo hace quien tiene «Editar» en Facturas.
+          </span>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {!puedeCambiarla ? null : p.anadible ? (
+          <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
+            <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+            Añadir como página {p.anadible.pagina.actual} a la factura {p.anadible.existente.numero_documento}
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
+            <Replace className="h-4 w-4" aria-hidden="true" />
+            Sustituir la existente
+          </Button>
+        )}
+        {/* La foto de la que ya está: de quien consulta Facturas, o si es suya. */}
+        {p.sustituible?.existente?.id && (consultar || puedeCambiarla) ? (
+          <div className="min-w-0">
+            <FotoExistente id={p.sustituible.existente.id} />
+          </div>
+        ) : null}
+        <Button type="button" variant="ghost" className="h-11 text-muted-foreground hover:text-foreground" onClick={() => onDescartar(p)}>
+          {/* Una página suelta no «deja» nada: se decide no añadirla. */}
+          {p.anadible ? "No añadirla" : "Dejar la que hay"}
+        </Button>
+      </div>
+    </li>
   );
 }
 
@@ -551,18 +585,25 @@ function IconoEstado({ nivel, e }: { nivel: NivelFila; e: ElementoCola }) {
  * Un documento enviado: icono de estado, nombre (+ tipo), UNA línea de estado
  * y sus acciones: «Reintentar» (si ya tiene trabajo en el servidor, reanuda
  * ESE trabajo), «Volver a subir» (el servidor ya no tiene sus ficheros),
- * cancelar mientras está en marcha y «Ver» al terminar.
+ * cancelar mientras está en marcha y, al terminar, «Ver» (en Compras, para quien
+ * la consulta) o «Corregir» (aquí, para quien solo sube; no en un repetido, que
+ * es el documento que ya estaba).
  */
 function FilaEnviado({
   e,
+  consultar,
   onReintentar,
   onVolverASubir,
   onCancelar,
+  onCorregir,
 }: {
   e: ElementoCola;
+  /** Consulta Compras («Ver» o «Editar» en Facturas). */
+  consultar: boolean;
   onReintentar: () => void;
   onVolverASubir: () => void;
   onCancelar: () => void;
+  onCorregir: (facturaId: number) => void;
 }) {
   const r = e.resultado;
   const linea = lineaEstado(e);
@@ -627,7 +668,7 @@ function FilaEnviado({
           <X className="h-4 w-4" aria-hidden="true" />
         </Button>
       )}
-      {r?.success && (
+      {r?.success && consultar && (
         <Link
           to={rutaDocumento(r.facturaId)}
           aria-label={`Ver ${e.nombre}`}
@@ -636,6 +677,18 @@ function FilaEnviado({
           Ver
         </Link>
       )}
+      {r?.success && !consultar && !r.duplicado && r.facturaId ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11 shrink-0 gap-1.5 px-3 text-sm font-medium"
+          onClick={() => onCorregir(r.facturaId!)}
+          aria-label={`Corregir ${e.nombre}`}
+        >
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+          Corregir
+        </Button>
+      ) : null}
     </li>
   );
 }

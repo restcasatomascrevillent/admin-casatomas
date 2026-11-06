@@ -785,7 +785,8 @@ export function TabCompras({
                   </button>
                 ))}
                 <Button variant="ghost" className="ml-auto h-11 shrink-0 gap-1.5 px-3 text-sm" onClick={() => setGestionando(true)}>
-                  <Truck className="h-4 w-4" aria-hidden="true" /> Gestionar proveedores
+                  {/* Con solo «Ver» es una lista de consulta (sin renombrar ni fusionar). */}
+                  <Truck className="h-4 w-4" aria-hidden="true" /> {puedeEditar ? "Gestionar proveedores" : "Ver proveedores"}
                 </Button>
               </div>
               {franjas}
