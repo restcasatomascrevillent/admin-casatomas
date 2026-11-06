@@ -7,7 +7,9 @@
  * con la misma lógica: seis estados × con y sin permiso × las dos variantes. Lo
  * único que cambia respecto a entonces es lo acordado con el dueño: el título de
  * «Llegó» ya no dice «ya servida», «Aceptar» acepta la reserva tal como está, y
- * sin permiso «Verificar», la estrella y la lista negra salen deshabilitadas.
+ * (06/11/2026, decisión del dueño) sin permiso de edición NO sale ninguna ranura:
+ * lo que no se puede usar se oculta, no se desactiva. La estrella de una reserva
+ * importante se sigue viendo, como dato, sin botón.
  *
  * Los ANCHOS no se pueden medir en jsdom (no calcula diseño): se fijan las clases
  * que los dan, que son las de siempre.
@@ -82,32 +84,32 @@ const CON_PERMISO: Record<Estado, { principal: string; ranuras: string }> = {
   no_show: { principal: "Confirmar", ranuras: "✖✔✖✔✖✔" }, // «No vino» ya no se cancela (cambio (a))
 };
 
-// Sin permiso, la principal dice «Aceptar» en TODAS las filas (como antes), deshabilitada.
-// CAMBIO ACORDADO (2026-10-01): «Verificar» y la lista negra también se apagan sin
-// permiso (antes: «Verificar» ✔ en la pendiente y la lista negra ✔ en todas).
-const SIN_PERMISO: Record<Estado, { principal: string; ranuras: string }> = {
-  pendiente: { principal: "Aceptar", ranuras: "✖✔✖✖✖✖" },
-  verificada: { principal: "Aceptar", ranuras: "✖✔✖✖✖✖" },
-  confirmada: { principal: "Aceptar", ranuras: "✖✔✖✖✖✖" },
-  completada: { principal: "Aceptar", ranuras: "✖✔✖✖✖✖" },
-  cancelada: { principal: "Aceptar", ranuras: "✖✖✖✖✖✖" },
-  no_show: { principal: "Aceptar", ranuras: "✖✔✖✖✖✖" },
-};
-
 describe("AccionesReserva · las seis ranuras, por estado y permiso", () => {
   describe.each(["fila", "tarjeta"] as const)("variante %s", (variante) => {
-    describe.each([true, false])("canEdit=%s", (canEdit) => {
-      const tabla = canEdit ? CON_PERMISO : SIN_PERMISO;
-
+    describe("canEdit=true", () => {
       it.each(ESTADOS)("%s", (estado) => {
-        const { botones } = montar({ reserva: reserva(estado), canEdit, variante });
+        const { botones } = montar({ reserva: reserva(estado), canEdit: true, variante });
 
         // Siempre seis, se pueda pulsar algo o no: los botones no bailan de sitio.
         expect(botones).toHaveLength(6);
-        expect(botones[0].textContent?.trim()).toBe(tabla[estado].principal);
+        expect(botones[0].textContent?.trim()).toBe(CON_PERMISO[estado].principal);
         expect(simbolos(botones), "principal · dar mesa · verificar · editar · cancelar · lista negra").toBe(
-          tabla[estado].ranuras,
+          CON_PERMISO[estado].ranuras,
         );
+      });
+    });
+
+    // 06/11/2026 (decisión del dueño): con solo «Ver» no sale ninguna ranura, ni deshabilitada; tampoco
+    // «Dar mesa» (lleva a repartir mesas) ni la casilla. La Lista quita además la columna entera.
+    describe("canEdit=false: nada", () => {
+      it.each(ESTADOS)("%s", (estado) => {
+        const { celda, al, onAsignarMesa } = montar({ reserva: reserva(estado), canEdit: false, variante });
+
+        expect(celda.querySelectorAll("button")).toHaveLength(0);
+        expect(celda.querySelector('[role="checkbox"]')).toBeNull();
+        expect(celda.textContent).toBe("");
+        expect(onAsignarMesa).not.toHaveBeenCalled();
+        expect(Object.values(al).every((f) => f.mock.calls.length === 0)).toBe(true);
       });
     });
   });
@@ -183,9 +185,9 @@ describe("AccionesReserva · qué hace cada botón", () => {
     expect(al.aceptar).not.toHaveBeenCalled();
   });
 
-  it.each([true, false])("lo deshabilitado no llama a nada (canEdit=%s)", (canEdit) => {
+  it("lo deshabilitado no llama a nada", () => {
     for (const estado of ESTADOS) {
-      const { al, onAsignarMesa, botones } = montar({ reserva: reserva(estado), canEdit });
+      const { al, onAsignarMesa, botones } = montar({ reserva: reserva(estado), canEdit: true });
       for (const b of botones) if (b.hasAttribute("disabled")) fireEvent.click(b);
       const deshabilitados = simbolos(botones);
       // Lo que salió deshabilitado no se ha llamado.
@@ -227,22 +229,12 @@ describe("AccionesReserva · el motivo de lo deshabilitado se ve al pasar el rat
     expect(within(celda).getByText("Confirmar").closest("button")!.getAttribute("title")).toMatch(/«Llegó»/);
   });
 
-  it("sin permiso, lo que se apaga por el permiso lo dice", () => {
-    const { botones } = montar({ reserva: reserva("confirmada"), canEdit: false });
-    expect(motivo(botones[0])).toBe("No tienes permiso para editar reservas");
-    expect(motivo(botones[3])).toBe("No tienes permiso para editar reservas");
-    expect(motivo(botones[4])).toBe("No tienes permiso para cancelar reservas");
-  });
-
-  it("CAMBIO ACORDADO: sin permiso, «Verificar» y la lista negra se apagan y lo dicen (también en la pendiente)", () => {
-    const { al, botones } = montar({ reserva: reserva("pendiente"), canEdit: false });
-    for (const b of [botones[2], botones[5]]) {
-      expect(b.hasAttribute("disabled")).toBe(true);
-      expect(motivo(b)).toBe("No tienes permiso para editar reservas");
-      fireEvent.click(b);
+  it("sin permiso ya no hay ningún «No tienes permiso…»: no hay botones (06/11/2026)", () => {
+    for (const estado of ESTADOS) {
+      const { celda } = montar({ reserva: reserva(estado), canEdit: false });
+      expect(celda.innerHTML, estado).not.toMatch(/permiso/i);
+      expect(within(celda).queryByRole("button"), estado).toBeNull();
     }
-    expect(al.verificar).not.toHaveBeenCalled();
-    expect(al.listaNegra).not.toHaveBeenCalled();
   });
 
   it("el envoltorio no cambia el ancho: es un `inline-flex shrink-0` pegado al botón", () => {
@@ -282,9 +274,9 @@ describe("AccionesReserva · mientras hay una petición en curso", () => {
     expect(botones[4].hasAttribute("disabled")).toBe(false);
   });
 
-  it("sin permiso no gira nada aunque esté ocupada (no había nada que pulsar)", () => {
-    const { botones } = montar({ reserva: reserva("pendiente"), canEdit: false, bloqueEnCurso: true });
-    expect(botones[0].querySelector("svg")?.getAttribute("class")).not.toMatch(/animate-spin/);
+  it("sin permiso no pinta nada aunque esté ocupada (no hay nada que pulsar)", () => {
+    const { celda } = montar({ reserva: reserva("pendiente"), canEdit: false, bloqueEnCurso: true, ocupada: true });
+    expect(celda.querySelector("svg")).toBeNull();
   });
 });
 
@@ -424,14 +416,16 @@ describe("EstrellaImportante", () => {
     }
   });
 
-  it("CAMBIO ACORDADO: sin permiso, deshabilitada con el motivo en el envoltorio y el mismo nombre (como en el kanban)", () => {
+  it("sin permiso (solo «Ver», 06/11/2026): sin botón; si es importante, la estrella se ve como dato", () => {
     for (const estado of ESTADOS) {
-      const { onClick, boton } = estrella({ reserva: reserva(estado), canEdit: false });
-      expect(boton.hasAttribute("disabled"), estado).toBe(true);
-      expect(boton.parentElement?.getAttribute("title"), estado).toBe("No tienes permiso para editar reservas");
-      expect(boton.getAttribute("aria-label"), estado).toBe("Marcar Ana como importante");
-      fireEvent.click(boton);
-      expect(onClick, estado).not.toHaveBeenCalled();
+      const normal = estrella({ reserva: reserva(estado), canEdit: false });
+      expect(normal.boton, estado).toBeNull();
+      expect(normal.svg, estado).toBeNull();
+
+      const importante = estrella({ reserva: reserva(estado, { importante: true }), canEdit: false });
+      expect(importante.boton, estado).toBeNull();
+      expect(importante.svg.getAttribute("aria-label"), estado).toBe("Importante");
+      expect(importante.svg.getAttribute("class"), estado).toMatch(/fill-amber-400/);
     }
   });
 

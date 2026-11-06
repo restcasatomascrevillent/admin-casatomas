@@ -135,17 +135,14 @@ describe("GestorReservasKanban · editar desde la tarjeta", () => {
     expect(within(menu).getByRole("menuitem", { name: /Editar reserva/ })).not.toHaveAttribute("data-disabled");
   });
 
-  it("sin permiso de edición sobre «reservas» el ítem sale deshabilitado y no abre nada", async () => {
+  it("sin permiso de edición sobre «reservas» el ítem no sale (06/11/2026: oculto, no desactivado) y no abre nada", async () => {
     h.canEdit = false;
     montar();
 
+    // Con teléfono, al menú solo le queda «Llamar».
     const menu = await abrirMenu("Ana Pendiente");
-    const editar = within(menu).getByRole("menuitem", { name: /Editar reserva/ });
-
-    expect(editar).toHaveAttribute("data-disabled");
-    // Un ítem deshabilitado no recibe el ratón (`pointer-events-none`): el motivo solo se ve en su envoltorio.
-    expect(editar.parentElement).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(editar);
+    expect(within(menu).queryByRole("menuitem", { name: /Editar reserva/ })).not.toBeInTheDocument();
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Llamar"]);
     expect(h.editarReserva).not.toHaveBeenCalled();
   });
 

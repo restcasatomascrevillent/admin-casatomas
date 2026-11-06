@@ -10,6 +10,7 @@ import { AjustesTienda } from "@/components/tienda/AjustesTienda";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useConfiguracionTienda } from "@/hooks/useTienda";
+import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import { porcentaje } from "@/lib/tienda";
 import { cn } from "@/lib/utils";
 
@@ -33,11 +34,14 @@ const pestanaDeUrl = (v: string | null): Pestana => (PESTANAS as readonly string
  * pago por internet, solo vista»): se compran en el restaurante. Vinos (cuáles
  * salen y a qué precio) y Ajustes (visible sí/no, %, aviso y cómo comprar).
  * Sección de permisos «tienda»: con «Ver» se consulta; cambiar algo pide
- * «Puede editar».
+ * «Puede editar» (también en la BD: la RLS de configuracion_tienda exige
+ * can_write_section('tienda')). Con solo «Ver» (06/11/2026, decisión del dueño)
+ * no sale la pestaña Ajustes ni los interruptores «A la venta» (se ocultan, no
+ * se desactivan) y junto a las pestañas aparece la etiqueta «Solo lectura».
  */
 export default function Tienda() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const pestana = pestanaDeUrl(searchParams.get("tab"));
+  const pestanaPedida = pestanaDeUrl(searchParams.get("tab"));
   const cambiarPestana = (v: string) => {
     const next = new URLSearchParams(searchParams);
     if (v === "vinos") next.delete("tab");
@@ -46,7 +50,10 @@ export default function Tienda() {
   };
   const configuracion = useConfiguracionTienda();
   const config = configuracion.data?.disponible ? configuracion.data.config : null;
-  const { canAccess: puedeEditar } = useCanAccessSection("tienda", "edit");
+  const { canAccess: puedeEditar, loading: cargandoPermisos } = useCanAccessSection("tienda", "edit");
+  const soloLectura = !cargandoPermisos && !puedeEditar;
+  // «Ajustes» es configuración: sin «Editar», ni pestaña ni enlace (`?tab=ajustes` cae en Vinos).
+  const pestana: Pestana = pestanaPedida === "ajustes" && !puedeEditar ? "vinos" : pestanaPedida;
   // Alto de la pantalla (regla del dueño para todo el panel): la barra de pestañas queda fija y
   // cada pestaña hace scroll por dentro. Sin medida (jsdom) cae al layout con scroll de página.
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
@@ -79,16 +86,19 @@ export default function Tienda() {
         <PestanasPagina
           pestanas={[
             { valor: "vinos", etiqueta: "Vinos", icono: <Wine /> },
-            { valor: "ajustes", etiqueta: "Ajustes", icono: <Settings2 /> },
+            ...(puedeEditar ? [{ valor: "ajustes", etiqueta: "Ajustes", icono: <Settings2 /> }] : []),
           ]}
           acciones={
-            <span
-              className={cn(
-                "whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium",
-                config.activa ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900",
-              )}
-            >
-              {config.activa ? `Visible · ${porcentaje(config.descuento_pct)}` : "Oculta en la web"}
+            <span className="flex items-center gap-2">
+              {soloLectura && <EtiquetaSoloLectura />}
+              <span
+                className={cn(
+                  "whitespace-nowrap rounded-full border px-3 py-1 text-xs font-medium",
+                  config.activa ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-300 bg-amber-50 text-amber-900",
+                )}
+              >
+                {config.activa ? `Visible · ${porcentaje(config.descuento_pct)}` : "Oculta en la web"}
+              </span>
             </span>
           }
         />
@@ -96,9 +106,11 @@ export default function Tienda() {
         <TabsContent value="vinos" className={cn(CONTENIDO_PESTANA, "flex flex-col")}>
           <VinosTienda config={config} puedeEditar={puedeEditar} />
         </TabsContent>
-        <TabsContent value="ajustes" className={CONTENIDO_PESTANA}>
-          <AjustesTienda config={config} puedeEditar={puedeEditar} />
-        </TabsContent>
+        {puedeEditar && (
+          <TabsContent value="ajustes" className={CONTENIDO_PESTANA}>
+            <AjustesTienda config={config} puedeEditar={puedeEditar} />
+          </TabsContent>
+        )}
       </Tabs>
     );
   }

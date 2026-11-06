@@ -34,11 +34,11 @@
 // (`EstrellaImportante`, en la columna Cliente) y la casilla de aceptar en bloque
 // de la tarjeta de móvil (`CasillaAceptarEnBloque`, junto al nombre).
 //
-// EL PERMISO: sin `canEdit` todo lo que escribe sale deshabilitado con el motivo
-// («No tienes permiso para editar reservas»). Desde el paso 3 también «Verificar»,
-// la estrella y la lista negra, que antes no lo miraban (decisión del dueño,
-// 2026-10-01, junto con endurecer la RLS de `reservas`). «Dar mesa» no escribe
-// nada (solo abre el plano) y sigue sin mirarlo.
+// EL PERMISO: sin `canEdit` no se pinta NINGUNA ranura (06/11/2026, decisión del
+// dueño para quien solo tiene «Ver»: lo que no puede usar se OCULTA, no se
+// desactiva, y la página enseña «Solo lectura»). La Lista quita entonces la
+// columna de acciones entera. Tampoco «Dar mesa»: lleva a repartir mesas. La
+// estrella de una reserva importante se sigue viendo, como dato, sin botón.
 // ============================================================================
 
 import type { ReactNode } from "react";
@@ -313,10 +313,9 @@ export function CasillaAceptarEnBloque({
 
 /**
  * La estrella de «importante»: en la columna Cliente de la tabla (`fila`) y junto
- * al nombre en la tarjeta de móvil (`tarjeta`). Si se puede pulsar y por qué no
- * salen de `accionesDisponibles`: sin permiso, deshabilitada y con el motivo en el
- * envoltorio. Su NOMBRE (lo que hará: «Marcar Ana como importante») no cambia
- * porque falte el permiso, igual que la estrella del kanban.
+ * al nombre en la tarjeta de móvil (`tarjeta`). Si se puede pulsar sale de
+ * `accionesDisponibles`. Sin permiso no hay botón (06/11/2026): si la reserva es
+ * importante, la estrella se ve como dato; si no, queda el hueco (la fila no baila).
  */
 export function EstrellaImportante({
   reserva,
@@ -330,8 +329,14 @@ export function EstrellaImportante({
   onClick?: () => void;
 }) {
   const { importante } = accionesDisponibles(reserva, { vista: "lista", canEdit });
-  const nombre = canEdit ? importante.titulo : accionesDisponibles(reserva, { vista: "lista", canEdit: true }).importante.titulo;
   const marcada = !!reserva.importante;
+  if (!importante.visible) {
+    return (
+      <span className={cn("inline-flex shrink-0 items-center justify-center", variante === "fila" ? "w-4" : "touch-target")}>
+        {marcada && <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-label="Importante" />}
+      </span>
+    );
+  }
   const habilitada = importante.habilitada && !!onClick;
   return (
     <ConMotivo className="shrink-0" motivo={habilitada ? undefined : importante.titulo}>
@@ -339,7 +344,7 @@ export function EstrellaImportante({
         type="button"
         onClick={onClick}
         disabled={!habilitada}
-        aria-label={nombre}
+        aria-label={importante.titulo}
         className={cn(
           // Con dedo: 44x44 de verdad en la tarjeta (va suelta en su cabecera) y área ampliada
           // en la tabla (no se puede ensanchar la fila por una estrella).
@@ -402,18 +407,20 @@ export function AccionesReserva({
   const pendiente = acc.aceptar.visible;
   const principal = pendiente ? acc.aceptar : acc.confirmar;
   const principalOcupada = ocupada || bloqueEnCurso;
-  // Sin permiso, la Lista enseña «Aceptar» en todas las filas (deshabilitado y con el motivo).
-  const textoAceptar = pendiente || !canEdit;
+  const textoAceptar = pendiente;
 
   // «Dar mesa»: ni la decisión ni el texto se escriben aquí, los pone el módulo
   // compartido con la pestaña Hoy. Si esta pantalla no trae a dónde saltar, el
   // botón no promete un plano que no existe (eso no es un motivo de la reserva).
   const { destino, titulo: tituloDarMesa } = resolverSaltoAsignacion(reserva, { nombreSala });
 
+  // Solo «Ver» (06/11/2026): ninguna ranura. La Lista ya no pinta ni la columna.
+  if (!canEdit) return null;
+
   const ranuras = (
     <RanurasDeAcciones
       seleccion={
-        variante === "fila" && canEdit ? (
+        variante === "fila" ? (
           <CasillaAceptarEnBloque reserva={reserva} canEdit={canEdit} marcada={seleccionada} onCambiar={al.seleccionar} />
         ) : undefined
       }

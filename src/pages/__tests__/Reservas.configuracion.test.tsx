@@ -14,6 +14,10 @@
  * También el mismo día («pon subpestañas porque el scroll es eterno»), «General» se repartió en cuatro
  * chips: «Reglas», «Servicio», «Mesas» y «Turnos». `?sub=general` (enlaces viejos) abre «Reglas». Qué
  * enseña cada parte del formulario lo prueba ConfiguracionGeneralReservas.partes.test.tsx.
+ *
+ * 06/11/2026 (decisión del dueño): con solo «Ver» en «Reservas · Configuración» NO se ve la pestaña (ni
+ * por enlace, que cae en «Hoy» y se limpia de la URL): solo entra quien tiene «Puede editar» en ella.
+ * Desaparece el aviso de «Solo lectura» que salía en cada chip.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -81,8 +85,10 @@ function pulsar(nombre: string | RegExp) {
 
 const chip = (nombre: string) => screen.getByRole("tab", { name: nombre });
 
+const PUEDE_CONFIGURAR = ["reservas_configuracion:view", "reservas_configuracion:edit"];
+
 beforeEach(() => {
-  h.permisos = new Set(["reservas:view", "reservas:edit", "reservas_configuracion:view"]);
+  h.permisos = new Set(["reservas:view", "reservas:edit", ...PUEDE_CONFIGURAR]);
 });
 
 /** Lo que pinta cada chip (los componentes de verdad van simulados arriba). */
@@ -168,46 +174,42 @@ describe("Reservas › Configuración · subpestañas", () => {
   });
 });
 
-describe("Reservas › Configuración · aviso de «Solo lectura»", () => {
-  // Antes lo ponía ConfiguracionTurnos encima de todo el chip «General»; ahora lo pone la página en cada chip.
-  it.each(["Reglas", "Servicio", "Mesas", "Turnos"] as const)(
-    "con solo «Ver», el chip «%s» dice que es solo lectura",
-    (nombre) => {
-      h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
-      montar("/reservas?tab=configuracion");
-      pulsar(nombre);
-
-      expect(screen.getByText("Solo lectura")).toBeInTheDocument();
-      expect(screen.getByText(/no tiene «Puede editar» en «Reservas · Configuración»/)).toBeInTheDocument();
-    },
-  );
-
-  it("en «Plantillas email» no lo repite la página: el editor lleva el suyo", () => {
-    h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
-    montar("/reservas?tab=configuracion&sub=plantillas");
+describe("Reservas › Configuración · sin aviso de «Solo lectura» (solo entra quien puede editar)", () => {
+  it.each(NOMBRES_CHIP)("con «Puede editar», el chip «%s» no enseña ningún «Solo lectura»", (nombre) => {
+    montar("/reservas?tab=configuracion");
+    pulsar(nombre);
 
     expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
+    expect(screen.queryByText(/no tiene «Puede editar» en «Reservas · Configuración»/)).not.toBeInTheDocument();
   });
-
-  it.each(["Reglas", "Servicio", "Mesas", "Turnos"] as const)(
-    "con «Puede editar», el chip «%s» no lo enseña",
-    (nombre) => {
-      h.permisos = new Set(["reservas:view", "reservas_configuracion:view", "reservas_configuracion:edit"]);
-      montar("/reservas?tab=configuracion");
-      pulsar(nombre);
-
-      expect(screen.queryByText("Solo lectura")).not.toBeInTheDocument();
-    },
-  );
 });
 
 describe("Reservas › Configuración · permiso propio «Reservas · Configuración»", () => {
-  it("con «Ver» en la sección se ve la pestaña con todos sus chips, aunque no se pueda editar", () => {
-    h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
+  it("con «Puede editar» en la sección se ve la pestaña con todos sus chips, aunque no se editen las reservas", () => {
+    h.permisos = new Set(["reservas:view", ...PUEDE_CONFIGURAR]);
     montar("/reservas?tab=configuracion");
 
     expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
     for (const nombre of NOMBRES_CHIP) expect(chip(nombre)).toBeInTheDocument();
+  });
+
+  it("con solo «Ver» en la sección (06/11/2026) NO hay pestaña Configuración, ni chips, ni plantillas", () => {
+    h.permisos = new Set(["reservas:view", "reservas:edit", "reservas_configuracion:view"]);
+    montar();
+
+    expect(screen.queryByRole("tab", { name: "Configuración" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("chips-subnivel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("editor-plantillas")).not.toBeInTheDocument();
+  });
+
+  it("con solo «Ver», un enlace a Configuración cae en «Hoy» y se limpia de la URL", () => {
+    h.permisos = new Set(["reservas:view", "reservas_configuracion:view"]);
+    montar("/reservas?tab=configuracion&sub=reglas");
+
+    expect(screen.getByRole("tab", { name: "Hoy" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("vista-hoy")).toBeInTheDocument();
+    expect(screen.queryByTestId("chip-reglas")).not.toBeInTheDocument();
+    expect(screen.getByTestId("ubicacion")).toHaveTextContent(/^\/reservas$/);
   });
 
   it("sin el permiso no hay pestaña Configuración, ni chips, ni plantillas: ni siendo admin ni editando Reservas", () => {

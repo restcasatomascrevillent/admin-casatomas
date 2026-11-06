@@ -15,6 +15,8 @@
 //     primero); si en su sala no cabe en ninguna, la propuesta de piezas.
 //   · «Liberar mesa» (sentadas): la mesa queda libre para otros; con Deshacer.
 //   · «No vino».
+// Con solo «Ver» en Reservas (06/11/2026, decisión del dueño) las fichas enseñan los datos
+// (y «Llamar») pero ningún botón que escriba: se ocultan, no se desactivan.
 // Al día solo: `useAlDiaMovil` (tiempo real + al volver a primer plano + 15 s).
 // Sin scroll de página: la lista ocupa el alto disponible y hace scroll dentro.
 // Lógica: `src/lib/reservas/hoyMovil.ts` y `sentarAhora.ts` (con tests).
@@ -36,6 +38,7 @@ import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useAlDiaMovil } from "@/hooks/useAlDiaMovil";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { deshacerSinReserva, useSentarSinReserva } from "@/hooks/useSentarSinReserva";
 import {
   CLAVE_AJUSTES_MESA,
@@ -502,7 +505,7 @@ function useSentarReservaEnMesa() {
 
 const PERSONAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
-function PanelMesaLibre({
+export function PanelMesaLibre({
   mesa,
   fecha,
   turno,
@@ -520,6 +523,8 @@ function PanelMesaLibre({
   const sentarSinReserva = useSentarSinReserva();
   const sentarReserva = useSentarReservaEnMesa();
   const [ocupado, setOcupado] = useState(false);
+  // Sentar (con o sin reserva) escribe: solo con «Editar» en Reservas.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
 
   // Las que aún no han llegado en este turno y caben, la más cercana a ahora primero.
   const candidatas = useMemo(() => {
@@ -566,24 +571,26 @@ function PanelMesaLibre({
         <SheetDescription>Libre · {mesa.plazas} plazas</SheetDescription>
       </SheetHeader>
 
-      <div className="space-y-2">
-        <p className="text-sm font-medium">Sentar sin reserva aquí: ¿cuántos son?</p>
-        <div className="grid grid-cols-4 gap-2">
-          {PERSONAS.map((n) => (
-            <Button
-              key={n}
-              variant="outline"
-              className="h-14 text-lg font-semibold"
-              disabled={ocupado || n > mesa.plazas}
-              onClick={() => void sinReserva(n)}
-            >
-              {n}
-            </Button>
-          ))}
+      {puedeEditar && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Sentar sin reserva aquí: ¿cuántos son?</p>
+          <div className="grid grid-cols-4 gap-2">
+            {PERSONAS.map((n) => (
+              <Button
+                key={n}
+                variant="outline"
+                className="h-14 text-lg font-semibold"
+                disabled={ocupado || n > mesa.plazas}
+                onClick={() => void sinReserva(n)}
+              >
+                {n}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
-      {candidatas.length > 0 && (
+      {puedeEditar && candidatas.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium">Sentar una reserva</p>
           <ul className="max-h-60 space-y-2 overflow-y-auto">
@@ -616,7 +623,7 @@ function PanelMesaLibre({
   );
 }
 
-function PanelReservaMovil({
+export function PanelReservaMovil({
   reserva,
   fecha,
   salas,
@@ -645,6 +652,8 @@ function PanelReservaMovil({
   const sentarReserva = useSentarReservaEnMesa();
   const turno: TurnoServicio = turnoDeHora(reserva.hora);
   const guardarAjustes = useGuardarAjustesMesa(reserva.espacio_id ?? "", fecha, turno);
+  // Todo lo de esta ficha que escribe (sentar, cambiar o liberar mesa, deshacer, «No vino») exige «Editar».
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const [eligiendo, setEligiendo] = useState(nombresMesa.length === 0 && !estaTerminada(reserva.estado));
   const [ocupado, setOcupado] = useState(false);
 
@@ -726,7 +735,7 @@ function PanelReservaMovil({
         <p className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">{reserva.notas_cliente}</p>
       )}
 
-      {terminada ? (
+      {!puedeEditar ? null : terminada ? (
         <div className="grid gap-2">
           {puedeLiberar && (
             <Button className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => liberarMesa(reserva))}>
@@ -772,7 +781,7 @@ function PanelReservaMovil({
         </div>
       )}
 
-      {eligiendo && (!terminada || sentada) && (
+      {puedeEditar && eligiendo && (!terminada || sentada) && (
         <div className="space-y-2">
           {propuesta && (
             <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/40">
@@ -813,7 +822,7 @@ function PanelReservaMovil({
       )}
 
       <div className="grid grid-cols-2 gap-2">
-        {!terminada && (
+        {puedeEditar && !terminada && (
           <Button
             variant="outline"
             className="h-12 min-w-0 text-destructive"
@@ -824,7 +833,7 @@ function PanelReservaMovil({
             <span className="truncate">No vino</span>
           </Button>
         )}
-        <Button variant="ghost" className={cn("h-12 min-w-0", terminada && "col-span-2")} onClick={onCerrar}>
+        <Button variant="ghost" className={cn("h-12 min-w-0", (terminada || !puedeEditar) && "col-span-2")} onClick={onCerrar}>
           Cerrar
         </Button>
       </div>

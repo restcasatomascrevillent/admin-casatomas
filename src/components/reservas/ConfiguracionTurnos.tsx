@@ -112,9 +112,9 @@ export function ConfiguracionTurnos() {
   const crearMutation = useCrearConfiguracionTurno();
   const actualizarMutation = useActualizarConfiguracionTurno();
   const eliminarMutation = useEliminarConfiguracionTurno();
-  // «Reservas · Configuración» (04/11/2026): con «Ver» se consulta todo; crear, editar, activar o borrar
-  // periodos pide «Puede editar», igual que la RLS de configuracion_turnos (20261104111000). El aviso de
-  // «Solo lectura» lo pone la página encima de cada chip (`AvisoSoloLecturaConfiguracion`).
+  // «Reservas · Configuración» (04/11/2026): crear, editar, activar o borrar periodos pide «Puede
+  // editar», igual que la RLS de configuracion_turnos (20261104111000). Desde el 06/11/2026 la página
+  // solo enseña esta pestaña a quien puede editarla; el modo de solo lectura de aquí queda como defensa.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas_configuracion", "edit");
 
   const form = useForm<FormValues>({

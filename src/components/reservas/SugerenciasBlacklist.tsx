@@ -310,16 +310,6 @@ function AccionesSugerencia({
 }
 
 /** Aviso de solo lectura, del ancho de la columna de acciones. */
-function SoloLectura() {
-  const texto = "Solo lectura: tu usuario no tiene permiso para aprobar o rechazar sugerencias.";
-  return (
-    <span className="flex items-center gap-1 text-[11px] pointer-coarse:text-xs text-muted-foreground" title={texto}>
-      <Lock className="h-3.5 w-3.5 shrink-0" />
-      Solo lectura
-    </span>
-  );
-}
-
 // ============================================================================
 // Celdas compartidas entre la tabla (lg+) y las tarjetas (por debajo de lg)
 // ============================================================================
@@ -509,7 +499,9 @@ export function SugerenciasBlacklist() {
           <Badge variant="secondary">{sugerencias.length}</Badge>
         </h3>
         <p className="text-xs text-muted-foreground">
-          Ausencias detectadas automáticamente. Revísalas antes de que caduquen de interés.
+          {canEdit
+            ? "Ausencias detectadas automáticamente. Revísalas antes de que caduquen de interés."
+            : "Ausencias detectadas automáticamente, pendientes de que alguien con permiso de edición las revise."}
         </p>
       </div>
 
@@ -528,18 +520,18 @@ export function SugerenciasBlacklist() {
               <BloqueCliente sugerencia={s} reincidente={resumen.reincidente} />
               <div className="flex items-center justify-between gap-2">
                 <CeldaHistorial resumen={resumen} />
-                <div className="flex shrink-0 items-center gap-1">
-                  {canEdit ? (
+                {/* Solo «Ver» (06/11/2026): sin Aprobar ni Rechazar, ni un aviso por fila; la etiqueta
+                    «Solo lectura» la pone la página, arriba. */}
+                {canEdit && (
+                  <div className="flex shrink-0 items-center gap-1">
                     <AccionesSugerencia
                       nombre={nombreDe(s)}
                       pendiente={mutando}
                       onRechazar={() => setARechazar(s)}
                       onAprobar={() => abrirAprobar(s)}
                     />
-                  ) : (
-                    <SoloLectura />
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -552,10 +544,12 @@ export function SugerenciasBlacklist() {
           <Table className="text-xs xl:text-sm">
             <TableHeader>
               <TableRow>
-                <TableHead
-                  aria-label="Acciones"
-                  className={cn("sticky left-0 z-30 h-10 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
-                />
+                {canEdit && (
+                  <TableHead
+                    aria-label="Acciones"
+                    className={cn("sticky left-0 z-30 h-10 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
+                  />
+                )}
                 <TableHead className={cn("h-10 bg-card", ANCHO_MOTIVO, CELDA)}>Motivo</TableHead>
                 <TableHead className={cn("h-10 bg-card", ANCHO_CLIENTE, CELDA)}>Cliente</TableHead>
                 <TableHead className={cn("h-10 bg-card", ANCHO_HISTORIAL, CELDA)}>Historial</TableHead>
@@ -567,28 +561,27 @@ export function SugerenciasBlacklist() {
                 const resumen = resumirHistorial(s.historial);
                 return (
                   <TableRow key={s.id} className={cn("group bg-card hover:bg-muted", ALTO_FILA)}>
-                    <TableCell
-                      className={cn(
-                        "px-1.5 py-2 align-middle xl:px-2",
-                        ANCHO_ACCIONES,
-                        "sticky left-0 z-10 border-r border-border/60",
-                        FRANJA_PENDIENTE,
-                        "bg-card group-hover:bg-muted",
-                      )}
-                    >
-                      <div className="flex items-center justify-start gap-1">
-                        {canEdit ? (
+                    {/* Solo «Ver»: sin columna de acciones (06/11/2026). */}
+                    {canEdit && (
+                      <TableCell
+                        className={cn(
+                          "px-1.5 py-2 align-middle xl:px-2",
+                          ANCHO_ACCIONES,
+                          "sticky left-0 z-10 border-r border-border/60",
+                          FRANJA_PENDIENTE,
+                          "bg-card group-hover:bg-muted",
+                        )}
+                      >
+                        <div className="flex items-center justify-start gap-1">
                           <AccionesSugerencia
                             nombre={nombreDe(s)}
                             pendiente={mutando}
                             onRechazar={() => setARechazar(s)}
                             onAprobar={() => abrirAprobar(s)}
                           />
-                        ) : (
-                          <SoloLectura />
-                        )}
-                      </div>
-                    </TableCell>
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell className={cn(CELDA, ANCHO_MOTIVO)}>
                       <InsigniaMotivo motivo={s.motivo} />
                     </TableCell>

@@ -215,16 +215,32 @@ describe("tarjeta · tocarla abre el menú de acciones (como el «⋮»)", () =>
     expect(screen.getAllByRole("menu")).toHaveLength(1);
   });
 
-  it("un control apagado (sin permiso) no abre el menú al tocar su envoltorio", async () => {
+  it("sin permiso (solo «Ver») no hay controles apagados en la tarjeta: ni estrella ni llegada (06/11/2026)", async () => {
     h.canEdit = false;
     montar();
     const card = await tarjeta("Ana");
 
-    const estrella = within(card).getByRole("button", { name: "Marcar como importante" });
-    expect(estrella).toBeDisabled();
-    fireEvent.click(estrella.parentElement as HTMLElement);
+    expect(within(card).queryByRole("button", { name: /importante/i })).not.toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /ha llegado/i })).not.toBeInTheDocument();
+    expect(card.querySelector("button:disabled")).toBeNull();
+    // Tocarla abre el menú, que solo trae «Llamar» (tiene teléfono).
+    fireEvent.click(card);
+    const menu = await screen.findByRole("menu");
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Llamar"]);
+  });
 
+  it("sin permiso y sin teléfono no hay menú: ni «⋮» ni se abre al tocar la tarjeta", async () => {
+    h.canEdit = false;
+    h.reservas = h.reservas.map((r) => ({ ...r, telefono: null }));
+    montar();
+    const card = await tarjeta("Ana");
+
+    expect(within(card).queryByRole("button", { name: /^Acciones de la reserva de Ana/ })).not.toBeInTheDocument();
+    fireEvent.click(card);
+    fireEvent.keyDown(card, { key: "Enter" });
+    await act(async () => {});
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(card).not.toHaveAttribute("aria-haspopup");
   });
 
   it("un ARRASTRE (ratón: >6 px) mueve la tarjeta y al soltar NO abre el menú", async () => {

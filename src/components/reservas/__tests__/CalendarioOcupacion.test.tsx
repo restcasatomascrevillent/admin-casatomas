@@ -76,6 +76,14 @@ vi.mock("@/integrations/supabase/client", () => {
 
 vi.mock("@/hooks/useMesas");
 vi.mock("@/hooks/useEspaciosReserva");
+// Permiso de edición de «reservas» (el pop-up de cierre lo mira). Por defecto, con permiso.
+const permisos = vi.hoisted(() => ({ editar: true }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (seccion: string, tipo: string = "view") => ({
+    canAccess: seccion === "reservas" && (tipo === "view" || permisos.editar),
+    loading: false,
+  }),
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // La suscripción realtime tiene sus tests (useReservasEnVivo.test.tsx); aquí solo se mira que el
 // calendario la monte.
@@ -767,6 +775,21 @@ describe("CalendarioOcupacion · estructura", () => {
     expect(within(dialogo).getByRole("button", { name: "Cerrar comida" })).toBeInTheDocument();
     expect(within(dialogo).getByRole("button", { name: "Cerrar cena" })).toBeInTheDocument();
     expect(within(dialogo).getByRole("button", { name: /Cerrar las dos/ })).toBeInTheDocument();
+  });
+
+  it("con solo «Ver» el pop-up enseña el día sin botones de abrir ni cerrar (06/11/2026)", async () => {
+    permisos.editar = false;
+    try {
+      montar();
+      await mesPintado();
+      fireEvent.click(casilla(20));
+      const dialogo = await screen.findByRole("dialog");
+      expect(within(dialogo).getByRole("heading", { name: "Martes, 20 de octubre" })).toBeInTheDocument();
+      expect(within(dialogo).getByTestId("estado-comida")).toBeInTheDocument();
+      expect(within(dialogo).queryByRole("button", { name: /Cerrar (comida|cena|las dos)/ })).toBeNull();
+    } finally {
+      permisos.editar = true;
+    }
   });
 });
 

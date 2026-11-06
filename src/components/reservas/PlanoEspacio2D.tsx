@@ -72,6 +72,16 @@
 //
 // La lógica pura (turnos, ajuste de capacidad, mensajes de error, resumen de
 // cierre) vive en `./asignacionPlano.ts`, con tests propios.
+//
+// ----------------------------------------------------------------------------
+// SOLO «VER» (06/11/2026, decisión del dueño)
+// ----------------------------------------------------------------------------
+// Sin «Editar» en Reservas el plano se CONSULTA: día, turno, mesas con quién las
+// ocupa, reservas del turno, zoom y PDF. No sale nada que escriba (sentar,
+// cambiar o quitar mesas, arrastrar reservas o recolocar mesas, piezas, añadir o
+// borrar mesas, «Deshacer», «Repartir», «Organizar», «Sin reserva», «Volver al
+// plano base», editar la reserva): se OCULTA, no se desactiva. La etiqueta
+// «Solo lectura» la pone la página (Reservas.tsx), junto a «Plano | Servicio».
 // ============================================================================
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
@@ -334,7 +344,7 @@ function TarjetaReserva({
   onActivar,
   onQuitarMesas,
   onEditar,
-  puedeEditar = true,
+  puedeEditar,
 }: {
   reserva: ReservaSala;
   mesasAsignadas: string[];
@@ -350,12 +360,16 @@ function TarjetaReserva({
   onQuitarMesas?: (reserva: ReservaSala) => void;
   /** Abre el editor de la reserva (2026-09-30): el lápiz junto al nombre, en toda fila. */
   onEditar?: (reserva: ReservaSala) => void;
-  /** Permiso de edición sobre «reservas»: sin él, el lápiz sale deshabilitado. */
-  puedeEditar?: boolean;
+  /**
+   * Permiso de edición sobre «reservas»: sin él la fila solo enseña la reserva, sin asa,
+   * lápiz, «Sentar»/«Cambiar» ni «Quitar mesas» (06/11/2026: se ocultan, no se desactivan).
+   */
+  puedeEditar: boolean;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `reserva-${reserva.id}`,
     data: { type: "reserva", reserva },
+    disabled: !puedeEditar,
   });
 
   const tieneMesa = mesasAsignadas.length > 0;
@@ -378,17 +392,19 @@ function TarjetaReserva({
       )}
     >
       {/* Asa de arrastre: solo aquí, para que el clic de la fila no pelee con el arrastre */}
-      <button
-        type="button"
-        {...listeners}
-        {...attributes}
-        aria-label={`Arrastrar ${reserva.nombre} al plano`}
-        title="Arrastrar al plano"
-        className="flex h-11 w-9 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
-        style={{ touchAction: "none" }}
-      >
-        <GripVertical className="h-5 w-5" />
-      </button>
+      {puedeEditar && (
+        <button
+          type="button"
+          {...listeners}
+          {...attributes}
+          aria-label={`Arrastrar ${reserva.nombre} al plano`}
+          title="Arrastrar al plano"
+          className="flex h-11 w-9 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground hover:text-foreground active:cursor-grabbing"
+          style={{ touchAction: "none" }}
+        >
+          <GripVertical className="h-5 w-5" />
+        </button>
+      )}
 
       {/* Datos */}
       <div className="min-w-[8rem] flex-1 basis-[8rem]">
@@ -405,14 +421,13 @@ function TarjetaReserva({
               junto al nombre y no en la botonera de la derecha: esa tiene ancho
               fijo (72 + 28 px) y el panel mide 320. Sin mirar el estado: solo el
               permiso lo apaga. */}
-          {onEditar && (
+          {onEditar && puedeEditar && (
             <button
               type="button"
-              disabled={!puedeEditar}
               onClick={() => onEditar(reserva)}
               aria-label={`Editar la reserva de ${reserva.nombre}`}
-              title={puedeEditar ? "Editar la reserva" : "No tienes permiso para editar reservas"}
-              className="-my-2 flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+              title="Editar la reserva"
+              className="-my-2 flex h-11 w-11 shrink-0 items-center justify-center rounded text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <SquarePen className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -455,37 +470,39 @@ function TarjetaReserva({
       {/* Acciones — posición y ancho FIJOS en todas las filas.
           El texto visible es corto para que quepa; el nombre completo de la
           acción vive en `aria-label` (mismo criterio que ListaReservasAvanzada). */}
-      <div className="ml-auto flex shrink-0 items-center gap-1">
-      <Button
-        type="button"
-        size="sm"
-        variant={activa ? "default" : tieneMesa ? "outline" : "secondary"}
-        className="h-11 min-w-[84px] shrink-0 touch-manipulation px-3 text-sm"
-        aria-label={
-          activa
-            ? `Dejar de elegir mesa para ${reserva.nombre}`
-            : tieneMesa
-              ? `Cambiar mesas de ${reserva.nombre}`
-              : `Sentar a ${reserva.nombre}`
-        }
-        onClick={() => onActivar(reserva)}
-      >
-        {activa ? "Eligiendo" : tieneMesa ? "Cambiar" : "Sentar"}
-      </Button>
-      {tieneMesa && onQuitarMesas ? (
+      {puedeEditar && (
+        <div className="ml-auto flex shrink-0 items-center gap-1">
         <Button
           type="button"
-          size="icon"
-          variant="ghost"
-          className="h-11 w-11 shrink-0 touch-manipulation text-muted-foreground hover:text-destructive"
-          aria-label={`Quitar mesas de ${reserva.nombre}`}
-          title="Quitar mesas"
-          onClick={() => onQuitarMesas(reserva)}
+          size="sm"
+          variant={activa ? "default" : tieneMesa ? "outline" : "secondary"}
+          className="h-11 min-w-[84px] shrink-0 touch-manipulation px-3 text-sm"
+          aria-label={
+            activa
+              ? `Dejar de elegir mesa para ${reserva.nombre}`
+              : tieneMesa
+                ? `Cambiar mesas de ${reserva.nombre}`
+                : `Sentar a ${reserva.nombre}`
+          }
+          onClick={() => onActivar(reserva)}
         >
-          <X className="h-4 w-4" />
+          {activa ? "Eligiendo" : tieneMesa ? "Cambiar" : "Sentar"}
         </Button>
-      ) : null}
-      </div>
+        {tieneMesa && onQuitarMesas ? (
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-11 w-11 shrink-0 touch-manipulation text-muted-foreground hover:text-destructive"
+            aria-label={`Quitar mesas de ${reserva.nombre}`}
+            title="Quitar mesas"
+            onClick={() => onQuitarMesas(reserva)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -1212,9 +1229,10 @@ export function PlanoEspacio2D({
     [mesaIdsDe, mesasPorId],
   );
 
+  // Sentar (elegir mesas para una reserva) escribe: sin «Editar» nunca hay reserva activa.
   const reservaActiva = useMemo(
-    () => reservasTurno.find((r) => r.id === reservaActivaId) ?? null,
-    [reservasTurno, reservaActivaId],
+    () => (puedeEditar ? reservasTurno.find((r) => r.id === reservaActivaId) ?? null : null),
+    [puedeEditar, reservasTurno, reservaActivaId],
   );
   const mesaIdsActivos = reservaActiva ? mesaIdsDe(reservaActiva.id) : [];
   const plazasActivas = plazasDeMesas(mesaIdsActivos, mesasPorId);
@@ -1604,7 +1622,7 @@ export function PlanoEspacio2D({
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveReserva(null);
-    if (!over) return;
+    if (!over || !puedeEditar) return;
 
     const activeData = active.data.current;
     const overData = over.data.current;
@@ -1764,6 +1782,8 @@ export function PlanoEspacio2D({
 
   // ── Recolocar mesas en el plano ───────────────────────────────────────────
   const handleMesaDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, mesa: Mesa) => {
+    // Recolocar una mesa cambia el plano base: solo con «Editar».
+    if (!puedeEditar) return;
     const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
     arrastreArmadoRef.current = false;
@@ -1776,7 +1796,7 @@ export function PlanoEspacio2D({
       offsetY: mesa.pos_y,
     });
     setSelectedMesa(mesa);
-  }, []);
+  }, [puedeEditar]);
 
   const handleMesaMove = useCallback(
     (clientX: number, clientY: number) => {
@@ -2400,12 +2420,16 @@ export function PlanoEspacio2D({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={deshacer} disabled={!ultimoCambio}>
-              <Undo2 className="mr-2 h-4 w-4" />
-              Deshacer
-            </Button>
+            {/* Todo lo que escribe, solo con «Editar» (06/11/2026: se oculta, no se desactiva). «Sin
+                reserva» y «Organizar» se ocultan solos. El PDF es de consulta: se queda. */}
+            {puedeEditar && (
+              <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={deshacer} disabled={!ultimoCambio}>
+                <Undo2 className="mr-2 h-4 w-4" />
+                Deshacer
+              </Button>
+            )}
             <BotonSentarSinReserva salaPreferida={espacioId} />
-            {turnoServicio && mesasPiezas.length > 0 && (
+            {puedeEditar && turnoServicio && mesasPiezas.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
@@ -2418,28 +2442,32 @@ export function PlanoEspacio2D({
                 Volver al plano base
               </Button>
             )}
-            <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={() => setShowAddMesa(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Mesa
-            </Button>
+            {puedeEditar && (
+              <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={() => setShowAddMesa(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Mesa
+              </Button>
+            )}
             {/* «Organizar» (09/10/2026): decide sala y mesa de TODAS las reservas del servicio y propone
                 antes de tocar nada. «Repartir» sigue al lado: solo da mesa en esta sala a las pendientes. */}
             {turnoServicio && <BotonOrganizarServicio fecha={fechaSel} turno={turnoServicio} />}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-11 touch-manipulation"
-              onClick={handleCalcularDistribucion}
-              disabled={repartiendo || reservasPendientes.length === 0}
-              title={
-                reservasPendientes.length === 0
-                  ? `No hay reservas pendientes de mesa en ${etiquetaFiltroTurno(filtroTurno).toLowerCase()}`
-                  : `Repartir mesas entre las ${reservasPendientes.length} reservas pendientes (a horas que no se pisen)`
-              }
-            >
-              <Wand2 className="mr-2 h-4 w-4" />
-              {repartiendo ? "Repartiendo…" : "Repartir"}
-            </Button>
+            {puedeEditar && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 touch-manipulation"
+                onClick={handleCalcularDistribucion}
+                disabled={repartiendo || reservasPendientes.length === 0}
+                title={
+                  reservasPendientes.length === 0
+                    ? `No hay reservas pendientes de mesa en ${etiquetaFiltroTurno(filtroTurno).toLowerCase()}`
+                    : `Repartir mesas entre las ${reservasPendientes.length} reservas pendientes (a horas que no se pisen)`
+                }
+              >
+                <Wand2 className="mr-2 h-4 w-4" />
+                {repartiendo ? "Repartiendo…" : "Repartir"}
+              </Button>
+            )}
             <Button variant="outline" size="sm" className="h-11 touch-manipulation" onClick={handleExportPDF}>
               <FileDown className="mr-2 h-4 w-4" />
               PDF
@@ -2741,7 +2769,7 @@ export function PlanoEspacio2D({
                         asignacion,
                         esPrimeraDelGrupo,
                         mesasDelGrupo: grupo.length,
-                        onQuitar: esPrimeraDelGrupo
+                        onQuitar: esPrimeraDelGrupo && puedeEditar
                           ? () => {
                               const reserva = (reservasDia ?? []).find((r) => r.id === asignacion.reserva_id);
                               if (reserva) pedirQuitarMesas(reserva);
@@ -2909,6 +2937,7 @@ export function PlanoEspacio2D({
                         hayServicio={!!turnoServicio}
                         turno={turnoServicio}
                         ocupado={guardarAjustes.isPending}
+                        soloLectura={!puedeEditar}
                         onGuardar={async (cambios, mensaje) => {
                           if (await guardarPiezas(cambios, mensaje)) setPropuestaPiezas(null);
                         }}
@@ -2953,15 +2982,17 @@ export function PlanoEspacio2D({
                     );
                   })()}
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-11 w-full touch-manipulation text-destructive hover:bg-destructive/10"
-                    onClick={() => setMesaABorrar(selectedMesa)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Borrar mesa
-                  </Button>
+                  {puedeEditar && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-11 w-full touch-manipulation text-destructive hover:bg-destructive/10"
+                      onClick={() => setMesaABorrar(selectedMesa)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Borrar mesa
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )}
@@ -3060,14 +3091,16 @@ export function PlanoEspacio2D({
                   </ScrollArea>
                 )}
 
-                <div className="border-t bg-muted/40 px-3 py-2">
-                  <p className="text-xs leading-snug text-muted-foreground">
-                    <strong className="font-medium text-foreground">Sentar:</strong> toca la reserva y toca la mesa.
-                    Para juntar mesas, sigue tocando más mesas.{" "}
-                    <strong className="font-medium text-foreground">Sin mesa no es un error:</strong> la reserva sigue
-                    en pie y se le puede dar mesa cuando toque.
-                  </p>
-                </div>
+                {puedeEditar && (
+                  <div className="border-t bg-muted/40 px-3 py-2">
+                    <p className="text-xs leading-snug text-muted-foreground">
+                      <strong className="font-medium text-foreground">Sentar:</strong> toca la reserva y toca la mesa.
+                      Para juntar mesas, sigue tocando más mesas.{" "}
+                      <strong className="font-medium text-foreground">Sin mesa no es un error:</strong> la reserva sigue
+                      en pie y se le puede dar mesa cuando toque.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

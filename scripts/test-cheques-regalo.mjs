@@ -6,8 +6,10 @@
 //
 // Cubre: pago (las mismas sentencias que lanza el webhook de Stripe de
 // casa-tomas-story), idempotencia ante eventos repetidos, listado y
-// contadores, verificación, canje único, caducidad (último día incluido),
-// reembolso, factura única y compra manual idempotente.
+// contadores, verificación, canje único (desde el 06/11/2026 basta con «Ver»
+// en Cheques: migración 20261106520000), caducidad (último día incluido),
+// reembolso, factura única y compra manual idempotente (esa sigue pidiendo
+// «Editar»).
 import { PGlite } from "@electric-sql/pglite";
 import { readdir, readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -172,12 +174,13 @@ listado = await listar();
 igual([listado.expedidos, listado.disponibles, listado.tickets[0].codigo], [1, 1, "CT-AAAA2222"], "el pagado aparece disponible");
 let v = await verificar(" ct-aaaa2222 ");
 igual([v.encontrado, v.valido, v.caducado, v.dias_restantes > 360], [true, true, false, true], "verificación normaliza el código y calcula días");
-await falla(canjear("CT-AAAA2222"), /permiso/, "solo lectura no puede canjear");
 await como(AJENO);
 await falla(verificar("CT-AAAA2222"), /permiso/, "sin permiso de Cheques no se puede verificar");
 await falla(listar(), /permiso/, "sin permiso de Cheques no se puede listar");
+await falla(canjear("CT-AAAA2222"), /permiso/, "sin permiso de Cheques no se puede canjear");
 await como(null);
 await falla(verificar("CT-AAAA2222"), /permiso/, "sin sesión no se puede verificar");
+await falla(canjear("CT-AAAA2222"), /permiso/, "sin sesión no se puede canjear");
 await como(LECTOR);
 await falla(listar({ tamano: 7 }), /Paginación inválida/, "tamaño de página no permitido");
 await falla(listar({ estado: "pendiente" }), /Filtro u orden inválido/, "estado de filtro no permitido");
@@ -208,7 +211,12 @@ const ultimoDia = await crearPagado("CT-CCCC4444");
 await fijarCaducidad(ultimoDia, hoy);
 v = await verificar("CT-CCCC4444");
 igual([v.valido, v.caducado, v.dias_restantes], [true, false, 0], "el último día todavía es válido");
-igual((await canjear("CT-CCCC4444")).usado, true, "se puede canjear el último día");
+// Este lo canjea solo lectura (solo «Ver» en Cheques): basta desde el 06/11/2026, y queda quién fue.
+await como(LECTOR);
+igual((await canjear("CT-CCCC4444")).usado, true, "se puede canjear el último día (y con solo «Ver»)");
+igual((await una(`select canjeado_por from public.cheques_regalo where codigo = 'CT-CCCC4444'`)).canjeado_por, LECTOR, "queda registrado el lector que canjeó");
+await falla(canjear("CT-CCCC4444"), /ya ha sido canjeado/, "tampoco el lector canjea dos veces");
+await como(EDITOR);
 
 const caducado = await crearPagado("CT-DDDD5555");
 const ayer = (await una(`select ($1::date - 1)::text as d`, [hoy])).d;

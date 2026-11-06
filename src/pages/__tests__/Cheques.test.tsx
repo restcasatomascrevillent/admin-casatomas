@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 const mock = vi.hoisted(() => ({ rpc: vi.fn(), edit: true, toast: vi.fn(), plantillaError: null as null | { code: string; message: string } }));
 vi.mock("@/components/cheques/ListaTickets", () => ({ ListaTickets: () => <div>Listado de tickets</div> }));
 vi.mock("@/components/DashboardLayout", () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
-vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: mock.edit }) }));
+// «Ver» en Cheques siempre; «Editar» según `mock.edit` (un super admin, como «Editar»: puede todo).
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (_seccion: string, tipo: string = "view") => ({ canAccess: tipo === "view" || mock.edit, loading: false }),
+}));
 vi.mock("sonner", () => ({ toast: { error: mock.toast, success: vi.fn() } }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {
   rpc: mock.rpc,
@@ -40,10 +43,16 @@ describe("Verificación y canje", () => {
     expect(screen.queryByText("Cheque válido para canjear")).toBeNull();
     expect(screen.queryByRole("button", { name: "Canjear cheque" })).toBeNull();
   });
-  it("permite verificar sin conceder canje a usuarios con solo lectura", async () => {
+  // 06/11/2026 (decisión del dueño): con solo «Ver» se consulta Y se canjea; el servidor lo permite desde
+  // la migración 20261106520000 (canjear_cheque_regalo con permiso de vista).
+  it("con solo «Ver» se verifica Y se canjea un cheque", async () => {
     mock.edit = false; render(<Cheques />); await buscar();
-    expect(screen.queryByRole("button", { name: "Canjear cheque" })).toBeNull();
-    expect(screen.getByText("Necesitas permiso de edición para canjearlo.")).toBeTruthy();
+    expect(screen.queryByText("Necesitas permiso de edición para canjearlo.")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Canjear cheque" }));
+    mock.rpc.mockResolvedValueOnce({ data: { ...valido, usado: true, valido: false }, error: null });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar canje" }));
+    await screen.findByText("Este cheque ya está canjeado");
+    expect(mock.rpc).toHaveBeenLastCalledWith("canjear_cheque_regalo", { p_codigo: "CT-ABCDEFGH" });
   });
   it("un error de canje obliga a comprobar de nuevo, sin presentar el cheque como válido", async () => {
     render(<Cheques />); await buscar();
@@ -85,4 +94,27 @@ describe("Verificación y canje", () => {
     expect(screen.queryByRole("button", { name: "Canjear cheque" })).toBeNull();
   });
 
+});
+
+describe("Pestañas según el permiso (06/11/2026)", () => {
+  beforeEach(() => { mock.plantillaError = null; mock.rpc.mockReset(); mock.edit = true; mock.rpc.mockResolvedValue({ data: valido, error: null }); });
+  const pestanas = () => screen.getAllByRole("tab").map((t) => t.textContent?.trim());
+
+  it("con solo «Ver»: expedición, verificar y Stripe; sin compra manual, configuración ni plantilla, y con la etiqueta «Solo lectura»", async () => {
+    mock.edit = false;
+    render(<Cheques />);
+    expect(pestanas()).toEqual(["Expedición de tickets", "Verificar cheque", "Stripe"]);
+    expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
+    // Ni siquiera montadas (la compra manual iba con `forceMount`).
+    expect(screen.queryByText("Personaliza tu factura")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Generar código y enviar cheque/ })).toBeNull();
+    expect(screen.queryByText(/Necesitas permiso de edición de Cheques/)).toBeNull();
+  });
+
+  it("con «Editar» (o super admin): las seis pestañas y sin etiqueta «Solo lectura»", async () => {
+    render(<Cheques />);
+    expect(pestanas()).toEqual(["Expedición de tickets", "Verificar cheque", "Compra manual", "Configuración", "Plantilla de factura", "Stripe"]);
+    expect(screen.queryByTestId("etiqueta-solo-lectura")).toBeNull();
+    await waitFor(() => expect(screen.queryByText("Cargando plantilla…")).toBeNull());
+  });
 });

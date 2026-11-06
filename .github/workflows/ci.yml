@@ -76,6 +76,8 @@ jobs:
         run: npm run test:vinos-publicacion:db
       - name: Permiso propio de Reservas › Configuración (PGlite)
         run: npm run test:reservas-configuracion:db
+      - name: Solo «Ver» canjea cheques; migración y rollback (PGlite)
+        run: npm run test:permisos-solo-ver:db
       - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
         run: npm run test:vinos-copeo-encuesta:db
       - name: Instagram, bucket y piezas por la sección marketing (PGlite)

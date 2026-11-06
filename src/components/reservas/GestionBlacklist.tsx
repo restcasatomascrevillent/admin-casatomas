@@ -19,9 +19,17 @@ import {
   useEliminarBlacklist,
   BlacklistEntry
 } from "@/hooks/useBlacklist";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { SugerenciasBlacklist } from "./SugerenciasBlacklist";
 
+/**
+ * Pestaña Blacklist de Reservas: sugerencias pendientes y la lista negra. Añadir, editar y quitar
+ * entradas exige «Editar» en Reservas; con solo «Ver» se consulta y esos botones no salen
+ * (06/11/2026, decisión del dueño: se ocultan, no se desactivan; la etiqueta «Solo lectura» la pone
+ * la página).
+ */
 export function GestionBlacklist() {
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { data: blacklist, isLoading } = useBlacklist();
   const crearBlacklist = useCrearBlacklist();
   const actualizarBlacklist = useActualizarBlacklist();
@@ -82,7 +90,7 @@ export function GestionBlacklist() {
     await eliminarBlacklist.mutateAsync(id);
   };
 
-  const accionesEntrada = (entry: NonNullable<typeof blacklist>[number]) => (
+  const accionesEntrada = (entry: NonNullable<typeof blacklist>[number]) => !puedeEditar ? null : (
                     <div className="flex justify-end gap-1">
                       <Button
                         variant="ghost"
@@ -148,83 +156,85 @@ export function GestionBlacklist() {
               Lista Negra
             </CardTitle>
             <CardDescription>
-              Gestiona emails y teléfonos bloqueados para reservas
+              {puedeEditar ? "Gestiona emails y teléfonos bloqueados para reservas" : "Emails y teléfonos bloqueados para reservas"}
             </CardDescription>
           </div>
-          <Dialog open={openDialog} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                Añadir
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingEntry ? "Editar entrada" : "Añadir a lista negra"}
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <Select
-                    value={formData.tipo}
-                    onValueChange={(value: "email" | "telefono") =>
-                      setFormData({ ...formData, tipo: value })
-                    }
-                    disabled={!!editingEntry}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="email">Email</SelectItem>
-                      <SelectItem value="telefono">Teléfono</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          {puedeEditar && (
+            <Dialog open={openDialog} onOpenChange={handleOpenChange}>
+              <DialogTrigger asChild>
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Añadir
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingEntry ? "Editar entrada" : "Añadir a lista negra"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Tipo</Label>
+                    <Select
+                      value={formData.tipo}
+                      onValueChange={(value: "email" | "telefono") =>
+                        setFormData({ ...formData, tipo: value })
+                      }
+                      disabled={!!editingEntry}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="telefono">Teléfono</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>{formData.tipo === "email" ? "Email" : "Teléfono"}</Label>
-                  <Input
-                    type={formData.tipo === "email" ? "email" : "tel"}
-                    value={formData.valor}
-                    onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
-                    placeholder={formData.tipo === "email" ? "ejemplo@email.com" : "+34 600 000 000"}
-                    disabled={!!editingEntry}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label>{formData.tipo === "email" ? "Email" : "Teléfono"}</Label>
+                    <Input
+                      type={formData.tipo === "email" ? "email" : "tel"}
+                      value={formData.valor}
+                      onChange={(e) => setFormData({ ...formData, valor: e.target.value })}
+                      placeholder={formData.tipo === "email" ? "ejemplo@email.com" : "+34 600 000 000"}
+                      disabled={!!editingEntry}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Nombre (opcional)</Label>
-                  <Input
-                    value={formData.nombre}
-                    onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                    placeholder="Nombre del cliente"
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label>Nombre (opcional)</Label>
+                    <Input
+                      value={formData.nombre}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      placeholder="Nombre del cliente"
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Motivo (opcional)</Label>
-                  <Textarea
-                    value={formData.motivo}
-                    onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
-                    placeholder="Razón por la que está en la lista negra"
-                    rows={3}
-                  />
-                </div>
+                  <div className="space-y-2">
+                    <Label>Motivo (opcional)</Label>
+                    <Textarea
+                      value={formData.motivo}
+                      onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
+                      placeholder="Razón por la que está en la lista negra"
+                      rows={3}
+                    />
+                  </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={!formData.valor.trim()}>
-                    {editingEntry ? "Guardar" : "Añadir"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={!formData.valor.trim()}>
+                      {editingEntry ? "Guardar" : "Añadir"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -285,7 +295,7 @@ export function GestionBlacklist() {
                 <TableHead>Motivo</TableHead>
                 <TableHead>Fecha</TableHead>
                 <TableHead>Caduca</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
+                {puedeEditar && <TableHead className="text-right">Acciones</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -328,9 +338,11 @@ export function GestionBlacklist() {
                       </Badge>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">
-                    {accionesEntrada(entry)}
-                  </TableCell>
+                  {puedeEditar && (
+                    <TableCell className="text-right">
+                      {accionesEntrada(entry)}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

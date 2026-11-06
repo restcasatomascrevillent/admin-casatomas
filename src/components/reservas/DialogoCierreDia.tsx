@@ -9,6 +9,9 @@
 // Misma lógica: `useCambiarCierre` (tabla `cierres_reserva`) y los cierres de
 // la RPC `servicios_cerrados_reserva`. Las reservas manuales del panel siguen
 // siendo posibles (solo avisan).
+//
+// Solo «Ver» en Reservas (06/11/2026, decisión del dueño): el pop-up enseña cómo
+// está el día, sin los botones de abrir y cerrar (se ocultan, no se desactivan).
 // ============================================================================
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -19,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { cn } from "@/lib/utils";
 import { useCambiarCierre } from "@/hooks/useCierresReserva";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   TURNOS_SERVICIO,
   cierraPorSemana,
@@ -47,8 +51,9 @@ function tituloDia(fecha: string): string {
 }
 
 export function DialogoCierreDia({ fecha, onClose, cierres, esPasado, esquemaPendiente }: DialogoCierreDiaProps) {
-  // Sin permiso de escritura en «reservas», la RLS de `cierres_reserva` lo
-  // rechaza y se avisa con el error (no se consulta el rol aquí).
+  // Cerrar y abrir escribe en `cierres_reserva` (RLS: edición en «reservas»). Sin
+  // ese permiso no se ofrecen los botones.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const cambiar = useCambiarCierre();
   const { data: configuracion } = useConfiguracionReservas();
   const semanal = cierreSemanalDesde(configuracion);
@@ -115,41 +120,43 @@ export function DialogoCierreDia({ fecha, onClose, cierres, esPasado, esquemaPen
               })}
             </ul>
 
-            {/* Acciones: botones grandes (tablet) */}
-            <div className="grid grid-cols-2 gap-3">
-              {TURNOS_SERVICIO.map((t) => {
-                const c = cerrado(t);
-                return (
-                  <Button
-                    key={t}
-                    type="button"
-                    variant={c ? "default" : "outline"}
-                    className="h-14 text-base"
-                    disabled={bloqueado}
-                    onClick={() => aplicar([t], !c)}
-                  >
-                    {c ? `Abrir ${NOMBRE_TURNO[t].toLowerCase()}` : `Cerrar ${NOMBRE_TURNO[t].toLowerCase()}`}
-                  </Button>
-                );
-              })}
-              <Button
-                type="button"
-                variant={todoCerrado ? "default" : "destructive"}
-                className="col-span-2 h-14 text-base"
-                disabled={bloqueado}
-                onClick={() => aplicar(TURNOS_SERVICIO, !todoCerrado)}
-              >
-                {todoCerrado ? "Abrir las dos (todo el día)" : "Cerrar las dos (todo el día)"}
-              </Button>
-            </div>
+            {/* Acciones: botones grandes (tablet). Solo con «Editar» en Reservas. */}
+            {puedeEditar && (
+              <div className="grid grid-cols-2 gap-3">
+                {TURNOS_SERVICIO.map((t) => {
+                  const c = cerrado(t);
+                  return (
+                    <Button
+                      key={t}
+                      type="button"
+                      variant={c ? "default" : "outline"}
+                      className="h-14 text-base"
+                      disabled={bloqueado}
+                      onClick={() => aplicar([t], !c)}
+                    >
+                      {c ? `Abrir ${NOMBRE_TURNO[t].toLowerCase()}` : `Cerrar ${NOMBRE_TURNO[t].toLowerCase()}`}
+                    </Button>
+                  );
+                })}
+                <Button
+                  type="button"
+                  variant={todoCerrado ? "default" : "destructive"}
+                  className="col-span-2 h-14 text-base"
+                  disabled={bloqueado}
+                  onClick={() => aplicar(TURNOS_SERVICIO, !todoCerrado)}
+                >
+                  {todoCerrado ? "Abrir las dos (todo el día)" : "Cerrar las dos (todo el día)"}
+                </Button>
+              </div>
+            )}
 
-            {esPasado && <p className="text-sm text-muted-foreground">Es un día pasado: ya no se puede cambiar.</p>}
-            {esquemaPendiente && (
+            {puedeEditar && esPasado && <p className="text-sm text-muted-foreground">Es un día pasado: ya no se puede cambiar.</p>}
+            {puedeEditar && esquemaPendiente && (
               <p className="text-sm text-muted-foreground">
                 Se ven los cierres por defecto. Para cambiarlos falta aplicar la migración de cierres.
               </p>
             )}
-            {!esquemaPendiente && cierres.length > 0 && (
+            {puedeEditar && !esquemaPendiente && cierres.length > 0 && (
               <p className="text-sm text-muted-foreground">Desde el panel se puede reservar igualmente (solo avisa).</p>
             )}
 
