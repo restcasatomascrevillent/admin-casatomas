@@ -43,9 +43,9 @@ export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
  */
 export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   dashboard: "sin efecto aquí; las reservas del día dependen de «Reservas».",
-  reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas y mover de sala.",
+  reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas, dar mesa y mover de sala, cerrar días y la lista negra. Con solo «Ver» se consulta todo, sin ningún botón para cambiarlo.",
   reservas_configuracion:
-    "cambiar las reglas, los turnos y las plantillas de correo de las reservas. Para entrar hace falta también «Ver» en Reservas.",
+    "entrar y cambiar las reglas, los turnos, las mesas y las plantillas de correo de las reservas. «Ver» aquí no sirve por sí solo: sin «Editar» no se ve la pestaña. Hace falta también «Ver» en Reservas.",
   gestor_carta:
     "añadir, cambiar y borrar platos, vinos, bebidas y cócteles: ajustar y restaurar precios, ordenar, visibilidad, fotos (quitar el fondo y vídeos), «Añadir vino» y «Varias botellas» con IA, traducciones y la votación del vino favorito. Con solo «Ver» se consulta la carta y se descarga el «PDF Carta».",
   gestion_web:
@@ -55,8 +55,8 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   instagram_agencia: "aceptar, entregar y comentar los encargos de Instagram como la agencia (Oficiosos). Con solo «Ver», los consulta.",
   instagram_render:
     "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",
-  cheques: "canjear cheques regalo y modificar la plantilla de factura.",
-  tienda: "poner o quitar vinos de la tienda y cambiar sus ajustes (visible, descuento y textos).",
+  cheques: "compra manual, configuración del cheque y plantilla de factura. Con solo «Ver» se consultan y se canjean cheques regalo.",
+  tienda: "poner o quitar vinos de la tienda y la pestaña Ajustes (visible, descuento y textos). Con solo «Ver» se consulta la lista de vinos.",
   facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
 };
 

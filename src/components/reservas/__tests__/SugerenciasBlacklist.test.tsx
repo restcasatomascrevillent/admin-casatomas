@@ -218,13 +218,17 @@ describe("SugerenciasBlacklist", () => {
     }
   });
 
-  it("sin permiso de edición NO ofrece aprobar ni rechazar (usuario de solo lectura)", () => {
+  it("sin permiso de edición NO ofrece aprobar ni rechazar, ni la columna de acciones (usuario de solo lectura)", () => {
     vi.mocked(useCanAccessSection).mockReturnValue({ canAccess: false, loading: false });
     const { tabla } = renderTabla([makeSugerencia()]);
 
     expect(within(tabla).queryByText("Aprobar")).toBeNull();
     expect(within(tabla).queryByText("Rechazar")).toBeNull();
-    expect(within(tabla).getByText(/solo lectura/i)).toBeDefined();
+    expect(within(tabla).queryAllByRole("button")).toEqual([]);
+    // 06/11/2026: ni columna ni aviso por fila; la etiqueta común «Solo lectura» la pone la página.
+    expect(tabla.querySelector('thead th[aria-label="Acciones"]')).toBeNull();
+    expect(within(tabla).queryByText(/solo lectura/i)).toBeNull();
+    expect(within(tabla).getByText("Juan García")).toBeDefined();
   });
 
   it("abrir el diálogo de Aprobar propone una fecha de caducidad por defecto (editable)", () => {

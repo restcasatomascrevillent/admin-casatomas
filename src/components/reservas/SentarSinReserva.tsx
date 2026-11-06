@@ -20,6 +20,7 @@ import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { useAjustesMesaDia } from "@/hooks/useAjustesMesaServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { deshacerSinReserva, useSentarSinReserva } from "@/hooks/useSentarSinReserva";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde } from "@/lib/reservas/servicioSala";
@@ -37,6 +38,10 @@ export function BotonSentarSinReserva({
   className?: string;
 }) {
   const [abierto, setAbierto] = useState(false);
+  // Sentar sin reserva CREA una reserva: exige «Editar» en Reservas. Con solo «Ver» el botón no
+  // existe (06/11/2026, decisión del dueño: se oculta, no se desactiva), esté donde esté.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  if (!puedeEditar) return null;
   return (
     <>
       <Button

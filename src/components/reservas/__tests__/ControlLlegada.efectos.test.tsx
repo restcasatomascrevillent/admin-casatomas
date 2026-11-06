@@ -10,9 +10,10 @@
  * nombre accesible.
  *
  * PASO 1 del refactor de acciones: la botonera lee `accionesDisponibles(reserva,
- * { vista: "hoy", canEdit })`; sin permiso de edición sus controles quedan
- * deshabilitados con el motivo visible (`ConMotivo`), y el vocabulario es el único
- * «Ha llegado» / «No vino». El `// BUG conocido` del permiso pasó a «corregido».
+ * { vista: "hoy", canEdit })`, y el vocabulario es el único «Ha llegado» / «No vino».
+ * El `// BUG conocido` del permiso pasó a «corregido». Desde el 06/11/2026 (decisión
+ * del dueño), sin permiso de edición NO hay controles: se ocultan, no se desactivan;
+ * solo queda el chip del estado («Llegó» / «No vino»).
  *
  * PASO 2: el hook real de detrás es ya el ejecutor único. Las escrituras van condicionadas
  * al estado de partida (`.in("estado", …)`) y el «Deshacer» del chip vuelve al estado que
@@ -276,26 +277,16 @@ describe("ControlLlegada · con texto y `soloIcono` (las columnas estrechas del 
   });
 });
 
-describe("ControlLlegada · sin permiso de edición (canEdit = false)", () => {
-  const MOTIVO = "No tienes permiso para editar reservas";
-
+describe("ControlLlegada · sin permiso de edición (canEdit = false): solo «Ver», nada que pulsar", () => {
   it.each(["pendiente", "verificada", "confirmada"])(
-    "reserva %s: «Ha llegado» y el menú «…» quedan deshabilitados, con el motivo visible, y no disparan nada",
+    "reserva %s: ni «Ha llegado» ni el menú «…» (06/11/2026: se ocultan, no se desactivan)",
     (estado) => {
       const acciones = accionesFalsas();
-      render(<Control reserva={reserva({ estado })} acciones={acciones as never} canEdit={false} />);
+      const { container } = render(<Control reserva={reserva({ estado })} acciones={acciones as never} canEdit={false} />);
 
-      const llegada = botonLlegada();
-      const menu = screen.getByRole("button", { name: "Más opciones de llegada para Ana" });
-      for (const boton of [llegada, menu]) {
-        expect(boton).toBeDisabled();
-        // Un botón deshabilitado no recibe el ratón (`pointer-events-none`): el motivo se ve en su envoltorio.
-        expect(boton.parentElement).toHaveAttribute("title", MOTIVO);
-      }
-      fireEvent.click(llegada);
-      fireEvent.keyDown(menu, { key: "Enter" });
-
-      expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /ha llegado/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Más opciones de llegada para Ana" })).not.toBeInTheDocument();
+      expect(container).toBeEmptyDOMElement();
       expect(acciones.marcarLlegada).not.toHaveBeenCalled();
       expect(acciones.marcarNoShow).not.toHaveBeenCalled();
     },
@@ -304,15 +295,12 @@ describe("ControlLlegada · sin permiso de edición (canEdit = false)", () => {
   it.each([
     ["completada", "Deshacer llegada de Ana"],
     ["no_show", "Deshacer «No vino» de Ana"],
-  ])("reserva %s: el «Deshacer» queda deshabilitado, con el motivo visible, y no dispara nada", (estado, nombreBoton) => {
+  ])("reserva %s: sin «Deshacer» (oculto, no desactivado)", (estado, nombreBoton) => {
     const acciones = accionesFalsas();
     render(<Control reserva={reserva({ estado })} acciones={acciones as never} canEdit={false} />);
 
-    const deshacer = screen.getByRole("button", { name: nombreBoton });
-
-    expect(deshacer).toBeDisabled();
-    expect(deshacer.parentElement).toHaveAttribute("title", MOTIVO);
-    fireEvent.click(deshacer);
+    expect(screen.queryByRole("button", { name: nombreBoton })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(acciones.deshacerLlegadaONoShow).not.toHaveBeenCalled();
   });
 

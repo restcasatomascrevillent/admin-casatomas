@@ -2,6 +2,9 @@
  * Pop-up de cierre del día (pestaña Calendario, encargo del dueño 2026-10-15):
  * al pulsar un día se abre; cierra comida, cena o las dos y reabre lo cerrado,
  * con la misma mutación de siempre (`useCambiarCierre`).
+ *
+ * Con solo «Ver» en Reservas (06/11/2026, decisión del dueño) enseña el estado del día sin los
+ * botones de abrir y cerrar: se ocultan, no se desactivan.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
@@ -14,6 +17,13 @@ vi.mock("@/hooks/useConfiguracionReservas", () => ({
   useConfiguracionReservas: () => ({ data: undefined }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const permisos = vi.hoisted(() => ({ editar: true }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (seccion: string, tipo: string = "view") => ({
+    canAccess: seccion === "reservas" && (tipo === "view" || permisos.editar),
+    loading: false,
+  }),
+}));
 
 import { DialogoCierreDia } from "@/components/reservas/DialogoCierreDia";
 import type { ServicioCerrado } from "../../../../supabase/functions/_shared/cierres";
@@ -31,6 +41,7 @@ const boton = (nombre: string | RegExp) => within(screen.getByRole("dialog")).ge
 
 beforeEach(() => {
   mutate.mockReset();
+  permisos.editar = true;
 });
 
 describe("DialogoCierreDia", () => {
@@ -90,6 +101,17 @@ describe("DialogoCierreDia", () => {
     abrir(MARTES, [], { esPasado: true });
     expect(boton("Cerrar comida")).toBeDisabled();
     expect(boton(/Cerrar las dos/)).toBeDisabled();
+  });
+
+  it("con solo «Ver»: el estado se ve, pero no hay ningún botón de abrir o cerrar", () => {
+    permisos.editar = false;
+    abrir(MARTES, [{ fecha: MARTES, turno: "cena", origen: "manual", motivo: null }]);
+    expect(screen.getByTestId("estado-cena")).toHaveTextContent("Cerrada a mano");
+    const dialogo = within(screen.getByRole("dialog"));
+    for (const nombre of [/Cerrar comida/, /Abrir cena/, /las dos/]) expect(dialogo.queryByRole("button", { name: nombre })).toBeNull();
+    // «Listo» sí: cerrar el pop-up no escribe nada.
+    expect(boton("Listo")).toBeEnabled();
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it("«Listo» cierra el pop-up", () => {

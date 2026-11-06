@@ -135,6 +135,7 @@ export function PanelPiezasMesa({
   hayServicio,
   turno,
   ocupado,
+  soloLectura = false,
   onGuardar,
   onProponer,
 }: {
@@ -147,6 +148,11 @@ export function PanelPiezasMesa({
   /** Servicio de los ajustes, para decir «solo esta cena» / «solo esta comida». */
   turno?: "comida" | "cena" | null;
   ocupado: boolean;
+  /**
+   * Solo «Ver» en Reservas (06/11/2026, decisión del dueño): se ve cómo está la mesa (piezas, picos,
+   * plazas, uniones) pero sin ningún botón para cambiarla (se ocultan, no se desactivan).
+   */
+  soloLectura?: boolean;
   onGuardar: (cambios: AjusteMesa[], mensaje: string) => void | Promise<void>;
   onProponer: (p: PropuestaAbierta) => void;
 }) {
@@ -219,6 +225,17 @@ export function PanelPiezasMesa({
     }
     const menos = cambiarPlazas(mesa, estado, -1);
     const mas = cambiarPlazas(mesa, estado, 1);
+    if (soloLectura) {
+      return (
+        <div className="rounded-md bg-muted/60 p-2 text-center">
+          <p className="text-lg font-semibold tabular-nums">{plazas} plazas</p>
+          <p className="text-xs text-muted-foreground">
+            de {mesa.sitio.min} a {mesa.sitio.max}
+          </p>
+          {junta && <p className="text-xs font-medium text-sky-700 dark:text-sky-400">{juntaTxt}</p>}
+        </div>
+      );
+    }
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2 rounded-md bg-muted/60 p-2">
@@ -277,7 +294,7 @@ export function PanelPiezasMesa({
         )}
       </div>
 
-      {!mesa.redonda && (
+      {!mesa.redonda && !soloLectura && (
         <div className="grid grid-cols-2 gap-2">
           {menosPico && e.picos > 0 ? (
             <Button
@@ -316,7 +333,7 @@ export function PanelPiezasMesa({
         </div>
       )}
 
-      {listaJuntar}
+      {!soloLectura && listaJuntar}
     </div>
   );
 }

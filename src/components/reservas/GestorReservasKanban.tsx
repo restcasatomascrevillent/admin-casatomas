@@ -485,8 +485,9 @@ export function GestorReservasKanban({
   const acciones = useAccionesServicioReserva();
   // Permiso de edición sobre «reservas». Antes solo lo miraba el editor y el resto
   // del kanban se apoyaba en la RLS de la BD; ahora TODO lo que escribe en una
-  // reserva (estrella, llegada, no vino, deshacer, mover, lista negra, editar)
-  // sale deshabilitado sin él, con el motivo a la vista (`accionesDisponibles`).
+  // reserva (estrella, llegada, no vino, deshacer, mover, lista negra, editar, dar
+  // mesa) exige el permiso, y sin él no sale (06/11/2026: se oculta, no se
+  // desactiva; `accionesDisponibles` y `ReservaCard`). Las tarjetas no se arrastran.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
   const dedo = useIsCoarsePointer();

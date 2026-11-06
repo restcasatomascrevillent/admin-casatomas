@@ -8,6 +8,9 @@
  * «Pendientes de mesa»; el kanban lleva su propio editor—, así que `VistaHoy` se monta sin props.)
  *
  * (06/10/2026: la pestaña Lista ya no lleva título ni subtítulo; su región conserva nombre y descripción.)
+ *
+ * (06/11/2026, decisión del dueño: con solo «Ver», «Nueva Reserva» no existe —se oculta, no se desactiva— y en
+ * su sitio, junto a las pestañas, sale la etiqueta común «Solo lectura»; también en el plano de una sala.)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
@@ -71,22 +74,25 @@ beforeEach(() => {
 describe("Reservas (página) · «Nueva Reserva» pide permiso de edición", () => {
   const botonAlta = () => screen.getByRole("button", { name: /Nueva Reserva/ });
 
-  it("sin permiso de edición el botón sale deshabilitado, explica por qué y no abre el alta", () => {
+  it("sin permiso de edición (solo «Ver») no hay botón: en su sitio, la etiqueta «Solo lectura»", () => {
     h.canEdit = false;
     montar();
 
-    expect(botonAlta()).toBeDisabled();
-    expect(botonAlta().parentElement).toHaveAttribute("title", expect.stringMatching(/permiso de edición/i));
-    fireEvent.click(botonAlta());
+    expect(screen.queryByRole("button", { name: /Nueva Reserva/ })).not.toBeInTheDocument();
+    expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
     expect(screen.queryByTestId("formulario-alta")).not.toBeInTheDocument();
     expect(h.formulario).not.toHaveBeenCalled();
+    // Las pestañas de consulta siguen.
+    for (const nombre of ["Hoy", "Lista", "Calendario", "Próximas reservas", "Blacklist"]) {
+      expect(screen.getByRole("tab", { name: nombre })).toBeInTheDocument();
+    }
   });
 
-  it("con permiso de edición el botón está habilitado, sin motivo, y abre el alta", async () => {
+  it("con permiso de edición el botón está, sin etiqueta «Solo lectura», y abre el alta", async () => {
     montar();
 
     expect(botonAlta()).toBeEnabled();
-    expect(botonAlta().parentElement).not.toHaveAttribute("title");
+    expect(screen.queryByTestId("etiqueta-solo-lectura")).not.toBeInTheDocument();
     fireEvent.click(botonAlta());
     expect(await screen.findByTestId("formulario-alta")).toBeInTheDocument();
   });

@@ -21,8 +21,9 @@
 // /emails-reserva/enviar-prueba (migración 20261104111000). Ser «admin» no
 // basta: hasta el 04/11/2026 aquí se aceptaba también `isAdmin`, y a un admin
 // sin permiso de edición le ofrecía guardar cambios que la base de datos
-// rechazaba. Leerlas pide «Ver» en esa sección, que es lo que ya exige ver la
-// pestaña Configuración.
+// rechazaba. Leerlas pide «Ver» en esa sección (RLS). Desde el 06/11/2026 la
+// pestaña Configuración solo la ve quien tiene «Puede editar» en ella, así que
+// el aviso de «Solo lectura» de aquí abajo queda como defensa.
 // ============================================================================
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";

@@ -54,6 +54,7 @@ export function SolicitudCard({
   onConvertir,
   onGestionarPropuesta,
   defaultExpanded = false,
+  soloLectura = false,
 }: {
   solicitud: SolicitudPendiente;
   onUpdateEstado: (id: string, estado: string) => Promise<boolean>;
@@ -63,6 +64,11 @@ export function SolicitudCard({
   /** Si se pasa, aparece "Propuesta y salas" (abre el diálogo de gestión completo). */
   onGestionarPropuesta?: (solicitud: SolicitudPendiente) => void;
   defaultExpanded?: boolean;
+  /**
+   * Solo «Ver» en Reservas (06/11/2026, decisión del dueño): sin «Gestionar» ni nada que
+   * escriba (notas, estado, propuesta, convertir). Se ven los datos de la solicitud.
+   */
+  soloLectura?: boolean;
 }) {
   const vistaPropuesta = estadoPropuestaVista(solicitud, format(new Date(), "yyyy-MM-dd"));
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -168,19 +174,21 @@ export function SolicitudCard({
           </div>
         )}
 
-        {/* Expandir/Contraer */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full h-7 text-xs"
-          onClick={() => setExpanded(!expanded)}
-        >
-          {expanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
-          {expanded ? "Menos opciones" : "Gestionar"}
-        </Button>
+        {/* Expandir/Contraer (sin permiso de edición no hay nada que gestionar) */}
+        {!soloLectura && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full h-7 text-xs"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />}
+            {expanded ? "Menos opciones" : "Gestionar"}
+          </Button>
+        )}
 
         {/* Zona expandida: acciones y notas */}
-        {expanded && (
+        {expanded && !soloLectura && (
           <div className="space-y-3 pt-2 border-t">
             {/* Editor de notas internas */}
             <div className="space-y-2">

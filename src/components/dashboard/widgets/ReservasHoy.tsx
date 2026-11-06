@@ -7,7 +7,6 @@ import { useIsCompactNav } from "@/hooks/use-mobile";
 import { useTodayReservations, useTodayConfirmedReservations } from "@/hooks/useDashboardStats";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
-import { ConMotivo } from "@/components/reservas/ConMotivo";
 import { TiraCifras } from "@/components/panel/TiraCifras";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -199,18 +198,17 @@ export function ReservasHoy() {
                           <div className="flex items-center gap-1">
                             <Badge variant="outline">{r.hora.substring(0, 5)}</Badge>
                             {/* Editar datos, día, hora, comensales, sala o notas de esta
-                                reserva, sea cual sea su estado. Cierra el popup antes. El
-                                botón deshabilitado no recibe el ratón: el motivo se ve en
-                                el envoltorio. */}
-                            <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                                reserva, sea cual sea su estado. Cierra el popup antes. Sin
+                                «Editar» en Reservas no sale (06/11/2026: se oculta, no se
+                                desactiva). */}
+                            {puedeEditar && (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground"
-                                disabled={!puedeEditar}
                                 aria-label={`Editar la reserva de ${r.nombre || "este cliente"}`}
-                                title={puedeEditar ? "Editar la reserva" : "No tienes permiso para editar reservas"}
+                                title="Editar la reserva"
                                 onClick={() => {
                                   setNotasAbiertas(false);
                                   editarReserva(r.id);
@@ -218,7 +216,7 @@ export function ReservasHoy() {
                               >
                                 <SquarePen className="h-3.5 w-3.5" />
                               </Button>
-                            </ConMotivo>
+                            )}
                           </div>
                         </div>
                         <p className="text-sm text-muted-foreground bg-background p-2 rounded italic">

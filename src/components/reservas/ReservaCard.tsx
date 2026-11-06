@@ -16,14 +16,18 @@
 // Mantener pulsado y arrastrar sigue moviendo la tarjeta: un arrastre no abre el menú al soltar
 // (dnd-kit ya se traga el clic posterior; además se ignora todo clic en los 400 ms siguientes a
 // un arrastre, por si el navegador sintetiza otro). No abren el menú: estrella, «⋮», la fila de
-// llegada (`ControlLlegada`), enlaces, y el envoltorio de un control apagado (`ConMotivo`);
-// los dos últimos se marcan con `data-sin-menu-tarjeta`. Un clic dentro del menú ya abierto
+// llegada (`ControlLlegada`) y enlaces; la fila de llegada se marca con `data-sin-menu-tarjeta`. Un clic dentro del menú ya abierto
 // (React lo propaga por el portal) tampoco cuenta: se mira el DOM, no el árbol de React.
 //
 // TECLADO: la tarjeta arrastrable es el activador del `KeyboardSensor` de dnd-kit, que usa
 // Intro/Espacio para empezar a arrastrar; esas teclas NO abren el menú (se prioriza el arrastre
 // con teclado). El menú se abre con el «⋮» (Tab hasta él). La tarjeta que no se arrastra (sin
 // permiso, estado que no se mueve, desplegable del Reservado) sí abre el menú con Intro/Espacio.
+//
+// SOLO «VER» (06/11/2026, decisión del dueño): sin permiso de edición no sale nada que escriba
+// (estrella pulsable, llegada, mover, dar mesa, editar, lista negra, «Liberar mesa»…): se OCULTA,
+// no se desactiva. Al menú solo le queda «Llamar»; sin teléfono no hay «⋮» y tocar la tarjeta no
+// abre nada. La estrella de una reserva importante se sigue viendo, como dato.
 // ============================================================================
 import { useEffect, useRef, useState, type MouseEvent, type KeyboardEvent } from "react";
 import { useDraggable } from "@dnd-kit/core";
@@ -41,11 +45,10 @@ import { Clock, Users, Star, GripVertical, Phone, MoveRight, MoreVertical, Loade
 import { cn } from "@/lib/utils";
 import { etiquetaMesasReserva } from "@/components/espacios/nombresMesa";
 import type { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
-import { accionesDisponibles, motivoSiNoSePuede } from "@/lib/reservas/accionesReserva";
+import { accionesDisponibles } from "@/lib/reservas/accionesReserva";
 import { etiquetaEstadoReserva, infoEstadoReserva, ocupaEspacio } from "@/lib/reservas/estadosReserva";
 import { columnaDeReserva, type Columna } from "@/lib/reservas/columnasServicio";
 import type { ReservaServicio } from "@/lib/reservas/servicioSala";
-import { ConMotivo } from "./ConMotivo";
 import { ControlLlegada } from "./ControlLlegada";
 import { accionesSoloIcono } from "./kanbanLayout";
 
@@ -102,7 +105,7 @@ export function ReservaCard({
   /**
    * Permiso de edición sobre «reservas». Obligatorio a propósito (un valor por
    * defecto dejaría pasar a todo el mundo si alguien se olvida de pasarlo): sin él,
-   * todo lo que escribe en la reserva sale deshabilitado, con el motivo visible.
+   * no sale nada que escriba en la reserva (06/11/2026: se oculta, no se desactiva).
    */
   puedeEditar: boolean;
   isDragOverlay?: boolean;
@@ -172,9 +175,16 @@ export function ReservaCard({
   const destinos = columnas.filter((c) => c.id !== columnaActual);
   const textoMesas = etiquetaMesasReserva(mesas);
 
+  // Qué lleva el menú «⋮». Sin permiso solo «Llamar» (si hay teléfono); sin nada, no hay menú.
+  const conDarMesa = puedeEditar && !!onDarMesa && (!!sinMesa || !!textoCambiarMesa);
+  const extras = puedeEditar ? (accionesExtra ?? []) : [];
+  const conEditar = !!onEditar && acc.editar.visible;
+  const hayMenu =
+    acc.mover.visible || conDarMesa || extras.length > 0 || !!reserva.telefono || conEditar || acc.listaNegra.visible;
+
   /** Un toque en una zona neutra de la tarjeta = pulsar «⋮». */
   const alTocarTarjeta = (e: MouseEvent<HTMLDivElement>) => {
-    if (e.defaultPrevented || isDragging) return;
+    if (!hayMenu || e.defaultPrevented || isDragging) return;
     if (Date.now() - finDeArrastre.current < MS_SIN_MENU_TRAS_ARRASTRE) return;
     const destino = e.target as Element;
     // El menú vive en un portal: React propaga hasta aquí los clics de dentro de él, pero no son de la tarjeta.
@@ -186,7 +196,7 @@ export function ReservaCard({
 
   /** Solo la tarjeta que NO se arrastra (si no, Intro/Espacio son del `KeyboardSensor`). */
   const alTeclearEnTarjeta = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
+    if (!hayMenu || e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
     e.preventDefault();
     setMenuAbierto(true);
   };
@@ -205,101 +215,96 @@ export function ReservaCard({
       onTouchStart={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
     >
-      <DropdownMenu open={menuAbierto} onOpenChange={setMenuAbierto}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className={cn("h-6 w-6 text-muted-foreground", compacta && "touch-hit h-8 w-8")}
-            aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
-          >
-            {acciones.estaEnCurso(reserva.id) ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <MoreVertical className="h-3.5 w-3.5" />
+      {hayMenu && (
+        <DropdownMenu open={menuAbierto} onOpenChange={setMenuAbierto}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className={cn("h-6 w-6 text-muted-foreground", compacta && "touch-hit h-8 w-8")}
+              aria-label={`Acciones de la reserva de ${reserva.nombre || "sin nombre"}`}
+            >
+              {acciones.estaEnCurso(reserva.id) ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <MoreVertical className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            {acc.mover.visible && (
+              <>
+                <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
+                  <MoveRight className="h-3.5 w-3.5" />
+                  Mover a…
+                </DropdownMenuLabel>
+                {acc.mover.habilitada ? (
+                  destinos.map((c) => (
+                    <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
+                      {c.title}
+                      {c.capacidadMax ? (
+                        <span className="ml-auto text-[10px] pointer-coarse:text-xs text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
+                      ) : null}
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  // El motivo, a la vista en el propio menú: «No se puede mover en este estado».
+                  <DropdownMenuItem disabled>{acc.mover.titulo}</DropdownMenuItem>
+                )}
+              </>
             )}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground font-normal">
-            <MoveRight className="h-3.5 w-3.5" />
-            Mover a…
-          </DropdownMenuLabel>
-          {acc.mover.habilitada ? (
-            destinos.map((c) => (
-              <DropdownMenuItem key={c.id} onSelect={() => onMover(reserva, c.id)}>
-                {c.title}
-                {c.capacidadMax ? (
-                  <span className="ml-auto text-[10px] pointer-coarse:text-xs text-muted-foreground tabular-nums">{c.capacidadMax} pax</span>
-                ) : null}
+            {/* «Dar mesa» (04/10/2026): abre el plano de SU sala con la reserva señalada, el mismo
+                diálogo que sale tras moverla. Solo con permiso de edición (06/11/2026). */}
+            {conDarMesa && (
+              <>
+                {acc.mover.visible && <DropdownMenuSeparator />}
+                <DropdownMenuItem onSelect={() => onDarMesa?.(reserva)}>
+                  <CircleDashed className="h-3.5 w-3.5 mr-2" />
+                  {sinMesa ? textoDarMesa : textoCambiarMesa}
+                </DropdownMenuItem>
+              </>
+            )}
+            {extras.map((a) => (
+              <DropdownMenuItem key={a.texto} onSelect={a.onSelect}>
+                {a.texto}
               </DropdownMenuItem>
-            ))
-          ) : (
-            // El motivo, a la vista en el propio menú: «No se puede mover en este
-            // estado» o «No tienes permiso para editar reservas».
-            <DropdownMenuItem disabled>{acc.mover.titulo}</DropdownMenuItem>
-          )}
-          {/* «Dar mesa» (04/10/2026): abre el plano de SU sala con la reserva señalada, el mismo
-              diálogo que sale tras moverla. Como «Dar mesa» de la Lista, no mira el permiso: el
-              plano ya lo comprueba al guardar. */}
-          {onDarMesa && (sinMesa || textoCambiarMesa) && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => onDarMesa(reserva)}>
-                <CircleDashed className="h-3.5 w-3.5 mr-2" />
-                {sinMesa ? textoDarMesa : textoCambiarMesa}
-              </DropdownMenuItem>
-            </>
-          )}
-          {accionesExtra?.map((a) => (
-            <DropdownMenuItem key={a.texto} onSelect={a.onSelect}>
-              {a.texto}
-            </DropdownMenuItem>
-          ))}
-          {reserva.telefono && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a href={`tel:${reserva.telefono}`}>
-                  <Phone className="h-3.5 w-3.5 mr-2" />
-                  Llamar
-                </a>
-              </DropdownMenuItem>
-            </>
-          )}
-          {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Va
-              en el menú de TODA tarjeta —también las que no se pueden mover— y
-              sin mirar el estado: lo único que lo apaga es el permiso. */}
-          {onEditar && (
-            <>
-              <DropdownMenuSeparator />
-              {/* El ítem deshabilitado no recibe el ratón: el motivo se ve en el envoltorio. */}
-              <ConMotivo className="block" motivo={motivoSiNoSePuede(acc.editar)}>
-                <DropdownMenuItem
-                  disabled={!acc.editar.habilitada}
-                  title={motivoSiNoSePuede(acc.editar)}
-                  onSelect={() => onEditar(reserva)}
-                >
+            ))}
+            {reserva.telefono && (
+              <>
+                {(acc.mover.visible || conDarMesa || extras.length > 0) && <DropdownMenuSeparator />}
+                <DropdownMenuItem asChild>
+                  <a href={`tel:${reserva.telefono}`}>
+                    <Phone className="h-3.5 w-3.5 mr-2" />
+                    Llamar
+                  </a>
+                </DropdownMenuItem>
+              </>
+            )}
+            {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Va
+                en el menú de TODA tarjeta —también las que no se pueden mover— y
+                sin mirar el estado: lo único que lo quita es el permiso. */}
+            {conEditar && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onEditar?.(reserva)}>
                   <SquarePen className="h-3.5 w-3.5 mr-2" />
                   Editar reserva
                 </DropdownMenuItem>
-              </ConMotivo>
-            </>
-          )}
-          <DropdownMenuSeparator />
-          <ConMotivo className="block" motivo={motivoSiNoSePuede(acc.listaNegra)}>
-            <DropdownMenuItem
-              disabled={!acc.listaNegra.habilitada}
-              onSelect={() => onBlacklist(reserva)}
-              className="text-destructive focus:text-destructive"
-            >
-              <ShieldBan className="h-3.5 w-3.5 mr-2" />
-              Añadir a blacklist
-            </DropdownMenuItem>
-          </ConMotivo>
-        </DropdownMenuContent>
-      </DropdownMenu>
+              </>
+            )}
+            {acc.listaNegra.visible && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onBlacklist(reserva)} className="text-destructive focus:text-destructive">
+                  <ShieldBan className="h-3.5 w-3.5 mr-2" />
+                  Añadir a blacklist
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
       {/* Asa decorativa: se retira en columnas estrechas, donde esos 16px son
           la diferencia entre ver el nombre y no verlo. La tarjeta entera
           sigue siendo arrastrable. */}
@@ -322,8 +327,8 @@ export function ReservaCard({
         arrastrable
           ? "cursor-grab active:cursor-grabbing hover:shadow-md hover:border-primary/30"
           : ocupaSitio
-            ? "cursor-pointer hover:shadow-md hover:border-primary/30"
-            : "cursor-pointer opacity-60",
+            ? cn(hayMenu && "cursor-pointer hover:shadow-md hover:border-primary/30")
+            : cn(hayMenu && "cursor-pointer", "opacity-60"),
         isDragging && "opacity-30 border-dashed border-primary/40",
         reserva.importante && "border-amber-400 bg-amber-50/30 dark:bg-amber-950/20",
         (reserva as { en_blacklist?: boolean }).en_blacklist && "border-destructive/40 bg-destructive/5",
@@ -334,8 +339,8 @@ export function ReservaCard({
       onKeyDown={arrastrable ? undefined : alTeclearEnTarjeta}
       {...(arrastrable ? listeners : {})}
       {...attributes}
-      aria-haspopup="menu"
-      aria-expanded={menuAbierto}
+      aria-haspopup={hayMenu ? "menu" : undefined}
+      aria-expanded={hayMenu ? menuAbierto : undefined}
       // dnd-kit pone `aria-disabled` en la tarjeta que no se arrastra; ahora esa tarjeta se puede tocar
       // (abre el menú), así que se quita y el estado de arrastre pasa a `data-arrastrable`.
       aria-disabled={arrastrable ? attributes["aria-disabled"] : undefined}
@@ -385,9 +390,9 @@ export function ReservaCard({
       <>
       <div className="flex items-start justify-between gap-1 mb-2">
         <div className="flex items-center gap-1.5 min-w-0">
-          {/* Sin permiso, deshabilitada y con el motivo a la vista (en el envoltorio:
-              un botón deshabilitado no recibe el ratón). */}
-          <ConMotivo motivo={motivoSiNoSePuede(acc.importante)}>
+          {/* Sin permiso no se puede marcar (06/11/2026: se oculta el botón); si la reserva ya es
+              importante, la estrella se sigue viendo como dato. */}
+          {acc.importante.visible ? (
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onToggleImportante(reserva); }}
@@ -400,7 +405,9 @@ export function ReservaCard({
             >
               <Star className={cn("h-3.5 w-3.5", reserva.importante ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30 hover:text-amber-400")} />
             </button>
-          </ConMotivo>
+          ) : (
+            reserva.importante && <Star className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" aria-label="Importante" />
+          )}
           {/* `title`: con las columnas estrechas (112–220px) los nombres largos
               se cortan con puntos suspensivos; el completo se lee al pasar el
               ratón, además de estar en el `aria-label` de la tarjeta. */}

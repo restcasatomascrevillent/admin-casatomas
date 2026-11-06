@@ -35,6 +35,7 @@
     "test:recorte-servidor:db": "node scripts/test-recorte-servidor-cupo.mjs",
     "test:vinos-publicacion:db": "node scripts/test-vinos-publicacion.mjs",
     "test:reservas-configuracion:db": "node scripts/test-permiso-reservas-configuracion.mjs",
+    "test:permisos-solo-ver:db": "node scripts/test-permisos-solo-ver.mjs",
     "test:vinos-copeo-encuesta:db": "node scripts/test-vinos-copeo-encuesta.mjs",
     "test:instagram:db": "node scripts/test-instagram.mjs",
     "test:instagram-programar:db": "node scripts/test-instagram-programar.mjs",

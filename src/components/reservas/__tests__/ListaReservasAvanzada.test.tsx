@@ -568,22 +568,22 @@ describe("ListaReservasAvanzada · «Convertir en reserva» pide permiso de edic
   const ultimasProps = (espia: ReturnType<typeof vi.fn>) => espia.mock.calls.at(-1)![0] as Record<string, unknown>;
   const accionesDeLaSolicitud = (tabla: HTMLElement) => botonesDeFila(filaDe(tabla, "Familia Ballester"));
 
-  it("sin permiso: el botón de la fila sale deshabilitado y lo explica, y ni la tarjeta ni «Gestionar» lo ofrecen", async () => {
+  it("sin permiso (solo «Ver», 06/11/2026): ni «Convertir» ni «Gestionar» en la fila, y la tarjeta va en solo lectura", async () => {
     supa.canEdit = false;
     const { tabla } = await montar();
-    const [convertir, , , gestionar] = accionesDeLaSolicitud(tabla);
+    const fila = filaDe(tabla, "Familia Ballester");
 
-    expect(convertir.textContent?.trim()).toBe("Convertir");
-    expect(convertir).toBeDisabled();
-    expect(convertir.parentElement).toHaveAttribute("title", "No tienes permiso para editar reservas");
-    fireEvent.click(convertir);
+    // La fila sigue (se consulta), pero sin columna de acciones: ningún botón.
+    expect(fila).toBeDefined();
+    expect(within(fila).queryAllByRole("button")).toEqual([]);
+    expect(within(fila).queryByText("Convertir")).toBeNull();
     expect(supa.formulario).not.toHaveBeenCalled();
-    expect(ultimasProps(supa.tarjetaSolicitud).onConvertir).toBeUndefined();
-
-    fireEvent.click(gestionar);
-    await waitFor(() => expect(supa.panelGestion).toHaveBeenCalled());
-    expect(ultimasProps(supa.panelGestion).onConvertir).toBeUndefined();
-    expect(ultimasProps(supa.panelGestion).onAceptarTelefono).toBeUndefined();
+    // Tarjeta de móvil: sin convertir, sin «Gestionar» (propuesta) y en solo lectura (sin notas ni estado).
+    const tarjeta = ultimasProps(supa.tarjetaSolicitud);
+    expect(tarjeta.onConvertir).toBeUndefined();
+    expect(tarjeta.onGestionarPropuesta).toBeUndefined();
+    expect(tarjeta.soloLectura).toBe(true);
+    expect(supa.panelGestion).not.toHaveBeenCalled();
   });
 
   it("con permiso: el botón de la fila abre el alta con la solicitud y la tarjeta también lo ofrece", async () => {
@@ -708,15 +708,13 @@ describe("ListaReservasAvanzada · editar una reserva, siempre", () => {
     expect(supa.editarReserva).toHaveBeenCalledWith("res-cancelada");
   });
 
-  it("sin permiso de edición sobre «reservas» el botón se queda, deshabilitado y explicándolo", async () => {
+  it("sin permiso de edición sobre «reservas» no hay botón de editar, ni en la tabla ni en la tarjeta (06/11/2026)", async () => {
     supa.canEdit = false;
     const { tabla } = await montar();
-    const boton = botonEditar(tabla, "Ana Pendiente");
 
-    expect(boton).toBeInTheDocument();
-    expect(boton.hasAttribute("disabled")).toBe(true);
-    expect(boton.getAttribute("aria-label")).toMatch(/No tienes permiso para editar reservas/);
-    fireEvent.click(boton);
+    expect(within(filaDe(tabla, "Ana Pendiente")).queryByRole("button")).toBeNull();
+    expect(screen.queryAllByRole("button", { name: /Gestionar: editar la reserva/ })).toEqual([]);
+    expect(screen.queryAllByRole("button", { name: /No tienes permiso/ })).toEqual([]);
     expect(supa.editarReserva).not.toHaveBeenCalled();
   });
 });
@@ -994,35 +992,35 @@ describe("ListaReservasAvanzada · estados y botones desde la fuente única", ()
     expect(editar.parentElement?.hasAttribute("title")).toBe(false);
   });
 
-  it("sin permiso, la principal dice «Aceptar» en todas las filas, deshabilitada y explicándolo (como antes)", async () => {
+  it("sin permiso (solo «Ver», 06/11/2026): ninguna fila tiene acciones y la tabla pierde la columna", async () => {
     supa.canEdit = false;
     const { tabla } = await montarSeis();
 
+    // La cabecera ya no lleva la columna «Acciones» (ni la casilla de seleccionar todas).
+    expect(within(tabla).queryByRole("columnheader", { name: "Acciones" })).toBeNull();
+    expect(within(tabla).queryByRole("checkbox")).toBeNull();
     for (const [, estado, nombre] of SEIS) {
-      const [principal] = botonesDeFila(filaDe(tabla, nombre));
-      expect(principal.textContent?.trim(), estado).toBe("Aceptar");
-      expect(principal.hasAttribute("disabled"), estado).toBe(true);
-      expect(principal.getAttribute("title"), estado).toBe("No tienes permiso para editar reservas");
+      const fila = filaDe(tabla, nombre);
+      expect(within(fila).queryAllByRole("button"), estado).toEqual([]);
+      // Primera celda: la fecha (antes, la de acciones).
+      expect(fila.querySelectorAll("td")).toHaveLength(5);
     }
+    expect(tabla.innerHTML).not.toMatch(/No tienes permiso/);
   });
 
-  it("CAMBIO ACORDADO (2026-10-01): sin permiso, «Verificar», la estrella y la lista negra salen deshabilitados y lo dicen", async () => {
-    // Antes no miraban el permiso: «Verificar» abría el modal en solo lectura y la estrella y la
-    // lista negra escribían (las paraba la RLS). Va con la RLS de `reservas` endurecida.
+  it("CAMBIO ACORDADO (2026-10-01) y (06/11/2026): sin permiso, ni «Verificar», ni la estrella, ni la lista negra, ni «Dar mesa»", async () => {
     supa.canEdit = false;
-    const { tabla } = await montarSeis();
-    const fila = filaDe(tabla, "Ana Pendiente");
-    const botones = botonesDeFila(fila);
-    const estrella = within(fila).getByRole("button", { name: "Marcar Ana Pendiente como importante" });
+    supa.filas = [{ ...reserva("res-vip", "pendiente", "Vera Vip"), importante: true }, reserva("res-ana", "pendiente", "Ana Pendiente")];
+    const { tabla } = await montar();
 
-    for (const boton of [botones[2], botones[5], estrella]) {
-      expect(boton.hasAttribute("disabled")).toBe(true);
-      expect(boton.parentElement?.getAttribute("title")).toBe("No tienes permiso para editar reservas");
-      fireEvent.click(boton);
+    for (const nombre of ["Vera Vip", "Ana Pendiente"]) {
+      const fila = filaDe(tabla, nombre);
+      expect(within(fila).queryByRole("button", { name: /importante/ }), nombre).toBeNull();
+      expect(within(fila).queryByRole("button", { name: /Verificar|lista negra|Dar mesa|mesa/i }), nombre).toBeNull();
     }
+    // La de una reserva importante se sigue viendo como dato.
+    expect(within(filaDe(tabla, "Vera Vip")).getByLabelText("Importante")).toBeInTheDocument();
     expect(supa.update).not.toHaveBeenCalled();
-    // «Dar mesa» no escribe nada (abre el plano): sigue sin mirar el permiso.
-    expect(botones[1].getAttribute("aria-label")).not.toMatch(/permiso/);
   });
 
   it("una reserva sin nombre: los botones dicen «este cliente», como el editor y la tarjeta de móvil", async () => {

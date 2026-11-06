@@ -72,7 +72,8 @@ const URL_TIENDA_WEB = urlTiendaWeb(VERSION_APP.entorno, import.meta.env.VITE_WE
 /**
  * Tienda › Vinos: los vinos activos de la carta con su precio de carta y el de
  * tienda (con el descuento vigente) y el interruptor «A la venta», que gestiona
- * `vinos_excluidos`. Los vinos sin precio o fuera de la carta de Casa Tomás
+ * `vinos_excluidos` (solo con «Puede editar» en Tienda; con solo «Ver» se ve el
+ * estado de cada vino, sin interruptor ni acciones sobre los mostrados). Los vinos sin precio o fuera de la carta de Casa Tomás
  * salen con su motivo y el interruptor bloqueado: se arreglan en Gestor Web ›
  * Carta. La web solo los enseña; se compran en el restaurante.
  *
@@ -147,12 +148,13 @@ export function VinosTienda({ config, puedeEditar }: Props) {
     }
   };
 
-  // El mismo interruptor en la tabla y en las tarjetas; el estado (con su motivo) lo describe.
-  const interruptor = (f: FilaVino) => (
+  // El mismo interruptor en la tabla y en las tarjetas; el estado (con su motivo) lo describe. Con solo
+  // «Ver» no hay interruptor (06/11/2026, decisión del dueño: se oculta, no se desactiva): queda el estado.
+  const interruptor = (f: FilaVino) => !puedeEditar ? null : (
     <Switch
       id={`venta-${f.vino.id}`}
       checked={f.motivo === null}
-      disabled={!puedeEditar || !f.conmutable || marcar.isPending}
+      disabled={!f.conmutable || marcar.isPending}
       aria-label={`A la venta: ${f.nombre}`}
       aria-describedby={`estado-${f.vino.id}`}
       onCheckedChange={(v) => void cambiar([f.vino.id], v, f.nombre)}
@@ -180,7 +182,11 @@ export function VinosTienda({ config, puedeEditar }: Props) {
       <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <p className="text-sm text-muted-foreground">
           <strong className="tabular-nums text-foreground">{aLaVenta} de {total}</strong> vinos activos a la venta con un {porcentaje(config.descuento_pct)} de descuento sobre la carta.
-          {!config.activa && <span className="ml-1 font-medium text-amber-800 dark:text-amber-300">La tienda está oculta en la web (actívala en Ajustes).</span>}
+          {!config.activa && (
+            <span className="ml-1 font-medium text-amber-800 dark:text-amber-300">
+              {puedeEditar ? "La tienda está oculta en la web (actívala en Ajustes)." : "La tienda está oculta en la web."}
+            </span>
+          )}
         </p>
         <Button asChild variant="outline" className="h-11 shrink-0 gap-2 self-start">
           <a href={URL_TIENDA_WEB} target="_blank" rel="noopener noreferrer">
@@ -262,7 +268,6 @@ export function VinosTienda({ config, puedeEditar }: Props) {
           </div>
         )}
       </div>
-      {!puedeEditar && <p className="shrink-0 text-sm text-muted-foreground">Para poner o quitar vinos necesitas el permiso «Puede editar» de Tienda.</p>}
 
       {esMovil ? (
         filas.length === 0 ? (

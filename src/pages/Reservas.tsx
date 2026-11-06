@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Clock, Mail, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
-import { ConMotivo } from "@/components/reservas/ConMotivo";
+import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
@@ -21,7 +21,6 @@ import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
 import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
 import { ConfiguracionGeneralReservas } from "@/components/reservas/ConfiguracionGeneralReservas";
 import { GestionMesasEspacios } from "@/components/reservas/GestionMesasEspacios";
-import { AvisoSoloLecturaConfiguracion } from "@/components/reservas/AvisoSoloLecturaConfiguracion";
 import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
 import { EditorPlantillasEmail } from "@/components/emails/EditorPlantillasEmail";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -37,9 +36,6 @@ import {
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { toast } from "sonner";
-
-/** Por qué «Nueva Reserva» sale deshabilitado (se ve al pasar el ratón). */
-const MOTIVO_SIN_PERMISO_ALTA = "Necesitas permiso de edición en Reservas para crear reservas";
 
 /**
  * Suelo (px) de las pestañas largas: por debajo (ventana muy baja, teclado del móvil abierto) la
@@ -74,19 +70,14 @@ function RegionPestanaLarga({ children }: { children: ReactNode }) {
 }
 
 /**
- * Un chip de Reservas › Configuración (menos «Plantillas email», que lleva su propio aviso y su propio
- * scroll): región de pestaña larga con el aviso de «Solo lectura» arriba. El aviso lo ponía
- * ConfiguracionTurnos encima de todo cuando era un solo chip; al repartirlo (04/11/2026, petición del
- * dueño: «el scroll es eterno») tiene que salir en cada uno. Dentro de la región y no fijo encima, para
- * no restar alto al contenido.
+ * Un chip de Reservas › Configuración (menos «Plantillas email», que lleva su propio scroll): región de
+ * pestaña larga. Hasta el 06/11/2026 llevaba arriba un aviso de «Solo lectura» para quien tenía «Ver» sin
+ * «Puede editar»; desde entonces solo entra quien puede editar (ver `puedeVerConfiguracion`).
  */
 function ChipConfiguracion({ children }: { children: ReactNode }) {
   return (
     <RegionPestanaLarga>
-      <div className="space-y-6">
-        <AvisoSoloLecturaConfiguracion />
-        {children}
-      </div>
+      <div className="space-y-6">{children}</div>
     </RegionPestanaLarga>
   );
 }
@@ -114,12 +105,17 @@ export default function Reservas() {
 
   const { data: espacios } = useEspaciosReserva();
   // «Configuración» tiene permiso propio, «Reservas · Configuración» (04/11/2026, como las pestañas del
-  // Gestor Web): con «Ver» se entra y con «Puede editar» se cambia (cada parte lo comprueba). El super
-  // admin, siempre; ser admin ya no basta por sí solo (hasta ahora era `role === "admin"`).
-  const { canAccess: puedeVerConfiguracion } = useCanAccessSection("reservas_configuracion");
-  // Editar una reserva: cada vista de reservas (Lista, Kanban de Hoy, Asignación,
-  // plano, modo servicio…) lleva su propio diálogo de edición.
-  const { canAccess: puedeEditarReservas } = useCanAccessSection("reservas", "edit");
+  // Gestor Web). Desde el 06/11/2026 (decisión del dueño) solo entra quien tiene «Puede editar» en esa
+  // sección: con solo «Ver» no hay pestaña, y un enlace `?tab=configuracion` cae en «Hoy». Se exigen los
+  // dos (editar implica ver, la regla de siempre). El super admin, siempre; ser admin no basta.
+  const { canAccess: verConfiguracion } = useCanAccessSection("reservas_configuracion");
+  const { canAccess: editarConfiguracion, loading: cargandoPermisos } = useCanAccessSection("reservas_configuracion", "edit");
+  const puedeVerConfiguracion = verConfiguracion && editarConfiguracion;
+  // Escribir en una reserva (crear, modificar, aceptar, cancelar, llegadas, mesas…) exige «Editar» en
+  // «Reservas». Sin él (solo «Ver», 06/11/2026) cada vista OCULTA lo que escribe y aquí, junto a las
+  // pestañas, sale la etiqueta común «Solo lectura» en lugar de «Nueva Reserva».
+  const { canAccess: puedeEditarReservas, loading: cargandoEdicion } = useCanAccessSection("reservas", "edit");
+  const soloLectura = !cargandoEdicion && !puedeEditarReservas;
   // ÚNICA instancia en la página: la lista unificada la usa para pintar las
   // solicitudes (ver aviso de realtime en el hook).
   const solicitudesState = useSolicitudesPendientes();
@@ -188,8 +184,13 @@ export default function Reservas() {
   };
 
   // Sin permiso de «Configuración», quien llegue por un enlace (`?tab=configuracion`) cae en «Hoy» en
-  // vez de en una pestaña vacía.
+  // vez de en una pestaña vacía, y el enlace se limpia de la URL.
   const pestanaVisible = activeTab === "configuracion" && !puedeVerConfiguracion ? "hoy" : activeTab;
+  useEffect(() => {
+    if (cargandoPermisos || puedeVerConfiguracion || tabFromUrl !== "configuracion") return;
+    setActiveTab("hoy");
+    setSearchParams({}, { replace: true });
+  }, [cargandoPermisos, puedeVerConfiguracion, tabFromUrl, setSearchParams]);
 
   const handleEspacioClick = (espacioId: string) => {
     const espacio = espacios?.find((e) => e.id === espacioId);
@@ -242,7 +243,8 @@ export default function Reservas() {
   if (selectedEspacio) {
     return (
       <DashboardLayout>
-        <div className="mb-3 flex justify-end">
+        <div className="mb-3 flex items-center justify-end gap-2">
+          {soloLectura && <EtiquetaSoloLectura />}
           <ToggleGroup
             type="single"
             value={vistaEspacio}
@@ -317,31 +319,32 @@ export default function Reservas() {
           ]}
           acciones={
             /* Crear una reserva exige permiso de EDICIÓN en «reservas», como el resto de acciones
-               que escriben (y la RLS del INSERT, 20261001170000). Sin él el botón sale deshabilitado
-               y explica por qué: el motivo va en el envoltorio (`ConMotivo`), porque un botón
-               deshabilitado no recibe el ratón. */
+               que escriben (y la RLS del INSERT, 20261001170000). Sin él (solo «Ver») el botón no
+               existe y su sitio lo ocupa la etiqueta común «Solo lectura» (06/11/2026, decisión del
+               dueño: lo que no se puede usar se oculta, no se desactiva). */
             <>
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
             <BotonAvisosSeccion seccion="reservas" />
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-              <ConMotivo motivo={puedeEditarReservas ? undefined : MOTIVO_SIN_PERMISO_ALTA} className="shrink-0">
+            {soloLectura && <EtiquetaSoloLectura />}
+            {puedeEditarReservas && (
+              <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
-                  <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9" disabled={!puedeEditarReservas}>
+                  <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9">
                     <Plus className="mr-2 h-4 w-4" />
                     Nueva Reserva
                   </Button>
                 </DialogTrigger>
-              </ConMotivo>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Reserva</DialogTitle>
-                </DialogHeader>
-                <FormularioReserva
-                  datosPreseleccionados={datosNuevaReserva}
-                  onSuccess={() => setOpenDialog(false)}
-                />
-              </DialogContent>
-            </Dialog>
+                <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Crear Nueva Reserva</DialogTitle>
+                  </DialogHeader>
+                  <FormularioReserva
+                    datosPreseleccionados={datosNuevaReserva}
+                    onSuccess={() => setOpenDialog(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            )}
             </>
           }
         />
@@ -413,7 +416,7 @@ export default function Reservas() {
           <TabsContent value="configuracion" className="mt-4">
             {/* Subpestañas en chips, como Cheques › Configuración. «Plantillas email» llegó del Super Admin
                 el 04/11/2026 (petición del dueño). Todas se rigen por «Reservas · Configuración», igual que
-                su RLS (20261104111000): con «Ver» se consultan y con «Puede editar» se cambian. Sin
+                su RLS (20261104111000); desde el 06/11/2026 solo llega aquí quien puede editarla. Sin
                 `RegionPestanaLarga` en las plantillas: su editor ya mide el alto que le queda y hace
                 scroll por dentro, y envolverlo daría un doble scroll.
 

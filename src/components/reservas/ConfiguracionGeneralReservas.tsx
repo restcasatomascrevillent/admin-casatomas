@@ -115,9 +115,9 @@ const CABECERA_PARTE: Record<
 export function ConfiguracionGeneralReservas({ parte }: { parte: ParteConfiguracionGeneral }) {
   const { data: config, isLoading } = useConfiguracionReservas();
   const actualizarMutation = useActualizarConfiguracionReservas();
-  // «Reservas · Configuración» (04/11/2026): con «Ver» se consultan las reglas; guardarlas pide «Puede
-  // editar», igual que la RLS de configuracion_reservas (20261104111000). El aviso de «Solo lectura» lo
-  // pone la página encima de cada chip (`AvisoSoloLecturaConfiguracion`).
+  // «Reservas · Configuración» (04/11/2026): guardar las reglas pide «Puede editar», igual que la RLS de
+  // configuracion_reservas (20261104111000). Desde el 06/11/2026 la página solo enseña esta pestaña a
+  // quien puede editarla; el modo de solo lectura de aquí dentro queda como defensa.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas_configuracion", "edit");
   const { data: espaciosData } = useEspaciosReserva();
   const { data: mesasData } = useMesas();

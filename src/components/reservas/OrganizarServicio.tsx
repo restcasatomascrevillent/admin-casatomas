@@ -23,6 +23,7 @@ import { useAsignacionesMesa } from "@/hooks/useAsignacionesMesa";
 import { CLAVE_AJUSTES_MESA, guardarAjustesServicio, useAjustesMesaDia, type TurnoServicio } from "@/hooks/useAjustesMesaServicio";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useSalaCerradaServicio } from "@/hooks/useSalaCerradaServicio";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import { admiteReservas } from "@/lib/reservas/negocios";
@@ -38,6 +39,10 @@ import type { AjusteMesa } from "@/lib/reservas/piezasMesa";
 
 export function BotonOrganizarServicio({ fecha, turno }: { fecha: string; turno: TurnoServicio }) {
   const [abierto, setAbierto] = useState(false);
+  // Organizar mueve reservas y da mesas: exige «Editar» en Reservas. Con solo «Ver» el botón no
+  // existe (06/11/2026, decisión del dueño: se oculta, no se desactiva).
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  if (!puedeEditar) return null;
   return (
     <>
       <Button

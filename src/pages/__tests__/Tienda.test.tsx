@@ -26,7 +26,10 @@ const h = vi.hoisted(() => ({
 vi.mock("sonner", () => ({ toast: h.toast }));
 vi.mock("@/components/DashboardLayout", () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock("@/hooks/useAlturaDisponible", () => ({ useAlturaDisponible: () => null }));
-vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: h.puedeEditar, loading: false }) }));
+// «Ver» en Tienda siempre; «Puede editar» según `h.puedeEditar` (un super admin, igual que «Editar»).
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (_seccion: string, tipo: string = "view") => ({ canAccess: tipo === "view" || h.puedeEditar, loading: false }),
+}));
 vi.mock("@/integrations/supabase/client", () => {
   const resolver = (tabla: string, e: { op: string; payload?: Fila }) => {
     if (tabla === "configuracion_tienda") {
@@ -165,12 +168,30 @@ describe("Tienda › Vinos", () => {
     espia.mockRestore();
   });
 
-  it("sin «Puede editar» los interruptores están bloqueados", async () => {
+  // 06/11/2026 (decisión del dueño): con solo «Ver» se ve la lista con el precio de carta → tienda, sin
+  // interruptores ni acciones sobre los mostrados (se ocultan, no se desactivan), y sin la pestaña Ajustes.
+  it("sin «Puede editar»: la lista se ve, sin interruptores ni pestaña Ajustes, con la etiqueta «Solo lectura»", async () => {
     h.puedeEditar = false;
     pintar();
     const lista = await tablaVinos();
-    expect(within(lista).getByRole("switch", { name: "A la venta: Rioja Crianza" })).toBeDisabled();
-    expect(screen.getByText(/necesitas el permiso «Puede editar» de Tienda/)).toBeInTheDocument();
+    expect(within(lista).queryAllByRole("switch")).toEqual([]);
+    // Precios y estado siguen a la vista.
+    expect(within(lista).getByText("Rioja Crianza")).toBeInTheDocument();
+    expect(within(lista).getAllByText("A la venta").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vinos"]);
+    expect(screen.getByTestId("etiqueta-solo-lectura")).toHaveTextContent("Solo lectura");
+    expect(screen.queryByText(/necesitas el permiso «Puede editar» de Tienda/)).toBeNull();
+    // Ni con un filtro puesto salen las acciones sobre los mostrados.
+    fireEvent.change(screen.getByLabelText("Buscar vino"), { target: { value: "rioja" } });
+    expect(screen.queryByRole("button", { name: /a la venta/i })).toBeNull();
+  });
+
+  it("con «Puede editar» (o super admin): interruptores, pestaña Ajustes y sin etiqueta «Solo lectura»", async () => {
+    pintar();
+    const lista = await tablaVinos();
+    expect(within(lista).getByRole("switch", { name: "A la venta: Rioja Crianza" })).toBeEnabled();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Vinos", "Ajustes"]);
+    expect(screen.queryByTestId("etiqueta-solo-lectura")).toBeNull();
   });
 
   it("escritorio: tabla con cabeceras, cada vino con su categoría debajo y su estado (a la venta, quitado o no vendible)", async () => {
@@ -265,10 +286,13 @@ describe("Tienda › Ajustes", () => {
     expect(h.config.descuento_pct).toBe("30.00");
   });
 
-  it("sin «Puede editar» el formulario es de solo lectura", async () => {
+  it("sin «Puede editar» no hay Ajustes: el enlace `?tab=ajustes` abre Vinos (06/11/2026)", async () => {
     h.puedeEditar = false;
     pintar("/tienda?tab=ajustes");
-    expect(await campoDescuento()).toBeDisabled();
+    await tablaVinos();
+    expect(screen.getByRole("tab", { name: /Vinos/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tab", { name: /Ajustes/ })).toBeNull();
+    expect(screen.queryByLabelText(/Descuento/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Guardar ajustes" })).toBeNull();
   });
 });

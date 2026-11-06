@@ -19,7 +19,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { ConMotivo } from "./ConMotivo";
 import { cn } from "@/lib/utils";
 import { useConfiguracionReservas } from "@/hooks/useConfiguracionReservas";
 import { useCanAccessSection } from "@/hooks/useUserRole";
@@ -435,7 +434,10 @@ interface PropsFila {
   onAsignarMesa: (destino: DestinoAsignacion) => void;
   /** Abre el editor de la reserva (por id). */
   onEditar: (reservaId: string) => void;
-  /** Permiso de edición sobre «reservas»: sin él, «Editar» sale deshabilitado. */
+  /**
+   * Permiso de edición sobre «reservas»: sin él la fila no lleva «Editar», «Sala» ni «Mesas»
+   * (06/11/2026, decisión del dueño: se ocultan, no se desactivan). Queda la consulta.
+   */
   puedeEditar: boolean;
   /** Reserva cuya sala se está guardando ahora mismo. */
   salaEnCurso: string | null;
@@ -497,38 +499,36 @@ function FilaReserva({
       {/* `flex-wrap`: en un móvil de 375 px con dedo los tres botones no caben en la fila y «Mesas» se
           salía de la tarjeta; dentro de la lista con scroll eso sería scroll horizontal. Ahora baja de
           línea. Desde `sm` la fila va en horizontal y este bloque mide lo que sus botones (no envuelve). */}
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Sin
-            mirar el estado: solo el permiso lo apaga. El botón deshabilitado no
-            recibe el ratón: el motivo se ve en el envoltorio. */}
-        <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+      {puedeEditar && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {/* Editar datos, día, hora, comensales, sala o notas (2026-09-30). Sin
+              mirar el estado: solo el permiso lo quita. */}
           <Button
             variant="ghost"
             size="sm"
             className="gap-1.5"
-            disabled={!puedeEditar}
-            title={puedeEditar ? "Editar datos, día, hora, comensales, sala y notas" : "No tienes permiso para editar reservas"}
+            title="Editar datos, día, hora, comensales, sala y notas"
             aria-label={`Editar la reserva de ${fila.nombre || "este cliente"}`}
             onClick={() => onEditar(fila.reserva_id)}
           >
             <SquarePen className="h-4 w-4" aria-hidden="true" />
             Editar
           </Button>
-        </ConMotivo>
-        <SelectorSala fila={fila} salas={salas} guardando={guardando} onElegir={onElegirSala} />
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-1.5"
-          disabled={!salto.destino}
-          title={tituloMesas}
-          aria-label={tituloMesas}
-          onClick={() => salto.destino && onAsignarMesa(salto.destino)}
-        >
-          <LayoutGrid className="h-4 w-4" aria-hidden="true" />
-          Mesas
-        </Button>
-      </div>
+          <SelectorSala fila={fila} salas={salas} guardando={guardando} onElegir={onElegirSala} />
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            disabled={!salto.destino}
+            title={tituloMesas}
+            aria-label={tituloMesas}
+            onClick={() => salto.destino && onAsignarMesa(salto.destino)}
+          >
+            <LayoutGrid className="h-4 w-4" aria-hidden="true" />
+            Mesas
+          </Button>
+        </div>
+      )}
     </li>
   );
 }
