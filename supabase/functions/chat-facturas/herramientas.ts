@@ -88,6 +88,7 @@ HERRAMIENTAS (usa la especifica)
 - ficha_proveedor: todo de UN proveedor.
 - gasto_por_categoria: gasto en vinos, marisco, limpieza... o reparto por categorias; "que X compro mas" con X categoria (licor, vino): sus top_productos.
 - variacion_precios: que ha subido o bajado de precio.
+- volumen_comprado: bebidas (regla 15) y litros/kilos aunque vaya en cajas o barriles.
 - buscar_productos / buscar_facturas: por nombre o tema en lenguaje libre.
 
 REGLAS
@@ -106,6 +107,7 @@ REGLAS
 12. compras_producto: di unidad, periodo y variantes contadas (productos_coincidentes); nunca sumes unidades distintas. Con por_variante da cada variante con su precio, no una media. coincidencia "aproximada": avisa de que no es el nombre exacto. sin_datos: dilo y da ultimo_dato (fecha, cantidad, proveedor) si viene; con sugerencias pregunta si es alguna. una_compra: solo hubo una, no hay evolucion.
 13. gasto_por_categoria: di periodo, base SIN IVA y sin_clasificar. variacion_precios: da precio y ref_precio; cambio_proveedor = otro proveedor, no subida del mismo: dilo; pocas_compras/ref_antigua: comparacion debil; sin_comparar: da su ultima compra.
 14. Mas barato/comparar: lista TODOS los proveedores, cada uno con su precio en SU unidad ("Osborne la caja a 519,40 €; Luga el kilo a 20,50 €"); sin ganador si avisos.unidades_mezcladas o productos_coincidentes > 1 (cebo vs bellota). Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg».
+15. Bebidas (cerveza, vino, licor, refresco): volumen_comprado con categoria (botellas: orden envases), nunca buscar_productos ni ranking (texto: «mostaza de cerveza»).
 Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludos ni relleno. Maximo 6 lineas salvo listados.`;
 }
 
@@ -241,14 +243,15 @@ export const TOOLS = [
     "Grafica y evolucion del precio de UN producto.",
     { producto: { type: "string" }, desde: FECHA_NULL, hasta: FECHA_NULL, unidad: UNIDAD }),
   fn("volumen_comprado",
-    "Litros/kilos y n de envases comprados aunque vaya en cajas o barriles ('litros de cerveza', " +
-    "'cuantas cervezas', 'cuantos barriles'). Di lineas_sin_convertir.",
+    "Litros/kilos, botellas/latas/barriles (cajas ya abiertas), formatos y proveedores aunque vaya en cajas " +
+    "o barriles ('hay cerveza?', 'litros de cerveza', 'botellas por vino', 'cuantos barriles'). Di lineas_sin_convertir.",
     {
       categoria: { type: ["string", "null"], description: "cerveza, vino" },
       producto: { type: ["string", "null"], description: "agua, aceite, tinto" },
       desde: FECHA_HIST,
       hasta: FECHA_HIST,
       unidad: { type: ["string", "null"], enum: ["l", "kg", null] },
+      orden: { type: ["string", "null"], enum: ["envases", null], description: "envases: mas botellas primero" },
     }),
   fn("buscar_productos",
     "Lineas de producto por nombre o descripcion ('compramos gambas?', 'que aceite').",
@@ -409,6 +412,12 @@ export type Llamada =
        * Solo entonces se paga la llamada de embeddings.
        */
       respaldoSemantico?: { consulta: string; param: string };
+      /** Se añade al resultado como `nota_ruta` (p. ej. por que se desvio a otra RPC). */
+      nota?: string;
+      /** Se añade al resultado como `nota_respuesta`: como redactar (solo viaja si se usa la herramienta). */
+      notaRespuesta?: string;
+      /** Tope de caracteres del resultado si no vale el general (MAX_CHARS_RESULTADO_TOOL). */
+      maxChars?: number;
     }
   | {
       tipo: "semantica";
@@ -430,6 +439,85 @@ export function tipoDeProducto(v: unknown, pregunta?: string): string | null {
   if (pregunta !== undefined && !/factur|albar/i.test(pregunta)) return null;
   return normalizarTipo(v);
 }
+
+// ─── Bebidas: familia, no texto ──────────────────────────────────────────────
+//  «¿Tenemos cerveza?» por buscar_productos buscaba el TEXTO «cerveza»: salia
+//  «MOSTAZA DE CERVEZA» (Despensa) y no salian Heineken ni los barriles de
+//  Cruzcampo, que no llevan la palabra (prueba del dueño, 06/11/2026). Y
+//  «botellas por vino» por ranking sumaba «4 botellas y 99 cajas». Una familia
+//  de bebidas va SIEMPRE a volumen_comprado_agente por categoria (clasificacion
+//  del catalogo; cajas ya pasadas a botellas). No entran «agua», «cava» ni
+//  «champan»: como categoria serian todos los refrescos o todos los vinos.
+
+/** Lista de 30 vinos ≈ 9.200 caracteres: con el tope general se cortaba. */
+export const MAX_CHARS_VOLUMEN = 12_000;
+/** Productos que se listan si se piden por botellas y el modelo no da limite. */
+export const LIMITE_VOLUMEN_ENVASES = 25;
+/**
+ * Como contestar con volumen_comprado. Va en el resultado y no en el prompt de
+ * sistema (que viaja en cada ronda y tiene tope de tamaño).
+ */
+export const NOTA_RESPUESTA_VOLUMEN =
+  "envases = botellas, latas o barriles con las cajas ya abiertas: di «598 botellas (99 cajas de 6 y 4 sueltas)» " +
+  "usando envases y compra, nunca «4 botellas y 99 cajas». Tipos de envase (barril, tercio, magnum…): " +
+  "por_envase.formato. Da proveedores de por_proveedor. Si lineas_sin_convertir > 0, dilo con sus ejemplos " +
+  "(no suman). Con productos_truncado: «los N con mas de M productos». Solo son productos de la categoria: " +
+  "nada de comida que lleve el nombre de la bebida.";
+
+const FAMILIAS_BEBIDA: Record<string, string> = {
+  cerveza: "cerveza", cervezas: "cerveza",
+  vino: "vino", vinos: "vino",
+  licor: "licor", licores: "licor", destilado: "licor", destilados: "licor",
+  refresco: "refresco", refrescos: "refresco",
+  bebida: "bebida", bebidas: "bebida",
+};
+const VACIAS_FAMILIA = new Set(["el", "la", "los", "las", "de", "del", "un", "una", "unos", "unas", "que", "y", "o", "en", "tipo", "tipos", "compra", "compras", "comprada", "compradas", "comprado", "comprados", "registros", "todo", "toda", "todos", "todas"]);
+
+/**
+ * 'cerveza', 'las cervezas', 'la bebida cerveza', 'vinos' → familia
+ * ('cerveza', 'vino', 'licor', 'refresco', 'bebida'); un producto concreto
+ * ('heineken', 'mostaza de cerveza', 'vino blanco Lanzar', 'agua') → null.
+ */
+export function familiaDeBebida(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const palabras = v.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z\s]/g, " ").split(/\s+/).filter((w) => w && !VACIAS_FAMILIA.has(w));
+  const familias = palabras.map((w) => FAMILIAS_BEBIDA[w]);
+  if (palabras.length === 0 || familias.some((f) => !f)) return null;
+  const concretas = [...new Set(familias.filter((f) => f !== "bebida"))];
+  if (concretas.length > 1) return null;
+  return concretas[0] ?? "bebida";
+}
+
+/** Llamada a volumen_comprado_agente. `nota` explica al modelo un desvio desde otra herramienta. */
+function llamadaVolumen(p: {
+  categoria: string | null; producto: string | null; desde: string | null; hasta: string | null;
+  unidad?: string | null; orden?: string | null; limite?: number | null; nota?: string;
+}): Llamada {
+  const orden = p.orden === "envases" || p.orden === "botellas" ? "envases" : null;
+  const limite = p.limite ?? (orden ? LIMITE_VOLUMEN_ENVASES : null);
+  return {
+    tipo: "rpc",
+    rpc: "volumen_comprado_agente",
+    params: {
+      p_texto: p.producto,
+      p_categoria: p.categoria,
+      p_desde: p.desde,
+      p_hasta: p.hasta,
+      p_medida: p.unidad === "l" || p.unidad === "kg" ? p.unidad : null,
+      p_limite: limite,
+      p_orden: orden,
+    },
+    limite: null,
+    maxChars: MAX_CHARS_VOLUMEN,
+    notaRespuesta: NOTA_RESPUESTA_VOLUMEN,
+    ...(p.nota ? { nota: p.nota } : {}),
+  };
+}
+
+const nota_desvio = (herramienta: string, familia: string) =>
+  `${herramienta}('${familia}') se ha contestado con volumen_comprado por categoria (familia de bebidas del ` +
+  `catalogo; la busqueda por texto mezclaba comida como 'mostaza de cerveza'). Responde con estos datos (regla 15).`;
 
 /** Parametros opcionales que solo existen desde 20261008120000: solo se mandan si vienen. */
 function opcionales(p: Record<string, string | null>): Record<string, string> {
@@ -467,6 +555,15 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       const criterio = texto(args.criterio);
       if (!criterio) throw new Error('Falta el parametro "criterio".');
       const { desde, hasta } = rangoOpcional(args);
+      // «Botellas por vino», «que cerveza compramos mas»: por cantidad, una
+      // familia de bebidas mezclaba cajas y botellas (suma por unidad).
+      const familia = criterio === "cantidad" ? familiaDeBebida(args.categoria) : null;
+      if (familia) {
+        return llamadaVolumen({
+          categoria: familia, producto: null, desde, hasta, orden: "envases", limite: entero(args.limite),
+          nota: nota_desvio("ranking cantidad", familia),
+        });
+      }
       return {
         tipo: "rpc",
         rpc: "ranking_agente",
@@ -525,6 +622,12 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       const producto = texto(args.producto);
       if (!producto) throw new Error("Falta el nombre del producto");
       const { desde, hasta } = rangoOpcional(args);
+      const familia = familiaDeBebida(producto);
+      if (familia) {
+        return llamadaVolumen({
+          categoria: familia, producto: null, desde, hasta, nota: nota_desvio("compras_producto", familia),
+        });
+      }
       return {
         tipo: "rpc",
         rpc: "compras_producto_agente",
@@ -606,28 +709,30 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
     }
 
     case "volumen_comprado": {
-      const categoria = texto(args.categoria);
-      const producto = texto(args.producto);
+      let categoria = texto(args.categoria);
+      let producto = texto(args.producto);
       if (!categoria && !producto) throw new Error('Falta el parametro "categoria" o "producto".');
+      // «cerveza» puesta como producto es la familia (la RPC tambien lo hace,
+      // pero «la bebida cerveza» no lo reconoceria).
+      const familia = !categoria ? familiaDeBebida(producto) : null;
+      if (familia) { categoria = familia; producto = null; }
       const { desde, hasta } = rangoOpcional(args);
-      const unidad = texto(args.unidad);
-      return {
-        tipo: "rpc",
-        rpc: "volumen_comprado_agente",
-        params: {
-          p_texto: producto,
-          p_categoria: categoria,
-          p_desde: desde,
-          p_hasta: hasta,
-          p_medida: unidad === "l" || unidad === "kg" ? unidad : null,
-        },
-        limite: null,
-      };
+      return llamadaVolumen({
+        categoria, producto, desde, hasta,
+        unidad: texto(args.unidad), orden: texto(args.orden),
+      });
     }
 
     case "buscar_productos": {
       const consulta = texto(args.consulta);
       if (!consulta) throw new Error("Falta la consulta");
+      const familia = familiaDeBebida(consulta);
+      if (familia) {
+        return llamadaVolumen({
+          categoria: familia, producto: null, desde: null, hasta: null, limite: 15,
+          nota: nota_desvio("buscar_productos", familia),
+        });
+      }
       return {
         tipo: "semantica",
         rpc: "buscar_productos_agente",
@@ -845,12 +950,24 @@ export function marcarResultado(nombre: string, data: any, limite: number | null
 }
 
 /** Corta un resultado gigante para que no se coma el contexto (y el coste). */
-export function recortar(s: string): string {
-  if (s.length <= MAX_CHARS_RESULTADO_TOOL) return s;
+export function recortar(s: string, max: number = MAX_CHARS_RESULTADO_TOOL): string {
+  if (s.length <= max) return s;
   return (
-    s.slice(0, MAX_CHARS_RESULTADO_TOOL) +
-    `\n…[RESULTADO CORTADO a ${MAX_CHARS_RESULTADO_TOOL} caracteres. Es un FRAGMENTO: no lo sumes; acota la busqueda.]`
+    s.slice(0, max) +
+    `\n…[RESULTADO CORTADO a ${max} caracteres. Es un FRAGMENTO: no lo sumes; acota la busqueda.]`
   );
+}
+
+/** Pone las notas de la llamada (desvio a otra RPC, como contestar) en el resultado, delante. */
+// deno-lint-ignore no-explicit-any
+export function anotarRuta(ll: Llamada, data: any): any {
+  if (ll.tipo !== "rpc" || !data || typeof data !== "object" || Array.isArray(data)) return data;
+  if (!ll.nota && !ll.notaRespuesta) return data;
+  return {
+    ...(ll.nota ? { nota_ruta: ll.nota } : {}),
+    ...(ll.notaRespuesta ? { nota_respuesta: ll.notaRespuesta } : {}),
+    ...data,
+  };
 }
 
 // ─── Peticiones duplicadas ───────────────────────────────────────────────────

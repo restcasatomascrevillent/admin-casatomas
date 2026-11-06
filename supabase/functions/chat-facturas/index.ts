@@ -5,6 +5,7 @@ import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import {
   type Adjunto,
   type DocRef,
+  anotarRuta,
   idsDeFilas,
   unirReferencias,
   esErrorCorregible,
@@ -262,12 +263,15 @@ async function ejecutarTool(nombre: string, args: any, supabase: any, ctx: Ctx):
         "Cita de cada dato proveedor, numero y fecha. La app muestra debajo los enlaces a la foto del original: no escribas URLs ni digas que no puedes enseñarla.";
     }
 
-    const { data: paraModelo, adjunto } = separarAdjunto(nombre, data);
+    const { data: paraModelo, adjunto } = separarAdjunto(nombre, anotarRuta(ll, data));
     return {
       fallo: false,
       adjunto,
       referencias,
-      contenido: recortar(JSON.stringify(marcarResultado(nombre, paraModelo, ll.limite, ctx.pregunta))),
+      contenido: recortar(
+        JSON.stringify(marcarResultado(nombre, paraModelo, ll.limite, ctx.pregunta)),
+        ll.tipo === "rpc" ? ll.maxChars : undefined,
+      ),
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : (e as { message?: string })?.message ?? "error en herramienta";
