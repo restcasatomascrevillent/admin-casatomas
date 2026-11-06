@@ -1,0 +1,47 @@
+{
+ "archivo": "R337.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ROMAN Y MARTOS ALIMENTACION, S.L.",
+ "cif": "B02873545",
+ "local": "casa_tomas",
+ "numero_documento": "26/5292",
+ "fecha": "2026-03-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RAPE NEGRO 9/10",
+   "producto_ficha": "Rape negro calibre 9/10",
+   "cantidad": 18.9,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.6,
+   "descuento_pct": null,
+   "total": 219.24,
+   "iva_pct": 10,
+   "albaran_ref": "26/10355",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 219.24,
+ "desglose_iva": [
+  {
+   "base": 219.24,
+   "pct": 10,
+   "cuota": 21.92
+  }
+ ],
+ "iva": 21.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 241.16,
+ "observaciones": "Albarán 26/10355 de 26/02/2026. A 30 días con albarán (SANTANDER); vencimiento 02/04/2026 por 241,16 €. Las dos páginas del PDF son la misma factura duplicada (leída una vez). Fecha de caducidad del lote (04/03/2026) no es fecha de factura.",
+ "alertas": []
+}

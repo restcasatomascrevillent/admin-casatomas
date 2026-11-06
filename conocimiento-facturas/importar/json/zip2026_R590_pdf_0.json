@@ -1,0 +1,63 @@
+{
+ "archivo": "R590.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "2096",
+ "fecha": "2026-04-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAÑAILLA",
+   "producto_ficha": "Cañaílla (busano), por kg",
+   "cantidad": 3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26,
+   "descuento_pct": null,
+   "total": 78,
+   "iva_pct": 10,
+   "albaran_ref": "5.336",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOGAVANTE",
+   "producto_ficha": null,
+   "cantidad": 4.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 52,
+   "descuento_pct": null,
+   "total": 244.4,
+   "iva_pct": 10,
+   "albaran_ref": "5.336",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 322.4,
+ "desglose_iva": [
+  {
+   "base": 322.4,
+   "pct": 10,
+   "cuota": 32.24
+  }
+ ],
+ "iva": 32.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 354.64,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 27/04/2026 por 354.64. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

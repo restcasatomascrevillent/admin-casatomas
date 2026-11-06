@@ -1,0 +1,46 @@
+{
+ "archivo": "R136.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+ "cif": "B30224109",
+ "local": "casa_tomas",
+ "numero_documento": "416",
+ "fecha": "2026-01-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "GRAMONA BRUT IMPERIAL GRVA 75 CL.",
+   "producto_ficha": "Gramona Imperial Brut Gran Reserva 75 cl (cava)",
+   "cantidad": 24.0,
+   "unidad": "botella",
+   "bultos": 4.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.4,
+   "descuento_pct": null,
+   "total": 393.6,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 393.6,
+ "desglose_iva": [
+  {
+   "base": 393.6,
+   "pct": 21,
+   "cuota": 82.66
+  }
+ ],
+ "iva": 82.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 476.26,
+ "observaciones": "Forma de pago REPOSICION. Nº factura impreso 2026/1 416. Pagina 1 del PDF = listado Facturas Pendientes de Cobro x Agente (no es factura, no extraida; muestra factura 1-416 de 19-01-26 por 476.26). Observaciones: CERRADO LUNES.",
+ "alertas": []
+}

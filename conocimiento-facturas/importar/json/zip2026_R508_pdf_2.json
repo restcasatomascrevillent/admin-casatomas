@@ -1,0 +1,46 @@
+{
+ "archivo": "R508.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 01870",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "CALAMAR (3P) I.Q.F",
+   "producto_ficha": "Calamar I.Q.F. (congelado individual)",
+   "cantidad": 3.87,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 32.9,
+   "iva_pct": 10,
+   "albaran_ref": "F568760",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 32.9,
+ "desglose_iva": [
+  {
+   "base": 32.9,
+   "pct": 10,
+   "cuota": 3.29
+  }
+ ],
+ "iva": 3.29,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 36.19,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F568760. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R738.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA SELECCION - VINOS CALDERON S.L.U.",
+ "cif": "B53804522",
+ "local": "casa_tomas",
+ "numero_documento": "F26000269",
+ "fecha": "2026-05-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "M.MURRIETA RV MARQUES DE MURRIETA RESERVA 2022",
+   "producto_ficha": "Marqués de Murrieta Reserva 2022 75 cl",
+   "cantidad": 129,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 15.25,
+   "descuento_pct": null,
+   "total": 1967.25,
+   "iva_pct": 21,
+   "albaran_ref": "A26000443",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1967.25,
+ "desglose_iva": [
+  {
+   "base": 1967.25,
+   "pct": 21,
+   "cuota": 413.12
+  }
+ ],
+ "iva": 413.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2380.37,
+ "observaciones": "Giro 30 días, vencimiento 13/06/2026 (2.380,37). Contenido 75 cl tomado de la ficha (no impreso).",
+ "alertas": []
+}

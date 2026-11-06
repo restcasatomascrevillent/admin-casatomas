@@ -1,0 +1,97 @@
+{
+ "archivo": "R1595.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260610",
+ "fecha": "2026-09-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMEJA FINA",
+   "producto_ficha": "Almeja fina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 90.0,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000610",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.0,
+   "descuento_pct": null,
+   "total": 64.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000610",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CAMARON",
+   "producto_ficha": "Camarón",
+   "cantidad": 0.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 75.0,
+   "descuento_pct": null,
+   "total": 60.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000610",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.8,
+   "descuento_pct": null,
+   "total": 67.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000610",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 371.2,
+ "desglose_iva": [
+  {
+   "base": 371.2,
+   "pct": 10,
+   "cuota": 37.12
+  }
+ ],
+ "iva": 37.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 408.32,
+ "observaciones": "Albarán 1-000610 del 29/09/2026. Forma de pago: transferencia CaixaBank; vencimiento 29/09/2026 por 408,32. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": []
+}

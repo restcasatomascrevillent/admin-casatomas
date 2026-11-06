@@ -1,0 +1,82 @@
+{
+ "archivo": "R275.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "63",
+ "fecha": "2026-02-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Bonito seco kg",
+   "producto_ficha": null,
+   "cantidad": 8.39,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.5,
+   "descuento_pct": null,
+   "total": 138.43,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L/ Gordal DH 60/80 2kg",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "L/ Rellenas anchoa FSY 2,500",
+   "producto_ficha": "Aceituna rellena de anchoa FSY 180 (lata)",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.9,
+   "descuento_pct": null,
+   "total": 38.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 242.83,
+ "desglose_iva": [
+  {
+   "base": 242.83,
+   "pct": 10,
+   "cuota": 24.28
+  }
+ ],
+ "iva": 24.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 267.11,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": [
+  "Bonito seco: 8,390 × 16,50 = 138,435; importe impreso 138,43."
+ ]
+}

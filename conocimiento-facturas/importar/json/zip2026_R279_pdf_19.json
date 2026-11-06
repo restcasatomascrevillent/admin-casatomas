@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  20
+ ],
+ "tipo": "factura",
+ "proveedor": "LUDEÑA GEA, DAVID",
+ "cif": "74242137T",
+ "local": "casa_tomas",
+ "numero_documento": "154/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 20,
+   "nombre": "PERCIFORMES Y A. (emb. EL PERA)",
+   "producto_ficha": null,
+   "cantidad": 2.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 30.48,
+   "iva_pct": 10,
+   "albaran_ref": "2811",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 30.48,
+ "desglose_iva": [
+  {
+   "base": 30.48,
+   "pct": 10,
+   "cuota": 3.05
+  }
+ ],
+ "iva": 3.05,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 33.53,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 737. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

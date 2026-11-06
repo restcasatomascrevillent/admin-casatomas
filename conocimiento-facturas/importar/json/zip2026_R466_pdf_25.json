@@ -1,0 +1,63 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  26
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS EL MONTGO, S.L.",
+ "cif": "B42710996",
+ "local": "casa_tomas",
+ "numero_documento": "216/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 26,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.7,
+   "descuento_pct": null,
+   "total": 56.19,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 26,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 7.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.91,
+   "descuento_pct": null,
+   "total": 156.68,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 212.87,
+ "desglose_iva": [
+  {
+   "base": 212.87,
+   "pct": 10.0,
+   "cuota": 21.29
+  }
+ ],
+ "iva": 21.29,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 234.16,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 5942, 5317, 6074. Embarcaciones: EL MONTGO.",
+ "alertas": []
+}

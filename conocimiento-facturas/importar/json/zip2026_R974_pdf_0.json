@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "RAFAEL BAEZA MACIA Y OTRA C.B.",
+ "cif": "E53671566",
+ "local": "casa_tomas",
+ "numero_documento": "741/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.35,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 69.1,
+   "descuento_pct": null,
+   "total": 93.29,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 93.29,
+ "desglose_iva": [
+  {
+   "base": 93.29,
+   "pct": 10,
+   "cuota": 9.33
+  }
+ ],
+ "iva": 9.33,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 102.62,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

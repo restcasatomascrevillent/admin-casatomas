@@ -1,0 +1,70 @@
+{
+ "archivo": "R1596.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 07576",
+ "fecha": "2026-09-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "REVUELTO SETAS X1",
+   "producto_ficha": "Revuelto de setas (bolsa 1 kg)",
+   "cantidad": 6,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.25,
+   "descuento_pct": null,
+   "total": 25.5,
+   "iva_pct": 4,
+   "albaran_ref": "F575993",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 2,
+   "nombre": "ROLLITO CARRILLADA Y SETAS 25.UND",
+   "producto_ficha": "Rollito de carrillada y setas (caja 25 uds)",
+   "cantidad": 50,
+   "unidad": "ud",
+   "bultos": 50,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 50.0,
+   "iva_pct": 10,
+   "albaran_ref": "F575993",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 75.5,
+ "desglose_iva": [
+  {
+   "base": 50.0,
+   "pct": 10,
+   "cuota": 5.0
+  },
+  {
+   "base": 25.5,
+   "pct": 4,
+   "cuota": 1.02
+  }
+ ],
+ "iva": 6.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 81.52,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F575993. Recargo de equivalencia impreso 1,4 % / 0,5 %: no se suma al total.",
+ "alertas": [
+  "Texto idéntico al de R1597.pdf (mismo nº de factura y mismo contenido): posible PDF duplicado; no cargar dos veces"
+ ]
+}

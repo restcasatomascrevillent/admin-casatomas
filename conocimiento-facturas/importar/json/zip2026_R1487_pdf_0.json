@@ -1,0 +1,46 @@
+{
+ "archivo": "R1487.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/17766",
+ "fecha": "2026-09-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "L.PACHARAN BAINES ORO 70CL 30º C6",
+   "producto_ficha": "Pacharán Baines Oro 70 cl (caja 6)",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 13.9,
+   "descuento_pct": 0.0,
+   "total": 333.6,
+   "iva_pct": 21,
+   "albaran_ref": "26/17.832",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 333.6,
+ "desglose_iva": [
+  {
+   "base": 333.6,
+   "pct": 21,
+   "cuota": 70.06
+  }
+ ],
+ "iva": 70.06,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 403.66,
+ "observaciones": "Giro/B2B, vencimiento 05/09/26. Albarán 26/17.832 (02/09/26). IVA por línea deducido de las bases impresas.",
+ "alertas": []
+}

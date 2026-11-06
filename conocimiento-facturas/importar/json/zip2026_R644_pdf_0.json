@@ -1,0 +1,80 @@
+{
+ "archivo": "R644.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BENEOLIVA, S.COOP. V.L.",
+ "cif": "F54450895",
+ "local": "casa_tomas",
+ "numero_documento": "26/ 2725",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OLIBEN VIRGEN 5L. (ENVASADO)",
+   "producto_ficha": "Aceite de oliva virgen Beneolive 5 L (garrafa)",
+   "cantidad": 8.0,
+   "unidad": "garrafa",
+   "bultos": null,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "L",
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 175.2,
+   "iva_pct": 4,
+   "albaran_ref": "COM 2257 /26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ALMORSAERO 5L. PET AOVE PICUAL T",
+   "producto_ficha": "AOVE Picual Almorsaero 5 L (garrafa PET)",
+   "cantidad": 2.0,
+   "unidad": "garrafa",
+   "bultos": null,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "L",
+   "precio_unitario": 28.5,
+   "descuento_pct": null,
+   "total": 57.0,
+   "iva_pct": 4,
+   "albaran_ref": "COM 2635 /26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "VIRGEN BENEOLIVE 5L. (ENVASADO)",
+   "producto_ficha": "Aceite de oliva virgen Beneolive 5 L (garrafa)",
+   "cantidad": 4.0,
+   "unidad": "garrafa",
+   "bultos": null,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "L",
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 87.6,
+   "iva_pct": 4,
+   "albaran_ref": "COM 2635 /26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 319.8,
+ "desglose_iva": [
+  {
+   "base": 319.8,
+   "pct": 4.0,
+   "cuota": 12.79
+  }
+ ],
+ "iva": 12.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 332.59,
+ "observaciones": "Forma de pago: Transfer. 30 days; vencimiento 2026-05-30, total 332.59; Albaranes: COM 2257 /26, COM 2635 /26; CIF del emisor no impreso en el texto; se identifica por el nombre Beneoliva (ficha).",
+ "alertas": []
+}

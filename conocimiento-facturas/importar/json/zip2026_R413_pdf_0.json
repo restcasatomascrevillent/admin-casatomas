@@ -1,0 +1,82 @@
+{
+ "archivo": "R413.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260102",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PERCEBE",
+   "producto_ficha": "Percebe",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 160.0,
+   "descuento_pct": null,
+   "total": 320.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000102",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 115.2,
+   "iva_pct": 10,
+   "albaran_ref": "1-000102",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BUEY",
+   "producto_ficha": "Buey (probablemente buey de mar)",
+   "cantidad": 7.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 19.0,
+   "descuento_pct": null,
+   "total": 134.9,
+   "iva_pct": 10,
+   "albaran_ref": "1-000102",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 570.1,
+ "desglose_iva": [
+  {
+   "base": 570.1,
+   "pct": 10,
+   "cuota": 57.01
+  }
+ ],
+ "iva": 57.01,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 627.11,
+ "observaciones": "Transferencia CAIXABANK; vencimiento 12/03/2026 por 627,11. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillent, cliente 152).",
+ "alertas": [
+  "PERCEBE a 160,00 €/kg; la ficha indica 110,00 €/kg."
+ ]
+}

@@ -1,0 +1,100 @@
+{
+ "archivo": "R1310.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "5555",
+ "fecha": "2026-08-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA",
+   "producto_ficha": "Quisquilla",
+   "cantidad": 4.75,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 94.0,
+   "descuento_pct": null,
+   "total": 446.5,
+   "iva_pct": 10,
+   "albaran_ref": "18393",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA GILLARDEAU",
+   "producto_ficha": "Ostra Gillardeau",
+   "cantidad": 24.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.15,
+   "descuento_pct": null,
+   "total": 51.6,
+   "iva_pct": 10,
+   "albaran_ref": "18777",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "QUISQUILLA",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 94.0,
+   "descuento_pct": null,
+   "total": 470.0,
+   "iva_pct": 10,
+   "albaran_ref": "18777",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "OSTRA GILLARDEAU",
+   "producto_ficha": "Ostra Gillardeau",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.15,
+   "descuento_pct": null,
+   "total": 103.2,
+   "iva_pct": 10,
+   "albaran_ref": "19092",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1071.3,
+ "desglose_iva": [
+  {
+   "base": 1071.3,
+   "pct": 10,
+   "cuota": 107.13
+  }
+ ],
+ "iva": 107.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1178.43,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Albarán 18777 subtotal 521,60.",
+ "alertas": [
+  "Código 89 QUISQUILLA (albarán 18777) no está en el catálogo de la ficha, que solo tiene 356 QUISQUILLA. producto_ficha en null; revisar si es el mismo artículo.",
+  "Quisquilla a 94,00 €/kg (356) frente a 93,00 €/kg en el catálogo. Se deja lo impreso."
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "SEMPERE ANDREU, EVA",
+ "cif": "48348526L",
+ "local": "casa_tomas",
+ "numero_documento": "335/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.2,
+   "descuento_pct": null,
+   "total": 21.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 21.3,
+ "desglose_iva": [
+  {
+   "base": 21.3,
+   "pct": 10.0,
+   "cuota": 2.13
+  }
+ ],
+ "iva": 2.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 23.43,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9580. Embarcaciones: LA EVA.",
+ "alertas": []
+}

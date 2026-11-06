@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  18
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SOLER MOLNA SL",
+ "cif": "B10669950",
+ "local": "casa_tomas",
+ "numero_documento": "1.071/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 18,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 74.1,
+   "descuento_pct": null,
+   "total": 111.15,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 111.15,
+ "desglose_iva": [
+  {
+   "base": 111.15,
+   "pct": 10,
+   "cuota": 11.12
+  }
+ ],
+ "iva": 11.12,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 122.27,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): SOLER MOLINA. Albaranes de subasta (informativo): 18020.",
+ "alertas": []
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R348.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0052/(2026)011924",
+ "fecha": "2026-03-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PIMIENTO CALIFORNIA AML MC 500",
+   "producto_ficha": "Pimiento california amarillo bandeja 500 g",
+   "cantidad": -1,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.7,
+   "descuento_pct": null,
+   "total": -2.7,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -2.7,
+ "desglose_iva": [
+  {
+   "base": -2.7,
+   "pct": 4,
+   "cuota": -0.11
+  }
+ ],
+ "iva": -0.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -2.81,
+ "observaciones": "Factura de devolución (abono) de la factura 0/0(063)0052/(2026)011903 de 10/03/2026 (R347). Pago en entrega: devuelve 2,81 EUR. Marca final '7' en la línea, sin significado conocido en la ficha.",
+ "alertas": []
+}

@@ -1,0 +1,99 @@
+{
+ "archivo": "R598.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170761835",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 12.65,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.7,
+   "descuento_pct": null,
+   "total": 21.51,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SANDIA FASHION 3 I ES",
+   "producto_ficha": "Sandía Fashion calibre 2-3",
+   "cantidad": 18.25,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.9,
+   "descuento_pct": null,
+   "total": 34.68,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PERA COSCIA 28 MIX XFCY DDC 5,5K 2M CL",
+   "producto_ficha": null,
+   "cantidad": 5.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.8,
+   "descuento_pct": null,
+   "total": 20.9,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "(ENV)-AGUACATE 14 ORSERO 4K",
+   "producto_ficha": "Aguacate calibre 14 Orsero (caja 4 kg)",
+   "cantidad": 1,
+   "unidad": "bulto",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 18.0,
+   "descuento_pct": null,
+   "total": 18.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 95.09,
+ "desglose_iva": [
+  {
+   "base": 95.09,
+   "pct": 4,
+   "cuota": 3.8
+  }
+ ],
+ "iva": 3.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 98.89,
+ "observaciones": "Entrega 30.04.2026. Líneas con GLOBALG.A.P. (asterisco quitado). Cuadro de envases vacío. Total BT 4.",
+ "alertas": [
+  "PERA COSCIA 28 MIX XFCY DDC 5,5K 2M CL: bulto de 5,5 kg; la ficha tiene la pera de 5,2 kg (caja 5,2 kg). Sin producto_ficha."
+ ]
+}

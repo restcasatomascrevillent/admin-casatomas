@@ -1,0 +1,46 @@
+{
+ "archivo": "R740.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A255/26",
+ "fecha": "2026-05-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ACEITE CON TRUFA, 250 ml.",
+   "producto_ficha": "Aceite con trufa 250 ml",
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 25,
+   "contenido_unidad": "cl",
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 156.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 156.0,
+ "desglose_iva": [
+  {
+   "base": 156.0,
+   "pct": 4,
+   "cuota": 6.24
+  }
+ ],
+ "iva": 6.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 162.24,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 255. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás).",
+ "alertas": []
+}

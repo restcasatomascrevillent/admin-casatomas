@@ -1,0 +1,69 @@
+{
+ "archivo": "R1018.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MAR MENOR DISTRIBUCIONES ALIMENTARIAS, S.L. (Doria Foods)",
+ "cif": "B73910747",
+ "local": "casa_tomas",
+ "numero_documento": "FRA/2026/18240",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Salmón High Quality Superior 7-8 kg/pza (cód. 3202463)",
+   "producto_ficha": null,
+   "cantidad": 13.88,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.95,
+   "descuento_pct": null,
+   "total": 110.35,
+   "iva_pct": 10,
+   "albaran_ref": "WH/OUT/247628",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Elaboración media (cód. 788A), pedido S326877",
+   "producto_ficha": null,
+   "cantidad": 13.88,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 11.1,
+   "iva_pct": 10,
+   "albaran_ref": "WH/OUT/247628",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Gestión de embalajes, punto verde y logística (Art. 78 Ley 37/92), 1,5 €/entrega",
+   "importe": 1.5,
+   "iva_pct": 10
+  }
+ ],
+ "subtotal": 122.95,
+ "desglose_iva": [
+  {
+   "base": 122.95,
+   "pct": 10,
+   "cuota": 12.3
+  }
+ ],
+ "iva": 12.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 135.25,
+ "observaciones": "Pedido S326877. Forma de pago: transferencia, plazo 15 días, vencimiento 15/07/2026 por 135,25 €. Dirección de entrega: Santa María de la Cabeza, 2 (MASIDE 2011 S.L., Restaurante Casa Tomás).",
+ "alertas": []
+}

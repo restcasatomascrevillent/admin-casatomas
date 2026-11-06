@@ -1,0 +1,65 @@
+{
+ "archivo": "R220.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ GALVAÑ CANDELA",
+ "cif": "48368394S",
+ "local": "touza",
+ "numero_documento": "FACT/008",
+ "fecha": "2026-02-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Cable RCA-RCA de 4 metros",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 20.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Mano de obra, instalación y configuración",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.0,
+   "descuento_pct": null,
+   "total": 96.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 116.0,
+ "desglose_iva": [
+  {
+   "base": 116.0,
+   "pct": 21,
+   "cuota": 24.36
+  }
+ ],
+ "iva": 24.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 140.36,
+ "observaciones": "Concepto impreso: «INSTALACIÓN TOUZA». Pago por transferencia a la cuenta indicada en el pie.",
+ "alertas": [
+  "El destinatario impreso es MASIDE 2011 S.L. (sin local); el local Touza se toma del concepto «INSTALACIÓN TOUZA». Confirmar."
+ ]
+}

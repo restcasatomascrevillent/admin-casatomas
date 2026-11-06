@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  28
+ ],
+ "tipo": "factura",
+ "proveedor": "CARTAGENERA 1940, CB",
+ "cif": "E19819705",
+ "local": "casa_tomas",
+ "numero_documento": "80/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 28,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 54.84,
+   "iva_pct": 10,
+   "albaran_ref": "3903",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 54.84,
+ "desglose_iva": [
+  {
+   "base": 54.84,
+   "pct": 10,
+   "cuota": 5.48
+  }
+ ],
+ "iva": 5.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 60.32,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 875. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

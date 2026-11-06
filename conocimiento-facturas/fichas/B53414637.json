@@ -1,0 +1,76 @@
+{
+  "cif": "B53414637",
+  "nombre": "SUMINISTROS HOSTELEROS BENISSA, S.L.U.",
+  "nombres_impresos": ["SUMINISTROS HOSTELEROS BENISSA, S.L.U.", "HOSTELBE"],
+  "categoria": "menaje",
+  "locales": ["casa_tomas"],
+  "muestras": ["R1314.pdf", "R1347.pdf", "R1431.pdf", "R1646.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán por factura, 1 página); también factura rectificativa (abono)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["SCF 141791", "SCF 142899", "SCF 143671", "SCB 8024 (rectificativa)"], "patron": "^(SCF|SCB) ?\\d{4,6}$", "donde": "fila 'SERIE | NÚMERO | FECHA | COD.CLIENTE' (serie y número van en celdas separadas). SCF = factura; SCB = rectificativa." },
+    "fecha": "tercera casilla de esa fila, DD/MM/AAAA; coincide con fin de mes (31/07/2026, 31/08/2026, 29/09/2026) aunque el albarán es anterior",
+    "albaranes": "línea 'NºALBARÁN: | SCA / 204640 | FECHA: 30/06/2026' (SCB / 7861 en la rectificativa; SCAB / 18628 en otra). Va antes de las líneas."
+  },
+
+  "lectura": {
+    "columnas": ["Descripción", "Modelo", "Unidades", "Precio", "Dto.", "Importe"],
+    "cantidad_es": "unidades (piezas). La columna Dto. solo existe en facturas con descuento.",
+    "columna_peso": null,
+    "precio_es_por": "unidad (cuchillo, parrilla, bandeja, congelador…). Es el precio de tarifa ANTES de descuento.",
+    "descuento_por_linea": { "existe": true, "columna": "Dto. (entre Precio e Importe, en el mismo grupo: '5,07 20,00')", "valores_habituales": [20] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin envases",
+    "cargos_y_descuentos_pie": ["Sin portes ni descuentos en el pie: TOTAL BRUTO | BASE IMP. | IVA % | TOTAL IVA | TOTAL."],
+    "trampas": [
+      "Cuando hay descuento, el '20,00' pegado al precio ('5,07 20,00') es el % de descuento: importe = unidades × precio × (1 − 0,20). 120 × 5,07 × 0,80 = 486,72.",
+      "La misma referencia puede venir a veces con descuento y a veces sin él (CUCHILLO CHULETERO HQ MONTBLANC: 60 × 9,57 con 20 % en julio; 4 × 7,47 sin dto. en otra factura).",
+      "En la rectificativa el importe es negativo y lleva ya el descuento aplicado aunque no se imprima: '-1 | 5,07 | -4,06' (5,07 × 0,80 = 4,056).",
+      "Líneas con 0 unidades y 0,00 son notas: 'CORRESP. FACT. 140811 FECHA 30.06.26', '** PRECIO ESPECIAL **', '---------PRECIO ESPECIAL------------', 'PRECIOS ESPECIALES', '**'. No son productos.",
+      "La columna Modelo (K6 COMAS, JOSPER, 3 CLAVELES, DB MARK, ALEXALO) es marca/modelo, no cantidad; a veces va junta a la descripción.",
+      "La cabecera incluye tres sedes (Denia, Calpe, Benissa) con teléfonos; el CIF del proveedor se imprime con puntos 'B-53.414.637'; B54583356 es el NIF del cliente (Maside 2011).",
+      "Las líneas de bancos 'BBVA-ES79 ...' y 'LA CAIXA-ES93 ...' son IBAN, no importes."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = unidades × precio × (1 − dto/100); sin dto, unidades × precio",
+    "TOTAL BRUTO = suma de importes (ya con dto); BASE IMP. = TOTAL BRUTO",
+    "TOTAL IVA = base × 0,21; TOTAL = base + IVA",
+    "R1314: 486,72 + 459,36 = 946,08; IVA 198,68; total 1.144,76",
+    "R1431: 3.320,00; IVA 697,20; total 4.017,20",
+    "R1646: 159,60 + 156,58 + 369,60 + 100,80 + 92,40 = 878,98; IVA 184,59; total 1.063,57",
+    "R1347 (rectificativa): −4,06; IVA −0,85; total −4,91"
+  ],
+
+  "guia_ocr": "Factura por entrega de menaje/maquinaria (Hostelbe/Benissa). Serie y número en celdas separadas (SCF 141791; rectificativa SCB 8024); fecha DD/MM/AAAA en la misma fila. Columnas: Descripción | Modelo | Unidades | Precio | Dto. | Importe. Si hay Dto., el '20,00' tras el precio es % de descuento y el importe ya lo lleva (u × precio × 0,8). Líneas con 0 unidades y 0,00 ('PRECIO ESPECIAL', 'CORRESP. FACT. ...') son notas, ignóralas. Rectificativa: cantidades e importes negativos. IVA 21 %. Totales: BRUTO, BASE, IVA, TOTAL. No leas IBAN ni teléfonos como importes.",
+
+  "productos": [
+    { "nombre_impreso": "CUCHILLO CHULETERO K6 | K6 COMAS", "nombre_normalizado": "Cuchillo chuletero K6 (Comas)", "familia": "cubertería", "presentacion": "cuchillo de mesa", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 4.95, "max": 5.07, "por": "unidad (antes del dto. 20 %)", "ejemplos": [["2026-06-30", 5.07]] }, "iva_pct": 21, "veces_visto": 3 },
+    { "nombre_impreso": "CUCHILLO CHULETERO HQ MONTBLANC | COMAS", "nombre_normalizado": "Cuchillo chuletero HQ Montblanc (Comas)", "familia": "cubertería", "presentacion": "cuchillo de mesa", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 7.47, "max": 9.57, "por": "unidad (9,57 con dto. 20 %; 7,47 sin dto.)", "ejemplos": [["2026-06-30", 9.57]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "SET 4 CUCHILLOS CHULETEROS WAGYU 11.5CM | 3 CLAVELES", "nombre_normalizado": "Set 4 cuchillos chuleteros Wagyu 11,5 cm (3 Claveles)", "familia": "cubertería", "presentacion": "set de 4", "formato": { "envase": "set", "contenido": 4, "unidad_contenido": "uds", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "set", "precio": { "min": 34.58, "max": 34.58, "por": "set (antes del dto. 20 %)", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "BANDEJA C/ASAS NGR 63.5X40.6CM DB | DB MARK", "nombre_normalizado": "Bandeja con asas negra 63,5x40,6 cm (DB Mark)", "familia": "menaje_cocina", "presentacion": "bandeja", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 65.61, "max": 65.61, "por": "unidad (antes del dto. 20 %)", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "SOPORTE BANDEJAS MADERA 54X42X83CM | ALEXALO", "nombre_normalizado": "Soporte de bandejas madera 54x42x83 cm (Alexalo)", "familia": "mobiliario", "presentacion": "soporte", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 170.0, "max": 170.0, "por": "unidad (antes del dto. 20 %)", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "CONGELADOR TAPA ABATIBLE (-60ºC)", "nombre_normalizado": "Congelador de tapa abatible -60 ºC", "familia": "maquinaria", "presentacion": "ultracongelador", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 3320.0, "max": 3320.0, "por": "unidad", "ejemplos": [["2026-08-03", 3320.0]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "PARRILLA RECTANGULAR DOBLE 15X40 REF | JOSPER", "nombre_normalizado": "Parrilla rectangular doble 15x40 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla de horno Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 152.0, "max": 159.6, "por": "unidad", "ejemplos": [["2026-09-07", 159.6]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "BESUGUERA 35X20 REF O403 | JOSPER / BESUGUERA 35X20 JOSPER", "nombre_normalizado": "Besuguera 35x20 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 88.0, "max": 92.4, "por": "unidad", "ejemplos": [["2026-09-07", 92.4]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "MINI PARRILLA PINZA 15X25 REF 240020 | JOSPER / MINI PARRILLA PINZA MALLA FINA 15X25", "nombre_normalizado": "Mini parrilla pinza 15x25 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 68.0, "max": 100.8, "por": "unidad", "ejemplos": [["2026-09-07", 100.8]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "PARRILLA RODABALLO 45X30 REF O405 | JOSPER", "nombre_normalizado": "Parrilla rodaballo 45x30 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 96.0, "max": 96.0, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "SARTEN DE MALLA METALICA 30CM DIAMETRO | JOSPER", "nombre_normalizado": "Sartén de malla metálica 30 cm (Josper)", "familia": "menaje_cocina", "presentacion": "sartén Josper", "formato": { "envase": "unidad", "contenido": 30, "unidad_contenido": "cm", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 172.0, "max": 172.0, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "PARRILLA DOBLE COCOCHAS 20X30 REF | JOSPER", "nombre_normalizado": "Parrilla doble cococha 20x30 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 200.0, "max": 200.0, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "MINI PARRILLA DOBLE 15X25 REF 240016 | JOSPER", "nombre_normalizado": "Mini parrilla doble 15x25 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 160.0, "max": 160.0, "por": "unidad", "ejemplos": [] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "PARRILLA MALLA 150X250X25 MM ASA 15X41X8 | JOSPER 240011", "nombre_normalizado": "Parrilla malla 150x250x25 mm con asa (Josper 240011)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 156.58, "max": 156.58, "por": "unidad", "ejemplos": [["2026-09-07", 156.58]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "PARRILLA CUADRADA DOBLE 30X40 JOSPER", "nombre_normalizado": "Parrilla cuadrada doble 30x40 (Josper)", "familia": "menaje_cocina", "presentacion": "parrilla Josper", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 184.8, "max": 184.8, "por": "unidad", "ejemplos": [["2026-09-07", 184.8]] }, "iva_pct": 21, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Solo hay 4 PDF digitales; el catálogo es pequeño (15 artículos) y los precios de las parrillas Josper subieron un 5 % entre agosto (152,00) y septiembre (159,60).",
+    "No se sabe si el 20 % de descuento es fijo en cuchilleria Comas (aparece en R1314 y R1346, no en HQ Montblanc de R1346); se trata como dato de línea.",
+    "Las líneas 'PRECIO ESPECIAL' sin importe indican una condición comercial pactada, no un producto; no consta su alcance."
+  ]
+}

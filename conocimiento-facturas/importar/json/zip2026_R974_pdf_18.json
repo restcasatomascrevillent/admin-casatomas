@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  19
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ GOMEZ, FRANCISCO JOSE",
+ "cif": "21060905N",
+ "local": "casa_tomas",
+ "numero_documento": "3/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 19,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 5.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.89,
+   "descuento_pct": null,
+   "total": 130.46,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 130.46,
+ "desglose_iva": [
+  {
+   "base": 130.46,
+   "pct": 10,
+   "cuota": 13.05
+  }
+ ],
+ "iva": 13.05,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 143.51,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 13495.",
+ "alertas": []
+}

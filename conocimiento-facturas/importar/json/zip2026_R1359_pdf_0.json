@@ -1,0 +1,65 @@
+{
+ "archivo": "R1359.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ALHAMA ABD VINO, S.L.",
+ "cif": "B73475121",
+ "local": "casa_tomas",
+ "numero_documento": "26A/2056",
+ "fecha": "2026-08-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Gerardo Méndez Do Ferreiro 2025",
+   "producto_ficha": null,
+   "cantidad": 48.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 624.0,
+   "iva_pct": 21,
+   "albaran_ref": "20270865",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Gerardo Méndez Do Ferreiro 2025 Magnum",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.14,
+   "descuento_pct": null,
+   "total": 385.68,
+   "iva_pct": 21,
+   "albaran_ref": "20270865",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1009.68,
+ "desglose_iva": [
+  {
+   "base": 1009.68,
+   "pct": 21,
+   "cuota": 212.03
+  }
+ ],
+ "iva": 212.03,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1221.71,
+ "observaciones": "Pago por transferencia BBVA. Vencimiento 21/08/2026 (1.221,71 €). Albarán 20270865 de 20/08/2026. Códigos de artículo 2332 y 2333 no incluidos en el nombre. Destinatario impreso: MASIDE 2011, S.L. (sin marca Casa Tomás).",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

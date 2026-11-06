@@ -1,0 +1,116 @@
+{
+ "archivo": "R750.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "5410",
+ "fecha": "2026-05-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOMATE DE PERA I M",
+   "producto_ficha": "Tomate de pera cat. I calibre M",
+   "cantidad": 31.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.25,
+   "descuento_pct": null,
+   "total": 38.75,
+   "iva_pct": 4,
+   "albaran_ref": "A 4222/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LIMON VERNA",
+   "producto_ficha": "Limón Verna",
+   "cantidad": 46.5,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 83.7,
+   "iva_pct": 4,
+   "albaran_ref": "A 4222/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "NARANJA LANE LATE ZUMO",
+   "producto_ficha": "Naranja Lane Late para zumo",
+   "cantidad": 14.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.9,
+   "descuento_pct": null,
+   "total": 13.05,
+   "iva_pct": 4,
+   "albaran_ref": "A 4222/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PATATAS MINI 2,700KG",
+   "producto_ficha": "Patata mini (bolsa 2,7 kg)",
+   "cantidad": 13.5,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 2.7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.4,
+   "descuento_pct": null,
+   "total": 45.9,
+   "iva_pct": 4,
+   "albaran_ref": "A 4222/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TOMATE DULCE II",
+   "producto_ficha": "Tomate dulce categoría II",
+   "cantidad": 15.32,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 114.9,
+   "iva_pct": 4,
+   "albaran_ref": "A 4222/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 296.3,
+ "desglose_iva": [
+  {
+   "base": 296.3,
+   "pct": 4,
+   "cuota": 11.85
+  }
+ ],
+ "iva": 11.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 308.15,
+ "observaciones": "Transferencia 30 días. Albarán A 4222/26 del 22/05/2026. Resumen de envases vacío. Destinatario no impreso en el texto del PDF (la ficha asigna casa_tomas).",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

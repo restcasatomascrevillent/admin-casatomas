@@ -1,0 +1,46 @@
+{
+ "archivo": "R1110.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260343",
+ "fecha": "2026-07-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 86.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000343",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 86.4,
+ "desglose_iva": [
+  {
+   "base": 86.4,
+   "pct": 10,
+   "cuota": 8.64
+  }
+ ],
+ "iva": 8.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 95.04,
+ "observaciones": "Transferencia CaixaBank; vencimiento 02/07/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": []
+}

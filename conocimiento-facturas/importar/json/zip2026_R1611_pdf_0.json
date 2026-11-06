@@ -1,0 +1,113 @@
+{
+ "archivo": "R1611.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/005019",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CEBOLLA CUBO (10X10)MM (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla en cubo 10x10 mm (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 1.46,
+   "descuento_pct": null,
+   "total": 14.62,
+   "iva_pct": 4,
+   "albaran_ref": "LA/9299",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CEBOLLA PERLA (4X2,5KG) 10KG",
+   "producto_ficha": "Cebolla perla (bolsas 4x2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 2.21,
+   "descuento_pct": null,
+   "total": 22.05,
+   "iva_pct": 4,
+   "albaran_ref": "LA/9299",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BOQUERON FILETE MARIPOSA TEMPURA (3X1KG) 3KG",
+   "producto_ficha": "Boqueron filete mariposa en tempura (3x1 kg)",
+   "cantidad": 15.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 5.93,
+   "descuento_pct": null,
+   "total": 88.95,
+   "iva_pct": 10,
+   "albaran_ref": "LA/9299",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "VARITA SURIMI (6X1KG) 6KG",
+   "producto_ficha": "Varita de surimi (6x1 kg)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.78,
+   "descuento_pct": null,
+   "total": 22.67,
+   "iva_pct": 10,
+   "albaran_ref": "LA/9299",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/9299)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 149.79,
+ "desglose_iva": [
+  {
+   "base": 111.62,
+   "pct": 10,
+   "cuota": 11.16
+  },
+  {
+   "base": 36.67,
+   "pct": 4,
+   "cuota": 1.47
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 12.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 162.74,
+ "observaciones": "Transferencia a 10 dias, vencimiento 10/10/2026. Albaran LA/9299 de 10/09/2026 (8 bultos, 41 kg). FTV-7331543 es una referencia del encabezado, no el numero de factura. Diferencias de centimos dentro de tolerancia: cebolla perla 10 x 2,21 = 22,10 frente a 22,05; varita 6 x 3,78 = 22,68 frente a 22,67.",
+ "alertas": []
+}

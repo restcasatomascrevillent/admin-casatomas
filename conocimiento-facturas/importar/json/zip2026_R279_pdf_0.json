@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "LA MINA, S.C.",
+ "cif": "J54737168",
+ "local": "casa_tomas",
+ "numero_documento": "35/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PLEURONECTIFORMES",
+   "producto_ficha": null,
+   "cantidad": 0.55,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 16.34,
+   "iva_pct": 10,
+   "albaran_ref": "2811",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 16.34,
+ "desglose_iva": [
+  {
+   "base": 16.34,
+   "pct": 10,
+   "cuota": 1.63
+  }
+ ],
+ "iva": 1.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 17.97,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 9. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

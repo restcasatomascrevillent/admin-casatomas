@@ -1,0 +1,140 @@
+{
+ "archivo": "R1072.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900005612",
+ "fecha": "2026-06-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LC. PACHARAN BEREZKO LITRO",
+   "producto_ficha": "Pacharán Berezko 1 litro",
+   "cantidad": 36,
+   "unidad": "botella",
+   "bultos": 6,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 11.09,
+   "descuento_pct": null,
+   "total": 399.24,
+   "iva_pct": 21,
+   "albaran_ref": "2904001531",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ORUJO AFILADOR CAFE",
+   "producto_ficha": "Orujo Afilador de café",
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.3,
+   "descuento_pct": null,
+   "total": 87.6,
+   "iva_pct": 21,
+   "albaran_ref": "2904001531",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ORUJO AFILADOR HIERBAS 0.70",
+   "producto_ficha": "Orujo Afilador de hierbas 70 cl",
+   "cantidad": 48,
+   "unidad": "botella",
+   "bultos": 8,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 6.95,
+   "descuento_pct": null,
+   "total": 333.6,
+   "iva_pct": 21,
+   "albaran_ref": "2904001531",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "ORUJO AFILADOR CREMA 70 cl.",
+   "producto_ficha": "Crema de orujo Afilador 70 cl",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": 4,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 8.25,
+   "descuento_pct": null,
+   "total": 198.0,
+   "iva_pct": 21,
+   "albaran_ref": "2904001531",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "GIN MARTIN MILLERS 0.70",
+   "producto_ficha": "Gin Martin Miller's 70 cl",
+   "cantidad": 90,
+   "unidad": "botella",
+   "bultos": 15,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 20.05,
+   "descuento_pct": null,
+   "total": 1804.5,
+   "iva_pct": 21,
+   "albaran_ref": "2904001531",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "GIN MARTIN MILLERS 0.70",
+   "producto_ficha": "Gin Martin Miller's 70 cl",
+   "cantidad": 42,
+   "unidad": "botella",
+   "bultos": 7,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "2904001531",
+   "bonificada": true,
+   "precio_referencia": 20.05
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (importe impreso en la casilla % DTO. del pie)",
+   "importe": -254.06,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 2568.88,
+ "desglose_iva": [
+  {
+   "base": 2568.88,
+   "pct": 21,
+   "cuota": 539.46
+  }
+ ],
+ "iva": 539.46,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3108.34,
+ "observaciones": "Albarán 2904001531 del 02/06/2026. Forma de pago no impresa. Total unidades 252. Página 1 de 3; las páginas 2 y 3 son otra factura cada una.",
+ "alertas": [
+  "Misma factura que R852 (2900005612, 02/06/2026, total 3.108,34): posible duplicado."
+ ]
+}

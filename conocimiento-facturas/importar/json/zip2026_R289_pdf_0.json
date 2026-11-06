@@ -1,0 +1,70 @@
+{
+ "archivo": "R289.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONFITERIA CERVIÑO S.L.",
+ "cif": "B32106940",
+ "local": "casa_tomas",
+ "numero_documento": "26/0000098",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAJA 400 CAÑAS",
+   "producto_ficha": "Cañas de repostería (caja de 400)",
+   "cantidad": 400,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.48,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": "101",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOQ BOQUILLAS",
+   "producto_ficha": "Boquillas",
+   "cantidad": 3,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.89,
+   "descuento_pct": null,
+   "total": 8.67,
+   "iva_pct": 21,
+   "albaran_ref": "101",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 200.67,
+ "desglose_iva": [
+  {
+   "base": 192.0,
+   "pct": 10,
+   "cuota": 19.2
+  },
+  {
+   "base": 8.67,
+   "pct": 21,
+   "cuota": 1.82
+  }
+ ],
+ "iva": 21.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 221.69,
+ "observaciones": "Recibo 30 días, vencimiento 30/03/2026. Albarán 101 de 12/02/2026. Líneas 'CONSUMO PREF' y 'LOTE' ignoradas.",
+ "alertas": [
+  "IVA 21 % en BOQUILLAS (base 8,67 con 21 % impreso en el pie); la ficha dice 10 % y no tenía muestra de precio ni fecha para este artículo. Se aplica lo impreso."
+ ]
+}

@@ -1,0 +1,87 @@
+{
+  "cif": "B30055404",
+  "nombre": "EXCLUSIVAS GALICIA, S.L.",
+  "nombres_impresos": ["EXCLUSIVAS GALICIA", "EXCLUSIVAS GALICIA S.L. Envases para alimentos"],
+  "categoria": "menaje",
+  "locales": ["casa_tomas"],
+  "muestras": ["R32.pdf", "R278.pdf", "R678.pdf", "R912.pdf", "R1472.pdf", "R1473.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega escaneada (1 página, un pedido por factura, forma de pago CONTADO)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["FV26/ 139", "FV26/ 2233", "FV26/ 5264", "FV26/ 7008", "FV26/ 9763", "FV26/ 9795"], "patron": "^FV26/ ?\\d{3,5}$", "donde": "casilla 'FACTURA Nº:' arriba a la derecha, bajo ALBARÁN Nº (que queda vacío) y FECHA; el número lleva un espacio tras la barra" },
+    "fecha": "casilla 'FECHA:' (DD/MM/AAAA), entre ALBARÁN Nº y FACTURA Nº. NO es la fecha 'PEDIDO Nº ... FECHA dd/mm/aaaa' que va dentro de la tabla, que es la del pedido y es anterior.",
+    "albaranes": "no hay albaranes: la casilla ALBARÁN Nº va en blanco. Dentro de la tabla, la línea 'PEDIDO Nº 10006  FECHA 04/01/2026' (en cursiva) agrupa las líneas del pedido."
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Descripción", "Cajas", "Uds/Caja", "Cantidad", "Precio", "% Dto.", "Importe"],
+    "cantidad_es": "unidades sueltas (envases, tapas, bayetas, rollos, guantes). Cantidad = Cajas × Uds/Caja. Si Cajas está vacío, se vendió suelto y Cantidad = Uds/Caja (ej. 120 bases, 20 bayetas).",
+    "columna_peso": null,
+    "precio_es_por": "unidad suelta (precio con 4 decimales, p. ej. 0,1456 € por envase). En rollos de film y bobinas de celulosa es por rollo/bobina (5,4000; 2,6200).",
+    "descuento_por_linea": { "existe": false, "columna": "% DTO. (siempre vacía en las muestras)", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin envases ni depósitos",
+    "cargos_y_descuentos_pie": ["Caja de resumen: % DESC., IMP. DESC., PORTES, ANTICIPO, BASE IMPONIBLE, % IVA, Importe IVA, % R.E., Importe R.E., TOTAL DOCUMENTO. En las muestras descuento, portes, anticipo y R.E. valen 0,00. 'Total Importe' (suma de líneas) sale justo encima."],
+    "trampas": [
+      "Documento escaneado ligeramente torcido con una línea de pliegue en medio; las descripciones se cortan por el borde de la columna ('...PA', '...F', 'CANUTO 0,2', '2CAPAS', '14', '( 30X5 |'): no es error de lectura, son nombres truncados en el original.",
+      "Precio con 4 decimales y coma decimal (0,1456); no confundir 0,0702 con 0,702. Los importes (2 decimales) = Cantidad × Precio redondeado.",
+      "La fecha del pedido en cursiva ('PEDIDO Nº 12036 FECHA 31/08/2026') NO es la fecha de factura (02/09/2026).",
+      "Hay dos bloques de dirección idénticos (envío y facturación) con el NIF del cliente 'ESB54583356' y teléfonos 966 107 887-685 481 351: no son datos de la factura. Cliente C07142. Vendedor 2. Nº Reparto 4B192/32.",
+      "Cajas y Uds/Caja son pequeños números en columnas contiguas a la derecha de la descripción; a veces la celda de Cajas está en blanco.",
+      "Todas las facturas se cobran al CONTADO el mismo día (Vencimientos = fecha factura)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "cantidad = cajas × uds/caja (o uds/caja si cajas está en blanco)",
+    "importe_linea = cantidad × precio (redondeado a 2 decimales)",
+    "Total Importe = base imponible = suma de importes de línea (sin descuento ni portes)",
+    "IVA = base × 21 %; TOTAL DOCUMENTO = base + IVA",
+    "R32: 120×0,1456=17,47 … suma 528,30; IVA 110,94; total 639,24",
+    "R278: base 516,70; IVA 108,51; total 625,21",
+    "R678: base 749,07; IVA 157,30; total 906,37",
+    "R912: base 83,32; IVA 17,50; total 100,82",
+    "R1473: base 385,79; IVA 81,02; total 466,81",
+    "R1472: 320 × 0,1730 = 55,36; IVA 11,63; total 66,99"
+  ],
+
+  "guia_ocr": "Factura escaneada de Exclusivas Galicia (envases para alimentos). Número 'FV26/ 5264' y fecha DD/MM/AAAA en las casillas FACTURA Nº y FECHA arriba a la derecha; ALBARÁN Nº va vacío. La fecha 'PEDIDO ... FECHA' dentro de la tabla NO es la de factura. Columnas: Código | Descripción (truncada por el borde) | Cajas | Uds/Caja | Cantidad | Precio | % Dto | Importe. Cantidad = Cajas × Uds/Caja; precio por unidad con 4 decimales; Importe = Cantidad × Precio. Cajas puede estar vacío. Descuento y portes 0,00. Base, 21 % IVA y TOTAL DOCUMENTO en el recuadro inferior. Pago CONTADO.",
+
+  "productos": [
+    { "nombre_impreso": "COOK1250N BASE NEGRA OVALADO 1250 CC 189X255X45 PA", "nombre_normalizado": "Base negra ovalada 1250 cc 189x255x45 (Cook1250N)", "familia": "envase_alimentario", "presentacion": "envase PP negro para comida", "formato": { "envase": "envase", "contenido": 1250, "unidad_contenido": "cc", "unidades_por_bulto": 320, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.1456, "max": 0.1689, "por": "unidad", "ejemplos": [["2026-01-07", 0.1456], ["2026-09-02", 0.1689]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "COVCOOK1250TP TAPA PP (PARA COOK1250N) 189X255X20 F", "nombre_normalizado": "Tapa PP para Cook1250N 189x255x20", "familia": "envase_alimentario", "presentacion": "tapa PP", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 320, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.1491, "max": 0.173, "por": "unidad", "ejemplos": [["2026-01-07", 0.1491], ["2026-09-02", 0.173]] }, "iva_pct": 21, "veces_visto": 5 },
+    { "nombre_impreso": "COOK400N BASE NEGRA OVALADO 400 CC 140X190X32 PAQ", "nombre_normalizado": "Base negra ovalada 400 cc 140x190x32 (Cook400N)", "familia": "envase_alimentario", "presentacion": "envase PP negro para comida", "formato": { "envase": "envase", "contenido": 400, "unidad_contenido": "cc", "unidades_por_bulto": 480, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0702, "max": 0.0814, "por": "unidad", "ejemplos": [["2026-02-25", 0.0702], ["2026-09-02", 0.0814]] }, "iva_pct": 21, "veces_visto": 3 },
+    { "nombre_impreso": "COVCOOK600TP TAPA PP (PARA COOK400N Y COOK600N) 14", "nombre_normalizado": "Tapa PP para Cook400N/Cook600N", "familia": "envase_alimentario", "presentacion": "tapa PP", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 480, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0716, "max": 0.0831, "por": "unidad", "ejemplos": [["2026-02-25", 0.0716], ["2026-09-02", 0.0831]] }, "iva_pct": 21, "veces_visto": 3 },
+    { "nombre_impreso": "BOL CAÑA DE AZUCAR GSBOWL12OZ 350 CC GEM", "nombre_normalizado": "Bol caña de azúcar 12 oz 350 cc (GEM)", "familia": "envase_alimentario", "presentacion": "bol compostable caña de azúcar", "formato": { "envase": "bol", "contenido": 350, "unidad_contenido": "cc", "unidades_por_bulto": 500, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0712, "max": 0.0712, "por": "unidad", "ejemplos": [["2026-01-07", 0.0712]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "461450 ENVASE AL/ RED POLLO 205X57 6X100 ALI", "nombre_normalizado": "Envase aluminio rectangular pollo 205x57 (461450)", "familia": "envase_alimentario", "presentacion": "envase de aluminio", "formato": { "envase": "envase", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 600, "bulto": "caja (6x100)" }, "unidad_factura": "unidad", "precio": { "min": 0.0956, "max": 0.0956, "por": "unidad", "ejemplos": [["2026-01-07", 0.0956]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "461450 TAPA VELAS CARTON FOLDING C/600", "nombre_normalizado": "Tapa cartón folding para envase 461450", "familia": "envase_alimentario", "presentacion": "tapa de cartón", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 600, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0637, "max": 0.0637, "por": "unidad", "ejemplos": [["2026-01-07", 0.0637]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "240890 ENVASE AL, 220x158x36mm 8x100 ALI", "nombre_normalizado": "Envase aluminio 220x158x36 mm (240890)", "familia": "envase_alimentario", "presentacion": "envase de aluminio", "formato": { "envase": "envase", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 800, "bulto": "caja (8x100)" }, "unidad_factura": "unidad", "precio": { "min": 0.1296, "max": 0.1296, "por": "unidad", "ejemplos": [["2026-01-07", 0.1296]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "240890 TAPA CARTON FOLDING IMPR 213X150", "nombre_normalizado": "Tapa cartón folding impresa 213x150 para 240890", "familia": "envase_alimentario", "presentacion": "tapa de cartón", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 800, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0793, "max": 0.0793, "por": "unidad", "ejemplos": [["2026-01-07", 0.0793]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "450280B CUENCO AL, 114/58x50 9HX 111 ALI", "nombre_normalizado": "Cuenco aluminio 114/58x50 (450280B)", "familia": "envase_alimentario", "presentacion": "envase de aluminio", "formato": { "envase": "cuenco", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 800, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0947, "max": 0.0947, "por": "unidad", "ejemplos": [["2026-01-07", 0.0947]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "450280 TAPA TRANS, CUENCO 45B0280 ALI", "nombre_normalizado": "Tapa transparente para cuenco 450280", "familia": "envase_alimentario", "presentacion": "tapa transparente", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 800, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.0688, "max": 0.0688, "por": "unidad", "ejemplos": [["2026-01-07", 0.0688]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "241936 ENVASE AL,313x212x38mm 4HX75 ALI", "nombre_normalizado": "Envase aluminio 313x212x38 mm (241936)", "familia": "envase_alimentario", "presentacion": "envase de aluminio", "formato": { "envase": "envase", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 300, "bulto": "caja (4x75)" }, "unidad_factura": "unidad", "precio": { "min": 0.2935, "max": 0.2935, "por": "unidad", "ejemplos": [["2026-05-06", 0.2935]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "241936 TAPA CARTON FOLDING IMPR 307X205", "nombre_normalizado": "Tapa cartón folding impresa 307x205 para 241936", "familia": "envase_alimentario", "presentacion": "tapa de cartón", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 300, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 0.1405, "max": 0.1405, "por": "unidad", "ejemplos": [["2026-05-06", 0.1405]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "ENSALADERA CARTÓN KRAFT ERPAEN18 1300 CC ø 184 6X50", "nombre_normalizado": "Ensaladera cartón kraft 1300 cc ø184 (Erpaen18)", "familia": "envase_alimentario", "presentacion": "ensaladera de cartón kraft", "formato": { "envase": "ensaladera", "contenido": 1300, "unidad_contenido": "cc", "unidades_por_bulto": 300, "bulto": "caja (6x50)" }, "unidad_factura": "unidad", "precio": { "min": 0.1731, "max": 0.1731, "por": "unidad", "ejemplos": [["2026-02-25", 0.1731]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "TAPA PET TAERPA28 (PARA ENSAL ERPAEN22,Y 18) ø 184 6X5", "nombre_normalizado": "Tapa PET para ensalada ø184 (Taerpa28)", "familia": "envase_alimentario", "presentacion": "tapa PET", "formato": { "envase": "tapa", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 300, "bulto": "caja (6x50)" }, "unidad_factura": "unidad", "precio": { "min": 0.1256, "max": 0.1256, "por": "unidad", "ejemplos": [["2026-02-25", 0.1256]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "FILM 30X300 1,060 KG PVMA114 LILA INDUSTRIAL CANUTO 0,2", "nombre_normalizado": "Film industrial 30x300 m, 1,060 kg, lila (PVMA114)", "familia": "film_aluminio", "presentacion": "rollo de film industrial", "formato": { "envase": "rollo", "contenido": 1.06, "unidad_contenido": "kg", "unidades_por_bulto": 3, "bulto": "caja" }, "unidad_factura": "rollo", "precio": { "min": 5.4, "max": 5.4, "por": "rollo", "ejemplos": [["2026-01-07", 5.4]] }, "iva_pct": 21, "veces_visto": 2 },
+    { "nombre_impreso": "FILM 30X250EL 0,817KG CANUTO 0,140 KG PESO NETO 0,677", "nombre_normalizado": "Film 30x250 m, 0,817 kg (peso neto 0,677 kg)", "familia": "film_aluminio", "presentacion": "rollo de film", "formato": { "envase": "rollo", "contenido": 0.817, "unidad_contenido": "kg", "unidades_por_bulto": 3, "bulto": "caja" }, "unidad_factura": "rollo", "precio": { "min": 4.4, "max": 4.4, "por": "rollo", "ejemplos": [["2026-09-02", 4.4]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "BOBINA CELULOSA CHEMINE EXTRA 1 KG GOFRADO 2CAPAS", "nombre_normalizado": "Bobina celulosa Chemine extra 1 kg gofrado 2 capas", "familia": "papel", "presentacion": "bobina industrial", "formato": { "envase": "bobina", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 6, "bulto": "caja" }, "unidad_factura": "bobina", "precio": { "min": 2.62, "max": 2.62, "por": "bobina", "ejemplos": [["2026-01-07", 2.62]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "BAYETA MICROFIB. 35X40 XM UTLABA12 ROLLO AMARIL 280 (", "nombre_normalizado": "Bayeta microfibra 35x40 amarilla 280 g, rollo (Utlaba12)", "familia": "limpieza_utensilios", "presentacion": "bayeta suelta (rollo de 20)", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 20, "bulto": "rollo" }, "unidad_factura": "bayeta", "precio": { "min": 0.5854, "max": 0.5854, "por": "unidad", "ejemplos": [["2026-02-25", 0.5854]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "BAYETA MICROFIB. 35X40 XM UTLABA13 ROLLO VERDE 280 G", "nombre_normalizado": "Bayeta microfibra 35x40 verde 280 g, rollo (Utlaba13)", "familia": "limpieza_utensilios", "presentacion": "bayeta suelta (rollo de 10)", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 10, "bulto": "rollo" }, "unidad_factura": "bayeta", "precio": { "min": 0.5854, "max": 0.5854, "por": "unidad", "ejemplos": [["2026-02-25", 0.5854]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "BAYETA MICROFIB. 35X38 1/4 UTLABA7 AMARI 240 GR ( 30X5", "nombre_normalizado": "Bayeta microfibra 35x38 1/4 amarilla 240 g (Utlaba7)", "familia": "limpieza_utensilios", "presentacion": "bayeta suelta", "formato": { "envase": "unidad", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 20, "bulto": "paquete" }, "unidad_factura": "bayeta", "precio": { "min": 0.4141, "max": 0.4141, "por": "unidad", "ejemplos": [["2026-06-17", 0.4141]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "GUANTES NITRILO EXTREME LITE NEGRO T-S 5GR SIN POLV", "nombre_normalizado": "Guantes nitrilo Extreme Lite negro talla S 5 g sin polvo (caja 1000)", "familia": "higiene", "presentacion": "caja de guantes desechables", "formato": { "envase": "caja", "contenido": 1000, "unidad_contenido": "uds", "unidades_por_bulto": 1000, "bulto": "caja" }, "unidad_factura": "guante (1 caja = 1000 guantes)", "precio": { "min": 0.0436, "max": 0.0436, "por": "guante", "ejemplos": [["2026-06-17", 0.0436]] }, "iva_pct": 21, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Solo 6 escaneos de muestra; los nombres salen truncados por la columna y no se puede ver el nombre completo (p. ej. 'COOK1250N BASE NEGRA OVALADO ... PA…', 'TAPA PP ... F…').",
+    "Subida de precios entre enero/febrero y septiembre en envases PP: COOK1250N 0,1456 → 0,1689, tapa 0,1491 → 0,1730, COOK400N 0,0702 → 0,0814, tapa 0,0716 → 0,0831 (≈ +16 %). No consta motivo.",
+    "El orden de numeración no coincide con el de las fechas en septiembre: FV26/9763 (02/09/2026) y FV26/9795 (02/09/2026) son del mismo día.",
+    "Bayetas: Uds/Caja (20 o 10) se ha interpretado como bayetas del rollo; el nombre dice ROLLO pero la cantidad se factura por bayeta suelta.",
+    "El archivo catalogo_lineas.txt está vacío (proveedor sin PDF digitales); el catálogo sale solo de las 6 muestras."
+  ]
+}

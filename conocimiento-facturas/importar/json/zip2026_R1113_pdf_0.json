@@ -1,0 +1,126 @@
+{
+ "archivo": "R1113.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-5504",
+ "fecha": "2026-07-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LAGRIMA IBERICA (ALJOMAR)",
+   "producto_ficha": "Lágrima ibérica Aljomar",
+   "cantidad": 9.08,
+   "unidad": "kg",
+   "bultos": 1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.15,
+   "descuento_pct": null,
+   "total": 119.4,
+   "iva_pct": 10,
+   "albaran_ref": "B 10.990",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "AJOS TIERNOS 5X1",
+   "producto_ficha": "Ajos tiernos congelados (5 x 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.95,
+   "descuento_pct": null,
+   "total": 19.75,
+   "iva_pct": 4,
+   "albaran_ref": "B 10.990",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "POLLO MUSLO DESH. CON PIEL 4X2,5KG",
+   "producto_ficha": "Muslo de pollo deshuesado con piel (4 x 2,5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.9,
+   "descuento_pct": null,
+   "total": 49.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 10.990",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BURRATA IQF 10UD (2BAND. 125GR)",
+   "producto_ficha": "Burrata IQF 125 g (10 uds, 2 bandejas)",
+   "cantidad": 20.0,
+   "unidad": "kg",
+   "bultos": 20.0,
+   "contenido_cantidad": 125,
+   "contenido_unidad": "g",
+   "precio_unitario": 4.4,
+   "descuento_pct": null,
+   "total": 88.0,
+   "iva_pct": 4,
+   "albaran_ref": "B 10.990",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CANELON CARNE/TRUFA/FOIE AUDENS",
+   "producto_ficha": "Canelón de carne, trufa y foie Audens",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3.0,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 38.0,
+   "descuento_pct": null,
+   "total": 114.0,
+   "iva_pct": 10,
+   "albaran_ref": "B 10.990",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 390.15,
+ "desglose_iva": [
+  {
+   "base": 168.4,
+   "pct": 10,
+   "cuota": 16.84
+  },
+  {
+   "base": 107.75,
+   "pct": 4,
+   "cuota": 4.31
+  },
+  {
+   "base": 114.0,
+   "pct": 10,
+   "cuota": 11.4
+  }
+ ],
+ "iva": 32.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 422.7,
+ "observaciones": "Vencimiento 19/07/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": [
+  "Letra de IVA X en «CANELON CARNE/TRUFA/FOIE AUDENS»: el pie suma su base al 10 %; se usa 10 %, la ficha no lo confirma."
+ ]
+}

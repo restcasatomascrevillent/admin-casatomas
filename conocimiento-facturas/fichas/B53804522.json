@@ -1,0 +1,112 @@
+{
+  "cif": "B53804522",
+  "nombre": "BODEGA SELECCIÓN VINOS CALDERÓN, S.L.U.",
+  "nombres_impresos": ["BODEGA SELECCION", "BODEGA SELECCIÓN - VINOS CALDERÓN S.L.U.", "VINOS CALDERON S.L.U."],
+  "categoria": "vino",
+  "locales": ["casa_tomas"],
+  "muestras": ["R146.pdf", "R399.pdf", "R738.pdf", "R188.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán por factura, una o dos líneas)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["F26000032", "F26000127", "F26000269", "F26000063"], "patron": "^F26\\d{6}$", "donde": "primera de las tres casillas de arriba (Nº | Fecha | Código)" },
+    "fecha": "casilla Fecha junto al número, DD/MM/AAAA",
+    "albaranes": "línea 'Albarán: A26000074 27/01/2026' antes de las líneas; bajo cada vino una línea 'Lote: 126105' sin importe (no es producto)"
+  },
+
+  "lectura": {
+    "columnas": ["REFERENCIA", "DESCRIPCION", "UNIDADES", "PRECIO", "%DTO.", "IMPORTE"],
+    "cantidad_es": "botellas sueltas (60, 129, 11, 18, 9: no son múltiplos de caja)",
+    "columna_peso": null,
+    "precio_es_por": "botella",
+    "descuento_por_linea": { "existe": true, "columna": "%DTO.", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Pie: TOTAL IMPORTE | %DTO. | DTO.S/FRA. | BASE IMPONIBLE | %IVA | IMPORTE IVA | %RCG | IMPORTE | TOTAL FACTURA; dto. y RCG vacíos en todas las muestras"],
+    "trampas": [
+      "Referencia y descripción vienen pegadas ('M.MURRIETA RV MARQUES DE MURRIETA RVA 2021'): 'M.MURRIETA RV' es prefijo de código, no parte del nombre.",
+      "Precio con 3-4 decimales (18,181 / 18,1800 / 15,2500): importe = unidades × precio sin redondear. En R146 el importe es 1090,908 y 60 × 18,181 = 1090,86; admitir ±0,05.",
+      "El escaneo (R188) sale con la parte derecha cortada (columna IVA y totales a medias) y la hoja inclinada; el nombre también sale cortado ('MARQUES DE MURRIETA MAGNUM 20').",
+      "Línea sin precio ni importe (1,00 ud. de Magnum): bonificación gratuita, no es un error.",
+      "El Código 0001979 de la cabecera es el código de cliente, no el número de factura."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = unidades × precio × (1 − dto/100); línea sin precio = 0",
+    "TOTAL IMPORTE = suma de importes de línea = BASE IMPONIBLE (no hay dto. ni cargos en el pie)",
+    "IVA = base × 21 %; total = base + IVA (1090,91 + 229,09 = 1320,00; 1967,25 + 413,12 = 2380,37)",
+    "Magnum R188: 11 × 36,00 = 396,00; + 83,16 = 479,16"
+  ],
+
+  "guia_ocr": "Factura de vino de Bodega Selección (Calderón), una entrega por factura. Número 'F26' + 6 cifras y fecha en las casillas de arriba; el Código 0001979 es del cliente. UNIDADES son botellas (no cajas) y PRECIO es por botella, sin IVA, con hasta 4 decimales. Ignora las líneas 'Lote:'. Una línea sin precio ni importe es una botella de regalo. IVA 21 % al pie, sin recargo. En el escaneo la columna derecha puede estar cortada: calcula importe = unidades × precio y compruébalo con la base.",
+
+  "productos": [
+    {
+      "nombre_impreso": "M.MURRIETA RV MARQUES DE MURRIETA RVA 2021",
+      "nombre_normalizado": "Marqués de Murrieta Reserva 2021 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 14.25, "max": 18.18, "por": "botella", "ejemplos": [["2026-01-27", 18.181], ["2026-03-11", 18.18], ["R654", 14.25]] },
+      "iva_pct": 21,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "M.MURRIETA RV MARQUES DE MURRIETA RESERVA 2022",
+      "nombre_normalizado": "Marqués de Murrieta Reserva 2022 75 cl",
+      "familia": "vino tinto",
+      "presentacion": "botella 75 cl",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 15.25, "max": 15.25, "por": "botella", "ejemplos": [["2026-05-14", 15.25]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "MARQ. MARQUES DE MURRIETA MAGNUM 20..",
+      "nombre_normalizado": "Marqués de Murrieta Magnum (añada sin leer)",
+      "familia": "vino tinto",
+      "presentacion": "magnum 150 cl",
+      "formato": { "envase": "botella", "contenido": 150, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 36.0, "max": 36.0, "por": "botella", "ejemplos": [["2026-02-06", 36.0]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "PAZO DE BARRA GRAN VINO PAZO DE BARRANTES",
+      "nombre_normalizado": "Pazo de Barrantes Gran Vino (nombre incompleto)",
+      "familia": "vino",
+      "presentacion": null,
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 27.0, "max": 27.0, "por": "botella", "ejemplos": [["R1289", 27.0]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LA COMTESSE | PAZO DE BARRANTES LA COMTESSE",
+      "nombre_normalizado": "Pazo de Barrantes La Comtessa",
+      "familia": "vino",
+      "presentacion": null,
+      "formato": { "envase": "botella", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": null },
+      "unidad_factura": "botella",
+      "precio": { "min": 80.0, "max": 80.0, "por": "botella", "ejemplos": [["R1289", 80.0]] },
+      "iva_pct": 21,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Murrieta Reserva 2021: precio 14,25 en R654 y 18,18 en R146/R399; no se ve el motivo (promoción o bonificación).",
+    "Magnum de Murrieta (escaneo R188): nombre y añada cortados; 36 €/botella parece bajo para un magnum, contrastar con otra factura. La segunda línea de 1,00 ud. sin precio parece regalo.",
+    "Pazo de Barrantes Gran Vino y La Comtessa solo salen en el catálogo (sin muestra de texto): formato no confirmado. 80 €/ud. para La Comtessa es alto para 75 cl (¿magnum?); 9 unidades no son caja de 6, así que la cantidad son botellas.",
+    "Solo 5 artículos distintos en 7 PDF; 1 de los 2 escaneos no se ha visto."
+  ]
+}

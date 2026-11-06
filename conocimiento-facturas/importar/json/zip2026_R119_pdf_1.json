@@ -1,0 +1,46 @@
+{
+ "archivo": "R119.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 00298",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "PULPO T-2 BORDO MARRUECOS",
+   "producto_ficha": "Pulpo T-2 congelado a bordo (Marruecos)",
+   "cantidad": 62.4,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.9,
+   "descuento_pct": null,
+   "total": 1179.36,
+   "iva_pct": 10,
+   "albaran_ref": "F566692",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1179.36,
+ "desglose_iva": [
+  {
+   "base": 1179.36,
+   "pct": 10,
+   "cuota": 117.94
+  }
+ ],
+ "iva": 117.94,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1297.3,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F566692. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

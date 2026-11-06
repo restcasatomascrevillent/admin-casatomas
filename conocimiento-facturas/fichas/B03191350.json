@@ -1,0 +1,151 @@
+{
+  "cif": "B03191350",
+  "nombre": "HERMANOS NAREJOS S.L.",
+  "nombres_impresos": ["HERMANOS NAREJOS S.L.", "HERMANOS NAREJO, S.L."],
+  "categoria": "marisco",
+  "locales": ["casa_tomas"],
+  "muestras": ["R124.pdf", "R589.pdf", "R1120.pdf", "R1622.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega que agrupa uno o varios albaranes (casi siempre escaneo; 27 de 28 PDF son escaneos)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["58", "1668", "3492", "5151"], "patron": "^\\d{1,5}$", "donde": "casilla 'Nº Factura:' arriba a la izquierda, debajo del CIF del proveedor; número corto sin año ni serie" },
+    "fecha": "casilla 'Fecha:' bajo el número de factura, DD/MM/AAAA",
+    "albaranes": "cabecera 'Albarán: 14.261 de Fecha: 22/09/2026' encima de sus líneas; el número del albarán lleva punto de millar (9.560, 14.261) y no es número de factura"
+  },
+
+  "lectura": {
+    "columnas": ["Ref.", "Descripción", "Lote", "Cantidad", "Precio", "% Dto", "Total"],
+    "cantidad_es": "kg (decimales con coma: 23,30; 1,90; 4,95). Excepción posible: ver dudas",
+    "columna_peso": null,
+    "precio_es_por": "kg",
+    "descuento_por_linea": { "existe": true, "columna": "% Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "La columna Lote es un código largo de números y letras (0235372026..., 220926293745, 08012026PEÑBOYOTB) justo antes de Cantidad: no es cantidad ni precio",
+      "Debajo de cada descripción hay una segunda línea con el nombre científico (Plesionika Edwardsii LKW, Mytilus galloprovincialis MSM, Aristeus antennatus - ARA., Lophius piscatorius MON): no es un artículo aparte",
+      "La referencia (075, 088, 097) es un código de 3 cifras a la izquierda, no una cantidad",
+      "El mismo artículo se repite en varios albaranes de la misma factura, a veces con precio distinto (quisquilla 70 y 60 el mismo día)",
+      "El total de cada línea queda media fila por debajo en el escaneo y la columna % Dto va vacía",
+      "Escaneos torcidos o con rayas verticales negras que cruzan cifras (R1622): comprobar con el cuadre",
+      "Importes con punto de millar y coma decimal: 4.478,40",
+      "Total de factura y vencimiento coinciden: forma de pago CONTADO, un solo vencimiento"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = cantidad × precio (la columna % Dto va vacía en las muestras; si trae valor, × (1 − dto/100))",
+    "BRUTO = suma de los totales de línea de todos los albaranes = B. Imponible",
+    "IVA = B. Imponible × 10 % (importe impreso en la casilla Importe)",
+    "TOTAL = B. Imponible + IVA. Ejemplo R1622: 45,00+2.061,90+2.556,00+49,50+54,00+90,00+90,00 = 4.946,40; IVA 494,64; total 5.441,04",
+    "Ejemplo R589: 23,30×70 = 1.631,00; 12×60 = 720,00; base 2.351,00; IVA 235,10; total 2.586,10"
+  ],
+
+  "guia_ocr": "Factura escaneada de Hermanos Narejos a Maside 2011 (Casa Tomás). Número en 'Nº Factura' (1-5 cifras) y fecha DD/MM/AAAA arriba a la izquierda. Cada albarán abre con 'Albarán: N de Fecha:'. Columnas: Ref (3 cifras), Descripción, Lote, Cantidad (kg), Precio (€/kg), % Dto (vacío), Total. Ignora el Lote (código largo) y la segunda línea en latín bajo el nombre. Cantidad y precio en kg con coma decimal; miles con punto. IVA único 10 %, sin recargo. Verifica cantidad × precio = total de línea y que la suma da B. Imponible; si falla, relee las cifras tapadas por rayas del escáner.",
+
+  "productos": [
+    {
+      "nombre_impreso": "QUISQUILLA X/P/M",
+      "nombre_normalizado": "Quisquilla (Plesionika edwardsii) tamaño X/P/M, por kg",
+      "familia": "marisco",
+      "presentacion": "fresco (la factura no lo indica; sin 'cocido' ni 'congelado' en la descripción)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 60.0, "max": 75.0, "por": "kg", "ejemplos": [["2026-04-06", 70.0], ["2026-04-06", 60.0], ["2026-07-06", 75.0], ["2026-09-28", 72.0], ["2026-08-10", 72.0]] },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "MEJILLONES (Mytilus galloprovincialis MSM)",
+      "nombre_normalizado": "Mejillón gallego vivo, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo/fresco (a granel, por kg; no es conserva)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 4.0, "max": 4.5, "por": "kg", "ejemplos": [["2026-09-28", 4.5], ["2026-08-10", 4.0]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "GAMBA ROJA (Aristeus antennatus - ARA.)",
+      "nombre_normalizado": "Gamba roja, por kg",
+      "familia": "marisco",
+      "presentacion": "fresco (no indicado)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 140.0, "max": 140.0, "por": "kg", "ejemplos": [["2026-07-06", 140.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CARABINERO",
+      "nombre_normalizado": "Carabinero, por kg",
+      "familia": "marisco",
+      "presentacion": "no indicado (precio bajo; ver dudas)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 26.1, "max": 26.1, "por": "kg", "ejemplos": [["2026-09-28", 26.1]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CIGALA",
+      "nombre_normalizado": "Cigala, por kg",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 78.0, "max": 78.0, "por": "kg", "ejemplos": [["2026-08-10", 78.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LANGOSTINOS",
+      "nombre_normalizado": "Langostinos, por kg",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 55.0, "max": 55.0, "por": "kg", "ejemplos": [["2026-08-10", 55.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CAÑAILLA",
+      "nombre_normalizado": "Cañaílla (busano), por kg",
+      "familia": "marisco",
+      "presentacion": "no indicado (probablemente vivo; lote PEÑBOYOTB)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 33.0, "max": 33.0, "por": "kg", "ejemplos": [["2026-01-12", 33.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RAPE (Lophius piscatorius MON)",
+      "nombre_normalizado": "Rape, por kg",
+      "familia": "pescado",
+      "presentacion": "no indicado (precio bajo; ver dudas)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 10.0, "max": 10.0, "por": "kg", "ejemplos": [["2026-09-28", 10.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Solo hay 1 PDF digital (R1307) y 4 escaneos de muestra: el catálogo son los 8 artículos vistos; 23 escaneos más no se han estudiado.",
+    "Los precios mínimo/máximo salen solo de las muestras y de las líneas de R1307, no de todos los PDF.",
+    "La cantidad se da por kg por el cuadre (p. ej. 62,20 × 72,00 = 4.478,40) y por los decimales; mejillón con cantidades enteras (10, 12, 20) a 4-4,50 también cuadra como kg, pero no se ha visto ninguna unidad escrita en el papel.",
+    "Mejillón: en todas las muestras es mejillón gallego vivo a granel (Mytilus galloprovincialis); no aparece conserva ni docena.",
+    "Carabinero a 26,10 €/kg y rape a 10,00 €/kg son precios bajos: podrían ser congelado o piezas pequeñas; la factura no lo dice.",
+    "Descuento por línea: la columna existe pero está vacía en las 4 muestras."
+  ]
+}

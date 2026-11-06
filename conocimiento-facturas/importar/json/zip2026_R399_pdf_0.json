@@ -1,0 +1,46 @@
+{
+ "archivo": "R399.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA SELECCION - VINOS CALDERON S.L.U.",
+ "cif": "B53804522",
+ "local": "casa_tomas",
+ "numero_documento": "F26000127",
+ "fecha": "2026-03-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "M.MURRIETA RV MARQUES DE MURRIETA RVA 2021",
+   "producto_ficha": "Marqués de Murrieta Reserva 2021 75 cl",
+   "cantidad": 60,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 18.18,
+   "descuento_pct": null,
+   "total": 1090.8,
+   "iva_pct": 21,
+   "albaran_ref": "A26000208",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1090.8,
+ "desglose_iva": [
+  {
+   "base": 1090.8,
+   "pct": 21,
+   "cuota": 229.07
+  }
+ ],
+ "iva": 229.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1319.87,
+ "observaciones": "Giro 30 días, vencimiento 10/04/2026 (1.319,87). Contenido 75 cl tomado de la ficha (no impreso).",
+ "alertas": []
+}

@@ -1,0 +1,49 @@
+{
+ "archivo": "R1092.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ARTEFLOR (José Miguel Riquelme Belén)",
+ "cif": "74187755J",
+ "local": "casa_tomas",
+ "numero_documento": "21/26",
+ "fecha": "2026-07-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Ramos de flores + servicio tanatorio Elche",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 176.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 176.0,
+ "desglose_iva": [
+  {
+   "base": 176.0,
+   "pct": 10,
+   "cuota": 17.6
+  }
+ ],
+ "iva": 17.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 193.6,
+ "observaciones": "IBAN ES** **** **** **** **** 8022",
+ "alertas": [
+  "Precio unitario no impreso (solo importe 176); cantidad 2 manuscrita",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

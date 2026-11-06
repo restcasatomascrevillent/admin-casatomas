@@ -1,0 +1,63 @@
+{
+ "archivo": "R1541.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26008369",
+ "fecha": "2026-09-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 12.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 154.8,
+   "iva_pct": 10,
+   "albaran_ref": "26110253",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE ATUN ROJO",
+   "producto_ficha": "Hueva de atún rojo",
+   "cantidad": 2.92,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 120.0,
+   "descuento_pct": null,
+   "total": 350.4,
+   "iva_pct": 10,
+   "albaran_ref": "26110253",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 505.2,
+ "desglose_iva": [
+  {
+   "base": 505.2,
+   "pct": 10,
+   "cuota": 50.52
+  }
+ ],
+ "iva": 50.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 555.72,
+ "observaciones": "Transferencia Banco Santander, vencimiento 17/10/2026. Albarán 26110253 de 14/09/2026. Línea de consumo preferente (13-03-2027) ignorada.",
+ "alertas": []
+}

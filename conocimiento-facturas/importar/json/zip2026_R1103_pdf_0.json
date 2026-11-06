@@ -1,0 +1,138 @@
+{
+ "archivo": "R1103.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 3831",
+ "fecha": "2026-07-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COLA GAMBON 1 6X2 T",
+   "producto_ficha": "Cola de gambón 1 (6 bolsas x 2 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 144.0,
+   "iva_pct": 10,
+   "albaran_ref": "20266678",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ESPADA 50/70",
+   "producto_ficha": "Pez espada 50/70 (FAO 87 Pacífico)",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 57.0,
+   "iva_pct": 10,
+   "albaran_ref": "20266678",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FTE. LUBINA X5 120/160",
+   "producto_ficha": "Lubina 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.75,
+   "descuento_pct": null,
+   "total": 68.75,
+   "iva_pct": 10,
+   "albaran_ref": "20266678",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "SALTEADO SETAS X1 VIRTO",
+   "producto_ficha": "Salteado de setas Virto (bolsa 1 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.1,
+   "descuento_pct": null,
+   "total": 15.5,
+   "iva_pct": 4,
+   "albaran_ref": "20266678",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "CHOCO LIMPIO 0% 600-800 LUNA DE MAR",
+   "producto_ficha": "Choco limpio 600-800 Luna de Mar",
+   "cantidad": 6.32,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.4,
+   "descuento_pct": null,
+   "total": 65.73,
+   "iva_pct": 10,
+   "albaran_ref": "20266678",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "GAMBA BLANCA 4 105/110 PZAS.",
+   "producto_ficha": "Gamba blanca 4 Italia 105/110 piezas",
+   "cantidad": 8.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.0,
+   "descuento_pct": null,
+   "total": 16.0,
+   "iva_pct": 10,
+   "albaran_ref": "20266678",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 366.98,
+ "desglose_iva": [
+  {
+   "base": 351.48,
+   "pct": 10,
+   "cuota": 35.15
+  },
+  {
+   "base": 15.5,
+   "pct": 4,
+   "cuota": 0.62
+  }
+ ],
+ "iva": 35.77,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 402.75,
+ "observaciones": "Transferencia a 30 dias, vencimiento 05/08/2026. Albaran 20266678 de 01/07/2026, pedido 20497. Notas de reparto impresas (Baul, Centro en rodajas) no son productos. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": [
+  "GAMBA BLANCA 4 105/110: 8,00 kg a 2,00 €/kg cuadra con el importe, pero el precio es muy bajo para gamba; la ficha lo deja en duda (puede ser precio por pieza). Se deja lo impreso."
+ ]
+}

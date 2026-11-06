@@ -1,0 +1,48 @@
+{
+ "archivo": "R1285.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "NO CONSTA EN EL TEXTO DEL PDF (CIF B03292638)",
+ "cif": "B03292638",
+ "local": "casa_tomas",
+ "numero_documento": "CO/501",
+ "fecha": "2026-07-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VIGILANCIA Y CONTROL INSECTOS RASTREROS Y ROEDORES",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 550.0,
+   "descuento_pct": null,
+   "total": 550.0,
+   "iva_pct": 21,
+   "albaran_ref": "500",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 550.0,
+ "desglose_iva": [
+  {
+   "base": 550.0,
+   "pct": 21,
+   "cuota": 115.5
+  }
+ ],
+ "iva": 115.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 665.5,
+ "observaciones": "Forma de pago: transferencia a 30 días. Vencimiento 20/07/2026 (665,50 €). Tratamiento realizado en C/ Santa Maria de la Cabeza, 2. Albarán 500 de 09/07/2026. Cliente impreso: CASA TOMAS RESTAURANTE (MASIDE 2011, S.L.). No se admiten devoluciones pasados 14 días.",
+ "alertas": [
+  "El nombre del emisor no aparece en el texto del PDF (solo el CIF B-03292638, en un bloque mezclado). Revisar el original para identificar al proveedor."
+ ]
+}

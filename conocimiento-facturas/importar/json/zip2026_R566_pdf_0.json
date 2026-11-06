@@ -1,0 +1,49 @@
+{
+ "archivo": "R566.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "REGYSISTEM SL",
+ "cif": "B03789807",
+ "local": "casa_tomas",
+ "numero_documento": "000293",
+ "fecha": "2026-04-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CONTRATO MANTENIMIENTO ANUAL BASIC CASH INFINITY MAYO-2026/2027 (cód. 00004)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 415.0,
+   "descuento_pct": null,
+   "total": 415.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-000170",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 415.0,
+ "desglose_iva": [
+  {
+   "base": 415.0,
+   "pct": 21,
+   "cuota": 87.15
+  }
+ ],
+ "iva": 87.15,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 502.15,
+ "observaciones": "Cabecera «CASA TOMAS / TOUZA» sin local concreto en la línea. Forma de pago: recibo domiciliado, vencimiento 30/04/2026 por 502,15 € (Caja Rural Central). Agente: 5, Dpto. Administración.",
+ "alertas": [
+  "El destinatario imprime «CASA TOMAS / TOUZA» sin indicar local; se deja no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

@@ -1,0 +1,367 @@
+{
+  "cif": "B54157011",
+  "nombre": "Once de Enero Artesanos del Mar",
+  "nombres_impresos": ["ONCE DE ENERO ARTESANOS DEL MAR", "ONCE DE ENERO"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R87.pdf", "R580.pdf", "R1105.pdf", "R1628.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (un albarán por factura), pescado y marisco por kilo",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["M / 246", "M / 2097", "M / 4001", "M / 5944"],
+      "patron": "^M / \\d{3,5}$",
+      "donde": "Fila 'FACTURA | M / 246 | MASIDE 2011, S.L.' arriba. Serie M, barra, número."
+    },
+    "fecha": "Fila 'FECHA | 23/01/2026 | 03330 CREVILLENTE', DD/MM/AAAA. Es la fecha de factura; la del albarán va en 'Albarán: 2026484 | Fecha: 20/01/2026'.",
+    "albaranes": "Línea 'Albarán: 20263719 | Fecha: 22/04/2026 | Su Pedido:' y debajo, en otra línea, el nº de pedido del cliente (ej. 18334). Una factura suele llevar un solo albarán."
+  },
+
+  "lectura": {
+    "columnas": ["CÓDIGO", "DESCRIPCIÓN", "LOTE", "CAJAS", "CANTIDAD", "PRECIO", "DTOS.", "IMPORTE"],
+    "cantidad_es": "kg. CAJAS es solo el nº de cajas/bultos y a menudo está VACÍO (la línea trae entonces solo kg, precio e importe)",
+    "columna_peso": "CANTIDAD",
+    "precio_es_por": "kg (€/kg)",
+    "descuento_por_linea": { "existe": false, "columna": "DTOS.", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10, 4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "no aparecen líneas de envase",
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "CAJAS vacía en muchas líneas: con 3 cifras son kg | precio | importe; con 4 son cajas | kg | precio | importe.",
+      "Línea de 'Total | 2 | 12,34' (o 'Total | 2,00') = total de cajas y de kg, NO un importe en euros.",
+      "Debajo de las líneas hay 'Notas: Baul / Kilos / Caja / Centro en rodajas': son notas de reparto, no productos.",
+      "La fila de 'Vencimientos 22/02/2026 | 92,82 | TRANSFERENCIA' repite el total de la factura.",
+      "El IVA es mixto en algunas facturas: bloque 10 % y bloque 4 % (setas) en dos filas de base y cuota.",
+      "El cliente (MASIDE 2011, CIF B54583356) sale arriba; el CIF del emisor B54157011 solo está en el pie del registro mercantil.",
+      "Descripciones y códigos no coinciden (el código corto es distinto del nombre largo); el lote lleva a veces * o -2 al final.",
+      "Una cantidad corta junto a la descripción (ej. 'COCOCHAS FRESCO COCOCHAS MERLUZA FRESCO') mezcla código y descripción en la misma celda."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = kg x precio por kg",
+    "IMPORTE BRUTO = suma de importes de las líneas",
+    "cuota = base x tipo; las líneas al 4 % (setas) y al 10 % van en bases separadas",
+    "total = bruto + cuotas. R1628: 82,50 + 35,31 = 117,81; IVA 10 % = 11,78; total 129,59",
+    "R87: base 69,73 (10 %) cuota 6,97 + base 15,50 (4 %) cuota 0,62 = 92,82",
+    "'Total' al pie de las líneas = nº de cajas y kg totales (R1628: 1 caja, 11,14 kg = 5,00 + 6,14)"
+  ],
+
+  "guia_ocr": "Emisor Once de Enero Artesanos del Mar; cliente Maside 2011. Número 'M / N' y fecha arriba. Cada línea: código | descripción | lote | [cajas] | kg | precio €/kg | importe. Cajas puede faltar: entonces solo hay kg, precio e importe. kg x precio = importe. Ignora 'Notas:' y la fila 'Total | cajas | kg', que no son euros. IVA general 10 %; el salteado de setas va al 4 % en una fila de base aparte. No hay descuentos ni recargo. El total final es el que sale tras 'TOTAL FACTURA' con símbolo €.",
+
+  "productos": [
+    {
+      "nombre_impreso": "QUISQUILLA PELADA LUNA DE MAR",
+      "nombre_normalizado": "Quisquilla pelada Luna de Mar",
+      "familia": "marisco",
+      "presentacion": "pelada, no indicado si fresca o congelada",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 16.0, "max": 16.5, "por": "kg", "ejemplos": [["2026-09-30", 16.5]] },
+      "iva_pct": 10,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "GAMBA BLANCA PELADA P LUNA DE MAR",
+      "nombre_normalizado": "Gamba blanca pelada Luna de Mar",
+      "familia": "marisco",
+      "presentacion": "pelada, no indicado si fresca o congelada",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 16.5, "max": 16.5, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "SALTEADO SETAS X1 VIRTO",
+      "nombre_normalizado": "Salteado de setas Virto (bolsa 1 kg)",
+      "familia": "verdura / precocinado",
+      "presentacion": "salteado precocinado, bolsas de 1 kg",
+      "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 3.1, "max": 3.1, "por": "kg", "ejemplos": [["2026-01-20", 3.1]] },
+      "iva_pct": 4,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "FTE. LUBINA X5 120/160",
+      "nombre_normalizado": "Lubina 120/160 g (caja 5 kg)",
+      "familia": "pescado",
+      "presentacion": "pescado de acuicultura en caja de 5 kg; no indicado si fresco",
+      "formato": { "envase": "caja", "contenido": 5, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 13.75, "max": 14.5, "por": "kg", "ejemplos": [["2026-04-22", 13.75]] },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "FTE. DORADA 120/160 X5",
+      "nombre_normalizado": "Dorada 120/160 g (caja 5 kg)",
+      "familia": "pescado",
+      "presentacion": "pescado de acuicultura en caja de 5 kg; no indicado si fresco",
+      "formato": { "envase": "caja", "contenido": 5, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 12.5, "max": 12.5, "por": "kg", "ejemplos": [["2026-04-22", 12.5]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "COLA GAMBON 1 6X2 T",
+      "nombre_normalizado": "Cola de gambón 1 (6 bolsas x 2 kg)",
+      "familia": "marisco",
+      "presentacion": "cola de gambón, caja 6x2 kg; no indicado si congelada",
+      "formato": { "envase": "caja", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 12.0, "max": 12.9, "por": "kg", "ejemplos": [["2026-04", 12.0]] },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "COLA GAMBON 1 BORDO",
+      "nombre_normalizado": "Cola de gambón 1 a bordo",
+      "familia": "marisco",
+      "presentacion": "cola de gambón, tratada a bordo",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 13.9, "max": 13.9, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COCOCHAS MERLUZA FRESCO",
+      "nombre_normalizado": "Cocochas de merluza fresco",
+      "familia": "pescado",
+      "presentacion": "fresco (lo dice la factura)",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "bandeja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 68.0, "max": 68.0, "por": "kg", "ejemplos": [["2026-07-09", 68.0]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "CABEZA ALISTADO",
+      "nombre_normalizado": "Cabeza de alistado (listado)",
+      "familia": "pescado",
+      "presentacion": "cabeza, no indicado si congelada",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 14.0, "max": 14.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "COLA ALISTADO 1 ANGOLA ( PEIX )",
+      "nombre_normalizado": "Cola de alistado 1 Angola",
+      "familia": "pescado",
+      "presentacion": "cola de alistado, no indicado si congelada",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 28.5, "max": 28.5, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "COLA ALISTADO 14X1 PESCANOVA",
+      "nombre_normalizado": "Cola de alistado Pescanova (14 x 1 kg)",
+      "familia": "pescado",
+      "presentacion": "cola de alistado, caja 14x1 kg; no indicado si congelada",
+      "formato": { "envase": "caja", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 14, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 27.9, "max": 29.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "ESPADA 30/50",
+      "nombre_normalizado": "Pez espada 30/50 (FAO 87 Pacífico)",
+      "familia": "pescado",
+      "presentacion": "pez espada en piezas, calibre 30-50; no indicado si fresco o congelado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 9.0, "max": 9.0, "por": "kg", "ejemplos": [["2026-04-22", 9.0]] },
+      "iva_pct": 10,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "ESPADA 50/70 FAO 87 PACIFICO",
+      "nombre_normalizado": "Pez espada 50/70 (FAO 87 Pacífico)",
+      "familia": "pescado",
+      "presentacion": "pez espada en piezas, calibre 50-70; no indicado si fresco o congelado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 9.5, "max": 9.5, "por": "kg", "ejemplos": [["2026-01-20", 9.5]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "SOLOMILLO CERDO EXTRA",
+      "nombre_normalizado": "Solomillo de cerdo extra",
+      "familia": "carne",
+      "presentacion": "carne de cerdo (no es pescado), por kg",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 5.75, "max": 5.75, "por": "kg", "ejemplos": [["2026-09-30", 5.75]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "QUISQUILLA EXTRA LORETO",
+      "nombre_normalizado": "Quisquilla extra Loreto",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 78.0, "max": 78.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "QUISQUILLA 1 LORETO",
+      "nombre_normalizado": "Quisquilla nº 1 Loreto",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 59.0, "max": 59.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "QUISQUILLA EXTRA ONCE DE ENERO",
+      "nombre_normalizado": "Quisquilla extra Once de Enero",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 78.0, "max": 79.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "QUISQUILLA 1 ONCE DE ENERO",
+      "nombre_normalizado": "Quisquilla nº 1 Once de Enero",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 62.0, "max": 69.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CHOCO LIMPIO 0% 600-800 LUNA DE MAR",
+      "nombre_normalizado": "Choco limpio 600-800 Luna de Mar",
+      "familia": "marisco",
+      "presentacion": "limpio, no indicado si congelado",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 10.4, "max": 10.4, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CALAMAR 4 LANZAL 10/12 C/G",
+      "nombre_normalizado": "Calamar 4 Lanzal 10/12 con globo",
+      "familia": "marisco",
+      "presentacion": "calamar entero (c/g), calibre 10/12",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 5.9, "max": 5.9, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CALAMAR LIMPIO 4 LANZAL 8x1",
+      "nombre_normalizado": "Calamar limpio 4 Lanzal (8 x 1 kg)",
+      "familia": "marisco",
+      "presentacion": "limpio, caja 8x1 kg; no indicado si congelado",
+      "formato": { "envase": "caja", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 8, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 10.25, "max": 10.75, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "RAPE 1 MURIEL",
+      "nombre_normalizado": "Rape 1 Muriel",
+      "familia": "pescado",
+      "presentacion": "no indicado",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 12.0, "max": 12.0, "por": "kg", "ejemplos": [["2026-04-22", 12.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RAPE 4 GRAN SOL 1000/15000",
+      "nombre_normalizado": "Rape 4 Gran Sol 1000/1500 g",
+      "familia": "pescado",
+      "presentacion": "rape entero, calibre 1000-1500 g",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 18.35, "max": 18.35, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RAPE MMPP S/P 1000/1500 ALF",
+      "nombre_normalizado": "Rape MMPP sin piel 1000/1500 g",
+      "familia": "pescado",
+      "presentacion": "rape sin piel, calibre 1000-1500 g; no indicado si congelado",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 19.0, "max": 19.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "PULPO 2 MARRUECOS A BORDO",
+      "nombre_normalizado": "Pulpo 2 Marruecos a bordo",
+      "familia": "marisco",
+      "presentacion": "pulpo tratado a bordo, no indicado si congelado",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 17.5, "max": 17.5, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RASCACIO MIX BORDO MAURITANIA",
+      "nombre_normalizado": "Rascacio mixto a bordo (Mauritania)",
+      "familia": "pescado",
+      "presentacion": "pescado de roca mixto, a bordo",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 4.5, "max": 4.5, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GAMBA BLANCA 4 105/110 PZAS.",
+      "nombre_normalizado": "Gamba blanca 4 Italia 105/110 piezas",
+      "familia": "marisco",
+      "presentacion": "calibre 105-110 piezas",
+      "formato": { "envase": "caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 2.0, "max": 2.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Las facturas solo dicen 'FRESCO' en las cocochas de merluza. En el resto no se indica fresco/congelado/salazón; hay pistas (Luna de Mar pelada, 14X1 Pescanova, 6X2, 8x1, 'a bordo' suelen ser congelados) pero no están confirmadas, por eso van como 'no indicado'. No aparece ninguna salazón.",
+    "Catálogo completo: 27 artículos distintos, todos incluidos. Se han unificado los códigos cortos distintos de un mismo nombre largo (ej. QPELA y QPL, CLGAM1 y CLG1) y 'ESPADA 30/50' con 'ESPADA 30/50 FAO 87 PACIFICO' (mismo código EM3-5).",
+    "'FTE.' (Fte. Lubina, Fte. Dorada) no se explica en las facturas.",
+    "Cola de alistado 14X1: en R1104 aparece '3 | 3,00 | 27,90 | 83,70' (3 cajas, 3,00 y 27,90 por 83,70). Cuadra 3 x 27,90, así que la cantidad podría ser cajas/bolsas y el precio por unidad de 1 kg, no por caja de 14 kg. Sin confirmar.",
+    "Gamba blanca 4 Italia 105/110: 8,00 x 2,00 = 16,00; el precio de 2,00 por kg parece muy bajo y puede ser un precio por pieza o un error de factura. Sin confirmar.",
+    "Setas salteadas: 5,00 x 3,10 = 15,50 al 4 % de IVA. Se asume bolsa de 1 kg a 3,10 €/kg, pero también podrían ser 5 bolsas a 3,10 € cada una.",
+    "Solomillo de cerdo no es pescado pero sale en el catálogo del proveedor (categoría carne).",
+    "El nº de lote de las cocochas de R1105 ('2511220131746-2') difiere en formato de las demás; no se usa como dato fiable."
+  ]
+}

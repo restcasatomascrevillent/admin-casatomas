@@ -1,0 +1,252 @@
+{
+  "cif": "B73915944",
+  "nombre": "CIELO DE BOCA, S.L.",
+  "nombres_impresos": ["CIELO DE BOCA, S.L.", "CIELO DE BOCA"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R157.pdf", "R622.pdf", "R1011.pdf", "R1599.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual ('RESUMEN MENSUAL + GIRO 5 DIA') que agrupa los albaranes del mes; carne, cocinados y congelados",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "2 (las líneas en la 1; los totales solos en la última)",
+    "numero_factura": {
+      "ejemplos": ["A26/1311", "A26/6237", "A26/9572", "A26/14519"],
+      "patron": "^A26/\\d{3,6}$",
+      "donde": "Casilla 'N.Factura' arriba a la izquierda. Se imprime con coma de millares ('A26/ 1,311', 'A26/ 14,519'): quita la coma y el espacio."
+    },
+    "fecha": "Casilla 'Fecha' junto al número, DD/MM/AA (31/01/26). Fecha de factura, no la del albarán.",
+    "albaranes": "Fila 'Albarán: A26/730 14/01/2026' (nº y fecha) antes de sus líneas. Bajo cada línea hay filas 'Lote: ... | F.Cad: ...' sin importe."
+  },
+
+  "lectura": {
+    "columnas": ["Ref.", "Descripción", "Cantidad (piezas/unidades)", "Peso en kg", "Precio", "Dto %", "Dto €", "Importe", "Tipo IVA"],
+    "cantidad_es": "piezas o envases; el peso real en kg va en la celda siguiente. En lo que se vende por peso, el importe se multiplica por los kg, no por la cantidad",
+    "columna_peso": "segunda cifra tras la descripción (9.61, 23.80...); en productos por unidad es solo informativa o repite la cantidad",
+    "precio_es_por": "kg en carnes frescas/curadas (pluma, lomo, chuletero, secreto, carrillera, pulpo); por unidad/envase en el resto (pionono, alcachofa, croquetas, donut, tarta, banda de manzana)",
+    "descuento_por_linea": { "existe": true, "columna": "Dto %", "valores_habituales": [10, 15] },
+    "iva_por_linea": true,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "sin líneas de envase",
+    "cargos_y_descuentos_pie": ["Columnas Dto. e Imp. Dto. del pie en blanco (el descuento va en la línea)"],
+    "trampas": [
+      "Números con punto decimal y coma de millares al estilo inglés (1,617.35; 9.61). No son formato español.",
+      "N.Factura con coma ('A26/ 14,519' = A26/14519). El código de cliente '2,236' es 2236.",
+      "La calle del cliente sale con un número intercalado ('CALLE SANTA MARIA 107 DE LA CABEZA, 2'): es ruido de otra celda, la dirección real es C/ Santa María de la Cabeza, 2.",
+      "La descripción se parte en dos filas ('...5 UDS.C/5 KG' / 'APROX', '...DE 1 KG APR'): la 2ª fila no es producto. Las filas 'Lote:' tampoco.",
+      "Dto % y Dto € van pegados al precio ('21.95 0.00 | 0.00 | 210.94 10'): el último número es el tipo de IVA (10).",
+      "En unas líneas el peso es 0.00 (croqueta pepperoni, banda de manzana): importe = cantidad × precio.",
+      "En pionono y flor de alcachofa el peso (7.60, 3.60) NO multiplica: 3 × 40,50 = 121,50.",
+      "Cantidad 10 y kg 9.40 en el secreto = 10 piezas de unos 0,9 kg; no son 10 kg."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "Por peso: importe = kg × precio × (1 − dto%). R157: 9,61 × 21,95 = 210,94; lomo R1599: 27,20 × 18,45 = 501,84",
+    "Por unidad: importe = cantidad × precio × (1 − dto%). Ej. banda de manzana 3 × 13,13 × 0,90 = 35,45; pionono 3 × 40,50 = 121,50",
+    "Para saber cuál: prueba cantidad × precio y kg × precio; el que coincide con el importe (±0,02) es el bueno",
+    "Total Bruto = Base Imponible = suma de importes (R157: 210,94 + 172,32 = 383,26; R1599: 1.617,35)",
+    "IVA = base × 10 % (R157: 38,33); total = base + IVA = 421,59; R1599: 1.617,35 + 161,74 = 1.779,09"
+  ],
+
+  "guia_ocr": "Emisor Cielo de Boca (Murcia); cliente Maside 2011/Casa Tomás. N.Factura 'A26/ 14,519' = A26/14519 (quita coma). Fecha DD/MM/AA. Números en formato inglés (punto decimal). Cada línea: ref, descripción, cantidad, kg, precio, dto%, dto€, importe, IVA 10. Carnes por kg: importe = kg × precio; resto por unidad: cantidad × precio. Ignora 'Lote:/F.Cad' y la 2ª fila de la descripción ('APROX'). Totales solo en la última página: base, 10 %, total.",
+
+  "productos": [
+    {
+      "nombre_impreso": "GG-PLUMA IBERICA",
+      "nombre_normalizado": "Pluma de cerdo ibérico (pieza, precio por kg)",
+      "familia": "carne",
+      "presentacion": "cerdo ibérico, pieza sin hueso, peso variable; caducidad a 12+ meses, probablemente congelada",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 21.95, "max": 21.95, "por": "kg", "ejemplos": [["2026-01-14", 21.95], ["2026-04-01", 21.95]], "nota": "Cantidad 2 piezas; 8,51 a 11,74 kg por línea; importe 186,80 a 257,04" },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "CP-LOMO C/H DE AÑOJO TERNERA",
+      "nombre_normalizado": "Lomo de añojo/ternera con hueso (pieza, precio por kg)",
+      "familia": "carne",
+      "presentacion": "ternera fresca, con hueso (C/H), pieza entera, peso variable (21 a 27 kg); caducidad ~4 semanas",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 16.95, "max": 18.45, "por": "kg", "ejemplos": [["2026-06-25", 16.95], ["2026-09-02", 18.45]], "nota": "Importe por línea 359,34 a 501,84" },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "CB-CHULETERO VACA 8 COST. +15 KG \"EXTRA\"",
+      "nombre_normalizado": "Chuletero de vaca 8 costillas, extra (pieza, precio por kg)",
+      "familia": "carne",
+      "presentacion": "vacuno fresco con hueso (costillas), pieza entera de unos 13 kg",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 26.25, "max": 26.25, "por": "kg", "ejemplos": [["2026-04-01", 26.25]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CB-SECRETO CERDO IBERICO AL ROMERO 5 UDS.C/5 KG APROX",
+      "nombre_normalizado": "Secreto de cerdo ibérico al romero (5 uds por bolsa de ~5 kg, precio por kg)",
+      "familia": "carne",
+      "presentacion": "cerdo ibérico marinado al romero, envasado; piezas de ~1 kg",
+      "formato": { "envase": "pieza envasada", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 5, "bulto": "caja ~5 kg" },
+      "unidad_factura": "kg",
+      "precio": { "min": 17.95, "max": 17.95, "por": "kg", "ejemplos": [["2026-01-14", 17.95], ["2026-06-03", 17.95]], "nota": "Cantidad 10 piezas; 8,94 a 9,60 kg por línea" },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "CB-CARRILLERA DE CERDO CONFITADA EN SU JUGO 5 UDS.C/5 KG APROX",
+      "nombre_normalizado": "Carrillera de cerdo confitada en su jugo (5 uds por ~5 kg, precio por kg)",
+      "familia": "carne cocinada",
+      "presentacion": "cocinada (confitada) y envasada, sin hueso",
+      "formato": { "envase": "pieza envasada", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 5, "bulto": "caja ~5 kg" },
+      "unidad_factura": "kg",
+      "precio": { "min": 14.95, "max": 15.95, "por": "kg", "ejemplos": [["2026-06-25", 15.95], ["2026-09-17", 15.95]], "nota": "Cantidad 5 o 10; 5,72 a 11,73 kg por línea" },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "EX-PLUMA DE CERDO IBERICO \"PRIMERA\" A B.T. C/4 UDES DE 1 KG APR",
+      "nombre_normalizado": "Pluma de cerdo ibérico 'primera' (4 uds de ~1 kg, precio por kg)",
+      "familia": "carne",
+      "presentacion": "cerdo ibérico, calidad primera, envasado en bolsas de 4 piezas de ~1 kg (B.T. sin aclarar)",
+      "formato": { "envase": "pieza envasada", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 4, "bulto": "caja ~4 kg" },
+      "unidad_factura": "kg",
+      "precio": { "min": 19.95, "max": 19.95, "por": "kg", "ejemplos": [["2026-09-23", 19.95]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AL-PULPO DE NASA",
+      "nombre_normalizado": "Pulpo de nasa (precio por kg)",
+      "familia": "pescado/marisco",
+      "presentacion": "pulpo entero; fresco/congelado no indicado",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 27.8, "max": 27.8, "por": "kg", "ejemplos": [], "nota": "Con 15 % de descuento: 6 piezas, 3,97 kg, importe 93,81" },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BG-ESCALOPAS DE FOIE GRAS DE CANRD 40/60 GR",
+      "nombre_normalizado": "Escalopas de foie gras de pato 40/60 g",
+      "familia": "foie",
+      "presentacion": "escalopas de foie de pato de 40 a 60 g; congelado o refrigerado no indicado (caducidad 18 meses, probablemente congelado)",
+      "formato": { "envase": "bolsa/bandeja", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 39.95, "max": 39.95, "por": "kg (ver dudas)", "ejemplos": [["2026-09-09", 39.95]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "CR-PIONONO C/3 BANDEJAS DE 30 UDS.",
+      "nombre_normalizado": "Pionono (caja de 3 bandejas de 30 uds)",
+      "familia": "pastelería",
+      "presentacion": "pionono pequeño en bandejas; caja de 3 bandejas de 30 unidades (≈2,5 kg)",
+      "formato": { "envase": "caja", "contenido": 90, "unidad_contenido": "uds", "unidades_por_bulto": 3, "bulto": "caja de 3 bandejas" },
+      "unidad_factura": "caja",
+      "precio": { "min": 40.5, "max": 40.5, "por": "caja", "ejemplos": [["2026-04-22", 40.5]], "nota": "A veces con 10 % de descuento (109,35 por 3 cajas)" },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "CR-FLOR DE ALCACHOFA XL EN AOVE Y AC. GIRASOL",
+      "nombre_normalizado": "Flor de alcachofa XL en AOVE y aceite de girasol (envase 1,8 kg)",
+      "familia": "conserva",
+      "presentacion": "conserva de flor de alcachofa en aceite, envase de ~1,8 kg",
+      "formato": { "envase": "envase", "contenido": 1.8, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "envase",
+      "precio": { "min": 26.0, "max": 26.9, "por": "envase", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CR-ALCACHOFA CORAZON CONFITADA EN AOVE 1800 GR",
+      "nombre_normalizado": "Corazón de alcachofa confitado en AOVE 1,8 kg",
+      "familia": "conserva",
+      "presentacion": "conserva en aceite, envase de 1,8 kg",
+      "formato": { "envase": "envase", "contenido": 1.8, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "envase",
+      "precio": { "min": 31.95, "max": 31.95, "por": "envase", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BG-MINI DONUT DE POLLO Y QUESO 20 UN 800 GR",
+      "nombre_normalizado": "Mini donut de pollo y queso (20 uds, 800 g)",
+      "familia": "precocinado",
+      "presentacion": "congelado, bolsa de 20 uds / 800 g",
+      "formato": { "envase": "bolsa", "contenido": 800, "unidad_contenido": "g", "unidades_por_bulto": 20, "bulto": "bolsa" },
+      "unidad_factura": "bolsa",
+      "precio": { "min": 6.2, "max": 6.2, "por": "bolsa", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CB-CROQUETA CREMOSA 45 GR.CONG.DE PEPPERONI",
+      "nombre_normalizado": "Croqueta cremosa de pepperoni 45 g (congelada)",
+      "familia": "precocinado",
+      "presentacion": "congelada, croquetas de 45 g",
+      "formato": { "envase": "bolsa", "contenido": 45, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "bolsa",
+      "precio": { "min": 13.95, "max": 13.95, "por": "bolsa (ver dudas)", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CB-CROQUETA CREMOSA 45 GR.CONG.DE BERENJENA,",
+      "nombre_normalizado": "Croqueta cremosa de berenjena 45 g (congelada)",
+      "familia": "precocinado",
+      "presentacion": "congelada, croquetas de 45 g",
+      "formato": { "envase": "bolsa", "contenido": 45, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "bolsa",
+      "precio": { "min": 13.95, "max": 13.95, "por": "bolsa (ver dudas)", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "MT-TARTA DE QUESO Y CHOCOLATE BLANCO",
+      "nombre_normalizado": "Tarta de queso y chocolate blanco",
+      "familia": "postre",
+      "presentacion": "tarta entera",
+      "formato": { "envase": "tarta", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "ud",
+      "precio": { "min": 33.0, "max": 33.0, "por": "ud", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "TB-BANDA DE MANZANA 500 GR C/3 UDES",
+      "nombre_normalizado": "Banda de manzana 500 g (caja de 3)",
+      "familia": "postre",
+      "presentacion": "pastelería, banda de manzana de 500 g, 3 unidades por caja",
+      "formato": { "envase": "caja", "contenido": 500, "unidad_contenido": "g", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "ud",
+      "precio": { "min": 13.13, "max": 13.13, "por": "ud (ver dudas)", "ejemplos": [["2026-09-09", 13.13]], "nota": "Con 10 % de descuento: 3 × 13,13 × 0,90 = 35,45" },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CB-BUÑUELOS DE BACALAO 40 GR C/4 KGS",
+      "nombre_normalizado": "Buñuelos de bacalao 40 g (bolsa de 4 kg)",
+      "familia": "precocinado",
+      "presentacion": "buñuelos de 40 g, envase de 4 kg; congelado no indicado (caducidad 12 meses)",
+      "formato": { "envase": "bolsa", "contenido": 4, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 18.25, "max": 18.25, "por": "kg (ver dudas)", "ejemplos": [["2026-09-10", 18.25]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Foie (5 | 5.00 | 39,95), buñuelos (12 | 12.00 | 18,25), croquetas (12 | 12.00 | 13,95) y donut (14 | 14.00 | 6,20): cantidad y kg son iguales, así que cantidad × precio y kg × precio dan lo mismo. Por precio parecen kg el foie (39,95 €/kg) y los buñuelos; en croquetas y donut podría ser kg o bolsa.",
+    "Banda de manzana: la cantidad 3 con precio 13,13 puede ser 3 bandas sueltas o 3 cajas; el importe solo confirma cantidad × precio.",
+    "No consta si la pluma ibérica y el secreto son frescos o congelados; solo la caducidad (12-24 meses) sugiere congelado.",
+    "Los 17 productos son los que salen en las 9 facturas digitales; no queda ninguno fuera del catálogo."
+  ]
+}

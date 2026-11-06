@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  24
+ ],
+ "tipo": "factura",
+ "proveedor": "RUSO AGULLO, ROQUE",
+ "cif": "48363703Q",
+ "local": "casa_tomas",
+ "numero_documento": "84/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 24,
+   "nombre": "PLEURONECTIFORMES",
+   "producto_ficha": null,
+   "cantidad": 4.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 119.0,
+   "iva_pct": 10,
+   "albaran_ref": "4150, 3903",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 119.0,
+ "desglose_iva": [
+  {
+   "base": 119.0,
+   "pct": 10,
+   "cuota": 11.9
+  }
+ ],
+ "iva": 11.9,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 130.9,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 772. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

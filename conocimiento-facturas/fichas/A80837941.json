@@ -1,0 +1,89 @@
+{
+  "cif": "A80837941",
+  "nombre": "MUSGRAVE ESPAÑA, S.A.U.",
+  "nombres_impresos": ["MUSGRAVE ESPAÑA, S.A.U.", "Dialsur TU CASH & CARRY", "CASH ELCHE"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R31.pdf", "R539.pdf", "R976.pdf", "R657.pdf", "R1577.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por compra en el cash (una por visita); muchas copias llevan el rótulo DUPLICADO DE FACTURA; también hay abonos de una sola línea",
+    "varias_facturas_por_pdf": "R657 trae 3 hojas = 3 documentos distintos (2 abonos y 1 factura); en general cada página es una factura 'Hoja 1 de 1'",
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["9904160-0001046", "9904160-0014478", "9904160-0027034", "9904160-0018861", "9904160-0041078", "9904161-0000612"], "patron": "^99041(60|61)-\\d{7}$", "donde": "recuadro de la derecha, 'Factura número:'. Serie 9904160 = ventas; 9904161 = abonos (anulaciones)" },
+    "fecha": "recuadro de la derecha, 'Fecha:' en DD-MM-AAAA con guiones. 'Vencimiento' (abajo a la izquierda) es otra fecha: no es la de factura",
+    "albaranes": null
+  },
+
+  "lectura": {
+    "columnas": ["Código (7 cifras)", "Descripción", "(letra M o P suelta)", "Cajas", "Unidades", "Tipo (% IVA)", "Pvp C/Iva", "Pvp S/Iva", "Total"],
+    "cantidad_es": "columna Unidades = cantidad real vendida: unidades sueltas (brick, lata, bolsa) o kg si la descripción acaba en KG/KILO. La columna Cajas es solo informativa (nº de cajas completas) y NO multiplica: 24 bricks = 2 cajas de 12",
+    "columna_peso": "En productos a peso (KG, KILO) Unidades lleva decimales (6,68; 1,51) y es el peso en kg",
+    "precio_es_por": "unidad de venta (brick, lata, bolsa, envase) o kg. Pvp S/Iva = precio sin IVA; Pvp C/Iva = Pvp S/Iva × (1 + IVA), solo informativo",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": true,
+    "tipos_iva": [4, 10, 21],
+    "recargo_equivalencia": "columnas % R.E. y Cuota R.E. existen pero van vacías en todas las muestras",
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "El Total de cada línea es Unidades × Pvp S/Iva (SIN IVA); no usar Pvp C/Iva",
+      "Lee Unidades, no Cajas: el número de Cajas es mucho menor y confunde",
+      "Carne y pollo a peso: cada pieza sale en su propia línea con el mismo código y 'Lote:' debajo (PECHUGA POLLO KG ×6). Son líneas distintas, suma todas; la línea 'Lote :' no tiene importe",
+      "Los abonos (rótulo DUPLICADO DE FACTURA + 'Esta factura anula a la factura: …') llevan cantidades, totales y base negativos; el total es negativo (ej. -73,47 €)",
+      "La letra suelta M o P antes de Cajas aparece en algunas líneas; no es cantidad",
+      "El escáner recorta la primera cifra del código y el borde izquierdo (queda '699730' por '0699730'); código y descripción distinguen artículos casi idénticos (blanco 0699730 / tinto 0699740)",
+      "Los precios cambian entre facturas (ej. brick vino 0,844 → 0,980; tomate cherry 5,81 → 8,31 €/kg)",
+      "Hay tachaduras y rayas de bolígrafo sobre algunas líneas (R539): el texto impreso sigue siendo válido",
+      "Cliente impreso: MASIDE 2011 SL / CASA TOMAS (CIF B54583356), Nº Cliente 0001114599"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = Unidades × Pvp S/Iva (redondeado a 2 decimales); ej. 24 × 0,844 = 20,26; 12 × 7,712 = 92,54",
+    "Base de cada tipo de IVA (4, 10, 21) = suma de los totales de línea de ese tipo; ej. R31: 10 % = 9,02+7,16+36,67+18,40+10,50+92,54 = 174,29",
+    "Cuota IVA = base × % redondeado; ej. 174,29 × 10 % = 17,43; 40,71 × 4 % = 1,63; 33,48 × 21 % = 7,03",
+    "Total factura = suma de bases + suma de cuotas; ej. R31: 248,48 + 26,09 = 274,57. El pie imprime también las sumas de base y cuota",
+    "En abonos todo va en negativo y cuadra igual (-66,79 base + -6,68 cuota = -73,47)"
+  ],
+
+  "guia_ocr": "Factura Dialsur/Musgrave. Número en el recuadro derecho tras 'Factura número:' (formato 9904160-0000000; abonos 9904161-). Fecha DD-MM-AAAA junto a 'Fecha:' (no la de Vencimiento). Cada línea: código 7 cifras, descripción, a veces letra M/P, Cajas (informativa), Unidades (cantidad real; kg si el artículo es KG/KILO), Tipo IVA 4/10/21, Pvp C/Iva, Pvp S/Iva, Total. Total = Unidades × Pvp S/Iva, sin IVA. No leas Cajas como cantidad. Cada pieza pesada va en línea propia; ignora las líneas 'Lote :'. Abonos: cantidades y totales negativos. Pie: bases y cuotas por tipo de IVA y TOTAL FACTURA.",
+
+  "productos": [
+    { "nombre_impreso": "BEBIDA ESPIRITUOSA ORGULLO 1 L", "nombre_normalizado": "Bebida espirituosa Orgullo 1 L", "familia": "bebida espirituosa", "presentacion": "botella", "formato": { "envase": "botella", "contenido": 1, "unidad_contenido": "l", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "botella", "precio": { "min": 5.65, "max": 6.61, "por": "botella", "ejemplos": [["2026-01-09", 6.61], ["2026-04-08", 6.61], ["2026-06-25", 5.65]] }, "iva_pct": 21, "veces_visto": 3 },
+    { "nombre_impreso": "VINO BLANCO BRICK VIÑA LANZAR 1 L", "nombre_normalizado": "Vino blanco Viña Lanzar brick 1 L", "familia": "vino", "presentacion": "brick envasado", "formato": { "envase": "brick", "contenido": 1, "unidad_contenido": "l", "unidades_por_bulto": 12, "bulto": "caja" }, "unidad_factura": "brick (Unidades; 12 = 1 caja)", "precio": { "min": 0.844, "max": 0.98, "por": "brick", "ejemplos": [["2026-01-09", 0.844], ["2026-05-05", 0.844], ["2026-09-23", 0.98]] }, "iva_pct": 21, "veces_visto": 4 },
+    { "nombre_impreso": "VINO TINTO BRICK VIÑA LANZAR 1 L", "nombre_normalizado": "Vino tinto Viña Lanzar brick 1 L", "familia": "vino", "presentacion": "brick envasado", "formato": { "envase": "brick", "contenido": 1, "unidad_contenido": "l", "unidades_por_bulto": 12, "bulto": "caja" }, "unidad_factura": "brick (Unidades; 12 = 1 caja)", "precio": { "min": 0.84, "max": 0.84, "por": "brick", "ejemplos": [["2026-06-25", 0.84]] }, "iva_pct": 21, "veces_visto": 1 },
+    { "nombre_impreso": "AZUCAR BLANCO AZUCARERA 1 KG", "nombre_normalizado": "Azúcar blanco Azucarera 1 kg", "familia": "azúcar", "presentacion": "envasado", "formato": { "envase": "paquete", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 10, "bulto": "caja" }, "unidad_factura": "paquete (Unidades; 10 = 1 caja)", "precio": { "min": 0.902, "max": 0.902, "por": "paquete", "ejemplos": [["2026-01-09", 0.902]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "AZUCAR ALTEZA 1 KG", "nombre_normalizado": "Azúcar Alteza 1 kg", "familia": "azúcar", "presentacion": "envasado", "formato": { "envase": "paquete", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 10, "bulto": "caja" }, "unidad_factura": "paquete (Unidades; 10 = 1 caja)", "precio": { "min": 0.8, "max": 0.8, "por": "paquete", "ejemplos": [["2026-09-23", 0.8]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "AZUCAR MORENO AZUCARERA 800 G", "nombre_normalizado": "Azúcar moreno Azucarera 800 g", "familia": "azúcar", "presentacion": "envasado", "formato": { "envase": "paquete", "contenido": 800, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "paquete", "precio": { "min": 1.79, "max": 1.79, "por": "paquete", "ejemplos": [["2026-01-09", 1.79], ["2026-05-05", 1.79], ["2026-06-25", 1.79]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "SECRETO CERDO POZO KG", "nombre_normalizado": "Secreto de cerdo (Pozo)", "familia": "carne cerdo", "presentacion": "fresco, a peso (piezas con lote)", "formato": { "envase": "pieza a peso", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 5.093, "max": 5.49, "por": "kg", "ejemplos": [["2026-01-09", 5.49], ["2026-05-05", 5.093]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "SECRETO CERDO DUROC KG", "nombre_normalizado": "Secreto de cerdo Duroc", "familia": "carne cerdo", "presentacion": "fresco, a peso (piezas con lote)", "formato": { "envase": "pieza a peso", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 6.3, "max": 6.3, "por": "kg", "ejemplos": [["2026-09-23", 6.3]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "PECHUGA POLLO KG", "nombre_normalizado": "Pechuga de pollo", "familia": "carne ave", "presentacion": "fresca, a peso (una línea por pieza con lote)", "formato": { "envase": "pieza a peso", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 5.75, "max": 5.75, "por": "kg", "ejemplos": [["2026-09-23", 5.75]] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "YEMA LIQUIDA PASTEURIZADA ELOW 1 L", "nombre_normalizado": "Yema líquida pasteurizada Elow 1 L", "familia": "huevo", "presentacion": "líquida pasteurizada envasada", "formato": { "envase": "envase", "contenido": 1, "unidad_contenido": "l", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "envase", "precio": { "min": 9.118, "max": 9.4, "por": "envase", "ejemplos": [["2026-01-09", 9.2], ["2026-05-05", 9.118], ["2026-09-23", 9.4]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "LECHE.COND.DES. 2,5KG PROSALUD 2,5 KG", "nombre_normalizado": "Leche condensada desnatada Prosalud 2,5 kg", "familia": "lácteo", "presentacion": "envasado", "formato": { "envase": "envase", "contenido": 2.5, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "envase", "precio": { "min": 10.5, "max": 10.5, "por": "envase", "ejemplos": [["2026-01-09", 10.5], ["2026-05-05", 10.5]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "HARINA TRIGO ALTEZA 1 KG", "nombre_normalizado": "Harina de trigo Alteza 1 kg", "familia": "harina", "presentacion": "envasado", "formato": { "envase": "paquete", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 10, "bulto": "caja" }, "unidad_factura": "paquete (Unidades; 10 = 1 caja)", "precio": { "min": 0.572, "max": 0.59, "por": "paquete", "ejemplos": [["2026-01-09", 0.572], ["2026-06-25", 0.59]] }, "iva_pct": 4, "veces_visto": 3 },
+    { "nombre_impreso": "CEBOLLA GORDA SACO 25 KG KG", "nombre_normalizado": "Cebolla gorda saco 25 kg", "familia": "verdura", "presentacion": "fresca, saco", "formato": { "envase": "saco", "contenido": 25, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "saco", "precio": { "min": 17.14, "max": 17.14, "por": "saco", "ejemplos": [["2026-01-09", 17.14]] }, "iva_pct": 4, "veces_visto": 1 },
+    { "nombre_impreso": "AJO BLANCO PELADO 1 KG UNIDAD", "nombre_normalizado": "Ajo blanco pelado 1 kg", "familia": "verdura", "presentacion": "pelado, envasado", "formato": { "envase": "bolsa", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "bolsa de 1 kg", "precio": { "min": 4.462, "max": 4.6, "por": "bolsa 1 kg", "ejemplos": [["2026-01-09", 4.462], ["2026-09-23", 4.6]] }, "iva_pct": 4, "veces_visto": 3 },
+    { "nombre_impreso": "PIMIENTO PIQUILLO TIRAS DON MOLINICO 1,9 KG", "nombre_normalizado": "Pimiento piquillo en tiras Don Molinico 1,9 kg", "familia": "conserva vegetal", "presentacion": "en conserva (lata)", "formato": { "envase": "lata", "contenido": 1.9, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "lata", "precio": { "min": 7.712, "max": 7.95, "por": "lata", "ejemplos": [["2026-01-09", 7.712], ["2026-06-25", 7.95], ["2026-09-23", 7.95]] }, "iva_pct": 10, "veces_visto": 5 },
+    { "nombre_impreso": "MAYONESA ORIGINAL HELLMANN'S 5 L", "nombre_normalizado": "Mayonesa Hellmann's original 5 L", "familia": "salsa", "presentacion": "envasado", "formato": { "envase": "envase", "contenido": 5, "unidad_contenido": "l", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "envase", "precio": { "min": 16.248, "max": 16.248, "por": "envase", "ejemplos": [["2026-04-08", 16.248]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "TOMATE CHERRY RAMA KILO", "nombre_normalizado": "Tomate cherry en rama", "familia": "verdura", "presentacion": "fresco", "formato": { "envase": "a peso / caja", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg (Unidades = kg)", "precio": { "min": 5.81, "max": 8.31, "por": "kg", "ejemplos": [["2026-04-08", 5.81], ["2026-06-25", 5.99], ["2026-05-05", 8.061], ["2026-09-23", 8.31]] }, "iva_pct": 4, "veces_visto": 4 },
+    { "nombre_impreso": "PREPARADO REBOZ.S/GLUTEN DANI 470 G", "nombre_normalizado": "Preparado para rebozar sin gluten Dani 470 g", "familia": "harina/rebozado", "presentacion": "envasado", "formato": { "envase": "bolsa", "contenido": 470, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "envase", "precio": { "min": 3.996, "max": 4.12, "por": "envase", "ejemplos": [["2026-05-05", 3.996], ["2026-06-25", 4.12]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "TOMATE ENTERO PELADO EXITO 1600 G", "nombre_normalizado": "Tomate entero pelado Éxito 1600 g", "familia": "conserva vegetal", "presentacion": "en conserva (lata)", "formato": { "envase": "lata", "contenido": 1600, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "lata", "precio": { "min": 5.4, "max": 5.4, "por": "lata", "ejemplos": [["2026-06-25", 5.4]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "TOMATE TROCEADO EXITO 2650 G", "nombre_normalizado": "Tomate troceado Éxito 2650 g", "familia": "conserva vegetal", "presentacion": "en conserva (lata)", "formato": { "envase": "lata", "contenido": 2650, "unidad_contenido": "g", "unidades_por_bulto": 6, "bulto": "caja" }, "unidad_factura": "lata (Unidades; 6 = 1 caja)", "precio": { "min": 3.87, "max": 3.99, "por": "lata", "ejemplos": [["2026-05-05", 3.87], ["2026-09-23", 3.99]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "PAN RALLADO VIVOCHEF 5 K", "nombre_normalizado": "Pan rallado Vivochef 5 kg", "familia": "pan rallado", "presentacion": "envasado", "formato": { "envase": "bolsa", "contenido": 5, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "bolsa", "precio": { "min": 5.81, "max": 5.93, "por": "bolsa", "ejemplos": [["2026-06-25", 5.93], ["2026-05-05", 5.81]] }, "iva_pct": 4, "veces_visto": 2 },
+    { "nombre_impreso": "PIMIENTO ROJO KILO", "nombre_normalizado": "Pimiento rojo", "familia": "verdura", "presentacion": "fresco", "formato": { "envase": "a peso", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 2.28, "max": 2.28, "por": "kg", "ejemplos": [["2026-06-25", 2.28]] }, "iva_pct": 4, "veces_visto": 1 },
+    { "nombre_impreso": "SAL DE MAR MALDON 1400 G", "nombre_normalizado": "Sal de mar Maldon 1400 g", "familia": "condimento", "presentacion": "envasado", "formato": { "envase": "envase", "contenido": 1400, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "envase", "precio": { "min": 15.763, "max": 15.763, "por": "envase", "ejemplos": [["2026-05-05", 15.763]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "FIDEO 4 GALLO 450 G", "nombre_normalizado": "Fideo 4 Gallos 450 g", "familia": "pasta", "presentacion": "envasado", "formato": { "envase": "paquete", "contenido": 450, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "paquete", "precio": { "min": 1.03, "max": 1.03, "por": "paquete", "ejemplos": [["2026-09-23", 1.03]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "GALLETA TOSTADA PETIT RIO 800 G", "nombre_normalizado": "Galleta tostada Petit Río 800 g", "familia": "galleta", "presentacion": "envasado", "formato": { "envase": "paquete", "contenido": 800, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "paquete", "precio": { "min": 3.036, "max": 3.036, "por": "paquete", "ejemplos": [["2026-01-29", 3.036]] }, "iva_pct": 10, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Catálogo sacado solo de 7 páginas de muestra (5 PDF de 50 escaneos): faltan muchos artículos que Musgrave vende; no hay catalogo_lineas porque no hay PDF digitales.",
+    "Significado de la letra M / P suelta antes de la columna Cajas: no se sabe (¿marca propia / pesado?). No afecta al cálculo.",
+    "Las cajas de cada artículo (12 bricks, 10 azúcar/harina, 6 tomate troceado) se deducen de Cajas × Unidades en la misma línea; del resto no se sabe.",
+    "En R1577 'SECRETO CERDO DUROC' (3,76 kg) muestra 4 en Cajas y las piezas de pollo ninguna: la columna Cajas no es fiable en productos a peso.",
+    "Tomate cherry rama: precio muy variable (5,81 a 8,31 €/kg); no se sabe si es cambio de calidad o de mercado.",
+    "Los abonos citan la factura que anulan ('Esta factura anula a la factura: 99041600016707 de 22-04-2026'): ese número viene sin guion."
+  ]
+}

@@ -1,0 +1,67 @@
+{
+ "archivo": "R961.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "REGYSISTEM SL",
+ "cif": "B03789807",
+ "local": "casa_tomas",
+ "numero_documento": "000373",
+ "fecha": "2026-06-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SERVICIO TÉCNICO ANUAL JULIO-2026/2027 (cód. 3014), línea 1",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 290.0,
+   "descuento_pct": null,
+   "total": 290.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-000245",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SERVICIO TÉCNICO ANUAL JULIO-2026/2027 (cód. 3014), línea 2",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 330.0,
+   "descuento_pct": null,
+   "total": 330.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-000245",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 620.0,
+ "desglose_iva": [
+  {
+   "base": 620.0,
+   "pct": 21,
+   "cuota": 130.2
+  }
+ ],
+ "iva": 130.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 750.2,
+ "observaciones": "Cabecera «CASA TOMAS / TOUZA» sin local concreto en las líneas. Forma de pago: recibo domiciliado, vencimiento 30/06/2026 por 750,20 € (Caja Rural Central). Agente: 5, Dpto. Administración.",
+ "alertas": [
+  "Dos líneas con el mismo código y descripción (3014) y importes distintos (290,00 y 330,00); se transcriben tal cual. Confirmar que no es una línea duplicada.",
+  "El destinatario imprime «CASA TOMAS / TOUZA» sin indicar local; se deja no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

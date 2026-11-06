@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "BONMATI MARTINEZ, ANTONIO",
+ "cif": "79102404E",
+ "local": "casa_tomas",
+ "numero_documento": "150/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.85,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.9,
+   "descuento_pct": null,
+   "total": 57.17,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 57.17,
+ "desglose_iva": [
+  {
+   "base": 57.17,
+   "pct": 10.0,
+   "cuota": 5.72
+  }
+ ],
+ "iva": 5.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 62.89,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6830. Embarcaciones: ninguna.",
+ "alertas": []
+}

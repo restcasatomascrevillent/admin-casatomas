@@ -1,0 +1,63 @@
+{
+ "archivo": "R397.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 1200",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ESPADA 30/50 FAO 87 PACIFICO",
+   "producto_ficha": "Pez espada 30/50 (FAO 87 Pacífico)",
+   "cantidad": 6.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.0,
+   "descuento_pct": null,
+   "total": 54.9,
+   "iva_pct": 10,
+   "albaran_ref": "20262086",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CALAMAR 4 LANZAL 10/12 C/G",
+   "producto_ficha": "Calamar 4 Lanzal 10/12 con globo",
+   "cantidad": 9.55,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.9,
+   "descuento_pct": null,
+   "total": 56.35,
+   "iva_pct": 10,
+   "albaran_ref": "20262086",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 111.25,
+ "desglose_iva": [
+  {
+   "base": 111.25,
+   "pct": 10,
+   "cuota": 11.13
+  }
+ ],
+ "iva": 11.13,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 122.38,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 11/04/2026, transferencia a 30 días. Albarán 20262086 del 11/03/2026, pedido 17180. Calamar: 9,55 x 5,90 = 56,345, impreso 56,35 (redondeo). Notas 'Kilos en rodajas' ignoradas. La fila Total (1 caja, 15,65 kg) no son euros.",
+ "alertas": []
+}

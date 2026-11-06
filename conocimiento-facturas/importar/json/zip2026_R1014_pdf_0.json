@@ -1,0 +1,81 @@
+{
+ "archivo": "R1014.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "COMERCIAL TABARCA, S.L.",
+ "cif": "B03286184",
+ "local": "touza",
+ "numero_documento": "70.089888",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "WHISKY JOHNNIE WALKER RED SOUL 70cl",
+   "producto_ficha": "Whisky Johnnie Walker (Red) 70 cl",
+   "cantidad": 4.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 70.0,
+   "contenido_unidad": "cl",
+   "precio_unitario": 13.7,
+   "descuento_pct": null,
+   "total": 54.8,
+   "iva_pct": 21,
+   "albaran_ref": "2.112410",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "WHISKY JOHNNIE WALKER RED SOUL 70cl",
+   "producto_ficha": "Whisky Johnnie Walker (Red) 70 cl",
+   "cantidad": 2.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 70.0,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "2.112410",
+   "bonificada": true,
+   "precio_referencia": 13.7
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "SERVICIO DE MANIPULACION Y ACARREOS",
+   "producto_ficha": "Servicio de manipulación y acarreos",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.86,
+   "descuento_pct": null,
+   "total": 1.86,
+   "iva_pct": 21,
+   "albaran_ref": "2.112410",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 56.66,
+ "desglose_iva": [
+  {
+   "base": 56.66,
+   "pct": 21,
+   "cuota": 11.9
+  }
+ ],
+ "iva": 11.9,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 68.56,
+ "observaciones": "Forma de pago: R/DOMICILIADO 45 DIAS (domiciliación). Vencimiento 15/08/2026. Cliente 022288 (TOUZA).",
+ "alertas": []
+}

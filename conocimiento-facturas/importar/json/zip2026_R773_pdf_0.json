@@ -1,0 +1,63 @@
+{
+ "archivo": "R773.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "OROWINES LEVANTE, S.L.",
+ "cif": "B73903429",
+ "local": "casa_tomas",
+ "numero_documento": "VFOL261479",
+ "fecha": "2026-05-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "JUAN GIL NACAR C.x06 BOT.0,75 L ES-ECO-024-MU",
+   "producto_ficha": "Juan Gil Nácar 75 cl (caja 6)",
+   "cantidad": 4.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 64.8,
+   "descuento_pct": null,
+   "total": 259.2,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "JUAN GIL NACAR BOTELLA 0,75 L ES-ECO-024-MU",
+   "producto_ficha": "Juan Gil Nácar 75 cl (botella suelta)",
+   "cantidad": 4.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 10.8,
+   "descuento_pct": 100.0,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 259.2,
+ "desglose_iva": [
+  {
+   "base": 259.2,
+   "pct": 21,
+   "cuota": 54.43
+  }
+ ],
+ "iva": 54.43,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 313.63,
+ "observaciones": "Nº pedido proveedor VPOL261705; su pedido 2026-004221. Pago a 60 dias f.f., recibo-giro, vencimiento 24/07/2026 por 313,63. Linea BOTELLA 0,75 L con 100,00 % dto.: 4 botellas de regalo, importe en blanco.",
+ "alertas": []
+}

@@ -1,0 +1,65 @@
+{
+ "archivo": "R926.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TALLERES DIEGO CHAPA Y PINTURA, S.L.",
+ "cif": "B53252763",
+ "local": "casa_tomas",
+ "numero_documento": "603/F",
+ "fecha": "2026-06-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CERRADURA PUERTA TRASERA",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 165.49,
+   "descuento_pct": null,
+   "total": 165.49,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MANO DE OBRA EN CHAPA",
+   "producto_ficha": null,
+   "cantidad": 1.2,
+   "unidad": "hora",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.5,
+   "descuento_pct": null,
+   "total": 51.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 216.49,
+ "desglose_iva": [
+  {
+   "base": 216.49,
+   "pct": 21,
+   "cuota": 45.46
+  }
+ ],
+ "iva": 45.46,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 261.95,
+ "observaciones": "Cobro al contado 11/06/2026. Entrada 08/06/2026, salida 09/06/2026. Cliente impreso como «PARTICULAR» (CIA: PARTICULAR, sin póliza ni siniestro). Reparación garantizada 3 meses o 2.000 km. Referencia de artículo no incluida en el nombre.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

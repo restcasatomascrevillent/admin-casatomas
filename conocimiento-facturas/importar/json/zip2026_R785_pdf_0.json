@@ -1,0 +1,68 @@
+{
+ "archivo": "R785.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PRODUCTOS DE ALMADRABA, S.L.",
+ "cif": "B11545027",
+ "local": "casa_tomas",
+ "numero_documento": "23A/26008148",
+ "fecha": "2026-05-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "V040 PORTES",
+   "producto_ficha": "Portes (gratuitos)",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "26012375",
+   "bonificada": true
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "F015 VENTRESCA ATUN ALMADRABA",
+   "producto_ficha": "Ventresca de atún de almadraba",
+   "cantidad": 11.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": 0,
+   "total": 388.5,
+   "iva_pct": 10,
+   "albaran_ref": "26012375",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 388.5,
+ "desglose_iva": [
+  {
+   "base": 388.5,
+   "pct": 10,
+   "cuota": 38.85
+  },
+  {
+   "base": 0.0,
+   "pct": 21,
+   "cuota": 0.0
+  }
+ ],
+ "iva": 38.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 427.35,
+ "observaciones": "Albarán 26012375 de 19/05/2026. Forma de pago RECIBO 30 DÍAS; vencimiento 18/06/2026 por 427,35. La línea «Contribución SCRAP: 6,44780863» (gestión de residuos, cuota 0,00) es informativa y no se cobra; no es producto. Lote ZH190526.",
+ "alertas": []
+}

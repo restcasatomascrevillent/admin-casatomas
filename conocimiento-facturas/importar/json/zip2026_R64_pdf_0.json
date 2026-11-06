@@ -1,0 +1,68 @@
+{
+ "archivo": "R64.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PRODUCTOS DE ALMADRABA, S.L.",
+ "cif": "B11545027",
+ "local": "casa_tomas",
+ "numero_documento": "23A/26000513",
+ "fecha": "2026-01-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "V040 PORTES",
+   "producto_ficha": "Portes (gratuitos)",
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "26000815",
+   "bonificada": true
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "C015 VENTRESCA ATÚN ROJO SALVAJE ALM. MÁX. CA",
+   "producto_ficha": "Ventresca de atún rojo salvaje de almadraba (calidad máxima)",
+   "cantidad": 23.48,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 48.0,
+   "descuento_pct": 0,
+   "total": 1127.04,
+   "iva_pct": 10,
+   "albaran_ref": "26000815",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1127.04,
+ "desglose_iva": [
+  {
+   "base": 1127.04,
+   "pct": 10,
+   "cuota": 112.7
+  },
+  {
+   "base": 0.0,
+   "pct": 21,
+   "cuota": 0.0
+  }
+ ],
+ "iva": 112.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1239.74,
+ "observaciones": "Albarán 26000815 de 15/01/2026. Forma de pago RECIBO 30 DÍAS; vencimiento 14/02/2026 por 1.239,74. Las líneas «Gest. residuos» y el «Lote CO120625» no son productos (el 23,4800 repetido es el kg del lote). En el pie, el 10,00 % es el tipo de IVA y la fila de portes queda con base 0,00 al 21 %.",
+ "alertas": []
+}

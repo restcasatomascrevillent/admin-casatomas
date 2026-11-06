@@ -1,0 +1,97 @@
+{
+ "archivo": "R147.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRANJA AVICOLA AVIQUES, S.L.",
+ "cif": "B54182407",
+ "local": "casa_tomas",
+ "numero_documento": "26/325",
+ "fecha": "2026-01-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DOCENA HUEVOS GR. CAT.A CLASE ´M´",
+   "producto_ficha": "Huevos frescos categoría A, clase M (docena)",
+   "cantidad": 60.0,
+   "unidad": "docena",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "ud",
+   "precio_unitario": 2.5,
+   "descuento_pct": null,
+   "total": 150.0,
+   "iva_pct": 4,
+   "albaran_ref": "T4/726",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "DOCENA HUEVOS GR. CAT.A CLASE ´M´",
+   "producto_ficha": "Huevos frescos categoría A, clase M (docena)",
+   "cantidad": 30.0,
+   "unidad": "docena",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "ud",
+   "precio_unitario": 2.5,
+   "descuento_pct": null,
+   "total": 75.0,
+   "iva_pct": 4,
+   "albaran_ref": "T4/750",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "DOCENA HUEVOS GR. CAT.A CLASE ´M´",
+   "producto_ficha": "Huevos frescos categoría A, clase M (docena)",
+   "cantidad": 60.0,
+   "unidad": "docena",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "ud",
+   "precio_unitario": 2.5,
+   "descuento_pct": null,
+   "total": 150.0,
+   "iva_pct": 4,
+   "albaran_ref": "T4/766",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "DOCENA HUEVOS GR. CAT.A CLASE ´M´",
+   "producto_ficha": "Huevos frescos categoría A, clase M (docena)",
+   "cantidad": 15.0,
+   "unidad": "docena",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "ud",
+   "precio_unitario": 2.5,
+   "descuento_pct": null,
+   "total": 37.5,
+   "iva_pct": 4,
+   "albaran_ref": "T4/784",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 412.5,
+ "desglose_iva": [
+  {
+   "base": 412.5,
+   "pct": 4,
+   "cuota": 16.5
+  }
+ ],
+ "iva": 16.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 429.0,
+ "observaciones": "Factura mensual que agrupa los albaranes semanales T4/726, T4/750, T4/766, T4/784. Nº cliente 18 (Masidé 2011). Cobro al contado por transferencia; vencimiento a la fecha de factura. Cantidades en docenas.",
+ "alertas": []
+}

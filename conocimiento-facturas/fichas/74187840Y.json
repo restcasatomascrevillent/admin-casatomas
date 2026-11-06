@@ -1,0 +1,63 @@
+{
+  "cif": "74187840Y",
+  "nombre": "Tomás Nicolás Riquelme",
+  "nombres_impresos": ["Tomás Nicolás Riquelme", "DISTRIBUCIÓN DE ACEITUNAS Y ENCURTIDOS", "BERNAL"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R25.pdf", "R533.pdf", "R1130.pdf", "R1670.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega, talonario preimpreso rellenado a mano (foto del papel, a veces torcida o con sombra)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["7", "112", "235", "328"], "patron": "^\\d{1,4}$", "donde": "casilla 'FACTURA Nº' arriba a la derecha, escrito a mano; numeración correlativa propia del proveedor (7 en enero, 328 en octubre)" },
+    "fecha": "tres huecos manuscritos junto a BERNAL: día, 'de' mes, 'de' año (ej. 9 de 4 de 2026). Sale como 3 números separados",
+    "albaranes": null
+  },
+
+  "lectura": {
+    "columnas": ["CANTIDAD", "CONCEPTO - REFERENCIA", "LOTE", "PRECIO", "IMPORTE"],
+    "cantidad_es": "kg si el concepto empieza por 'kg' (capellán seco); unidades (latas, sin confirmar) si empieza por 'L/'",
+    "columna_peso": null,
+    "precio_es_por": "kg (capellán) o lata (L/); IMPORTE = CANTIDAD × PRECIO",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": "casilla R.E. del pie con un guion en todas las muestras (no se aplica)",
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["casilla DESCUENTO % siempre vacía"],
+    "trampas": [
+      "Todo va escrito a mano: 6, 8, 0 y 9 se confunden; el año 2026 se leyó como 2025 y 2028 en dos muestras",
+      "El año manuscrito es dudoso: confírmalo con el número correlativo de factura (todas son de 2026)",
+      "El precio puede estar mal escrito: 3 × 12,50 no es 38,70, pero IMPORTE, BASE y TOTAL cuadran con 12,90; fíate del importe y de la suma",
+      "La firma ocupa filas vacías: ignorarla",
+      "La foto sale girada, con sombra o cortada por el borde izquierdo (R1130)",
+      "Pie: TOTAL BRUTO, DESCUENTO, BASE, % IVA, IMPORTE IVA, R.E. y TOTAL con €; los decimales van con punto, coma o apóstrofo (6.57, 82'40)",
+      "Cliente escrito a mano: MASIDE 2011 S.L. B54583356, domicilio C/ Virgen de la Cabeza nº 2 Crevillent, 'Pago: Alicante'"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio (3 × 21,90 = 65,70; 6 × 10,30 = 61,80; 8 × 10,30 = 82,40; 8 × 10,50 = 84,00; 3 × 12,90 = 38,70)",
+    "total_bruto = suma de importes = base (sin descuento)",
+    "cuota IVA = base × 10 % (65,70 → 6,57; 61,80 → 6,18; 82,40 → 8,24; 122,70 → 12,27)",
+    "total = base + IVA (65,70 + 6,57 = 72,27; 61,80 + 6,18 = 67,98; 82,40 + 8,24 = 90,64; 122,70 + 12,27 = 134,97)"
+  ],
+
+  "guia_ocr": "Factura manuscrita de Tomás Nicolás Riquelme (aceitunas y encurtidos, Crevillent), talonario con foto. Nº de factura a mano arriba a la derecha. Fecha en tres huecos: día, mes, año (2026; el año se lee mal, no lo copies sin mirar). Líneas: CANTIDAD, CONCEPTO (kg capellán seco; L/ = lata de aceitunas), LOTE (código, no cantidad), PRECIO, IMPORTE = cantidad × precio. Pie: TOTAL BRUTO, BASE, IVA 10 %, R.E. vacía, TOTAL. Si precio × cantidad no da el importe, prevalece el importe que cuadra con base y total.",
+
+  "productos": [
+    { "nombre_impreso": "L/ Gordal OH 60/80", "nombre_normalizado": "Aceituna gordal (lata), calibre 60/80", "familia": "aceitunas", "presentacion": "en conserva (lata)", "formato": { "envase": "lata", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "lata (L/)", "precio": { "min": 21.9, "max": 21.9, "por": "lata", "ejemplos": [["2026-01-08", 21.9]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "kg Capellán seco", "nombre_normalizado": "Capellán seco (pescado seco)", "familia": "pescado seco / salazón", "presentacion": "seco, a granel por kg", "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 10.3, "max": 10.5, "por": "kg", "ejemplos": [["2026-04-09", 10.3], ["2026-07-18", 10.3], ["2026-10-08", 10.5]] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "L/ Rellenas anchoas FSY 180", "nombre_normalizado": "Aceituna rellena de anchoa FSY 180 (lata)", "familia": "aceitunas", "presentacion": "en conserva (lata)", "formato": { "envase": "lata", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "lata (L/)", "precio": { "min": 12.9, "max": 12.9, "por": "lata", "ejemplos": [["2026-10-08", 12.9]] }, "iva_pct": 10, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Catálogo sacado solo de 4 muestras manuscritas (de 35 escaneos): 3 artículos vistos; faltan otros.",
+    "'L/' se interpreta como 'lata' sin confirmar; tampoco se sabe el tamaño de la lata ni qué son 'OH' y 'FSY 180'.",
+    "R25 (8/1): el año manuscrito parece 2025, pero el número de factura 7 sugiere enero de 2026. Revisar la fecha real.",
+    "R1670: en la línea de capellán, la palabra tras 'seco' es ilegible (¿'act', 'aceite'?); precio 10,50 frente a 10,30 en las otras tres facturas.",
+    "R1670: el precio de las rellenas se lee 12,50 pero el importe 38,70 cuadra con 12,90 (3 × 12,90). Se toma 12,90."
+  ]
+}

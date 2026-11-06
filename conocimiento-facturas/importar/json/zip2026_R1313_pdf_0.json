@@ -1,0 +1,63 @@
+{
+ "archivo": "R1313.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MR FRIO SOLUCIONES TERMICAS, S.L.",
+ "cif": "B24831901",
+ "local": "casa_tomas",
+ "numero_documento": "000216",
+ "fecha": "2026-08-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "A.A SPLIT TECHO KOSNER 9000 FRIGORIAS INVERTER R-32 A++ CON BOMBA DE CONDENSADOS",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3650.0,
+   "descuento_pct": 20,
+   "total": 2920.0,
+   "iva_pct": 21,
+   "albaran_ref": "J-66",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "DESMONTAR SPLIT TECHO LG AVERIADO Y MONTAJE NUEVA",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 350.0,
+   "descuento_pct": 20,
+   "total": 280.0,
+   "iva_pct": 21,
+   "albaran_ref": "J-66",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3200.0,
+ "desglose_iva": [
+  {
+   "base": 3200.0,
+   "pct": 21,
+   "cuota": 672.0
+  }
+ ],
+ "iva": 672.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3872.0,
+ "observaciones": "Suministro e instalación de aire acondicionado de techo (albarán J-66, 08/07/2026). Descuento 20% en ambas líneas. Forma de pago: transferencia bancaria Santander. Destinatario RESTAURANTE CASA TOMÁS / MASIDE 2011 SL (B-54583356), C/ Santa María de la Cabeza 2.",
+ "alertas": []
+}

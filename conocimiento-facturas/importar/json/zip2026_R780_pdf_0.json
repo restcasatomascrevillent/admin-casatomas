@@ -1,0 +1,65 @@
+{
+ "archivo": "R780.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "COFRADIA DE PESCADORES DE SANTA POLA",
+ "cif": "G03065158",
+ "local": "casa_tomas",
+ "numero_documento": "1.000 /SC26",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Alquiler Cajas",
+   "producto_ficha": "Alquiler de cajas de la lonja",
+   "cantidad": 48.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.17,
+   "descuento_pct": null,
+   "total": 8.16,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Comisión Venta",
+   "producto_ficha": "Comisión de venta de la lonja (4,15 %)",
+   "cantidad": 4.15,
+   "unidad": "%",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 146.32,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 154.48,
+ "desglose_iva": [
+  {
+   "base": 154.48,
+   "pct": 21,
+   "cuota": 32.44
+  }
+ ],
+ "iva": 32.44,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 186.92,
+ "observaciones": "Factura de servicios de la lonja (periodo mayo 2026), no es pescado. Albaranes del mes: 10. Comisión 4,15 % sobre base de compras de 3.525,62 €. Sin recargo ni retención.",
+ "alertas": [
+  "Comisión Venta: base 3.525,62 € × 4,15 % = 146,31 €; impreso 146,32 € (diferencia 0,01 €). Se deja lo impreso."
+ ]
+}

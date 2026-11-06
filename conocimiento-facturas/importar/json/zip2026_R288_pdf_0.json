@@ -1,0 +1,63 @@
+{
+ "archivo": "R288.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CREVI-GELATS, S.L.",
+ "cif": "B54211685",
+ "local": "casa_tomas",
+ "numero_documento": "50/26",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MANTECADO 6 L",
+   "producto_ficha": "Helado de mantecado, cubeta 6 L",
+   "cantidad": 2.0,
+   "unidad": "cubeta",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "l",
+   "precio_unitario": 26.42,
+   "descuento_pct": null,
+   "total": 52.84,
+   "iva_pct": 10,
+   "albaran_ref": "44/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MANTECADO 6 L",
+   "producto_ficha": "Helado de mantecado, cubeta 6 L",
+   "cantidad": 2.0,
+   "unidad": "cubeta",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "l",
+   "precio_unitario": 26.42,
+   "descuento_pct": null,
+   "total": 52.84,
+   "iva_pct": 10,
+   "albaran_ref": "81/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 105.68,
+ "desglose_iva": [
+  {
+   "base": 105.68,
+   "pct": 10,
+   "cuota": 10.57
+  }
+ ],
+ "iva": 10.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 116.25,
+ "observaciones": "Pago contado. Vencimiento 28/02/2026. Dos albaranes: 44/26 de 03/02/2026 y 81/26 de 25/02/2026.",
+ "alertas": []
+}

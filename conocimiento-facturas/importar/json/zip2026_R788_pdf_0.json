@@ -1,0 +1,46 @@
+{
+ "archivo": "R788.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Redissa & Dibos, s.l.",
+ "cif": "B73066458",
+ "local": "casa_tomas",
+ "numero_documento": "1/2026 5186",
+ "fecha": "2026-05-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Tinto R. Duero Mirum 75 cl.",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 39.0,
+   "descuento_pct": null,
+   "total": 78.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 78.0,
+ "desglose_iva": [
+  {
+   "base": 78.0,
+   "pct": 21,
+   "cuota": 16.38
+  }
+ ],
+ "iva": 16.38,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 94.38,
+ "observaciones": "Forma de pago reposición; COPIA FACTURA; cerrado lunes",
+ "alertas": []
+}

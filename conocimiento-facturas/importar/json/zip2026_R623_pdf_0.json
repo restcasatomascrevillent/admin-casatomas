@@ -1,0 +1,97 @@
+{
+ "archivo": "R623.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONFITERIA CERVIÑO S.L.",
+ "cif": "B32106940",
+ "local": "casa_tomas",
+ "numero_documento": "26/0000186",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CAJA 400 CAÑAS",
+   "producto_ficha": "Cañas de repostería (caja de 400)",
+   "cantidad": 400,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.48,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": "235",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CAJA 400 CAÑAS",
+   "producto_ficha": "Cañas de repostería (caja de 400)",
+   "cantidad": 400,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.48,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": "247",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PALMERA CON CHOCO",
+   "producto_ficha": "Palmera con chocolate",
+   "cantidad": 6,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.09,
+   "descuento_pct": null,
+   "total": 12.54,
+   "iva_pct": 10,
+   "albaran_ref": "247",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BOMBAS CON CREMA",
+   "producto_ficha": "Bombas con crema",
+   "cantidad": 12,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.45,
+   "descuento_pct": null,
+   "total": 17.4,
+   "iva_pct": 10,
+   "albaran_ref": "247",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 413.94,
+ "desglose_iva": [
+  {
+   "base": 413.94,
+   "pct": 10,
+   "cuota": 41.39
+  }
+ ],
+ "iva": 41.39,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 455.33,
+ "observaciones": "Recibo 30 días, vencimiento 30/05/2026. Albaranes 235 (06/04) y 247 (07/04). Las líneas PALMERA y BOMBAS CON CREMA van sin cabecera de albarán tras el 247; se asignan a ese albarán.",
+ "alertas": []
+}

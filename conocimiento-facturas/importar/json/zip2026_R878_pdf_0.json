@@ -1,0 +1,99 @@
+{
+ "archivo": "R878.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRUTOS SECOS EL LLANO, S.L.",
+ "cif": "B30341598",
+ "local": "casa_tomas",
+ "numero_documento": "13685/25",
+ "fecha": "2026-06-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COKTEL REF.23 B/ 1 KG",
+   "producto_ficha": "Cóctel de frutos secos ref. 23, bolsa 1 kg",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 12,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.65,
+   "descuento_pct": null,
+   "total": 55.8,
+   "iva_pct": 10,
+   "albaran_ref": "10169/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FINI MIX GOMA PICA B/ 1 KG",
+   "producto_ficha": "Fini Mix golosinas goma picante, bolsas de 1 kg (bulto 12 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.369,
+   "descuento_pct": null,
+   "total": 52.42,
+   "iva_pct": 10,
+   "albaran_ref": "10169/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FLOR DE HIBISCUS",
+   "producto_ficha": "Flor de hibisco (seca)",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.2,
+   "descuento_pct": null,
+   "total": 16.8,
+   "iva_pct": 10,
+   "albaran_ref": "10169/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MIXENSALADA B/ 1 KG",
+   "producto_ficha": "Mix para ensalada, bolsa 1 kg",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 42.5,
+   "iva_pct": 10,
+   "albaran_ref": "10169/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 167.52,
+ "desglose_iva": [
+  {
+   "base": 167.52,
+   "pct": 10,
+   "cuota": 16.75
+  }
+ ],
+ "iva": 16.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 184.27,
+ "observaciones": "Escaneo. Factura impresa: nº 13685/25, fecha 10/06/26, cliente MASIDE 2011 cód. 2133. Albarán 10169/26 del 10/06/2026. Vencimiento giro 17/06/26.",
+ "alertas": [
+  "Nº de factura 13685/25 con fecha de 2026: el sufijo /25 es anómalo; se lee tal como está impreso."
+ ]
+}

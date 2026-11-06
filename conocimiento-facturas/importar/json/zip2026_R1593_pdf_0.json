@@ -1,0 +1,48 @@
+{
+ "archivo": "R1593.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260601",
+ "fecha": "2026-09-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "DORADA",
+   "producto_ficha": "Dorada",
+   "cantidad": 17.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 51.0,
+   "descuento_pct": null,
+   "total": 867.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000601",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 867.0,
+ "desglose_iva": [
+  {
+   "base": 867.0,
+   "pct": 10,
+   "cuota": 86.7
+  }
+ ],
+ "iva": 86.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 953.7,
+ "observaciones": "Albarán 1-000601 del 21/09/2026. Forma de pago: transferencia CaixaBank; vencimiento 21/09/2026 por 953,70. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "DORADA a 51,00 €/kg; la ficha da 62,00 €/kg."
+ ]
+}

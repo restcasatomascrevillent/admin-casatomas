@@ -1,0 +1,100 @@
+{
+ "archivo": "R993.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EQUIPALIA SUMINISTROS HOSTELEROS, S.L.",
+ "cif": "B42568519",
+ "local": "casa_tomas",
+ "numero_documento": "VTAF/26-03210",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BOL HONDO ESSENCE DAPPLE CHARCOAL 16.5 CM 58.5 CL VITROPORCELANA (24) STEELITE (cód. 17560597)",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.9,
+   "descuento_pct": null,
+   "total": 165.66,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-04135",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FUENTE OVAL STOLT Ø 32 CM (6) VITROPORCELANA (cód. POFUS32)",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.84,
+   "descuento_pct": null,
+   "total": 29.2,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-04184",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PLATO COUPE PETRA-GRAFITO 25,25 CM VITROPORCELANA (12) STEELITE (cód. 11720566)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.94,
+   "descuento_pct": null,
+   "total": 155.23,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-04184",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PLATO CUADRADO BOSSA NOVA 28X28CM (6) NACHTMAN (cód. 91315)",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.22,
+   "descuento_pct": null,
+   "total": 158.64,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-04184",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 508.73,
+ "desglose_iva": [
+  {
+   "base": 508.73,
+   "pct": 21,
+   "cuota": 106.83
+  }
+ ],
+ "iva": 106.83,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 615.56,
+ "observaciones": "Dirección de envío: RESTAURANTE CASA TOMAS / MASIDE 2011, S.L. Forma de pago: GIRO. Importe pendiente 615,56 €.",
+ "alertas": [
+  "Línea 17560597: 24 x 6,90 = 165,60, pero el importe impreso es 165,66 (precio redondeado en el PDF). Se deja el importe impreso.",
+  "Línea 11720566: 12 x 12,94 = 155,28, pero el importe impreso es 155,23 (precio redondeado en el PDF). Se deja el importe impreso."
+ ]
+}

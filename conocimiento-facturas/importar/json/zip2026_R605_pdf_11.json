@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "AMBIT PEREZ, VICENTE",
+ "cif": "74193866Y",
+ "local": "casa_tomas",
+ "numero_documento": "204/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 12,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.15,
+   "descuento_pct": null,
+   "total": 130.83,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 130.83,
+ "desglose_iva": [
+  {
+   "base": 130.83,
+   "pct": 10.0,
+   "cuota": 13.08
+  }
+ ],
+ "iva": 13.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 143.91,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: ninguna.",
+ "alertas": []
+}

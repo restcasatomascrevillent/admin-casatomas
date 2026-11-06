@@ -1,0 +1,63 @@
+{
+ "archivo": "R935.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26005480",
+ "fecha": "2026-06-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 3.38,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 141.96,
+   "iva_pct": 10,
+   "albaran_ref": "26106017",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 10.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 121.8,
+   "iva_pct": 10,
+   "albaran_ref": "26106017",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 263.76,
+ "desglose_iva": [
+  {
+   "base": 263.76,
+   "pct": 10,
+   "cuota": 26.38
+  }
+ ],
+ "iva": 26.38,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 290.14,
+ "observaciones": "Transferencia Banco Santander, vencimiento 20/07/2026. Albarán 26106017 de 15/06/2026. Línea de texto «Bonito entero que se ha partido en lomos… Total peso lomos de bonito: 8,060 kg» no es artículo: se ignora. Líneas de consumo preferente (12-12-2026) ignoradas.",
+ "alertas": []
+}

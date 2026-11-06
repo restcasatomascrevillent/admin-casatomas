@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  21
+ ],
+ "tipo": "factura",
+ "proveedor": "MARINA MONLLOR CB",
+ "cif": "E70931498",
+ "local": "casa_tomas",
+ "numero_documento": "1.033/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 21,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.3,
+   "descuento_pct": null,
+   "total": 63.27,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 63.27,
+ "desglose_iva": [
+  {
+   "base": 63.27,
+   "pct": 10,
+   "cuota": 6.33
+  }
+ ],
+ "iva": 6.33,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 69.6,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 16859.",
+ "alertas": []
+}

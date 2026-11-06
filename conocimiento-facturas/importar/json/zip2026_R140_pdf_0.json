@@ -1,0 +1,43 @@
+{
+ "archivo": "R140.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90259603",
+ "fecha": "2026-02-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Real Conservera Española Ventresca de Bonito en",
+   "producto_ficha": "Ventresca de bonito en aceite, Real Conservera Española",
+   "cantidad": 12,
+   "unidad": "lata",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": null,
+   "iva_pct": 10,
+   "albaran_ref": "40296276",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": null,
+ "desglose_iva": [],
+ "iva": null,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": null,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 03/04/2026. Albarán 40296276 del 30/01/2026. Punto verde no legible con claridad.",
+ "alertas": [
+  "Línea de ventresca sin precio ni importe impresos en el texto extraído (CANTIDAD 1 CA / 12 UN, PRECIO y TOTAL vacíos).",
+  "El pie aparece sin base, IVA ni total en el texto; solo hay un '0,00 EUR' sin etiqueta clara. No cuadra: revisar el PDF original."
+ ]
+}

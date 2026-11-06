@@ -1,0 +1,46 @@
+{
+ "archivo": "R922.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170769347",
+ "fecha": "2026-06-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMENDRA FRITA I BONGUST 1X950GR 10% ES",
+   "producto_ficha": "Almendra frita Bongust (bolsa 950 g)",
+   "cantidad": 12,
+   "unidad": "bulto",
+   "bultos": 12,
+   "contenido_cantidad": 950,
+   "contenido_unidad": "g",
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 192.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 192.0,
+ "desglose_iva": [
+  {
+   "base": 192.0,
+   "pct": 10,
+   "cuota": 19.2
+  }
+ ],
+ "iva": 19.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 211.2,
+ "observaciones": "Entrega 22.06.2026. IVA 10 %. Anotación (CP) ignorada. Total BT 12.",
+ "alertas": []
+}

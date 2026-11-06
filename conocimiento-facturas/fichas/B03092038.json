@@ -1,0 +1,242 @@
+{
+  "cif": "B03092038",
+  "nombre": "PESCADOS MOLTO, S.L.",
+  "nombres_impresos": ["PESCADOS MOLTO, S.L.", "PESCADOS MOLTO"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R50.pdf", "R543.pdf", "R1019.pdf", "R1229.pdf", "R1630.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura que agrupa uno o varios albaranes (a veces uno solo), siempre pescado y marisco por kilo o por pieza",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-2",
+    "numero_factura": {
+      "ejemplos": ["310", "55 (serie S)", "90 (serie S)", "125 (serie S)", "5367"],
+      "patron": "^\\d{1,5}$",
+      "donde": "Tabla de cabecera 'Factura | Ejercicio | Serie | Fecha | Cliente': primera celda. La Serie ('S') es la tercera celda y falta en algunas facturas (ej. 5367, 310): entonces la fila tiene una celda menos. El cliente es siempre 1607."
+    },
+    "fecha": "Cuarta celda (tercera si no hay serie) de esa misma fila, DD/MM/AAAA. Es la fecha de factura (fin de mes o quincena), no la del albarán.",
+    "albaranes": "Cabecera 'Albarán | 150 S 26/06/2026' (número, serie S opcional, fecha) seguida de 'Id Pescado | Lote | Cajas | Kilos | Precio | Importe' y sus líneas. Tras las líneas de cada albarán aparece una cifra suelta con su subtotal (sin etiqueta)."
+  },
+
+  "lectura": {
+    "columnas": ["Id Pescado (nº + nombre)", "Lote", "Cajas", "Kilos", "Precio", "Importe"],
+    "cantidad_es": "kg en casi todo (columna 'Kilos'). Excepción: ostras, donde la columna 'Kilos' lleva UNIDADES (piezas). 'Cajas' casi siempre vale 1 y no multiplica nada.",
+    "columna_peso": "Kilos",
+    "precio_es_por": "kg (€/kg); en ostras €/pieza",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "no aparecen líneas de envase",
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "En ostras la columna Kilos son piezas (48,00 x 2,19 = 105,12): no son 48 kg a 2,19 €/kg.",
+      "Bajo cada línea hay una línea de trazabilidad (nombre científico, Arte, Met. Prod., Zona, Prov.) sin importe: no es un producto.",
+      "El nombre largo a veces se parte en dos líneas ('OSTRA ROYALE N2 DAVID' / 'HERVE').",
+      "Cifra suelta tras cada albarán = subtotal del albarán, no una línea.",
+      "El IVA y total van en una fila sin la base repetida: 'Base | %IVA | Cuota IVA | %RE | Cuota RE' pierde la primera celda porque coincide con T.Bruto.",
+      "Facturas de varias páginas: la primera acaba en 'Suma y sigue' sin totales; los totales solo salen en la última página.",
+      "Aparece la palabra suelta 'KILO' o el texto 'Pág. 1 de 0' como ruido.",
+      "El proveedor viene en la cabecera como emisor y MASIDE 2011 / CASA TOMAS es el cliente (no confundir CIF B54583356 con el del proveedor B03092038)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = kilos (o piezas en ostras) x precio",
+    "subtotal albarán = suma de sus importes",
+    "T.Bruto = base = suma de todos los albaranes",
+    "cuota IVA = base x 10% (redondeada a 2 decimales); R.E. = 0",
+    "total = base + cuota IVA. Ejemplo R1229: 161,48+125,73+116,55+103,20+201,96+221,27 = 930,19; IVA 93,02; total 1.023,21",
+    "El nº de Id Pescado coincide con los 3 últimos dígitos del Lote (328 -> 0212260102328)"
+  ],
+
+  "guia_ocr": "Emisor Pescados Molto; cliente Maside 2011/Casa Tomas. Lee número, serie (S, a veces ausente) y fecha de la fila 'Factura | Ejercicio | Serie | Fecha | Cliente'. Cada albarán trae líneas 'Id nombre | Lote | Cajas | Kilos | Precio | Importe'. Kilos x Precio = Importe; precio en €/kg. En ostras la columna Kilos son PIEZAS y el precio es por pieza. Ignora las líneas de trazabilidad (Arte, Zona, Prov.) y las cifras sueltas de subtotal de albarán. IVA 10 %, sin recargo. Totales solo en la última página.",
+
+  "productos": [
+    {
+      "nombre_impreso": "328 OSTRA ROYALE N2 DAVID HERVE",
+      "nombre_normalizado": "Ostra Royale nº 2 David Hervé",
+      "familia": "marisco",
+      "presentacion": "ostra viva (cultivo), por pieza",
+      "formato": { "envase": "caja", "contenido": 1, "unidad_contenido": "pieza", "unidades_por_bulto": 48, "bulto": "caja" },
+      "unidad_factura": "pieza (columna Kilos)",
+      "precio": { "min": 2.19, "max": 2.19, "por": "pieza", "ejemplos": [["2026-04-07", 2.19], ["2026-07-16", 2.19], ["2026-09-22", 2.19]] },
+      "iva_pct": 10,
+      "veces_visto": 59
+    },
+    {
+      "nombre_impreso": "308 OSTRA GILLARDEAU",
+      "nombre_normalizado": "Ostra Gillardeau",
+      "familia": "marisco",
+      "presentacion": "ostra viva, por pieza",
+      "formato": { "envase": "caja", "contenido": 1, "unidad_contenido": "pieza", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "pieza (columna Kilos)",
+      "precio": { "min": 2.05, "max": 2.15, "por": "pieza", "ejemplos": [["2026-07-18", 2.15]] },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "331 OSTRA PETER PAN N6",
+      "nombre_normalizado": "Ostra Peter Pan nº 6",
+      "familia": "marisco",
+      "presentacion": "ostra viva, por pieza",
+      "formato": { "envase": "caja", "contenido": 1, "unidad_contenido": "pieza", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "pieza (columna Kilos)",
+      "precio": { "min": 1.24, "max": 1.24, "por": "pieza", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "319 BOGAVANTE AZUL",
+      "nombre_normalizado": "Bogavante azul",
+      "familia": "marisco",
+      "presentacion": "vivo, capturado (redes de arrastre, zona 37.1)",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 26.8, "max": 26.8, "por": "kg", "ejemplos": [["2026-01-14", 26.8]] },
+      "iva_pct": 10,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "92 BOGAVANTE CANADA",
+      "nombre_normalizado": "Bogavante de Canadá",
+      "familia": "marisco",
+      "presentacion": "no indicado (visto solo en 2025)",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 18.95, "max": 18.95, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "312 TELLINA",
+      "nombre_normalizado": "Tellina",
+      "familia": "marisco",
+      "presentacion": "bivalvo vivo",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 29.8, "max": 29.8, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "303 CLOCHINA",
+      "nombre_normalizado": "Clóchina",
+      "familia": "marisco",
+      "presentacion": "bivalvo vivo",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 4.5, "max": 4.5, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "300 MEJILLON",
+      "nombre_normalizado": "Mejillón vivo (cultivo suspendido)",
+      "familia": "marisco",
+      "presentacion": "vivo, fresco (Mytilus galloprovincialis)",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 5.25, "max": 5.25, "por": "kg", "ejemplos": [["2026-01-14", 5.25]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "245 COLA RAPE 2/3",
+      "nombre_normalizado": "Cola de rape 2/3 kg (Lophius budegassa)",
+      "familia": "pescado",
+      "presentacion": "cola de rape entera, capturado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 18.9, "max": 21.8, "por": "kg", "ejemplos": [["2026-07-17", 19.8], ["2026-07-30", 21.8]] },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "70 COLA RAPE G 500/1800",
+      "nombre_normalizado": "Cola de rape grande 500/1800 g",
+      "familia": "pescado",
+      "presentacion": "cola de rape, calibre 500-1800 g",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 15.8, "max": 15.8, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "558 RAPE",
+      "nombre_normalizado": "Rape entero",
+      "familia": "pescado",
+      "presentacion": "entero, capturado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 10.95, "max": 10.95, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "520 ALFONSIÑO",
+      "nombre_normalizado": "Alfonsiño",
+      "familia": "pescado",
+      "presentacion": "entero, capturado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 28.9, "max": 28.9, "por": "kg", "ejemplos": [["2026-07-16", 28.9]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "100 ZAMBURIÑA 20/30 PIEZAS",
+      "nombre_normalizado": "Zamburiña 20/30 piezas por kilo",
+      "familia": "marisco",
+      "presentacion": "no indicado (calibre 20-30 piezas/kg)",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 12.95, "max": 12.95, "por": "kg", "ejemplos": [["2026-07-18", 12.95]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "356 QUISQUILLA",
+      "nombre_normalizado": "Quisquilla",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 93.0, "max": 93.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "350 GAMBA ROJA",
+      "nombre_normalizado": "Gamba roja",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 55.0, "max": 55.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "351 GAMBA BLANCA",
+      "nombre_normalizado": "Gamba blanca",
+      "familia": "marisco",
+      "presentacion": "no indicado",
+      "formato": { "envase": "granel", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "caja" },
+      "unidad_factura": "kg",
+      "precio": { "min": 29.8, "max": 29.8, "por": "kg", "ejemplos": [] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Las facturas NO dicen si el pescado es fresco, congelado o salado; solo traen 'Met. Prod.: Capturado' o 'De cría' y el arte. Mejillón, bivalvos, bogavante y ostras se entienden vivos; el resto (quisquilla, gambas, zamburiña) queda como 'no indicado'. No aparece ninguna salazón.",
+    "Ostras: se deduce que la columna Kilos son piezas porque el precio (1,24-2,19) es imposible por kg. Gillardeau salió con 24 piezas en el catálogo y con 48 en R1229; no se sabe cuántas trae la caja (Cajas siempre 1, incluso con 144 piezas de Peter Pan).",
+    "Catálogo completo: 16 artículos, todos incluidos. Los rangos de precio salen del catálogo y de 5 muestras; solo se dan mínimo/máximo donde se vieron varios importes.",
+    "Los precios de Bogavante Canadá (2025) y Cola rape G (2025) son de lotes de diciembre 2025/julio 2025 y pueden estar desfasados."
+  ]
+}

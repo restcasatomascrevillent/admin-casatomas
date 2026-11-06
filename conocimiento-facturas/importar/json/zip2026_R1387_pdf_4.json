@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "JOSE LOPEZ SEMPERE Y OTROS, C.B.",
+ "cif": "E03582699",
+ "local": "casa_tomas",
+ "numero_documento": "1.155/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 5,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.57,
+   "descuento_pct": null,
+   "total": 62.25,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 62.25,
+ "desglose_iva": [
+  {
+   "base": 62.25,
+   "pct": 10,
+   "cuota": 6.23
+  }
+ ],
+ "iva": 6.23,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 68.48,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): TAPILU. Albaranes de subasta (informativo): 18463.",
+ "alertas": []
+}

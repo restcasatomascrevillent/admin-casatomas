@@ -1,0 +1,139 @@
+{
+ "archivo": "R1145.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "7505",
+ "fecha": "2026-07-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOMATE DE PERA",
+   "producto_ficha": "Tomate de pera",
+   "cantidad": 34.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.3,
+   "descuento_pct": null,
+   "total": 44.2,
+   "iva_pct": 4,
+   "albaran_ref": "A 5820/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TOMATE DULCE II",
+   "producto_ficha": "Tomate dulce categoría II",
+   "cantidad": 12.1,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.0,
+   "descuento_pct": null,
+   "total": 84.7,
+   "iva_pct": 4,
+   "albaran_ref": "A 5820/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LIMON RODREJO",
+   "producto_ficha": "Limón Rodrejo",
+   "cantidad": 21.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 21.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 5820/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CEREZA 28",
+   "producto_ficha": "Cereza calibre 28",
+   "cantidad": 7.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.0,
+   "descuento_pct": null,
+   "total": 28.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 5820/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MELOCOTON BABY GOLD 6",
+   "producto_ficha": "Melocotón Baby Gold calibre 6",
+   "cantidad": 12.9,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.25,
+   "descuento_pct": null,
+   "total": 29.03,
+   "iva_pct": 4,
+   "albaran_ref": "A 5820/26",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (-4 x 1,6500, devolución)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -6.6,
+   "descuento_pct": null,
+   "total": -6.6,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 200.33,
+ "desglose_iva": [
+  {
+   "base": 206.93,
+   "pct": 4,
+   "cuota": 8.28
+  },
+  {
+   "base": -6.6,
+   "pct": 21,
+   "cuota": -1.39
+  }
+ ],
+ "iva": 6.89,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 207.22,
+ "observaciones": "Transferencia 30 días. Albarán A 5820/26 del 23/07/2026. Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

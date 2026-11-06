@@ -1,0 +1,83 @@
+{
+ "archivo": "R700.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VESCEL PACKAGING S.L.U.",
+ "cif": "B10804714",
+ "local": "casa_tomas",
+ "numero_documento": "1232",
+ "fecha": "2026-05-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Guantes de Nitrilo Azul sin polvo Talla M (cód. 005071)",
+   "producto_ficha": null,
+   "cantidad": 120.0,
+   "unidad": "ud",
+   "bultos": 12,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.46,
+   "descuento_pct": null,
+   "total": 415.2,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.253",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Guantes de Nitrilo Azul sin polvo Talla L (cód. 005072)",
+   "producto_ficha": null,
+   "cantidad": 120.0,
+   "unidad": "ud",
+   "bultos": 12,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.46,
+   "descuento_pct": null,
+   "total": 415.2,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.253",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Guantes de Nitrilo Azul sin polvo Talla XL (cód. 005073)",
+   "producto_ficha": null,
+   "cantidad": 40.0,
+   "unidad": "ud",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.46,
+   "descuento_pct": null,
+   "total": 138.4,
+   "iva_pct": 21,
+   "albaran_ref": "H26/1.253",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 968.8,
+ "desglose_iva": [
+  {
+   "base": 968.8,
+   "pct": 21,
+   "cuota": 203.45
+  }
+ ],
+ "iva": 203.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1172.25,
+ "observaciones": "Cliente 0000003398. Forma de pago: giro a 15 días fecha factura, vencimiento 22/05/2026 por 1.172,25 €. Registro RD de envases ENV/2025/000054866.",
+ "alertas": [
+  "Destinatario impreso: MASIDE 2011, S.L. sin nombre de local: se deja no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

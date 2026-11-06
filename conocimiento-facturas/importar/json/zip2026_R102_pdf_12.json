@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  13
+ ],
+ "tipo": "factura",
+ "proveedor": "MOLINA CERDA, MANUELA",
+ "cif": "21398561M",
+ "local": "casa_tomas",
+ "numero_documento": "78/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 13,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 17.85,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 17.85,
+ "desglose_iva": [
+  {
+   "base": 17.85,
+   "pct": 10.0,
+   "cuota": 1.79
+  }
+ ],
+ "iva": 1.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 19.64,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645. Embarcaciones: ninguna.",
+ "alertas": []
+}

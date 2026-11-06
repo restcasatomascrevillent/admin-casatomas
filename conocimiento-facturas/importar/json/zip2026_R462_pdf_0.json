@@ -1,0 +1,46 @@
+{
+ "archivo": "R462.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "1532",
+ "fecha": "2026-03-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO",
+   "producto_ficha": null,
+   "cantidad": 31.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12,
+   "descuento_pct": null,
+   "total": 379.2,
+   "iva_pct": 10,
+   "albaran_ref": "3.957",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 379.2,
+ "desglose_iva": [
+  {
+   "base": 379.2,
+   "pct": 10,
+   "cuota": 37.92
+  }
+ ],
+ "iva": 37.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 417.12,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 30/03/2026 por 417.12. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

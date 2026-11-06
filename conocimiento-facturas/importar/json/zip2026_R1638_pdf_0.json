@@ -1,0 +1,122 @@
+{
+ "archivo": "R1638.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900011110",
+ "fecha": "2026-09-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "B. JACK DANIELS APPLE",
+   "producto_ficha": "Jack Daniel's Apple",
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.76,
+   "descuento_pct": null,
+   "total": 225.12,
+   "iva_pct": 21,
+   "albaran_ref": "2904002610",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "B. JACK DANIELS BONDED RYE",
+   "producto_ficha": "Jack Daniel's Bonded Rye",
+   "cantidad": 6,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.89,
+   "descuento_pct": null,
+   "total": 143.34,
+   "iva_pct": 21,
+   "albaran_ref": "2904002610",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "B. JACK DANIELS APPLE",
+   "producto_ficha": "Jack Daniel's Apple",
+   "cantidad": 2,
+   "unidad": "botella",
+   "bultos": 0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "2904002610",
+   "bonificada": true,
+   "precio_referencia": 18.76
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "W. JOHNNIE WALKER RED LABEL 0.70",
+   "producto_ficha": "Whisky Johnnie Walker Red Label 70 cl",
+   "cantidad": 11,
+   "unidad": "botella",
+   "bultos": 1,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 12.3,
+   "descuento_pct": null,
+   "total": 135.3,
+   "iva_pct": 21,
+   "albaran_ref": "2904002610",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "W. JOHNNIE WALKER RED LABEL 0.70",
+   "producto_ficha": "Whisky Johnnie Walker Red Label 70 cl",
+   "cantidad": 1,
+   "unidad": "botella",
+   "bultos": 0,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "2904002610",
+   "bonificada": true,
+   "precio_referencia": 12.3
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (importe impreso en la casilla % DTO. del pie)",
+   "importe": -45.34,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 458.42,
+ "desglose_iva": [
+  {
+   "base": 458.42,
+   "pct": 21,
+   "cuota": 96.27
+  }
+ ],
+ "iva": 96.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 554.69,
+ "observaciones": "Albarán 2904002610 del 29/09/2026. Forma de pago no impresa. Total unidades 32. Dos líneas bonificadas a 0,000.",
+ "alertas": []
+}

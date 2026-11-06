@@ -1,0 +1,50 @@
+{
+ "archivo": "R38.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4,
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "Winterhalter Iberica S.L.U.",
+ "cif": "B92282029",
+ "local": "casa_tomas",
+ "numero_documento": "7100165710",
+ "fecha": "2026-01-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "F 40 Detergente para cristal con Oxipower",
+   "producto_ficha": null,
+   "cantidad": 5.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 95.0,
+   "descuento_pct": 15,
+   "total": 403.75,
+   "iva_pct": 21,
+   "albaran_ref": "8002577777",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 403.75,
+ "desglose_iva": [
+  {
+   "base": 403.75,
+   "pct": 21,
+   "cuota": 84.79
+  }
+ ],
+ "iva": 84.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 488.54,
+ "observaciones": "Pedido 2002141951 (Mail CC Tomas, 15/01/2026). Entrega 16/01/2026. Pago en 30 dias netos, recibo domiciliado. La linea imprime 12,00 KG bajo el producto: se toma como contenido por unidad. Paginas 2 a 5: condiciones generales de venta.",
+ "alertas": []
+}

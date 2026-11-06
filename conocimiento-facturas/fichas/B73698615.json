@@ -1,0 +1,185 @@
+{
+  "cif": "B73698615",
+  "nombre": "SOKOL VIN, S.L.",
+  "nombres_impresos": ["SOKOL VIN, S.L.", "SOKOL VIN"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R159.pdf", "R741.pdf", "R1163.pdf", "R1437.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por pedido (un número de pedido por factura), 1 página, digital",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["A040/26", "A241/26", "A403/26", "A495/26"],
+      "patron": "^A\\d{3}/26$",
+      "donde": "'FACTURA: A403/26 | FECHA: 16.07.2026' bajo los datos del cliente. El número coincide con 'Nº PEDIDO' (403)."
+    },
+    "fecha": "'FECHA: DD.MM.AAAA' con puntos, a la derecha del número de factura.",
+    "albaranes": null
+  },
+
+  "lectura": {
+    "columnas": ["Nº LOTE", "CANTIDAD", "DESCRIPCIÓN", "PRECIO", "IMPORTE"],
+    "cantidad_es": "unidades (latas/tarros/botellas/cucharas) en caviar, carne de cangrejo, huevas de trucha, aceite y cucharas; kg en la trufa",
+    "columna_peso": null,
+    "precio_es_por": "unidad (el formato en gr/ml va dentro de la descripción); kg en la trufa",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Sin cargos ni descuentos; el pie tiene una fila por tipo de IVA (Base Imponible | I.V.A. x% | Total Factura) y, si hay dos tipos, una última línea con el total general"],
+    "trampas": [
+      "La columna 'Nº LOTE' está vacía y la cantidad cae en su lugar (el primer número de la línea ES la cantidad).",
+      "El formato (10 gr, 20 gr, 30 gr, 50 gr, 100 gr, 250 gr, 250 ml) va en la descripción y NO es la cantidad: '5 | CAVIAR OSCIETRA IMPERIAL, 10 gr. | 13,00 | 65,00' son 5 latas de 10 g a 13 € cada una.",
+      "La cantidad de trufa es kg con 3 decimales (0,300) y el precio es por kg; en R1437 el importe sale '100' sin decimales (0,303 × 330 = 99,99 redondeado a 100,00).",
+      "Debajo de las líneas hay 3-11 filas '0,00' de relleno: ignorarlas.",
+      "IVA mixto en una misma factura (R159: 10% sobre 746,00 y 4% sobre 156,00 del aceite); el total final es la suma de ambas filas (820,60 + 162,24 = 982,84).",
+      "La trufa viene con IVA 4% impreso (R741, R1437); el caviar, cangrejo y huevas con 10%."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio (sin descuentos)",
+    "por cada tipo de IVA: base = suma de importes de sus líneas; IVA = base × % (redondeado a céntimos); total = base + IVA",
+    "total factura = suma de los totales por tipo de IVA (R159: 746,00 + 74,60 + 156,00 + 6,24 = 982,84)",
+    "factura de un solo tipo (R741): 165,00 + 4% (6,60) = 171,60; R1163: 195,00 + 10% (19,50) = 214,50"
+  ],
+
+  "guia_ocr": "Factura digital de Sokol Vin, una página. Número 'A403/26' y fecha 'DD.MM.AAAA' en la misma fila 'FACTURA: … | FECHA: …'. La columna Nº LOTE está vacía: el primer número de cada línea es la CANTIDAD (unidades; kg con 3 decimales en trufa). Los gramos o ml de la descripción son el formato de la lata/tarro, no la cantidad. PRECIO es por unidad (por kg en trufa); IMPORTE = cantidad × precio. Ignora las filas '0,00' de relleno. El pie puede tener dos IVA (10% y 4%): suma los dos totales. Cliente: MASIDE 2011 / Casa Tomás.",
+
+  "productos": [
+    {
+      "nombre_impreso": "TRUFA DE VERANO TUBER AESTIVUM",
+      "nombre_normalizado": "Trufa de verano (Tuber aestivum)",
+      "familia": "trufa",
+      "presentacion": "trufa fresca a granel, por peso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 330.0, "max": 550.0, "por": "kg", "ejemplos": [["2026-05-07", 550.0], ["2026-08-26", 330.0]] },
+      "iva_pct": 4,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "TRUFA TUBER MELANSPORUM",
+      "nombre_normalizado": "Trufa negra (Tuber melanosporum)",
+      "familia": "trufa",
+      "presentacion": "trufa fresca a granel, por peso",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "kg",
+      "precio": { "min": 880.0, "max": 880.0, "por": "kg", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "CAVIAR OSCIETRA IMPERIAL, 10 gr.",
+      "nombre_normalizado": "Caviar Oscietra Imperial 10 g",
+      "familia": "caviar",
+      "presentacion": "caviar envasado (lata/tarro, el envase no se indica)",
+      "formato": { "envase": "lata/tarro (sin especificar)", "contenido": 10, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 13.0, "max": 13.0, "por": "unidad", "ejemplos": [["2026-01-29", 13.0]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "CAVIAR OSCIETRA IMPERIAL, 20 gr.",
+      "nombre_normalizado": "Caviar Oscietra Imperial 20 g",
+      "familia": "caviar",
+      "presentacion": "caviar envasado (lata/tarro, el envase no se indica)",
+      "formato": { "envase": "lata/tarro (sin especificar)", "contenido": 20, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 26.0, "max": 26.0, "por": "unidad", "ejemplos": [["2026-01-29", 26.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CAVIAR OSCIETRA IMPERIAL, 30 gr.",
+      "nombre_normalizado": "Caviar Oscietra Imperial 30 g",
+      "familia": "caviar",
+      "presentacion": "caviar envasado (lata/tarro, el envase no se indica)",
+      "formato": { "envase": "lata/tarro (sin especificar)", "contenido": 30, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 39.0, "max": 39.0, "por": "unidad", "ejemplos": [["2026-01-29", 39.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CAVIAR OSCIETRA IMPERIAL, 50 gr.",
+      "nombre_normalizado": "Caviar Oscietra Imperial 50 g",
+      "familia": "caviar",
+      "presentacion": "caviar envasado (lata/tarro, el envase no se indica)",
+      "formato": { "envase": "lata/tarro (sin especificar)", "contenido": 50, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 65.0, "max": 65.0, "por": "unidad", "ejemplos": [["2026-01-29", 65.0], ["2026-07-16", 65.0]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CAVIAR OSCIETRA IMPERIAL, 100 gr.",
+      "nombre_normalizado": "Caviar Oscietra Imperial 100 g",
+      "familia": "caviar",
+      "presentacion": "caviar envasado (lata/tarro, el envase no se indica)",
+      "formato": { "envase": "lata/tarro (sin especificar)", "contenido": 100, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 130.0, "max": 130.0, "por": "unidad", "ejemplos": [["2026-01-29", 130.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ACEITE CON TRUFA, 250 ml.",
+      "nombre_normalizado": "Aceite con trufa 250 ml",
+      "familia": "aceite",
+      "presentacion": "aceite aromatizado envasado",
+      "formato": { "envase": "botella (sin especificar)", "contenido": 25, "unidad_contenido": "cl", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 13.0, "max": 13.0, "por": "unidad", "ejemplos": [["2026-01-29", 13.0]] },
+      "iva_pct": 4,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CARNE DE CANGREJO, 250 gr.",
+      "nombre_normalizado": "Carne de cangrejo 250 g",
+      "familia": "marisco",
+      "presentacion": "carne de cangrejo envasada (no se indica si congelada o pasteurizada)",
+      "formato": { "envase": "tarro/lata (sin especificar)", "contenido": 250, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 22.0, "max": 22.0, "por": "unidad", "ejemplos": [["2026-01-29", 22.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "HUEVAS DE TRUCHA, 250 gr.",
+      "nombre_normalizado": "Huevas de trucha 250 g",
+      "familia": "huevas",
+      "presentacion": "huevas de trucha envasadas",
+      "formato": { "envase": "tarro/lata (sin especificar)", "contenido": 250, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 26.0, "max": 26.0, "por": "unidad", "ejemplos": [["2026-01-29", 26.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CUCHARAS DE NACAR",
+      "nombre_normalizado": "Cucharas de nácar",
+      "familia": "menaje",
+      "presentacion": "cuchara para caviar, unidad suelta",
+      "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 1, "bulto": "unidad" },
+      "unidad_factura": "unidad",
+      "precio": { "min": 3.0, "max": 3.0, "por": "unidad", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 2
+    }
+  ],
+
+  "dudas": [
+    "La trufa de verano pasa de 550 €/kg (R741, mayo) a 330 €/kg (R1437, agosto): puede ser variación estacional real; no es un error de lectura si cuadra.",
+    "La trufa lleva IVA 4% impreso en R741 y R1437 (poco habitual): se transcribe tal cual; la melanosporum (R317) no se ha leído, su IVA se desconoce.",
+    "El aceite con trufa lleva 4% (deducido del 6,24 sobre 156,00 en R159).",
+    "La factura no dice si el caviar va en lata o tarro ni si el cangrejo es congelado o pasteurizado.",
+    "Cucharas de nácar: IVA no verificado (R862 no está entre las muestras leídas).",
+    "El catálogo completo cabe en la ficha (11 artículos); no hay artículos fuera."
+  ]
+}

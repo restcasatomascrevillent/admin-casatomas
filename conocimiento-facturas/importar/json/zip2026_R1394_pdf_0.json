@@ -1,0 +1,67 @@
+{
+ "archivo": "R1394.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "8472",
+ "fecha": "2026-09-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": null,
+   "nombre": "Envase CAJA CUNERA (1 x 3,3000)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.3,
+   "descuento_pct": null,
+   "total": 3.3,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  },
+  {
+   "orden": 2,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (4 x 1,6500)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.6,
+   "descuento_pct": null,
+   "total": 6.6,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 9.9,
+ "desglose_iva": [
+  {
+   "base": 9.9,
+   "pct": 21,
+   "cuota": 2.08
+  }
+ ],
+ "iva": 2.08,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 11.98,
+ "observaciones": "Transferencia 30 días. Factura solo de envases (albarán ENV 2282/26 del 01/09/2026). Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

@@ -1,0 +1,81 @@
+{
+ "archivo": "R651.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ROMAN Y MARTOS ALIMENTACION, S.L.",
+ "cif": "B02873545",
+ "local": "casa_tomas",
+ "numero_documento": "26/9074",
+ "fecha": "2026-04-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RODABALLO SALVAJE 2000/3000",
+   "producto_ficha": "Rodaballo salvaje 2-3 kg/pieza",
+   "cantidad": 9.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.95,
+   "descuento_pct": null,
+   "total": 229.92,
+   "iva_pct": 10,
+   "albaran_ref": "26/18901",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RODABALLO SALVAJE 1000/2000",
+   "producto_ficha": "Rodaballo salvaje 1-2 kg/pieza",
+   "cantidad": 2.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.95,
+   "descuento_pct": null,
+   "total": 62.27,
+   "iva_pct": 10,
+   "albaran_ref": "26/18901",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "RODABALLO SALVAJE 2000/3000",
+   "producto_ficha": "Rodaballo salvaje 2-3 kg/pieza",
+   "cantidad": 9.2,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.95,
+   "descuento_pct": null,
+   "total": 220.34,
+   "iva_pct": 10,
+   "albaran_ref": "26/18901",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 512.53,
+ "desglose_iva": [
+  {
+   "base": 512.53,
+   "pct": 10,
+   "cuota": 51.25
+  }
+ ],
+ "iva": 51.25,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 563.78,
+ "observaciones": "Albarán 26/18901 de 06/04/2026. A 30 días con albarán (SANTANDER); vencimiento 10/05/2026 por 563,78 €. Total kilos 21,40. El calibre 2000/3000 aparece en dos líneas con lotes distintos (04042026 y TUR030426): son dos líneas. Las dos páginas del PDF son la misma factura duplicada (leída una vez).",
+ "alertas": []
+}

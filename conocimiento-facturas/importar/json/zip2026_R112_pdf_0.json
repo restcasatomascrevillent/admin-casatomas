@@ -1,0 +1,46 @@
+{
+ "archivo": "R112.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EQUIPALIA SUMINISTROS HOSTELEROS, S.L.",
+ "cif": "B42568519",
+ "local": "casa_tomas",
+ "numero_documento": "VTAF/26-00183",
+ "fecha": "2026-01-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PLATO PASTA NATURA Ø 23 CM (6) (cód. QU18113)",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.94,
+   "descuento_pct": null,
+   "total": 29.88,
+   "iva_pct": 21,
+   "albaran_ref": "VTAA/26-00053",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 29.88,
+ "desglose_iva": [
+  {
+   "base": 29.88,
+   "pct": 21,
+   "cuota": 6.27
+  }
+ ],
+ "iva": 6.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 36.15,
+ "observaciones": "Dirección de envío: RESTAURANTE CASA TOMAS / MASIDE 2011, S.L. Forma de pago: GIRO. Importe pendiente 36,15 €.",
+ "alertas": []
+}

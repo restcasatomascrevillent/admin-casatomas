@@ -1,0 +1,46 @@
+{
+ "archivo": "R120.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CÁRNICAS JOSELITO, S.A.",
+ "cif": "A87934337",
+ "local": "casa_tomas",
+ "numero_documento": "F-2650047",
+ "fecha": "2026-01-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHICHAS JOSELITO FRESCAS",
+   "producto_ficha": null,
+   "cantidad": 16.514,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.0,
+   "descuento_pct": null,
+   "total": 346.79,
+   "iva_pct": 10,
+   "albaran_ref": "F-2650051",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 346.79,
+ "desglose_iva": [
+  {
+   "base": 346.79,
+   "pct": 10,
+   "cuota": 34.68
+  }
+ ],
+ "iva": 34.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 381.47,
+ "observaciones": "Forma de pago: GIRO a 30 días F.F. Vencimiento 13/02/2026 por 381,47 €. Albarán F-2650051 (14/01/2026). Cliente 13608. Observación impresa: carne fresca.",
+ "alertas": []
+}

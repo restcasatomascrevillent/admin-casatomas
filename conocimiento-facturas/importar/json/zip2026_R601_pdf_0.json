@@ -1,0 +1,48 @@
+{
+ "archivo": "R601.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260188",
+ "fecha": "2026-04-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "RODABALLO",
+   "producto_ficha": "Rodaballo",
+   "cantidad": 13.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.5,
+   "descuento_pct": null,
+   "total": 396.5,
+   "iva_pct": 10,
+   "albaran_ref": "1-000188",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 396.5,
+ "desglose_iva": [
+  {
+   "base": 396.5,
+   "pct": 10,
+   "cuota": 39.65
+  }
+ ],
+ "iva": 39.65,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 436.15,
+ "observaciones": "Transferencia CaixaBank; vencimiento 23/04/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: RODABALLO 30,50 (ficha 34,50)"
+ ]
+}

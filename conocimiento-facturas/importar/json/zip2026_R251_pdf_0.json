@@ -1,0 +1,80 @@
+{
+ "archivo": "R251.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170751766",
+ "fecha": "2026-02-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA AGRIA 20K ES",
+   "producto_ficha": "Patata agria (saco 20 kg)",
+   "cantidad": 1200.0,
+   "unidad": "kg",
+   "bultos": 60,
+   "contenido_cantidad": 20,
+   "contenido_unidad": "kg",
+   "precio_unitario": 0.64,
+   "descuento_pct": null,
+   "total": 768.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 5 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 5 (Costa Rica)",
+   "cantidad": 13.05,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 22.84,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 69.95,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.62,
+   "descuento_pct": null,
+   "total": 43.37,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 834.21,
+ "desglose_iva": [
+  {
+   "base": 834.21,
+   "pct": 4,
+   "cuota": 33.37
+  }
+ ],
+ "iva": 33.37,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 867.58,
+ "observaciones": "Fecha entrega 20.02.2026, igual que la fecha de factura. Total BT 66 (60+1+5). Asterisco GLOBALG.A.P. quitado del nombre.",
+ "alertas": []
+}

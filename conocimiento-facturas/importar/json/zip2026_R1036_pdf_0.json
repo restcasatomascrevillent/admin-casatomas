@@ -1,0 +1,101 @@
+{
+ "archivo": "R1036.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Victor Millán (nombre solo en la forma de pago; sin razón social ni CIF impresos)",
+ "cif": null,
+ "local": "casa_tomas",
+ "numero_documento": "V-20260066",
+ "fecha": "2026-06-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Kit Nebulizadores 27 desde 25-50m2 (bomba alta presión, tubería alta y baja presión, racores y nebulizadores)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 940.04,
+   "descuento_pct": null,
+   "total": 940.04,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Ventilador 20\"",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 300.0,
+   "descuento_pct": null,
+   "total": 1200.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Kit Nebulizadores 27 desde 25-50m2 (bomba alta presión, tubería alta y baja presión, racores y nebulizadores)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 940.03,
+   "descuento_pct": null,
+   "total": 940.03,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Ventilador 20\"",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 300.0,
+   "descuento_pct": null,
+   "total": 600.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3680.07,
+ "desglose_iva": [
+  {
+   "base": 3680.07,
+   "pct": 21,
+   "cuota": 772.81
+  }
+ ],
+ "iva": 772.81,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 4452.88,
+ "observaciones": "Forma de pago: transferencia (cuenta impresa, no transcrita). Vencimiento 23/06/2026. Las filas de agrupación «Equipo restaurante» y «Equipo pub» (cantidad 1, importe 0,00) no se han tomado como líneas. Cliente impreso: MASIDE 2011 S.L., C/ Santa Maria de la Cabeza 2, Crevillente.",
+ "alertas": [
+  "Emisor sin CIF ni razón social impresos; el nombre «Victor Millán» aparece solo en la forma de pago. Revisar el original para identificar al proveedor.",
+  "«Kit Nebulizadores 27» aparece dos veces con precios 940,04 y 940,03 (diferencia de 0,01 €); se registra tal cual.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "TORRES AZNAR, RAFAEL",
+ "cif": "21452598S",
+ "local": "casa_tomas",
+ "numero_documento": "498/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.6,
+   "descuento_pct": null,
+   "total": 56.96,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 56.96,
+ "desglose_iva": [
+  {
+   "base": 56.96,
+   "pct": 10,
+   "cuota": 5.7
+  }
+ ],
+ "iva": 5.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 62.66,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18463.",
+ "alertas": []
+}

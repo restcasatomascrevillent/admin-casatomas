@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "BOTELLA GARCIA, FRANCISCO MIGUEL",
+ "cif": "74011303V",
+ "local": "casa_tomas",
+ "numero_documento": "513/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 0.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.4,
+   "descuento_pct": null,
+   "total": 32.68,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 32.68,
+ "desglose_iva": [
+  {
+   "base": 32.68,
+   "pct": 10,
+   "cuota": 3.27
+  }
+ ],
+ "iva": 3.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 35.95,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18463.",
+ "alertas": []
+}

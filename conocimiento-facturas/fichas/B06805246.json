@@ -1,0 +1,3178 @@
+{
+  "cif": "B06805246",
+  "nombre": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO, S.R.L.",
+  "nombres_impresos": [
+    "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO, SRL",
+    "NICOLAS Y VALERO",
+    "nicolasyvalero.es"
+  ],
+  "categoria": "alimentacion-general",
+  "locales": [
+    "casa_tomas"
+  ],
+  "muestras": [
+    "R58.pdf",
+    "R481.pdf",
+    "R1000.pdf",
+    "R127.pdf",
+    "R1641.pdf"
+  ],
+  "documento": {
+    "tipo_habitual": "factura quincenal (giro resumen) que agrupa muchos albaranes de reparto; 3-5 páginas, 1 factura por PDF. Hay además facturas pequeñas por familia (P = pescado fresco, PS) y abonos (C)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "3-5",
+    "numero_factura": {
+      "ejemplos": [
+        "A26/1709",
+        "A26/4158",
+        "A26/14710",
+        "A26/31504",
+        "A26/48446",
+        "P26/2169",
+        "PS26/248",
+        "C26/3026"
+      ],
+      "patron": "^(A|P|PS|C)26/\\d+$",
+      "donde": "arriba de cada página: 'FACTURA ORIGINAL Nº A26/14710' (se repite en todas las páginas y también en el pie 'FRA. Nº')"
+    },
+    "fecha": "'FECHA 16/01/2026' (enero) o 'FECHA 31/03/26' (año de 2 cifras desde marzo), junto a 'F.VTO PAGO'. Es fecha de factura (quincena); las fechas de entrega van en cada albarán",
+    "albaranes": "cabecera de grupo 'Alb.: A26/620 (08/01/26)' o 'Alb.: A26/4.586 ( 18/03/2026)' (A = seco/congelado, P = pescadería, con punto de millar) antes de sus líneas; un mismo albarán puede cruzar de página"
+  },
+  "lectura": {
+    "columnas": [
+      "Ref.",
+      "Descripción",
+      "Unidad (U. / 1C, 2U, '1C y 1U')",
+      "Cantidad",
+      "Precio",
+      "Dto (€/unidad, a veces)",
+      "Importe neto",
+      "IVA % (solo desde marzo)"
+    ],
+    "cantidad_es": "unidades sueltas (botes, bolsas, piezas, raciones) o kg en producto a peso. La columna Unidad cuenta BULTOS (2C = 2 cajas, 3U = 3 unidades, '1C y 2U') y no se multiplica por el precio: 1C con Cantidad 15 = una caja de 15 unidades; 1U con Cantidad 5,900 = una pieza/caja de 5,9 kg",
+    "columna_peso": "Cantidad, con 3 decimales, en productos pescados, carnes, jamón, trufa, etc.",
+    "precio_es_por": "unidad en envasados (ud, tarro, bote) y kg en producto pesado; siempre sobre Cantidad",
+    "descuento_por_linea": {
+      "existe": true,
+      "columna": "Dto (entre Precio e Importe; en enero era 'Dto', desde marzo 'DtoM | Dto')",
+      "valores_habituales": [
+        0.25,
+        0.26,
+        0.35,
+        0.76
+      ]
+    },
+    "iva_por_linea": true,
+    "tipos_iva": [
+      4,
+      10,
+      21
+    ],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": "no hay líneas de envase ni de devolución de envases en las muestras",
+    "cargos_y_descuentos_pie": [
+      "Texto 'Gestión de embalajes, punto verde y logística según Art. 78 Ley 37/92.2: 1,82 €/entrega' / 'Cada reparto incluye 1,82 € + IVA por embalajes, logística y punto verde': es solo un texto informativo, NO es una línea de artículo ni aparece con importe propio; ignorarlo como línea. Su importe (1,82 € por día de reparto) ya va dentro de la base (ver reglas_cuadre).",
+      "Pie con IBAN del proveedor, aviso de riesgos laborales y texto de protección de datos: ignorar"
+    ],
+    "trampas": [
+      "Hay DOS diseños en el año. Enero (R58, R127): columnas Unidad | Cantidad | Precio | Dto | Importe neto, SIN IVA por línea, el IVA solo en el pie. Desde marzo (R481, R1000, R1641): columnas U. | Cantidad | Precio | DtoM | Dto | Imp. | IVA, con el tipo ('10%', '4%', '21%') pegado detrás del importe, a veces sin barra ('247,80 10%')",
+      "En el pie de enero la cabecera dice 'Dto. | Imp. Dto.' pero el '10%' y el '4%' son el % de IVA (con su importe); no es un descuento",
+      "Dto por línea es euros por unidad (no %) y a veces sale con punto decimal ('0.25'): 4 × 5,40 − 4 × 0,25 = 20,60. Importe neto = Cantidad × Precio − Cantidad × Dto, y no coincide con Cantidad × Precio (8 × 4,95 = 39,60 pero el importe es 37,52). Dar prioridad al importe impreso",
+      "Importes con punto de millar y coma decimal (1.234,56); Cantidad con 3 decimales y coma ('5,900')",
+      "La descripción puede estar en la línea de arriba y el código/importes en la de abajo, o partida en dos líneas; texto lateral repetido ('SRL.', 'VALERO', 'NICOLÁS', 'Inscrip.', 'Hoja', 'tomo', 'folio', 'MU-00104919', 'C.I.F.:B06805246') se mete delante del código: ignorarlo",
+      "Debajo de cada línea hay 'Lote: … | Fecha Cad.: …' (no son artículos) y bloques de letras/números hex (F8BBB8F…) que son códigos de barras: ignorar",
+      "El número 'PÁGINA 1/4' de la primera página puede no coincidir con las hojas reales (R1641 tiene 5)",
+      "Sellos 'DUPLICADO' y 'NO VALIDO COMO…' (copia); el cliente impreso es MASIDE 2011 SLU / RESTAURANTE CASA TOMAS, B54583356, cliente nº 11157: no es el proveedor",
+      "Un mismo código cambia de nombre y de formato con el tiempo (9255 'TRI-COK DELUXE 280 GRS C/10U' pasa a 'CO(K) - ACEITE OLIVA 280 GR - TRITICUM' con IVA 4 %)",
+      "Los precios de pescado fresco, marisco y trufa cambian de una entrega a otra: no corregir un precio solo por estar fuera del rango",
+      "Abono: factura C26/… con cantidades e importes negativos (zamburiña −4,800 kg / −88,32; total −97,15 €)"
+    ]
+  },
+  "reglas_cuadre": [
+    "importe_linea = Cantidad × Precio − Cantidad × Dto(€/ud si hay), redondeado al céntimo (157,50 = 15 × 10,50; 20,60 = 4 × 5,40 − 4 × 0,25)",
+    "Total Importe (base) = suma de importes de todas las líneas + 1,82 € por cada día de reparto distinto; en R58 las líneas suman 2.898,93 y la base es 2.909,85 (dif. 10,92 = 6 × 1,82; hay 6 fechas de albarán distintas: 03, 08, 09, 10, 13 y 14/01). No hay línea visible con ese cargo",
+    "Enero (R58, R127): el pie es 'base 10 % | IVA', 'suma de bases', 'base 4 % | IVA', total. R58: 2.298,58 × 10 % = 229,86; 611,27 × 4 % = 24,45; bases 2.909,85 + IVA 254,31 = 3.164,16. R127: 4.866,75 × 10 % = 486,68; 851,82 × 4 % = 34,07; 5.718,57 + 520,75 = 6.239,32",
+    "Desde marzo: la primera cifra del pie es 'Total Importe' = suma de bases; después una fila por tipo con base | % IVA | '+importe IVA'. R481: 4.357,18 = 3.790,88 (10 %) + 566,30 (4 %); IVA 379,09 + 22,65; total 4.758,92. R1000: 6.122,98 = 5.575,68 + 547,30; IVA 557,57 + 21,89; total 6.702,44. R1641: 6.250,82 = 5.353,28 (10 %) + 851,82 (4 %) + 45,72 (21 %); IVA 535,33 + 34,07 + 9,60; total 6.829,82",
+    "base por tipo = suma de importes de las líneas con ese % (más la parte del 1,82 € que corresponda); sin recargo de equivalencia ni retención",
+    "total = suma de bases + suma de IVA; coincide con 'FRA. Nº … Importe:' del pie"
+  ],
+  "guia_ocr": "Proveedor: Nicolás y Valero (B06805246). El cliente es MASIDE 2011 / Casa Tomás. Número 'FACTURA ORIGINAL Nº A26/nnnn' y FECHA DD/MM/AAAA (o AA). Albaranes 'Alb.: A26/nnn (dd/mm/aa)'. Línea: Ref | descripción | Unidad(bultos, ej. 2C) | Cantidad (unidades o kg, 3 decimales) | Precio | Dto €/ud opcional | Importe | IVA % pegado al importe desde marzo. Importe ≈ Cantidad × Precio. Ignora Lote/Fecha Cad, hashes, texto lateral repetido, IBAN y el texto de 1,82 € de embalajes (no es línea). Pie: Total Importe, bases por 4/10/21 %, IVA, total.",
+  "productos": [
+    {
+      "nombre_impreso": "ATUN ROJO (30143)",
+      "nombre_normalizado": "Atún rojo fresco (lomo/pieza)",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 42,
+        "max": 42,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            42
+          ],
+          [
+            "2026-06-30",
+            42
+          ],
+          [
+            "2026-09-30",
+            42
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 55
+    },
+    {
+      "nombre_impreso": "VENTRESCA ATUN ROJO (30234)",
+      "nombre_normalizado": "Ventresca de atún rojo fresca",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 48,
+        "max": 52,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            52
+          ],
+          [
+            "2026-09-30",
+            48
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "VENTRESCA ATUN ROJO FRESCO (30146)",
+      "nombre_normalizado": "Ventresca de atún rojo fresca (ref. 30146)",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 38.5,
+        "max": 38.5,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "KAMA/PARPATANA ATUN ROJO CORTADA RACION (30638)",
+      "nombre_normalizado": "Kama/parpatana de atún rojo cortada en ración",
+      "familia": "pescado",
+      "presentacion": "fresco, cortado",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 23,
+        "max": 23,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            23
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "SAKU (AKAMI) ATUN ROJO ULTRACONGELADO (30162)",
+      "nombre_normalizado": "Saku (akami) de atún rojo ultracongelado",
+      "familia": "pescado",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 50.7,
+        "max": 50.7,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "RP-VENTRESCA DE ATUN CLARO-280 LP AO RO-280 LP C/16U (8440)",
+      "nombre_normalizado": "Ventresca de atún claro en aceite, lata 280 (caja 16)",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva, lata",
+      "formato": {
+        "envase": "lata",
+        "contenido": 280,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 16,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 9.21,
+        "max": 9.56,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            9.56
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "GAMBA ROJA N1 COSTA ALICANTE (30828)",
+      "nombre_normalizado": "Gamba roja N1 de la costa de Alicante",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 122,
+        "max": 145,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            136
+          ],
+          [
+            "2026-09-30",
+            140
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 22
+    },
+    {
+      "nombre_impreso": "GAMBA ROJA G COSTA CARTAGENA (30042)",
+      "nombre_normalizado": "Gamba roja G de Cartagena",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 122,
+        "max": 135,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "GAMBA ROJA EXT COSTA ALMERIA (30881)",
+      "nombre_normalizado": "Gamba roja extra de Almería",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 86,
+        "max": 105,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "GAMBA ROJA/ALISTADO HUELVA EXTRA ESPECIAL (30380)",
+      "nombre_normalizado": "Gamba roja alistado de Huelva extra especial",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 100,
+        "max": 100,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COQUINA EXTRA (30786)",
+      "nombre_normalizado": "Coquina extra",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 38,
+        "max": 39,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            38
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "COQUINA DE A PIE (30175)",
+      "nombre_normalizado": "Coquina de a pie",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 29,
+        "max": 29,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            29
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "MEJILLON GALLEGO SACO (30312)",
+      "nombre_normalizado": "Mejillón gallego en saco (5 kg)",
+      "familia": "marisco",
+      "presentacion": "vivo/fresco, a granel en saco",
+      "formato": {
+        "envase": "saco",
+        "contenido": 5,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "saco"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 3.8,
+        "max": 3.9,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            3.8
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "MEJILLON GOURMET GALLEGO -30P/BANDEJA 1K (30313)",
+      "nombre_normalizado": "Mejillón gourmet gallego bandeja 1 kg (30 piezas)",
+      "familia": "marisco",
+      "presentacion": "vivo/fresco, bandeja",
+      "formato": {
+        "envase": "bandeja",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "bandeja"
+      },
+      "unidad_factura": "bandeja (1 kg)",
+      "precio": {
+        "min": 3.9,
+        "max": 4.5,
+        "por": "bandeja",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            4.5
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "MEJILLON ROCA SACO (30105)",
+      "nombre_normalizado": "Mejillón de roca en saco (5 kg)",
+      "familia": "marisco",
+      "presentacion": "vivo/fresco, a granel en saco",
+      "formato": {
+        "envase": "saco",
+        "contenido": 5,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "saco"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 6.2,
+        "max": 6.2,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ENTERA (K) AQUANARIA-LUBINA 11 (1100-1300) (30706)",
+      "nombre_normalizado": "Lubina entera Aquanaria 1,1-1,3 kg",
+      "familia": "pescado",
+      "presentacion": "fresco, entera",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 14.9,
+        "max": 14.9,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            14.9
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "LOMOS LIMPIOS (K) AQUANARIA-LUBINA 15 (1500-2000) (30843)",
+      "nombre_normalizado": "Lomos de lubina limpios Aquanaria 15 (1,5-2 kg)",
+      "familia": "pescado",
+      "presentacion": "fresco, lomo limpio",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 16.6,
+        "max": 16.6,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            16.6
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 13
+    },
+    {
+      "nombre_impreso": "LOMOS LIMPIOS (K) SALMON FRESCO 7/8 (30186)",
+      "nombre_normalizado": "Lomos de salmón fresco 7/8",
+      "familia": "pescado",
+      "presentacion": "fresco, lomo limpio",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 13.5,
+        "max": 13.7,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            13.7
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "LOMOS LIMPIOS (K) SALMON FRESCO 5/6K (30002)",
+      "nombre_normalizado": "Lomos de salmón fresco 5/6",
+      "familia": "pescado",
+      "presentacion": "fresco, lomo limpio",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 12.3,
+        "max": 12.3,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "FILETE DE SALMON FRESCO (30483)",
+      "nombre_normalizado": "Filete de salmón fresco (envasado)",
+      "familia": "pescado",
+      "presentacion": "fresco, filete",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 17.2,
+        "max": 17.7,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "COLA DE RAPE 4+K (30837)",
+      "nombre_normalizado": "Cola de rape 4+ kg",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 22.5,
+        "max": 23,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            23
+          ],
+          [
+            "2026-09-30",
+            22.5
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "COLA DE RAPE 3-4K (30836)",
+      "nombre_normalizado": "Cola de rape 3-4 kg",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 23.5,
+        "max": 23.5,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COLA DE RAPE ULTRACONGELADO (30674)",
+      "nombre_normalizado": "Cola de rape ultracongelada",
+      "familia": "pescado",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 19.5,
+        "max": 19.5,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CAÑAILLA XL (30132)",
+      "nombre_normalizado": "Cañaílla XL",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 32,
+        "max": 32,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            32
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "CAÑAILLA MG (30858)",
+      "nombre_normalizado": "Cañaílla MG",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 32,
+        "max": 33,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "PALOMETA (30366)",
+      "nombre_normalizado": "Palometa",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 24,
+        "max": 24,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "RASCACIO 1-2k (30698)",
+      "nombre_normalizado": "Rascacio 1-2 kg",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 22,
+        "max": 22,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "GALLO PEDRO 1-2k (30035)",
+      "nombre_normalizado": "Gallo pedro 1-2 kg",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 22,
+        "max": 22,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "COCOCHA BACALAO FRESCA (30106)",
+      "nombre_normalizado": "Cococha de bacalao fresca",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 24,
+        "max": 24,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "CABALLA FRESCA (30515)",
+      "nombre_normalizado": "Caballa fresca",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 5.8,
+        "max": 5.8,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BOQUERON MEDITERRANEO (30862)",
+      "nombre_normalizado": "Boquerón mediterráneo fresco",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 7.8,
+        "max": 7.8,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "BOQUERON ATLANTICO (30033)",
+      "nombre_normalizado": "Boquerón atlántico fresco",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 6.9,
+        "max": 6.9,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "DENTON (30260)",
+      "nombre_normalizado": "Dentón",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 27,
+        "max": 27,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            27
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CHANQUETE/LLANQUETA (30261)",
+      "nombre_normalizado": "Chanquete/llanqueta",
+      "familia": "pescado",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 68,
+        "max": 68,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            68
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "PUNTILLA (30265)",
+      "nombre_normalizado": "Puntilla",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 28.5,
+        "max": 28.5,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            28.5
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CIGALA N1 - 9/12p (30716)",
+      "nombre_normalizado": "Cigala N1 9/12 piezas",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 84,
+        "max": 84,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CIGALA XL - 7/9p (30763)",
+      "nombre_normalizado": "Cigala XL 7/9 piezas",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 96,
+        "max": 96,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LANGOSTINO NACIONAL \"MG\" (30785)",
+      "nombre_normalizado": "Langostino nacional MG",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 42,
+        "max": 42,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "QUISQUILLA G NASAS ALMERIA (30816)",
+      "nombre_normalizado": "Quisquilla G de nasas de Almería",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 60,
+        "max": 60,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ESPARDEÑAS (30370)",
+      "nombre_normalizado": "Espardeñas",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 92,
+        "max": 92,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CHIRLA ITALIANA GORDA (30291)",
+      "nombre_normalizado": "Chirla italiana gorda",
+      "familia": "marisco",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 14.5,
+        "max": 14.5,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ZAMBURIÑA 20/30 C/CORAL MEDIA CONCHA 1K (PNE 800 grs) C/10U (10190)",
+      "nombre_normalizado": "Zamburiña 20/30 con coral, media concha (caja 10 x 1 kg, peso neto escurrido 800 g)",
+      "familia": "marisco",
+      "presentacion": "congelado, media concha",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 10,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 18.4,
+        "max": 18.4,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            18.4
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "CONCHA MARISCO GRAT.25%VIEIRA (10049)",
+      "nombre_normalizado": "Concha de marisco gratinada con 25 % de vieira (caja 12)",
+      "familia": "marisco elaborado",
+      "presentacion": "congelado, precocinado",
+      "formato": {
+        "envase": "concha",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 10,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 1.9,
+        "max": 1.9,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AIN-VIIEIRA GRATIANADA 18X120 GRS (14109)",
+      "nombre_normalizado": "Vieira gratinada (18 x 120 g)",
+      "familia": "marisco elaborado",
+      "presentacion": "congelado, precocinado",
+      "formato": {
+        "envase": "concha",
+        "contenido": 120,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 18,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 1.63,
+        "max": 1.63,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            1.63
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AIN-FILETE GALLINETA 150/250 25% GLAS C/5 KG (14319)",
+      "nombre_normalizado": "Filete de gallineta 150/250 con 25 % de glaseado (caja 5 kg)",
+      "familia": "pescado",
+      "presentacion": "congelado, filete",
+      "formato": {
+        "envase": "caja",
+        "contenido": 5,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 5.25,
+        "max": 5.25,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "(C)SD-COULANT PISTACHO 100 GR C/12UD (14641)",
+      "nombre_normalizado": "Coulant de pistacho 100 g (caja 12)",
+      "familia": "postre",
+      "presentacion": "congelado, individual",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 100,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 12,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 1.9,
+        "max": 2.21,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            1.9
+          ],
+          [
+            "2026-03-31",
+            2.1
+          ],
+          [
+            "2026-09-30",
+            2.21
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 48
+    },
+    {
+      "nombre_impreso": "(C)PO-COULANT S/GLUTEN CHOCOLATE 120 GR C/18UD (11017)",
+      "nombre_normalizado": "Coulant de chocolate sin gluten 120 g (caja 18)",
+      "familia": "postre",
+      "presentacion": "congelado, individual, sin gluten",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 120,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 18,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 1.47,
+        "max": 1.47,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            1.47
+          ],
+          [
+            "2026-09-30",
+            1.47
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 32
+    },
+    {
+      "nombre_impreso": "QUESO GRANA PADANO ESCAMAS 500 GRS (6484)",
+      "nombre_normalizado": "Grana Padano en escamas 500 g (caja 4)",
+      "familia": "queso",
+      "presentacion": "envasado, escamas",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 500,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 4,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 8.55,
+        "max": 9.05,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            9.05
+          ],
+          [
+            "2026-03-31",
+            8.55
+          ],
+          [
+            "2026-06-30",
+            8.6
+          ],
+          [
+            "2026-09-30",
+            9
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 40
+    },
+    {
+      "nombre_impreso": "IN-BROTE GUISANTE 50 GRS (6855)",
+      "nombre_normalizado": "Brote de guisante 50 g",
+      "familia": "micro-verdura",
+      "presentacion": "fresco, envasado",
+      "formato": {
+        "envase": "bandeja",
+        "contenido": 50,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 3.85,
+        "max": 3.85,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            3.85
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 29
+    },
+    {
+      "nombre_impreso": "IN-MIX DE PETALOS (12976)",
+      "nombre_normalizado": "Mix de pétalos comestibles",
+      "familia": "micro-verdura",
+      "presentacion": "fresco, envasado",
+      "formato": {
+        "envase": "bandeja",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 3.85,
+        "max": 3.85,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            3.85
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 17
+    },
+    {
+      "nombre_impreso": "EU-MUJJOL ROJO SHIKRAN TARRO 340 GRS (262)",
+      "nombre_normalizado": "Mújol rojo (huevas) Shikran, tarro 340 g",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva, tarro",
+      "formato": {
+        "envase": "tarro",
+        "contenido": 340,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 12.95,
+        "max": 13.25,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            12.95
+          ],
+          [
+            "2026-03-31",
+            13.25
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 25
+    },
+    {
+      "nombre_impreso": "(C)ORI-SALSA KIKKOMAN (SIN GLUTEN) FREE SHOYU 1L (7377)",
+      "nombre_normalizado": "Salsa de soja Kikkoman sin gluten 1 L",
+      "familia": "salsa",
+      "presentacion": "envasado, botella",
+      "formato": {
+        "envase": "botella",
+        "contenido": 1,
+        "unidad_contenido": "L",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 7.05,
+        "max": 7.05,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            7.05
+          ],
+          [
+            "2026-09-30",
+            7.05
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 22
+    },
+    {
+      "nombre_impreso": "MANTEQUILLA SIN SAL 1 KG - LATTERIA SORESINA (6487)",
+      "nombre_normalizado": "Mantequilla sin sal Soresina 1 kg",
+      "familia": "lácteo",
+      "presentacion": "envasado, pastilla",
+      "formato": {
+        "envase": "pastilla",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 7.01,
+        "max": 7.23,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 21
+    },
+    {
+      "nombre_impreso": "IC-COBERTURA EDELWEIS CHOCOLATE BLANCO (6192)",
+      "nombre_normalizado": "Cobertura de chocolate blanco Edelweiss",
+      "familia": "repostería",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": null,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 11.44,
+        "max": 15.99,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            15.99
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 17
+    },
+    {
+      "nombre_impreso": "IC-COBERTURA 72% VANINI CHOCOLATE CACAO (6189)",
+      "nombre_normalizado": "Cobertura de chocolate negro 72 % Vanini",
+      "familia": "repostería",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": null,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 13.4,
+        "max": 18.72,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            18.72
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "GOUR-SALSA MANTEQUILLA BLANCA 1 KG (14171)",
+      "nombre_normalizado": "Salsa mantequilla blanca 1 kg",
+      "familia": "salsa",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 13.48,
+        "max": 13.7,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            13.48
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 16
+    },
+    {
+      "nombre_impreso": "SO-SALSA HOLANDESA 1 LT (14680)",
+      "nombre_normalizado": "Salsa holandesa 1 L",
+      "familia": "salsa",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "brik",
+        "contenido": 1,
+        "unidad_contenido": "L",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 13.3,
+        "max": 14.9,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            13.3
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "GOUR-SALSA HOLANDESA 1 KG (14165)",
+      "nombre_normalizado": "Salsa holandesa Gourmet 1 kg",
+      "familia": "salsa",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 18.84,
+        "max": 18.84,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            18.84
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "SO-SALSUS SALSA HOLANDESA 1 LT (14696)",
+      "nombre_normalizado": "Salsa holandesa Salsus 1 L",
+      "familia": "salsa",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "brik",
+        "contenido": 1,
+        "unidad_contenido": "L",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 14.9,
+        "max": 14.9,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GOUR-MAYO-WASABI 1 KG (14162)",
+      "nombre_normalizado": "Mayonesa de wasabi 1 kg",
+      "familia": "salsa",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bote",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 14.22,
+        "max": 14.22,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            14.22
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "NERI WASABI EN PASTA 43gr (9629)",
+      "nombre_normalizado": "Wasabi en pasta Neri 43 g",
+      "familia": "condimento",
+      "presentacion": "envasado, tubo",
+      "formato": {
+        "envase": "tubo",
+        "contenido": 43,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 2.02,
+        "max": 2.02,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            2.02
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 16
+    },
+    {
+      "nombre_impreso": "CO(K) - ACEITE OLIVA 280 GR - TRITICUM / (C)TRI-COK DELUXE 280 GRS C/10U (9255)",
+      "nombre_normalizado": "Aceite de oliva Triticum 280 g (caja 10)",
+      "familia": "aceite",
+      "presentacion": "envasado, monodosis/pequeño formato",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 280,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 10,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 2.64,
+        "max": 2.64,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            2.64
+          ],
+          [
+            "2026-03-31",
+            2.64
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "(C)OK-TATAKI DE CHULETA PREMIUM LIMPIO C/15 UD (12854)",
+      "nombre_normalizado": "Tataki de chuleta premium limpio (caja 15)",
+      "familia": "carne de vaca",
+      "presentacion": "congelado/refrigerado, preparado",
+      "formato": {
+        "envase": "unidad",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 15,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 10.35,
+        "max": 10.83,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            10.5
+          ],
+          [
+            "2026-09-30",
+            10.35
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 9
+    },
+    {
+      "nombre_impreso": "CAP-ESCALOPE 40/60 GRS.FOIE GRAS CANARD CRU 1KG APROX.CONG (8138)",
+      "nombre_normalizado": "Escalope de foie gras de pato crudo 40/60 g (caja ~1 kg)",
+      "familia": "foie",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "caja",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 40.08,
+        "max": 40.29,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            40.29
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "LA-TRUFA VERANO GRANEL +15G FRESCA 1KG (14519)",
+      "nombre_normalizado": "Trufa de verano fresca a granel +15 g",
+      "familia": "trufa",
+      "presentacion": "fresca, a granel",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 125,
+        "max": 412.5,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            125
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 10
+    },
+    {
+      "nombre_impreso": "LA-TRUFA NEGRA INVIERNO PEQUEÑA IRREGULAR 8/15G FRESCA (14430)",
+      "nombre_normalizado": "Trufa negra de invierno pequeña irregular 8/15 g fresca",
+      "familia": "trufa",
+      "presentacion": "fresca",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 400,
+        "max": 912.5,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            400
+          ],
+          [
+            "2026-03-31",
+            850
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "LA-TRUFA NEGRA INVIERNO PRIMERA IRREGULAR +15G FRESCA (14390)",
+      "nombre_normalizado": "Trufa negra de invierno primera irregular +15 g fresca",
+      "familia": "trufa",
+      "presentacion": "fresca",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 593.75,
+        "max": 818.75,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 4,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "LA-TRUFA OTOÑO FRESCA ENTERA +15 GRS (14026)",
+      "nombre_normalizado": "Trufa de otoño fresca entera +15 g",
+      "familia": "trufa",
+      "presentacion": "fresca",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 300,
+        "max": 700,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            700
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "AR-TRUFA VERANO CONG.STD B/500 (1302)",
+      "nombre_normalizado": "Trufa de verano congelada estándar 500 g",
+      "familia": "trufa",
+      "presentacion": "congelada",
+      "formato": {
+        "envase": "bote",
+        "contenido": 500,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 217.62,
+        "max": 217.62,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CO-BOQUERON EN VINAGRETA 1000 GRS / BOQUERÓN DEL CANTABRICO EN VINAGRETA 950 GR (3429)",
+      "nombre_normalizado": "Boquerón del Cantábrico en vinagreta (tarro ~1 kg)",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva, vinagreta",
+      "formato": {
+        "envase": "tarro",
+        "contenido": 1000,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 31.38,
+        "max": 31.38,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            31.38
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 12
+    },
+    {
+      "nombre_impreso": "CO-CUBO ANCHOA DEL CANTABRICO GILDA 50 UNID. (6609)",
+      "nombre_normalizado": "Cubo de anchoa del Cantábrico para gildas (50 uds)",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva",
+      "formato": {
+        "envase": "cubo",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 50,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 53.95,
+        "max": 53.95,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "NV-ANCHOA SALAZON \"000\" CANTAB. B/20 UD-200 grs (7174)",
+      "nombre_normalizado": "Anchoa en salazón 000 del Cantábrico, bote 20 uds / 200 g",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva, salazón",
+      "formato": {
+        "envase": "bote",
+        "contenido": 200,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 28.85,
+        "max": 28.85,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            28.85
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "NV-ANCHOA SALAZON SELECC. \"00\" CANTAB. B/15 UD-150 grs APROX. (7739)",
+      "nombre_normalizado": "Anchoa en salazón selección 00 del Cantábrico, bote 15 uds / 150 g",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva, salazón",
+      "formato": {
+        "envase": "bote",
+        "contenido": 150,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 11.45,
+        "max": 11.45,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "(C)DP-MARINERA REGAÑA 4U B/35 GRS-CAJA 60 B / REGAÑA MARINERA 2x60 - DON PELAYO (8290)",
+      "nombre_normalizado": "Regañá marinera Don Pelayo (caja de 60 bolsas)",
+      "familia": "aperitivo",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 35,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 60,
+        "bulto": "caja"
+      },
+      "unidad_factura": "caja",
+      "precio": {
+        "min": 35.5,
+        "max": 35.5,
+        "por": "caja",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            35.5
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "CAR-ARENQUE AHUM. Y MARINADO EN ACEITE 450 GRS (14121)",
+      "nombre_normalizado": "Arenque ahumado y marinado en aceite 450 g",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva",
+      "formato": {
+        "envase": "tarro",
+        "contenido": 450,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 14,
+        "max": 14,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "SARDINA AHUMADA 550 GR - NICOLAS Y VALERO (13259)",
+      "nombre_normalizado": "Sardina ahumada 550 g (marca propia)",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva",
+      "formato": {
+        "envase": "tarro",
+        "contenido": 550,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 15.8,
+        "max": 15.8,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            15.8
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AN-HUEVA LUMPO NEGRO 340 GRS (6144)",
+      "nombre_normalizado": "Huevas de lumpo negro 340 g",
+      "familia": "conserva de pescado",
+      "presentacion": "conserva",
+      "formato": {
+        "envase": "tarro",
+        "contenido": 340,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 19.5,
+        "max": 19.5,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            19.5
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "GJ-CENTRO JAMON SERRANO BODEGA (313)",
+      "nombre_normalizado": "Centro de jamón serrano bodega deshuesado",
+      "familia": "embutido",
+      "presentacion": "pieza deshuesada",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "pieza"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 11.9,
+        "max": 13.65,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            13.65
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 11
+    },
+    {
+      "nombre_impreso": "CS-SALCHICHON PIEZA CULAR SUPERIOR \"CASA SENDRA\" (7211)",
+      "nombre_normalizado": "Salchichón de Vic pieza cular Casa Sendra",
+      "familia": "embutido",
+      "presentacion": "pieza entera",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "pieza"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 38,
+        "max": 38,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            38
+          ],
+          [
+            "2026-09-30",
+            38
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "(E)(C)IT-GUANCIALE 6 X 2 KGS (6531)",
+      "nombre_normalizado": "Guanciale (caja 6 x 2 kg)",
+      "familia": "embutido",
+      "presentacion": "pieza, peso variable",
+      "formato": {
+        "envase": "pieza",
+        "contenido": 2,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 6,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 12.17,
+        "max": 12.17,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            12.17
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "MRM-PASTRAMI 2 KGS APROX (13578)",
+      "nombre_normalizado": "Pastrami (pieza ~2 kg)",
+      "familia": "embutido",
+      "presentacion": "pieza",
+      "formato": {
+        "envase": "pieza",
+        "contenido": 2,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "pieza"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 27.56,
+        "max": 27.56,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "SM-SOLOMILLO AÑOJO +3,0 KGS. FRESCO. (6417)",
+      "nombre_normalizado": "Solomillo de añojo +3 kg fresco",
+      "familia": "carne de vaca",
+      "presentacion": "fresco, con hueso: no",
+      "formato": {
+        "envase": "pieza",
+        "contenido": 3,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 28.38,
+        "max": 34.26,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "SOLOMILLO VACA +3,0 KGS. FRESCO (3117)",
+      "nombre_normalizado": "Solomillo de vaca +3 kg fresco",
+      "familia": "carne de vaca",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": 3,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 30.25,
+        "max": 30.25,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "ARA-RIÑONADA C/SOLOMILLO TERNERA HEMBRA (14288)",
+      "nombre_normalizado": "Riñonada con solomillo de ternera hembra",
+      "familia": "carne de vaca",
+      "presentacion": "fresco, con hueso",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 20.46,
+        "max": 20.5,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            20.46
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "CHULETERO AÑOJO CON HUESO Y SOLOMILLO (1975)",
+      "nombre_normalizado": "Chuletero de añojo con hueso y solomillo",
+      "familia": "carne de vaca",
+      "presentacion": "fresco, con hueso",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 16.17,
+        "max": 16.17,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            16.17
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "OK-SOLOMILLO BUEY SUPREMA ANCESTRAL (13003)",
+      "nombre_normalizado": "Solomillo de buey Suprema Ancestral",
+      "familia": "carne de vaca",
+      "presentacion": "fresco",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 63.25,
+        "max": 63.25,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            63.25
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "(E) LOMO ALTO WAGYU JAPONES A5 LOMO ALTO S/HUESO (14689)",
+      "nombre_normalizado": "Lomo alto de wagyu japonés A5 sin hueso",
+      "familia": "carne de vaca",
+      "presentacion": "fresco, sin hueso",
+      "formato": {
+        "envase": "pieza",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 113.2,
+        "max": 113.2,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "DA-RABO VACA TERMOFORMADO BOLSA FRESCO DAS (8696)",
+      "nombre_normalizado": "Rabo de vaca termoformado, bolsa fresca",
+      "familia": "carne de vaca",
+      "presentacion": "fresco, termoformado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": null,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": null,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 16.5,
+        "max": 16.5,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            16.5
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AIN-COSTILLA DE CERDO TROCEADA C/4 KGS (14698)",
+      "nombre_normalizado": "Costilla de cerdo troceada (caja 4 kg)",
+      "familia": "carne de cerdo",
+      "presentacion": "congelado, troceada",
+      "formato": {
+        "envase": "caja",
+        "contenido": 4,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 5.4,
+        "max": 5.4,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            5.4
+          ],
+          [
+            "2026-09-30",
+            5.4
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "AIN-TAQUITOS DE CERDO EMPANADOS C/4 KGS (14989)",
+      "nombre_normalizado": "Taquitos de cerdo empanados (caja 4 kg)",
+      "familia": "carne de cerdo rebozada",
+      "presentacion": "congelado, empanado",
+      "formato": {
+        "envase": "caja",
+        "contenido": 4,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 8.1,
+        "max": 8.1,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "VIB-PULLED CERDO DESMIGADO 1KG C/5U (8708)",
+      "nombre_normalizado": "Pulled pork desmigado (5 x 1 kg)",
+      "familia": "carne de cerdo",
+      "presentacion": "cocinado, envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 5,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 13.66,
+        "max": 13.66,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            13.66
+          ],
+          [
+            "2026-09-30",
+            13.66
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 14
+    },
+    {
+      "nombre_impreso": "SMX-COCHINITA PIBIL B/1 KG C/5 KGS (12356)",
+      "nombre_normalizado": "Cochinita pibil (5 x 1 kg)",
+      "familia": "carne de cerdo",
+      "presentacion": "cocinado, envasado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 5,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 15.35,
+        "max": 15.35,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "OREJA 500 grs.ADOBADA BOLSA C/9U (633)",
+      "nombre_normalizado": "Oreja adobada 500 g (caja 9)",
+      "familia": "carne de cerdo",
+      "presentacion": "adobada, envasada",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 500,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 9,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 4.05,
+        "max": 4.05,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            4.05
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "AIN-FINGER POLLO 1x3 K (6059)",
+      "nombre_normalizado": "Fingers de pollo (3 kg)",
+      "familia": "pollo rebozado",
+      "presentacion": "congelado, rebozado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 3,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 9.45,
+        "max": 9.45,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "ALBONDIGAS AJO PEREJIL 100 UNID (CERDO Y TERNERA) (3017)",
+      "nombre_normalizado": "Albóndigas de ajo y perejil, cerdo y ternera (caja 100 uds)",
+      "familia": "plato preparado",
+      "presentacion": "congelado, precocinado",
+      "formato": {
+        "envase": "caja",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 100,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 5.45,
+        "max": 5.45,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            5.45
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "OK-MINI BURGUER MEAT VACA LURRA 38 GRS C/100 UDS (13941)",
+      "nombre_normalizado": "Mini burguer de vaca Lurra 38 g (caja 100)",
+      "familia": "carne de vaca",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 38,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 100,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.75,
+        "max": 0.75,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "RP/CA-ROLL DE CARRILLERA DE VACUNO C/MANGO C/30 UDS (14749)",
+      "nombre_normalizado": "Roll de carrillera de vacuno con mango (caja 30)",
+      "familia": "plato preparado",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "unidad",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 30,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 1.37,
+        "max": 1.37,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "EX-BUÑUELOS DE CHOCOLATE 30 GR C/72 UNIDADES / 40 GR - EXQUISITARIUM (4935)",
+      "nombre_normalizado": "Buñuelos de chocolate (caja 72)",
+      "familia": "postre",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 30,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 72,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.85,
+        "max": 0.95,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            0.85
+          ],
+          [
+            "2026-03-31",
+            0.95
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "TRI-BARRA DE PAN NATURE ESSENCIA 850 GRS C/6 UD (13811)",
+      "nombre_normalizado": "Barra de pan Nature Essencia 850 g (caja 6)",
+      "familia": "pan",
+      "presentacion": "congelado, pan",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 850,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 6,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 5.92,
+        "max": 5.92,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            5.92
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "(C)BRT-PAN DIAMANTINO 35 GR C/70U (11211)",
+      "nombre_normalizado": "Pan diamantino 35 g (caja 70)",
+      "familia": "pan",
+      "presentacion": "congelado, pan",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 35,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 70,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.27,
+        "max": 0.27,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            0.27
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "(C) CTP-PULGA PAN DE CRISTAL C/100 UDS (3786)",
+      "nombre_normalizado": "Pulga de pan de cristal (caja 100)",
+      "familia": "pan",
+      "presentacion": "congelado, pan",
+      "formato": {
+        "envase": "unidad",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 100,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.63,
+        "max": 0.7,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            0.7
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "PAN BAO BLANCO 60 GR / WA-PAN BAO 60 GRS BLANCO B/25 UDS (8797)",
+      "nombre_normalizado": "Pan bao blanco 60 g",
+      "familia": "pan",
+      "presentacion": "congelado, pan",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 60,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 25,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.38,
+        "max": 0.38,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": 4,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "BRIOCHE NEUTRO 35 GR SIN SESAMO - TRITICUM / TRI-BRIOCHE 35 GR C/96U NEUTRO (8446)",
+      "nombre_normalizado": "Brioche neutro 35 g (caja 96)",
+      "familia": "pan",
+      "presentacion": "congelado, pan",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 35,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 96,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.41,
+        "max": 0.41,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": 4,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "TRI-DISCO NEUTRO 35 GR C/96U (12304)",
+      "nombre_normalizado": "Disco de pan neutro 35 g (caja 96)",
+      "familia": "pan",
+      "presentacion": "congelado, pan",
+      "formato": {
+        "envase": "unidad",
+        "contenido": 35,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 96,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 0.52,
+        "max": 0.52,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "IC-PRALINE ALMENDRA TOSTADA ARTES. 55% ALMENDRA C/ 5 KG (11814)",
+      "nombre_normalizado": "Praliné de almendra tostada 55 % (caja 5 kg)",
+      "familia": "repostería",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "caja",
+        "contenido": 5,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 28.86,
+        "max": 28.86,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            28.86
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "(E)SO-MALTOSEC 500 GR/UD (2020)",
+      "nombre_normalizado": "Maltosec Sosa 500 g",
+      "familia": "repostería",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bote",
+        "contenido": 500,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 27.3,
+        "max": 27.3,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-03-31",
+            27.3
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "TREZ-ESFERA VERMUT ROJO CON 15% ALC 25MM 35U C/4U (15409)",
+      "nombre_normalizado": "Esferas de vermut rojo 15 % alc. 25 mm (35 uds, caja 4)",
+      "familia": "esferificación",
+      "presentacion": "congelado, con alcohol",
+      "formato": {
+        "envase": "bote",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 4,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 23.85,
+        "max": 23.85,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            23.85
+          ]
+        ]
+      },
+      "iva_pct": 21,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "FRESH PEARLS LIMA LIMON 55 GRS (7151)",
+      "nombre_normalizado": "Fresh Pearls lima-limón 55 g",
+      "familia": "esferificación",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bote",
+        "contenido": 55,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 3.54,
+        "max": 3.54,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            3.54
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "AR-AGUACATE DADOS B/ 1 KG C/5 UDS (12292)",
+      "nombre_normalizado": "Aguacate en dados 1 kg (caja 5)",
+      "familia": "fruta congelada",
+      "presentacion": "congelado, dados",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 5,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 6.57,
+        "max": 6.91,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-01-16",
+            6.57
+          ]
+        ]
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "AGUACATE EN MITADES (1286)",
+      "nombre_normalizado": "Aguacate en mitades congelado (caja 5 kg)",
+      "familia": "fruta congelada",
+      "presentacion": "congelado, mitades",
+      "formato": {
+        "envase": "caja",
+        "contenido": 5,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 7.08,
+        "max": 7.08,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "(C)AR-MANGO 10x10 DADOS 1 KG C/5 KGS. (13097)",
+      "nombre_normalizado": "Mango en dados 10x10 (1 kg, caja 5 kg)",
+      "familia": "fruta congelada",
+      "presentacion": "congelado, dados",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 5,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 6.22,
+        "max": 6.22,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "AIN-MEZCLA SETAS 4 X 1 KG (14084)",
+      "nombre_normalizado": "Mezcla de setas (4 x 1 kg)",
+      "familia": "verdura congelada",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 4,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 4.95,
+        "max": 4.95,
+        "por": "kg",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            4.95
+          ]
+        ]
+      },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "OLI-OLIVAS KALAMATA TAMAÑO XL C/HUESO 2 KGS (13768)",
+      "nombre_normalizado": "Aceitunas Kalamata XL con hueso 2 kg",
+      "familia": "conserva vegetal",
+      "presentacion": "conserva",
+      "formato": {
+        "envase": "cubo",
+        "contenido": 2,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 15.33,
+        "max": 15.33,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "OLI-OLIVAS KALAMATA TAMAÑO L S/HUESO 2 KGS (13767)",
+      "nombre_normalizado": "Aceitunas Kalamata L sin hueso 2 kg",
+      "familia": "conserva vegetal",
+      "presentacion": "conserva",
+      "formato": {
+        "envase": "cubo",
+        "contenido": 2,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 13.89,
+        "max": 13.89,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            13.89
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "PANKO 10 KG. YAMA (1708)",
+      "nombre_normalizado": "Panko Yama 10 kg",
+      "familia": "rebozado",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "saco",
+        "contenido": 10,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 35.65,
+        "max": 35.65,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "(C)CLV-MINI EMPANADILLA CRIOLLA 4X1 KG (13990)",
+      "nombre_normalizado": "Mini empanadilla criolla (4 x 1 kg)",
+      "familia": "aperitivo",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "bolsa",
+        "contenido": 1,
+        "unidad_contenido": "kg",
+        "unidades_por_bulto": 4,
+        "bulto": "caja"
+      },
+      "unidad_factura": "kg",
+      "precio": {
+        "min": 3.8,
+        "max": 3.8,
+        "por": "kg",
+        "ejemplos": []
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "LINGOTE HOJALDRE INVERTIDO CARAMELIZADO 75 UDS (12817)",
+      "nombre_normalizado": "Lingote de hojaldre invertido caramelizado (caja 75)",
+      "familia": "repostería",
+      "presentacion": "congelado",
+      "formato": {
+        "envase": "unidad",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 75,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 19.95,
+        "max": 19.95,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-06-30",
+            19.95
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "FM-JARABE MELAZA DE CAÑA ¨MIEL DE CAÑA¨ LA FLOR DE MALAGA (15437)",
+      "nombre_normalizado": "Miel de caña (melaza) La Flor de Málaga",
+      "familia": "endulzante",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "botella",
+        "contenido": null,
+        "unidad_contenido": null,
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 4.72,
+        "max": 4.72,
+        "por": "ud",
+        "ejemplos": []
+      },
+      "iva_pct": null,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "ACEITE DE SESAMO 500 ML (1725)",
+      "nombre_normalizado": "Aceite de sésamo 500 ml",
+      "familia": "aceite",
+      "presentacion": "envasado, botella",
+      "formato": {
+        "envase": "botella",
+        "contenido": 500,
+        "unidad_contenido": "ml",
+        "unidades_por_bulto": 1,
+        "bulto": "unidad"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 7.48,
+        "max": 7.48,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            7.48
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "(E)CAV-PINTURA 250 GRS. CEBOLLINO C/6 UDS (14369)",
+      "nombre_normalizado": "Pintura de cebollino 250 g (caja 6)",
+      "familia": "condimento",
+      "presentacion": "envasado",
+      "formato": {
+        "envase": "bote",
+        "contenido": 250,
+        "unidad_contenido": "g",
+        "unidades_por_bulto": 6,
+        "bulto": "caja"
+      },
+      "unidad_factura": "ud",
+      "precio": {
+        "min": 12.1,
+        "max": 12.1,
+        "por": "ud",
+        "ejemplos": [
+          [
+            "2026-09-30",
+            12.1
+          ]
+        ]
+      },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+  "dudas": [
+    "El catálogo digital tiene unos 170 artículos distintos; aquí van los 120 más repetidos. Quedan fuera 23+ artículos con 1 sola aparición (sobre todo pescado/marisco fresco de una entrega, repostería y pequeños envasados), p. ej.: PUERRO CONFITADO EN ACEITE 1.85 KG; CHIMAKI ZASA (HOJA BAMBU 100 PZ) (5264); STP-CROQUETA QUISQUILLA 35g 3x1K (30689); COF-GUINDILLA REBOZADA EN TEMPURA PRECOC. 1.KG C/2 UD (13650); (C)VIB-CEBOLLAS PLATILLO FRESCAS CARAM.500 GRS.C/6U (7870); LA-REBOZUELO SILVESTRE A GRANEL C/3KG (14021); TREZ-ESFERA SALMOREJO 25MM 25U C/4U (15413); TREZ-ESFERA MELON S/ALC 25MM 35U C/4U (15410); TRA-TROCADERO INDIVID. C/12 UDS CONG (14534); TRA-GOLDROCHE INDIVID. C/15 UDS CONG (11791); (E)SO-GELCREM FRIO 500 GRS/UNIDAD (5282); (E)SO-PROMAYO 600 GRS (15391).",
+    "veces_visto es un mínimo: el texto lateral repetido ('Inscrip.', 'Tomo', 'VALERO', etc.) pega prefijos distintos delante de la misma línea y parte el recuento (p. ej. ATUN ROJO sumaría ~55, no 38).",
+    "No se ha podido confirmar si el cargo de 1,82 €/entrega entra en la base del 10 % o del 21 %: solo se ha deducido en R58 (dif. 10,92 = 6 × 1,82) y no se ha repetido el cálculo en las otras muestras porque la extracción de líneas está partida por texto lateral.",
+    "En las facturas de enero no hay IVA por línea; el IVA de los artículos solo vistos en enero (iva_pct null) no está confirmado.",
+    "Las dos facturas R127 (enero) y R1641 (septiembre) tienen la misma base al 4 % (851,82) y el mismo IVA 34,07; posible casualidad o dato repetido, no comprobado.",
+    "En coberturas de chocolate (6192, 6189) y trufa a granel no queda claro si Cantidad son kg o unidades de 1 kg; los precios bajan de 15,99 a 11,44 (blanco) y de 18,72 a 13,40 (negro) entre enero y marzo/junio.",
+    "Cuando el cliente aparece como 'MASIDE 2011 SLU – RESTAURANTE CASA TOMAS' no hay muestras de Touza en las 5 facturas leídas.",
+    "Importe a veces ≠ Cantidad × Precio (setas 14084: 8 × 4,95 = 39,60 pero 37,52; esfera vermut 23,85 → 22,86): hay un descuento por unidad no impreso en esas líneas; no se ha deducido su regla."
+  ]
+}

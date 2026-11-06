@@ -1,0 +1,82 @@
+{
+ "archivo": "R1187.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260416",
+ "fecha": "2026-07-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 87.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000416",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PERCEBE",
+   "producto_ficha": "Percebe",
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.0,
+   "descuento_pct": null,
+   "total": 237.5,
+   "iva_pct": 10,
+   "albaran_ref": "1-000416",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BOGAVANTE",
+   "producto_ficha": "Bogavante",
+   "cantidad": 12.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 315.9,
+   "iva_pct": 10,
+   "albaran_ref": "1-000416",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 640.4,
+ "desglose_iva": [
+  {
+   "base": 640.4,
+   "pct": 10,
+   "cuota": 64.04
+  }
+ ],
+ "iva": 64.04,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 704.44,
+ "observaciones": "Albarán 1-000416 del 24/07/2026. Forma de pago: transferencia CaixaBank; vencimiento 24/07/2026 por 704,44. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "PERCEBE a 95,00 €/kg; la ficha da 110,00 €/kg (única referencia). Cuadra con cantidad x precio = total; revisar el precio."
+ ]
+}

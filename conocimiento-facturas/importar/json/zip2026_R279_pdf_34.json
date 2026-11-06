@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  35
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO MYT, C.B.",
+ "cif": "E24948994",
+ "local": "casa_tomas",
+ "numero_documento": "78/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 35,
+   "nombre": "MACRUROS",
+   "producto_ficha": null,
+   "cantidad": 6.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 853.05,
+   "iva_pct": 10,
+   "albaran_ref": "3654, 3396, 2186, 2073",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 853.05,
+ "desglose_iva": [
+  {
+   "base": 853.05,
+   "pct": 10,
+   "cuota": 85.31
+  }
+ ],
+ "iva": 85.31,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 938.36,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 913. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

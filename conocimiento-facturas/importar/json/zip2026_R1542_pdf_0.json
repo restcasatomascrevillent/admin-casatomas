@@ -1,0 +1,65 @@
+{
+ "archivo": "R1542.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26008476",
+ "fecha": "2026-09-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 2.58,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 108.36,
+   "iva_pct": 10,
+   "albaran_ref": "26002472",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MOJAMA DE ATUN ALETA AMARILLA SELECCION EXTRA",
+   "producto_ficha": "Mojama de atún aleta amarilla selección extra",
+   "cantidad": 6.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 241.2,
+   "iva_pct": 10,
+   "albaran_ref": "26002472",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 349.56,
+ "desglose_iva": [
+  {
+   "base": 349.56,
+   "pct": 10,
+   "cuota": 34.96
+  }
+ ],
+ "iva": 34.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 384.52,
+ "observaciones": "Transferencia Banco Santander, vencimiento 22/10/2026. Albarán 26002472 con la misma fecha que la factura.",
+ "alertas": [
+  "Albarán 26002472 con numeración fuera de la serie habitual (261xxxxx) y con la misma fecha que la factura (22/09/2026); no encaja con la ficha (albarán 2-4 días antes). Importes cuadran; se deja tal cual."
+ ]
+}

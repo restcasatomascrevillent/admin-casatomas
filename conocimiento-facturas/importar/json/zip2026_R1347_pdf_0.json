@@ -1,0 +1,46 @@
+{
+ "archivo": "R1347.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "SUMINISTROS HOSTELEROS BENISSA, S.L.U.",
+ "cif": "B53414637",
+ "local": "casa_tomas",
+ "numero_documento": "SCB 8024",
+ "fecha": "2026-08-21",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CUCHILLO CHULETERO K6 | K6 COMAS",
+   "producto_ficha": "Cuchillo chuletero K6 (Comas)",
+   "cantidad": -1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.07,
+   "descuento_pct": null,
+   "total": -4.06,
+   "iva_pct": 21,
+   "albaran_ref": "SCB / 7861",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -4.06,
+ "desglose_iva": [
+  {
+   "base": -4.06,
+   "pct": 21,
+   "cuota": -0.85
+  }
+ ],
+ "iva": -0.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -4.91,
+ "observaciones": "Rectificativa de la factura SCF 140811. La línea «CORRESP. FACT. 140811 FECHA 30.06.26» (0 uds, 0,00) es una nota, no un producto. La línea no tiene columna de descuento; el importe -4,06 coincide con 5,07 con el 20 % de la factura original (según ficha). Forma de pago PENDIENTE.",
+ "alertas": []
+}

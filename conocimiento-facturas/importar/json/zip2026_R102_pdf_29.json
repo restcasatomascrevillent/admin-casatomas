@@ -1,0 +1,46 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  30
+ ],
+ "tipo": "factura",
+ "proveedor": "ACOSTA SAURA, PEDRO DAVID",
+ "cif": "23954260J",
+ "local": "casa_tomas",
+ "numero_documento": "43/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 30,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 2.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 58.65,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 58.65,
+ "desglose_iva": [
+  {
+   "base": 58.65,
+   "pct": 10.0,
+   "cuota": 5.87
+  }
+ ],
+ "iva": 5.87,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 64.52,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 419. Embarcaciones: MARINA Y PEDRO.",
+ "alertas": []
+}

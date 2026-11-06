@@ -1,0 +1,99 @@
+{
+ "archivo": "R600.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260185",
+ "fecha": "2026-04-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GALLINETA",
+   "producto_ficha": "Gallineta",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.9,
+   "descuento_pct": null,
+   "total": 83.6,
+   "iva_pct": 10,
+   "albaran_ref": "1-000185",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "RODABALLO",
+   "producto_ficha": "Rodaballo",
+   "cantidad": 44.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.5,
+   "descuento_pct": null,
+   "total": 1346.58,
+   "iva_pct": 10,
+   "albaran_ref": "1-000185",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "SALMONETE",
+   "producto_ficha": "Salmonete",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 144.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000185",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "SAN PEDRO",
+   "producto_ficha": "San Pedro",
+   "cantidad": 6.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 177.23,
+   "iva_pct": 10,
+   "albaran_ref": "1-000185",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1751.41,
+ "desglose_iva": [
+  {
+   "base": 1751.41,
+   "pct": 10,
+   "cuota": 175.14
+  }
+ ],
+ "iva": 175.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1926.55,
+ "observaciones": "Transferencia CaixaBank; vencimiento 22/04/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: RODABALLO 30,50 (ficha 34,50); SAN PEDRO 25,50 (ficha 24,50)"
+ ]
+}

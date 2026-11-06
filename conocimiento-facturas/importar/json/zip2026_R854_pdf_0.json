@@ -1,0 +1,141 @@
+{
+ "archivo": "R854.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+ "cif": "A80837941",
+ "local": "casa_tomas",
+ "numero_documento": "9904160-0023476",
+ "fecha": "2026-06-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BEBIDA ESPIRITUOSA ORGULLO 1 L",
+   "producto_ficha": "Bebida espirituosa Orgullo 1 L",
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "l",
+   "precio_unitario": 6.61,
+   "descuento_pct": null,
+   "total": 6.61,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "VINO BLANCO BRICK VINA LANZAR 1 L",
+   "producto_ficha": "Vino blanco Viña Lanzar brick 1 L",
+   "cantidad": 12,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "l",
+   "precio_unitario": 0.844,
+   "descuento_pct": null,
+   "total": 10.13,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "AZUCAR MORENO AZUCARERA 800 G",
+   "producto_ficha": "Azúcar moreno Azucarera 800 g",
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 800,
+   "contenido_unidad": "g",
+   "precio_unitario": 1.79,
+   "descuento_pct": null,
+   "total": 3.58,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CALABACIN KILO",
+   "producto_ficha": null,
+   "cantidad": 4.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.523,
+   "descuento_pct": null,
+   "total": 6.17,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "AJO BLANCO PELADO 1 KG UNIDAD",
+   "producto_ficha": "Ajo blanco pelado 1 kg",
+   "cantidad": 5,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.462,
+   "descuento_pct": null,
+   "total": 22.31,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "PIMIENTO PIQUILLO TIRAS DON MOLINICO 1,9 KG",
+   "producto_ficha": "Pimiento piquillo en tiras Don Molinico 1,9 kg",
+   "cantidad": 19,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": 1.9,
+   "contenido_unidad": "kg",
+   "precio_unitario": 7.712,
+   "descuento_pct": null,
+   "total": 146.53,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 195.33,
+ "desglose_iva": [
+  {
+   "base": 28.48,
+   "pct": 4,
+   "cuota": 1.14
+  },
+  {
+   "base": 150.11,
+   "pct": 10,
+   "cuota": 15.01
+  },
+  {
+   "base": 16.74,
+   "pct": 21,
+   "cuota": 3.52
+  }
+ ],
+ "iva": 19.67,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 215,
+ "observaciones": "Crédito a 30 días, vencimiento 03-07-2026.",
+ "alertas": []
+}

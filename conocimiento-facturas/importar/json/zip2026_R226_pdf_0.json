@@ -1,0 +1,53 @@
+{
+ "archivo": "R226.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+ "cif": "B01414531",
+ "local": "casa_tomas",
+ "numero_documento": "VFN 26/000830",
+ "fecha": "2026-01-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "C/6B LP LA CUVEE 0,75L",
+   "producto_ficha": "LP La Cuvée 75 cl (caja 6)",
+   "cantidad": 40.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 236.4,
+   "descuento_pct": null,
+   "total": 9456.0,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 26/000885",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "- 20 % BONIFICAC S/ 9.456",
+   "importe": -1891.2,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 7564.8,
+ "desglose_iva": [
+  {
+   "base": 7564.8,
+   "pct": 21,
+   "cuota": 1588.61
+  }
+ ],
+ "iva": 1588.61,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 9153.41,
+ "observaciones": "Pedido cliente 67326; pedido bodega VPN-26/000755. Expedido por agencia. Forma de pago GIRO 60 días; vencimiento 31/03/26 por 9.153,41 €. Punto verde 10,83 € incluido en factura (informativo, ya dentro de la base).",
+ "alertas": []
+}

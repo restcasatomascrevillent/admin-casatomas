@@ -1,0 +1,97 @@
+{
+ "archivo": "R964.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170769996",
+ "fecha": "2026-06-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I 3K ES",
+   "producto_ficha": "Guindilla piparra (bulto 3 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 3,
+   "contenido_unidad": "kg",
+   "precio_unitario": 15.1,
+   "descuento_pct": null,
+   "total": 45.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 11.65,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.7,
+   "descuento_pct": null,
+   "total": 19.81,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CEREZA 32 I 2K ES",
+   "producto_ficha": "Cereza calibre 32 (bulto 2 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 5.25,
+   "descuento_pct": null,
+   "total": 52.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MELOC AMARILLO 16 I ES",
+   "producto_ficha": "Melocotón amarillo calibre 16",
+   "cantidad": 8.2,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.25,
+   "descuento_pct": null,
+   "total": 18.45,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 136.06,
+ "desglose_iva": [
+  {
+   "base": 136.06,
+   "pct": 4,
+   "cuota": 5.44
+  }
+ ],
+ "iva": 5.44,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 141.5,
+ "observaciones": "Fecha entrega 26.06.2026. Referencia impresa 0809827540 (no es el nº de factura). Líneas con * certificadas GLOBALG.A.P. Total BT 9.",
+ "alertas": []
+}

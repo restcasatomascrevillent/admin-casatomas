@@ -1,0 +1,101 @@
+{
+ "archivo": "R1654.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170783196",
+ "fecha": "2026-10-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GUINDILLA PIPARRA I 1,5K ES",
+   "producto_ficha": null,
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 18.85,
+   "descuento_pct": null,
+   "total": 28.28,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIM PADRON I 10UN ES",
+   "producto_ficha": "Pimiento de Padrón (bandeja, 10 ud por bulto)",
+   "cantidad": 10.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.15,
+   "descuento_pct": null,
+   "total": 21.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 11.05,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 19.89,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "(ENV)-AGUACATE 12 ORSERO 4K",
+   "producto_ficha": "Aguacate calibre 12 Orsero (caja 4 kg)",
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 15.0,
+   "descuento_pct": null,
+   "total": 15.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 84.67,
+ "desglose_iva": [
+  {
+   "base": 84.67,
+   "pct": 4,
+   "cuota": 3.39
+  }
+ ],
+ "iva": 3.39,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 88.06,
+ "observaciones": "Entrega 02.10.2026. Cliente MASIDE 2011 S.L.U. (código 32536 CASA TOMAS). Número 0810076238 en observaciones (no es el nº de factura). Pie: Importe Bruto 84,67, base 84,67, IVA 4,0 % 3,39. Sin forma de pago impresa (varios IBAN). Sin cuadro de envases.",
+ "alertas": [
+  "GUINDILLA PIPARRA I 1,5K ES no está en el catálogo de la ficha, que solo tiene la variante 3K; producto_ficha null.",
+  "El texto '(ENV)-AGUACATE' se trata como producto, como indica la ficha, no como cargo de envase.",
+  "Albarán: no hay cabecera de albarán; albaran_ref null en todas las líneas."
+ ]
+}

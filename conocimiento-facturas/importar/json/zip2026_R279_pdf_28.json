@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  29
+ ],
+ "tipo": "factura",
+ "proveedor": "GUILLO ORTS, ANDRES",
+ "cif": "48571389N",
+ "local": "casa_tomas",
+ "numero_documento": "111/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 29,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 1.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 31.36,
+   "iva_pct": 10,
+   "albaran_ref": "3521",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 31.36,
+ "desglose_iva": [
+  {
+   "base": 31.36,
+   "pct": 10,
+   "cuota": 3.14
+  }
+ ],
+ "iva": 3.14,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 34.5,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 884. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

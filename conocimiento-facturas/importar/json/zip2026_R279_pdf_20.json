@@ -1,0 +1,63 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  21
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERIAS SKIPI CB",
+ "cif": "E42614479",
+ "local": "casa_tomas",
+ "numero_documento": "85/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 21,
+   "nombre": "PERCIFORMES Y A.",
+   "producto_ficha": null,
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 58.05,
+   "iva_pct": 10,
+   "albaran_ref": "3903, 4150",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 21,
+   "nombre": "PLEURONECTIFORMES",
+   "producto_ficha": null,
+   "cantidad": 1.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 40.17,
+   "iva_pct": 10,
+   "albaran_ref": "3903, 4150",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 98.22,
+ "desglose_iva": [
+  {
+   "base": 98.22,
+   "pct": 10,
+   "cuota": 9.82
+  }
+ ],
+ "iva": 9.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 108.04,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 739. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

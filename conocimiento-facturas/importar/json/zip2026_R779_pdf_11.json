@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  12
+ ],
+ "tipo": "factura",
+ "proveedor": "LA RANCHERA 2018 S.L.",
+ "cif": "B42573030",
+ "local": "casa_tomas",
+ "numero_documento": "734/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 12,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 3.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.66,
+   "descuento_pct": null,
+   "total": 94.04,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 94.04,
+ "desglose_iva": [
+  {
+   "base": 94.04,
+   "pct": 10.0,
+   "cuota": 9.4
+  }
+ ],
+ "iva": 9.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 103.44,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9331, 9454. Embarcaciones: ninguna.",
+ "alertas": []
+}

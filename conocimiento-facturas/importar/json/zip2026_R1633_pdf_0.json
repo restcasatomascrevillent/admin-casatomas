@@ -1,0 +1,46 @@
+{
+ "archivo": "R1633.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "abono",
+ "proveedor": "Distribuciones de Bebidas Catral, S.L.",
+ "cif": "B53167433",
+ "local": "casa_tomas",
+ "numero_documento": "A00054",
+ "fecha": "2026-09-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Rappel barril Cruzcampo 50 L.",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -445.9,
+   "descuento_pct": null,
+   "total": -445.9,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -445.9,
+ "desglose_iva": [
+  {
+   "base": -445.9,
+   "pct": 21,
+   "cuota": -93.64
+  }
+ ],
+ "iva": -93.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -539.54,
+ "observaciones": "Forma de pago REPOSICIÓN; sellado PAGADO 07-10-26 transferencia. La página 1 del PDF es el justificante de transferencia Ruralvía (07/10/2026, 539,54 € de Catral a MASIDE 2011) y no se extrae. Líneas a 0,00 con texto 'A- 4T 2026 -A' omitidas",
+ "alertas": []
+}

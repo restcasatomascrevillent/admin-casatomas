@@ -1,0 +1,46 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "FERRANDO PEREZ ANTONIO",
+ "cif": "79100535Q",
+ "local": "casa_tomas",
+ "numero_documento": "100/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.6,
+   "descuento_pct": null,
+   "total": 39.9,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 39.9,
+ "desglose_iva": [
+  {
+   "base": 39.9,
+   "pct": 10.0,
+   "cuota": 3.99
+  }
+ ],
+ "iva": 3.99,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 43.89,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 5317. Embarcaciones: ninguna.",
+ "alertas": []
+}

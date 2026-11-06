@@ -1,0 +1,46 @@
+{
+ "archivo": "R1640.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+ "cif": "B06805246",
+ "local": "casa_tomas",
+ "numero_documento": "C26/3026",
+ "fecha": "2026-09-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ZAMBURIÑA 20/30 C/CORAL MEDIA CONCHA 1K (PNE 800 grs) C/10U",
+   "producto_ficha": "Zamburiña 20/30 con coral, media concha (caja 10 x 1 kg, peso neto escurrido 800 g)",
+   "cantidad": -4.8,
+   "unidad": "kg",
+   "bultos": -6.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.4,
+   "descuento_pct": null,
+   "total": -88.32,
+   "iva_pct": 10,
+   "albaran_ref": "C26/2.966",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -88.32,
+ "desglose_iva": [
+  {
+   "base": -88.32,
+   "pct": 10,
+   "cuota": -8.83
+  }
+ ],
+ "iva": -8.83,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -97.15,
+ "observaciones": "Abono de la factura quincenal; cliente MASIDE 2011 SLU / Restaurante Casa Tomás. Observaciones impresas: DEV. A26/58122 DE FECHA 23/09/2026, POR NO DISPONER DE STOCK DE 10/20 SE LE ENVÍA ESTA DEV. Sin cargo de 1,82 EUR.",
+ "alertas": []
+}

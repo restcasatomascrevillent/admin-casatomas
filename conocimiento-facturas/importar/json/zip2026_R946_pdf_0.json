@@ -1,0 +1,48 @@
+{
+ "archivo": "R946.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "XL/000156",
+ "fecha": "2026-06-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CALAMAR PATAG. LIMPIO (9-12)CM 5KG",
+   "producto_ficha": "Calamar patagonico limpio 9-12 cm (caja 5 kg)",
+   "cantidad": -10.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.34,
+   "descuento_pct": null,
+   "total": -113.37,
+   "iva_pct": 10,
+   "albaran_ref": "LA/6173",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -113.37,
+ "desglose_iva": [
+  {
+   "base": -113.37,
+   "pct": 10,
+   "cuota": -11.34
+  }
+ ],
+ "iva": -11.34,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -124.71,
+ "observaciones": "Factura rectificativa (abono) de devolucion. Lleva 'Retiro correspondiente al Albaran LA/6150 fecha 11/06/2026', que es el albaran de calamar de L/002962 (R947). Vencimiento 23/06/2026 por -124,71 EUR. Peso -10 kg, 0 bultos. FTV-7027219 es una referencia del encabezado.",
+ "alertas": [
+  "El numero impreso es XL/000156 (factura rectificativa), no encaja con el patron L/00xxxx de la ficha. Se deja lo impreso."
+ ]
+}

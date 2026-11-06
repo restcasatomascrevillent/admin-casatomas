@@ -1,0 +1,106 @@
+{
+  "cif": "B03354073",
+  "nombre": "Panaderia Garcia, S.L.",
+  "nombres_impresos": ["PANADERIA GARCIA S.L.", "Panaderia Garcia, S.L."],
+  "categoria": "panaderia",
+  "locales": ["casa_tomas"],
+  "muestras": ["R137.pdf", "R655.pdf", "R1015.pdf", "R1632.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual de fin de mes con una sola línea de pan (pan de cristal); dos maquetaciones distintas",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["0030", "0108", "0161", "2026-1-183"],
+      "patron": "^(\\d{4}|2026-1-\\d+)$",
+      "donde": "Maquetación antigua (hasta junio): 'Factura Nº 0161' arriba, el número va ANTES de 'c/c 100.- MASIDE 2011'. Maquetación nueva (vista en agosto y septiembre, 'FACTURA DE VENTA'): casilla Nº FACTURA, formato 2026-1-183"
+    },
+    "fecha": "Antigua: 'Fecha 30-06-2026' (DD-MM-AAAA) bajo el número. Nueva: casilla FECHA arriba a la izquierda, DD/MM/AAAA. Siempre último día del mes (o antes si es festivo)",
+    "albaranes": "No hay albaranes: una línea por factura con la cantidad total del mes"
+  },
+
+  "lectura": {
+    "columnas": ["Antigua: CONCEPTO | CANTIDAD | UNIDADES | PRECIO | IMPORTE", "Nueva: ARTÍCULO | DESCRIPCIÓN | CANT. | PRECIO | IMPORTE"],
+    "cantidad_es": "cajas de 21 barras (nota '(21 Barras x Caja)' bajo la línea en la maqueta antigua)",
+    "columna_peso": null,
+    "precio_es_por": "Antigua: barra (1,40 €) y la columna UNIDADES = cajas x 21 barras; importe = UNIDADES x PRECIO. Nueva: caja (29,40 € = 21 x 1,40); importe = CANT. x PRECIO",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "Maqueta antigua: 'c/c 100.-' es la cuenta contable del cliente, no forma parte del número de factura",
+      "Maqueta antigua: bajo el IVA salen una etiqueta '10%' y otra '4%'; el IVA real es 4% (la base del 10% está vacía y el total no lo lleva)",
+      "Líneas 'BARRAS DE 1/2 KILO' (2,45) y 'PANES DE 1 KILO' (4,38) salen siempre con cantidad 0 e importe '-': son tarifa, no se han comprado; no crear líneas de compra",
+      "En la maqueta antigua CANTIDAD (12) son cajas y UNIDADES (252) son barras; no confundir",
+      "Maqueta nueva: ARTÍCULO '185' es el código y 11,00 son cajas con decimales"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "antigua: UNIDADES = CANTIDAD x 21; importe línea = UNIDADES x 1,40 (12 cajas -> 252 -> 352,80; 15 cajas -> 315 -> 441,00)",
+    "nueva: importe línea = CANT. x 29,40 (11 cajas -> 323,40)",
+    "base = importe de la línea (las líneas de 1/2 kilo y 1 kilo valen 0)",
+    "IVA 4% = base x 0,04 (352,80 -> 14,11; 441,00 -> 17,64; 323,40 -> 12,94)",
+    "total = base + IVA (352,80 + 14,11 = 366,91; 441,00 + 17,64 = 458,64; 323,40 + 12,94 = 336,34)"
+  ],
+
+  "guia_ocr": "Factura mensual de pan con una sola línea real: PAN DE CRISTAL. Hay dos maquetas. Antigua: 'Factura Nº' + 4 dígitos (no incluyas 'c/c 100.-'), fecha DD-MM-AAAA, columnas CANTIDAD (cajas), UNIDADES (barras, cajas x 21), PRECIO por barra 1,40. Nueva: nº tipo 2026-1-183, código 185, CANT. en cajas, PRECIO por caja 29,40. Ignora las líneas 'BARRAS DE 1/2 KILO' y 'PANES DE 1 KILO' (cantidad 0, importe '-'). IVA siempre 4%, ignora la etiqueta '10%'. Cliente MASIDE 2011 (B54583356).",
+
+  "productos": [
+    {
+      "nombre_impreso": "PAN DE CRISTAL (21 Barras x Caja)",
+      "nombre_normalizado": "Pan de cristal (barra, caja de 21)",
+      "familia": "pan",
+      "presentacion": "barra de pan fresco, por piezas, en caja de 21",
+      "formato": { "envase": "barra", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 21, "bulto": "caja" },
+      "unidad_factura": "caja en CANTIDAD; el precio es por barra y la columna UNIDADES da las barras",
+      "precio": { "min": 1.40, "max": 1.40, "por": "barra", "ejemplos": [["2026-01-31", 1.40], ["2026-04-30", 1.40], ["2026-06-30", 1.40]] },
+      "iva_pct": 4,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "185 PAN DE CRISTAL",
+      "nombre_normalizado": "Pan de cristal (barra, caja de 21) - maqueta nueva",
+      "familia": "pan",
+      "presentacion": "barra de pan fresco, por piezas, en caja de 21",
+      "formato": { "envase": "barra", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 21, "bulto": "caja" },
+      "unidad_factura": "caja",
+      "precio": { "min": 29.40, "max": 29.40, "por": "caja", "ejemplos": [["2026-08-31", 29.40], ["2026-09-30", 29.40]] },
+      "iva_pct": 4,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "BARRAS DE 1/2 KILO",
+      "nombre_normalizado": "Barra de pan de 1/2 kilo",
+      "familia": "pan",
+      "presentacion": "pieza de pan fresco de 500 g (solo tarifa, nunca comprada en las muestras)",
+      "formato": { "envase": "pieza", "contenido": 500, "unidad_contenido": "g", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "pieza",
+      "precio": { "min": 2.45, "max": 2.45, "por": "pieza", "ejemplos": [["2026-01-31", 2.45]] },
+      "iva_pct": 4,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "PANES DE 1 KILO",
+      "nombre_normalizado": "Pan de 1 kilo",
+      "familia": "pan",
+      "presentacion": "pieza de pan fresco de 1 kg (solo tarifa, nunca comprada en las muestras)",
+      "formato": { "envase": "pieza", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": null },
+      "unidad_factura": "pieza",
+      "precio": { "min": 4.38, "max": 4.38, "por": "pieza", "ejemplos": [["2026-01-31", 4.38]] },
+      "iva_pct": 4,
+      "veces_visto": 7
+    }
+  ],
+
+  "dudas": [
+    "No se sabe cuándo cambió la maqueta: junio sale antigua y agosto/septiembre nueva",
+    "En la maqueta antigua los totales no muestran claramente el % de IVA (aparece '4%' y una etiqueta '10%'); el cálculo confirma 4%",
+    "Las líneas de 1/2 kilo y 1 kilo nunca han tenido cantidad en las muestras; no se sabe si se facturarán algún día",
+    "Facturas observadas: enero, abril, junio, agosto y septiembre; el resto de meses (9 PDF en total) no está en las muestras"
+  ]
+}

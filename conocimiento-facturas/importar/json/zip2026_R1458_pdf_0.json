@@ -1,0 +1,46 @@
+{
+ "archivo": "R1458.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES GUTI E HIJOS S.L",
+ "cif": "B72748676",
+ "local": "casa_tomas",
+ "numero_documento": "B 1279",
+ "fecha": "2026-08-24",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUESO ADIANO MANCHEGO CURADO ARTESANO",
+   "producto_ficha": "Queso manchego curado artesano (Adiano)",
+   "cantidad": 5.75,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.64,
+   "descuento_pct": null,
+   "total": 141.68,
+   "iva_pct": 4,
+   "albaran_ref": "1506",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 141.68,
+ "desglose_iva": [
+  {
+   "base": 141.68,
+   "pct": 4,
+   "cuota": 5.67
+  }
+ ],
+ "iva": 5.67,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 147.35,
+ "observaciones": "Pago 30 días vista. Albarán 1506. Cantidad impresa = piezas (bultos); cantidad JSON = kilos.",
+ "alertas": []
+}

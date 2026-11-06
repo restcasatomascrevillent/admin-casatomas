@@ -1,0 +1,48 @@
+{
+ "archivo": "R533.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "112",
+ "fecha": "2026-04-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "kg Capellán seco",
+   "producto_ficha": "Capellán seco (pescado seco)",
+   "cantidad": 6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.3,
+   "descuento_pct": null,
+   "total": 61.8,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 61.8,
+ "desglose_iva": [
+  {
+   "base": 61.8,
+   "pct": 10,
+   "cuota": 6.18
+  }
+ ],
+ "iva": 6.18,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 67.98,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": [
+  "Año manuscrito legible como 2028; se toma 2026."
+ ]
+}

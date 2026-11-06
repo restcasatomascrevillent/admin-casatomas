@@ -1,0 +1,121 @@
+{
+ "archivo": "R513.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0002/(2026)005602",
+ "fecha": "2026-04-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "JAMÓN SERR TAQUIT 500G S.ALCAR",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.19,
+   "descuento_pct": null,
+   "total": 24.76,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATA MINI MC C 25/35 CJ 5 K",
+   "producto_ficha": "Patata mini calibre 25/35 caja 5 kg",
+   "cantidad": 2.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.75,
+   "descuento_pct": null,
+   "total": 33.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TROCADERO VIVA MIXTA CJ MC 8PZ",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.15,
+   "descuento_pct": null,
+   "total": 36.45,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "SALMORRETA CLASICA 380GR",
+   "producto_ficha": null,
+   "cantidad": 9.0,
+   "unidad": "tarro",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.69,
+   "descuento_pct": null,
+   "total": 69.21,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "COMPRA MÁS PAGA MENOS",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -2.48,
+   "descuento_pct": null,
+   "total": -2.48,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 161.44,
+ "desglose_iva": [
+  {
+   "base": 91.49,
+   "pct": 10,
+   "cuota": 9.15
+  },
+  {
+   "base": 69.95,
+   "pct": 4,
+   "cuota": 2.8
+  }
+ ],
+ "iva": 11.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 173.39,
+ "observaciones": "Pagado con tarjeta (VISA debito).",
+ "alertas": []
+}

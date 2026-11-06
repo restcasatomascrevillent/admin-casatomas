@@ -1,0 +1,80 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  17
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS GONZALEZ LOPEZ C.B.",
+ "cif": "E42544965",
+ "local": "casa_tomas",
+ "numero_documento": "263/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 17,
+   "nombre": "PLEURONECTIFORMES (emb. NUEVO MAGU)",
+   "producto_ficha": null,
+   "cantidad": 4.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 125.43,
+   "iva_pct": 10,
+   "albaran_ref": "2691, 3654, 2811, 2186",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 17,
+   "nombre": "MACRUROS (emb. NUEVO MAGU)",
+   "producto_ficha": null,
+   "cantidad": 5.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 679.15,
+   "iva_pct": 10,
+   "albaran_ref": "2691, 3654, 2811, 2186",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 17,
+   "nombre": "PLEURONECTIFORMES (emb. ROSQUI)",
+   "producto_ficha": null,
+   "cantidad": 2.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 61.09,
+   "iva_pct": 10,
+   "albaran_ref": "2691, 3654, 2811, 2186",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 865.67,
+ "desglose_iva": [
+  {
+   "base": 865.67,
+   "pct": 10,
+   "cuota": 86.57
+  }
+ ],
+ "iva": 86.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 952.24,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 693. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

@@ -1,0 +1,97 @@
+{
+ "archivo": "R161.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170749556",
+ "fecha": "2026-02-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PATATA I ES",
+   "producto_ficha": "Patata cat. I (saco ~15 kg)",
+   "cantidad": 112.4,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.6,
+   "descuento_pct": null,
+   "total": 67.44,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FRESON I 1K ES",
+   "producto_ficha": "Fresón (tarrina 1 kg)",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 13.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "AGUACATE HASS 14 I 4K MX",
+   "producto_ficha": "Aguacate Hass calibre 14 (caja 4 kg)",
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 17.5,
+   "descuento_pct": null,
+   "total": 17.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MELON PIEL SAPO 5 XTRA EL ABUELO BR",
+   "producto_ficha": "Melón piel de sapo calibre 4-5 extra",
+   "cantidad": 13.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.75,
+   "descuento_pct": null,
+   "total": 22.75,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 121.19,
+ "desglose_iva": [
+  {
+   "base": 121.19,
+   "pct": 4,
+   "cuota": 4.85
+  }
+ ],
+ "iva": 4.85,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 126.04,
+ "observaciones": "Fecha entrega 05.02.2026, igual que la fecha de factura. Anotacion suelta 'CARGA 05.02': no es producto. Total BT 13. Peso neto = bruto - tara en PATATA I (116,00 - 3,60).",
+ "alertas": []
+}

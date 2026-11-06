@@ -1,0 +1,46 @@
+{
+ "archivo": "R158.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CREVI-GELATS, S.L.",
+ "cif": "B54211685",
+ "local": "casa_tomas",
+ "numero_documento": "21/26",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MANTECADO 6 L",
+   "producto_ficha": "Helado de mantecado, cubeta 6 L",
+   "cantidad": 2.0,
+   "unidad": "cubeta",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "l",
+   "precio_unitario": 26.42,
+   "descuento_pct": null,
+   "total": 52.84,
+   "iva_pct": 10,
+   "albaran_ref": "15/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 52.84,
+ "desglose_iva": [
+  {
+   "base": 52.84,
+   "pct": 10,
+   "cuota": 5.28
+  }
+ ],
+ "iva": 5.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 58.12,
+ "observaciones": "Pago contado. Vencimiento 31/01/2026. Albarán 15/26 de 14/01/2026. La columna Lote (5238) no es cantidad ni precio.",
+ "alertas": []
+}

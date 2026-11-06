@@ -1,0 +1,86 @@
+{
+ "archivo": "R109.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGA SELECCION - VINOS CALDERON S.L.U.",
+ "cif": "B53804522",
+ "local": "casa_tomas",
+ "numero_documento": "F26000036",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MUR MARQUES DE MURRIETA RVA 2021",
+   "producto_ficha": "Marqués de Murrieta Reserva 2021 75 cl",
+   "cantidad": 22,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 18.0,
+   "descuento_pct": null,
+   "total": 396.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000082",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MUR MARQUES DE MURRIETA RVA 2021",
+   "producto_ficha": "Marqués de Murrieta Reserva 2021 75 cl",
+   "cantidad": 2,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000082",
+   "bonificada": true,
+   "precio_referencia": 18.0
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PAZO GRAN VINO PAZO DE BARRANTES",
+   "producto_ficha": "Pazo de Barrantes Gran Vino (nombre incompleto)",
+   "cantidad": 24,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.0,
+   "descuento_pct": null,
+   "total": 648.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26000082",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1044.0,
+ "desglose_iva": [
+  {
+   "base": 1044.0,
+   "pct": 21,
+   "cuota": 219.24
+  }
+ ],
+ "iva": 219.24,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1263.24,
+ "observaciones": "Escaneo (imagen). Albarán A26000082 de 29/01/2026. Lotes 126105 ignorados. Contenido 75 cl de Murrieta tomado de la ficha (no impreso). Anotación manuscrita 'Cobro 28/02/2026' (no impresa).",
+ "alertas": [
+  "Línea de 2 botellas MURRIETA RVA 2021 sin precio ni importe: se toma como bonificada (la base 1.044,00 = 396,00 + 648,00 lo confirma).",
+  "Precio 18,00 € de MURRIETA RVA 2021: distinto de 18,18 / 18,181 (R146, R399) y de 14,25 (R654). Impreso así.",
+  "PAZO DE BARRANTES GRAN VINO: formato (cl) no impreso; contenido_cantidad a null.",
+  "Escaneo: el inicio del nombre del Pazo aparece cortado ('AZO GRAN VINO...'); se transcribe lo visible."
+ ]
+}

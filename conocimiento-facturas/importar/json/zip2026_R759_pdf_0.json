@@ -1,0 +1,156 @@
+{
+ "archivo": "R759.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MARÍA EUGENIA ALONSO ROCAMORA (notaria)",
+ "cif": "34832427P",
+ "local": "casa_tomas",
+ "numero_documento": "12600089-C",
+ "fecha": "2026-05-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Derechos notariales: corretaje del asiento 12600089, crédito sin afianzamiento (65.000 €), epígrafe 17 del arancel",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 195.0,
+   "descuento_pct": null,
+   "total": 195.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Traslados (1 de 9 folios)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.41,
+   "descuento_pct": null,
+   "total": 5.41,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Testimonio HASH",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.01,
+   "descuento_pct": null,
+   "total": 6.01,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Testimonio cotejo protocolo electrónico",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.81,
+   "descuento_pct": null,
+   "total": 7.81,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "Diligencia incorporación protocolo electrónico",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.01,
+   "descuento_pct": null,
+   "total": 3.01,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "Diligencia depósito protocolo electrónico",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.01,
+   "descuento_pct": null,
+   "total": 3.01,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 7,
+   "pagina": 1,
+   "nombre": "Gastos: consulta al registro mercantil",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.0,
+   "descuento_pct": null,
+   "total": 10.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento 20 %",
+   "importe": -46.05,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 184.2,
+ "desglose_iva": [
+  {
+   "base": 184.2,
+   "pct": 21,
+   "cuota": 38.68
+  }
+ ],
+ "iva": 38.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": 27.63,
+ "total": 195.25,
+ "observaciones": "Total factura impreso 222,88 € (base tras descuento 184,20 + IVA 38,68). Retención IRPF 15 % (27,63 €): líquido a pagar 195,25 €, que es el total registrado. Número de factura: referencia del notario 12600089-C (asiento 12600089A, 25/05/26). Sin forma de pago impresa.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

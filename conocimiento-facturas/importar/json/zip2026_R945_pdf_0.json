@@ -1,0 +1,66 @@
+{
+ "archivo": "R945.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BANCO BILBAO VIZCAYA ARGENTARIA, S.A. (BBVA)",
+ "cif": "A48265169",
+ "local": "casa_tomas",
+ "numero_documento": "260791A00351185",
+ "fecha": "2026-06-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Amortización cuota arrendamiento financiero contrato 0182 3029 0501 0000001660148 (vto. 17-06-2026)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 782.39,
+   "descuento_pct": null,
+   "total": 782.39,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Intereses cuota arrendamiento financiero contrato 0182 3029 0501 0000001660148 (vto. 17-06-2026)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 257.84,
+   "descuento_pct": null,
+   "total": 257.84,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1040.23,
+ "desglose_iva": [
+  {
+   "base": 1040.23,
+   "pct": 21,
+   "cuota": 218.45
+  }
+ ],
+ "iva": 218.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1258.68,
+ "observaciones": "Documento impreso como FACTURA de BBVA (cuota de arrendamiento financiero con IVA 21%, seguro 0,00). Plaza y fecha: Madrid. Oficina Crevillent. Datos del contrato: MASIDE 2011 S.L.",
+ "alertas": [
+  "Es la factura con IVA de una cuota de leasing; el CIF del emisor (A48265169) está en texto vertical muy pequeño y se ha tomado como el de BBVA. Revisar si debe tratarse como factura o como cuota financiera.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

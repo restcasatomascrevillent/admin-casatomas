@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  31
+ ],
+ "tipo": "factura",
+ "proveedor": "GONZALEZ GARCIA, VICTOR",
+ "cif": "23029497B",
+ "local": "casa_tomas",
+ "numero_documento": "62/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 31,
+   "nombre": "PERCIFORMES Y A. (emb. BAHIA DE PALOS)",
+   "producto_ficha": null,
+   "cantidad": 3.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 144.77,
+   "iva_pct": 10,
+   "albaran_ref": "4150, 3396",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 144.77,
+ "desglose_iva": [
+  {
+   "base": 144.77,
+   "pct": 10,
+   "cuota": 14.48
+  }
+ ],
+ "iva": 14.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 159.25,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 887. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R1235.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90290179",
+ "fecha": "2026-07-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Paleta Bellota 100% Ibérica 5J 5-6 kg N24",
+   "producto_ficha": "Paleta de bellota 100% ibérica 5J, pieza de 5-6 kg (cobrada al peso)",
+   "cantidad": 5.65,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.0991,
+   "descuento_pct": null,
+   "total": 175.71,
+   "iva_pct": 10,
+   "albaran_ref": "40331298",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Jamón Bellota 100% Iberico 5J 8-9 kg N24",
+   "producto_ficha": "Jamón de bellota 100% ibérico 5J, pieza de 8-9 kg",
+   "cantidad": 16.98,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 54.7998,
+   "descuento_pct": null,
+   "total": 930.5,
+   "iva_pct": 10,
+   "albaran_ref": "40331298",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1106.21,
+ "desglose_iva": [
+  {
+   "base": 1106.21,
+   "pct": 10,
+   "cuota": 110.62
+  }
+ ],
+ "iva": 110.62,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1216.83,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 27/09/2026. Punto verde 0,79 EUR informativo, no sumado al total. Albarán 40331298 del 28/07/2026. Margen: '4169' es código de la línea de jamón.",
+ "alertas": []
+}

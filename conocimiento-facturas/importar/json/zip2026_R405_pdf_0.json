@@ -1,0 +1,48 @@
+{
+ "archivo": "R405.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MARCELINO ROMERO ROCAMORA",
+ "cif": "20082189S",
+ "local": "casa_tomas",
+ "numero_documento": "23",
+ "fecha": "2026-03-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Sacos de carbón",
+   "producto_ficha": null,
+   "cantidad": 60,
+   "unidad": "saco",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.0,
+   "descuento_pct": null,
+   "total": 1020.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1020.0,
+ "desglose_iva": [
+  {
+   "base": 1020.0,
+   "pct": 21,
+   "cuota": 214.2
+  }
+ ],
+ "iva": 214.2,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1234.2,
+ "observaciones": "Factura manuscrita, cliente Maside 2011 s.l.u.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

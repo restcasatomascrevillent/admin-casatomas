@@ -1,0 +1,80 @@
+{
+ "archivo": "R1012.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS EL MILITAR, S.L.",
+ "cif": "B03409315",
+ "local": "casa_tomas",
+ "numero_documento": "2026 A 04450",
+ "fecha": "2026-06-04",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FLT.CORVINA S/ESPINA X7",
+   "producto_ficha": "Filete de corvina sin espina (caja 7 kg)",
+   "cantidad": 7,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 66.5,
+   "iva_pct": 10,
+   "albaran_ref": "F572026",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TORT. CAMARON PREMIUM 30.UNI",
+   "producto_ficha": "Tortita de camarón premium (pack 30 uds)",
+   "cantidad": 30,
+   "unidad": "ud",
+   "bultos": 30,
+   "contenido_cantidad": 30,
+   "contenido_unidad": "ud",
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 30.0,
+   "iva_pct": 10,
+   "albaran_ref": "F572026",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "COLAS ALISTAO 1",
+   "producto_ficha": "Colas alistao 1",
+   "cantidad": 3.1,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.5,
+   "descuento_pct": null,
+   "total": 79.05,
+   "iva_pct": 10,
+   "albaran_ref": "F572026",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 175.55,
+ "desglose_iva": [
+  {
+   "base": 175.55,
+   "pct": 10,
+   "cuota": 17.56
+  }
+ ],
+ "iva": 17.56,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 193.11,
+ "observaciones": "Forma de pago y vencimiento sin valor en el texto (cabecera Domiciliación). Albarán F572026. Recargo de equivalencia impreso 1,4 %: no se suma al total.",
+ "alertas": []
+}

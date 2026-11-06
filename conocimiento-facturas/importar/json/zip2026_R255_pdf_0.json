@@ -1,0 +1,50 @@
+{
+ "archivo": "R255.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CALEUNG HOLDINGS, S.L.",
+ "cif": "B85973527",
+ "local": "casa_tomas",
+ "numero_documento": "2026021",
+ "fecha": "2026-02-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Château Giscours 2022",
+   "producto_ficha": null,
+   "cantidad": 90.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 58.68,
+   "descuento_pct": null,
+   "total": 5280.99,
+   "iva_pct": 21,
+   "albaran_ref": "A260038",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 5280.99,
+ "desglose_iva": [
+  {
+   "base": 5280.99,
+   "pct": 21,
+   "cuota": 1109.01
+  }
+ ],
+ "iva": 1109.01,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 6390.0,
+ "observaciones": "Vencimiento 25/03/2026. Pago por transferencia bancaria (cuenta no transcrita). Gestor vacío. Cliente impreso: MASIDE 2011,S.L. (sin marca Casa Tomás).",
+ "alertas": [
+  "Línea: 90 x 58,68 = 5.281,20 frente a 5.280,99 impreso (-0,21 €).",
+  "IVA impreso 1.109,01 frente al 21 % de la base impresa (1.108,91): diferencia de 0,10 €. El total 6.390,00 coincide con los importes impresos; revisar el original.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

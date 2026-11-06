@@ -1,0 +1,315 @@
+{
+  "cif": "E13781760",
+  "nombre": "Herederos Ángel Mariño Hermo C.B.",
+  "nombres_impresos": ["HEREDEROS ANGEL MARIÑO HERMO C.B.", "Angel Mar"],
+  "categoria": "marisco",
+  "locales": ["casa_tomas"],
+  "muestras": ["R118.pdf", "R430.pdf", "R697.pdf", "R1007.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura que agrupa uno o varios albaranes (digital, 15 de 15 PDF)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["252024", "2600332", "2600583", "2600809"], "patron": "^\\d{6,7}$", "donde": "casilla 'Número Fra.' arriba, a la derecha del título; desde 2026 empieza por 26 (26 + correlativo)" },
+    "fecha": "casilla 'Fecha' bajo el número, formato DD-MM-AAAA",
+    "albaranes": "línea 'Alb. Nº:26001189 de fecha: 04-05-26' (fecha DD-MM-AA) antes de sus líneas; una factura puede traer 1 a 3 albaranes"
+  },
+
+  "lectura": {
+    "columnas": ["Código", "Descripción", "Cantidad", "Precio/u", "Importe"],
+    "cantidad_es": "kg (decimales con coma: 5,80; 9,10). Berberecho, erizo, longueirón, ameixa, percebe, mexillón y cigala salen con cantidades enteras o a medias que cuadran como kg",
+    "columna_peso": null,
+    "precio_es_por": "kg",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Línea 'PO Portes' (cantidad 1, precio = importe) al final de CADA albarán; entra en la base imponible con el mismo IVA 10 %"],
+    "trampas": [
+      "Un albarán por día: la línea Portes se repite una vez por albarán (hasta 3 por factura) con importes distintos (26, 33, 34, 38, 57)",
+      "El calibre va en el nombre (1-1.5 kg, 0.9-1.1 kg, 700-900 gr, G, M, extra); cambia de factura a factura para el mismo código, no lo trates como artículo nuevo sin mirar el código",
+      "Erratas fijas en descripciones: 'hermbra', coma final tras 'kg,'",
+      "Pie de factura: BASE IMPONIBLE | 10,00 (% IVA) | I.V.A. | R.E. | RETENCION | TOTAL; R.E. y RETENCION vienen vacíos",
+      "Precios con 4 decimales (35,5000), importes con 2 y miles con punto (1.048,45)",
+      "Cliente impreso MASIDE 2011 S.L. (B54583356), DPTO: CASA TOMÁS",
+      "Forma de pago GIRO 30: vencimiento a 30 días"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_linea = cantidad × precio/u, redondeado a 2 decimales (2,10 × 41,9000 = 87,99)",
+    "base imponible = suma de todas las líneas, incluidos los Portes",
+    "IVA = base × 10 % (R1007: 522,85 → 52,29)",
+    "total = base + IVA. R697: 1.627,23 + 162,72 = 1.789,95; R118: 1.048,45 + 104,85 = 1.153,30"
+  ],
+
+  "guia_ocr": "Factura digital de Herederos Ángel Mariño Hermo (Angel Mar, Boiro) a Maside 2011, Casa Tomás. Número en 'Número Fra.' y fecha DD-MM-AAAA. Cada albarán abre con 'Alb. Nº: ... de fecha:'. Columnas: Código, Descripción, Cantidad (kg), Precio/u (€/kg, 4 decimales), Importe. Todo es marisco y pescado vivo o fresco de Galicia; el calibre va en el nombre. Cada albarán termina con una línea PO Portes (cantidad 1): es cargo, no producto. IVA único 10 %, sin R.E. ni retención. Comprueba cantidad × precio = importe y que la suma de importes da la base.",
+
+  "productos": [
+    {
+      "nombre_impreso": "Centolla gallega hembra 1-1.5 kg",
+      "nombre_normalizado": "Centolla gallega hembra viva (1-1,5 kg), por kg",
+      "familia": "marisco",
+      "presentacion": "vivo; variantes de calibre en el nombre: 0.9-1.1 kg, 1 kg, 1-1.5 kg",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 29.9, "max": 49.0, "por": "kg", "ejemplos": [["2026-05-09", 33.5], ["2026-05-09", 35.9], ["2026-03-21", 34.9], ["2026-06-27", 35.5], ["2025-12-31", 49.0]] },
+      "iva_pct": 10,
+      "veces_visto": 15
+    },
+    {
+      "nombre_impreso": "Rodaballo Salvaje 5-6 kg.",
+      "nombre_normalizado": "Rodaballo salvaje pieza entera (5-6 kg; también 700 gr), por kg",
+      "familia": "pescado",
+      "presentacion": "fresco, salvaje, pieza entera",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 34.0, "max": 36.0, "por": "kg", "ejemplos": [["2026-04", 36.0]] },
+      "iva_pct": 10,
+      "veces_visto": 8
+    },
+    {
+      "nombre_impreso": "Berberecho G",
+      "nombre_normalizado": "Berberecho gallego grande, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo, a granel por kg (no conserva)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 29.5, "max": 33.5, "por": "kg", "ejemplos": [["2026-06-27", 29.5]] },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "Berberecho extra",
+      "nombre_normalizado": "Berberecho extra, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo, a granel por kg (no conserva)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 32.5, "max": 36.0, "por": "kg", "ejemplos": [["2026-05-09", 32.5]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "Buey de mar gallego hembra 1-1.5 kg",
+      "nombre_normalizado": "Buey de mar gallego hembra vivo (también 700-900 gr y 0.8-1.2 kg), por kg",
+      "familia": "marisco",
+      "presentacion": "vivo",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 26.9, "max": 32.5, "por": "kg", "ejemplos": [["2025-12-31", 32.5], ["2026-06-27", 26.9]] },
+      "iva_pct": 10,
+      "veces_visto": 7
+    },
+    {
+      "nombre_impreso": "Erizo de Mar G",
+      "nombre_normalizado": "Erizo de mar grande, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 18.0, "max": 27.9, "por": "kg", "ejemplos": [["2026-03-21", 18.0]] },
+      "iva_pct": 10,
+      "veces_visto": 6
+    },
+    {
+      "nombre_impreso": "San Martiño 2-2.6 kg.",
+      "nombre_normalizado": "San Martín (pez) pieza entera (2-2,7 kg), por kg",
+      "familia": "pescado",
+      "presentacion": "fresco, pieza entera",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 25.5, "max": 26.0, "por": "kg", "ejemplos": [["2026-03-21", 25.5]] },
+      "iva_pct": 10,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "Longueiron M",
+      "nombre_normalizado": "Longueirón (navaja) mediano, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 24.5, "max": 24.9, "por": "kg", "ejemplos": [["2026-06-27", 24.5], ["2026-05-08", 24.9]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Percebe Galego extra",
+      "nombre_normalizado": "Percebe gallego extra, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo/fresco",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 126.0, "max": 126.0, "por": "kg", "ejemplos": [["2026", 126.0]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Palometa roja/Virrey 1-1.5 kg.",
+      "nombre_normalizado": "Palometa roja (virrey) pieza entera, por kg",
+      "familia": "pescado",
+      "presentacion": "fresco, pieza entera",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 65.9, "max": 69.9, "por": "kg", "ejemplos": [["2026-05-09", 69.9], ["2026-05-09", 65.9]] },
+      "iva_pct": 10,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "Lenguado Salvaje 600-800 gr.",
+      "nombre_normalizado": "Lenguado salvaje pieza entera (600 g a 1 kg), por kg",
+      "familia": "pescado",
+      "presentacion": "fresco, salvaje",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 41.9, "max": 42.0, "por": "kg", "ejemplos": [["2026-06-27", 41.9]] },
+      "iva_pct": 10,
+      "veces_visto": 4
+    },
+    {
+      "nombre_impreso": "Centolla hembra 1-1.5 kg,",
+      "nombre_normalizado": "Centolla hembra (diciembre 2025, precio de Navidad), por kg",
+      "familia": "marisco",
+      "presentacion": "vivo",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 49.0, "max": 49.0, "por": "kg", "ejemplos": [["2025-12-31", 49.0]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Necora Galega hembra M",
+      "nombre_normalizado": "Necora gallega hembra mediana, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 45.0, "max": 45.0, "por": "kg", "ejemplos": [["2025-12-31", 45.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Lubina Galega anzuelo 1-1.5 kg,",
+      "nombre_normalizado": "Lubina gallega de anzuelo pieza entera (0,9-1,5 kg), por kg",
+      "familia": "pescado",
+      "presentacion": "fresco, salvaje (anzuelo)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 34.9, "max": 38.0, "por": "kg", "ejemplos": [["2025-12-31", 38.0]] },
+      "iva_pct": 10,
+      "veces_visto": 2
+    },
+    {
+      "nombre_impreso": "Ameixa Rubia M",
+      "nombre_normalizado": "Almeja rubia mediana, por kg",
+      "familia": "marisco",
+      "presentacion": "viva, a granel por kg (no conserva)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 25.5, "max": 25.5, "por": "kg", "ejemplos": [["2026", 25.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Ameixa Fina G",
+      "nombre_normalizado": "Almeja fina grande, por kg",
+      "familia": "marisco",
+      "presentacion": "viva, a granel por kg (no conserva)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 119.0, "max": 119.0, "por": "kg", "ejemplos": [["2026-06-27", 119.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Navalla Galega G",
+      "nombre_normalizado": "Navaja gallega grande, por kg",
+      "familia": "marisco",
+      "presentacion": "viva",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 35.5, "max": 35.5, "por": "kg", "ejemplos": [["2026", 35.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Mexillon G",
+      "nombre_normalizado": "Mejillón gallego grande, por kg",
+      "familia": "marisco",
+      "presentacion": "vivo/fresco, a granel por kg (no conserva)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 2.9, "max": 2.9, "por": "kg", "ejemplos": [["2026", 2.9]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Camaron Cocido Extra",
+      "nombre_normalizado": "Camarón cocido extra, por kg",
+      "familia": "marisco",
+      "presentacion": "cocido",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 94.0, "max": 94.0, "por": "kg", "ejemplos": [["2026", 94.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Cigala Noruega 0 (5/8 pzs)",
+      "nombre_normalizado": "Cigala noruega calibre 0 (5-8 piezas/kg), por kg",
+      "familia": "marisco",
+      "presentacion": "no indicado (fresca/viva por el calibre)",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 69.0, "max": 69.0, "por": "kg", "ejemplos": [["2026", 69.0]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Bogavante Europeo 1-1.5 kg,",
+      "nombre_normalizado": "Bogavante europeo vivo (1-1,5 kg), por kg",
+      "familia": "marisco",
+      "presentacion": "vivo",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 42.8, "max": 42.8, "por": "kg", "ejemplos": [["2026", 42.8]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Curuxo 0.7-1 kg.",
+      "nombre_normalizado": "Curuxo (especie no identificada), por kg",
+      "familia": "pescado",
+      "presentacion": "no indicado",
+      "formato": null,
+      "unidad_factura": "kg",
+      "precio": { "min": 35.5, "max": 35.5, "por": "kg", "ejemplos": [["2026", 35.5]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "Portes",
+      "nombre_normalizado": "Portes (transporte) por albarán",
+      "familia": "servicio",
+      "presentacion": "cargo, no producto",
+      "formato": null,
+      "unidad_factura": "servicio (cantidad 1)",
+      "precio": { "min": 26.0, "max": 57.0, "por": "albarán", "ejemplos": [["2025-12-31", 57.0], ["2026-03-21", 26.0], ["2026-06-27", 33.0]] },
+      "iva_pct": 10,
+      "veces_visto": 22
+    }
+  ],
+
+  "dudas": [
+    "Catálogo completo: 22 filas (todos los artículos de las 15 facturas digitales); no se ha recortado nada.",
+    "Los precios mínimo y máximo salen de las líneas únicas del catálogo y de las 4 muestras; en artículos vistos varias veces el rango real puede ser mayor y las fechas de los ejemplos son aproximadas.",
+    "La unidad se deduce como kg por los decimales (5,80; 9,10) y por el cuadre; berberecho, erizo, ameixa y longueirón vienen con cantidades enteras (2,00; 3,00) y a 18-119 €/kg encajan como kg, pero ninguna factura escribe la unidad.",
+    "Mejillón (Mexillon G, 2,90 €/kg): se asume vivo a granel; la factura no pone 'vivo' ni 'conserva'.",
+    "Curuxo: no se ha podido identificar la especie.",
+    "Centolla 'hembra 1-1.5 kg,' a 49,00 €/kg (31-12-2025) está muy por encima del resto del año (29,90-35,90): subida de Navidad, no error.",
+    "Camarón cocido extra aparece una sola vez; es el único artículo cocido."
+  ]
+}

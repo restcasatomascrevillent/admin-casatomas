@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  24
+ ],
+ "tipo": "factura",
+ "proveedor": "MARTINEZ PIEDECAUSA, FRANCISCO",
+ "cif": "48319583X",
+ "local": "casa_tomas",
+ "numero_documento": "1.076/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 24,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 92.1,
+   "descuento_pct": null,
+   "total": 225.65,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 225.65,
+ "desglose_iva": [
+  {
+   "base": 225.65,
+   "pct": 10,
+   "cuota": 22.57
+  }
+ ],
+ "iva": 22.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 248.22,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 16980.",
+ "alertas": []
+}

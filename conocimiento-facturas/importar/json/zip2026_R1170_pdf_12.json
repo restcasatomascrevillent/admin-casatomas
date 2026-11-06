@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  13
+ ],
+ "tipo": "factura",
+ "proveedor": "MOLINA CERDA, MANUELA",
+ "cif": "21398561M",
+ "local": "casa_tomas",
+ "numero_documento": "712/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 13,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 4.65,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 96.29,
+   "descuento_pct": null,
+   "total": 447.77,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 447.77,
+ "desglose_iva": [
+  {
+   "base": 447.77,
+   "pct": 10,
+   "cuota": 44.78
+  }
+ ],
+ "iva": 44.78,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 492.55,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 16120, 16498, 15519.",
+ "alertas": []
+}

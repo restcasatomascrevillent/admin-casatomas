@@ -1,0 +1,64 @@
+{
+ "archivo": "R157.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "CIELO DE BOCA, S.L.",
+ "cif": "B73915944",
+ "local": "casa_tomas",
+ "numero_documento": "A26/1311",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GG-PLUMA IBERICA",
+   "producto_ficha": "Pluma de cerdo ibérico (pieza, precio por kg)",
+   "cantidad": 9.61,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.95,
+   "descuento_pct": 0.0,
+   "total": 210.94,
+   "iva_pct": 10,
+   "albaran_ref": "A26/730",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CB-SECRETO CERDO IBERICO AL ROMERO 5 UDS.C/5 KG APROX",
+   "producto_ficha": "Secreto de cerdo ibérico al romero (5 uds por bolsa de ~5 kg, precio por kg)",
+   "cantidad": 9.6,
+   "unidad": "kg",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.95,
+   "descuento_pct": 0.0,
+   "total": 172.32,
+   "iva_pct": 10,
+   "albaran_ref": "A26/730",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 383.26,
+ "desglose_iva": [
+  {
+   "base": 383.26,
+   "pct": 10,
+   "cuota": 38.33
+  }
+ ],
+ "iva": 38.33,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 421.59,
+ "observaciones": "Factura mensual 'RESUMEN MENSUAL + GIRO 5 DIA' (pago por giro a 5 días). Cantidades por peso: cantidad = kg (columna Peso), bultos = piezas (columna Cantidad). Lotes y caducidades omitidos. Número impreso 'A26/ 1,311' normalizado a A26/1311. Cliente 2236 (RETE.CASA TOMAS).",
+ "alertas": []
+}

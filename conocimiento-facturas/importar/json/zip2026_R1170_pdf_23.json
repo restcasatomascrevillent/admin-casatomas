@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  24
+ ],
+ "tipo": "factura",
+ "proveedor": "GABINO PASCUAL, MANUEL",
+ "cif": "74232979L",
+ "local": "casa_tomas",
+ "numero_documento": "255/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 24,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.5,
+   "descuento_pct": null,
+   "total": 35.18,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 35.18,
+ "desglose_iva": [
+  {
+   "base": 35.18,
+   "pct": 10,
+   "cuota": 3.52
+  }
+ ],
+ "iva": 3.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 38.7,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): TABARQUI Y TOLOSA. Albaranes de subasta (informativo): 16232.",
+ "alertas": []
+}
