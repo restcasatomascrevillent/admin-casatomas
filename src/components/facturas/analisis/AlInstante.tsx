@@ -1,8 +1,9 @@
 // «Al instante» bajo la gráfica de «Explorar» (Facturas › Análisis, 06/11/2026).
 //
-//   · FilaAlInstante: los diez chips (sin IA). En el móvil van en una tira con
-//     scroll horizontal y degradados que avisan de que hay más; desde `sm`, en
-//     varias líneas. 44 px de alto, `aria-pressed` y tooltip con su explicación.
+//   · FilaAlInstante: la fila única de botones bajo la gráfica: las gráficas del
+//     explorador (presets) y las consultas sin IA, sin repetidos. Bajan de línea
+//     y crecen hasta llenar cada una, en cualquier ancho (sin huecos). 44 px de
+//     alto con el dedo, `aria-pressed` y tooltip con su explicación.
 //   · ResultadoAlInstante: lo que ocupa el HUECO de la gráfica al pulsar uno
 //     (gráfica, tabla o lista), con título, periodo y «Volver al explorador».
 //
@@ -153,7 +154,9 @@ const ORDEN_FILA = [
 
 const CLASE_BOTON = cn(
   // Fondo suave, sin borde; icono en dorado. Mismo aspecto para presets y consultas.
-  "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-transparent bg-muted/50 px-3.5 text-sm text-foreground/80 transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none sm:min-h-9 pointer-coarse:min-h-11",
+  // Crecen hasta llenar cada línea, en cualquier ancho (06/11/2026, dueño: «que se
+  // ajusten al espacio para no dejar huecos vacíos, que sea responsive»).
+  "inline-flex min-h-11 shrink-0 grow items-center justify-center gap-2 whitespace-nowrap rounded-full border border-transparent bg-muted/50 px-3 text-[13px] sm:px-3.5 sm:text-sm text-foreground/80 transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none sm:min-h-9 pointer-coarse:min-h-11",
   "[&>svg]:text-[hsl(38,59%,38%)] aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:font-medium aria-pressed:text-foreground",
   FOCO,
 );
@@ -199,7 +202,7 @@ export function FilaAlInstante({
             ref={ref}
             role="group"
             aria-label="Gráficas rápidas"
-            className="-mx-1 flex snap-x gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible"
+            className="flex flex-wrap gap-1.5"
           >
             {orden.map((clave) => {
               if (clave.startsWith("p:")) {
