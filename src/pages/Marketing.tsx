@@ -6,7 +6,9 @@ import { CreadorNewsletter } from "@/components/marketing/CreadorNewsletter";
 import { GestionCorreos } from "@/components/marketing/GestionCorreos";
 import { EstadisticasNewsletter } from "@/components/marketing/EstadisticasNewsletter";
 import { HistorialEnvios } from "@/components/marketing/HistorialEnvios";
+import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { Send, Users, BarChart3 } from "lucide-react";
 
 /**
@@ -44,27 +46,38 @@ export default function Marketing() {
     const pedida = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
     return PESTANAS.includes(pedida as (typeof PESTANAS)[number]) ? (pedida as string) : "crear";
   });
+  // «Editar» en Newsletter (decisión del dueño, 06/11/2026). Con solo «Ver» se consultan suscriptores,
+  // campañas (el historial) y estadísticas: la pestaña «Enviar Newsletter» y «Actualizar» la lista de
+  // envío se OCULTAN y arriba sale «Solo lectura». enviar-newsletter, newsletter-sync-resend y la RLS
+  // exigen lo mismo (migración 20261106500000_permisos_carta_newsletter). Instagram va aparte.
+  const { canAccess: puedeEditar, loading: cargandoPermiso } = useCanAccessSection("marketing", "edit");
+  const soloLectura = !cargandoPermiso && !puedeEditar;
+  // Sin «Editar» no hay «Enviar Newsletter»: si se pidió (o es la de por defecto), se abre «Suscriptores».
+  const pestanaVisible = !puedeEditar && pestana === "crear" ? "suscriptores" : pestana;
 
   return (
     <DashboardLayout>
       {/* Sin título de página (2026-09-25): la pestaña "Newsletter" activa
           en el menú lateral ya dice dónde estás; el subtítulo era relleno. */}
       <div ref={setRaiz} className="flex flex-col" style={alto ? { height: alto } : undefined}>
-        <Tabs value={pestana} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
+        <Tabs value={pestanaVisible} onValueChange={setPestana} className="flex flex-1 min-h-0 flex-col gap-2 sm:gap-3">
           <PestanasPagina
             pestanas={[
-              { valor: "crear", etiqueta: "Enviar Newsletter", etiquetaCorta: "Enviar", icono: <Send /> },
+              ...(puedeEditar ? [{ valor: "crear", etiqueta: "Enviar Newsletter", etiquetaCorta: "Enviar", icono: <Send /> }] : []),
               { valor: "suscriptores", etiqueta: "Suscriptores", icono: <Users /> },
               { valor: "estadisticas", etiqueta: "Estadísticas", icono: <BarChart3 /> },
             ]}
+            acciones={soloLectura ? <EtiquetaSoloLectura /> : undefined}
           />
 
           {/* Desde `lg` el formulario y la vista previa van lado a lado y cada
               columna hace su propio scroll (CreadorNewsletter); por debajo van
               apiladas y desplaza la pestaña entera. */}
-          <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`}>
-            <CreadorNewsletter />
-          </TabsContent>
+          {puedeEditar && (
+            <TabsContent value="crear" className={`${CONTENIDO_PESTANA} lg:flex lg:flex-col lg:overflow-hidden`}>
+              <CreadorNewsletter />
+            </TabsContent>
+          )}
 
           <TabsContent value="suscriptores" className={CONTENIDO_PESTANA}>
             <GestionCorreos />

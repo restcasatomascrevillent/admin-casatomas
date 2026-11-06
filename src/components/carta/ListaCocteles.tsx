@@ -17,15 +17,21 @@ import { cn } from "@/lib/utils";
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarCoctelModal } from "./EditarCoctelModal";
 import { etiquetaAlergeno } from "@/lib/alergenos";
-import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { AccionesTarjeta, EstadoLectura, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { lineaActivado, lineaCartas } from "./estadoLectura";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 
 interface ListaCoctelesProps {
   cocteles: Coctel[];
+  /**
+   * Solo «Ver» en la carta, sin «Editar» (06/11/2026): sin interruptores ni botones
+   * (Foto, Editar, Eliminar); la publicación se lee en texto.
+   */
+  soloLectura?: boolean;
 }
 
-export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
+export function ListaCocteles({ cocteles, soloLectura = false }: ListaCoctelesProps) {
   const { eliminarCoctel, actualizarCoctel, toggleActivado, toggleRestaurante, toggleTouza } = useCocteles();
   const fotoRapida = useRef<FotoRapidaHandle>(null);
   const [coctelAEliminar, setCoctelAEliminar] = useState<Coctel | null>(null);
@@ -113,24 +119,28 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 </Button>
               }
               controles={
-                /* Visibilidad Web */
-                <VisibilidadToggles
-                  restaurante={coctel.restaurante ?? false}
-                  touza={coctel.touza ?? false}
-                  onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: coctel.id, restaurante: checked })}
-                  onTouzaChange={(checked) => toggleTouza.mutate({ id: coctel.id, touza: checked })}
-                  isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                  activado={coctel.activado ?? true}
-                  onActivadoChange={(checked) =>
-                    toggleActivado.mutate({
-                      id: coctel.id,
-                      activado: checked,
-                      nombre: coctel.nombre ?? undefined,
-                    })
-                  }
-                  isActivadoPending={toggleActivado.isPending}
-                  compact
-                />
+                soloLectura ? (
+                  <EstadoLectura lineas={[lineaActivado(coctel.activado), lineaCartas(coctel.restaurante, coctel.touza)]} />
+                ) : (
+                  /* Visibilidad Web */
+                  <VisibilidadToggles
+                    restaurante={coctel.restaurante ?? false}
+                    touza={coctel.touza ?? false}
+                    onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: coctel.id, restaurante: checked })}
+                    onTouzaChange={(checked) => toggleTouza.mutate({ id: coctel.id, touza: checked })}
+                    isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                    activado={coctel.activado ?? true}
+                    onActivadoChange={(checked) =>
+                      toggleActivado.mutate({
+                        id: coctel.id,
+                        activado: checked,
+                        nombre: coctel.nombre ?? undefined,
+                      })
+                    }
+                    isActivadoPending={toggleActivado.isPending}
+                    compact
+                  />
+                )
               }
               info={
                 <>
@@ -157,56 +167,63 @@ export function ListaCocteles({ cocteles }: ListaCoctelesProps) {
                 </>
               }
               acciones={
-                <AccionesTarjeta
-                  nombre={coctel.nombre}
-                  tieneFoto={tieneFoto}
-                  onFoto={() => fotoRapida.current?.abrir(coctel)}
-                  onEditar={() => setCoctelAEditar(coctel)}
-                  onEliminar={() => setCoctelAEliminar(coctel)}
-                />
+                soloLectura ? null : (
+                  <AccionesTarjeta
+                    nombre={coctel.nombre}
+                    tieneFoto={tieneFoto}
+                    onFoto={() => fotoRapida.current?.abrir(coctel)}
+                    onEditar={() => setCoctelAEditar(coctel)}
+                    onEliminar={() => setCoctelAEliminar(coctel)}
+                  />
+                )
               }
             />
           );
         })}
       </div>
 
-      <AlertDialog open={!!coctelAEliminar} onOpenChange={(open) => !open && setCoctelAEliminar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar cóctel?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente "{coctelAEliminar?.nombre}".
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEliminar}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Con solo «Ver» no se monta nada de lo que escribe (borrar, foto, ficha de edición). */}
+      {!soloLectura && (
+        <>
+          <AlertDialog open={!!coctelAEliminar} onOpenChange={(open) => !open && setCoctelAEliminar(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar cóctel?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. Se eliminará permanentemente "{coctelAEliminar?.nombre}".
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleEliminar}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      <FotoRapidaCarta
-        ref={fotoRapida}
-        tipo="bebida"
-        bucket="cocteles"
-        tabla="Cocteles"
-        onGuardada={mostrarFoto}
-        guardarUrl={(id, url) => actualizarCoctel.mutateAsync({ id, imagen_url: url })}
-        quitarFoto={(id) => actualizarCoctel.mutateAsync({ id, imagen_url: null })}
-      />
+          <FotoRapidaCarta
+            ref={fotoRapida}
+            tipo="bebida"
+            bucket="cocteles"
+            tabla="Cocteles"
+            onGuardada={mostrarFoto}
+            guardarUrl={(id, url) => actualizarCoctel.mutateAsync({ id, imagen_url: url })}
+            quitarFoto={(id) => actualizarCoctel.mutateAsync({ id, imagen_url: null })}
+          />
 
-      <EditarCoctelModal
-        open={!!coctelAEditar}
-        onOpenChange={(open) => {
-          if (!open) setCoctelAEditar(null);
-        }}
-        coctel={coctelAEditar}
-      />
+          <EditarCoctelModal
+            open={!!coctelAEditar}
+            onOpenChange={(open) => {
+              if (!open) setCoctelAEditar(null);
+            }}
+            coctel={coctelAEditar}
+          />
+        </>
+      )}
     </>
   );
 }

@@ -60,6 +60,9 @@ vi.mock("@/components/carta/BotonVinoDesdeFoto", () => ({
 // La votación del vino favorito tiene sus propias pruebas (EncuestaVinoFavorito.test.tsx).
 vi.mock("@/components/carta/EncuestaVinoFavorito", () => ({ EncuestaVinoFavorito: () => null }));
 
+// Con «Editar» en la carta (lo de solo «Ver» está en TabCarta.permisos.test.tsx).
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
+
 import TabCarta from "../tabs/TabCarta";
 
 beforeAll(() => {

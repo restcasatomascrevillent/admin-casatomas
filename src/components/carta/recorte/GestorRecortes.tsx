@@ -19,7 +19,8 @@ import { useCanAccessSection } from "@/hooks/useUserRole";
  */
 export function GestorRecortes() {
   const { user } = useAuth();
-  const { canAccess } = useCanAccessSection("gestor_carta");
+  // Recortar y mandar trabajos escribe en la carta: hace falta «Editar» (06/11/2026).
+  const { canAccess } = useCanAccessSection("gestor_carta", "edit");
 
   // Limpieza única: el antiguo «Diagnóstico recorte» (?diag=recorte) se retiró; se borra su marca.
   useEffect(() => {

@@ -25,8 +25,9 @@
 //   sigue con la lectura básica y la descripción prudente.
 // - Lecturas de BD con el cliente del usuario (RLS); si fallan, se sigue sin
 //   ellas (categorías del body, sin ejemplos, sin precio).
-// - Auth: verify_jwt (config.toml) + permiso de ESCRITURA en `gestor_carta`
-//   (misma función que la RLS de la carta, resuelta con el JWT del usuario).
+// - Auth: verify_jwt (config.toml) + «Editar» en `gestor_carta`
+//   (can_edit_section, la misma función que la RLS de la carta desde
+//   20261106500000, resuelta con el JWT del usuario; con solo «Ver» no se gasta IA).
 // - Clave del proceso «vinos»: OPENAI_API_KEY_VINOS (si falta, OPENAI_API_KEY).
 //
 // Body: { imagen: "<base64 JPEG, con o sin prefijo data:>", categorias?: string[] }
@@ -667,7 +668,7 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   }
   if (req.method !== "POST") return json({ ok: false, error: "Método no permitido" }, 405);
 
-  // ---- Auth: usuario del panel con permiso de escritura en la carta ------
+  // ---- Auth: usuario del panel con «Editar» en la carta (06/11/2026) -----
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return json({ ok: false, error: "No autorizado" }, 401);
   const supabaseUser = createClientBase(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -677,8 +678,8 @@ serve(conAuditoriaDePeticion(FUNCION, createClientBase, async (req) => {
   const permiso = await comprobarPermisoSeccion(
     supabaseUser as unknown as ClientePermiso,
     "gestor_carta",
-    "escribir",
-    "No tienes permiso para editar la carta",
+    "editar",
+    "No tienes permiso para editar la carta (hace falta «Editar», no solo «Ver»)",
   );
   if (!permiso.ok) return json({ ok: false, error: permiso.error }, permiso.status);
 

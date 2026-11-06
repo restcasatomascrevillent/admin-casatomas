@@ -30,6 +30,10 @@ import {
  * (04/11/2026, petición del dueño). Una sola franja con el interruptor y el
  * botón de resultados, para no alargar la lista de vinos. En la web, al entrar
  * en la carta de vinos sale un aviso de 3 segundos con el botón «Votar».
+ *
+ * Con solo «Ver» en la carta (06/11/2026, decisión del dueño): se lee si la votación
+ * está abierta, sin interruptor ni «Resultados» (los votos llevan nombre y contacto:
+ * la base de datos solo se los da a quien puede editar la carta).
  */
 export function EncuestaVinoFavorito() {
   const id = useId();
@@ -48,44 +52,60 @@ export function EncuestaVinoFavorito() {
   return (
     <Card data-tour="gw-carta-encuesta">
       <CardContent className="space-y-1 px-4 py-2.5">
-        <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <Label htmlFor={id} className="flex min-w-0 cursor-pointer items-center gap-2">
-            <Trophy className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            <span>Votación «Vota tu vino favorito y gana un sorteo» en la web</span>
-          </Label>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-10"
-              disabled={!disponible}
-              onClick={() => setVerResultados(true)}
-            >
-              <Users className="mr-2 h-4 w-4" aria-hidden="true" />
-              Resultados
-            </Button>
-            <Switch
-              id={id}
-              checked={activa}
-              disabled={!disponible || !puedeEditar || cambiarActiva.isPending}
-              onCheckedChange={(valor) => cambiarActiva.mutate(valor)}
-            />
+        {!puedeEditar ? (
+          <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+              <Trophy className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>Votación «Vota tu vino favorito y gana un sorteo» en la web</span>
+            </p>
+            {!aviso && (
+              <Badge variant={activa ? "default" : "secondary"} data-testid="estado-votacion">
+                {activa ? "Abierta en la web" : "Cerrada"}
+              </Badge>
+            )}
           </div>
-        </div>
+        ) : (
+          <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <Label htmlFor={id} className="flex min-w-0 cursor-pointer items-center gap-2">
+              <Trophy className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>Votación «Vota tu vino favorito y gana un sorteo» en la web</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-10"
+                disabled={!disponible}
+                onClick={() => setVerResultados(true)}
+              >
+                <Users className="mr-2 h-4 w-4" aria-hidden="true" />
+                Resultados
+              </Button>
+              <Switch
+                id={id}
+                checked={activa}
+                disabled={!disponible || cambiarActiva.isPending}
+                onCheckedChange={(valor) => cambiarActiva.mutate(valor)}
+              />
+            </div>
+          </div>
+        )}
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}
       </CardContent>
 
-      <ResultadosDialog
-        open={verResultados}
-        onOpenChange={setVerResultados}
-        votos={votos.data ?? []}
-        cargando={votos.isLoading}
-        error={votos.isError}
-        puedeEditar={puedeEditar}
-        vaciando={vaciar.isPending}
-        onVaciar={() => vaciar.mutate()}
-      />
+      {puedeEditar && (
+        <ResultadosDialog
+          open={verResultados}
+          onOpenChange={setVerResultados}
+          votos={votos.data ?? []}
+          cargando={votos.isLoading}
+          error={votos.isError}
+          puedeEditar={puedeEditar}
+          vaciando={vaciar.isPending}
+          onVaciar={() => vaciar.mutate()}
+        />
+      )}
     </Card>
   );
 }

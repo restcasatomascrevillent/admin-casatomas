@@ -24,7 +24,8 @@ import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarPlatoModal } from "./EditarPlatoModal";
 import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
 import { etiquetaAlergeno, parseAlergenos } from "@/lib/alergenos";
-import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { AccionesTarjeta, EstadoLectura, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { lineaActivado, lineaFotoExpandida } from "./estadoLectura";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { useInRouterContext } from "react-router-dom";
 import { AbrirPlatoDesdeUrl } from "./video/AbrirPlatoDesdeUrl";
@@ -35,9 +36,15 @@ const CARTA_CARD_ASPECT_RATIO = 300 / 160;
 
 interface ListaPlatosProps {
   platos: Plato[];
+  /**
+   * Solo «Ver» en la carta, sin «Editar» (06/11/2026): las tarjetas se consultan sin
+   * interruptores ni botones (Foto, Editar, Eliminar, posición de la foto); la
+   * publicación se lee en texto. Ver la foto en grande sigue disponible.
+   */
+  soloLectura?: boolean;
 }
 
-export function ListaPlatos({ platos }: ListaPlatosProps) {
+export function ListaPlatos({ platos, soloLectura = false }: ListaPlatosProps) {
   const {
     toggleExpanded,
     toggleActivado,
@@ -178,7 +185,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {plato.imagen_url && (
+                  {plato.imagen_url && !soloLectura && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -210,27 +217,33 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 </div>
               </div>
 
-              {/* Visibilidad Web */}
-              <VisibilidadToggles
-                activado={plato.activado ?? true}
-                onActivadoChange={(checked) =>
-                  toggleActivado.mutate({
-                    id: plato.id,
-                    activado: checked,
-                    nombre: plato.nombre ?? undefined,
-                  })
-                }
-                isActivadoPending={toggleActivado.isPending}
-                compact
-              />
+              {soloLectura ? (
+                <EstadoLectura lineas={[lineaActivado(plato.activado), lineaFotoExpandida(plato.imagen_url, plato.expanded)]} />
+              ) : (
+                <>
+                  {/* Visibilidad Web */}
+                  <VisibilidadToggles
+                    activado={plato.activado ?? true}
+                    onActivadoChange={(checked) =>
+                      toggleActivado.mutate({
+                        id: plato.id,
+                        activado: checked,
+                        nombre: plato.nombre ?? undefined,
+                      })
+                    }
+                    isActivadoPending={toggleActivado.isPending}
+                    compact
+                  />
 
-              <FotoExpandidaToggle
-                imagenUrl={plato.imagen_url}
-                nombre={plato.nombre || "Plato"}
-                expanded={plato.expanded}
-                isPending={toggleExpanded.isPending}
-                onChange={(checked) => handleToggleExpanded(plato, checked)}
-              />
+                  <FotoExpandidaToggle
+                    imagenUrl={plato.imagen_url}
+                    nombre={plato.nombre || "Plato"}
+                    expanded={plato.expanded}
+                    isPending={toggleExpanded.isPending}
+                    onChange={(checked) => handleToggleExpanded(plato, checked)}
+                  />
+                </>
+              )}
 
               {plato.descripcion && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
@@ -285,57 +298,64 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
                 </div>
               )}
 
-              <AccionesTarjeta
-                nombre={plato.nombre}
-                tieneFoto={Boolean(plato.imagen_url?.trim())}
-                onFoto={() => fotoRapida.current?.abrir(plato)}
-                onEditar={() => setPlatoAEditar(plato)}
-                onEliminar={() => setPlatoAEliminar(plato)}
-              />
+              {!soloLectura && (
+                <AccionesTarjeta
+                  nombre={plato.nombre}
+                  tieneFoto={Boolean(plato.imagen_url?.trim())}
+                  onFoto={() => fotoRapida.current?.abrir(plato)}
+                  onEditar={() => setPlatoAEditar(plato)}
+                  onEliminar={() => setPlatoAEliminar(plato)}
+                />
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Dialog de confirmación */}
-      <AlertDialog open={!!platoAEliminar} onOpenChange={(open) => !open && setPlatoAEliminar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar plato?</AlertDialogTitle>
-            <AlertDialogDescription>
-              ¿Estás seguro de que quieres eliminar "{platoAEliminar?.nombre}"? Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEliminar}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Con solo «Ver» no se monta nada de lo que escribe (borrar, foto, ficha de edición). */}
+      {!soloLectura && (
+        <>
+          {/* Dialog de confirmación */}
+          <AlertDialog open={!!platoAEliminar} onOpenChange={(open) => !open && setPlatoAEliminar(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar plato?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  ¿Estás seguro de que quieres eliminar "{platoAEliminar?.nombre}"? Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleEliminar}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      <FotoRapidaCarta
-        ref={fotoRapida}
-        tipo="plato"
-        bucket="platos"
-        tabla="Platos"
-        onGuardada={mostrarFoto}
-        guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
-        quitarFoto={(id) => actualizarPlato.mutateAsync({ id, imagen_url: null, expanded: false })}
-      />
+          <FotoRapidaCarta
+            ref={fotoRapida}
+            tipo="plato"
+            bucket="platos"
+            tabla="Platos"
+            onGuardada={mostrarFoto}
+            guardarUrl={(id, url) => actualizarPlato.mutateAsync({ id, imagen_url: url })}
+            quitarFoto={(id) => actualizarPlato.mutateAsync({ id, imagen_url: null, expanded: false })}
+          />
 
-      {enRouter && <AbrirPlatoDesdeUrl<Plato> platos={platos} onAbrir={setPlatoAEditar} />}
-      <EditarPlatoModal
-        open={!!platoAEditar}
-        onOpenChange={(open) => {
-          if (!open) setPlatoAEditar(null);
-        }}
-        plato={platoAEditar}
-      />
+          {enRouter && <AbrirPlatoDesdeUrl<Plato> platos={platos} onAbrir={setPlatoAEditar} />}
+          <EditarPlatoModal
+            open={!!platoAEditar}
+            onOpenChange={(open) => {
+              if (!open) setPlatoAEditar(null);
+            }}
+            plato={platoAEditar}
+          />
+        </>
+      )}
 
       <Dialog
         open={!!fotoAVisualizar}
@@ -357,7 +377,7 @@ export function ListaPlatos({ platos }: ListaPlatosProps) {
         </DialogContent>
       </Dialog>
 
-      {posicionPlato && posicionPlato.imagen_url && (
+      {!soloLectura && posicionPlato && posicionPlato.imagen_url && (
         <ImagePositionSelector
           open={!!posicionPlato}
           onOpenChange={(open) => {

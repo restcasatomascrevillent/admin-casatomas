@@ -21,17 +21,19 @@ describe("comprobarPermisoNewsletter", () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it("pregunta can_write_section('marketing')", async () => {
+  it("pregunta can_edit_section('marketing') («Editar», 06/11/2026), nunca can_write_section ni can_read_section", async () => {
     const { c, rpc } = cliente({ user: { id: "u1" }, permitido: true });
     expect(await comprobarPermisoNewsletter(c)).toEqual({ ok: true, userId: "u1" });
-    expect(rpc).toHaveBeenCalledWith("can_write_section", { _section: "marketing" });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("can_edit_section", { _section: "marketing" });
   });
 
-  it("403 si el usuario no tiene permiso de escritura en marketing", async () => {
+  it("403 si el usuario solo tiene «Ver» en marketing (can_edit_section = false)", async () => {
     const { c } = cliente({ user: { id: "u1" }, permitido: false });
     const r = await comprobarPermisoNewsletter(c);
     expect(r.ok).toBe(false);
     expect(r.ok === false && r.status).toBe(403);
+    expect(r.ok === false && r.error).toMatch(/Editar/);
   });
 
   it("403 también si la RPC devuelve algo que no es true", async () => {

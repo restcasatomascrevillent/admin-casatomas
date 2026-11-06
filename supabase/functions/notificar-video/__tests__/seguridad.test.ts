@@ -46,7 +46,7 @@ describe("aviso de encargo una sola vez", () => {
   });
 });
 
-describe("permisos: Instagram con «Editar»; la carta como estaba", () => {
+describe("permisos: «Editar» en Instagram y en la carta (06/11/2026)", () => {
   it("secciones y modo por tipo", () => {
     expect(seccionesDeTipo("reel")).toEqual(SECCIONES_REEL);
     expect(SECCIONES_REEL[0]).toBe("instagram_render");
@@ -54,7 +54,9 @@ describe("permisos: Instagram con «Editar»; la carta como estaba", () => {
     expect(seccionesDeTipo("video")).toEqual(["gestor_carta"]);
     expect(modoPermisoDeTipo("reel")).toBe("editar");
     expect(modoPermisoDeTipo("encargo")).toBe("editar");
-    expect(modoPermisoDeTipo("video")).toBe("escribir");
+    // La carta también: con solo «Ver» no se avisa de vídeos ni recortes (no los puede ni leer).
+    expect(modoPermisoDeTipo("video")).toBe("editar");
+    expect(modoPermisoDeTipo("recorte")).toBe("editar");
   });
 
   it("«editar» pregunta a can_edit_section", async () => {

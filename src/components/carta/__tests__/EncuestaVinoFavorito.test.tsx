@@ -26,10 +26,25 @@ describe("Votación del vino favorito en el Gestor Web", () => {
     fireEvent.click(screen.getByRole("switch", { name: /Vota tu vino favorito/ }));
     expect(mock.cambiar).toHaveBeenCalledWith(true);
   });
-  it("sin permiso de edición no se puede cambiar", () => {
+  it("con solo «Ver» (06/11/2026): se lee si está abierta, sin interruptor ni «Resultados» (nombres y contactos)", () => {
     mock.puede = false;
+    mock.activa = true;
+    const { rerender } = render(<EncuestaVinoFavorito />);
+    expect(screen.queryByRole("switch")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Resultados" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Vaciar" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Vota tu vino favorito/)).toBeInTheDocument();
+    expect(screen.getByTestId("estado-votacion")).toHaveTextContent("Abierta en la web");
+    mock.activa = false;
+    rerender(<EncuestaVinoFavorito />);
+    expect(screen.getByTestId("estado-votacion")).toHaveTextContent("Cerrada");
+    expect(mock.cambiar).not.toHaveBeenCalled();
+    expect(screen.queryByText("Ana")).not.toBeInTheDocument();
+  });
+  it("con «Editar» no sale la etiqueta de estado de solo lectura", () => {
     render(<EncuestaVinoFavorito />);
-    expect(screen.getByRole("switch", { name: /Vota tu vino favorito/ })).toBeDisabled();
+    expect(screen.queryByTestId("estado-votacion")).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /Vota tu vino favorito/ })).toBeEnabled();
   });
   it("resultados: ranking, sorteo y vaciar con confirmación", () => {
     render(<EncuestaVinoFavorito />);

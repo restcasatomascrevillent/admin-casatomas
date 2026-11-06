@@ -105,9 +105,10 @@ serve(conAuditoriaDePeticion("enviar-newsletter", createClientBase, async (req) 
   // --------------------------------------------------------------------------
   // Autenticación + permiso de la sección Marketing. Antes bastaba con estar
   // autenticado: cualquier usuario del panel (cocina, sala...) podía mandar un
-  // correo a toda la lista. Ahora se exige can_write_section('marketing'),
-  // la misma función que usan las políticas RLS de newsletter_suscriptores.
-  // Se llama con un cliente "del usuario" (su JWT), porque can_write_section()
+  // correo a toda la lista. Ahora se exige «Editar» en Marketing
+  // (can_edit_section('marketing'), 06/11/2026; antes can_write_section), lo
+  // mismo que la RLS de newsletter_envios (migración 20261106500000).
+  // Se llama con un cliente "del usuario" (su JWT), porque can_edit_section()
   // resuelve auth.uid() de la llamada (mismo patrón que emails-reserva).
   // --------------------------------------------------------------------------
   const authHeader = req.headers.get('Authorization');

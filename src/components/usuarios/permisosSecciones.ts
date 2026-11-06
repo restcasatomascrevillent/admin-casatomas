@@ -46,10 +46,12 @@ export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas y mover de sala.",
   reservas_configuracion:
     "cambiar las reglas, los turnos y las plantillas de correo de las reservas. Para entrar hace falta también «Ver» en Reservas.",
-  gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
-  gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
+  gestor_carta:
+    "añadir, cambiar y borrar platos, vinos, bebidas y cócteles: ajustar y restaurar precios, ordenar, visibilidad, fotos (quitar el fondo y vídeos), «Añadir vino» y «Varias botellas» con IA, traducciones y la votación del vino favorito. Con solo «Ver» se consulta la carta y se descarga el «PDF Carta».",
+  gestion_web:
+    "sin efecto: en Novedades, Menús diarios y Tapas basta con «Ver» para cambiarlo todo (decisión del dueño, 06/11/2026).",
   marketing:
-    "en Instagram: crear y cambiar piezas, subir fotos, usar la IA, publicar, programar, pedir encargos y generar vídeos. Con solo «Ver» se consulta. En el newsletter, aún no se usa.",
+    "en Instagram: crear y cambiar piezas, subir fotos, usar la IA, publicar, programar, pedir encargos y generar vídeos. En el newsletter: crear y enviar newsletters (también la prueba) y actualizar la lista de envío. Con solo «Ver» se consultan los suscriptores, el historial de envíos y las estadísticas.",
   instagram_agencia: "aceptar, entregar y comentar los encargos de Instagram como la agencia (Oficiosos). Con solo «Ver», los consulta.",
   instagram_render:
     "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",

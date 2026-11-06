@@ -33,7 +33,8 @@ interface Props {
  */
 export function AvisoTrabajosVideo({ procesarYGuardar }: Props) {
   const { user } = useAuth();
-  const { canAccess } = useCanAccessSection("gestor_carta");
+  // Procesar y guardar vídeos escribe en la carta: hace falta «Editar» (06/11/2026).
+  const { canAccess } = useCanAccessSection("gestor_carta", "edit");
   const queryClient = useQueryClient();
   const potente = useRef<boolean | null>(leerMedidaCacheada()?.potente ?? null);
   const descartados = useRef(new Set<string>());

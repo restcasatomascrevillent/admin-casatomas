@@ -188,9 +188,13 @@ export function seccionesDeTipo(tipo: TipoTrabajo): readonly string[] {
   return [seccionDeTipo(tipo)];
 }
 
-/** Instagram exige «Editar» (can_edit_section, 20261111000000); la carta sigue como estaba. */
-export function modoPermisoDeTipo(tipo: TipoTrabajo): "editar" | "escribir" {
-  return tipo === "encargo" || tipo === "reel" ? "editar" : "escribir";
+/**
+ * Todo exige «Editar» (can_edit_section): Instagram desde 20261111000000 y la carta
+ * (vídeos y recortes) desde 20261106500000 (06/11/2026: con solo «Ver» la carta se
+ * consulta; los trabajos de vídeo y recorte ya solo los lee quien la edita).
+ */
+export function modoPermisoDeTipo(_tipo: TipoTrabajo): "editar" {
+  return "editar";
 }
 
 /** Cliente mínimo (supabase-js con service role) para marcar el aviso. */

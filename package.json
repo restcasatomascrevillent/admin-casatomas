@@ -47,6 +47,7 @@
     "test:instagram-encargos:db": "node scripts/test-instagram-encargos.mjs",
     "test:instagram-seguridad:db": "node scripts/test-instagram-seguridad.mjs",
     "test:instagram-carrusel:db": "node scripts/test-instagram-carrusel.mjs",
+    "test:permisos-carta-newsletter:db": "node scripts/test-permisos-carta-newsletter.mjs",
     "test:migraciones": "node scripts/comprobar-versiones-migraciones.mjs",
     "instagram:recursos": "node scripts/instagram/subir-recursos.mjs",
     "instagram:render-reels": "node scripts/instagram/render-reels.mjs"

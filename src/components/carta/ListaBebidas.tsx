@@ -15,15 +15,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarBebidaModal } from "./EditarBebidaModal";
-import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { AccionesTarjeta, EstadoLectura, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { lineaActivado, lineaCartas } from "./estadoLectura";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 
 interface ListaBebidasProps {
   bebidas: Bebida[];
+  /**
+   * Solo «Ver» en la carta, sin «Editar» (06/11/2026): sin interruptores ni botones
+   * (Foto, Editar, Eliminar); la publicación se lee en texto.
+   */
+  soloLectura?: boolean;
 }
 
-export function ListaBebidas({ bebidas }: ListaBebidasProps) {
+export function ListaBebidas({ bebidas, soloLectura = false }: ListaBebidasProps) {
   const { eliminarBebida, actualizarBebida, toggleActivado, toggleRestaurante, toggleTouza } = useBebidas();
   const [bebidaAEditar, setBebidaAEditar] = useState<Bebida | null>(null);
   const [bebidaAEliminar, setBebidaAEliminar] = useState<Bebida | null>(null);
@@ -103,24 +109,28 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                 </Button>
               }
               controles={
-                /* Visibilidad Web */
-                <VisibilidadToggles
-                  restaurante={bebida.restaurante ?? false}
-                  touza={bebida.touza ?? false}
-                  onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
-                  onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
-                  isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                  activado={bebida.activado ?? true}
-                  onActivadoChange={(checked) =>
-                    toggleActivado.mutate({
-                      id: bebida.id,
-                      activado: checked,
-                      nombre: bebida.nombre ?? undefined,
-                    })
-                  }
-                  isActivadoPending={toggleActivado.isPending}
-                  compact
-                />
+                soloLectura ? (
+                  <EstadoLectura lineas={[lineaActivado(bebida.activado), lineaCartas(bebida.restaurante, bebida.touza)]} />
+                ) : (
+                  /* Visibilidad Web */
+                  <VisibilidadToggles
+                    restaurante={bebida.restaurante ?? false}
+                    touza={bebida.touza ?? false}
+                    onRestauranteChange={(checked) => toggleRestaurante.mutate({ id: bebida.id, restaurante: checked })}
+                    onTouzaChange={(checked) => toggleTouza.mutate({ id: bebida.id, touza: checked })}
+                    isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                    activado={bebida.activado ?? true}
+                    onActivadoChange={(checked) =>
+                      toggleActivado.mutate({
+                        id: bebida.id,
+                        activado: checked,
+                        nombre: bebida.nombre ?? undefined,
+                      })
+                    }
+                    isActivadoPending={toggleActivado.isPending}
+                    compact
+                  />
+                )
               }
               info={
                 <>
@@ -141,59 +151,66 @@ export function ListaBebidas({ bebidas }: ListaBebidasProps) {
                 </>
               }
               acciones={
-                <AccionesTarjeta
-                  nombre={bebida.nombre}
-                  tieneFoto={tieneFoto}
-                  onFoto={() => fotoRapida.current?.abrir(bebida)}
-                  onEditar={() => setBebidaAEditar(bebida)}
-                  onEliminar={() => setBebidaAEliminar(bebida)}
-                />
+                soloLectura ? null : (
+                  <AccionesTarjeta
+                    nombre={bebida.nombre}
+                    tieneFoto={tieneFoto}
+                    onFoto={() => fotoRapida.current?.abrir(bebida)}
+                    onEditar={() => setBebidaAEditar(bebida)}
+                    onEliminar={() => setBebidaAEliminar(bebida)}
+                  />
+                )
               }
             />
           );
         })}
       </div>
 
-      <AlertDialog open={!!bebidaAEliminar} onOpenChange={(open) => !open && setBebidaAEliminar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar bebida?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción eliminará permanentemente "{bebidaAEliminar?.nombre}" de la carta. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (bebidaAEliminar) eliminarBebida.mutate(bebidaAEliminar.id);
-                setBebidaAEliminar(null);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Con solo «Ver» no se monta nada de lo que escribe (borrar, foto, ficha de edición). */}
+      {!soloLectura && (
+        <>
+          <AlertDialog open={!!bebidaAEliminar} onOpenChange={(open) => !open && setBebidaAEliminar(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar bebida?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción eliminará permanentemente "{bebidaAEliminar?.nombre}" de la carta. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (bebidaAEliminar) eliminarBebida.mutate(bebidaAEliminar.id);
+                    setBebidaAEliminar(null);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      <FotoRapidaCarta
-        ref={fotoRapida}
-        tipo="bebida"
-        bucket="bebidas"
-        tabla="Bebidas"
-        onGuardada={mostrarFoto}
-        guardarUrl={(id, url) => actualizarBebida.mutateAsync({ id, imagen_url: url })}
-        quitarFoto={(id) => actualizarBebida.mutateAsync({ id, imagen_url: null })}
-      />
+          <FotoRapidaCarta
+            ref={fotoRapida}
+            tipo="bebida"
+            bucket="bebidas"
+            tabla="Bebidas"
+            onGuardada={mostrarFoto}
+            guardarUrl={(id, url) => actualizarBebida.mutateAsync({ id, imagen_url: url })}
+            quitarFoto={(id) => actualizarBebida.mutateAsync({ id, imagen_url: null })}
+          />
 
-      <EditarBebidaModal
-        open={!!bebidaAEditar}
-        onOpenChange={(open) => {
-          if (!open) setBebidaAEditar(null);
-        }}
-        bebida={bebidaAEditar}
-      />
+          <EditarBebidaModal
+            open={!!bebidaAEditar}
+            onOpenChange={(open) => {
+              if (!open) setBebidaAEditar(null);
+            }}
+            bebida={bebidaAEditar}
+          />
+        </>
+      )}
     </>
   );
 }

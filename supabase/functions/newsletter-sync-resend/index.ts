@@ -79,7 +79,7 @@ serve(conAuditoriaDePeticion("newsletter-sync-resend", createClientBase, async (
         supabaseUser as unknown as ClientePermiso,
         SECCION_MARKETING,
         modo,
-        modo === "escribir" ? "No tienes permiso para sincronizar el newsletter" : "No tienes permiso para ver el newsletter",
+        modo === "leer" ? "No tienes permiso para ver el newsletter" : "No tienes permiso para sincronizar el newsletter (hace falta «Editar» en Newsletter)",
       );
     },
   });
