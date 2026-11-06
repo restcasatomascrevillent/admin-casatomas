@@ -708,11 +708,12 @@ export const AYUDA_SECRETOS: Record<string, AyudaSecreto> = {
     enlace: "https://github.com/settings/personal-access-tokens/new",
     textoEnlace: "Crear el token en GitHub",
     pasos: [
-      "Con la cuenta restcasatomascrevillent, crea un «Fine-grained token».",
-      "Repository access: «Public repositories» (no necesita ningún repositorio). Account permissions → «Plan»: Read-only.",
+      "Con la cuenta restcasatomascrevillent, crea un «Fine-grained token». Nombre: «Panel · Servicios». Caducidad: 1 año.",
+      "Repository access: «Only select repositories» → web-casatomas, admin-casatomas y touza-casatomas. Repository permissions → «Actions»: Read-only.",
+      "Account permissions → «Plan»: Read-only (para los minutos y lo facturado exactos).",
       "Copia el token (empieza por github_pat_): GitHub solo lo enseña una vez.",
     ],
-    permisos: "Solo lectura del plan y de la facturación: no puede tocar el código.",
+    permisos: "Solo lectura de las ejecuciones de pruebas, del plan y de la facturación: no puede tocar el código ni lanzar nada.",
   },
   SERVICIOS_SUPABASE_TOKEN: {
     titulo: "Token de gestión de Supabase",
