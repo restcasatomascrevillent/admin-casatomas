@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Clock, Mail, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
 import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { ConMotivo } from "@/components/reservas/ConMotivo";
+import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
@@ -319,6 +320,9 @@ export default function Reservas() {
                que escriben (y la RLS del INSERT, 20261001170000). Sin él el botón sale deshabilitado
                y explica por qué: el motivo va en el envoltorio (`ConMotivo`), porque un botón
                deshabilitado no recibe el ratón. */
+            <>
+            {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
+            <BotonAvisosSeccion seccion="reservas" />
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <ConMotivo motivo={puedeEditarReservas ? undefined : MOTIVO_SIN_PERMISO_ALTA} className="shrink-0">
                 <DialogTrigger asChild>
@@ -338,6 +342,7 @@ export default function Reservas() {
                 />
               </DialogContent>
             </Dialog>
+            </>
           }
         />
 

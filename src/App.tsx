@@ -10,7 +10,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
-import { AvisoTrabajosVideo } from "@/components/carta/potente/AvisoTrabajosVideo";
 import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
@@ -110,9 +109,8 @@ const App = () => (
               <ColaSubidaProvider>
               {/* Cola de «Vídeo del plato»: se procesa en segundo plano y se guarda sola (01-11-2026). */}
               <ColaVideosProvider>
-              {/* «Hay N vídeo(s) pendiente(s)…» de otros dispositivos: solo en los potentes; los
-                  mete en la cola de arriba (docs/video-dispositivo-potente.md). */}
-              <AvisoTrabajosVideo />
+              {/* El aviso «Hay N vídeo(s) pendiente(s)…» (AvisoTrabajosVideo) se quitó el
+                  06/11/2026 a petición del dueño, igual que el de las fotos pendientes de recortar. */}
               {/* Recorte de fotos del móvil tras guardar: pestaña muerta a medias y refresco de la carta. */}
               <GestorRecortes />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}

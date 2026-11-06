@@ -1,7 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { Printer } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { BotonHerramientaCarta } from "../BotonHerramientaCarta";
 import type { FilaPlato, FilaVino, TipoCartaImpresa } from "@/lib/carta-pdf/datos";
 
 // El diálogo (maquetación, logos, fuentes y pdf-lib) solo se descarga al pulsar el botón.
@@ -25,19 +24,16 @@ export function BotonCartaImprimir({ tipo, platos, vinos, className }: Props) {
   const [montado, setMontado] = useState(false);
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        className={cn("min-w-0 px-3 sm:px-4", className)}
-        title={tipo === "vinos" ? "Carta de vinos para imprimir (PDF A5 o A4)" : "Carta de platos para imprimir (PDF A5 o A4)"}
+      <BotonHerramientaCarta
+        icono={<Printer />}
+        etiqueta="PDF Carta"
+        ayuda={tipo === "vinos" ? "Carta de vinos para imprimir: PDF en A5 o A4" : "Carta de platos para imprimir: PDF en A5 o A4"}
+        className={className}
         onClick={() => {
           setMontado(true);
           setAbierto(true);
         }}
-      >
-        <Printer className="mr-2 h-4 w-4 shrink-0" />
-        <span className="truncate">PDF Carta</span>
-      </Button>
+      />
       {montado && (
         <Suspense fallback={null}>
           <DialogoCartaImprimir abierto={abierto} onCambiarAbierto={setAbierto} tipo={tipo} platos={platos} vinos={vinos} />
