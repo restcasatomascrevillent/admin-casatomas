@@ -118,7 +118,16 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "Tres formas de mirar",
       texto:
-        "«Documentos» enseña las facturas y albaranes. «Productos», lo que compras, cuánto gastas por categoría, qué ha subido de precio y cómo ha cambiado cada precio. «Proveedores», cuánto le compras a cada uno, cada cuánto y qué. El número indica cuántos resultados hay para lo que has buscado.",
+        "«Documentos» enseña las facturas y albaranes. «Productos», lo que compras, cuánto gastas por categoría, qué ha subido de precio y cómo ha cambiado cada precio. «Proveedores», de más a menos gasto; toca uno y se despliega con sus datos y sus facturas por meses. El número indica cuántos resultados hay para lo que has buscado.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-local-periodo",
+      pestana: F_COMPRAS,
+      titulo: "Local y periodo",
+      texto:
+        "Elige de qué local quieres ver las compras (Casa Tomás, Touza o los dos) y de qué periodo: este mes, el anterior, el trimestre, el año o todo. Cambian las listas y sus totales.",
       opcional: true,
       lado: "bottom",
     },
@@ -127,7 +136,7 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "Filtros rápidos",
       texto:
-        "Toca un filtro para ver solo una parte: solo facturas, solo albaranes, los albaranes que aún no tienen factura, los que tienen avisos o los que nadie ha revisado todavía.",
+        "Toca un filtro para ver solo una parte: solo facturas, solo albaranes, los albaranes que aún no tienen factura, los abonos, los que tienen avisos o los que nadie ha revisado todavía.",
       opcional: true,
       lado: "bottom",
     },
@@ -136,16 +145,16 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_COMPRAS,
       titulo: "La lista, ordenada por meses",
       texto:
-        "Primero el mes (con cuántos documentos hay y cuánto suman), dentro cada proveedor un poco hacia dentro y, debajo, sus documentos unidos por una línea fina. Toca un mes o un proveedor para plegarlo o desplegarlo. Un albarán que ya está en una factura sale más claro y no suma, para no contarlo dos veces.",
+        "La lista ocupa todo el ancho, por meses (con cuántos documentos hay, cuánto suman y lo que restan los abonos). Cada fila: fecha, proveedor, número, marcas e importe. Toca un mes para plegarlo o desplegarlo. Un albarán que ya está en una factura sale tachado y no suma, para no contarlo dos veces.",
       opcional: true,
-      lado: "right",
+      lado: "top",
     },
     {
       elemento: "facturas-ficha",
       pestana: F_COMPRAS,
       titulo: "Avisos y revisión automática",
       texto:
-        "Toca un documento para abrir su ficha. Si algo no cuadra sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «Precio extremo», «Sin total»… (tócalo y te lo explica). Las que cuadran se marcan solas como «Revisada auto»: solo tienes que mirar las que tienen avisos y las que pone «Sin revisar».",
+        "Toca un documento y su ficha ocupa toda la pantalla; «Volver a la lista» te devuelve a la lista tal como estaba. Si algo no cuadra sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «Precio extremo», «Sin total»… (tócalo y te lo explica). Las que cuadran se marcan solas como «Revisada auto»: solo tienes que mirar las que tienen avisos y las que pone «Sin revisar».",
       opcional: true,
       lado: "left",
     },
@@ -176,13 +185,13 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       opcional: true,
       lado: "left",
     },
-    // --- IA (solo se señala: el tour nunca envía preguntas, cuestan dinero) ---
+    // --- Análisis (solo se señala: el tour nunca envía preguntas, cuestan dinero) ---
     {
       elemento: F_IA,
       pestana: F_IA,
-      titulo: "3. Preguntar a la IA",
+      titulo: "3. Análisis: tus compras en gráficas",
       texto:
-        "En «IA» le preguntas a la aplicación por tus compras, con tus palabras, como a una persona. Responde con los datos de tus facturas y albaranes. Te enseñamos sus partes.",
+        "En «Análisis» tienes un tablero que sale hecho: lo que gastas, a quién, qué ha subido de precio y tus gastos fijos. Las cuentas son las de tus facturas y albaranes. Te enseñamos sus partes.",
       lado: "bottom",
     },
     {
@@ -190,46 +199,64 @@ export const TOURS: Record<SeccionAyuda, PasoTour[]> = {
       pestana: F_IA,
       titulo: "Lo que cuesta la IA",
       texto:
-        "Aquí arriba ves lo que ha costado este mes preguntar al asistente (suelen ser céntimos). Tócalo para ver el detalle. Si se acerca al tope de gasto, se pone en naranja o en rojo.",
+        "Aquí arriba ves lo que ha costado este mes preguntar a la IA (suelen ser céntimos). Tócalo para ver el detalle. Si se acerca al tope de gasto, se pone en naranja o en rojo. El tablero no gasta nada.",
       opcional: true,
       lado: "bottom",
     },
     {
-      elemento: "facturas-ia-historial",
+      elemento: "facturas-analisis-barra",
       pestana: F_IA,
-      titulo: "Tus conversaciones",
+      titulo: "Periodo y local",
       texto:
-        "Aquí se guardan las preguntas que ya has hecho, con su fecha. Toca una para volver a ella y seguir donde lo dejaste. «Nueva conversación» empieza de cero.",
+        "Elige qué mirar: este mes, el trimestre, el año, todo o unas fechas a tu gusto («Personalizado», con atajos como «últimos 30 días»); y los dos locales juntos o solo Casa Tomás o Touza. Todo el tablero cambia a la vez.",
       opcional: true,
-      lado: "right",
+      lado: "bottom",
     },
     {
-      elemento: "facturas-ia-sugerencias",
+      elemento: "facturas-analisis-indicadores",
       pestana: F_IA,
-      titulo: "Preguntas de ejemplo",
+      titulo: "Las cifras del periodo",
       texto:
-        "Si no sabes por dónde empezar, toca una de estas: «¿Cuánto hemos gastado en octubre?», las facturas de un proveedor, sus albaranes de esta semana o lo que más compráis. Se pregunta sola al tocarla.",
+        "Lo gastado con IVA (y cuánto cambia frente al mismo periodo anterior, si está cargado), los abonos, lo que te han regalado o descontado y los albaranes que aún no tienen factura. Toca una cifra para ver las facturas que la forman y abrir su PDF.",
+      opcional: true,
+      lado: "bottom",
+    },
+    {
+      elemento: "facturas-analisis-explorador",
+      pestana: F_IA,
+      titulo: "Explorar: tu gráfica a medida",
+      texto:
+        "Cambia la gráfica al momento sin preguntar a la IA: qué medir (gasto, base, abonos, precio…), por qué agruparlo (día, mes, proveedor, familia…), por qué colorearlo y qué filtrar. Toca una barra para ver solo ese tramo o sus documentos. «Fijar en el tablero» la guarda.",
       opcional: true,
       lado: "top",
     },
     {
-      elemento: "facturas-ia-al-instante",
+      elemento: "facturas-analisis-tablero",
       pestana: F_IA,
-      abrir: "facturas-ia-al-instante-abrir",
-      titulo: "Al instante",
+      titulo: "Las gráficas",
       texto:
-        "Son las respuestas rápidas: salen al momento, sin escribir y sin gastar IA. Gasto de este mes, gasto por mes, mejores proveedores, productos más comprados, documentos por revisar, con avisos o sin total, gasto por categoría, qué ha subido de precio y la evolución del precio de un producto.",
+        "Toca un proveedor, un producto que sube, una familia o un gasto fijo: verás sus documentos, podrás abrirlo en «Compras» o llevarlo al explorador. En «Gasto por familia» te avisa de las líneas sin clasificar.",
       opcional: true,
       lado: "top",
+    },
+    {
+      elemento: "facturas-ia-abrir",
+      pestana: F_IA,
+      titulo: "Pregúntale a la IA",
+      texto:
+        "Para lo que no esté en el tablero, abre la IA y pregúntale con tus palabras. Sale un panel a la derecha; el tablero sigue a la vista.",
+      opcional: true,
+      lado: "bottom",
     },
     {
       elemento: "facturas-ia-pregunta",
       pestana: F_IA,
+      abrir: "facturas-ia-abrir",
       titulo: "Escribe tu pregunta",
       texto:
-        "Para todo lo demás, escríbela aquí con tus palabras y pulsa la flecha para enviarla. Por ejemplo: «¿Cuánto gastamos en carne en septiembre?» o «¿Qué proveedor nos vende más caro el aceite?».",
+        "Toca una sugerencia o escribe aquí y pulsa la flecha. Si la respuesta trae una gráfica, «Fijar en el tablero» la deja al final del tablero. Tus conversaciones están en «Historial», dentro del panel.",
       opcional: true,
-      lado: "top",
+      lado: "left",
     },
     PASO_FINAL,
   ],

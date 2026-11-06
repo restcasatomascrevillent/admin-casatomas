@@ -1,0 +1,70 @@
+{
+ "archivo": "R688.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Exclusivas Uriarte, S.L.",
+ "cif": "B03821576",
+ "local": "casa_tomas",
+ "numero_documento": "A26/4589",
+ "fecha": "2026-05-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ARROZ MOLINO ROCA CARNAROLI OLD 2K",
+   "producto_ficha": "Arroz Molino Roca Carnaroli Old 2 kg",
+   "cantidad": 16.0,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.2,
+   "descuento_pct": null,
+   "total": 131.2,
+   "iva_pct": 4,
+   "albaran_ref": "A26/6902",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "VENTRESCA BONITO ESP.HOST.ENTERAS N",
+   "producto_ficha": "Ventresca de bonito (conserva, 'esp. hostelería', entera)",
+   "cantidad": 72.0,
+   "unidad": "lata",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.55,
+   "descuento_pct": null,
+   "total": 471.6,
+   "iva_pct": 10,
+   "albaran_ref": "A26/6902",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 602.8,
+ "desglose_iva": [
+  {
+   "base": 131.2,
+   "pct": 4,
+   "cuota": 5.25
+  },
+  {
+   "base": 471.6,
+   "pct": 10,
+   "cuota": 47.16
+  }
+ ],
+ "iva": 52.41,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 655.21,
+ "observaciones": "Forma de pago: recibo 45 días domiciliado. Nº cliente 4,027.",
+ "alertas": [
+  "Lote del arroz impreso '8.00 K' en vez de 16.00 K; las columnas dicen 16 kg x 8,20 = 131,20 y cuadra."
+ ]
+}

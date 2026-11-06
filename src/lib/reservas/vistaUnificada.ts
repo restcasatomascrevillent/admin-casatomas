@@ -271,17 +271,44 @@ export function resolverDeepLinkReservas(params: {
 // ----------------------------------------------------------------------------
 // Subpestañas de «Configuración»: /reservas?tab=configuracion&sub=plantillas
 // ----------------------------------------------------------------------------
-// «General» es lo de siempre (reglas, mesas y turnos); «Plantillas email» son
-// los correos de reserva, que hasta el 04/11/2026 vivían en el Super Admin
-// (/super-admin/plantillas-email, que ahora redirige aquí). Como las pestañas
-// de arriba, la URL solo se lee al llegar por un enlace: al cambiar de chip
-// a mano se limpia.
-export const SUBPESTANAS_CONFIGURACION = ["general", "plantillas"] as const;
+// «Plantillas email» son los correos de reserva, que hasta el 04/11/2026
+// vivían en el Super Admin (/super-admin/plantillas-email, que ahora redirige
+// aquí). Como las pestañas de arriba, la URL solo se lee al llegar por un
+// enlace: al cambiar de chip a mano se limpia.
+//
+// 04/11/2026, petición del dueño («pon subpestañas porque el scroll es
+// eterno»): lo que era un solo chip «General» (reglas, mesas y turnos, todo
+// seguido) se reparte en cuatro, cada uno corto:
+//   · «Reglas»: antelación y cierre, límites por contacto, comensales y qué
+//     datos se piden;
+//   · «Servicio»: tiempo de ocupación de mesa, retraso del modo servicio y
+//     qué salas y mesas se ofrecen al asignar;
+//   · «Mesas»: mesas y aforo por espacio;
+//   · «Turnos»: los periodos de servicio.
+// «Servicio» y «Mesas» van aparte porque las dos son una lista sala a sala, y
+// juntas volvían a dar un scroll largo.
+export const SUBPESTANAS_CONFIGURACION = ["reglas", "servicio", "mesas", "turnos", "plantillas"] as const;
 export type SubpestanaConfiguracion = (typeof SUBPESTANAS_CONFIGURACION)[number];
 
-/** `?sub=` → subpestaña de Configuración; sin ella, o desconocida, «General». */
+/** Texto de cada chip. Aquí y no en la página: el aviso de «corrige esto en …» del formulario los nombra igual. */
+export const ETIQUETAS_SUBPESTANA_CONFIGURACION: Record<SubpestanaConfiguracion, string> = {
+  reglas: "Reglas",
+  servicio: "Servicio",
+  mesas: "Mesas",
+  turnos: "Turnos",
+  plantillas: "Plantillas email",
+};
+
+/**
+ * Nombres viejos que siguen valiendo. `sub=general` era el chip único de antes del reparto (enlaces
+ * guardados, notas): abre el primero, «Reglas». Un `Map` y no un objeto, para que `sub=toString` y
+ * compañía no encuentren nada heredado.
+ */
+const ALIAS_SUBPESTANA_CONFIGURACION = new Map<string, SubpestanaConfiguracion>([["general", "reglas"]]);
+
+/** `?sub=` → subpestaña de Configuración; sin ella, o desconocida, «Reglas». */
 export function resolverSubpestanaConfiguracion(sub?: string | null): SubpestanaConfiguracion {
-  return (SUBPESTANAS_CONFIGURACION as readonly string[]).includes(sub ?? "")
-    ? (sub as SubpestanaConfiguracion)
-    : "general";
+  const valor = sub ?? "";
+  if ((SUBPESTANAS_CONFIGURACION as readonly string[]).includes(valor)) return valor as SubpestanaConfiguracion;
+  return ALIAS_SUBPESTANA_CONFIGURACION.get(valor) ?? "reglas";
 }

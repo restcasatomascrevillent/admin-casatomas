@@ -94,13 +94,19 @@ describe("precargarRecorte", () => {
 
 describe("<PrecargaRecorte />", () => {
   const precargar = vi.fn(async () => true);
-  let acceso = true;
+  // «editar»: Ver + Editar en la carta; «ver»: solo Ver; «nada»: sin la sección.
+  let acceso: "editar" | "ver" | "nada" = "editar";
 
   beforeEach(() => {
     vi.resetModules();
     precargar.mockClear();
-    acceso = true;
-    vi.doMock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: acceso, loading: false }) }));
+    acceso = "editar";
+    vi.doMock("@/hooks/useUserRole", () => ({
+      useCanAccessSection: (seccion: string, tipo: "view" | "edit" = "view") => ({
+        canAccess: seccion === "gestor_carta" && (tipo === "edit" ? acceso === "editar" : acceso !== "nada"),
+        loading: false,
+      }),
+    }));
     vi.doMock("../recorte/quitarFondoNavegador", () => ({ precargarRecorte: precargar }));
   });
   afterEach(() => {
@@ -108,7 +114,7 @@ describe("<PrecargaRecorte />", () => {
     vi.doUnmock("../recorte/quitarFondoNavegador");
   });
 
-  it("con acceso a la carta, lanza la precarga unos segundos después de entrar", async () => {
+  it("con «Editar» en la carta, lanza la precarga unos segundos después de entrar", async () => {
     vi.useFakeTimers();
     const { PrecargaRecorte, ESPERA_PRECARGA_MS } = await import("../recorte/PrecargaRecorte");
     render(<PrecargaRecorte />);
@@ -120,8 +126,11 @@ describe("<PrecargaRecorte />", () => {
     expect(precargar).toHaveBeenCalledTimes(1);
   });
 
-  it("sin acceso a la carta no descarga nada", async () => {
-    acceso = false;
+  it.each([
+    ["sin acceso a la carta", "nada"],
+    ["con solo «Ver» (no sube fotos, 06/11/2026)", "ver"],
+  ] as const)("%s no descarga nada", async (_caso, nivel) => {
+    acceso = nivel;
     vi.useFakeTimers();
     const { PrecargaRecorte, ESPERA_PRECARGA_MS } = await import("../recorte/PrecargaRecorte");
     render(<PrecargaRecorte />);

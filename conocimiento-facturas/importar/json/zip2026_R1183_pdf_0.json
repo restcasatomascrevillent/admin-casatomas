@@ -1,0 +1,67 @@
+{
+ "archivo": "R1183.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CONGELADOS PINTO, S.L.",
+ "cif": "B03680253",
+ "local": "casa_tomas",
+ "numero_documento": "B-5932",
+ "fecha": "2026-07-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COQUINA 12X250 ALTA",
+   "producto_ficha": "Coquina (12 x 250 g)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 48.0,
+   "contenido_cantidad": 250,
+   "contenido_unidad": "g",
+   "precio_unitario": 21.45,
+   "descuento_pct": null,
+   "total": 257.4,
+   "iva_pct": 10,
+   "albaran_ref": "B 11.937",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CROQUETAS COCHINILLO CON MANZANA 4X500 T",
+   "producto_ficha": "Croquetas de cochinillo con manzana (4 x 500 g)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 4.0,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 5.55,
+   "descuento_pct": null,
+   "total": 22.2,
+   "iva_pct": 10,
+   "albaran_ref": "B 11.937",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 279.6,
+ "desglose_iva": [
+  {
+   "base": 279.6,
+   "pct": 10,
+   "cuota": 27.96
+  }
+ ],
+ "iva": 27.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 307.56,
+ "observaciones": "Vencimiento 02/08/2026 (remesa factura semanal, vto. 6 días).",
+ "alertas": [
+  "Posible duplicado: R1184.pdf tiene el mismo texto (B-5932, 27/07/2026, total 307,56). Confirmar si sobra uno antes de cargar ambos.",
+  "«COQUINA 12X250 ALTA»: precio 21,45 €/kg; la ficha tiene 24,50 €/kg.",
+  "CROQUETAS COCHINILLO CON MANZANA 4X500 T: Cajas/Ud y Cantidad coinciden (1 kg por bolsa), pero la ficha dice 500 g por bolsa; se respeta lo impreso."
+ ]
+}

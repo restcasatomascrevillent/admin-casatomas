@@ -1,0 +1,121 @@
+[
+ {
+  "clave": "zip2026:R27.pdf#0",
+  "json": "json/zip2026_R27_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R27.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+  "total": 366.7,
+  "fecha": "2026-01-05",
+  "local": "casa_tomas",
+  "alertas": 0
+ },
+ {
+  "clave": "zip2026:R66.pdf#0",
+  "json": "json/zip2026_R66_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R66.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "Instalaciones Electricas Candela, S.L.",
+  "total": 1130.47,
+  "fecha": "2026-01-21",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R117.pdf#0",
+  "json": "json/zip2026_R117_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R117.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "MR FRIO SOLUCIONES TERMICAS, S.L.",
+  "total": 585.33,
+  "fecha": "2026-01-28",
+  "local": "casa_tomas",
+  "alertas": 0
+ },
+ {
+  "clave": "zip2026:R1165.pdf#0",
+  "json": "json/zip2026_R1165_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1165.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "SOKOL VIN, S.L.",
+  "total": 91.0,
+  "fecha": "2026-07-01",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R1622.pdf#0",
+  "json": "json/zip2026_R1622_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1622.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "HERMANOS NAREJOS S.L.",
+  "total": 5441.04,
+  "fecha": "2026-09-28",
+  "local": "casa_tomas",
+  "alertas": 1
+ },
+ {
+  "clave": "zip2026:R1572.pdf#0",
+  "json": "json/zip2026_R1572_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1572.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "MUSGRAVE ESPAÑA, S.A.U.",
+  "total": 367.64,
+  "fecha": "2026-09-29",
+  "local": "casa_tomas",
+  "alertas": 2
+ },
+ {
+  "clave": "zip2026:R1670.pdf#0",
+  "json": "json/zip2026_R1670_pdf_0.json",
+  "paginas": [
+   {
+    "pdf": "pdf/R1670.pdf",
+    "pages": [
+     1
+    ]
+   }
+  ],
+  "proveedor": "Tomás Nicolás Riquelme",
+  "total": 134.97,
+  "fecha": "2026-10-08",
+  "local": "casa_tomas",
+  "alertas": 1
+ }
+]

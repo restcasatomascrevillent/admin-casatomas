@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Wine, Eye, EyeOff, Move, Info, MapPinOff } from "lucide-react";
+import { Award, Wine, Eye, EyeOff, Move, Info, MapPinOff } from "lucide-react";
 import { Vino, useVinos } from "@/hooks/useVinos";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { VisibilidadToggles } from "./VisibilidadToggles";
 import { EditarVinoModal } from "./EditarVinoModal";
 import { ImagePositionSelector } from "../gestion-web/ImagePositionSelector";
-import { AccionesTarjeta, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { AccionesTarjeta, EstadoLectura, EtiquetaCategoria } from "./PartesTarjetaCarta";
+import { lineaFotoExpandida } from "./estadoLectura";
 import { FotoRapidaCarta, type FotoRapidaHandle } from "./FotoRapidaCarta";
 import { TarjetaCartaLateral } from "./TarjetaCartaLateral";
 import { cartasVino, EXPLICACION_CARTAS_VINO, textoPublicacionVino, vinoPublicado } from "./publicacionVino";
@@ -33,6 +34,11 @@ const CARTA_CARD_ASPECT_RATIO = 300 / 160;
 
 interface ListaVinosProps {
   vinos: Vino[];
+  /**
+   * Solo «Ver» en la carta, sin «Editar» (06/11/2026): sin interruptores ni botones
+   * (Foto, Editar, Eliminar, posición de la foto); en qué carta sale se lee en texto.
+   */
+  soloLectura?: boolean;
 }
 
 /**
@@ -52,7 +58,7 @@ function EtiquetaOrigenPorConfirmar({ titulo }: { titulo: string }) {
   );
 }
 
-export function ListaVinos({ vinos }: ListaVinosProps) {
+export function ListaVinos({ vinos, soloLectura = false }: ListaVinosProps) {
   const {
     eliminarVino,
     toggleExpanded,
@@ -136,11 +142,13 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
 
   return (
     <>
-      {/* Qué hace cada interruptor (04/11/2026, dueño: «pon una explicación breve»). */}
-      <p className="mb-3 flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-        <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-        <span>{EXPLICACION_CARTAS_VINO}</span>
-      </p>
+      {/* Qué hace cada interruptor (04/11/2026, dueño: «pon una explicación breve»). Sin interruptores, sobra. */}
+      {!soloLectura && (
+        <p className="mb-3 flex items-start gap-2 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{EXPLICACION_CARTAS_VINO}</span>
+        </p>
+      )}
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {vinos.map((vino) => {
           const tieneFoto = Boolean(vino.imagen_url?.trim());
@@ -178,7 +186,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
               titulo={<h3 className="font-semibold text-base leading-tight [overflow-wrap:anywhere]">{vino.nombre}</h3>}
               controlesFoto={
                 <>
-                  {tieneFoto && (
+                  {tieneFoto && !soloLectura && (
                     <Button
                       type="button"
                       variant="ghost"
@@ -206,41 +214,51 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 </>
               }
               controles={
-                <>
-                  {/* Publicación: un interruptor por carta; sin origen claro no se enciende. */}
-                  <VisibilidadToggles
-                    restaurante={cartas.restaurante}
-                    touza={cartas.touza}
-                    onRestauranteChange={(checked) =>
-                      toggleRestaurante.mutate({ id: vino.id, restaurante: checked, touza: cartas.touza })
-                    }
-                    onTouzaChange={(checked) =>
-                      toggleTouza.mutate({ id: vino.id, touza: checked, restaurante: cartas.restaurante })
-                    }
-                    isPending={toggleRestaurante.isPending || toggleTouza.isPending}
-                    bloquearEncender={!origenClaro}
-                    nota={
-                      origenClaro ? (
-                        <span className={publicado ? "text-muted-foreground" : "font-medium text-destructive"}>
-                          {textoPublicacionVino(cartas)}
-                        </span>
-                      ) : (
-                        <span className="font-medium text-amber-800 dark:text-amber-300">
-                          {publicado && `${textoPublicacionVino(cartas)} `}
-                          {avisoTarjetaSinOrigen(vino)}
-                        </span>
-                      )
-                    }
-                    compact
+                soloLectura ? (
+                  <EstadoLectura
+                    lineas={[
+                      { texto: textoPublicacionVino(cartas), tono: publicado ? "normal" : "apagado" },
+                      !origenClaro && { texto: avisoTarjetaSinOrigen(vino), tono: "aviso" },
+                      lineaFotoExpandida(vino.imagen_url, vino.expanded),
+                    ]}
                   />
-                  <FotoExpandidaToggle
-                    imagenUrl={vino.imagen_url}
-                    nombre={nombre}
-                    expanded={vino.expanded}
-                    isPending={toggleExpanded.isPending}
-                    onChange={(checked) => handleToggleExpanded(vino, checked)}
-                  />
-                </>
+                ) : (
+                  <>
+                    {/* Publicación: un interruptor por carta; sin origen claro no se enciende. */}
+                    <VisibilidadToggles
+                      restaurante={cartas.restaurante}
+                      touza={cartas.touza}
+                      onRestauranteChange={(checked) =>
+                        toggleRestaurante.mutate({ id: vino.id, restaurante: checked, touza: cartas.touza })
+                      }
+                      onTouzaChange={(checked) =>
+                        toggleTouza.mutate({ id: vino.id, touza: checked, restaurante: cartas.restaurante })
+                      }
+                      isPending={toggleRestaurante.isPending || toggleTouza.isPending}
+                      bloquearEncender={!origenClaro}
+                      nota={
+                        origenClaro ? (
+                          <span className={publicado ? "text-muted-foreground" : "font-medium text-destructive"}>
+                            {textoPublicacionVino(cartas)}
+                          </span>
+                        ) : (
+                          <span className="font-medium text-amber-800 dark:text-amber-300">
+                            {publicado && `${textoPublicacionVino(cartas)} `}
+                            {avisoTarjetaSinOrigen(vino)}
+                          </span>
+                        )
+                      }
+                      compact
+                    />
+                    <FotoExpandidaToggle
+                      imagenUrl={vino.imagen_url}
+                      nombre={nombre}
+                      expanded={vino.expanded}
+                      isPending={toggleExpanded.isPending}
+                      onChange={(checked) => handleToggleExpanded(vino, checked)}
+                    />
+                  </>
+                )
               }
               info={
                 <>
@@ -262,14 +280,34 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                     </p>
                   )}
 
-                  {/* Precio */}
-                  <div className="flex items-end justify-between pt-2 border-t">
+                  {/* Precio, y la copa y la puntuación Parker si las tiene (04/11/2026) */}
+                  <div className="flex flex-wrap items-end justify-between gap-2 pt-2 border-t">
                     <div className="flex items-baseline gap-1">
                       <span className="text-2xl font-bold text-primary">
                         {vino.precio_eur ? `${vino.precio_eur.toFixed(2)}` : "—"}
                       </span>
                       <span className="text-lg font-medium text-primary">€</span>
                     </div>
+                    {(vino.copeo || vino.puntuacion_parker) && (
+                      <div className="flex flex-wrap items-center gap-1">
+                        {vino.copeo && (
+                          <Badge variant="secondary" className="gap-1 px-1.5 py-0 text-xs" title="Se sirve por copas">
+                            <Wine className="h-3 w-3" aria-hidden="true" />
+                            {vino.precio_copa_eur ? `Copa ${vino.precio_copa_eur.toFixed(2)} €` : "Copa"}
+                          </Badge>
+                        )}
+                        {vino.puntuacion_parker ? (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 px-1.5 py-0 text-xs"
+                            title={`Puntuación Parker${vino.puntuacion_parker_anada ? ` (añada ${vino.puntuacion_parker_anada})` : ""}`}
+                          >
+                            <Award className="h-3 w-3" aria-hidden="true" />
+                            {vino.puntuacion_parker} RP
+                          </Badge>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 </>
               }
@@ -293,59 +331,66 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
                 </>
               }
               acciones={
-                <AccionesTarjeta
-                  nombre={vino.nombre}
-                  tieneFoto={tieneFoto}
-                  onFoto={() => fotoRapida.current?.abrir(vino)}
-                  onEditar={() => setVinoAEditar(vino)}
-                  onEliminar={() => setVinoAEliminar(vino)}
-                />
+                soloLectura ? null : (
+                  <AccionesTarjeta
+                    nombre={vino.nombre}
+                    tieneFoto={tieneFoto}
+                    onFoto={() => fotoRapida.current?.abrir(vino)}
+                    onEditar={() => setVinoAEditar(vino)}
+                    onEliminar={() => setVinoAEliminar(vino)}
+                  />
+                )
               }
             />
           );
         })}
       </div>
 
-      <AlertDialog open={!!vinoAEliminar} onOpenChange={(open) => !open && setVinoAEliminar(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Eliminar vino?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción eliminará permanentemente "{vinoAEliminar?.nombre}" de la carta. Esta acción no se puede deshacer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (vinoAEliminar) eliminarVino.mutate(vinoAEliminar.id);
-                setVinoAEliminar(null);
-              }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Eliminar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Con solo «Ver» no se monta nada de lo que escribe (borrar, foto, ficha de edición). */}
+      {!soloLectura && (
+        <>
+          <AlertDialog open={!!vinoAEliminar} onOpenChange={(open) => !open && setVinoAEliminar(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar vino?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción eliminará permanentemente "{vinoAEliminar?.nombre}" de la carta. Esta acción no se puede deshacer.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (vinoAEliminar) eliminarVino.mutate(vinoAEliminar.id);
+                    setVinoAEliminar(null);
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
-      <FotoRapidaCarta
-        ref={fotoRapida}
-        tipo="vino"
-        bucket="vinos"
-        tabla="Vinos"
-        onGuardada={mostrarFoto}
-        guardarUrl={(id, url) => actualizarVino.mutateAsync({ id, imagen_url: url })}
-        quitarFoto={(id) => actualizarVino.mutateAsync({ id, imagen_url: null, expanded: false })}
-      />
+          <FotoRapidaCarta
+            ref={fotoRapida}
+            tipo="vino"
+            bucket="vinos"
+            tabla="Vinos"
+            onGuardada={mostrarFoto}
+            guardarUrl={(id, url) => actualizarVino.mutateAsync({ id, imagen_url: url })}
+            quitarFoto={(id) => actualizarVino.mutateAsync({ id, imagen_url: null, expanded: false })}
+          />
 
-      <EditarVinoModal
-        open={!!vinoAEditar}
-        onOpenChange={(open) => {
-          if (!open) setVinoAEditar(null);
-        }}
-        vino={vinoAEditar}
-      />
+          <EditarVinoModal
+            open={!!vinoAEditar}
+            onOpenChange={(open) => {
+              if (!open) setVinoAEditar(null);
+            }}
+            vino={vinoAEditar}
+          />
+        </>
+      )}
 
       <Dialog
         open={!!fotoAVisualizar}
@@ -367,7 +412,7 @@ export function ListaVinos({ vinos }: ListaVinosProps) {
         </DialogContent>
       </Dialog>
 
-      {posicionVino && posicionVino.imagen_url && (
+      {!soloLectura && posicionVino && posicionVino.imagen_url && (
         <ImagePositionSelector
           open={!!posicionVino}
           onOpenChange={(open) => {

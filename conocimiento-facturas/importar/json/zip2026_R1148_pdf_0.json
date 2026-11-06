@@ -1,0 +1,120 @@
+{
+ "archivo": "R1148.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0204/(2026)012738",
+ "fecha": "2026-07-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "POLLO CONTRAMUSLO S/H S/P VC",
+   "producto_ficha": "Contramuslo de pollo sin hueso ni piel al vacío (por kg)",
+   "cantidad": 1.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.89,
+   "descuento_pct": null,
+   "total": 11.49,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "POLLO CONTRAMUSLO S/H S/P VC",
+   "producto_ficha": "Contramuslo de pollo sin hueso ni piel al vacío (por kg)",
+   "cantidad": 1.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.89,
+   "descuento_pct": null,
+   "total": 10.31,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BERBERECHO MC 50-70PZ/KG FAO27",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "bolsa",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.65,
+   "descuento_pct": null,
+   "total": 35.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PATATA MINI MC C 25/35 CJ 5 K",
+   "producto_ficha": "Patata mini calibre 25/35 caja 5 kg",
+   "cantidad": 2,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.75,
+   "descuento_pct": null,
+   "total": 33.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "MICROMEZCLUM C/PETALOS MPM BJ",
+   "producto_ficha": "Micromezclum con pétalos bandeja",
+   "cantidad": 1,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.49,
+   "descuento_pct": null,
+   "total": 5.49,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 96.09,
+ "desglose_iva": [
+  {
+   "base": 57.1,
+   "pct": 10,
+   "cuota": 5.71
+  },
+  {
+   "base": 38.99,
+   "pct": 4,
+   "cuota": 1.56
+  }
+ ],
+ "iva": 7.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 103.36,
+ "observaciones": "Cash & carry Makro Elche, pagada con tarjeta 103,36 EUR. Pollo a peso: cantidad = kg de Cont P., precio por kg. Peso total 3,700 kg (informativo). Pagina 2: recibo del datafono repetido.",
+ "alertas": []
+}

@@ -227,6 +227,23 @@ describe("ListaUsuarios · información de accesos actualizada", () => {
     expect(within(actualizada).queryByText("Gestiona usuarios")).toBeNull();
   });
 
+  it("al tocar los permisos a mano el rol sigue a los permisos: un admin con solo «Ver» pasa a Staff (06/11/2026)", async () => {
+    doble.bd.tablas.user_roles.find((f) => f.user_id === CAMARERO)!.role = "admin";
+    h.presets = [];
+    render(<ListaUsuarios canManageSuperAdmins />);
+    const fila = (await screen.findByText("camarero1")).closest("tr")!;
+    fireEvent.click(within(fila).getByRole("button", { name: "Permisos" }));
+    const dialogo = await screen.findByRole("dialog");
+    // Con solo «Ver» en lo que tenga, el diálogo avisa del rol que se guardará.
+    for (const sw of within(dialogo).queryAllByRole("switch", { name: /^Puede editar / })) {
+      if (sw.getAttribute("aria-checked") === "true") fireEvent.click(sw);
+    }
+    expect(within(dialogo).getByTestId("rol-al-guardar")).toHaveTextContent("Rol al guardar: Staff");
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Guardar Permisos" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(doble.filasDe("user_roles", CAMARERO)[0].role).toBe("staff");
+  });
+
   it("el acceso completo solo se muestra a los super admins", async () => {
     render(<ListaUsuarios canManageSuperAdmins />);
     const fila = (await screen.findByText("Dueño")).closest("tr")!;
@@ -281,19 +298,26 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
   });
 
   // 04/11/2026 (petición del dueño): la pestaña Configuración de Reservas tiene su propia sección, como las
-  // pestañas del Gestor Web. Sale en la tabla, justo debajo de Reservas, con «Ver» y «Puede editar».
-  it("«Reservas · Configuración» tiene su fila con «Ver» y «Puede editar», y se concede como cualquier sección", async () => {
+  // pestañas del Gestor Web. Sale en la tabla, justo debajo de Reservas.
+  // 06/11/2026 (decisión del dueño): con solo «Ver» no se entra, así que esa fila solo ofrece «Puede editar»,
+  // que concede «Ver» y «Puede editar» a la vez, y al quitarlo se quitan los dos.
+  it("«Reservas · Configuración» solo ofrece «Puede editar», que da los dos permisos a la vez", async () => {
     const dialogo = await abrirPermisosDelCamarero();
 
     const filas = within(dialogo).getAllByRole("row").map((f) => f.textContent ?? "");
     const reservas = filas.findIndex((t) => t.startsWith("ReservasEditar"));
     expect(filas[reservas + 1]).toMatch(/^Reservas · Configuración/);
-    expect(interruptor(dialogo, "Ver Reservas · Configuración")).not.toBeChecked();
-    expect(interruptor(dialogo, "Puede editar Reservas · Configuración")).toBeDisabled();
-    expect(interruptor(dialogo, "Puede editar Reservas · Configuración")).toHaveAccessibleDescription(/plantillas de correo/);
+    expect(within(dialogo).queryByRole("switch", { name: "Ver Reservas · Configuración" })).not.toBeInTheDocument();
+    expect(within(dialogo).getByText("«Ver» va con «Puede editar» en Reservas · Configuración")).toBeInTheDocument();
+    const editar = interruptor(dialogo, "Puede editar Reservas · Configuración");
+    // Sin «Ver» previo ya se puede activar (no hay interruptor de «Ver» que encender antes).
+    expect(editar).toBeEnabled();
+    expect(editar).not.toBeChecked();
+    expect(editar).toHaveAccessibleDescription(/plantillas de correo/);
+    expect(editar).toHaveAccessibleDescription(/«Ver» aquí no sirve por sí solo/);
 
-    fireEvent.click(interruptor(dialogo, "Ver Reservas · Configuración"));
-    fireEvent.click(interruptor(dialogo, "Puede editar Reservas · Configuración"));
+    fireEvent.click(editar);
+    expect(editar).toBeChecked();
     const permiso = await guardar(dialogo);
 
     expect(permiso("reservas_configuracion")).toEqual({
@@ -304,6 +328,25 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
     });
     // Reservas sigue como estaba: son permisos independientes.
     expect(permiso("reservas")).toMatchObject({ can_view: true, can_edit: true });
+  });
+
+  it("al quitar «Puede editar» en «Reservas · Configuración» se quitan los dos (también un «Ver» suelto de antes)", async () => {
+    doble.bd.tablas.user_permissions.push({
+      id: "p-conf",
+      user_id: CAMARERO,
+      section_key: "reservas_configuracion",
+      can_view: true,
+      can_edit: true,
+    } as never);
+    const dialogo = await abrirPermisosDelCamarero();
+
+    const editar = interruptor(dialogo, "Puede editar Reservas · Configuración");
+    expect(editar).toBeChecked();
+    fireEvent.click(editar);
+    expect(editar).not.toBeChecked();
+    const permiso = await guardar(dialogo);
+
+    expect(permiso("reservas_configuracion")).toMatchObject({ can_view: false, can_edit: false });
   });
 
   it("guardar sin tocar nada no pierde la edición", async () => {
@@ -405,6 +448,11 @@ describe("ListaUsuarios · «Puede editar» por sección", () => {
       expect(
         within(dialogo).getByLabelText("Editar Facturas: No"),
       ).toHaveTextContent("No");
+      // «Facturas · Subida» (06/11/2026): un solo permiso, «Puede subir».
+      expect(
+        within(dialogo).getByLabelText("Puede subir Facturas · Subida: No"),
+      ).toHaveTextContent("No");
+      expect(within(dialogo).queryByLabelText(/^Editar Facturas · Subida/)).toBeNull();
       expect(within(dialogo).queryByRole("switch")).toBeNull();
       expect(within(dialogo).queryByRole("combobox")).toBeNull();
       expect(

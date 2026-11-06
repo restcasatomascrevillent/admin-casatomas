@@ -1,0 +1,97 @@
+{
+ "archivo": "R394.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "1274",
+ "fecha": "2026-03-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LUBINA PLAYA",
+   "producto_ficha": null,
+   "cantidad": 5.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25,
+   "descuento_pct": null,
+   "total": 137.5,
+   "iva_pct": 10,
+   "albaran_ref": "3.101",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "QUISQUILLA X/P/M",
+   "producto_ficha": "Quisquilla (Plesionika edwardsii) tamaño X/P/M, por kg",
+   "cantidad": 2.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 65,
+   "descuento_pct": null,
+   "total": 182,
+   "iva_pct": 10,
+   "albaran_ref": "3.274",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "QUISQUILLA X/P/M",
+   "producto_ficha": "Quisquilla (Plesionika edwardsii) tamaño X/P/M, por kg",
+   "cantidad": 2.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39,
+   "descuento_pct": null,
+   "total": 93.6,
+   "iva_pct": 10,
+   "albaran_ref": "3.274",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CAÑAILLA",
+   "producto_ficha": "Cañaílla (busano), por kg",
+   "cantidad": 5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22,
+   "descuento_pct": null,
+   "total": 110,
+   "iva_pct": 10,
+   "albaran_ref": "3.287",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 523.1,
+ "desglose_iva": [
+  {
+   "base": 523.1,
+   "pct": 10,
+   "cuota": 52.31
+  }
+ ],
+ "iva": 52.31,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 575.41,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 16/03/2026 por 575.41. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

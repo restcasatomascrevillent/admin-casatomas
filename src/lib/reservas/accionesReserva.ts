@@ -22,26 +22,31 @@
 //               va `habilitada: false` con el porqué en `titulo`. En Hoy lo que
 //               no aplica directamente no se pinta (p. ej. «Ha llegado» en una
 //               reserva que ya llegó: su sitio lo ocupa el chip con «Deshacer»).
-//   habilitada  ¿Se puede pulsar? Mezcla estado y permiso. NO mira el estado
+//               Sin permiso de edición, nada es visible (06/11/2026).
+//   habilitada  ¿Se puede pulsar? Lo decide el estado. NO mira el estado
 //               transitorio de la pantalla (petición en curso): eso lo suma quien
 //               pinta (`ocupada || !habilitada`).
 //   titulo      Texto para el `title` / `aria-label` del botón. SIEMPRE dice algo
 //               si `visible`, también habilitado; vacío si no es visible.
 //
 // MATRIZ CON PERMISO (✔ = habilitada, ✖ = visible pero deshabilitada, · = no
-// visible). Columnas en el orden del ciclo de vida (`ORDEN_ESTADOS`). Sin permiso
-// (`canEdit` false) todo pasa de ✔ a ✖ y lo que estaba en · sigue en ·; la única
-// excepción es «seleccionar», que sin permiso desaparece.
+// visible). Columnas en el orden del ciclo de vida (`ORDEN_ESTADOS`).
+//
+// SIN PERMISO (`canEdit` false): TODO va a «·», en las dos vistas (06/11/2026,
+// decisión del dueño para quien solo tiene «Ver» en Reservas: lo que no puede
+// usar se OCULTA, no se desactiva, y la página enseña la etiqueta común «Solo
+// lectura», `EtiquetaSoloLectura`). Hasta entonces salía deshabilitado con «No
+// tienes permiso para editar reservas» (cambios c y e de abajo).
 //
 //   LISTA (gestión)     pend.  verif.  confirm.  Llegó  cancel.  No vino
 //   aceptar              ✔      ·       ·         ·      ·        ·
 //   confirmar            ·      ✔       ✖         ✖      ✖        ✖
-//   verificar (*)        ✔      ✖       ✖         ✖      ✖        ✖
+//   verificar            ✔      ✖       ✖         ✖      ✖        ✖
 //   seleccionar (bloque) ✔      ·       ·         ·      ·        ·
 //   cancelar (**)        ✔      ✔       ✔         ✖      ✖        ✖
 //   editar               ✔      ✔       ✔         ✔      ✔        ✔
-//   importante (*)       ✔      ✔       ✔         ✔      ✔        ✔
-//   listaNegra (*)       ✔      ✔       ✔         ✔      ✔        ✔
+//   importante           ✔      ✔       ✔         ✔      ✔        ✔
+//   listaNegra           ✔      ✔       ✔         ✔      ✔        ✔
 //   haLlegado/noVino/deshacer/mover: · en todos los estados
 //
 //   HOY (servicio)      pend.  verif.  confirm.  Llegó  cancel.(***)  No vino
@@ -54,12 +59,6 @@
 //   listaNegra           ✔      ✔       ✔         ✔      ✔            ✔
 //   aceptar/confirmar/verificar/seleccionar/cancelar: · en todos los estados
 //
-// (*) Cambio (e), paso 3: en la LISTA también respetan `canEdit`. Hasta entonces
-//     no lo miraban («Verificar» abría el modal en solo lectura; la estrella y la
-//     lista negra escribían y lo paraba la RLS). Decisión del dueño (2026-10-01),
-//     junto con endurecer la RLS de `reservas` (escribir exige permiso de EDICIÓN):
-//     sin permiso salen deshabilitadas con «No tienes permiso para editar
-//     reservas», como en Hoy (cambio c).
 // (**) Cambio acordado: antes también se podía cancelar una reserva «Llegó» o «No
 //     vino»; ya no (decisión del dueño). Si la Lista quiere que la ranura siga
 //     en su sitio, sale deshabilitada con el motivo.
@@ -68,22 +67,22 @@
 //
 // CAMBIOS ACORDADOS respecto al comportamiento de hoy:
 //   · (a) `cancelar` no se ofrece en «Llegó» / «No vino».
-//   · (b) `editar` está visible en los seis estados, y habilitada según
-//     `canEdit` («No tienes permiso para editar reservas» si no).
+//   · (b) `editar` está visible en los seis estados (con permiso).
 //   · (c) Hoy respeta el permiso: «Ha llegado», «No vino», «Deshacer», «Mover», la
-//     estrella y la lista negra van deshabilitadas sin `canEdit`, con el motivo
-//     visible (`ConMotivo`). Antes el kanban no miraba el permiso y se apoyaba en
-//     la RLS.
+//     estrella y la lista negra exigen `canEdit`. Antes el kanban no miraba el
+//     permiso y se apoyaba en la RLS.
 //   · (d) Un solo vocabulario: «Ha llegado» / «No vino» (antes el menú del kanban
 //     decía «No se presentó»). En la Lista, «Llegó» ya no se dice «ya servida».
 //   · (e) La Lista también respeta el permiso en «Verificar», la estrella y la
-//     lista negra (ver (*)).
+//     lista negra (decisión del dueño, 2026-10-01, junto con endurecer la RLS de
+//     `reservas`: escribir exige permiso de EDICIÓN).
+//   · (f) 06/11/2026: sin permiso, todo oculto (ver arriba).
 //
 // FUERA DE ESTA FUNCIÓN, a propósito y tal como está hoy:
 //   · «Dar mesa» lo decide `resolverSaltoAsignacion` (saltoAsignacion.ts), módulo
-//     compartido con el kanban de Hoy (menú «⋮» de las tarjetas «Sin mesa»): Lista siempre lo
-//     pinta, habilitado si la reserva tiene sala y fecha y no está cancelada, sin
-//     mirar `canEdit`.
+//     compartido con el kanban de Hoy (menú «⋮» de las tarjetas «Sin mesa»). Con
+//     permiso, la Lista siempre lo pinta, habilitado si la reserva tiene sala y
+//     fecha y no está cancelada; sin permiso no se pinta (lleva a repartir mesas).
 //   · «Gestionar» es de las SOLICITUDES del bot; en una reserva esa ranura es
 //     ahora «editar».
 //   · «Llamar» (enlace tel:) del menú de la tarjeta.
@@ -146,9 +145,13 @@ export interface OpcionesAcciones {
   canEdit: boolean;
 }
 
-/** Texto ya existente en la lista, el kanban, el plano y el panel de asignación. */
+/**
+ * Motivo «sin permiso» de antes del 06/11/2026, cuando lo que no se podía usar salía deshabilitado.
+ * Ya no lo devuelve `accionesDisponibles` (sin permiso todo va oculto); se conserva para las
+ * pantallas que todavía lo enseñen como defensa (p. ej. el editor si se abre sin permiso).
+ */
 export const TITULO_SIN_PERMISO_EDITAR = "No tienes permiso para editar reservas";
-/** Texto actual del botón de cancelar de la lista. */
+/** Ídem, el del botón de cancelar de la lista. */
 export const TITULO_SIN_PERMISO_CANCELAR = "No tienes permiso para cancelar reservas";
 /**
  * «Aceptar» de la Lista: acepta la reserva TAL COMO ESTÁ, sin tocar hora ni sala
@@ -177,21 +180,28 @@ function motivoNoCancelable(estado: string): string {
   return `No se puede cancelar: la reserva está ${fraseDe(estado)}`;
 }
 
+/** Sin permiso de edición: ninguna acción (todo oculto, decisión del dueño del 06/11/2026). */
+const SIN_PERMISO: AccionesDisponibles = Object.fromEntries(
+  ACCIONES_RESERVA.map((a) => [a, oculta()]),
+) as AccionesDisponibles;
+
 /**
  * Qué acciones tiene `reserva` en `vista`, cuáles se pueden pulsar y con qué
- * texto. Devuelve SIEMPRE las doce claves de `ACCIONES_RESERVA`.
+ * texto. Devuelve SIEMPRE las doce claves de `ACCIONES_RESERVA`. Sin `canEdit`,
+ * las doce ocultas.
  */
 export function accionesDisponibles(reserva: ReservaParaAcciones, { vista, canEdit }: OpcionesAcciones): AccionesDisponibles {
+  if (!canEdit) return { ...SIN_PERMISO };
   const { estado } = reserva;
   const nombre = reserva.nombre || "este cliente";
   const importante = !!reserva.importante;
 
-  return vista === "lista" ? accionesDeLista(estado, nombre, importante, canEdit) : accionesDeHoy(estado, importante, canEdit);
+  return vista === "lista" ? accionesDeLista(estado, nombre, importante) : accionesDeHoy(estado, importante);
 }
 
 // ─── LISTA (gestión) ─────────────────────────────────────────────────────────
 
-function accionesDeLista(estado: string, nombre: string, importante: boolean, canEdit: boolean): AccionesDisponibles {
+function accionesDeLista(estado: string, nombre: string, importante: boolean): AccionesDisponibles {
   const pendiente = estado === ESTADO_PENDIENTE;
   const verificada = estado === ESTADO_VERIFICADA;
   const viva = esEstadoVivo(estado);
@@ -201,47 +211,31 @@ function accionesDeLista(estado: string, nombre: string, importante: boolean, ca
     // «Confirmar» en el resto (deshabilitada si no hay nada que confirmar).
     // «Aceptar» acepta la reserva TAL COMO ESTÁ, sin tocar hora ni sala (ver
     // `espacioAlAceptar` en verificacion.ts).
-    aceptar: pendiente
-      ? accion(canEdit, canEdit ? TITULO_ACEPTAR : TITULO_SIN_PERMISO_EDITAR)
-      : oculta(),
+    aceptar: pendiente ? accion(true, TITULO_ACEPTAR) : oculta(),
     confirmar: pendiente
       ? oculta()
-      : !canEdit
-        ? accion(false, TITULO_SIN_PERMISO_EDITAR)
-        : verificada
-          ? accion(true, "Confirmar la reserva verificada")
-          : accion(false, `Nada que aceptar ni confirmar: la reserva está ${fraseDe(estado)}`),
+      : verificada
+        ? accion(true, "Confirmar la reserva verificada")
+        : accion(false, `Nada que aceptar ni confirmar: la reserva está ${fraseDe(estado)}`),
 
-    // Cambio (e): sin permiso no se abre el modal (antes se abría en solo
-    // lectura). Como en «Confirmar», sin permiso manda el permiso.
-    verificar: !canEdit
-      ? accion(false, TITULO_SIN_PERMISO_EDITAR)
-      : pendiente
-        ? accion(true, "Verificar: comparar lo pedido con lo ofrecido")
-        : accion(false, "Verificar: solo para reservas pendientes"),
+    verificar: pendiente
+      ? accion(true, "Verificar: comparar lo pedido con lo ofrecido")
+      : accion(false, "Verificar: solo para reservas pendientes"),
 
-    // La casilla de «aceptar en bloque»: solo las pendientes y solo con permiso.
-    seleccionar: pendiente && canEdit ? accion(true, "Seleccionar para aceptar en bloque") : oculta(),
+    // La casilla de «aceptar en bloque»: solo las pendientes.
+    seleccionar: pendiente ? accion(true, "Seleccionar para aceptar en bloque") : oculta(),
 
     // Cambio (a): solo las vivas se cancelan. «Llegó» y «No vino» ya no.
     cancelar: viva
-      ? accion(canEdit, canEdit ? `Cancelar la reserva de ${nombre} — pedirá confirmación` : TITULO_SIN_PERMISO_CANCELAR)
+      ? accion(true, `Cancelar la reserva de ${nombre} — pedirá confirmación`)
       : accion(false, motivoNoCancelable(estado)),
 
-    // Cambio (b): siempre, en los seis estados; solo la apaga el permiso.
-    editar: accion(
-      canEdit,
-      canEdit
-        ? `Gestionar: editar la reserva de ${nombre} — datos, día, hora, comensales y sala`
-        : TITULO_SIN_PERMISO_EDITAR,
-    ),
+    // Cambio (b): siempre, en los seis estados.
+    editar: accion(true, `Gestionar: editar la reserva de ${nombre} — datos, día, hora, comensales y sala`),
 
-    // Cambio (e): en cualquier estado, pero solo con permiso.
-    importante: accion(
-      canEdit,
-      canEdit ? (importante ? `Desmarcar ${nombre} como importante` : `Marcar ${nombre} como importante`) : TITULO_SIN_PERMISO_EDITAR,
-    ),
-    listaNegra: accion(canEdit, canEdit ? `Añadir a ${nombre} a la lista negra` : TITULO_SIN_PERMISO_EDITAR),
+    // Cambio (e): en cualquier estado.
+    importante: accion(true, importante ? `Desmarcar ${nombre} como importante` : `Marcar ${nombre} como importante`),
+    listaNegra: accion(true, `Añadir a ${nombre} a la lista negra`),
 
     // De servicio: la Lista no los tiene.
     haLlegado: oculta(),
@@ -253,30 +247,25 @@ function accionesDeLista(estado: string, nombre: string, importante: boolean, ca
 
 // ─── HOY (servicio) ──────────────────────────────────────────────────────────
 
-function accionesDeHoy(estado: string, importante: boolean, canEdit: boolean): AccionesDisponibles {
+function accionesDeHoy(estado: string, importante: boolean): AccionesDisponibles {
   const viva = esEstadoVivo(estado);
   const llego = estado === ESTADO_LLEGADA;
   const noVino = estado === ESTADO_NO_SHOW;
   const movible = ocupaEspacio(estado);
-  // Cambio (c): lo que escribe en `reservas` respeta el permiso.
-  const conPermiso = (habilitadoTitulo: string) => accion(canEdit, canEdit ? habilitadoTitulo : TITULO_SIN_PERMISO_EDITAR);
 
   return {
-    haLlegado: viva ? conPermiso("Ha llegado") : oculta(),
-    noVino: viva ? conPermiso("No vino") : oculta(),
+    haLlegado: viva ? accion(true, "Ha llegado") : oculta(),
+    noVino: viva ? accion(true, "No vino") : oculta(),
     // En el lugar de «Ha llegado» sale el chip «Llegó» / «No vino» con su «Deshacer».
-    deshacer: llego ? conPermiso("Deshacer llegada") : noVino ? conPermiso("Deshacer «No vino»") : oculta(),
+    deshacer: llego ? accion(true, "Deshacer llegada") : noVino ? accion(true, "Deshacer «No vino»") : oculta(),
     // La entrada «Mover a…» del menú está siempre; lo que cambia es si hay a dónde.
-    mover: accion(
-      movible && canEdit,
-      !movible ? "No se puede mover en este estado" : canEdit ? "Mover a…" : TITULO_SIN_PERMISO_EDITAR,
-    ),
+    mover: accion(movible, movible ? "Mover a…" : "No se puede mover en este estado"),
 
     // Cambio (b): siempre, en los seis estados.
-    editar: conPermiso("Editar reserva"),
+    editar: accion(true, "Editar reserva"),
 
-    importante: conPermiso(importante ? "Quitar importante" : "Marcar como importante"),
-    listaNegra: conPermiso("Añadir a blacklist"),
+    importante: accion(true, importante ? "Quitar importante" : "Marcar como importante"),
+    listaNegra: accion(true, "Añadir a blacklist"),
 
     // De gestión: Hoy no los tiene.
     aceptar: oculta(),

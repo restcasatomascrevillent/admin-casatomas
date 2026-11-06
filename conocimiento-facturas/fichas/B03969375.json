@@ -1,0 +1,87 @@
+{
+  "cif": "B03969375",
+  "nombre": "CAFES JUFERNA S.L.",
+  "nombres_impresos": ["CAFES JUFERNA", "cafesjuferna.com"],
+  "categoria": "alimentacion (despensa, conservas, salsas, infusiones; NO vende café en las facturas vistas)",
+  "locales": ["casa_tomas"],
+  "muestras": ["R128.pdf", "R468.pdf", "R983.pdf", "R1280.pdf", "R1598.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura mensual que agrupa los albaranes semanales del mes",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1-3",
+    "numero_factura": { "ejemplos": ["2026/001136", "2026/003624", "2026/007784", "2026/009206", "2026/011599"], "patron": "^2026/\\d{6}$", "donde": "casilla Nº FACTURA arriba a la izquierda, primera de las casillas (Nº FACTURA | FECHA | CLIENTE HOJA | FORMA PAGO | REPRESENTANTE)" },
+    "fecha": "casilla FECHA junto al número, DD/MM/AAAA, normalmente fin de mes",
+    "albaranes": "cabecera 'ALBARÁN Nº 2026/000036 DE FECHA 02/01/2026' (o 'Albarán ____ Nº 2026/005539 de fecha 04/06/2026') antes de sus líneas"
+  },
+
+  "lectura": {
+    "columnas": ["Ref./Código", "Descripción", "Cantidad", "Precio", "%IVA (en facturas antiguas)", "Importe/Subtotal"],
+    "cantidad_es": "unidades de venta tal como las describe el artículo (lata, tarro, bote, bolsa, cubo, pack); en 'ATUN ... 12 UDS.' son 12 latas sueltas a 6,90 cada una",
+    "columna_peso": null,
+    "precio_es_por": "unidad de venta (lata, tarro, bote, pack). Los kg/gramos/uds del nombre describen el contenido, no son la cantidad",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Pie: Neto | % Dtos | Importes | Base Imponible | % | Importe I.V.A. | % | Importe Rec. | TOTAL; en realidad el '10,00' es el % de IVA (la cabecera 'Dtos' está mal rotulada y no hay descuento)"],
+    "trampas": [
+      "El '10,00' junto al precio (factura antigua, columna '%IVA %Dto') y el '10,00' del pie es IVA reducido, no descuento: 259,46 + 25,95 = 285,41.",
+      "En las facturas de 2026 más recientes el orden de columnas cambia: Cantidad va al principio de la línea ('2,00 33126 | PALMITO…') en vez de después del nombre ('33126 PALMITO… | 2,00 | 4,99 10,00 | 9,98').",
+      "Cada hoja sale duplicada en el PDF (original y 'COPIA DE FACTURA'); no sumar dos veces.",
+      "En facturas de varias hojas (1/2, 2/2) el pie con Neto/IVA/Total es el de TODA la factura y se repite en cada hoja; no sumar los pies. El neto 260,66 de R983 es la suma de las líneas de las dos hojas.",
+      "Devoluciones: cantidad negativa y subtotal negativo ('-1,00 … TOMATE ENTERO 5 KG DIAMIR(RETIRADO) | 5,40 | -5,40').",
+      "La cabecera trae el CIF del cliente (B-54583356) y el del proveedor (B03969375): no confundir.",
+      "Un mismo artículo cambia de precio entre meses (Salsa barbacoa Millas 7,90 → 5,95; infusión frutas del bosque 2,70 → 2,95)."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "importe_línea = cantidad × precio (sin dto.)",
+    "Neto = base = suma de importes de línea de todos los albaranes de la factura (devoluciones restan)",
+    "IVA = base × 10 %; total = base + IVA (259,46 → 25,95 → 285,41; 260,66 → 26,07 → 286,73; 72,64 → 7,26 → 79,90; 217,69 → 21,77 → 239,46)",
+    "Vencimiento al pie = fecha de factura por el importe total (pago por transferencia)"
+  ],
+
+  "guia_ocr": "Factura mensual de Juferna que agrupa albaranes (cada uno con su fecha). Número 2026/00xxxx y fecha en las casillas de arriba. Línea = código de 5 cifras + descripción + cantidad + precio unitario + importe; la cantidad son latas, tarros, botes o packs, no kg. El '10,00' junto al precio o en el pie es IVA 10 %, no descuento. Cantidades negativas son devoluciones. El PDF repite cada hoja como 'COPIA DE FACTURA': no dupliques líneas. El pie de la hoja 1/N ya es el total de toda la factura. Suma de importes = base.",
+
+  "productos": [
+    { "nombre_impreso": "33126 PALMITO ENTERO 1KG LATA F.A. DIAMIR", "nombre_normalizado": "Palmito entero 1 kg lata Diamir", "familia": "conserva vegetal", "presentacion": "lata en conserva", "formato": { "envase": "lata", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 4.99, "max": 4.99, "por": "lata", "ejemplos": [["2026-01-30", 4.99]] }, "iva_pct": 10, "veces_visto": 31 },
+    { "nombre_impreso": "41035 TAPENONES TARRO 1KG - PEQUEÑO", "nombre_normalizado": "Tapenones (alcaparrones) tarro 1 kg, pequeño", "familia": "encurtido", "presentacion": "tarro envasado", "formato": { "envase": "tarro", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 8.45, "max": 8.45, "por": "tarro", "ejemplos": [["2026-06-04", 8.45]] }, "iva_pct": 10, "veces_visto": 23 },
+    { "nombre_impreso": "20035 KETCHUP CHOVI 1900 GR. 6UND", "nombre_normalizado": "Ketchup Chovi 1,9 kg", "familia": "salsa", "presentacion": "bote/cubo 1.900 g", "formato": { "envase": "bote", "contenido": 1.9, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 4.95, "max": 4.95, "por": "bote", "ejemplos": [["2026-01-02", 4.95]] }, "iva_pct": 10, "veces_visto": 15 },
+    { "nombre_impreso": "30515 MAIZ DULCE F.A. 300GR DIAMIR 12 UDS", "nombre_normalizado": "Maíz dulce 300 g Diamir (pack 12 latas)", "familia": "conserva vegetal", "presentacion": "lata en conserva", "formato": { "envase": "lata", "contenido": 300, "unidad_contenido": "g", "unidades_por_bulto": 12, "bulto": "pack" }, "unidad_factura": "pack", "precio": { "min": 12.95, "max": 12.95, "por": "pack de 12", "ejemplos": [["2026-03-26", 12.95]] }, "iva_pct": 10, "veces_visto": 9 },
+    { "nombre_impreso": "50099 REVUELTO ENSALADA AL NATURAL - 1 KILO", "nombre_normalizado": "Revuelto de ensalada al natural 1 kg", "familia": "conserva vegetal", "presentacion": "envase 1 kg al natural", "formato": { "envase": "bote", "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 9.49, "max": 9.49, "por": "bote", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 8 },
+    { "nombre_impreso": "31073 ATUN CLARO ACEITE RO-900 MONTEY / DIAMIR - 12 UDS.", "nombre_normalizado": "Atún claro en aceite RO-900 (12 latas)", "familia": "conserva pescado", "presentacion": "lata en aceite vegetal, marca Montey o Diamir según albarán", "formato": { "envase": "lata", "contenido": 900, "unidad_contenido": "g", "unidades_por_bulto": 12, "bulto": "caja" }, "unidad_factura": "unidad", "precio": { "min": 6.9, "max": 6.9, "por": "lata", "ejemplos": [["2026-01-15", 6.9]] }, "iva_pct": 10, "veces_visto": 12 },
+    { "nombre_impreso": "22015 INFUSION CANTUESO SHIP - AZACONSA - 25UND", "nombre_normalizado": "Infusión cantueso Azaconsa 25 sobres", "familia": "infusión", "presentacion": "caja de 25 sobres", "formato": { "envase": "caja", "contenido": 25, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "caja", "precio": { "min": 2.35, "max": 2.35, "por": "caja", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 7 },
+    { "nombre_impreso": "20082 SALSA BARBACOA MILLAS 1.850 ML", "nombre_normalizado": "Salsa barbacoa Millas 1,85 L", "familia": "salsa", "presentacion": "bote 1.850 ml", "formato": { "envase": "bote", "contenido": 1.85, "unidad_contenido": "l", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 5.95, "max": 7.9, "por": "bote", "ejemplos": [["2026-03-05", 7.9], ["2026-06-04", 5.95]] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "22044 INFUSION FRUTAS DEL BOSQUE PIRAMIDE 15 UDS", "nombre_normalizado": "Infusión frutas del bosque pirámide 15 uds", "familia": "infusión", "presentacion": "caja de 15 pirámides", "formato": { "envase": "caja", "contenido": 15, "unidad_contenido": "pirámides", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "caja", "precio": { "min": 2.7, "max": 2.95, "por": "caja", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "20018 MANTEQUILLA TARRINA 10GR. RENY PICOT 100UDS", "nombre_normalizado": "Mantequilla tarrina 10 g Reny Picot (100 uds)", "familia": "lácteo", "presentacion": "caja de 100 tarrinas monodosis", "formato": { "envase": "tarrina", "contenido": 10, "unidad_contenido": "g", "unidades_por_bulto": 100, "bulto": "caja" }, "unidad_factura": "caja", "precio": { "min": 14.65, "max": 14.65, "por": "caja de 100", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "50054 ALTRAMUCES BOLSA 2KG - JUFERNA", "nombre_normalizado": "Altramuces Juferna bolsa 2 kg", "familia": "encurtido", "presentacion": "bolsa envasada", "formato": { "envase": "bolsa", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 6.35, "max": 6.35, "por": "bolsa", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "15010 COLACAO ESTUCHE 50 SOBRES 10 U/C", "nombre_normalizado": "ColaCao estuche 50 sobres", "familia": "cacao soluble", "presentacion": "estuche de 50 sobres (10 u/c)", "formato": { "envase": "estuche", "contenido": 50, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "estuche", "precio": { "min": 20.25, "max": 20.25, "por": "estuche", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "32001 TOMATE EXITO TROCEADO B/ 3 KG.", "nombre_normalizado": "Tomate troceado Éxito lata 3 kg", "familia": "conserva vegetal", "presentacion": "lata en conserva", "formato": { "envase": "lata", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 5.2, "max": 5.2, "por": "lata", "ejemplos": [["2026-01-02", 5.2]] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "20116 SALSA BARBACOA CUBO 1900 GR. - CHOVI - 6 uds.", "nombre_normalizado": "Salsa barbacoa Chovi cubo 1,9 kg", "familia": "salsa", "presentacion": "cubo 1.900 g", "formato": { "envase": "cubo", "contenido": 1.9, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 7.9, "max": 7.9, "por": "cubo", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "19099 COLORANTE ALIMENTARIO PRIMERA 900GR", "nombre_normalizado": "Colorante alimentario Primera 900 g", "familia": "condimento", "presentacion": "envase 900 g", "formato": { "envase": "bote", "contenido": 900, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 5.6, "max": 5.6, "por": "bote", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "13063 PICKWICK ROOIBOS VAINILLA ISE HORNIMANS 25UND", "nombre_normalizado": "Infusión Pickwick rooibos vainilla 25 uds", "familia": "infusión", "presentacion": "caja de 25 sobres", "formato": { "envase": "caja", "contenido": 25, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "caja", "precio": { "min": 7.35, "max": 7.35, "por": "caja", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "18022 MIEL DE FLORES 500 GRA. ANTIGOTEO DIAMIR", "nombre_normalizado": "Miel de flores antigoteo 500 g Diamir", "familia": "miel", "presentacion": "bote antigoteo 500 g", "formato": { "envase": "bote", "contenido": 500, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 3.4, "max": 3.4, "por": "bote", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "13039 INFUSION TE VERDE PURO HORNIMANS 100UND", "nombre_normalizado": "Té verde puro Hornimans 100 uds", "familia": "infusión", "presentacion": "caja de 100 sobres", "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "caja", "precio": { "min": 6.5, "max": 6.5, "por": "caja", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "19077 AJO GRANULADO JUFERNA BOTE 900GR.", "nombre_normalizado": "Ajo granulado Juferna bote 900 g", "familia": "condimento", "presentacion": "bote 900 g", "formato": { "envase": "bote", "contenido": 900, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 9.4, "max": 9.4, "por": "bote", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "32016 TOMATE ENTERO 5 KG DIAMIR", "nombre_normalizado": "Tomate entero pelado lata 5 kg Diamir", "familia": "conserva vegetal", "presentacion": "lata en conserva", "formato": { "envase": "lata", "contenido": 5, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 5.4, "max": 5.4, "por": "lata", "ejemplos": [["2026-06-04", -5.4]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "19063 HIERBAS PROVENZALES BOTE 250GR. - JUFERNA -", "nombre_normalizado": "Hierbas provenzales Juferna bote 250 g", "familia": "condimento", "presentacion": "bote 250 g", "formato": { "envase": "bote", "contenido": 250, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 5.5, "max": 5.5, "por": "bote", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "19151 SAL NEGRA EN ESCAMAS 380GR - DIDILO", "nombre_normalizado": "Sal negra en escamas Didilo 380 g", "familia": "condimento", "presentacion": "bote 380 g", "formato": { "envase": "bote", "contenido": 380, "unidad_contenido": "g", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 7.26, "max": 7.26, "por": "bote", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "13033 INFUSION TE VERDE POMPADOUR PACK 100", "nombre_normalizado": "Té verde Pompadour pack 100", "familia": "infusión", "presentacion": "pack de 100 sobres", "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "pack", "precio": { "min": 6.75, "max": 6.75, "por": "pack", "ejemplos": [["2026-07-09", 6.75]] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "51013 SPAGUETTI AL HUEVO GALLO 3 KG.", "nombre_normalizado": "Espaguetis al huevo Gallo 3 kg", "familia": "pasta", "presentacion": "paquete 3 kg", "formato": { "envase": "paquete", "contenido": 3, "unidad_contenido": "kg", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "unidad", "precio": { "min": 8.35, "max": 8.35, "por": "paquete", "ejemplos": [["2026-01-02", 8.35]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "13030 INFUSION TE ROJO HORNIMANS 100UND", "nombre_normalizado": "Té rojo Hornimans 100 uds", "familia": "infusión", "presentacion": "caja de 100 sobres", "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "caja", "precio": { "min": 6.5, "max": 6.5, "por": "caja", "ejemplos": [["2026-01-29", 6.5]] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "13029 INFUSION TE CLASSIC HORNIMANS 100UND", "nombre_normalizado": "Té clásico Hornimans 100 uds", "familia": "infusión", "presentacion": "caja de 100 sobres", "formato": { "envase": "caja", "contenido": 100, "unidad_contenido": "sobres", "unidades_por_bulto": 1, "bulto": null }, "unidad_factura": "caja", "precio": { "min": 6.5, "max": 6.5, "por": "caja", "ejemplos": [["2026-09-03", 6.5]] }, "iva_pct": 10, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "La categoría del info.json dice 'bebidas', pero las facturas son de conservas, salsas, condimentos, pasta e infusiones; no aparece café (kilos, paquetes o cápsulas) en ninguna factura vista.",
+    "Maíz dulce 300 g 12 uds a 12,95 es precio de pack de 12 (≈1,08 la lata); Colacao 'estuche 50 sobres 10 U/C' (20,25) y Mantequilla 100 uds (14,65) también parecen precio por caja/estuche, pero la factura no lo dice y se deduce del importe.",
+    "Ketchup/Barbacoa Chovi '6UND' / '6 uds.': el precio 4,95/7,90 cuadra con un bote de 1,9 kg, no con la caja de 6; cantidad 1 = un bote.",
+    "Atún RO-900: la marca del albarán varía entre MONTEY y DIAMIR para la misma referencia 31073 (se tratan como el mismo producto).",
+    "Tomate entero 5 kg: solo se ve en la devolución (R983) y en otra factura; precio de la devolución negativo.",
+    "Catálogo completo: 26 artículos en 8 PDF; ninguno queda fuera."
+  ]
+}

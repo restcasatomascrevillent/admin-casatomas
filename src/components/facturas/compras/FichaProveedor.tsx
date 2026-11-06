@@ -1,170 +1,182 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Merge, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Factura } from "@/hooks/useFacturas";
 import { useFichaProveedor } from "@/hooks/useCompras";
-import { formatCurrency, formatDate, formatDateCorta } from "@/components/facturas/shared/formatters";
+import { formatDate, formatImporte, plural } from "@/components/facturas/shared/formatters";
+import { detalleError } from "@/lib/facturas/listaCompras";
 import { EditorProveedor, ProveedoresDialog } from "@/components/facturas/productos/ProveedoresDialog";
-import { esAlbaranSinFactura, textoFrecuencia } from "@/lib/facturas/compras";
-import type { Proveedor } from "@/lib/facturas/proveedores";
+import { textoFrecuencia } from "@/lib/facturas/compras";
+import type { Proveedor, ResolverProveedor } from "@/lib/facturas/proveedores";
+import type { AgregadoProveedor } from "@/lib/facturas/resumenCompras";
+import { ListaDocumentos, type DocumentoFila } from "./ListaDocumentos";
+import { DetalleTecnico } from "./estilo";
 
-/** Una cifra de la fila de resumen: etiqueta gris encima (corta; `titulo` trae la larga), valor debajo, sin marco. */
-const dato = (etiqueta: string, valor: string | null, titulo?: string) =>
-  valor ? (
-    <div className="min-w-0">
-      <dt className="truncate text-[11px] pointer-coarse:text-xs font-medium text-muted-foreground" title={titulo ?? etiqueta}>
-        {etiqueta}
-      </dt>
-      <dd className="truncate text-[13px] font-semibold tabular-nums" title={valor}>
-        {valor}
-      </dd>
-    </div>
-  ) : null;
+/** Cuántos productos de «Qué le compras» se enseñan en el despliegue. */
+const PRODUCTOS_RESUMIDOS = 5;
+
+/** Un dato de la línea de datos: etiqueta gris y valor, en línea. */
+const Dato = ({ etiqueta, children }: { etiqueta: string; children: ReactNode }) => (
+  <div className="min-w-0 px-3 py-1.5 first:pl-0">
+    <dt className="text-xs font-medium text-muted-foreground">{etiqueta}</dt>
+    <dd className="min-w-0 text-sm font-medium tabular-nums">{children}</dd>
+  </div>
+);
 
 /**
- * Compras › Proveedores › ficha: qué le compras, cada cuánto y cuándo fue el
- * último pedido (RPC `ficha_proveedor_agente`), sus documentos, y las acciones
- * de siempre sobre proveedores: editar nombre/CIF y fusionar con otro.
+ * Compras › Proveedores › despliegue (rediseño del 05/11/2026): lo que se ve al
+ * tocar un proveedor en la lista, debajo de su fila. Una línea de datos (CIF,
+ * cada cuánto pide, último pedido, regalado y abonos), qué le compras resumido
+ * (RPC `ficha_proveedor_agente`; cada producto abre su ficha), las acciones de
+ * siempre (editar nombre/CIF, fusionar) y SUS DOCUMENTOS por meses con el
+ * subtotal de cada mes, igual que en Documentos. Todo respeta el local y el
+ * periodo elegidos (`agregado` viene ya filtrado).
  */
 export function FichaProveedor({
   proveedor,
-  documentos,
+  agregado,
+  facturas,
+  resolver,
+  avisosPorId,
+  seleccionadoDocId,
   puedeEditar,
+  hayFiltros,
   onAbrirDocumento,
+  onPrecargarDocumento,
   onAbrirProducto,
+  hoy,
 }: {
   proveedor: Proveedor;
-  /** Sus facturas y albaranes, el más reciente primero. */
-  documentos: Factura[];
+  /** Lo suyo con el local y el periodo elegidos (undefined = ningún documento). */
+  agregado: AgregadoProveedor<DocumentoFila> | undefined;
+  /** Todas las facturas, para «Incluido en F-xxx». */
+  facturas: Pick<Factura, "id" | "numero_documento">[];
+  resolver: ResolverProveedor;
+  avisosPorId: Map<number, unknown[]>;
+  seleccionadoDocId: number | null;
   puedeEditar: boolean;
+  /** Hay local o periodo elegidos (para el texto de «ningún documento»). */
+  hayFiltros: boolean;
   onAbrirDocumento: (id: number) => void;
-  /** Busca ese producto en el modo Productos (por su nombre). */
+  /** Pide la ficha de un documento por adelantado. */
+  onPrecargarDocumento?: (id: number) => void;
+  /** Abre ese producto (por su nombre, el que da «Qué le compras»: puede ser el de la línea). */
   onAbrirProducto: (nombre: string) => void;
+  /** Para pruebas y capturas: el «hoy» de la lista de documentos. */
+  hoy?: Date;
 }) {
   const fichaQ = useFichaProveedor(proveedor.nombre);
   const [editando, setEditando] = useState(false);
   const [fusionando, setFusionando] = useState(false);
   const ficha = fichaQ.data && "proveedor" in fichaQ.data ? fichaQ.data : null;
-  const sinFactura = documentos.filter(esAlbaranSinFactura);
   const otrasFormas = proveedor.variantes.filter((v) => v !== proveedor.nombre);
   const frecuencia = textoFrecuencia(ficha?.intervalo_medio_dias ?? null);
+  const ultimo = ficha?.ultima ?? proveedor.ultima_fecha;
+  const documentos = agregado?.documentos ?? [];
 
   return (
-    <div className="space-y-3 p-3 sm:p-4">
-      <header className="space-y-1">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Proveedor</p>
-        <h2 className="break-words text-lg font-semibold leading-tight">
-          {proveedor.nombre}
-          {proveedor.nombre_comercial && <span className="font-normal text-muted-foreground"> · «{proveedor.nombre_comercial}»</span>}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {proveedor.cif ? `CIF ${proveedor.cif}` : "Sin CIF"}
-          {proveedor.cifs_extra.length > 0 && ` (también ${proveedor.cifs_extra.join(", ")})`}
-        </p>
-        {otrasFormas.length > 0 && (
-          <p className="text-xs text-muted-foreground">Llega como: {otrasFormas.map((v) => `«${v}»`).join(", ")}</p>
+    <div className="border-b border-border/60 bg-muted/[0.12] shadow-[inset_3px_0_0_0_hsl(var(--primary))]" data-testid="despliegue-proveedor">
+      <div className="space-y-3 py-3 pl-10 pr-3">
+        <dl className="flex flex-wrap divide-x divide-border/60" aria-label="Datos del proveedor">
+          <Dato etiqueta="CIF">
+            {proveedor.cif ?? "sin CIF"}
+            {proveedor.cifs_extra.length > 0 && <span className="font-normal text-muted-foreground"> (también {proveedor.cifs_extra.join(", ")})</span>}
+          </Dato>
+          {frecuencia && <Dato etiqueta="Pide">{frecuencia}</Dato>}
+          {ultimo && <Dato etiqueta="Último pedido">{formatDate(ultimo)}</Dato>}
+          {agregado && agregado.regalado > 0 && (
+            <Dato etiqueta="Regalado / descuentos">
+              {formatImporte(agregado.regalado)}
+              <span className="font-normal text-muted-foreground"> sin IVA{agregado.regaladoEstimado ? " · estimado" : ""}</span>
+            </Dato>
+          )}
+          {agregado && agregado.nAbonos > 0 && (
+            <Dato etiqueta={agregado.nAbonos === 1 ? "Abono" : "Abonos"}>
+              <span className="text-emerald-700 dark:text-emerald-400">{formatImporte(agregado.abonos)}</span>
+              <span className="font-normal text-muted-foreground"> ({plural(agregado.nAbonos, "documento", "documentos")})</span>
+            </Dato>
+          )}
+        </dl>
+
+        {fichaQ.isLoading && (
+          <p className="text-sm text-muted-foreground" role="status">
+            Cargando qué le compras…
+          </p>
         )}
+        {fichaQ.isError && (
+          <div className="flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground" role="status">
+            <span>No se ha podido leer qué le compras.</span>
+            <Button variant="ghost" className="h-11 px-3 text-sm" onClick={() => void fichaQ.refetch()}>
+              Reintentar
+            </Button>
+            <DetalleTecnico detalle={detalleError(fichaQ.error)} />
+          </div>
+        )}
+        {ficha && ficha.top_productos.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Qué le compras">
+            <span className="mr-1 text-xs font-medium text-muted-foreground">Qué le compras</span>
+            {ficha.top_productos.slice(0, PRODUCTOS_RESUMIDOS).map((t) => (
+              <button
+                key={`${t.producto}|${t.unidad ?? ""}`}
+                type="button"
+                onClick={() => onAbrirProducto(t.producto)}
+                aria-label={`Ver el producto ${t.producto}`}
+                className="relative inline-flex h-9 items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 text-[13px] transition-colors before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] hover:border-border hover:bg-muted/40 active:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary motion-reduce:transition-none"
+              >
+                <span className="font-medium">{t.producto}</span>
+                {t.ultimo_precio !== null && (
+                  <span className="text-xs tabular-nums text-muted-foreground">
+                    {formatImporte(t.ultimo_precio)}
+                    {t.unidad ? `/${t.unidad}` : ""}
+                  </span>
+                )}
+              </button>
+            ))}
+            {ficha.top_productos.length > PRODUCTOS_RESUMIDOS && (
+              <span className="text-xs text-muted-foreground">y {ficha.top_productos.length - PRODUCTOS_RESUMIDOS} más · último precio sin IVA</span>
+            )}
+          </div>
+        )}
+
+        {(otrasFormas.length > 0 || proveedor.nombre_comercial) && (
+          <p className="text-xs text-muted-foreground">
+            {proveedor.nombre_comercial && <>Nombre comercial «{proveedor.nombre_comercial}». </>}
+            {otrasFormas.length > 0 && <>Llega como: {otrasFormas.map((v) => `«${v}»`).join(", ")}</>}
+          </p>
+        )}
+
         {puedeEditar && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            <Button variant="outline" className="h-11 gap-1.5" onClick={() => setEditando((v) => !v)} aria-expanded={editando}>
+          <div className="-ml-3 flex flex-wrap gap-1">
+            <Button variant="ghost" className="h-11 gap-1.5 px-3 text-sm" onClick={() => setEditando((v) => !v)} aria-expanded={editando}>
               <Pencil className="h-4 w-4" aria-hidden="true" /> Editar datos
             </Button>
-            <Button variant="outline" className="h-11 gap-1.5" onClick={() => setFusionando(true)}>
+            <Button variant="ghost" className="h-11 gap-1.5 px-3 text-sm" onClick={() => setFusionando(true)}>
               <Merge className="h-4 w-4" aria-hidden="true" /> Fusionar con otro proveedor
             </Button>
           </div>
         )}
         {editando && <EditorProveedor p={proveedor} onCerrar={() => setEditando(false)} />}
-      </header>
+      </div>
 
-      <section aria-label="Resumen del proveedor" className="space-y-2">
-        {fichaQ.isLoading && (
-          <p className="text-sm text-muted-foreground" role="status">
-            Cargando la ficha…
-          </p>
-        )}
-        {fichaQ.isError && (
-          <p className="text-sm text-muted-foreground" role="status">
-            No se ha podido leer la ficha: {(fichaQ.error as { message?: string })?.message ?? "error desconocido"}.
-          </p>
-        )}
-        {fichaQ.data && !ficha && (
-          <p className="text-sm text-muted-foreground" role="status">
-            No hay compras registradas de este proveedor todavía.
-          </p>
-        )}
-        <dl className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Cifras del proveedor">
-          {dato("Documentos", `${proveedor.facturas} fact. · ${proveedor.albaranes} alb.`)}
-          {dato("Gasto", formatCurrency(ficha?.gasto ?? proveedor.total_facturas + proveedor.total_albaranes), "Gasto (con IVA)")}
-          {dato("Último pedido", ficha?.ultima ? formatDate(ficha.ultima) : proveedor.ultima_fecha ? formatDate(proveedor.ultima_fecha) : null)}
-          {dato("Cada cuánto", frecuencia ? `Pide ${frecuencia}` : null)}
-          {dato("Sin factura", String(sinFactura.length), "Albaranes sin factura")}
-        </dl>
-        {ficha?.reparto && (
-          <p className="text-xs text-muted-foreground">
-            En facturas {formatCurrency(ficha.reparto.en_facturas)} · en albaranes sin factura {formatCurrency(ficha.reparto.en_albaranes_sin_factura)}
-          </p>
-        )}
-        {ficha && ficha.otros_parecidos.length > 0 && (
-          <p className="text-xs text-muted-foreground">Otros con nombre parecido: {ficha.otros_parecidos.join(", ")}.</p>
-        )}
-      </section>
-
-      {ficha && ficha.top_productos.length > 0 && (
-        <section aria-label="Qué le compras" className="space-y-1">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Qué le compras</h3>
-          <ul className="divide-y divide-border/50 border-y border-border/50">
-            {ficha.top_productos.map((t) => (
-              <li key={`${t.producto}|${t.unidad ?? ""}`}>
-                <button
-                  type="button"
-                  onClick={() => onAbrirProducto(t.producto)}
-                  className="flex min-h-11 w-full items-center gap-3 px-1 py-1.5 text-left hover:bg-muted/40"
-                  aria-label={`Ver el producto ${t.producto}`}
-                >
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{t.producto}</span>
-                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                    {t.ultimo_precio !== null ? `${formatCurrency(t.ultimo_precio)}${t.unidad ? `/${t.unidad}` : ""}` : "—"}
-                    {t.ultima_fecha ? ` · ${formatDateCorta(t.ultima_fecha)}` : ""}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <section aria-label="Documentos del proveedor" className="space-y-1">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Documentos ({documentos.length})</h3>
-        {documentos.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Ningún documento cargado.</p>
-        ) : (
-          <ul className="divide-y divide-border/50 border-y border-border/50">
-            {documentos.map((d) => (
-              <li key={d.id}>
-                <button
-                  type="button"
-                  onClick={() => onAbrirDocumento(d.id)}
-                  className="flex min-h-11 w-full items-center gap-3 px-1 py-1.5 text-left hover:bg-muted/40"
-                  aria-label={`Abrir ${d.tipo === "albaran" ? "el albarán" : "la factura"} ${d.numero_documento}`}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">
-                      {d.numero_documento}{" "}
-                      <span className="font-normal text-muted-foreground">· {d.tipo === "albaran" ? "Albarán" : "Factura"}</span>
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {formatDateCorta(d.fecha)}
-                      {esAlbaranSinFactura(d) && " · sin factura"}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-sm tabular-nums">{d.total != null ? formatCurrency(d.total) : "—"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* Sus documentos, planos (sin caja dentro de la caja), con un separador fino arriba. */}
+      <div className="border-t border-border/60 bg-card">
+        <ListaDocumentos
+          documentos={documentos}
+          facturas={facturas}
+          resolver={resolver}
+          avisosPorId={avisosPorId}
+          seleccionadoId={seleccionadoDocId}
+          cargando={false}
+          hayFiltros={hayFiltros}
+          onAbrir={onAbrirDocumento}
+          onPrecargar={onPrecargarDocumento}
+          hoy={hoy}
+          conProveedor={false}
+          recordar={false}
+          cabecerasFijas={false}
+          etiqueta={`Documentos de ${proveedor.nombre}`}
+        />
+      </div>
 
       {fusionando && <ProveedoresDialog puedeEditar={puedeEditar} seleccionInicial={[proveedor.id]} onCerrar={() => setFusionando(false)} />}
     </div>

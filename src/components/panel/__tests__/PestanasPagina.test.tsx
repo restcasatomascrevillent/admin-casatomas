@@ -107,11 +107,38 @@ describe("PestanasPagina", () => {
     expect(envoltorioPestanas.compareDocumentPosition(acciones) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("con accionesDebajoEnMovil=\"xl\" los botones siguen en su propia fila hasta 1280 px (Gestor Web › Carta)", () => {
+    montar({ acciones: <button type="button">Añadir</button>, accionesDebajoEnMovil: "xl" });
+    const barra = screen.getByTestId("pestanas-pagina");
+    expect(barra.className).toContain("flex-wrap");
+    expect(barra.className).toContain("xl:flex-nowrap");
+    expect(barra.className).toContain("xl:border-b");
+    expect(barra.className).not.toContain("sm:flex-nowrap");
+    const envoltorioPestanas = screen.getByRole("tablist").parentElement!;
+    expect(envoltorioPestanas.className).toContain("sm:basis-full");
+    expect(envoltorioPestanas.className).toContain("xl:basis-auto");
+    const acciones = screen.getByRole("button", { name: "Añadir" }).parentElement!;
+    expect(acciones.className).toContain("w-full");
+    expect(acciones.className).toContain("xl:w-auto");
+    expect(acciones.className).not.toContain("sm:w-auto");
+  });
+
   it("sin accionesDebajoEnMovil la barra es una sola fila", () => {
     montar({ acciones: <button type="button">Añadir</button> });
     const barra = screen.getByTestId("pestanas-pagina");
     expect(barra.className).not.toContain("flex-wrap");
     expect(barra.className).not.toContain("border-b-0");
     expect(screen.getByRole("button", { name: "Añadir" }).parentElement!.className).not.toContain("w-full");
+  });
+
+  it("soloIconosEnMovil: en el móvil solo el icono (la etiqueta sigue siendo el nombre accesible) y un punto por contador", () => {
+    montar({ soloIconosEnMovil: true });
+    const primera = screen.getByRole("tab", { name: /^Primera/ });
+    expect(within(primera).getByText("Primera").className).toContain("sr-only sm:not-sr-only");
+    expect(primera).toHaveAttribute("title", "Primera");
+    expect(primera.className).toContain("min-w-11");
+    expect(screen.getByTestId("punto-a").className).toContain("sm:hidden");
+    // Sin icono, la etiqueta se ve igual que siempre.
+    expect(within(screen.getByRole("tab", { name: /^Segunda/ })).getByText("Segunda").className).not.toContain("sr-only");
   });
 });

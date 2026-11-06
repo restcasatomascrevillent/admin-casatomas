@@ -6,12 +6,19 @@ import { toast } from "sonner";
 import {
   Upload, FileText, X, Send, Loader2, CheckCircle2, XCircle, AlertTriangle, Copy,
   Camera, FolderOpen, Replace, RotateCcw, Clock, Image as ImageIcon, File as FileIcon,
-  Layers, ChevronUp, ChevronDown, FilePlus2, Ungroup,
+  Layers, ChevronUp, ChevronDown, FilePlus2, Ungroup, Pencil,
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { useColaSubida } from "@/hooks/useColaSubida";
-import { type ElementoCola, progresoTanda } from "@/lib/facturas/colaSubida";
-import type { Esperado } from "@/lib/facturas/documentoLargo";
+import {
+  type CausaRechazo,
+  type ElementoCola,
+  POSICION_AVISOS,
+  progresoTanda,
+  puedeCancelar,
+  puedeReintentar,
+  puedeVolverASubir,
+} from "@/lib/facturas/colaSubida";
 import type { PendienteDecidir } from "@/lib/facturas/pendientesDecidir";
 import {
   claseFichero,
@@ -25,15 +32,29 @@ import {
 import { cn } from "@/lib/utils";
 import { FotoExistente } from "./AvisoDuplicadoDialog";
 import { CosteLecturaDocumento } from "./CosteLecturaDocumento";
-import { type DecisionDuplicado, SustituirFacturaDialog } from "./SustituirFacturaDialog";
+import { SustituirFacturaDialog } from "./SustituirFacturaDialog";
+import { CorregirDocumentoDialog } from "./CorregirDocumentoDialog";
+import { useCorreccionDocumento, usePermisosFacturas } from "@/hooks/usePermisosFacturas";
+import { useDecisionDuplicado } from "./useDecisionDuplicado";
+
+/** Título del aviso de un fichero que no se admite. */
+const TITULO_RECHAZO: Record<CausaRechazo, string> = {
+  tipo: "Tipo de archivo no permitido",
+  tamano: "Archivo demasiado grande",
+  vacio: "Archivo vacío",
+};
 
 /** Dónde se ve el documento ya guardado (la pestaña Compras, en Documentos). */
 const RUTA_COMPRAS = "/facturas?tab=compras";
 /** «Ver»: abre ESE documento en Compras › Documentos (sin id, solo Compras). */
 const rutaDocumento = (id: number | undefined) => (id ? `${RUTA_COMPRAS}&modo=documentos&doc=${id}` : RUTA_COMPRAS);
 
-/** Dorado de marca: solo para la acción principal de la pantalla. */
-const DORADO = "bg-[hsl(38,59%,45%)] text-white hover:bg-[hsl(38,59%,38%)] focus-visible:ring-[hsl(38,59%,45%)]";
+/**
+ * Dorado de marca: solo para la acción principal de la pantalla. Oscurecido a
+ * 34 % de luminosidad (05/11/2026): con texto blanco da 5,3:1 (el de 45 %
+ * daba 3,3:1, por debajo del 4,5:1 de WCAG AA).
+ */
+const DORADO = "bg-[hsl(38,59%,34%)] text-white hover:bg-[hsl(38,59%,28%)] focus-visible:ring-[hsl(38,59%,34%)]";
 
 /**
  * Pestaña «Cargar» de Facturas. Solo ENSEÑA la cola global
@@ -43,15 +64,25 @@ const DORADO = "bg-[hsl(38,59%,45%)] text-white hover:bg-[hsl(38,59%,38%)] focus
  * exterior, filas con separador fino y el dorado solo en «Enviar». Ocupa el
  * alto que le da la página (sin scroll de página): zona de subida, barra y
  * botones fijos; la lista hace scroll por dentro.
+ *
+ * Permisos (06/11/2026): la ve quien tiene «Facturas · Subida» o «Editar». Quien
+ * consulta Compras («Ver») abre lo subido allí («Ver»); quien solo sube lo
+ * corrige aquí mismo («Corregir», CorregirDocumentoDialog), y solo lo suyo.
  */
 export function SubidaFacturas() {
   const { cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina } = useColaSubida();
+  const permisos = usePermisosFacturas();
+  const [corrigiendo, setCorrigiendo] = useState<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Segundo input solo para la cámara de la tablet/móvil (`capture`): abre la
   // cámara directamente en vez del selector de archivos.
   const camaraInputRef = useRef<HTMLInputElement>(null);
-  const [decision, setDecision] = useState<DecisionDuplicado | null>(null);
+  const { decision, setDecision, cancelar, dejar, confirmar: confirmarDecision } = useDecisionDuplicado({
+    sustituir,
+    anadirPagina,
+    descartar: descartarPendiente,
+  });
   /** Fotos marcadas para unirlas como UN documento. */
   const [marcados, setMarcados] = useState<Set<string>>(() => new Set());
 
@@ -59,7 +90,11 @@ export function SubidaFacturas() {
   const seleccionados = elementos.filter((e) => e.fase === "seleccionado");
   const resto = ordenarPorGravedad(elementos.filter((e) => e.fase !== "seleccionado"));
   const terminados = elementos.filter((e) => e.fase === "terminado");
-  const fallidosConFichero = terminados.filter((e) => !e.resultado?.success && e.file);
+  const reintentables = terminados.filter(puedeReintentar);
+  const cancelarEnvio = async (e: ElementoCola) => {
+    const r = await cola.cancelar(e.id);
+    if (r.ok === false) toast.error(`No se ha cancelado ${e.nombre}`, { description: r.motivo, position: POSICION_AVISOS });
+  };
   const progreso = progresoTanda(estado);
   const hayLista = elementos.length > 0 || pendientes.length > 0;
   const compacta = hayLista; // con algo en la cola, la zona de subida es una fila ligera
@@ -69,21 +104,11 @@ export function SubidaFacturas() {
     // Se copia la lista ANTES de vaciar el input: `files` es una referencia viva.
     const { rechazados } = cola.añadirArchivos(Array.from(files));
     for (const r of rechazados) {
-      toast.error(r.motivo.includes("10MB") ? "Archivo demasiado grande" : "Tipo de archivo no permitido", {
-        description: `El archivo ${r.nombre} ${r.motivo}`,
-      });
+      toast.error(TITULO_RECHAZO[r.causa], { description: `El archivo ${r.nombre} ${r.motivo}`, position: POSICION_AVISOS });
     }
     // Limpiar los inputs (permite volver a elegir el mismo archivo).
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (camaraInputRef.current) camaraInputRef.current.value = "";
-  };
-
-  // Los errores los enseña el propio diálogo (se queda abierto con el motivo).
-  const confirmarDecision = async (esperado: Esperado) => {
-    if (!decision) return;
-    if (decision.tipo === "sustituir") await sustituir(decision.s, esperado);
-    else await anadirPagina(decision.a, esperado);
-    setDecision(null);
   };
 
   const marcables = seleccionados.filter((e) => e.fotos || claseFichero(e) === "imagen");
@@ -299,7 +324,15 @@ export function SubidaFacturas() {
               <h3 className="text-xs font-medium text-muted-foreground">Enviados</h3>
               <ul className="divide-y divide-border/60">
                 {resto.map((e) => (
-                  <FilaEnviado key={e.id} e={e} onReintentar={() => cola.reintentar(e.id)} />
+                  <FilaEnviado
+                    key={e.id}
+                    e={e}
+                    consultar={permisos.consultar}
+                    onReintentar={() => cola.reintentar(e.id)}
+                    onVolverASubir={() => cola.volverASubir(e.id)}
+                    onCancelar={() => void cancelarEnvio(e)}
+                    onCorregir={setCorrigiendo}
+                  />
                 ))}
               </ul>
             </section>
@@ -316,7 +349,7 @@ export function SubidaFacturas() {
               Enviar {seleccionados.length} documento{seleccionados.length !== 1 ? "s" : ""}
             </Button>
           )}
-          {fallidosConFichero.length > 0 && (
+          {reintentables.length > 0 && (
             <Button variant="ghost" onClick={() => cola.reintentar()} className="h-11 flex-1 text-muted-foreground hover:text-foreground">
               Reintentar fallidos
             </Button>
@@ -330,9 +363,11 @@ export function SubidaFacturas() {
       )}
       <SustituirFacturaDialog
         decision={decision}
-        onCancelar={() => setDecision(null)}
+        onCancelar={cancelar}
+        onDejar={dejar}
         onConfirmar={confirmarDecision}
       />
+      {!permisos.consultar && <CorregirDocumentoDialog facturaId={corrigiendo} onCerrar={() => setCorrigiendo(null)} />}
     </div>
   );
 }
@@ -397,24 +432,25 @@ function PaginasGrupo({
               <ImageIcon className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
             )}
             <span className="px-0.5 text-xs font-medium">Pág. {i + 1}</span>
-            <span className="flex flex-col">
+            {/* Objetivo táctil de 44 × 44 px (antes 18 px: imposible con el dedo). */}
+            <span className="flex">
               <button
                 type="button"
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
                 disabled={i === 0}
                 onClick={() => onMover(i, i - 1)}
                 aria-label={`Subir la página ${i + 1} (${f.name})`}
               >
-                <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 type="button"
-                className="rounded p-0.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-30"
                 disabled={i === fotos.length - 1}
                 onClick={() => onMover(i, i + 1)}
                 aria-label={`Bajar la página ${i + 1} (${f.name})`}
               >
-                <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
               </button>
             </span>
           </li>
@@ -445,55 +481,89 @@ function SeccionPendientes({
       </h3>
       <ul className="divide-y divide-border/60">
         {pendientes.map((p) => (
-          <li key={p.trabajoId} className="space-y-2 py-3">
-            <p className="text-sm">
-              <span className="font-medium">{p.nombre}</span>
-              {p.anadible ? (
-                <span className="block text-xs text-muted-foreground">
-                  Es la página {p.anadible.pagina.actual} de {p.anadible.pagina.total} de la factura{" "}
-                  {p.anadible.existente.numero_documento}, que ya existe con {p.anadible.existente.lineas} líneas. Añádela
-                  para completarla (no se borra nada).
-                </span>
-              ) : p.sustituible ? (
-                <span className="block text-xs text-muted-foreground">
-                  Ya existe la factura {p.sustituible.existente.numero_documento} ({p.sustituible.existente.lineas} líneas):
-                  no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.
-                </span>
-              ) : null}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {p.anadible ? (
-                <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
-                  <FilePlus2 className="h-4 w-4" aria-hidden="true" />
-                  Añadir como página {p.anadible.pagina.actual} a la factura {p.anadible.existente.numero_documento}
-                </Button>
-              ) : (
-                <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
-                  <Replace className="h-4 w-4" aria-hidden="true" />
-                  Sustituir la existente
-                </Button>
-              )}
-              {p.sustituible?.existente?.id ? (
-                <div className="min-w-0">
-                  <FotoExistente id={p.sustituible.existente.id} />
-                </div>
-              ) : null}
-              <Button type="button" variant="ghost" className="h-11 text-muted-foreground hover:text-foreground" onClick={() => onDescartar(p)}>
-                Dejar la que hay
-              </Button>
-            </div>
-          </li>
+          <FilaPendiente key={p.trabajoId} p={p} onDecidir={onDecidir} onDescartar={onDescartar} />
         ))}
       </ul>
     </section>
   );
 }
 
-function IconoEstado({ nivel, fase }: { nivel: NivelFila; fase: ElementoCola["fase"] }) {
+function FilaPendiente({
+  p,
+  onDecidir,
+  onDescartar,
+}: {
+  p: PendienteDecidir;
+  onDecidir: (p: PendienteDecidir) => void;
+  onDescartar: (p: PendienteDecidir) => void;
+}) {
+  // Sustituir o añadir página cambia una factura (QA C-09): con «Editar», cualquiera;
+  // con «Facturas · Subida», solo si la que ya existe la subió él (06/11/2026).
+  // «Dejar la que hay» / «No añadirla» descarta lo suyo: siempre.
+  const existenteId = (p.anadible ?? p.sustituible)?.existente?.id ?? null;
+  const { puede: puedeCambiarla, comprobando } = useCorreccionDocumento(existenteId);
+  const { consultar } = usePermisosFacturas();
+  return (
+    <li className="space-y-2 py-3">
+      <p className="text-sm">
+        <span className="font-medium">{p.nombre}</span>
+        {p.anadible ? (
+          <span className="block text-xs text-muted-foreground">
+            Es la página {p.anadible.pagina.actual} de {p.anadible.pagina.total} de la factura{" "}
+            {p.anadible.existente.numero_documento}, que ya existe con {p.anadible.existente.lineas} líneas. Añádela
+            para completarla (no se borra nada).
+          </span>
+        ) : p.sustituible ? (
+          <span className="block text-xs text-muted-foreground">
+            Ya existe la factura {p.sustituible.existente.numero_documento} ({p.sustituible.existente.lineas} líneas):
+            no se ha creado otra. Si la que hay está mal leída, puedes sustituirla por este documento.
+          </span>
+        ) : null}
+        {!puedeCambiarla && !comprobando && (
+          <span className="block text-xs text-muted-foreground">
+            La que ya existe la subió otra persona: sustituirla o completarla lo hace quien tiene «Editar» en Facturas.
+          </span>
+        )}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {!puedeCambiarla ? null : p.anadible ? (
+          <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
+            <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+            Añadir como página {p.anadible.pagina.actual} a la factura {p.anadible.existente.numero_documento}
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" className="h-11 gap-2" onClick={() => onDecidir(p)}>
+            <Replace className="h-4 w-4" aria-hidden="true" />
+            Sustituir la existente
+          </Button>
+        )}
+        {/* La foto de la que ya está: de quien consulta Facturas, o si es suya. */}
+        {p.sustituible?.existente?.id && (consultar || puedeCambiarla) ? (
+          <div className="min-w-0">
+            <FotoExistente id={p.sustituible.existente.id} />
+          </div>
+        ) : null}
+        <Button type="button" variant="ghost" className="h-11 text-muted-foreground hover:text-foreground" onClick={() => onDescartar(p)}>
+          {/* Una página suelta no «deja» nada: se decide no añadirla. */}
+          {p.anadible ? "No añadirla" : "Dejar la que hay"}
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function IconoEstado({ nivel, e }: { nivel: NivelFila; e: ElementoCola }) {
   const base = "mt-0.5 h-4 w-4 shrink-0";
+  const r = e.resultado;
+  // Guardado pero SIN original: en rojo (hay que guardar una copia a mano).
+  if (r?.success && r.archivoGuardado === false) return <XCircle className={cn(base, "text-destructive")} aria-hidden="true" />;
+  // Sigue (o se quedó parado) en el servidor: reloj, no rojo.
+  if (e.lento || (r && !r.success && (r.sigueEnServidor || r.parado))) {
+    return <Clock className={cn(base, "text-amber-600 dark:text-amber-400")} aria-hidden="true" />;
+  }
   switch (nivel) {
     case "marcha":
-      return fase === "en_cola" ? (
+      return e.fase === "en_cola" ? (
         <Clock className={cn(base, "text-muted-foreground")} aria-hidden="true" />
       ) : (
         <Loader2 className={cn(base, "text-muted-foreground motion-safe:animate-spin")} aria-hidden="true" />
@@ -511,20 +581,46 @@ function IconoEstado({ nivel, fase }: { nivel: NivelFila; fase: ElementoCola["fa
   }
 }
 
-/** Un documento enviado: icono de estado, nombre (+ tipo), UNA línea de estado y su acción. */
-function FilaEnviado({ e, onReintentar }: { e: ElementoCola; onReintentar: () => void }) {
+/**
+ * Un documento enviado: icono de estado, nombre (+ tipo), UNA línea de estado
+ * y sus acciones: «Reintentar» (si ya tiene trabajo en el servidor, reanuda
+ * ESE trabajo), «Volver a subir» (el servidor ya no tiene sus ficheros),
+ * cancelar mientras está en marcha y, al terminar, «Ver» (en Compras, para quien
+ * la consulta) o «Corregir» (aquí, para quien solo sube; no en un repetido, que
+ * es el documento que ya estaba).
+ */
+function FilaEnviado({
+  e,
+  consultar,
+  onReintentar,
+  onVolverASubir,
+  onCancelar,
+  onCorregir,
+}: {
+  e: ElementoCola;
+  /** Consulta Compras («Ver» o «Editar» en Facturas). */
+  consultar: boolean;
+  onReintentar: () => void;
+  onVolverASubir: () => void;
+  onCancelar: () => void;
+  onCorregir: (facturaId: number) => void;
+}) {
   const r = e.resultado;
   const linea = lineaEstado(e);
   const tipo = r?.success ? tipoDocumento(r) : null;
+  const sinOriginal = !!r?.success && r.archivoGuardado === false;
+  const enServidor = !!r && !r.success && (r.parado || r.sigueEnServidor);
+  // En marcha (menos el camino síncrono) o parado en el servidor: se puede cancelar / quitar.
+  const cancelable = (e.fase !== "terminado" && puedeCancelar(e)) || (enServidor && !!e.trabajoId);
   return (
     <li data-nivel={linea.nivel} className="flex items-start gap-3 py-2.5">
-      <IconoEstado nivel={linea.nivel} fase={e.fase} />
+      <IconoEstado nivel={linea.nivel} e={e} />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span className="min-w-0 truncate text-sm font-medium">{e.nombre}</span>
           {tipo && <span className="shrink-0 text-xs text-muted-foreground">{ETIQUETA_TIPO[tipo]}</span>}
         </div>
-        <p className="break-words text-xs text-muted-foreground">
+        <p className={cn("break-words text-xs", sinOriginal ? "font-medium text-destructive" : "text-muted-foreground")}>
           {linea.texto}
           {/* Lo que costó leerlo (también si resultó duplicado: la lectura se pagó igual). */}
           {r?.success && r.costeUsd !== undefined && (
@@ -535,7 +631,7 @@ function FilaEnviado({ e, onReintentar }: { e: ElementoCola; onReintentar: () =>
           )}
         </p>
       </div>
-      {r && !r.success && e.file && (
+      {puedeReintentar(e) && (
         <Button
           type="button"
           variant="ghost"
@@ -547,7 +643,32 @@ function FilaEnviado({ e, onReintentar }: { e: ElementoCola; onReintentar: () =>
           Reintentar
         </Button>
       )}
-      {r?.success && (
+      {puedeVolverASubir(e) && (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11 shrink-0 gap-1.5 px-3 text-muted-foreground hover:text-foreground"
+          onClick={onVolverASubir}
+          aria-label={`Volver a subir ${e.nombre}`}
+        >
+          <Upload className="h-4 w-4" aria-hidden="true" />
+          Volver a subir
+        </Button>
+      )}
+      {cancelable && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-11 w-11 shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={onCancelar}
+          aria-label={e.fase === "terminado" ? `Quitar ${e.nombre} del servidor` : `Cancelar ${e.nombre}`}
+          title={e.fase === "terminado" ? "Quitar (se descarta en el servidor)" : "Cancelar el envío"}
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      )}
+      {r?.success && consultar && (
         <Link
           to={rutaDocumento(r.facturaId)}
           aria-label={`Ver ${e.nombre}`}
@@ -556,6 +677,18 @@ function FilaEnviado({ e, onReintentar }: { e: ElementoCola; onReintentar: () =>
           Ver
         </Link>
       )}
+      {r?.success && !consultar && !r.duplicado && r.facturaId ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className="h-11 shrink-0 gap-1.5 px-3 text-sm font-medium"
+          onClick={() => onCorregir(r.facturaId!)}
+          aria-label={`Corregir ${e.nombre}`}
+        >
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+          Corregir
+        </Button>
+      ) : null}
     </li>
   );
 }

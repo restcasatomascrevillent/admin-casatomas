@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Json, Tables } from "@/integrations/supabase/types";
 import { notificarGuardadoYPublicacion } from "@/lib/rebuild-webs";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { HORARIO_POR_DEFECTO, leerHorario, resumenHorario, type HorarioWeb } from "@/lib/horario-web";
 
 export type ConfiguracionWeb = Tables<"configuracion_web">;
 
@@ -140,6 +141,26 @@ export function useConfiguracionWeb() {
     onSettled: () => { queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }); },
   });
 
+  // Días y horas de cada botón (20261104142000). La web lo lee al vuelo (cada
+  // minuto): no hace falta republicarla. `null` = volver a lo de siempre.
+  const cambiarHorarioMenuTapas = useMutation({
+    mutationFn: async ({ boton, horario }: { boton: BotonMenuTapas; horario: HorarioWeb | null }) => {
+      const { error } = await supabase.rpc("configuracion_web_horario_menu_tapas", {
+        p_seccion: boton,
+        p_horario: horario as unknown as Json,
+      });
+      if (error) throw error;
+    },
+    onSuccess: (_data, { boton, horario }) => {
+      const nombre = boton === "menu" ? "Menú del día" : "Tapas";
+      toast.success(`Horario de «${nombre}» guardado`, {
+        description: `${resumenHorario(horario ?? HORARIO_POR_DEFECTO[boton])}. La web lo aplica en un minuto.`,
+      });
+    },
+    onError: (error: Error) => toast.error("No se pudo guardar el horario", { description: mensajeUsuario(error) }),
+    onSettled: () => { queryClient.invalidateQueries({ queryKey: QUERY_KEY_CONFIGURACION_WEB }); },
+  });
+
   return {
     config,
     /** Por defecto (sin fila o sin tabla) las fotos se ven: es lo que hacen las webs. */
@@ -158,5 +179,12 @@ export function useConfiguracionWeb() {
     botonesMenuTapasDisponibles: typeof config?.mostrar_menu_dia_casa_tomas === "boolean"
       && typeof config?.mostrar_tapas_casa_tomas === "boolean",
     cambiarBotonMenuTapas,
+    horariosMenuTapas: {
+      menu: leerHorario(config?.horario_menu_dia_casa_tomas, "menu"),
+      tapas: leerHorario(config?.horario_tapas_casa_tomas, "tapas"),
+    } satisfies Record<BotonMenuTapas, HorarioWeb>,
+    /** La columna existe (migración aplicada): `undefined` si no, `null` si está sin guardar. */
+    horariosDisponibles: config !== null && config.horario_menu_dia_casa_tomas !== undefined,
+    cambiarHorarioMenuTapas,
   };
 }

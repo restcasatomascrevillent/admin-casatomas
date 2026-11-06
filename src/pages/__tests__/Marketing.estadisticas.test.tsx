@@ -10,6 +10,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 
 vi.mock("@/components/DashboardLayout", () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock("@/hooks/useAlturaDisponible", () => ({ useAlturaDisponible: () => 640 }));
+// Con «Editar» en Newsletter (lo de solo «Ver» está en Marketing.permisos.test.tsx).
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
 vi.mock("@/components/marketing/CreadorNewsletter", () => ({ CreadorNewsletter: () => <p>Creador de prueba</p> }));
 vi.mock("@/components/marketing/GestionCorreos", () => ({ GestionCorreos: () => <p>Suscriptores de prueba</p> }));
 vi.mock("@/components/marketing/HistorialEnvios", () => ({ HistorialEnvios: () => <section>Historial de prueba</section> }));

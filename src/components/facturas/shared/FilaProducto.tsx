@@ -1,12 +1,30 @@
 import { useState, type ReactNode } from "react";
-import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura, type Factura } from "@/hooks/useFacturas";
+import { useUpdateProductoFactura, useCrearProductoFactura, type ProductoFactura } from "@/hooks/useFacturas";
 import { Input } from "@/components/ui/input";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { AyudaPopover } from "@/components/AyudaPopover";
 import { Button } from "@/components/ui/button";
 import { Pencil, AlertCircle, Check, X } from "lucide-react";
-import { formatCantidadLinea, formatCurrency, formatNumero } from "./formatters";
+import { formatCantidadLinea, formatImporte, formatNumero, precioAnomalo, valorSinDescuento } from "./formatters";
 import { normalizarUnidadFactura } from "./unidad";
+import { esLineaRegalo } from "@/lib/facturas/resumenCompras";
+
+/** «Regalo»: la línea no se cobró (importe 0) pero vale algo (`importe_bruto`). */
+const InsigniaRegalo = () => (
+  <span className="inline-flex h-6 shrink-0 items-center rounded-md border border-emerald-300 bg-emerald-50 px-1.5 text-xs font-medium text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+    Regalo
+  </span>
+);
+
+/** «Valor sin descuento …» a la vista y su explicación en un popover táctil (no en `title`). */
+const ValorSinDescuento = ({ v, className = "" }: { v: { texto: string; titulo: string }; className?: string }) => (
+  <span className={`inline-flex items-center gap-1 ${className}`}>
+    <span>{v.texto}</span>
+    <AyudaPopover etiqueta="Qué es el valor sin descuento" className="-my-3.5 ml-0 mr-0 h-11 w-11">
+      {v.titulo}
+    </AyudaPopover>
+  </span>
+);
 
 /**
  * Categoría del producto de la línea (catálogo de Facturas › Productos). Solo
@@ -15,7 +33,7 @@ import { normalizarUnidadFactura } from "./unidad";
 export const EtiquetaCategoria = ({ p }: { p: ProductoFactura }) =>
   p.categoria ? (
     <span
-      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-[11px] pointer-coarse:text-xs font-normal leading-none text-muted-foreground"
+      className="inline-flex max-w-[11rem] shrink-0 items-center truncate rounded-full border border-border/60 bg-muted/50 px-2 py-0.5 text-xs font-normal leading-none text-muted-foreground"
       title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}
     >
       {p.categoria.nombre}
@@ -42,7 +60,7 @@ const NombreLinea = ({
     <button
       type="button"
       onClick={() => onAbrirProducto(p.producto_id as number)}
-      className={`${compacto ? "relative before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-['']" : "min-h-11"} min-w-0 rounded-md text-left font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${className}`}
+      className={`${compacto ? "relative before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']" : "min-h-11"} min-w-0 rounded-md text-left font-medium underline decoration-dotted underline-offset-2 hover:decoration-solid focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${className}`}
       aria-label={`Ver el producto ${p.producto_canonico ?? p.producto_nombre}`}
       title="Ver el producto: evolución del precio y dónde más aparece"
     >
@@ -57,20 +75,30 @@ const NombreLinea = ({
 export const FilaProducto = ({
   p,
   isMobile,
-  allDocs,
+  mediaReferencia,
   onAbrirProducto,
   nuevaEnFacturaId,
   onCerrarNueva,
+  editable = false,
 }: {
   p: ProductoFactura;
   isMobile?: boolean;
-  allDocs: Factura[];
+  /**
+   * Media de referencia del precio unitario (otras líneas del mismo producto y
+   * proveedor; ver `indicePreciosLinea`). Sin ella no se avisa de nada.
+   */
+  mediaReferencia?: number;
   /** Si se pasa, el nombre de la línea enlaza con la ficha de su producto. */
   onAbrirProducto?: (productoId: number) => void;
   /** Modo «línea nueva»: `p` va vacío, se abre el formulario y Guardar crea la línea en ese documento. */
   nuevaEnFacturaId?: number;
   /** En modo «línea nueva»: se llama al guardar o cancelar. */
   onCerrarNueva?: () => void;
+  /**
+   * Se puede corregir (el lápiz): «Editar» en Facturas, o «Facturas · Subida» si el
+   * documento es suyo (06/11/2026). Sin él, el lápiz no sale. Por defecto, no.
+   */
+  editable?: boolean;
 }) => {
   const esNueva = nuevaEnFacturaId != null;
   const [isEditing, setIsEditing] = useState(esNueva);
@@ -115,21 +143,19 @@ export const FilaProducto = ({
     }
   };
 
-  const pastPrices = allDocs
-    .flatMap(f => f.productos)
-    .filter(past => past.id !== p.id && past.producto_nombre.toLowerCase() === p.producto_nombre.toLowerCase() && typeof past.precio_unitario === 'number')
-    .map(past => past.precio_unitario as number);
-
-  const avgPrice = pastPrices.length > 0 ? pastPrices.reduce((a, b) => a + b, 0) / pastPrices.length : undefined;
-
-  // Warning si el precio unitario cambia drásticamente respecto al último histórico (+100%)
-  const hasAnomaly = avgPrice && p.precio_unitario && (p.precio_unitario > avgPrice * 2);
-  const showAnomalyWarning = isEditing ? (avgPrice && Number(precioUnitario) > avgPrice * 2) : hasAnomaly;
+  // Aviso si el precio unitario pasa del doble de la media de referencia (mismo
+  // proveedor y nombre, sin precios a 0; la calcula quien monta la fila con
+  // `indicePreciosLinea`, una sola vez para todas las líneas).
+  const avgPrice = mediaReferencia;
+  const hasAnomaly = precioAnomalo(p.precio_unitario, avgPrice);
+  const sinDescuento = valorSinDescuento(p);
+  const regalo = esLineaRegalo(p);
+  const showAnomalyWarning = isEditing ? precioAnomalo(precioUnitario === "" ? null : Number(precioUnitario), avgPrice) : hasAnomaly;
 
   if (isMobile) {
     if (isEditing) {
       return (
-        <div className="flex flex-col gap-2 text-xs bg-muted/30 p-2 rounded-md border border-border/40 shadow-sm relative">
+        <div className="relative my-1 flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 p-3 text-xs">
           <Input className="h-11 text-base md:text-base" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre del producto" aria-label="Nombre del producto" />
           <div className="flex gap-2">
             <Input className="h-11 w-full text-base md:text-base" type="number" inputMode="decimal" value={cantidad} onChange={(e) => setCantidad(e.target.value)} placeholder="Cant" aria-label="Cantidad" />
@@ -152,38 +178,51 @@ export const FilaProducto = ({
       );
     }
 
+    // Columnas (dentro de un contenedor con `container-type: inline-size`, la sección
+    // «Líneas» de la ficha): desde 30rem, Producto · Cantidad · Precio · Importe · lápiz,
+    // alineadas con la cabecera de la tabla; por debajo, nombre + importe y en gris
+    // «cantidad × precio · categoría». El lápiz va a la derecha: con puntero solo
+    // aparece al pasar por encima (o con el foco); en táctil se ve siempre.
     return (
-      // Fila plana con separador fino, dos líneas: nombre + importe, y debajo en gris
-      // «cantidad × precio · categoría». El lápiz va a la derecha: con puntero solo
-      // aparece al pasar por encima (o con el foco); en táctil se ve siempre.
-      <div className="group/prod flex items-start gap-1 border-b border-border/50 py-1.5 text-xs last:border-b-0">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
-            <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums text-foreground">
-              {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
-              {formatCurrency(p.precio)}
-            </span>
-          </div>
+      <div
+        className={`group/prod grid grid-cols-[minmax(0,1fr)_auto_2.75rem] items-center gap-x-3 border-b border-border/50 py-1.5 text-xs last:border-b-0 hover:bg-muted/20 [@container(min-width:30rem)]:grid-cols-[minmax(0,1fr)_5.5rem_6.5rem_7rem_2.75rem]`}
+      >
+        <div className="min-w-0">
+          <NombreLinea p={p} onAbrirProducto={onAbrirProducto} compacto className="min-w-0 break-words text-sm font-medium text-foreground" />
           <p className="text-muted-foreground">
-            {formatCantidadLinea(p)} × {formatCurrency(p.precio_unitario ?? null)}
-            {p.categoria && (
-              <>
-                {" · "}
-                <span title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}>{p.categoria.nombre}</span>
-              </>
-            )}
+            <span className={`[@container(min-width:30rem)]:hidden`}>
+              {formatCantidadLinea(p)} × {formatImporte(p.precio_unitario ?? null)}
+              {p.categoria && " · "}
+            </span>
+            {p.categoria && <span title={`${p.categoria.ruta}${p.producto_canonico ? ` · ${p.producto_canonico}` : ""}`}>{p.categoria.nombre}</span>}
           </p>
+          {sinDescuento && (
+            <p className="text-muted-foreground">
+              <ValorSinDescuento v={sinDescuento} />
+            </p>
+          )}
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="-my-1.5 h-11 w-11 shrink-0 text-muted-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prod:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
-          onClick={() => setIsEditing(true)}
-          aria-label={`Editar ${p.producto_nombre}`}
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <span className={`hidden text-right text-sm tabular-nums text-muted-foreground [@container(min-width:30rem)]:block`}>{formatCantidadLinea(p)}</span>
+        <span className={`hidden text-right text-sm tabular-nums text-muted-foreground [@container(min-width:30rem)]:block`}>{formatImporte(p.precio_unitario ?? null)}</span>
+        <span className="flex items-center justify-end gap-1.5 whitespace-nowrap text-sm font-semibold tabular-nums text-foreground">
+          {regalo && <InsigniaRegalo />}
+          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-600" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatImporte(avgPrice ?? null)})</AyudaPopover>}
+          {formatImporte(p.precio)}
+        </span>
+        {editable ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="-my-1.5 h-11 w-11 shrink-0 text-muted-foreground [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/prod:opacity-100 [@media(hover:hover)]:focus-visible:opacity-100"
+            onClick={() => setIsEditing(true)}
+            aria-label={`Editar ${p.producto_nombre}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : (
+          // Sin lápiz el hueco se queda: las columnas siguen alineadas con la cabecera.
+          <span aria-hidden="true" />
+        )}
       </div>
     );
   }
@@ -244,9 +283,11 @@ export const FilaProducto = ({
           segundo scroll horizontal dentro de la fila desplegada. */}
       <TableCell className="py-2.5 font-medium">
         <div className="flex min-w-0 items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
-            <Pencil className="h-4 w-4" />
-          </Button>
+          {editable && (
+            <Button variant="ghost" size="icon" className="h-11 w-11 shrink-0" onClick={() => setIsEditing(true)} aria-label={`Editar ${p.producto_nombre}`}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+          )}
           <NombreLinea p={p} onAbrirProducto={onAbrirProducto} className="truncate" />
           <EtiquetaCategoria p={p} />
         </div>
@@ -263,11 +304,21 @@ export const FilaProducto = ({
       </TableCell>
       <TableCell className="py-2.5 text-right text-muted-foreground tabular-nums whitespace-nowrap">
         <div className="flex items-center justify-end gap-1.5">
-          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Anomalía: media histórica {formatCurrency(avgPrice!)}</AyudaPopover>}
-          <span>{formatCurrency(p.precio_unitario ?? null)}</span>
+          {hasAnomaly && <AyudaPopover etiqueta="Anomalía de precio" icono={<AlertCircle className="h-4 w-4 text-orange-500" aria-hidden="true" />}>Más del doble de lo que suele cobrar este proveedor (media {formatImporte(avgPrice ?? null)})</AyudaPopover>}
+          <span>{formatImporte(p.precio_unitario ?? null)}</span>
         </div>
       </TableCell>
-      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">{formatCurrency(p.precio)}</TableCell>
+      <TableCell className="py-2.5 text-right font-semibold tabular-nums whitespace-nowrap text-foreground">
+        <span className="inline-flex items-center justify-end gap-1.5">
+          {regalo && <InsigniaRegalo />}
+          {formatImporte(p.precio)}
+        </span>
+        {sinDescuento && (
+          <span className="block whitespace-normal text-xs font-normal text-muted-foreground">
+            <ValorSinDescuento v={sinDescuento} className="justify-end" />
+          </span>
+        )}
+      </TableCell>
     </TableRow>
   );
 };

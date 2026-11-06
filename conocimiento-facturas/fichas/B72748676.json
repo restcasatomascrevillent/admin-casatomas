@@ -1,0 +1,95 @@
+{
+  "cif": "B72748676",
+  "nombre": "DISTRIBUCIONES GUTI E HIJOS, S.L.",
+  "nombres_impresos": ["DISTRIBUCIONES GUTI E HIJOS S.L", "Guti Productos Selectos"],
+  "categoria": "lacteos",
+  "locales": ["casa_tomas"],
+  "muestras": ["R116.pdf", "R271.pdf", "R856.pdf", "R1219.pdf", "R1458.pdf", "R1604.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega (cada factura recoge un único albarán, normalmente 1-2 líneas)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["B 63", "B 200", "B 770", "B 1106", "B 1279", "B 1436"],
+      "patron": "^B\\s?\\d{1,5}$",
+      "donde": "recuadro 'Factura' arriba a la izquierda: letra de serie B y número secuencial a su derecha"
+    },
+    "fecha": "recuadro 'Fecha' junto al número, DD/MM/AAAA",
+    "albaranes": "dentro de la tabla, antes de las líneas: 'Albarán: 80 de Fecha: 21/01/2026' (puede escribirse 1.315 con punto de millar)"
+  },
+
+  "lectura": {
+    "columnas": ["Artículo", "Descripción", "Cantidad", "KILOS", "Precio", "%Dto", "Total"],
+    "cantidad_es": "piezas (cuñas/trozos); NO es lo que se cobra",
+    "columna_peso": "KILOS (peso real total de las piezas; coincide con 'Cantidad:' de la línea de Lote)",
+    "precio_es_por": "kg",
+    "descuento_por_linea": { "existe": true, "columna": "%Dto", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": [],
+    "trampas": [
+      "El total de la línea es KILOS x Precio, no Cantidad x Precio (p. ej. 4,73 kg x 114,75 = 542,77 con Cantidad 1,00).",
+      "Debajo de cada línea hay 'Lote num. XXXX Cantidad: N,NN': ese N,NN son los kilos, no es otra línea.",
+      "El IVA va en el pie: 4 % para los quesos y 10 % para la cecina de wagyu; una factura trae un solo tipo cuando solo hay un tipo de producto.",
+      "El número '383' pequeño bajo el recuadro del cliente no es el número de factura.",
+      "La caja BRUTO del pie repite la base cuando no hay descuentos; las demás casillas del pie (dto, recargo, portes) van vacías.",
+      "El cliente aparece como 'RESTAURANTE CASA TOMAS / MASIDE 2011, S.L.' CIF B54583356."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = KILOS x precio x (1 - dto/100)  (comprobado: 2,80 x 24,64 = 68,99; 3,18 x 21,93 = 69,74)",
+    "bruto = base imponible = suma de totales de línea",
+    "cuota_iva = base x iva% (p. ej. 138,73 x 4 % = 5,55; 542,77 x 10 % = 54,28)",
+    "total = base + cuota_iva (p. ej. 142,72 + 5,71 = 148,43; 542,77 + 54,28 = 597,05)"
+  ],
+
+  "guia_ocr": "Escaneo de factura Guti (quesos y cecina). Número: recuadro Factura arriba izquierda, letra B + número. Fecha: recuadro Fecha, DD/MM/AAAA. Columnas: Cantidad = piezas, KILOS = peso, Precio = €/kg, %Dto, Total = KILOS x Precio. Ignora la línea 'Lote num. … Cantidad:' (solo repite los kilos). Albarán y su fecha van encima de las líneas. Pie: BRUTO, B. Imponible, %Iva (4 quesos, 10 cecina), Importe IVA, TOTAL, y forma de pago '30 días vista' con vencimiento. Cliente: Maside 2011, B54583356.",
+
+  "productos": [
+    {
+      "nombre_impreso": "QUESO ADIANO MANCHEGO CURADO ARTESANO (QUEA02)",
+      "nombre_normalizado": "Queso manchego curado artesano (Adiano)",
+      "familia": "queso",
+      "presentacion": "curado, artesano, pieza/cuña vendida a peso",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 24.64, "max": 24.65, "por": "kg", "ejemplos": [["2026-02-23", 24.65], ["2026-05-30", 24.64], ["2026-07-27", 24.64], ["2026-08-24", 24.64], ["2026-09-21", 24.64]] },
+      "iva_pct": 4,
+      "veces_visto": 5
+    },
+    {
+      "nombre_impreso": "QUESO ADIANO MANCHEGO SEMICURADO ARTESANO (QUEA01)",
+      "nombre_normalizado": "Queso manchego semicurado artesano (Adiano)",
+      "familia": "queso",
+      "presentacion": "semicurado, artesano, pieza/cuña vendida a peso",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 21.93, "max": 21.93, "por": "kg", "ejemplos": [["2026-05-30", 21.93]] },
+      "iva_pct": 4,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "CECINA DE WAGYU (SIN LIMPIAR) (CECI005)",
+      "nombre_normalizado": "Cecina de wagyu, sin limpiar",
+      "familia": "cecina/curado",
+      "presentacion": "curada, sin limpiar, pieza entera vendida a peso",
+      "formato": { "envase": "pieza", "contenido": null, "unidad_contenido": "kg", "unidades_por_bulto": null, "bulto": "pieza" },
+      "unidad_factura": "kg",
+      "precio": { "min": 114.75, "max": 114.75, "por": "kg", "ejemplos": [["2026-01-26", 114.75]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "Solo escaneos: 13 PDF en el año y 6 vistos; puede haber más artículos (otros quesos, otras cecinas).",
+    "No se sabe el peso medio de cada pieza (los kilos varían: ~1,4-1,5 kg por pieza de queso curado).",
+    "No hay ejemplos con descuento por línea: la columna %Dto va vacía en todas las muestras.",
+    "El IVA del pie puede tener dos filas si una factura mezcla quesos (4 %) y cecina (10 %); no se ha visto un caso."
+  ]
+}

@@ -1,0 +1,63 @@
+{
+ "archivo": "R222.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "EL CAPRICHO DE LOREN SL",
+ "cif": "B09707274",
+ "local": "casa_tomas",
+ "numero_documento": "F26 - 76",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GILDA TRADICIONAL BANDEJA 18 UDS.",
+   "producto_ficha": "Gilda tradicional (bandeja de 18 uds)",
+   "cantidad": 8.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": 18,
+   "contenido_unidad": "ud",
+   "precio_unitario": 22.91,
+   "descuento_pct": 35,
+   "total": 119.13,
+   "iva_pct": 10,
+   "albaran_ref": "2600120",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "GILDA TRADICIONAL BANDEJA 18 UDS.",
+   "producto_ficha": "Gilda tradicional (bandeja de 18 uds)",
+   "cantidad": 8.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": 18,
+   "contenido_unidad": "ud",
+   "precio_unitario": 22.91,
+   "descuento_pct": 35,
+   "total": 119.13,
+   "iva_pct": 10,
+   "albaran_ref": "2600180",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 238.26,
+ "desglose_iva": [
+  {
+   "base": 238.26,
+   "pct": 10,
+   "cuota": 23.83
+  }
+ ],
+ "iva": 23.83,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 262.09,
+ "observaciones": "Factura mensual que agrupa los albaranes 2600120, 2600180. Cliente 130 (Restaurante Casa Tomás). Forma de pago: giro a 12 días. Suma bruta 366,56 €, dtos. lineales 128,30 €. El código TBAI del pie no es producto.",
+ "alertas": []
+}

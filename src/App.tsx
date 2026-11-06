@@ -10,7 +10,6 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 import type { SectionKey } from "@/hooks/useUserRole";
 import { SuperAdminProvider } from "@/hooks/useSuperAdmin";
-import { AvisoTrabajosVideo } from "@/components/carta/potente/AvisoTrabajosVideo";
 import { GestorRecortes } from "@/components/carta/recorte/GestorRecortes";
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars";
 import { ColaSubidaProvider } from "@/components/facturas/ColaSubidaProvider";
@@ -27,12 +26,15 @@ const Ecommerce = lazy(() => import("./pages/Ecommerce"));
 const GestionWeb = lazy(() => import("./pages/GestorWeb"));
 const AsistenteTelefonico = lazy(() => import("./pages/AsistenteTelefonico"));
 const Marketing = lazy(() => import("./pages/Marketing"));
+const Instagram = lazy(() => import("./pages/Instagram"));
+const InstagramRapido = lazy(() => import("./pages/InstagramRapido"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(() => import("./pages/Cheques"));
 const Tienda = lazy(() => import("./pages/Tienda"));
 const Facturas = lazy(() => import("./pages/Facturas"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
+const Avisos = lazy(() => import("./pages/Avisos"));
 const GestorGasto = lazy(() => import("./pages/GestorGasto"));
 const GestionResenas = lazy(() => import("./pages/GestionResenas"));
 const TraficoWeb = lazy(() => import("./pages/TraficoWeb"));
@@ -107,9 +109,8 @@ const App = () => (
               <ColaSubidaProvider>
               {/* Cola de «Vídeo del plato»: se procesa en segundo plano y se guarda sola (01-11-2026). */}
               <ColaVideosProvider>
-              {/* «Hay N vídeo(s) pendiente(s)…» de otros dispositivos: solo en los potentes; los
-                  mete en la cola de arriba (docs/video-dispositivo-potente.md). */}
-              <AvisoTrabajosVideo />
+              {/* El aviso «Hay N vídeo(s) pendiente(s)…» (AvisoTrabajosVideo) se quitó el
+                  06/11/2026 a petición del dueño, igual que el de las fotos pendientes de recortar. */}
               {/* Recorte de fotos del móvil tras guardar: pestaña muerta a medias y refresco de la carta. */}
               <GestorRecortes />
               {/* Barrera de nivel app: último recurso para que nunca quede la pantalla en blanco. */}
@@ -130,11 +131,21 @@ const App = () => (
                   <Route path="/gestor-carta" element={<Navigate to="/gestion-web?tab=carta" replace />} />
                   <Route path="/gestion-bot" element={<Navigate to="/super-admin/bot-web" replace />} />
                   <Route path="/marketing" element={pagina(<Marketing />)} />
+                  {/* Instagram: sección propia desde el 05/11/2026 (antes, pestaña de Newsletter). Sección de permisos «marketing». */}
+                  <Route path="/instagram" element={pagina(<Instagram />)} />
+                  {/* Acceso directo para la pantalla de inicio del móvil: asistente rápido a pantalla completa (docs/instagram-movil.md). */}
+                  <Route path="/instagram/rapido" element={pagina(<InstagramRapido />, "marketing")} />
                   <Route path="/cheques" element={pagina(<Cheques />, "cheques")} />
                   <Route path="/tienda" element={pagina(<Tienda />, "tienda")} />
                   <Route path="/facturas" element={pagina(<Facturas />)} />
+                  {/* «Pregúntale a la IA» a pantalla completa (06/11/2026): la MISMA página de Facturas
+                      (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
+                      página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
+                  <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
+                  {/* Historial de avisos (campana): para todos los roles. */}
+                  <Route path="/avisos" element={pagina(<Avisos />)} />
                   <Route path="/ayuda" element={pagina(<Ayuda />)} />
                   <Route path="/super-admin/login" element={bajoDemanda(<SuperAdminLogin />)} />
                   <Route path="/super-admin" element={paginaSuperAdmin(<SuperAdminPanel />)} />

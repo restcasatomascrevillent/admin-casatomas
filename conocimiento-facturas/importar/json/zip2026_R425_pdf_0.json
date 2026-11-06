@@ -1,0 +1,84 @@
+{
+ "archivo": "R425.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VIVEROS LA DAMA, S.L.",
+ "cif": "B53383832",
+ "local": "casa_tomas",
+ "numero_documento": "349",
+ "fecha": "2026-03-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Blaukorn fertilizante azul 5 kg",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.9669,
+   "descuento_pct": null,
+   "total": 13.97,
+   "iva_pct": 21,
+   "albaran_ref": "461",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Aqua manguera 19 mm. 25 m.",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.9752,
+   "descuento_pct": null,
+   "total": 32.98,
+   "iva_pct": 21,
+   "albaran_ref": "461",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Surface pistola metal/caucho 8 formas",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.7355,
+   "descuento_pct": null,
+   "total": 11.73,
+   "iva_pct": 21,
+   "albaran_ref": "461",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 58.68,
+ "desglose_iva": [
+  {
+   "base": 58.68,
+   "pct": 21,
+   "cuota": 12.32
+  }
+ ],
+ "iva": 12.32,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 71.0,
+ "observaciones": "Pago contado, vto 21/03/2026",
+ "alertas": [
+  "Los importes de línea son con IVA incluido (suma de líneas = subtotal = total); la base imponible impresa es inferior al subtotal",
+  "Las líneas venían impresas con IVA incluido: se han pasado a base imponible",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

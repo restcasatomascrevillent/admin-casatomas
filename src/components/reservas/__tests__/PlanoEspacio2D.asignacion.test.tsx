@@ -21,7 +21,7 @@
  * Solo se mockean los hooks de mesas y plano (datos de configuración, ajenos a
  * lo que se prueba) y `sonner`, para poder leer los avisos.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
@@ -1167,16 +1167,61 @@ describe("PlanoEspacio2D · editar una reserva desde su fila", () => {
     expect(rpcDeAsignacion()).toHaveLength(0);
   });
 
-  it("sin permiso de edición sobre «reservas» el lápiz sale deshabilitado y lo explica", async () => {
+  it("sin permiso de edición sobre «reservas» no hay lápiz (06/11/2026: oculto, no desactivado)", async () => {
     h.canEdit = false;
     montar();
-    await esperarReserva("Familia Pérez");
+    expect(await screen.findByText("Familia Pérez")).toBeInTheDocument();
 
-    const boton = botonEditar("Familia Pérez");
-    expect(boton).toBeDisabled();
-    expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(boton);
+    expect(screen.queryByRole("button", { name: "Editar la reserva de Familia Pérez" })).not.toBeInTheDocument();
     expect(h.editarReserva).not.toHaveBeenCalled();
+  });
+});
+
+// 06/11/2026 (decisión del dueño): con solo «Ver» en Reservas el plano se CONSULTA. No queda nada que
+// escriba, ni desactivado: sentar, cambiar o quitar mesas, arrastrar, añadir o borrar mesas, Deshacer,
+// Repartir, Organizar, Sin reserva, Volver al plano base. Se queda lo de consulta (día, turno, zoom, PDF).
+describe("PlanoEspacio2D · solo «Ver»", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    h.canEdit = false;
+    h.store.asignaciones = [];
+    h.store.llamadasRpc = [];
+    h.store.llamadasEq = [];
+  });
+  afterEach(() => {
+    h.canEdit = true;
+  });
+
+  it("las filas de reserva solo enseñan la reserva: sin asa, «Sentar», «Cambiar» ni «Quitar mesas»", async () => {
+    montar({ asignaciones: [{ id: "a1", reserva_id: "r-ana", mesa_id: "m5" }] });
+    expect(await screen.findByText("Con mesa")).toBeInTheDocument();
+
+    for (const nombre of [/^Arrastrar /, /^Sentar a /, /^Cambiar mesas de /, /^Quitar mesas de /, /^Editar la reserva de /]) {
+      expect(screen.queryAllByRole("button", { name: nombre }), String(nombre)).toEqual([]);
+    }
+    expect(screen.queryByText(/Sin mesa no es un error/i)).not.toBeInTheDocument();
+  });
+
+  it("la cabecera solo deja lo de consulta: «Volver» y «PDF»", async () => {
+    montar();
+    expect(await screen.findByText("Familia Pérez")).toBeInTheDocument();
+
+    for (const nombre of [/Deshacer/, /^Mesa$/, /Repartir/, /Organizar/, /Sin reserva/, /plano base/i]) {
+      expect(screen.queryByRole("button", { name: nombre }), String(nombre)).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: /PDF/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Volver/ })).toBeInTheDocument();
+  });
+
+  it("tocar una mesa enseña quién la ocupa, sin «Borrar mesa» ni nada que escriba", async () => {
+    montar({ asignaciones: [{ id: "a1", reserva_id: "r-ana", mesa_id: "m5" }] });
+    expect(await screen.findByText("Con mesa")).toBeInTheDocument();
+
+    fireEvent.click(botonMesa("Mesa 5"));
+    expect(await screen.findByText("Ocupada por")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Borrar mesa/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Juntar|Separar|Pico|Mesa en fila/ })).not.toBeInTheDocument();
+    expect(rpcDeAsignacion()).toHaveLength(0);
   });
 });
 

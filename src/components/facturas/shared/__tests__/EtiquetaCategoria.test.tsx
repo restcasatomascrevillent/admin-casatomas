@@ -32,9 +32,34 @@ describe("EtiquetaCategoria", () => {
     const qc = new QueryClient();
     render(
       <QueryClientProvider client={qc}>
-        <FilaProducto p={linea({ categoria: { nombre: "Lácteos y huevos", ruta: "Lácteos y huevos" } })} isMobile allDocs={[]} />
+        <FilaProducto p={linea({ categoria: { nombre: "Lácteos y huevos", ruta: "Lácteos y huevos" } })} isMobile />
       </QueryClientProvider>,
     );
     expect(screen.getByText("Lácteos y huevos")).toBeInTheDocument();
+  });
+});
+
+describe("FilaProducto: aviso de precio con la media que le pasan", () => {
+  const pintar = (mediaReferencia: number | undefined, precio_unitario = 4.14) =>
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <FilaProducto p={linea({ precio_unitario })} isMobile mediaReferencia={mediaReferencia} />
+      </QueryClientProvider>,
+    );
+
+  it("más del doble de la media: avisa", () => {
+    pintar(2);
+    expect(screen.getByRole("button", { name: /Anomalía de precio/ })).toBeInTheDocument();
+  });
+
+  it("sin media, o por debajo del doble, o con precio 0: no avisa", () => {
+    const a = pintar(undefined);
+    expect(screen.queryByRole("button", { name: /Anomalía de precio/ })).toBeNull();
+    a.unmount();
+    const b = pintar(3);
+    expect(screen.queryByRole("button", { name: /Anomalía de precio/ })).toBeNull();
+    b.unmount();
+    pintar(1, 0);
+    expect(screen.queryByRole("button", { name: /Anomalía de precio/ })).toBeNull();
   });
 });

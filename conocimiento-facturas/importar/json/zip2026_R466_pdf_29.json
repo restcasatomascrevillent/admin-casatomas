@@ -1,0 +1,63 @@
+{
+ "archivo": "R466.pdf",
+ "paginas_pdf": [
+  30
+ ],
+ "tipo": "factura",
+ "proveedor": "INNAZ PESCA, SL",
+ "cif": "B19393974",
+ "local": "casa_tomas",
+ "numero_documento": "349/A",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 30,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.75,
+   "descuento_pct": null,
+   "total": 70.08,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 30,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 10.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.21,
+   "descuento_pct": null,
+   "total": 215.31,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 285.39,
+ "desglose_iva": [
+  {
+   "base": 285.39,
+   "pct": 10.0,
+   "cuota": 28.54
+  }
+ ],
+ "iva": 28.54,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 313.93,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 5942, 6319, 6074, 5317. Embarcaciones: ninguna.",
+ "alertas": []
+}

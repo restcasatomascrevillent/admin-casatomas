@@ -1,0 +1,70 @@
+{
+ "archivo": "R862.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SOKOL VIN, S.L.",
+ "cif": "B73698615",
+ "local": "casa_tomas",
+ "numero_documento": "A293/26",
+ "fecha": "2026-05-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TRUFA DE VERANO TUBER AESTIVUM",
+   "producto_ficha": "Trufa de verano (Tuber aestivum)",
+   "cantidad": 0.165,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 420.0,
+   "descuento_pct": null,
+   "total": 69.3,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CUCHARAS DE NACAR",
+   "producto_ficha": "Cucharas de nácar",
+   "cantidad": 6.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.0,
+   "descuento_pct": null,
+   "total": 18.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 87.3,
+ "desglose_iva": [
+  {
+   "base": 69.3,
+   "pct": 4,
+   "cuota": 2.77
+  },
+  {
+   "base": 18.0,
+   "pct": 21,
+   "cuota": 3.78
+  }
+ ],
+ "iva": 6.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 93.85,
+ "observaciones": "Forma de pago: transferencia bancaria. Pedido nº 293. Cliente: MASIDE 2011, S.L.U. (Restaurante Casa Tomás). Pie con dos tipos de IVA: 4 % (69,30) y 21 % (18,00).",
+ "alertas": [
+  "Cucharas de nácar con IVA 21 % (3,78 sobre base 18,00). La ficha solo recoge 4 % y 10 %, y la ficha daba el IVA de las cucharas como no verificado. El iva_pct de la línea (21) se deduce del pie. Además, a 3,00 €/ud aquí frente a 13,00 €/ud en R1164."
+ ]
+}

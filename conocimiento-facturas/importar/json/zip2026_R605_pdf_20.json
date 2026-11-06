@@ -1,0 +1,63 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  21
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO CARRILLO, JOSE TOMAS",
+ "cif": "74386669T",
+ "local": "casa_tomas",
+ "numero_documento": "511/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 21,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.63,
+   "descuento_pct": null,
+   "total": 83.04,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 21,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.8,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.3,
+   "descuento_pct": null,
+   "total": 32.94,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 115.98,
+ "desglose_iva": [
+  {
+   "base": 115.98,
+   "pct": 10.0,
+   "cuota": 11.6
+  }
+ ],
+ "iva": 11.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 127.58,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 7074, 8403. Embarcaciones: ninguna.",
+ "alertas": []
+}

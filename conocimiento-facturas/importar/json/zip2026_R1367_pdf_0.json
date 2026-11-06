@@ -1,0 +1,46 @@
+{
+ "archivo": "R1367.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "JOSE LUIS FLORES GOMEZ",
+ "cif": "04191309L",
+ "local": "casa_tomas",
+ "numero_documento": "000836",
+ "fecha": "2026-08-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ANCESTRAL",
+   "producto_ficha": null,
+   "cantidad": 10.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.94,
+   "descuento_pct": 10,
+   "total": 323.46,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 323.46,
+ "desglose_iva": [
+  {
+   "base": 323.46,
+   "pct": 21,
+   "cuota": 67.93
+  }
+ ],
+ "iva": 67.93,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 391.39,
+ "observaciones": "Forma de pago y vencimiento no impresos en el texto (campos vacíos); figura número de cuenta BBVA (no transcrito). Destinatario impreso: RESTAURANTE CASA TOMÁS, MASIDE 2011 S.L.U., C/ Santa Maria de la Cabeza, 2 - Local 2. Código de artículo 5314 no incluido en el nombre.",
+ "alertas": []
+}

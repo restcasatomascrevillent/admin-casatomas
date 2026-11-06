@@ -2,6 +2,7 @@ import { Camera, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { LineaEstado } from "./estadoLectura";
 
 /**
  * Categoría del elemento, discreta, encima del nombre. Sirve sobre todo al
@@ -21,6 +22,31 @@ export function EtiquetaCategoria({ categoria, className }: { categoria: string 
     >
       <span className="truncate">{categoria}</span>
     </Badge>
+  );
+}
+
+/**
+ * Con solo «Ver» en la carta (sin «Editar», decisión del dueño del 06/11/2026): en vez de los
+ * interruptores, dónde se publica el elemento, en texto. Una línea por dato; `aviso` en rojo
+ * (no sale en la web) o ámbar (falta el origen del vino).
+ */
+export function EstadoLectura({ lineas }: { lineas: ReadonlyArray<LineaEstado | false | null | undefined> }) {
+  const visibles = lineas.filter((l): l is LineaEstado => Boolean(l));
+  if (visibles.length === 0) return null;
+  return (
+    <ul data-testid="estado-lectura" className="space-y-0.5 rounded-md bg-muted/50 px-2 py-1.5 text-sm">
+      {visibles.map((l) => (
+        <li
+          key={l.texto}
+          className={cn(
+            "leading-snug",
+            l.tono === "apagado" ? "font-medium text-destructive" : l.tono === "aviso" ? "font-medium text-amber-800 dark:text-amber-300" : "text-muted-foreground",
+          )}
+        >
+          {l.texto}
+        </li>
+      ))}
+    </ul>
   );
 }
 

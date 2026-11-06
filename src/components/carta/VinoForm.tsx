@@ -32,20 +32,26 @@ import { SelectorFotoCarta } from "./recorte/SelectorFotoCarta";
 import { trasGuardarFotoCarta } from "./recorte/avisoGuardadoSinFondo";
 import { noCerrarAlTocarFuera } from "./dialogoCarta";
 import { esquemaPrecioCarta } from "./precioCarta";
+import { CamposCopaParker } from "./CamposCopaParker";
+import { camposCopaParker, cambiosCopaParker, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 
 // Origen obligatorio (04/11/2026): país, región y categoría con denominación
 // (no «… — ORIGEN PENDIENTE»). Sin él no se guarda, tampoco si lo rellena la IA.
-const formSchema = z.object({
-  nombre: nombreCarta,
-  categoria: categoriaVino,
-  precio_eur: esquemaPrecioCarta,
-  descripcion: descripcionCarta,
-  ingredientes: z.string().optional(),
-  denominacion_origen: z.string().optional(),
-  ubicacion_pais: paisVino,
-  ubicacion_region: regionVino,
-});
+// Copa y Parker (04/11/2026): ver copaParker.ts.
+const formSchema = z
+  .object({
+    nombre: nombreCarta,
+    categoria: categoriaVino,
+    precio_eur: esquemaPrecioCarta,
+    descripcion: descripcionCarta,
+    ingredientes: z.string().optional(),
+    denominacion_origen: z.string().optional(),
+    ubicacion_pais: paisVino,
+    ubicacion_region: regionVino,
+    ...camposCopaParker,
+  })
+  .superRefine(exigirPrecioCopa);
 
 interface VinoFormProps {
   open: boolean;
@@ -82,6 +88,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
       denominacion_origen: "",
       ubicacion_pais: "",
       ubicacion_region: "",
+      ...COPA_PARKER_VACIO,
     },
   });
 
@@ -120,7 +127,7 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
     precargaAbiertaRef.current = precarga;
     const v = valoresDesdeDatosVino(precarga.datos);
     limpiarLectura();
-    form.reset({ ...v, categoria: v.categoria || categoriaInicial || "", precio_eur: "" });
+    form.reset({ ...v, categoria: v.categoria || categoriaInicial || "", precio_eur: "", ...COPA_PARKER_VACIO });
     iniciarRecorte(precarga.foto, precarga.recorte);
   }, [open, precarga, form, categoriaInicial, iniciarRecorte, limpiarRecorte, cancelarLectura, limpiarLectura]);
 
@@ -171,6 +178,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
       denominacion_origen: values.denominacion_origen,
       ubicacion_pais: values.ubicacion_pais,
       ubicacion_region: values.ubicacion_region,
+      // Solo lo que no es el valor por defecto: ver `cambiosCopaParker`.
+      ...cambiosCopaParker(values),
     };
 
     const nuevoVino = await crearVino.mutateAsync(vinoData);
@@ -335,6 +344,8 @@ export function VinoForm({ open, onOpenChange, categoriaInicial, precarga }: Vin
               }
               avisoOrigen={avisoOrigen}
             />
+
+            <CamposCopaParker control={form.control} />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
                 iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. En el móvil, «Cancelar» y

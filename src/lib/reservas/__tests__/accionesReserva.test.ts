@@ -18,7 +18,8 @@
  *   lista negra, desde el paso 1—; (d) un solo vocabulario, «Ha llegado» /
  *   «No vino»; (e) desde el paso 3, la Lista también respeta el permiso en
  *   «Verificar», la estrella y la lista negra (decisión del dueño, 2026-10-01, con
- *   la RLS de `reservas` endurecida). Ya no queda nada que escriba sin mirarlo.
+ *   la RLS de `reservas` endurecida). Ya no queda nada que escriba sin mirarlo;
+ *   (f) desde el 06/11/2026, sin permiso no sale NADA (se oculta, no se desactiva).
  *
  * Los textos son los de hoy salvo donde lo dice un cambio acordado (en el paso 3,
  * «Llegó» deja de decirse «ya servida»): migrar la Lista no cambia lo que lee el
@@ -80,36 +81,10 @@ const CON_PERMISO: Record<VistaReservas, Fila> = {
   },
 };
 
-const SIN_PERMISO: Record<VistaReservas, Fila> = {
-  lista: {
-    aceptar:     "✖·····",
-    confirmar:   "·✖✖✖✖✖",
-    verificar:   "✖✖✖✖✖✖", // cambio (e): antes abría el modal en solo lectura
-    seleccionar: "······", // sin permiso desaparece la casilla de aceptar en bloque
-    cancelar:    "✖✖✖✖✖✖",
-    editar:      "✖✖✖✖✖✖",
-    importante:  "✖✖✖✖✖✖", // cambio (e)
-    listaNegra:  "✖✖✖✖✖✖", // cambio (e)
-    haLlegado:   "······",
-    noVino:      "······",
-    deshacer:    "······",
-    mover:       "······",
-  },
-  hoy: {
-    aceptar:     "······",
-    confirmar:   "······",
-    verificar:   "······",
-    seleccionar: "······",
-    cancelar:    "······",
-    haLlegado:   "✖✖✖···", // cambio (c)
-    noVino:      "✖✖✖···", // cambio (c)
-    deshacer:    "···✖·✖", // cambio (c)
-    mover:       "✖✖✖✖✖✖", // cambio (c)
-    editar:      "✖✖✖✖✖✖", // cambio (b)
-    importante:  "✖✖✖✖✖✖", // cambio (c)
-    listaNegra:  "✖✖✖✖✖✖", // cambio (c), ampliado en el paso 1: también la lista negra de Hoy
-  },
-};
+// 06/11/2026 (decisión del dueño): sin permiso de edición NADA es visible, en ninguna vista ni
+// estado. Lo que no se puede usar se oculta (no se desactiva) y la página dice «Solo lectura».
+const TODO_OCULTO = Object.fromEntries(ACCIONES_RESERVA.map((a) => [a, "······"])) as Fila;
+const SIN_PERMISO: Record<VistaReservas, Fila> = { lista: TODO_OCULTO, hoy: TODO_OCULTO };
 
 const simbolo = (a: EstadoAccion) => (!a.visible ? "·" : a.habilitada ? "✔" : "✖");
 
@@ -181,23 +156,14 @@ describe("accionesDisponibles — invariantes de cada respuesta", () => {
     }
   });
 
-  it("sin permiso, lo que queda deshabilitado POR EL PERMISO lo dice en el título", () => {
-    // Desde el cambio (e) también «Verificar», la estrella y la lista negra de la Lista.
-    for (const [vista, accion] of [
-      ["lista", "aceptar"],
-      ["lista", "editar"],
-      ["lista", "cancelar"],
-      ["lista", "verificar"],
-      ["lista", "importante"],
-      ["lista", "listaNegra"],
-      ["hoy", "haLlegado"],
-      ["hoy", "noVino"],
-      ["hoy", "mover"],
-      ["hoy", "importante"],
-      ["hoy", "listaNegra"],
-      ["hoy", "editar"],
-    ] as const) {
-      expect(titulo("pendiente", vista, false, accion), `${vista}.${accion}`).toMatch(/permiso/i);
+  it("sin permiso no queda NADA visible ni pulsable, en ningún estado ni vista (06/11/2026)", () => {
+    for (const vista of VISTAS) {
+      for (const estado of [...ESTADOS, "rechazada"]) {
+        const sin = acciones(estado, vista, false, { importante: true });
+        for (const accion of ACCIONES_RESERVA) {
+          expect(sin[accion], `${vista}/${estado}/${accion}`).toEqual({ visible: false, habilitada: false, titulo: "" });
+        }
+      }
     }
   });
 
@@ -232,12 +198,13 @@ describe("Lista y Hoy siguen siendo diferentes", () => {
     ACCIONES_RESERVA.filter((a) => acciones(estado, vista, canEdit)[a].visible);
 
   it("solo comparten editar, la estrella y la lista negra; cada vista tiene lo suyo", () => {
-    for (const canEdit of [true, false]) {
-      for (const estado of ESTADOS) {
-        const enLista = visibles(estado, "lista", canEdit);
-        const enHoy = visibles(estado, "hoy", canEdit);
-        expect(enLista.filter((a) => enHoy.includes(a)).sort(), `${estado}/${canEdit}`).toEqual(["editar", "importante", "listaNegra"]);
-      }
+    for (const estado of ESTADOS) {
+      const enLista = visibles(estado, "lista", true);
+      const enHoy = visibles(estado, "hoy", true);
+      expect(enLista.filter((a) => enHoy.includes(a)).sort(), estado).toEqual(["editar", "importante", "listaNegra"]);
+      // Sin permiso, ninguna de las dos enseña nada.
+      expect(visibles(estado, "lista", false), estado).toEqual([]);
+      expect(visibles(estado, "hoy", false), estado).toEqual([]);
     }
   });
 
@@ -269,11 +236,10 @@ describe("cambios acordados", () => {
     it.each([
       ["completada", "No se puede cancelar una reserva que ya llegó"],
       ["no_show", "No se puede cancelar una reserva marcada como «No vino»"],
-    ])("%s: la ranura sigue en la Lista, deshabilitada y con el motivo, con o sin permiso", (estado, motivo) => {
-      for (const canEdit of [true, false]) {
-        const cancelar = acciones(estado, "lista", canEdit).cancelar;
-        expect(cancelar).toEqual({ visible: true, habilitada: false, titulo: motivo });
-      }
+    ])("%s: con permiso, la ranura sigue en la Lista, deshabilitada y con el motivo", (estado, motivo) => {
+      expect(acciones(estado, "lista", true).cancelar).toEqual({ visible: true, habilitada: false, titulo: motivo });
+      // Sin permiso, ni la ranura (06/11/2026).
+      expect(acciones(estado, "lista", false).cancelar.visible).toBe(false);
     });
 
     it("las vivas siguen pudiéndose cancelar con permiso", () => {
@@ -287,43 +253,38 @@ describe("cambios acordados", () => {
     });
   });
 
-  describe("(b) editar está en los seis estados de las dos vistas, y solo lo apaga el permiso", () => {
+  describe("(b) editar está en los seis estados de las dos vistas, y solo lo quita el permiso", () => {
     it.each(VISTAS)("%s", (vista) => {
       for (const estado of ESTADOS) {
         expect(acciones(estado, vista, true).editar, estado).toMatchObject({ visible: true, habilitada: true });
-        expect(acciones(estado, vista, false).editar, estado).toEqual({
-          visible: true,
-          habilitada: false,
-          titulo: TITULO_SIN_PERMISO_EDITAR,
-        });
+        expect(acciones(estado, vista, false).editar, estado).toEqual({ visible: false, habilitada: false, titulo: "" });
       }
     });
 
-    it("el texto sin permiso es el que ya usan la lista, el kanban, el plano y el panel de asignación", () => {
+    it("el texto de «sin permiso» de antes se conserva para las pantallas que aún lo usan de defensa", () => {
       expect(TITULO_SIN_PERMISO_EDITAR).toBe("No tienes permiso para editar reservas");
+      expect(TITULO_SIN_PERMISO_CANCELAR).toBe("No tienes permiso para cancelar reservas");
     });
   });
 
   describe("(c) Hoy respeta el permiso en todas sus acciones (la lista negra, desde el paso 1)", () => {
-    it("con permiso están habilitadas; sin él, deshabilitadas y dicen por qué", () => {
+    it("con permiso están habilitadas; sin él, ocultas (06/11/2026)", () => {
       for (const estado of ESTADOS) {
         const con = acciones(estado, "hoy", true);
         const sin = acciones(estado, "hoy", false);
         for (const a of ["haLlegado", "noVino", "deshacer", "mover", "importante", "listaNegra", "editar"] as const) {
+          expect(sin[a], `${estado}/${a}`).toEqual({ visible: false, habilitada: false, titulo: "" });
           if (!con[a].visible) continue;
           // mover en cancelada / No vino no se habilita ni con permiso: no hay a dónde.
           if (a !== "mover" || con[a].habilitada) expect(con[a].habilitada, `${estado}/${a}`).toBe(true);
-          expect(sin[a].habilitada, `${estado}/${a}`).toBe(false);
-          expect(sin[a].visible, `${estado}/${a}`).toBe(true);
         }
       }
     });
 
-    it("«Mover» en una reserva que no ocupa sitio dice que no se puede, antes que lo del permiso", () => {
-      for (const canEdit of [true, false]) {
-        expect(acciones("no_show", "hoy", canEdit).mover.titulo).toBe("No se puede mover en este estado");
-        expect(acciones("cancelada", "hoy", canEdit).mover.titulo).toBe("No se puede mover en este estado");
-      }
+    it("«Mover» en una reserva que no ocupa sitio dice que no se puede (con permiso; sin él, ni sale)", () => {
+      expect(acciones("no_show", "hoy", true).mover.titulo).toBe("No se puede mover en este estado");
+      expect(acciones("cancelada", "hoy", true).mover.titulo).toBe("No se puede mover en este estado");
+      expect(acciones("no_show", "hoy", false).mover.visible).toBe(false);
     });
   });
 
@@ -362,7 +323,6 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
       "Aceptar la reserva tal como está (hora y sala actuales); se avisa al cliente si tiene email",
     );
     expect(TITULO_ACEPTAR).toBe(titulo("pendiente", "lista", true, "aceptar"));
-    expect(titulo("pendiente", "lista", false, "aceptar")).toBe(TITULO_SIN_PERMISO_EDITAR);
   });
 
   it("confirmar: «Confirmar» si está verificada; si no hay nada que confirmar, lo dice con la frase del estado", () => {
@@ -372,10 +332,6 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
     expect(titulo("no_show", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «no vino»");
     // Vocabulario único (decisión (d), paso 3): «Llegó», ya no «ya servida».
     expect(titulo("completada", "lista", true, "confirmar")).toBe("Nada que aceptar ni confirmar: la reserva está marcada como «Llegó»");
-    // Sin permiso manda el permiso, sea cual sea el estado.
-    for (const estado of ["verificada", "confirmada", "completada", "cancelada", "no_show"]) {
-      expect(titulo(estado, "lista", false, "confirmar"), estado).toBe(TITULO_SIN_PERMISO_EDITAR);
-    }
   });
 
   it("verificar: solo las pendientes; el texto del resto explica por qué no", () => {
@@ -385,14 +341,10 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
     }
   });
 
-  it("CAMBIO (e): sin permiso, «Verificar», la estrella y la lista negra lo dicen, en cualquier estado", () => {
+  it("CAMBIO (e) y (f): sin permiso, «Verificar», la estrella y la lista negra ni salen, en cualquier estado", () => {
     for (const estado of ESTADOS) {
       for (const accion of ["verificar", "importante", "listaNegra"] as const) {
-        expect(acciones(estado, "lista", false)[accion], `${estado}/${accion}`).toEqual({
-          visible: true,
-          habilitada: false,
-          titulo: TITULO_SIN_PERMISO_EDITAR,
-        });
+        expect(acciones(estado, "lista", false)[accion], `${estado}/${accion}`).toEqual({ visible: false, habilitada: false, titulo: "" });
       }
     }
   });
@@ -401,12 +353,9 @@ describe("Lista — textos (los de hoy: el paso que migre la Lista no cambia lo 
     expect(titulo("pendiente", "lista", true, "seleccionar")).toBe("Seleccionar para aceptar en bloque");
   });
 
-  it("cancelar: con el nombre; el estado manda sobre el permiso", () => {
+  it("cancelar: con el nombre; si no se puede por el estado, lo dice", () => {
     expect(titulo("confirmada", "lista", true, "cancelar")).toBe("Cancelar la reserva de Ana — pedirá confirmación");
-    expect(titulo("confirmada", "lista", false, "cancelar")).toBe(TITULO_SIN_PERMISO_CANCELAR);
-    expect(TITULO_SIN_PERMISO_CANCELAR).toBe("No tienes permiso para cancelar reservas");
     expect(titulo("cancelada", "lista", true, "cancelar")).toBe("La reserva ya está cancelada");
-    expect(titulo("cancelada", "lista", false, "cancelar")).toBe("La reserva ya está cancelada");
   });
 
   it("editar: empieza por «Gestionar» (así la llama «Dar mesa» cuando falta la sala) y lleva el nombre", () => {
@@ -444,7 +393,7 @@ describe("Hoy — textos (los del kanban y ControlLlegada, con el vocabulario de
     expect(titulo("confirmada", "hoy", true, "listaNegra")).toBe("Añadir a blacklist");
   });
 
-  it("sin permiso, TODAS las acciones visibles de Hoy llevan el texto del permiso (salvo mover en un estado que no se mueve)", () => {
+  it("sin permiso, ninguna acción de Hoy sale (ni con texto de permiso: ya no se desactivan)", () => {
     for (const [estado, accion] of [
       ["confirmada", "haLlegado"],
       ["confirmada", "noVino"],
@@ -455,7 +404,7 @@ describe("Hoy — textos (los del kanban y ControlLlegada, con el vocabulario de
       ["confirmada", "importante"],
       ["confirmada", "listaNegra"],
     ] as const) {
-      expect(titulo(estado, "hoy", false, accion), `${estado}/${accion}`).toBe(TITULO_SIN_PERMISO_EDITAR);
+      expect(acciones(estado, "hoy", false)[accion].visible, `${estado}/${accion}`).toBe(false);
     }
   });
 });

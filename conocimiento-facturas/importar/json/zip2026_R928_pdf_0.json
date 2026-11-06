@@ -1,0 +1,116 @@
+{
+ "archivo": "R928.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260276",
+ "fecha": "2026-06-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMEJA FINA",
+   "producto_ficha": "Almeja fina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 90.0,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000276",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 52.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000276",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "CENTOLLA",
+   "producto_ficha": "Centolla",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.0,
+   "descuento_pct": null,
+   "total": 105.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000276",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "LANGOSTA",
+   "producto_ficha": "Langosta",
+   "cantidad": 0.55,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 60.0,
+   "descuento_pct": null,
+   "total": 33.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000276",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.4,
+   "descuento_pct": null,
+   "total": 86.4,
+   "iva_pct": 10,
+   "albaran_ref": "1-000276",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 456.4,
+ "desglose_iva": [
+  {
+   "base": 456.4,
+   "pct": 10,
+   "cuota": 45.64
+  }
+ ],
+ "iva": 45.64,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 502.04,
+ "observaciones": "Transferencia CaixaBank; vencimiento 09/06/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: CENTOLLA 35,00 (ficha 25,00)"
+ ]
+}

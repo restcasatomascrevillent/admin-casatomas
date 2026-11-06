@@ -1,0 +1,48 @@
+{
+ "archivo": "R674.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "139",
+ "fecha": "2026-05-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "L/ Gordal 60/80 DH 2kg N",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 65.7,
+ "desglose_iva": [
+  {
+   "base": 65.7,
+   "pct": 10,
+   "cuota": 6.57
+  }
+ ],
+ "iva": 6.57,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 72.27,
+ "observaciones": "Cliente MASIDE 2011 S.L. B54583356; pago Alicante.",
+ "alertas": [
+  "Nº manuscrito corregido: sobre '138' aparece reescrito '139' arriba; se toma 139."
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "archivo": "R874.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 2864",
+ "fecha": "2026-05-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "COCOCHAS MERLUZA FRESCO",
+   "producto_ficha": "Cocochas de merluza fresco",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 68.0,
+   "descuento_pct": null,
+   "total": 136.0,
+   "iva_pct": 10,
+   "albaran_ref": "20265140",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 136.0,
+ "desglose_iva": [
+  {
+   "base": 136.0,
+   "pct": 10,
+   "cuota": 13.6
+  }
+ ],
+ "iva": 13.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 149.6,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 27/06/2026, transferencia a 30 días. Albarán 20265140 del 27/05/2026, sin pedido. Nota de entrega 8467 impresa. El código de lote aparece con asterisco ('06622609002819*'). La fila Total (2,00 kg) no son euros.",
+ "alertas": []
+}

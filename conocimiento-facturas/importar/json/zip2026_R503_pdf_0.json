@@ -1,0 +1,102 @@
+{
+ "archivo": "R503.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENCHENTA SLU",
+ "cif": "B94186988",
+ "local": "casa_tomas",
+ "numero_documento": "1-5001",
+ "fecha": "2026-03-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": 0,
+   "total": 72.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-55",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.5,
+   "descuento_pct": 0,
+   "total": 53.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-55",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "RAPE",
+   "producto_ficha": "Rape",
+   "cantidad": 4.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.0,
+   "descuento_pct": 0,
+   "total": 68.6,
+   "iva_pct": 10,
+   "albaran_ref": "3-55",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.0,
+   "descuento_pct": 0,
+   "total": 27.0,
+   "iva_pct": 21,
+   "albaran_ref": "3-55",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 220.6,
+ "desglose_iva": [
+  {
+   "base": 193.6,
+   "pct": 10,
+   "cuota": 19.36
+  },
+  {
+   "base": 27.0,
+   "pct": 21,
+   "cuota": 5.67
+  }
+ ],
+ "iva": 25.03,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 245.63,
+ "observaciones": "Transferencia BBVA. Vencimiento igual a la fecha de la factura. Albarán 3-55.",
+ "alertas": []
+}

@@ -112,13 +112,59 @@ supabase functions deploy chat-facturas    --project-ref sfonaclosuafvlhutkon
 
 **3) Panel** (build normal).
 
-### Archivo del documento original
+### Archivo del documento original (desde el 05-nov-2026: solo Google Drive)
 
-Mientras los secrets `GOOGLE_*` no existan, `procesar-factura` guarda el PDF o la
-imagen en el bucket `facturas-originales` y deja la ruta en `facturas.archivo_path`.
-Antes se descartaba el fichero con un `console.warn`. En cuanto se configuren los
-secrets de Drive, vuelve a usarse Drive sin tocar codigo; Storage queda como red de
-seguridad si Drive falla.
+Orden del dueño: «no se puede guardar nada en Supabase Storage». El original va
+SIEMPRE a Drive (carpeta del proveedor → «2026-03 Marzo») y se guarda
+`facturas.drive_url`. El bucket `facturas-originales` es solo almacén temporal:
+
+- `pendientes/{uid}/{trabajo}/…`: piezas del OCR por trabajos. Se borran al
+  terminar o fallar el trabajo (los «duplicado» las guardan hasta decidir).
+- `temporal/{factura}-{nombre}`: el original cuando Drive falla al guardar. La
+  factura queda «pendiente de Drive» (`archivo_path` sin `drive_url`; el botón del
+  original lo dice) y la Edge Function `facturas-originales-drive` (pg_cron
+  `facturas-originales-drive`, cada 10 min, solo si hay algo que hacer) la sube y
+  borra la copia. A los 5 fallos seguidos: aviso de prioridad alta en la campana
+  (`original_sin_drive`); después reintenta cada 6 h.
+
+La misma función rescata lo antiguo (rutas `AAAA/MM/…`, huérfanos de
+sustituciones y restos de `pendientes/`). Migración
+`20261105193000_facturas_originales_drive.sql` (test en
+`supabase/tests/facturas_originales_drive_test.sql`). A mano (admin):
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/facturas-originales-drive" \
+  -H "Authorization: Bearer <JWT de un admin>" -H "Content-Type: application/json" \
+  -d '{"accion":"informe"}'      # o {"accion":"pasar"}
+```
+
+### QA de «Cargar» (06-nov-2026, migración `20261106200000_facturas_cargar_qa.sql`)
+
+Orden: desplegar `procesar-factura`, `ocr-trabajo`, `importar-factura-historica`
+y `facturas-originales-drive`; después la migración y su test
+(`supabase/tests/facturas_cargar_qa_test.sql`). Qué cambia:
+
+- Ningún original se pierde: si una consolidación se corta tras crear la
+  factura, el reintento archiva el original (y mete las líneas si faltan); la
+  limpieza nunca borra lo de `pendientes/` de una factura sin original, y el
+  cron se lo devuelve (va a Drive y se le pone como `drive_url`).
+- Drive: subida en UNA llamada (multipart; sin ficheros vacíos), carpetas sin
+  duplicar con subidas a la vez, cachés que se olvidan ante 401/404, el UPDATE
+  de `drive_url` se reintenta en vez de subir otra copia, aviso de Drive caído
+  agrupado (uno por hora).
+- Duplicados: el panel los descarta con `ocr_descartar_trabajo`; los que nadie
+  decide caducan a los 7 días (original a Drive como «anterior-…»).
+- «Reintentar» del panel: `ocr_reintentar_trabajo` reanuda el MISMO trabajo
+  (los «fallido» guardan sus ficheros 24 h).
+- URL de las Edge Functions desde Vault `project_url` (antes iba fija la del
+  proyecto viejo en `ocr_despachar` y dos despachadores más): **en producción
+  tiene que existir el secreto de Vault `project_url`**; sin él, el OCR por
+  trabajos queda mudo.
+- Cron `reanudar-trabajos-ocr` cada minuto (en la demo faltaba).
+- Storage: solo `pendientes/{uid}/` para el panel; bucket a 20 MB (PDF de la
+  importación histórica con Drive caído).
+- Rescate a mano de una factura sin original cuyo fichero está en Drive:
+  `{"accion":"buscar_original","factura_id":354,"nombre":"anterior-….jpeg","enlazar":true}`.
 
 ### Revision pendiente para el dueño
 
@@ -207,7 +253,7 @@ aparece guardada. En `ocr_trabajos` queda una fila con `num_paginas = 1` y `orig
 1. Facturas → Subir → «Elegir archivos» → el PDF (o la captura de 945×2048 que ya hay).
    El PDF de Luga (2 páginas) se trocea solo por páginas; la captura, en 5 franjas.
 2. El resultado dirá «Ya existe la factura ML/101511 (8 líneas)…» con el botón
-   **Sustituir la existente** (exige permiso de EDICIÓN en Facturas).
+   **Sustituir la existente** (exige «Editar» en Facturas; con «Facturas · Subida», solo si la factura la subiste tú).
 3. El diálogo enseña «Ahora» (total, nº de líneas, avisos) frente a «Documento nuevo».
    Al confirmar, en una sola transacción: copia de la fila, sus líneas y su historial en
    `facturas_sustituciones`; borra el historial de precios y las líneas viejas; actualiza

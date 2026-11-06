@@ -1,0 +1,2193 @@
+Curuxo|17
+Lenguado salvaje|17
+Longueirón|18
+Palometa roja|17
+Rodaballo salvaje|17
+San Martín|17
+Sal en saco|6
+Sal en pastillas 25 kg|9
+Sistema de conservación de vino Tower portable edition dual|10
+Tapones para champán x3|10
+Tapones para vino tranquilo x10 gold|10
+Macruros|17
+Ancestral|12
+Mejillón en escabeche Ramón Franco 8/12|18
+Bomba de drenaje para evaporador|10
+Revisión de máquina de conductos y cambio de filtro|11
+Aalto 75 cl|12
+Aalto Magnum|12
+Abadía Retuerta Selección 75 cl|12
+Alabaster 75 cl|12
+Alaya Tierra 75 cl|12
+Ausás Interpretación 75 cl|12
+Bardos Roble 75 cl|12
+Bardos Viñedos de Altura (autor) 75 cl|12
+Baynos 75 cl|12
+Borsao Bole 75 cl|12
+Bosque de Matasnos 75 cl|12
+Bruto 75 cl|12
+Carmelo Rodero Crianza 75 cl|12
+Cartago 75 cl|12
+Cepa 21 75 cl|12
+Clío 22 meses 75 cl|12
+Códice Crianza 75 cl|12
+Dominio del Bendito El Primer Paso 75 cl|12
+Dominio del Bendito La Cuesta de las Musas 75 cl|12
+Dominio del Bendito Las Sabias 75 cl|12
+Dominio del Bendito Las Sabias Magnum|12
+Dominio del Bendito Titán del Bendito 75 cl|12
+El Vínculo Reserva 75 cl|12
+Emilio Moro 75 cl|12
+Emilio Moro Finca Resalso 75 cl|12
+Emilio Moro Malleolus 75 cl|12
+Emilio Moro Polvorete 75 cl|12
+Figuero Asomo 75 cl|12
+Figuero Pago de Torrosillo 75 cl|12
+Garmón 75 cl|12
+Hacienda Monasterio Cosecha 75 cl|12
+Hito (de Cepa 21) 75 cl|12
+José Pariente Verdejo 75 cl|12
+Juan Gil etiqueta azul cuvée 75 cl|12
+Juan Gil etiqueta nácar 75 cl|12
+Juan Gil etiqueta plata 12 meses 75 cl|12
+Juan Gil etiqueta plata Magnum|12
+La Chispa Negra 50 cl|12
+La Rebusca 75 cl|12
+Matarromera Crianza 75 cl|12
+Mauro 75 cl|12
+Montecastro 75 cl|12
+Morca 75 cl|12
+Pruno 75 cl|12
+Rosario Vera 75 cl|12
+Rosario Vera Amona 75 cl|12
+San Román 75 cl|12
+Semele Crianza 75 cl|12
+Tarima Hill 75 cl|12
+Pesquera Crianza 75 cl|12
+Pesquera Reserva 75 cl|12
+Tridente Gota de Arena 75 cl|12
+Tridente Rejón 75 cl|12
+Valduero Una Cepa 75 cl|12
+Victorino 75 cl|12
+Vidilla Verdejo 75 cl|12
+Vigía de la Atalaya 75 cl|12
+Brandy Ximénez-Spínola 10000 botellas 70 cl|14
+Ximénez-Spínola single barrel 70 cl|14
+Enrique Mendoza Oraval 75 cl|12
+Espárrago 5 frutos El Navarrico lata 425 ml|6
+Espárrago 6/8 El Navarrico lata 425 ml|6
+Estrecho Enrique Mendoza 75 cl|12
+Marchapán Picos Camperos 150 g|7
+Patatas fritas San Nicasio 150 g|6
+Diferencia por actualización de precios (Frisco)|11
+Movimientos de entrada (logística frigorífica)|11
+Movimientos de salida (logística frigorífica)|11
+Posición fija picking congelado|11
+Ajuste de energía|11
+Alquiler de equipos de medida y lectura|11
+Bono social|11
+Coste de energía|11
+Excesos de potencia|11
+Impuesto eléctrico|11
+Término de energía|11
+Término de potencia|11
+Aceite de oliva virgen extra Hacienda El Palo 500 ml|6
+Perciformes|17
+Pleuronectiformes|17
+Cefalópodos|18
+Alquiler de local|11
+Antídoto La Hormiga 75 cl|12
+Gerardo Méndez Cepas Vellas 75 cl|12
+Gerardo Méndez Do Ferreiro 75 cl|12
+Gerardo Méndez Do Ferreiro Magnum|12
+Alquiler de vajilla|11
+Alquiler de plato trinchero decorado|11
+Reposición de plato trinchero (faltas)|11
+Flores de tanatorio|11
+Asesoramiento fiscal y laboral|11
+Gestión de contrato eventual|11
+Gestión de contrato indefinido|11
+Gestión de contrato de interinidad|11
+Envío telemático de cuentas anuales|11
+Hojas de reclamaciones|10
+Depósito de cuentas anuales (suplido)|11
+Centralita empresa|11
+Línea móvil empresa|11
+Pack negocio plus|11
+Descuento promoción telefonía|11
+Telefonía fija empresas|11
+Cuota de televisión|11
+Alitas de pollo tulipa mexicanas|19
+Harina de almendra|6
+Anchoas en conserva 500 g|17
+Chili con carne|8
+Bacon inglés en lonchas|20
+Bizcocho de chocochips sin gluten|7
+Brownie|7
+Cachopo pequeño de jamón y pimiento|19
+Pollo deshilachado (pulled)|19
+Cinta de lomo de cerdo|19
+Atún claro en aceite Claramar 1 kg|6
+Coca de verduras|8
+Costillar de cerdo troceado BBQ|19
+Crema crunch black cookies 3 kg|7
+Crema crunch Choco-Kinder 3 kg|7
+Crema crunch speculoos 3 kg|7
+Crema de pistacho 12 % 3 kg|7
+Tenders de pollo crujientes|19
+Croquetas de pulpo|8
+Croquetas de vieira|8
+Guacamole 500 g|6
+Hamburguesa de vacuno 180 g|19
+Queso Edam en lonchas 1 kg|4
+Mantequilla Albiero 1 kg|4
+Mantequilla en porciones 10 g|4
+Pepitas de pollo 12 g|19
+Pan focaccia precortado 80 g|7
+Pan de molde sin gluten|7
+Pan rústico redondo sin gluten|7
+Panecillo sin gluten|7
+Papel de horno siliconado|9
+Patatas fritas congeladas 3/8|8
+Pizza siciliana artesanal|8
+Popdots Lotus Biscoff|7
+Popdots pistacho|7
+Popdots sugar|7
+Milanesa de pollo|19
+Recortes de salmón ahumado|17
+Solomillo de cerdo|19
+Tarta de zanahoria sin gluten|7
+Tiras de pechuga de pollo asadas|19
+Cococha de bacalao desalada|17
+Concentrado de bacalao para pil-pil 100 ml|6
+Lomo de bacalao desalado|17
+Amortización de arrendamiento financiero|11
+Intereses de arrendamiento financiero|11
+Pazo de Barrantes La Comtesse 75 cl|12
+Marqués de Murrieta Reserva 75 cl|12
+Marqués de Murrieta Magnum|12
+Pazo de Barrantes 75 cl|12
+Bonificación 20 %|11
+Servicio de picking (logística frigorífica)|11
+Análisis de ósmosis doméstica y desinfección|11
+Cartucho de carbón compacto 10"|10
+Cartucho de sedimentos compacto 10" 5 micras|10
+Cartucho de sedimentos plisado lavable 10" 20 micras|10
+Codo mixto rosca macho 1/4" tubo 1/4"|10
+Desplazamiento y kilometraje|11
+Manguito reductor tubo 1/4" a 3/8"|10
+Mano de obra técnico|11
+Prefiltro encapsulado de carbón 12"|10
+Entrecot de vaca Hutten congelado|19
+Gildas de cecina, queso y huevo|20
+Helado de jengibre 2,5 l|7
+Salmón ahumado lingote con trufa blanca y oro 500 g|17
+Viruta pequeña de chocolate con leche|7
+Arenque ahumado con mostaza|17
+Brocheta capricho de chistorra|20
+Brocheta pig|20
+Buñuelo de choco y langostino 500 g|8
+Buñuelos de bacalao|8
+Caviaroli de yuzu 200 g|6
+Hamburguesa de wagyu congelada 200 g|19
+Manga de huevo clásica 250 g|6
+Suso crema 60 g|8
+Chuleta de cerdo Duroc joven congelada|19
+Secreto de cerdo congelado|19
+Chistorra extra|20
+Cola de langostino rebozada 500 g|8
+Cremositos de salmorejo|8
+Crepe tradicional neutro|7
+Croqueta de rape y gambas|8
+Croqueta panko de jamón|8
+Crujiente de alcachofa|6
+Gyoza de atún rojo|8
+Gyoza de rabo de toro|8
+Huevo cocinado a baja temperatura|4
+Leche frita casera|7
+Mini brochetas yakitori de pollo|8
+Oreja de cerdo adobada 500 g|19
+Pan de aceite para hamburguesa 60 g|7
+Papada curada de bellota 100 % ibérica|20
+Perlas mignonette para ostras|6
+Pintura de cebollino Caviaroli 250 ml|6
+Puerros confitados|5
+Gestión de residuos RGA por albarán|11
+Rollito de pato 20 g|8
+Rollito primavera de pato 20 g|8
+Roux oscuro Knorr 1 kg|6
+Solomillo de cerdo confitado|19
+Sorbete de limón|7
+Tarta carrot cake|7
+Tatin de manzana individual|7
+Twist green|6
+Ventresca de bonito en aceite de oliva 1/4|6
+Mini mollete andaluz 38 g|7
+Chuletón de vaca madurada Rinonada Behiki|19
+Servicio de elaboración (por kg)|11
+Salmón fresco entero|17
+Sacos de carbón|6
+Anchoas XL alta restauración|17
+Derechos notariales de crédito (corretaje)|11
+Descuento 20 %|11
+Diligencias y testimonios de protocolo electrónico|11
+Consulta al Registro Mercantil|11
+Prevención de riesgos: seguridad, higiene y ergonomía|11
+Vigilancia de la salud|11
+Aire acondicionado split de techo Kosner 9000 frigorías inverter|10
+Alquiler de cajas|11
+Comisión de venta|11
+Renovación de LEI|11
+Agua Vichy Catalán 30 cl|15
+Envase retornable botella Schweppes 20 cl|11
+Envase retornable caja Seven Up 20 cl|11
+Envase retornable caja AXL 35 cl|11
+Caja estuche térmica 3 botellas|9
+La Casera gaseosa 50 cl|15
+Envase retornable botella 50 cl|11
+Envase retornable botella Paolo 27,5 cl|11
+Envase retornable completo Premium Mix 30 cl|11
+Gestión de retirada de productos|11
+Beefeater Black 70 cl|14
+Envase retornable jaula La Casera 50 cl|11
+Envase retornable jaula Schweppes 20 cl|11
+Envase retornable jaula Paolo 27,5 cl|11
+La Casera gaseosa tinto de verano 27,5 cl|15
+Leche Puleva hostelería 1,5 l|4
+Leche Puleva semidesnatada 1 l|4
+Rappel sobre ventas|11
+Seven Up Zero 20 cl|15
+Schweppes limón zero 20 cl|15
+Schweppes tónica 20 cl|15
+Servicio de manipulación y acarreos|11
+Zumo Vida Selección melocotón 20 cl|15
+Zumo Vida Selección piña 20 cl|15
+Bomba de crema|7
+Boquillas|7
+Caja de 400 cañas|7
+Crema pastelera|7
+Palmera de chocolate|7
+Cola de alistado|17
+Filete de corvina|17
+Pulpo congelado|18
+Rodaja de pez espada|17
+Revuelto de setas|8
+Rollito de carrillada y setas|8
+Torpedo de langostino|8
+Tortillita de camarón|8
+Twister de langostino|8
+Carne de vieira|18
+Vieira media concha|18
+Alquiler de equipos de medida y lectura|11
+Bono social|11
+Cuota de gestión eléctrica|11
+Derechos de acceso eléctricos|11
+Derechos de enganche eléctricos|11
+Derechos de extensión eléctricos|11
+Término de energía|11
+Energía reactiva|11
+Término de potencia|11
+Impuesto eléctrico|11
+Calamar indio limpio troceado|18
+Callos preparados|19
+Chistorra|20
+Chorizo extra dulce|20
+Pan guttiau pergamena|7
+Croquetas de alcachofa|8
+Dátiles con almendra y bacon|8
+Focaccia|7
+Gilda de salmón y queso|8
+Lasaña florentina|8
+Magra con tomate y pimientos|19
+Morcón blanco|20
+Pesto fresco|6
+Pomodoraccino|6
+Medallón de queso de cabra|4
+Quesillo|7
+Salsa de tomate frito pouch 2,5 kg|6
+Tomate seco en tiras en aceite|6
+Torreznos de Soria|20
+Tortillita de langostino|8
+Carta doble A4 con bloc 13 vistas|10
+Carta doble A4 con bloc 7 vistas|10
+Logotipo en carta|11
+Portacuentas|10
+Helado de mantecado|7
+Alquiler de local|11
+Consumo de agua|11
+Consumo de electricidad|11
+Base de fusible BUC 160|10
+Boletín eléctrico pasado por Industria|11
+Bombilla LED GU10 7 W|10
+Brida de derivación 20 mm|10
+Cable libre de halógenos 1x6|10
+Caja estanca 100x100|10
+Caja de automáticos 14 elementos|10
+Caja estanca 80x80|10
+Canaleta Efapel 20x12,5|10
+Diferencial 2P 40 A AEG|10
+Diferencial 4P 40 A 30 mA AEG|10
+Downlight LED empotrable 12 W|10
+Enchufe schuko Efapel|10
+Enchufe schuko Oteo superficie|10
+Fuente de alimentación 35 W 24 V|10
+Fuente de alimentación 350 W 24 V|10
+Fusible 40 A 500 V gG|10
+Fusible NH 000 63 A gG|10
+Grapas|10
+Manguera 3x2,5|10
+Marco de 3 elementos Efapel TBR blanco|10
+Marco de 2 elementos Efapel TBR blanco|10
+Cable libre de halógenos 2,5|10
+Cable libre de halógenos 1x4|10
+Cable libre de halógenos 1x10|10
+Punteras aisladas TE-6 verde|10
+Sensor de movimiento 360º de techo|10
+Tapa de enchufe Efapel 90632 TBR blanco|10
+Térmico 3P+N 16 A curva C AEG|10
+Térmico 3P+N 40 A curva C AEG|10
+Térmico estrecho 2P 20 A AEG|10
+Térmico estrecho 2P 16 A|10
+Terminal CU T-10/10|10
+Tira LED 12 W 24 V|10
+Tira LED 5 m 24 W 24 V|10
+Tubo Artiglas negro 25|10
+Zócalo de 3 Efapel Logus superficie|10
+Chorizo criollo|20
+Chuletas de cordero lechal|19
+Mollejas de ternera|19
+Mollejas de cordero|19
+Tiras de asado de ternera|19
+Ajos tiernos congelados|5
+Cabezas de alistado|17
+Alitas crispy|8
+Bacalao en dados|17
+Bacon entero|20
+Burrata|4
+Cabecero ibérico|19
+Canelón de carne, trufa y foie|8
+Manitas de cerdo|19
+Secreto de cerdo congelado|19
+Solomillo de cerdo|19
+Coquina|18
+Cordero estofado|19
+Croquetas de cochinillo con manzana|8
+Espinacas congeladas|5
+Cola de gambón|18
+Gambón rebozado|8
+Judía plana troceada|5
+Judía redonda troceada|5
+Lágrima ibérica|19
+Mejillón media concha|18
+Carne de mejillón|18
+Mejillón tigre con bechamel|8
+Cocochas de merluza|17
+Mini palitos de emmental|8
+Nachos con cheddar|8
+Patatas prefritas 7/7|8
+Pimiento rojo en tiras|5
+Pimiento verde en tiras|5
+Alas de pollo|19
+Pollo estilo Kentucky|8
+Jamoncitos de pollo|19
+Muslo de pollo deshuesado|19
+Estampación de uniforme 1 color|11
+Gorro alto negro|10
+Gorro gran chef con velcro|10
+Pantalón unisex de cocina|10
+Bolsa de papel con asa plana 26x18x25 cm|9
+Cambio de lona de toldo|11
+Reparación de toldo|11
+Ajo pelado|5
+Bebida espirituosa 1715 1 L|14
+Chuleta de lomo de cerdo congelada|19
+Harina para fritura 5 kg|6
+Lomo de cerdo extra tierno ElPozo|19
+Media canal de cerdo|19
+Mermelada de arándanos La Vieja Fábrica 800 g|6
+Pimiento del piquillo en tiras 1,9 kg|6
+Rinonada de ternera|19
+Ampollas nitrificantes para vivero|10
+Bomba skimmer Octo AQ1800|10
+Transporte, colocación y puesta en marcha de vivero|11
+Visita de mantenimiento de vivero|11
+Vivero de marisco Mercury 200 VTR|10
+Altramuces|6
+Bonito seco|17
+Aceituna chupadedos|6
+Aceituna cuquillo|6
+Aceituna gordal 60/80|6
+Capellán seco|17
+Aceituna cóctel|6
+Aceituna gazpacho|6
+Aceituna rellena de anchoa|6
+Aceituna partida|6
+Alcaparrón|6
+Actualización FNEE gas|11
+Almacenamiento subterráneo de gas|11
+Alquiler de equipo de medida de gas|11
+Término fijo de gas (distribuidora)|11
+Cuota GTS gas|11
+Impuesto especial de hidrocarburos (gas)|11
+Peaje de gas (término variable)|11
+Tasa CNMC gas|11
+Energía gas natural|11
+Bolsa de basura negra 85x105 cm 100 L|9
+Bobina de aluminio industrial 30 cm|9
+Film PVC 30 cm|9
+Film PVC 45 cm|9
+Guantes de nitrilo azul sin polvo|9
+Guantes de vinilo azul sin polvo|9
+Papel vegetal 40x60 cm|9
+Agua San Pellegrino con gas 50 cl|15
+Agua Solán de Cabras 2 l|15
+Agua Solán de Cabras 33 cl|15
+Agua Solán de Cabras 50 cl|15
+Alubias cocidas Luengo 2,6 kg|6
+Anís Marie Brizard 1 L|14
+Anís Tenis seco 1 L|14
+Atún claro en aceite vegetal Arroyabe 900 g|6
+Atún claro en aceite de girasol Navegante 900 g|6
+Azúcar Azucarera 1 kg|6
+Brandy 1866 70 cl|14
+Brandy Cardenal Mendoza 70 cl|14
+Brandy Luis Felipe Gran Reserva 70 cl|14
+Brandy Magno 70 cl|14
+Cava Gramona Imperial Brut Corpinnat 75 cl|12
+Champagne Ruinart Blanc de Blancs 75 cl|12
+Champagne Ruinart Brut Reserva 75 cl|12
+Bombay Sapphire 70 cl|14
+Gin Botanicals Premium 70 cl|14
+G'Vine Floraison 70 cl|14
+Hendrick's 70 cl|14
+London Nº 3 70 cl|14
+Gin Mare 70 cl|14
+Mombasa Club 70 cl|14
+Licor 43 70 cl|14
+Aperol 1 L|14
+Baileys 1 L|14
+Campari 1 L|14
+Campari 70 cl|14
+Jägermeister 70 cl|14
+Licor de manzana sin alcohol Drols 1 L|14
+Licor de mora sin alcohol Drols 1 L|14
+Pacharán Baines Oro 70 cl|14
+Ponche Caballero 1 L|14
+Red Bull 25 cl|15
+Ron Bacardi 1 L|14
+Ron Barceló Imperial 70 cl|14
+Ron Brugal Extraviejo 70 cl|14
+Ron Cacique Añejo 70 cl|14
+Ron Matusalem 15 años 70 cl|14
+Ron Matusalem 7 años 70 cl|14
+Ron Negrita 70 cl|14
+Tequila Clase Azul Reposado 70 cl|14
+Tequila Don Julio Blanco 70 cl|14
+Tequila Don Julio Reposado 70 cl|14
+Tequila José Cuervo Silver 70 cl|14
+Tequila Patrón Reposado 70 cl|14
+Macán 75 cl|12
+Mistela La Manchega Extra 1 L|12
+Vermut Martini Blanco 1 L|12
+Vermut Martini Rojo 1 L|12
+Whisky Cardhu 12 años 70 cl|14
+Whisky DYC 8 años 70 cl|14
+Whiskey Four Roses 70 cl|14
+Whisky J&B 70 cl|14
+Jack Daniel's Apple 70 cl|14
+Johnnie Walker Blue Label 70 cl|14
+Whisky Macallan 12 años Double Cask 70 cl|14
+Dewar's White Label 70 cl|14
+Iraila|12
+Moscato d'Asti Duchessalia|12
+Pazo La Cuesta Godello|12
+Pazo La Cuesta Mencía|12
+Manguera Aqua 19 mm 25 m|10
+Fertilizante Blaukorn 5 kg|10
+Planta calla blanca|10
+Maceta cerámica Maiori 19x17 cm|10
+Planta chlorophytum (cintas)|10
+Plantel de tomate Marmande raf (pack 6)|10
+Plantel de tomate pera Encanar (pack 6)|10
+Plantel de escarola lisa (pack 12)|10
+Planta de fresa|10
+Melocotonero|10
+Planta cocos nucifera|10
+Planta de hierba buena|10
+Planta de hierba luisa|10
+Plantel de judía redonda de enrame (pack 6)|10
+Palmera kentia|10
+Kumquat|10
+Platanera (Musa acuminata)|10
+Planta de perejil|10
+Potho con tutor 1,25 m|10
+Planta de sandía rayada|10
+Pistola de riego metal/caucho 8 formas|10
+Planta de tomate de espaldera|10
+Kit de nebulizadores 25-50 m2|10
+Ventilador 20"|10
+Descalcificador Winterhalter A 70 LS|9
+Abrillantador Winterhalter B 100 N|9
+Bomba de desagüe 220-240 V|10
+Desplazamiento técnico zona 1|11
+Detergente de cristal Winterhalter F 40|9
+Manguera DN5|10
+Mano de obra técnico especialista|11
+Alfombrilla desodorizante para urinario|9
+Ambientador Spa Air Freshener 250 ml|9
+Cono suplemento porta chemi coreless|9
+Dispensador de ambientador a pilas|9
+Insecticida carga baja 250 ml|9
+Portarrollos Chemi blanco serie Dynamic|9
+Instalación de dispensadores|11
+Toallita perfumada Luxe|9
+Mantenimiento y asesoramiento en protección de datos|11
+Bolsa de basura 55x60 cm 30 L|9
+Vaso caña extragrueso|10
+Cubitera flexible de silicona 6 cubitos|10
+Folios Navigator 80 g 500 hojas|9
+Lejía amarilla Kiriko 2 L|9
+Paletina de madera biodegradable 9 cm 100 ud|9
+Pilas alcalinas Panasonic 3A (4 ud)|10
+Papel industrial en bobina|9
+Papel secamanos|9
+Rotulador Pilot negro|10
+Pincho de bambú 12 cm|9
+Plato de pulpo 14 cm|10
+Plato de pulpo 20 cm|10
+Plumero maxi largo|9
+Rollo de fibra verde 600x15 cm|9
+Saco de basura negro 85x105 cm 120 L|9
+Salsera reutilizable con tapa|9
+Salvamantel de mimbre 30 cm|10
+Lavavajillas ultraconcentrado|9
+Vaso de cartón 120 cc|9
+Vaso con tapa 250 cc|9
+Vaso cubata ancho|10
+Aceituna gordal con hueso|6
+Aceituna rellena de anchoa|6
+Aguacate|5
+Albahaca|5
+Alcachofa laminada en conserva|6
+Alcaparras|6
+Alubia blanca seca|6
+Alubia cocida|6
+Arroz basmati|6
+Arroz de grano medio|6
+Arándano fresco|5
+Bacon en tiras|20
+Barquillo cilíndrico|7
+Batidor de acero inoxidable 34 cm|10
+Berenjena negra|5
+Báscula de cocina Orbegozo PC3100|10
+Cebolla|5
+Cebolla dulce|5
+Cebolla en cubos|5
+Cebolla morada|5
+Cebollino|5
+Dulce de membrillo|6
+Edamame congelado|8
+Ensalada de wakame|6
+Espaguetis|6
+Espinaca baby|5
+Espárrago verde|5
+Etiquetas para recipiente hermético|9
+Fresa|5
+Fuet|20
+Guantes de nitrilo negros|9
+Guisantes congelados|8
+Harina de trigo uso común|6
+Harina para freír|6
+Leche condensada entera|4
+Lechuga trocadero|5
+Lenteja pardina|6
+Lima|5
+Mango en cubos congelado|8
+Mantequilla|4
+Manzana golden|5
+Mermelada de arándanos|6
+Mermelada de naranja amarga|6
+Mermelada de pimiento|6
+Mermelada de tomate|6
+Mezcla de frutas del bosque congelada|8
+Mezcla de setas|5
+Micromezclum clásico|5
+Micromezclum con flores|5
+Micromezclum picante|5
+Miel de caña|6
+Miel de flores|6
+Migas de bacalao desalado|17
+Milka Chocoswing 300 g|7
+Mini maíz|5
+Mini pepino dulce|5
+Minimagdalenas rellenas|7
+Mirin|6
+Miso blanco|6
+Morcilla de Burgos|20
+Morcilla de cebolla|20
+Morcillo de vaca|19
+Mortadela|20
+Mostaza Dijon|6
+Mostaza Rioba biberón 300 g|6
+Mostaza antigua|6
+Mozzarella perlas|4
+Mozzarella rallada|4
+Nabo|5
+Nachos con jalapeños|6
+Naranja de mesa|5
+Naranja de zumo|5
+Nata para montar|4
+Nescafé Classic natural 200 g|16
+Nuez mondada|6
+Nuez moscada molida|6
+Obleas de empanadilla|7
+Oreja de cerdo cocida|19
+Orejones de albaricoque|6
+Pak choi|5
+Paleta de cerdo|19
+Palmeritas de chocolate|7
+Palo cortado Península 75 cl|12
+Palo de aluminio 150 cm|9
+Pan bao|7
+Pan de 15 cereales|7
+Pan de hamburguesa con sésamo|7
+Pan de hamburguesa rústico XXL|7
+Pan de hostelería Bimbo|7
+Pan de molde sin gluten Dr. Schär|7
+Pan de molde sándwich|7
+Pan mini hamburguesa|7
+Pan pita|7
+Pan rallado|6
+Pan rombo|7
+Panceta ahumada|20
+Panceta curada|20
+Panceta ibérica|20
+Papel antigrasa|9
+Papel de arroz|6
+Papel vegetal|9
+Papelera basculante 50 l|10
+Pasas sultanas|6
+Pasta de achiote|6
+Pasta de ajo negro|6
+Pasta de ají amarillo|6
+Pasta de curry rojo|6
+Pasta de soja doenjang|6
+Pasta de soja gochujang|6
+Pasta kataifi|7
+Pastillas de encendido|9
+Patata agria lavada|5
+Patata de guarnición|5
+Patata en juliana|5
+Patata monalisa lavada|5
+Patata para tortilla|5
+Patata violeta|5
+Patatas paja|6
+Pechuga de pavo en lonchas|20
+Pechuga de pavo para sándwich|20
+Pedro Ximénez dulce Delgado 5 l|12
+Pepinillos en vinagre|6
+Pepino|5
+Perejil|5
+Perlas de yuzu|6
+Pesto genovese|6
+Picos selección gourmet|7
+Pimentón dulce DOP|6
+Pimienta negra en grano|6
+Pimiento California amarillo|5
+Pimiento dulce Trimini|5
+Pimiento en dados|5
+Pimiento habanero|5
+Pimiento pequeño dulce|5
+Pimiento rojo|5
+Pimiento rojo en tiras en conserva|6
+Pimiento rojo italiano|5
+Pimiento rojo y verde en tiras|5
+Pimiento rojo, verde y amarillo|5
+Pimiento verde|5
+Pinza jumbo inox 30 cm|10
+Piparra en conserva|6
+Piparra fresca|5
+Piruleta de corazón|7
+Pistacho en polvo|6
+Pistacho granillo|6
+Pisto|6
+Piña|5
+Piñón chino|6
+Plancha Sacher|7
+Preparado de queso fundido y mozzarella|4
+Preparado para pizza en grano|4
+Puerro|5
+Puré de mango|6
+Pétalos negros de sal|6
+Queso brie en brique|4
+Queso crema|4
+Queso mascarpone|4
+Ragout de ternera|19
+Recambio de gas para soplete|10
+Remolacha cocida|5
+Repollo rizado|5
+Romero|5
+Sal fina|6
+Sal gruesa|6
+Salmón fresco|17
+Salsa de queso cheddar|6
+Salsa kimchi|6
+Solomillo de cerdo|19
+Tomate cherry|5
+Tomate cherry mix cinco sabores|5
+Tomate pelado en lata|6
+Tomate rojo|5
+Tortilla chips|6
+Tortilla de trigo 25 cm|7
+Vaso chiquito 210 ml|9
+Vinagre de limpieza|9
+Vinagre de vino blanco|6
+Virutas de chocolate con leche|7
+Virutas de chocolate marmolizadas|7
+Virutas de jamón|20
+Yogur Oikos fresa|4
+Zanahoria baby|5
+Ñora|6
+Ventresca de atún rojo|17
+Cerdo desmigado (pulled pork)|19
+Zamburiña con coral media concha|18
+Gilda tradicional|6
+Pan de trigo país moreno|7
+Aguja de cerdo deshuesada|19
+Aguja de ternera|19
+Cadera de ternera|19
+Callos de vacuno|19
+Churrasco de ternera|19
+Cochinillo|19
+Costillas de cerdo en tiras|19
+Cuello de cordero lechal|19
+Entrecot de vaca|19
+Falda de ternera|19
+Lomo bajo de angus|19
+Lomo bajo de wagyu|19
+Lomo de buey gallego con hueso|19
+Lomo de vaca|19
+Lomo de vaca madurada|19
+Paletilla de cordero lechal|19
+Secreto de cerdo|19
+Solomillo de ternera|19
+Aalto PS Magnum|12
+Aalto PS 75 cl|12
+Alanda blanco 75 cl|12
+Bienlarme Lágrimas Bellas 75 cl|12
+Coma Vella 75 cl|12
+El Puntido 3 L|12
+Gorvia Dona blanca 75 cl|12
+Majuelos de Callejo 75 cl|12
+Sierra Cantabria (obsequio)|12
+Aceite de oliva virgen extra Oro Bailén picual 50 cl|6
+Páramo de Corcos ecológico 75 cl|12
+Rafael Palacios Louro 75 cl|12
+San Vicente Magnum|12
+Sapientia verdejo ecológico 75 cl|12
+Valderiz tinto fino 75 cl|12
+Patatas fritas en lata 40 g|6
+Patatas fritas lisas 50 g|6
+Bol Everest con tapa 22 cm|10
+Plato de presentación Bordado Chef 31 cm|10
+Chaira oval diamante 25 cm|10
+Chaira profesional 25 cm|10
+Cuchara de bambú 14 cm|10
+Frappé decantador con enfriador|10
+Jarrón de cemento rústico 26x29 cm|10
+Jarrón de cemento rústico 31x38 cm|10
+Plato de presentación Lluvia 33 cm|10
+Paellero de sobremesa a gas|10
+Plato oval Stone 23x15 cm|10
+Ramo de flor seca lavanda|10
+Rompemariscos de acero inox|10
+Sierra de carnicero 43 cm|10
+Tarro de miel con tapa de madera|10
+Tenedor cuchara de marisco|10
+Plato Texture Crocodile 33 cm|10
+Anchoa en aceite Hansa 14/16 filetes|17
+Bacón ahumado|20
+Boquerones en vinagre|17
+Fondo de montaña Paellalia 410 g|6
+Fondo de pescado Paellalia 410 g|6
+Jamón deshuesado gran reserva Altos de Iberia|20
+Lacón cocido ahumado|20
+Lomo adobado|20
+Mantequilla Kerrygold con sal 200 g|4
+Mantequilla Pont Morin 1 kg|4
+Queso azul Paladín|4
+Queso cremoso de untar cubo 3 kg|4
+Queso provolone Albiero|4
+Queso de rulo Mont de France|4
+Queso semicurado mezcla Dialse|4
+Salmorreta Paellalia 140 g|6
+Salmorreta Paellalia 380 g|6
+Tomate asado a la leña El Labrador 720 ml|6
+Tomate asado y pimiento Hortamed 465 g|6
+Tomate rallado El Labrador 720 ml|6
+Tomate seco El Labrador 370 ml|6
+Ventresca de atún El Capricho 115 g|6
+Envase de aluminio 220x158x36 mm|9
+Tapa de cartón para envase 220x158 mm|9
+Envase de aluminio 313x212x38 mm|9
+Tapa de cartón para envase 313x212 mm|9
+Tapa transparente para cuenco 450280|9
+Cuenco de aluminio 114/58x50 mm|9
+Envase de aluminio para pollo asado 205x57 mm|9
+Tapa de cartón para envase de pollo asado|9
+Bayeta de microfibra amarilla|9
+Bayeta de microfibra verde|9
+Bobina de celulosa Chemine extra 1 kg|9
+Bol de caña de azúcar 350 cc|9
+Envase Cook negro ovalado 1250 cc|9
+Envase Cook negro ovalado 400 cc|9
+Tapa PP para envase Cook 1250|9
+Tapa PP para envase Cook 400/600|9
+Ensaladera de cartón kraft 1300 cc|9
+Tapa PET para ensaladera 184 mm|9
+Mantenimiento de extintor 6 kg ABC|11
+Recarga de extintor 6 kg ABC|11
+Escarapota|17
+Rey|17
+Escalopa de foie gras congelada 50 g|19
+José Pariente Sauvignon blanc 75 cl|12
+José Pariente Sauvignon blanc Magnum|12
+QS|12
+Terras Gauda 75 cl|12
+Terras Gauda Magnum|12
+Trompeta de la muerte seca 1 kg|5
+Ventresca de bonito en conserva|6
+Cabeza de cerdo|19
+Chorizo|20
+Panceta de cerdo|19
+Salados de cerdo|19
+Cable RCA-RCA 4 m|10
+Materiales varios|10
+Amplificador de megafonía T-4240MP 4x240 W|10
+Almendra molida|6
+Bayas de goji|6
+Cóctel de frutos secos|6
+Golosinas Fini mix goma pica|7
+Flor de hibisco|16
+Golosinas Jake mini max azúcar|7
+Mix de frutos secos para ensalada|6
+Piñones|6
+Accesorios de PVC|10
+Barra abatible satinada 80 cm|10
+Forro aislante|10
+Flexo de grifo extensible 1 m|10
+Grifo de fregadero con maneta medicinal|10
+Recambios de calentador Ariston|10
+Pulsador Sigma negro para cisterna empotrada|10
+Pulsador de urinario Grohe|10
+Tapas WC negras|10
+Toma de desagüe para lavadora|10
+Tubo PVC cromado 32|10
+Tuerca de sifón cromada|10
+Válvula de fregadero|10
+Albaricoque valenciano|5
+Envase retornable batea o bandeja|11
+Berenjena blanca|5
+Envase retornable caja Campo|11
+Cereza|5
+Ciruela President|5
+Envase perdido|11
+Envase retornable caja Cunera|11
+Envase caja Turia sin coste|11
+Envase Petit Suis|11
+El Perro Verde Selección Especial 75 cl|12
+Cubitera ovalada Fenomenal|10
+Fenomenal Verdejo ecológico 75 cl|12
+Fenomenal Verdejo ecológico Magnum|12
+Paxaro Tolo 75 cl|12
+Sacacorchos Pulltap's slider El Perro Verde|10
+Remírez de Ganuza Trasnocho 75 cl|12
+Torbreck Runrig Shiraz 75 cl|12
+Control de plagas|11
+Aguardiente de orujo Quemeira 70 cl|14
+Cachito Loco crema de fresa 70 cl|14
+Crema de orujo Quemeira 70 cl|14
+Gintleman Black 70 cl|14
+Gintleman Strawberry 70 cl|14
+Licor Bello Castello Superiore 70 cl|14
+Licor de limón Bello Castello 70 cl|14
+Licor herbero Cabasset 70 cl|14
+Licor de hierbas Quemeira 70 cl|14
+Blue Bird manzana verde 70 cl|14
+Blue Bird mora 70 cl|14
+Moscatel Grano de Oro 1 l|12
+Palet 1200x800|9
+Promoción especial|11
+Caviar Pure Huso dauricus 10 g|17
+Caviar Pure Huso dauricus 30 g|17
+Caviar Pure Huso dauricus 50 g|17
+Dispositivos a plazos|11
+Fibra y llamadas|11
+Pack Love Empresa Impulsa|11
+Calamar limpio|18
+Choco limpio|18
+Pez espada|17
+Gamba blanca|18
+Gamba blanca pelada|18
+Quisquilla extra|18
+Rascacio|17
+Salteado de setas congelado|5
+Alfonsiño|17
+Bogavante azul|18
+Bogavante de Canadá|18
+Clochina|18
+Cola de rape|17
+Ostra Gillardeau|18
+Ostra Peter Pan|18
+Ostra Royale David Hervé|18
+Tellina|18
+Zamburiña|18
+Comisión gestión cheques restaurante|11
+Bordado de camisa|11
+Camisa manga larga cuello camisero|10
+Gorro alto de popelín negro|10
+Pantalón chino slim caballero|10
+Pantalón chino slim señora|10
+Azúcar en sobres corazón San Valentín|6
+Azúcar moreno Salzillo stick 6 g|6
+Azúcar Salzillo sobres 6 g|6
+Café Barrocco 3 kg|16
+Café descafeinado Esmeralda 2 kg|16
+Descafeinado soluble Salzillo sobres|16
+Edulcorante en polvo Salzillo sobres|6
+Leche condensada desnatada Sirve Fácil 840 g|4
+Leche condensada desnatada en sobres|4
+Manzanilla Salzillo sobres|16
+Mercancía en depósito|11
+Poleo Salzillo sobres|16
+Taza mug con tapa blanca|10
+Taza y plato cortado Barrocco|10
+Taza y plato solo arte blanco|10
+Taza y plato solo Barrocco|10
+Té Salzillo sobres|16
+Té verde Salzillo sobres|16
+Visita comercial|11
+Ventresca de atún rojo de almadraba|17
+Alojamiento|11
+Tasa turística|11
+Pan de cristal 1/2 kg|7
+Pan de cristal 1 kg|7
+Brillante|18
+Envases de cajas de pescado|11
+Inspección de baja tensión|11
+Gestión de redes sociales|11
+Hosting y dominio web|11
+Tasas del Registro Mercantil|11
+Mantenimiento anual Cashkeeper Plus|11
+Mantenimiento anual Cash Infinity Basic|11
+Servicio técnico anual de caja|11
+Parpatana de atún rojo|17
+Falso rodaballo|17
+Rape negro|17
+Helado de crema de coco|7
+Helado de queso|7
+A Coroa Godello 200 Cestos 75 cl|12
+Mirum Ribera del Duero 75 cl|12
+Channel Manager OpenTable|11
+Channel Manager Reservas de Google|11
+CoverBookings servicios|11
+Servicio de reconfirmación|11
+Web booking engine por pax|11
+904 Gran Reserva 75 cl|12
+Boletus edulis en aceite de oliva A. Sádaba 850 ml|6
+Pimientos del piquillo artesanos A. Sádaba 425 ml|6
+Pimientos del piquillo rellenos de atún A. Sádaba 1 l|6
+Piparras picantes sabor dulce A. Sádaba 370 ml|6
+Yemas de espárrago A. Sádaba 370 ml|6
+Langostino cocido 30/40|18
+Alión 75 cl|12
+Bacalao salado en filetes|17
+Chartreuse arándanos 70 cl|14
+Codillo de cerdo 300 g|19
+Condado de Haza Crianza Magnum|12
+Costilla de cerdo barbacoa|19
+Cremoso de chipirón 2 kg|8
+Fever-Tree ginger beer 20 cl|15
+Fever-Tree grapefruit 20 cl|15
+Fever-Tree raspberry 20 cl|15
+Fever-Tree tónica Indian 20 cl|15
+Fever-Tree ginger ale 20 cl|15
+JO Sylarion 75 cl|12
+JO Vatan 75 cl|12
+Juvé & Camps Cava Milesime 75 cl|12
+La Gula del Norte pack 2x150 g|17
+Lagar de Cervera Albariño 75 cl|12
+Lagar de Cervera Albariño Magnum|12
+Martelo Rioja 75 cl|12
+Mix de 7 setas Tre Cime 1 kg|5
+Licor de saúco Nojae 70 cl|14
+Orejas de cochinillo 300 g|19
+Paco y Lola Vintage 75 cl|12
+Pintia 75 cl|12
+Piruli de codorniz|19
+Croqueta de bacalao Precoan 25 g|8
+Kuyper Amaretto Sour 1 l|14
+Kuyper Espresso Martini 1 l|14
+Kuyper Margarita 1 l|14
+Kuyper Mojito 0,0 1 l|15
+Kuyper Mojito 1 l|14
+Kuyper Piña Colada 1 l|14
+Kuyper Pornstar Martini 0,0 1 l|15
+Kuyper Pornstar Martini 1 l|14
+Teisseire puré de coco 1 l|6
+Teisseire puré de fresa 1 l|6
+Teisseire puré de piña 1 l|6
+Anticipo de cliente (aplicación)|11
+Bao de cerdo|8
+Barra de pan grande|7
+Barra de pan integral|7
+Bocadillo (pan)|7
+Carcasas de pollo|19
+Cava Visiega brut 75 cl|12
+Coladores|10
+Contramuslo de pollo|19
+Contramuslo de pollo deshuesado con piel|19
+Contramuslo de pollo deshuesado sin piel|19
+Contribución a SCRAP (Naturcid)|11
+Coquita|7
+Costilla de cerdo|19
+Descuento comercial|11
+El jardín de Lucía 2025|12
+Fideo chino|6
+Filete de salmón|17
+Flan Royal en bote 800 g|7
+Hilo de cocina|10
+Kiwi Gold|5
+Manzanilla dulce ecológica Naturcid|16
+Mezcla de setas deshidratadas|6
+Moldes redondos 10x4,5 cm|10
+Néctar de piña Rioba 1 l|15
+Pasta de wasabi|6
+Pedro Ximénez Don Pablo 75 cl|12
+Picada mixta|19
+Pimiento del piquillo entero|6
+Pinzas de emplatar|10
+Plátano|5
+Plátano prefrito|8
+Polenta|6
+Poleo ecológico Naturcid|16
+Porta comandas inox 50 cm|10
+Praliné de almendra La Casa 128 g|7
+Preparado para rebozados sin gluten|6
+Presa ibérica|19
+Proespuma frío Sosa|6
+Profiteroles de nata|7
+Puerro limpio|5
+Pulled pork BBQ|19
+Pulverizador de pistola 1 l|9
+Pulverizador de pistola 500 ml|9
+Puré de açaí|6
+Puré de coco|6
+Puré de fresa|6
+Puré de mandarina|6
+Puré de manzana Granny|6
+Puré de patata Mousline|6
+Puré de piña|6
+Queso Idiazabal|4
+Queso Philadelphia original|4
+Queso blanco en salmuera para ensalada|4
+Queso cheddar en lonchas|4
+Queso crema sin lactosa|4
+Queso curado en escamas|4
+Queso de cabra fresco|4
+Queso de vaca ahumado en lonchas|4
+Queso emmental en barra|4
+Queso feta DOP Dodoni|4
+Queso feta en salmuera|4
+Queso gorgonzola|4
+Queso mezcla semicurado|4
+Queso provolone|4
+Queso rallado en hilo para pizza|4
+Ramen shoyu|6
+Ramequín inox 45 cl|10
+Renting vehículo Mercedes|11
+Repollo liso|5
+Rollo de cocina Scottex|9
+Rollo escurreplatos antideslizante 3 m|10
+Roscón de Reyes|7
+Rotulador permanente negro|10
+Rotuladores fluorescentes|10
+Rúcula|5
+Salchicha bratwurst|20
+Salchicha de pavo|20
+Salchichón extra|20
+Salchichón ibérico|20
+Salchichón pagès|20
+Salicornia|5
+Salmorejo sin gluten|6
+Salmorreta|6
+Salsa Worcestershire|6
+Salsa bacon ahumado Heinz|6
+Salsa barbacoa|6
+Salsa chili dulce|6
+Salsa chipotle|6
+Salsa de pescado|6
+Salsa de queso mexicana|6
+Salsa hoisin|6
+Salsa kebab|6
+Salsa ponzu|6
+Salsa romesco|6
+Salsa sambal oelek|6
+Salsa tartufata|6
+Salsa teriyaki|6
+Salvamanteles de papel|9
+Salvia|5
+Sartén de aluminio antiadherente 28 cm|10
+Sartén de inox 20 cm|10
+Sartén degustación 9,5 cm|10
+Sartén honda de aluminio 24 cm|10
+Secreto de cerdo Duroc|19
+Seta shiitake|5
+Seta shiitake deshidratada|6
+Sirope de caramelo|6
+Snack de algas|6
+Sobrasada de Mallorca|20
+Sobrasada ibérica|20
+Solomillo de cerdo Duroc|19
+Soplete de hostelería|10
+Sucedáneo de caviar de mújol|6
+Tabla de corte azul GN 1/1|10
+Tabla de corte roja GN 1/1|10
+Tapa inox GN 1/1|10
+Tapa inox GN 1/2|10
+Tapa para bandeja de microondas|9
+Tapa para ensaladera 1300 ml|9
+Tartaleta de frambuesa|7
+Tartar de fuet|20
+Tejas de Tolosa|7
+Temporizador digital|10
+Tenedor de marisco inox|10
+Tijera de cocina|10
+Tinta de sepia|6
+Tocino ibérico|20
+Tomate en rama|5
+Tomate frito|6
+Tomate pera|5
+Tomate rallado|6
+Tomillo|5
+Tomillo limón|5
+Topping de huesitos|7
+Tortilla de maíz 15 cm|7
+Tortilla de patata con cebolla|6
+Tortilla de trigo 12 cm|7
+Tortilla de trigo 15 cm|7
+Tortilla de trigo 20 cm|7
+Trasero de pollo|19
+Trituradora Metro Professional 60 l|10
+Turrón de chocolate Suchard|7
+Té verde con limoncillo Pompadour|16
+Uva roja sin pepitas|5
+Vaso Country 36 cl|10
+Vaso chato transparente 12 cl|9
+Venta por volumen|11
+Vinagre de Jerez|6
+Vinagre de Jerez reserva 12 años|6
+Vinagre de arroz|6
+Vinagre de manzana|6
+Vino blanco Cerro Cruz brick 1 l|12
+Vino blanco Gilda verdejo 75 cl|12
+Vino blanco Pazo de Villarei godello 75 cl|12
+Vino blanco Rama Corta verdejo 75 cl|12
+Vino blanco Señorío Real verdejo 75 cl|12
+Vinoteca de doble temperatura 32 botellas|10
+Vodka Eristoff 1 l|14
+Volovanes|7
+Xia jiao de langostino|8
+Yogur griego azucarado|4
+Yogur natural Danone|4
+Zanahoria con hoja|5
+Zumo Granini tomate 20 cl|15
+Zumo de açaí y manzana 75 cl|15
+Zumo de manzana y mango 75 cl|15
+Zumo de manzana, fresa y frambuesa 75 cl|15
+Zumo de naranja, zanahoria y jengibre 75 cl|15
+Tiras de pollo sweet chili|8
+Camembert empanado|8
+Queso fresco Cabezuelo|4
+Queso fresco en tempura|8
+Setas variadas congeladas|5
+Tarta de queso y pistacho|7
+Chichas ibéricas Joselito|19
+Panceta curada Joselito|20
+Château Giscours 75 cl|12
+El Seque 75 cl|12
+Fefiñanes 75 cl|12
+Gewürztraminer Léon Beyer 75 cl|12
+Château Pindefleurs 75 cl|12
+Viña Tondonia Reserva blanco 75 cl|12
+Servicio de maestro cortador para evento|11
+Servicio de corte de jamón y envasado|11
+Cadera de vaca|19
+Chuleta T-bone de vaca|19
+Chuletón de vaca selección|19
+Lomo bajo de vaca|19
+Morcilla de arroz de Burgos|20
+Solomillo de vaca|19
+La Rubia 18/70 33 cl|13
+Agua Vichy Catalán 25 cl|15
+Amstel 33 cl|13
+Amstel Oro 0,0 33 cl|13
+Amstel Radler limón 33 cl|13
+Cruzcampo barril 20 l|13
+Cruzcampo barril 50 l|13
+El Águila sin filtrar barril 20 l|13
+Bitter Kas|15
+El Alcázar 33 cl|13
+Sidra Ladrón de Manzanas 33 cl|13
+Cruzcampo Especial sin gluten 33 cl|13
+Cruzcampo Gran Reserva 33 cl|13
+Desperados 33 cl|13
+El Águila 33 cl|13
+El Águila sin filtrar 33 cl|13
+Envase retornable caja cerveza 33 cl|11
+Envase barril 20 l|11
+Envase barril 50 l|11
+Fianza tubo carbónico|11
+Heineken 0,0 33 cl|13
+Heineken 33 cl|13
+Judas 33 cl|13
+Mort Subite Kriek 25 cl|13
+Paulaner Hefe Weissbier 50 cl|13
+Plástico de envase 33 cl|11
+Sol 33 cl|13
+Tubo carbónico 12 kg|11
+Jack Daniel's Bonded Rye 70 cl|14
+Jack Daniel's Fire 70 cl|14
+London Nº 1 70 cl|14
+Martin Miller's 70 cl|14
+Tanqueray 0,0 70 cl|14
+Baileys 70 cl|14
+Licor de limón Villa Massa 70 cl|14
+Pacharán Berezko 1 l|14
+Pacharán Zoco 1441 70 cl|14
+Sambuca Molinari Extra 1 l|14
+Granadina Rives sin alcohol|15
+Orujo Afilador de café 70 cl|14
+Orujo Afilador crema 70 cl|14
+Orujo Afilador de hierbas 70 cl|14
+Ron Don Papa Masskara 70 cl|14
+Ron Legendario Elixir 7 años 70 cl|14
+Tequila Patrón Añejo 70 cl|14
+Tequila Patrón Silver 70 cl|14
+J&B 70 cl|14
+Cecina de wagyu|20
+Queso manchego curado Adiano|4
+Queso manchego semicurado Adiano|4
+Godeval Cepas Vellas 75 cl|12
+Gramona Imperial Gran Reserva Brut 75 cl|12
+Gramona Tres Lustros Gran Reserva Brut 75 cl|12
+Bagús 75 cl|12
+Bagús Magnum|12
+Balbás Ancestral 75 cl|12
+Casal de Armán blanco 75 cl|12
+Bermejo Malvasía seco ecológico 75 cl|12
+Mano de obra y desplazamiento|11
+Retirada de lamas y colocación de marco con tornillos|10
+Chapa perforada 2x1 galvanizada lacada|10
+Marco fijo de ángulo 40 con tramex|10
+Pan diamantino 35 g|7
+Salsa de soja Kikkoman sin gluten 1 l|6
+Cookie deluxe 280 g|7
+Lomo alto de wagyu A5|19
+Chuletero de buey madurado|19
+Maltosec Sosa 500 g|6
+Costilla de cerdo troceada|19
+Filete de gallineta|17
+Fingers de pollo|8
+Taquitos de cerdo empanados|8
+Albóndigas de ajo y perejil|19
+Aguacate en dados congelado|5
+Trufa de verano congelada|5
+Rinonada con solomillo de ternera|19
+Boquerón fresco|17
+Brioche neutro 35 g sin sésamo|7
+Buñuelos de chocolate|7
+Vieira gratinada 120 g|8
+Caballa fresca|17
+Cañaílla|18
+Escalope de foie gras|19
+Chanquete|17
+Hoja de bambú para chimaki Zasa|6
+Aceite de oliva virgen extra 280 g|6
+Cola de rape congelada|17
+Salchichón Casa Sendra|20
+Dentón|17
+Buñuelo negro de bacalao con alioli 15 g|8
+Lomo de salmón fresco|17
+Fresh pearls lima limón 55 g|6
+Centro de jamón serrano|20
+Mayonesa de wasabi 1 kg|6
+Salsa holandesa 1 kg|6
+Salsa de mantequilla blanca 1 kg|6
+Praliné de almendra tostada|7
+Mix de pétalos|5
+Jamón serrano reserva deshuesado|20
+Trufa negra de invierno fresca|5
+Trufa de verano fresca|5
+Langostino nacional|18
+Lomo alto de vaca|19
+Lomo de lubina|17
+Mantequilla Soresina 1 kg|4
+Mejillón de roca|18
+Wasabi en pasta Neri 43 g|6
+Anchoa en salazón 200 g|17
+Chuletero de vaca Simmental|19
+Mini hamburguesa de vaca 38 g|19
+Aceitunas kalamata XL con hueso 2 kg|6
+Pan bao blanco 60 g|7
+Panko 10 kg|6
+Puntilla|18
+Ventresca de atún claro en conserva|6
+Solomillo de añojo|19
+Chile chipotle adobado 215 g|6
+Cochinita pibil|19
+Goldroche individual|7
+Trocadero individual|7
+Barra de pan nature essencia 850 g|7
+Laurent-Perrier La Cuvée 75 cl|12
+Laurent-Perrier Millésimé 75 cl|12
+Laurent-Perrier Millésimé Magnum|12
+Laurent-Perrier Cuvée Rosé 75 cl|12
+Marqués de Riscal Gran Reserva 150 Aniversario 75 cl|12
+Marqués de Riscal XR Rosado 75 cl|12
+Barón de Chirel Blanco 75 cl|12
+Barón de Chirel Tinto Magnum|12
+Barón de Chirel Tinto 75 cl|12
+Barón de Chirel Tinto 3 l|12
+Marqués de Riscal XR Tinto Magnum|12
+Marqués de Riscal XR Tinto 75 cl|12
+Laurent-Perrier La Cuvée Salmanazar 9 l|12
+Laurent-Perrier La Cuvée Baltasar 12 l|12
+Laurent-Perrier La Cuvée Matusalén 6 l|12
+Laurent-Perrier La Cuvée Magnum|12
+Laurent-Perrier Cuvée Rosé Magnum|12
+Laurent-Perrier Grand Siècle Magnum|12
+Laurent-Perrier Grand Siècle 75 cl|12
+Laurent-Perrier Alexandra Rosé 75 cl|12
+Arienzo 75 cl|12
+Finca Montico Gran Vino 75 cl|12
+Limousin Gran Vino 75 cl|12
+Laurent-Perrier Heritage 75 cl|12
+Laurent-Perrier Ultra Brut 75 cl|12
+Marqués de Riscal Verdejo sobre lías finas 75 cl|12
+Copa Spiegelau Marqués de Riscal|10
+Drop stop Marqués de Riscal|10
+Champanera Laurent-Perrier grande con asa de cuero|10
+Champanera Laurent-Perrier magnum con asa de cuero|10
+Champanera Laurent-Perrier pequeña con asa de cuero|10
+Copa Laurent-Perrier 16 cl|10
+Copa flauta Laurent-Perrier 28 cl nº 5|10
+Posavasos Laurent-Perrier plata|10
+Sacacorchos Marqués de Riscal|10
+Servidor de vino antigoteo|10
+912 de Altitud 12 meses Magnum|12
+912 de Altitud 12 meses 75 cl|12
+912 de Altitud 9 meses Magnum|12
+912 de Altitud 9 meses 75 cl|12
+912 de Altitud al cuadrado 75 cl|12
+912 de Altitud Verdejo sobre lías 75 cl|12
+Abridores (caja)|10
+Aceite de oliva virgen extra Capri Picual primer día de cosecha 500 ml|6
+Brión Cepas Vellas Godello 75 cl|12
+Brión Cepas Vellas Brancellao 75 cl|12
+Ron Capitán Morgan Dark 1 L|14
+Chartreuse amarillo 70 cl|14
+Finca Rodma Avizor 75 cl|12
+Finca Rodma Selección 75 cl|12
+Gastos de devolución de recibo|11
+Gran Rodma 75 cl|12
+Whisky Macallan Diamond SII 70 cl|14
+Monin puré de fruta de la pasión 1 L|15
+Monin puré de mango 1 L|15
+Licor St-Germain flor de saúco 70 cl|14
+Sirope Monin manzana verde 70 cl|15
+Sirope Monin melocotón 70 cl|15
+Sirope Monin spicy mango 70 cl|15
+Ajo granulado Juferna 900 g|6
+Altramuces Juferna 2 kg|6
+Atún claro en aceite Montey 900 g|6
+ColaCao 50 sobres|6
+Colorante alimentario Primera 900 g|6
+Hierbas provenzales Juferna 250 g|6
+Infusión de cantueso Azaconsa 25 ud|16
+Infusión de frutas del bosque pirámide 15 ud|16
+Té clásico Hornimans 100 ud|16
+Té rojo Hornimans 100 ud|16
+Té verde Pompadour 100 ud|16
+Té verde puro Hornimans 100 ud|16
+Ketchup Chovi 1,9 kg|6
+Maíz dulce Diamir 300 g|6
+Mantequilla en tarrina 10 g Reny Picot|4
+Revuelto de ensalada al natural 1 kg|6
+Sal negra en escamas Didilo 380 g|6
+Salsa barbacoa Chovi 1,9 kg|6
+Salsa barbacoa Millás 1,85 L|6
+Tomate troceado Éxito 3 kg|6
+Château Giscours|12
+Gasóleo|11
+Casar de Burbia Godello Magnum|12
+Casar de Burbia Godello 75 cl|12
+El Castañal 75 cl|12
+Almeja rubia|18
+Besugo|17
+Buey de mar hembra|18
+Cabracho|17
+Camarón|18
+Dorada|17
+Escupiña|18
+Gallineta|17
+Lenguado|17
+Pargo|17
+Rodaballo|17
+Salmonete|17
+Volandeira|18
+Cecina de wagyu Kurado limited edition|20
+Cecina de wagyu Japanese Black limited edition|20
+Gin 135º East Hyogo 70 cl|14
+Barra plegable The Botanical's|10
+Champagne Victoire Cuvée Millésime 75 cl|12
+Champagne Victoire Brut Celebration Millésime 75 cl|12
+Chaqueta The Botanical's|10
+Copa balón The Botanical's|10
+Cubitera The Botanical's|10
+Baijiu Dragon and Jade Goalong 50 cl|14
+Whiskey Elvis Midnight Snack 70 cl|14
+Expositor Mamont vodka|10
+Whisky GlenAllachie 35 años 70 cl|14
+Vodka Mamont 70 cl|14
+Gin Mermaid Pink 70 cl|14
+Gin Mermaid Zest 70 cl|14
+Mezcal Los Amantes reposado 70 cl|14
+Gin Porcelain Mandarin 70 cl|14
+Gin Porcelain Shanghai 70 cl|14
+Ron Bermúdez Añejo Selecto 70 cl|14
+Ron Bermúdez Blanco Superior 70 cl|14
+Ron Serum Mamie con especias 70 cl|14
+Tequila Cofradía Iguanas cerámica reposado 70 cl|14
+Tequila Gran Cofradía Torre de Picos cerámica reposado 70 cl|14
+Whisky Tomatin 12 años Sherry Cask 70 cl|14
+Whisky Tomatin 12 años 70 cl|14
+Whisky Tomatin 14 años 70 cl|14
+Whisky Tomatin 18 años 70 cl|14
+Vermut Retiro Costina 75 cl|12
+Cachaça Vinícius 70 cl|14
+Almeja babosa|18
+Bonito del norte|17
+Camarón cocido|18
+Gadiformes|17
+Pulpo de nasa|18
+Escalopa de foie gras de pato|19
+Mini donut de pollo y queso|8
+Carrillera de cerdo confitada en su jugo|19
+Chuletero de vaca|19
+Croquetas de berenjena, jamón ibérico y parmesano|8
+Croquetas de pepperoni|8
+Secreto ibérico al romero|19
+Lomo de añojo con hueso|19
+Corazón de alcachofa confitado en AOVE 1,8 kg|6
+Flor de alcachofa XL en AOVE y aceite de girasol 1,8 kg|6
+Pionono|7
+Tarta de queso y chocolate blanco|7
+Banda de manzana 500 g|7
+Agua de azahar 1 L|6
+Azúcar blanco Sucrebo 1 kg|6
+Azúcar perlado Creax 1 kg|7
+Bolsa de papel kraft con asa|9
+Caja cuadrada blanca con tapa 22x8 cm|9
+Caja blanca con asa 10,5x10,5x4,5 cm|9
+Disco de cartón oro liso 32 cm|9
+Harina de trigo de gran fuerza Garbi 25 kg|6
+Huevo entero líquido pasteurizado Ovopak|4
+Levadura fresca Sucra|6
+Descuento por promoción (caja completa)|11
+Envase Petit Vega Cañada|11
+Guisante|5
+Kiwi Sungold|5
+Limón|5
+Mandarina|5
+Manzana Fuji|5
+Manzana Pink Lady|5
+Melocotón|5
+Paraguayo|5
+Melón Brasil|5
+Melón Montiel|5
+Melón piel de sapo|5
+Pera Conferencia|5
+Pera Ercolina|5
+Pera Coscia|5
+Sandía|5
+Tomate Muchamiel|5
+Tomate bola|5
+Tomate dulce|5
+Uva moscatel|5
+Uva|5
+Boquerón mariposa en tempura|8
+Caja de porex|9
+Calamar patagónico limpio|18
+Cargo logístico extraordinario|11
+Cebolla perla|5
+Costilla de cerdo en tacos congelada|19
+Pincho rojo de cerdo mini 40 g|19
+Flamenquín de ave|8
+Gilda de anchoa 25 ud|6
+Haba baby|5
+Hamburguesa mini de langostino 31 g|8
+Muslo de pollo relleno de ciruelas y piñones|19
+Mezcla de frutas B5 (mango, melón, piña y kiwi) 150 g|5
+Trufas de chocolate 50 ud|7
+Varita de surimi|17
+Bolsa de vacío 90 micras 150x200 mm|9
+Bolsa de vacío 90 micras 200x300 mm|9
+Bolsa de vacío 90 micras 400x500 mm|9
+Impuesto sobre envases de plástico no reutilizables|11
+Huevos clase M|4
+Atún en aceite RO-1000 Cortizo|6
+Queso manchego semicurado Arquero|4
+Queso de oveja curado trufado Campollano|4
+Sardinillas en aceite extra especial|17
+Caña de lomo ibérico 5J reserva|20
+Berberecho al natural en conserva|18
+Mejillón en escabeche Real Conservera|18
+Sardinillas en aceite de oliva 14/18|17
+Casar de Burbia Godello ecológico 75 cl|12
+Tebaida 75 cl|12
+Alojamiento y desayuno|11
+Aparcamiento de hotel|11
+Albaricoque|5
+Almendra con chocolate y cacao|6
+Almendra frita|6
+Cereza picota|5
+Champiñón|5
+Ciruela|5
+Coco|5
+Dátil barhi|5
+Espárrago blanco|5
+Frambuesa|5
+Fruta de la pasión|5
+Gominolas|7
+Jínjol (azufaifa)|5
+Mango Kent|5
+Níspero|5
+Patata agria|5
+Patata|5
+Pimiento de Padrón|5
+Pistacho tostado|6
+Rosiñol|5
+Seta|5
+Tomate seco|6
+Bonito|17
+Boquerón|17
+Hueva|17
+Langostino|18
+Sardina|17
+Varios (pescado y marisco)|18
+Cuota de servicio de agua|11
+Alcantarillado consumo|11
+Alcantarillado cuota de servicio|11
+Canon de saneamiento consumo|11
+Canon de saneamiento cuota de servicio|11
+Conservación de contador de agua|11
+Regularización aplazamiento canon de saneamiento|11
+Teisseire sirope de cereza 70 cl|6
+Teisseire sirope de chocolate blanco 70 cl|6
+Teisseire sirope de arándanos 70 cl|6
+Teisseire sirope de avellana 70 cl|6
+Teisseire sirope de mango 70 cl|6
+Teisseire sirope de melocotón 70 cl|6
+Teisseire sirope de vainilla 70 cl|6
+Teisseire sirope de frambuesa 70 cl|6
+Teisseire sirope de melón 70 cl|6
+Teisseire sirope de pera 70 cl|6
+Valbuena 5º 75 cl|12
+Costilla baby back en jugo|19
+Costilla baby back con salsa barbacoa|19
+Vermut Yzaguirre Reserva rojo 1 l|12
+Vermut Yzaguirre Reserva blanco 1 l|12
+Viña Arana Gran Reserva 75 cl|12
+Viña Ardanza Reserva 75 cl|12
+Arroz Albufera Sivaris 5 kg|6
+Azúcar de coco Socchef 3 kg|6
+Caldo granulado de carne Bovis 1 kg|6
+Coca mini de aceite 20 g|8
+Cote de vaca Danish Crown|19
+Croquetón de puchero 65 g|8
+Manga pastelera profesional 43 cm|9
+Mantequilla de cabra Hoya Iglesia 125 g|4
+Queso de oveja curado manchego artesano El Pesebre|4
+Queso de oveja semicurado manchego artesano El Pesebre|4
+Stracciatella Prelibata 1 kg|4
+Raviolis de gambas Artipasta|8
+Raviolis de verduritas Artipasta|8
+Aderezo thai 500 g|6
+Salsa yakiniku 500 g|6
+Setas perrechico y nameko Bovis 1 kg|5
+Tomate semiseco Bovis 1 kg|6
+Tostadas de cristal 8x5 cm 200 g|7
+Vainas de vainilla Bourbon Madagascar 250 g|6
+Alarma anti-intrusión y anti-inhibidores|11
+Alarma Zerovision anti-intrusión y anti-inhibidores|11
+Dispositivos adicionales de alarma|11
+Teléfono inalámbrico DECT Philips D2702 duo|10
+Agua Bezoya 33 cl|15
+Aquarius limón 30 cl|15
+Aquarius naranja 30 cl|15
+Coca-Cola 23,7 cl|15
+Coca-Cola 35 cl|15
+Coca-Cola Zero Zero 23,7 cl|15
+Coca-Cola Zero 23,7 cl|15
+Coca-Cola Zero 35 cl|15
+Envase retornable Coca-Cola 23,7 cl|11
+Envase retornable Coca-Cola 35 cl|11
+Envase retornable Lanjarón 50 cl|11
+Envase retornable Lanjarón vidrio 1 l|11
+Fanta limón 23,7 cl|15
+Fanta naranja 23,7 cl|15
+Fanta naranja Zero lata 33 cl|15
+Rappel Coca-Cola formato 23,7 cl|11
+Rappel Coca-Cola formato 30 y 35 cl|11
+Fuze Tea limón 30 cl|15
+Agua Lanjarón vidrio retornable 50 cl|15
+Agua Lanjarón vidrio retornable 1 l|15
+Envase plástico Coca-Cola 23,7 cl|11
+Sprite 23,7 cl|15
+Zumo Tuareg melocotón 20 cl|15
+Zumo Tuareg piña 20 cl|15
+ITV periódica: gases|11
+ITV periódica: seguridad|11
+Tasa DGT|11
+Aceite con trufa 250 ml|6
+Carne de cangrejo 250 g|18
+Caviar Oscietra Imperial 10 g|17
+Caviar Oscietra Imperial 20 g|17
+Caviar Oscietra Imperial 30 g|17
+Caviar Oscietra Imperial 50 g|17
+Caviar Oscietra Imperial 100 g|17
+Cucharas de nácar|10
+Huevas de trucha 250 g|17
+Trufa de verano (Tuber aestivum)|5
+Trufa negra (Tuber melanosporum)|5
+Alicate de marisco Herdmar|10
+Ambientador Activa Rosso 0,75 l|9
+Ambientador desodorante Bio-Rose 1 l|9
+Amoniaco La Salud 1,5 l|9
+Araña inox 15 cm|10
+Bandeja oval Cántabro 24,5x16x7 cm|10
+Bandeja de pastelería de aluminio 60x40 cm|10
+Bandeja rectangular de porcelana Fósil Bidasoa 36x12,7 cm|10
+Bayeta en rollo punto azul|9
+Bobina de mecha gofrada Karme 800 g|9
+Bobina de mecha pasta pura Muro 1 kg|9
+Bolsa camiseta blanca 50x60 cm Karme 1 kg|9
+Bolsa camiseta blanca eco 50x60 cm 80 ud|9
+Bolsa de cuchillos Arcos 17 piezas|10
+Bolsa de plástico transparente 15x30 cm|9
+Fuente oval Bonna 29x17 cm|10
+Bowl Aster 14x4,5 cm 30 cl|10
+Bowl Santorini 21x15x5 cm|10
+Bioalcohol limón Brissol MT210 5 kg|9
+Carro bandejero|10
+Cebolla molida Serhos 1 kg|6
+Chaira 26 cm Arcos|10
+Chaira diamante 30,5 cm Vogue|10
+Chaira profesional 30 cm Arcos|10
+Colador media bola reforzado 22 cm|10
+Colador doble malla 26 cm Lacor|10
+Colorante alimentario BT-1 Sheros|6
+Copa Inventa 7 Bartender champagne 30 cl|10
+Cubeta GN 1/1 200 mm|10
+Cubo de basura de plástico negro 95 l|10
+Cuchara de madera de haya para servir 30 cm Lacor|10
+Cuchillo chuletero profesional|10
+Cuchillo mondador Arcos 188500|10
+Cuchillo mondador curvo|10
+Cuchillo para ostras Deglon|10
+Set de 2 cuencos 8x8x3,5 cm con bandeja 22x9x4 cm|10
+Detergente manual Palm P33 concentrado 1 kg|9
+Detergente manual Palm P5 0,75 kg|9
+Encendedor de cocina largo a gas Lacor|10
+Estropajo nanas inox Pla|9
+Estropajo salvauñas con esponja Pla|9
+Rollo Floor 3 m fucsia|9
+Fregona de microfibra lila|9
+Guante bicolor satinado|9
+Abrillantador Help HC25 agua dura 5 kg|9
+Gel de manos manzana Help HP10 5 kg|9
+Limpiacristales Help LG80 0,75 l|9
+Hermético GN 1/4 100 mm 2,8 l Araven|10
+Hermético GN 1/6 100 mm 1,7 l Araven|10
+Hermético GN 1/9 100 mm 1 l Araven|10
+Leche entera Covap 1,5 l|4
+Lejía Caprichosa 2 l|9
+Limpiador de acero inoxidable GL110 Global 1 l|9
+Bandeja oval de melamina azul guayaba 20x14x3 cm|10
+Plato Ming turquesa 30x30 cm Pura Sangre|10
+Mini cazuela de aluminio con asas 17,5 cm|10
+Multiusos desinfectante GL80 0,75 l|9
+Multiusos desinfectante GL80 5 l|9
+Cuchara de café Paladium|10
+Ensaladera Panio antracita 20 cm|10
+Ensaladera Panio beige 16 cm|10
+Paño de algodón azul para vajilla Pla|9
+Paño de cocina Wonderdry|9
+Papel antigrasa blanco 500 ud|9
+Bol oval Pasiego alabastro 24x16 cm|10
+Pastillas de urinario Action AC60 Nítida 1 kg|9
+Pimienta negra molida BT-1 Sheros|6
+Té negro Pakistani pirámide 15 ud|16
+Té rojo Cuerpo Deseo pirámide 15 ud|16
+Plato irregular de porcelana Fósil Bidasoa|10
+Plato de piedra jaspeado 29 cm|10
+Recogedor con palo Pla|9
+Rejilla de urinario cítrica|9
+Plato llano Ribe 24 cm|10
+Rollo higiénico industrial extra gofrado Karme 350 g|9
+Salero de cristal cuadrado Supreminox|10
+Bandeja Santorini 38x30x8 cm|10
+Sartén de aluminio Expert 28 cm|10
+Servilleta negra con cenefa 20x20 cm|9
+Servilleta 30x30 cm 1 capa Manila|9
+Soplete de cabezal a gas Lacor|10
+Tijera de cocina 200 mm Arcos|10
+Cuchillo panero universal 25 cm Arcos|10
+Vaso Bistro 37 cl|10
+Vaso bodega/sidra midi 23 cl|10
+Vaso galão 22 cl|10
+Vaso Este bajo 39 cl Bormioli|10
+Vaso taberna 37 cl|10
+Plato hondo Wellington 25 cm|10
+Zapato de seguridad sin cordones negro|10
+Bandeja con asas negra 63,5x40,6 cm|10
+Besuguera Josper 35x20|10
+Congelador de tapa abatible (-60 ºC)|10
+Cuchillo chuletero HQ Montblanc|10
+Cuchillo chuletero K6|10
+Mini parrilla doble Josper 15x25|10
+Mini parrilla de pinza Josper 15x25|10
+Mini parrilla de pinza malla fina Josper 15x25|10
+Parrilla cuadrada doble Josper 30x40|10
+Parrilla doble para cocochas Josper 20x30|10
+Parrilla de malla Josper 150x250x25 mm|10
+Parrilla rectangular doble Josper 15x40|10
+Parrilla para rodaballo Josper 45x30|10
+Sartén de malla metálica Josper 30 cm|10
+Set de 4 cuchillos chuleteros wagyu 11,5 cm|10
+Soporte de bandejas de madera 54x42x83 cm|10
+Huevas de atún rojo|17
+Mojama de atún aleta amarilla|17
+Bandeja oval Mamba melamina blanca 30,5x17,5 cm|10
+Bandeja oval Mirage Bonna 37 cm|10
+Bandeja Tango Radix Bonna 36x17 cm|10
+Bol hondo Essence Dapple charcoal Steelite 16,5 cm|10
+Bol Ripple Mirage Bonna 13x5 cm|10
+Cacerola baja de aluminio fundido Black Series 28 cm|10
+Fuente oval Stolt 32 cm|10
+Plancha grill de piedra lisa de aluminio fundido 37,5x23 cm|10
+Plato coupe Petra grafito Steelite 25,25 cm|10
+Plato cuadrado Bossa Nova 28x28 cm|10
+Plato hondo con pie Filo 21 cm|10
+Plato llano Moon 31 cm|10
+Plato ovalado Sahara Cresta Bonna 19x13 cm|10
+Plato pasta Natura 23 cm|10
+Gin Larios 1 l|14
+Ron Burla Negra 70 cl|14
+Vermut Nordés rojo 1 l|12
+Montecillo Crianza 75 cl|12
+Cerradura de puerta trasera|10
+Lámpara de gas xenón 85 V 35 W|10
+Mano de obra de chapa|11
+Mensualidad Movistar Plus bar fútbol|11
+Camiseta técnica manga corta|10
+Delantal sin peto con bolsillo 50x75 cm|10
+Bisagra de puerta de arcón congelador|10
+Burlete de puerta de congelador Liebherr|10
+Burlete de puerta de horno Repagas|10
+Cableado anticalórico de tostador|10
+Cajón completo lacado negro Coreco|10
+Carga de aceite UG-323|10
+Reparación de cierre de cámara de cava de vinos|10
+Cierre de muelle nariz|10
+Clavija Schuko 16 A|10
+Conjunto de electroválvulas de sistema de agua para horno de gas|10
+Desmontaje y montaje de split de techo|11
+Ficha cerámica sencilla|10
+Ficha cerámica triple|10
+Interruptor de puesta en marcha de cortadora Brähler|10
+Inyector de gas ciudad|10
+Junta de tapa de peladora Sammic|10
+Kit de buje, retenes y rodamientos Sammic|10
+Manguera flexible de gas 1/2x1/2 2000 mm|10
+Palastro cromo duro|10
+Presostato de vapor de horno Repagas|10
+Silicona de resistencia para sellado|10
+Sonda NTC de evaporador|10
+Termopar interrumpido M9 con cable|10
+Termostato digital Dixell XWL30RHD|10
+Termostato de seguridad de freidora 235 º|10
+Termostato de llenado|10
+Válvula Nova 830|10
+Ventilador 10 W 220 V multianclaje|10
+Agua San Pellegrino 50 cl|15
+Alcachofa en trozos en conserva|6
+Alcachofa laminada en conserva|6
+Alcachofa cortada congelada|8
+Atún en aceite de girasol Bachi 650 g|6
+Azúcar blanco 1 kg|6
+Azúcar glas 500 g|6
+Azúcar moreno 800 g|6
+Berenjena rayada|5
+Berenjena negra|5
+Canela en rama|6
+Cebolla|5
+Cebolla en cubos|5
+Cebolla en tiras|5
+Cebolla en escamas|6
+Cebolla frita|6
+Cebolla roja en conserva|6
+Chorizo criollo|20
+Fideo nº 4 Gallo 450 g|6
+Fideo cabellín 5 kg|6
+Galleta tostada 800 g|7
+Hierbas provenzales|6
+Lejía multiuso 5 l|9
+Lote de Navidad|6
+Macarrones 5 kg|6
+Espirales con vegetales 5 kg|6
+Panceta blanca doble|20
+Bacon loncheado|20
+Bacon en dados|20
+Pimienta negra molida 800 g|6
+Pimiento del piquillo entero Don Molinico 1,9 kg|6
+Pimiento rojo|5
+Pimiento Lamuyo rojo|5
+Pimiento verde|5
+Preparado para rebozar sin gluten Dani 470 g|6
+Remolacha cocida|5
+Salchicha blanca|20
+Salsa de soja sin gluten 1 l|6
+Secreto de cerdo Duroc|19
+Secreto de cerdo|19
+Solomillo de cerdo|19
+Tabasco 150 ml|6
+Tomate entero pelado 1,6 kg|6
+Tomate troceado 2,65 kg|6
+Vinagre balsámico de Módena 5 l|6
+Vinagre blanco 1 l|6
+Descuento comercial|11
+Vino blanco 828 75 cl|12
+Vino blanco semidulce 828 75 cl|12
+Aceituna cortada Sarasa 750 g|6
+Aceituna Mare Nostrum Maestrazgo 700 g|6
+Aceite de coco bio Origens 500 ml|6
+Aceite especial para freír doble rendimiento 10 l|6
+Aceite de sésamo Blue Dragon 150 ml|6
+Actimel desnatado natural|4
+Actimel natural|4
+Actimel fresa|4
+Activia cremoso lima limón|4
+Activia natural|4
+Agua Bezoya 1,5 l|15
+Agua Cabreiroa 50 cl|15
+Agua fuerte 1 l|9
+Agua Lanjarón 1,5 l|15
+Aguacate|5
+Aguja de cerdo sin hueso|19
+Airbag de patata Sosa 650 g|6
+Ajo negro|6
+Ajo tierno|5
+Albahaca|5
+Alcohol 96 º|9
+Alioli Chovi|6
+Mayonesa japonesa Allgroo 520 ml|6
+Almendra marcona frita|6
+Anchoa en aceite de oliva|17
+Anchoa del Cantábrico en aceite de girasol|17
+Antioxidante en polvo Sosa 500 g|6
+Apio verde|5
+Aquarius limón lata 33 cl|15
+Arándano silvestre|5
+Recipientes herméticos Araven 1/4 GN 2,8 l|10
+Tijera de cocina Arcos|10
+Arenque ahumado|17
+Bolígrafo azul|10
+Bolígrafo negro|10
+Bolígrafo retráctil surtido|10
+Bolígrafo Sigma gel surtido|10
+Rotulador permanente negro|10
+Laurel en hoja|6
+Leche entera 1 l|4
+Aroma de vainilla Vahine 200 ml|6
+Arroz carnaroli Riso Gallo 1 kg|6
+Arroz extra 5 kg|6
+Arroz de grano largo 5 kg|6
+Atún lomo central|17
+Baby leaf mixta|5
+Bacalao migas salado|17
+Bacalao recortes salado|17
+Bandeja PP microondas negra 1250 cc|9
+Bandeja PP microondas negra 800 cc|9
+Barco de madera bio 17 cm|9
+Barco de madera bio 9 cm|9
+Barquillo de cacao Pico|7
+Barquillo cilíndrico|7
+Batidora de mano Jata 1200 W|10
+Lechuga batavia mixta|5
+Lechuga batavia verde|5
+Batidor de 8 varillas inox 50 cm|10
+Batidor inox 51 cm|10
+Bebida espirituosa Don Pablo 1 l|14
+Brócoli bimi|5
+Brócoli congelado 2,25 kg|8
+Bitter Kas 20 cl|15
+Bj|6
+Bo|6
+Boquerón en vinagre alineado|17
+Bowl ensaladera 7 cm|10
+Bowl de melamina 15x12x7 cm|10
+Bowl desechable PS negro y oro 160 ml|9
+Bowl thai desechable 300 ml|9
+Brocheta de bambú roja|9
+Pan de hamburguesa brioche|7
+Cabezal de soplete profesional|10
+Cacahuete frito repelado|6
+Cacao puro sin azúcar Valor 250 g|6
+Cacerola alta inox 28 cm 10 l|10
+Cacerola inox 28 cm 6,5 l|10
+Cadera de añojo|19
+Caja lisa blanca 31 l|10
+Caldo casero de carne 1 l|6
+Caldo dashi Marutomo 1 kg|6
+Caldo ramen miso Kitano 1 kg|6
+Callo de vacuno|19
+Cañas de crema Rioba|7
+Canónigos|5
+Cantonales Garre 500 g|6
+Queso roquefort Cantorel|4
+Aceite de oliva virgen extra ecológico monodosis 10 ml|6
+Cargas de sifón de crema|10
+Cartucho de gas 227 g|10
+Jamón deshuesado Castillo de Magaña|20
+Cava Visiega brut 75 cl|12
+Cazuela de barro 14 cm|10
+Cebolleta|5
+Cebollino|5
+Cecina en taquitos Palcarsa|20
+Vino blanco Cerro de la Cruz brik 1 l|12
+Champiñón pie cortado mini|5
+Tomate cherry amarillo|5
+Tomate cherry|5
+Chile rojo|5
+Chirivía|5
+Chocolate negro 70 % Valor 300 g|7
+Chocolate negro 82 % Valor 170 g|7
+Choricitos picantes Palcarsa 1 kg|20
+Chorizo ahumado|20
+Chorizo ibérico extra|20
+Chorizo ibérico en taquitos|20
+Chorizo sarta extra|20
+Chuletas de cordero lechal|19
+Chutney de mango Patak's 1,3 kg|6
+Cilantro|5
+Cilantro en tubo 80 g|6
+Lomo de cerdo adobado|19
+Ciruela pasa sin hueso|6
+Citronela|5
+Guanciale Citterio|20
+Recambio de gas para soplete|10
+Cartucho de gas 227 g|10
+Coca-Cola lata 33 cl|15
+Coca-Cola Zero lata 33 cl|15
+Coca-Cola Zero sin cafeína lata 33 cl|15
+Cochinita pibil|19
+Cóctel de frutos secos con pasas|6
+Cóctel de frutos secos crudo|6
+Cóctel de frutos secos|6
+Cogollos|5
+Col china|5
+Cola de langostino cocida|18
+Coliflor|5
+Colorante alimentario 900 g|6
+Descuento comercial|11
+Concentrado de caña Carmen 920 g|6
+Concentrado de pesto rojo Knorr 340 g|6
+Migas de atún en aceite vegetal 650 g|6
+Costilla de cerdo troceada|19
+Coulis de frambuesa Ponthier 500 g|6
+Crema de cacahuete 500 g|6
+Crema Lotus Biscoff 1,6 kg|6
+Crema de yogur Pastoret 900 g|4
+Crème fraîche 24 %|4
+Crème fraîche 30 %|4
+Cubeta inox GN 1/2 4 cm|10
+Cubeta inox GN 1/2 6,5 cm|10
+Cubeta inox GN 1/3 10 cm|10
+Cubeta inox perforada GN 1/2 10 cm|10
+Cubeta de manutención blanca 55 l|10
+Cubeta rectangular blanca 8 l|10
+Cubeta rectangular de color 8 l|10
+Cubo de fregona 14 l|9
+Cuchillo carnicero antideslizante 200 mm|10
+Cuchillo de chef antideslizante 250 mm|10
+Cuchillo deshuesador antideslizante 130 mm|10
+Cuchillo santoku antideslizante 180 mm|10
+Cuchillo deshuesador universal 130 mm|10
+Cuchillo pelador 100 mm|10
+Cuchillo santoku exprés 130 mm|10
+Cuchillo santoku universal 180 mm|10
+Cuello de cordero|19
+Preparado para rebozar sin gluten Dani 3 kg|6
+Pedro Ximénez dulce Delgado 5 l|12
+Alcaparras|6
+Queso feta|4
+Carne de pimiento choricero Don Molinico 550 g|6
+Bebida espirituosa Don Pablo 1 l|14
+Harina de garbanzo sin gluten 2 kg|6
+Harina de garbanzo 3 kg|6
+Dosificador de salsas blanco 70,8 cl|10
+Dosificador transparente 260 cc|10
+Edamame congelado|8
+Endibia|5
+Eneldo|5
+Ensalada de wakame|6
+Envase de aluminio redondo con tapa|9
+Espárrago blanco 6/9 Vera 325 g|6
+Espárrago verde|5
+Espátula de silicona 25 cm|10
+Espinaca baby|5
+Espinacas congeladas|5
+Espirales tricolor 5 kg|6
+Espolvoreador fino|10
+Estropajo metálico|9
+Extracto de gamba roja Paljibe 80 g|6
+Jengibre para sushi 250 g|6
+Salsa romesco Ferrer 645 g|6
+Fiambre de sándwich en lonchas|20
+Fibra verde con esponja 14 ud|9
+Fibra verde salvauñas 4 ud|9
+Fideo nº 2 Gallo 450 g|6
+Fideos de arroz Go-Tan 250 g|6
+Fideos chinos Soubry 250 g|6
+Film de palet transparente 23 mic|9
+Film PVC 30 cm|9
+Frisée|5
+Bizcocho de tiramisú Fine Life 500 g|7
+Fino La Ina 75 cl|12
+Flanera inox 8 cm|10
+Agua Font Vella 33 cl|15
+Pétalos negros de sal|6
+Frambuesa|5
+Fresa|5
+Fruta de la pasión|5
+Churrasco de ternera|19
+Fuet|20
+Furikake Kiwami 500 g|6
+Galleta rellena de crema Oreo 440 g|7
+Galleta Oreo mini 400 g|7
+Galleta picada topping Oreo 400 g|7
+Galleta danesa de mantequilla 454 g|7
+Galleta María dorada|7
+Galleta molida caramelizada 1,1 kg|7
+Galleta salada cóctel 350 g|7
+Galleta tostada 800 g|7
+Gamba roja|18
+Gancho de carnicero 8 cm|10
+Garbanzo cocido Cidacos 400 g|6
+Garbanzo pedrosillano|6
+Garbanzo selecto Luengo|6
+Helado de vainilla 2,5 l|7
+Gelbinder Sosa 500 g|6
+Coco|5
+Germinados de cebolla|5
+Germinados de rabanitos|5
+Glucosa líquida Sosa 1,5 kg|6
+Ñoquis de patata Cecco|6
+Ñoquis de gorgonzola Pataro 400 g|6
+Gominolas|7
+Pasta de ají amarillo|6
+Grill Jocel 2000 W|10
+Guacamole 500 g|6
+Guacamole 1 kg|6
+Guante de tela de silicona|10
+Guantes de nitrilo azul sin polvo|9
+Guantes de nitrilo negros|9
+Hamburguesa de tofu y calabaza 150 g|8
+Harina para freír|6
+Harina para fritura 5 kg|6
+Harina de trigo uso común|6
+Ketchup Heinz monodosis 10 ml|6
+Jalapeño verde|5
+Hermético GN 1/9 100 mm 1 l Araven|10
+Hierbabuena|5
+Papel higiénico Scottex acolchado 32 rollos|9
+Hinojo bulbo|5
+Hoja de curry|5
+Huesos de añojo|19
+Hummus|6
+Humo en polvo Sosa 500 g|6
+Huevo líquido pasteurizado 1 l|4
+Jabón de manos dermo 500 ml|9
+Jamón cocido en lonchas|20
+Jamón serrano en taquitos|20
+Jengibre fresco|5
+Jengibre en polvo|6
+Pasta kataifi|7
+Judía verde fina en conserva|6
+Judía plana troceada|5
+Kit Kat mix in 400 g|7
+Lion mix in 400 g|7
+Kiwi Gold|5
+Caldo de pollo en polvo Knorr sin gluten 1 kg|6
+Kumquat fresco|5
+Sobrasada en crema La Cría 1 kg|20
+Pimentón dulce La Dalia 800 g|6
+Mermelada de arándanos La Vieja Fábrica 800 g|6
+Mermelada de higos La Vieja Fábrica 800 g|6
+Lacón cocido para tapas|20
+Mozzarella perlas|4
+Pasta wonton 250 g|6
+Lana de madera para encendido 1 kg|9
+Laurel en hoja|6
+Lavavajillas ultraconcentrado|9
+Lavavajillas a mano Fairy 5 l|9
+Lavavajillas a mano 5 l|9
+Salsa Worcestershire|6
+Leche de coco Suree 17 % 1 l|6
+Leche condensada entera|4
+Leche entera 1 l|4
+Leche Asturiana hostelería 1,5 l|4
+Leche semidesnatada sin lactosa Puleva 1 l|4
+Leche semidesnatada Asturiana 1 l|4
+Lechuga iceberg|5
+Lechuga trocadero|5
+Lenteja pardina|6
+Levadura Levanova 25 g|6
+Lima|5
+Limón|5
+Limpiasuelos insecticida KH desic|9
+Lomo de atún limpio|17
+Lomo cabecero ibérico en lonchas|20
+Lomo de cerdo Duroc|19
+Lomo embuchado en lonchas|20
+Queso tipo gouda en lonchas 1 kg|4
+Lote de 3 herméticos GN 1/3 6 l|10
+Lote de 3 herméticos GN 1/6 1,7 l|10
+Panceta ibérica|20
+Magdalena casera Rioba 9 ud|7
+Magdalenas sin gluten Celia Proceli 4 ud|7
+Maíz dulce en lata 570 g|6
+Maíz frito pequeño 500 g|6
+Pepino|5
+Maltosec Sosa 500 g|6
+Manga pastelera 30x46 cm 100 ud|9
+Mango en cubos congelado|8
+Manitas de cerdo|19
+Mantequilla Kerrygold con sal 200 g|4
+Mantequilla|4
+Manzana golden|5
+Manzana Granny Smith|5
+Marcador fluorescente|10
+Mayonesa japonesa Kewpie 2,4 l|6

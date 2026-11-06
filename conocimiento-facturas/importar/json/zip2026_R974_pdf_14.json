@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  15
+ ],
+ "tipo": "factura",
+ "proveedor": "MANZANARO SALAS, FELIPE",
+ "cif": "48350532R",
+ "local": "casa_tomas",
+ "numero_documento": "39/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 15,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 35.2,
+   "descuento_pct": null,
+   "total": 77.44,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 77.44,
+ "desglose_iva": [
+  {
+   "base": 77.44,
+   "pct": 10,
+   "cuota": 7.74
+  }
+ ],
+ "iva": 7.74,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 85.18,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): SAN AGUSTIN. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

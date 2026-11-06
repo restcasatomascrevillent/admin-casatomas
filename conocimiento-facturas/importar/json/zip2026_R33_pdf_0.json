@@ -1,0 +1,46 @@
+{
+ "archivo": "R33.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Exclusivas Uriarte, S.L.",
+ "cif": "B03821576",
+ "local": "casa_tomas",
+ "numero_documento": "A26/328",
+ "fecha": "2026-01-13",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ARROZ MOLINO ROCA CARNAROLI OLD 2K",
+   "producto_ficha": "Arroz Molino Roca Carnaroli Old 2 kg",
+   "cantidad": 16.0,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": 2,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.2,
+   "descuento_pct": null,
+   "total": 131.2,
+   "iva_pct": 4,
+   "albaran_ref": "A26/522",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 131.2,
+ "desglose_iva": [
+  {
+   "base": 131.2,
+   "pct": 4,
+   "cuota": 5.25
+  }
+ ],
+ "iva": 5.25,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 136.45,
+ "observaciones": "Forma de pago: recibo 45 días domiciliado. Nº cliente 4,027.",
+ "alertas": []
+}

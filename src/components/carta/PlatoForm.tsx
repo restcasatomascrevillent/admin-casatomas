@@ -1,3 +1,5 @@
+import { AptoParaPlato } from "./AptoParaPlato";
+import { cambioVegetariano } from "@/lib/dietas-plato";
 import { guardarUnidadPlato, opcionesUnidadPlato } from "@/lib/unidades-platos";
 import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -68,6 +70,7 @@ const formSchema = z
     ),
     descripcion: descripcionCarta,
     sin_gluten_disponible: z.boolean().default(false),
+    vegetariano: z.boolean().default(false),
     ingredientes: z.string().optional(),
     unidad: z.string().default("Unidad"),
     gramos: z.coerce.number().optional(),
@@ -129,6 +132,7 @@ export function PlatoForm({
       precio_eur: 0,
       descripcion: "",
       sin_gluten_disponible: false,
+      vegetariano: false,
       ingredientes: "",
       unidad: "Unidad",
       gramos: 100,
@@ -214,6 +218,8 @@ export function PlatoForm({
         descripcion: values.descripcion,
         sin_gluten_disponible:
           todosAlergenos.includes("gluten") && values.sin_gluten_disponible,
+        // Solo si se marca (ver `cambioVegetariano`).
+        ...cambioVegetariano(null, values.vegetariano),
         ingredientes: values.ingredientes,
         unidad: guardarUnidadPlato(values.unidad, values.gramos),
         alergenos_oficiales: todosAlergenos.length > 0 ? todosAlergenos : null,
@@ -506,28 +512,12 @@ export function PlatoForm({
               )}
             </div>
 
-            {tieneGluten && (
-              <FormField
-                control={form.control}
-                name="sin_gluten_disponible"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-3 rounded-lg border border-emerald-600/25 bg-emerald-50 p-3 space-y-0">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(value) =>
-                          field.onChange(value === true)
-                        }
-                      />
-                    </FormControl>
-                    <FormLabel className="cursor-pointer leading-relaxed text-emerald-900">
-                      Se puede hacer sin gluten
-                    </FormLabel>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            {/* «Apto para» (04/11/2026, dueño): celíacos, vegetarianos y sin lactosa, con su motivo y las
+                casillas «Se puede hacer sin gluten» y «Vegetariano». Mismas reglas que los filtros de la web. */}
+            <AptoParaPlato
+              control={form.control}
+              alergenos={sinAlergenos ? [SIN_ALERGENOS_DECLARADOS] : combinarAlergenos(alergenosSeleccionados, alergenosPersonalizados)}
+            />
 
             <details className="rounded-lg border p-3">
               <summary className="cursor-pointer font-medium">

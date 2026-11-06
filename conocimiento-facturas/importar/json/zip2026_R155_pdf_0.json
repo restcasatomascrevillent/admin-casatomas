@@ -1,0 +1,122 @@
+{
+ "archivo": "R155.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ENCHENTA SLU",
+ "cif": "B94186988",
+ "local": "casa_tomas",
+ "numero_documento": "1-4851",
+ "fecha": "2026-01-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJA",
+   "producto_ficha": "Navaja",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.0,
+   "descuento_pct": 0,
+   "total": 68.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-12",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.5,
+   "descuento_pct": 0,
+   "total": 94.5,
+   "iva_pct": 10,
+   "albaran_ref": "3-12",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA PLANA",
+   "producto_ficha": "Ostra plana",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.75,
+   "descuento_pct": 0,
+   "total": 99.0,
+   "iva_pct": 10,
+   "albaran_ref": "3-12",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PORTES",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.75,
+   "descuento_pct": 0,
+   "total": 25.75,
+   "iva_pct": 21,
+   "albaran_ref": "3-12",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PORTES ALBARÁN Nº5 13/01/2026",
+   "producto_ficha": "Portes (transporte)",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.8,
+   "descuento_pct": 0,
+   "total": 25.8,
+   "iva_pct": 21,
+   "albaran_ref": "3-12",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 313.05,
+ "desglose_iva": [
+  {
+   "base": 261.5,
+   "pct": 10,
+   "cuota": 26.15
+  },
+  {
+   "base": 51.55,
+   "pct": 21,
+   "cuota": 10.83
+  }
+ ],
+ "iva": 36.98,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 350.03,
+ "observaciones": "Transferencia BBVA. Vencimiento igual a la fecha de la factura. Albarán 3-12.",
+ "alertas": [
+  "Dos líneas de PORTES en el albarán 3-12. La segunda dice «PORTES ALBARÁN Nº5 13/01/2026», que cita un albarán Nº5 que no aparece en esta factura; se extrae tal cual.",
+  "Precio fuera del rango de la ficha: NAVAJA 34,00 € (rango 20–29)."
+ ]
+}

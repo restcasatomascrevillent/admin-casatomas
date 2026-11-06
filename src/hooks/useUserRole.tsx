@@ -33,10 +33,23 @@ export const SECTIONS = [
   { key: "gestor_carta", label: "Gestor Web · Carta" },
   { key: "gestion_web", label: "Gestor Web · Novedades, menús y tapas" },
   { key: "marketing", label: "Newsletter" },
+  // Usuarios de la agencia (Oficiosos) en los encargos de Instagram, 10/11/2026:
+  // aceptan, entregan versiones y comentan (pestaña Instagram › Encargos). Ver
+  // docs/instagram-encargos.md. Con «Marketing» se es el restaurante.
+  { key: "instagram_agencia", label: "Instagram · Agencia (Oficiosos)" },
+  // Usuario del equipo que genera los vídeos de los reels (scripts/instagram/
+  // render-reels.mjs), 11/11/2026: con «Editar» solo reclama, genera, sube y
+  // cierra sus trabajos. Sin Marketing. Ver docs/instagram-video.md.
+  { key: "instagram_render", label: "Instagram · Render (equipo de vídeo)" },
   { key: "cheques", label: "Cheques regalo" },
   // Tienda de vinos de la web (escaparate: se compra en el restaurante), 2026-11-03.
   { key: "tienda", label: "Tienda" },
   { key: "facturas", label: "Facturas" },
+  // Subir facturas y albaranes (pestaña Cargar) y corregir lo que sube uno
+  // mismo, 06/11/2026 (dueño). Va por libre: no necesita «Ver» en Facturas.
+  // Un solo interruptor («Puede subir», guardado en can_view). En la BD:
+  // facturas_puede_subir() (migración 20261106510000).
+  { key: "facturas_subida", label: "Facturas · Subida" },
   { key: "usuarios", label: "Usuarios" },
 ] as const;
 // Nota: Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web,

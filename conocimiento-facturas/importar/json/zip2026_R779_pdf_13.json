@@ -1,0 +1,63 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  14
+ ],
+ "tipo": "factura",
+ "proveedor": "LUDEÑA GEA, DAVID",
+ "cif": "74242137T",
+ "local": "casa_tomas",
+ "numero_documento": "441/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 14,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 2.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.48,
+   "descuento_pct": null,
+   "total": 74.71,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 14,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.3,
+   "descuento_pct": null,
+   "total": 31.59,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 106.3,
+ "desglose_iva": [
+  {
+   "base": 106.3,
+   "pct": 10.0,
+   "cuota": 10.63
+  }
+ ],
+ "iva": 10.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 116.93,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 10684, 11164. Embarcaciones: EL PERA.",
+ "alertas": []
+}

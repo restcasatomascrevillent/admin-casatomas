@@ -121,12 +121,12 @@ const REVISAR_MAIN = () => {
 test("Servicios: cuatro pestañas sin desbordes, botones de ≥ 44 px con nombre y barras con su %", async ({ page }) => {
   await abrir(page, "/super-admin/servicios");
   await expect(page.getByRole("heading", { level: 1, name: "Servicios" })).toBeVisible();
-  // Resumen: lo esencial (gasto, lo que requiere atención, lo más cerca del límite y las renovaciones).
-  await expect(page.getByTestId("cifra-mes")).toBeVisible();
-  await expect(page.getByRole("region", { name: /Requiere atención/ })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Lo más cerca del límite" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Próximas renovaciones" })).toBeVisible();
-  for (const pestana of ["Resumen", "Servicios", "Costes", "Configurar"]) {
+  // Estado (06/11/2026): el semáforo de toda la instalación, una ficha por servicio y «Qué mirar».
+  await expect(page.getByTestId("estado-general")).toBeVisible();
+  await expect(page.getByTestId("estado-gasto")).toBeVisible();
+  await expect(page.getByRole("list", { name: "Estado de cada servicio" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Qué mirar" })).toBeVisible();
+  for (const pestana of ["Estado", "Servicios", "Costes", "Configurar"]) {
     await page.getByRole("tab", { name: new RegExp(`^${pestana}`) }).click();
     await expect(page.getByRole("tab", { name: new RegExp(`^${pestana}`) })).toHaveAttribute("aria-selected", "true");
     if (pestana === "Servicios") await expect(page.getByRole("article")).toHaveCount(9); // Perplexity está quitado

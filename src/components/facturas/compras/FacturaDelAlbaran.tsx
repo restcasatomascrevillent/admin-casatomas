@@ -10,7 +10,7 @@ import {
   useFacturasCandidatas,
   useVincularAlbaran,
 } from "@/hooks/useCotejoAlbaranes";
-import { formatCurrency, formatDate } from "@/components/facturas/shared/formatters";
+import { formatImporte, formatDate } from "@/components/facturas/shared/formatters";
 import { tonoDiferencia } from "@/lib/facturas/cotejo";
 import { EnlaceDocumento } from "./AlbaranesDeFactura";
 import { ResumenImportes, TablaCotejo } from "./TablaCotejo";
@@ -49,9 +49,9 @@ function AsociarFactura({ albaranId }: { albaranId: number }) {
               >
                 <span className="font-medium">Factura {f.numero_documento}</span>
                 <span className="text-xs text-muted-foreground">{formatDate(f.fecha)}</span>
-                <span className="ml-auto tabular-nums">{formatCurrency(f.base)}</span>
+                <span className="ml-auto tabular-nums">{formatImporte(f.base)}</span>
                 {f.cita_albaran && (
-                  <span className="inline-flex h-6 w-full items-center text-[11px] pointer-coarse:text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                  <span className="inline-flex h-6 w-full items-center text-xs font-medium text-emerald-700 dark:text-emerald-300">
                     Cita este albarán
                   </span>
                 )}
@@ -101,8 +101,8 @@ export function FacturaDelAlbaran({
   onAbrirDocumento,
 }: {
   albaran: Factura;
-  /** La factura que lo recoge, si está cargada en la lista. */
-  factura: Factura | null;
+  /** La factura que lo recoge, si está cargada en la lista (basta su número). */
+  factura: Pick<Factura, "numero_documento"> | null;
   onAbrirDocumento: (id: number) => void;
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");

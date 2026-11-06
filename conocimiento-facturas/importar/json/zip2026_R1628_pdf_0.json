@@ -1,0 +1,63 @@
+{
+ "archivo": "R1628.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 5944",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA PELADA LUNA DE MAR",
+   "producto_ficha": "Quisquilla pelada Luna de Mar",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.5,
+   "descuento_pct": null,
+   "total": 82.5,
+   "iva_pct": 10,
+   "albaran_ref": "202610793",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "SOLOMILLO CERDO EXTRA",
+   "producto_ficha": "Solomillo de cerdo extra",
+   "cantidad": 6.14,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.75,
+   "descuento_pct": null,
+   "total": 35.31,
+   "iva_pct": 10,
+   "albaran_ref": "202610793",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 117.81,
+ "desglose_iva": [
+  {
+   "base": 117.81,
+   "pct": 10,
+   "cuota": 11.78
+  }
+ ],
+ "iva": 11.78,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 129.59,
+ "observaciones": "Transferencia a 30 dias, vencimiento 30/10/2026. Albaran 202610793 de 30/09/2026, pedido 23441. Nota impresa en solomillo: Caja. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": []
+}

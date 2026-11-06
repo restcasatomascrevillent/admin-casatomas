@@ -1,0 +1,66 @@
+{
+ "archivo": "R1550.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Instalaciones Electricas Candela, S.L.",
+ "cif": "B53149829",
+ "local": "casa_tomas",
+ "numero_documento": "00165",
+ "fecha": "2026-09-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SENSOR DE MOVIMIENTO 360º SUP.TECHO 3600",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.32,
+   "descuento_pct": 15.0,
+   "total": 18.97,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TRABAJOS",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.0,
+   "descuento_pct": null,
+   "total": 25.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 43.97,
+ "desglose_iva": [
+  {
+   "base": 43.97,
+   "pct": 21,
+   "cuota": 9.23
+  }
+ ],
+ "iva": 9.23,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 53.2,
+ "observaciones": "Transferencia a la cuenta del proveedor impresa en la factura. Trabajos marcados TOUZA.",
+ "alertas": [
+  "Destinatario impreso solo MASIDE 2011: local no_consta.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

@@ -1,0 +1,64 @@
+{
+  "cif": "B54490115",
+  "nombre": "ARLANDIZ LLORCA, S.L. (armador 'PEPE ARMONIA'; aparece dentro de los PDF de la lonja de la Cofradía de Pescadores de Santa Pola)",
+  "nombres_impresos": ["ARLANDIZ LLORCA, S.L.", "PEPE ARMONIA", "Cofradia de Pescadores de Santa Pola - Lonja de Pescados"],
+  "categoria": "pescado",
+  "locales": ["casa_tomas"],
+  "muestras": ["R102.pdf", "R605.pdf", "R1170.pdf", "R466.pdf", "R1568.pdf"],
+
+  "documento": {
+    "tipo_habitual": "PDF mensual de la lonja con UNA FACTURA POR ARMADOR, una por página: cada armador (barco/empresa de pesca) factura el pescado que Casa Tomás compró en subasta ese mes",
+    "varias_facturas_por_pdf": true,
+    "paginas_tipicas": "6-33 (muestras: 8, 26, 27, 30, 33); una página = una factura de un armador distinto, con su propio emisor, CIF y número",
+    "numero_factura": { "ejemplos": ["90/A", "94/A", "63/A", "47/A", "611/A", "1.044/A"], "patron": "^[\\d.]+/A$", "donde": "'Factura Nº/Serie' arriba; distinto en cada página; puede llevar punto de millar" },
+    "fecha": "'Fecha Factura' (DD/MM/AAAA): último día del mes; periodo en 'Periodo Facturado del 01/MM/2026 al 30/MM/2026'. Igual en todas las páginas del PDF",
+    "albaranes": "'Albaran(es) No 1960, 1832, 751, 299, 870' al final de cada página: números de albarán de subasta, solo informativo y repetidos entre armadores"
+  },
+
+  "lectura": {
+    "columnas": ["#", "Familia", "Descripción", "Total Kilos", "Importe"],
+    "cantidad_es": "kg de pescado (2 decimales)",
+    "columna_peso": "Total Kilos",
+    "precio_es_por": "no se imprime precio; €/kg = Importe ÷ Total Kilos",
+    "descuento_por_linea": { "existe": false, "columna": null, "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Sin cargos: los cargos de lonja (alquiler de cajas y comisión de venta) los factura aparte la Cofradía en la factura de servicios (G03065158)"],
+    "trampas": [
+      "Cada página es una factura distinta, con emisor, CIF/DNI y número distintos: hay que partir el PDF por página, no sumar todo",
+      "El CIF de este proveedor (B54490115) aparece solo en la página de ARLANDIZ LLORCA; las demás páginas llevan CIF de otros armadores (E…, J…, B…, DNI)",
+      "Las líneas no son productos concretos sino familias de pescado ('21 MACRUROS', '15 PERCIFORMES Y A.', '16 PLEURONECTIFORMES', '17 GADIFORMES', '33 CEFALOPODOS'): el número delante es el código de familia, NO la cantidad",
+      "La primera columna '#' es un contador de línea que sigue aunque cambie la 'Embarcación' (subtítulo 'Embarcación …' que no es línea de importe)",
+      "Importes con punto de millar (1.726,19) y comas decimales; el precio €/kg varía muchísimo dentro de una misma familia según la especie",
+      "'Sumas Totales' repite kilos e importe; no es una línea más. 'Albaran(es)' no son líneas"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "base = suma de los importes de las líneas de la página (R102 p1: 1.726,19 + 445,79 = 2.171,98)",
+    "kilos 'Sumas Totales' = suma de 'Total Kilos' (8,45 + 3,85 = 12,30)",
+    "IVA = base × 10 % (2.171,98 → 217,20)",
+    "total = base + IVA (2.389,18); sin recargo ni retención"
+  ],
+
+  "guia_ocr": "PDF de la lonja de Santa Pola con una factura por armador y página: trata cada página como factura independiente (emisor, CIF y 'Factura Nº/Serie' propios; fecha de fin de mes; cliente MASIDE 2011 / CASA TOMAS código 815). Líneas: # | Familia (código + nombre, p. ej. '21 MACRUROS') | Total Kilos | Importe. No hay precio: calcula €/kg = importe/kilos. El código de familia no es cantidad. Ignora el subtítulo 'Embarcación …' y la lista de albaranes. IVA 10 %: base + 10 % = total.",
+
+  "productos": [
+    { "nombre_impreso": "21 MACRUROS", "nombre_normalizado": "Macruros (familia 21)", "familia": "marisco/crustáceo (código de familia de la lonja)", "presentacion": "fresco, subasta de lonja", "formato": null, "unidad_factura": "kg", "precio": { "min": 14.4, "max": 204.3, "por": "kg", "ejemplos": [["2026-01-31", 204.3], ["2026-01-31", 115.8], ["2026-01-31", 103.2]] }, "iva_pct": 10, "veces_visto": 91 },
+    { "nombre_impreso": "15 PERCIFORMES Y A.", "nombre_normalizado": "Perciformes y afines (familia 15)", "familia": "pescado (código de familia de la lonja)", "presentacion": "fresco, subasta de lonja", "formato": null, "unidad_factura": "kg", "precio": { "min": 5.9, "max": 38.3, "por": "kg", "ejemplos": [["2026-01-31", 7.5], ["2026-01-31", 8.7], ["2026-01-31", 16.2]] }, "iva_pct": 10, "veces_visto": 99 },
+    { "nombre_impreso": "16 PLEURONECTIFORMES", "nombre_normalizado": "Pleuronectiformes, pescado plano (familia 16)", "familia": "pescado (código de familia de la lonja)", "presentacion": "fresco, subasta de lonja", "formato": null, "unidad_factura": "kg", "precio": { "min": 21.6, "max": 39.6, "por": "kg", "ejemplos": [["2026-01-31", 25.5], ["2026-01-31", 21.6]] }, "iva_pct": 10, "veces_visto": 49 },
+    { "nombre_impreso": "17 GADIFORMES", "nombre_normalizado": "Gadiformes (familia 17)", "familia": "pescado (código de familia de la lonja)", "presentacion": "fresco, subasta de lonja", "formato": null, "unidad_factura": "kg", "precio": { "min": 1.2, "max": 8.8, "por": "kg", "ejemplos": [["2026-01-31", 1.2], ["2026-01-31", 6.2]] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "33 CEFALOPODOS", "nombre_normalizado": "Cefalópodos (familia 33)", "familia": "cefalópodo (código de familia de la lonja)", "presentacion": "fresco, subasta de lonja", "formato": null, "unidad_factura": "kg", "precio": { "min": 10.9, "max": 18.2, "por": "kg", "ejemplos": [["2026-09-30", 12.9], ["2026-09-30", 13.3]] }, "iva_pct": 10, "veces_visto": 7 }
+  ],
+
+  "dudas": [
+    "Las líneas son por familia taxonómica; no se sabe qué especie concreta compra Casa Tomás (p. ej. si 'Macruros' son gamba roja/langostino por su precio de 14 a 204 €/kg). Hay que preguntar al dueño o mirar los albaranes de subasta.",
+    "Los 'veces_visto' vienen del catálogo agregado de 8 PDF (cuentan líneas de todos los armadores, no solo de ARLANDIZ LLORCA).",
+    "Los rangos €/kg se calcularon dividiendo importe entre kilos de las muestras y 4 ejemplos del catálogo; son aproximados.",
+    "No se ve si hay facturas de armador con otros tipos de IVA; en las 30 páginas leídas siempre es 10 %.",
+    "El nº de página y el orden de armadores cambia de un mes a otro; no hay un orden fijo."
+  ]
+}

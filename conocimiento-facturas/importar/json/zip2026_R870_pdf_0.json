@@ -1,0 +1,80 @@
+{
+ "archivo": "R870.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "2940",
+ "fecha": "2026-06-08",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BONITO",
+   "producto_ficha": null,
+   "cantidad": 17.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12,
+   "descuento_pct": null,
+   "total": 211.2,
+   "iva_pct": 10,
+   "albaran_ref": "7.768",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CIGALA",
+   "producto_ficha": "Cigala, por kg",
+   "cantidad": 4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 45,
+   "descuento_pct": null,
+   "total": 180,
+   "iva_pct": 10,
+   "albaran_ref": "7.876",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "LANGOSTINOS",
+   "producto_ficha": "Langostinos, por kg",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32,
+   "descuento_pct": null,
+   "total": 64,
+   "iva_pct": 10,
+   "albaran_ref": "7.876",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 455.2,
+ "desglose_iva": [
+  {
+   "base": 455.2,
+   "pct": 10,
+   "cuota": 45.52
+  }
+ ],
+ "iva": 45.52,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 500.72,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 08/06/2026 por 500.72. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

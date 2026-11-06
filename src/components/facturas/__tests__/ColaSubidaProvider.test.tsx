@@ -6,7 +6,9 @@ vi.mock("@/integrations/supabase/client", async () => {
   const m = await import("./dobleSupabaseFacturas");
   return { supabase: m.doble.supabase };
 });
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), useUsuarioIdOpcional: () => "u1" }));
+// Con «Editar» en Facturas (todo, como antes del 06/11/2026); los perfiles, en SubidaFacturas.permisos.test.tsx.
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
 const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
@@ -156,6 +158,8 @@ describe("ColaSubidaProvider · pop-up de documento ya subido", () => {
     const dialogo = await screen.findByRole("dialog");
     expect(dialogo.textContent).toContain("Este albarán ya estaba subido");
     expect(dialogo.textContent).toContain("dup.pdf");
+    // UI-13: concordancia con el título.
+    expect(dialogo.textContent).toContain("ya estaba guardado. No se ha creado otro.");
     expect(await screen.findByText("A-123")).toBeTruthy();
     expect(screen.getByText("Pescados Mari")).toBeTruthy();
     const foto = screen.getByRole("link", { name: /Ver la foto del que ya está|Ver documento original/ });
@@ -167,13 +171,29 @@ describe("ColaSubidaProvider · pop-up de documento ya subido", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
-  it("duplicado sustituible: recuerda «Pendientes de decidir» y ofrece Decidir", async () => {
-    const sustituible = { existente: { id: 7, numero_documento: "A-123", lineas: 3 } } as unknown as ResultadoProcesamiento["sustituible"];
+  it("duplicado sustituible: ofrece «Sustituir por la nueva» y «Dejar la que hay» (sin mandar a Cargar) y mantiene la foto del existente", async () => {
+    const sustituible = { trabajo_id: "t-1", existente: { id: 7, numero_documento: "A-123", lineas: 3 } } as unknown as ResultadoProcesamiento["sustituible"];
     await subir(duplicada("dup.pdf", { sustituible }));
     const dialogo = await screen.findByRole("dialog");
-    expect(dialogo.textContent).toContain("Pendientes de decidir");
-    fireEvent.click(screen.getByRole("button", { name: "Decidir" }));
-    expect(screen.getByTestId("ubicacion").textContent).toBe("/facturas?tab=cargar");
+    expect(dialogo.textContent).toContain("reemplazar");
+    expect(screen.getByRole("button", { name: "Sustituir por la nueva" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Dejar la que hay" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Decidir" })).toBeNull();
+    expect(await screen.findByRole("link", { name: /Ver la foto del que ya está|Ver documento original/ })).toBeTruthy();
+    // «Sustituir por la nueva» abre la confirmación (relectura).
+    fireEvent.click(screen.getByRole("button", { name: "Sustituir por la nueva" }));
+    expect(await screen.findByText(/¿Sustituir la factura A-123\?/)).toBeTruthy();
+  });
+
+  it("UI-13: una factura duplicada dice «guardada» y «otra» (concordancia con «Esta factura»)", async () => {
+    doble.fijarRespuestas((tabla) => (tabla === "facturas" ? { ...existente, tipo: "factura" } : []));
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: servidorAntiguo, procesarUnico: async () => duplicada("f.pdf", { tipo: "factura" }) } });
+    elegir("f.pdf");
+    fireEvent.click(screen.getByRole("button", { name: /Enviar 1 documento/ }));
+    const dialogo = await screen.findByRole("dialog");
+    await waitFor(() => expect(dialogo.textContent).toContain("Esta factura ya estaba subida"));
+    expect(dialogo.textContent).toContain("ya estaba guardada. No se ha creado otra.");
+    expect(dialogo.textContent).not.toContain("ya estaba guardado.");
   });
 
   it("no aparece para una página añadible ni para un documento guardado", async () => {

@@ -1,0 +1,117 @@
+{
+ "archivo": "R409.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170755521",
+ "fecha": "2026-03-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CEREZA FINAL 12 30+ I LAS MARIAS 2,5K CL",
+   "producto_ficha": "Cereza final de campaña 30+ (caja 2,5 kg, Chile)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": 2.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 11.5,
+   "descuento_pct": null,
+   "total": 57.5,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I PIRAMIDAL LILOT CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 13.1,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 23.58,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MANGO KENT 12 I AVION ORSERO 5,5K PE",
+   "producto_ficha": "Mango Kent calibre 12 (caja 5,5 kg)",
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": 5.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 32.0,
+   "descuento_pct": null,
+   "total": 32.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "KIWI SUNGOLD 33 I ZESPRI 5,8K IT",
+   "producto_ficha": "Kiwi Sungold Zespri (caja 5,8 kg)",
+   "cantidad": 1.0,
+   "unidad": "bt",
+   "bultos": 1,
+   "contenido_cantidad": 5.8,
+   "contenido_unidad": "kg",
+   "precio_unitario": 33.0,
+   "descuento_pct": null,
+   "total": 33.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "UVA JACKS SALUTE J I VANGUARD 4K PE",
+   "producto_ficha": "Uva Jack's Salute (caja 4 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 4,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.1,
+   "descuento_pct": null,
+   "total": 16.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 162.48,
+ "desglose_iva": [
+  {
+   "base": 162.48,
+   "pct": 4,
+   "cuota": 6.5
+  }
+ ],
+ "iva": 6.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 168.98,
+ "observaciones": "Fecha entrega 18.03.2026, igual que la fecha de factura. Total BT 6. La PIÑA GOLD 6 viene de PIRAMIDAL LILOT (no ORSERO): asociada por calibre y origen CR. Asteriscos GLOBALG.A.P. quitados del nombre.",
+ "alertas": [
+  "MANGO KENT 12 a 32,00 EUR/bulto: por debajo del rango de la ficha (34-45). Lo impreso se deja tal cual.",
+  "KIWI SUNGOLD 33 a 33,00 EUR/bulto; la ficha fija 32,00 EUR/bulto. Lo impreso se deja tal cual."
+ ]
+}

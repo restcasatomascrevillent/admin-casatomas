@@ -1,0 +1,80 @@
+{
+ "archivo": "R1547.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS NAREJOS S.L.",
+ "cif": "B03191350",
+ "local": "casa_tomas",
+ "numero_documento": "4958",
+ "fecha": "2026-09-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MEJILLONES",
+   "producto_ficha": "Mejillón gallego vivo, por kg",
+   "cantidad": 10,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 45,
+   "iva_pct": 10,
+   "albaran_ref": "13.660",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LANGOSTINOS",
+   "producto_ficha": "Langostinos, por kg",
+   "cantidad": 2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 50,
+   "descuento_pct": null,
+   "total": 100,
+   "iva_pct": 10,
+   "albaran_ref": "13.660",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MEJILLONES",
+   "producto_ficha": "Mejillón gallego vivo, por kg",
+   "cantidad": 10,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.5,
+   "descuento_pct": null,
+   "total": 45,
+   "iva_pct": 10,
+   "albaran_ref": "13.737",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 190.0,
+ "desglose_iva": [
+  {
+   "base": 190.0,
+   "pct": 10,
+   "cuota": 19.0
+  }
+ ],
+ "iva": 19.0,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 209.0,
+ "observaciones": "Forma de pago CONTADO, vencimiento único el 14/09/2026 por 209.0. Cliente MASIDE 2011 S.L.U. (Casa Tomás). Albaranes agrupados; ref y albarán_ref sin lote.",
+ "alertas": []
+}

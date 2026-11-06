@@ -34,8 +34,9 @@ import { MENSAJE_NO_DISPONIBLE, formatoNumero, plural } from "@/lib/newsletter/t
 // actualiza sola al abrirse si la lista no cuadra con los activos, si la última
 // actualización correcta tiene más de 24 h o si no hubo ninguna
 // (motivoAutoSincronizacion): una vez por montaje, en segundo plano, sin avisos
-// emergentes y solo si el usuario puede escribir en Marketing (lo mismo que
-// exige la función: can_write_section('marketing')). Los textos son para personal no técnico: nada de nombres de servicios
+// emergentes y solo si el usuario puede EDITAR Marketing (lo mismo que exige la
+// función: can_edit_section('marketing'), 06/11/2026). Con solo «Ver» la tarjeta
+// se consulta y el botón «Actualizar» no aparece. Los textos son para personal no técnico: nada de nombres de servicios
 // ni de variables; el detalle técnico va dentro de un desplegable.
 // Controles táctiles de ≥ 44 px (h-11), como el resto del panel en tablet.
 
@@ -226,10 +227,12 @@ export function SincronizacionResend({ activos, compacta = false }: PropsSincron
                 </PopoverContent>
               </Popover>
             )}
-            <Button type="button" variant="outline" size="sm" onClick={() => sincronizar({})} disabled={isPending || sinClave} aria-label="Actualizar lista de envío">
-              {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              Actualizar
-            </Button>
+            {puedeSincronizar && (
+              <Button type="button" variant="outline" size="sm" onClick={() => sincronizar({})} disabled={isPending || sinClave} aria-label="Actualizar lista de envío">
+                {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                Actualizar
+              </Button>
+            )}
           </div>
         </div>
         {aviso ? (
@@ -334,10 +337,12 @@ export function SincronizacionResend({ activos, compacta = false }: PropsSincron
           ) : null}
         </div>
 
-        <Button className="h-11 w-full sm:w-auto" variant="outline" onClick={() => sincronizar({})} disabled={isPending || sinClave}>
-          {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-          Actualizar lista de envío
-        </Button>
+        {puedeSincronizar && (
+          <Button className="h-11 w-full sm:w-auto" variant="outline" onClick={() => sincronizar({})} disabled={isPending || sinClave}>
+            {isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+            Actualizar lista de envío
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

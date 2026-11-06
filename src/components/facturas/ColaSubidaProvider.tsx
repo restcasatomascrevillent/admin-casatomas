@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { leerTrabajosOcrEnCurso } from "@/hooks/useTrabajoOcr";
 import { ColaSubidaContext, type ContextoColaSubida, RUTA_CARGAR } from "@/hooks/useColaSubida";
-import type { AlertaValidacion } from "@/hooks/useFacturas";
+import { invalidarTrasDocumento, type AlertaValidacion } from "@/hooks/useFacturas";
 import {
   clasificarResultado,
   crearColaSubida,
@@ -16,6 +16,7 @@ import {
   depsSupabase,
   type ElementoCola,
   hayEnNavegador,
+  POSICION_AVISOS,
   type ResumenTanda,
   textoResumenTanda,
 } from "@/lib/facturas/colaSubida";
@@ -28,15 +29,24 @@ import {
 } from "@/lib/facturas/documentoLargo";
 import { ETIQUETA_TIPO, tipoDocumento } from "@/lib/facturas/resultadosCarga";
 import {
+  descartarPendienteServidor,
   fusionarPendientes,
   guardarDescartados,
   leerDescartados,
   leerPendientesDecidir,
 } from "@/lib/facturas/pendientesDecidir";
+import { useIsCompactNav } from "@/hooks/use-mobile";
 
 import { AvisoDuplicadoDialog, type AvisoDuplicado } from "@/components/facturas/AvisoDuplicadoDialog";
+import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
+import { SustituirFacturaDialog } from "@/components/facturas/SustituirFacturaDialog";
+import { useDecisionDuplicado } from "@/components/facturas/useDecisionDuplicado";
 
 export const CLAVE_PENDIENTES = "ocr_pendientes_decidir";
+
+/** «Ver» de un documento: abre ESE documento en Compras › Documentos (sin id, la pestaña Cargar). */
+const rutaVerDocumento = (id: number | undefined) =>
+  id ? `/facturas?tab=compras&modo=documentos&doc=${id}` : RUTA_CARGAR;
 
 interface Props {
   children: ReactNode;
@@ -56,6 +66,8 @@ interface Props {
  *  · Al cargar la página: adopta los documentos largos del usuario que siguen
  *    leyéndose en el servidor.
  *  · `beforeunload` solo mientras haya ficheros que dependen del navegador.
+ *  · Por debajo de 1024 px (menú en panel deslizante, sin pie visible) pinta
+ *    un indicador flotante mientras haya documentos en marcha fuera de «Cargar».
  */
 export function ColaSubidaProvider({ children, deps }: Props) {
   const queryClient = useQueryClient();
@@ -75,7 +87,7 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   const encolarAviso = (a: AvisoDuplicado) => setAvisos((prev) => [...prev, a]);
 
   const [cola] = useState(() => {
-    const ver = { label: "Ver", onClick: () => navegarRef.current(RUTA_CARGAR) };
+    const irACargar = { label: "Ver", onClick: () => navegarRef.current(RUTA_CARGAR) };
     const alTerminar = (e: ElementoCola) => {
       const r = e.resultado;
       const clase = clasificarResultado(r);
@@ -83,19 +95,24 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       const tipo = tipoDocumento(r);
       const doc = tipo ? ETIQUETA_TIPO[tipo] : "Documento";
       const guardado = tipo === "factura" ? "guardada" : "guardado";
+      // «Ver» lleva al documento guardado (Compras › Documentos), no a la lista de la subida.
+      const ver = { label: "Ver", onClick: () => navegarRef.current(rutaVerDocumento(r?.facturaId)) };
+      const pos = { position: POSICION_AVISOS };
       if (r?.success && !r.duplicado) {
-        queryClient.invalidateQueries({ queryKey: ["facturas"] });
-        queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+        // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
+        invalidarTrasDocumento(queryClient);
       }
+      const temporal = r?.archivoEstado === "temporal" ? " · original pendiente de subir a Drive (se subirá solo)" : "";
       switch (clase) {
         case "guardada":
-          toast.success(`${doc} ${guardado}`, { description: e.nombre, action: ver });
+          toast.success(`${doc} ${guardado}`, { description: `${e.nombre}${temporal}`, action: ver, ...pos });
           break;
         case "avisos": {
           const n = r?.alertas?.length ?? 0;
           toast.warning(`${doc} ${guardado} con ${n} aviso${n === 1 ? "" : "s"}`, {
-            description: `${e.nombre}: conviene revisar los importes.`,
+            description: `${e.nombre}: conviene revisar los importes.${temporal}`,
             action: ver,
+            ...pos,
           });
           break;
         }
@@ -103,6 +120,14 @@ export function ColaSubidaProvider({ children, deps }: Props) {
           toast.error("No se ha podido archivar el original", {
             description: `${e.nombre}: los datos están guardados, pero el fichero no. Guarda una copia a mano y avisa al administrador.`,
             action: ver,
+            ...pos,
+          });
+          break;
+        case "en_servidor":
+          toast(`${e.nombre} sigue en el servidor`, {
+            description: "Está tardando más de lo normal. Aparecerá en la lista al terminar; no hace falta volver a subirlo.",
+            action: irACargar,
+            ...pos,
           });
           break;
         case "pendiente":
@@ -112,17 +137,25 @@ export function ColaSubidaProvider({ children, deps }: Props) {
             toast(`${e.nombre}: es otra página de ${r.anadible.existente.numero_documento}`, {
               description: "Queda en «Pendientes de decidir» para añadirla a la factura que ya existe.",
               action: { label: "Decidir", onClick: () => navegarRef.current(RUTA_CARGAR) },
+              ...pos,
             });
           } else {
             // El mismo documento: pop-up con enlace a la foto del existente (sin toast, para no avisar dos veces).
-            encolarAviso({ nombre: e.nombre, facturaId: r?.facturaId, tipo, pendiente: true });
+            encolarAviso({
+              nombre: e.nombre,
+              facturaId: r?.facturaId,
+              tipo,
+              pendiente: true,
+              sustituible: r?.sustituible ?? null,
+              preview: e.preview,
+            });
           }
           break;
         case "duplicada":
           encolarAviso({ nombre: e.nombre, facturaId: r?.facturaId, tipo, pendiente: false });
           break;
         default:
-          toast.error(`No se ha podido leer ${e.nombre}`, { description: r?.error, action: ver });
+          toast.error(`No se ha podido leer ${e.nombre}`, { description: r?.error, action: irACargar, ...pos });
       }
     };
     const alAcabarTanda = (r: ResumenTanda) => {
@@ -183,14 +216,41 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   const [descartados, setDescartados] = useState<Set<string>>(() => leerDescartados());
   const [sustituidos, setSustituidos] = useState<Set<string>>(() => new Set());
 
-  const descartarPendiente = useCallback((trabajoId: string) => {
-    setDescartados((prev) => {
-      const nuevo = new Set(prev);
-      nuevo.add(trabajoId);
-      guardarDescartados(nuevo);
-      return nuevo;
-    });
-  }, []);
+  /**
+   * «Dejar la que hay» / «No añadirla»: se oculta YA y se descarta en el
+   * servidor (ocr_descartar_trabajo: deja de salir en «Pendientes de decidir»
+   * y en el indicador, en cualquier navegador). Sin la RPC, como antes: se
+   * recuerda en este navegador. Si el servidor no lo permite, vuelve a salir
+   * con el motivo.
+   */
+  const descartarPendiente = useCallback(
+    (trabajoId: string) => {
+      setSustituidos((prev) => new Set(prev).add(trabajoId));
+      void descartarPendienteServidor(trabajoId).then((r) => {
+        if (r.como === "error") {
+          setSustituidos((prev) => {
+            const nuevo = new Set(prev);
+            nuevo.delete(trabajoId);
+            return nuevo;
+          });
+          toast.error("No se ha podido descartar", { description: r.motivo, position: POSICION_AVISOS });
+          return;
+        }
+        cola.marcarDescartado(trabajoId);
+        if (r.como === "local") {
+          setDescartados((prev) => {
+            const nuevo = new Set(prev);
+            nuevo.add(trabajoId);
+            guardarDescartados(nuevo);
+            return nuevo;
+          });
+        } else {
+          queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
+        }
+      });
+    },
+    [cola, queryClient],
+  );
 
   const sustituir = useCallback(
     async (s: Sustituible, esperado?: Esperado) => {
@@ -198,8 +258,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       toast.success("Factura sustituida", { description: r.message });
       setSustituidos((prev) => new Set(prev).add(s.trabajo_id));
       cola.marcarSustituida(s.trabajo_id, r.alertas as AlertaValidacion[]);
-      queryClient.invalidateQueries({ queryKey: ["facturas"] });
-      queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+      // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
+      invalidarTrasDocumento(queryClient);
       queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
     },
     [cola, queryClient],
@@ -211,8 +271,8 @@ export function ColaSubidaProvider({ children, deps }: Props) {
       toast.success(`Página ${a.pagina.actual} añadida`, { description: r.message });
       setSustituidos((prev) => new Set(prev).add(a.trabajo_id));
       cola.marcarPaginaAnadida(a.trabajo_id, r.alertas as AlertaValidacion[]);
-      queryClient.invalidateQueries({ queryKey: ["facturas"] });
-      queryClient.invalidateQueries({ queryKey: ["albaranes"] });
+      // Documento nuevo: lista, productos, compras y proveedores (QA C-11).
+      invalidarTrasDocumento(queryClient);
       queryClient.invalidateQueries({ queryKey: [CLAVE_PENDIENTES] });
     },
     [cola, queryClient],
@@ -227,6 +287,19 @@ export function ColaSubidaProvider({ children, deps }: Props) {
     () => ({ cola, estado, activos: cuentaActivos(estado), pendientes, descartarPendiente, sustituir, anadirPagina }),
     [cola, estado, pendientes, descartarPendiente, sustituir, anadirPagina],
   );
+
+  // Mismo flujo (relectura + confirmación + servidor) que «Pendientes de decidir».
+  const { decision, setDecision, cancelar, confirmar, dejar } = useDecisionDuplicado({
+    sustituir,
+    anadirPagina,
+    descartar: descartarPendiente,
+  });
+
+  // Menú en panel deslizante (< 1024 px): su pie no se ve, así que el
+  // indicador flota abajo mientras haya algo en marcha y no se esté en «Cargar».
+  const navCompacta = useIsCompactNav();
+  const enCargar = location.pathname === "/facturas" && new URLSearchParams(location.search).get("tab") === "cargar";
+  const flotante = navCompacta && !enCargar && valor.activos > 0;
 
   const aviso = avisos[0];
   return (
@@ -246,6 +319,21 @@ export function ColaSubidaProvider({ children, deps }: Props) {
             setAvisos((prev) => prev.slice(1));
             navigate(RUTA_CARGAR);
           }}
+          onSustituir={(s) => {
+            setAvisos((prev) => prev.slice(1));
+            setDecision({ tipo: "sustituir", s });
+          }}
+          onDejar={(s) => {
+            descartarPendiente(s.trabajo_id);
+            setAvisos((prev) => prev.slice(1));
+          }}
+        />
+      )}
+      <SustituirFacturaDialog decision={decision} onCancelar={cancelar} onDejar={dejar} onConfirmar={confirmar} />
+      {flotante && (
+        <IndicadorSubidasFacturas
+          variante="flotante"
+          className="fixed bottom-[calc(0.75rem+env(safe-area-inset-bottom))] left-3 z-40 max-w-[calc(100vw-1.5rem)] lg:hidden"
         />
       )}
     </ColaSubidaContext.Provider>

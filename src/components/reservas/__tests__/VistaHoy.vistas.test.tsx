@@ -15,6 +15,8 @@ const h = vi.hoisted(() => ({
   reservas: [] as Record<string, unknown>[],
   /** Cómo contesta la consulta de reservas de hoy: al momento, nunca (cargando) o con error. */
   respuesta: "ok" as "ok" | "pendiente" | "error",
+  /** «Editar» en Reservas (06/11/2026: con solo «Ver», ni «Organizar» ni «Sin reserva»). */
+  puedeEditar: true,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({
@@ -51,7 +53,9 @@ vi.mock("@/hooks/useEspaciosReserva", () => ({
   }),
 }));
 vi.mock("@/hooks/useAsignacionesMesa", () => ({ useAsignacionesMesa: () => ({ data: [] }) }));
-vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (_seccion: string, tipo: string = "view") => ({ canAccess: tipo === "view" || h.puedeEditar, loading: false }),
+}));
 vi.mock("@/hooks/useEdicionReserva", () => ({ useEdicionReserva: () => ({ editarReserva: vi.fn(), dialogoEdicion: null }) }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
 vi.mock("@/components/reservas/ElegirMesaDialog", () => ({ ElegirMesaDialog: () => null }));
@@ -276,5 +280,32 @@ describe("Hoy · el plano conoce el error de carga de las reservas de hoy (revis
     montar();
     await waitFor(() => expect(screen.getByTestId("vista-plano")).toHaveAttribute("data-reservas-error", "true"));
     h.respuesta = "ok";
+  });
+});
+
+// 06/11/2026 (decisión del dueño): «Organizar» y «Sin reserva» escriben; con solo «Ver» no salen (ni
+// desactivados), en ninguna de las dos vistas, y la ayuda (ⓘ) no habla de acciones ni de arrastrar.
+describe("Hoy · solo «Ver»", () => {
+  afterEach(() => {
+    h.puedeEditar = true;
+  });
+
+  it("con «Editar» están «Organizar» y «Sin reserva»", () => {
+    montar();
+    expect(screen.getByRole("button", { name: /Organizar/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Sin reserva/ })).toBeInTheDocument();
+  });
+
+  it("con solo «Ver» no están, ni en el kanban ni en el plano, y la ayuda no promete acciones", () => {
+    h.puedeEditar = false;
+    montar();
+    expect(screen.queryByRole("button", { name: /Organizar/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sin reserva/ })).toBeNull();
+    expect(screen.getByRole("note")).toHaveAttribute("title", "Las reservas de hoy, una columna por sala.");
+
+    fireEvent.click(screen.getByRole("radio", { name: "Plano" }));
+    expect(screen.queryByRole("button", { name: /Organizar/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Sin reserva/ })).toBeNull();
+    expect(screen.getByRole("note")).toHaveAttribute("title", "Toca una mesa para ver su reserva.");
   });
 });

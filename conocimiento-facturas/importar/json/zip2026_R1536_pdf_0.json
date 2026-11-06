@@ -1,0 +1,83 @@
+{
+ "archivo": "R1536.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260592",
+ "fecha": "2026-09-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000592",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CIGALA",
+   "producto_ficha": "Cigala",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 85.0,
+   "descuento_pct": null,
+   "total": 255.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000592",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "NECORA",
+   "producto_ficha": "Nécora",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.0,
+   "descuento_pct": null,
+   "total": 60.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000592",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 373.0,
+ "desglose_iva": [
+  {
+   "base": 373.0,
+   "pct": 10,
+   "cuota": 37.3
+  }
+ ],
+ "iva": 37.3,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 410.3,
+ "observaciones": "Albarán 1-000592 del 17/09/2026. Forma de pago: transferencia CaixaBank; vencimiento 17/09/2026 por 410,30. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "CIGALA a 85,00 €/kg; la ficha da 55,00 €/kg.",
+  "NECORA a 30,00 €/kg; la ficha da 35,00 €/kg."
+ ]
+}

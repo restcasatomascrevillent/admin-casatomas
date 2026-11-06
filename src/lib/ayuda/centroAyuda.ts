@@ -65,7 +65,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Revisión automática y avisos",
         pasos: [
-          "Ve a «Compras». El documento nuevo aparece en el mes que le toca, dentro de su proveedor.",
+          "Ve a «Compras». El documento nuevo aparece en el mes que le toca, con su proveedor en la misma fila.",
           "Las facturas que cuadran (base + IVA = total, sin precios raros, de un proveedor que ya conocemos) se marcan solas como «Revisada auto»: no tienes que hacer nada con ellas.",
           "Si algo no encaja sale un aviso en rojo o naranja que dice qué pasa: «IVA no cuadra», «No cuadra», «Línea mal», «Precio extremo», «Precio atípico», «Total enorme», «Sin total»… Toca el aviso y te lo explica. Para ver solo esas, usa el filtro «Con avisos»; para las que nadie ha mirado, «Sin revisar».",
         ],
@@ -73,7 +73,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         titulo: "Comprobar y corregir",
         pasos: [
-          "Abre el documento: arriba tienes los importes, debajo sus líneas y, al final de la ficha, la foto del papel original.",
+          "Toca el documento y su ficha ocupa toda la pantalla: arriba tienes los importes (y, si te regalaron algo o te hicieron descuento, cuánto vale), debajo sus líneas y, al final, la foto del papel original. «Volver a la lista» te deja la lista como estaba.",
           "Compara con el original usando el zoom: botones + y −, dos dedos o Ctrl + rueda para ampliar; arrastra para moverte; doble toque para acercar; «Girar» si salió torcida; y el botón de pantalla completa para verla en grande. «Original» (arriba) la abre en otra pestaña.",
           "Si algo está mal leído, pulsa «Editar» para corregir el proveedor, el número, la fecha o los importes, y activa «Marcar como verificada» para que pase a «Revisada». Una línea concreta se corrige con su lápiz. Al guardar, los avisos se vuelven a calcular.",
         ],
@@ -82,25 +82,27 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
         titulo: "Albaranes y facturas",
         pasos: [
           "Un albarán es la nota de entrega; luego el proveedor manda la factura que los recoge. En la ficha de una factura ves sus albaranes y un cotejo producto a producto (entregado contra cobrado, sin IVA) con las diferencias en color. Con «Añadir albarán» unes uno que falte; los citados en la factura salen los primeros.",
-          "En la ficha de un albarán pone «Ya facturado» (con la factura y un botón para verla) o «Sin factura todavía», con «Asociar a factura». El filtro «Albaranes sin factura» te enseña los que aún no te han facturado. En la lista, un albarán ya facturado sale más claro y no suma, para no contarlo dos veces.",
+          "En la ficha de un albarán pone «Ya facturado» (con la factura y un botón para verla) o «Sin factura todavía», con «Asociar a factura». El filtro «Albaranes sin factura» te enseña los que aún no te han facturado. En la lista, un albarán ya facturado sale tachado con «Incluido en …» y no suma, para no contarlo dos veces.",
         ],
       },
       {
         titulo: "Buscar lo que has comprado",
         pasos: [
           "Escribe en el buscador de arriba (un producto, un proveedor o un número) y elige cómo mirarlo: «Documentos», «Productos» o «Proveedores». El número de cada botón dice cuántos resultados hay.",
-          "En «Documentos» la lista va por meses (con cuántos documentos hay y cuánto suman), dentro por proveedor y, debajo, sus documentos unidos por una línea. Toca un mes o un proveedor para plegarlo o desplegarlo; se acuerda de cómo lo dejaste.",
+          "Debajo del buscador eliges el local (Todos, Casa Tomás o Touza) y el periodo (este mes, el anterior, el trimestre, el año o todo). Cambian las listas y sus totales. Las cifras y gráficas (gasto, abonos, lo regalado, proveedores con más gasto) están en la pestaña «Análisis».",
+          "En «Documentos» la lista ocupa todo el ancho y va por meses (con cuántos documentos hay, cuánto suman y lo que restan los abonos). Cada fila: fecha, proveedor, número, marcas (Albarán, Abono, Touza, avisos, sin revisar…) e importe. Toca un mes para plegarlo o desplegarlo; se acuerda de cómo lo dejaste. Los abonos (devoluciones) salen en verde con «−» y tienen su filtro.",
           "En «Productos» ves cuánto gastas por categoría (toca una para filtrar), qué productos «Subieron de precio» y, al abrir uno, la gráfica de su precio por proveedor y en qué documentos aparece. Desde ahí puedes cambiarle la categoría, el nombre o unir duplicados.",
-          "En «Proveedores» ves cuánto le compras a cada uno, qué, cada cuánto y su último pedido. El filtro «Con albaranes sin factura» te dice a quién reclamar facturas.",
+          "En «Proveedores» están ordenados por lo que les gastas. Toca uno y se despliega ahí mismo: CIF, cada cuánto pide, último pedido, qué le compras y sus facturas por meses (toca una para abrirla); otro toque lo pliega. El filtro «Con albaranes sin factura» te dice a quién reclamar facturas.",
           "Desde una ficha puedes saltar a otra (de una línea a su producto, de un documento a su proveedor) y volver con «Volver a…».",
         ],
       },
       {
-        titulo: "Preguntar a la IA",
+        titulo: "Análisis: el tablero y la IA",
         pasos: [
-          "Para preguntas como «¿cuánto gastamos en carne este mes?», ve a «IA». Puedes tocar una pregunta de ejemplo o escribirla con tus palabras y pulsar la flecha.",
-          "Para lo más habitual, despliega «Al instante»: gasto de este mes, gasto por mes, mejores proveedores, productos más comprados, por revisar, con avisos, sin total, gasto por categoría, qué ha subido de precio y la evolución del precio de un producto. Salen al momento y no gastan IA.",
-          "A la izquierda (en la tablet, en «Historial») quedan tus conversaciones anteriores. Arriba a la derecha ves lo que ha costado la IA este mes; si se acerca al tope, se pone en naranja o rojo.",
+          "En «Análisis» el tablero sale hecho: las cifras del periodo, el explorador, los proveedores a los que más compras, lo que más ha subido de precio, el gasto por familia, los gastos fijos al mes, los abonos y Casa Tomás frente a Touza. Arriba eliges el periodo (mes, trimestre, año, todo o «Personalizado» con las fechas que quieras) y el local; el enlace de la página guarda esa elección para volver o compartirla. No gasta IA.",
+          "«Explorar» cambia la gráfica al momento: elige qué medir (gasto con IVA, base sin IVA, nº de documentos, abonos, regalado; y con un producto filtrado, cantidad o precio medio), el eje (día, semana, mes, trimestre, proveedor, familia, producto, local o tipo), el color y los filtros. Tienes atajos («Gasto por mes», «Top proveedores», «Por familia», «Precio de un producto», «Abonos por proveedor»), «Ver como tabla», «CSV» y «Fijar en el tablero».",
+          "Desde cualquier cifra llegas a sus facturas: toca un indicador, una barra del explorador («Ver documentos») o una fila de las tarjetas. Sale la lista de documentos que forman esa cifra (con el total, que cuadra) y, al tocar uno, su PDF en grande con «Anterior/Siguiente», «Abrir en Drive» y «Abrir en Compras». Si Drive pide iniciar sesión, usa «Abrir en Drive».",
+          "Para lo demás, pulsa «Pregúntale a la IA»: sale un panel a la derecha con sugerencias y una caja para escribir con tus palabras. Si la respuesta trae una gráfica, «Fijar en el tablero» la deja al final del tablero. Tus conversaciones están en «Historial», dentro del panel. Arriba a la derecha ves lo que ha costado la IA este mes.",
         ],
       },
     ],
@@ -153,7 +155,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cómo veo si un producto ha subido de precio?",
         respuesta:
-          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. También puedes usar «Qué ha subido de precio» o «Evolución de precio» en «Al instante», en la pestaña «IA».",
+          "En «Compras», elige «Productos» y toca «Subieron de precio». Al abrir un producto ves la gráfica de su precio con cada proveedor y en qué facturas aparece. En «Análisis» tienes «Lo que más ha subido» y, en el explorador, el atajo «Precio de un producto».",
       },
       {
         pregunta: "¿Dónde veo el papel original?",
@@ -168,7 +170,7 @@ export const FICHAS_AYUDA: FichaAyuda[] = [
       {
         pregunta: "¿Cuánto cuesta usar la IA?",
         respuesta:
-          "Poco: cada pregunta al chatbot y cada documento leído cuestan céntimos. Lo ves arriba a la derecha (en «IA», lo del chatbot; en «Cargar», lo de leer documentos) y al tocarlo sale el detalle. Los botones de «Al instante» no gastan nada: leen tus datos directamente.",
+          "Poco: cada pregunta al chatbot y cada documento leído cuestan céntimos. Lo ves arriba a la derecha (en «Análisis», lo del chatbot; en «Cargar», lo de leer documentos) y al tocarlo sale el detalle. El tablero de «Análisis» no gasta nada: lee tus datos directamente.",
       },
     ],
   },

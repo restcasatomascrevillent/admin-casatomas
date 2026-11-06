@@ -30,6 +30,8 @@ const h = vi.hoisted(() => ({
   /** Cómo está la consulta de mesas asignadas de hoy. */
   asignacionesEstado: "ok" as "ok" | "cargando" | "error",
   refetchAsignaciones: (() => undefined) as unknown,
+  /** «Editar» en Reservas (06/11/2026: con solo «Ver», nada que escriba). */
+  puedeEditar: true,
 }));
 
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { from: vi.fn(), rpc: vi.fn(), functions: { invoke: vi.fn() } } }));
@@ -60,7 +62,9 @@ vi.mock("@/hooks/useAccionesServicioReserva", () => ({ useAccionesServicioReserv
 vi.mock("@/hooks/useAccionesModoServicio", () => ({
   useAccionesModoServicio: () => ({ liberarMesa: h.liberar, deshacerLiberarMesa: h.deshacer, estaEnCurso: () => false }),
 }));
-vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
+vi.mock("@/hooks/useUserRole", () => ({
+  useCanAccessSection: (_seccion: string, tipo: string = "view") => ({ canAccess: tipo === "view" || h.puedeEditar, loading: false }),
+}));
 vi.mock("@/hooks/useEdicionReserva", () => ({ useEdicionReserva: () => ({ editarReserva: vi.fn(), dialogoEdicion: null }) }));
 vi.mock("@/components/reservas/BlacklistModal", () => ({ BlacklistModal: () => null }));
 vi.mock("@/components/reservas/ElegirMesaDialog", () => ({
@@ -347,6 +351,51 @@ describe("Plano de Hoy · las mesas, con la lógica y los umbrales del modo serv
     expect(within(detalle).queryByRole("button", { name: /Diana Cena/ })).toBeNull();
     fireEvent.click(within(detalle).getByRole("button", { name: /^Sentar en la mesa 5 a Berta Sinmesa/ }));
     await waitFor(() => expect(h.asignar).toHaveBeenCalledWith({ reserva_id: "r-berta", mesa_ids: ["m5"] }));
+  });
+});
+
+// 06/11/2026 (decisión del dueño): con solo «Ver» en Reservas el plano se consulta (mesas, estados,
+// reservas y notas) sin nada que escriba, ni desactivado.
+describe("Plano de Hoy · solo «Ver»", () => {
+  beforeEach(() => {
+    h.puedeEditar = false;
+  });
+  afterEach(() => {
+    h.puedeEditar = true;
+  });
+
+  it("una mesa ocupada enseña su reserva, sin «Ha llegado», «Liberar mesa» ni el menú de acciones", () => {
+    montar();
+    fireEvent.click(mesaBoton("2"));
+    const detalle = screen.getByTestId("detalle-mesa");
+    expect(within(detalle).getByRole("heading", { name: "Mesa 2" })).toBeInTheDocument();
+    expect(within(detalle).getByText("Rosa Reservada")).toBeInTheDocument();
+    expect(within(detalle).queryByRole("button", { name: /ha llegado/i })).toBeNull();
+
+    fireEvent.click(within(detalle).getByRole("button", { name: "Cerrar la mesa" }));
+    fireEvent.click(mesaBoton("4"));
+    const otra = screen.getByTestId("detalle-mesa");
+    expect(within(otra).queryByRole("button", { name: /Liberar mesa|Deshacer liberar/ })).toBeNull();
+    expect(within(otra).queryByRole("button", { name: /importante|Editar|blacklist/i })).toBeNull();
+    expect(otra.querySelector("button:disabled")).toBeNull();
+  });
+
+  it("una mesa libre no ofrece «Sentar aquí» ni «Solo dar la mesa»", () => {
+    montar();
+    fireEvent.click(mesaBoton("5"));
+    const detalle = screen.getByTestId("detalle-mesa");
+    expect(within(detalle).queryByRole("region", { name: "Sentar aquí" })).toBeNull();
+    expect(within(detalle).queryByRole("button", { name: /^Sentar en la mesa|Solo dar la mesa/ })).toBeNull();
+  });
+
+  it("sin «Plano base» ni interruptor de la terraza; las tarjetas por sentar no se arrastran", () => {
+    montar();
+    expect(screen.queryByRole("button", { name: /Plano base/ })).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    const sinMesa = screen.getByRole("region", { name: "Sin mesa en Comedor" });
+    for (const tarjeta of within(sinMesa).getAllByRole("button", { name: /^(Berta|Diana)[^,]*,/ })) {
+      expect(tarjeta).toHaveAttribute("data-arrastrable", "false");
+    }
   });
 });
 

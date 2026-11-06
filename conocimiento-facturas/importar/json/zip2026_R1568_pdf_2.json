@@ -1,0 +1,46 @@
+{
+ "archivo": "R1568.pdf",
+ "paginas_pdf": [
+  3
+ ],
+ "tipo": "factura",
+ "proveedor": "ARLANDIZ LLORCA, S.L.",
+ "cif": "B54490115",
+ "local": "casa_tomas",
+ "numero_documento": "611/A",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 3,
+   "nombre": "33 CEFALOPODOS",
+   "producto_ficha": "Cefalópodos (familia 33)",
+   "cantidad": 39.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.89,
+   "descuento_pct": null,
+   "total": 504.74,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 504.74,
+ "desglose_iva": [
+  {
+   "base": 504.74,
+   "pct": 10,
+   "cuota": 50.47
+  }
+ ],
+ "iva": 50.47,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 555.21,
+ "observaciones": "Periodo 01/09/2026 a 30/09/2026. Embarcación(es): PEPE ARMONIA. Albaranes de subasta (informativo): 19691, 19215.",
+ "alertas": []
+}

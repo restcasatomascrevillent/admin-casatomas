@@ -1,0 +1,116 @@
+{
+ "archivo": "R206.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PONCE SPORT WEAR, S.L.U.",
+ "cif": "B54310578",
+ "local": "casa_tomas",
+ "numero_documento": "A/57",
+ "fecha": "2026-02-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GORRO ALTO POPELIN (001 - NEGRO, G)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.9,
+   "descuento_pct": null,
+   "total": 7.9,
+   "iva_pct": 21,
+   "albaran_ref": "A23",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CAMISA CBO ML CUELLO CAMISERO",
+   "producto_ficha": null,
+   "cantidad": 22.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.85,
+   "descuento_pct": null,
+   "total": 480.7,
+   "iva_pct": 21,
+   "albaran_ref": "A23",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BDO CAMISA + T",
+   "producto_ficha": null,
+   "cantidad": 22.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.71,
+   "descuento_pct": null,
+   "total": 37.62,
+   "iva_pct": 21,
+   "albaran_ref": "A23",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PANTALON CHINO SRA SLIM (36)",
+   "producto_ficha": null,
+   "cantidad": 4.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.95,
+   "descuento_pct": null,
+   "total": 99.8,
+   "iva_pct": 21,
+   "albaran_ref": "A23",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PANTALON CHINO CBO SLIM",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.95,
+   "descuento_pct": null,
+   "total": 598.8,
+   "iva_pct": 21,
+   "albaran_ref": "A23",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1224.82,
+ "desglose_iva": [
+  {
+   "base": 1224.82,
+   "pct": 21,
+   "cuota": 257.21
+  }
+ ],
+ "iva": 257.21,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1482.03,
+ "observaciones": "Desglose por tallas impreso bajo cada artículo (no incluido). Forma de pago no impresa; figura cuenta CAJA MAR (no transcrita). Sin vencimiento impreso. Cliente impreso: MASIDE 2011, S.L.U.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

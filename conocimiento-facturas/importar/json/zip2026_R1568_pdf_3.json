@@ -1,0 +1,46 @@
+{
+ "archivo": "R1568.pdf",
+ "paginas_pdf": [
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "SANMARTIN SANCHEZ, DANIEL",
+ "cif": "77759714A",
+ "local": "casa_tomas",
+ "numero_documento": "243/A",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 4,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 2.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.8,
+   "descuento_pct": null,
+   "total": 69.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 69.5,
+ "desglose_iva": [
+  {
+   "base": 69.5,
+   "pct": 10,
+   "cuota": 6.95
+  }
+ ],
+ "iva": 6.95,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 76.45,
+ "observaciones": "Periodo 01/09/2026 a 30/09/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 19691.",
+ "alertas": []
+}

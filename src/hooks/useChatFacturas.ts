@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { normalizarAdjuntos, type AdjuntoChat } from "@/lib/facturas/seriePrecio";
+import { componerMensaje } from "@/lib/facturas/graficasCopiloto";
 
 // ─── Tipos alineados con las tablas reales de Supabase ───────────────────────
 // Tablas: chat_facturas_conversaciones, chat_facturas_mensajes
@@ -30,7 +31,11 @@ export interface MensajeChat {
   adjuntos?: AdjuntoChat[];
 }
 
-export function useChatFacturas() {
+/**
+ * `activo` = false (quien no tiene «Editar» en Facturas: sin IA, 06/11/2026):
+ * no se pide el historial de conversaciones.
+ */
+export function useChatFacturas({ activo = true }: { activo?: boolean } = {}) {
   const [conversaciones, setConversaciones] = useState<Conversacion[]>([]);
   const [conversacionActiva, setConversacionActiva] = useState<Conversacion | null>(null);
   const [mensajes, setMensajes] = useState<MensajeChat[]>([]);
@@ -67,7 +72,8 @@ export function useChatFacturas() {
     }
 
     // Columnas reales: id, conversacion_id, rol, contenido, created_at
-    const mapped: MensajeChat[] = (data ?? []).map((m: any) => ({
+    const filas = (data ?? []) as unknown as { id: string; contenido: string; rol: string; conversacion_id: string; created_at: string; adjuntos?: unknown }[];
+    const mapped: MensajeChat[] = filas.map((m) => ({
       id: m.id,
       contenido: m.contenido,
       rol: m.rol as "user" | "assistant",
@@ -86,6 +92,25 @@ export function useChatFacturas() {
     setConversacionActiva(conv);
     await cargarMensajes(conv.id);
   }, [cargarMensajes]);
+
+  // ─── Abrir una conversación por su id (`/facturas/ia?c=<id>`) ────────────────
+  // La del historial ya cargado o, si aún no ha llegado, la de la base de datos.
+  // false si no existe (borrada, o de otra cuenta: RLS no la devuelve).
+  const abrirConversacionPorId = useCallback(async (id: string): Promise<boolean> => {
+    let conv: Conversacion | null = conversaciones.find((c) => c.id === id) ?? null;
+    if (!conv) {
+      const { data, error } = await supabase.from("chat_facturas_conversaciones").select("*").eq("id", id).maybeSingle();
+      if (error) {
+        console.error("Error abriendo la conversación:", error);
+        return false;
+      }
+      const fila = (Array.isArray(data) ? data[0] : data) as unknown as Conversacion | undefined;
+      conv = fila?.id === id ? fila : null;
+    }
+    if (!conv) return false;
+    await seleccionarConversacion(conv);
+    return true;
+  }, [conversaciones, seleccionarConversacion]);
 
   // ─── Crear nueva conversación ─────────────────────────────────────────────────
   const nuevaConversacion = useCallback(async (): Promise<Conversacion | null> => {
@@ -179,8 +204,13 @@ export function useChatFacturas() {
   }, [cargarConversaciones]);
 
   // ─── Enviar mensaje al chatbot (Edge Function `chat-facturas`) ───────────────
-  const enviarMensaje = useCallback(async (texto: string) => {
-    if (!texto.trim() || isSending) return;
+  // `contexto`: una gráfica sobre la que se pregunta (ver graficasCopiloto.ts).
+  // Viaja al final del texto del mensaje: se guarda y se manda tal cual, así
+  // que el modelo la ve sin cambiar la Edge Function. El título de la
+  // conversación sale solo de la pregunta.
+  const enviarMensaje = useCallback(async (pregunta: string, opciones?: { contexto?: string | null }) => {
+    if (!pregunta.trim() || isSending) return;
+    const texto = componerMensaje(pregunta, opciones?.contexto);
 
     let conv = conversacionActiva;
 
@@ -206,7 +236,7 @@ export function useChatFacturas() {
 
     // Actualizar título si es el primer mensaje
     if (mensajes.length === 0) {
-      await actualizarTitulo(conv.id, texto);
+      await actualizarTitulo(conv.id, pregunta.trim());
     }
 
     try {
@@ -342,8 +372,9 @@ export function useChatFacturas() {
 
   // ─── Cargar conversaciones al montar ─────────────────────────────────────
   useEffect(() => {
+    if (!activo) return;
     cargarConversaciones();
-  }, [cargarConversaciones]);
+  }, [cargarConversaciones, activo]);
 
   return {
     conversaciones,
@@ -352,6 +383,7 @@ export function useChatFacturas() {
     isLoading,
     isSending,
     seleccionarConversacion,
+    abrirConversacionPorId,
     nuevaConversacion,
     enviarMensaje,
     regenerarRespuesta,

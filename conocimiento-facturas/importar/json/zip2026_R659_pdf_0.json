@@ -1,0 +1,140 @@
+{
+ "archivo": "R659.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "4748",
+ "fecha": "2026-05-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LIMON VERNA",
+   "producto_ficha": "Limón Verna",
+   "cantidad": 36.5,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 4,
+   "albaran_ref": "A 3678/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PATATAS MINI 2,700KG",
+   "producto_ficha": "Patata mini (bolsa 2,7 kg)",
+   "cantidad": 16.2,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": 2.7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.4,
+   "descuento_pct": null,
+   "total": 55.08,
+   "iva_pct": 4,
+   "albaran_ref": "A 3678/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TOMATE DANIELA II M",
+   "producto_ficha": "Tomate Daniela cat. II calibre M",
+   "cantidad": 49.0,
+   "unidad": "kg",
+   "bultos": 7,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.2,
+   "descuento_pct": null,
+   "total": 58.8,
+   "iva_pct": 4,
+   "albaran_ref": "A 3678/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "NARANJA POWER",
+   "producto_ficha": "Naranja Power",
+   "cantidad": 14.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 14.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 3678/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (-3 x 1,65)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -4.95,
+   "descuento_pct": null,
+   "total": -4.95,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  },
+  {
+   "orden": 6,
+   "pagina": null,
+   "nombre": "Envase BATEA ALICHAMPI (-1 x 1,65)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -1.65,
+   "descuento_pct": null,
+   "total": -1.65,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 186.98,
+ "desglose_iva": [
+  {
+   "base": 193.58,
+   "pct": 4,
+   "cuota": 7.74
+  },
+  {
+   "base": -6.6,
+   "pct": 21,
+   "cuota": -1.39
+  }
+ ],
+ "iva": 6.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 193.33,
+ "observaciones": "Transferencia 30 días. Albarán A 3678/26 del 07/05/2026. Destinatario no impreso en el texto del PDF (la ficha asigna casa_tomas).",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

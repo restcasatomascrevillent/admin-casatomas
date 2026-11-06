@@ -510,12 +510,7 @@ export function textoDias(dias: number): string {
   return dias > 0 ? `en ${dias.toLocaleString("es-ES")} días` : `hace ${(-dias).toLocaleString("es-ES")} días`;
 }
 
-// ─── Resumen: lo más cerca del límite y lo que requiere atención ────────────
-
-/** Las métricas con % de los servicios en uso, de la más cercana a su límite a la que menos (las `n` primeras). */
-export function masCercaDelLimite(servicios: ServicioContratado[], lecturas: Map<string, LecturaServicio>, n = 5): AvisoConsumo[] {
-  return avisosConsumo(servicios, lecturas, 0).slice(0, n);
-}
+// ─── Lo que requiere atención (pestaña Estado, «Qué mirar») ─────────────────
 
 /** Con 30 días o menos (o ya pasada) la renovación se marca y pide atención. */
 export const DIAS_RENOVACION_CERCANA = 30;
@@ -543,7 +538,7 @@ const ORDEN_GRAVEDAD: Record<GravedadPendiente, number> = { rojo: 0, ambar: 1, i
 const nombres = (lista: string[]) => (lista.length <= 3 ? lista.join(", ") : `${lista.slice(0, 3).join(", ")} y ${lista.length - 3} más`);
 
 /**
- * «Requiere atención» del Resumen: lo que el dueño tiene que hacer algo,
+ * «Qué mirar» de la pestaña Estado: lo que el dueño tiene que hacer algo,
  * de lo más grave a lo menos. Consumos a partir del 80 %, renovaciones
  * pasadas o en 30 días, claves que faltan o el proveedor rechaza, avisos de
  * la IA (funciones que no registran su gasto, modelos sin tarifa) y planes o
@@ -708,11 +703,12 @@ export const AYUDA_SECRETOS: Record<string, AyudaSecreto> = {
     enlace: "https://github.com/settings/personal-access-tokens/new",
     textoEnlace: "Crear el token en GitHub",
     pasos: [
-      "Con la cuenta restcasatomascrevillent, crea un «Fine-grained token».",
-      "Repository access: «Public repositories» (no necesita ningún repositorio). Account permissions → «Plan»: Read-only.",
+      "Con la cuenta restcasatomascrevillent, crea un «Fine-grained token». Nombre: «Panel · Servicios». Caducidad: 1 año.",
+      "Repository access: «Only select repositories» → web-casatomas, admin-casatomas y touza-casatomas. Repository permissions → «Actions»: Read-only.",
+      "Account permissions → «Plan»: Read-only (para los minutos y lo facturado exactos).",
       "Copia el token (empieza por github_pat_): GitHub solo lo enseña una vez.",
     ],
-    permisos: "Solo lectura del plan y de la facturación: no puede tocar el código.",
+    permisos: "Solo lectura de las ejecuciones de pruebas, del plan y de la facturación: no puede tocar el código ni lanzar nada.",
   },
   SERVICIOS_SUPABASE_TOKEN: {
     titulo: "Token de gestión de Supabase",
@@ -942,3 +938,112 @@ export const TEXTO_ERROR: Record<string, string> = {
   error_api: "El proveedor no ha devuelto los datos. Se volverá a intentar en la próxima lectura.",
   error_interno: "No se pudo contactar con el proveedor (sin respuesta o tiempo agotado).",
 };
+
+// ─── Estado de un vistazo (pestaña «Estado», 06/11/2026) ────────────────────
+// Petición del dueño: «la primera pestaña tiene que ser algo muy visual, que de
+// primera vista sepas el estado de la instalación completa». Una ficha por
+// servicio en uso con un color y dos o tres palabras; el detalle, en su tarjeta.
+
+/** El color de una ficha. «gris»: sin datos (no hay lectura automática o aún no se ha leído). */
+export type EstadoServicio = Semaforo | "gris";
+
+export const TEXTO_ESTADO: Record<EstadoServicio, string> = {
+  rojo: "Urgente",
+  ambar: "Aviso",
+  verde: "Bien",
+  gris: "Sin datos",
+};
+
+export interface FichaEstado {
+  proveedor: string;
+  /** Sin la aclaración entre paréntesis: «Vapi», no «Vapi (asistente telefónico)». */
+  nombre: string;
+  nombreCompleto: string;
+  categoria: string;
+  estado: EstadoServicio;
+  /** Dos o tres palabras: «Bien», «Al 121 %», «Falta la clave», «Renueva en 12 días». */
+  motivo: string;
+  /** La métrica más cerca de su límite (para el anillo), si alguna tiene límite. */
+  principal: { etiqueta: string; porcentaje: number; textoValor: string | null; textoLimite: string | null } | null;
+}
+
+export interface EstadoInstalacion {
+  fichas: FichaEstado[];
+  cuenta: Record<EstadoServicio, number>;
+  /** El estado de toda la instalación: el peor color (el gris solo si no hay nada más). */
+  general: EstadoServicio;
+}
+
+/** «Vapi (asistente telefónico)» → «Vapi»; «Visitas a las webs (peticiones al CDN)» → «Visitas a las webs». */
+export const sinAclaracion = (texto: string): string => texto.replace(/\s*\([^)]*\)\s*$/, "").trim() || texto;
+
+const RANGO_ESTADO: Record<EstadoServicio, number> = { rojo: 3, ambar: 2, verde: 1, gris: 0 };
+
+/**
+ * Una ficha por servicio en uso: el peor de su consumo (≥ 90 % rojo, 70–90 %
+ * ámbar), su clave (rechazada: rojo; falta: ámbar), la lectura (fallida: ámbar)
+ * y su renovación (pasada: rojo; en 30 días o menos: ámbar). Sin ningún dato,
+ * gris. Primero lo urgente; dentro de cada color, el orden de siempre.
+ */
+export function estadoInstalacion(args: {
+  servicios: ServicioContratado[];
+  lecturas: Map<string, LecturaServicio>;
+  renovaciones: Renovacion[];
+  sinLector?: Set<string>;
+}): EstadoInstalacion {
+  const { servicios, lecturas, renovaciones, sinLector = new Set<string>() } = args;
+  const fichas: FichaEstado[] = [];
+  servicios.filter((s) => s.activo !== false).forEach((s) => {
+    const lectura = lecturas.get(s.proveedor) ?? null;
+    const conLimite = combinarMetricas(s, lectura).filter((f) => f.porcentaje != null && f.semaforo != null);
+    const top = conLimite.reduce<FilaMetrica | null>((m, f) => (m == null || (f.porcentaje ?? 0) > (m.porcentaje ?? 0) ? f : m), null);
+    const principal = top
+      ? { etiqueta: sinAclaracion(top.etiqueta), porcentaje: top.porcentaje!, textoValor: top.textoValor, textoLimite: top.textoLimite }
+      : null;
+
+    let estado: EstadoServicio = "gris";
+    let motivo = sinLector.has(s.proveedor) ? "Se mira en su panel" : "Sin datos aún";
+    const subir = (e: EstadoServicio, m: string) => {
+      if (RANGO_ESTADO[e] > RANGO_ESTADO[estado]) {
+        estado = e;
+        motivo = m;
+      }
+    };
+
+    if (lectura && !lectura.error) subir("verde", "Bien");
+    if (top?.semaforo === "rojo" || top?.semaforo === "ambar") subir(top.semaforo, `Al ${formatearPorcentaje(top.porcentaje!)}`);
+    if (lectura?.error && !sinLector.has(s.proveedor)) {
+      if (lectura.error === "credencial_rechazada") subir("rojo", "Clave rechazada");
+      else if (lectura.error === "falta_secreto") subir("ambar", "Falta la clave");
+      else subir("ambar", "No se pudo leer");
+    }
+    const suyas = renovaciones.filter((r) => r.proveedor === s.proveedor).sort((a, b) => a.dias - b.dias);
+    const proxima = suyas[0];
+    if (proxima && proxima.dias < 0) subir("rojo", "Renovación pasada");
+    else if (proxima && proxima.dias <= DIAS_RENOVACION_CERCANA) subir("ambar", `Renueva ${textoDias(proxima.dias)}`);
+
+    fichas.push({
+      proveedor: s.proveedor,
+      nombre: sinAclaracion(s.nombre),
+      nombreCompleto: s.nombre,
+      categoria: s.categoria,
+      estado,
+      motivo,
+      principal,
+    });
+  });
+  fichas.sort((a, b) => RANGO_ESTADO[b.estado] - RANGO_ESTADO[a.estado]);
+  const cuenta: Record<EstadoServicio, number> = { rojo: 0, ambar: 0, verde: 0, gris: 0 };
+  for (const f of fichas) cuenta[f.estado] += 1;
+  const general: EstadoServicio = cuenta.rojo ? "rojo" : cuenta.ambar ? "ambar" : cuenta.verde ? "verde" : "gris";
+  return { fichas, cuenta, general };
+}
+
+/** El titular del estado general: «Todo en orden», «Todo funciona · 2 avisos», «1 servicio necesita atención». */
+export function titularEstado(e: Pick<EstadoInstalacion, "cuenta" | "general">): string {
+  const { rojo, ambar } = e.cuenta;
+  if (e.general === "rojo") return rojo === 1 ? "1 servicio necesita atención" : `${rojo} servicios necesitan atención`;
+  if (e.general === "ambar") return ambar === 1 ? "Todo funciona · 1 aviso" : `Todo funciona · ${ambar} avisos`;
+  if (e.general === "verde") return "Todo en orden";
+  return "Todavía sin datos";
+}

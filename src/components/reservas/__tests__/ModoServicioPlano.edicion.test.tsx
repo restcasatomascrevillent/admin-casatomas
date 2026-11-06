@@ -140,17 +140,14 @@ describe("ModoServicioPlano · editar la reserva de una mesa", () => {
     expect(h.editarReserva).toHaveBeenCalledWith("r-anonima");
   });
 
-  it("sin permiso de edición sobre «reservas» el botón sale deshabilitado", async () => {
+  it("sin permiso de edición sobre «reservas» no hay botón (06/11/2026: oculto, no desactivado)", async () => {
     h.canEdit = false;
     montar();
 
     abrirMesa("4");
-    const boton = await screen.findByRole("button", { name: /Editar reserva/ });
-
-    expect(boton).toBeDisabled();
-    // Un botón deshabilitado no recibe el ratón (`pointer-events-none`): el motivo solo se ve en su envoltorio.
-    expect(boton.parentElement).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(boton);
+    // La hoja se abre y enseña la reserva, pero sin «Editar reserva».
+    expect(await screen.findByRole("button", { name: "Cerrar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Editar reserva/ })).not.toBeInTheDocument();
     expect(h.editarReserva).not.toHaveBeenCalled();
   });
 

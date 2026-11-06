@@ -1,0 +1,46 @@
+{
+ "archivo": "R1655.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170783210",
+ "fecha": "2026-10-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMENDRA FRITA I BONGUST 1X950GR 10% ES",
+   "producto_ficha": "Almendra frita Bongust (bolsa 950 g)",
+   "cantidad": 6.0,
+   "unidad": "bulto",
+   "bultos": 6,
+   "contenido_cantidad": 950,
+   "contenido_unidad": "g",
+   "precio_unitario": 16.1,
+   "descuento_pct": null,
+   "total": 96.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 96.6,
+ "desglose_iva": [
+  {
+   "base": 96.6,
+   "pct": 10,
+   "cuota": 9.66
+  }
+ ],
+ "iva": 9.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 106.26,
+ "observaciones": "Entrega 02.10.2026. Cliente MASIDE 2011 S.L.U. (código 32536 CASA TOMAS). Número 0810076537 y referencia 20261002:110255 en observaciones (no es el nº de factura). Anotación '(CP)' en observaciones, no es producto. Pie: Importe Bruto 96,60, base 96,60, IVA 10,0 % 9,66. Sin forma de pago impresa (varios IBAN). Sin cuadro de envases.",
+ "alertas": []
+}

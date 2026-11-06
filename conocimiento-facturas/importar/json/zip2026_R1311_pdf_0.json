@@ -1,0 +1,69 @@
+{
+ "archivo": "R1311.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "MAR MENOR DISTRIBUCIONES ALIMENTARIAS, S.L. (Doria Foods)",
+ "cif": "B73910747",
+ "local": "casa_tomas",
+ "numero_documento": "FRA/2026/21911",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Salmon Superior Feroe 7000-8000 g/pz (cód. F3221307)",
+   "producto_ficha": null,
+   "cantidad": 22.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.76,
+   "descuento_pct": null,
+   "total": 174.6,
+   "iva_pct": 10,
+   "albaran_ref": "WH/OUT/253998",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Elaboración media (cód. 788A), pedido S333743",
+   "producto_ficha": null,
+   "cantidad": 22.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 18.0,
+   "iva_pct": 10,
+   "albaran_ref": "WH/OUT/253998",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Gestión de embalajes, punto verde y logística (Art. 78 Ley 37/92), 1,5 €/entrega",
+   "importe": 1.5,
+   "iva_pct": 10
+  }
+ ],
+ "subtotal": 194.1,
+ "desglose_iva": [
+  {
+   "base": 194.1,
+   "pct": 10,
+   "cuota": 19.41
+  }
+ ],
+ "iva": 19.41,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 213.51,
+ "observaciones": "Pedido S333743. Forma de pago: transferencia, plazo 15 días, vencimiento 15/08/2026 por 213,51 €. Dirección de entrega: Santa María de la Cabeza, 2 (MASIDE 2011 S.L., Restaurante Casa Tomás).",
+ "alertas": []
+}

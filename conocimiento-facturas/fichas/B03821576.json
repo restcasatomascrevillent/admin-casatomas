@@ -1,0 +1,109 @@
+{
+  "cif": "B03821576",
+  "nombre": "Exclusivas Uriarte, S.L.",
+  "nombres_impresos": ["URIARTE", "Exclusivas Uriarte, S.L.", "Exclusivas Uriarte"],
+  "categoria": "alimentacion-general",
+  "locales": ["casa_tomas"],
+  "muestras": ["R33.pdf", "R564.pdf", "R1174.pdf", "R1556.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por albarán (casi siempre un albarán y 1-3 líneas por factura), escaneada",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": {
+      "ejemplos": ["A26/328", "A26/4,222", "A26/8,019", "A26/10,121"],
+      "patron": "^A26/\\d{1,2}[.,]?\\d{3}$",
+      "donde": "recuadro morado arriba a la derecha: 'N. Fac A26/328 Fecha 13/01/26'. Los miles llevan separador impreso (A26/4,222 = A26/4222): quitar la coma/punto al guardar."
+    },
+    "fecha": "'Fecha' junto a 'N. Fac', DD/MM/AA con año de dos cifras.",
+    "albaranes": "cabecera en negrita 'Albaran: A26/522 (13/01/26) - RESTAURANTE CASA TOMAS' sobre las líneas. Debajo de cada línea: 'Lote: A480614 x 16.00 K'."
+  },
+
+  "lectura": {
+    "columnas": ["Ref.", "Descripción", "Cajas", "U.C", "Uds", "Kilos", "Precio", "Dto%", "Dto€", "Importe"],
+    "cantidad_es": "unidades (Uds) o kg según el artículo: cajas × U.C (unidades por caja) = Uds; en artículos a peso, Kilos manda",
+    "columna_peso": "Kilos",
+    "precio_es_por": "ud (conservas, vino) o kg (arroz a granel/en bolsas)",
+    "descuento_por_linea": { "existe": true, "columna": "Dto% / Dto€", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [4, 10, 21],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Pie: Imp Bruto | % Dto. | Imp Dto. | Base Imp. | % IVA | Imp. IVA | % R.E. | R.E. | TOTAL FACTURA; en las muestras % Dto., Imp Dto., R.E. salen vacíos"],
+    "trampas": [
+      "Escaneo con la hoja ladeada y mucho espacio en blanco; las columnas numéricas son estrechas y se pueden desplazar una posición.",
+      "Con el 'Albaran' sin línea de descuento, las cifras 8 | 8,00 | 16,00 | 8,20 del arroz son Uds, Uds/Kilos y Kilos con precio 8,20 €/kg (16 kg × 8,20 = 131,20); el '8' suelto es el nº de bolsas.",
+      "Para ventresca: Cajas 2, U.C 24 (latas por caja), Uds 48, Precio 6,55 por lata (48 × 6,55 = 314,40).",
+      "Bloque 'Mercancia Pendiente' bajo las líneas (p. ej. 'VENTRESCA BONITO ESP.HOST.ENTERA 1.00'): es mercancía NO servida ni facturada, sin importe; no es una línea.",
+      "El '4,027' junto al CIF del cliente es el nº de cliente, no un importe ni un nº de factura.",
+      "Los importes de las líneas usan punto decimal ('131.20') y en la fila de totales mezcla de punto y coma; los números de factura usan coma para los miles.",
+      "Descripciones recortadas por la columna ('ARROZ MOLINO ROCA CARNAROLI OLD 2K', 'VENTRESCA BONITO ESP.HOST.ENTERAS N')."
+    ]
+  },
+
+  "reglas_cuadre": [
+    "Uds = Cajas × U.C cuando hay cajas (2 × 24 = 48)",
+    "importe_linea = Uds × Precio (conservas, vino) o Kilos × Precio (arroz)",
+    "Imp Bruto = suma de importes; Base Imp. = Imp Bruto − descuentos",
+    "IVA = base × % (4% arroz, 10% ventresca); TOTAL = base + IVA (R33: 131,20 + 5,25 = 136,45; R564: 314,40 + 31,44 = 345,84)",
+    "si la factura mezcla artículos con distinto IVA, el pie tendrá una fila de base e IVA por tipo (no visto en las muestras)"
+  ],
+
+  "guia_ocr": "Escaneo de factura de Uriarte, una página. Número en 'N. Fac A26/…' (los miles llevan coma: A26/4,222 = A26/4222), fecha DD/MM/AA. Columnas: Ref, Descripción, Cajas, U.C, Uds, Kilos, Precio, Dto%, Dto€, Importe. Cajas × U.C = Uds; el precio es por unidad (conservas) o por kilo (arroz: Kilos × Precio = Importe). Ignora 'Lote …' y todo lo que sale bajo 'Mercancia Pendiente': no se factura. El '4,027' del recuadro es el nº de cliente. IVA 4% arroz, 10% ventresca. Cliente: Restaurante Casa Tomas / MASIDE 2011.",
+
+  "productos": [
+    {
+      "nombre_impreso": "ARROZ MOLINO ROCA CARNAROLI OLD 2K",
+      "nombre_normalizado": "Arroz Molino Roca Carnaroli Old 2 kg",
+      "familia": "arroz",
+      "presentacion": "arroz Carnaroli envasado en bolsa de 2 kg (añejo 'Old')",
+      "formato": { "envase": "bolsa", "contenido": 2, "unidad_contenido": "kg", "unidades_por_bulto": 8, "bulto": "caja" },
+      "unidad_factura": "kg (8 bolsas × 2 kg = 16 kg por albarán)",
+      "precio": { "min": 8.2, "max": 8.2, "por": "kg", "ejemplos": [["2026-01-13", 8.2], ["2026-07-28", 8.2], ["2026-09-22", 8.2]] },
+      "iva_pct": 4,
+      "veces_visto": 3
+    },
+    {
+      "nombre_impreso": "VENTRESCA BONITO ESP.HOST.ENTERAS N",
+      "nombre_normalizado": "Ventresca de bonito (conserva, 'esp. hostelería', entera)",
+      "familia": "conserva-pescado",
+      "presentacion": "conserva de ventresca de bonito, formato hostelería (no se ve el peso de la lata)",
+      "formato": { "envase": "lata", "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 24, "bulto": "caja" },
+      "unidad_factura": "lata (Uds = cajas × 24)",
+      "precio": { "min": 6.55, "max": 6.55, "por": "lata", "ejemplos": [["2026-04-23", 6.55]] },
+      "iva_pct": 10,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "TROMPETA DE LOS MUERTOS PETRAS 1 KG.",
+      "nombre_normalizado": "Trompeta de los muertos Petras 1 kg",
+      "familia": "setas",
+      "presentacion": "setas envasadas (bolsa/lata de 1 kg, el envase no se ve)",
+      "formato": { "envase": null, "contenido": 1, "unidad_contenido": "kg", "unidades_por_bulto": 3, "bulto": "caja" },
+      "unidad_factura": "unidad de 1 kg (1 caja × 3 = 3 uds)",
+      "precio": { "min": 10.98, "max": 10.98, "por": "ud", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    },
+    {
+      "nombre_impreso": "BOSQUE DE MATASNOS ETIQ BLANCA",
+      "nombre_normalizado": "Bosque de Matasnos etiqueta blanca",
+      "familia": "vino",
+      "presentacion": "vino tinto; formato 75 cl supuesto por el precio (el albarán no lo indica)",
+      "formato": { "envase": "botella", "contenido": 75, "unidad_contenido": "cl", "unidades_por_bulto": 6, "bulto": "caja" },
+      "unidad_factura": "botella (4 cajas × 6 = 24 botellas)",
+      "precio": { "min": 20.96, "max": 20.96, "por": "botella", "ejemplos": [] },
+      "iva_pct": null,
+      "veces_visto": 1
+    }
+  ],
+
+  "dudas": [
+    "17 de 18 PDF son escaneos y solo se han leído 4 (R33, R564, R1174, R1556): el catálogo es muy corto y probablemente incompleto.",
+    "La disposición exacta de las cifras bajo Cajas/U.C/Uds/Kilos en el arroz (8 | 8,00 | 16,00) no está del todo clara en el escaneo; el cuadre solo funciona con Kilos 16 × 8,20 = 131,20.",
+    "Las dos últimas filas (trompeta y Bosque de Matasnos) salen del catálogo digital R1138, no de las muestras; su IVA y el formato de la botella (75 cl) no se ven: se deducen.",
+    "La ventresca no indica el peso de la lata ('N' final recortado): el 'N' podría ser 'NATURAL'.",
+    "El arroz aparece con fecha 28/07 y 22/09 con mismo importe y mismo precio: mismo pedido repetido, no duplicado."
+  ]
+}

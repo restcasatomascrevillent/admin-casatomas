@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  16
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO CARRILLO, JOSE TOMAS",
+ "cif": "74386669T",
+ "local": "casa_tomas",
+ "numero_documento": "1.164/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 16,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.3,
+   "descuento_pct": null,
+   "total": 29.13,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 29.13,
+ "desglose_iva": [
+  {
+   "base": 29.13,
+   "pct": 10,
+   "cuota": 2.91
+  }
+ ],
+ "iva": 2.91,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 32.04,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18578.",
+ "alertas": []
+}

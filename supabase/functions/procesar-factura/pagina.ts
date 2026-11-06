@@ -16,6 +16,8 @@
 import {
   comprobarCuadre,
   DESCRIPCION_IVA_PCT,
+  DESCRIPCION_RETENCION_IRPF,
+  DESCRIPCION_RETENCION_IRPF_PCT,
   type DocumentoExtraido,
   leerImporteLiteral,
   type LineaExtraida,
@@ -63,7 +65,8 @@ export const PAGINA_JSON_SCHEMA = {
           "impresos. Si no se ve, o se ve vacío, todo null (y tabla_totales_vacia según corresponda). No " +
           "calcules nada.",
         required: [
-          "total_literal", "subtotal_literal", "iva_literal", "subtotal", "iva", "total", "tabla_totales_vacia",
+          "total_literal", "subtotal_literal", "iva_literal", "subtotal", "iva", "retencion_irpf",
+          "retencion_irpf_pct", "total", "tabla_totales_vacia",
         ],
         properties: {
           total_literal: { ...strNull, description: "Caracteres impresos del TOTAL A PAGAR; null si no se ve." },
@@ -71,6 +74,8 @@ export const PAGINA_JSON_SCHEMA = {
           iva_literal: { ...strNull, description: "Caracteres impresos de la CUOTA de IVA en euros (no el %)." },
           subtotal: numNull,
           iva: numNull,
+          retencion_irpf: { ...numNull, description: DESCRIPCION_RETENCION_IRPF },
+          retencion_irpf_pct: { ...numNull, description: DESCRIPCION_RETENCION_IRPF_PCT },
           total: numNull,
           tabla_totales_vacia: {
             type: "boolean",
@@ -253,6 +258,10 @@ export interface PiePagina {
   iva_literal: string | null;
   subtotal: number | null;
   iva: number | null;
+  /** Retención de IRPF del pie, en positivo; null si no hay. Opcional en el
+   *  tipo: piezas guardadas antes del 06/11/2026 no la traen. */
+  retencion_irpf?: number | null;
+  retencion_irpf_pct?: number | null;
   total: number | null;
   tabla_totales_vacia: boolean;
 }
@@ -429,6 +438,8 @@ export function validarPagina(
         iva_literal: strOrNull(pie.iva_literal),
         subtotal: numOrNull(pie.subtotal),
         iva: numOrNull(pie.iva),
+        retencion_irpf: numOrNull(pie.retencion_irpf),
+        retencion_irpf_pct: numOrNull(pie.retencion_irpf_pct),
         total: numOrNull(pie.total),
         tabla_totales_vacia: pie.tabla_totales_vacia === true,
       },

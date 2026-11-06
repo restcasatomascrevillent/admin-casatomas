@@ -1,0 +1,94 @@
+{
+  "cif": "46914230A",
+  "nombre": "CASIMIRO PEREZ RODRIGUEZ",
+  "nombres_impresos": ["CASIMIRO PEREZ RODRIGUEZ"],
+  "categoria": "marisco",
+  "locales": ["casa_tomas"],
+  "muestras": ["R47.pdf", "R469.pdf", "R1112.pdf", "R1595.pdf"],
+
+  "documento": {
+    "tipo_habitual": "factura por entrega: una factura por cada albarán (71 PDF digitales en el año, 71 totales, una sola cabecera de albarán en cada muestra)",
+    "varias_facturas_por_pdf": false,
+    "paginas_tipicas": "1",
+    "numero_factura": { "ejemplos": ["1 260007", "1 260123", "1 260377", "1 260610"], "patron": "^1 26\\d{4}$", "donde": "casilla NÚMERO bajo la cabecera NÚMERO | FECHA | PÁGINA; el '1' inicial es la serie y 260007 el número (26 = año)" },
+    "fecha": "casilla FECHA junto al número, DD/MM/AAAA; coincide con la fecha del albarán y con la del vencimiento",
+    "albaranes": "línea 'Albarán: | 1-000007 | 07/01/2026' antes de las líneas; el nº de albarán es el sufijo del nº de factura (1-000007 corresponde a 260007)"
+  },
+
+  "lectura": {
+    "columnas": ["Artículo (código corto)", "Descripción", "Cantidad", "Precio", "Subtotal", "Dto.", "Total"],
+    "cantidad_es": "kg para el pescado y el marisco al peso (percebe, berberecho, almejas, rape…); UNIDADES para la ostra (36, 24, 48 = 3, 2, 4 docenas). La factura no imprime la unidad: se deduce del precio",
+    "columna_peso": null,
+    "precio_es_por": "kg (ostra: por unidad)",
+    "descuento_por_linea": { "existe": true, "columna": "DTO.", "valores_habituales": [] },
+    "iva_por_linea": false,
+    "tipos_iva": [10],
+    "recargo_equivalencia": false,
+    "retencion_irpf": false,
+    "envases": null,
+    "cargos_y_descuentos_pie": ["Tabla del pie TIPO | IMPORTE | DESCUENTO | PRONTO PAGO | PORTES | FINANCIACIÓN | BASE | I.V.A. | R.E. con tres filas de tipo (21,00 / 10,00 / 4,00): solo se rellena la de 10,00. En las muestras no hay descuento, pronto pago, portes ni financiación (columnas vacías)"],
+    "trampas": [
+      "Las líneas no llevan IVA: el 10 % solo aparece en la tabla del pie, en la fila 10,00; las filas 21,00 y 4,00 están vacías, no son importes",
+      "En la fila 10,00 los números son IMPORTE | BASE | IVA (p. ej. 165,00 | 165,00 | 16,50): importe y base salen repetidos",
+      "Nº de factura impreso como '1 260007' (serie separada por un espacio)",
+      "Formato español: punto de millar y coma decimal (1.160,75)",
+      "La ostra cuenta unidades y el resto kilos; no confundir cantidad 36 con kilos",
+      "Línea de VOLANDEIRA vista sin precio ni total (solo 1,50): revisar a mano",
+      "El código de artículo es de 1 a 4 letras (B, O, AF, KABR…) y no es único: manda la descripción"
+    ]
+  },
+
+  "reglas_cuadre": [
+    "total_linea = cantidad × precio (descuento por línea no visto; si hubiera Dto., × (1 − dto/100)); subtotal y total de la línea son iguales en las muestras",
+    "base = suma de los totales de línea = columnas IMPORTE y BASE de la fila 10,00",
+    "IVA = base × 10 % (R469: 1.055,23 × 10 % = 105,52)",
+    "total factura = base + IVA (R47: 165,00 + 16,50 = 181,50; R469: 1.055,23 + 105,52 = 1.160,75; R1112: 353,40 + 35,34 = 388,74)",
+    "el importe del vencimiento es igual al TOTAL"
+  ],
+
+  "guia_ocr": "Factura de un solo albarán. Número: casilla NÚMERO, formato '1 26xxxx' (serie y número separados por espacio). Fecha DD/MM/AAAA en la casilla FECHA. Cada línea: código corto | descripción | cantidad | precio | subtotal | total. Cantidad en kg, salvo OSTRA que son unidades; precio por kg (ostra por unidad). No hay IVA por línea: el IVA 10 % está en la tabla del pie, fila 10,00 (importe | base | IVA); las filas 21,00 y 4,00 están vacías. Comprueba cantidad × precio = total y base × 1,10 = TOTAL. Decimales con coma, millares con punto. La dirección de Crevillent es el cliente, no el proveedor.",
+
+  "productos": [
+    { "nombre_impreso": "BERBERECHO", "nombre_normalizado": "Berberecho", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 24.0, "max": 32.0, "por": "kg", "ejemplos": [["2026-07-14", 29.0], ["2026-09-29", 32.0]] }, "iva_pct": 10, "veces_visto": 39 },
+    { "nombre_impreso": "OSTRA", "nombre_normalizado": "Ostra", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 12, "bulto": "docena" }, "unidad_factura": "unidad (cantidad en múltiplos de 12: 24, 36, 48)", "precio": { "min": 2.4, "max": 2.8, "por": "ud", "ejemplos": [["2026-07-14", 2.4], ["2026-09-29", 2.8]] }, "iva_pct": 10, "veces_visto": 32 },
+    { "nombre_impreso": "OSTRA S.E. / OSTRA S. E.", "nombre_normalizado": "Ostra S.E.", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": 12, "bulto": "docena" }, "unidad_factura": "unidad (48 en el ejemplo)", "precio": { "min": 2.4, "max": 2.4, "por": "ud", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "ALMEJA FINA", "nombre_normalizado": "Almeja fina", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 90.0, "max": 100.0, "por": "kg", "ejemplos": [["2026-07-14", 90.0], ["2026-09-29", 90.0]] }, "iva_pct": 10, "veces_visto": 18 },
+    { "nombre_impreso": "ALMEJA RUBIA", "nombre_normalizado": "Almeja rubia", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 28.5, "max": 28.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "BUEY", "nombre_normalizado": "Buey (probablemente buey de mar)", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 19.0, "max": 19.0, "por": "kg", "ejemplos": [["2026-03-23", 19.0]] }, "iva_pct": 10, "veces_visto": 14 },
+    { "nombre_impreso": "CENTOLLA", "nombre_normalizado": "Centolla", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 25.0, "max": 25.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 11 },
+    { "nombre_impreso": "PERCEBE", "nombre_normalizado": "Percebe", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 110.0, "max": 110.0, "por": "kg", "ejemplos": [["2026-01-07", 110.0]] }, "iva_pct": 10, "veces_visto": 8 },
+    { "nombre_impreso": "BOGAVANTE", "nombre_normalizado": "Bogavante", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 26.0, "max": 26.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 7 },
+    { "nombre_impreso": "NECORA", "nombre_normalizado": "Nécora", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 35.0, "max": 35.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 5 },
+    { "nombre_impreso": "CAMARON", "nombre_normalizado": "Camarón", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 75.0, "max": 80.0, "por": "kg", "ejemplos": [["2026-09-29", 75.0]] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "CIGALA", "nombre_normalizado": "Cigala", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 55.0, "max": 55.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "LANGOSTA", "nombre_normalizado": "Langosta", "familia": "marisco_crustaceo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 60.0, "max": 60.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "NAVAJA", "nombre_normalizado": "Navaja", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 28.0, "max": 28.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "LONGUEIRON", "nombre_normalizado": "Longueirón", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 21.5, "max": 21.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "VOLANDEIRA", "nombre_normalizado": "Volandeira", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": null, "precio": { "min": null, "max": null, "por": null, "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "ESCUPIÑA", "nombre_normalizado": "Escupiña", "familia": "marisco_bivalvo", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 25.5, "max": 25.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "RAPE", "nombre_normalizado": "Rape", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 16.95, "max": 16.95, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 7 },
+    { "nombre_impreso": "RODABALLO", "nombre_normalizado": "Rodaballo", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 34.5, "max": 34.5, "por": "kg", "ejemplos": [["2026-03-23", 34.5]] }, "iva_pct": 10, "veces_visto": 9 },
+    { "nombre_impreso": "LUBINA", "nombre_normalizado": "Lubina", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 26.5, "max": 26.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 10 },
+    { "nombre_impreso": "DORADA", "nombre_normalizado": "Dorada", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 62.0, "max": 62.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 6 },
+    { "nombre_impreso": "LENGUADO", "nombre_normalizado": "Lenguado", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 29.5, "max": 29.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "LENGUADO 0.8/1KG", "nombre_normalizado": "Lenguado de 0,8 a 1 kg la pieza", "familia": "pescado", "presentacion": "calibre 0,8-1 kg por pieza", "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 24.0, "max": 24.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 2 },
+    { "nombre_impreso": "SAN PEDRO", "nombre_normalizado": "San Pedro", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 24.5, "max": 24.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 4 },
+    { "nombre_impreso": "GALLINETA", "nombre_normalizado": "Gallineta", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 20.9, "max": 20.9, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "SALMONETE", "nombre_normalizado": "Salmonete", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 24.0, "max": 24.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "CABRACHO", "nombre_normalizado": "Cabracho", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 37.0, "max": 37.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 3 },
+    { "nombre_impreso": "PARGO", "nombre_normalizado": "Pargo", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 28.5, "max": 28.5, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 },
+    { "nombre_impreso": "BESUGO", "nombre_normalizado": "Besugo", "familia": "pescado", "presentacion": null, "formato": { "envase": null, "contenido": null, "unidad_contenido": null, "unidades_por_bulto": null, "bulto": null }, "unidad_factura": "kg", "precio": { "min": 45.0, "max": 45.0, "por": "kg", "ejemplos": [] }, "iva_pct": 10, "veces_visto": 1 }
+  ],
+
+  "dudas": [
+    "Presentación del marisco: la factura nunca dice vivo, fresco, cocido ni congelado, por eso presentacion va null. Falta que el dueño confirme cuáles llegan cocidos (¿camarón, buey, centolla, bogavante, percebe?)",
+    "La unidad de la columna Cantidad no está impresa: se deduce de que cantidad × precio = total. Kilos para todo salvo la ostra (unidades, múltiplos de 12). Nada se factura por docena: el precio de la ostra es por unidad (2,40-2,80)",
+    "BUEY: no pone 'de mar'. Enchenta factura BUEY DE MAR a 13,50 €/kg; aquí sale a 19,00 €/kg. Confirmar que es el mismo producto",
+    "DORADA a 62 €/kg es muy alto frente al resto: confirmar si es dorada o si cantidad/precio van en otra unidad",
+    "OSTRA frente a OSTRA S.E.: no se sabe qué significa S.E. (mismo precio visto, 2,40)",
+    "Los rangos de precio salen solo de las 4 muestras y de un ejemplo por artículo del catálogo; no hay mínimos ni máximos reales de todo el año",
+    "VOLANDEIRA aparece sin precio ni total en el único ejemplo visto",
+    "La columna DTO. existe pero no se ha visto ningún valor; el pie tampoco muestra pronto pago, portes ni financiación",
+    "Catálogo completo (30 artículos): no queda ninguno fuera de la ficha"
+  ]
+}

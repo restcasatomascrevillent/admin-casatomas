@@ -140,16 +140,12 @@ describe("PanelAsignacion · editar desde la fila", () => {
     expect(h.editarReserva).toHaveBeenCalledWith("r-sin-nombre");
   });
 
-  it("sin permiso de edición sobre «reservas» el botón sale deshabilitado y lo explica", () => {
+  it("sin permiso de edición sobre «reservas» no hay botón (06/11/2026: oculto, no desactivado)", () => {
     h.canEdit = false;
     montar();
 
-    const boton = screen.getByRole("button", { name: /Editar la reserva de Ana Pendiente/ });
-    expect(boton).toBeDisabled();
-    expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    // Un botón deshabilitado no recibe el ratón (`pointer-events-none`): el motivo solo se ve en su envoltorio.
-    expect(boton.parentElement).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(boton);
+    expect(screen.getByText("Ana Pendiente")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Editar la reserva de Ana Pendiente/ })).not.toBeInTheDocument();
     expect(h.editarReserva).not.toHaveBeenCalled();
   });
 

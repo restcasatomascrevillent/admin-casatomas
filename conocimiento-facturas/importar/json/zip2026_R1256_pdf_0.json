@@ -1,0 +1,46 @@
+{
+ "archivo": "R1256.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINÍCOLAS VINOS DE CALIDAD, S.L.",
+ "cif": "B53882460",
+ "local": "casa_tomas",
+ "numero_documento": "26FV/1228",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOSCATO D'ASTI DUCHESSALIA 2025 (art. 52.343)",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/2316",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 180.0,
+ "desglose_iva": [
+  {
+   "base": 180.0,
+   "pct": 21,
+   "cuota": 37.8
+  }
+ ],
+ "iva": 37.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 217.8,
+ "observaciones": "Cliente 1813. Facturar a MASIDE 2011, S.L.U. / CASA TOMÁS. Recibo a 30 días, vencimiento 30/08/2026 por 217,80 €. Albarán A26/2316 (07/07/2026).",
+ "alertas": []
+}

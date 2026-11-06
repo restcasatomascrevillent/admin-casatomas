@@ -97,6 +97,11 @@ verify_jwt = false
 [functions.ocr-trabajo]
 verify_jwt = false
 
+# facturas-originales-drive: la llama el cron «facturas-originales-drive» por
+# pg_net (sin JWT, con x-ocr-secret) o un admin con su JWT (lo comprueba ella).
+[functions.facturas-originales-drive]
+verify_jwt = false
+
 # clasificar-productos: la llama el cron «clasificar-productos» por pg_net (sin
 # JWT) con la cabecera x-ocr-secret == OCR_TRABAJOS_SECRET (mismo secreto y
 # mismo valor de Vault que ocr-trabajo), y el botón de Facturas › Productos con
@@ -135,6 +140,11 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.procesar-factura]
+verify_jwt = true
+
+# Importación histórica de facturas ya extraídas (Facturas › Importación
+# histórica). JWT de usuario + permiso de edición en facturas + rol admin.
+[functions.importar-factura-historica]
 verify_jwt = true
 
 # Proxy de OpenAI (antes Lovable/Gemini). La autenticación REAL la hace la
@@ -182,6 +192,40 @@ verify_jwt = true
 # 20261103120000_servicios_contratados.sql.
 [functions.servicios-uso]
 verify_jwt = true
+
+# Marketing › Instagram (antes funciones de Vercel api/instagram-*). JWT de
+# usuario + can_write_section('marketing'), todo COMO EL USUARIO (clave pública
+# + su JWT; nunca service_role): la RLS de instagram_piezas y del bucket
+# «instagram» decide. Leen IG_ACCESS_TOKEN, IG_USER_ID, META_APP_ID y, si
+# están, META_API_VERSION y META_APP_SECRET de los secretos de Supabase, y
+# nunca los devuelven ni los registran. Ver docs/instagram.md.
+[functions.instagram-publicar]
+verify_jwt = true
+
+[functions.instagram-estado]
+verify_jwt = true
+
+# Biblioteca de fotos de Instagram en Google Drive (listar, subir, miniatura,
+# preparar copia temporal en el bucket). Mismo permiso (marketing) y mismos
+# secretos de Google que las facturas + GOOGLE_DRIVE_MARKETING_FOLDER_ID.
+[functions.instagram-drive]
+verify_jwt = true
+
+# IA de textos de Instagram (docs/instagram-ia.md): JWT de usuario +
+# can_write_section('marketing'), como el usuario. Secreto OPENAI_API_KEY.
+[functions.instagram-ia]
+verify_jwt = true
+
+# Marketing › Instagram › Métricas (docs/instagram-metricas.md). verify_jwt =
+# false porque la llama pg_cron (net.http_post, tarea instagram-metricas-diarias)
+# SIN usuario ni JWT, igual que sync-trafico-web. Autenticación real dentro:
+# · cron: x-webhook-secret == INSTAGRAM_METRICAS_CRON_SECRET (Vault
+#   'instagram_metricas_cron_secret'), en tiempo constante y FALLANDO CERRADO;
+# · panel: JWT de usuario + can_read_section('marketing') para leer y
+#   can_write_section('marketing') para «Actualizar ahora».
+# Escribe las métricas con la clave de servicio (solo service_role puede).
+[functions.instagram-metricas]
+verify_jwt = false
 
 
 # ----------------------------------------------------------------------------
@@ -239,6 +283,19 @@ verify_jwt = false
 # y el tipo de cambio del BCE. Ver supabase/functions/sincronizar-costes-openai/
 # y la migración 20261008150000_openai_costes_reales.sql.
 [functions.sincronizar-costes-openai]
+verify_jwt = false
+
+# Marketing › Instagram › publicaciones programadas. La llama SOLO pg_cron
+# (job «instagram-programador», cada 5 min, net.http_post) sin usuario ni JWT:
+# con verify_jwt = true la pasarela la cortaría con 401. Autenticación real:
+# cabecera x-webhook-secret == INSTAGRAM_PROGRAMADOR_SECRET (tiempo constante,
+# FALLA CERRADO -> 500 si falta). El valor sale del secreto de Vault
+# 'instagram_programador_secret' y la URL de 'project_url' (mismo patrón que
+# sync-trafico-web). No acepta datos del cuerpo: publica las vencidas de
+# instagram_programaciones con service_role. Ver
+# supabase/functions/instagram-programador/programador.ts y la migración
+# 20261106110000_instagram_programacion.sql.
+[functions.instagram-programador]
 verify_jwt = false
 
 

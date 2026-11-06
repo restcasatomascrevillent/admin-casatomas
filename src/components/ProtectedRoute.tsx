@@ -14,14 +14,18 @@ interface ProtectedRouteProps {
 }
 
 // Mapeo de rutas a secciones
-const ROUTE_TO_SECTION: Record<string, SectionKey> = {
+const ROUTE_TO_SECTION: Record<string, SectionKey | SectionKey[]> = {
   "/dashboard": "dashboard",
   "/": "dashboard",
   "/reservas": "reservas",
   // "/trabajadores" ya no requiere permiso: la ruta solo redirige a "/".
   "/marketing": "marketing",
+  // Instagram: sección propia del menú, mismo permiso que Newsletter. La
+  // agencia (Oficiosos, «instagram_agencia») entra solo a la pestaña Encargos.
+  "/instagram": ["marketing", "instagram_agencia"],
   "/tienda": "tienda",
-  "/facturas": "facturas",
+  // «Facturas · Subida» (06/11/2026) entra también, solo a la pestaña Cargar.
+  "/facturas": ["facturas", "facturas_subida"],
   "/usuarios": "usuarios",
 };
 // Ecommerce, Asistente Tel., Gestor Gasto, Reseñas Google, Tráfico web y
@@ -40,7 +44,8 @@ const DESTINOS_RECHAZO: { ruta: string; secciones: SectionKey[] }[] = [
   { ruta: "/marketing", secciones: ["marketing"] },
   { ruta: "/cheques", secciones: ["cheques"] },
   { ruta: "/tienda", secciones: ["tienda"] },
-  { ruta: "/facturas", secciones: ["facturas"] },
+  { ruta: "/facturas", secciones: ["facturas", "facturas_subida"] },
+  { ruta: "/instagram", secciones: ["instagram_agencia"] },
 ];
 
 export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProps) => {
@@ -85,12 +90,7 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
       )?.ruta ?? "/ayuda"; // /ayuda no exige permisos: nunca rebota
       navigate(destino, { replace: true });
     };
-    // La sección de usuarios es solo para admins (no configurable por
-    // permisos, igual que antes).
-    if (sectionKeys.includes("usuarios")) {
-      if (!isAdmin) rechazar();
-      return;
-    }
+    // «Usuarios» se configura por permisos como las demás (06/11/2026; antes, rol admin).
 
     // Verificar permiso de visualización (basta con una de las secciones:
     // p. ej. el Gestor Web agrupa carta, contenido web y bot, y cada pestaña
@@ -117,6 +117,6 @@ export const ProtectedRoute = ({ children, requiredSection }: ProtectedRouteProp
 
   const required = requiredSection ?? ROUTE_TO_SECTION[location.pathname];
   const keys = Array.isArray(required) ? required : required ? [required] : [];
-  if (!isSuperAdmin && keys.length && (keys.includes("usuarios") ? !isAdmin : !keys.some(key => permissions.some(p => p.section_key === key && p.can_view)))) return null;
+  if (!isSuperAdmin && keys.length && !keys.some(key => permissions.some(p => p.section_key === key && p.can_view))) return null;
   return <>{children}</>;
 };

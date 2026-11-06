@@ -1,0 +1,48 @@
+{
+ "archivo": "R1450.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "DISTRIBUCIONES GASTRONÓMICAS NICOLÁS Y VALERO SRL",
+ "cif": "B06805246",
+ "local": "casa_tomas",
+ "numero_documento": "A26/39633",
+ "fecha": "2026-08-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VARIOS-GAMBA ROJA",
+   "producto_ficha": null,
+   "cantidad": -0.65,
+   "unidad": "kg",
+   "bultos": -1.0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 120.0,
+   "descuento_pct": null,
+   "total": -78.0,
+   "iva_pct": 10,
+   "albaran_ref": "A26/48.373",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -78.0,
+ "desglose_iva": [
+  {
+   "base": -78.0,
+   "pct": 10,
+   "cuota": -7.8
+  }
+ ],
+ "iva": -7.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -85.8,
+ "observaciones": "Abono de la factura quincenal; cliente MASIDE 2011 SLU / Restaurante Casa Tomás. Observaciones impresas: ABONO DIFERENCIA DE PESO Y MERMAS GAMBA ROJA CORRESPONDIENTE AL ALBARAN P26/18464 DEL 11/08/26. Aunque el número empieza por A26 es un abono (importes negativos). Sin cargo de 1,82 EUR.",
+ "alertas": [
+  "Número de documento A26/39633 (serie A) pero con importes negativos: tratado como abono."
+ ]
+}

@@ -1,0 +1,82 @@
+{
+ "archivo": "R849.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SITVAL (Societat Valenciana d'Inspecció Tècnica de Vehicles SA)",
+ "cif": "A72599418",
+ "local": "casa_tomas",
+ "numero_documento": "2026-0302M/08023",
+ "fecha": "2026-06-05",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Seguridad (ITV periódica 8384GZL)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.05,
+   "descuento_pct": null,
+   "total": 25.05,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Gases (ITV periódica 8384GZL)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 17.9,
+   "descuento_pct": null,
+   "total": 17.9,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Tasa DGT",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.18,
+   "descuento_pct": null,
+   "total": 4.18,
+   "iva_pct": 0,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 42.95,
+ "desglose_iva": [
+  {
+   "base": 42.95,
+   "pct": 21,
+   "cuota": 9.02
+  }
+ ],
+ "iva": 9.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 56.15,
+ "observaciones": "ITV periódica matrícula 8384GZL, 05/06/2026. Pago online. Tasas 4,18 fuera de la base.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

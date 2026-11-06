@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  20
+ ],
+ "tipo": "factura",
+ "proveedor": "MOLINA MIRA, JOSE IVAN",
+ "cif": "33481277Q",
+ "local": "casa_tomas",
+ "numero_documento": "358/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 20,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 1.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 52.2,
+   "descuento_pct": null,
+   "total": 99.18,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 99.18,
+ "desglose_iva": [
+  {
+   "base": 99.18,
+   "pct": 10.0,
+   "cuota": 9.92
+  }
+ ],
+ "iva": 9.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 109.1,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 9454. Embarcaciones: ninguna.",
+ "alertas": []
+}

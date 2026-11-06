@@ -1299,6 +1299,9 @@ export type Database = {
       }
       configuracion_web: {
         Row: {
+          encuesta_vinos_activa: boolean
+          horario_menu_dia_casa_tomas: Json | null
+          horario_tapas_casa_tomas: Json | null
           id: boolean
           mostrar_fotos_platos_casa_tomas: boolean
           mostrar_fotos_platos_touza: boolean
@@ -1308,6 +1311,9 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          encuesta_vinos_activa?: boolean
+          horario_menu_dia_casa_tomas?: Json | null
+          horario_tapas_casa_tomas?: Json | null
           id?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
@@ -1317,6 +1323,9 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          encuesta_vinos_activa?: boolean
+          horario_menu_dia_casa_tomas?: Json | null
+          horario_tapas_casa_tomas?: Json | null
           id?: boolean
           mostrar_fotos_platos_casa_tomas?: boolean
           mostrar_fotos_platos_touza?: boolean
@@ -1324,6 +1333,44 @@ export type Database = {
           mostrar_tapas_casa_tomas?: boolean
           updated_at?: string
           updated_by?: string | null
+        }
+        Relationships: []
+      }
+      // «Vota tu vino favorito» (migración 20261104141000_encuesta_vino_favorito). La web vota con
+      // la RPC votar_vino_favorito; el panel con «Gestor carta» lee y vacía.
+      votos_vino_favorito: {
+        Row: {
+          acepta_bases: boolean
+          contacto: string
+          contacto_normalizado: string
+          created_at: string
+          id: string
+          idioma: string
+          nombre: string
+          vino_id: string | null
+          vino_nombre: string
+        }
+        Insert: {
+          acepta_bases: boolean
+          contacto: string
+          contacto_normalizado: string
+          created_at?: string
+          id?: string
+          idioma?: string
+          nombre: string
+          vino_id?: string | null
+          vino_nombre: string
+        }
+        Update: {
+          acepta_bases?: boolean
+          contacto?: string
+          contacto_normalizado?: string
+          created_at?: string
+          id?: string
+          idioma?: string
+          nombre?: string
+          vino_id?: string | null
+          vino_nombre?: string
         }
         Relationships: []
       }
@@ -1650,7 +1697,9 @@ export type Database = {
           facturado_origen: string | null
           fecha: string
           id: number
+          import_clave: string | null
           iva: number | null
+          local: string | null
           numero_documento: string
           observaciones: string | null
           ocr_trabajo_id: string | null
@@ -1660,6 +1709,8 @@ export type Database = {
           proveedor_id: number | null
           proveedor_normalizado: string | null
           resumen: string | null
+          retencion_irpf: number | null
+          retencion_irpf_pct: number | null
           subtotal: number | null
           tipo: string
           total: number | null
@@ -1680,7 +1731,9 @@ export type Database = {
           facturado_origen?: string | null
           fecha: string
           id?: number
+          import_clave?: string | null
           iva?: number | null
+          local?: string | null
           numero_documento: string
           observaciones?: string | null
           ocr_trabajo_id?: string | null
@@ -1690,6 +1743,8 @@ export type Database = {
           proveedor_id?: number | null
           proveedor_normalizado?: string | null
           resumen?: string | null
+          retencion_irpf?: number | null
+          retencion_irpf_pct?: number | null
           subtotal?: number | null
           tipo: string
           total?: number | null
@@ -1710,7 +1765,9 @@ export type Database = {
           facturado_origen?: string | null
           fecha?: string
           id?: number
+          import_clave?: string | null
           iva?: number | null
+          local?: string | null
           numero_documento?: string
           observaciones?: string | null
           ocr_trabajo_id?: string | null
@@ -1720,6 +1777,8 @@ export type Database = {
           proveedor_id?: number | null
           proveedor_normalizado?: string | null
           resumen?: string | null
+          retencion_irpf?: number | null
+          retencion_irpf_pct?: number | null
           subtotal?: number | null
           tipo?: string
           total?: number | null
@@ -2148,6 +2207,387 @@ export type Database = {
           razonamiento_tokens?: number
         }
         Relationships: []
+      }
+      instagram_fotos: {
+        Row: {
+          alto: number
+          ancho: number
+          created_at: string
+          descripcion: string
+          drive_id: string | null
+          id: string
+          marca: string
+          ruta: string | null
+          subida_por: string | null
+          tipo: string
+        }
+        Insert: {
+          alto: number
+          ancho: number
+          created_at?: string
+          descripcion?: string
+          drive_id?: string | null
+          id?: string
+          marca: string
+          ruta?: string | null
+          subida_por?: string | null
+          tipo: string
+        }
+        Update: {
+          alto?: number
+          ancho?: number
+          created_at?: string
+          descripcion?: string
+          drive_id?: string | null
+          id?: string
+          marca?: string
+          ruta?: string | null
+          subida_por?: string | null
+          tipo?: string
+        }
+        Relationships: []
+      }
+      instagram_metricas_capturas: {
+        Row: {
+          avisos: Json
+          dias: number
+          error: string | null
+          error_tipo: string | null
+          fin: string | null
+          id: number
+          ig_user_id: string | null
+          inicio: string
+          ok: boolean
+          origen: string
+          publicaciones: number
+        }
+        Insert: {
+          avisos?: Json
+          dias?: number
+          error?: string | null
+          error_tipo?: string | null
+          fin?: string | null
+          id?: never
+          ig_user_id?: string | null
+          inicio?: string
+          ok?: boolean
+          origen: string
+          publicaciones?: number
+        }
+        Update: {
+          avisos?: Json
+          dias?: number
+          error?: string | null
+          error_tipo?: string | null
+          fin?: string | null
+          id?: never
+          ig_user_id?: string | null
+          inicio?: string
+          ok?: boolean
+          origen?: string
+          publicaciones?: number
+        }
+        Relationships: []
+      }
+      instagram_metricas_cuenta: {
+        Row: {
+          alcance: number | null
+          capturado_at: string
+          comentarios: number | null
+          compartidos: number | null
+          cuentas_interaccion: number | null
+          fecha: string
+          guardados: number | null
+          id: number
+          ig_user_id: string
+          interacciones: number | null
+          me_gusta: number | null
+          seguidores: number | null
+          toques_enlaces: number | null
+          visitas_perfil: number | null
+          visualizaciones: number | null
+        }
+        Insert: {
+          alcance?: number | null
+          capturado_at?: string
+          comentarios?: number | null
+          compartidos?: number | null
+          cuentas_interaccion?: number | null
+          fecha: string
+          guardados?: number | null
+          id?: never
+          ig_user_id: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          seguidores?: number | null
+          toques_enlaces?: number | null
+          visitas_perfil?: number | null
+          visualizaciones?: number | null
+        }
+        Update: {
+          alcance?: number | null
+          capturado_at?: string
+          comentarios?: number | null
+          compartidos?: number | null
+          cuentas_interaccion?: number | null
+          fecha?: string
+          guardados?: number | null
+          id?: never
+          ig_user_id?: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          seguidores?: number | null
+          toques_enlaces?: number | null
+          visitas_perfil?: number | null
+          visualizaciones?: number | null
+        }
+        Relationships: []
+      }
+      instagram_metricas_publicacion: {
+        Row: {
+          alcance: number | null
+          capturado_at: string
+          caption: string | null
+          comentarios: number | null
+          compartidos: number | null
+          fecha_captura: string
+          guardados: number | null
+          id: number
+          ig_user_id: string
+          interacciones: number | null
+          me_gusta: number | null
+          media_id: string
+          miniatura_url: string | null
+          permalink: string | null
+          pieza_id: string | null
+          producto: string | null
+          publicado_at: string | null
+          tipo_medio: string | null
+          visualizaciones: number | null
+        }
+        Insert: {
+          alcance?: number | null
+          capturado_at?: string
+          caption?: string | null
+          comentarios?: number | null
+          compartidos?: number | null
+          fecha_captura: string
+          guardados?: number | null
+          id?: never
+          ig_user_id: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          media_id: string
+          miniatura_url?: string | null
+          permalink?: string | null
+          pieza_id?: string | null
+          producto?: string | null
+          publicado_at?: string | null
+          tipo_medio?: string | null
+          visualizaciones?: number | null
+        }
+        Update: {
+          alcance?: number | null
+          capturado_at?: string
+          caption?: string | null
+          comentarios?: number | null
+          compartidos?: number | null
+          fecha_captura?: string
+          guardados?: number | null
+          id?: never
+          ig_user_id?: string
+          interacciones?: number | null
+          me_gusta?: number | null
+          media_id?: string
+          miniatura_url?: string | null
+          permalink?: string | null
+          pieza_id?: string | null
+          producto?: string | null
+          publicado_at?: string | null
+          tipo_medio?: string | null
+          visualizaciones?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_metricas_publicacion_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_piezas: {
+        Row: {
+          alt_text: string | null
+          caption: string | null
+          contenedor_id: string | null
+          created_at: string
+          creado_por: string | null
+          datos: Json
+          drive_id: string | null
+          error: string | null
+          estado: string
+          formato: string
+          id: string
+          imagen_borrada_at: string | null
+          imagen_ruta: string | null
+          marca: string
+          media_id: string | null
+          permalink: string | null
+          plantilla: string
+          publicada_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          alt_text?: string | null
+          caption?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          datos?: Json
+          drive_id?: string | null
+          error?: string | null
+          estado?: string
+          formato: string
+          id?: string
+          imagen_borrada_at?: string | null
+          imagen_ruta?: string | null
+          marca: string
+          media_id?: string | null
+          permalink?: string | null
+          plantilla: string
+          publicada_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          alt_text?: string | null
+          caption?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          datos?: Json
+          drive_id?: string | null
+          error?: string | null
+          estado?: string
+          formato?: string
+          id?: string
+          imagen_borrada_at?: string | null
+          imagen_ruta?: string | null
+          marca?: string
+          media_id?: string | null
+          permalink?: string | null
+          plantilla?: string
+          publicada_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      instagram_programaciones: {
+        Row: {
+          bloqueada_hasta: string | null
+          bloqueo_id: string | null
+          cancelada_at: string | null
+          cancelada_por: string | null
+          contenedor_id: string | null
+          created_at: string
+          creado_por: string | null
+          estado: string
+          id: string
+          intentos: number
+          marca: string
+          media_id: string | null
+          permalink: string | null
+          pieza_id: string
+          programada_para: string
+          publicada_at: string | null
+          siguiente_intento_at: string
+          ultimo_error: string | null
+          ultimo_intento_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          bloqueada_hasta?: string | null
+          bloqueo_id?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          estado?: string
+          id?: string
+          intentos?: number
+          marca: string
+          media_id?: string | null
+          permalink?: string | null
+          pieza_id: string
+          programada_para: string
+          publicada_at?: string | null
+          siguiente_intento_at: string
+          ultimo_error?: string | null
+          ultimo_intento_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          bloqueada_hasta?: string | null
+          bloqueo_id?: string | null
+          cancelada_at?: string | null
+          cancelada_por?: string | null
+          contenedor_id?: string | null
+          created_at?: string
+          creado_por?: string | null
+          estado?: string
+          id?: string
+          intentos?: number
+          marca?: string
+          media_id?: string | null
+          permalink?: string | null
+          pieza_id?: string
+          programada_para?: string
+          publicada_at?: string | null
+          siguiente_intento_at?: string
+          ultimo_error?: string | null
+          ultimo_intento_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_programaciones_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      instagram_publicaciones_en_curso: {
+        Row: {
+          bloqueada_hasta: string
+          bloqueo_id: string
+          created_at: string
+          pieza_id: string
+        }
+        Insert: {
+          bloqueada_hasta: string
+          bloqueo_id: string
+          created_at?: string
+          pieza_id: string
+        }
+        Update: {
+          bloqueada_hasta?: string
+          bloqueo_id?: string
+          created_at?: string
+          pieza_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_publicaciones_en_curso_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: true
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       items_documento: {
         Row: {
@@ -3484,9 +3924,12 @@ export type Database = {
           contenido_origen: string | null
           contenido_unidad: string | null
           created_at: string | null
+          descuento_pct: number | null
           embedding: string | null
           factura_id: number
           id: number
+          importe_bruto: number | null
+          importe_bruto_estimado: boolean
           iva_pct: number | null
           nombre: string
           nombre_normalizado: string | null
@@ -3505,9 +3948,12 @@ export type Database = {
           contenido_origen?: string | null
           contenido_unidad?: string | null
           created_at?: string | null
+          descuento_pct?: number | null
           embedding?: string | null
           factura_id: number
           id?: number
+          importe_bruto?: number | null
+          importe_bruto_estimado?: boolean
           iva_pct?: number | null
           nombre: string
           nombre_normalizado?: string | null
@@ -3526,9 +3972,12 @@ export type Database = {
           contenido_origen?: string | null
           contenido_unidad?: string | null
           created_at?: string | null
+          descuento_pct?: number | null
           embedding?: string | null
           factura_id?: number
           id?: number
+          importe_bruto?: number | null
+          importe_bruto_estimado?: boolean
           iva_pct?: number | null
           nombre?: string
           nombre_normalizado?: string | null
@@ -4635,7 +5084,11 @@ export type Database = {
           expanded: boolean | null
           featured: boolean | null
           id: string
+          copeo: boolean
           imagen_posicion_y: number | null
+          precio_copa_eur: number | null
+          puntuacion_parker: number | null
+          puntuacion_parker_anada: number | null
           imagen_url: string | null
           ingredientes: string | null
           nombre: string | null
@@ -4670,7 +5123,11 @@ export type Database = {
           expanded?: boolean | null
           featured?: boolean | null
           id: string
+          copeo?: boolean
           imagen_posicion_y?: number | null
+          precio_copa_eur?: number | null
+          puntuacion_parker?: number | null
+          puntuacion_parker_anada?: number | null
           imagen_url?: string | null
           ingredientes?: string | null
           nombre?: string | null
@@ -4705,7 +5162,11 @@ export type Database = {
           expanded?: boolean | null
           featured?: boolean | null
           id?: string
+          copeo?: boolean
           imagen_posicion_y?: number | null
+          precio_copa_eur?: number | null
+          puntuacion_parker?: number | null
+          puntuacion_parker_anada?: number | null
           imagen_url?: string | null
           ingredientes?: string | null
           nombre?: string | null
@@ -4881,6 +5342,38 @@ export type Database = {
           razonamiento_tokens: number | null
         }
         Relationships: []
+      }
+      instagram_metricas_publicacion_ultima: {
+        Row: {
+          alcance: number | null
+          capturado_at: string | null
+          caption: string | null
+          comentarios: number | null
+          compartidos: number | null
+          fecha_captura: string | null
+          guardados: number | null
+          id: number | null
+          ig_user_id: string | null
+          interacciones: number | null
+          me_gusta: number | null
+          media_id: string | null
+          miniatura_url: string | null
+          permalink: string | null
+          pieza_id: string | null
+          producto: string | null
+          publicado_at: string | null
+          tipo_medio: string | null
+          visualizaciones: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "instagram_metricas_publicacion_pieza_id_fkey"
+            columns: ["pieza_id"]
+            isOneToOne: false
+            referencedRelation: "instagram_piezas"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vista_asignacion_dia: {
         Row: {
@@ -5211,6 +5704,16 @@ export type Database = {
         Args: { p_seccion: string; p_mostrar: boolean }
         Returns: undefined
       }
+      // Días y horas de «Menú del día» y «Tapas» (migración 20261104142000_horario_menu_tapas).
+      configuracion_web_horario_menu_tapas: {
+        Args: { p_seccion: string; p_horario: Json | null }
+        Returns: undefined
+      }
+      // «Vota tu vino favorito» (migración 20261104141000_encuesta_vino_favorito).
+      votar_vino_favorito: {
+        Args: { p_vino_id: string; p_nombre: string; p_contacto: string; p_acepta_bases: boolean; p_idioma?: string }
+        Returns: Json
+      }
       // Tienda de vinos (migración 20261103150000_tienda_vinos).
       tienda_precio_venta: {
         Args: { p_precio_carta: number; p_descuento_pct: number }
@@ -5384,6 +5887,26 @@ export type Database = {
       has_section_permission: {
         Args: { _permission: string; _section: string; _user_id: string }
         Returns: boolean
+      }
+      instagram_cancelar_programacion: {
+        Args: { p_id: string }
+        Returns: Json
+      }
+      instagram_programar: {
+        Args: {
+          p_confirmar_conflicto?: boolean
+          p_para: string
+          p_pieza_id: string
+        }
+        Returns: Json
+      }
+      instagram_reprogramar: {
+        Args: {
+          p_confirmar_conflicto?: boolean
+          p_id: string
+          p_para: string
+        }
+        Returns: Json
       }
       http: {
         Args: { request: Database["public"]["CompositeTypes"]["http_request"] }

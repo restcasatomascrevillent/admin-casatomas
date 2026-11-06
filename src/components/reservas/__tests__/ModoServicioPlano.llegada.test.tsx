@@ -201,28 +201,35 @@ describe("ModoServicioPlano · «Ha llegado» (antes «Sentar»)", () => {
     expect(boton.parentElement).not.toHaveAttribute("title");
   });
 
-  it("sin permiso de edición sale deshabilitado, con el motivo visible en su envoltorio, y no llama a nada", async () => {
+  it("sin permiso de edición no sale (oculto, no desactivado) y no llama a nada", async () => {
     h.canEdit = false;
     montar();
 
     abrirMesa("4");
-    const boton = await screen.findByRole("button", { name: "Ha llegado" });
-
-    expect(boton).toBeDisabled();
-    // Un botón deshabilitado no recibe el ratón (`pointer-events-none`): el motivo se ve en el envoltorio.
-    expect(boton.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
-    fireEvent.click(boton);
+    expect(await screen.findByRole("button", { name: "Cerrar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ha llegado" })).not.toBeInTheDocument();
     expect(h.marcarLlegada).not.toHaveBeenCalled();
   });
 
-  it("«Editar reserva» sigue diciendo lo mismo sin permiso (el texto sale de accionesDisponibles)", async () => {
+  it("sin permiso, una reserva que ya llegó tampoco ofrece «Liberar mesa» ni «Mover a otra mesa» (06/11/2026)", async () => {
+    h.canEdit = false;
+    montar();
+
+    abrirMesa("5");
+    expect(await screen.findByRole("button", { name: "Cerrar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Liberar mesa/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Deshacer liberar/ })).not.toBeInTheDocument();
+    expect(h.liberarMesa).not.toHaveBeenCalled();
+  });
+
+  it("sin permiso tampoco hay «Editar reserva» ni ningún «No tienes permiso…»", async () => {
     h.canEdit = false;
     montar();
 
     abrirMesa("4");
-    const boton = await screen.findByRole("button", { name: /Editar reserva/ });
-
-    expect(boton).toBeDisabled();
-    expect(boton.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
+    expect(await screen.findByRole("button", { name: "Cerrar" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Editar reserva/ })).not.toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(MOTIVO_SIN_PERMISO);
   });
 });

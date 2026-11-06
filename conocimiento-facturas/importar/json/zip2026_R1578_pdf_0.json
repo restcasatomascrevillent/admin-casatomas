@@ -1,0 +1,52 @@
+{
+ "archivo": "R1578.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "BODEGAS DE LOS HEREDEROS DEL MARQUÉS DE RISCAL, S.L.U.",
+ "cif": "B01414531",
+ "local": "casa_tomas",
+ "numero_documento": "VFN 26/008345",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "C/6 B.CHIREL VERDEJO 2023",
+   "producto_ficha": "Barón de Chirel Verdejo 2023 (caja 6)",
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 6,
+   "contenido_unidad": "ud",
+   "precio_unitario": 223.2,
+   "descuento_pct": null,
+   "total": 223.2,
+   "iva_pct": 21,
+   "albaran_ref": "VAL 26/009318",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "- 20 % BONIFICAC S/ 223,2",
+   "importe": -44.64,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 178.56,
+ "desglose_iva": [
+  {
+   "base": 178.56,
+   "pct": 21,
+   "cuota": 37.5
+  }
+ ],
+ "iva": 37.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 216.06,
+ "observaciones": "Documento escaneado (imagen, 1 página); cifras leídas de la imagen. Pedido cliente 68841-BDC VJO; pedido bodega VPN-26/007468. Forma de pago GIRO 60 días; vencimiento 29/09/26 por 216,06 €. Punto verde 0,38 € incluido en factura (informativo, ya dentro de la base).",
+ "alertas": []
+}

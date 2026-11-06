@@ -640,16 +640,17 @@ describe("PanelAsignacion · las acciones de cada fila siguen donde estaban", ()
     expect(mesas).toBeDisabled();
   });
 
-  it("sin permiso de edición, «Editar» sale deshabilitado en todas las filas y lo explica", () => {
+  it("sin permiso de edición (solo «Ver», 06/11/2026): ni «Editar», ni «Sala», ni «Mesas» en ninguna fila", () => {
     h.canEdit = false;
     montar();
 
-    const botones = screen.getAllByRole("button", { name: /^Editar la reserva de/ });
-    expect(botones).toHaveLength(4);
-    for (const boton of botones) {
-      expect(boton).toBeDisabled();
-      expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    }
+    // Las filas siguen (se consultan)…
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(0);
+    // …pero sin ninguna de las tres acciones, ni desactivadas.
+    expect(screen.queryAllByRole("button", { name: /^Editar la reserva de/ })).toEqual([]);
+    expect(screen.queryAllByRole("button", { name: /^(Sala|Dar sala)/ })).toEqual([]);
+    expect(screen.queryAllByRole("button", { name: /mesa/i }).filter((b) => b.closest("li"))).toEqual([]);
+    expect(document.body.innerHTML).not.toMatch(/No tienes permiso/);
   });
 
   it("también en el resto de días: las filas de otro día llevan las mismas tres acciones", () => {

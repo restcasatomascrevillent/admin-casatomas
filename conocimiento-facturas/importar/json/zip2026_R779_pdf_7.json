@@ -1,0 +1,46 @@
+{
+ "archivo": "R779.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "RODRIGUEZ JIMENEZ. JUAN FRANCISCO",
+ "cif": "75233388C",
+ "local": "casa_tomas",
+ "numero_documento": "10/A",
+ "fecha": "2026-05-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 4.1,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.63,
+   "descuento_pct": null,
+   "total": 92.78,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 92.78,
+ "desglose_iva": [
+  {
+   "base": 92.78,
+   "pct": 10.0,
+   "cuota": 9.28
+  }
+ ],
+ "iva": 9.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 102.06,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 10325. Embarcaciones: ninguna.",
+ "alertas": []
+}

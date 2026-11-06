@@ -1031,7 +1031,8 @@ export function ListaReservasAvanzada({
                   onUpdateEstado={solicitudesState.updateEstado}
                   onUpdateNotas={solicitudesState.updateNotasInternas}
                   onConvertir={canEdit ? (s) => abrirConversion(s) : undefined}
-                  onGestionarPropuesta={(s) => setSolicitudGestionId(s.id)}
+                  onGestionarPropuesta={canEdit ? (s) => setSolicitudGestionId(s.id) : undefined}
+                  soloLectura={!canEdit}
                 />
               )
             ) : (() => { const reservation = fila.reserva; const al = alPulsar(reservation); return (
@@ -1113,11 +1114,13 @@ export function ListaReservasAvanzada({
                       único que lleva es la casilla de "seleccionar todas"; el
                       nombre de la columna vive en `aria-label`, que los lectores
                       de pantalla sí anuncian y no ocupa ancho. */}
-                  <TableHead
-                    aria-label="Acciones"
-                    className={cn("sticky left-0 z-30 h-10 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
-                  >
-                    {canEdit && (
+                  {/* Solo «Ver» (06/11/2026): sin permiso de edición no hay ninguna acción que pintar,
+                      así que la columna entera desaparece y su ancho se lo queda Cliente. */}
+                  {canEdit && (
+                    <TableHead
+                      aria-label="Acciones"
+                      className={cn("sticky left-0 z-30 h-10 border-r border-border/60 bg-card", ANCHO_ACCIONES, CELDA)}
+                    >
                       <RanuraSeleccion>
                         <Checkbox
                           checked={pendientesVisibles().length > 0 && pendientesVisibles().every((r) => seleccionadas.has(r.id))}
@@ -1126,8 +1129,8 @@ export function ListaReservasAvanzada({
                           aria-label="Seleccionar todas las pendientes visibles"
                         />
                       </RanuraSeleccion>
-                    )}
-                  </TableHead>
+                    </TableHead>
+                  )}
                   <TableHead className={cn("h-10 bg-card", ANCHO_FECHA, CELDA)}>
                     Fecha<span className="hidden xl:inline"> y hora</span>
                   </TableHead>
@@ -1141,7 +1144,7 @@ export function ListaReservasAvanzada({
               <TableBody>
                 {filas.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={canEdit ? 6 : 5} className="text-center py-8 text-muted-foreground">
                       {textoListaVacia}
                     </TableCell>
                   </TableRow>
@@ -1164,20 +1167,23 @@ export function ListaReservasAvanzada({
                     <TableRow key={reservation.id} className={cn("group", ALTO_FILA, fondo.fila)}>
                       {/* Acciones PRIMERO (2026-09-26, petición del dueño). El
                           juego de acciones es el mismo en todas las filas; lo
-                          que no aplica va deshabilitado, nunca se quita. */}
-                      <CeldaAcciones fondo={fondo.acciones}>
-                        <AccionesReserva
-                          variante="fila"
-                          reserva={reservation}
-                          canEdit={canEdit}
-                          al={al}
-                          ocupada={acciones.estaEnCurso(reservation.id)}
-                          bloqueEnCurso={aceptandoBloque}
-                          seleccionada={seleccionadas.has(reservation.id)}
-                          nombreSala={nombreSalaDe(reservation)}
-                          onAsignarMesa={onAsignarMesa}
-                        />
-                      </CeldaAcciones>
+                          que no aplica va deshabilitado, nunca se quita. Sin
+                          permiso de edición no hay columna (06/11/2026). */}
+                      {canEdit && (
+                        <CeldaAcciones fondo={fondo.acciones}>
+                          <AccionesReserva
+                            variante="fila"
+                            reserva={reservation}
+                            canEdit={canEdit}
+                            al={al}
+                            ocupada={acciones.estaEnCurso(reservation.id)}
+                            bloqueEnCurso={aceptandoBloque}
+                            seleccionada={seleccionadas.has(reservation.id)}
+                            nombreSala={nombreSalaDe(reservation)}
+                            onAsignarMesa={onAsignarMesa}
+                          />
+                        </CeldaAcciones>
+                      )}
                       {/* Fecha y hora juntas: dos columnas para esto gastaban
                           ancho que hacía falta para las acciones. */}
                       <CeldaFechaHora dia={new Date(reservation.fecha)} hora={reservation.hora} />
@@ -1381,7 +1387,8 @@ export function ListaReservasAvanzada({
               El asistente telefónico no pudo cerrar esta reserva. Ajusta día, hora, comensales y sala mirando la ocupación y envía la propuesta al cliente; cuando la acepte, se crea la reserva.
             </DialogDescription>
           </DialogHeader>
-          {solicitudGestion && solicitudesState && (
+          {/* Solo con permiso de edición: el panel es para gestionar (notas, estado, propuesta). */}
+          {solicitudGestion && solicitudesState && canEdit && (
             <SolicitudGestionPanel
               key={solicitudGestion.id}
               solicitud={solicitudGestion}
@@ -1449,30 +1456,31 @@ function FilaSolicitud({
       {/* Mismas ranuras que una fila de reserva (el mismo molde,
           `RanurasDeAcciones`) y en el mismo orden: lo que una solicitud no
           puede hacer (dar mesa, verificar, cancelar, lista negra) sale
-          deshabilitado, no desaparece. */}
-      <CeldaAcciones franja fondo={FONDOS.destacada.acciones}>
-        <RanurasDeAcciones
-          seleccion={canEdit ? null : undefined}
-          principal={{
-            etiqueta: "Convertir",
-            titulo: canEdit
-              ? abierta
+          deshabilitado, no desaparece. Sin permiso de edición, ni la columna
+          (06/11/2026: solo «Ver» no gestiona solicitudes). */}
+      {canEdit && (
+        <CeldaAcciones franja fondo={FONDOS.destacada.acciones}>
+          <RanurasDeAcciones
+            seleccion={null}
+            principal={{
+              etiqueta: "Convertir",
+              titulo: abierta
                 ? "Convertir la solicitud en una reserva"
-                : `La solicitud ya está ${estadoLabel.toLowerCase()}`
-              : "No tienes permiso para editar reservas",
-            icono: <CalendarPlus />,
-            onClick: canEdit && abierta ? onConvertir : undefined,
-          }}
-          darMesa={DAR_MESA_SOLICITUD}
-          verificar={{ titulo: "Verificar: solo para reservas" }}
-          gestionar={{
-            titulo: "Gestionar: propuesta al cliente, salas y notas",
-            onClick: onGestionar,
-          }}
-          cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
-          listaNegra={{ titulo: "Lista negra: solo para reservas" }}
-        />
-      </CeldaAcciones>
+                : `La solicitud ya está ${estadoLabel.toLowerCase()}`,
+              icono: <CalendarPlus />,
+              onClick: abierta ? onConvertir : undefined,
+            }}
+            darMesa={DAR_MESA_SOLICITUD}
+            verificar={{ titulo: "Verificar: solo para reservas" }}
+            gestionar={{
+              titulo: "Gestionar: propuesta al cliente, salas y notas",
+              onClick: onGestionar,
+            }}
+            cancelar={{ titulo: "Descartar la solicitud: se hace desde «Gestionar»" }}
+            listaNegra={{ titulo: "Lista negra: solo para reservas" }}
+          />
+        </CeldaAcciones>
+      )}
       <CeldaFechaHora
         dia={solicitud.fecha_solicitada ? new Date(`${solicitud.fecha_solicitada}T12:00:00`) : null}
         hora={solicitud.hora_solicitada}

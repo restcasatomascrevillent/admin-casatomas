@@ -62,6 +62,8 @@ jobs:
         run: npm run test:platos-updated-at:db
       - name: Alertas de un documento al añadir o borrar líneas (PGlite)
         run: npm run test:alertas-lineas:db
+      - name: Indicaciones para la IA por proveedor (PGlite)
+        run: npm run test:proveedores-notas-ia:db
       - name: Servicios contratados y su consumo, solo super admin (PGlite)
         run: npm run test:servicios:db
       - name: Cambio de la propia contraseña, límite de intentos (PGlite)
@@ -74,6 +76,38 @@ jobs:
         run: npm run test:vinos-publicacion:db
       - name: Permiso propio de Reservas › Configuración (PGlite)
         run: npm run test:reservas-configuracion:db
+      - name: Solo «Ver» canjea cheques; migración y rollback (PGlite)
+        run: npm run test:permisos-solo-ver:db
+      - name: Facturas, «Ver» solo consulta y permiso «Facturas · Subida» (PGlite)
+        run: npm run test:permisos-facturas-subida:db
+      - name: Vino por copas, Parker, votación del vino favorito, horario de menú y tapas y platos vegetarianos (PGlite)
+        run: npm run test:vinos-copeo-encuesta:db
+      - name: Instagram, bucket y piezas por la sección marketing (PGlite)
+        run: npm run test:instagram:db
+      - name: Instagram, publicaciones programadas, RPC y cron del programador (PGlite)
+        run: npm run test:instagram-programar:db
+      - name: Métricas de Instagram, tablas, RLS y cron (PGlite)
+        run: npm run test:instagram-metricas:db
+      - name: Instagram, estado de publicación solo por el servidor, cerrojo, texto alternativo y limpieza del bucket (PGlite)
+        run: npm run test:instagram-servidor:db
+      - name: IA de textos de Instagram, guías de marca y sugerencias (PGlite)
+        run: npm run test:instagram-ia:db
+      - name: Fechas y campañas de Instagram, borradores con fecha prevista (PGlite)
+        run: npm run test:instagram-campanas:db
+      - name: Reels en MP4, cola de render, cubo de vídeo y reels «procesando» (PGlite)
+        run: npm run test:instagram-video:db
+      - name: Métricas para aprender de Instagram, «Qué funciona» (PGlite)
+        run: npm run test:instagram-aprender:db
+      - name: Encargos de Instagram, estados por RPC, agencia, rondas y pieza al aprobar (PGlite)
+        run: npm run test:instagram-encargos:db
+      - name: Seguridad de Instagram, «Editar» para escribir, agencia y trabajador de render limitados, limpieza de vídeo y cupo de IA (PGlite)
+        run: npm run test:instagram-seguridad:db
+      - name: Carruseles de Instagram, diapositivas, programar con el texto y limpieza de todas las imágenes (PGlite)
+        run: npm run test:instagram-carrusel:db
+      - name: «Editar» para escribir en la carta y en el newsletter; con solo «Ver», consulta (PGlite)
+        run: npm run test:permisos-carta-newsletter:db
+      - name: Versiones de migración sin repetir (salvo las históricas)
+        run: npm run test:migraciones
       - name: Recorte en el servidor, inferencia real con onnxruntime-node (Linux)
         run: npx vitest run api/
         env:

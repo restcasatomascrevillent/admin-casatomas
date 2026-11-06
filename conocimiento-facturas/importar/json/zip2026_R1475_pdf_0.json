@@ -1,0 +1,46 @@
+{
+ "archivo": "R1475.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Exclusivas Uriarte, S.L.",
+ "cif": "B03821576",
+ "local": "casa_tomas",
+ "numero_documento": "A26/9428",
+ "fecha": "2026-09-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "VENTRESCA BONITO ESP.HOST.ENTERAS N",
+   "producto_ficha": "Ventresca de bonito (conserva, 'esp. hostelería', entera)",
+   "cantidad": 24.0,
+   "unidad": "lata",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.55,
+   "descuento_pct": null,
+   "total": 157.2,
+   "iva_pct": 10,
+   "albaran_ref": "A26/14776",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 157.2,
+ "desglose_iva": [
+  {
+   "base": 157.2,
+   "pct": 10,
+   "cuota": 15.72
+  }
+ ],
+ "iva": 15.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 172.92,
+ "observaciones": "Forma de pago: recibo 45 días domiciliado. Nº cliente 4,027.",
+ "alertas": []
+}

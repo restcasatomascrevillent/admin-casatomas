@@ -1,0 +1,57 @@
+{
+ "archivo": "R767.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GARCIMAR, SL",
+ "cif": "B08057531",
+ "local": "casa_tomas",
+ "numero_documento": "L/002473",
+ "fecha": "2026-05-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FLAMENQUIN AVE 47% 6 KG",
+   "producto_ficha": "Flamenquin de ave 47 % (caja 6 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.08,
+   "descuento_pct": null,
+   "total": 36.97,
+   "iva_pct": 10,
+   "albaran_ref": "LA/5283",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "CARGO LOGISTICO EXTRAORDINARIO (LA/5283)",
+   "importe": 1.5,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 38.47,
+ "desglose_iva": [
+  {
+   "base": 36.97,
+   "pct": 10,
+   "cuota": 3.7
+  },
+  {
+   "base": 1.5,
+   "pct": 21,
+   "cuota": 0.32
+  }
+ ],
+ "iva": 4.02,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 42.49,
+ "observaciones": "Transferencia a 10 dias, vencimiento 02/06/2026. Albaran LA/5283 de 21/05/2026 (2 bultos, 12 kg). FTV-6938519 es una referencia del encabezado, no el numero de factura.",
+ "alertas": []
+}

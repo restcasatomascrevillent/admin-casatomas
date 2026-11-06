@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  19
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO-GARZON SL",
+ "cif": "B42678672",
+ "local": "casa_tomas",
+ "numero_documento": "600/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 19,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.5,
+   "descuento_pct": null,
+   "total": 24.05,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 24.05,
+ "desglose_iva": [
+  {
+   "base": 24.05,
+   "pct": 10.0,
+   "cuota": 2.41
+  }
+ ],
+ "iva": 2.41,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 26.46,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: NUEVO ALBOR.",
+ "alertas": []
+}

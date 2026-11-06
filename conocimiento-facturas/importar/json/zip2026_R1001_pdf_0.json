@@ -1,0 +1,46 @@
+{
+ "archivo": "R1001.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "REGYSISTEM SL",
+ "cif": "B03789807",
+ "local": "touza",
+ "numero_documento": "000386",
+ "fecha": "2026-06-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SERVICIO TÉCNICO ANUAL JULIO-2026/2027 (LOCAL: TOUZA) (cód. 3014)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 370.0,
+   "descuento_pct": null,
+   "total": 370.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-000258",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 370.0,
+ "desglose_iva": [
+  {
+   "base": 370.0,
+   "pct": 21,
+   "cuota": 77.7
+  }
+ ],
+ "iva": 77.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 447.7,
+ "observaciones": "Cabecera «CASA TOMAS / TOUZA», local indicado en la línea: TOUZA. Forma de pago: recibo domiciliado, vencimiento 30/06/2026 por 447,70 € (Caja Rural Central). Agente: 5, Dpto. Administración.",
+ "alertas": []
+}

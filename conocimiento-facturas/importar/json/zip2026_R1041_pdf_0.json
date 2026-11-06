@@ -1,0 +1,63 @@
+{
+ "archivo": "R1041.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0010/(2026)014376",
+ "fecha": "2026-07-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ACT GIRASOL AOLEICO MC 5L",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.5,
+   "descuento_pct": null,
+   "total": 9.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Oferta Calendario adviento verano ACT GIRASOL AOLEICO MC 5L (225545) 8,55€",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": null,
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -0.95,
+   "descuento_pct": null,
+   "total": -0.95,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 8.55,
+ "desglose_iva": [
+  {
+   "base": 8.55,
+   "pct": 10,
+   "cuota": 0.86
+  }
+ ],
+ "iva": 0.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 9.41,
+ "observaciones": "Forma de pago: efectivo. Ticket de compra en Makro Elche (cash & carry). Descuentos sin codigo de IVA impreso: tipo asignado por cuadre con la tabla del pie (Oferta Calendario adviento verano ACT GIRASOL AOLEICO MC 5L (225545) 8,55€).",
+ "alertas": []
+}

@@ -15,7 +15,7 @@
  *     (`puedeConcederEdicion` en los componentes; en la BD, la RLS de
  *     user_permissions solo deja escribir a super admins).
  */
-import { SECTIONS } from "@/hooks/useUserRole";
+import { SECTIONS, type AppRole } from "@/hooks/useUserRole";
 import type { ManagedUser } from "@/hooks/useUsersManagement";
 
 export interface PermisoSeccion {
@@ -25,34 +25,62 @@ export interface PermisoSeccion {
 }
 
 type Seccion = (typeof SECTIONS)[number];
-type SeccionConfigurable = Exclude<Seccion, { key: "usuarios" }>;
+type SeccionConfigurable = Seccion;
 
 /**
- * Secciones que se configuran desde Usuarios. «usuarios» no: esa sección va por
- * rol admin, no por permisos (ProtectedRoute / AppSidebar).
+ * Secciones que se configuran desde Usuarios. Desde el 06/11/2026 también
+ * «usuarios» (antes iba por el rol admin): un solo interruptor, «Puede ver», que
+ * deja consultar la lista en el admin panel; gestionarla es solo del super admin.
  */
-export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = SECTIONS.filter(
-  (seccion): seccion is SeccionConfigurable => seccion.key !== "usuarios",
-);
+export const SECCIONES_CONFIGURABLES: SeccionConfigurable[] = [...SECTIONS];
 
 /**
  * Qué desbloquea «Puede editar» en cada sección, tal como está HOY el panel: Reservas,
- * Reservas · Configuración, Cheques y Tienda miran el permiso de edición
- * (`useCanAccessSection(…, "edit")`); en el resto basta con «Ver». Si una sección empieza
- * a exigir edición, cambiar su texto aquí. Se muestra detrás de «Editar: ».
+ * Reservas · Configuración, Cheques, Tienda y Facturas (06/11/2026) miran el permiso de
+ * edición (`useCanAccessSection(…, "edit")`); en el resto basta con «Ver». Si una sección
+ * empieza a exigir edición, cambiar su texto aquí. Se muestra detrás de «Editar: » (en las
+ * de un solo interruptor, detrás de su etiqueta, p. ej. «Puede subir: »).
  */
 export const AYUDA_EDICION: Record<SeccionConfigurable["key"], string> = {
   dashboard: "sin efecto aquí; las reservas del día dependen de «Reservas».",
-  reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas y mover de sala.",
+  reservas: "crear y modificar reservas, aceptarlas o cancelarlas, marcar llegadas, dar mesa y mover de sala, cerrar días y la lista negra. Con solo «Ver» se consulta todo, sin ningún botón para cambiarlo.",
   reservas_configuracion:
-    "cambiar las reglas, los turnos y las plantillas de correo de las reservas. Para entrar hace falta también «Ver» en Reservas.",
-  gestor_carta: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
-  gestion_web: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
-  marketing: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
-  cheques: "canjear cheques regalo y modificar la plantilla de factura.",
-  tienda: "poner o quitar vinos de la tienda y cambiar sus ajustes (visible, descuento y textos).",
-  facturas: "aún no se usa; con «Ver» ya se puede modificar todo en esta sección.",
+    "entrar y cambiar las reglas, los turnos, las mesas y las plantillas de correo de las reservas. «Ver» aquí no sirve por sí solo: sin «Editar» no se ve la pestaña. Hace falta también «Ver» en Reservas.",
+  gestor_carta:
+    "añadir, cambiar y borrar platos, vinos, bebidas y cócteles: ajustar y restaurar precios, ordenar, visibilidad, fotos (quitar el fondo y vídeos), «Añadir vino» y «Varias botellas» con IA, traducciones y la votación del vino favorito. Con solo «Ver» se consulta la carta y se descarga el «PDF Carta».",
+  gestion_web:
+    "sin efecto: en Novedades, Menús diarios y Tapas basta con «Ver» para cambiarlo todo (decisión del dueño, 06/11/2026).",
+  marketing:
+    "en Instagram: crear y cambiar piezas, subir fotos, usar la IA, publicar, programar, pedir encargos y generar vídeos. En el newsletter: crear y enviar newsletters (también la prueba) y actualizar la lista de envío. Con solo «Ver» se consultan los suscriptores, el historial de envíos y las estadísticas.",
+  instagram_agencia: "aceptar, entregar y comentar los encargos de Instagram como la agencia (Oficiosos). Con solo «Ver», los consulta.",
+  instagram_render:
+    "obligatorio para el usuario del equipo de vídeo: reclamar, generar y subir los vídeos de los reels. No le des Marketing.",
+  cheques: "compra manual, configuración del cheque y plantilla de factura. Con solo «Ver» se consultan y se canjean cheques regalo.",
+  tienda: "poner o quitar vinos de la tienda y la pestaña Ajustes (visible, descuento y textos). Con solo «Ver» se consulta la lista de vinos.",
+  facturas:
+    "modificar, verificar y borrar documentos, clasificar productos, cambiar los ajustes de Facturas y usar la IA; también subir (pestaña Cargar). Con solo «Ver» se consultan Análisis y Compras.",
+  facturas_subida:
+    "pestaña Cargar: subir facturas y albaranes, decidir sobre los repetidos y corregir los datos leídos de lo que sube él mismo (no lo de otros). No necesita «Ver» en Facturas: sin él, solo ve Cargar.",
+  usuarios:
+    "consultar en el admin panel la lista de usuarios y sus permisos. Crear, borrar, bloquear y cambiar permisos es solo del super admin.",
 };
+
+/**
+ * Secciones con UN solo interruptor (06/11/2026): «Facturas · Subida» («Puede
+ * subir»). Lo que habilita no se divide en ver/editar: se guarda en can_view y
+ * can_edit queda siempre a false (la BD acepta cualquiera de los dos,
+ * facturas_puede_subir()). En la tabla, el interruptor va en la columna «Ver» y
+ * la de «Puede editar» queda vacía.
+ */
+export const SECCIONES_UN_INTERRUPTOR: Partial<Record<SeccionConfigurable["key"], { etiqueta: string }>> = {
+  facturas_subida: { etiqueta: "Puede subir" },
+  usuarios: { etiqueta: "Puede ver" },
+};
+
+/** Etiqueta del único interruptor de la sección («Puede subir»), o null si tiene «Ver» y «Puede editar». */
+export function interruptorUnico(sectionKey: string): string | null {
+  return SECCIONES_UN_INTERRUPTOR[sectionKey as SeccionConfigurable["key"]]?.etiqueta ?? null;
+}
 
 /**
  * Por qué el diálogo «Permisos» sale en solo lectura a quien no es super admin: la RLS de
@@ -70,8 +98,10 @@ type PermisoGuardado = { section_key: string; can_view?: boolean | null; can_edi
 export function permisosParaEditar(origen: ReadonlyArray<PermisoGuardado>): PermisoSeccion[] {
   return SECCIONES_CONFIGURABLES.map((seccion) => {
     const guardado = origen.find((p) => p.section_key === seccion.key);
-    const can_edit = Boolean(guardado?.can_edit);
-    return { section_key: seccion.key, can_view: Boolean(guardado?.can_view) || can_edit, can_edit };
+    const guardadoEditar = Boolean(guardado?.can_edit);
+    // Un solo interruptor: lo que haya (can_view o can_edit) es «sí», y se guarda en can_view.
+    const can_edit = interruptorUnico(seccion.key) ? false : guardadoEditar;
+    return { section_key: seccion.key, can_view: Boolean(guardado?.can_view) || guardadoEditar, can_edit };
   });
 }
 
@@ -84,13 +114,57 @@ export function cambiarVer(permisos: PermisoSeccion[], sectionKey: string, ver: 
 
 /** Cambia «Puede editar» de una sección; sin «Ver» no se puede activar. */
 export function cambiarEditar(permisos: PermisoSeccion[], sectionKey: string, editar: boolean): PermisoSeccion[] {
-  return permisos.map((p) => (p.section_key === sectionKey ? { ...p, can_edit: editar && p.can_view } : p));
+  const unico = interruptorUnico(sectionKey) !== null;
+  return permisos.map((p) => (p.section_key === sectionKey ? { ...p, can_edit: editar && p.can_view && !unico } : p));
 }
 
 /** Los mismos permisos sin edición en ninguna sección (para quien no puede concederla). */
 export function sinEdicion(permisos: PermisoSeccion[]): PermisoSeccion[] {
   return permisos.map((p) => (p.can_edit ? { ...p, can_edit: false } : p));
 }
+
+/**
+ * Secciones que NO cuentan para decidir el rol por los permisos: el Dashboard («Editar»
+ * no hace nada), los dos perfiles especiales de Instagram, «Facturas · Subida» y
+ * «Usuarios» (un solo interruptor cada una).
+ */
+const SECCIONES_FUERA_DEL_ROL = new Set(["dashboard", "instagram_agencia", "instagram_render", "facturas_subida", "usuarios"]);
+
+/**
+ * Rol base que corresponde a unos permisos (06/11/2026, dueño: «cuando cambias los
+ * permisos no se actualiza bien el rol»). Antes el rol solo cambiaba al elegir un rol
+ * preconfigurado: al tocar los permisos a mano, alguien que era «Admin» seguía
+ * saliendo como «Admin» con solo «Ver». Regla:
+ *   - edita en TODAS las secciones que cuentan → admin;
+ *   - edita en alguna → manager;
+ *   - solo ve (o nada) → staff.
+ */
+export function rolSegunPermisos(origen: ReadonlyArray<PermisoGuardado>): AppRole {
+  const permisos = permisosParaEditar(origen);
+  const cuentan = permisos.filter((p) => !SECCIONES_FUERA_DEL_ROL.has(p.section_key));
+  if (cuentan.length > 0 && cuentan.every((p) => p.can_edit)) return "admin";
+  if (permisos.some((p) => p.can_edit)) return "manager";
+  return "staff";
+}
+
+/**
+ * Rol que se guarda con unos permisos: el del rol preconfigurado elegido o, si se han
+ * tocado a mano, el de un preconfigurado con esos mismos permisos; si no hay ninguno,
+ * el que sale de `rolSegunPermisos`.
+ */
+export function rolAlGuardar(
+  permisos: ReadonlyArray<PermisoGuardado>,
+  presets: ReadonlyArray<{ id: string; base_role: AppRole; permissions: ReadonlyArray<PermisoGuardado> }>,
+  presetElegido: string | null,
+): AppRole {
+  const elegido = presetElegido ? presets.find((p) => p.id === presetElegido) : undefined;
+  if (elegido) return elegido.base_role;
+  const igual = presets.find((p) => mismosPermisos(permisos, p.permissions));
+  return igual ? igual.base_role : rolSegunPermisos(permisos);
+}
+
+/** Nombre legible de un rol base. */
+export const NOMBRE_ROL: Record<AppRole, string> = { admin: "Admin", manager: "Manager", staff: "Staff" };
 
 /** ¿Coinciden «Ver» y «Puede editar» en todas las secciones configurables? */
 export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArray<PermisoGuardado>): boolean {
@@ -102,12 +176,28 @@ export function mismosPermisos(a: ReadonlyArray<PermisoGuardado>, b: ReadonlyArr
 
 export type DatosPermisos = Pick<ManagedUser, "is_super_admin" | "role" | "permissions">;
 
-/** «Ver» y «Editar» de cada sección, más la fila de Usuarios (va por rol, no por permisos). */
-export function seccionesConPermisos(user: DatosPermisos) {
+/**
+ * «Ver» y «Editar» de cada sección, más la fila de Usuarios (va por rol, no por permisos).
+ * Las de un solo interruptor llevan `unInterruptor` («Puede subir») y su valor en `ver`
+ * (y el mismo en `editar`, para quien solo mire esos dos).
+ */
+export function seccionesConPermisos(user: DatosPermisos): Array<{
+  key: string;
+  label: string;
+  ayuda: string;
+  ver: boolean;
+  editar: boolean;
+  unInterruptor?: string;
+}> {
   const permisos = permisosParaEditar(user.permissions);
   return [
     ...SECCIONES_CONFIGURABLES.map((seccion) => {
       const permiso = permisos.find(p => p.section_key === seccion.key);
+      const unico = interruptorUnico(seccion.key);
+      if (unico) {
+        const si = user.is_super_admin || Boolean(permiso?.can_view);
+        return { key: seccion.key, label: seccion.label, ayuda: `${unico}: ${AYUDA_EDICION[seccion.key]}`, ver: si, editar: si, unInterruptor: unico };
+      }
       return {
         key: seccion.key,
         label: seccion.label,
@@ -116,12 +206,5 @@ export function seccionesConPermisos(user: DatosPermisos) {
         editar: user.is_super_admin || Boolean(permiso?.can_edit),
       };
     }),
-    {
-      key: "usuarios",
-      label: "Usuarios",
-      ayuda: "Consulta en el admin panel; gestión en el superadmin.",
-      ver: user.is_super_admin || user.role === "admin",
-      editar: user.is_super_admin,
-    },
   ];
 }

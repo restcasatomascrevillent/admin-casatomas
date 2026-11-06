@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCanAccessSection } from "@/hooks/useUserRole";
-import { AvisoTrabajosRecorte } from "../potente/AvisoTrabajosRecorte";
 
 /**
  * Recortes de fotos fuera de los formularios:
@@ -12,13 +11,16 @@ import { AvisoTrabajosRecorte } from "../potente/AvisoTrabajosRecorte";
  *   - al abrir el panel, detecta un recorte del móvil que se quedó a medias
  *     porque el sistema cerró la pestaña (marca sin latido): el móvil queda
  *     marcado y las siguientes fotos van directas al servidor;
- *   - en un ordenador, ofrece recortar aquí esas fotos (AvisoTrabajosRecorte).
+ *   - el aviso «Hay N fotos pendientes de recortar · ¿Recortarlas aquí?» que
+ *     salía en los ordenadores (AvisoTrabajosRecorte) se quitó el 06/11/2026 a
+ *     petición del dueño: ya no se muestra. Esas fotos se recortan con «Quitar
+ *     fondo» desde la ficha.
  * Los módulos del recorte se cargan bajo demanda (no engordan el arranque).
  */
 export function GestorRecortes() {
   const { user } = useAuth();
-  const { canAccess } = useCanAccessSection("gestor_carta");
-  const [ordenador, setOrdenador] = useState(false);
+  // Recortar y mandar trabajos escribe en la carta: hace falta «Editar» (06/11/2026).
+  const { canAccess } = useCanAccessSection("gestor_carta", "edit");
 
   // Limpieza única: el antiguo «Diagnóstico recorte» (?diag=recorte) se retiró; se borra su marca.
   useEffect(() => {
@@ -33,12 +35,11 @@ export function GestorRecortes() {
     if (!user || !canAccess) return;
     let cancelar: (() => void) | undefined;
     let vivo = true;
-    void Promise.all([import("./recorteEnSegundoPlano"), import("./recorteEnOrdenador"), import("./quitarFondoNavegador")]).then(
-      ([m, o, q]) => {
+    void Promise.all([import("./recorteEnSegundoPlano"), import("./recorteEnOrdenador")]).then(
+      ([m, o]) => {
         if (!vivo) return;
         m.configurarAlNoRecortar(o.mandarRecorteAOrdenador);
         cancelar = m.recuperarRecorteInterrumpido();
-        setOrdenador(q.recorteNavegadorSeguro());
       },
       // Sin estos módulos las fotos sin fondo solo se avisan (sin trabajo para un ordenador).
       (e) => console.warn("[recorte] no se pudo preparar el gestor de recortes", e),
@@ -50,5 +51,5 @@ export function GestorRecortes() {
   }, [user, canAccess]);
 
 
-  return user && canAccess && ordenador ? <AvisoTrabajosRecorte /> : null;
+  return null;
 }

@@ -30,7 +30,8 @@
 //  Secretos (Supabase → Edge Functions → Secrets; los crea el dueño):
 //    SERVICIOS_VERCEL_TOKEN  (+ SERVICIOS_VERCEL_TEAM_ID, por defecto el equipo casa-tomas)
 //    SERVICIOS_SUPABASE_TOKEN (token de gestión: Usage Analytics y Logs, lectura)
-//    SERVICIOS_GITHUB_TOKEN  (+ SERVICIOS_GITHUB_OWNER, por defecto restcasatomascrevillent)
+//    SERVICIOS_GITHUB_TOKEN  (+ SERVICIOS_GITHUB_OWNER, por defecto restcasatomascrevillent;
+//                             SERVICIOS_GITHUB_REPOS, por defecto web/admin/touza-casatomas)
 //    RESEND_API_KEY          (ya existe en producción)
 //    STRIPE_SECRET_KEY       (ya existe en producción; el modo sale del prefijo)
 //    VAPI_API_KEY            (opcional; la usa vapi-analytics: coste de Vapi del mes)
@@ -518,10 +519,112 @@ export function resumirUsoGithub(json: unknown): UsoGithub {
   return r;
 }
 
+/** Repositorios cuyas ejecuciones de GitHub Actions se cuentan (06/11/2026). */
+export const GITHUB_REPOS_POR_DEFECTO = ["web-casatomas", "admin-casatomas", "touza-casatomas"];
+/** Una ejecución que falla en menos de esto no llegó a empezar: GitHub no le dio máquina. */
+export const SEGUNDOS_SIN_ARRANCAR = 20;
+/** Con estas seguidas sin arrancar, la tarjeta avisa de que GitHub está bloqueado. */
+export const RACHA_BLOQUEO = 3;
+
+export interface EjecucionGithub {
+  repo: string;
+  creada: string;
+  segundos: number;
+  estado: string;
+  conclusion: string | null;
+}
+
+export interface ResumenEjecucionesGithub {
+  total: number;
+  sinArrancar: number;
+  /** Suma de la duración de las que sí arrancaron, por minutos empezados (como factura GitHub). */
+  minutosEstimados: number;
+  /** Cuántas de las últimas, seguidas, no arrancaron. */
+  racha: number;
+  bloqueadoDesde: string | null;
+  ultimaQueArranco: string | null;
+  porRepo: Record<string, { ejecuciones: number; sin_arrancar: number; minutos: number }>;
+}
+
+const noArranco = (e: EjecucionGithub) =>
+  e.estado === "completed" && e.conclusion === "failure" && e.segundos < SEGUNDOS_SIN_ARRANCAR;
+
+/**
+ * Lo que dicen las ejecuciones del mes de los repositorios (06/11/2026, petición del dueño: «añade
+ * esas métricas al apartado de servicios para controlarlo»). Detecta el caso de noviembre de 2026:
+ * con los minutos gastados, GitHub da por fallidas todas las ejecuciones en 2–4 s sin arrancarlas
+ * (ni registro ni máquina), también la copia de seguridad programada.
+ */
+export function resumirEjecucionesGithub(ejecuciones: EjecucionGithub[]): ResumenEjecucionesGithub {
+  const orden = [...ejecuciones].sort((a, b) => b.creada.localeCompare(a.creada));
+  const r: ResumenEjecucionesGithub = {
+    total: orden.length, sinArrancar: 0, minutosEstimados: 0, racha: 0, bloqueadoDesde: null, ultimaQueArranco: null, porRepo: {},
+  };
+  let enRacha = true;
+  for (const e of orden) {
+    const repo = (r.porRepo[e.repo] ??= { ejecuciones: 0, sin_arrancar: 0, minutos: 0 });
+    repo.ejecuciones++;
+    if (e.estado !== "completed") continue;
+    if (noArranco(e)) {
+      r.sinArrancar++;
+      repo.sin_arrancar++;
+      if (enRacha) {
+        r.racha++;
+        r.bloqueadoDesde = e.creada;
+      }
+      continue;
+    }
+    enRacha = false;
+    r.ultimaQueArranco ??= e.creada;
+    const minutos = Math.ceil(Math.max(0, e.segundos) / 60);
+    r.minutosEstimados += minutos;
+    repo.minutos += minutos;
+  }
+  return r;
+}
+
+/** Ejecuciones de este mes de un repositorio (hasta 500); null si no hay acceso. */
+async function ejecucionesRepo(ctx: ContextoLector, cab: Record<string, string>, cuenta: string, repo: string): Promise<EjecucionGithub[] | null> {
+  const desde = inicioMesUtc(ctx.ahora).toISOString().slice(0, 10);
+  const out: EjecucionGithub[] = [];
+  for (let pagina = 1; pagina <= 5; pagina++) {
+    const url = `https://api.github.com/repos/${encodeURIComponent(cuenta)}/${encodeURIComponent(repo)}/actions/runs?created=${encodeURIComponent(`>=${desde}`)}&per_page=100&page=${pagina}`;
+    const r = await pedir(ctx, url, cab).catch(() => null);
+    if (!r?.ok || !esObjeto(r.json) || !Array.isArray(r.json.workflow_runs)) return pagina === 1 ? null : out;
+    const filas = r.json.workflow_runs.filter(esObjeto);
+    for (const f of filas) {
+      const inicio = Date.parse(String(f.run_started_at ?? f.created_at ?? ""));
+      const fin = Date.parse(String(f.updated_at ?? ""));
+      out.push({
+        repo,
+        creada: String(f.created_at ?? ""),
+        segundos: Number.isFinite(inicio) && Number.isFinite(fin) ? Math.max(0, (fin - inicio) / 1000) : 0,
+        estado: String(f.status ?? ""),
+        conclusion: typeof f.conclusion === "string" ? f.conclusion : null,
+      });
+    }
+    if (filas.length < 100) break;
+  }
+  return out;
+}
+
+const fechaCorta = (iso: string) =>
+  new Date(iso).toLocaleString("es-ES", { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+/**
+ * GitHub: minutos de Actions del mes frente a lo incluido, ejecuciones por repositorio y si GitHub
+ * las está arrancando. Dos fuentes, cada una opcional:
+ *  · el informe de facturación (permiso «Plan» de la cuenta): minutos y dólares exactos;
+ *  · las ejecuciones de los repositorios (permiso «Actions» de lectura): cuántas, cuántas no
+ *    arrancaron, desde cuándo está bloqueado y, sin el informe, una estimación de los minutos.
+ * Solo es error si fallan las dos.
+ */
 export const leerGithub: Lector = async (ctx) => {
   const token = secreto(ctx, "SERVICIOS_GITHUB_TOKEN");
   if (!token) return faltaSecreto("SERVICIOS_GITHUB_TOKEN");
   const cuenta = secreto(ctx, "SERVICIOS_GITHUB_OWNER") || GITHUB_OWNER_POR_DEFECTO;
+  const repos = (secreto(ctx, "SERVICIOS_GITHUB_REPOS") || GITHUB_REPOS_POR_DEFECTO.join(","))
+    .split(",").map((r) => r.trim()).filter(Boolean);
   const cab = {
     Authorization: `Bearer ${token}`,
     Accept: "application/vnd.github+json",
@@ -533,26 +636,73 @@ export const leerGithub: Lector = async (ctx) => {
   const base = `https://api.github.com/users/${encodeURIComponent(cuenta)}/settings/billing/usage`;
   let r = await pedir(ctx, `${base}/summary?year=${anio}&month=${mes}`, cab);
   if (r.status === 404) r = await pedir(ctx, `${base}?year=${anio}&month=${mes}`, cab);
-  if (!r.ok) return rechazoHttp(r.status, { cuenta, permiso_necesario: "Plan (lectura)" });
+  const uso = r.ok ? resumirUsoGithub(r.json) : null;
 
-  const uso = resumirUsoGithub(r.json);
+  const porRepo = await Promise.all(repos.map((repo) => ejecucionesRepo(ctx, cab, cuenta, repo).catch(() => null)));
+  const conAcceso = repos.filter((_, i) => porRepo[i] !== null);
+  const ejecuciones = conAcceso.length ? resumirEjecucionesGithub(porRepo.flatMap((e) => e ?? [])) : null;
+
+  if (!uso && !ejecuciones) return rechazoHttp(r.status, { cuenta, permiso_necesario: "Plan (lectura)" });
+
   const horasMes = Math.max(1, (ctx.ahora.getTime() - inicioMesUtc(ctx.ahora).getTime()) / 3_600_000);
-  const metricas: Record<string, Metrica> = {
-    actions_computo: {
+  const metricas: Record<string, Metrica> = {};
+  const detalles: Record<string, unknown> = { cuenta };
+  const avisos: string[] = [];
+
+  if (uso) {
+    metricas.actions_computo = {
       orden: 1, etiqueta: "Pruebas automáticas (GitHub Actions)", valor: redondear(uso.computoUsd), unidad: "USD", periodo: "mes en curso",
       nota: `${Math.round(uso.minutos).toLocaleString("es-ES")} minutos este mes (precio de lista, antes de descontar lo incluido).`,
-    },
-    almacenamiento_artefactos: {
-      orden: 2, etiqueta: "Almacenamiento de artefactos y paquetes", valor: Math.round((uso.almacenamientoGbHoras / horasMes) * GIB), unidad: "bytes",
+    };
+    metricas.almacenamiento_artefactos = {
+      orden: 4, etiqueta: "Almacenamiento de artefactos y paquetes", valor: Math.round((uso.almacenamientoGbHoras / horasMes) * GIB), unidad: "bytes",
       periodo: "media del mes",
-    },
-    actions_minutos: { orden: 3, etiqueta: "Minutos de Actions", valor: Math.round(uso.minutos), unidad: "minutos", periodo: "mes en curso" },
-  };
-  const detalles: Record<string, unknown> = { cuenta };
+    };
+  } else {
+    detalles.permiso_faltante = "Plan (lectura): sin él, los minutos son una estimación y no se ve lo facturado.";
+  }
+
+  metricas.actions_minutos = uso
+    ? { orden: 2, etiqueta: "Minutos de Actions", valor: Math.round(uso.minutos), unidad: "minutos", periodo: "mes en curso", nota: "Dato de GitHub." }
+    : {
+      orden: 2, etiqueta: "Minutos de Actions", valor: ejecuciones!.minutosEstimados, unidad: "minutos", periodo: "mes en curso",
+      nota: "Estimación con la duración de cada ejecución (GitHub cuenta cada trabajo por separado: el gasto real es algo mayor).",
+    };
+
+  if (ejecuciones) {
+    // En el orden configurado y con los que no tienen ninguna (0), para comparar de un vistazo.
+    for (const repo of conAcceso) ejecuciones.porRepo[repo] ??= { ejecuciones: 0, sin_arrancar: 0, minutos: 0 };
+    const nombres = conAcceso
+      .map((repo) => `${repo.replace(/-casatomas$/, "")} ${ejecuciones.porRepo[repo].ejecuciones}`).join(" · ");
+    metricas.actions_ejecuciones = {
+      orden: 3, etiqueta: "Ejecuciones de Actions", valor: ejecuciones.total, unidad: "ejecuciones", periodo: "mes en curso",
+      nota: nombres || undefined,
+    };
+    metricas.actions_sin_arrancar = {
+      orden: 3.5, etiqueta: "Ejecuciones que no arrancaron", valor: ejecuciones.sinArrancar, unidad: "ejecuciones", periodo: "mes en curso",
+      nota: `Terminan en menos de ${SEGUNDOS_SIN_ARRANCAR} s sin llegar a empezar: GitHub no les da máquina (minutos agotados o pago).`,
+    };
+    detalles.repos = conAcceso;
+    detalles.ejecuciones_por_repo = ejecuciones.porRepo;
+    if (ejecuciones.ultimaQueArranco) detalles.ultima_ejecucion_que_arranco = ejecuciones.ultimaQueArranco;
+    if (ejecuciones.racha >= RACHA_BLOQUEO && ejecuciones.bloqueadoDesde) {
+      detalles.bloqueado_desde = ejecuciones.bloqueadoDesde;
+      avisos.push(
+        `GitHub no arranca las pruebas automáticas desde el ${fechaCorta(ejecuciones.bloqueadoDesde)}: las últimas ${ejecuciones.racha} ejecuciones terminan en segundos sin empezar, también la copia de seguridad diaria. Suele ser que se han gastado los minutos del mes o un problema de pago: revisa github.com/settings/billing.`,
+      );
+    }
+    if (conAcceso.length < repos.length) {
+      avisos.push(`Sin acceso a las ejecuciones de ${repos.filter((x) => !conAcceso.includes(x)).join(", ")}: dale al token el permiso «Actions» (lectura) en esos repositorios.`);
+    }
+  } else {
+    detalles.permiso_faltante_actions = "Actions (lectura) en los repositorios: sin él no se ven las ejecuciones ni si GitHub está bloqueado.";
+  }
+  if (avisos.length) detalles.avisos = avisos;
+
   const yo = await pedir(ctx, "https://api.github.com/user", cab).catch(() => null);
   const plan = yo?.ok && esObjeto(yo.json) && esObjeto(yo.json.plan) ? yo.json.plan.name : null;
   if (typeof plan === "string" && plan) detalles.plan_detectado = plan;
-  const coste_variable: CosteVariable | null = uso.netoUsd == null ? null : {
+  const coste_variable: CosteVariable | null = uso?.netoUsd == null ? null : {
     importe: redondear(Math.max(0, uso.netoUsd), 4), moneda: "USD", periodo: "mes en curso", origen: "api",
     nota: "Lo que GitHub factura este mes por encima de lo incluido en el plan.",
   };

@@ -1,0 +1,52 @@
+{
+ "archivo": "R244.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUCIONES DIRECTAS 2004, S.L.",
+ "cif": "B53980611",
+ "local": "casa_tomas",
+ "numero_documento": "2900001485",
+ "fecha": "2026-02-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GIN LONDON Nº 1 0.70",
+   "producto_ficha": "Gin London Nº 1 70 cl",
+   "cantidad": 4,
+   "unidad": "botella",
+   "bultos": 0,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 20.65,
+   "descuento_pct": null,
+   "total": 82.6,
+   "iva_pct": 21,
+   "albaran_ref": "2904000404",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [
+  {
+   "concepto": "Descuento comercial 9 % (importe impreso en la casilla % DTO. del pie)",
+   "importe": -7.43,
+   "iva_pct": 21
+  }
+ ],
+ "subtotal": 75.17,
+ "desglose_iva": [
+  {
+   "base": 75.17,
+   "pct": 21,
+   "cuota": 15.79
+  }
+ ],
+ "iva": 15.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 90.96,
+ "observaciones": "Escaneo. Albarán 2904000404 del 12/02/2026. Total unidades 4. Forma de pago no impresa.",
+ "alertas": []
+}

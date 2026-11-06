@@ -1,0 +1,65 @@
+{
+ "archivo": "R1125.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "IMPORTACIONES SINGULARES, S.L. (Bermar Spain)",
+ "cif": "B09863796",
+ "local": "casa_tomas",
+ "numero_documento": "R1 26001",
+ "fecha": "2026-07-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Stoppers Champagne x 3 (cód. Stop 004), abono de CV 260146",
+   "producto_ficha": null,
+   "cantidad": -1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.5,
+   "descuento_pct": null,
+   "total": -26.5,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Stoppers vino tranquilo x 10 GOLD (cód. Gold 3EG), abono de CV 260146",
+   "producto_ficha": null,
+   "cantidad": -1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 43.0,
+   "descuento_pct": null,
+   "total": -43.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -69.5,
+ "desglose_iva": [
+  {
+   "base": -69.5,
+   "pct": 21,
+   "cuota": -14.6
+  }
+ ],
+ "iva": -14.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -84.1,
+ "observaciones": "Abono de la factura CV 260146 (R1124). Forma de pago: domiciliación bancaria, vencimiento 31/07/2026 por -84,10 €. Neto con la factura CV 260146: 0,00 €.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "archivo": "R1533.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Tomás Nicolás Riquelme",
+ "cif": "74187840Y",
+ "local": "casa_tomas",
+ "numero_documento": "306",
+ "fecha": "2026-09-17",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "L/ Gordal DH 60/80 2 kg N",
+   "producto_ficha": "Aceituna gordal (lata), calibre 60/80",
+   "cantidad": 3,
+   "unidad": "lata",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 21.9,
+   "descuento_pct": null,
+   "total": 65.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "T/ Alcaparrón fino T1",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 17.0,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 82.7,
+ "desglose_iva": [
+  {
+   "base": 82.7,
+   "pct": 10,
+   "cuota": 8.27
+  }
+ ],
+ "iva": 8.27,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 90.97,
+ "observaciones": "Pago: Alicante. Factura manuscrita de talonario; cliente MASIDE 2011 S.L. B54583356, R.E. y descuento vacíos.",
+ "alertas": [
+  "Tipo de alcaparrón (T1/T3) poco legible."
+ ]
+}

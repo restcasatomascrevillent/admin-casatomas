@@ -1,0 +1,63 @@
+{
+ "archivo": "R374.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "26/4370",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ATUN CLARO ARROYABE A/V RO900 C12",
+   "producto_ficha": "Atún claro Arroyabe en aceite vegetal, lata RO-900 (caja 12)",
+   "cantidad": 12,
+   "unidad": "lata",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.833,
+   "descuento_pct": 0.0,
+   "total": 118.0,
+   "iva_pct": 10,
+   "albaran_ref": "26/4.297",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ATUN NAVEGANTE A/GIRASOL RO900 C12",
+   "producto_ficha": "Atún Navegante en aceite de girasol, lata RO-900 (caja 12)",
+   "cantidad": 5,
+   "unidad": "lata",
+   "bultos": 0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.12,
+   "descuento_pct": 0.0,
+   "total": 25.6,
+   "iva_pct": 10,
+   "albaran_ref": "26/4.297",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 143.6,
+ "desglose_iva": [
+  {
+   "base": 143.6,
+   "pct": 10,
+   "cuota": 14.36
+  }
+ ],
+ "iva": 14.36,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 157.96,
+ "observaciones": "Giro/B2B, vencimiento 13/03/26. Albarán 26/4.297 (12/03/26). La segunda línea son 5 latas sueltas (0 cajas). IVA 10 % deducido de las bases impresas.",
+ "alertas": []
+}

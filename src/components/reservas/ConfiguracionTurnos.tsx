@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-import { ConfiguracionGeneralReservas } from "./ConfiguracionGeneralReservas";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,9 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Clock, TrendingUp, Settings, Layers, Lock } from "lucide-react";
+import { Plus, Pencil, Trash2, Clock, TrendingUp, Settings, Layers } from "lucide-react";
 import { toast } from "sonner";
 import {
   useConfiguracionTurnos,
@@ -114,8 +112,9 @@ export function ConfiguracionTurnos() {
   const crearMutation = useCrearConfiguracionTurno();
   const actualizarMutation = useActualizarConfiguracionTurno();
   const eliminarMutation = useEliminarConfiguracionTurno();
-  // «Reservas · Configuración» (04/11/2026): con «Ver» se consulta todo; crear, editar, activar o borrar
-  // periodos pide «Puede editar», igual que la RLS de configuracion_turnos (20261104111000).
+  // «Reservas · Configuración» (04/11/2026): crear, editar, activar o borrar periodos pide «Puede
+  // editar», igual que la RLS de configuracion_turnos (20261104111000). Desde el 06/11/2026 la página
+  // solo enseña esta pestaña a quien puede editarla; el modo de solo lectura de aquí queda como defensa.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas_configuracion", "edit");
 
   const form = useForm<FormValues>({
@@ -330,21 +329,9 @@ export function ConfiguracionTurnos() {
   }
 
   return (
+    // Desde el 04/11/2026 esto es solo el chip «Turnos» de Reservas › Configuración (petición del dueño: «pon
+    // subpestañas porque el scroll es eterno»). Las reglas y las mesas que iban encima tienen ya su chip.
     <div className="space-y-8">
-      {!puedeEditar && (
-        <Alert>
-          <Lock className="h-4 w-4" />
-          <AlertTitle>Solo lectura</AlertTitle>
-          <AlertDescription>
-            Puedes ver la configuración de reservas, pero tu usuario no tiene «Puede editar» en «Reservas ·
-            Configuración»: aquí no se pueden guardar cambios.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Configuración general de reservas */}
-      <ConfiguracionGeneralReservas />
-
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">Configuración de Turnos</h3>

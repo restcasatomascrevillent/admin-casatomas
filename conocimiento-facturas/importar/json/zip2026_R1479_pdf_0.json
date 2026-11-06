@@ -1,0 +1,48 @@
+{
+ "archivo": "R1479.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CARNES IBERICAS DEL NORTE S.L.",
+ "cif": "B20691994",
+ "local": "casa_tomas",
+ "numero_documento": "260100018885",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CORDERO LECHAL PALETILLA 450-595 GR CONG.",
+   "producto_ficha": "Paletilla de cordero lechal congelada 450-595 g",
+   "cantidad": 425.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.5,
+   "descuento_pct": null,
+   "total": 10005.13,
+   "iva_pct": 10,
+   "albaran_ref": "2026/01/0012206",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 10005.13,
+ "desglose_iva": [
+  {
+   "base": 10005.13,
+   "pct": 10.0,
+   "cuota": 1000.51
+  }
+ ],
+ "iva": 1000.51,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 11005.64,
+ "observaciones": "Forma de pago: GIRO 90 DIAS; vencimiento 2026-11-29, total 11005.64; Albaranes: 2026/01/0012206; Copia escaneada: el emisor impreso es CARNES IBERICAS DEL NORTE S.L. (CIF B-20691994, Astigarraga), no EMBAJADORES MADRID (B75143214) como las digitales de esta carpeta; el cliente (CASA TOMAS / MASIDE 2011, B54583356) y el formato de albaran coinciden.",
+ "alertas": [
+  "Escaneo: el CIF de la carpeta/ficha (B75143214) no es el del emisor impreso (B20691994)"
+ ]
+}

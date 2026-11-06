@@ -290,16 +290,17 @@ describe("tarjeta · la estrella («importante»)", () => {
     expect(await screen.findByRole("button", { name: "Marcar como importante" })).toBeInTheDocument();
   });
 
-  it("sin permiso de edición la estrella sale deshabilitada, con el motivo visible, y no escribe", async () => {
+  it("sin permiso de edición no hay estrella que pulsar (06/11/2026: oculta, no desactivada) y no se escribe", async () => {
     h.canEdit = false;
+    h.reservas = [reserva("r-ana", "confirmada", "Ana"), reserva("r-bea", "confirmada", "Bea", { importante: true })];
     montar();
 
-    const estrella = within(await tarjeta("Ana")).getByRole("button", { name: "Marcar como importante" });
-
-    expect(estrella).toBeDisabled();
-    // Un botón deshabilitado no recibe el ratón: el motivo se ve en su envoltorio.
-    expect(estrella.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
-    fireEvent.click(estrella);
+    expect(within(await tarjeta("Ana")).queryByRole("button", { name: /importante/i })).not.toBeInTheDocument();
+    // La de una reserva importante se sigue VIENDO, como dato.
+    const bea = await tarjeta("Bea");
+    expect(within(bea).queryByRole("button", { name: /importante/i })).not.toBeInTheDocument();
+    expect(within(bea).getByLabelText("Importante")).toBeInTheDocument();
+    expect(document.body.innerHTML).not.toContain(MOTIVO_SIN_PERMISO);
     expect(escrituras()).toEqual([]);
     expect(toast.success).not.toHaveBeenCalled();
   });
@@ -361,33 +362,25 @@ describe("tarjeta · «Ha llegado» y «No vino» (ControlLlegada)", () => {
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("sin permiso de edición «Ha llegado» y el menú «…» salen deshabilitados, con el motivo visible, y no escriben", async () => {
+  it("sin permiso de edición no salen «Ha llegado» ni el menú «…» (ocultos, no desactivados) y no se escribe", async () => {
     h.canEdit = false;
     montar();
 
-    const llegada = await screen.findByRole("button", { name: "Marcar que Ana ha llegado" });
-    const menu = screen.getByRole("button", { name: "Más opciones de llegada para Ana" });
-
-    for (const boton of [llegada, menu]) {
-      expect(boton).toBeDisabled();
-      expect(boton.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
-    }
-    fireEvent.click(llegada);
-    fireEvent.keyDown(menu, { key: "Enter" });
+    await tarjeta("Ana");
+    expect(screen.queryByRole("button", { name: "Marcar que Ana ha llegado" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Más opciones de llegada para Ana" })).not.toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: "No vino" })).not.toBeInTheDocument();
     expect(escrituras()).toEqual([]);
   });
 
-  it("sin permiso, el «Deshacer» de una reserva que ya llegó también sale deshabilitado", async () => {
+  it("sin permiso, una reserva que ya llegó enseña el chip «Llegó» pero sin «Deshacer»", async () => {
     h.canEdit = false;
     h.reservas = [reserva("r-ana", "completada", "Ana", { llegada_at: "2026-09-30T19:23:00.000Z" })];
     montar();
 
-    const deshacer = await screen.findByRole("button", { name: "Deshacer llegada de Ana" });
-
-    expect(deshacer).toBeDisabled();
-    expect(deshacer.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
-    fireEvent.click(deshacer);
+    const ana = await tarjeta("Ana");
+    expect(within(ana).getByTitle(/^Llegó/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deshacer llegada de Ana" })).not.toBeInTheDocument();
     expect(escrituras()).toEqual([]);
   });
 });
@@ -539,16 +532,17 @@ describe("tarjeta · «Mover a…»", () => {
     expect(escrituras()).toEqual([]);
   });
 
-  it("sin permiso de edición no se ofrece ningún destino: el motivo sale en el menú, la tarjeta no se arrastra y no se escribe", async () => {
+  it("sin permiso de edición el menú no lleva «Mover a…» (ni destinos ni motivo), la tarjeta no se arrastra y no se escribe", async () => {
     h.canEdit = false;
     montar();
 
     const menu = await abrirMenu("Ana");
 
-    expect(within(menu).getByText("Mover a…")).toBeInTheDocument();
-    const aviso = within(menu).getByRole("menuitem", { name: MOTIVO_SIN_PERMISO });
-    expect(aviso).toHaveAttribute("data-disabled");
+    expect(within(menu).queryByText("Mover a…")).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: MOTIVO_SIN_PERMISO })).not.toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: /^Terraza/ })).not.toBeInTheDocument();
+    // Solo queda «Llamar»: nada de lo que escribe.
+    expect(within(menu).getAllByRole("menuitem").map((i) => i.textContent?.trim())).toEqual(["Llamar"]);
     // El arrastre (ratón, tacto y teclado) está apagado en dnd-kit (`disabled`); la tarjeta lo dice con
     // `data-arrastrable` y sin `aria-disabled`, porque tocarla abre el menú.
     expect(await tarjeta("Ana")).toHaveAttribute("data-arrastrable", "false");
@@ -597,16 +591,13 @@ describe("tarjeta · «Añadir a blacklist»", () => {
     expect(h.invoke).not.toHaveBeenCalled();
   });
 
-  it("sin permiso de edición sale deshabilitado, con el motivo visible, y no abre el modal", async () => {
+  it("sin permiso de edición no sale (oculto, no desactivado) y no abre el modal", async () => {
     h.canEdit = false;
     montar();
 
     const menu = await abrirMenu("Ana");
-    const item = within(menu).getByRole("menuitem", { name: /Añadir a blacklist/ });
 
-    expect(item).toHaveAttribute("data-disabled");
-    expect(item.parentElement).toHaveAttribute("title", MOTIVO_SIN_PERMISO);
-    fireEvent.click(item);
+    expect(within(menu).queryByRole("menuitem", { name: /Añadir a blacklist/ })).not.toBeInTheDocument();
     expect(h.modalBlacklist).not.toHaveBeenCalledWith("r-ana", true);
   });
 });

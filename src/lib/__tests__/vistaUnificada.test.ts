@@ -8,6 +8,8 @@ import {
   filtrarFilasUnificadas,
   resolverDeepLinkReservas,
   resolverSubpestanaConfiguracion,
+  ETIQUETAS_SUBPESTANA_CONFIGURACION,
+  SUBPESTANAS_CONFIGURACION,
   unificarReservasYSolicitudes,
   type ReservaListable,
 } from "@/lib/reservas/vistaUnificada";
@@ -207,13 +209,35 @@ describe("resolverDeepLinkReservas", () => {
 describe("resolverSubpestanaConfiguracion", () => {
   it("?sub=plantillas abre «Plantillas email» (destino de /super-admin/plantillas-email)", () => {
     expect(resolverSubpestanaConfiguracion("plantillas")).toBe("plantillas");
-    expect(resolverSubpestanaConfiguracion("general")).toBe("general");
   });
 
-  it("sin ?sub o con uno desconocido, «General»", () => {
-    expect(resolverSubpestanaConfiguracion(null)).toBe("general");
-    expect(resolverSubpestanaConfiguracion(undefined)).toBe("general");
-    expect(resolverSubpestanaConfiguracion("")).toBe("general");
-    expect(resolverSubpestanaConfiguracion("plantillas-email")).toBe("general");
+  // 04/11/2026: el antiguo «General» se repartió en cuatro chips (petición del dueño, «el scroll es eterno»).
+  it("cada chip nuevo se abre por su nombre", () => {
+    for (const sub of SUBPESTANAS_CONFIGURACION) expect(resolverSubpestanaConfiguracion(sub)).toBe(sub);
+    expect(SUBPESTANAS_CONFIGURACION).toEqual(["reglas", "servicio", "mesas", "turnos", "plantillas"]);
+  });
+
+  it("?sub=general (el chip único de antes) sigue valiendo: abre el primero, «Reglas»", () => {
+    expect(resolverSubpestanaConfiguracion("general")).toBe("reglas");
+  });
+
+  it("sin ?sub o con uno desconocido, «Reglas»", () => {
+    expect(resolverSubpestanaConfiguracion(null)).toBe("reglas");
+    expect(resolverSubpestanaConfiguracion(undefined)).toBe("reglas");
+    expect(resolverSubpestanaConfiguracion("")).toBe("reglas");
+    expect(resolverSubpestanaConfiguracion("plantillas-email")).toBe("reglas");
+    // Nada heredado de los objetos de JavaScript cuela como subpestaña.
+    expect(resolverSubpestanaConfiguracion("toString")).toBe("reglas");
+    expect(resolverSubpestanaConfiguracion("constructor")).toBe("reglas");
+  });
+
+  it("cada chip tiene su texto, corto", () => {
+    expect(ETIQUETAS_SUBPESTANA_CONFIGURACION).toEqual({
+      reglas: "Reglas",
+      servicio: "Servicio",
+      mesas: "Mesas",
+      turnos: "Turnos",
+      plantillas: "Plantillas email",
+    });
   });
 });

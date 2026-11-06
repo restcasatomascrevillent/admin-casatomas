@@ -1,0 +1,46 @@
+{
+ "archivo": "R205.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90260797",
+ "fecha": "2026-02-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Jamon Bellota 100% Iberico SRC Tramo 7-8 kgs NP",
+   "producto_ficha": "Jamón de bellota 100% ibérico SRC, tramo 7-8 kg",
+   "cantidad": 16.1,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 45.0,
+   "descuento_pct": null,
+   "total": 724.5,
+   "iva_pct": 10,
+   "albaran_ref": "40297287",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 724.5,
+ "desglose_iva": [
+  {
+   "base": 724.5,
+   "pct": 10,
+   "cuota": 72.45
+  }
+ ],
+ "iva": 72.45,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 796.95,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 13/04/2026. Punto verde 0,75 EUR informativo, no sumado al total. Albarán 40297287 del 06/02/2026.",
+ "alertas": []
+}

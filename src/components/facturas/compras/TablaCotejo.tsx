@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { formatCurrency } from "@/components/facturas/shared/formatters";
+import { formatImporte } from "@/components/facturas/shared/formatters";
 import {
   CLASE_TONO,
   ETIQUETA_ESTADO,
@@ -41,14 +41,14 @@ export function ResumenImportes({
   return (
     <p className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-sm tabular-nums">
       <span className="text-muted-foreground">{etiquetaAlbaranes}</span>
-      <span className="font-medium">{formatCurrency(sumaAlbaranes)}</span>
+      <span className="font-medium">{formatImporte(sumaAlbaranes)}</span>
       <span aria-hidden="true" className="text-muted-foreground">·</span>
       <span className="text-muted-foreground">{etiquetaFactura}</span>
-      <span className="font-medium">{formatCurrency(baseFactura)}</span>
+      <span className="font-medium">{formatImporte(baseFactura)}</span>
       <span aria-hidden="true" className="text-muted-foreground">·</span>
       <span className="text-muted-foreground">Diferencia</span>
       <span className={`font-semibold ${tono ? CLASE_TONO[tono] : ""}`} data-tono={tono ?? undefined}>
-        {diferencia === null ? "—" : `${signo}${formatCurrency(diferencia)}`}
+        {diferencia === null ? "—" : `${signo}${formatImporte(diferencia)}`}
       </span>
     </p>
   );
@@ -66,9 +66,9 @@ function Fila({ p, apagada }: { p: ProductoCotejo; apagada?: boolean }) {
       <td className={`px-1 py-1.5 text-right font-medium ${apagada ? "" : CLASE_TONO[tono]}`} title={ETIQUETA_ESTADO[p.estado]}>
         {apagada ? "Cuadra" : textoDiferencia(p)}
         {!apagada && p.diferencia_importe !== null && p.diferencia_importe !== 0 && (
-          <span className={`block text-[11px] pointer-coarse:text-xs font-normal tabular-nums ${CLASE_TONO[tonoDiferencia(p.diferencia_importe, p.en_albaranes?.importe ?? null)]}`}>
+          <span className={`block text-xs font-normal tabular-nums ${CLASE_TONO[tonoDiferencia(p.diferencia_importe, p.en_albaranes?.importe ?? null)]}`}>
             {p.diferencia_importe > 0 ? "+" : ""}
-            {formatCurrency(p.diferencia_importe)}
+            {formatImporte(p.diferencia_importe)}
           </span>
         )}
       </td>
@@ -101,7 +101,7 @@ export function TablaCotejo({
           <table className="w-full min-w-[28rem] border-collapse text-xs">
             <caption className="sr-only">Cotejo por producto: {etiquetaAlbaranes.toLowerCase()} frente a la factura</caption>
             <thead>
-              <tr className="border-b text-[11px] pointer-coarse:text-xs uppercase tracking-wider text-muted-foreground">
+              <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
                 <th scope="col" className="py-1 pl-2 pr-2 text-left font-medium">Producto</th>
                 <th scope="col" className="px-1 py-1 text-right font-medium">{etiquetaAlbaranes}</th>
                 <th scope="col" className="px-1 py-1 text-right font-medium">Factura</th>

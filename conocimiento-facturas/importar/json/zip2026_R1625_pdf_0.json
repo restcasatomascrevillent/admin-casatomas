@@ -1,0 +1,63 @@
+{
+ "archivo": "R1625.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "VINOS Y LICORES GAMBÍN, S.L.",
+ "cif": "B73483042",
+ "local": "casa_tomas",
+ "numero_documento": "62/2546",
+ "fecha": "2026-09-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ANIS TENIS SECO 1L 48º C6",
+   "producto_ficha": "Anís Tenis Seco 1 L (caja 6)",
+   "cantidad": -30,
+   "unidad": "botella",
+   "bultos": -5,
+   "contenido_cantidad": 100,
+   "contenido_unidad": "cl",
+   "precio_unitario": 10.25,
+   "descuento_pct": 0.0,
+   "total": -307.5,
+   "iva_pct": 21,
+   "albaran_ref": "62/2.585",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "L.PACHARAN BAINES ORO 70CL 30º C6",
+   "producto_ficha": "Pacharán Baines Oro 70 cl (caja 6)",
+   "cantidad": -12,
+   "unidad": "botella",
+   "bultos": -2,
+   "contenido_cantidad": 70,
+   "contenido_unidad": "cl",
+   "precio_unitario": 13.9,
+   "descuento_pct": 0.0,
+   "total": -166.8,
+   "iva_pct": 21,
+   "albaran_ref": "62/2.585",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -474.3,
+ "desglose_iva": [
+  {
+   "base": -474.3,
+   "pct": 21,
+   "cuota": -99.6
+  }
+ ],
+ "iva": -99.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -573.9,
+ "observaciones": "Abono por devolución de mercancía (alb. 26/19293, transportado por Diego Gastón, en la rectificativa figura como 26/19.293). Rectifica la factura 26-19.351 (R1624). Giro/B2B, vencimiento 29/09/26.",
+ "alertas": []
+}

@@ -60,7 +60,7 @@ export const ALTO_FILA = "h-14";
  * rompe en dos lineas y descuadra el alto de la fila.
  */
 export const INSIGNIA =
-  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0 text-[10px] font-medium leading-none xl:text-[11px]";
+  "inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0 text-xs font-medium leading-none";
 
 // ---------------------------------------------------------------------------
 // Anchos de columna

@@ -48,6 +48,11 @@ vi.mock("@/components/carta/VinoForm", () => ({ VinoForm: () => null }));
 vi.mock("@/components/carta/CoctelForm", () => ({ CoctelForm: () => null }));
 vi.mock("@/components/carta/AjustePreciosModal", () => ({ AjustePreciosModal: () => null }));
 vi.mock("@/components/carta/BotonVinoDesdeFoto", () => ({ BotonVinoDesdeFoto: () => null }));
+// La votación del vino favorito tiene sus propias pruebas (EncuestaVinoFavorito.test.tsx).
+vi.mock("@/components/carta/EncuestaVinoFavorito", () => ({ EncuestaVinoFavorito: () => null }));
+
+// Con «Editar» en la carta (lo de solo «Ver» está en TabCarta.permisos.test.tsx).
+vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
 
 import TabCarta from "../tabs/TabCarta";
 

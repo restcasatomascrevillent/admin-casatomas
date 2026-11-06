@@ -1,0 +1,63 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  6
+ ],
+ "tipo": "factura",
+ "proveedor": "ARLANDIZ LLORCA, S.L.",
+ "cif": "B54490115",
+ "local": "casa_tomas",
+ "numero_documento": "423/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 6,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 28.25,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.12,
+   "descuento_pct": null,
+   "total": 144.5,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 6,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 7.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.33,
+   "descuento_pct": null,
+   "total": 272.49,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 416.99,
+ "desglose_iva": [
+  {
+   "base": 416.99,
+   "pct": 10,
+   "cuota": 41.7
+  }
+ ],
+ "iva": 41.7,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 458.69,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): PEPE ARMONIA. Albaranes de subasta (informativo): 13495, 12478.",
+ "alertas": []
+}

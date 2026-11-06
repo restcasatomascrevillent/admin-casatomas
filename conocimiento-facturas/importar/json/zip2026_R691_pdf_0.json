@@ -1,0 +1,97 @@
+{
+ "archivo": "R691.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26003972",
+ "fecha": "2026-05-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 1.72,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 72.24,
+   "iva_pct": 10,
+   "albaran_ref": "26104319",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE ATUN ROJO",
+   "producto_ficha": "Hueva de atún rojo",
+   "cantidad": 1.48,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 120.0,
+   "descuento_pct": null,
+   "total": 177.6,
+   "iva_pct": 10,
+   "albaran_ref": "26104319",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MOJAMA DE ATUN ALETA AMARILLA SELECCION EXTRA",
+   "producto_ficha": "Mojama de atún aleta amarilla selección extra",
+   "cantidad": 5.88,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 211.68,
+   "iva_pct": 10,
+   "albaran_ref": "26104319",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "BONITO ENTERO",
+   "producto_ficha": "Bonito entero (Sarda sarda)",
+   "cantidad": 17.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.0,
+   "descuento_pct": null,
+   "total": 204.0,
+   "iva_pct": 10,
+   "albaran_ref": "26104319",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 665.52,
+ "desglose_iva": [
+  {
+   "base": 665.52,
+   "pct": 10,
+   "cuota": 66.55
+  }
+ ],
+ "iva": 66.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 732.07,
+ "observaciones": "Transferencia Banco Santander, vencimiento 08/06/2026. Albarán 26104319 de 04/05/2026. Primera vez que aparece la hueva de atún rojo en las muestras de la ficha (120 €/kg, cuadra).",
+ "alertas": []
+}

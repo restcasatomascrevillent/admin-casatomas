@@ -9,6 +9,7 @@ import {
   Shield,
   Settings,
   HelpCircle,
+  Instagram,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -85,6 +86,16 @@ const menuItems: {
     sectionKey: "marketing",
     toggleKey: "marketing",
   },
+  // Instagram (05/11/2026): sección propia, antes era una pestaña de Newsletter.
+  // Mismo permiso y mismo interruptor del Super Admin que Newsletter («marketing»).
+  {
+    title: "Instagram",
+    url: "/instagram",
+    icon: Instagram,
+    // La agencia (Oficiosos) también entra, solo a «Encargos» (docs/instagram-encargos.md).
+    sectionKey: ["marketing", "instagram_agencia"],
+    toggleKey: "marketing",
+  },
   {
     title: "Cheques",
     url: "/cheques",
@@ -103,7 +114,8 @@ const menuItems: {
     title: "Facturas",
     url: "/facturas",
     icon: Receipt,
-    sectionKey: "facturas",
+    // Con solo «Facturas · Subida» también sale (entra a la pestaña Cargar, 06/11/2026).
+    sectionKey: ["facturas", "facturas_subida"],
     toggleKey: "facturas",
   },
   {
@@ -113,6 +125,8 @@ const menuItems: {
     sectionKey: "usuarios",
     toggleKey: "usuarios",
   },
+  // «Avisos» ya no va aquí (06/11/2026, petición del dueño): cada sección tiene su botón rojo (BotonAvisosSeccion)
+  // y la campana de arriba enlaza a /avisos con todos.
   { title: "Ayuda", url: "/ayuda", icon: HelpCircle },
 ];
 
@@ -126,7 +140,8 @@ export function AppSidebar() {
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
-  const isActive = (path: string) => currentPath === path;
+  // También en sus subrutas: /facturas/ia (la IA a pantalla completa) sigue marcando «Facturas».
+  const isActive = (path: string) => currentPath === path || (path !== "/" && currentPath.startsWith(`${path}/`));
   // En el panel deslizante (tablet vertical) `state` sigue siendo el del menú de escritorio,
   // pero dentro del Sheet siempre se ve expandido: no confundir con el carril de iconos.
   const isCollapsed = state === "collapsed" && !isMobile;
@@ -144,8 +159,7 @@ export function AppSidebar() {
     const keys = Array.isArray(item.sectionKey)
       ? item.sectionKey
       : [item.sectionKey];
-    // Usuarios es solo para admins, no configurable por permisos (2026-09-26).
-    if (keys.includes("usuarios")) return isAdmin;
+    // Usuarios se configura por permisos como las demás desde el 06/11/2026 (antes, rol admin).
     // Ser "admin" ya no da acceso a todo lo demás: solo un super admin lo ve
     // todo pase lo que pase en la tabla de permisos.
     if (isSuperAdmin) return true;

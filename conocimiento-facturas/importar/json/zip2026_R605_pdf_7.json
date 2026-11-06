@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  8
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO ISABEL Y ANDRES,C.B.",
+ "cif": "E73170599",
+ "local": "casa_tomas",
+ "numero_documento": "219/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 8,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 0.95,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 95.47,
+   "descuento_pct": null,
+   "total": 90.7,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 90.7,
+ "desglose_iva": [
+  {
+   "base": 90.7,
+   "pct": 10.0,
+   "cuota": 9.07
+  }
+ ],
+ "iva": 9.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 99.77,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 6963. Embarcaciones: ninguna.",
+ "alertas": []
+}

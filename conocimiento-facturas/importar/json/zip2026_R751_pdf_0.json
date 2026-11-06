@@ -1,0 +1,49 @@
+{
+ "archivo": "R751.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "RAÚL DÍAZ NAVARRO",
+ "cif": "48348034X",
+ "local": "casa_tomas",
+ "numero_documento": "26/050",
+ "fecha": "2026-05-22",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Inspección inicial baja tensión s/ R.D. 842/2002 (local de pública concurrencia, cafetería, C/ Santa Maria de la Cabeza nº 4, certificado 2026-048-CI-01)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 235.0,
+   "descuento_pct": null,
+   "total": 235.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 235.0,
+ "desglose_iva": [
+  {
+   "base": 235.0,
+   "pct": 21,
+   "cuota": 49.35
+  }
+ ],
+ "iva": 49.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 284.35,
+ "observaciones": "Forma de pago: transferencia bancaria BBVA (cuenta no transcrita). Sin vencimiento impreso. Facturar a: MASIDE 2011 SL, NIF B54583356, C/ Santa Maria de la Cabeza nº 2.",
+ "alertas": [
+  "La inspección se refiere al local de C/ Santa Maria de la Cabeza nº 4, distinto del nº 2 de facturación de MASIDE; verificar que corresponde al local de Casa Tomás.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

@@ -1,0 +1,65 @@
+{
+ "archivo": "R1301.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "J CARBO (nombre según texto)",
+ "cif": "A79393179",
+ "local": "casa_tomas",
+ "numero_documento": "211199510",
+ "fecha": "2026-08-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CHORIZO CRIOLLO (art. 365005)",
+   "producto_ficha": null,
+   "cantidad": 3.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.0,
+   "descuento_pct": null,
+   "total": 27.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LOMO TERNERA C/H C/S AVILEÑA (art. 114027)",
+   "producto_ficha": null,
+   "cantidad": 23.14,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.8,
+   "descuento_pct": null,
+   "total": 481.31,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 508.61,
+ "desglose_iva": [
+  {
+   "base": 508.61,
+   "pct": 10,
+   "cuota": 50.86
+  }
+ ],
+ "iva": 50.86,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 559.47,
+ "observaciones": "Pedido 6962543, forma de pago RECIBO. Peso neto total 27,040 kg. Nota: «Selección». Costes de subproductos no incluidos (Orden APA 1556/2002).",
+ "alertas": [
+  "El nombre del emisor no aparece en la cabecera; en el pie solo figura «J CARBO». El CIF se toma de la carpeta (A79393179). Revisar el PDF original."
+ ]
+}

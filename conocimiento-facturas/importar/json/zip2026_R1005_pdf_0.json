@@ -1,0 +1,46 @@
+{
+ "archivo": "R1005.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "LICORES Y DISTRIBUCIONES BELLOD, S.L.",
+ "cif": "B03141165",
+ "local": "casa_tomas",
+ "numero_documento": "4189/026",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MARCHAPAN PICOS CAMPEROS 150G.",
+   "producto_ficha": "Marchapán Picos Camperos 150 g",
+   "cantidad": 75,
+   "unidad": "ud",
+   "bultos": 3,
+   "contenido_cantidad": 150,
+   "contenido_unidad": "g",
+   "precio_unitario": 0.8,
+   "descuento_pct": null,
+   "total": 60.0,
+   "iva_pct": 4,
+   "albaran_ref": "7063/026",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 60.0,
+ "desglose_iva": [
+  {
+   "base": 60.0,
+   "pct": 4,
+   "cuota": 2.4
+  }
+ ],
+ "iva": 2.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 62.4,
+ "observaciones": "Número impreso 4.189/026. Transferencia 30 días, vencimiento 30/07/2026.",
+ "alertas": []
+}

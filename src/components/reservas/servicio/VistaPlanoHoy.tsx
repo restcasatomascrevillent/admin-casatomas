@@ -28,6 +28,11 @@
 //     y atenúan las demás. Con «Todo el día» se pinta el turno EN CURSO (una mesa
 //     no puede enseñar la comida y la cena a la vez).
 //
+// SOLO «VER» (06/11/2026, decisión del dueño): sin «Editar» en Reservas se ve todo
+// (salas, mesas con su estado, reservas, notas) pero no sale nada que escriba:
+// ni las acciones de la tarjeta, ni «Liberar mesa», ni «Sentar aquí», ni las piezas,
+// ni el interruptor de la terraza, ni «Plano base». Se ocultan, no se desactivan.
+//
 // DATOS Y TIEMPO REAL: las reservas de hoy llegan de `VistaHoy` (la consulta que
 // ya tenía, con `llegada_at`/`salida_at` si existen) y las mesas asignadas son la
 // misma consulta del kanban. `VistaHoy` ya monta `useReservasEnVivo` y el sondeo
@@ -112,7 +117,7 @@ import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { SIN_ASIGNAR, columnaDeReserva, construirColumnas, esSinAsignar } from "@/lib/reservas/columnasServicio";
 import { ocupaEspacio } from "@/lib/reservas/estadosReserva";
-import { TITULO_SIN_PERMISO_EDITAR, accionesDisponibles } from "@/lib/reservas/accionesReserva";
+import { accionesDisponibles } from "@/lib/reservas/accionesReserva";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { esGrupoGrande, esSalaMesaLarga, sugerenciaGrupoGrande, type SugerenciaGrupo } from "@/lib/reservas/grupoGrande";
 import { esSalaPrivada } from "@/lib/reservas/salaPrivada";
@@ -134,7 +139,6 @@ import {
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
 import { BlacklistModal } from "../BlacklistModal";
-import { ConMotivo } from "../ConMotivo";
 import { ReservaCard } from "../ReservaCard";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
 import { MapaSalaServicio } from "./MapaSalaServicio";
@@ -433,7 +437,7 @@ export function VistaPlanoHoy({
   );
 
   const tocarMesa = (mesa: Mesa) => {
-    if (eligiendoPara) {
+    if (eligiendoPara && puedeEditar) {
       const r = eligiendoPara;
       setEligiendoPara(null);
       void soltar(r, mesa);
@@ -862,28 +866,27 @@ export function VistaPlanoHoy({
           {/* Liberar / deshacer: lo del modo servicio (solo `salida_at`; la reserva sigue «Llegó»). Antes que
               la tarjeta: es lo que se viene a hacer a una mesa «por liberar», y en la tablet apaisada la
               tarjeta entera no cabe a la vista. */}
-          {haLlegado(r.estado) && (
-            <ConMotivo className="flex" motivo={puedeEditar ? undefined : TITULO_SIN_PERMISO_EDITAR}>
-              {r.salida_at ? (
-                <Button
-                  variant="outline"
-                  className="h-11 w-full"
-                  disabled={!puedeEditar || servicio.estaEnCurso(r.id)}
-                  onClick={() => void servicio.deshacerLiberarMesa(r)}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4" /> Deshacer liberar
-                </Button>
-              ) : (
-                <Button
-                  variant={estadoSel?.estado === "por_liberar" ? "default" : "outline"}
-                  className="h-11 w-full"
-                  disabled={!puedeEditar || servicio.estaEnCurso(r.id)}
-                  onClick={() => void servicio.liberarMesa(r)}
-                >
-                  <LogOut className="mr-2 h-4 w-4" /> Liberar mesa
-                </Button>
-              )}
-            </ConMotivo>
+          {/* Solo con «Editar» en Reservas (06/11/2026: sin él se oculta, no se desactiva). */}
+          {haLlegado(r.estado) && puedeEditar && (
+            r.salida_at ? (
+              <Button
+                variant="outline"
+                className="h-11 w-full"
+                disabled={servicio.estaEnCurso(r.id)}
+                onClick={() => void servicio.deshacerLiberarMesa(r)}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" /> Deshacer liberar
+              </Button>
+            ) : (
+              <Button
+                variant={estadoSel?.estado === "por_liberar" ? "default" : "outline"}
+                className="h-11 w-full"
+                disabled={servicio.estaEnCurso(r.id)}
+                onClick={() => void servicio.liberarMesa(r)}
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Liberar mesa
+              </Button>
+            )
           )}
           {tarjeta(r)}
         </div>
@@ -897,13 +900,14 @@ export function VistaPlanoHoy({
           reservas={reservasEnMesas}
           hayServicio
           turno={turno}
-          ocupado={guardandoPiezas || !puedeEditar}
+          ocupado={guardandoPiezas}
+          soloLectura={!puedeEditar}
           onGuardar={(cambios, mensaje) => guardarPiezas(cambios, mensaje)}
           onProponer={setPropuestaPiezas}
         />
       )}
 
-      {estadoSel?.estado === "libre" && (
+      {estadoSel?.estado === "libre" && puedeEditar && (
         <section aria-label="Sentar aquí" className="space-y-2">
           <p className="text-[13px] text-muted-foreground">
             {candidatas.length > 0
@@ -928,10 +932,10 @@ export function VistaPlanoHoy({
                       {sentando === r.id ? <Loader2 className="h-4 w-4 animate-spin" aria-label="Guardando" /> : `${pax} pax${noCaben ? " · no caben" : ""}`}
                     </span>
                   </p>
-                  <ConMotivo className="flex flex-wrap gap-1.5" motivo={puedeEditar ? undefined : TITULO_SIN_PERMISO_EDITAR}>
+                  <div className="flex flex-wrap gap-1.5">
                     <Button
                       className="h-11 flex-1"
-                      disabled={!puedeEditar || sentando !== null}
+                      disabled={sentando !== null}
                       onClick={() => void sentarAqui(r, true)}
                       aria-label={
                         `Sentar en la mesa ${mesaSel.nombre} a ${nombre}, ${hora}, ${pax} comensales` +
@@ -944,14 +948,14 @@ export function VistaPlanoHoy({
                       <Button
                         variant="outline"
                         className="h-11 flex-1"
-                        disabled={!puedeEditar || sentando !== null}
+                        disabled={sentando !== null}
                         onClick={() => void sentarAqui(r, false)}
                         aria-label={`Solo dar la mesa ${mesaSel.nombre} a ${nombre}, ${hora}: todavía no ha llegado`}
                       >
                         Solo dar la mesa
                       </Button>
                     )}
-                  </ConMotivo>
+                  </div>
                 </li>
               );
             })}
@@ -1106,23 +1110,32 @@ export function VistaPlanoHoy({
             {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
             {!proponiendo && sala && (
               <div className="ml-auto flex shrink-0 items-center gap-2">
-                {esTerraza && (
+                {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
+                    solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
+                {esTerraza && puedeEditar && (
                   <label className="flex h-10 items-center gap-2 rounded-md border px-2 text-[13px]">
                     <Switch checked={cierreSala.cerrada} onCheckedChange={(v) => void cierreSala.cambiar(v)} aria-label={`${sala.title} cerrada en este servicio`} />
                     Cerrada
                   </label>
                 )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 gap-1.5"
-                  disabled={numAjustes === 0 || !puedeEditar}
-                  onClick={() => setConfirmarBase(true)}
-                  title={numAjustes === 0 ? "Este servicio ya está como el plano base" : "Deshacer picos, piezas prestadas y uniones de este servicio"}
-                >
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden lg:inline">Plano base</span>
-                </Button>
+                {esTerraza && !puedeEditar && cierreSala.cerrada && (
+                  <Badge variant="outline" className="h-10 px-2 text-[13px]">
+                    Cerrada en este servicio
+                  </Badge>
+                )}
+                {puedeEditar && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-10 gap-1.5"
+                    disabled={numAjustes === 0}
+                    onClick={() => setConfirmarBase(true)}
+                    title={numAjustes === 0 ? "Este servicio ya está como el plano base" : "Deshacer picos, piezas prestadas y uniones de este servicio"}
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden lg:inline">Plano base</span>
+                  </Button>
+                )}
               </div>
             )}
           </div>

@@ -24,6 +24,7 @@ import { PanelStripe } from "@/components/cheques/PanelStripe";
 import { GastosGestionCheques } from "@/components/cheques/GastosGestionCheques";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
+import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado abierto en el
@@ -74,9 +75,18 @@ function mensajeError(error: unknown, accion: string) {
 }
 const euro = (n: number) => new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" }).format(n);
 
+/**
+ * Cheques regalo. Permisos (06/11/2026, decisión del dueño):
+ *   · «Ver»: consultar la expedición de tickets y Stripe, verificar un código y CANJEARLO (la RPC
+ *     `canjear_cheque_regalo` lo permite con «Ver» desde la migración 20261106520000).
+ *   · «Editar»: además, compra manual, configuración del cheque (correo, PDF, validez y gastos de
+ *     gestión) y plantilla de factura. Sin «Editar» esas pestañas NO salen (se ocultan, no se
+ *     desactivan) y junto a las pestañas aparece la etiqueta común «Solo lectura».
+ */
 export default function Cheques() {
   const hoy = useHoyCheques();
-  const { canAccess: puedeEditar } = useCanAccessSection("cheques", "edit");
+  const { canAccess: puedeEditar, loading: cargandoPermisos } = useCanAccessSection("cheques", "edit");
+  const soloLectura = !cargandoPermisos && !puedeEditar;
   const [pestana, setPestana] = useState("expedicion");
   const [codigo, setCodigo] = useState("CT-");
   const [errorVerificacion, setErrorVerificacion] = useState("");
@@ -122,7 +132,8 @@ export default function Cheques() {
     finally { setOcupado(false); }
   }
   async function canjear() {
-    if (!resultado?.valido || caducado || !resultado.codigo || !puedeEditar || ocupado) return;
+    // Canjear basta con «Ver» (decisión del dueño, 06/11/2026); el servidor lo comprueba igual.
+    if (!resultado?.valido || caducado || !resultado.codigo || ocupado) return;
     setOcupado(true);
     try {
       const { data, error } = await db.rpc("canjear_cheque_regalo", { p_codigo: resultado.codigo });
@@ -173,15 +184,20 @@ export default function Cheques() {
           pestanas={[
             { valor: "expedicion", etiqueta: "Expedición de tickets", icono: <Ticket /> },
             { valor: "verificar", etiqueta: "Verificar cheque", icono: <Search /> },
-            { valor: "manual", etiqueta: "Compra manual", icono: <HandCoins /> },
-            { valor: "regalo", etiqueta: "Configuración", icono: <Palette /> },
-            { valor: "plantilla", etiqueta: "Plantilla de factura", icono: <FileText /> },
+            ...(puedeEditar
+              ? [
+                  { valor: "manual", etiqueta: "Compra manual", icono: <HandCoins /> },
+                  { valor: "regalo", etiqueta: "Configuración", icono: <Palette /> },
+                  { valor: "plantilla", etiqueta: "Plantilla de factura", icono: <FileText /> },
+                ]
+              : []),
             { valor: "stripe", etiqueta: "Stripe", icono: <CreditCard /> },
           ]}
+          acciones={soloLectura ? <EtiquetaSoloLectura /> : undefined}
         />
         <TabsContent value="expedicion" className="mt-0 min-w-0 data-[state=inactive]:hidden"><ListaTickets /></TabsContent>
-        <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>
-        <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo extra={{ valor: "gastos", etiqueta: "Gastos de gestión", icono: <Receipt />, contenido: <GastosGestionCheques /> }} /></TabsContent>
+        {puedeEditar && <TabsContent value="manual" forceMount className={CONTENIDO_PESTANA}><CompraManual /></TabsContent>}
+        {puedeEditar && <TabsContent value="regalo" className={CONTENIDO_PESTANA}><PlantillaChequeRegalo extra={{ valor: "gastos", etiqueta: "Gastos de gestión", icono: <Receipt />, contenido: <GastosGestionCheques /> }} /></TabsContent>}
         <TabsContent value="stripe" className={CONTENIDO_PESTANA}><PanelStripe /></TabsContent>
         <TabsContent value="verificar" className={`${CONTENIDO_PESTANA} space-y-5 max-w-4xl`}>
           <Card className="rounded-2xl border-[#e5ddd0] shadow-sm overflow-hidden"><CardHeader className="bg-[#faf7f1] border-b border-[#eee7dc] p-5 sm:p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white border border-[#e5ddd0] text-[#795440]"><ShieldCheck className="h-6 w-6" /></div><div><CardTitle className="text-xl sm:text-2xl">Comprobar cheque regalo</CardTitle><p className="text-sm text-muted-foreground mt-1">Introduce el código del email para consultar su importe y disponibilidad.</p></div></div></CardHeader><CardContent className="p-5 sm:p-6">
@@ -193,11 +209,12 @@ export default function Cheques() {
           {errorVerificacion && <Card className="border-destructive/50 rounded-2xl"><CardContent className="pt-6"><p role="alert">{errorVerificacion}</p></CardContent></Card>}
           {resultado && <Card className={`rounded-2xl ${puedeCanjear ? "border-emerald-300 bg-emerald-50/40" : "border-destructive/30"}`}><CardContent className="space-y-4 pt-6" role="status" aria-live="polite">
             <h2 className={`flex items-center gap-2 font-semibold ${puedeCanjear ? "text-emerald-700" : "text-destructive"}`}>{puedeCanjear ? <CheckCircle2 /> : <XCircle />}{estado}</h2>
-            {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.caduca_el && <div className="text-sm"><p>Válido hasta el {fechaCaducidad(resultado.caduca_el)} (incluido).</p>{!resultado.usado && resultado.estado === "pagado" && <p className="font-semibold">{estadoCaducidad(resultado.caduca_el, hoy).texto}</p>}</div>}{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{puedeCanjear && puedeEditar && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}{puedeCanjear && !puedeEditar && <p className="text-sm text-muted-foreground">Necesitas permiso de edición para canjearlo.</p>}</>}
+            {resultado.encontrado && <><p className="text-3xl font-semibold">{euro(Number(resultado.importe_eur))}</p><p className="font-mono">{resultado.codigo}</p>{resultado.caduca_el && <div className="text-sm"><p>Válido hasta el {fechaCaducidad(resultado.caduca_el)} (incluido).</p>{!resultado.usado && resultado.estado === "pagado" && <p className="font-semibold">{estadoCaducidad(resultado.caduca_el, hoy).texto}</p>}</div>}{resultado.destinatario_nombre && <p>Para: {resultado.destinatario_nombre}</p>}{resultado.canjeado_en && <p className="text-sm text-muted-foreground">Canjeado el {new Date(resultado.canjeado_en).toLocaleString("es-ES")}</p>}{puedeCanjear && <Button disabled={ocupado} onClick={() => setConfirmar(true)}>Canjear cheque</Button>}</>}
           </CardContent></Card>}
         </TabsContent>
-        {/* La vista previa se pega arriba de la REGIÓN de la pestaña (su contenedor de scroll), ya no de la ventana. */}
-        <TabsContent value="plantilla" className={CONTENIDO_PESTANA}>
+        {/* La vista previa se pega arriba de la REGIÓN de la pestaña (su contenedor de scroll), ya no de la ventana.
+            Solo con «Editar»: la plantilla de factura es configuración. */}
+        {puedeEditar && <TabsContent value="plantilla" className={CONTENIDO_PESTANA}>
           {cargando ? <p className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />Cargando plantilla…</p> : <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-start">
             <Card className="rounded-2xl shadow-sm"><CardHeader><div className="flex items-start justify-between gap-3"><div><CardTitle>Personaliza tu factura</CardTitle><p className="text-sm text-muted-foreground mt-2">El logo y los datos de Casa Tomás ya están preparados.</p></div><Palette className="h-5 w-5 text-[#795440] shrink-0" /></div></CardHeader><CardContent>
               {errorCarga && <div className="space-y-3 rounded-lg border border-destructive/40 p-4"><p role="alert">{errorCarga}</p><p className="text-sm text-muted-foreground">Vista previa de la plantilla Casa Tomás. No se han recuperado los datos guardados; la edición está bloqueada hasta restablecer la conexión.</p><Button onClick={() => void cargar()} variant="outline">Reintentar conexión</Button></div>}
@@ -221,7 +238,7 @@ export default function Cheques() {
               <Card><CardHeader><CardTitle className="text-base">Mensaje que recibirá el cliente</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap break-words text-sm">{plantilla.email_mensaje}</p><p className="mt-4 text-xs text-muted-foreground">Adjunto: Factura-CT-00000001.pdf</p></CardContent></Card>
             </div>
           </div>}
-        </TabsContent>
+        </TabsContent>}
       </Tabs>
     </div>
     <Dialog open={confirmar} onOpenChange={open => !ocupado && setConfirmar(open)}><DialogContent><DialogHeader><DialogTitle>Canjear cheque regalo</DialogTitle><DialogDescription>Vas a utilizar {resultado?.codigo} por {euro(Number(resultado?.importe_eur || 0))}. Después no podrá volver a canjearse.</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" disabled={ocupado} onClick={() => setConfirmar(false)}>Volver</Button><Button disabled={ocupado || !puedeCanjear} onClick={() => void canjear()}>{ocupado && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Confirmar canje</Button></DialogFooter></DialogContent></Dialog>

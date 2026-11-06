@@ -11,7 +11,7 @@ import {
   useDesvincularAlbaran,
   useVincularAlbaran,
 } from "@/hooks/useCotejoAlbaranes";
-import { formatCurrency, formatDate } from "@/components/facturas/shared/formatters";
+import { formatImporte, formatDate } from "@/components/facturas/shared/formatters";
 import { CLASE_TONO, tonoDiferencia, type Cotejo } from "@/lib/facturas/cotejo";
 import { ResumenImportes, TablaCotejo } from "./TablaCotejo";
 
@@ -41,7 +41,7 @@ export function EnlaceDocumento({
   );
 }
 
-const CHIP = "inline-flex h-6 shrink-0 items-center rounded px-1.5 text-[11px] pointer-coarse:text-xs font-medium";
+const CHIP = "inline-flex h-6 shrink-0 items-center rounded px-1.5 text-xs font-medium";
 const CHIP_CITADO = `${CHIP} bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300`;
 const CHIP_NEUTRO = `${CHIP} bg-muted text-muted-foreground`;
 const CHIP_AVISO = `${CHIP} bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300`;
@@ -113,7 +113,7 @@ function AnadirAlbaran({ facturaId }: { facturaId: number }) {
               >
                 <span className="font-medium">Albarán {c.numero_documento}</span>
                 <span className="text-xs text-muted-foreground">{formatDate(c.fecha)}</span>
-                <span className="ml-auto tabular-nums">{formatCurrency(c.base)}</span>
+                <span className="ml-auto tabular-nums">{formatImporte(c.base)}</span>
                 <span className="flex w-full flex-wrap gap-1">
                   {c.citado_en_factura && <span className={CHIP_CITADO}>Citado en la factura</span>}
                   {!c.mismo_proveedor && <span className={CHIP_AVISO}>Otro proveedor: {c.proveedor ?? "—"}</span>}
@@ -148,9 +148,9 @@ function BloqueCotejo({ cotejo }: { cotejo: Cotejo }) {
       />
       {conCitados && (
         <p className="text-xs text-muted-foreground">
-          {formatCurrency(r.base_citada_sin_albaran)} son de albaranes citados sin subir · sin explicar{" "}
+          {formatImporte(r.base_citada_sin_albaran)} son de albaranes citados sin subir · sin explicar{" "}
           <span className={`font-semibold tabular-nums ${CLASE_TONO[tono]}`} data-tono={tono}>
-            {formatCurrency(r.diferencia_sin_explicar)}
+            {formatImporte(r.diferencia_sin_explicar)}
           </span>
         </p>
       )}
@@ -172,7 +172,7 @@ export function AlbaranesDeFactura({
 }: {
   factura: Factura;
   /** Los albaranes con facturado_en_id = esta factura que ya tiene la lista (por si la RPC no está). */
-  albaranesCargados: Factura[];
+  albaranesCargados: Pick<Factura, "id" | "numero_documento" | "fecha" | "subtotal">[];
   onAbrirDocumento: (id: number) => void;
 }) {
   const { canAccess: puedeEditar } = useCanAccessSection("facturas", "edit");
@@ -224,7 +224,7 @@ export function AlbaranesDeFactura({
                     {a.citado_en_factura ? "Citado" : "No citado"}
                   </span>
                 )}
-                <span className="ml-auto tabular-nums">{formatCurrency(a.base)}</span>
+                <span className="ml-auto tabular-nums">{formatImporte(a.base)}</span>
               </EnlaceDocumento>
               {disponible && puedeEditar && (
                 <Button
@@ -252,7 +252,7 @@ export function AlbaranesDeFactura({
             {cotejo.albaranes_no_subidos.length === 1 ? "albarán que no está subido" : "albaranes que no están subidos"}:{" "}
             <span className="font-medium">{cotejo.albaranes_no_subidos.map((c) => c.numero).join(", ")}</span>{" "}
             <span className="tabular-nums">
-              ({formatCurrency(cotejo.albaranes_no_subidos.reduce((s, c) => s + (c.importe ?? 0), 0))})
+              ({formatImporte(cotejo.albaranes_no_subidos.reduce((s, c) => s + (c.importe ?? 0), 0))})
             </span>
           </p>
         </div>

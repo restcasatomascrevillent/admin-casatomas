@@ -1,0 +1,66 @@
+{
+ "archivo": "R969.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "SECURITAS DIRECT ESPAÑA, S.A.U.",
+ "cif": "A26106013",
+ "local": "casa_tomas",
+ "numero_documento": "2606C00546788",
+ "fecha": "2026-06-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "ALARMA ANTI-INTRUSION Y ANTI-INHIBIDORES",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.0,
+   "descuento_pct": null,
+   "total": 4.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 2,
+   "nombre": "ALARMA ZEROVISION ANTI-INTRUSION Y ANTI-INHIBIDORES",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 43.92,
+   "descuento_pct": null,
+   "total": 43.92,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 47.92,
+ "desglose_iva": [
+  {
+   "base": 47.92,
+   "pct": 21,
+   "cuota": 10.06
+  }
+ ],
+ "iva": 10.06,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 57.98,
+ "observaciones": "Cuota mensual de alarma, periodo 01/06/2026-30/06/2026. Contrato 3207305, instalación en CALLE SANTA MARIA DE LA CABEZA 2, Crevillente. Pago domiciliado en cuenta bancaria. Marca impresa en cabecera: Verisure. Destinatario MASIDE2011 SLU (CIF B54583356) sin Casa Tomás ni Touza impreso.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

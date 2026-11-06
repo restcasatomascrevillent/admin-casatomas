@@ -1,0 +1,46 @@
+{
+ "archivo": "R423.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "REGYSISTEM SL",
+ "cif": "B03789807",
+ "local": "touza",
+ "numero_documento": "000224",
+ "fecha": "2026-03-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CONT. MANTENIMIENTO ANUAL PLUS CASHKEEPER ABRIL-2026/2027 (LOCAL: TOUZA) (cód. 00005)",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 535.0,
+   "descuento_pct": null,
+   "total": 535.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-000097",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 535.0,
+ "desglose_iva": [
+  {
+   "base": 535.0,
+   "pct": 21,
+   "cuota": 112.35
+  }
+ ],
+ "iva": 112.35,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 647.35,
+ "observaciones": "Cabecera «CASA TOMAS / TOUZA», local indicado en la línea: TOUZA. Forma de pago: recibo domiciliado, vencimiento 30/03/2026 por 647,35 € (Caja Rural Central). Agente: GRUPO MOLINES.",
+ "alertas": []
+}

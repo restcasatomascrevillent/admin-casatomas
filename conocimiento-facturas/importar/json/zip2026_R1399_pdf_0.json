@@ -1,0 +1,99 @@
+{
+ "archivo": "R1399.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CETAREA ANGEL MAR S.L.",
+ "cif": "B88665229",
+ "local": "casa_tomas",
+ "numero_documento": "260281",
+ "fecha": "2026-08-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Buey de mar gallego hembra 1.3-1.9kg.",
+   "producto_ficha": "Buey de mar gallego hembra",
+   "cantidad": 7.7,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.9,
+   "descuento_pct": null,
+   "total": 207.13,
+   "iva_pct": 10,
+   "albaran_ref": "2600749",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Ameixa Fina 30-40",
+   "producto_ficha": "Almeja fina grande (30-40)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 92.8,
+   "descuento_pct": null,
+   "total": 185.6,
+   "iva_pct": 10,
+   "albaran_ref": "2600749",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Berberecho G",
+   "producto_ficha": "Berberecho gallego grande",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 33.9,
+   "descuento_pct": null,
+   "total": 67.8,
+   "iva_pct": 10,
+   "albaran_ref": "2600749",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Portes",
+   "producto_ficha": "Portes",
+   "cantidad": 1.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.0,
+   "descuento_pct": null,
+   "total": 27.0,
+   "iva_pct": 10,
+   "albaran_ref": "2600749",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 487.53,
+ "desglose_iva": [
+  {
+   "base": 487.53,
+   "pct": 10,
+   "cuota": 48.75
+  }
+ ],
+ "iva": 48.75,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 536.28,
+ "observaciones": "Forma de pago GIRO 30; vencimiento 28/09/2026. Un albarán: 2600749 (27-08-26).",
+ "alertas": [
+  "Portes de 27,00 € en el albarán 2600749: por debajo del mínimo de la ficha (33 €). Se extrae lo impreso."
+ ]
+}

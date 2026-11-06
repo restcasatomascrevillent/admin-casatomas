@@ -1,0 +1,65 @@
+{
+ "archivo": "R435.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO INSULA ROMA S.L.",
+ "cif": "B73423998",
+ "local": "casa_tomas",
+ "numero_documento": "1-900257",
+ "fecha": "2026-03-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CASAR DE B. GODELLO ECOLOG. 2024",
+   "producto_ficha": null,
+   "cantidad": 120,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.4,
+   "descuento_pct": null,
+   "total": 1008.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-712592",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CASAR DE B. GODELLO ECOLOG. 2024",
+   "producto_ficha": null,
+   "cantidad": 12,
+   "unidad": "botella",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.4,
+   "descuento_pct": 100,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": "1-712592",
+   "bonificada": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1008.0,
+ "desglose_iva": [
+  {
+   "base": 1008.0,
+   "pct": 21,
+   "cuota": 211.68
+  }
+ ],
+ "iva": 211.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1219.68,
+ "observaciones": "Domiciliación 45 días, vencimiento 26/04/2026. Servir a Casa Tomás Crevillente 09:00-13:00. Subtotal línea 2 impreso 100,80 con dto 100% (regalo).",
+ "alertas": [
+  "Dirección del emisor impresa: Murcia (Avda. Rector José Loustau 10)."
+ ]
+}

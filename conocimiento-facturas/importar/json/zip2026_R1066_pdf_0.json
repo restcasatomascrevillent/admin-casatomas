@@ -1,0 +1,89 @@
+{
+ "archivo": "R1066.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "7122",
+ "fecha": "2026-07-09",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TOM.MUCHAMIEL MADURO",
+   "producto_ficha": "Tomate Muchamiel maduro",
+   "cantidad": 21.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 21.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 5558/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": null,
+   "nombre": "Envase CAJA TURIA (-5 x 0,00)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  },
+  {
+   "orden": 3,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (-4 x 1,65)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -6.6,
+   "descuento_pct": null,
+   "total": -6.6,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 14.4,
+ "desglose_iva": [
+  {
+   "base": 21.0,
+   "pct": 4,
+   "cuota": 0.84
+  },
+  {
+   "base": -6.6,
+   "pct": 21,
+   "cuota": -1.39
+  }
+ ],
+ "iva": -0.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 13.85,
+ "observaciones": "Transferencia 30 días. Albarán A 5558/26 del 09/07/2026. Caja Turia devuelta a 0,00 €. Destinatario no impreso en el texto del PDF (la ficha asigna casa_tomas).",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

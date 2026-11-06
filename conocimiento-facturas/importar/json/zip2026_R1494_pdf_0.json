@@ -1,0 +1,83 @@
+{
+ "archivo": "R1494.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260521",
+ "fecha": "2026-08-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CENTOLLA",
+   "producto_ficha": "Centolla",
+   "cantidad": 0.9,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 20.0,
+   "descuento_pct": null,
+   "total": 18.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000521",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.8,
+   "descuento_pct": null,
+   "total": 100.8,
+   "iva_pct": 10,
+   "albaran_ref": "1-000521",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "BOGAVANTE",
+   "producto_ficha": "Bogavante",
+   "cantidad": 9.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 24.0,
+   "descuento_pct": null,
+   "total": 216.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000521",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 334.8,
+ "desglose_iva": [
+  {
+   "base": 334.8,
+   "pct": 10,
+   "cuota": 33.48
+  }
+ ],
+ "iva": 33.48,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 368.28,
+ "observaciones": "Albarán 1-000521 del 26/08/2026. Forma de pago: transferencia CaixaBank; vencimiento 26/08/2026 por 368,28. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "CENTOLLA a 20,00 €/kg; la ficha da 25,00 €/kg.",
+  "BOGAVANTE a 24,00 €/kg; la ficha da 26,00 €/kg."
+ ]
+}

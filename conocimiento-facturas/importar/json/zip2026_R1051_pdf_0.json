@@ -1,0 +1,102 @@
+{
+ "archivo": "R1051.pdf",
+ "paginas_pdf": [
+  1,
+  2,
+  3,
+  4
+ ],
+ "tipo": "factura",
+ "proveedor": "AVATEL TELECOM, S.A.",
+ "cif": "A93135218",
+ "local": "casa_tomas",
+ "numero_documento": "CURF26/213370",
+ "fecha": "2026-07-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "TV incluido migración 1-31 Jul - Cuota TV",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.47,
+   "descuento_pct": null,
+   "total": 2.47,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Centralita Empresa MAX 1-31 Jul",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 49.99,
+   "descuento_pct": null,
+   "total": 49.99,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Promo 15 meses Centralita Empresa MAX 1-31 Jul",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -10.0,
+   "descuento_pct": null,
+   "total": -10.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Telefonía Fija Empresas 1-30 Jun 966107887",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.21,
+   "descuento_pct": null,
+   "total": 0.21,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 42.67,
+ "desglose_iva": [
+  {
+   "base": 42.67,
+   "pct": 21,
+   "cuota": 8.96
+  }
+ ],
+ "iva": 8.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 51.63,
+ "observaciones": "Consumo 01/06/2026-30/06/2026. Domiciliación bancaria, vence 02/07/2026. Móvil 613196915 (GB ilimitados MAX, Pack 100 SMS) y extensión de centralita incluidos en cuotas sin importe propio. Páginas 2-4: detalle de llamadas; la página 4 no tiene texto extraíble.",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

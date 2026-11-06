@@ -1,0 +1,85 @@
+{
+ "archivo": "R1144.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "7506",
+ "fecha": "2026-07-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": null,
+   "nombre": "Envase PETIT SUIS (1 x 0,8260)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.83,
+   "descuento_pct": null,
+   "total": 0.83,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  },
+  {
+   "orden": 2,
+   "pagina": null,
+   "nombre": "Envase BATEA PAQUITO MARTIN (2 x 1,6500)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.3,
+   "descuento_pct": null,
+   "total": 3.3,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  },
+  {
+   "orden": 3,
+   "pagina": null,
+   "nombre": "Envase BANDEJA PAQUITO MARTIN (3 x 1,6500)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.95,
+   "descuento_pct": null,
+   "total": 4.95,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false,
+   "es_envase": true
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 9.08,
+ "desglose_iva": [
+  {
+   "base": 9.08,
+   "pct": 21,
+   "cuota": 1.91
+  }
+ ],
+ "iva": 1.91,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 10.99,
+ "observaciones": "Transferencia 30 días. Factura solo de envases (albarán ENV 1941/26 del 23/07/2026). Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

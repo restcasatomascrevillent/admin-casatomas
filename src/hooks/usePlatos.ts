@@ -24,6 +24,8 @@ export interface Plato {
   precio_eur: number | null;
   descripcion: string | null;
   sin_gluten_disponible?: boolean | null;
+  /** 'vegetariano' y/o 'vegano' confirmados (20261104151000). Ausente antes de esa migración. */
+  etiquetas_dieteticas?: string[] | null;
   ingredientes: string | null;
   unidad: string | null;
   alergenos_oficiales: any;
@@ -54,6 +56,7 @@ export interface NuevoPlato {
   precio_eur: number;
   descripcion?: string;
   sin_gluten_disponible?: boolean;
+  etiquetas_dieteticas?: string[] | null;
   ingredientes?: string;
   unidad?: string;
   alergenos_oficiales?: any;
@@ -198,6 +201,8 @@ export function usePlatos() {
             ...(nuevoPlato.sin_gluten_disponible === true
               ? { sin_gluten_disponible: true }
               : {}),
+            // Solo si viene marcado: sin la migración 20261104151000 el alta sigue funcionando.
+            ...(nuevoPlato.etiquetas_dieteticas ? { etiquetas_dieteticas: nuevoPlato.etiquetas_dieteticas } : {}),
             ingredientes: nuevoPlato.ingredientes || null,
             unidad: normalizarUnidadPlato(nuevoPlato.unidad),
             alergenos_oficiales:

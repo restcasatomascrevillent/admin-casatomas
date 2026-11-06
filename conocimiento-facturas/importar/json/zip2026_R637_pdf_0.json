@@ -1,0 +1,116 @@
+{
+ "archivo": "R637.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Antonio Miguel Rodriguez Perez (Alquileres El Redondo)",
+ "cif": "29016276M",
+ "local": "casa_tomas",
+ "numero_documento": "L67/2026",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALBARAN 242 (alquiler vajilla, 1 dia)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 195.76,
+   "descuento_pct": null,
+   "total": 195.76,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ALBARAN 251 (alquiler vajilla, 1 dia)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 164.72,
+   "descuento_pct": null,
+   "total": 164.72,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "ALBARAN 256 (alquiler vajilla, 1 dia)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 200.2,
+   "descuento_pct": null,
+   "total": 200.2,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "ALBARAN 272 (alquiler vajilla, 1 dia)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 153.24,
+   "descuento_pct": null,
+   "total": 153.24,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "ALBARAN 288 (alquiler vajilla, 1 dia)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 257.08,
+   "descuento_pct": null,
+   "total": 257.08,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 971.0,
+ "desglose_iva": [
+  {
+   "base": 971.0,
+   "pct": 21,
+   "cuota": 203.91
+  }
+ ],
+ "iva": 203.91,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1174.91,
+ "observaciones": "Alquiler de vajilla/menaje por albaran; pago por transferencia IBAN impreso",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

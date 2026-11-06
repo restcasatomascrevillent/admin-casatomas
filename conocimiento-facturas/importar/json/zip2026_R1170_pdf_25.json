@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  26
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO MYT, C.B.",
+ "cif": "E24948994",
+ "local": "casa_tomas",
+ "numero_documento": "759/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 26,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 119.8,
+   "descuento_pct": null,
+   "total": 239.6,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 239.6,
+ "desglose_iva": [
+  {
+   "base": 239.6,
+   "pct": 10,
+   "cuota": 23.96
+  }
+ ],
+ "iva": 23.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 263.56,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): MANUEL Y TERESA. Albaranes de subasta (informativo): 15519.",
+ "alertas": []
+}

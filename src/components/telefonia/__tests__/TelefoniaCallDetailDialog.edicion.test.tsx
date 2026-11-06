@@ -89,16 +89,14 @@ describe("TelefoniaCallDetailDialog · editar la reserva de la llamada", () => {
     expect(screen.queryByRole("button", { name: /Editar reserva/ })).not.toBeInTheDocument();
   });
 
-  it("sin permiso de edición sobre «reservas» el botón sale deshabilitado y lo explica", () => {
+  it("sin permiso de edición sobre «reservas» no hay botón de editar (06/11/2026: oculto, no desactivado)", () => {
     h.canEdit = false;
     montar(llamada({ reserva_id: "res-1" }));
 
-    const boton = screen.getByRole("button", { name: /Editar reserva/ });
-    expect(boton).toBeDisabled();
-    expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    // Un botón deshabilitado no recibe el ratón (`pointer-events-none`): el motivo solo se ve en su envoltorio.
-    expect(boton.parentElement).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(boton);
+    // «Ver reserva creada» sigue: es solo un enlace.
+    expect(screen.getByRole("link", { name: /Ver reserva creada/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Editar reserva/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No tienes permiso para editar reservas/)).not.toBeInTheDocument();
     expect(h.editarReserva).not.toHaveBeenCalled();
   });
 

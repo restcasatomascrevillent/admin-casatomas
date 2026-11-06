@@ -1,0 +1,46 @@
+{
+ "archivo": "R1258.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "TIMBRADOS VALENCIA, S.L.",
+ "cif": "B46432423",
+ "local": "casa_tomas",
+ "numero_documento": "FR26070862",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "26X18X25 ASA PLANA 1T CEL. BLANCO 80 GR",
+   "producto_ficha": null,
+   "cantidad": 3.0,
+   "unidad": "millar",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 250.0,
+   "descuento_pct": null,
+   "total": 750.0,
+   "iva_pct": 21,
+   "albaran_ref": "ALB2607318",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 750.0,
+ "desglose_iva": [
+  {
+   "base": 750.0,
+   "pct": 21,
+   "cuota": 157.5
+  }
+ ],
+ "iva": 157.5,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 907.5,
+ "observaciones": "Cobro por transferencia a 30 días. Vencimiento 30/08/2026 (907,50 €). Portes pagados. Referencia impresa: RESTAURANTE CASA TOMAS. Incluye contribución de 1,72 € al SCRAP de envases PROCIRCULAR (informativa, no aparece como cargo en el pie). Código de artículo no incluido en el nombre.",
+ "alertas": []
+}

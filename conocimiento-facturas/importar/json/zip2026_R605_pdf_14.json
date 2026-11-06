@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  15
+ ],
+ "tipo": "factura",
+ "proveedor": "POMARES SOLER, S.L.",
+ "cif": "B42585679",
+ "local": "casa_tomas",
+ "numero_documento": "581/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 15,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.65,
+   "descuento_pct": null,
+   "total": 9.04,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 9.04,
+ "desglose_iva": [
+  {
+   "base": 9.04,
+   "pct": 10.0,
+   "cuota": 0.9
+  }
+ ],
+ "iva": 0.9,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 9.94,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: MONTCLAR I.",
+ "alertas": []
+}

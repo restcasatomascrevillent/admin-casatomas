@@ -1,0 +1,81 @@
+{
+ "archivo": "R336.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ROMAN Y MARTOS ALIMENTACION, S.L.",
+ "cif": "B02873545",
+ "local": "casa_tomas",
+ "numero_documento": "26/4479",
+ "fecha": "2026-02-27",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FALSO RODABALLO 2000/3000",
+   "producto_ficha": "Falso rodaballo 2-3 kg/pieza",
+   "cantidad": 4.9,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 127.4,
+   "iva_pct": 10,
+   "albaran_ref": "26/9506",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FALSO RODABALLO 800/1000",
+   "producto_ficha": "Falso rodaballo 0,8-1 kg/pieza",
+   "cantidad": 4.1,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 26.0,
+   "descuento_pct": null,
+   "total": 106.6,
+   "iva_pct": 10,
+   "albaran_ref": "26/9506",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "RAPE NEGRO 5/6",
+   "producto_ficha": "Rape negro calibre 5/6",
+   "cantidad": 5.4,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 11.6,
+   "descuento_pct": null,
+   "total": 62.64,
+   "iva_pct": 10,
+   "albaran_ref": "26/9506",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 296.64,
+ "desglose_iva": [
+  {
+   "base": 296.64,
+   "pct": 10,
+   "cuota": 29.66
+  }
+ ],
+ "iva": 29.66,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 326.3,
+ "observaciones": "Albarán 26/9506 de 23/02/2026. A 30 días con albarán (SANTANDER); vencimiento 29/03/2026 por 326,30 €. Total kilos 14,40. Las dos páginas del PDF son la misma factura duplicada (leída una vez). El texto vertical de fondo (MARTOS, ROMÁN, Málaga…) y las fechas de caducidad de lote no son datos de la factura.",
+ "alertas": []
+}

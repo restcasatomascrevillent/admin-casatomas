@@ -1,0 +1,46 @@
+{
+ "archivo": "R1539.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "DISTRIBUIDORAS DE BODEGAS, S.L. (D.I.B.O.S.)",
+ "cif": "B30224109",
+ "local": "casa_tomas",
+ "numero_documento": "8754",
+ "fecha": "2026-09-16",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GRAMONA BRUT IMPERIAL GRVA 75 CL.",
+   "producto_ficha": "Gramona Imperial Brut Gran Reserva 75 cl (cava)",
+   "cantidad": 48.0,
+   "unidad": "botella",
+   "bultos": 8.0,
+   "contenido_cantidad": 75,
+   "contenido_unidad": "cl",
+   "precio_unitario": 16.92,
+   "descuento_pct": null,
+   "total": 812.16,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 812.16,
+ "desglose_iva": [
+  {
+   "base": 812.16,
+   "pct": 21,
+   "cuota": 170.55
+  }
+ ],
+ "iva": 170.55,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 982.71,
+ "observaciones": "Forma de pago REPOSICION. CERRADO LUNES.",
+ "alertas": []
+}

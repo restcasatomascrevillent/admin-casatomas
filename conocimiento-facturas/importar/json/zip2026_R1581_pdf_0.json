@@ -1,0 +1,99 @@
+{
+ "archivo": "R1581.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ALHAMA ABD VINO, S.L.",
+ "cif": "B73475121",
+ "local": "casa_tomas",
+ "numero_documento": "26A/1827",
+ "fecha": "2026-07-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Gerardo Méndez Do Ferreiro 2025 Magnum",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.14,
+   "descuento_pct": null,
+   "total": 192.84,
+   "iva_pct": 21,
+   "albaran_ref": "404",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Antídoto La Hormiga 2022",
+   "producto_ficha": null,
+   "cantidad": 12.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 22.3,
+   "descuento_pct": null,
+   "total": 267.6,
+   "iva_pct": 21,
+   "albaran_ref": "20270575",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Gerardo Méndez Do Ferreiro 2025",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 312.0,
+   "iva_pct": 21,
+   "albaran_ref": "20270575",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Gerardo Méndez Cepas Vellas 2023",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 25.84,
+   "descuento_pct": null,
+   "total": 155.04,
+   "iva_pct": 21,
+   "albaran_ref": "20270575",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 927.48,
+ "desglose_iva": [
+  {
+   "base": 927.48,
+   "pct": 21,
+   "cuota": 194.77
+  }
+ ],
+ "iva": 194.77,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1122.25,
+ "observaciones": "Pago por transferencia BBVA. Vencimiento 29/07/2026 (1.122,25 €). Albaranes 404 y 20270575, ambos de 28/07/2026. Códigos de artículo no incluidos en el nombre. Destinatario impreso: MASIDE 2011, S.L. (sin marca Casa Tomás).",
+ "alertas": [
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

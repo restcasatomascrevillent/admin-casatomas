@@ -1,0 +1,107 @@
+{
+ "archivo": "R1571.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Transgourmet Ibérica, S.A.U.",
+ "cif": "A17371758",
+ "local": "casa_tomas",
+ "numero_documento": "260041046015887",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Pimiento piq. Quality tira lata 1,9K",
+   "producto_ficha": null,
+   "cantidad": 10.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.93,
+   "descuento_pct": null,
+   "total": 109.3,
+   "iva_pct": 10,
+   "albaran_ref": "000331062",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Beb. esp. 1715 1L 30º",
+   "producto_ficha": null,
+   "cantidad": 1.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.75,
+   "descuento_pct": null,
+   "total": 6.75,
+   "iva_pct": 21,
+   "albaran_ref": "000331062",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "Lomo Elpozo extra tie. VC E/K",
+   "producto_ficha": null,
+   "cantidad": 3.42,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.725,
+   "descuento_pct": 10.0,
+   "total": 16.16,
+   "iva_pct": 10,
+   "albaran_ref": "000331062",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "Ajo pelado bco. bol. 1K",
+   "producto_ficha": null,
+   "cantidad": 2.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 6.49,
+   "descuento_pct": null,
+   "total": 12.98,
+   "iva_pct": 4,
+   "albaran_ref": "000331062",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 145.19,
+ "desglose_iva": [
+  {
+   "base": 12.98,
+   "pct": 4,
+   "cuota": 0.52
+  },
+  {
+   "base": 125.46,
+   "pct": 10,
+   "cuota": 12.55
+  },
+  {
+   "base": 6.75,
+   "pct": 21,
+   "cuota": 1.42
+  }
+ ],
+ "iva": 14.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 159.68,
+ "observaciones": "Albarán 000331062, cliente 2002989, vencimiento 30/09/2026",
+ "alertas": []
+}

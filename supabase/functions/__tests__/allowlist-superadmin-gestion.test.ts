@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
   actorEmail: "dueno@casatomas.test",
   superadmin: false,
   admin: false,
-  rpcCaida: "" as "" | "is_admin" | "is_super_admin",
+  rpcCaida: "" as "" | "has_section_permission" | "is_super_admin",
   llamadasAuth: [] as string[],
   actorId: "11111111-1111-4111-8111-111111111111",
   objetivoId: "22222222-2222-4222-8222-222222222222",
@@ -47,7 +47,8 @@ vi.mock("https://esm.sh/@supabase/supabase-js@2", () => {
       rpc: async (fn: string) => {
         if (fn === h.rpcCaida) return { data: null, error: { message: "db offline" } };
         if (fn === "is_super_admin") return { data: h.superadmin, error: null };
-        if (fn === "is_admin") return { data: h.admin, error: null };
+        // «Ver» en la sección usuarios (06/11/2026; antes, el rol admin con is_admin).
+        if (fn === "has_section_permission") return { data: h.admin, error: null };
         return { data: null, error: { message: `rpc inesperada ${fn}` } };
       },
       from: () => consulta(),
@@ -92,9 +93,9 @@ describe.each(["crear", "eliminar", "listar"] as const)("%s · el email del allo
     expect(r.status).toBe(403);
     expect(h.llamadasAuth).toEqual([]);
   });
-  it.each(["is_super_admin", "is_admin"] as const)("si %s falla → 503 sin tocar Auth (fail-closed)", async (rpc) => {
+  it.each(["is_super_admin", "has_section_permission"] as const)("si %s falla → 503 sin tocar Auth (fail-closed)", async (rpc) => {
     // crear y eliminar solo consultan is_super_admin; list-users consulta las dos.
-    if (accion !== "listar" && rpc === "is_admin") return;
+    if (accion !== "listar" && rpc === "has_section_permission") return;
     h.rpcCaida = rpc;
     const r = await pedir(accion);
     expect(r.status).toBe(503);
@@ -109,13 +110,13 @@ describe.each(["crear", "eliminar", "listar"] as const)("%s · el email del allo
   });
 });
 
-describe("list-users · contrato de rol admin", () => {
-  it("rol admin sin super_admins → 200 (sin depender del email)", async () => {
+describe("list-users · «Ver» en la sección Usuarios (06/11/2026)", () => {
+  it("con «Ver» en Usuarios y sin super_admins → 200 (sin depender del email)", async () => {
     h.admin = true; h.actorEmail = "encargado@staff.local";
     expect((await pedir("listar")).status).toBe(200);
   });
-  it("si is_admin falla no se pasa a is_super_admin: 503 aunque sea super admin", async () => {
-    h.superadmin = true; h.rpcCaida = "is_admin";
+  it("si has_section_permission falla no se pasa a is_super_admin: 503 aunque sea super admin", async () => {
+    h.superadmin = true; h.rpcCaida = "has_section_permission";
     expect((await pedir("listar")).status).toBe(503);
   });
 });

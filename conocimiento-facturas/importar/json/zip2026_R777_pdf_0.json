@@ -1,0 +1,133 @@
+{
+ "archivo": "R777.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "5709",
+ "fecha": "2026-05-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "LIMON VERNA",
+   "producto_ficha": "Limón Verna",
+   "cantidad": 48.5,
+   "unidad": "kg",
+   "bultos": 5,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 87.3,
+   "iva_pct": 4,
+   "albaran_ref": "A 4467/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "CALABACIN",
+   "producto_ficha": "Calabacín",
+   "cantidad": 11.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.0,
+   "descuento_pct": null,
+   "total": 11.5,
+   "iva_pct": 4,
+   "albaran_ref": "A 4467/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PATATAS MINI 2,700KG",
+   "producto_ficha": "Patata mini (bolsa 2,7 kg)",
+   "cantidad": 18.9,
+   "unidad": "kg",
+   "bultos": 7,
+   "contenido_cantidad": 2.7,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.4,
+   "descuento_pct": null,
+   "total": 64.26,
+   "iva_pct": 4,
+   "albaran_ref": "A 4467/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "TOMATE DANIELA I G",
+   "producto_ficha": "Tomate Daniela cat. I calibre G",
+   "cantidad": 42.0,
+   "unidad": "kg",
+   "bultos": 8,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.2,
+   "descuento_pct": null,
+   "total": 50.4,
+   "iva_pct": 4,
+   "albaran_ref": "A 4467/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TOMATE DULCE II",
+   "producto_ficha": "Tomate dulce categoría II",
+   "cantidad": 23.38,
+   "unidad": "kg",
+   "bultos": 9,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 175.35,
+   "iva_pct": 4,
+   "albaran_ref": "A 4467/26",
+   "bonificada": false
+  },
+  {
+   "orden": 6,
+   "pagina": 1,
+   "nombre": "FRESAS PIPO 1kg",
+   "producto_ficha": "Fresa Pipo (tarrina 1 kg)",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 3.5,
+   "descuento_pct": null,
+   "total": 14.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 4467/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 402.81,
+ "desglose_iva": [
+  {
+   "base": 402.81,
+   "pct": 4,
+   "cuota": 16.11
+  }
+ ],
+ "iva": 16.11,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 418.92,
+ "observaciones": "Transferencia 30 días. Albarán A 4467/26 del 29/05/2026. Resumen de envases vacío. Destinatario no impreso en el texto del PDF (la ficha asigna casa_tomas).",
+ "alertas": [
+  "local tomado de la ficha (no impreso)"
+ ]
+}

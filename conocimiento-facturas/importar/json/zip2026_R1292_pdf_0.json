@@ -1,0 +1,117 @@
+{
+ "archivo": "R1292.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRANCISCO JOSÉ SANTACRUZ GAMBÍN,S.L.U",
+ "cif": "B54968961",
+ "local": "casa_tomas",
+ "numero_documento": "8016",
+ "fecha": "2026-08-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MELOCOTON BABY GOLD 6",
+   "producto_ficha": "Melocotón Baby Gold calibre 6",
+   "cantidad": 16.55,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.25,
+   "descuento_pct": null,
+   "total": 37.24,
+   "iva_pct": 4,
+   "albaran_ref": "A 6177/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "AGUACATE HASS (caja 4kg)",
+   "producto_ficha": "Aguacate Hass (caja 4 kg)",
+   "cantidad": 1.0,
+   "unidad": "caja",
+   "bultos": 1,
+   "contenido_cantidad": 4.0,
+   "contenido_unidad": "kg",
+   "precio_unitario": 18.0,
+   "descuento_pct": null,
+   "total": 18.0,
+   "iva_pct": 4,
+   "albaran_ref": "A 6177/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MELON MONTIEL",
+   "producto_ficha": "Melón Montiel",
+   "cantidad": 9.28,
+   "unidad": "kg",
+   "bultos": 0,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.48,
+   "descuento_pct": null,
+   "total": 4.45,
+   "iva_pct": 4,
+   "albaran_ref": "A 6177/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "TOMATE DULCE II",
+   "producto_ficha": "Tomate dulce categoría II",
+   "cantidad": 25.7,
+   "unidad": "kg",
+   "bultos": 10,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 192.75,
+   "iva_pct": 4,
+   "albaran_ref": "A 6177/26",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "UVA MOSCATEL",
+   "producto_ficha": "Uva moscatel",
+   "cantidad": 7.96,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.0,
+   "descuento_pct": null,
+   "total": 15.92,
+   "iva_pct": 4,
+   "albaran_ref": "A 6177/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 268.36,
+ "desglose_iva": [
+  {
+   "base": 268.36,
+   "pct": 4,
+   "cuota": 10.73
+  }
+ ],
+ "iva": 10.73,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 279.09,
+ "observaciones": "Transferencia 30 días. Albarán A 6177/26 del 12/08/2026. Hay una fila suelta 'PALOMERO' bajo la línea de aguacate (texto de origen o envase, no se incluye como producto). Destinatario no impreso en el PDF digital; la ficha asigna casa_tomas.",
+ "alertas": [
+  "AGUACATE HASS (caja 4kg) a 18,00 €/caja; la ficha da 22,00 €/caja. Se deja lo impreso.",
+  "local tomado de la ficha (no impreso)"
+ ]
+}

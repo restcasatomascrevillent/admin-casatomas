@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ESTEVE PALOMARES,VICENTE A.",
+ "cif": "21384384L",
+ "local": "casa_tomas",
+ "numero_documento": "434/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 2,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 1.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 32.7,
+   "descuento_pct": null,
+   "total": 45.78,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 45.78,
+ "desglose_iva": [
+  {
+   "base": 45.78,
+   "pct": 10,
+   "cuota": 4.58
+  }
+ ],
+ "iva": 4.58,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 50.36,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

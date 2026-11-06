@@ -1,0 +1,48 @@
+{
+ "archivo": "R1505.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "6546",
+ "fecha": "2026-09-14",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALFONSIÑO",
+   "producto_ficha": "Alfonsiño",
+   "cantidad": 4.45,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.8,
+   "descuento_pct": null,
+   "total": 123.71,
+   "iva_pct": 10,
+   "albaran_ref": "22780",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 123.71,
+ "desglose_iva": [
+  {
+   "base": 123.71,
+   "pct": 10,
+   "cuota": 12.37
+  }
+ ],
+ "iva": 12.37,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 136.08,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura.",
+ "alertas": [
+  "Alfonsiño a 27,80 €/kg; el catálogo de la ficha da 28,90 €/kg. Se deja lo impreso."
+ ]
+}

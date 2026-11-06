@@ -1,0 +1,66 @@
+{
+ "archivo": "R846.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "SERVICIOS HOSTELEROS DISBEYA, S.L.",
+ "cif": "B54968045",
+ "local": "casa_tomas",
+ "numero_documento": "2026/A00001",
+ "fecha": "2026-06-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FORMATO 300 Y 350 CL. (RAPPEL COCA COLA AÑO 2025)",
+   "producto_ficha": null,
+   "cantidad": 485.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -2.44,
+   "descuento_pct": null,
+   "total": -1183.4,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FORMATO 237 CL. (RAPPEL COCA COLA AÑO 2025)",
+   "producto_ficha": null,
+   "cantidad": 279.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": -2.87,
+   "descuento_pct": null,
+   "total": -800.73,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -1984.13,
+ "desglose_iva": [
+  {
+   "base": -1984.13,
+   "pct": 21,
+   "cuota": -416.67
+  }
+ ],
+ "iva": -416.67,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -2400.8,
+ "observaciones": "Abono por rappel Coca-Cola año 2025 (cliente 03393 BARRA RESTAURANTE CASA TOMAS, ruta MMR1). Forma de pago REPOSICION; sellado PAGADO 03-06-2026 'Transferencia x Caixa'. Cuatro filas de texto a 0,00 ('RAPPEL COCA COLA AÑO 2025', 'CASA TOMAS + TOUZA') omitidas. Importes en negativo (abono); cantidad = 485 y 279 unidades impresas (probablemente cajas, no consta).",
+ "alertas": [
+  "El texto impreso dice 'CASA TOMAS + TOUZA': el rappel cubre ambos locales pero la factura va a nombre de Casa Tomás (cliente 03393)",
+  "Número 2026/A00001 con serie distinta de las facturas normales (patrón 2026/NNNNNN)"
+ ]
+}

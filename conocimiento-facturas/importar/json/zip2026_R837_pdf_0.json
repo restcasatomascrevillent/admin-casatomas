@@ -1,0 +1,64 @@
+{
+ "archivo": "R837.pdf",
+ "paginas_pdf": [
+  1,
+  2
+ ],
+ "tipo": "factura",
+ "proveedor": "ROMAN Y MARTOS ALIMENTACION, S.L.",
+ "cif": "B02873545",
+ "local": "casa_tomas",
+ "numero_documento": "26/14058",
+ "fecha": "2026-05-26",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PALOMETA ROJA (VIRREY) 1000/2000",
+   "producto_ficha": "Palometa roja (virrey) 1-2 kg/pieza",
+   "cantidad": 6.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 216.0,
+   "iva_pct": 10,
+   "albaran_ref": "26/31659",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PALOMETA ROJA (VIRREY) 2000/3000",
+   "producto_ficha": "Palometa roja (virrey) 2-3 kg/pieza",
+   "cantidad": 4.2,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 36.0,
+   "descuento_pct": null,
+   "total": 151.2,
+   "iva_pct": 10,
+   "albaran_ref": "26/31659",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 367.2,
+ "desglose_iva": [
+  {
+   "base": 367.2,
+   "pct": 10,
+   "cuota": 36.72
+  }
+ ],
+ "iva": 36.72,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 403.92,
+ "observaciones": "Albarán 26/31659 de 22/05/2026. A 30 días con albarán (SANTANDER); vencimiento 25/06/2026 por 403,92 €. Total kilos 10,20. En la primera línea aparece «6» en la columna UDS. (informativo, no se factura: se factura por KILOS). Las dos páginas del PDF son la misma factura duplicada (leída una vez).",
+ "alertas": []
+}

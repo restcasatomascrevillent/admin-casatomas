@@ -54,14 +54,14 @@ describe("autenticar", () => {
     expect(await autenticar(cab({}), "estado", { secretoCron: "s", comprobarUsuario: usuarioOk })).toMatchObject({ ok: false, status: 401 });
   });
 
-  it("panel: sincronizar pide permiso de escritura; estado, de lectura", async () => {
+  it("panel: sincronizar pide «Editar» (06/11/2026, no basta «Ver»); estado, solo «Ver»", async () => {
     const comprobar = vi.fn(async () => ({ ok: true as const, userId: "u7" }));
     expect(await autenticar(cab({ authorization: "Bearer jwt" }), "sincronizar", { secretoCron: "s", comprobarUsuario: comprobar })).toEqual({
       ok: true,
       origen: "panel",
       usuarioId: "u7",
     });
-    expect(comprobar).toHaveBeenLastCalledWith("escribir");
+    expect(comprobar).toHaveBeenLastCalledWith("editar");
     await autenticar(cab({ authorization: "Bearer jwt" }), "estado", { secretoCron: "s", comprobarUsuario: comprobar });
     expect(comprobar).toHaveBeenLastCalledWith("leer");
   });

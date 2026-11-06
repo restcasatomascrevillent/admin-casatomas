@@ -1,0 +1,49 @@
+{
+ "archivo": "R1061.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "LOGISTICA FRISECO, S.L.",
+ "cif": "B54787213",
+ "local": "casa_tomas",
+ "numero_documento": "26/0301",
+ "fecha": "2026-07-01",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "MOVIMIENTOS DE ENTRADA",
+   "producto_ficha": null,
+   "cantidad": -47.0,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 3.1659,
+   "descuento_pct": null,
+   "total": -148.8,
+   "iva_pct": 21,
+   "albaran_ref": "431",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -148.8,
+ "desglose_iva": [
+  {
+   "base": -148.8,
+   "pct": 21,
+   "cuota": -31.25
+  }
+ ],
+ "iva": -31.25,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -180.05,
+ "observaciones": "Giro 30 dias. Vencimiento 2026-07-30. Retrocesion de movimiento cargado en n/fra. 266 de 30.06.2026 por no corresponder.",
+ "alertas": [
+  "Cabecera 'FACTURA' con importes negativos: tratado como abono.",
+  "Local asignado por defecto a Casa Tomás (la factura solo pone MASIDE 2011)"
+ ]
+}

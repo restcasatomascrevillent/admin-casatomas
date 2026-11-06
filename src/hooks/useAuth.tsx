@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import type { QueryClient } from "@tanstack/react-query";
 import { emitirRevalidacionSesion } from "@/lib/revalidacion-sesion";
+import { borrarCopiasLista } from "@/lib/facturas/copiaListaCompras";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 import {
   limpiarAvisoSesionCaducada,
@@ -158,6 +159,8 @@ export function AuthProvider({
   const idPintado = useRef<string | null>(null);
   /** Cancela y VACÍA la caché: invalidar no basta, serviría datos viejos en el primer render. */
   const vaciarCache = useCallback(() => {
+    // También la copia de la lista de Compras guardada en el dispositivo.
+    borrarCopiasLista();
     const qc = clienteConsultas.current;
     if (!qc) return;
     void qc.cancelQueries();
@@ -342,6 +345,7 @@ export function AuthProvider({
     if (!userId) return;
     let activo = true;
     let comprobando = false;
+    let inicial = true;
     const cerrarPorBloqueo = async () => {
       if (!activo || usuariosBloqueados.current.has(userId)) return;
       usuariosBloqueados.current.add(userId);
@@ -398,8 +402,11 @@ export function AuthProvider({
           await decidirCierre();
         } else if (!error) {
           // Sesión válida: reutiliza esta misma comprobación (15 s, foco y
-          // visibilidad) para releer rol y permisos (CT-REM-FE-02).
-          emitirRevalidacionSesion();
+          // visibilidad) para releer rol y permisos (CT-REM-FE-02). La
+          // PRIMERA no: rol y permisos se acaban de leer al entrar este
+          // usuario (UserRoleProvider) y se pedían dos veces seguidas.
+          if (inicial) inicial = false;
+          else emitirRevalidacionSesion();
         }
       } catch {
         /* Un corte de red no cierra una sesión válida. El servidor mantiene el bloqueo. */
@@ -655,6 +662,12 @@ export function AuthProvider({
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
+
+/**
+ * Id del usuario con sesión, o null; sin <AuthProvider> (pruebas) también null
+ * en vez de lanzar. Para cachés por usuario (lista de Compras guardada).
+ */
+export const useUsuarioIdOpcional = (): string | null => useContext(AuthContext)?.user?.id ?? null;
 
 export const useAuth = (): AuthContextValue => {
   const context = useContext(AuthContext);

@@ -1,0 +1,46 @@
+{
+ "archivo": "R179.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170749753",
+ "fecha": "2026-02-06",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 12.25,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.8,
+   "descuento_pct": null,
+   "total": 22.05,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 22.05,
+ "desglose_iva": [
+  {
+   "base": 22.05,
+   "pct": 4,
+   "cuota": 0.88
+  }
+ ],
+ "iva": 0.88,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 22.93,
+ "observaciones": "Fecha entrega 06.02.2026, igual que la fecha de factura. Anotaciones sueltas 'CARGA 05.02' y '(CP)': no son producto. Total BT 1.",
+ "alertas": []
+}

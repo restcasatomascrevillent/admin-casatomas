@@ -471,6 +471,65 @@ describe("lectores", () => {
     expect(sinPermiso).toMatchObject({ error: "credencial_rechazada", detalles: { permiso_necesario: "Plan (lectura)" } });
   });
 
+  // 06/11/2026: minutos, ejecuciones y bloqueo de GitHub Actions (el caso real de noviembre: todo
+  // terminaba en 2–4 s sin arrancar, también la copia de seguridad).
+  const ejecucion = (creada: string, segundos: number, conclusion: string | null = "success", status = "completed") => {
+    const inicio = new Date(creada).getTime();
+    return { created_at: creada, run_started_at: creada, updated_at: new Date(inicio + segundos * 1000).toISOString(), status, conclusion };
+  };
+  const rutasEjecuciones = (porRepo: Record<string, unknown[]>) => Object.fromEntries(Object.entries(porRepo).map(([repo, runs]) => [
+    `api.github.com/repos/restcasatomascrevillent/${repo}/actions/runs`,
+    () => resp({ total_count: runs.length, workflow_runs: runs }),
+  ]));
+
+  it("GitHub: avisa cuando las ejecuciones no arrancan y cuenta las del mes por repositorio", async () => {
+    const f = fetchSimulado(rutasCompletas(rutasEjecuciones({
+      "web-casatomas": [ejecucion("2026-11-03T10:00:00Z", 3, "failure"), ejecucion("2026-11-02T19:52:00Z", 1300, "failure"), ejecucion("2026-11-02T10:00:00Z", 600)],
+      "admin-casatomas": [ejecucion("2026-11-03T11:00:00Z", 2, "failure"), ejecucion("2026-11-03T09:00:00Z", 4, "failure"), ejecucion("2026-11-03T11:30:00Z", 0, null, "in_progress")],
+      "touza-casatomas": [],
+    })));
+    const r = await LECTORES.github({ ...ctx(SECRETOS, {}), fetch: f.fn });
+    expect(r.error).toBeFalsy();
+    expect(r.metricas.actions_ejecuciones).toMatchObject({ valor: 6, nota: "web 3 · admin 3 · touza 0" });
+    expect(r.metricas.actions_sin_arrancar).toMatchObject({ valor: 3 });
+    // Con el informe de facturación, los minutos son los de GitHub (1100), no la estimación.
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 1100, nota: "Dato de GitHub." });
+    expect(r.detalles).toMatchObject({
+      bloqueado_desde: "2026-11-03T09:00:00Z",
+      ultima_ejecucion_que_arranco: "2026-11-02T19:52:00Z",
+      repos: ["web-casatomas", "admin-casatomas", "touza-casatomas"],
+    });
+    expect((r.detalles!.avisos as string[])[0]).toMatch(/GitHub no arranca las pruebas automáticas desde el 0?3\/11,? 10:00: las últimas 3 ejecuciones/);
+    const runs = f.llamadas.find((l) => l.url.pathname.endsWith("/web-casatomas/actions/runs"))!;
+    expect(runs.url.searchParams.get("created")).toBe(">=2026-11-01");
+  });
+
+  it("GitHub: sin permiso «Plan» estima los minutos con las ejecuciones; sin nada → credencial_rechazada", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      "api.github.com/users/restcasatomascrevillent/settings/billing/usage/summary": () => resp({ message: "Resource not accessible" }, 403),
+      ...rutasEjecuciones({
+        "web-casatomas": [ejecucion("2026-11-02T10:00:00Z", 601), ejecucion("2026-11-02T09:00:00Z", 59, "failure")],
+        "admin-casatomas": [ejecucion("2026-11-02T08:00:00Z", 120)],
+        "touza-casatomas": [],
+      }),
+    })));
+    expect(r.error).toBeFalsy();
+    // 601 s → 11 min, 59 s → 1 min, 120 s → 2 min (minutos empezados, como factura GitHub).
+    expect(r.metricas.actions_minutos).toMatchObject({ valor: 14, nota: expect.stringContaining("Estimación") });
+    expect(r.metricas.actions_computo).toBeUndefined();
+    expect(r.detalles!.permiso_faltante).toMatch(/Plan/);
+    expect(r.detalles!.avisos).toBeUndefined();
+  });
+
+  it("GitHub: sin acceso a un repositorio lo dice", async () => {
+    const r = await LECTORES.github(ctx(SECRETOS, rutasCompletas({
+      ...rutasEjecuciones({ "web-casatomas": [ejecucion("2026-11-02T10:00:00Z", 60)], "admin-casatomas": [] }),
+      "api.github.com/repos/restcasatomascrevillent/touza-casatomas/actions/runs": () => resp({ message: "Not Found" }, 404),
+    })));
+    expect(r.detalles!.repos).toEqual(["web-casatomas", "admin-casatomas"]);
+    expect((r.detalles!.avisos as string[]).join(" ")).toMatch(/touza-casatomas.*«Actions» \(lectura\)/);
+  });
+
   it("Resend: clave solo de envío (401 restricted_api_key) aprovecha las cabeceras de cuota", async () => {
     const r = await LECTORES.resend(ctx(SECRETOS, rutasCompletas({
       "api.resend.com/domains": () => resp({ name: "restricted_api_key", message: "This API key is restricted" }, 401, { "x-resend-monthly-quota": "40" }),

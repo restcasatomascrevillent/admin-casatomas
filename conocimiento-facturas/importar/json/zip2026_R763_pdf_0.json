@@ -1,0 +1,48 @@
+{
+ "archivo": "R763.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260227",
+ "fecha": "2026-05-11",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "GALLINETA",
+   "producto_ficha": "Gallineta",
+   "cantidad": 16.05,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 23.0,
+   "descuento_pct": null,
+   "total": 369.15,
+   "iva_pct": 10,
+   "albaran_ref": "1-000227",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 369.15,
+ "desglose_iva": [
+  {
+   "base": 369.15,
+   "pct": 10,
+   "cuota": 36.92
+  }
+ ],
+ "iva": 36.92,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 406.07,
+ "observaciones": "Transferencia CaixaBank; vencimiento 11/05/2026 por el total. Destinatario impreso: MASIDE 2011, S.L.U. (Crevillente), código cliente 152. Agente 1 CASIMIRO.",
+ "alertas": [
+  "Precio distinto de la ficha: GALLINETA 23,00 (ficha 20,90)"
+ ]
+}

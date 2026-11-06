@@ -34,20 +34,26 @@ import { BotonCambiarFondo } from "./recorte/BotonCambiarFondo";
 import { ACCEPT_FOTO, mensajeErrorStorage } from "@/lib/validarFoto";
 import { useLecturaEtiquetaVino } from "./lecturaEtiquetaVino";
 import { PistaPrecioVino } from "./PistaPrecioVino";
+import { CamposCopaParker } from "./CamposCopaParker";
+import { camposCopaParker, cambiosCopaParker, copaParkerParaCampos, COPA_PARKER_VACIO, exigirPrecioCopa } from "./copaParker";
 
 // Origen obligatorio también al editar (04/11/2026): país, región y categoría
 // con denominación. Un vino de «… — ORIGEN PENDIENTE» no se guarda hasta
 // elegirle la suya (así se corrigen los que quedan).
-const formSchema = z.object({
-  nombre: nombreCarta,
-  categoria: categoriaVino,
-  precio_eur: esquemaPrecioCarta,
-  descripcion: descripcionCarta,
-  ingredientes: z.string().optional(),
-  denominacion_origen: z.string().optional(),
-  ubicacion_pais: paisVino,
-  ubicacion_region: regionVino,
-});
+// Copa y Parker (04/11/2026): ver copaParker.ts.
+const formSchema = z
+  .object({
+    nombre: nombreCarta,
+    categoria: categoriaVino,
+    precio_eur: esquemaPrecioCarta,
+    descripcion: descripcionCarta,
+    ingredientes: z.string().optional(),
+    denominacion_origen: z.string().optional(),
+    ubicacion_pais: paisVino,
+    ubicacion_region: regionVino,
+    ...camposCopaParker,
+  })
+  .superRefine(exigirPrecioCopa);
 
 /**
  * Deriva el nombre de fichero en Storage a partir de la URL pública guardada.
@@ -95,6 +101,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       denominacion_origen: "",
       ubicacion_pais: "",
       ubicacion_region: "",
+      ...COPA_PARKER_VACIO,
     },
   });
 
@@ -133,6 +140,7 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
       denominacion_origen: vino.denominacion_origen ?? "",
       ubicacion_pais: vino.ubicacion_pais ?? "",
       ubicacion_region: vino.ubicacion_region ?? "",
+      ...copaParkerParaCampos(vino),
     });
 
     limpiarRecorte();
@@ -222,6 +230,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
         denominacion_origen: values.denominacion_origen?.trim() || null,
         ubicacion_region: values.ubicacion_region?.trim() || null,
         ubicacion_pais: values.ubicacion_pais?.trim() || null,
+        // Solo lo que cambia: ver `cambiosCopaParker`.
+        ...cambiosCopaParker(values, vino),
         // Sin alergenos_oficiales/alergenos_notas a propósito: el modal ya no
         // los muestra y así los valores guardados de cada vino no se tocan.
         ...(imageUrlUpdate !== undefined ? { imagen_url: imageUrlUpdate } : {}),
@@ -358,6 +368,8 @@ export function EditarVinoModal({ open, onOpenChange, vino }: EditarVinoModalPro
               }
               avisoOrigen={avisoOrigen}
             />
+
+            <CamposCopaParker control={form.control} />
 
             {/* Con dedo el pie queda pegado abajo del diálogo (formulario largo o teclado abierto en
                 iOS): «Guardar» siempre a la vista. Con ratón, igual que antes. En el móvil, «Cancelar» y

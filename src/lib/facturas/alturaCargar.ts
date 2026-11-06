@@ -19,8 +19,13 @@
 //     se quita la descripción de la cabecera. Sin lista, siempre la grande.
 // ============================================================================
 
-/** Suelo (px) del bloque de la página Facturas: por debajo, scroll de página. */
-export const ALTURA_MINIMA_FACTURAS = 420;
+/**
+ * Suelo (px) del bloque de la página Facturas: por debajo, scroll de página.
+ * 360 y no 420 (QA de diseño 05/11/2026, F13): con el teclado abierto en una
+ * tablet el viewport visual baja a ~370 px y el suelo de 420 dejaba 48 px de
+ * scroll de página.
+ */
+export const ALTURA_MINIMA_FACTURAS = 360;
 
 /** Alto de la zona de subida grande, medido en el navegador (p-8, icono, texto, botones h-12, ayuda). */
 export const ALTO_ZONA_AMPLIA = 260;

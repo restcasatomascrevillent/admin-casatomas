@@ -1,0 +1,46 @@
+{
+ "archivo": "R605.pdf",
+ "paginas_pdf": [
+  25
+ ],
+ "tipo": "factura",
+ "proveedor": "RUSO VIDAL, CB",
+ "cif": "E70667209",
+ "local": "casa_tomas",
+ "numero_documento": "392/A",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 25,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 3.65,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.81,
+   "descuento_pct": null,
+   "total": 46.77,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 46.77,
+ "desglose_iva": [
+  {
+   "base": 46.77,
+   "pct": 10.0,
+   "cuota": 4.68
+  }
+ ],
+ "iva": 4.68,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 51.45,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 8403. Embarcaciones: ninguna.",
+ "alertas": []
+}

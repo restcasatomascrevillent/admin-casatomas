@@ -1,0 +1,80 @@
+{
+ "archivo": "R1348.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "Makro Distribucion Mayorista, S.A.",
+ "cif": "A28647451",
+ "local": "casa_tomas",
+ "numero_documento": "0/0(063)0051/(2026)008720",
+ "fecha": "2026-08-25",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "JALAPEÑOS BJ 200G",
+   "producto_ficha": null,
+   "cantidad": -2.0,
+   "unidad": "bandeja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.01,
+   "descuento_pct": null,
+   "total": -10.02,
+   "iva_pct": 4,
+   "albaran_ref": "9-227460354",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PEPINO ESPAÑOL MA 2KG",
+   "producto_ficha": "Pepino español malla 2 kg",
+   "cantidad": -1.0,
+   "unidad": "malla",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 4.61,
+   "descuento_pct": null,
+   "total": -4.61,
+   "iva_pct": 4,
+   "albaran_ref": "9-227460354",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "PIMIENTO RJ/ITA ARO 2A CJ4,5KG",
+   "producto_ficha": null,
+   "cantidad": -1.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.3,
+   "descuento_pct": null,
+   "total": -9.3,
+   "iva_pct": 4,
+   "albaran_ref": "9-227460354",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -23.93,
+ "desglose_iva": [
+  {
+   "base": -23.93,
+   "pct": 4,
+   "cuota": -0.96
+  }
+ ],
+ "iva": -0.96,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -24.89,
+ "observaciones": "Factura de devolucion (abono) que anula parte de la factura 0/0(063)0052/(2026)046639 de 25/08/2026 (pedido 9-227460354). Cantidades y totales en negativo. Pago en entrega.",
+ "alertas": []
+}

@@ -20,10 +20,13 @@
 //
 // Autorización (CT-REM-FN-01, 30-oct-2026): ya NO está en ADMITE_INTEGRACION.
 //   · bulk → solo service role (como antes).
-//   · campos / tipo → usuario con la sección Carta (gestor_carta) o Novedades
-//     (gestion_web) en modo "view" — el mismo listón con el que hoy la RLS deja
-//     guardar la carta (`can_write_section` mira can_view). 401 sin usuario,
-//     403 sin sección.
+//   · campos / tipo → usuario con «Editar» en la Carta (gestor_carta) o «Ver»
+//     en Novedades (gestion_web). 401 sin usuario, 403 sin sección.
+//   · Los tipos de la CARTA (plato, bebida, vino, coctel) exigen «Editar» en
+//     gestor_carta (06/11/2026, decisión del dueño: con solo «Ver» la carta se
+//     consulta y no gasta IA; la RLS de la carta exige lo mismo desde
+//     20261106500000). Novedades, menús, tapas y el modo campos siguen igual
+//     para gestion_web: con «Ver» basta (el Gestor Web no cambia).
 // Clave por `claveOpenAI("otros")` y cada llamada deja su fila en ia_uso.
 // ---------------------------------------------------------------------------
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -40,6 +43,16 @@ const createClient = clienteConAuditoria(createClientBase, "traducir-contenido")
 
 /** Secciones del panel desde las que se traduce (basta con una). */
 export const SECCIONES_TRADUCCION = ["gestor_carta", "gestion_web"] as const;
+
+/**
+ * Permiso que pide cada sección para traducir: en la carta, «Editar» (traducir es
+ * parte de guardar un plato, vino, bebida o cóctel); en el Gestor Web, «Ver»
+ * (con «Ver» ya se cambia todo allí).
+ */
+export const PERMISO_TRADUCCION = { gestor_carta: "edit", gestion_web: "view" } as const;
+
+/** Tipos de la carta: solo los traduce quien puede editar la carta. */
+export const TIPOS_CARTA: readonly TipoContenido[] = ["plato", "bebida", "vino", "coctel"];
 
 /** Tope del modo `tipo` (el modo `campos` ya tiene el suyo en campos.ts). */
 export const MAX_CARACTERES_DATOS = 20000;
@@ -125,17 +138,29 @@ serve(conAuditoriaDePeticion("traducir-contenido", createClientBase, async (req)
   // en nombre de nadie por las otras ramas.
   const servicio = esServiceRole(req);
   let disparador = "bulk";
+  let editaCarta = false;
   if (!servicio) {
-    const auth = await exigirPermiso(req, SECCIONES_TRADUCCION, "view", { crearCliente: createClient, corsHeaders });
-    if (!auth.ok) return auth.response;
-    disparador = `usuario:${auth.userId}`;
+    const deps = { crearCliente: createClient, corsHeaders };
+    // Primero «Editar» en la carta; si no (403), «Ver» en el Gestor Web. Cualquier
+    // otro fallo (401 sin usuario, 503 sin poder comprobar) corta aquí.
+    const carta = await exigirPermiso(req, "gestor_carta", PERMISO_TRADUCCION.gestor_carta, deps);
+    if (carta.ok) {
+      editaCarta = true;
+      disparador = `usuario:${carta.userId}`;
+    } else if (carta.status !== 403) {
+      return carta.response;
+    } else {
+      const web = await exigirPermiso(req, "gestion_web", PERMISO_TRADUCCION.gestion_web, deps);
+      if (!web.ok) return web.response;
+      disparador = `usuario:${web.userId}`;
+    }
   }
 
   const uso = new AcumuladorUso("traducir-contenido", MODEL, "chat");
   const inicioMs = Date.now();
   const llamar = (system: string, user: string) => callOpenAI(uso, system, user);
   try {
-    return await atender(req, servicio, llamar, uso);
+    return await atender(req, servicio, llamar, uso, editaCarta);
   } finally {
     await registrarUso(uso, { disparador, duracionMs: Date.now() - inicioMs });
   }
@@ -146,6 +171,7 @@ async function atender(
   servicio: boolean,
   callOpenAI: (system: string, user: string) => Promise<unknown>,
   uso: AcumuladorUso,
+  editaCarta: boolean,
 ): Promise<Response> {
   let payload: Record<string, unknown>;
   try {
@@ -208,6 +234,11 @@ async function atender(
 
   if (!tipo || !TIPOS_VALIDOS.includes(tipo as TipoContenido)) {
     return json({ error: `tipo inválido. Debe ser uno de: ${TIPOS_VALIDOS.join(", ")}` }, 400);
+  }
+  // Un plato, vino, bebida o cóctel solo lo traduce quien puede editar la carta
+  // (quien entra por el Gestor Web con «Ver» traduce novedades, menús y tapas).
+  if (TIPOS_CARTA.includes(tipo) && !editaCarta) {
+    return json({ success: false, error: "No tienes permiso para editar la carta (hace falta «Editar», no solo «Ver»)." }, 403);
   }
   if (!datos || typeof datos !== "object") {
     return json({ error: "Falta el campo 'datos'" }, 400);

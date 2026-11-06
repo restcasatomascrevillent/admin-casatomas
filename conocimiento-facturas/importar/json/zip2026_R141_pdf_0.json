@@ -1,0 +1,80 @@
+{
+ "archivo": "R141.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 381",
+ "fecha": "2026-01-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "FTE. LUBINA X5 120/160",
+   "producto_ficha": "Lubina 120/160 g (caja 5 kg)",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 14.5,
+   "descuento_pct": null,
+   "total": 72.5,
+   "iva_pct": 10,
+   "albaran_ref": "2026724",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "QUISQUILLA 1 LORETO",
+   "producto_ficha": "Quisquilla nº 1 Loreto",
+   "cantidad": 5.5,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 59.0,
+   "descuento_pct": null,
+   "total": 324.5,
+   "iva_pct": 10,
+   "albaran_ref": "2026724",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "COLA GAMBON 1 BORDO",
+   "producto_ficha": "Cola de gambón 1 a bordo",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.9,
+   "descuento_pct": null,
+   "total": 166.8,
+   "iva_pct": 10,
+   "albaran_ref": "2026724",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 563.8,
+ "desglose_iva": [
+  {
+   "base": 563.8,
+   "pct": 10,
+   "cuota": 56.38
+  }
+ ],
+ "iva": 56.38,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 620.18,
+ "observaciones": "Destinatario impreso MASIDE 2011, S.L. (CIF B54583356), que la ficha asigna a casa_tomas. Vencimiento 28/02/2026, transferencia a 30 días. Albarán 2026724 del 28/01/2026, pedido 16189. Nota 'Baul' ignorada. La fila Total (3 cajas, 22,50 kg) no son euros.",
+ "alertas": []
+}

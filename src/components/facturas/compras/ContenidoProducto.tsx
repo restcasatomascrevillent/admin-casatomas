@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AyudaPopover } from "@/components/AyudaPopover";
 import {
   useContenidoProducto,
   useGuardarContenidoProducto,
@@ -53,9 +54,12 @@ export function ContenidoProducto({ productoId, puedeEditar }: { productoId: num
     <section
       aria-label="Contenido por caja o unidad"
       className="flex min-h-11 flex-wrap items-center gap-x-1.5 text-sm"
-      title="Cuánto trae cada caja o envase: sirve para comparar proveedores en €/kg o €/l cuando la línea de la factura no lo dice."
     >
       <span className={guardada !== null ? "font-medium" : "text-muted-foreground"}>{resumen}</span>
+      {/* La explicación, con un toque (antes solo en `title`, que en la tablet no se ve: QA M2). */}
+      <AyudaPopover etiqueta="Para qué sirve lo que trae cada caja" className="-my-3.5 mx-0">
+        Cuánto trae cada caja o envase: sirve para comparar proveedores en €/kg o €/l cuando la línea de la factura no lo dice.
+      </AyudaPopover>
       {puedeEditar && (
         <>
           <span className="text-muted-foreground/60" aria-hidden="true">·</span>

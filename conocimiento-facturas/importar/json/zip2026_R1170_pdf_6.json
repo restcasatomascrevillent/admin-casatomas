@@ -1,0 +1,46 @@
+{
+ "archivo": "R1170.pdf",
+ "paginas_pdf": [
+  7
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO CARRILLO C.B.",
+ "cif": "E54234778",
+ "local": "casa_tomas",
+ "numero_documento": "688/A",
+ "fecha": "2026-07-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 7,
+   "nombre": "17 GADIFORMES",
+   "producto_ficha": "Gadiformes (familia 17)",
+   "cantidad": 8.15,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 10.8,
+   "descuento_pct": null,
+   "total": 88.02,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 88.02,
+ "desglose_iva": [
+  {
+   "base": 88.02,
+   "pct": 10,
+   "cuota": 8.8
+  }
+ ],
+ "iva": 8.8,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 96.82,
+ "observaciones": "Periodo 01/07/2026 a 31/07/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 15037.",
+ "alertas": []
+}

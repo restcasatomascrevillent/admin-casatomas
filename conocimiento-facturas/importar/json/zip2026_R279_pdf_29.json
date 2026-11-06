@@ -1,0 +1,46 @@
+{
+ "archivo": "R279.pdf",
+ "paginas_pdf": [
+  30
+ ],
+ "tipo": "factura",
+ "proveedor": "LUDEÑA GEA, JORGE",
+ "cif": "48322320X",
+ "local": "casa_tomas",
+ "numero_documento": "89/A",
+ "fecha": "2026-02-28",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 30,
+   "nombre": "PERCIFORMES Y A. (emb. ANTONIA Y CINTA)",
+   "producto_ficha": null,
+   "cantidad": 1.45,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": null,
+   "descuento_pct": null,
+   "total": 31.9,
+   "iva_pct": 10,
+   "albaran_ref": "3903",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 31.9,
+ "desglose_iva": [
+  {
+   "base": 31.9,
+   "pct": 10,
+   "cuota": 3.19
+  }
+ ],
+ "iva": 3.19,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 35.09,
+ "observaciones": "Venta en lonja de Santa Pola. Código armador 886. Periodo 01/02/2026 al 28/02/2026. Destinatario CASA TOMAS (815) / MASIDE 2011 S.L.U. Precio por kg no impreso.",
+ "alertas": []
+}

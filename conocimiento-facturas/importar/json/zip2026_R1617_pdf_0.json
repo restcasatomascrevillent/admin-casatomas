@@ -1,0 +1,119 @@
+{
+ "archivo": "R1617.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "VINÍCOLAS VINOS DE CALIDAD, S.L.",
+ "cif": "B53882460",
+ "local": "casa_tomas",
+ "numero_documento": "26FV/1651",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "NAVAJAS FINISTERRE 6-8 PZAS. (art. 149.004)",
+   "producto_ficha": null,
+   "cantidad": 25.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.0,
+   "descuento_pct": null,
+   "total": 325.0,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3184",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BERBERECHOS 60-70 PZAS. (art. 149.001)",
+   "producto_ficha": null,
+   "cantidad": 25.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 18.8,
+   "descuento_pct": null,
+   "total": 470.0,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3184",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "MOSCATO D'ASTI DUCHESSALIA 2025 (art. 52.343)",
+   "producto_ficha": null,
+   "cantidad": 24.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 7.5,
+   "descuento_pct": null,
+   "total": 180.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/3227",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "IRAILA 2024 (art. 09.935)",
+   "producto_ficha": null,
+   "cantidad": 6.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 60.0,
+   "descuento_pct": null,
+   "total": 360.0,
+   "iva_pct": 21,
+   "albaran_ref": "A26/3227",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "ALMEJAS 30 PZAS. (art. 149.003)",
+   "producto_ficha": null,
+   "cantidad": 25.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 725.0,
+   "iva_pct": 10,
+   "albaran_ref": "A26/3227",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 2060.0,
+ "desglose_iva": [
+  {
+   "base": 540.0,
+   "pct": 21,
+   "cuota": 113.4
+  },
+  {
+   "base": 1520.0,
+   "pct": 10,
+   "cuota": 152.0
+  }
+ ],
+ "iva": 265.4,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 2325.4,
+ "observaciones": "Cliente 1813. Facturar a MASIDE 2011, S.L.U. / CASA TOMÁS. Recibo a 30 días, vencimiento 30/10/2026 por 2.325,40 €. Albaranes A26/3184 (01/09/2026) y A26/3227 (02/09/2026). Desglose: 21 % sobre 540,00 (vinos) y 10 % sobre 1.520,00 (marisco).",
+ "alertas": []
+}

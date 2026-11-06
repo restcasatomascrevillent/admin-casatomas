@@ -1801,3 +1801,99 @@ describe("iva_pct en los esquemas y en el guardado", () => {
     expect(n.productos.map((p: { iva_pct: number | null }) => p.iva_pct)).toEqual([4, null, null]);
   });
 });
+
+// ============================================================================
+//  Retención de IRPF (06/11/2026): total = subtotal + iva − retención
+// ============================================================================
+
+describe("retención de IRPF", () => {
+  // Alquiler: base 750, IVA 21 % 157,50, retención 19 % 142,50 → 765,00.
+  const alquiler = (over: Partial<DocumentoExtraido> = {}) =>
+    doc({
+      productos: [linea({ nombre: "Alquiler local", cantidad: 1, precio_unitario: 750, total: 750 })],
+      subtotal: 750,
+      iva: 157.5,
+      retencion_irpf: 142.5,
+      retencion_irpf_pct: 19,
+      total: 765,
+      ...over,
+    });
+
+  it("el esquema la pide como número o null, en required, antes del total", () => {
+    const props = DOCUMENTO_JSON_SCHEMA.schema.properties as Record<string, { type: unknown; description?: string }>;
+    const req = [...DOCUMENTO_JSON_SCHEMA.schema.required] as string[];
+    for (const c of ["retencion_irpf", "retencion_irpf_pct"]) {
+      expect(props[c].type).toEqual(["number", "null"]);
+      expect(req).toContain(c);
+      expect(req.indexOf(c)).toBeLessThan(req.indexOf("total"));
+    }
+    expect(props.retencion_irpf.description).toMatch(/recargo de equivalencia/i);
+    const pie = PAGINA_JSON_SCHEMA.schema.properties.pie;
+    expect([...pie.required].sort()).toEqual(Object.keys(pie.properties).sort());
+    expect(pie.required).toContain("retencion_irpf");
+  });
+
+  it("validarEstructura la acepta como número o null, y si no viene", () => {
+    expect(validarEstructura(alquiler()).ok).toBe(true);
+    expect(validarEstructura(alquiler({ retencion_irpf: null, retencion_irpf_pct: null })).ok).toBe(true);
+    const sin = { ...alquiler() } as Record<string, unknown>;
+    delete sin.retencion_irpf;
+    delete sin.retencion_irpf_pct;
+    expect(validarEstructura(sin).ok).toBe(true);
+    const mal = validarEstructura({ ...alquiler(), retencion_irpf: "142,50" });
+    expect(mal.ok).toBe(false);
+    expect(mal.problemas.map((p) => p.campo)).toContain("retencion_irpf");
+  });
+
+  it("factura con retención del 19 % que cuadra: sin iva_incoherente", () => {
+    expect(codigos(alquiler())).not.toContain("iva_incoherente");
+    // Sin la retención, el mismo pie sí descuadra.
+    expect(codigos(alquiler({ retencion_irpf: null }))).toContain("iva_incoherente");
+  });
+
+  it("si no cuadra, el aviso cuenta la retención", () => {
+    const d = comprobarCuadre(alquiler({ total: 780 })).find((x) => x.codigo === "iva_incoherente");
+    expect(d?.mensaje).toMatch(/retencion IRPF 142\.50 EUR/);
+    expect(d?.detalle.retencion_irpf).toBe(142.5);
+  });
+
+  it("abono: la retención en positivo resta con el signo de la base", () => {
+    const abono = alquiler({
+      productos: [linea({ nombre: "Abono alquiler", cantidad: -1, precio_unitario: 750, total: -750 })],
+      subtotal: -750, iva: -157.5, retencion_irpf: 142.5, total: -765,
+    });
+    expect(codigos(abono)).not.toContain("iva_incoherente");
+    const n = normalizarDatos(abono);
+    expect(n.retencion_irpf).toBe(-142.5);
+    expect(n.retencion_irpf_pct).toBe(19);
+  });
+
+  it("deducción A: total = base + IVA − retención", () => {
+    const { datos, deduccion } = deducirImportes(alquiler({ total: null }));
+    expect(datos.total).toBe(765);
+    expect(deduccion?.metodo).toBe("subtotal_mas_iva");
+    expect(deduccion?.alerta.mensaje).toMatch(/retencion IRPF/);
+    // Sin retención, como siempre.
+    expect(deducirImportes(alquiler({ total: null, retencion_irpf: null })).datos.total).toBe(907.5);
+  });
+
+  it("normalizarDatos: conserva importe y %, calcula el % con la base, 0 → null", () => {
+    const n = normalizarDatos(alquiler());
+    expect(n.retencion_irpf).toBe(142.5);
+    expect(n.retencion_irpf_pct).toBe(19);
+    expect(normalizarDatos(alquiler({ retencion_irpf_pct: null })).retencion_irpf_pct).toBe(19);
+    const cero = normalizarDatos(alquiler({ retencion_irpf: 0, retencion_irpf_pct: 19 }));
+    expect(cero.retencion_irpf).toBeNull();
+    expect(cero.retencion_irpf_pct).toBeNull();
+    // % y base pero sin importe: no se inventa el importe.
+    const soloPct = normalizarDatos(alquiler({ retencion_irpf: null, retencion_irpf_pct: 19 }));
+    expect(soloPct.retencion_irpf).toBeNull();
+    const sinCampo = normalizarDatos(doc());
+    expect(sinCampo.retencion_irpf).toBeNull();
+    expect(sinCampo.retencion_irpf_pct).toBeNull();
+  });
+
+  it("una relectura que añade la retención cuenta como cambio del pie", () => {
+    expect(contarCambiosNumericos(alquiler({ retencion_irpf: null }), alquiler()).campos).toContain("retencion_irpf");
+  });
+});

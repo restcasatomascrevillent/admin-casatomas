@@ -1,0 +1,97 @@
+{
+ "archivo": "R102.pdf",
+ "paginas_pdf": [
+  19
+ ],
+ "tipo": "factura",
+ "proveedor": "CHACOPINO-GARZON SL",
+ "cif": "B42678672",
+ "local": "casa_tomas",
+ "numero_documento": "86/A",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 19,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 8.85,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.07,
+   "descuento_pct": null,
+   "total": 80.3,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 19,
+   "nombre": "16 PLEURONECTIFORMES",
+   "producto_ficha": "Pleuronectiformes, pescado plano (familia 16)",
+   "cantidad": 1.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 28.8,
+   "descuento_pct": null,
+   "total": 40.32,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 19,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 3.75,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 8.3,
+   "descuento_pct": null,
+   "total": 31.13,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 19,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.2,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 39.3,
+   "descuento_pct": null,
+   "total": 86.46,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 238.21,
+ "desglose_iva": [
+  {
+   "base": 238.21,
+   "pct": 10.0,
+   "cuota": 23.82
+  }
+ ],
+ "iva": 23.82,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 262.03,
+ "observaciones": "Lonja Cofradia de Pescadores de Santa Pola. Cliente impreso: CASA TOMAS (815). Albaranes de subasta (solo informativo): 645, 870, 299. Embarcaciones: NUEVO RAMON Y DOLORES, NUEVO ALBOR.",
+ "alertas": []
+}

@@ -507,10 +507,11 @@ export function useUsersManagement() {
 
       // Asignar permisos por defecto según rol. Un usuario nuevo empieza SIN
       // edición en ninguna sección: la da después un super admin en «Permisos».
+      // «Facturas · Subida» no entra con el «ver todo» del manager: subir es un permiso aparte (06/11/2026).
       const defaultPermissions = SECTIONS.map((s) => ({
         user_id: userId,
         section_key: s.key,
-        can_view: role === "manager" || s.key === "dashboard",
+        can_view: (role === "manager" && s.key !== "facturas_subida") || s.key === "dashboard",
         can_edit: false,
       }));
 

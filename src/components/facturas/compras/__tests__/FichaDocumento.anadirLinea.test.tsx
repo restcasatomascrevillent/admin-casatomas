@@ -43,7 +43,6 @@ function montar() {
       <FichaDocumento
         doc={doc}
         avisos={[]}
-        mismoTipo={[]}
         facturaDelAlbaran={null}
         albaranesDeLaFactura={[]}
         onEditar={vi.fn()}

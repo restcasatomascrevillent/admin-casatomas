@@ -71,7 +71,7 @@ export function systemPrompt(hoy: string = hoyMadrid()): string {
 Hoy es ${hoy}. Pasa fechas ISO AAAA-MM-DD solo si el usuario dice un periodo; si no, desde/hasta null = todo el historico (nunca supongas "este año"). Si una herramienta da error de argumentos, corrige y reintenta; nunca respondas con otro periodo.
 
 DATOS
-- Documentos: factura = gasto facturado, albaran = entrega: no sumes albaranes al gasto facturado. Productos y categorias: cuentan facturas + albaranes sin factura (tipo null) salvo que pidan solo uno; si traen en_facturas/en_albaranes_sin_factura, da ese reparto.
+- Gasto = facturas + albaranes sin factura (gasto_total; un albaran facturado ya va en su factura). Productos y categorias: cuentan facturas + albaranes sin factura (tipo null) salvo que pidan solo uno; si traen en_facturas/en_albaranes_sin_factura, da ese reparto.
 - IVA: total/gasto/valor de un DOCUMENTO llevan IVA incluido salvo los deducidos (regla 3); "base" es sin IVA. El precio_unitario y el importe de una LINEA de producto van SIN IVA salvo nota contraria: dilo asi, nunca "IVA incluido".
 - Albaran facturado = su factura cita su numero (no se cuenta dos veces); no hay estado de pago (pagado: no se sabe). Albaranes "sin factura"/"sin facturar"/pendientes: albaranes_sin_factura. "sin_total" NO significa sin factura.
 
@@ -92,7 +92,7 @@ HERRAMIENTAS (usa la especifica)
 
 REGLAS
 1. Usa solo datos de las herramientas: nunca inventes importes, fechas, proveedores ni numeros. Cita un numero de documento solo si aparece literal en un campo "numero" del resultado.
-2. Lista vacia o "sin_datos" = no hay datos registrados, nunca "no se gasto nada". No estimes.
+2. Lista vacia o "sin_datos" = no hay datos registrados, nunca "no se gasto nada".
 3. Si das un importe (gasto, total, IVA, media), mira sin_total, deducidos y sin_iva (sueltos, en "si_das_importes" o como documentos_sin_total/_deducidos/_sin_iva) del tipo del que hablas (facturas o albaranes): cita esos documentos (numero, proveedor) y nunca digas que la cifra es completa. sin_total: no suma, la cifra es PARCIAL. Deducido (total_origen "deducido"): total calculado desde las lineas, no leido: dilo; si iva_conocido=false es la base SIN IVA y el real sera mayor; nunca digas "IVA incluido" de un deducido. sin_iva: su IVA no esta en la suma de IVA.
 3b. Pregunta de cuantos o de UN documento (la ultima factura): solo lo pedido; sin avisos de parcial de otros documentos.
 4. "fecha_dudosa"/"fechas_dudosas": la fecha es la de subida; avisalo al hablar de la ultima factura o al agrupar por mes, año o dia de la semana.
@@ -106,7 +106,7 @@ REGLAS
 12. compras_producto: di unidad, periodo y variantes contadas (productos_coincidentes); nunca sumes unidades distintas. Con por_variante da cada variante con su precio, no una media. coincidencia "aproximada": avisa de que no es el nombre exacto. sin_datos: dilo y da ultimo_dato (fecha, cantidad, proveedor) si viene; con sugerencias pregunta si es alguna. una_compra: solo hubo una, no hay evolucion.
 13. gasto_por_categoria: di periodo, base SIN IVA y sin_clasificar. variacion_precios: da precio y ref_precio; cambio_proveedor = otro proveedor, no subida del mismo: dilo; pocas_compras/ref_antigua: comparacion debil; sin_comparar: da su ultima compra.
 14. Mas barato/comparar: lista TODOS los proveedores, cada uno con su precio en SU unidad ("Osborne la caja a 519,40 €; Luga el kilo a 20,50 €"); sin ganador si avisos.unidades_mezcladas o productos_coincidentes > 1 (cebo vs bellota). Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg».
-Formato: español, importes 1.234,56 €, fechas en texto (15 de enero de 2026), maximo 6 lineas salvo listados.`;
+Formato: español, 1.234,56 €, fechas 15/01/2026. Viñetas o tabla, sin saludos ni relleno. Maximo 6 lineas salvo listados.`;
 }
 
 // ─── Definicion de herramientas ──────────────────────────────────────────────
@@ -240,6 +240,16 @@ export const TOOLS = [
   fn("grafico_precio",
     "Grafica y evolucion del precio de UN producto.",
     { producto: { type: "string" }, desde: FECHA_NULL, hasta: FECHA_NULL, unidad: UNIDAD }),
+  fn("volumen_comprado",
+    "Litros/kilos y n de envases comprados aunque vaya en cajas o barriles ('litros de cerveza', " +
+    "'cuantas cervezas', 'cuantos barriles'). Di lineas_sin_convertir.",
+    {
+      categoria: { type: ["string", "null"], description: "cerveza, vino" },
+      producto: { type: ["string", "null"], description: "agua, aceite, tinto" },
+      desde: FECHA_HIST,
+      hasta: FECHA_HIST,
+      unidad: { type: ["string", "null"], enum: ["l", "kg", null] },
+    }),
   fn("buscar_productos",
     "Lineas de producto por nombre o descripcion ('compramos gambas?', 'que aceite').",
     { consulta: { type: "string" } }),
@@ -595,6 +605,26 @@ export function prepararLlamada(nombre: string, args: any, pregunta?: string): L
       };
     }
 
+    case "volumen_comprado": {
+      const categoria = texto(args.categoria);
+      const producto = texto(args.producto);
+      if (!categoria && !producto) throw new Error('Falta el parametro "categoria" o "producto".');
+      const { desde, hasta } = rangoOpcional(args);
+      const unidad = texto(args.unidad);
+      return {
+        tipo: "rpc",
+        rpc: "volumen_comprado_agente",
+        params: {
+          p_texto: producto,
+          p_categoria: categoria,
+          p_desde: desde,
+          p_hasta: hasta,
+          p_medida: unidad === "l" || unidad === "kg" ? unidad : null,
+        },
+        limite: null,
+      };
+    }
+
     case "buscar_productos": {
       const consulta = texto(args.consulta);
       if (!consulta) throw new Error("Falta la consulta");
@@ -643,7 +673,40 @@ export function necesitaRespaldoSemantico(data: any): boolean {
 }
 
 /** Adjunto de la respuesta para la UI (contrato con useChatFacturas). */
-export interface Adjunto { tipo: "serie_precio"; datos: unknown }
+export interface DocRef {
+  id: number;
+  tipo: string | null;
+  numero: string | null;
+  proveedor: string | null;
+  fecha: string | null;
+  drive_url: string | null;
+  archivo_path: string | null;
+}
+export type Adjunto = { tipo: "serie_precio"; datos: unknown } | { tipo: "documentos"; datos: DocRef[] };
+
+export const MAX_REFERENCIAS = 12;
+
+/** Une referencias sin repetir documento y con tope (la UI las pinta bajo la respuesta). */
+export function unirReferencias(listas: DocRef[][]): DocRef[] {
+  const vistos = new Set<number>();
+  const salida: DocRef[] = [];
+  for (const r of listas.flat()) {
+    if (!r || !Number.isFinite(r.id) || vistos.has(r.id)) continue;
+    vistos.add(r.id);
+    salida.push(r);
+    if (salida.length >= MAX_REFERENCIAS) break;
+  }
+  return salida;
+}
+
+/** Ids de documento de las filas de filtrar_documentos (cada fila trae `id`). */
+// deno-lint-ignore no-explicit-any
+export function idsDeFilas(data: any): number[] {
+  if (!data || typeof data !== "object" || !Array.isArray(data.filas)) return [];
+  const ids: number[] = [];
+  for (const f of data.filas) if (f && Number.isInteger(f.id)) ids.push(f.id);
+  return ids.slice(0, MAX_REFERENCIAS);
+}
 
 /**
  * grafico_precio: la serie entera (puntos) va a la UI como adjunto y el

@@ -7,7 +7,8 @@ export const ESPERA_PRECARGA_MS = 5_000;
 /** Permiso de la carta sin exigir <UserRoleProvider> (en los tests de página no siempre lo hay). */
 function usePuedeTocarCarta(): boolean {
   try {
-    return useCanAccessSection("gestor_carta").canAccess;
+    // Solo quien puede editar la carta usa el recorte (06/11/2026: con solo «Ver» no hay fotos que subir).
+    return useCanAccessSection("gestor_carta", "edit").canAccess;
   } catch {
     return false;
   }

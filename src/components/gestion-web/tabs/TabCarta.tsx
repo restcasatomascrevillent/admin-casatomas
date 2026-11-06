@@ -25,11 +25,17 @@ import { CoctelForm } from "@/components/carta/CoctelForm";
 import { ListaPlatos } from "@/components/carta/ListaPlatos";
 import { ListaBebidas } from "@/components/carta/ListaBebidas";
 import { ListaVinos } from "@/components/carta/ListaVinos";
+import { EncuestaVinoFavorito } from "@/components/carta/EncuestaVinoFavorito";
 import { ListaCocteles } from "@/components/carta/ListaCocteles";
 import { AjustePreciosModal } from "@/components/carta/AjustePreciosModal";
 import { BotonVinoDesdeFoto, type VinoDesdeFoto } from "@/components/carta/BotonVinoDesdeFoto";
 import { OrdenarCategoria } from "@/components/carta/OrdenarCategoria";
 import { FiltrosVinos } from "@/components/carta/FiltrosVinos";
+import { BotonCartaImprimir } from "@/components/carta/imprimir/BotonCartaImprimir";
+import { BotonHerramientaCarta } from "@/components/carta/BotonHerramientaCarta";
+import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
+import { useCanAccessSection } from "@/hooks/useUserRole";
+import { cn } from "@/lib/utils";
 import {
   categoriaDelFiltro,
   FILTRO_TODOS,
@@ -66,6 +72,13 @@ type ItemCarta = {
 };
 
 export default function TabCarta() {
+  // «Editar» en la carta (decisión del dueño, 06/11/2026). Con solo «Ver» se consulta (lista, buscador,
+  // filtros y tarjetas en lectura) y se descarga el «PDF Carta»; todo lo que escribe o gasta IA se OCULTA
+  // (añadir, «Varias botellas», ajustar precios, ordenar, interruptores, fotos, editar, borrar, la
+  // votación) y arriba sale «Solo lectura». La base de datos y las funciones exigen lo mismo
+  // (migración 20261106500000_permisos_carta_newsletter). El super admin siempre edita.
+  const { canAccess: puedeEditar } = useCanAccessSection("gestor_carta", "edit");
+  const soloLectura = !puedeEditar;
   const { platos, isLoading: isLoadingPlatos, categorias: categoriasPlatos, guardarOrden: guardarOrdenPlatos } = usePlatos();
   const { bebidas, isLoading: isLoadingBebidas, categorias: categoriasBebidas, guardarOrden: guardarOrdenBebidas } = useBebidas();
   const { vinos, isLoading: isLoadingVinos, categorias: categoriasVinos, guardarOrden: guardarOrdenVinos } = useVinos();
@@ -158,7 +171,7 @@ export default function TabCarta() {
       todos: platos ?? [],
       guardarOrden: guardarOrdenPlatos,
       añadir: "Añadir plato",
-      vacio: "No hay platos todavía. Haz clic en \"Añadir plato\" para comenzar.",
+      vacio: soloLectura ? "No hay platos todavía." : "No hay platos todavía. Haz clic en \"Añadir plato\" para comenzar.",
       total: platos?.length ?? 0,
       filtrados: platosFiltrados.length,
       categorias: categoriasPlatos,
@@ -171,7 +184,7 @@ export default function TabCarta() {
       todos: bebidas ?? [],
       guardarOrden: guardarOrdenBebidas,
       añadir: "Añadir bebida",
-      vacio: "No hay bebidas todavía. Haz clic en \"Añadir bebida\" para comenzar.",
+      vacio: soloLectura ? "No hay bebidas todavía." : "No hay bebidas todavía. Haz clic en \"Añadir bebida\" para comenzar.",
       total: bebidas?.length ?? 0,
       filtrados: bebidasFiltradas.length,
       categorias: categoriasBebidas,
@@ -184,7 +197,7 @@ export default function TabCarta() {
       todos: vinos ?? [],
       guardarOrden: guardarOrdenVinos,
       añadir: "Añadir vino",
-      vacio: "No hay vinos todavía. Haz clic en \"Añadir vino\" para comenzar.",
+      vacio: soloLectura ? "No hay vinos todavía." : "No hay vinos todavía. Haz clic en \"Añadir vino\" para comenzar.",
       total: vinos?.length ?? 0,
       filtrados: vinosFiltrados.length,
       categorias: categoriasVinos,
@@ -200,7 +213,7 @@ export default function TabCarta() {
       todos: cocteles ?? [],
       guardarOrden: guardarOrdenCocteles,
       añadir: "Añadir cóctel",
-      vacio: "No hay cócteles todavía. Haz clic en \"Añadir cóctel\" para comenzar.",
+      vacio: soloLectura ? "No hay cócteles todavía." : "No hay cócteles todavía. Haz clic en \"Añadir cóctel\" para comenzar.",
       total: cocteles?.length ?? 0,
       filtrados: coctelesFiltrados.length,
       categorias: categoriasCocteles,
@@ -215,13 +228,31 @@ export default function TabCarta() {
   // numerar solo los visibles chocarían con los ocultos.
   const elementosCategoria = actual.categoria ? actual.todos.filter((i) => i.categoria === actual.categoria) : [];
   // (En Vinos, con una denominación elegida en las píldoras.)
-  const puedeOrdenar = !hayBusqueda && Boolean(actual.categoria) && elementosCategoria.length > 1;
+  const puedeOrdenar = puedeEditar && !hayBusqueda && Boolean(actual.categoria) && elementosCategoria.length > 1;
   const enModoOrdenar = ordenando && puedeOrdenar;
   // Si deja de poder ordenarse (p. ej. la categoría se queda con un solo
   // elemento), se sale del modo para no volver a entrar solo más tarde.
   useEffect(() => {
     if (ordenando && !puedeOrdenar) setOrdenando(false);
   }, [ordenando, puedeOrdenar]);
+
+  // Herramientas de la barra (botones secundarios), en el orden en que se ven. El «PDF Carta» solo
+  // lee: también con solo «Ver».
+  const herramientas = [
+    (seccionActiva === "platos" || seccionActiva === "vinos") && (
+      <BotonCartaImprimir key="pdf" tipo={seccionActiva} platos={platos} vinos={vinos} />
+    ),
+    puedeEditar && (
+      <BotonHerramientaCarta
+        key="precios"
+        icono={<Percent />}
+        etiqueta="Ajustar precios"
+        etiquetaCorta="Precios"
+        ayuda="Sube o baja los precios de una categoría en %, o cambia uno solo"
+        onClick={() => setDialogAjustePreciosOpen(true)}
+      />
+    ),
+  ].filter(Boolean);
 
   const renderContenido = (seccion: Seccion, lista: ReactNode) => {
     const config = secciones[seccion];
@@ -266,7 +297,7 @@ export default function TabCarta() {
               (02/11/2026: antes iban encima, apretados a la derecha, solo con iconos y con un hueco
               vacío). El número de cada sección se ve desde `sm`. */}
           <PestanasPagina
-            accionesDebajoEnMovil
+            accionesDebajoEnMovil="xl"
             pestanas={(Object.keys(secciones) as Seccion[]).map((seccion) => ({
               valor: seccion,
               etiqueta: secciones[seccion].etiqueta,
@@ -275,31 +306,67 @@ export default function TabCarta() {
               tour: seccion === "vinos" ? "gw-carta-vinos" : undefined,
             }))}
             acciones={
-              // Móvil: rejilla de 2 columnas, todos con su texto (02/11/2026: solo iconos «no eran
-              // nada intuitivos»). En Vinos (03/11/2026: un único «Añadir vino», que lee la etiqueta
-              // con IA al poner la foto), arriba «Varias botellas · Ajustar precios» y abajo «Añadir
-              // vino» a todo el ancho. Desde `sm`, una fila como siempre.
-              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center" data-tour="gw-carta-acciones">
-                <Button variant="outline" className="min-w-0 px-3 sm:px-4" onClick={() => setDialogAjustePreciosOpen(true)} title="Ajustar precios">
-                  <Percent className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">Ajustar precios</span>
-                </Button>
-                {seccionActiva === "vinos" && (
-                  <div className="order-first flex min-w-0 items-center gap-2 sm:order-none sm:flex-wrap" data-tour="gw-carta-vinos-foto">
-                    <BotonVinoDesdeFoto
-                      categorias={categoriasConOrigen(categoriasVinos)}
-                      onLeido={(resultado) => {
-                        setPrecargaVino(resultado);
-                        setDialogVinoOpen(true);
-                      }}
-                    />
+              soloLectura ? (
+                // Solo «Ver»: la etiqueta común y, en Platos y Vinos, el «PDF Carta».
+                <div className="flex w-full items-center justify-between gap-2 sm:justify-end xl:w-auto" data-tour="gw-carta-acciones">
+                  <EtiquetaSoloLectura />
+                  {herramientas.length > 0 && <div className="flex min-w-0 items-center gap-2">{herramientas}</div>}
+                </div>
+              ) : (
+                // Botones de la carta (06/11/2026, dueño: «mejora la estética de los botones»):
+                //  · «Añadir …» es la acción principal (relleno de marca); «PDF Carta» y «Ajustar
+                //    precios» son herramientas (contorno, unidas en un grupo) y «Varias botellas» va
+                //    junto a «Añadir vino», porque también añade.
+                //  · Desde 1280 px, una fila a la derecha de las secciones, con la principal al final
+                //    (textos cortos y ayuda emergente hasta 1536 px). Entre 640 y 1280 px (tableta,
+                //    portátil con el menú lateral) bajan a su propia fila: herramientas a la izquierda y
+                //    «Añadir» a la derecha; en una fila con las secciones no cabían y se cortaban.
+                //  · En el móvil, una rejilla de 2 columnas sin huecos: arriba «Añadir …» (a todo el
+                //    ancho, o con «Varias botellas» al lado en Vinos, o con «Ajustar precios» en Bebidas
+                //    y Cócteles) y debajo las herramientas, todas de 44 px con dedo.
+                <div
+                  className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-3 xl:w-auto xl:justify-end"
+                  data-tour="gw-carta-acciones"
+                >
+                  <div
+                    className={cn(
+                      "grid min-w-0 gap-2 sm:order-2 sm:flex sm:items-center",
+                      herramientas.length > 1 || seccionActiva === "vinos" ? "col-span-2 grid-cols-2" : "col-span-1 grid-cols-1",
+                    )}
+                    data-tour={seccionActiva === "vinos" ? "gw-carta-vinos-foto" : undefined}
+                  >
+                    <Button
+                      className={cn("order-1 min-w-0 px-3 shadow-sm sm:order-2 sm:px-4", seccionActiva !== "vinos" && herramientas.length > 1 && "col-span-2")}
+                      onClick={actual.abrirDialogo}
+                    >
+                      <Plus />
+                      <span className="truncate">{actual.añadir}</span>
+                    </Button>
+                    {seccionActiva === "vinos" && (
+                      <BotonVinoDesdeFoto
+                        className="order-2 sm:order-1"
+                        categorias={categoriasConOrigen(categoriasVinos)}
+                        onLeido={(resultado) => {
+                          setPrecargaVino(resultado);
+                          setDialogVinoOpen(true);
+                        }}
+                      />
+                    )}
                   </div>
-                )}
-                <Button className={`min-w-0 px-3 sm:px-4 ${seccionActiva === "vinos" ? "col-span-2 sm:col-span-1" : ""}`} onClick={actual.abrirDialogo} title={actual.añadir}>
-                  <Plus className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">{actual.añadir}</span>
-                </Button>
-              </div>
+                  <div
+                    role="group"
+                    aria-label="Herramientas de la carta"
+                    className={cn(
+                      "grid min-w-0 gap-2 sm:order-1 sm:flex sm:gap-0",
+                      // Desde `sm`, botones unidos: un solo grupo de contorno.
+                      "sm:[&>*+*]:-ml-px sm:[&>*]:rounded-none sm:[&>*:first-child]:rounded-l-md sm:[&>*:last-child]:rounded-r-md sm:[&>*:focus-visible]:z-10 sm:[&>*:hover]:z-10 sm:[&>*]:relative",
+                      herramientas.length > 1 ? "col-span-2 grid-cols-2" : "col-span-1 grid-cols-1",
+                    )}
+                  >
+                    {herramientas}
+                  </div>
+                </div>
+              )
             }
           />
         </div>
@@ -341,7 +408,7 @@ export default function TabCarta() {
               {seccionActiva !== "vinos" && actual.categorias.length > 0 && (
                 <Select value={actual.categoria} onValueChange={actual.setCategoria} disabled={hayBusqueda}>
                   <SelectTrigger
-                    className="w-full sm:w-[220px] bg-background"
+                    className="w-full sm:w-[180px] lg:w-[220px] bg-background"
                     aria-label="Categoría"
                     title={hayBusqueda ? "La búsqueda incluye todas las categorías" : undefined}
                   >
@@ -386,11 +453,11 @@ export default function TabCarta() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 w-full sm:w-auto"
+                  className="w-full sm:w-auto"
                   title={`Cambiar el orden de «${actual.categoria}» en la web`}
                   onClick={() => setOrdenando(true)}
                 >
-                  <ArrowUpDown className="mr-2 h-4 w-4" />
+                  <ArrowUpDown />
                   Ordenar
                 </Button>
               )}
@@ -402,50 +469,57 @@ export default function TabCarta() {
             </div>
 
             <TabsContent value="platos" className="mt-0 space-y-4">
-              {renderContenido("platos", <ListaPlatos platos={platosFiltrados} />)}
+              {renderContenido("platos", <ListaPlatos platos={platosFiltrados} soloLectura={soloLectura} />)}
             </TabsContent>
             <TabsContent value="bebidas" className="mt-0">
-              {renderContenido("bebidas", <ListaBebidas bebidas={bebidasFiltradas} />)}
+              {renderContenido("bebidas", <ListaBebidas bebidas={bebidasFiltradas} soloLectura={soloLectura} />)}
             </TabsContent>
-            <TabsContent value="vinos" className="mt-0">
-              {renderContenido("vinos", <ListaVinos vinos={vinosFiltrados} />)}
+            <TabsContent value="vinos" className="mt-0 space-y-4">
+              {/* Votación del vino favorito (04/11/2026): una franja, encima de la lista. */}
+              <EncuestaVinoFavorito />
+              {renderContenido("vinos", <ListaVinos vinos={vinosFiltrados} soloLectura={soloLectura} />)}
             </TabsContent>
             <TabsContent value="cocteles" className="mt-0">
-              {renderContenido("cocteles", <ListaCocteles cocteles={coctelesFiltrados} />)}
+              {renderContenido("cocteles", <ListaCocteles cocteles={coctelesFiltrados} soloLectura={soloLectura} />)}
             </TabsContent>
           </>
         )}
       </Tabs>
 
-      <PlatoForm
-        open={dialogPlatoOpen}
-        onOpenChange={setDialogPlatoOpen}
-        categoriaInicial={categoriaPlatos}
-      />
-      <BebidaForm
-        open={dialogBebidaOpen}
-        onOpenChange={setDialogBebidaOpen}
-        categoriaInicial={categoriaBebidas}
-      />
-      <VinoForm
-        open={dialogVinoOpen}
-        onOpenChange={(abierto) => {
-          setDialogVinoOpen(abierto);
-          if (!abierto) setPrecargaVino(null);
-        }}
-        categoriaInicial={esCategoriaOrigenPendiente(categoriaVinos) ? "" : categoriaVinos}
-        precarga={precargaVino}
-      />
-      <CoctelForm
-        open={dialogCoctelOpen}
-        onOpenChange={setDialogCoctelOpen}
-        categoriaInicial={categoriaCocteles}
-      />
+      {/* Formularios de alta y ajuste de precios: con solo «Ver» ni se montan. */}
+      {puedeEditar && (
+        <>
+          <PlatoForm
+            open={dialogPlatoOpen}
+            onOpenChange={setDialogPlatoOpen}
+            categoriaInicial={categoriaPlatos}
+          />
+          <BebidaForm
+            open={dialogBebidaOpen}
+            onOpenChange={setDialogBebidaOpen}
+            categoriaInicial={categoriaBebidas}
+          />
+          <VinoForm
+            open={dialogVinoOpen}
+            onOpenChange={(abierto) => {
+              setDialogVinoOpen(abierto);
+              if (!abierto) setPrecargaVino(null);
+            }}
+            categoriaInicial={esCategoriaOrigenPendiente(categoriaVinos) ? "" : categoriaVinos}
+            precarga={precargaVino}
+          />
+          <CoctelForm
+            open={dialogCoctelOpen}
+            onOpenChange={setDialogCoctelOpen}
+            categoriaInicial={categoriaCocteles}
+          />
 
-      <AjustePreciosModal
-        open={dialogAjustePreciosOpen}
-        onOpenChange={setDialogAjustePreciosOpen}
-      />
+          <AjustePreciosModal
+            open={dialogAjustePreciosOpen}
+            onOpenChange={setDialogAjustePreciosOpen}
+          />
+        </>
+      )}
     </div>
   );
 }

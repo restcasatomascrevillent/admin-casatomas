@@ -1,0 +1,83 @@
+{
+ "archivo": "R881.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS GALMAR, S.L.",
+ "cif": "B36475416",
+ "local": "casa_tomas",
+ "numero_documento": "202602540",
+ "fecha": "2026-06-12",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CALAMAR 2P MARRUECOS ALIA (zona FAO 34, lote 0525)",
+   "producto_ficha": null,
+   "cantidad": 486.5,
+   "unidad": "kg",
+   "bultos": 20,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 9.7,
+   "descuento_pct": 0,
+   "total": 4719.05,
+   "iva_pct": 10,
+   "albaran_ref": "013442",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "PULPO P3 SHANDONG26 FAO34 (origen Marruecos, lote 0226)",
+   "producto_ficha": null,
+   "cantidad": 754.0,
+   "unidad": "kg",
+   "bultos": 22,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 14.8,
+   "descuento_pct": 0,
+   "total": 11159.2,
+   "iva_pct": 10,
+   "albaran_ref": "013442",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "VIEIRA PACIFICO M/C 20/30 FAO87 CHILE (lote O26016)",
+   "producto_ficha": null,
+   "cantidad": 512.0,
+   "unidad": "kg",
+   "bultos": 64,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 13.9,
+   "descuento_pct": 0,
+   "total": 7116.8,
+   "iva_pct": 10,
+   "albaran_ref": "013442",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 22995.05,
+ "desglose_iva": [
+  {
+   "base": 22995.05,
+   "pct": 10,
+   "cuota": 2299.51
+  }
+ ],
+ "iva": 2299.51,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 25294.56,
+ "observaciones": "Forma de pago: pagaré 90 días F.F. Vencimiento 10/09/2026 por 25.294,56 €. Albarán 013442 (10/06/2026). Pie: R.E. 1,40 % con cuota 0,00. Columnas del albarán: caja = 2.ª cifra, kg = 3.ª cifra, precio por kg = 4.ª, importe = última.",
+ "alertas": [
+  "La primera cifra de cada línea (396,80 / 746,00 / 480,00) no se identifica; se usa la 3.ª cifra como kg. Los importes cuadran con kg x precio (486,50 x 9,70 = 4.719,05; 754 x 14,80 = 11.159,20; 512 x 13,90 = 7.116,80).",
+  "Los tres productos figuran en el albarán 013442 con cajas, kg y precio por kg; la columna «cajas» se interpreta como bultos."
+ ]
+}

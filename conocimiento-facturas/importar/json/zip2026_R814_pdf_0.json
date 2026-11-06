@@ -1,0 +1,63 @@
+{
+ "archivo": "R814.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CREVIGEST, S.L.",
+ "cif": "B03898012",
+ "local": "casa_tomas",
+ "numero_documento": "29",
+ "fecha": "2026-06-02",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Alquiler local c/ Santa María de la Cabeza nº 1B (mes de junio)",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "mes",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 718.9,
+   "descuento_pct": null,
+   "total": 718.9,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Consumo Electricidad 31-03-2026 a 30-04-2026",
+   "producto_ficha": null,
+   "cantidad": 1,
+   "unidad": "servicio",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 89.17,
+   "descuento_pct": null,
+   "total": 89.17,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 808.07,
+ "desglose_iva": [
+  {
+   "base": 808.07,
+   "pct": 21,
+   "cuota": 169.69
+  }
+ ],
+ "iva": 169.69,
+ "recargo_equivalencia": null,
+ "retencion_irpf": 153.53,
+ "total": 824.23,
+ "observaciones": "Alquiler mensual de local más consumo de luz repercutido. Retención IRPF 19%. Destinatario MASIDE 2011 SL (B54583356), dirección impresa C/ Santa María de la Cabeza 2. Pago por transferencia Banco Santander.",
+ "alertas": []
+}

@@ -1,0 +1,66 @@
+// Datos del tablero de Facturas › Análisis: UNA llamada a la RPC
+// `tablero_compras` (migración 20261105150500) con todos los bloques.
+// react-query guarda cada periodo/local 5 minutos: cambiar de «Año» a «Mes» y
+// volver no vuelve a pedir nada.
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { esErrorRpcInexistente } from "@/lib/facturas/preguntasRapidas";
+import { normalizarTablero, type TableroCompras } from "@/lib/facturas/tableroCompras";
+
+export const TEXTO_TABLERO_SIN_MIGRACION =
+  "El tablero aún no está activado en esta base de datos: falta aplicar la migración 20261105150500_tablero_compras.";
+
+/** supabase.rpc sin los tipos generados (la RPC no está en types.ts, que se mantiene a mano). */
+async function rpc(funcion: string, args: Record<string, unknown>) {
+  const llamar = supabase.rpc as unknown as (
+    this: typeof supabase,
+    fn: string,
+    a?: Record<string, unknown>,
+  ) => PromiseLike<{ data: unknown; error: { message?: string; code?: string } | null }>;
+  return llamar.call(supabase, funcion, args);
+}
+
+/** La consulta del tablero (la usan el hook y la precarga de los periodos más probables). */
+export function consultaTablero(desde: string | null, hasta: string | null, local: "casa_tomas" | "touza" | null) {
+  return {
+    queryKey: ["tablero-compras", desde, hasta, local] as const,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<TableroCompras> => {
+      const { data, error } = await rpc("tablero_compras", { p_desde: desde, p_hasta: hasta, p_local: local });
+      if (esErrorRpcInexistente(error)) throw new Error(TEXTO_TABLERO_SIN_MIGRACION);
+      if (error) throw new Error(error.message || "No se ha podido cargar el tablero");
+      return normalizarTablero(data);
+    },
+  };
+}
+
+export function useTableroCompras(desde: string | null, hasta: string | null, local: "casa_tomas" | "touza" | null) {
+  return useQuery({
+    ...consultaTablero(desde, hasta, local),
+    // Al cambiar de periodo o local se queda el tablero anterior hasta que llega el nuevo (sin parpadeo).
+    placeholderData: (anterior) => anterior,
+    retry: (n, e) => !(e instanceof Error && e.message === TEXTO_TABLERO_SIN_MIGRACION) && n < 1,
+  });
+}
+
+/** Productos comprados cuyo nombre contiene el texto (para el buscador de «Precio de un producto»). */
+export function useBuscarProductosComprados(texto: string) {
+  const q = texto.trim();
+  return useQuery({
+    queryKey: ["tablero-compras", "buscar-producto", q.toLowerCase()],
+    enabled: q.length >= 2,
+    staleTime: 5 * 60_000,
+    retry: false,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await rpc("buscar_productos_texto_agente", { p_texto: q, p_limite: 60 });
+      if (error) throw new Error(error.message || "No se ha podido buscar");
+      const vistos = new Map<string, string>();
+      for (const fila of Array.isArray(data) ? data : []) {
+        const nombre = typeof (fila as { producto?: unknown }).producto === "string" ? (fila as { producto: string }).producto.trim() : "";
+        const clave = nombre.toLowerCase();
+        if (nombre && !vistos.has(clave)) vistos.set(clave, nombre);
+      }
+      return [...vistos.values()].slice(0, 12);
+    },
+  });
+}

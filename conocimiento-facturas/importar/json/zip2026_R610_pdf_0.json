@@ -1,0 +1,63 @@
+{
+ "archivo": "R610.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Restaurant Booking & Distribution Services S.L.",
+ "cif": "B90227976",
+ "local": "casa_tomas",
+ "numero_documento": "2026042401",
+ "fecha": "2026-04-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Channel-Manager Reservas de Google (April 2026)",
+   "producto_ficha": null,
+   "cantidad": 200,
+   "unidad": "persona",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 0.0,
+   "descuento_pct": null,
+   "total": 0.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "Channel-Manager OpenTable Reservas (April 2026)",
+   "producto_ficha": null,
+   "cantidad": 2,
+   "unidad": "persona",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.5,
+   "descuento_pct": null,
+   "total": 3.0,
+   "iva_pct": 21,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 3.0,
+ "desglose_iva": [
+  {
+   "base": 3.0,
+   "pct": 21,
+   "cuota": 0.63
+  }
+ ],
+ "iva": 0.63,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 3.63,
+ "observaciones": "Recibo domiciliado. Vencimiento 05/05/2026. Licencia Casa Tomas Crevillent.",
+ "alertas": []
+}

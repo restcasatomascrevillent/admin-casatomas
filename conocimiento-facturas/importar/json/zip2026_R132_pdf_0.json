@@ -1,0 +1,63 @@
+{
+ "archivo": "R132.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Salazones Garre",
+ "cif": "B73028474",
+ "local": "casa_tomas",
+ "numero_documento": "F / 26000691",
+ "fecha": "2026-01-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "HUEVA DE MUJOL SELECCION EXTRA",
+   "producto_ficha": "Hueva de mújol selección extra",
+   "cantidad": 1.34,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 70.0,
+   "descuento_pct": null,
+   "total": 93.8,
+   "iva_pct": 10,
+   "albaran_ref": "26100633",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "HUEVA DE MARUCA CALIDAD EXTRA",
+   "producto_ficha": "Hueva de maruca calidad extra (Molva molva)",
+   "cantidad": 3.04,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 42.0,
+   "descuento_pct": null,
+   "total": 127.68,
+   "iva_pct": 10,
+   "albaran_ref": "26100633",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 221.48,
+ "desglose_iva": [
+  {
+   "base": 221.48,
+   "pct": 10,
+   "cuota": 22.15
+  }
+ ],
+ "iva": 22.15,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 243.63,
+ "observaciones": "Transferencia Banco Santander, vencimiento 01/03/2026. Albarán 26100633 de 26/01/2026.",
+ "alertas": []
+}

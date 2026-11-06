@@ -26,6 +26,7 @@ import {
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "./servicio/VistaPlanoHoy";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
  * «¿Comida o Cena?»; después la vista pasa a Plano en MODO PROPUESTA (`VistaPlanoHoy`, prop `organizar`).
  * «Reparto de mesas» (`PlanoEspacio2D`) ya no se ofrece desde Hoy: lo esencial está en el Plano.
  *
+ * SOLO «VER» (06/11/2026, decisión del dueño): sin «Editar» en Reservas no salen «Organizar» ni «Sin
+ * reserva» (se ocultan, no se desactivan); el kanban, el plano y la vista de móvil tampoco ofrecen
+ * nada que escriba. La etiqueta «Solo lectura» la pone la página, junto a las pestañas.
+ *
  * `onAbrirSala` (sin uso desde el 10/10/2026): abría el reparto de mesas de una sala (`Reservas.tsx`, el
  * mismo salto que el Calendario: `PlanoEspacio2D`, con su conmutador al modo servicio).
  */
@@ -79,6 +84,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   const [salaPlano, setSalaPlano] = useState<string | null>(leerSalaPlanoHoy);
   // Móvil (< 768 px): vista propia para el camarero (`movil/VistaHoyMovil.tsx`). Tablet y escritorio, igual.
   const esMovil = useIsMobile();
+  // «Organizar» mueve reservas y da mesas: solo con «Editar» en Reservas.
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   // «Organizar»: turno de la propuesta en curso (o `null`) y la pregunta «¿Comida o Cena?».
   const [organizando, setOrganizando] = useState<"comida" | "cena" | null>(null);
   const [preguntarTurno, setPreguntarTurno] = useState(false);
@@ -220,18 +227,21 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           filtroTurno={filtroTurno}
           onFiltroTurno={cambiarTurno}
           vista={vista}
+          soloLectura={!puedeEditar}
           onVista={(v) => {
             cambiarVista(v);
             if (v !== "plano") setOrganizando(null);
           }}
           accion={
-            <div className="flex shrink-0 gap-2 sm:order-2">
-              <Button className="touch-hit h-9 gap-1.5 px-4 pointer-coarse:h-9" onClick={pulsarOrganizar} disabled={!!organizando}>
-                <Wand2 className="h-4 w-4" aria-hidden="true" />
-                Organizar
-              </Button>
-              <BotonSentarSinReserva className="touch-hit h-9 shrink-0 pointer-coarse:h-9" />
-            </div>
+            puedeEditar ? (
+              <div className="flex shrink-0 gap-2 sm:order-2">
+                <Button className="touch-hit h-9 gap-1.5 px-4 pointer-coarse:h-9" onClick={pulsarOrganizar} disabled={!!organizando}>
+                  <Wand2 className="h-4 w-4" aria-hidden="true" />
+                  Organizar
+                </Button>
+                <BotonSentarSinReserva className="touch-hit h-9 shrink-0 pointer-coarse:h-9" />
+              </div>
+            ) : undefined
           }
         />
 
@@ -242,7 +252,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             filtroTurno={filtroTurno}
             salaId={salaPlano}
             onCambiarSala={cambiarSala}
-            organizar={organizando ? { turno: organizando, onSalir: () => setOrganizando(null) } : null}
+            organizar={organizando && puedeEditar ? { turno: organizando, onSalir: () => setOrganizando(null) } : null}
             reservasError={errorReservasHoy}
             onReintentarReservas={() => void refetchReservasHoy()}
           />
@@ -250,7 +260,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           <GestorReservasKanban busqueda={busqueda} filtroTurno={filtroTurno} onVerPlanoSala={verPlanoDeSala} />
         )}
       </div>
-      <Dialog open={preguntarTurno} onOpenChange={setPreguntarTurno}>
+      <Dialog open={preguntarTurno && puedeEditar} onOpenChange={setPreguntarTurno}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>¿Qué servicio organizo?</DialogTitle>
@@ -278,6 +288,16 @@ function turnoSiguiente(): "comida" | "cena" {
   return new Date().getHours() < 16 ? "comida" : "cena";
 }
 
+/** La ayuda (ⓘ) de cada vista de «Hoy». Con solo «Ver» no hay acciones ni arrastre. */
+function ayudaVistaHoy(vista: ModoVistaHoy, soloLectura: boolean): string {
+  if (soloLectura) {
+    return vista === "plano" ? "Toca una mesa para ver su reserva." : "Las reservas de hoy, una columna por sala.";
+  }
+  return vista === "plano"
+    ? "Toca una mesa para ver su reserva y sus acciones."
+    : "Toca una tarjeta para ver sus acciones, o mantenla pulsada y arrástrala a otro espacio.";
+}
+
 /**
  * Opción del selector «Kanban | Plano». Marcada, OSCURA (`bg-primary`), como el resto de conmutadores de
  * vista del panel (Plano | Servicio de una sala): el dorado de `accent` sobre blanco daba 3,5:1.
@@ -302,8 +322,11 @@ function BarraFiltrosHoy({
   vista,
   onVista,
   soloFiltros = false,
+  soloLectura = false,
   accion,
 }: {
+  /** Solo «Ver»: la ayuda no habla de acciones ni de arrastrar. */
+  soloLectura?: boolean;
   /** Botón de acción junto al turno («Sin reserva»). */
   accion?: ReactNode;
   /** Móvil: solo buscador y turno (sin «Kanban | Plano» ni la ayuda). */
@@ -372,16 +395,8 @@ function BarraFiltrosHoy({
         <span
           role="note"
           className="hidden shrink-0 text-muted-foreground sm:order-4 sm:inline-flex"
-          aria-label={
-            vista === "plano"
-              ? "Toca una mesa para ver su reserva y sus acciones."
-              : "Toca una tarjeta para ver sus acciones, o mantenla pulsada y arrástrala a otro espacio."
-          }
-          title={
-            vista === "plano"
-              ? "Toca una mesa para ver su reserva y sus acciones."
-              : "Toca una tarjeta para ver sus acciones, o mantenla pulsada y arrástrala a otro espacio."
-          }
+          aria-label={ayudaVistaHoy(vista, soloLectura)}
+          title={ayudaVistaHoy(vista, soloLectura)}
         >
           <Info className="h-4 w-4" aria-hidden="true" />
         </span>

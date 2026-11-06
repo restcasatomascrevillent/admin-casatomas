@@ -11,6 +11,7 @@
 //  categoría de cada línea en la vista de factura).
 // ============================================================================
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { opcionReintento } from "@/hooks/useListaCompras";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -44,6 +45,10 @@ export interface LineaProducto {
   proveedor: string | null;
   numero_documento: string | null;
   tipo: string | null;
+  /** Proveedor unificado del documento (null sin la migración de proveedores). */
+  proveedor_id?: number | null;
+  /** Albarán ya recogido en una factura (no cuenta en la evolución del precio). */
+  facturado_en_id?: number | null;
 }
 
 // Los tipos generados no conocen siempre las RPC nuevas (types.ts se mantiene a
@@ -53,9 +58,15 @@ const rpc = (fn: string, args?: Record<string, unknown>) => (supabase.rpc as any
 
 const argsPeriodo = (f: FiltroPeriodo) => ({ p_desde: f.desde, p_hasta: f.hasta, p_tipo: f.tipo });
 
-export const useCategoriasProducto = () =>
+/** `enabled: false` deja la petición para luego (Compras la pide cuando ya tiene la lista). */
+export interface OpcionesConsulta {
+  enabled?: boolean;
+}
+
+export const useCategoriasProducto = ({ enabled = true }: OpcionesConsulta = {}) =>
   useQuery({
     queryKey: [CLAVE_PRODUCTOS, "categorias"],
+    enabled,
     queryFn: async (): Promise<CategoriaProducto[]> => {
       const { data, error } = await supabase
         .from("categorias_producto")
@@ -68,9 +79,10 @@ export const useCategoriasProducto = () =>
     retry: false,
   });
 
-export const useResumenProductos = (f: FiltroPeriodo) =>
+export const useResumenProductos = (f: FiltroPeriodo, { enabled = true }: OpcionesConsulta = {}) =>
   useQuery({
     queryKey: [CLAVE_PRODUCTOS, "resumen", f.desde, f.hasta, f.tipo],
+    enabled,
     queryFn: async (): Promise<ResumenProducto[]> => {
       const { data, error } = await rpc("productos_resumen", argsPeriodo(f));
       if (error) throw error;
@@ -93,14 +105,16 @@ export const useGastoCategorias = (f: FiltroPeriodo) =>
   });
 
 /** Líneas de un producto (id) o las que no tienen producto ("sin"). null = no consultar. */
-export const useLineasProducto = (producto: number | "sin" | null) =>
-  useQuery({
+export const useLineasProducto = (producto: number | "sin" | null) => {
+  const qc = useQueryClient();
+  return useQuery({
     queryKey: [CLAVE_PRODUCTOS, "lineas", producto],
     enabled: producto !== null,
+    retry: opcionReintento(qc),
     queryFn: async (): Promise<LineaProducto[]> => {
       let q = supabase
         .from("productos_factura")
-        .select("id, nombre, cantidad, unidad, precio_unitario, total, producto_id, factura_id, facturas(fecha, proveedor, numero_documento, tipo)")
+        .select("id, nombre, cantidad, unidad, precio_unitario, total, producto_id, factura_id, facturas(fecha, proveedor, numero_documento, tipo, proveedor_id, facturado_en_id)")
         .order("id", { ascending: false })
         .limit(500);
       q = producto === "sin" ? q.is("producto_id", null) : q.eq("producto_id", producto as number);
@@ -120,12 +134,46 @@ export const useLineasProducto = (producto: number | "sin" | null) =>
         proveedor: l.facturas?.proveedor ?? null,
         numero_documento: l.facturas?.numero_documento ?? null,
         tipo: l.facturas?.tipo ?? null,
+        proveedor_id: l.facturas?.proveedor_id ?? null,
+        facturado_en_id: l.facturas?.facturado_en_id ?? null,
       }));
       // Más reciente primero (fecha del documento; a igualdad, la última insertada).
       return filas.sort((a, b) => (b.fecha ?? "").localeCompare(a.fecha ?? "") || b.id - a.id);
     },
     staleTime: 30_000,
   });
+};
+
+/** El `producto_id` que más se repite en esas filas (null si ninguna tiene). */
+function productoMasFrecuente(filas: { producto_id: number | null }[] | null): number | null {
+  const cuenta = new Map<number, number>();
+  for (const f of filas ?? []) if (f.producto_id != null) cuenta.set(f.producto_id, (cuenta.get(f.producto_id) ?? 0) + 1);
+  let mejor: number | null = null;
+  let max = 0;
+  for (const [id, n] of cuenta) if (n > max) [mejor, max] = [id, n];
+  return mejor;
+}
+
+/**
+ * El producto del catálogo de una línea por su NOMBRE (QA 05/11/2026, C-01):
+ * «Qué le compras» de un proveedor (`ficha_proveedor_agente`) trae el nombre
+ * de la línea («MERLUZA PINCHO 3KG»), no el del catálogo, y no trae el id.
+ * Todas las líneas tienen ya `producto_id`: se busca la línea con ese nombre
+ * exacto (y si no, sin mayúsculas) y se toma su producto. null = ninguno.
+ */
+export async function productoDeLinea(nombre: string): Promise<number | null> {
+  const texto = nombre.trim();
+  if (!texto) return null;
+  const exacta = await supabase.from("productos_factura").select("producto_id").eq("nombre", texto).limit(200);
+  if (exacta.error) throw exacta.error;
+  const id = productoMasFrecuente(exacta.data as { producto_id: number | null }[] | null);
+  if (id !== null) return id;
+  // Sin mayúsculas (los comodines de LIKE se escapan: es el nombre tal cual).
+  const patron = texto.replace(/[\\%_*]/g, (c) => `\\${c}`);
+  const parecida = await supabase.from("productos_factura").select("producto_id").ilike("nombre", patron).limit(200);
+  if (parecida.error) throw parecida.error;
+  return productoMasFrecuente(parecida.data as { producto_id: number | null }[] | null);
+}
 
 /** Unidad del contenido de una caja/envase (productos_catalogo.contenido_unidad). */
 export type UnidadContenido = "kg" | "l" | "ud";

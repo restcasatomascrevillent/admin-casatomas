@@ -1,0 +1,48 @@
+{
+ "archivo": "R29.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170746951",
+ "fecha": "2026-01-19",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 PRE ORSERO STD CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 11.6,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.3,
+   "descuento_pct": null,
+   "total": 15.08,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 15.08,
+ "desglose_iva": [
+  {
+   "base": 15.08,
+   "pct": 4,
+   "cuota": 0.6
+  }
+ ],
+ "iva": 0.6,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 15.68,
+ "observaciones": "Fecha entrega 19.01.2026, igual que la fecha de factura. Anotaciones sueltas '17.01.26' y '(CP)': no son producto. Total BT 1.",
+ "alertas": [
+  "Nombre impreso 'PIÑA GOLD 6 PRE ORSERO STD CR' distinto del catalogo; asociado a Piña Gold calibre 6 por calibre y origen CR. Revisar."
+ ]
+}

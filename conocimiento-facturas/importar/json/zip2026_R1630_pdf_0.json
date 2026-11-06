@@ -1,0 +1,80 @@
+{
+ "archivo": "R1630.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "125 S",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 105.12,
+   "iva_pct": 10,
+   "albaran_ref": "232 S",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 105.12,
+   "iva_pct": 10,
+   "albaran_ref": "234 S",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 48.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 105.12,
+   "iva_pct": 10,
+   "albaran_ref": "235 S",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 315.36,
+ "desglose_iva": [
+  {
+   "base": 315.36,
+   "pct": 10,
+   "cuota": 31.54
+  }
+ ],
+ "iva": 31.54,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 346.9,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. El lote 0212260915328 se repite en los tres albaranes (232 S, 234 S, 235 S).",
+ "alertas": []
+}

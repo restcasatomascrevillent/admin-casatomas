@@ -1,0 +1,116 @@
+{
+ "archivo": "R903.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS MOLTO, S.L.",
+ "cif": "B03092038",
+ "local": "casa_tomas",
+ "numero_documento": "4115",
+ "fecha": "2026-06-15",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "CLOCHINA",
+   "producto_ficha": "Clóchina",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.5,
+   "descuento_pct": null,
+   "total": 27.5,
+   "iva_pct": 10,
+   "albaran_ref": "12605",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "BOGAVANTE AZUL",
+   "producto_ficha": "Bogavante azul",
+   "cantidad": 10.75,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 27.8,
+   "descuento_pct": null,
+   "total": 298.85,
+   "iva_pct": 10,
+   "albaran_ref": "12605",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "TELLINA",
+   "producto_ficha": "Tellina",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.8,
+   "descuento_pct": null,
+   "total": 61.6,
+   "iva_pct": 10,
+   "albaran_ref": "12605",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "OSTRA ROYALE N2 DAVID HERVE",
+   "producto_ficha": "Ostra Royale nº 2 David Hervé",
+   "cantidad": 24.0,
+   "unidad": "pieza",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.19,
+   "descuento_pct": null,
+   "total": 52.56,
+   "iva_pct": 10,
+   "albaran_ref": "13027",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "TELLINA",
+   "producto_ficha": "Tellina",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 31.8,
+   "descuento_pct": null,
+   "total": 127.2,
+   "iva_pct": 10,
+   "albaran_ref": "13027",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 567.71,
+ "desglose_iva": [
+  {
+   "base": 567.71,
+   "pct": 10,
+   "cuota": 56.77
+  }
+ ],
+ "iva": 56.77,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 624.48,
+ "observaciones": "Vencimiento: antes de 15 días desde emisión de factura. Serie no impresa en la cabecera. Dos albaranes: 12605 (10/06/2026) y 13027 (13/06/2026). Ostras: la columna Kilos son piezas.",
+ "alertas": [
+  "Clóchina a 5,50 €/kg; la ficha tiene 4,50 €/kg (+22 %)."
+ ]
+}

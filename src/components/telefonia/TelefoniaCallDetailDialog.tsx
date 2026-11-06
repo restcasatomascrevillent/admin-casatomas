@@ -14,7 +14,6 @@ import { es } from "date-fns/locale";
 import { Link } from "react-router-dom";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
-import { ConMotivo } from "@/components/reservas/ConMotivo";
 
 interface CallLog {
     id: string;
@@ -275,24 +274,17 @@ export function TelefoniaCallDetailDialog({ call, onClose }: Props) {
                                         Ver reserva creada
                                     </Link>
                                 </Button>
-                                {/* El botón deshabilitado no recibe el ratón: el motivo se ve en el envoltorio. */}
-                                <ConMotivo motivo={puedeEditar ? undefined : "No tienes permiso para editar reservas"}>
+                                {/* Sin «Editar» en Reservas no sale (06/11/2026: se oculta, no se desactiva). */}
+                                {puedeEditar && (
                                     <Button
                                         variant="outline"
                                         size="sm"
                                         className="h-11 px-4"
-                                        disabled={!puedeEditar}
-                                        title={puedeEditar ? undefined : "No tienes permiso para editar reservas"}
                                         onClick={() => editarReserva(reservaId)}
                                     >
                                         <SquarePen className="w-4 h-4 mr-2" />
                                         Editar reserva
                                     </Button>
-                                </ConMotivo>
-                                {!puedeEditar && (
-                                    <p className="basis-full text-xs text-muted-foreground">
-                                        No tienes permiso para editar reservas.
-                                    </p>
                                 )}
                             </section>
                         )}

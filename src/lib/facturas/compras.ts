@@ -6,9 +6,10 @@
 //  Aquí vive lo que reparte el texto buscado entre los tres modos (contadores),
 //  los filtros de cada modo y la traducción de un documento a su proveedor.
 // ============================================================================
-import type { Factura } from "@/hooks/useFacturas";
+import type { Factura, ProductoFactura } from "@/hooks/useFacturas";
 import { filtrarProductos, normalizarBusqueda, type MapaCategorias, type ResumenProducto } from "./productos";
 import { filtrarProveedores, type Proveedor, type ResolverProveedor } from "./proveedores";
+import { esAbono } from "./resumenCompras";
 
 export type ModoCompras = "documentos" | "productos" | "proveedores";
 
@@ -23,6 +24,7 @@ export type FiltroDocumentos =
   | "facturas"
   | "albaranes"
   | "albaranes_sin_factura"
+  | "abonos"
   | "con_avisos"
   | "sin_revisar";
 
@@ -31,6 +33,7 @@ export const FILTROS_DOCUMENTOS: { valor: FiltroDocumentos; etiqueta: string }[]
   { valor: "facturas", etiqueta: "Facturas" },
   { valor: "albaranes", etiqueta: "Albaranes" },
   { valor: "albaranes_sin_factura", etiqueta: "Albaranes sin factura" },
+  { valor: "abonos", etiqueta: "Abonos" },
   { valor: "con_avisos", etiqueta: "Con avisos" },
   { valor: "sin_revisar", etiqueta: "Sin revisar" },
 ];
@@ -52,15 +55,32 @@ export const palabrasBusqueda = (texto: string): string[] => {
   return q ? q.split(" ") : [];
 };
 
-/** Todo lo que se puede buscar de un documento: cabecera y nombre de cada línea. */
-function pajarDocumento(d: Factura): string {
+/**
+ * Lo mínimo de un documento para buscarlo y filtrarlo. `observaciones` y
+ * `productos` son opcionales: la cabecera de la lista (`documentos_lista()`)
+ * no los trae y su búsqueda por línea la hace el servidor (ver `extra`).
+ */
+export type DocumentoBuscable = Pick<Factura, "id" | "tipo" | "numero_documento" | "proveedor" | "cif" | "total" | "verificada" | "fecha"> & {
+  facturado_en_id?: number | null;
+  observaciones?: string | null;
+  productos?: Pick<ProductoFactura, "producto_nombre" | "producto_canonico">[];
+};
+
+/**
+ * Ids de documentos que el SERVIDOR dice que casan con el texto (por sus
+ * líneas u observaciones, `buscar_documentos_compras`). null = no hay.
+ */
+export type CasanEnServidor = ReadonlySet<number> | null | undefined;
+
+/** Todo lo que se puede buscar de un documento: cabecera y nombre de cada línea (si las trae). */
+function pajarDocumento(d: DocumentoBuscable): string {
   return normalizarBusqueda(
     [
       d.numero_documento,
       d.proveedor,
       d.cif,
       d.observaciones,
-      ...d.productos.flatMap((p) => [p.producto_nombre, p.producto_canonico]),
+      ...(d.productos ?? []).flatMap((p) => [p.producto_nombre, p.producto_canonico]),
     ]
       .filter(Boolean)
       .join(" "),
@@ -70,8 +90,8 @@ function pajarDocumento(d: Factura): string {
 // El pajar de cada documento se calcula una vez por objeto (la lista de
 // react-query conserva las referencias entre renders): buscar letra a letra
 // no vuelve a recorrer todas las líneas.
-const cachePajar = new WeakMap<Factura, string>();
-const pajar = (d: Factura): string => {
+const cachePajar = new WeakMap<DocumentoBuscable, string>();
+const pajar = (d: DocumentoBuscable): string => {
   let v = cachePajar.get(d);
   if (v === undefined) {
     v = pajarDocumento(d);
@@ -80,15 +100,17 @@ const pajar = (d: Factura): string => {
   return v;
 };
 
-export const coincideDocumento = (d: Factura, palabras: string[]): boolean => {
+/** ¿Casa con las palabras? En lo que trae el documento o, si no, según el servidor (`extra`). */
+export const coincideDocumento = (d: DocumentoBuscable, palabras: string[], extra?: CasanEnServidor): boolean => {
   if (palabras.length === 0) return true;
+  if (extra?.has(d.id)) return true;
   const h = pajar(d);
   return palabras.every((w) => h.includes(w));
 };
 
 type Avisos = Map<number, unknown[]>;
 
-function pasaFiltroDocumento(d: Factura, filtro: FiltroDocumentos, avisos: Avisos): boolean {
+function pasaFiltroDocumento(d: DocumentoBuscable, filtro: FiltroDocumentos, avisos: Avisos): boolean {
   switch (filtro) {
     case "facturas":
       return d.tipo === "factura";
@@ -96,6 +118,8 @@ function pasaFiltroDocumento(d: Factura, filtro: FiltroDocumentos, avisos: Aviso
       return d.tipo === "albaran";
     case "albaranes_sin_factura":
       return esAlbaranSinFactura(d);
+    case "abonos":
+      return esAbono(d);
     case "con_avisos":
       return (avisos.get(d.id) ?? []).length > 0;
     case "sin_revisar":
@@ -106,23 +130,35 @@ function pasaFiltroDocumento(d: Factura, filtro: FiltroDocumentos, avisos: Aviso
 }
 
 /** Documentos que cumplen el texto y el chip elegido, del más reciente al más antiguo. */
-export function filtrarDocumentos(docs: Factura[], texto: string, filtro: FiltroDocumentos, avisos: Avisos): Factura[] {
+export function filtrarDocumentos<D extends DocumentoBuscable>(
+  docs: D[],
+  texto: string,
+  filtro: FiltroDocumentos,
+  avisos: Avisos,
+  extra?: CasanEnServidor,
+): D[] {
   const palabras = palabrasBusqueda(texto);
   return docs
-    .filter((d) => coincideDocumento(d, palabras) && pasaFiltroDocumento(d, filtro, avisos))
+    .filter((d) => coincideDocumento(d, palabras, extra) && pasaFiltroDocumento(d, filtro, avisos))
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
 }
 
 /** Cuántos documentos salen con cada chip (para el texto buscado). */
-export function contarFiltrosDocumentos(docs: Factura[], texto: string, avisos: Avisos): Record<FiltroDocumentos, number> {
+export function contarFiltrosDocumentos(
+  docs: DocumentoBuscable[],
+  texto: string,
+  avisos: Avisos,
+  extra?: CasanEnServidor,
+): Record<FiltroDocumentos, number> {
   const palabras = palabrasBusqueda(texto);
-  const base = docs.filter((d) => coincideDocumento(d, palabras));
+  const base = docs.filter((d) => coincideDocumento(d, palabras, extra));
   const cuenta = (f: FiltroDocumentos) => base.filter((d) => pasaFiltroDocumento(d, f, avisos)).length;
   return {
     todo: base.length,
     facturas: cuenta("facturas"),
     albaranes: cuenta("albaranes"),
     albaranes_sin_factura: cuenta("albaranes_sin_factura"),
+    abonos: cuenta("abonos"),
     con_avisos: cuenta("con_avisos"),
     sin_revisar: cuenta("sin_revisar"),
   };
@@ -133,7 +169,7 @@ export const claveProveedorDocumento = (d: Pick<Factura, "proveedor">, resolver:
   d.proveedor ? resolver(d.proveedor).clave : "";
 
 /** Albaranes sin factura de cada proveedor (por clave canónica). */
-export function albaranesSinFacturaPorProveedor(docs: Factura[], resolver: ResolverProveedor): Map<string, number> {
+export function albaranesSinFacturaPorProveedor(docs: DocumentoBuscable[], resolver: ResolverProveedor): Map<string, number> {
   const mapa = new Map<string, number>();
   for (const d of docs) {
     if (!esAlbaranSinFactura(d)) continue;
@@ -150,22 +186,23 @@ export function albaranesSinFacturaPorProveedor(docs: Factura[], resolver: Resol
  */
 export function proveedoresDelTexto(
   proveedores: Proveedor[],
-  docs: Factura[],
+  docs: DocumentoBuscable[],
   texto: string,
   resolver: ResolverProveedor,
+  extra?: CasanEnServidor,
 ): Proveedor[] {
   const palabras = palabrasBusqueda(texto);
   if (palabras.length === 0) return proveedores;
   const porNombre = new Set(filtrarProveedores(proveedores, texto).map((p) => p.id));
   const clavesConDocumento = new Set<string>();
-  for (const d of docs) if (coincideDocumento(d, palabras)) clavesConDocumento.add(claveProveedorDocumento(d, resolver));
+  for (const d of docs) if (coincideDocumento(d, palabras, extra)) clavesConDocumento.add(claveProveedorDocumento(d, resolver));
   return proveedores.filter((p) => porNombre.has(p.id) || clavesConDocumento.has(`#${p.id}`));
 }
 
 /** Lista final del modo Proveedores: texto + chip, por documentos de más a menos. */
 export function filtrarProveedoresCompras(
   proveedores: Proveedor[],
-  docs: Factura[],
+  docs: DocumentoBuscable[],
   texto: string,
   filtro: FiltroProveedores,
   resolver: ResolverProveedor,
@@ -186,31 +223,71 @@ export interface ContadoresCompras {
 /** Resultados por modo para el texto buscado (sin chips: el contador es del texto). */
 export function contarPorModo(args: {
   texto: string;
-  documentos: Factura[];
+  documentos: DocumentoBuscable[];
   productos: ResumenProducto[];
   proveedores: Proveedor[];
   mapaCategorias: MapaCategorias;
   resolver: ResolverProveedor;
+  extra?: CasanEnServidor;
 }): ContadoresCompras {
   const palabras = palabrasBusqueda(args.texto);
   return {
-    documentos: args.documentos.filter((d) => coincideDocumento(d, palabras)).length,
+    documentos: args.documentos.filter((d) => coincideDocumento(d, palabras, args.extra)).length,
     productos: filtrarProductos(
       args.productos,
       { busqueda: args.texto, categoria: "todas", proveedor: "", soloConCompras: false },
       args.mapaCategorias,
       args.resolver,
     ).length,
-    proveedores: proveedoresDelTexto(args.proveedores, args.documentos, args.texto, args.resolver).length,
+    proveedores: proveedoresDelTexto(args.proveedores, args.documentos, args.texto, args.resolver, args.extra).length,
   };
 }
 
 /** Documentos de un proveedor canónico (clave `#id`), el más reciente primero. */
-export function documentosDeProveedor(docs: Factura[], proveedor: Pick<Proveedor, "id">, resolver: ResolverProveedor): Factura[] {
+export function documentosDeProveedor<D extends DocumentoBuscable>(docs: D[], proveedor: Pick<Proveedor, "id">, resolver: ResolverProveedor): D[] {
   const clave = `#${proveedor.id}`;
   return docs
     .filter((d) => claveProveedorDocumento(d, resolver) === clave)
     .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.id - a.id);
+}
+
+// ─── Fichas en el historial del navegador (QA 05/11/2026, C-12) ──────────────
+// Abrir una ficha (documento o producto) es una entrada nueva del historial con
+// `?doc=` o `?producto=` en la URL y, en el `state` de la navegación, la PILA de
+// fichas abiertas desde la lista (la actual, la última). «Atrás» del navegador
+// y «Volver a …» retroceden una ficha; «Volver a la lista», todas.
+
+export type FichaCompras = { tipo: "documento"; id: number } | { tipo: "producto"; id: number };
+
+/** Parámetros de la URL que son enlaces de Compras (se quitan al cambiar de pestaña). */
+export const PARAMS_ENLACE_COMPRAS = ["modo", "doc", "mes", "prov", "producto"] as const;
+
+/** La pila de fichas guardada en el `state` de la navegación ([] = la lista). */
+export function pilaDeFichas(estado: unknown): FichaCompras[] {
+  const pila = (estado as { fichaCompras?: { pila?: unknown } } | null)?.fichaCompras?.pila;
+  if (!Array.isArray(pila)) return [];
+  return pila.filter(
+    (f): f is FichaCompras =>
+      !!f &&
+      typeof f === "object" &&
+      ((f as FichaCompras).tipo === "documento" || (f as FichaCompras).tipo === "producto") &&
+      Number.isInteger((f as FichaCompras).id),
+  );
+}
+
+/** ¿Esta navegación es abrir/cerrar una ficha de Compras? (Facturas no debe tratarla como un enlace nuevo.) */
+export const esNavegacionDeFicha = (estado: unknown): boolean => pilaDeFichas(estado).length > 0;
+
+/** El `state` de la navegación con esa pila. */
+export const estadoConFichas = (pila: FichaCompras[]) => ({ fichaCompras: { pila } });
+
+/** La búsqueda de la URL (`?…`) con la ficha (o sin ninguna, `null`) y sin otros enlaces de Compras. */
+export function busquedaConFicha(busqueda: string, ficha: FichaCompras | null): string {
+  const p = new URLSearchParams(busqueda);
+  for (const k of PARAMS_ENLACE_COMPRAS) p.delete(k);
+  p.set("tab", "compras");
+  if (ficha) p.set(ficha.tipo === "documento" ? "doc" : "producto", String(ficha.id));
+  return `?${p.toString()}`;
 }
 
 // ─── Productos que han subido de precio ─────────────────────────────────────

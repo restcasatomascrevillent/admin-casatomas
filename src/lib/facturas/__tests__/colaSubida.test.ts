@@ -10,12 +10,14 @@ import {
   hayEnNavegador,
   nombreUnico,
   progresoTanda,
+  puedeReintentar,
+  puedeVolverASubir,
   type ResultadoProcesamiento,
   textoIndicador,
   textoResumenTanda,
   clasificarResultado,
 } from "../colaSubida";
-import { SinDocumentosLargos, type EstadoTrabajo, type PlanDocumento } from "../documentoLargo";
+import { SigueEnServidor, SinDocumentosLargos, type EstadoTrabajo, type PlanDocumento } from "../documentoLargo";
 
 const pdf = (nombre: string, bytes = 10) => new File(["x".repeat(bytes)], nombre, { type: "application/pdf" });
 const jpg = (nombre: string) => new File(["x"], nombre, { type: "image/jpeg" });
@@ -448,5 +450,268 @@ describe("otra página de una factura existente", () => {
     expect(clasificarResultado(ok("x", { duplicado: true, anadible }))).toBe("pendiente");
     expect(clasificarResultado(ok("x", { duplicado: true }))).toBe("duplicada");
     expect(clasificarResultado(ok("x", { paginaAnadida: true }))).toBe("sustituida");
+  });
+});
+
+// ── 05/11/2026: QA de «Cargar» ───────────────────────────────────────────────
+
+describe("UI-10: ficheros de 0 bytes", () => {
+  it("se rechazan al añadirlos, con su causa para el aviso", () => {
+    const cola = crearColaSubida(deps());
+    const r = cola.añadirArchivos([new File([], "vacio.png", { type: "image/png" }), jpg("bien.jpg")]);
+    expect(r.añadidos).toBe(1);
+    expect(r.rechazados).toEqual([{ nombre: "vacio.png", motivo: expect.stringMatching(/vacío \(0 bytes\)/), causa: "vacio" }]);
+    expect(cola.getEstado().elementos.map((e) => e.nombre)).toEqual(["bien.jpg"]);
+  });
+});
+
+describe("UI-1: un trabajo que tarda NO es un fallo y su reintento sigue EL MISMO trabajo", () => {
+  const sinFin = () => new Promise<EstadoTrabajo>(() => {});
+
+  it("pasado el tiempo normal: «Sigue en el servidor» (en marcha, no fallido)", async () => {
+    let aviso: ((t: EstadoTrabajo | null, info?: { lento: boolean }) => void) | undefined;
+    const cola = crearColaSubida(deps({
+      iniciarUnico: async () => ({ trabajoId: "t1", numPiezas: 1 }),
+      esperar: (_id, onCambio) => { aviso = onCambio; return sinFin(); },
+    }));
+    cola.añadirArchivos([pdf("lento.pdf")]);
+    cola.enviar();
+    await vuelta();
+    aviso!(trabajo("pagina1", { num_paginas: 1 }), { lento: true });
+    const e = cola.getEstado().elementos[0];
+    expect(e).toMatchObject({ fase: "procesando", lento: true });
+    expect(e.progreso).toMatch(/^Sigue en el servidor/);
+    expect(cuentaActivos(cola.getEstado())).toBe(1);
+  });
+
+  it("si se deja de mirar (SigueEnServidor), queda «sigue en el servidor» y «Reintentar» llama a ocr_reintentar_trabajo con EL MISMO trabajo, sin subir ni crear otro", async () => {
+    const iniciarUnico = vi.fn(async () => ({ trabajoId: "t1", numPiezas: 1 }));
+    const reintentarTrabajo = vi.fn(async () => ({ disponible: true, ok: true, estado: "pagina1" }));
+    let vez = 0;
+    const esperar = vi.fn(async () => {
+      vez += 1;
+      if (vez === 1) throw new SigueEnServidor(trabajo("pagina1"));
+      return trabajo("completado", { num_paginas: 1 });
+    });
+    const cola = crearColaSubida(deps({ iniciarUnico, esperar, reintentarTrabajo }));
+    cola.añadirArchivos([pdf("colgado.pdf")]);
+    cola.enviar();
+    await vuelta();
+    let e = cola.getEstado().elementos[0];
+    expect(e.resultado).toMatchObject({ success: false, sigueEnServidor: true });
+    expect(clasificarResultado(e.resultado)).toBe("en_servidor");
+    expect(puedeReintentar(e)).toBe(true);
+
+    expect(cola.reintentar(e.id)).toBe(1);
+    await vuelta();
+    await vuelta();
+    expect(reintentarTrabajo).toHaveBeenCalledWith("t1");
+    expect(iniciarUnico).toHaveBeenCalledTimes(1); // nunca otro trabajo
+    expect(esperar).toHaveBeenLastCalledWith("t1", expect.any(Function));
+    e = cola.getEstado().elementos[0];
+    expect(e).toMatchObject({ fase: "terminado", trabajoId: "t1", resultado: { success: true } });
+  });
+
+  it("un trabajo FALLIDO con fichero: reanuda en el servidor (estado «reanudado»), no lo vuelve a subir", async () => {
+    const iniciarUnico = vi.fn(async () => ({ trabajoId: "t1", numPiezas: 1 }));
+    const reintentarTrabajo = vi.fn(async () => ({ disponible: true, ok: true, estado: "reanudado" }));
+    let vez = 0;
+    const esperar = vi.fn(async () => (++vez === 1 ? trabajo("fallido", { error: "OpenAI no responde" }) : trabajo("completado")));
+    const cola = crearColaSubida(deps({ iniciarUnico, esperar, reintentarTrabajo }));
+    cola.añadirArchivos([pdf("f.pdf")]);
+    cola.enviar();
+    await vuelta();
+    cola.reintentar();
+    await vuelta();
+    await vuelta();
+    expect(iniciarUnico).toHaveBeenCalledTimes(1);
+    expect(cola.getEstado().elementos[0].resultado?.success).toBe(true);
+  });
+
+  it("si el servidor ya no tiene los ficheros: lo explica y ofrece volver a subir (eso sí es un trabajo nuevo)", async () => {
+    const iniciarUnico = vi.fn(async () => ({ trabajoId: `t${iniciarUnico.mock.calls.length}`, numPiezas: 1 }));
+    const reintentarTrabajo = vi.fn(async () => ({ disponible: true, ok: false, motivo: "Los ficheros ya no están: vuelve a subir el documento" }));
+    let vez = 0;
+    const esperar = vi.fn(async () => (++vez === 1 ? trabajo("fallido") : trabajo("completado")));
+    const cola = crearColaSubida(deps({ iniciarUnico, esperar, reintentarTrabajo }));
+    cola.añadirArchivos([pdf("f.pdf")]);
+    cola.enviar();
+    await vuelta();
+    const id = cola.getEstado().elementos[0].id;
+    cola.reintentar(id);
+    await vuelta();
+    let e = cola.getEstado().elementos[0];
+    expect(e.resultado).toMatchObject({ success: false, ficherosAusentes: true, error: "Los ficheros ya no están: vuelve a subir el documento" });
+    expect(puedeReintentar(e)).toBe(false);
+    expect(puedeVolverASubir(e)).toBe(true);
+    expect(cola.volverASubir(id)).toBe(1);
+    await vuelta();
+    e = cola.getEstado().elementos[0];
+    expect(iniciarUnico).toHaveBeenCalledTimes(2);
+    expect(e.resultado?.success).toBe(true);
+  });
+
+  it("servidor sin la RPC: un FALLIDO con fichero se vuelve a subir como antes; uno que seguía en marcha solo se vuelve a mirar", async () => {
+    const iniciarUnico = vi.fn(async () => ({ trabajoId: "t1", numPiezas: 1 }));
+    const reintentarTrabajo = vi.fn(async () => ({ disponible: false, ok: false }));
+    const esperar = vi.fn(async () => trabajo("fallido"));
+    const cola = crearColaSubida(deps({ iniciarUnico, esperar, reintentarTrabajo }));
+    cola.añadirArchivos([pdf("f.pdf")]);
+    cola.enviar();
+    await vuelta();
+    cola.reintentar();
+    await vuelta();
+    await vuelta();
+    expect(iniciarUnico).toHaveBeenCalledTimes(2);
+
+    // Adoptado (sin fichero) que «sigue en el servidor»: solo se vuelve a mirar el mismo.
+    const esperar2 = vi.fn(async (): Promise<EstadoTrabajo> => { throw new SigueEnServidor(null); });
+    const cola2 = crearColaSubida(deps({ esperar: esperar2, reintentarTrabajo }));
+    cola2.adoptar([trabajo("paginas", { id: "t7" })]);
+    await vuelta();
+    const e = cola2.getEstado().elementos[0];
+    expect(e.resultado?.sigueEnServidor).toBe(true);
+    cola2.reintentar(e.id);
+    await vuelta();
+    expect(esperar2).toHaveBeenCalledTimes(2);
+    expect(esperar2).toHaveBeenLastCalledWith("t7", expect.any(Function));
+  });
+});
+
+describe("UI-9: adoptar trabajos parados", () => {
+  it("uno que pasó su límite se enseña como «Parado en el servidor» y NO cuenta como procesando ni avisa", () => {
+    const ahora = Date.parse("2026-11-05T12:00:00Z");
+    const alTerminar = vi.fn();
+    const esperar = vi.fn(() => new Promise<EstadoTrabajo>(() => {}));
+    const cola = crearColaSubida(deps({ esperar, alTerminar, ahora: () => ahora }));
+    const n = cola.adoptar([
+      trabajo("paginas", { id: "vivo", updated_at: "2026-11-05T11:59:00Z", limite_at: "2026-11-05T12:10:00Z" }),
+      trabajo("pagina1", { id: "ayer", nombre_original: "colgado-de-ayer.jpg", num_paginas: 1, updated_at: "2026-11-04T16:00:00Z" }),
+    ]);
+    expect(n).toBe(2);
+    const [vivo, parado] = cola.getEstado().elementos;
+    expect(vivo).toMatchObject({ fase: "procesando", trabajoId: "vivo" });
+    expect(parado).toMatchObject({ fase: "terminado", trabajoId: "ayer", tanda: 0, resultado: { success: false, parado: true } });
+    expect(parado.resultado?.error).toMatch(/^Parado en el servidor/);
+    expect(cuentaActivos(cola.getEstado())).toBe(1);
+    expect(esperar).toHaveBeenCalledTimes(1); // al parado no se le sondea
+    expect(alTerminar).not.toHaveBeenCalled();
+    expect(progresoTanda(cola.getEstado())).toEqual({ hechos: 0, total: 1 });
+  });
+});
+
+describe("UI-11: cancelar un documento enviado", () => {
+  it("en cola: se quita sin subir nada; lo que va por el camino síncrono no se cancela", async () => {
+    const d = diferida<ResultadoProcesamiento>();
+    const cola = crearColaSubida(deps({
+      maxSimultaneos: 1,
+      procesarUnico: () => d.promesa,
+      iniciarUnico: async () => { throw new SinDocumentosLargos("antiguo"); },
+    }));
+    cola.añadirArchivos([pdf("a.pdf"), pdf("b.pdf")]);
+    cola.enviar();
+    await vuelta();
+    const b = cola.getEstado().elementos[1];
+    expect(b.fase).toBe("en_cola");
+    expect(await cola.cancelar(b.id)).toEqual({ ok: true });
+    expect(cola.getEstado().elementos.map((e) => e.nombre)).toEqual(["a.pdf"]);
+    const a = cola.getEstado().elementos[0];
+    expect(a.fase).toBe("enviando");
+    expect(await cola.cancelar(a.id)).toEqual({ ok: false, motivo: expect.stringMatching(/no se puede cancelar/) });
+    d.resolver(ok("a.pdf"));
+    await vuelta();
+  });
+
+  it("subiendo: se corta ANTES de crear el trabajo (no se lee ni se paga) y no avisa", async () => {
+    const subida = diferida<void>();
+    const crear = vi.fn();
+    const alTerminar = vi.fn();
+    const cola = crearColaSubida(deps({
+      alTerminar,
+      iniciarUnico: async (_f, onProgreso) => {
+        await subida.promesa; // la subida a Storage tarda
+        onProgreso(1, 1); // lanza si se canceló
+        crear();
+        return { trabajoId: "t1", numPiezas: 1 };
+      },
+    }));
+    cola.añadirArchivos([pdf("lento.pdf")]);
+    cola.enviar();
+    await vuelta();
+    const e = cola.getEstado().elementos[0];
+    expect(e.fase).toBe("subiendo");
+    expect(hayEnNavegador(cola.getEstado())).toBe(true);
+    expect(await cola.cancelar(e.id)).toEqual({ ok: true });
+    expect(cola.getEstado().elementos).toHaveLength(0);
+    expect(hayEnNavegador(cola.getEstado())).toBe(false);
+    subida.resolver();
+    await vuelta();
+    expect(crear).not.toHaveBeenCalled();
+    expect(alTerminar).not.toHaveBeenCalled();
+    expect(cola.getEstado().elementos).toHaveLength(0);
+  });
+
+  it("leyéndose en el servidor: llama a ocr_descartar_trabajo; si el servidor no deja (consolidando), lo dice y sigue", async () => {
+    const descartarTrabajo = vi.fn()
+      .mockResolvedValueOnce({ disponible: true, ok: false, motivo: "Ya se está guardando: no se puede cancelar" })
+      .mockResolvedValueOnce({ disponible: true, ok: true, estado: "cancelado" });
+    const fin = diferida<EstadoTrabajo>();
+    const alTerminar = vi.fn();
+    const cola = crearColaSubida(deps({
+      alTerminar, descartarTrabajo,
+      iniciarUnico: async () => ({ trabajoId: "t1", numPiezas: 1 }),
+      esperar: () => fin.promesa,
+    }));
+    cola.añadirArchivos([pdf("a.pdf")]);
+    cola.enviar();
+    await vuelta();
+    const e = cola.getEstado().elementos[0];
+    expect(e.fase).toBe("procesando");
+    expect(await cola.cancelar(e.id)).toEqual({ ok: false, motivo: "Ya se está guardando: no se puede cancelar" });
+    expect(cola.getEstado().elementos).toHaveLength(1);
+    expect(await cola.cancelar(e.id)).toEqual({ ok: true });
+    expect(descartarTrabajo).toHaveBeenLastCalledWith("t1");
+    expect(cola.getEstado().elementos).toHaveLength(0);
+    fin.resolver(trabajo("cancelado"));
+    await vuelta();
+    expect(alTerminar).not.toHaveBeenCalled();
+  });
+
+  it("leyéndose y sin la RPC: no se cancela (se explica)", async () => {
+    const cola = crearColaSubida(deps({
+      descartarTrabajo: async () => ({ disponible: false, ok: false }),
+      iniciarUnico: async () => ({ trabajoId: "t1", numPiezas: 1 }),
+      esperar: () => new Promise(() => {}),
+    }));
+    cola.añadirArchivos([pdf("a.pdf")]);
+    cola.enviar();
+    await vuelta();
+    const r = await cola.cancelar(cola.getEstado().elementos[0].id);
+    expect(r).toEqual({ ok: false, motivo: expect.stringMatching(/no se puede cancelar/) });
+    expect(cola.getEstado().elementos).toHaveLength(1);
+  });
+
+  it("parado en el servidor: «quitar» lo descarta en el servidor", async () => {
+    const descartarTrabajo = vi.fn(async () => ({ disponible: true, ok: true }));
+    const cola = crearColaSubida(deps({ descartarTrabajo, ahora: () => Date.parse("2026-11-05T12:00:00Z") }));
+    cola.adoptar([trabajo("pagina1", { id: "ayer", updated_at: "2026-11-04T10:00:00Z" })]);
+    expect(await cola.cancelar(cola.getEstado().elementos[0].id)).toEqual({ ok: true });
+    expect(descartarTrabajo).toHaveBeenCalledWith("ayer");
+    expect(cola.getEstado().elementos).toHaveLength(0);
+  });
+});
+
+describe("UI-4: «Dejar la que hay» marca la fila del duplicado", () => {
+  it("deja de ofrecer sustituir/añadir y cuenta como «ya existía»", async () => {
+    const sustituible = { trabajo_id: "t1", existente: { id: 54 }, nuevo: {} } as never;
+    const cola = crearColaSubida(deps({ procesarUnico: async (_f, n) => ok(n, { duplicado: true, sustituible }) }));
+    cola.añadirArchivos([pdf("d.pdf")]);
+    cola.enviar();
+    await vuelta();
+    expect(clasificarResultado(cola.getEstado().elementos[0].resultado)).toBe("pendiente");
+    cola.marcarDescartado("t1");
+    const r = cola.getEstado().elementos[0].resultado;
+    expect(r).toMatchObject({ descartado: true, sustituible: null });
+    expect(clasificarResultado(r)).toBe("duplicada");
   });
 });

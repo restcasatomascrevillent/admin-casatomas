@@ -1,0 +1,68 @@
+{
+ "archivo": "R167.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "SALVADOR PINAR JIMÉNEZ, S.L.U",
+ "cif": "B73417701",
+ "local": "casa_tomas",
+ "numero_documento": "A26/2.559",
+ "fecha": "2026-01-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "SALSA DRESSING ADEREZO THAI 500 Grs A. BUENO CG",
+   "producto_ficha": "Salsa dressing aderezo thai 500 g (A. Bueno, congelada)",
+   "cantidad": 8.0,
+   "unidad": "ud",
+   "bultos": 1,
+   "contenido_cantidad": 500,
+   "contenido_unidad": "g",
+   "precio_unitario": 15.82,
+   "descuento_pct": null,
+   "total": 126.56,
+   "iva_pct": 10,
+   "albaran_ref": "A26/2.410",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "TOSTADAS CRISTAL 8X5CM 200 GRS PANADERIA",
+   "producto_ficha": "Tostadas de cristal 8x5 cm 200 g (marca Jesús)",
+   "cantidad": 20.0,
+   "unidad": "ud",
+   "bultos": 2,
+   "contenido_cantidad": 200,
+   "contenido_unidad": "g",
+   "precio_unitario": 3.47,
+   "descuento_pct": null,
+   "total": 69.4,
+   "iva_pct": 4,
+   "albaran_ref": "A26/2.410",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 195.96,
+ "desglose_iva": [
+  {
+   "base": 126.56,
+   "pct": 10,
+   "cuota": 12.66
+  },
+  {
+   "base": 69.4,
+   "pct": 4,
+   "cuota": 2.78
+  }
+ ],
+ "iva": 15.44,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 211.4,
+ "observaciones": "Forma de pago 31. Vencimiento 10/02/2026. Fecha emisión sin dato en el documento.",
+ "alertas": []
+}

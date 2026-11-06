@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { FolderTree, Merge, Search, SlidersHorizontal, Sparkles, Truck, TrendingUp, X } from "lucide-react";
+import { FolderTree, Merge, Search, SearchX, SlidersHorizontal, Sparkles, Truck, TrendingUp, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { formatCurrency, formatDateCorta } from "@/components/facturas/shared/formatters";
+import { formatDateCorta, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import {
   useCategoriasProducto,
@@ -40,6 +40,9 @@ import { LineasSinClasificar } from "./LineasSinClasificar";
 import { ProveedoresDialog } from "./ProveedoresDialog";
 import { SelectorCategoria } from "./SelectorCategoria";
 import { AvisosPrecio } from "./AvisosPrecio";
+import { CHIP, EstadoError, EstadoVacio, FOCO, Hueso, filaEstado, useDesbordeHorizontal } from "@/components/facturas/compras/estilo";
+import { detalleError } from "@/lib/facturas/listaCompras";
+import { ConfirmarClasificarIA } from "./ConfirmarClasificarIA";
 
 type Orden = "gasto" | "compras" | "nombre";
 const TODOS = "__todos";
@@ -88,6 +91,8 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
   const [fusionando, setFusionando] = useState(false);
   const [editandoCategorias, setEditandoCategorias] = useState(false);
   const [viendoProveedores, setViendoProveedores] = useState(false);
+  const [confirmandoIA, setConfirmandoIA] = useState(false);
+  const [refChips, difuminado] = useDesbordeHorizontal();
 
   const filtroPeriodo = useMemo(() => ({ ...rangoPeriodo(periodo), tipo: tipo === TODOS ? null : tipo }), [periodo, tipo]);
   const categoriasQ = useCategoriasProducto();
@@ -131,16 +136,28 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
   const error = resumenQ.error ?? categoriasQ.error ?? gastoQ.error;
   if (error) {
     const sinMigrar = faltaMigracionCatalogo(error as { code?: string; message?: string });
-    return (
-      <div className="flex h-full items-center justify-center rounded-xl border bg-card p-6 text-center">
-        <div className="max-w-md space-y-2">
-          <p className="font-semibold">{sinMigrar ? "El catálogo de productos aún no está activado" : "No se ha podido cargar el catálogo"}</p>
-          <p className="text-sm text-muted-foreground">
-            {sinMigrar
-              ? "Falta aplicar la migración 20261007160000_productos_catalogo_categorias en la base de datos."
-              : (error as { message?: string }).message}
-          </p>
+    if (sinMigrar) {
+      return (
+        <div className="flex h-full items-center justify-center rounded-xl border bg-card p-6 text-center">
+          <div className="max-w-md space-y-2">
+            <p className="font-semibold">El catálogo de productos aún no está activado</p>
+            <p className="text-sm text-muted-foreground">Falta aplicar la migración 20261007160000_productos_catalogo_categorias en la base de datos.</p>
+          </div>
         </div>
+      );
+    }
+    // Frase amable y el detalle técnico plegado (QA de diseño F12).
+    return (
+      <div className={compacto ? "flex h-full min-h-0 flex-col justify-center" : "flex h-full items-center justify-center rounded-xl border bg-card"}>
+        <EstadoError
+          titulo="No se ha podido cargar el catálogo de productos"
+          detalle={detalleError(error)}
+          onReintentar={() => {
+            if (resumenQ.isError) void resumenQ.refetch();
+            if (categoriasQ.isError) void categoriasQ.refetch();
+            if (gastoQ.isError) void gastoQ.refetch();
+          }}
+        />
       </div>
     );
   }
@@ -225,12 +242,15 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
     <div
       className={
         compacto
-          ? "flex h-full min-h-0 flex-col gap-0.5"
+          ? "flex h-full min-h-0 flex-col"
           : "flex h-full min-h-0 flex-col gap-2 rounded-xl border border-border/50 bg-card p-2 shadow-sm sm:p-3"
       }
     >
+      {/* En Compras, herramientas y chips de categoría van en UNA fila: chips a la izquierda
+          (con scroll horizontal) y las herramientas fijas a la derecha. Fuera de Compras, dos filas. */}
+      <div className={compacto ? "flex shrink-0 items-center gap-1 border-b border-border/60 px-2" : "contents"}>
       {/* Herramientas: en Compras, botones de icono con etiqueta accesible (nada se corta a 1280). */}
-      <div className={`flex shrink-0 items-center ${compacto ? "gap-0.5" : "flex-wrap gap-2"}`}>
+      <div className={`flex shrink-0 items-center ${compacto ? "order-2 gap-0.5 border-l border-border/60 pl-1" : "flex-wrap gap-2"}`}>
         {busquedaExterna === undefined && (
           <div className="relative min-w-[12rem] flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
@@ -250,7 +270,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
                 <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
                 <span>Filtros</span>
                 {filtrosActivos > 0 && (
-                  <span className="rounded-full bg-muted px-1.5 text-[11px] pointer-coarse:text-xs font-semibold leading-5 text-foreground tabular-nums">
+                  <span className="rounded-full bg-muted px-1.5 text-xs font-semibold leading-5 text-foreground tabular-nums">
                     {filtrosActivos}
                   </span>
                 )}
@@ -288,30 +308,46 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
               variant="ghost"
               className="h-11 shrink-0 gap-1.5 px-3 text-primary"
               disabled={clasificar.isPending}
-              onClick={() => clasificar.mutate()}
-              aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
-              title={`Clasificar ${pendientes} línea(s) con IA`}
+              onClick={() => setConfirmandoIA(true)}
+              aria-label={clasificar.isPending ? "Clasificando…" : `Clasificar ${formatEntero(pendientes)} con IA`}
+              title={`Clasificar ${plural(pendientes, "línea", "líneas")} con IA`}
             >
               <Sparkles className="h-4 w-4" aria-hidden="true" />
-              <span className="tabular-nums">{pendientes}</span>
+              <span className="tabular-nums">{formatEntero(pendientes)}</span>
             </Button>
           ) : (
-            <Button variant="outline" disabled={clasificar.isPending} onClick={() => clasificar.mutate()}>
+            <Button variant="outline" disabled={clasificar.isPending} onClick={() => setConfirmandoIA(true)}>
               <Sparkles className="mr-1 h-4 w-4" aria-hidden="true" />
-              {clasificar.isPending ? "Clasificando…" : `Clasificar ${pendientes} con IA`}
+              {clasificar.isPending ? "Clasificando…" : `Clasificar ${formatEntero(pendientes)} con IA`}
             </Button>
           ))}
       </div>
 
       {/* Gasto por categoría (clic = filtrar): una sola fila de chips, con scroll horizontal sin barra */}
       <div
-        className={`flex shrink-0 overflow-x-auto no-scrollbar ${compacto ? "h-11 items-center gap-1" : "gap-2 pb-1"}`}
+        ref={refChips}
+        className={`flex overflow-x-auto no-scrollbar ${compacto ? "order-1 h-11 min-w-0 flex-1 items-center gap-1" : "shrink-0 gap-2 pb-1"} ${difuminado}`}
         role="toolbar"
         aria-label="Gasto por categoría"
       >
-        <button type="button" onClick={() => elegirChip("todas")} aria-pressed={chipActivo("todas")} className={chipCategoria(compacto, "")}>
+        <button
+          type="button"
+          onClick={() => elegirChip("todas")}
+          aria-pressed={chipActivo("todas")}
+          className={chipCategoria(compacto, "")}
+          title="Gasto sin IVA (importes de línea)"
+        >
           <span className="font-semibold">Todas</span>
-          <span className="tabular-nums text-muted-foreground">{formatCurrency(gastoTotal)}</span>
+          <span className="whitespace-nowrap tabular-nums text-muted-foreground">
+            {/* Mientras llega el gasto, «…» y no «0,00 €» (QA de diseño F11). */}
+            {gastoQ.data ? (
+              <>
+                {formatImporte(gastoTotal)} <span className="text-xs">sin IVA</span>
+              </>
+            ) : (
+              "…"
+            )}
+          </span>
         </button>
         {totales.map((t) => (
           <button
@@ -319,11 +355,12 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
             type="button"
             onClick={() => elegirChip(t.clave)}
             aria-pressed={chipActivo(t.clave)}
+            title="Gasto sin IVA (importes de línea)"
             className={chipCategoria(compacto, t.clave === "pendiente" ? "!border-amber-400/70 bg-amber-50 dark:bg-amber-950/30" : "")}
           >
             <span className="whitespace-nowrap font-semibold">{t.nombre}</span>
             <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-              {t.clave === "pendiente" ? `${t.lineas} línea(s) · ${formatCurrency(t.gasto)}` : formatCurrency(t.gasto)}
+              {t.clave === "pendiente" ? `${plural(t.lineas, "línea", "líneas")} · ${formatImporte(t.gasto)}` : formatImporte(t.gasto)}
             </span>
           </button>
         ))}
@@ -341,13 +378,14 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
             <span className="flex items-center gap-1 whitespace-nowrap font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-red-600" aria-hidden="true" /> Subieron de precio
             </span>
-            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{nombresSubida.size} producto(s)</span>
+            <span className="whitespace-nowrap tabular-nums text-muted-foreground">{plural(nombresSubida.size, "producto", "productos")}</span>
           </button>
         )}
       </div>
+      </div>
 
       {vista === "productos" && (!compacto || categoria !== "todas" || (puedeEditar && seleccion.size > 0)) && (
-        <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <div className={`flex shrink-0 flex-wrap items-center gap-2 ${compacto ? "border-b border-border/60 px-2 py-0.5" : ""}`}>
           {/* En Compras este selector va dentro de «Filtros» (la lista es estrecha y el alto, justo). */}
           {!compacto && selectorSubcategoria}
           {categoria !== "todas" && (
@@ -357,7 +395,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
           )}
           {puedeEditar && seleccion.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 px-2 py-1" aria-label="Acciones sobre la selección">
-              <span className="text-sm font-medium">{seleccion.size} seleccionado(s)</span>
+              <span className="text-sm font-medium">{plural(seleccion.size, "seleccionado", "seleccionados")}</span>
               <SelectorCategoria
                 categorias={categorias}
                 valor={undefined}
@@ -379,13 +417,46 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
       )}
 
       {/* Lista (scroll por dentro) */}
-      <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${compacto ? "border-t border-border/50" : "rounded-lg border"}`} data-testid="lista-productos">
+      <div className={`relative min-h-0 flex-1 overflow-y-auto overscroll-contain ${compacto ? "" : "rounded-lg border"}`} data-testid="lista-productos">
         {vista === "pendientes" ? (
           <LineasSinClasificar catalogo={productos} categorias={categorias} puedeEditar={puedeEditar} />
         ) : resumenQ.isLoading ? (
-          <p className="p-4 text-sm text-muted-foreground">Cargando productos…</p>
+          <div role="status" aria-busy="true">
+            <span className="sr-only">Cargando productos…</span>
+            <ul className="divide-y divide-border/50" aria-hidden="true">
+              {Array.from({ length: 8 }, (_, i) => (
+                <li key={i} className="flex min-h-12 items-center gap-3 px-3 py-2">
+                  <Hueso className="h-4 w-4 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Hueso className={`h-3.5 ${i % 2 ? "w-1/3" : "w-1/2"}`} />
+                    <Hueso className="h-3 w-3/5" />
+                  </div>
+                  <Hueso className="h-3.5 w-16" />
+                </li>
+              ))}
+            </ul>
+          </div>
         ) : visibles.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">Ningún producto coincide con los filtros.</p>
+          <EstadoVacio
+            icono={<SearchX />}
+            titulo="Ningún producto coincide con los filtros"
+            texto={productos.length === 0 ? "Los productos aparecen al subir facturas y clasificar sus líneas." : "Prueba con otra palabra, otra categoría u otros filtros."}
+            accion={
+              filtrosActivos > 0 || categoria !== "todas" || soloSubidas
+                ? {
+                    etiqueta: "Quitar filtros",
+                    onClick: () => {
+                      setCategoria("todas");
+                      setPeriodo("todo");
+                      setTipo(TODOS);
+                      setProveedor("");
+                      setOrden("gasto");
+                      setSoloSubidas(false);
+                    },
+                  }
+                : undefined
+            }
+          />
         ) : (
           <>
             {!compacto && (
@@ -421,10 +492,10 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         )}
       </div>
 
-      <p className="shrink-0 text-xs text-muted-foreground">
+      <p className={compacto ? "flex h-9 shrink-0 items-center border-t border-border/60 px-3 text-xs text-muted-foreground" : "shrink-0 text-xs text-muted-foreground"}>
         {vista === "productos"
-          ? `${visibles.length} producto(s) · ${formatCurrency(gastoVisible)}`
-          : `${pendientes} línea(s) sin clasificar`}{" "}
+          ? `${plural(visibles.length, "producto", "productos")} · ${formatImporte(gastoVisible)}`
+          : `${plural(pendientes, "línea", "líneas")} sin clasificar`}{" "}
         · importes de línea sin IVA
       </p>
 
@@ -448,6 +519,7 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
         />
       )}
       {editandoCategorias && <CategoriasDialog categorias={categorias} onCerrar={() => setEditandoCategorias(false)} />}
+      <ConfirmarClasificarIA abierto={confirmandoIA} lineas={pendientes} onCerrar={() => setConfirmandoIA(false)} onConfirmar={() => clasificar.mutate()} />
       {viendoProveedores && <ProveedoresDialog puedeEditar={puedeEditar} onCerrar={() => setViendoProveedores(false)} />}
     </div>
   );
@@ -458,9 +530,15 @@ export function TabProductos({ busqueda: busquedaExterna, onAbrir, seleccionadoI
  * visualmente de 32 px pero con zona táctil de 44 (el contenedor mide 44 y el
  * `before:` amplía el toque); fuera de Compras, la tarjeta de dos líneas de siempre.
  */
+/**
+ * Hueco de 44×44 de la casilla de 16 px (QA C-14): es un <label>, así que un
+ * toque en cualquier punto del hueco marca o desmarca la casilla.
+ */
+const HUECO_CASILLA = "flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-md hover:bg-muted/40";
+
 const chipCategoria = (compacto: boolean, extra: string) =>
   compacto
-    ? `relative flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-transparent px-3 text-xs before:absolute before:inset-x-0 before:-inset-y-1.5 before:content-[''] aria-pressed:bg-muted aria-pressed:text-foreground hover:bg-muted/50 ${extra}`
+    ? `${CHIP} text-xs ${extra}`
     : `flex min-h-11 shrink-0 flex-col justify-center rounded-lg border px-3 py-1 text-left text-xs aria-pressed:border-primary aria-pressed:bg-primary/10 ${extra}`;
 
 function FilaResumen({
@@ -498,23 +576,23 @@ function FilaResumen({
     const detalle = [
       ruta ?? "Sin categoría",
       nombresProv.length > 0 ? nombresProv.join(", ") : null,
-      `${p.compras} compra(s)`,
+      plural(p.compras, "compra", "compras"),
       formatCantidades(p.cantidades),
-      p.ultimo_precio !== null ? `últ. ${formatCurrency(p.ultimo_precio)}` : null,
+      p.ultimo_precio !== null ? `últ. ${formatImporte(p.ultimo_precio)}` : null,
     ]
       .filter(Boolean)
       .join(" · ");
     return (
       <li
-        className={`flex items-center gap-1 px-2 py-1 ${abierto ? "bg-muted/70" : seleccionado ? "bg-primary/5" : ""}`}
+        className={`flex min-h-12 items-center gap-1 py-0.5 pl-1 pr-2 ${filaEstado(abierto)} ${!abierto && seleccionado ? "bg-primary/5" : ""}`}
         aria-current={abierto ? "true" : undefined}
       >
         {conCasilla && (
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center">
+          <label className={HUECO_CASILLA} data-testid="hueco-casilla">
             <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
-          </div>
+          </label>
         )}
-        <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 flex-1 rounded-md px-1 py-0.5 text-left hover:bg-muted/40">
+        <button type="button" onClick={onAbrir} className={`min-h-11 min-w-0 flex-1 rounded-md px-1.5 py-1 text-left active:bg-muted/50 ${FOCO}`}>
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-sm font-medium" title={p.nombre}>
               {p.nombre}
@@ -529,7 +607,7 @@ function FilaResumen({
                 <title>Clasificado por la IA; nadie lo ha corregido todavía</title>
               </Sparkles>
             )}
-            <span className="ml-auto shrink-0 pl-2 text-sm font-semibold tabular-nums">{formatCurrency(p.gasto)}</span>
+            <span className="ml-auto shrink-0 pl-2 text-sm font-semibold tabular-nums">{formatImporte(p.gasto)}</span>
           </span>
           <span className="block truncate text-xs text-muted-foreground" title={detalle}>
             {detalle}
@@ -545,9 +623,13 @@ function FilaResumen({
       }`}
       aria-current={abierto ? "true" : undefined}
     >
-      <div className="flex h-11 w-11 items-center justify-center">
-        {conCasilla && <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />}
-      </div>
+      {conCasilla ? (
+        <label className={HUECO_CASILLA}>
+          <Checkbox checked={seleccionado} onCheckedChange={onAlternar} aria-label={`Seleccionar ${p.nombre}`} />
+        </label>
+      ) : (
+        <div className="h-11 w-11" />
+      )}
       <button type="button" onClick={onAbrir} className="min-h-11 min-w-0 rounded-md px-1 py-1 text-left hover:bg-muted/40">
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`min-w-0 break-words font-medium ${lg("lg:truncate")}`}>{p.nombre}</span>
@@ -572,20 +654,20 @@ function FilaResumen({
         </span>
       </button>
       {/* Móvil, tablet y Compras: gasto a la derecha; el resto debajo. lg+ (lista ancha): columnas. */}
-      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatCurrency(p.gasto)}</span>
+      <span className={`text-right font-semibold tabular-nums ${lg("lg:hidden")}`}>{formatImporte(p.gasto)}</span>
       <span className={`col-start-2 col-end-4 text-xs text-muted-foreground ${lg("lg:hidden")}`}>
-        {p.compras} compra(s) · {formatCantidades(p.cantidades)}
-        {p.ultimo_precio !== null && ` · últ. ${formatCurrency(p.ultimo_precio)}`}
+        {plural(p.compras, "compra", "compras")} · {formatCantidades(p.cantidades)}
+        {p.ultimo_precio !== null && ` · últ. ${formatImporte(p.ultimo_precio)}`}
       </span>
       {!compacta && (
         <>
-          <span className="hidden text-right text-sm tabular-nums lg:block">{p.compras}</span>
+          <span className="hidden text-right text-sm tabular-nums lg:block">{formatEntero(p.compras)}</span>
           <span className="hidden truncate text-right text-sm tabular-nums lg:block" title={formatCantidades(p.cantidades)}>
             {formatCantidades(p.cantidades)}
           </span>
-          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatCurrency(p.gasto)}</span>
+          <span className="hidden text-right text-sm font-semibold tabular-nums lg:block">{formatImporte(p.gasto)}</span>
           <span className="hidden text-right text-sm tabular-nums lg:block" title={p.ultima_fecha ? `Última compra ${formatDateCorta(p.ultima_fecha)}` : undefined}>
-            {p.ultimo_precio === null ? "—" : formatCurrency(p.ultimo_precio)}
+            {p.ultimo_precio === null ? "—" : formatImporte(p.ultimo_precio)}
           </span>
         </>
       )}

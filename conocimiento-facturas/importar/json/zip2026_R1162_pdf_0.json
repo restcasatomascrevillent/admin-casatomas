@@ -1,0 +1,48 @@
+{
+ "archivo": "R1162.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "PESCADOS GALMAR, S.L.",
+ "cif": "B36475416",
+ "local": "casa_tomas",
+ "numero_documento": "202603153",
+ "fecha": "2026-07-23",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PULPO P2 HAIFEN marruecos FAO34 (lote ILCMA0226014)",
+   "producto_ficha": null,
+   "cantidad": 90.5,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 15.5,
+   "descuento_pct": 0,
+   "total": 1402.75,
+   "iva_pct": 10,
+   "albaran_ref": "018790",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 1402.75,
+ "desglose_iva": [
+  {
+   "base": 1402.75,
+   "pct": 10,
+   "cuota": 140.28
+  }
+ ],
+ "iva": 140.28,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 1543.03,
+ "observaciones": "Forma de pago: pagaré 90 días F.F. Vencimiento 21/10/2026 por 1.543,03 €. Albarán 018790 (23/07/2026). Pie: R.E. 1,40 % con cuota 0,00. Columnas del albarán: caja = 2.ª cifra, kg = 3.ª cifra, precio por kg = 4.ª, importe = última.",
+ "alertas": [
+  "La primera cifra de la línea (90,50) no se identifica; se usa la 3.ª cifra como kg. El importe cuadra: 90,50 x 15,50 = 1.402,75."
+ ]
+}

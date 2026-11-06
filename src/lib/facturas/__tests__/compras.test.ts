@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Factura, ProductoFactura } from "@/hooks/useFacturas";
 import {
+  busquedaConFicha,
+  esNavegacionDeFicha,
+  estadoConFichas,
+  pilaDeFichas,
   albaranesSinFacturaPorProveedor,
   contarFiltrosDocumentos,
   contarPorModo,
@@ -116,9 +120,16 @@ describe("documentos", () => {
       facturas: 1,
       albaranes: 2,
       albaranes_sin_factura: 1,
+      abonos: 0,
       con_avisos: 0,
       sin_revisar: 3,
     });
+  });
+
+  it("chip «Abonos»: los documentos con total negativo", () => {
+    const conAbono = [...DOCS, { ...DOCS[0], id: 99, numero_documento: "AB-1", total: -40 }];
+    expect(filtrarDocumentos(conAbono, "", "abonos", AVISOS).map((d) => d.id)).toEqual([99]);
+    expect(contarFiltrosDocumentos(conAbono, "", AVISOS).abonos).toBe(1);
   });
 
   it("del más reciente al más antiguo", () => {
@@ -215,5 +226,27 @@ describe("subidas de precio y ficha de proveedor", () => {
     expect(textoFrecuencia(14)).toBe("cada dos semanas");
     expect(textoFrecuencia(30)).toBe("cada mes");
     expect(textoFrecuencia(90)).toBe("cada 3 meses");
+  });
+});
+
+describe("fichas en el historial (QA C-12)", () => {
+  it("lee la pila del state y descarta lo que no es una ficha", () => {
+    expect(pilaDeFichas(null)).toEqual([]);
+    expect(pilaDeFichas({ otra: 1 })).toEqual([]);
+    expect(pilaDeFichas(estadoConFichas([{ tipo: "documento", id: 3 }, { tipo: "producto", id: 9 }]))).toEqual([
+      { tipo: "documento", id: 3 },
+      { tipo: "producto", id: 9 },
+    ]);
+    expect(pilaDeFichas({ fichaCompras: { pila: [{ tipo: "x", id: 1 }, { tipo: "producto", id: 1.5 }, { tipo: "producto", id: 2 }] } })).toEqual([
+      { tipo: "producto", id: 2 },
+    ]);
+    expect(esNavegacionDeFicha(estadoConFichas([{ tipo: "documento", id: 1 }]))).toBe(true);
+    expect(esNavegacionDeFicha(estadoConFichas([]))).toBe(false);
+  });
+
+  it("la URL lleva ?doc= o ?producto= y pierde los otros enlaces de Compras", () => {
+    expect(busquedaConFicha("?tab=compras&modo=documentos&doc=7&mes=2026-08", { tipo: "producto", id: 4 })).toBe("?tab=compras&producto=4");
+    expect(busquedaConFicha("?tab=productos&x=1", { tipo: "documento", id: 2 })).toBe("?tab=compras&x=1&doc=2");
+    expect(busquedaConFicha("?tab=compras&doc=7", null)).toBe("?tab=compras");
   });
 });

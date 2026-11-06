@@ -1,0 +1,46 @@
+{
+ "archivo": "R974.pdf",
+ "paginas_pdf": [
+  5
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO ISABEL Y ANDRES,C.B.",
+ "cif": "E73170599",
+ "local": "casa_tomas",
+ "numero_documento": "428/A",
+ "fecha": "2026-06-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 5,
+   "nombre": "15 PERCIFORMES Y A.",
+   "producto_ficha": "Perciformes y afines (familia 15)",
+   "cantidad": 10.6,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.1,
+   "descuento_pct": null,
+   "total": 54.06,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 54.06,
+ "desglose_iva": [
+  {
+   "base": 54.06,
+   "pct": 10,
+   "cuota": 5.41
+  }
+ ],
+ "iva": 5.41,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 59.47,
+ "observaciones": "Periodo 01/06/2026 a 30/06/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 11871.",
+ "alertas": []
+}

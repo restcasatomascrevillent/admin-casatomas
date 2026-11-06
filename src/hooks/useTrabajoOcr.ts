@@ -1,14 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { type EstadoTrabajo, SELECT_TRABAJO, SONDEO_MS } from "@/lib/facturas/documentoLargo";
+import { type EstadoTrabajo, SELECT_TRABAJO, SONDEO_MS, trabajoParado } from "@/lib/facturas/documentoLargo";
 
 export const ESTADOS_EN_CURSO = ["pendiente", "pagina1", "paginas", "consolidando"] as const;
 
 /**
- * Documentos largos que siguen leyéndose en el servidor (últimas 24 h).
+ * Documentos que el servidor tiene «en curso» (últimas 24 h), con `limite_at`.
  * `usuarioId`: solo los que subió ese usuario (la cola en segundo plano los
- * ADOPTA al recargar la página). Si la tabla aún no existe (migración sin
- * aplicar) o falla la lectura, devuelve [] sin error.
+ * ADOPTA al recargar la página). OJO: puede traer trabajos PARADOS (pasaron
+ * su límite y el cron no los cerró): la cola los enseña como «Parado en el
+ * servidor» y no como «Leyendo…» (ver `trabajoParado`). Si la tabla aún no
+ * existe (migración sin aplicar) o falla la lectura, devuelve [] sin error.
  */
 export async function leerTrabajosOcrEnCurso(usuarioId?: string): Promise<EstadoTrabajo[]> {
   const desde = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -20,13 +22,13 @@ export async function leerTrabajosOcrEnCurso(usuarioId?: string): Promise<Estado
 }
 
 /**
- * Documentos largos que siguen leyéndose en segundo plano (de cualquier
- * usuario con acceso a Facturas), con sondeo mientras haya alguno.
+ * Documentos que siguen leyéndose DE VERDAD en segundo plano (de cualquier
+ * usuario con acceso a Facturas; sin los parados), con sondeo mientras haya alguno.
  */
 export function useTrabajosOcrEnCurso() {
   return useQuery<EstadoTrabajo[]>({
     queryKey: ["ocr_trabajos_en_curso"],
-    queryFn: () => leerTrabajosOcrEnCurso(),
+    queryFn: async () => (await leerTrabajosOcrEnCurso()).filter((t) => !trabajoParado(t)),
     refetchInterval: (q) => ((q.state.data?.length ?? 0) > 0 ? SONDEO_MS : 60_000),
     staleTime: 2000,
   });

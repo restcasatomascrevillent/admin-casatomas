@@ -1,0 +1,46 @@
+{
+ "archivo": "R1058.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "abono",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170771955",
+ "fecha": "2026-07-10",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALBARIC. I ES",
+   "producto_ficha": "Albaricoque cat. I",
+   "cantidad": 9.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.2,
+   "descuento_pct": null,
+   "total": -19.8,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": -19.8,
+ "desglose_iva": [
+  {
+   "base": -19.8,
+   "pct": 4,
+   "cuota": -0.79
+  }
+ ],
+ "iva": -0.79,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": -20.59,
+ "observaciones": "Abono devolución de la factura 9170771954 (línea ALBARIC. I ES). Referencia impresa 0060907166. Total BT 2.",
+ "alertas": []
+}

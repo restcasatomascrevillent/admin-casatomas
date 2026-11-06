@@ -1,0 +1,46 @@
+{
+ "archivo": "R1387.pdf",
+ "paginas_pdf": [
+  9
+ ],
+ "tipo": "factura",
+ "proveedor": "PESQUERO ISABEL Y ANDRES,C.B.",
+ "cif": "E73170599",
+ "local": "casa_tomas",
+ "numero_documento": "655/A",
+ "fecha": "2026-08-31",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 9,
+   "nombre": "21 MACRUROS",
+   "producto_ficha": "Macruros (familia 21)",
+   "cantidad": 2.4,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 75.9,
+   "descuento_pct": null,
+   "total": 182.16,
+   "iva_pct": 10,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 182.16,
+ "desglose_iva": [
+  {
+   "base": 182.16,
+   "pct": 10,
+   "cuota": 18.22
+  }
+ ],
+ "iva": 18.22,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 200.38,
+ "observaciones": "Periodo 01/08/2026 a 31/08/2026. Embarcación(es): no consta. Albaranes de subasta (informativo): 18463.",
+ "alertas": []
+}

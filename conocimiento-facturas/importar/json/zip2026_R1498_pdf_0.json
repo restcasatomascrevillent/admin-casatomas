@@ -1,0 +1,99 @@
+{
+ "archivo": "R1498.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "ONCE DE ENERO ARTESANOS DEL MAR",
+ "cif": "B54157011",
+ "local": "casa_tomas",
+ "numero_documento": "M / 5388",
+ "fecha": "2026-09-07",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "QUISQUILLA PELADA LUNA DE MAR",
+   "producto_ficha": "Quisquilla pelada Luna de Mar",
+   "cantidad": 5.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 16.0,
+   "descuento_pct": null,
+   "total": 80.0,
+   "iva_pct": 10,
+   "albaran_ref": "20269626",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "FTE. DORADA 120/160 X5",
+   "producto_ficha": "Dorada 120/160 g (caja 5 kg)",
+   "cantidad": 10.0,
+   "unidad": "kg",
+   "bultos": 2,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 12.25,
+   "descuento_pct": null,
+   "total": 122.5,
+   "iva_pct": 10,
+   "albaran_ref": "20269626",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "SOLOMILLO CERDO EXTRA",
+   "producto_ficha": "Solomillo de cerdo extra",
+   "cantidad": 6.83,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 5.75,
+   "descuento_pct": null,
+   "total": 39.27,
+   "iva_pct": 10,
+   "albaran_ref": "20269626",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "COLA ALISTADO 14X1 PESCANOVA",
+   "producto_ficha": "Cola de alistado Pescanova (14 x 1 kg)",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 10,
+   "albaran_ref": "20269626",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 299.77,
+ "desglose_iva": [
+  {
+   "base": 299.77,
+   "pct": 10,
+   "cuota": 29.98
+  }
+ ],
+ "iva": 29.98,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 329.75,
+ "observaciones": "Transferencia a 30 dias, vencimiento 07/10/2026. Albaran 20269626 de 01/09/2026, pedido 22639. Nota impresa en solomillo: Caja. Emisor: nombre tomado de la ficha (no sale en el texto); CIF B54157011 del pie.",
+ "alertas": [
+  "FTE. DORADA 120/160 X5 a 12,25 €/kg; la ficha tiene 12,50 €/kg como precio habitual. Se deja lo impreso."
+ ]
+}

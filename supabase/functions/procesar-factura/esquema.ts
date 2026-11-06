@@ -67,6 +67,20 @@ export const DESCRIPCION_IVA_PCT =
   "'% R.E.'. null si no hay columna de tipo por linea, si en vez del porcentaje trae un codigo (1, 2, A) " +
   "o si no se lee. NO lo deduzcas por el tipo de producto.";
 
+/** Retencion de IRPF del pie (alquileres, gestorias, profesionales). La
+ *  comparten DOCUMENTO_JSON_SCHEMA y el pie de PAGINA_JSON_SCHEMA. Se RESTA:
+ *  total a pagar = base + IVA - retencion. */
+export const DESCRIPCION_RETENCION_IRPF =
+  "Importe en euros de la RETENCION DE IRPF impresa en el pie ('Retencion IRPF', 'IRPF', '- Ret. 19 %'): " +
+  "la llevan alquileres, gestorias y profesionales, y SE RESTA del total a pagar. Copia el numero en " +
+  "POSITIVO aunque el papel lo pinte con signo menos. null si el documento no trae retencion. No es el " +
+  "recargo de equivalencia (R.E., que SUMA) ni el '% IVA'. Si una columna titulada 'RETENCION' contiene " +
+  "en realidad la cuota de IVA (base x tipo de IVA), esto es null. No la calcules aplicando el porcentaje.";
+
+export const DESCRIPCION_RETENCION_IRPF_PCT =
+  "El PORCENTAJE de retencion de IRPF impreso junto a ese importe (19, 15, 7, 1), en positivo. null si " +
+  "no hay retencion o si el papel no imprime el porcentaje.";
+
 export const DOCUMENTO_JSON_SCHEMA = {
   name: "documento_comercial",
   strict: true,
@@ -77,7 +91,7 @@ export const DOCUMENTO_JSON_SCHEMA = {
       "total_literal", "subtotal_literal", "iva_literal",
       "tipo", "proveedor", "cif", "cliente", "numero_documento", "pagina", "fecha", "sin_importes",
       "continua_en_otra_pagina", "filas_tabla", "productos",
-      "subtotal", "iva", "total", "observaciones", "resumen",
+      "subtotal", "iva", "retencion_irpf", "retencion_irpf_pct", "total", "observaciones", "resumen",
     ],
     properties: {
       // ── LAS CITAS VAN LAS PRIMERAS, Y ESO NO ES COSMETICA ──
@@ -276,6 +290,14 @@ export const DOCUMENTO_JSON_SCHEMA = {
           "impresas, la suma de las que has citado. Si 'iva_literal' es null, esto tambien es null: no lo " +
           "calcules aplicando el porcentaje a la base.",
       },
+      retencion_irpf: {
+        type: ["number", "null"],
+        description: DESCRIPCION_RETENCION_IRPF,
+      },
+      retencion_irpf_pct: {
+        type: ["number", "null"],
+        description: DESCRIPCION_RETENCION_IRPF_PCT,
+      },
       total: {
         type: ["number", "null"],
         description:
@@ -350,6 +372,12 @@ export interface DocumentoExtraido {
   subtotal: number | null;
   iva_literal?: string | null;
   iva: number | null;
+  /** Retencion de IRPF impresa en el pie, en positivo (el signo de abono lo
+   *  pone la normalizacion). null = sin retencion. Opcional como las citas:
+   *  respuestas antiguas no la traen. total = subtotal + iva - retencion. */
+  retencion_irpf?: number | null;
+  /** Porcentaje de la retencion (19, 15, 7, 1). null si no se imprime. */
+  retencion_irpf_pct?: number | null;
   total_literal?: string | null;
   total: number | null;
   observaciones: string | null;
@@ -436,6 +464,13 @@ export function validarEstructura(raw: unknown): ResultadoValidacion {
 
   for (const campo of ["subtotal", "iva", "total"] as const) {
     if (!esNumeroONull(d[campo])) {
+      push(campo, `debe ser un numero o null, llego ${JSON.stringify(d[campo])}`);
+    }
+  }
+
+  // Retencion de IRPF: se valida SI VIENE (respuestas antiguas no la traen).
+  for (const campo of ["retencion_irpf", "retencion_irpf_pct"] as const) {
+    if (d[campo] !== undefined && !esNumeroONull(d[campo])) {
       push(campo, `debe ser un numero o null, llego ${JSON.stringify(d[campo])}`);
     }
   }
@@ -631,6 +666,24 @@ const eur = (n: number) => `${n.toFixed(2)} EUR`;
  *  flotante, y eso llegaria tal cual a una columna NUMERIC(10,2). */
 const redondear2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/**
+ * Retencion de IRPF del documento CON EL SIGNO DE LA BASE: el modelo la copia
+ * en positivo, pero en un abono (base e IVA en negativo) tambien resta en
+ * negativo. Sin base, manda el signo del total. null si no hay retencion (0
+ * cuenta como «no hay»). Invariante: total = subtotal + iva - retencion.
+ */
+export function retencionConSigno(
+  d: { subtotal?: number | null; total?: number | null; retencion_irpf?: number | null },
+): number | null {
+  const r = d.retencion_irpf;
+  if (!esNumeroFinito(r) || r === 0) return null;
+  const ref = esNumeroFinito(d.subtotal) && d.subtotal !== 0
+    ? d.subtotal
+    : (esNumeroFinito(d.total) && d.total !== 0 ? d.total : null);
+  const abs = redondear2(Math.abs(r));
+  return ref !== null && ref < 0 ? -abs : abs;
+}
+
 /** Fila de `facturas.alertas_validacion`: mismo formato que devuelve
  *  `validar_cordura_factura` en SQL. */
 export interface AlertaValidacion {
@@ -801,19 +854,22 @@ export function comprobarCuadre(datos: DocumentoExtraido): Descuadre[] {
     }
   }
 
-  // ── c) subtotal + iva = total ──
+  // ── c) subtotal + iva - retencion IRPF = total ──
   if (esNumeroFinito(datos.subtotal) && esNumeroFinito(datos.iva) && esNumeroFinito(datos.total)) {
-    const esperado = datos.subtotal + datos.iva;
+    const retencion = retencionConSigno(datos);
+    const esperado = datos.subtotal + datos.iva - (retencion ?? 0);
     const tol = Math.max(TOL_IVA_ABS, Math.max(lineas.length, 1) * TOL_IVA_POR_LINEA);
     if (Math.abs(esperado - datos.total) > tol) {
       out.push({
         codigo: "iva_incoherente",
         severidad: "media",
         mensaje:
-          `subtotal ${eur(datos.subtotal)} + IVA ${eur(datos.iva)} = ${eur(esperado)}, ` +
-          `pero el total leido es ${eur(datos.total)}.`,
+          `subtotal ${eur(datos.subtotal)} + IVA ${eur(datos.iva)}` +
+          (retencion !== null ? ` - retencion IRPF ${eur(retencion)}` : "") +
+          ` = ${eur(esperado)}, pero el total leido es ${eur(datos.total)}.`,
         detalle: {
           subtotal: datos.subtotal, iva: datos.iva, total: datos.total,
+          ...(retencion !== null ? { retencion_irpf: retencion } : {}),
           esperado: Number(esperado.toFixed(2)),
           diferencia: Number((esperado - datos.total).toFixed(2)),
           tolerancia: Number(tol.toFixed(2)),
@@ -922,6 +978,7 @@ export function contarCambiosNumericos(
   cmp("subtotal", antes.subtotal, despues.subtotal);
   cmp("iva", antes.iva, despues.iva);
   cmp("total", antes.total, despues.total);
+  cmp("retencion_irpf", antes.retencion_irpf, despues.retencion_irpf);
 
   // Si cambia el numero de lineas, ya es una reescritura por si sola.
   const n = Math.max(antes.productos?.length ?? 0, despues.productos?.length ?? 0);
@@ -992,7 +1049,7 @@ export function compararExpansion(
   }
 
   const cambiosCabecera: string[] = [];
-  for (const c of ["subtotal", "iva", "total"] as const) {
+  for (const c of ["subtotal", "iva", "total", "retencion_irpf"] as const) {
     const a = esNumeroFinito(antes[c]) ? antes[c] : null;
     const b = esNumeroFinito(despues[c]) ? despues[c] : null;
     if (a === null && b === null) continue;
@@ -1757,7 +1814,8 @@ export function deducirImportes(datos: DocumentoExtraido): {
 
   // ── A) El bloque de totales esta impreso salvo su ultima linea ──
   if (esNumeroFinito(datos.subtotal) && esNumeroFinito(datos.iva)) {
-    const total = redondear2(datos.subtotal + datos.iva);
+    const retencion = retencionConSigno(datos);
+    const total = redondear2(datos.subtotal + datos.iva - (retencion ?? 0));
     return {
       datos: { ...datos, total },
       deduccion: {
@@ -1769,12 +1827,15 @@ export function deducirImportes(datos: DocumentoExtraido): {
           severidad: "media",
           mensaje:
             `El documento no declara total a pagar. Se ha CALCULADO como base ${eur(datos.subtotal)} ` +
-            `+ IVA ${eur(datos.iva)} = ${eur(total)}: aritmetica exacta sobre dos importes que si ` +
+            `+ IVA ${eur(datos.iva)}` +
+            (retencion !== null ? ` - retencion IRPF ${eur(retencion)}` : "") +
+            ` = ${eur(total)}: aritmetica exacta sobre importes que si ` +
             `estan impresos, pero el total NO se ha leido del papel.`,
           detalle: {
             metodo: "subtotal_mas_iva",
             subtotal: datos.subtotal,
             iva: datos.iva,
+            ...(retencion !== null ? { retencion_irpf: retencion } : {}),
             total,
             origen: "deduccion",
           },

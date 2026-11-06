@@ -23,6 +23,7 @@ import {
   cambiarEditar,
   cambiarVer,
   permisosParaEditar,
+  rolAlGuardar,
   sinEdicion,
   type PermisoSeccion,
 } from "@/components/usuarios/permisosSecciones";
@@ -181,7 +182,13 @@ export function InvitarUsuario({ onSuccess, allowSuperAdmin = false }: InvitarUs
         body: {
           username: nombreNormalizado,
           password,
-          role,
+          // El rol sigue a los permisos (06/11/2026): el del preconfigurado elegido o el
+          // que corresponde a lo marcado a mano (rolAlGuardar).
+          role: rolAlGuardar(
+            isSuperAdmin ? permissions : sinEdicion(permissions),
+            presets,
+            selectedAccessConfig.startsWith(PRESET_OPTION_PREFIX) ? selectedAccessConfig.slice(PRESET_OPTION_PREFIX.length) : null,
+          ),
           // La función respeta el can_edit que le llega: solo un super admin lo envía.
           permissions: isSuperAdmin ? permissions : sinEdicion(permissions),
         },

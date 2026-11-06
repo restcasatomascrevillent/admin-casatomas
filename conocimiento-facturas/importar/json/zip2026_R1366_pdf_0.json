@@ -1,0 +1,118 @@
+{
+ "archivo": "R1366.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "CASIMIRO PEREZ RODRIGUEZ",
+ "cif": "46914230A",
+ "local": "casa_tomas",
+ "numero_documento": "1 260493",
+ "fecha": "2026-08-18",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "BERBERECHO",
+   "producto_ficha": "Berberecho",
+   "cantidad": 2.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 58.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000493",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "LANGOSTA",
+   "producto_ficha": "Langosta",
+   "cantidad": 1.3,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 55.0,
+   "descuento_pct": null,
+   "total": 71.5,
+   "iva_pct": 10,
+   "albaran_ref": "1-000493",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "OSTRA",
+   "producto_ficha": "Ostra",
+   "cantidad": 36.0,
+   "unidad": "ud",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 2.8,
+   "descuento_pct": null,
+   "total": 100.8,
+   "iva_pct": 10,
+   "albaran_ref": "1-000493",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "CENTOLLA",
+   "producto_ficha": "Centolla",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 30.0,
+   "descuento_pct": null,
+   "total": 90.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000493",
+   "bonificada": false
+  },
+  {
+   "orden": 5,
+   "pagina": 1,
+   "nombre": "PERCEBE",
+   "producto_ficha": "Percebe",
+   "cantidad": 1.5,
+   "unidad": "kg",
+   "bultos": null,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 100.0,
+   "descuento_pct": null,
+   "total": 150.0,
+   "iva_pct": 10,
+   "albaran_ref": "1-000493",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 470.3,
+ "desglose_iva": [
+  {
+   "base": 470.3,
+   "pct": 10,
+   "cuota": 47.03
+  }
+ ],
+ "iva": 47.03,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 517.33,
+ "observaciones": "Albarán 1-000493 del 18/08/2026. Forma de pago: transferencia CaixaBank; vencimiento 18/08/2026 por 517,33. Cliente impreso: MASIDE 2011, S.L.U. (Crevillent).",
+ "alertas": [
+  "LANGOSTA a 55,00 €/kg; la ficha da 60,00 €/kg.",
+  "CENTOLLA a 30,00 €/kg; la ficha da 25,00 €/kg.",
+  "PERCEBE a 100,00 €/kg; la ficha da 110,00 €/kg."
+ ]
+}

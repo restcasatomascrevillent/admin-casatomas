@@ -1,0 +1,46 @@
+{
+ "archivo": "R1632.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "Panaderia Garcia, S.L.",
+ "cif": "B03354073",
+ "local": "casa_tomas",
+ "numero_documento": "2026-1-183",
+ "fecha": "2026-09-30",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "PAN DE CRISTAL",
+   "producto_ficha": "Pan de cristal (barra, caja de 21) - maqueta nueva",
+   "cantidad": 11.0,
+   "unidad": "caja",
+   "bultos": null,
+   "contenido_cantidad": 21,
+   "contenido_unidad": "ud",
+   "precio_unitario": 29.4,
+   "descuento_pct": null,
+   "total": 323.4,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 323.4,
+ "desglose_iva": [
+  {
+   "base": 323.4,
+   "pct": 4,
+   "cuota": 12.94
+  }
+ ],
+ "iva": 12.94,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 336.34,
+ "observaciones": "Maqueta nueva 'FACTURA DE VENTA', código de artículo 185. Precio por caja de 21 barras (29,40 = 21 x 1,40). Recibo a 30 días, vencimiento 30/09/2026. Código de cliente 0000305.",
+ "alertas": []
+}

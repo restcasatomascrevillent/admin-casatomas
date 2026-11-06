@@ -1,0 +1,104 @@
+{
+ "archivo": "R1136.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "FRUTOS SECOS EL LLANO, S.L.",
+ "cif": "B30341598",
+ "local": "casa_tomas",
+ "numero_documento": "12410/26",
+ "fecha": "2026-07-20",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "ALMENDRA MOLIDA REPELADA B/ 1 KG",
+   "producto_ficha": "Almendra molida repelada, bolsa 1 kg",
+   "cantidad": 1.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 8.95,
+   "iva_pct": 4,
+   "albaran_ref": "12410/26",
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "ALMENDRA MOLIDA REPELADA B/ 1 KG",
+   "producto_ficha": "Almendra molida repelada, bolsa 1 kg",
+   "cantidad": 3.0,
+   "unidad": "kg",
+   "bultos": 3,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.95,
+   "descuento_pct": null,
+   "total": 26.85,
+   "iva_pct": 4,
+   "albaran_ref": "12410/26",
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "FINI MIX GOMA PICA B/ 1 KG",
+   "producto_ficha": "Fini Mix golosinas goma picante, bolsas de 1 kg (bulto 12 kg)",
+   "cantidad": 12.0,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": 12,
+   "contenido_unidad": "kg",
+   "precio_unitario": 4.369,
+   "descuento_pct": null,
+   "total": 52.42,
+   "iva_pct": 10,
+   "albaran_ref": "12410/26",
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "MIXENSALADA B/ 1 KG",
+   "producto_ficha": "Mix para ensalada, bolsa 1 kg",
+   "cantidad": 4.0,
+   "unidad": "kg",
+   "bultos": 4,
+   "contenido_cantidad": 1,
+   "contenido_unidad": "kg",
+   "precio_unitario": 8.5,
+   "descuento_pct": null,
+   "total": 34.0,
+   "iva_pct": 10,
+   "albaran_ref": "12410/26",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 122.22,
+ "desglose_iva": [
+  {
+   "base": 86.42,
+   "pct": 10,
+   "cuota": 8.64
+  },
+  {
+   "base": 35.8,
+   "pct": 4,
+   "cuota": 1.43
+  }
+ ],
+ "iva": 10.07,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 132.29,
+ "observaciones": "Albarán 12410/26 del 20/07/2026. Vencimiento giro 27/07/26. Líneas de horario y cierre no son productos.",
+ "alertas": [
+  "PDF digital: el texto no trae nº ni fecha de factura; numero_documento y fecha son los del albarán 12410/26 (20/07/2026)."
+ ]
+}

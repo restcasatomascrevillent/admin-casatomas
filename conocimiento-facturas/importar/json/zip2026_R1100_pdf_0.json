@@ -1,0 +1,46 @@
+{
+ "archivo": "R1100.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "GRUPO OSBORNE, S.A.",
+ "cif": "A11535564",
+ "local": "casa_tomas",
+ "numero_documento": "90284910",
+ "fecha": "2026-07-03",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "Pluma Bellota 100% Iberica 5J",
+   "producto_ficha": "Pluma de bellota 100% ibérica 5J",
+   "cantidad": 26.615,
+   "unidad": "kg",
+   "bultos": 6,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 34.0,
+   "descuento_pct": null,
+   "total": 904.91,
+   "iva_pct": 10,
+   "albaran_ref": "40325845",
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 904.91,
+ "desglose_iva": [
+  {
+   "base": 904.91,
+   "pct": 10,
+   "cuota": 90.49
+  }
+ ],
+ "iva": 90.49,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 995.4,
+ "observaciones": "Pagadero 60 días, adeudo SEPA anticipo. Vencimiento 01/09/2026. Punto verde 0,66 EUR informativo, no sumado al total. Albarán 40325845 del 03/07/2026.",
+ "alertas": []
+}

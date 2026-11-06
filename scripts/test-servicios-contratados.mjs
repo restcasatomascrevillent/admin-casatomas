@@ -24,6 +24,8 @@ const MIGRACION_2 = await readFile("supabase/migrations/20261103160000_servicios
 const ROLLBACK_2 = await readFile("supabase/rollbacks/20261103160000_servicios_planes_costes_ROLLBACK.sql", "utf8");
 const MIGRACION_3 = await readFile("supabase/migrations/20261104121000_servicios_configurables.sql", "utf8");
 const ROLLBACK_3 = await readFile("supabase/rollbacks/20261104121000_servicios_configurables_ROLLBACK.sql", "utf8");
+const MIGRACION_4 = await readFile("supabase/migrations/20261112120000_servicios_github_minutos.sql", "utf8");
+const ROLLBACK_4 = await readFile("supabase/rollbacks/20261112120000_servicios_github_minutos_ROLLBACK.sql", "utf8");
 
 let comprobaciones = 0;
 const ok = (v, msg) => { assert.ok(v, msg); comprobaciones++; };
@@ -440,5 +442,19 @@ igual(Number((await limpia.query("select eur_por_usd from public.servicios_confi
 const mLimpia = (await limpia.query("select public.servicios_metricas_supabase() m")).rows[0].m;
 ok(mLimpia.bd_bytes > 0 && mLimpia.eur_por_usd === 0.92 && !("openai_usd_mes_real" in mLimpia) && !("llamadas_mes" in mLimpia) && !("cheques_stripe_mes" in mLimpia),
   "sin las tablas opcionales, servicios_metricas_supabase() falla o se inventa cifras");
+
+// 13. Minutos de Actions de GitHub (20261112120000): límite de 2.000 al mes,
+// idempotente, sin pisar un límite ya editado en el panel, y su rollback.
+const limitesGithub = async () => (await limpia.query("select limites from public.servicios_contratados where proveedor = 'github'")).rows[0].limites;
+await limpia.exec(MIGRACION_4);
+const conMinutos = await limitesGithub();
+ok(conMinutos.actions_minutos?.limite === 2000 && conMinutos.actions_minutos?.unidad === "minutos", "GitHub no tiene el límite de 2.000 minutos de Actions");
+await limpia.exec(MIGRACION_4);
+igual(await limitesGithub(), conMinutos, "reaplicar la de minutos de GitHub cambia los límites");
+await limpia.exec(ROLLBACK_4);
+ok(!("actions_minutos" in (await limitesGithub())), "el rollback deja el límite de minutos de GitHub");
+await limpia.exec(`update public.servicios_contratados set limites = coalesce(limites, '{}'::jsonb) || '{"actions_minutos": {"limite": 3000, "etiqueta": "Minutos de Actions"}}' where proveedor = 'github'`);
+await limpia.exec(MIGRACION_4);
+igual((await limitesGithub()).actions_minutos.limite, 3000, "la migración pisa un límite de minutos editado en el panel");
 
 console.log(`servicios_contratados + planes_costes + configurables (PGlite): ${comprobaciones} comprobaciones OK`);

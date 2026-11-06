@@ -135,16 +135,13 @@ describe("ReservasHoy · editar desde el popup de notas", () => {
     expect(h.editarReserva).toHaveBeenCalledWith("r-anonima");
   });
 
-  it("sin permiso de edición sobre «reservas» el botón sale deshabilitado y lo explica", async () => {
+  it("sin permiso de edición sobre «reservas» no hay botón (06/11/2026: oculto, no desactivado)", async () => {
     h.canEdit = false;
     const popup = await abrirNotas();
 
-    const boton = within(popup).getByRole("button", { name: "Editar la reserva de Ana Pendiente" });
-    expect(boton).toBeDisabled();
-    expect(boton).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    // Un botón deshabilitado no recibe el ratón (`pointer-events-none`): el motivo solo se ve en su envoltorio.
-    expect(boton.parentElement).toHaveAttribute("title", expect.stringMatching(/No tienes permiso para editar reservas/));
-    fireEvent.click(boton);
+    // La nota se sigue leyendo; el lápiz no está.
+    expect(within(popup).getByText("Ana Pendiente")).toBeInTheDocument();
+    expect(within(popup).queryByRole("button", { name: "Editar la reserva de Ana Pendiente" })).not.toBeInTheDocument();
     expect(h.editarReserva).not.toHaveBeenCalled();
   });
 

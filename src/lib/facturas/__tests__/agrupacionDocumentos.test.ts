@@ -1,20 +1,16 @@
-import { beforeEach, describe, expect, it } from "vitest";
-import type { Factura } from "@/hooks/useFacturas";
 import {
   agruparDocumentos,
   claveEstadoMes,
-  claveEstadoProveedor,
   claveMes,
   etiquetaMes,
   guardarPlegado,
+  importeQueSuma,
   leerPlegado,
+  MESES_ABIERTOS_BUSCANDO,
   mesAbierto,
   mesesRecientes,
-  proveedorAbierto,
   sumaEnTotal,
-  ubicacionDocumento,
 } from "../agrupacionDocumentos";
-import { crearResolverProveedor, type Proveedor } from "../proveedores";
 
 const doc = (id: number, extra: Partial<Factura>): Factura => ({
   id,
@@ -39,29 +35,6 @@ const doc = (id: number, extra: Partial<Factura>): Factura => ({
   ...extra,
 });
 
-const prov = (id: number, nombre: string, variantes: string[]): Proveedor => ({
-  id,
-  nombre,
-  nombre_comercial: null,
-  cif: null,
-  activo: true,
-  origen: null,
-  documentos: 1,
-  facturas: 1,
-  albaranes: 0,
-  total_facturas: 0,
-  total_albaranes: 0,
-  ultima_fecha: null,
-  variantes,
-  alias: [],
-  cifs_extra: [],
-});
-
-const resolver = crearResolverProveedor([
-  prov(1, "Pescados Rías Baixas", ["Pescados Rías Baixas S.L.", "PESCADOS RIAS BAIXAS"]),
-  prov(2, "Makro", ["Makro", "MAKRO AUTOSERVICIO"]),
-]);
-
 describe("fechas y etiquetas", () => {
   it("saca el mes de la fecha y lo llama en español", () => {
     expect(claveMes("2026-10-03")).toBe("2026-10");
@@ -82,116 +55,108 @@ describe("fechas y etiquetas", () => {
 
 describe("agruparDocumentos", () => {
   it("meses del más reciente al más antiguo y «Sin fecha» al final", () => {
-    const g = agruparDocumentos(
-      [
-        doc(1, { fecha: "2026-08-20" }),
-        doc(2, { fecha: "" }),
-        doc(3, { fecha: "2026-10-01" }),
-        doc(4, { fecha: "2025-12-31" }),
-        doc(5, { fecha: "2026-09-15" }),
-      ],
-      resolver,
-    );
+    const g = agruparDocumentos([
+      doc(1, { fecha: "2026-08-20" }),
+      doc(2, { fecha: "" }),
+      doc(3, { fecha: "2026-10-01" }),
+      doc(4, { fecha: "2025-12-31" }),
+      doc(5, { fecha: "2026-09-15" }),
+    ]);
     expect(g.map((m) => m.clave)).toEqual(["2026-10", "2026-09", "2026-08", "2025-12", "sin-fecha"]);
     expect(g.at(-1)?.etiqueta).toBe("Sin fecha");
   });
 
-  it("agrupa por proveedor canónico (variantes juntas), A-Z y «Sin proveedor» al final", () => {
-    const g = agruparDocumentos(
-      [
-        doc(1, { proveedor: "PESCADOS RIAS BAIXAS" }),
-        doc(2, { proveedor: "Pescados Rías Baixas S.L." }),
-        doc(3, { proveedor: "MAKRO AUTOSERVICIO" }),
-        doc(4, { proveedor: null }),
-        doc(5, { proveedor: "Bodegas del Salnés" }),
-      ],
-      resolver,
-    );
+  it("dentro del mes, del documento más reciente al más antiguo (sin subgrupos por proveedor)", () => {
+    const g = agruparDocumentos([
+      doc(1, { fecha: "2026-10-01", proveedor: "Makro" }),
+      doc(2, { fecha: "2026-10-09", proveedor: "Pescados" }),
+      doc(3, { fecha: "2026-10-09", proveedor: null }),
+    ]);
     expect(g).toHaveLength(1);
-    expect(g[0].proveedores.map((p) => p.nombre)).toEqual(["Bodegas del Salnés", "Makro", "Pescados Rías Baixas", "Sin proveedor"]);
-    expect(g[0].proveedores[2].documentos.map((d) => d.id).sort()).toEqual([1, 2]);
-    expect(g[0].documentos).toBe(5);
-  });
-
-  it("dentro de cada proveedor, del documento más reciente al más antiguo", () => {
-    const g = agruparDocumentos(
-      [doc(1, { fecha: "2026-10-01" }), doc(2, { fecha: "2026-10-09" }), doc(3, { fecha: "2026-10-09" })],
-      resolver,
-    );
-    expect(g[0].proveedores[0].documentos.map((d) => d.id)).toEqual([3, 2, 1]);
+    expect(g[0].documentos.map((d) => d.id)).toEqual([3, 2, 1]);
   });
 
   it("total = facturas + albaranes sin factura; un albarán facturado se ve pero no suma", () => {
-    const g = agruparDocumentos(
-      [
-        doc(1, { tipo: "factura", total: 1000.5 }),
-        doc(2, { tipo: "albaran", total: 300, facturado_en_id: 1 }), // ya dentro de la factura 1
-        doc(3, { tipo: "albaran", total: 120.25, facturado_en_id: null }), // sin factura: suma
-        doc(4, { tipo: "albaran", total: null }), // sin importe: cuenta como documento, no suma
-      ],
-      resolver,
-    );
-    const mes = g[0];
-    expect(mes.documentos).toBe(4);
-    expect(mes.total).toBe(1120.75);
-    expect(mes.proveedores[0].documentos).toHaveLength(4);
-    expect(mes.proveedores[0].total).toBe(1120.75);
+    const g = agruparDocumentos([
+      doc(1, { tipo: "factura", total: 1000.5 }),
+      doc(2, { tipo: "albaran", total: 300, facturado_en_id: 1 }), // ya dentro de la factura 1
+      doc(3, { tipo: "albaran", total: 120.25, facturado_en_id: null }), // sin factura: suma
+      doc(4, { tipo: "albaran", total: null }), // sin importe: cuenta como documento, no suma
+    ]);
+    expect(g[0].documentos).toHaveLength(4);
+    expect(g[0].total).toBe(1120.75);
+    expect(g[0].abonos).toBe(0);
   });
 
-  it("el total del mes es la suma de sus proveedores y no arrastra errores de coma flotante", () => {
-    const g = agruparDocumentos([doc(1, { total: 0.1 }), doc(2, { total: 0.2 }), doc(3, { total: 10, proveedor: "Makro" })], resolver);
+  it("los abonos restan del total del mes y se cuentan aparte", () => {
+    const g = agruparDocumentos([doc(1, { total: 500 }), doc(2, { total: -120.4 }), doc(3, { total: -9.6 })]);
+    expect(g[0].total).toBe(370);
+    expect(g[0].abonos).toBe(-130);
+  });
+
+  it("no arrastra errores de coma flotante", () => {
+    const g = agruparDocumentos([doc(1, { total: 0.1 }), doc(2, { total: 0.2 }), doc(3, { total: 10 })]);
     expect(g[0].total).toBe(10.3);
   });
 
   it("un albarán facturado en otro mes no suma en el suyo (ya está en la factura)", () => {
-    const g = agruparDocumentos(
-      [doc(1, { tipo: "albaran", fecha: "2026-09-30", total: 80, facturado_en_id: 99 }), doc(2, { tipo: "albaran", fecha: "2026-10-02", total: 20 })],
-      resolver,
-    );
-    expect(g.map((m) => [m.clave, m.total, m.documentos])).toEqual([
+    const g = agruparDocumentos([
+      doc(1, { tipo: "albaran", fecha: "2026-09-30", total: 80, facturado_en_id: 99 }),
+      doc(2, { tipo: "albaran", fecha: "2026-10-02", total: 20 }),
+    ]);
+    expect(g.map((m) => [m.clave, m.total, m.documentos.length])).toEqual([
       ["2026-10", 20, 1],
       ["2026-09", 0, 1],
     ]);
   });
 
   it("lista vacía = sin grupos", () => {
-    expect(agruparDocumentos([], resolver)).toEqual([]);
+    expect(agruparDocumentos([])).toEqual([]);
   });
 
-  it("sumaEnTotal", () => {
+  it("sumaEnTotal e importeQueSuma", () => {
     expect(sumaEnTotal({ tipo: "factura", facturado_en_id: null })).toBe(true);
     expect(sumaEnTotal({ tipo: "albaran", facturado_en_id: null })).toBe(true);
     expect(sumaEnTotal({ tipo: "albaran", facturado_en_id: 7 })).toBe(false);
     expect(sumaEnTotal({ tipo: "albaran" })).toBe(true);
+    expect(importeQueSuma({ tipo: "albaran", facturado_en_id: 7, total: 50 })).toBe(0);
+    expect(importeQueSuma({ tipo: "factura", facturado_en_id: null, total: null })).toBe(0);
+    expect(importeQueSuma({ tipo: "factura", facturado_en_id: null, total: -12.5 })).toBe(-12.5);
   });
 });
 
 describe("qué grupos están abiertos", () => {
   const hoy = new Date(2026, 9, 10);
 
-  it("por defecto, solo el mes actual y el anterior", () => {
-    expect(mesAbierto("2026-10", {}, hoy, false)).toBe(true);
-    expect(mesAbierto("2026-09", {}, hoy, false)).toBe(true);
-    expect(mesAbierto("2026-08", {}, hoy, false)).toBe(false);
-    expect(mesAbierto("sin-fecha", {}, hoy, false)).toBe(false);
+  it("por defecto (y con cualquier chip), solo el mes actual y el anterior", () => {
+    expect(mesAbierto("2026-10", {}, hoy)).toBe(true);
+    expect(mesAbierto("2026-09", {}, hoy)).toBe(true);
+    expect(mesAbierto("2026-08", {}, hoy)).toBe(false);
+    expect(mesAbierto("sin-fecha", {}, hoy)).toBe(false);
+    expect(mesAbierto("2026-03", {}, hoy, null)).toBe(false);
   });
 
-  it("con búsqueda o chip se abren todos, pero lo que decidió el usuario manda", () => {
-    expect(mesAbierto("2026-03", {}, hoy, true)).toBe(true);
-    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: false }, hoy, true)).toBe(false);
-    expect(mesAbierto("2026-10", { [claveEstadoMes("2026-10")]: false }, hoy, false)).toBe(false);
-    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: true }, hoy, false)).toBe(true);
+  it("con texto buscado se abren solo los 3 meses con resultados más recientes", () => {
+    expect(MESES_ABIERTOS_BUSCANDO).toBe(3);
+    expect(mesAbierto("2025-01", {}, hoy, 0)).toBe(true);
+    expect(mesAbierto("2024-12", {}, hoy, 2)).toBe(true);
+    expect(mesAbierto("2024-11", {}, hoy, 3)).toBe(false);
+    // Aunque sea el mes de hoy: si no está entre los 3 primeros con resultados, plegado.
+    expect(mesAbierto("2026-10", {}, hoy, 5)).toBe(false);
   });
 
-  it("los proveedores empiezan abiertos", () => {
-    expect(proveedorAbierto("2026-10", "#1", {})).toBe(true);
-    expect(proveedorAbierto("2026-10", "#1", { [claveEstadoProveedor("2026-10", "#1")]: false })).toBe(false);
-    expect(proveedorAbierto("2026-09", "#1", { [claveEstadoProveedor("2026-10", "#1")]: false })).toBe(true);
+  it("lo que decidió el usuario manda, con o sin búsqueda", () => {
+    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: false }, hoy, 0)).toBe(false);
+    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: true }, hoy, 7)).toBe(true);
+    expect(mesAbierto("2026-10", { [claveEstadoMes("2026-10")]: false }, hoy)).toBe(false);
+    expect(mesAbierto("2026-03", { [claveEstadoMes("2026-03")]: true }, hoy)).toBe(true);
   });
 
-  it("ubicacionDocumento da el mes y el proveedor canónico", () => {
-    expect(ubicacionDocumento({ fecha: "2026-03-04", proveedor: "MAKRO AUTOSERVICIO" }, resolver)).toEqual({ mes: "2026-03", proveedor: "#2" });
-    expect(ubicacionDocumento({ fecha: "", proveedor: null }, resolver)).toEqual({ mes: "sin-fecha", proveedor: "" });
+  it("si la lista tiene un solo mes, sale abierto (salvo que se pliegue a mano)", () => {
+    expect(mesAbierto("2025-03", {}, hoy, null, 1)).toBe(true);
+    expect(mesAbierto("2025-03", {}, hoy, 4, 1)).toBe(true);
+    expect(mesAbierto("2025-03", { [claveEstadoMes("2025-03")]: false }, hoy, null, 1)).toBe(false);
+    expect(mesAbierto("2025-03", {}, hoy, null, 2)).toBe(false);
   });
 });
 

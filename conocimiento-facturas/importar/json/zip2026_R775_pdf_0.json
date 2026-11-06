@@ -1,0 +1,97 @@
+{
+ "archivo": "R775.pdf",
+ "paginas_pdf": [
+  1
+ ],
+ "tipo": "factura",
+ "proveedor": "HERMANOS FERNANDEZ LOPEZ, SAU",
+ "cif": "A08620056",
+ "local": "casa_tomas",
+ "numero_documento": "9170766002",
+ "fecha": "2026-05-29",
+ "productos": [
+  {
+   "orden": 1,
+   "pagina": 1,
+   "nombre": "KIWI SUNGOLD 18 I ZESPRI 5,8K NZ",
+   "producto_ficha": "Kiwi Sungold Zespri (caja 5,8 kg)",
+   "cantidad": 1,
+   "unidad": "bulto",
+   "bultos": 1,
+   "contenido_cantidad": 5.8,
+   "contenido_unidad": "kg",
+   "precio_unitario": 29.0,
+   "descuento_pct": null,
+   "total": 29.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 2,
+   "pagina": 1,
+   "nombre": "MANGO KENT 12 I AVION ORSERO 5,5K MX",
+   "producto_ficha": "Mango Kent calibre 12 (caja 5,5 kg)",
+   "cantidad": 1,
+   "unidad": "bulto",
+   "bultos": 1,
+   "contenido_cantidad": 5.5,
+   "contenido_unidad": "kg",
+   "precio_unitario": 48.0,
+   "descuento_pct": null,
+   "total": 48.0,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 3,
+   "pagina": 1,
+   "nombre": "SANDIA FASHION 3 I ES",
+   "producto_ficha": "Sandía Fashion calibre 2-3",
+   "cantidad": 18.85,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.4,
+   "descuento_pct": null,
+   "total": 26.39,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  },
+  {
+   "orden": 4,
+   "pagina": 1,
+   "nombre": "PIÑA GOLD 6 I ORO ORSERO CR",
+   "producto_ficha": "Piña Gold calibre 6 (Costa Rica)",
+   "cantidad": 11.65,
+   "unidad": "kg",
+   "bultos": 1,
+   "contenido_cantidad": null,
+   "contenido_unidad": null,
+   "precio_unitario": 1.7,
+   "descuento_pct": null,
+   "total": 19.81,
+   "iva_pct": 4,
+   "albaran_ref": null,
+   "bonificada": false
+  }
+ ],
+ "cargos_pie": [],
+ "subtotal": 123.2,
+ "desglose_iva": [
+  {
+   "base": 123.2,
+   "pct": 4,
+   "cuota": 4.93
+  }
+ ],
+ "iva": 4.93,
+ "recargo_equivalencia": null,
+ "retencion_irpf": null,
+ "total": 128.13,
+ "observaciones": "Entrega 29.05.2026. Líneas con GLOBALG.A.P. (asterisco quitado). Anotación (CP) ignorada. Cuadro de envases vacío. Total BT 4.",
+ "alertas": []
+}

@@ -3,8 +3,9 @@
 // ----------------------------------------------------------------------------
 // Dos llamadores:
 //   · el panel (botón «Sincronizar con Resend» y el estado de la conexión):
-//     JWT del usuario + can_read_section('marketing') para ver el estado y
-//     can_write_section('marketing') para sincronizar;
+//     JWT del usuario + can_read_section('marketing') («Ver») para ver el estado y
+//     can_edit_section('marketing') («Editar», 06/11/2026; antes
+//     can_write_section) para sincronizar;
 //   · pg_cron / Cron del Dashboard (una vez al día): sin usuario, con la
 //     cabecera x-webhook-secret == NEWSLETTER_SYNC_CRON_SECRET (comparación en
 //     tiempo constante; FALLA CERRADO si el secret no está configurado). Mismo
@@ -54,7 +55,7 @@ export async function autenticar(
     return { ok: true, origen: "cron", usuarioId: null };
   }
   if (!cabeceras.get("authorization")) return { ok: false, status: 401, error: "Unauthorized" };
-  const permiso = await cfg.comprobarUsuario(accion === "sincronizar" ? "escribir" : "leer");
+  const permiso = await cfg.comprobarUsuario(accion === "sincronizar" ? "editar" : "leer");
   if (!permiso.ok) return { ok: false, status: permiso.status, error: permiso.error };
   return { ok: true, origen: "panel", usuarioId: permiso.userId };
 }
