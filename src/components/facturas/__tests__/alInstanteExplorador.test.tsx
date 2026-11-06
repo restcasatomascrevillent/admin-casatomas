@@ -64,27 +64,35 @@ beforeEach(() => {
 });
 
 describe("Al instante: la fila de chips", () => {
-  it("bajo la gráfica, sin título, solo los que NO están ya en los presets de arriba, sin pulsar y con su explicación", async () => {
+  it("una sola fila bajo la gráfica, sin título ni repetidos: las gráficas del explorador y las consultas, mezcladas", async () => {
     montar();
     const ex = await explorador();
     const botones = within(fila(ex)).getAllByRole("button");
     expect(botones.map((b) => b.textContent)).toEqual([
       "Gasto este mes",
+      "Gasto por mes",
+      "Top proveedores",
+      "Por familia",
       "Productos más comprados",
+      "Precio de un producto",
+      "Qué ha subido de precio",
+      "Abonos por proveedor",
       "Por revisar",
       "Con avisos",
       "Sin total",
-      "Qué ha subido de precio",
     ]);
-    // Sin duplicados de los presets (06/11/2026, dueño: «estás duplicando los botones»).
-    for (const repetido of ["Gasto por mes", "Top proveedores", "Gasto por categoría", "Evolución de precio"]) {
-      expect(within(fila(ex)).queryByRole("button", { name: repetido })).not.toBeInTheDocument();
+    // Ya no hay fila de presets arriba de la estantería: cada botón sale una vez (06/11/2026).
+    expect(within(ex).getAllByRole("group", { name: "Gráficas rápidas" })).toHaveLength(1);
+    for (const nombre of ["Gasto por mes", "Top proveedores", "Por familia", "Precio de un producto", "Abonos por proveedor"]) {
+      expect(within(ex).getAllByRole("button", { name: nombre })).toHaveLength(1);
     }
     // Sin el rótulo «Al instante · sin IA, ocupa el sitio de la gráfica».
     expect(within(ex).queryByText(/sin IA, ocupa el sitio/)).not.toBeInTheDocument();
-    expect(fila(ex)).toHaveAccessibleName("Más consultas");
-    expect(botones.every((b) => b.getAttribute("aria-pressed") === "false")).toBe(true);
+    // La gráfica del explorador por defecto es «Gasto por mes»: ese preset sale pulsado; las consultas, no.
+    expect(chip(ex, "Gasto por mes")).toHaveAttribute("aria-pressed", "true");
+    expect(chip(ex, "Con avisos")).toHaveAttribute("aria-pressed", "false");
     expect(chip(ex, "Con avisos")).toHaveAccessibleDescription("Documentos con avisos de lectura o de importes.");
+    expect(chip(ex, "Top proveedores")).toHaveAccessibleDescription("Los 10 proveedores con más gasto del periodo.");
     // Debajo de la gráfica (en el orden del documento).
     const grafica = within(ex).getByRole("img");
     expect(grafica.compareDocumentPosition(fila(ex)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -156,5 +164,17 @@ describe("Al instante: pulsar sustituye la gráfica y volver la restaura", () =>
     fireEvent.click(within(within(ex).getByRole("group", { name: "Gráficas rápidas" })).getByRole("button", { name: "Por familia" }));
     await waitFor(() => expect(within(ex).queryByTestId("resultado-al-instante")).not.toBeInTheDocument());
     expect(chip(ex, "Con avisos")).toHaveAttribute("aria-pressed", "false");
+    expect(chip(ex, "Por familia")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("pulsar el preset que ya estaba elegido también devuelve la gráfica del explorador", async () => {
+    montar();
+    const ex = await explorador();
+    fireEvent.click(chip(ex, "Con avisos"));
+    await within(ex).findByTestId("resultado-al-instante");
+    expect(chip(ex, "Gasto por mes")).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(chip(ex, "Gasto por mes"));
+    await waitFor(() => expect(within(ex).queryByTestId("resultado-al-instante")).not.toBeInTheDocument());
+    expect(chip(ex, "Gasto por mes")).toHaveAttribute("aria-pressed", "true");
   });
 });

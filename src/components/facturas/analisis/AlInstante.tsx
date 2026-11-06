@@ -25,6 +25,7 @@ import {
   Table2,
   TrendingUp,
   Truck,
+  Undo2,
   Wallet,
   X,
   Zap,
@@ -113,30 +114,83 @@ function useBordes() {
   return { ref, bordes };
 }
 
+/** Una gráfica del explorador de un toque (antes, la fila de presets de arriba). */
+export interface BotonPreset {
+  id: string;
+  etiqueta: string;
+  descripcion: string;
+  pulsado: boolean;
+  onPulsar: () => void;
+}
+
+/** Icono de cada preset del explorador (los mismos que sus equivalentes de abajo). */
+const ICONOS_PRESET: Record<string, LucideIcon> = {
+  "gasto-mes": CalendarRange,
+  "top-proveedores": Truck,
+  familias: PieChart,
+  "precio-producto": LineChart,
+  "abonos-proveedor": Undo2,
+};
+
+/**
+ * Orden de la fila única bajo la gráfica (06/11/2026, dueño: «quita los botones
+ * de arriba y los que no se repitan añádelos bajo»): presets del explorador
+ * (`p:`) y consultas que ocupan el sitio de la gráfica, mezclados por tema.
+ */
+const ORDEN_FILA = [
+  "c:gasto-mes",
+  "p:gasto-mes",
+  "p:top-proveedores",
+  "p:familias",
+  "c:productos-mas-comprados",
+  "p:precio-producto",
+  "c:subidas-precio",
+  "p:abonos-proveedor",
+  "c:por-revisar",
+  "c:con-avisos",
+  "c:sin-total",
+] as const;
+
+const CLASE_BOTON = cn(
+  // Fondo suave, sin borde; icono en dorado. Mismo aspecto para presets y consultas.
+  "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-transparent bg-muted/50 px-3.5 text-sm text-foreground/80 transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none sm:min-h-9 pointer-coarse:min-h-11",
+  "[&>svg]:text-[hsl(38,59%,38%)] aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:font-medium aria-pressed:text-foreground",
+  FOCO,
+);
+
 export function FilaAlInstante({
   activo,
   onElegir,
   cargando,
+  presets = [],
 }: {
   activo: IdAlInstante | null;
   /** null = volver a la gráfica del explorador (pulsar el chip activo). */
   onElegir: (id: IdAlInstante | null) => void;
   /** El chip cuyo resultado se está consultando. */
   cargando?: boolean;
+  /** Las gráficas del explorador de un toque, en la misma fila. */
+  presets?: BotonPreset[];
 }) {
   const idAyuda = useId();
   const { ref, bordes } = useBordes();
-  // El chip activo, a la vista en la tira del móvil.
+  // El botón activo, a la vista en la tira del móvil.
+  const presetPulsado = presets.find((p) => p.pulsado)?.id;
+  const claveActiva = activo ? activo : presetPulsado ? `preset-${presetPulsado}` : null;
   useEffect(() => {
     const el = ref.current;
-    const chip = activo ? el?.querySelector<HTMLElement>(`[data-chip="${activo}"]`) : null;
+    const chip = claveActiva ? el?.querySelector<HTMLElement>(`[data-chip="${claveActiva}"]`) : null;
     if (!el || !chip || el.scrollWidth <= el.clientWidth + 1) return;
     const izq = chip.offsetLeft - 24;
     const der = chip.offsetLeft + chip.offsetWidth + 24 - el.clientWidth;
     if (izq < el.scrollLeft) el.scrollLeft = Math.max(0, izq);
     else if (der > el.scrollLeft) el.scrollLeft = der;
-  }, [activo, ref]);
+  }, [claveActiva, ref]);
   const degradado = "pointer-events-none absolute inset-y-0 z-10 w-8 from-card to-transparent sm:hidden";
+  const porId = new Map(presets.map((p) => [p.id, p]));
+  const chips = new Map(CHIPS_VISIBLES.map((c) => [c.id, c]));
+  // Los presets que no estén en ORDEN_FILA (si se añadieran) van al final.
+  const orden: string[] = [...ORDEN_FILA, ...presets.filter((p) => !ORDEN_FILA.includes(`p:${p.id}` as never)).map((p) => `p:${p.id}`)];
   return (
     <div className="flex min-w-0 flex-col border-t border-border/60 pt-3" data-testid="al-instante" data-tour="facturas-analisis-al-instante">
       <TooltipProvider delayDuration={300}>
@@ -144,14 +198,41 @@ export function FilaAlInstante({
           <div
             ref={ref}
             role="group"
-            aria-label="Más consultas"
+            aria-label="Gráficas rápidas"
             className="-mx-1 flex snap-x gap-1.5 overflow-x-auto overscroll-x-contain px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible"
           >
-            {CHIPS_VISIBLES.map((c) => {
+            {orden.map((clave) => {
+              if (clave.startsWith("p:")) {
+                const p = porId.get(clave.slice(2));
+                if (!p) return null;
+                const Icono = ICONOS_PRESET[p.id] ?? CalendarRange;
+                return (
+                  <Tooltip key={clave}>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        data-chip={`preset-${p.id}`}
+                        aria-pressed={p.pulsado}
+                        aria-describedby={`${idAyuda}-preset-${p.id}`}
+                        onClick={p.onPulsar}
+                        className={CLASE_BOTON}
+                      >
+                        <Icono className="h-4 w-4" aria-hidden />
+                        {p.etiqueta}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[18rem] text-xs">
+                      {p.descripcion}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+              const c = chips.get(clave.slice(2) as IdAlInstante);
+              if (!c) return null;
               const Icono = ICONOS[c.id];
               const pulsado = activo === c.id;
               return (
-                <Tooltip key={c.id}>
+                <Tooltip key={clave}>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
@@ -160,12 +241,7 @@ export function FilaAlInstante({
                       aria-describedby={`${idAyuda}-${c.id}`}
                       aria-busy={(pulsado && cargando) || undefined}
                       onClick={() => onElegir(pulsado ? null : c.id)}
-                      className={cn(
-                        // Más discretos que los presets de arriba: sin borde, fondo suave e icono en dorado.
-                        "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 whitespace-nowrap rounded-full border border-transparent bg-muted/50 px-3.5 text-sm text-foreground/80 transition-colors hover:bg-muted hover:text-foreground motion-reduce:transition-none sm:min-h-9 pointer-coarse:min-h-11",
-                        "[&>svg]:text-[hsl(38,59%,38%)] aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:pr-2 aria-pressed:font-medium aria-pressed:text-foreground",
-                        FOCO,
-                      )}
+                      className={cn(CLASE_BOTON, "aria-pressed:pr-2")}
                     >
                       {pulsado && cargando ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Icono className="h-4 w-4" aria-hidden />}
                       {c.etiqueta}
@@ -188,8 +264,13 @@ export function FilaAlInstante({
           {bordes.der && <span aria-hidden="true" data-testid="al-instante-mas-der" className={cn(degradado, "right-0 bg-gradient-to-l")} />}
         </div>
       </TooltipProvider>
-      {/* La explicación de cada chip para lectores de pantalla (el tooltip es solo visual). */}
+      {/* La explicación de cada botón para lectores de pantalla (el tooltip es solo visual). */}
       <div className="sr-only">
+        {presets.map((p) => (
+          <span key={p.id} id={`${idAyuda}-preset-${p.id}`}>
+            {p.descripcion}.
+          </span>
+        ))}
         {CHIPS_VISIBLES.map((c) => (
           <span key={c.id} id={`${idAyuda}-${c.id}`}>
             {c.descripcion}

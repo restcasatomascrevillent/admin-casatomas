@@ -388,6 +388,15 @@ function Totales({
 
 // ─── Explorador ─────────────────────────────────────────────────────────────
 
+/** Lo que hace cada gráfica de un toque (tooltip y lectores de pantalla). */
+const DESCRIPCION_PRESET: Record<string, string> = {
+  "gasto-mes": "Gráfica del gasto con IVA de cada mes, por local",
+  "top-proveedores": "Los 10 proveedores con más gasto del periodo",
+  familias: "Gasto por familia de producto (base sin IVA)",
+  "precio-producto": "Cómo ha cambiado el precio de un producto, por proveedor",
+  "abonos-proveedor": "Devoluciones y rectificativas de cada proveedor",
+};
+
 export function Explorador({
   config,
   onConfig,
@@ -685,34 +694,6 @@ export function Explorador({
         </div>
       </header>
 
-      {/* Presets de un toque */}
-      <div role="group" aria-label="Gráficas rápidas" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
-        {PRESETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            aria-pressed={preset === p.id}
-            onClick={() => {
-              const base = aplicarPreset(config, p);
-              setAviso(null);
-              if (p.pideProducto && base.filtros.productos.length === 0) {
-                onConfig({ ...base, medida: "gasto" });
-                setPestanaFiltro("producto");
-                setPrecioPendiente(true);
-                setFiltroAbierto(true);
-              } else onConfig(base);
-            }}
-            className={cn(
-              "inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-border px-3.5 text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground",
-              "aria-pressed:border-primary/40 aria-pressed:bg-primary/10 aria-pressed:text-foreground",
-              FOCO,
-            )}
-          >
-            {p.etiqueta}
-          </button>
-        ))}
-      </div>
-
       {/* Estantería */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto_auto]">
         <Campo etiqueta="Medida">
@@ -956,7 +937,28 @@ export function Explorador({
       )}
 
       {/* «Al instante», bajo la gráfica: su resultado se pone en el hueco de arriba. */}
-      <FilaAlInstante activo={instante} onElegir={elegirInstante} />
+      <FilaAlInstante
+        activo={instante}
+        onElegir={elegirInstante}
+        presets={PRESETS.map((p) => ({
+          id: p.id,
+          etiqueta: p.etiqueta,
+          descripcion: DESCRIPCION_PRESET[p.id] ?? p.etiqueta,
+          // Con una consulta en el hueco de la gráfica, ningún preset está «pulsado».
+          pulsado: !instante && preset === p.id,
+          onPulsar: () => {
+            const base = aplicarPreset(config, p);
+            setAviso(null);
+            setInstante(null);
+            if (p.pideProducto && base.filtros.productos.length === 0) {
+              onConfig({ ...base, medida: "gasto" });
+              setPestanaFiltro("producto");
+              setPrecioPendiente(true);
+              setFiltroAbierto(true);
+            } else onConfig(base);
+          },
+        }))}
+      />
     </section>
   );
 }
