@@ -7,7 +7,8 @@ import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 const createClient = clienteConAuditoria(createClientBase, "buscar-precios-mercado");
 
 // Sin llamadores en el panel (candidata a borrarse, CT-REM-FN-06). Mientras
-// exista: sección Facturas (view), consulta corta y gasto registrado en ia_uso
+// exista: sección Facturas con «Editar» (es IA: desde el 06/11/2026 la IA de
+// Facturas exige «Editar»), consulta corta y gasto registrado en ia_uso
 // (CT-REM-FN-02).
 export const SECCION_PRECIOS = "facturas";
 export const MAX_LONGITUD_QUERY = 200;
@@ -22,7 +23,7 @@ serve(conAuditoriaDePeticion("buscar-precios-mercado", createClientBase, async (
     return new Response(null, { headers: corsHeaders });
   }
 
-  const auth = await exigirPermiso(req, SECCION_PRECIOS, "view", { crearCliente: createClient, corsHeaders });
+  const auth = await exigirPermiso(req, SECCION_PRECIOS, "edit", { crearCliente: createClient, corsHeaders });
   if (!auth.ok) return auth.response;
 
   const uso = new AcumuladorUso("buscar-precios-mercado", "sonar", "chat");

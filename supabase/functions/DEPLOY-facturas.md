@@ -253,7 +253,7 @@ aparece guardada. En `ocr_trabajos` queda una fila con `num_paginas = 1` y `orig
 1. Facturas → Subir → «Elegir archivos» → el PDF (o la captura de 945×2048 que ya hay).
    El PDF de Luga (2 páginas) se trocea solo por páginas; la captura, en 5 franjas.
 2. El resultado dirá «Ya existe la factura ML/101511 (8 líneas)…» con el botón
-   **Sustituir la existente** (exige permiso de EDICIÓN en Facturas).
+   **Sustituir la existente** (exige «Editar» en Facturas; con «Facturas · Subida», solo si la factura la subiste tú).
 3. El diálogo enseña «Ahora» (total, nº de líneas, avisos) frente a «Documento nuevo».
    Al confirmar, en una sola transacción: copia de la fila, sus líneas y su historial en
    `facturas_sustituciones`; borra el historial de precios y las líneas viejas; actualiza

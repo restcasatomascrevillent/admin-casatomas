@@ -53,6 +53,9 @@ const createClient = clienteConAuditoria(createClientBase, "chat-facturas");
 //   · Cero documentos     -> "no hay datos", nunca "no se gasto nada" (A-5).
 // ============================================================================
 
+/** La IA de Facturas: «Editar» en Facturas (06/11/2026). Exportado para los tests. */
+export const SECCION_IA_FACTURAS = { seccion: "facturas", permiso: "edit" } as const;
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -299,9 +302,11 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  // ── Auth: usuario real CON permiso de la seccion `facturas` ──
+  // ── Auth: usuario real CON permiso de EDICION en la seccion `facturas` ──
   // La anon key es un JWT valido y viaja en el bundle publico del panel, asi
   // que `verify_jwt` no basta. Mismo patron que `procesar-factura`.
+  // Desde el 06/11/2026 (dueño) la IA de Facturas es solo para quien tiene
+  // «Editar»: con solo «Ver» se consulta Analisis y Compras, sin IA.
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return json({ error: "Unauthorized" }, 401);
 
@@ -317,15 +322,15 @@ serve(conAuditoriaDePeticion("chat-facturas", createClientBase, async (req) => {
 
   const { data: permitido, error: permError } = await supabase.rpc("has_section_permission", {
     _user_id: user.id,
-    _section: "facturas",
-    _permission: "view",
+    _section: SECCION_IA_FACTURAS.seccion,
+    _permission: SECCION_IA_FACTURAS.permiso,
   });
   if (permError) {
     console.error("[chat-facturas] Error comprobando permisos:", permError.message);
     return json({ success: false, respuesta: "No se han podido verificar tus permisos.", error: permError.message }, 500);
   }
   if (!permitido) {
-    return json({ success: false, respuesta: "No tienes acceso a la seccion de facturas.", error: "forbidden" }, 403);
+    return json({ success: false, respuesta: "La IA de Facturas exige el permiso «Editar» en Facturas.", error: "forbidden" }, 403);
   }
 
   // Dos peticiones identicas pegadas (usuario+sesion+mensaje) comparten UNA
