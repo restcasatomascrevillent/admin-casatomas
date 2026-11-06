@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Images } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BotonHerramientaCarta } from "./BotonHerramientaCarta";
 import type { VinoDesdeFoto } from "./leerVinoFoto";
 import { LoteVinosDialog } from "./LoteVinosFoto";
 import { useLoteVinos, type FilaLote } from "./useLoteVinos";
@@ -10,6 +10,7 @@ export type { DatosVinoFoto, VinoDesdeFoto } from "./leerVinoFoto";
 interface Props {
   categorias: string[];
   onLeido: (resultado: VinoDesdeFoto) => void;
+  className?: string;
 }
 
 /**
@@ -21,7 +22,7 @@ interface Props {
  * «Añadir vino»): el formulario lee la etiqueta con IA al poner la foto
  * (lecturaEtiquetaVino.ts).
  */
-export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
+export function BotonVinoDesdeFoto({ categorias, onLeido, className }: Props) {
   const lote = useLoteVinos(categorias);
   const [loteAbierto, setLoteAbierto] = useState(false);
   // Fila cuyo formulario está abierto: el diálogo del lote se oculta mientras.
@@ -41,16 +42,16 @@ export function BotonVinoDesdeFoto({ categorias, onLeido }: Props) {
 
   return (
     <>
-      <Button
-        variant="outline"
-        className="min-w-0 flex-1 px-3 sm:flex-none sm:px-4"
+      <BotonHerramientaCarta
+        icono={<Images />}
+        etiqueta="Varias botellas"
+        etiquetaCorta="Botellas"
+        nombreAccesible={enLote ? `Varias botellas (${enLote})` : "Varias botellas"}
+        ayuda="Añade varios vinos seguidos: una foto de cada etiqueta y los revisas después"
+        extra={enLote > 0 ? <span aria-hidden="true" className="-ml-1 shrink-0 tabular-nums">{`(${enLote})`}</span> : null}
+        className={className}
         onClick={() => setLoteAbierto(true)}
-        title={enLote ? `Varias botellas (${enLote})` : "Varias botellas"}
-      >
-        <Images className="mr-2 h-4 w-4 shrink-0" />
-        <span className="truncate">Varias botellas</span>
-        {enLote > 0 && <span className="ml-1 shrink-0 tabular-nums">{`(${enLote})`}</span>}
-      </Button>
+      />
       <LoteVinosDialog
         open={loteAbierto && filaEnForm === null}
         onOpenChange={setLoteAbierto}

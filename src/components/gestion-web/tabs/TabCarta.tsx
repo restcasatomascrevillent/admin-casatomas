@@ -32,6 +32,8 @@ import { BotonVinoDesdeFoto, type VinoDesdeFoto } from "@/components/carta/Boton
 import { OrdenarCategoria } from "@/components/carta/OrdenarCategoria";
 import { FiltrosVinos } from "@/components/carta/FiltrosVinos";
 import { BotonCartaImprimir } from "@/components/carta/imprimir/BotonCartaImprimir";
+import { BotonHerramientaCarta } from "@/components/carta/BotonHerramientaCarta";
+import { cn } from "@/lib/utils";
 import {
   categoriaDelFiltro,
   FILTRO_TODOS,
@@ -225,6 +227,21 @@ export default function TabCarta() {
     if (ordenando && !puedeOrdenar) setOrdenando(false);
   }, [ordenando, puedeOrdenar]);
 
+  // Herramientas de la barra (botones secundarios), en el orden en que se ven.
+  const herramientas = [
+    (seccionActiva === "platos" || seccionActiva === "vinos") && (
+      <BotonCartaImprimir key="pdf" tipo={seccionActiva} platos={platos} vinos={vinos} />
+    ),
+    <BotonHerramientaCarta
+      key="precios"
+      icono={<Percent />}
+      etiqueta="Ajustar precios"
+      etiquetaCorta="Precios"
+      ayuda="Sube o baja los precios de una categoría en %, o cambia uno solo"
+      onClick={() => setDialogAjustePreciosOpen(true)}
+    />,
+  ].filter(Boolean);
+
   const renderContenido = (seccion: Seccion, lista: ReactNode) => {
     const config = secciones[seccion];
     if (config.categorias.length === 0) {
@@ -268,7 +285,7 @@ export default function TabCarta() {
               (02/11/2026: antes iban encima, apretados a la derecha, solo con iconos y con un hueco
               vacío). El número de cada sección se ve desde `sm`. */}
           <PestanasPagina
-            accionesDebajoEnMovil
+            accionesDebajoEnMovil="xl"
             pestanas={(Object.keys(secciones) as Seccion[]).map((seccion) => ({
               valor: seccion,
               etiqueta: secciones[seccion].etiqueta,
@@ -277,39 +294,58 @@ export default function TabCarta() {
               tour: seccion === "vinos" ? "gw-carta-vinos" : undefined,
             }))}
             acciones={
-              // Móvil: rejilla de 2 columnas, todos con su texto (02/11/2026: solo iconos «no eran
-              // nada intuitivos»). En Vinos (03/11/2026: un único «Añadir vino», que lee la etiqueta
-              // con IA al poner la foto), arriba «Varias botellas · Ajustar precios» y abajo «Añadir
-              // vino» a todo el ancho. Desde `sm`, una fila como siempre.
-              <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center" data-tour="gw-carta-acciones">
-                <Button variant="outline" className="min-w-0 px-3 sm:px-4" onClick={() => setDialogAjustePreciosOpen(true)} title="Ajustar precios">
-                  <Percent className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">Ajustar precios</span>
-                </Button>
-                {seccionActiva === "vinos" && (
-                  <div className="order-first flex min-w-0 items-center gap-2 sm:order-none sm:flex-wrap" data-tour="gw-carta-vinos-foto">
+              // Botones de la carta (06/11/2026, dueño: «mejora la estética de los botones»):
+              //  · «Añadir …» es la acción principal (relleno de marca); «PDF Carta» y «Ajustar
+              //    precios» son herramientas (contorno, unidas en un grupo) y «Varias botellas» va
+              //    junto a «Añadir vino», porque también añade.
+              //  · Desde 1280 px, una fila a la derecha de las secciones, con la principal al final
+              //    (textos cortos y ayuda emergente hasta 1536 px). Entre 640 y 1280 px (tableta,
+              //    portátil con el menú lateral) bajan a su propia fila: herramientas a la izquierda y
+              //    «Añadir» a la derecha; en una fila con las secciones no cabían y se cortaban.
+              //  · En el móvil, una rejilla de 2 columnas sin huecos: arriba «Añadir …» (a todo el
+              //    ancho, o con «Varias botellas» al lado en Vinos, o con «Ajustar precios» en Bebidas
+              //    y Cócteles) y debajo las herramientas, todas de 44 px con dedo.
+              <div
+                className="grid w-full grid-cols-2 gap-2 sm:flex sm:items-center sm:justify-between sm:gap-3 xl:w-auto xl:justify-end"
+                data-tour="gw-carta-acciones"
+              >
+                <div
+                  className={cn(
+                    "grid min-w-0 gap-2 sm:order-2 sm:flex sm:items-center",
+                    herramientas.length > 1 || seccionActiva === "vinos" ? "col-span-2 grid-cols-2" : "col-span-1 grid-cols-1",
+                  )}
+                  data-tour={seccionActiva === "vinos" ? "gw-carta-vinos-foto" : undefined}
+                >
+                  <Button
+                    className={cn("order-1 min-w-0 px-3 shadow-sm sm:order-2 sm:px-4", seccionActiva !== "vinos" && herramientas.length > 1 && "col-span-2")}
+                    onClick={actual.abrirDialogo}
+                  >
+                    <Plus />
+                    <span className="truncate">{actual.añadir}</span>
+                  </Button>
+                  {seccionActiva === "vinos" && (
                     <BotonVinoDesdeFoto
+                      className="order-2 sm:order-1"
                       categorias={categoriasConOrigen(categoriasVinos)}
                       onLeido={(resultado) => {
                         setPrecargaVino(resultado);
                         setDialogVinoOpen(true);
                       }}
                     />
-                  </div>
-                )}
-                <Button className={`min-w-0 px-3 sm:px-4 ${seccionActiva === "vinos" ? "col-span-2 sm:col-span-1" : ""}`} onClick={actual.abrirDialogo} title={actual.añadir}>
-                  <Plus className="mr-2 h-4 w-4 shrink-0" />
-                  <span className="truncate">{actual.añadir}</span>
-                </Button>
-                {/* «PDF Carta» (05/11/2026): en el móvil ocupa una celda como los demás; desde `sm`, la primera de la fila. */}
-                {(seccionActiva === "platos" || seccionActiva === "vinos") && (
-                  <BotonCartaImprimir
-                    tipo={seccionActiva}
-                    platos={platos}
-                    vinos={vinos}
-                    className="sm:order-first"
-                  />
-                )}
+                  )}
+                </div>
+                <div
+                  role="group"
+                  aria-label="Herramientas de la carta"
+                  className={cn(
+                    "grid min-w-0 gap-2 sm:order-1 sm:flex sm:gap-0",
+                    // Desde `sm`, botones unidos: un solo grupo de contorno.
+                    "sm:[&>*+*]:-ml-px sm:[&>*]:rounded-none sm:[&>*:first-child]:rounded-l-md sm:[&>*:last-child]:rounded-r-md sm:[&>*:focus-visible]:z-10 sm:[&>*:hover]:z-10 sm:[&>*]:relative",
+                    herramientas.length > 1 ? "col-span-2 grid-cols-2" : "col-span-1 grid-cols-1",
+                  )}
+                >
+                  {herramientas}
+                </div>
               </div>
             }
           />
@@ -352,7 +388,7 @@ export default function TabCarta() {
               {seccionActiva !== "vinos" && actual.categorias.length > 0 && (
                 <Select value={actual.categoria} onValueChange={actual.setCategoria} disabled={hayBusqueda}>
                   <SelectTrigger
-                    className="w-full sm:w-[220px] bg-background"
+                    className="w-full sm:w-[180px] lg:w-[220px] bg-background"
                     aria-label="Categoría"
                     title={hayBusqueda ? "La búsqueda incluye todas las categorías" : undefined}
                   >
@@ -397,11 +433,11 @@ export default function TabCarta() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-11 w-full sm:w-auto"
+                  className="w-full sm:w-auto"
                   title={`Cambiar el orden de «${actual.categoria}» en la web`}
                   onClick={() => setOrdenando(true)}
                 >
-                  <ArrowUpDown className="mr-2 h-4 w-4" />
+                  <ArrowUpDown />
                   Ordenar
                 </Button>
               )}
