@@ -4,6 +4,11 @@
 //
 // Las gráficas que manda la IA (adjuntos `serie_precio`) se ven AQUÍ, bajo su
 // respuesta, con «Fijar en el tablero» para dejarlas al final del tablero.
+//
+// `variante="completa"` (06/11/2026): el mismo hilo a pantalla completa
+// (ChatPantallaCompleta, `/facturas/ia`): columna de lectura centrada (máx.
+// 900 px), gráficas más altas y la caja de la pregunta fija abajo. Lo escrito
+// en la caja puede vivir fuera (`borrador`) para no perderlo al cambiar de vista.
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import ReactMarkdown from "react-markdown";
 // GFM: la IA contesta con TABLAS markdown (`| a | b |`) y sin esto salían en crudo (QA 05/11/2026).
@@ -48,6 +53,11 @@ interface Props {
   onQuitarFijada: (id: string) => void;
   /** «Abrir en el explorador»: la misma gráfica, pero en el explorador del tablero. */
   onExplorar?: (g: GraficaIa) => void;
+  /** Panel lateral (estrecho) o pantalla completa. */
+  variante?: "lateral" | "completa";
+  /** Lo escrito en la caja, guardado fuera (sigue al pasar del panel a pantalla completa). */
+  borrador?: string;
+  onBorrador?: (texto: string) => void;
 }
 
 /** Tablas y textos largos de la respuesta: que no ensanchen el panel (estrecho). */
@@ -123,8 +133,27 @@ function BotonCopiar({ texto }: { texto: string }) {
   );
 }
 
-export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onEnviar, onRegenerar, fijadas, onFijar, onQuitarFijada, onExplorar }: Props) {
-  const [input, setInput] = useState("");
+export function PanelCopiloto({
+  mensajes,
+  isLoading,
+  isSending,
+  sugerencias,
+  onEnviar,
+  onRegenerar,
+  fijadas,
+  onFijar,
+  onQuitarFijada,
+  onExplorar,
+  variante = "lateral",
+  borrador,
+  onBorrador,
+}: Props) {
+  const [inputPropio, setInputPropio] = useState("");
+  const input = borrador ?? inputPropio;
+  const setInput = onBorrador ?? setInputPropio;
+  const completa = variante === "completa";
+  // A pantalla completa la lectura va centrada y con un ancho cómodo.
+  const columna = completa ? "mx-auto w-full max-w-[900px] px-4 sm:px-6" : "";
   const hiloRef = useRef<HTMLDivElement>(null);
   const cajaRef = useRef<HTMLTextAreaElement>(null);
   const lista: Sugerencia[] = [...sugerencias.map((texto) => ({ texto })), SUGERENCIA_GRAFICA];
@@ -169,13 +198,14 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={hiloRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4">
+      <div ref={hiloRef} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", !completa && "px-4")}>
         {vacio ? (
-          <div className="space-y-2 py-3">
+          <div className={cn("space-y-2 py-3", columna, completa && "py-6 sm:py-10")}>
+            {completa && <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">¿Qué quieres saber de tus compras?</h2>}
             <p className="text-sm text-muted-foreground">
               Pregunta por tus compras con tus palabras. Si la respuesta trae una gráfica, puedes fijarla en el tablero.
             </p>
-            <ul className="space-y-1" data-tour="facturas-ia-sugerencias" aria-label="Sugerencias para empezar">
+            <ul className={cn("space-y-1", completa && "grid gap-2 space-y-0 pt-2 sm:grid-cols-2")} data-tour="facturas-ia-sugerencias" aria-label="Sugerencias para empezar">
               {lista.map((s) => (
                 <li key={s.texto}>
                   <button
@@ -199,7 +229,7 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
             </ul>
           </div>
         ) : (
-          <ol className="space-y-3 py-3" aria-label="Conversación con la IA">
+          <ol className={cn("space-y-3 py-3", columna, completa && "space-y-5 py-6")} aria-label="Conversación con la IA">
             {isLoading && mensajes.length === 0 && (
               <li>
                 <Escribiendo />
@@ -208,10 +238,11 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
             {mensajes.map((m, i) => (
               <li key={m.id}>
                 {m.rol === "user" ? (
-                  <MensajeUsuario mensaje={m} />
+                  <MensajeUsuario mensaje={m} completa={completa} />
                 ) : (
                   <MensajeAsistente
                     mensaje={m}
+                    completa={completa}
                     fijadas={fijadas}
                     onFijar={onFijar}
                     onQuitarFijada={onQuitarFijada}
@@ -230,8 +261,8 @@ export function PanelCopiloto({ mensajes, isLoading, isSending, sugerencias, onE
         )}
       </div>
 
-      <div className="shrink-0 border-t border-border/60 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-ring" data-tour="facturas-ia-pregunta">
+      <div className={cn("shrink-0 border-t border-border/60 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2", completa ? "bg-background" : "px-4")}>
+        <div className={cn("relative rounded-2xl border border-border/70 bg-background transition-colors focus-within:border-ring", completa && "mx-auto w-[calc(100%-2rem)] max-w-[868px] shadow-sm sm:w-[calc(100%-3rem)]")} data-tour="facturas-ia-pregunta">
           <Textarea
             ref={cajaRef}
             value={input}
@@ -271,7 +302,7 @@ function SinGuardar({ mensaje }: { mensaje: MensajeChat }) {
   return <span className="mr-1 font-medium text-destructive">sin guardar (se perderá al recargar) ·</span>;
 }
 
-function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
+function MensajeUsuario({ mensaje, completa }: { mensaje: MensajeChat; completa?: boolean }) {
   const { pregunta, contexto } = separarContexto(mensaje.contenido);
   return (
     <div className="flex flex-col items-end gap-0.5">
@@ -281,7 +312,7 @@ function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
           <span className="line-clamp-2 break-words">sobre {asuntoDeContexto(contexto)}</span>
         </span>
       )}
-      <div className="max-w-[90%] rounded-2xl rounded-br-md bg-primary px-3 py-1.5 text-sm text-primary-foreground">
+      <div className={cn("rounded-2xl rounded-br-md bg-primary px-3 py-1.5 text-sm text-primary-foreground", completa ? "max-w-[80%] sm:text-base" : "max-w-[90%]")}>
         <div className="prose prose-sm prose-invert max-w-none break-words prose-p:my-0">
           <ReactMarkdown remarkPlugins={PLUGINS_MARKDOWN} components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
             {pregunta}
@@ -298,6 +329,7 @@ function MensajeUsuario({ mensaje }: { mensaje: MensajeChat }) {
 
 function MensajeAsistente({
   mensaje,
+  completa,
   fijadas,
   onFijar,
   onQuitarFijada,
@@ -305,6 +337,7 @@ function MensajeAsistente({
   onExplorar,
 }: {
   mensaje: MensajeChat;
+  completa?: boolean;
   fijadas: ReadonlySet<string>;
   onFijar: (g: GraficaIa) => void;
   onQuitarFijada: (id: string) => void;
@@ -315,7 +348,7 @@ function MensajeAsistente({
   const graficas = graficasDeMensaje(mensaje);
   return (
     <div className="flex flex-col gap-1">
-      <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1")}>
+      <div className={cn(CLASES_PROSA, "prose prose-sm max-w-none text-foreground dark:prose-invert prose-p:my-1", completa && "sm:prose-base sm:prose-p:my-1.5")}>
         <ReactMarkdown remarkPlugins={PLUGINS_MARKDOWN} components={COMPONENTES_MARKDOWN_SEGUROS} urlTransform={urlMarkdownSegura}>
           {mensaje.contenido}
         </ReactMarkdown>
@@ -323,8 +356,8 @@ function MensajeAsistente({
       {graficas.map((g) => {
         const fijada = fijadas.has(g.id);
         return (
-          <div key={g.id} className="rounded-xl border border-border/70 p-2">
-            <GraficoSeriePrecio datos={g.serie} alto={180} />
+          <div key={g.id} className={cn("rounded-xl border border-border/70 p-2", completa && "p-3")}>
+            <GraficoSeriePrecio datos={g.serie} alto={completa ? 320 : 180} />
             <div className="mt-1 flex flex-wrap items-center gap-x-1">
               <button
                 type="button"

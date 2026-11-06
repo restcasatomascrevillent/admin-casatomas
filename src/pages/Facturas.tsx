@@ -21,6 +21,7 @@ import { leerEnlaceCompras } from "@/lib/facturas/tableroCompras";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useColaSubidaOpcional } from "@/hooks/useColaSubida";
 import { ALTURA_MINIMA_FACTURAS } from "@/lib/facturas/alturaCargar";
+import { esRutaIaCompleta } from "@/lib/facturas/copilotoCompleto";
 
 // Rediseño del 08/10/2026: «Documentos» y «Productos» (las pestañas de antes) son
 // ahora modos de Compras; sus enlaces antiguos (`?tab=productos` de la campana,
@@ -39,7 +40,10 @@ const Facturas = () => {
   // `?tab=cargar`: el indicador global de subidas, los toasts y la campana
   // llevan directos a la pestaña «Cargar», también si ya estabas en Facturas.
   const [searchParams, setSearchParams] = useSearchParams();
-  const { key: claveNavegacion, state: estadoNavegacion } = useLocation();
+  const { key: claveNavegacion, state: estadoNavegacion, pathname } = useLocation();
+  // `/facturas/ia` (06/11/2026): «Pregúntale a la IA» a pantalla completa. Es esta
+  // misma página (no se desmonta al ir y volver): sin pestañas y con Análisis delante.
+  const pantallaIa = esRutaIaCompleta(pathname);
   // Abrir o cerrar una ficha de Compras es una entrada del historial (`?doc=` /
   // `?producto=` con la pila en el `state`, QA 05/11/2026 C-12): no es un enlace
   // nuevo, así que no se vuelve a aplicar como `modoPedido`.
@@ -47,8 +51,9 @@ const Facturas = () => {
   const ultimoModoPedido = useRef<{ modo: ModoCompras; clave: string; doc?: number; mes?: string; prov?: number } | undefined>(undefined);
   // Sin `?tab=` pero con un enlace a Compras (`?modo=`, `?doc=`, `?mes=`, `?prov=`…), Compras; si no, Análisis.
   // También al volver con «Atrás» a una URL sin `?tab=` (QA 05/11/2026: se quedaba en Compras).
-  const tabUrl =
-    pestanaDeUrl(searchParams.get("tab")) ?? (PARAMS_ENLACE_COMPRAS.some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL);
+  const tabUrl = pantallaIa
+    ? "chat"
+    : pestanaDeUrl(searchParams.get("tab")) ?? (PARAMS_ENLACE_COMPRAS.some((k) => searchParams.has(k)) ? "compras" : PESTANA_INICIAL);
   const [activeTab, setActiveTab] = useState<string>(tabUrl);
   // `?tab=productos` (la campana, marcadores antiguos) abre Compras en el modo Productos.
   // `?tab=compras&modo=documentos&doc=<id>` (el «Ver» de Cargar) abre ESE documento.
@@ -155,6 +160,7 @@ const Facturas = () => {
           <PestanasPagina
             // En el móvil, solo iconos: a 390 px el gasto de IA tapaba «Cargar» (QA 05/11/2026).
             soloIconosEnMovil
+            className={pantallaIa ? "hidden" : undefined}
             pestanas={[
               { valor: "chat", etiqueta: "Análisis", icono: <BarChart3 />, tour: "facturas-pestana-ia" },
               { valor: "compras", etiqueta: "Compras", icono: <ShoppingCart />, contador: totalDocumentos, tour: "facturas-pestana-compras" },
@@ -186,7 +192,9 @@ const Facturas = () => {
                 (ChatFacturas). El gasto de IA va junto a la pestaña (GastoIaPestana). */}
             <TabsContent value="chat" forceMount className="h-full m-0 outline-none data-[state=inactive]:hidden">
               <div className="h-full min-h-0 overflow-hidden">
-                {(analisisMontada || activeTab === "chat") && <ChatFacturas ref={chatRef} onIrA={irA} activa={activeTab === "chat"} />}
+                {(analisisMontada || activeTab === "chat") && (
+                  <ChatFacturas ref={chatRef} onIrA={irA} activa={activeTab === "chat"} pantallaCompleta={pantallaIa} />
+                )}
               </div>
             </TabsContent>
 

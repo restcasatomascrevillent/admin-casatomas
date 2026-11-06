@@ -19,8 +19,12 @@
 // siguen el explorador, la conversación y el copiloto como estaban. Por eso la
 // URL solo se escribe cuando cambia el periodo o el local AQUÍ (no al montar ni
 // al navegar a Compras), y el copiloto se esconde mientras no se ve Análisis.
+//
+// `pantallaCompleta` (ruta `/facturas/ia`, 06/11/2026): el chat ocupa el sitio
+// del tablero (ChatPantallaCompleta) con este mismo estado; el tablero y el
+// explorador siguen montados (ocultos) y al volver están como se dejaron.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarSearch, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -51,6 +55,8 @@ import { SelectorPeriodo } from "./analisis/SelectorPeriodo";
 import { DocumentosDeCifra } from "./analisis/DocumentosDeCifra";
 import { ErrorTablero, EsqueletoTablero, Segmentado } from "./analisis/piezas";
 import { CopilotoLateral } from "./copiloto/CopilotoLateral";
+import { ChatPantallaCompleta } from "./copiloto/ChatPantallaCompleta";
+import { enlacePantallaCompleta, destinoVolver, type EstadoPantallaCompleta } from "@/lib/facturas/copilotoCompleto";
 import { desplazarDentro, esMovil } from "./analisis/desplazar";
 
 export interface ChatFacturasRef {
@@ -62,6 +68,8 @@ interface ChatFacturasProps {
   onIrA?: (enlace: string) => void;
   /** ¿Se está viendo la pestaña? (sigue montada aunque no). Por defecto, sí. */
   activa?: boolean;
+  /** `/facturas/ia`: el chat a pantalla completa en lugar del tablero. */
+  pantallaCompleta?: boolean;
 }
 
 const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
@@ -108,7 +116,7 @@ function textoSeleccion(sel: SeleccionPeriodo, hoy: Date): string {
   return f.desde && f.hasta ? textoRango(f.desde, f.hasta) : NOMBRE_PERIODO[sel.tipo];
 }
 
-export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true }, ref) => {
+export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true, pantallaCompleta = false }, ref) => {
   const hoy = useHoy();
   const hoyRef = useRef(hoy);
   hoyRef.current = hoy;
@@ -188,11 +196,14 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     isLoading,
     isSending,
     seleccionarConversacion,
+    abrirConversacionPorId,
     nuevaConversacion,
     enviarMensaje,
     regenerarRespuesta,
     eliminarConversacion,
   } = useChatFacturas();
+  // Lo escrito en la caja vive aquí: sigue al pasar del panel a pantalla completa y al volver.
+  const [borrador, setBorrador] = useState("");
 
   const periodoSugerencias: PeriodoAnalisis = seleccion.tipo === "personalizado" ? "todo" : seleccion.tipo;
   const sugerencias = useMemo(() => sugerenciasDeTablero(tablero.data, periodoSugerencias), [tablero.data, periodoSugerencias]);
@@ -222,6 +233,39 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       filtros: { ...FILTROS_VACIOS, productos: [g.serie.producto], unidad: g.serie.unidad ? g.serie.unidad.toLowerCase() : null },
     });
   };
+  // ─── Pantalla completa (`/facturas/ia`) ───
+  const navegar = useNavigate();
+  const ubicacion = useLocation();
+  const enlaceCompleta = enlacePantallaCompleta(conversacionActiva?.id);
+  const irAPantallaCompleta = () => {
+    const estado: EstadoPantallaCompleta = { volverA: `${ubicacion.pathname}${ubicacion.search}` };
+    navegar(enlaceCompleta, { state: estado });
+  };
+  /** Al salir de pantalla completa: al panel lateral (por defecto) o al explorador con una gráfica de la IA. */
+  const alSalir = useRef<GraficaIa | null>(null);
+  const salirDePantallaCompleta = (explorarGrafica?: GraficaIa) => {
+    alSalir.current = explorarGrafica ?? null;
+    const estado = ubicacion.state as Partial<EstadoPantallaCompleta> | null;
+    // Vino de Análisis en esta pestaña: «Atrás», a la misma URL (periodo y local) y sin apilar historial.
+    if (estado?.volverA) navegar(-1);
+    else navegar(destinoVolver(estado));
+  };
+  const estabaCompleta = useRef(pantallaCompleta);
+  useEffect(() => {
+    if (estabaCompleta.current && !pantallaCompleta) {
+      const g = alSalir.current;
+      alSalir.current = null;
+      if (g) explorarGraficaIa(g);
+      // De vuelta, el panel lateral abierto con la misma conversación (en el móvil, para ver la gráfica, no).
+      if (!g || !esMovil()) {
+        setVerHistorial(false);
+        setAbierto(true);
+      }
+    }
+    estabaCompleta.current = pantallaCompleta;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al entrar o salir de pantalla completa
+  }, [pantallaCompleta]);
+
   const abrirConversacion = (c: Conversacion) => {
     setVerHistorial(false);
     return seleccionarConversacion(c);
@@ -289,6 +333,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
             onLocal={setLocal}
             onTramo={verTramo}
             volverTramo={volverTramo}
+            hoy={hoy}
             onDocumentos={setPeticionDocs}
             onIrA={irA}
             fijadas={idsExploraciones}
@@ -299,14 +344,14 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       />
     );
 
-  const copilotoVisible = abierto && activa;
+  const copilotoVisible = abierto && activa && !pantallaCompleta;
   return (
     // Con el copiloto abierto (360 px, no modal) el contenido deja su hueco a la
     // derecha (desde lg, 1024 px): si no, el panel tapaba el botón y la franja
     // derecha (QA 05/11/2026). En la tablet vertical no: quedarían ~440 px y las
     // tarjetas, a 2 columnas, se aplastaban; ahí el panel va por encima.
     <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "lg:pr-[360px]")}>
-      <div className="flex shrink-0 flex-wrap items-center gap-2" data-tour="facturas-analisis-barra">
+      <div className={cn("flex shrink-0 flex-wrap items-center gap-2", pantallaCompleta && "hidden")} data-tour="facturas-analisis-barra">
         <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} />
         {/* Local, «Actualizando…» y la IA van juntos: si la barra no cabe (tablet en
             vertical), bajan juntos a la segunda fila y el botón no se queda solo. */}
@@ -340,7 +385,7 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       {/* `relative`: los `sr-only` (absolute) de dentro se quedan en el tablero y no
           alargan la PÁGINA (scroll de 1063 px a 1180×820, QA 05/11/2026). */}
       <div
-        className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className={cn("relative min-h-0 flex-1 overflow-y-auto overscroll-contain", pantallaCompleta && "hidden")}
         role="region"
         aria-label="Tablero de compras"
         data-testid="tablero-analisis"
@@ -348,6 +393,30 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
       >
         {cuerpo}
       </div>
+
+      {pantallaCompleta && (
+        <ChatPantallaCompleta
+          conversaciones={conversaciones}
+          conversacionActiva={conversacionActiva}
+          onSeleccionarConversacion={(c) => void seleccionarConversacion(c)}
+          onNuevaConversacion={() => void nuevaConversacion()}
+          onEliminarConversacion={eliminarConversacion}
+          abrirConversacionPorId={abrirConversacionPorId}
+          onVolver={() => salirDePantallaCompleta()}
+          mensajes={mensajes}
+          isLoading={isLoading}
+          isSending={isSending}
+          sugerencias={sugerencias}
+          onEnviar={(texto) => void enviarMensaje(texto)}
+          onRegenerar={regenerarRespuesta}
+          fijadas={idsFijadas}
+          onFijar={fijar}
+          onQuitarFijada={quitar}
+          onExplorar={(g) => salirDePantallaCompleta(g)}
+          borrador={borrador}
+          onBorrador={setBorrador}
+        />
+      )}
 
       <DocumentosDeCifra peticion={peticionDocs} onCerrar={() => setPeticionDocs(null)} onIrA={onIrA} />
 
@@ -371,6 +440,10 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         onFijar={fijar}
         onQuitarFijada={quitar}
         onExplorar={explorarGraficaIa}
+        enlacePantallaCompleta={enlaceCompleta}
+        onPantallaCompleta={irAPantallaCompleta}
+        borrador={borrador}
+        onBorrador={setBorrador}
       />
     </div>
   );

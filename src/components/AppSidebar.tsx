@@ -139,7 +139,8 @@ export function AppSidebar() {
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
 
-  const isActive = (path: string) => currentPath === path;
+  // También en sus subrutas: /facturas/ia (la IA a pantalla completa) sigue marcando «Facturas».
+  const isActive = (path: string) => currentPath === path || (path !== "/" && currentPath.startsWith(`${path}/`));
   // En el panel deslizante (tablet vertical) `state` sigue siendo el del menú de escritorio,
   // pero dentro del Sheet siempre se ve expandido: no confundir con el carril de iconos.
   const isCollapsed = state === "collapsed" && !isMobile;

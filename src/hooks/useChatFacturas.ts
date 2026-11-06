@@ -68,7 +68,8 @@ export function useChatFacturas() {
     }
 
     // Columnas reales: id, conversacion_id, rol, contenido, created_at
-    const mapped: MensajeChat[] = (data ?? []).map((m: any) => ({
+    const filas = (data ?? []) as unknown as { id: string; contenido: string; rol: string; conversacion_id: string; created_at: string; adjuntos?: unknown }[];
+    const mapped: MensajeChat[] = filas.map((m) => ({
       id: m.id,
       contenido: m.contenido,
       rol: m.rol as "user" | "assistant",
@@ -87,6 +88,25 @@ export function useChatFacturas() {
     setConversacionActiva(conv);
     await cargarMensajes(conv.id);
   }, [cargarMensajes]);
+
+  // ─── Abrir una conversación por su id (`/facturas/ia?c=<id>`) ────────────────
+  // La del historial ya cargado o, si aún no ha llegado, la de la base de datos.
+  // false si no existe (borrada, o de otra cuenta: RLS no la devuelve).
+  const abrirConversacionPorId = useCallback(async (id: string): Promise<boolean> => {
+    let conv: Conversacion | null = conversaciones.find((c) => c.id === id) ?? null;
+    if (!conv) {
+      const { data, error } = await supabase.from("chat_facturas_conversaciones").select("*").eq("id", id).maybeSingle();
+      if (error) {
+        console.error("Error abriendo la conversación:", error);
+        return false;
+      }
+      const fila = (Array.isArray(data) ? data[0] : data) as unknown as Conversacion | undefined;
+      conv = fila?.id === id ? fila : null;
+    }
+    if (!conv) return false;
+    await seleccionarConversacion(conv);
+    return true;
+  }, [conversaciones, seleccionarConversacion]);
 
   // ─── Crear nueva conversación ─────────────────────────────────────────────────
   const nuevaConversacion = useCallback(async (): Promise<Conversacion | null> => {
@@ -358,6 +378,7 @@ export function useChatFacturas() {
     isLoading,
     isSending,
     seleccionarConversacion,
+    abrirConversacionPorId,
     nuevaConversacion,
     enviarMensaje,
     regenerarRespuesta,

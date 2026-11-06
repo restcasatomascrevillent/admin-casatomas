@@ -53,7 +53,11 @@ interface PropsGrafica {
   /** Resumen para lectores de pantalla (va como nombre de la imagen). */
   descripcion: string;
   compacta?: boolean;
+  /** Qué se cuenta en el globo («3 documentos»); null, nada. Las de «Al instante» por categoría cuentan líneas. */
+  cuenta?: { uno: string; varios: string } | null;
 }
+
+const CUENTA_DOCUMENTOS = { uno: "documento", varios: "documentos" };
 
 /** Muestra de la trama de un mes incompleto (la misma que la barra). */
 const MuestraTrama = () => (
@@ -92,7 +96,16 @@ function Globo({
   series,
   medida,
   unidad,
-}: TooltipProps<number, string> & { series: SerieGrafica[]; medida: Exploracion["parametros"]["medida"]; unidad: string | null }) {
+  cuenta,
+  elegible,
+}: TooltipProps<number, string> & {
+  series: SerieGrafica[];
+  medida: Exploracion["parametros"]["medida"];
+  unidad: string | null;
+  cuenta: { uno: string; varios: string } | null;
+  /** «toca para elegir» solo si tocar hace algo (las gráficas de «Al instante» no eligen). */
+  elegible: boolean;
+}) {
   if (!active || !payload?.length) return null;
   const fila = payload[0]?.payload as FilaGrafica | undefined;
   if (!fila) return null;
@@ -118,12 +131,28 @@ function Globo({
         <span className="font-semibold tabular-nums">{formatoValor(fila.valor, medida, unidad)}</span>
       </p>
       {fila.incompleto && <p className="font-medium text-amber-800 dark:text-amber-400">Mes incompleto: faltan facturas por subir</p>}
-      <p className="text-muted-foreground">{fila.documentos === 1 ? "1 documento" : `${formatEntero(fila.documentos)} documentos`} · toca para elegir</p>
+      {(cuenta || elegible) && (
+        <p className="text-muted-foreground">
+          {cuenta && (fila.documentos === 1 ? `1 ${cuenta.uno}` : `${formatEntero(fila.documentos)} ${cuenta.varios}`)}
+          {cuenta && elegible && " · "}
+          {elegible && "toca para elegir"}
+        </p>
+      )}
     </div>
   );
 }
 
-export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, onSeleccion, apartarSinClasificar, descripcion, compacta }: PropsGrafica) {
+export function GraficaExplorador({
+  exploracion,
+  tipo,
+  alto = 300,
+  seleccion,
+  onSeleccion,
+  apartarSinClasificar,
+  descripcion,
+  compacta,
+  cuenta = CUENTA_DOCUMENTOS,
+}: PropsGrafica) {
   const { filas, series } = useMemo(() => datosGrafica(exploracion, { apartarSinClasificar }), [exploracion, apartarSinClasificar]);
   const { medida, unidad } = exploracion.parametros;
   const ejeY = (n: number) => formatoEje(n, medida, unidad);
@@ -148,7 +177,7 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
     <Cell
       key={f.clave}
       fillOpacity={opacidad(f.clave)}
-      cursor="pointer"
+      cursor={onSeleccion ? "pointer" : undefined}
       {...(f.incompleto ? { fill: `url(#${idTrama})`, stroke: COLOR_UNICO, strokeDasharray: "3 2" } : {})}
     />
   );
@@ -156,7 +185,7 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
     <Cell
       key={f.clave}
       fillOpacity={opacidad(f.clave) * (f.incompleto ? 0.4 : 1)}
-      cursor="pointer"
+      cursor={onSeleccion ? "pointer" : undefined}
       {...(f.incompleto ? { stroke: color, strokeDasharray: "3 2" } : {})}
     />
   );
@@ -165,7 +194,7 @@ export function GraficaExplorador({ exploracion, tipo, alto = 300, seleccion, on
   const sinGlobo = !!seleccion && esTactil();
   const globo = (
     <Tooltip
-      content={<Globo series={series} medida={medida} unidad={unidad} />}
+      content={<Globo series={series} medida={medida} unidad={unidad} cuenta={cuenta} elegible={!!onSeleccion} />}
       cursor={{ fill: "hsl(var(--muted))", opacity: 0.5 }}
       {...(sinGlobo ? { active: false } : {})}
     />

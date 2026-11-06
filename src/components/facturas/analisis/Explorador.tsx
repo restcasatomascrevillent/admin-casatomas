@@ -11,6 +11,10 @@
 //
 //   «Ver como tabla», exportar CSV y «Fijar en el tablero» (se guarda la
 //   configuración, no la imagen).
+//
+//   Debajo, «Al instante» (06/11/2026): diez chips sin IA (AlInstante.tsx). Al
+//   pulsar uno, su resultado ocupa el hueco de la gráfica; el chip activo (o
+//   «Volver al explorador») la devuelve, y tocar la estantería también.
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownToLine,
@@ -68,7 +72,9 @@ import { enlaceMesCompras, enlaceProveedorCompras, fechaCorta, nombreCorto, text
 import type { PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import type { FiltroLocal } from "@/lib/facturas/resumenCompras";
 import { EstadoError, EstadoVacio } from "@/components/facturas/compras/estilo";
+import type { IdAlInstante } from "@/lib/facturas/alInstante";
 import { GraficaExplorador, TablaExploracion } from "./GraficaExplorador";
+import { FilaAlInstante, ResultadoAlInstante, type ProductoAlInstante } from "./AlInstante";
 import { FOCO } from "./piezas";
 import { desplazarDentro, esTactil } from "./desplazar";
 
@@ -91,6 +97,8 @@ export interface PropsExplorador {
   pedirProducto?: number;
   /** Tras «Ver solo este tramo»: a qué se vuelve («al año 2026») y cómo. */
   volverTramo?: { texto: string; volver: () => void } | null;
+  /** «Hoy» de la pantalla (para «Gasto este mes» de «Al instante»). */
+  hoy?: Date;
 }
 
 const ETIQUETA = "mb-1 block text-xs font-medium uppercase tracking-wide text-muted-foreground";
@@ -390,6 +398,7 @@ export function Explorador({
   onQuitarFijada,
   pedirProducto,
   volverTramo,
+  hoy: hoyProp,
 }: PropsExplorador) {
   const idTitulo = useId();
   const [aviso, setAviso] = useState<string | null>(null);
@@ -401,6 +410,12 @@ export function Explorador({
   const [precioPendiente, setPrecioPendiente] = useState(false);
   const raiz = useRef<HTMLElement>(null);
   const tiraPunto = useRef<HTMLDivElement>(null);
+  // «Al instante»: el chip cuyo resultado ocupa el hueco de la gráfica (null = la del explorador).
+  const [instante, setInstante] = useState<IdAlInstante | null>(null);
+  const [productoInstante, setProductoInstante] = useState<ProductoAlInstante | null>(null);
+  const hueco = useRef<HTMLDivElement>(null);
+  const [hoyLocal] = useState(() => new Date());
+  const hoy = hoyProp ?? hoyLocal;
 
   const params = useMemo(() => parametrosExplorar(config, periodo, local), [config, periodo, local]);
   const q = useExplorarCompras(params);
@@ -408,6 +423,24 @@ export function Explorador({
   const tipo = graficaEfectiva(config);
   const idFijada = claveConfig(config);
   const fijada = fijadas.has(idFijada);
+  // Tocar la estantería, un preset o un filtro (o «Abrir en el explorador») vuelve a la gráfica del explorador.
+  useEffect(() => setInstante(null), [idFijada]);
+  // El resultado, a la vista (los chips van debajo y puede quedar por encima).
+  useEffect(() => {
+    if (instante) desplazarDentro(hueco.current, "nearest");
+  }, [instante]);
+  const elegirInstante = (id: IdAlInstante | null) => {
+    if (id === "evolucion-precio" && !productoInstante && config.filtros.productos.length === 1)
+      setProductoInstante({ producto: config.filtros.productos[0], unidad: config.filtros.unidad });
+    setSeleccion(null);
+    setInstante(id);
+  };
+  /** «Volver al explorador» desde el resultado: el foco, al chip que estaba activo. */
+  const volverDeInstante = () => {
+    const id = instante;
+    setInstante(null);
+    requestAnimationFrame(() => raiz.current?.querySelector<HTMLElement>(`[data-chip="${id}"]`)?.focus({ preventScroll: true }));
+  };
   const actualizando = q.isFetching && !q.isLoading;
   // Se ve la gráfica de la consulta ANTERIOR (o la nueva aún no ha salido): sus
   // cifras no se tocan, porque sus documentos serían de otra consulta (QA 05/11/2026).
@@ -617,11 +650,11 @@ export function Explorador({
           )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-0.5">
-          <button type="button" className={cn(ACCION, FOCO)} aria-pressed={verTabla || tipo === "tabla"} onClick={() => setVerTabla((v) => !v)} disabled={tipo === "tabla"}>
+          <button type="button" className={cn(ACCION, FOCO)} aria-pressed={verTabla || tipo === "tabla"} onClick={() => setVerTabla((v) => !v)} disabled={tipo === "tabla" || !!instante}>
             <Table2 className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">Ver como tabla</span>
             <span className="sr-only sm:hidden">Ver como tabla</span>
           </button>
-          <button type="button" className={cn(ACCION, FOCO)} onClick={exportar} disabled={!ex || ex.sinDatos}>
+          <button type="button" className={cn(ACCION, FOCO)} onClick={exportar} disabled={!ex || ex.sinDatos || !!instante}>
             <ArrowDownToLine className="h-4 w-4" aria-hidden /> <span className="hidden sm:inline">CSV</span>
             <span className="sr-only sm:hidden">Exportar CSV</span>
           </button>
@@ -629,6 +662,7 @@ export function Explorador({
             type="button"
             className={cn(ACCION, FOCO, fijada && "text-primary")}
             aria-pressed={fijada}
+            disabled={!!instante}
             onClick={() => {
               if (fijada) return onQuitarFijada(idFijada);
               // Caben 8: la 9.ª quita la más antigua, y se avisa (QA 05/11/2026).
@@ -831,7 +865,7 @@ export function Explorador({
         <p className="text-xs text-muted-foreground">Solo productos: sin portes, servicios, envases ni energía.</p>
       )}
 
-      {ex && !ex.sinDatos && (
+      {ex && !ex.sinDatos && !instante && (
         <Totales
           ex={ex}
           config={exConfig}
@@ -840,11 +874,29 @@ export function Explorador({
         />
       )}
 
-      {cuerpo}
+      {/* El hueco de la gráfica: la del explorador o el resultado de «Al instante». */}
+      <div ref={hueco} className="flex min-w-0 scroll-mt-2 flex-col">
+        {instante ? (
+          <ResultadoAlInstante
+            id={instante}
+            periodo={periodo}
+            textoPeriodo={textoPeriodo}
+            local={local}
+            hoy={hoy}
+            producto={productoInstante}
+            onProducto={setProductoInstante}
+            onElegir={elegirInstante}
+            onVolver={volverDeInstante}
+            onIrA={onIrA}
+          />
+        ) : (
+          cuerpo
+        )}
+      </div>
 
       {/* Punto elegido */}
       {/* La cifra en su línea y los botones debajo: en el móvil se pisaban (QA 05/11/2026). */}
-      {punto && ex && listo && (
+      {punto && ex && listo && !instante && (
         <div
           ref={tiraPunto}
           className="flex flex-wrap items-center gap-x-1 gap-y-0.5 rounded-lg border border-primary/30 bg-primary/5 px-3 py-1.5"
@@ -891,12 +943,15 @@ export function Explorador({
           </button>
         </div>
       )}
-      {!punto && ex && !ex.sinDatos && ex.puntos.length > 0 && (
+      {!punto && !instante && ex && !ex.sinDatos && ex.puntos.length > 0 && (
         <p className="text-xs text-muted-foreground">
           <ChevronDown className="mr-1 inline h-3 w-3 -rotate-90" aria-hidden />
           Toca una barra o un punto para {esTiempo(exConfig.agrupar) ? "ver solo ese tramo" : "filtrar por él"} o ver sus documentos.
         </p>
       )}
+
+      {/* «Al instante», bajo la gráfica: su resultado se pone en el hueco de arriba. */}
+      <FilaAlInstante activo={instante} onElegir={elegirInstante} />
     </section>
   );
 }

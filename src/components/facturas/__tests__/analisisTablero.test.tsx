@@ -216,7 +216,8 @@ describe("tablero: sale hecho al abrir la pestaña", () => {
     }
     expect(within(tablero()).getByRole("region", { name: "Proveedores con más gasto" })).toHaveAccessibleDescription(/Los que más: Proveedor 1 9\.000 €/);
     // Nada del copiloto de antes en la pantalla principal.
-    expect(screen.queryByRole("button", { name: /al instante/i })).not.toBeInTheDocument();
+    // (El desplegable «Al instante» del chat; sus chips vuelven el 06/11/2026 bajo «Explorar», como «Al instante: …».)
+    expect(screen.queryByRole("button", { name: /^al instante$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^nuevo$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /limpiar/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /historial/i })).not.toBeInTheDocument();
