@@ -31,10 +31,13 @@ import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 export function BotonSentarSinReserva({
   salaPreferida = null,
+  soloIcono = false,
   className,
 }: {
   /** Desde el plano de una sala: sus mesas primero. */
   salaPreferida?: string | null;
+  /** Solo el icono (Hoy en móvil, 07/11/2026: una sola fila de controles). El texto queda como nombre accesible. */
+  soloIcono?: boolean;
   className?: string;
 }) {
   const [abierto, setAbierto] = useState(false);
@@ -47,11 +50,13 @@ export function BotonSentarSinReserva({
       <Button
         variant="secondary"
         size="sm"
-        className={cn("h-11 touch-manipulation gap-1.5 whitespace-nowrap", className)}
+        className={cn("h-11 touch-manipulation gap-1.5 whitespace-nowrap", soloIcono && "w-11 px-0 pointer-coarse:px-0", className)}
         onClick={() => setAbierto(true)}
+        aria-label={soloIcono ? "Sin reserva" : undefined}
+        title={soloIcono ? "Sentar sin reserva" : undefined}
       >
-        <UserPlus className="h-4 w-4" aria-hidden />
-        Sin reserva
+        <UserPlus className={soloIcono ? "h-5 w-5" : "h-4 w-4"} aria-hidden />
+        {!soloIcono && "Sin reserva"}
       </Button>
       <Dialog open={abierto} onOpenChange={setAbierto}>
         <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">

@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useResumenOcupacionHoy } from "@/hooks/useOcupacionHoy";
 import { ChevronDown, Clock, Info, MapIcon, Search, SquareKanban, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { supabase } from "@/integrations/supabase/client";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { ReservasEnVivoContexto, useReservasEnVivo } from "@/hooks/useReservasEnVivo";
 import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
+import { AvisoSinConexion } from "@/components/panel/AvisoSinConexion";
+import { esErrorDeRed } from "@/hooks/useEnLinea";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
 import { GestorReservasKanban } from "./GestorReservasKanban";
 import { DisponibilidadCuartos } from "./DisponibilidadCuartos";
@@ -15,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
 import {
+  COLUMNAS_RESERVAS_HOY,
   esModoVistaHoy,
   guardarSalaPlanoHoy,
   guardarVistaHoy,
@@ -31,6 +33,9 @@ import { VistaHoyMovil } from "./movil/VistaHoyMovil";
 import { BotonSentarSinReserva } from "./SentarSinReserva";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+/** Sin relectura periódica (el móvil ya tiene la suya, `useAlDiaMovil`). */
+const SIN_SONDEO = { refetchInterval: false } as const;
 
 /**
  * Pestaña "Hoy" (rediseñada 2026-09-25, petición del dueño): antes esto era
@@ -114,15 +119,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     cambiarVista("plano");
   };
 
-  const {
-    isLoading,
-    isError: errorResumen,
-    error: errorResumenDetalle,
-    refetch: refetchResumen,
-  } = useResumenOcupacionHoy();
-
-  // Ojo con el orden: estos hooks van ANTES de los `return` de carga/error de
-  // arriba, o React se queda sin hooks a mitad de render.
+  // 07/11/2026: ya no se espera al «resumen de ocupación» (2 consultas cada minuto que bloqueaban toda la
+  // pestaña con un esqueleto y cuyas cifras no se pintan desde el 17/10). Cada vista enseña lo suyo según llega.
   // Cambios de `reservas` y de mesas hechos en otro dispositivo: UNA suscripción
   // para toda la pestaña (kanban, cifras y la rejilla
   // por cuartos, que no abre la suya: `ReservasEnVivoContexto`).
@@ -134,8 +132,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
    * Reservas de hoy de Casa Tomás, para el plano del servicio y la vista de hoy en móvil
    * (`marca`, para quedarse con las de Casa Tomás: `admiteReservas`).
    *
-   * `select("*")`, como el kanban: trae `llegada_at`, `importante`, `telefono`… si existen (las tarjetas
-   * del plano los necesitan) sin romper si una migración no está aplicada. NO se reutiliza
+   * Columnas explícitas (`COLUMNAS_RESERVAS_HOY`, 07/11/2026: antes `select("*")`), las mismas que el kanban.
+   * NO se reutiliza
    * `useReservasServicioDia`: ese pide `llegada_at` y `salida_at` por nombre, y su error subiría hasta
    * aquí y tumbaría la pestaña entera. (`"reservas" as any` porque `espacio_id` no está en los tipos generados.)
    *
@@ -147,15 +145,19 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
    */
   const {
     data: reservasHoy,
-    isError: errorReservasHoy,
+    isError: falloReservasHoy,
+    error: errorDetalleReservasHoy,
     refetch: refetchReservasHoy,
+    dataUpdatedAt: reservasHoyActualizadas,
+    fetchStatus: estadoPeticionReservasHoy,
   } = useQuery({
-    ...REFRESCO_PERIODICO,
+    // En el móvil ya las relee `useAlDiaMovil` (cada 30 s): sin el sondeo de cada minuto, para no pedirlas dos veces.
+    ...(esMovil ? SIN_SONDEO : REFRESCO_PERIODICO),
     queryKey: ["reservas-hoy", "pendientes-mesa", hoy],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("*")
+        .select(COLUMNAS_RESERVAS_HOY)
         .eq("fecha", hoy)
         .neq("estado", "cancelada")
         .order("hora");
@@ -165,45 +167,27 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     },
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-3 sm:space-y-4">
-        <div className="rounded-xl border bg-card/50 p-3 sm:p-4 animate-pulse">
-          <div className="h-10 sm:h-8 bg-muted rounded" />
-        </div>
-        <div className="h-80 bg-muted/40 rounded-xl animate-pulse" />
-      </div>
-    );
-  }
-
-  if (errorResumen) {
-    return (
-      <EstadoErrorCarga
-        titulo="el resumen de ocupación de hoy"
-        error={errorResumenDetalle}
-        onReintentar={() => refetchResumen()}
-      />
-    );
-  }
+  // Con datos guardados (caché o copia sin conexión, `cacheOffline.ts`) un fallo de red NO tapa la lista:
+  // se siguen viendo las reservas que había y `AvisoSinConexion` dice de qué hora son.
+  const errorReservasHoy = falloReservasHoy && !reservasHoy;
+  const avisoRed = (
+    <AvisoSinConexion
+      actualizadoEn={reservasHoyActualizadas}
+      falloRed={(falloReservasHoy && esErrorDeRed(errorDetalleReservasHoy)) || estadoPeticionReservasHoy === "paused"}
+    />
+  );
 
   if (esMovil) {
+    // Móvil (07/11/2026): los controles (Reservas|Mesas, turno, buscador y «Sin reserva») van en UNA fila
+    // dentro de `VistaHoyMovil`, que guarda su propio buscador y turno (por defecto el del reloj).
     return (
       <ReservasEnVivoContexto.Provider value={true}>
-        <div className="space-y-2">
-          <BarraFiltrosHoy
-            busqueda={busqueda}
-            onBusqueda={setBusqueda}
-            filtroTurno={filtroTurno}
-            onFiltroTurno={setFiltroTurno}
-            vista={vista}
-            onVista={cambiarVista}
-            soloFiltros
-            accion={<BotonSentarSinReserva className="shrink-0" />}
-          />
+        <div className="flex min-h-0 flex-col gap-1">
+          {avisoRed}
           {errorReservasHoy ? (
             <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
           ) : (
-            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} busqueda={busqueda} filtroTurno={filtroTurno} />
+            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} />
           )}
         </div>
       </ReservasEnVivoContexto.Provider>
@@ -216,6 +200,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     // `reservas`.
     <ReservasEnVivoContexto.Provider value={true}>
       <div className="space-y-2">
+        {avisoRed}
         {/* Revisión 17/10/2026: sin cifras de ocupación en la fila de filtros (a petición del
             dueño). En el kanban sigue «Disponibilidad por cuartos de hora», plegada; el plano
             empieza justo debajo de la fila de filtros. */}

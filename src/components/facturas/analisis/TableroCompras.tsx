@@ -10,6 +10,8 @@
 //   3. EXPLORAR, la gráfica a medida: es un módulo fijo (se mueve, no se quita)
 //      que parte la rejilla en dos.
 //   4. Las gráficas fijadas (del explorador y de la IA).
+//   0. Arriba, «Requiere atención»: las alertas del día (cron facturas-alertas,
+//      20261107300000). Las mismas alertas se marcan en las gráficas.
 // Qué se ve, en qué orden y de qué tamaño lo elige cada usuario con
 // «Personalizar» (ConfiguradorTablero; se guarda en `dashboard_config`).
 //
@@ -46,6 +48,9 @@ import { FILTROS_VACIOS, type ConfigExplorador, type ExploracionFijada, type Loc
 import { peticionSimple, type PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import { consultaTablero } from "@/hooks/useTableroCompras";
 import { useConfigTablero } from "@/hooks/useConfigTablero";
+import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
+import { alertasDelPeriodo, umbralSubida } from "@/lib/facturas/alertas";
+import { RequiereAtencion } from "./Alertas";
 import { ProveedoresTop } from "./GraficasPrincipales";
 import { AbonosPorProveedor, CasaTomasYTouza, GastoPorFamilia, GastosFijos, LoQueMasHaSubido } from "./TarjetasDetalle";
 import { AlbaranesPorRevisar, EvolucionProducto, GastoPorMesModulo, ProductosMasComprados, RegaladoPorProveedor } from "./ModulosExtra";
@@ -95,6 +100,12 @@ export function TableroCompras({
 }: Props) {
   const { config, guardar } = useConfigTablero();
   const [detalle, setDetalle] = useState<IdDetalle | null>(null);
+  // Alertas vigentes: la tarjeta de arriba enseña todas (las de hoy no dependen del periodo);
+  // las gráficas, las de su periodo.
+  const alertasQ = useAlertasFacturas(local);
+  const alertas = useMemo(() => alertasQ.data ?? [], [alertasQ.data]);
+  const alertasPeriodo = useMemo(() => alertasDelPeriodo(alertas, periodo, local), [alertas, periodo, local]);
+  const umbral = umbralSubida(alertas) ?? 10;
   const i = datos.indicadores;
   const variacion = textoVariacion(datos);
   const notaRetencion = notaRetencionGasto(i.gasto, i.retencionIrpf);
@@ -356,6 +367,8 @@ export function TableroCompras({
             tamano={t}
             onAmpliar={ampliar("subidas")}
             subidas={datos.subidas}
+            umbralPct={umbral}
+            alertas={alertasPeriodo}
             acciones={siListo((s: Datos["subidas"]["productos"][number]) => [
               {
                 etiqueta: "Ver su precio en el explorador",
@@ -451,7 +464,19 @@ export function TableroCompras({
           />
         );
       case "gasto_mes":
-        return <GastoPorMesModulo tamano={t} onAmpliar={ampliar("gasto_mes")} meses={datos.meses} periodo={periodo} local={local} onDocumentos={onDocumentos} pendiente={pendiente} />;
+        return (
+          <GastoPorMesModulo
+            tamano={t}
+            onAmpliar={ampliar("gasto_mes")}
+            meses={datos.meses}
+            periodo={periodo}
+            local={local}
+            onDocumentos={onDocumentos}
+            onIrA={onIrA}
+            pendiente={pendiente}
+            alertas={alertas}
+          />
+        );
       case "productos":
         return <ProductosMasComprados {...comunesExtra} tamano={t} onAmpliar={ampliar("productos")} />;
       case "por_revisar":
@@ -491,6 +516,9 @@ export function TableroCompras({
 
   return (
     <div className="@container/tablero space-y-4 pb-4">
+      {/* 0 · Requiere atención (alertas del día) */}
+      <RequiereAtencion alertas={alertas} onIrA={onIrA} onExplorar={onExplorar} pendiente={pendiente} />
+
       {/* 1 · Cifras */}
       {config.cifras.length > 0 && (
         <ul className={cn(rejillaCifras(config.cifras.length), atenuar)} aria-label="Indicadores del periodo" aria-busy={pendiente || undefined} data-tour="facturas-analisis-indicadores">

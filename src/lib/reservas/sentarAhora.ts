@@ -63,19 +63,25 @@ export function horaActual(ahora: Date = new Date()): string {
   return `${dos(ahora.getHours())}:${dos(ahora.getMinutes())}:00`;
 }
 
-export function opcionesParaSentar(params: {
+/**
+ * Todas las mesas de todas las salas con sus plazas de ESTE servicio (piezas, picos y uniones ya aplicados),
+ * en el orden de las salas. Las piezas que hoy están dentro de otra unión no salen.
+ */
+export function opcionesMesasServicio(params: {
   salas: ReadonlyArray<{ id: string; nombre: string }>;
   mesas: readonly FilaMesaSala[];
   ajustesDia: readonly AjusteDia[];
-  asignaciones: readonly AsignacionDia[];
-  excluidas: ReadonlySet<string>;
-  configOcupacion?: ConfigOcupacionMesa;
-  /** `id` vacío para quien aún no tiene reserva (walk-in). */
-  reserva: { id: string; hora: string; comensales: number; espacioId: string | null };
-}): OpcionesSentar {
-  const { salas, mesas, ajustesDia, excluidas, configOcupacion, reserva } = params;
-  const asignaciones = params.asignaciones.filter(asignacionOcupa);
-  const turno = turnoDeHora(reserva.hora);
+  turno: "comida" | "cena";
+}): MesaOpcion[] {
+  return construirOpciones(params.salas, params.mesas, params.ajustesDia, params.turno).opciones;
+}
+
+function construirOpciones(
+  salas: ReadonlyArray<{ id: string; nombre: string }>,
+  mesas: readonly FilaMesaSala[],
+  ajustesDia: readonly AjusteDia[],
+  turno: "comida" | "cena",
+) {
   const opciones: MesaOpcion[] = [];
   const porSala = new Map<string, { piezas: MesaPiezas[]; estado: ReturnType<typeof estadoServicio> }>();
 
@@ -100,6 +106,23 @@ export function opcionesParaSentar(params: {
       });
     }
   }
+  return { opciones, porSala };
+}
+
+export function opcionesParaSentar(params: {
+  salas: ReadonlyArray<{ id: string; nombre: string }>;
+  mesas: readonly FilaMesaSala[];
+  ajustesDia: readonly AjusteDia[];
+  asignaciones: readonly AsignacionDia[];
+  excluidas: ReadonlySet<string>;
+  configOcupacion?: ConfigOcupacionMesa;
+  /** `id` vacío para quien aún no tiene reserva (walk-in). */
+  reserva: { id: string; hora: string; comensales: number; espacioId: string | null };
+}): OpcionesSentar {
+  const { salas, mesas, ajustesDia, excluidas, configOcupacion, reserva } = params;
+  const asignaciones = params.asignaciones.filter(asignacionOcupa);
+  const turno = turnoDeHora(reserva.hora);
+  const { opciones, porSala } = construirOpciones(salas, mesas, ajustesDia, turno);
 
   const libre = (mesaId: string) =>
     !excluidas.has(mesaId) &&

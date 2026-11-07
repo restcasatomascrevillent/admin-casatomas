@@ -77,6 +77,10 @@ export function useOcupacionHoy() {
  * (src/lib/reservas/resumenOcupacion.ts). Touza no admite reservas (decisión
  * del dueño, 2026-10-01): sus reservas y salas se ignoran. La capacidad es la
  * suma de las salas activas de Casa Tomás (mismo criterio que el trigger).
+ *
+ * SIN CONSUMIDORES desde el 07/11/2026: «Hoy» ya no lo monta (sus cifras no se pintaban desde el
+ * 17/10 y bloqueaba la pestaña hasta cargar). Se conserva porque `clavesCache.ts` y sus tests
+ * cuentan con la clave `reservas_hoy_resumen`; sin importarlo, no entra en ningún paquete.
  */
 export function useResumenOcupacionHoy() {
   const espaciosQuery = useQuery({

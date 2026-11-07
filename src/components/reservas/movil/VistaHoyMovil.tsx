@@ -2,31 +2,53 @@
 // «HOY» EN MÓVIL (< 768 px) — para el camarero que va sentando gente
 // ----------------------------------------------------------------------------
 // Durante el servicio el panel se usa en el MÓVIL (cada camarero el suyo).
-// Dos vistas, «Reservas | Mesas»:
-//   · RESERVAS: arriba «Llegan ahora» (próximos 15 min y hasta 30 min tarde) y
-//     después las de hoy agrupadas por sala («Sin mesa» arriba).
+// UNA sola fila de controles (07/11/2026, antes eran cuatro bandas): «Reservas |
+// Mesas», el turno (por defecto el del reloj: antes de las 17:00 comida, después
+// cena), una lupa que despliega el buscador encima y «Sin reserva» (icono).
+//   · RESERVAS: arriba «Llegan ahora» (próximos 15 min y hasta 30 min tarde),
+//     después el resto de las que aún no han llegado, por hora, y abajo las ya
+//     sentadas, plegadas. «No vino» y canceladas no salen. Cada fila, en grande:
+//     hora, nombre, personas, la mesa PREVISTA («Prevista: Mesa 7») o la
+//     confirmada («En mesa 9») y un botón «Sentar · Mesa 7» (un toque = «Llegó»
+//     en su mesa) o «Sentar» (abre la ficha con el selector de mesa).
 //   · MESAS: cada sala en una cuadrícula de botones grandes con su estado
-//     (libre, sentada, reservada a una hora). Tocar una libre: sentar sin
-//     reserva aquí (un toque con el número de personas) o sentar una reserva.
-//     Tocar una ocupada: su ficha («Cambiar mesa», «Liberar mesa»).
+//     (libre, sentada, prevista a una hora). Tocar una libre o una prevista:
+//     sentar sin reserva aquí o sentar una reserva. Tocar una ocupada: su ficha.
 // La ficha de una reserva (panel inferior) tiene botones grandes:
 //   · «Sentar en mesa X»  → la MISMA acción «Ha llegado» del panel.
-//   · «Cambiar mesa» / «Elegir mesa» → mesas libres donde caben (su sala
-//     primero); si en su sala no cabe en ninguna, la propuesta de piezas.
+//   · «Cambiar mesa» / «Elegir mesa» → selector con las mesas de TODAS las salas
+//     donde cabe: libre (verde), prevista para otra reserva (ámbar: se puede
+//     elegir, avisando de que esa otra se queda sin ella) u ocupada por alguien
+//     sentado (no se puede). Lógica en `src/lib/reservas/confirmarMesa.ts`.
 //   · «Liberar mesa» (sentadas): la mesa queda libre para otros; con Deshacer.
 //   · «No vino».
 // Con solo «Ver» en Reservas (06/11/2026, decisión del dueño) las fichas enseñan los datos
 // (y «Llamar») pero ningún botón que escriba: se ocultan, no se desactivan.
 // Al día solo: `useAlDiaMovil` (tiempo real + al volver a primer plano + 15 s).
 // Sin scroll de página: la lista ocupa el alto disponible y hace scroll dentro.
-// Lógica: `src/lib/reservas/hoyMovil.ts` y `sentarAhora.ts` (con tests).
+// Lógica: `src/lib/reservas/hoyMovil.ts`, `sentarAhora.ts` y `confirmarMesa.ts` (con tests).
 // ============================================================================
 
-import { useEffect, useMemo, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Armchair, ChevronRight, Clock, DoorOpen, MapPin, Phone, Undo2, Users, UserX } from "lucide-react";
+import {
+  Armchair,
+  ChevronDown,
+  Clock,
+  DoorOpen,
+  MapPin,
+  Phone,
+  Search,
+  StickyNote,
+  Undo2,
+  Users,
+  UserX,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
@@ -46,16 +68,18 @@ import {
   useGuardarAjustesMesa,
   type TurnoServicio,
 } from "@/hooks/useAjustesMesaServicio";
+import { BotonSentarSinReserva } from "@/components/reservas/SentarSinReserva";
 import { configAsignacionDesde } from "@/lib/reservas/ventanaAsignacion";
 import { configServicioSalaDesde, type ReservaMesaServicio } from "@/lib/reservas/servicioSala";
 import { turnoDeHora } from "@/lib/reservas/asignacionMesas";
 import { ESTADOS_RESERVA, type EstadoReserva } from "@/lib/reservas/estadosReserva";
 import type { FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import {
-  agruparHoyMovil,
   estadoMesasHoy,
   estaTerminada,
-  lleganAhora,
+  listaHoyMovil,
+  textoMesaConfirmada,
   textoMesas,
   type EstadoMesaHoy,
   type MesaOpcion,
@@ -68,16 +92,34 @@ import {
   type AjusteMesa,
   type MesaPiezas,
 } from "@/lib/reservas/piezasMesa";
-import { horaActual, opcionesParaSentar, type AjusteDia } from "@/lib/reservas/sentarAhora";
+import { horaActual, opcionesMesasServicio, opcionesParaSentar, type AjusteDia } from "@/lib/reservas/sentarAhora";
+import {
+  clasificarMesasParaSentar,
+  decidirSentarPrevista,
+  type DecisionSentarPrevista,
+  estadoParaConfirmar,
+  reemplazarMesasEnLista,
+  textoDesplazamiento,
+  type Desplazamiento,
+  type MesaParaConfirmar,
+  type SelectorMesas,
+} from "@/lib/reservas/confirmarMesa";
+import type { ConfigOcupacionMesa } from "@/lib/reservas/ocupacionMesa";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { cn } from "@/lib/utils";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 type ReservaMovil = ReservaMesaServicio;
 type Vista = "reservas" | "mesas";
+/** Cómo se abre la ficha: normal, con el selector de mesa abierto o con la confirmación de quitar la prevista a otra. */
+type InicioFicha = "normal" | "elegir" | "confirmar";
 
 const horaCorta = (h: string) => (h ?? "").slice(0, 5);
 const ESTADOS_POR_LLEGAR = new Set(["pendiente", "verificada", "confirmada"]);
+/** Igual que `CLAVE_ASIGNACIONES_MESA` (useAsignacionesMesa.ts); aquí sin importarla para el cambio local. */
+const CLAVE_ASIGNACIONES = "asignaciones_mesa";
+
+const ETIQUETA_TURNO: Record<FiltroTurnoHoy, string> = { comida: "Comida", cena: "Cena", todo: "Todo" };
 
 function infoEstado(estado: string) {
   return ESTADOS_RESERVA[estado as EstadoReserva] ?? null;
@@ -97,24 +139,28 @@ function useMinutoAhora(): number {
   return minuto;
 }
 
-export function VistaHoyMovil({
-  reservas,
-  fecha,
-  busqueda,
-  filtroTurno,
-}: {
-  reservas: ReservaMovil[] | undefined;
-  fecha: string;
-  busqueda: string;
-  filtroTurno: FiltroTurnoHoy;
-}) {
+/** Tras un error de mesas (MESA_OCUPADA, otro camarero se adelantó…): releer lo de hoy enseguida. */
+function refrescarTrasError(qc: QueryClient) {
+  for (const clave of CLAVES_POR_CAMBIO.ocupacion) void qc.invalidateQueries({ queryKey: [clave] });
+}
+
+export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | undefined; fecha: string }) {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, 240);
   const [vista, setVista] = useState<Vista>("reservas");
+  // El turno del reloj por defecto: la lista sale corta (solo el servicio en curso). Se puede cambiar.
+  const [filtroTurno, setFiltroTurno] = useState<FiltroTurnoHoy>(() => turnoDeHora(horaActual()));
+  const [busqueda, setBusqueda] = useState("");
+  const [buscando, setBuscando] = useState(false);
   const [abiertaId, setAbiertaId] = useState<string | null>(null);
-  const [mesaLibre, setMesaLibre] = useState<MesaOpcion | null>(null);
+  const [inicioFicha, setInicioFicha] = useState<InicioFicha>("normal");
+  const [mesaLibre, setMesaLibre] = useState<{ mesa: MesaOpcion; prevista: PrevistaMesa | null } | null>(null);
+  const [verSentadas, setVerSentadas] = useState(false);
+  const [sentandoId, setSentandoId] = useState<string | null>(null);
   const minutoAhora = useMinutoAhora();
   useAlDiaMovil();
+  const { marcarLlegada } = useAccionesServicioReserva();
+  const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
 
   const { data: espacios } = useEspaciosReserva();
   const { data: mesas } = useMesas();
@@ -129,6 +175,7 @@ export function VistaHoyMovil({
   const salaPorId = useMemo(() => new Map(salas.map((s) => [s.id, s.nombre])), [salas]);
   const asignacionesDia = useMemo(() => asignaciones ?? [], [asignaciones]);
   const mesaPorId = useMemo(() => new Map((mesas ?? []).map((m) => [m.id, m])), [mesas]);
+  const configOcupacion = useMemo(() => configServicioSalaDesde(config), [config]);
 
   // Turno que pintan las mesas: el del filtro o, con «Todo el día», el del reloj.
   const turno: TurnoServicio =
@@ -147,46 +194,122 @@ export function VistaHoyMovil({
     return (id: string) => mapa.get(id) ?? [];
   }, [asignacionesDia, mesaPorId]);
 
-  const grupos = useMemo(
-    () => agruparHoyMovil(reservas ?? [], salas, mesasDe, { busqueda, filtroTurno }),
-    [reservas, salas, mesasDe, busqueda, filtroTurno],
-  );
-  const llegan = useMemo(
-    () => lleganAhora(reservas ?? [], mesasDe, minutoAhora, { busqueda, filtroTurno }),
+  const lista = useMemo(
+    () => listaHoyMovil(reservas ?? [], mesasDe, minutoAhora, { busqueda, filtroTurno }),
     [reservas, mesasDe, minutoAhora, busqueda, filtroTurno],
   );
+  const vacia = lista.llegan.length + lista.porLlegar.length + lista.sentadas.length === 0;
 
   const abierta = (reservas ?? []).find((r) => r.id === abiertaId) ?? null;
 
-  const fila = (reserva: ReservaMovil, nombresMesa: string[], terminada: boolean, extra?: { tarde?: boolean; sala?: boolean }) => (
-    <FilaReservaMovil
-      key={reserva.id}
-      reserva={reserva}
-      nombresMesa={nombresMesa}
-      terminada={terminada}
-      tarde={extra?.tarde}
-      sala={extra?.sala && reserva.espacio_id ? (salaPorId.get(reserva.espacio_id) ?? "") : undefined}
-      onAbrir={() => setAbiertaId(reserva.id)}
-    />
-  );
+  const abrirFicha = (id: string, inicio: InicioFicha = "normal") => {
+    setInicioFicha(inicio);
+    setAbiertaId(id);
+  };
+
+  /**
+   * «Sentar · Mesa 7»: un toque = «Llegó» en su mesa prevista, SI sigue libre en su franja. Ocupada por alguien
+   * sentado (o sin mesa): la ficha con el selector. Prevista para otra reserva: la ficha con la confirmación.
+   */
+  const sentarDesdeFila = async (reserva: ReservaMovil, decision: DecisionSentarPrevista) => {
+    if (decision.tipo === "elegir") return abrirFicha(reserva.id, "elegir");
+    if (decision.tipo === "confirmar") return abrirFicha(reserva.id, "confirmar");
+    setSentandoId(reserva.id);
+    try {
+      await marcarLlegada(reserva);
+    } finally {
+      setSentandoId(null);
+    }
+  };
+
+  const fila = (reserva: ReservaMovil, nombresMesa: string[], extra: { tarde?: boolean; sentada?: boolean }) => {
+    const decision = decidirSentarPrevista(asignacionesDia, reserva, configOcupacion);
+    return (
+      <FilaReservaMovil
+        key={reserva.id}
+        reserva={reserva}
+        nombresMesa={nombresMesa}
+        terminada={!!extra.sentada}
+        tarde={extra.tarde}
+        sala={reserva.espacio_id ? (salaPorId.get(reserva.espacio_id) ?? "") : undefined}
+        onAbrir={() => abrirFicha(reserva.id)}
+        onSentar={puedeEditar && !extra.sentada ? () => void sentarDesdeFila(reserva, decision) : undefined}
+        mesaPrevistaOcupada={nombresMesa.length > 0 && decision.tipo === "elegir"}
+        sentando={sentandoId === reserva.id}
+      />
+    );
+  };
+
+  const pax = (filas: Array<{ reserva: ReservaMovil }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
 
   return (
     <div ref={setRaiz} className="flex min-h-0 flex-col gap-2" style={alto ? { height: alto } : undefined}>
-      <ToggleGroup
-        type="single"
-        value={vista}
-        onValueChange={(v) => (v === "reservas" || v === "mesas") && setVista(v)}
-        variant="outline"
-        className="grid shrink-0 grid-cols-2"
-        aria-label="Ver reservas o mesas"
-      >
-        <ToggleGroupItem value="reservas" className="h-11 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-          Reservas
-        </ToggleGroupItem>
-        <ToggleGroupItem value="mesas" className="h-11 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground">
-          Mesas
-        </ToggleGroupItem>
-      </ToggleGroup>
+      {buscando && (
+        <div className="relative shrink-0">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+          <Input
+            autoFocus
+            placeholder="Buscar por nombre o teléfono…"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="h-11 pl-9 pr-12"
+            aria-label="Buscar reservas"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-11 w-11"
+            aria-label="Cerrar la búsqueda"
+            onClick={() => {
+              setBusqueda("");
+              setBuscando(false);
+            }}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </Button>
+        </div>
+      )}
+
+      <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-controles">
+        <ToggleGroup
+          type="single"
+          value={vista}
+          onValueChange={(v) => (v === "reservas" || v === "mesas") && setVista(v)}
+          variant="outline"
+          className="grid min-w-0 flex-1 grid-cols-2"
+          aria-label="Ver reservas o mesas"
+        >
+          <ToggleGroupItem value="reservas" className="h-11 px-2 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11">
+            Reservas
+          </ToggleGroupItem>
+          <ToggleGroupItem value="mesas" className="h-11 px-2 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11">
+            Mesas
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <Select value={filtroTurno} onValueChange={(v) => setFiltroTurno(v as FiltroTurnoHoy)}>
+          <SelectTrigger className="h-11 w-[5.75rem] shrink-0 gap-1 px-2 text-sm [&>svg]:shrink-0" aria-label="Turno">
+            <SelectValue>{ETIQUETA_TURNO[filtroTurno]}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="comida">Comida</SelectItem>
+            <SelectItem value="cena">Cena</SelectItem>
+            <SelectItem value="todo">Todo el día</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button
+          type="button"
+          variant={busqueda ? "default" : "outline"}
+          size="icon"
+          className="h-11 w-11 shrink-0"
+          aria-label={busqueda ? `Buscar (filtrando por «${busqueda}»)` : "Buscar"}
+          aria-expanded={buscando}
+          onClick={() => setBuscando((v) => !v)}
+        >
+          <Search className="h-5 w-5" aria-hidden="true" />
+        </Button>
+        <BotonSentarSinReserva soloIcono className="shrink-0" />
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border bg-card" data-testid="hoy-movil-lista">
         {reservas === undefined ? (
@@ -200,36 +323,55 @@ export function VistaHoyMovil({
             reservas={reservas}
             turno={turno}
             terrazaCerradaId={cierre.cerrada ? (terraza?.id ?? null) : null}
-            onLibre={setMesaLibre}
-            onOcupada={setAbiertaId}
+            onLibre={(mesa, prevista) => setMesaLibre({ mesa, prevista })}
+            onOcupada={(id) => abrirFicha(id)}
           />
+        ) : vacia ? (
+          <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
         ) : (
           <>
-            {llegan.length > 0 && (
+            {lista.llegan.length > 0 && (
               <section aria-label="Llegan ahora">
                 <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
                   <span>Llegan ahora</span>
-                  <span className="text-xs font-normal tabular-nums">{llegan.length}</span>
+                  <span className="text-xs font-normal tabular-nums">
+                    {lista.llegan.length} · {pax(lista.llegan)} pax
+                  </span>
                 </h3>
-                <ul className="divide-y">{llegan.map((f) => fila(f.reserva, f.mesas, false, { tarde: f.tarde, sala: true }))}</ul>
+                <ul className="divide-y">{lista.llegan.map((f) => fila(f.reserva, f.mesas, { tarde: f.tarde }))}</ul>
               </section>
             )}
-            {grupos.length === 0 ? (
-              <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
-            ) : (
-              grupos.map((g) => (
-                <section key={g.clave} aria-label={g.titulo}>
-                  <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-muted/95 px-3 py-2 text-sm font-semibold backdrop-blur">
-                    <span>{g.titulo}</span>
-                    <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                      {g.totalReservas} {g.totalReservas === 1 ? "reserva" : "reservas"} · {g.totalPersonas} pax
+            {lista.porLlegar.length > 0 && (
+              <section aria-label="Por llegar">
+                <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-muted/95 px-3 py-2 text-sm font-semibold backdrop-blur">
+                  <span>Por llegar</span>
+                  <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                    {lista.porLlegar.length} {lista.porLlegar.length === 1 ? "reserva" : "reservas"} · {pax(lista.porLlegar)} pax
+                  </span>
+                </h3>
+                <ul className="divide-y">{lista.porLlegar.map((f) => fila(f.reserva, f.mesas, { tarde: f.tarde }))}</ul>
+              </section>
+            )}
+            {lista.sentadas.length > 0 && (
+              <section aria-label="Sentadas">
+                <h3 className="sticky top-0 z-10 border-b bg-muted/95 backdrop-blur">
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center justify-between px-3 text-sm font-semibold"
+                    aria-expanded={verSentadas}
+                    onClick={() => setVerSentadas((v) => !v)}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <ChevronDown className={cn("h-4 w-4 transition-transform", verSentadas && "rotate-180")} aria-hidden="true" />
+                      Ya sentadas
                     </span>
-                  </h3>
-                  <ul className="divide-y">
-                    {g.filas.map((f) => fila(f.reserva, f.mesas, f.terminada, { sala: g.clave === "sin-mesa" }))}
-                  </ul>
-                </section>
-              ))
+                    <span className="text-xs font-normal text-muted-foreground tabular-nums">
+                      {lista.sentadas.length} · {pax(lista.sentadas)} pax
+                    </span>
+                  </button>
+                </h3>
+                {verSentadas && <ul className="divide-y">{lista.sentadas.map((f) => fila(f.reserva, f.mesas, { sentada: true }))}</ul>}
+              </section>
             )}
           </>
         )}
@@ -247,8 +389,9 @@ export function VistaHoyMovil({
               asignaciones={asignacionesDia}
               ajustesDia={ajustesDia ?? []}
               mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
-              configOcupacion={configServicioSalaDesde(config)}
+              configOcupacion={configOcupacion}
               nombresMesa={mesasDe(abierta.id)}
+              inicio={inicioFicha}
               onCerrar={() => setAbiertaId(null)}
             />
           )}
@@ -259,12 +402,20 @@ export function VistaHoyMovil({
         <SheetContent side="bottom" className="max-h-[85dvh] overflow-y-auto rounded-t-2xl">
           {mesaLibre && (
             <PanelMesaLibre
-              key={mesaLibre.id}
-              mesa={mesaLibre}
+              key={mesaLibre.mesa.id}
+              mesa={mesaLibre.mesa}
+              prevista={mesaLibre.prevista}
               fecha={fecha}
               turno={turno}
               reservas={reservas ?? []}
+              mesas={mesas ?? []}
+              asignaciones={asignacionesDia}
+              configOcupacion={configOcupacion}
               minutoAhora={minutoAhora}
+              onVerReserva={(id) => {
+                setMesaLibre(null);
+                abrirFicha(id);
+              }}
               onCerrar={() => setMesaLibre(null)}
             />
           )}
@@ -274,13 +425,15 @@ export function VistaHoyMovil({
   );
 }
 
-// ─── Vista «Mesas» ───────────────────────────────────────────────────────────
+// ─── Fila de la lista ────────────────────────────────────────────────────────
 
 /**
- * Una reserva en la lista móvil de Hoy. Toda la fila abre su panel, salvo el teléfono (15/10/2026, petición del
- * dueño: «en la vista móvil de Hoy hay que añadir el teléfono»), que es un enlace `tel:` para llamar con un toque.
- * Un `<a>` no puede ir dentro de un `<button>`: el botón va por debajo, cubriendo la fila (`absolute inset-0`), y el
- * contenido por encima sin recibir toques (`pointer-events-none`), salvo el enlace del teléfono.
+ * Una reserva en la lista móvil de Hoy, en grande para leerla de un vistazo (07/11/2026): hora, nombre y
+ * personas arriba; debajo la mesa («Prevista: Mesa 7» / «En mesa 9» / «Sin mesa»), el estado y, si las
+ * hay, las notas del cliente. Toda la fila abre su ficha, salvo el botón «Sentar», que es la acción directa.
+ * El teléfono (15/10/2026) es un icono «Llamar» de 44 px en la línea del nombre, desde 375 px de ancho.
+ * Un `<button>` no puede ir dentro de otro: el de la fila va por debajo, cubriéndola (`absolute inset-0`), y
+ * el contenido por encima sin recibir toques (`pointer-events-none`), salvo el botón «Sentar».
  */
 export function FilaReservaMovil({
   reserva,
@@ -289,66 +442,111 @@ export function FilaReservaMovil({
   tarde,
   sala,
   onAbrir,
+  onSentar,
+  mesaPrevistaOcupada = false,
+  sentando = false,
 }: {
   reserva: ReservaMovil;
   nombresMesa: string[];
+  /** Ya sentada: «En mesa 9» y sin botón. */
   terminada: boolean;
   tarde?: boolean;
-  /** Nombre de la sala, si hay que enseñarlo junto a las mesas. */
+  /** Nombre de la sala, junto a la mesa. */
   sala?: string;
   onAbrir: () => void;
+  /** «Sentar · Mesa 7» / «Sentar». Sin él (solo «Ver», o ya sentada) no hay botón. */
+  onSentar?: () => void;
+  /** Su mesa prevista la ocupa alguien sentado: el botón dice «Sentar» (abre el selector). */
+  mesaPrevistaOcupada?: boolean;
+  sentando?: boolean;
 }) {
   const info = infoEstado(reserva.estado);
-  const telefono = telefonoLegible(reserva.telefono);
   const tel = enlaceTelefono(reserva.telefono);
+  const directo = nombresMesa.length > 0 && !mesaPrevistaOcupada;
+  const sentada = reserva.estado === "completada";
+  const textoMesa = textoMesaConfirmada(nombresMesa, sentada);
+  const notas = (reserva.notas_cliente ?? "").trim();
   return (
     <li className="relative">
       <button
         type="button"
         onClick={onAbrir}
-        aria-label={`${horaCorta(reserva.hora)} ${reserva.nombre || "Sin nombre"}, ${reserva.numero_comensales} personas, ${textoMesas(nombresMesa)}`}
+        aria-label={`${horaCorta(reserva.hora)} ${reserva.nombre || "Sin nombre"}, ${reserva.numero_comensales} personas, ${textoMesa}`}
         className="absolute inset-0 h-full w-full active:bg-muted/60"
       />
-      <div
-        className={cn(
-          "pointer-events-none relative flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left",
-          terminada && "opacity-50",
-        )}
-      >
-        <span className="w-12 shrink-0 text-base font-semibold tabular-nums">{horaCorta(reserva.hora)}</span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium">{reserva.nombre || "Sin nombre"}</span>
-          {/* Mesa/sala, comensales y estado en su propia línea: los cinco en la fila de arriba dejaban el nombre con ~110px y lo truncaban enseguida («Carlos Ruiz…»). */}
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className={cn("text-sm", nombresMesa.length ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>
-              {textoMesas(nombresMesa)}
-              {sala !== undefined && ` · ${sala}`}
+      <div className={cn("pointer-events-none relative flex flex-col gap-1.5 px-3 py-2.5 text-left", terminada && "opacity-75")}>
+        <div className="flex items-center gap-2">
+          <span className="w-14 shrink-0 text-lg font-semibold leading-tight tabular-nums">{horaCorta(reserva.hora)}</span>
+          <span className="min-w-0 flex-1 truncate text-lg font-semibold leading-tight">{reserva.nombre || "Sin nombre"}</span>
+          <span className="flex shrink-0 items-center gap-1 text-xl font-bold leading-none tabular-nums" aria-hidden="true">
+            <Users className="h-5 w-5 text-muted-foreground" />
+            {reserva.numero_comensales}
+          </span>
+          {/* Teléfono (15/10/2026, petición del dueño): icono de 44 px con márgenes negativos para no
+              hacer la fila más alta. Desde 375 px: a 320 px dejaba el nombre en ~100 px. */}
+          {tel && (
+            <a
+              href={tel}
+              aria-label={`Llamar a ${reserva.nombre || "la reserva"}`}
+              title={telefonoLegible(reserva.telefono) ?? undefined}
+              className="pointer-events-auto -my-2 hidden h-11 w-11 shrink-0 items-center justify-center rounded-md text-primary active:bg-muted min-[375px]:inline-flex"
+            >
+              <Phone className="h-5 w-5" aria-hidden="true" />
+            </a>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold",
+                nombresMesa.length === 0
+                  ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                  : sentada
+                    ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                    : "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
+              )}
+            >
+              {textoMesa}
             </span>
-            <span className="flex items-center gap-1 text-sm tabular-nums">
-              <Users className="h-4 w-4 text-muted-foreground" aria-hidden />
-              {reserva.numero_comensales}
-            </span>
+            {sala && <span className="text-xs text-muted-foreground">{sala}</span>}
             {tarde ? (
               <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
             ) : (
               info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
             )}
           </span>
-          {telefono && tel && (
-            <a
-              href={tel}
-              aria-label={`Llamar a ${reserva.nombre || "la reserva"}: ${telefono}`}
-              className="pointer-events-auto -my-1 inline-flex min-h-11 items-center gap-1.5 pr-3 text-sm font-medium tabular-nums text-primary underline-offset-2 active:underline"
+          {onSentar && (
+            <Button
+              type="button"
+              className="pointer-events-auto h-11 shrink-0 gap-1.5 px-3 text-sm font-semibold pointer-coarse:px-3"
+              disabled={sentando}
+              onClick={onSentar}
+              aria-label={directo ? `Sentar a ${reserva.nombre || "la reserva"} en ${textoMesas(nombresMesa).toLowerCase()}` : `Sentar a ${reserva.nombre || "la reserva"}: elegir mesa`}
             >
-              <Phone className="h-4 w-4 shrink-0" aria-hidden />
-              {telefono}
-            </a>
+              <Armchair className="h-4 w-4" aria-hidden="true" />
+              {directo ? `Sentar · ${textoMesas(nombresMesa)}` : "Sentar"}
+            </Button>
           )}
-        </span>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+        </div>
+        {notas && (
+          <p className="flex min-w-0 items-center gap-1.5 text-sm text-amber-800 dark:text-amber-300">
+            <StickyNote className="h-4 w-4 shrink-0" aria-label="Notas del cliente" />
+            <span className="truncate">{notas}</span>
+          </p>
+        )}
       </div>
     </li>
   );
+}
+
+// ─── Vista «Mesas» ───────────────────────────────────────────────────────────
+
+/** Una mesa prevista para una reserva que aún no ha llegado (vista «Mesas»). */
+export interface PrevistaMesa {
+  reservaId: string;
+  nombre: string;
+  hora: string;
 }
 
 function CuadriculaMesas({
@@ -369,7 +567,8 @@ function CuadriculaMesas({
   reservas: ReservaMovil[];
   turno: TurnoServicio;
   terrazaCerradaId: string | null;
-  onLibre: (m: MesaOpcion) => void;
+  /** Libre o solo prevista para alguien que no ha llegado: sentar aquí. */
+  onLibre: (m: MesaOpcion, prevista: PrevistaMesa | null) => void;
   onOcupada: (reservaId: string) => void;
 }) {
   const estados = useMemo(() => estadoMesasHoy(asignaciones, reservas, turno, turnoDeHora), [asignaciones, reservas, turno]);
@@ -451,20 +650,25 @@ function CasillaMesa({
   opcion: MesaOpcion;
   junta: string[];
   estado: EstadoMesaHoy;
-  onLibre: (m: MesaOpcion) => void;
+  onLibre: (m: MesaOpcion, prevista: PrevistaMesa | null) => void;
   onOcupada: (reservaId: string) => void;
 }) {
+  const pulsar = () => {
+    if (estado.tipo === "libre") onLibre(opcion, null);
+    else if (estado.tipo === "reservada") onLibre(opcion, { reservaId: estado.reservaId, nombre: estado.nombre, hora: estado.hora });
+    else onOcupada(estado.reservaId);
+  };
   return (
     <button
       type="button"
-      onClick={() => (estado.tipo === "libre" ? onLibre(opcion) : onOcupada(estado.reservaId))}
+      onClick={pulsar}
       className={cn(
         "flex min-h-20 flex-col items-start justify-between rounded-lg border-2 p-2 text-left active:scale-[0.98]",
         estado.tipo === "libre" && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
         estado.tipo === "sentada" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
         estado.tipo === "reservada" && "border-sky-500 bg-sky-50 dark:bg-sky-950/40",
       )}
-      aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `reservada a las ${horaCorta(estado.hora)}`}`}
+      aria-label={`Mesa ${opcion.nombre}, ${opcion.plazas} plazas, ${estado.tipo === "libre" ? "libre" : estado.tipo === "sentada" ? `sentada: ${estado.nombre}` : `prevista a las ${horaCorta(estado.hora)} para ${estado.nombre || "una reserva"}`}`}
     >
       <span className="flex w-full items-baseline justify-between gap-1">
         <span className="text-lg font-bold leading-none">{opcion.nombre}</span>
@@ -485,56 +689,198 @@ function CasillaMesa({
   );
 }
 
-/** Mover de sala si hace falta, dar la mesa y (si no había llegado) sentar. */
-function useSentarReservaEnMesa() {
-  const { marcarLlegada, moverEspacio } = useAccionesServicioReserva();
+// ─── Escribir mesas (con cambio local inmediato) ─────────────────────────────
+
+/**
+ * `asignar_mesas_reserva` con el cambio aplicado YA en la lista de asignaciones de hoy (la de esta vista),
+ * para que la vista «Mesas» y las demás filas lo enseñen al momento; la invalidación del hook trae después
+ * la verdad. Si falla (MESA_OCUPADA…), el propio hook avisa con el mensaje en español y aquí se relee todo.
+ */
+function useAsignarConCambioLocal(fecha: string, mesas: readonly Mesa[]) {
+  const qc = useQueryClient();
   const asignar = useAsignarMesasReserva();
-  return async (reserva: ReservaMovil, mesa: MesaOpcion, antes?: () => Promise<void>) => {
+  return useCallback(
+    async (reservaId: string, mesaIds: string[], reserva?: ReservaMovil) => {
+      const mapa = new Map(mesas.map((m) => [m.id, m]));
+      const datosReserva = reserva
+        ? {
+            id: reserva.id,
+            nombre: reserva.nombre ?? "",
+            hora: reserva.hora,
+            numero_comensales: reserva.numero_comensales,
+            estado: reserva.estado,
+            fecha,
+            salida_at: reserva.salida_at ?? null,
+          }
+        : null;
+      qc.setQueriesData<AsignacionConDetalles[]>(
+        { predicate: (q) => q.queryKey[0] === CLAVE_ASIGNACIONES && q.queryKey[1] === fecha && q.queryKey[2] == null },
+        (antes) => (Array.isArray(antes) ? reemplazarMesasEnLista(antes, reservaId, mesaIds, { mesas: mapa, reserva: datosReserva }) : antes),
+      );
+      try {
+        await asignar.mutateAsync({ reserva_id: reservaId, mesa_ids: mesaIds, silencioso: true });
+      } catch (e) {
+        refrescarTrasError(qc);
+        throw e;
+      }
+    },
+    [asignar, fecha, mesas, qc],
+  );
+}
+
+/** Quitarles la mesa a las reservas desplazadas; si algo falla después, `deshacer` se las devuelve. */
+function useDesplazar(asignarLocal: ReturnType<typeof useAsignarConCambioLocal>) {
+  return useCallback(
+    async (desplazadas: readonly Desplazamiento[]) => {
+      const hechas: Desplazamiento[] = [];
+      for (const d of desplazadas) {
+        await asignarLocal(d.reservaId, d.mesaIdsQuedan);
+        hechas.push(d);
+      }
+      return async () => {
+        for (const d of hechas) await asignarLocal(d.reservaId, d.mesaIdsAntes).catch(() => undefined);
+      };
+    },
+    [asignarLocal],
+  );
+}
+
+/** «García se queda sin mesa prevista.» / «García sigue con la mesa 8.» para el aviso de después. */
+function textoDesplazadas(desplazadas: readonly Desplazamiento[], nombreMesa: (id: string) => string): string | undefined {
+  if (desplazadas.length === 0) return undefined;
+  return desplazadas
+    .map((d) =>
+      d.mesaIdsQuedan.length === 0
+        ? `${d.nombre} (${horaCorta(d.hora)}) se queda sin mesa prevista.`
+        : `${d.nombre} (${horaCorta(d.hora)}) sigue con ${textoMesas(d.mesaIdsQuedan.map(nombreMesa)).toLowerCase()}.`,
+    )
+    .join(" ");
+}
+
+/** Mover de sala si hace falta, quitar la mesa a quien la tuviera prevista, dar la mesa y (si no había llegado) sentar. */
+function useSentarReservaEnMesa(fecha: string, mesas: readonly Mesa[]) {
+  const { marcarLlegada, moverEspacio } = useAccionesServicioReserva();
+  const asignarLocal = useAsignarConCambioLocal(fecha, mesas);
+  const desplazar = useDesplazar(asignarLocal);
+  const nombreMesa = (id: string) => mesas.find((m) => m.id === id)?.nombre ?? "?";
+  return async (
+    reserva: ReservaMovil,
+    mesa: MesaOpcion,
+    opciones: { antes?: () => Promise<void>; desplazadas?: readonly Desplazamiento[] } = {},
+  ) => {
     let actual = reserva;
     if (mesa.espacioId !== reserva.espacio_id) {
       const ok = await moverEspacio(reserva, mesa.espacioId, mesa.salaNombre);
       if (!ok) throw new Error("mover");
       actual = { ...reserva, espacio_id: mesa.espacioId };
     }
-    if (antes) await antes();
-    await asignar.mutateAsync({ reserva_id: reserva.id, mesa_ids: [mesa.id], silencioso: true });
-    toast.success(`${reserva.nombre ?? "Reserva"} → mesa ${mesa.nombre}`);
+    if (opciones.antes) await opciones.antes();
+    const deshacer = await desplazar(opciones.desplazadas ?? []);
+    try {
+      await asignarLocal(reserva.id, [mesa.id], reserva);
+    } catch (e) {
+      await deshacer();
+      throw e;
+    }
+    toast.success(`${reserva.nombre || "Reserva"} → mesa ${mesa.nombre}`, {
+      description: textoDesplazadas(opciones.desplazadas ?? [], nombreMesa),
+    });
     if (!estaTerminada(reserva.estado)) await marcarLlegada(actual);
   };
 }
+
+// ─── Confirmación «Sentar igualmente» ────────────────────────────────────────
+
+interface Pendiente {
+  texto: string;
+  ejecutar: () => Promise<unknown>;
+}
+
+function ConfirmarDesplazamiento({
+  pendiente,
+  ocupado,
+  onConfirmar,
+  onCancelar,
+}: {
+  pendiente: Pendiente;
+  ocupado: boolean;
+  onConfirmar: () => void;
+  onCancelar: () => void;
+}) {
+  return (
+    <div role="alert" className="space-y-2 rounded-lg border-2 border-amber-400 bg-amber-50 p-3 dark:bg-amber-950/40">
+      <p className="text-sm font-medium">{pendiente.texto}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" className="h-12" disabled={ocupado} onClick={onCancelar}>
+          Cancelar
+        </Button>
+        <Button className="h-12" disabled={ocupado} onClick={onConfirmar}>
+          Sentar igualmente
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Ficha de una mesa libre (o solo prevista) ───────────────────────────────
 
 const PERSONAS = [1, 2, 3, 4, 5, 6, 7, 8];
 
 export function PanelMesaLibre({
   mesa,
+  prevista = null,
   fecha,
   turno,
   reservas,
+  mesas = [],
+  asignaciones = [],
+  configOcupacion,
   minutoAhora,
+  onVerReserva,
   onCerrar,
 }: {
   mesa: MesaOpcion;
+  /** La mesa está prevista para una reserva que aún no ha llegado. */
+  prevista?: PrevistaMesa | null;
   fecha: string;
   turno: TurnoServicio;
   reservas: ReservaMovil[];
+  mesas?: Mesa[];
+  asignaciones?: AsignacionConDetalles[];
+  configOcupacion?: ConfigOcupacionMesa;
   minutoAhora: number;
+  onVerReserva?: (reservaId: string) => void;
   onCerrar: () => void;
 }) {
   const sentarSinReserva = useSentarSinReserva();
-  const sentarReserva = useSentarReservaEnMesa();
+  const sentarReserva = useSentarReservaEnMesa(fecha, mesas);
+  const desplazar = useDesplazar(useAsignarConCambioLocal(fecha, mesas));
   const [ocupado, setOcupado] = useState(false);
+  const [pendiente, setPendiente] = useState<Pendiente | null>(null);
   // Sentar (con o sin reserva) escribe: solo con «Editar» en Reservas.
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
+  const nombreMesa = (id: string) => mesas.find((m) => m.id === id)?.nombre ?? "?";
 
-  // Las que aún no han llegado en este turno y caben, la más cercana a ahora primero.
+  // Las que aún no han llegado en este turno y caben: la que tiene esta mesa prevista primero y luego la más cercana a ahora.
   const candidatas = useMemo(() => {
     const m = (h: string) => parseInt(h.slice(0, 2), 10) * 60 + parseInt(h.slice(3, 5), 10);
     return reservas
       .filter(
         (r) => ESTADOS_POR_LLEGAR.has(r.estado) && turnoDeHora(r.hora) === turno && r.numero_comensales <= mesa.plazas,
       )
-      .sort((a, b) => Math.abs(m(a.hora) - minutoAhora) - Math.abs(m(b.hora) - minutoAhora));
-  }, [reservas, turno, mesa.plazas, minutoAhora]);
+      .sort(
+        (a, b) =>
+          Number(b.id === prevista?.reservaId) - Number(a.id === prevista?.reservaId) ||
+          Math.abs(m(a.hora) - minutoAhora) - Math.abs(m(b.hora) - minutoAhora),
+      );
+  }, [reservas, turno, mesa.plazas, minutoAhora, prevista?.reservaId]);
+
+  // Para quien entra sin reserva: ¿pisa la franja de ahora a alguien?
+  const [horaAhora] = useState(() => horaActual());
+  const estadoSinReserva = useMemo(
+    () => estadoParaConfirmar(asignaciones, mesa.id, { id: "", hora: horaAhora }, configOcupacion),
+    [asignaciones, mesa.id, horaAhora, configOcupacion],
+  );
 
   const ejecutar = async (trabajo: () => Promise<unknown>) => {
     setOcupado(true);
@@ -545,12 +891,15 @@ export function PanelMesaLibre({
       if (e instanceof Error && e.message !== "mover") toast.error(mensajeUsuario(e));
     } finally {
       setOcupado(false);
+      setPendiente(null);
     }
   };
 
-  const sinReserva = (personas: number) =>
+  const sinReservaYa = (personas: number, desplazadas: readonly Desplazamiento[]) =>
     ejecutar(async () => {
+      const deshacerDesplazar = await desplazar(desplazadas);
       const r = await sentarSinReserva.mutateAsync({ fecha, hora: horaActual(), personas, mesa });
+      if (r.errorMesa) await deshacerDesplazar();
       const deshacer = {
         label: "Deshacer",
         onClick: async () => {
@@ -559,8 +908,29 @@ export function PanelMesaLibre({
         },
       };
       if (r.errorMesa) toast.warning(`${r.nombre} sentado sin mesa: ${r.errorMesa}`, { action: deshacer });
-      else toast.success(`${r.nombre} → mesa ${mesa.nombre}`, { action: deshacer });
+      else toast.success(`${r.nombre} → mesa ${mesa.nombre}`, { action: deshacer, description: textoDesplazadas(desplazadas, nombreMesa) });
     });
+
+  const sinReserva = (personas: number) => {
+    if (estadoSinReserva.tipo === "prevista") {
+      const desplazadas = estadoSinReserva.desplazadas;
+      setPendiente({ texto: textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa), ejecutar: () => sinReservaYa(personas, desplazadas) });
+    } else void sinReservaYa(personas, []);
+  };
+
+  const sentarUna = (r: ReservaMovil) => {
+    const estado = estadoParaConfirmar(asignaciones, mesa.id, { id: r.id, hora: r.hora }, configOcupacion);
+    if (estado.tipo === "ocupada") {
+      toast.error(`La mesa ${mesa.nombre} está ocupada por ${estado.nombre}.`);
+      return;
+    }
+    const desplazadas = estado.tipo === "prevista" ? estado.desplazadas : [];
+    const hacer = () => ejecutar(() => sentarReserva(r, mesa, { desplazadas }));
+    if (desplazadas.length > 0) setPendiente({ texto: textoDesplazamiento(mesa.nombre, desplazadas, nombreMesa), ejecutar: hacer });
+    else void hacer();
+  };
+
+  const ocupadaAhora = estadoSinReserva.tipo === "ocupada";
 
   return (
     <div className="space-y-4 pb-2">
@@ -568,52 +938,72 @@ export function PanelMesaLibre({
         <SheetTitle>
           Mesa {mesa.nombre} · {mesa.salaNombre}
         </SheetTitle>
-        <SheetDescription>Libre · {mesa.plazas} plazas</SheetDescription>
+        <SheetDescription>
+          {prevista ? `Prevista para ${prevista.nombre || "una reserva"} (${horaCorta(prevista.hora)}) · ${mesa.plazas} plazas` : `Libre · ${mesa.plazas} plazas`}
+        </SheetDescription>
       </SheetHeader>
 
-      {puedeEditar && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Sentar sin reserva aquí: ¿cuántos son?</p>
-          <div className="grid grid-cols-4 gap-2">
-            {PERSONAS.map((n) => (
-              <Button
-                key={n}
-                variant="outline"
-                className="h-14 text-lg font-semibold"
-                disabled={ocupado || n > mesa.plazas}
-                onClick={() => void sinReserva(n)}
-              >
-                {n}
-              </Button>
-            ))}
-          </div>
-        </div>
+      {prevista && onVerReserva && (
+        <Button variant="outline" className="h-11 w-full" onClick={() => onVerReserva(prevista.reservaId)}>
+          Ver la ficha de {prevista.nombre || "la reserva"}
+        </Button>
       )}
 
-      {puedeEditar && candidatas.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">Sentar una reserva</p>
-          <ul className="max-h-60 space-y-2 overflow-y-auto">
-            {candidatas.map((r) => (
-              <li key={r.id}>
-                <Button
-                  variant="outline"
-                  className="h-12 w-full justify-between"
-                  disabled={ocupado}
-                  onClick={() => void ejecutar(() => sentarReserva(r, mesa))}
-                >
-                  <span className="truncate">
-                    <span className="font-semibold tabular-nums">{horaCorta(r.hora)}</span> {r.nombre || "Sin nombre"}
-                  </span>
-                  <span className="flex items-center gap-1 tabular-nums">
-                    <Users className="h-4 w-4" aria-hidden />
-                    {r.numero_comensales}
-                  </span>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
+      {pendiente ? (
+        <ConfirmarDesplazamiento
+          pendiente={pendiente}
+          ocupado={ocupado}
+          onCancelar={() => setPendiente(null)}
+          onConfirmar={() => void pendiente.ejecutar()}
+        />
+      ) : (
+        <>
+          {puedeEditar && candidatas.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Sentar una reserva</p>
+              <ul className="max-h-60 space-y-2 overflow-y-auto">
+                {candidatas.map((r) => (
+                  <li key={r.id}>
+                    <Button
+                      variant={r.id === prevista?.reservaId ? "default" : "outline"}
+                      className="h-12 w-full justify-between"
+                      disabled={ocupado}
+                      onClick={() => sentarUna(r)}
+                    >
+                      <span className="truncate">
+                        <span className="font-semibold tabular-nums">{horaCorta(r.hora)}</span> {r.nombre || "Sin nombre"}
+                        {r.id === prevista?.reservaId && " · prevista aquí"}
+                      </span>
+                      <span className="flex items-center gap-1 tabular-nums">
+                        <Users className="h-4 w-4" aria-hidden />
+                        {r.numero_comensales}
+                      </span>
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {puedeEditar && !ocupadaAhora && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Sentar sin reserva aquí: ¿cuántos son?</p>
+              <div className="grid grid-cols-4 gap-2">
+                {PERSONAS.map((n) => (
+                  <Button
+                    key={n}
+                    variant="outline"
+                    className="h-14 text-lg font-semibold"
+                    disabled={ocupado || n > mesa.plazas}
+                    onClick={() => sinReserva(n)}
+                  >
+                    {n}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <Button variant="ghost" className="h-12 w-full" onClick={onCerrar}>
@@ -622,6 +1012,84 @@ export function PanelMesaLibre({
     </div>
   );
 }
+
+// ─── Selector de mesa («¿Dónde se sientan?») ─────────────────────────────────
+
+/**
+ * Rejilla de botones grandes con las mesas de TODAS las salas donde cabe la reserva, agrupadas por sala:
+ * arriba la suya (la prevista, o donde está sentada); cada una marcada libre (verde), prevista para otra
+ * reserva (ámbar, se puede elegir) u ocupada por alguien sentado (gris, no se puede).
+ */
+export function SelectorMesaMovil({
+  selector,
+  sentada,
+  ocupado,
+  onElegir,
+}: {
+  selector: SelectorMesas;
+  /** La reserva ya está sentada: su mesa actual no se vuelve a ofrecer. */
+  sentada: boolean;
+  ocupado: boolean;
+  onElegir: (m: MesaParaConfirmar) => void;
+}) {
+  const casilla = (m: MesaParaConfirmar) => {
+    const deshabilitada = ocupado || m.estado.tipo === "ocupada" || (m.propia && sentada);
+    const detalle = m.propia && (sentada || m.estado.tipo !== "ocupada")
+      ? sentada
+        ? "Aquí está"
+        : "Su mesa prevista"
+      : m.estado.tipo === "ocupada"
+        ? `Ocupada · ${m.estado.nombre}`
+        : m.estado.tipo === "prevista"
+          ? `Prevista: ${m.estado.desplazadas.map((d) => `${d.nombre} ${horaCorta(d.hora)}`).join(", ")}`
+          : "Libre";
+    return (
+      <li key={m.id}>
+        <button
+          type="button"
+          disabled={deshabilitada}
+          onClick={() => onElegir(m)}
+          aria-label={`Mesa ${m.nombre}, ${m.plazas} plazas, ${m.salaNombre}: ${detalle}`}
+          className={cn(
+            "flex min-h-16 w-full flex-col items-start justify-between rounded-lg border-2 p-2 text-left active:scale-[0.98] disabled:cursor-not-allowed",
+            m.propia && "border-primary bg-primary/10",
+            !m.propia && m.estado.tipo === "libre" && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
+            !m.propia && m.estado.tipo === "prevista" && "border-amber-500 bg-amber-50 dark:bg-amber-950/40",
+            !m.propia && m.estado.tipo === "ocupada" && "border-muted bg-muted/60 text-muted-foreground opacity-70",
+          )}
+        >
+          <span className="flex w-full items-baseline justify-between gap-1">
+            <span className="text-lg font-bold leading-none">{m.nombre}</span>
+            <span className="flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">
+              <Users className="h-3 w-3" aria-hidden />
+              {m.plazas}
+            </span>
+          </span>
+          <span className="line-clamp-2 w-full text-xs">{detalle}</span>
+        </button>
+      </li>
+    );
+  };
+
+  return (
+    <div className="space-y-3" data-testid="selector-mesa">
+      {selector.propias.length > 0 && (
+        <section aria-label={sentada ? "Su mesa" : "Prevista"}>
+          <h4 className="mb-1 text-sm font-semibold">{sentada ? "Ahora en" : "Prevista"}</h4>
+          <ul className="grid grid-cols-3 gap-2">{selector.propias.map(casilla)}</ul>
+        </section>
+      )}
+      {selector.salas.map((s) => (
+        <section key={s.salaId} aria-label={s.salaNombre}>
+          <h4 className="mb-1 text-sm font-semibold">{s.salaNombre}</h4>
+          <ul className="grid grid-cols-3 gap-2">{s.mesas.map(casilla)}</ul>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+// ─── Ficha de una reserva ────────────────────────────────────────────────────
 
 export function PanelReservaMovil({
   reserva,
@@ -633,6 +1101,7 @@ export function PanelReservaMovil({
   mesasExcluidas,
   configOcupacion,
   nombresMesa,
+  inicio = "normal",
   onCerrar,
 }: {
   reserva: ReservaMovil;
@@ -644,27 +1113,34 @@ export function PanelReservaMovil({
   mesasExcluidas: readonly string[];
   configOcupacion: ReturnType<typeof configServicioSalaDesde>;
   nombresMesa: string[];
+  /** Desde el botón «Sentar» de la fila: con el selector abierto o con la confirmación de quitar la prevista a otra. */
+  inicio?: InicioFicha;
   onCerrar: () => void;
 }) {
   const qc = useQueryClient();
   const { marcarLlegada, marcarNoShow, deshacerLlegadaONoShow } = useAccionesServicioReserva();
   const { liberarMesa } = useAccionesModoServicio();
-  const sentarReserva = useSentarReservaEnMesa();
+  const sentarReserva = useSentarReservaEnMesa(fecha, mesas);
   const turno: TurnoServicio = turnoDeHora(reserva.hora);
   const guardarAjustes = useGuardarAjustesMesa(reserva.espacio_id ?? "", fecha, turno);
   // Todo lo de esta ficha que escribe (sentar, cambiar o liberar mesa, deshacer, «No vino») exige «Editar».
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
-  const [eligiendo, setEligiendo] = useState(nombresMesa.length === 0 && !estaTerminada(reserva.estado));
+  const [eligiendo, setEligiendo] = useState(
+    (nombresMesa.length === 0 || inicio === "elegir") && !estaTerminada(reserva.estado),
+  );
   const [ocupado, setOcupado] = useState(false);
+  const [pendiente, setPendiente] = useState<Pendiente | null>(null);
+  const desplazar = useDesplazar(useAsignarConCambioLocal(fecha, mesas));
 
   const salaNombre = (id: string | null) => salas.find((s) => s.id === id)?.nombre ?? "Sin sala";
   const terminada = estaTerminada(reserva.estado);
   const sentada = reserva.estado === "completada";
   const puedeLiberar = sentada && nombresMesa.length > 0 && !reserva.salida_at;
   const excluidas = useMemo(() => new Set(mesasExcluidas), [mesasExcluidas]);
+  const nombreMesa = (id: string) => mesas.find((m) => m.id === id)?.nombre ?? "?";
 
-  // Mesas libres donde cabe (con las plazas de ESTE servicio) y, si no cabe, la propuesta de piezas.
-  const { caben, propuesta } = useMemo(
+  // Si no cabe en ninguna mesa de su sala, la propuesta de piezas (juntar/separar) de siempre.
+  const { propuesta } = useMemo(
     () =>
       opcionesParaSentar({
         salas,
@@ -678,6 +1154,21 @@ export function PanelReservaMovil({
     [salas, mesas, ajustesDia, asignaciones, excluidas, configOcupacion, reserva],
   );
 
+  // El selector: todas las mesas donde cabe, de todas las salas, con su estado para la franja de la reserva.
+  const selector = useMemo(
+    () =>
+      clasificarMesasParaSentar({
+        opciones: opcionesMesasServicio({ salas, mesas, ajustesDia, turno }),
+        asignaciones,
+        reserva: { id: reserva.id, hora: reserva.hora, comensales: reserva.numero_comensales, espacioId: reserva.espacio_id },
+        propias: asignaciones.filter((a) => a.reserva_id === reserva.id).map((a) => a.mesa_id),
+        excluidas,
+        config: configOcupacion,
+      }),
+    [salas, mesas, ajustesDia, turno, asignaciones, reserva, excluidas, configOcupacion],
+  );
+  const hayMesas = selector.propias.length + selector.salas.length > 0;
+
   const ejecutar = async (trabajo: () => Promise<unknown>) => {
     setOcupado(true);
     try {
@@ -687,23 +1178,64 @@ export function PanelReservaMovil({
       // Cada paso ya avisa de su error.
     } finally {
       setOcupado(false);
+      setPendiente(null);
     }
   };
 
   /** Mover de sala si hace falta, asignar la mesa y sentar. */
-  const sentarEn = (mesa: MesaOpcion, cambios?: AjusteMesa[]) =>
+  const sentarEn = (mesa: MesaOpcion, cambios?: AjusteMesa[], desplazadas?: readonly Desplazamiento[]) =>
     ejecutar(() =>
-      sentarReserva(
-        reserva,
-        mesa,
-        cambios?.length
+      sentarReserva(reserva, mesa, {
+        desplazadas,
+        antes: cambios?.length
           ? async () => {
               await guardarAjustes.mutateAsync(cambios);
               void qc.invalidateQueries({ queryKey: [CLAVE_AJUSTES_MESA] });
             }
           : undefined,
-      ),
+      }),
     );
+
+  /** Sentar en SU mesa prevista quitándosela antes a quien la pisa (y devolviéndosela si «Llegó» no se guarda). */
+  const sentarEnPrevista = (desplazadas: readonly Desplazamiento[]) =>
+    ejecutar(async () => {
+      const deshacer = await desplazar(desplazadas);
+      if (!(await marcarLlegada(reserva))) {
+        await deshacer();
+        throw new Error("llegada");
+      }
+    });
+
+  const confirmarPrevista = (desplazadas: readonly Desplazamiento[]) =>
+    setPendiente({
+      texto: textoDesplazamiento(textoMesas(nombresMesa).replace(/^Mesas? /, ""), desplazadas, nombreMesa),
+      ejecutar: () => sentarEnPrevista(desplazadas),
+    });
+
+  // Desde el botón «Sentar · Mesa 7» de la fila con la prevista pisada por otra reserva: la confirmación directamente.
+  useEffect(() => {
+    if (inicio !== "confirmar" || terminada) return;
+    const decision = decidirSentarPrevista(asignaciones, reserva, configOcupacion);
+    if (decision.tipo === "confirmar") confirmarPrevista(decision.desplazadas);
+    // Solo al abrir la ficha.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const elegir = (m: MesaParaConfirmar) => {
+    if (m.propia) {
+      if (terminada || m.estado.tipo === "ocupada") return;
+      if (m.estado.tipo === "prevista") confirmarPrevista(m.estado.desplazadas);
+      else void ejecutar(() => marcarLlegada(reserva));
+      return;
+    }
+    if (m.estado.tipo === "ocupada") return;
+    if (m.estado.tipo === "prevista") {
+      const desplazadas = m.estado.desplazadas;
+      setPendiente({ texto: textoDesplazamiento(m.nombre, desplazadas, nombreMesa), ejecutar: () => sentarEn(m, undefined, desplazadas) });
+      return;
+    }
+    void sentarEn(m);
+  };
 
   const info = infoEstado(reserva.estado);
 
@@ -718,7 +1250,7 @@ export function PanelReservaMovil({
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
             <span className="flex items-center gap-1"><Clock className="h-4 w-4" aria-hidden />{horaCorta(reserva.hora)}</span>
             <span className="flex items-center gap-1"><Users className="h-4 w-4" aria-hidden />{reserva.numero_comensales} pax</span>
-            <span className="flex items-center gap-1"><MapPin className="h-4 w-4" aria-hidden />{salaNombre(reserva.espacio_id)} · {textoMesas(nombresMesa)}</span>
+            <span className="flex items-center gap-1"><MapPin className="h-4 w-4" aria-hidden />{salaNombre(reserva.espacio_id)} · {textoMesaConfirmada(nombresMesa, sentada)}</span>
           </div>
         </SheetDescription>
       </SheetHeader>
@@ -735,90 +1267,94 @@ export function PanelReservaMovil({
         <p className="rounded-md bg-amber-50 p-2 text-sm dark:bg-amber-950/40">{reserva.notas_cliente}</p>
       )}
 
-      {!puedeEditar ? null : terminada ? (
-        <div className="grid gap-2">
-          {puedeLiberar && (
-            <Button className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => liberarMesa(reserva))}>
-              <DoorOpen className="mr-2 h-5 w-5" /> Liberar {textoMesas(nombresMesa).toLowerCase()}
-            </Button>
-          )}
-          {sentada && !reserva.salida_at && (
-            <Button
-              variant="outline"
-              className="h-14 text-base"
-              disabled={ocupado}
-              onClick={() => setEligiendo((v) => !v)}
-              aria-expanded={eligiendo}
-            >
-              Cambiar mesa
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            className="h-12 w-full"
-            disabled={ocupado}
-            onClick={() => ejecutar(() => deshacerLlegadaONoShow(reserva))}
-          >
-            <Undo2 className="mr-2 h-5 w-5" /> Deshacer «{info?.etiqueta ?? reserva.estado}»
-          </Button>
-        </div>
+      {pendiente && puedeEditar ? (
+        <ConfirmarDesplazamiento
+          pendiente={pendiente}
+          ocupado={ocupado}
+          onCancelar={() => setPendiente(null)}
+          onConfirmar={() => void pendiente.ejecutar()}
+        />
       ) : (
-        <div className="grid gap-2">
-          {nombresMesa.length > 0 && (
-            <Button className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => marcarLlegada(reserva))}>
-              <Armchair className="mr-2 h-5 w-5" /> Sentar en {textoMesas(nombresMesa).toLowerCase()}
-            </Button>
-          )}
-          <Button
-            variant={nombresMesa.length > 0 ? "outline" : "default"}
-            className="h-14 text-base"
-            disabled={ocupado}
-            onClick={() => setEligiendo((v) => !v)}
-            aria-expanded={eligiendo}
-          >
-            {nombresMesa.length > 0 ? "Cambiar mesa" : "Elegir mesa"}
-          </Button>
-        </div>
-      )}
-
-      {puedeEditar && eligiendo && (!terminada || sentada) && (
-        <div className="space-y-2">
-          {propuesta && (
-            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/40">
-              <p className="text-sm">{propuesta.propuesta.texto}</p>
+        <>
+          {!puedeEditar ? null : terminada ? (
+            <div className="grid gap-2">
+              {puedeLiberar && (
+                <Button className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => liberarMesa(reserva))}>
+                  <DoorOpen className="mr-2 h-5 w-5" /> Liberar {textoMesas(nombresMesa).toLowerCase()}
+                </Button>
+              )}
+              {sentada && !reserva.salida_at && (
+                <Button
+                  variant="outline"
+                  className="h-14 text-base"
+                  disabled={ocupado}
+                  onClick={() => setEligiendo((v) => !v)}
+                  aria-expanded={eligiendo}
+                >
+                  Cambiar mesa
+                </Button>
+              )}
               <Button
-                className="mt-2 h-12 w-full"
+                variant="outline"
+                className="h-12 w-full"
                 disabled={ocupado}
-                onClick={() => sentarEn(propuesta.mesa, propuesta.propuesta.cambios)}
+                onClick={() => ejecutar(() => deshacerLlegadaONoShow(reserva))}
               >
-                Hacer y sentar en la {propuesta.mesa.nombre}
+                <Undo2 className="mr-2 h-5 w-5" /> Deshacer «{info?.etiqueta ?? reserva.estado}»
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-2">
+              {nombresMesa.length > 0 && (
+                <Button
+                  className="h-14 text-base"
+                  disabled={ocupado}
+                  onClick={() => {
+                    const decision = decidirSentarPrevista(asignaciones, reserva, configOcupacion);
+                    if (decision.tipo === "confirmar") confirmarPrevista(decision.desplazadas);
+                    else if (decision.tipo === "elegir") setEligiendo(true);
+                    else void ejecutar(() => marcarLlegada(reserva));
+                  }}
+                >
+                  <Armchair className="mr-2 h-5 w-5" /> Sentar en {textoMesas(nombresMesa).toLowerCase()}
+                </Button>
+              )}
+              <Button
+                variant={nombresMesa.length > 0 ? "outline" : "default"}
+                className="h-14 text-base"
+                disabled={ocupado}
+                onClick={() => setEligiendo((v) => !v)}
+                aria-expanded={eligiendo}
+              >
+                {nombresMesa.length > 0 ? "Cambiar mesa" : "Elegir mesa"}
               </Button>
             </div>
           )}
-          {caben.length === 0 && !propuesta ? (
-            <p className="text-sm text-muted-foreground">
-              No hay ninguna mesa libre donde quepan {reserva.numero_comensales}. Júntalas desde el plano.
-            </p>
-          ) : (
-            <ul className="grid grid-cols-2 gap-2">
-              {caben.map((m) => (
-                <li key={m.id}>
+
+          {puedeEditar && eligiendo && (!terminada || sentada) && (
+            <div className="space-y-3">
+              {propuesta && (
+                <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:bg-amber-950/40">
+                  <p className="text-sm">{propuesta.propuesta.texto}</p>
                   <Button
-                    variant="outline"
-                    className="h-14 w-full flex-col gap-0"
+                    className="mt-2 h-12 w-full"
                     disabled={ocupado}
-                    onClick={() => sentarEn(m)}
+                    onClick={() => sentarEn(propuesta.mesa, propuesta.propuesta.cambios)}
                   >
-                    <span className="text-base font-semibold">Mesa {m.nombre}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {m.plazas} plazas{m.espacioId !== reserva.espacio_id ? ` · ${m.salaNombre}` : ""}
-                    </span>
+                    Hacer y sentar en la {propuesta.mesa.nombre}
                   </Button>
-                </li>
-              ))}
-            </ul>
+                </div>
+              )}
+              {!hayMesas && !propuesta ? (
+                <p className="text-sm text-muted-foreground">
+                  No hay ninguna mesa donde quepan {reserva.numero_comensales}. Júntalas desde el plano.
+                </p>
+              ) : (
+                <SelectorMesaMovil selector={selector} sentada={sentada} ocupado={ocupado} onElegir={elegir} />
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       <div className="grid grid-cols-2 gap-2">

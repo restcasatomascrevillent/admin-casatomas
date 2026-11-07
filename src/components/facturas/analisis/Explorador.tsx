@@ -73,7 +73,10 @@ import type { PeticionDocumentos } from "@/lib/facturas/documentosCifra";
 import type { FiltroLocal } from "@/lib/facturas/resumenCompras";
 import { EstadoError, EstadoVacio } from "@/components/facturas/compras/estilo";
 import type { IdAlInstante } from "@/lib/facturas/alInstante";
+import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
+import { marcasDeExploracion } from "@/lib/facturas/alertas";
 import { GraficaExplorador, TablaExploracion } from "./GraficaExplorador";
+import { MarcaAlerta } from "./Alertas";
 import { FilaAlInstante, ResultadoAlInstante, type ProductoAlInstante } from "./AlInstante";
 import { FOCO } from "./piezas";
 import { desplazarDentro, esTactil } from "./desplazar";
@@ -434,6 +437,21 @@ export function Explorador({
   const params = useMemo(() => parametrosExplorar(config, periodo, local), [config, periodo, local]);
   const q = useExplorarCompras(params);
   const ex = q.data;
+  // Alertas de Facturas (20261107300000) sobre los puntos de la gráfica y, en el precio de un producto, su referencia.
+  const alertasQ = useAlertasFacturas(local);
+  const marcas = useMemo(
+    () =>
+      ex
+        ? marcasDeExploracion(alertasQ.data ?? [], {
+            medida: ex.parametros.medida,
+            agrupar: ex.parametros.agrupar,
+            filtros: config.filtros,
+            periodo,
+            local,
+          })
+        : null,
+    [alertasQ.data, ex, config.filtros, periodo, local],
+  );
   const tipo = graficaEfectiva(config);
   const idFijada = claveConfig(config);
   const fijada = fijadas.has(idFijada);
@@ -603,6 +621,9 @@ export function Explorador({
             onSeleccion={listo ? (c) => setSeleccion((s) => (s === c ? null : c)) : undefined}
             apartarSinClasificar={apartar}
             descripcion={descripcion}
+            alertas={marcas?.porClave}
+            referencia={marcas?.referencia}
+            onIrA={onIrA}
           />
         )}
         <p className="sr-only" aria-live="polite">
@@ -894,6 +915,12 @@ export function Explorador({
             <span className="ml-2 tabular-nums">{formatoValor(punto.valor, ex.parametros.medida, ex.parametros.unidad)}</span>
             <span className="ml-2 text-xs text-muted-foreground">{formatEntero(punto.documentos)} docs.</span>
           </p>
+          {(marcas?.porClave.get(punto.clave)?.length ?? 0) > 0 && (
+            <p className="flex min-w-0 basis-full items-center gap-2 text-xs font-medium text-amber-800 dark:text-amber-400">
+              <MarcaAlerta alertas={marcas?.porClave.get(punto.clave) ?? []} etiqueta={etiquetaPunto(punto)} onIrA={onIrA} />
+              <span className="min-w-0 break-words">{(marcas?.porClave.get(punto.clave) ?? []).map((a) => a.titulo).join(" · ")}</span>
+            </p>
+          )}
           {accion && (
             <button
               type="button"

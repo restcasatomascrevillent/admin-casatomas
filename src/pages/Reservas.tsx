@@ -1,28 +1,17 @@
-import { useState, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo, useRef, type ComponentProps, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Clock, Mail, Plus, Settings, SlidersHorizontal, Timer } from "lucide-react";
-import { FormularioReserva } from "@/components/reservas/FormularioReserva";
 import { EtiquetaSoloLectura } from "@/components/panel/EtiquetaSoloLectura";
 import { BotonAvisosSeccion } from "@/components/avisos/BotonAvisosSeccion";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
 import { ChipsSubnivel } from "@/components/panel/ChipsSubnivel";
 import { VistaHoy } from "@/components/reservas/VistaHoy";
-import { ListaReservasAvanzada } from "@/components/reservas/ListaReservasAvanzada";
-import { CalendarioOcupacion } from "@/components/reservas/CalendarioOcupacion";
-import { PlanoEspacio2D } from "@/components/reservas/PlanoEspacio2D";
-import { ModoServicioPlano } from "@/components/reservas/servicio/ModoServicioPlano";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { LayoutGrid, Utensils } from "lucide-react";
-import { GestionBlacklist } from "@/components/reservas/GestionBlacklist";
-import { ConfiguracionTurnos } from "@/components/reservas/ConfiguracionTurnos";
-import { ConfiguracionGeneralReservas } from "@/components/reservas/ConfiguracionGeneralReservas";
-import { GestionMesasEspacios } from "@/components/reservas/GestionMesasEspacios";
-import { PanelAsignacion } from "@/components/reservas/PanelAsignacion";
-import { EditorPlantillasEmail } from "@/components/emails/EditorPlantillasEmail";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useSolicitudesPendientes } from "@/hooks/useSolicitudesPendientes";
@@ -35,7 +24,75 @@ import {
 } from "@/lib/reservas/vistaUnificada";
 import type { DestinoAsignacion } from "@/lib/reservas/saltoAsignacion";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
+
+// ============================================================================
+// PESTAÑAS BAJO DEMANDA (07/11/2026, «Hoy» ligera con poca cobertura)
+// ----------------------------------------------------------------------------
+// Antes esta página importaba todas sus pestañas (planos, calendario, asignación,
+// configuración, plantillas de correo…) y el fichero de Reservas pesaba ~455 KB,
+// que el móvil del camarero se bajaba entero para ver solo «Hoy». Ahora «Hoy» va
+// en el fichero de la página y el resto se pide al abrir su pestaña (Radix monta
+// solo la pestaña activa). El alta («Nueva Reserva») también, al abrir el diálogo.
+// Si tras un despliegue falta un fichero viejo, la barrera de errores recarga
+// sola (ErrorBoundary › PATRON_CHUNK_OBSOLETO), como con las páginas (App.tsx).
+// ============================================================================
+const FormularioReserva = lazy(() =>
+  import("@/components/reservas/FormularioReserva").then((m) => ({ default: m.FormularioReserva })),
+);
+const ListaReservasAvanzada = lazy(() =>
+  import("@/components/reservas/ListaReservasAvanzada").then((m) => ({ default: m.ListaReservasAvanzada })),
+);
+const CalendarioOcupacion = lazy(() =>
+  import("@/components/reservas/CalendarioOcupacion").then((m) => ({ default: m.CalendarioOcupacion })),
+);
+const PlanoEspacio2D = lazy(() => import("@/components/reservas/PlanoEspacio2D").then((m) => ({ default: m.PlanoEspacio2D })));
+const ModoServicioPlano = lazy(() =>
+  import("@/components/reservas/servicio/ModoServicioPlano").then((m) => ({ default: m.ModoServicioPlano })),
+);
+const GestionBlacklist = lazy(() =>
+  import("@/components/reservas/GestionBlacklist").then((m) => ({ default: m.GestionBlacklist })),
+);
+const ConfiguracionTurnos = lazy(() =>
+  import("@/components/reservas/ConfiguracionTurnos").then((m) => ({ default: m.ConfiguracionTurnos })),
+);
+const ConfiguracionGeneralReservas = lazy(() =>
+  import("@/components/reservas/ConfiguracionGeneralReservas").then((m) => ({ default: m.ConfiguracionGeneralReservas })),
+);
+const GestionMesasEspacios = lazy(() =>
+  import("@/components/reservas/GestionMesasEspacios").then((m) => ({ default: m.GestionMesasEspacios })),
+);
+const PanelAsignacion = lazy(() =>
+  import("@/components/reservas/PanelAsignacion").then((m) => ({ default: m.PanelAsignacion })),
+);
+const EditorPlantillasEmail = lazy(() =>
+  import("@/components/emails/EditorPlantillasEmail").then((m) => ({ default: m.EditorPlantillasEmail })),
+);
+
+/** Esqueleto ligero mientras llega el fichero de una pestaña. */
+function CargandoPestana() {
+  return (
+    <div role="status" aria-live="polite" className="space-y-3">
+      <div className="h-9 animate-pulse rounded-md bg-muted" aria-hidden="true" />
+      <div className="h-64 animate-pulse rounded-xl bg-muted/40" aria-hidden="true" />
+      <span className="sr-only">Cargando…</span>
+    </div>
+  );
+}
+
+const bajoDemanda = (contenido: ReactNode) => <Suspense fallback={<CargandoPestana />}>{contenido}</Suspense>;
+
+/**
+ * La lista con sus solicitudes. `useSolicitudesPendientes` (toda la tabla, realtime y sondeo de cada
+ * minuto) vive AQUÍ y no en la página desde el 07/11/2026: solo la usa «Lista», y como Radix desmonta la
+ * pestaña que no se ve, con «Hoy» abierta ya no se pide nada de solicitudes. Sigue habiendo UNA sola
+ * instancia (ver aviso de realtime en el hook).
+ */
+function PestanaLista(props: Omit<ComponentProps<typeof ListaReservasAvanzada>, "solicitudesState">) {
+  const solicitudesState = useSolicitudesPendientes();
+  return bajoDemanda(<ListaReservasAvanzada {...props} solicitudesState={solicitudesState} />);
+}
 
 /**
  * Suelo (px) de las pestañas largas: por debajo (ventana muy baja, teclado del móvil abierto) la
@@ -84,6 +141,9 @@ function ChipConfiguracion({ children }: { children: ReactNode }) {
 
 export default function Reservas() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // Móvil (< 768 px, 07/11/2026): avisos y «Nueva reserva» como iconos en la MISMA fila que las pestañas
+  // (antes bajaban a una fila propia que se comía ~48 px de la lista de Hoy). En tablet siguen debajo.
+  const esMovil = useIsMobile();
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedEspacio, setSelectedEspacio] = useState<{ id: string; nombre: string } | null>(null);
   // Dentro de una sala: "plano" es el editor/asignación de siempre
@@ -116,9 +176,6 @@ export default function Reservas() {
   // pestañas, sale la etiqueta común «Solo lectura» en lugar de «Nueva Reserva».
   const { canAccess: puedeEditarReservas, loading: cargandoEdicion } = useCanAccessSection("reservas", "edit");
   const soloLectura = !cargandoEdicion && !puedeEditarReservas;
-  // ÚNICA instancia en la página: la lista unificada la usa para pintar las
-  // solicitudes (ver aviso de realtime en el hook).
-  const solicitudesState = useSolicitudesPendientes();
   const listaRef = useRef<HTMLElement | null>(null);
 
   // Identidad estable mientras el diálogo está abierto: si se recreara en cada render,
@@ -260,7 +317,7 @@ export default function Reservas() {
           </ToggleGroup>
         </div>
 
-        {vistaEspacio === "servicio" ? (
+        {bajoDemanda(vistaEspacio === "servicio" ? (
           <ModoServicioPlano
             espacioId={selectedEspacio.id}
             espacioNombre={selectedEspacio.nombre}
@@ -289,7 +346,7 @@ export default function Reservas() {
             reservaId={saltoAsignacion?.reservaId}
             altoDePantalla
           />
-        )}
+        ))}
       </DashboardLayout>
     );
   }
@@ -308,7 +365,7 @@ export default function Reservas() {
             todo el día. Sin título de página: la pestaña "Reservas" del menú lateral ya dice dónde
             estás. */}
         <PestanasPagina
-          accionesDebajoEnMovil="lg"
+          accionesDebajoEnMovil={esMovil ? undefined : "lg"}
           pestanas={[
             { valor: "hoy", etiqueta: "Hoy" },
             { valor: "reservas", etiqueta: "Lista" },
@@ -324,24 +381,30 @@ export default function Reservas() {
                dueño: lo que no se puede usar se oculta, no se desactiva). */
             <>
             {/* Avisos de reservas (06/11/2026, petición del dueño: antes era una entrada de la barra lateral). */}
-            <BotonAvisosSeccion seccion="reservas" />
+            <BotonAvisosSeccion seccion="reservas" className={esMovil ? "h-11 px-2.5 pointer-coarse:h-11" : undefined} />
             {soloLectura && <EtiquetaSoloLectura />}
             {puedeEditarReservas && (
               <Dialog open={openDialog} onOpenChange={setOpenDialog}>
                 <DialogTrigger asChild>
-                  <Button className="touch-hit h-9 shrink-0 pointer-coarse:h-9">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Nueva Reserva
+                  <Button
+                    size={esMovil ? "icon" : "default"}
+                    className={esMovil ? "h-11 w-11 shrink-0" : "touch-hit h-9 shrink-0 pointer-coarse:h-9"}
+                    title={esMovil ? "Nueva reserva" : undefined}
+                  >
+                    <Plus className={esMovil ? "h-5 w-5" : "mr-2 h-4 w-4"} />
+                    <span className={esMovil ? "sr-only" : undefined}>Nueva Reserva</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Crear Nueva Reserva</DialogTitle>
                   </DialogHeader>
-                  <FormularioReserva
-                    datosPreseleccionados={datosNuevaReserva}
-                    onSuccess={() => setOpenDialog(false)}
-                  />
+                  {bajoDemanda(
+                    <FormularioReserva
+                      datosPreseleccionados={datosNuevaReserva}
+                      onSuccess={() => setOpenDialog(false)}
+                    />,
+                  )}
                 </DialogContent>
               </Dialog>
             )}
@@ -383,32 +446,31 @@ export default function Reservas() {
             <p id="descripcion-todas-reservas" className="sr-only">
               Historial completo, de cualquier fecha. Las solicitudes que el asistente telefónico no pudo cerrar aparecen marcadas como «Solicitud» con su motivo.
             </p>
-            <ListaReservasAvanzada
+            <PestanaLista
               // `key`: si llega otro filtro por URL estando ya en la página
               // (p. ej. desde la campana), la lista se reinicia con él.
               key={`${statusFromUrl ?? ""}|${dateFromUrl ?? ""}`}
               onAsignarMesa={handleAsignarMesa}
               initialStatusFilter={statusFromUrl || undefined}
               initialDateFilter={dateFromUrl === "today" ? new Date() : undefined}
-              solicitudesState={solicitudesState}
             />
           </section>
         </TabsContent>
 
         <TabsContent value="calendario" className="space-y-6 mt-6">
-          <CalendarioOcupacion />
+          {bajoDemanda(<CalendarioOcupacion />)}
         </TabsContent>
 
         {/* "Asignación" (reservas-sin-salas, Fase B): el cliente solo reserva
             una hora; aquí se reparten salas y mesas, con las próximas N horas
             arriba. "Mesas" usa el mismo salto al plano que Lista y Hoy. */}
         <TabsContent value="asignacion" className="mt-6">
-          <PanelAsignacion onAsignarMesa={handleAsignarMesa} />
+          {bajoDemanda(<PanelAsignacion onAsignarMesa={handleAsignarMesa} />)}
         </TabsContent>
 
         <TabsContent value="blacklist" className="space-y-6 mt-6">
           <RegionPestanaLarga>
-            <GestionBlacklist />
+            {bajoDemanda(<GestionBlacklist />)}
           </RegionPestanaLarga>
         </TabsContent>
 
@@ -438,26 +500,26 @@ export default function Reservas() {
               />
               <TabsContent value="reglas" className="mt-0">
                 <ChipConfiguracion>
-                  <ConfiguracionGeneralReservas parte="reglas" />
+                  {bajoDemanda(<ConfiguracionGeneralReservas parte="reglas" />)}
                 </ChipConfiguracion>
               </TabsContent>
               <TabsContent value="servicio" className="mt-0">
                 <ChipConfiguracion>
-                  <ConfiguracionGeneralReservas parte="servicio" />
+                  {bajoDemanda(<ConfiguracionGeneralReservas parte="servicio" />)}
                 </ChipConfiguracion>
               </TabsContent>
               <TabsContent value="mesas" className="mt-0">
                 <ChipConfiguracion>
-                  <GestionMesasEspacios />
+                  {bajoDemanda(<GestionMesasEspacios />)}
                 </ChipConfiguracion>
               </TabsContent>
               <TabsContent value="turnos" className="mt-0">
                 <ChipConfiguracion>
-                  <ConfiguracionTurnos />
+                  {bajoDemanda(<ConfiguracionTurnos />)}
                 </ChipConfiguracion>
               </TabsContent>
               <TabsContent value="plantillas" className="mt-0">
-                <EditorPlantillasEmail />
+                {bajoDemanda(<EditorPlantillasEmail />)}
               </TabsContent>
             </Tabs>
           </TabsContent>
