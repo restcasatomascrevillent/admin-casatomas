@@ -22,6 +22,11 @@ vi.mock("@/components/SuperAdminRoute", () => ({
     return <>{children}</>;
   },
 }));
+// El marco del panel (menú y cabecera, montado una vez desde el 07/11/2026): aquí solo hace falta el contenido.
+vi.mock("@/components/PanelLayout", async () => {
+  const { Outlet } = await import("react-router-dom");
+  return { PanelLayout: () => <Outlet />, CargandoContenido: () => null };
+});
 vi.mock("@/components/ui/sonner", () => ({ Toaster: () => null }));
 vi.mock("@/components/carta/potente/AvisoTrabajosVideo", () => ({ AvisoTrabajosVideo: () => null }));
 vi.mock("@/components/carta/recorte/GestorRecortes", () => ({ GestorRecortes: () => null }));
