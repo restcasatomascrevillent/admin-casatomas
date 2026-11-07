@@ -129,8 +129,8 @@ export interface ConfigTablero {
   v?: number;
 }
 
-/** 2 = gráficas de decisión (15/11/2026). */
-export const VERSION_TABLERO = 2;
+/** 2 = gráficas de decisión (15/11/2026); 3 = Análisis en una pantalla, con «Gasto por mes» en «Qué decidir hoy» (07/11/2026). */
+export const VERSION_TABLERO = 3;
 
 /**
  * El tablero de gestión (15/11/2026, maqueta del dueño): arriba el gasto y las
@@ -149,6 +149,7 @@ export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
     { id: "fijos", tamano: "s" },
     { id: "abonos", tamano: "s" },
     { id: "locales", tamano: "s" },
+    { id: "gasto_mes", tamano: "m" },
   ],
   v: VERSION_TABLERO,
 };
@@ -161,6 +162,11 @@ export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
  */
 export function actualizarVersion(c: ConfigTablero): ConfigTablero {
   if ((c.v ?? 1) >= VERSION_TABLERO) return c;
+  if ((c.v ?? 1) >= 2) {
+    // 3 (07/11/2026): «Gasto por mes» va al lado de «Qué decidir hoy»; se añade una vez.
+    const modulos = c.modulos.some((m) => m.id === "gasto_mes") ? c.modulos : [...c.modulos, { id: "gasto_mes" as IdModulo, tamano: "m" as Tamano }];
+    return { ...c, modulos, v: VERSION_TABLERO };
+  }
   const cifras = [...c.cifras];
   const pos = Math.max(0, cifras.indexOf("gasto") + 1);
   const nuevas = (["precios_suben", "ahorro_posible", "familias_fuera"] as IdCifra[]).filter((x) => !cifras.includes(x));
@@ -174,6 +180,7 @@ export function actualizarVersion(c: ConfigTablero): ConfigTablero {
   };
   meter("ahorro", "subidas", "s");
   meter("precios_top", "familias", "l");
+  meter("gasto_mes", "locales", "m");
   return { cifras, modulos, v: VERSION_TABLERO };
 }
 

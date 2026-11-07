@@ -5,7 +5,7 @@
 // tablero`) y cada tarjeta otro (`@container`). La rejilla y las filas se
 // ordenan según el sitio que tienen DE VERDAD (al abrir la IA el tablero se
 // estrecha ~360 px aunque la pantalla siga siendo ancha), no según la pantalla.
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronRight, FileText, Maximize2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -97,15 +97,18 @@ export function Segmentado<T extends string>({
   valor,
   onCambio,
   className,
+  compacto = false,
 }: {
   etiqueta: string;
   opciones: { valor: T; etiqueta: string }[];
   valor: T;
   onCambio: (v: T) => void;
   className?: string;
+  /** Más bajo (36 px con ratón, 44 con dedo): para la barra única de Análisis. */
+  compacto?: boolean;
 }) {
   return (
-    <div role="group" aria-label={etiqueta} className={cn("inline-flex shrink-0 gap-1 rounded-lg bg-muted/40 p-1", className)}>
+    <div role="group" aria-label={etiqueta} className={cn("inline-flex shrink-0 gap-1 rounded-lg bg-muted/40", compacto ? "gap-0.5 p-0.5" : "p-1", className)}>
       {opciones.map((o) => (
         <button
           key={o.valor}
@@ -113,7 +116,8 @@ export function Segmentado<T extends string>({
           aria-pressed={valor === o.valor}
           onClick={() => onCambio(o.valor)}
           className={cn(
-            "min-h-11 whitespace-nowrap rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground",
+            "whitespace-nowrap rounded-md font-medium text-muted-foreground transition-colors hover:text-foreground",
+            compacto ? "min-h-8 px-2 text-[0.8125rem] pointer-coarse:min-h-11 2xl:px-2.5" : "min-h-11 px-3 text-sm",
             "aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-sm",
             FOCO,
           )}
@@ -135,6 +139,14 @@ export function Segmentado<T extends string>({
  * cualquier botón). Las filas de dentro siguen siendo sus propios botones.
  * Es un contenedor (`@container`): sus filas se ordenan por SU ancho.
  */
+/**
+ * Tarjeta que LLENA su caja (07/11/2026, Análisis en una pantalla): mide lo que
+ * le da su hueco de la vista y solo su contenido hace scroll por dentro; la
+ * cabecera se queda fija. Lo activa la vista (`<TarjetaLlena.Provider value>`),
+ * así los módulos de siempre no cambian.
+ */
+export const TarjetaLlena = createContext(false);
+
 export function Tarjeta({
   titulo,
   subtitulo,
@@ -155,6 +167,7 @@ export function Tarjeta({
   onAmpliar?: () => void;
 }) {
   const id = useId();
+  const llena = useContext(TarjetaLlena);
   return (
     <section
       aria-labelledby={`${id}-t`}
@@ -165,10 +178,11 @@ export function Tarjeta({
       className={cn(
         "@container relative flex h-full min-w-0 flex-col rounded-xl border border-border/70 bg-card p-3.5 shadow-[0_1px_2px_0_rgb(0_0_0/0.03)] transition-colors sm:p-4",
         onAmpliar && "hover:border-border",
+        llena && "min-h-0 overflow-hidden",
         className,
       )}
     >
-      <header className="group/cabecera relative mb-2.5 flex items-start gap-2">
+      <header className="group/cabecera relative mb-2.5 flex shrink-0 items-start gap-2">
         <div className="min-w-0 flex-1">
           <h3
             id={`${id}-t`}
@@ -206,7 +220,13 @@ export function Tarjeta({
           {resumen}
         </p>
       )}
-      {children}
+      {llena ? (
+        <div className="-mr-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain pr-2" data-testid="caja-scroll">
+          {children}
+        </div>
+      ) : (
+        children
+      )}
     </section>
   );
 }

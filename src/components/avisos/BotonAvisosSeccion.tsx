@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils";
  * avisos sin revisar; sin ninguno, discreto. Abre un modal con los avisos de la sección, filtros
  * (sin revisar o todos, y por tipo), «Revisado» uno a uno o todos, y el enlace a su origen.
  */
-export function BotonAvisosSeccion({ seccion, className }: { seccion: SeccionAvisos; className?: string }) {
+/** `compacto`: el texto «Avisos» solo en pantallas muy anchas (barra única de Facturas › Análisis). */
+export function BotonAvisosSeccion({ seccion, className, compacto = false }: { seccion: SeccionAvisos; className?: string; compacto?: boolean }) {
   const [abierto, setAbierto] = useState(false);
   // «Ver todas» de otra parte de la sección (p. ej. «Requiere atención» de Análisis) abre este modal.
   useEffect(() => {
@@ -42,7 +43,7 @@ export function BotonAvisosSeccion({ seccion, className }: { seccion: SeccionAvi
         data-testid={`avisos-${seccion}`}
       >
         <Bell className="h-4 w-4" aria-hidden="true" />
-        <span className="hidden sm:inline">Avisos</span>
+        <span className={compacto ? "hidden 2xl:inline" : "hidden sm:inline"}>Avisos</span>
         {conPendientes && (
           <span
             aria-hidden="true"

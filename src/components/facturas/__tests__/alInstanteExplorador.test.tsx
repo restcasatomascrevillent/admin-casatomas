@@ -43,6 +43,9 @@ const CON_AVISOS = {
 };
 
 async function explorador() {
+  // Análisis en una pantalla (07/11/2026): el explorador es la vista «Explorar».
+  await screen.findByLabelText("Indicadores del periodo");
+  fireEvent.click(within(screen.getByRole("group", { name: "Vista del análisis" })).getByRole("button", { name: "Explorar" }));
   const ex = await screen.findByRole("region", { name: "Explorar" });
   // La gráfica del explorador ya ha salido.
   await within(ex).findByText("308.808,70 €");

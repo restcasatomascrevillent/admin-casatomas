@@ -61,6 +61,13 @@ interface PestanasPaginaProps {
    * móvil de Instagram, 05/11/2026). Las pestañas sin icono enseñan su etiqueta.
    */
   soloIconosEnMovil?: boolean;
+  /**
+   * `acciones` se queda con todo el hueco que dejan las pestañas (y puede encoger): para meter
+   * en la misma fila una barra de filtros (Facturas › Análisis, barra única, 07/11/2026).
+   */
+  accionesAnchas?: boolean;
+  /** Los iconos de las pestañas solo en pantallas muy anchas (≥ 2xl): deja sitio a `acciones`. */
+  iconosSoloMuyAncho?: boolean;
   className?: string;
 }
 
@@ -137,6 +144,8 @@ export function PestanasPagina({
   iconosSoloEscritorio,
   accionesDebajoEnMovil,
   soloIconosEnMovil,
+  accionesAnchas,
+  iconosSoloMuyAncho,
   className,
 }: PestanasPaginaProps) {
   const { ref, bordes } = useBordesScroll();
@@ -179,6 +188,7 @@ export function PestanasPagina({
                   className={cn(
                     "inline-flex shrink-0 [&>svg]:h-4 [&>svg]:w-4",
                     iconosSoloEscritorio && "hidden sm:inline-flex",
+                    iconosSoloMuyAncho && "sm:hidden 2xl:inline-flex",
                     soloIconosEnMovil && "[&>svg]:h-5 [&>svg]:w-5 sm:[&>svg]:h-4 sm:[&>svg]:w-4",
                   )}
                   aria-hidden="true"
@@ -223,6 +233,7 @@ export function PestanasPagina({
         <div
           className={cn(
             "ml-auto flex shrink-0 items-center gap-2",
+            accionesAnchas && "min-w-0 flex-1 shrink",
             debajo?.acciones,
           )}
         >
