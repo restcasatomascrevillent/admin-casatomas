@@ -75,7 +75,7 @@ vi.mock("@/components/reservas/ElegirMesaDialog", () => ({
 }));
 
 import { VistaPlanoHoy, type ReservaPlanoHoy } from "@/components/reservas/servicio/VistaPlanoHoy";
-import type { FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
+import { CLAVE_MODO_MESAS_HOY, type FiltroTurnoHoy } from "@/lib/reservas/vistaHoy";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -210,6 +210,7 @@ function anchoVentana(px: number) {
 }
 
 beforeEach(() => {
+  window.localStorage.removeItem(CLAVE_MODO_MESAS_HOY);
   anchoVentana(1440);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(a(14, 30));
@@ -747,20 +748,81 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     expect(screen.queryByRole("button", { name: "Alejar el plano" })).toBeNull();
   });
 
-  it("el plano de mesas NO tiene scroll y el número de mesa sale entero, sin recortar (07/11/2026)", async () => {
-    h.mesas = [...h.mesas, mesa("m13", "13", "comedor", 4, 7, 4)];
+  for (const modo of ["plano", "ordenadas"] as const) {
+    it(`«${modo}»: el plano de mesas NO tiene scroll y el número de mesa sale entero, sin recortar`, async () => {
+      window.localStorage.setItem(CLAVE_MODO_MESAS_HOY, modo);
+      h.mesas = [...h.mesas, mesa("m13", "13", "comedor", 4, 7, 4)];
+      montar({ fijo: true });
+      const contenedor = await screen.findByTestId("mesas-grandes");
+      expect(contenedor).toHaveAttribute("data-modo", modo);
+      for (const nodo of [contenedor, ...Array.from(contenedor.querySelectorAll("*"))] as HTMLElement[]) {
+        expect(nodo.getAttribute("class") ?? "").not.toMatch(/overflow-(auto|scroll|y-auto|x-auto|y-scroll|x-scroll)/);
+      }
+      expect(contenedor).toHaveClass("overflow-hidden", "touch-none", "select-none");
+      const numero = within(mesaBoton("13")).getByTestId("numero-mesa");
+      expect(numero).toHaveTextContent(/^13$/);
+      expect(numero).toHaveClass("whitespace-nowrap", "shrink-0");
+      expect(numero.className).not.toMatch(/truncate|text-ellipsis/);
+      // Sin el icono de estado que se comía el número.
+      expect(mesaBoton("13").querySelector("[data-glifo-estado]")).toBeNull();
+    });
+  }
+
+  it("«Plano»: cada mesa en su sitio (lo de la izquierda a la izquierda, lo de arriba arriba)", async () => {
     montar({ fijo: true });
-    const contenedor = await screen.findByTestId("mesas-grandes");
-    for (const nodo of [contenedor, ...Array.from(contenedor.querySelectorAll("*"))] as HTMLElement[]) {
-      expect(nodo.getAttribute("class") ?? "").not.toMatch(/overflow-(auto|scroll|y-auto|x-auto|y-scroll|x-scroll)/);
+    expect(await screen.findByTestId("mesas-grandes")).toHaveAttribute("data-modo", "plano");
+    const izq = (n: string) => parseFloat(mesaBoton(n).style.left);
+    const arriba = (n: string) => parseFloat(mesaBoton(n).style.top);
+    // Comedor: 1, 2 y 3 en y = 1 m (x 1, 3, 5); 4 y 5 en y = 4 m (x 1, 3).
+    expect(izq("1")).toBeLessThan(izq("2"));
+    expect(izq("2")).toBeLessThan(izq("3"));
+    expect(izq("4")).toBeLessThan(izq("5"));
+    expect(arriba("1")).toBeLessThan(arriba("4"));
+    expect(arriba("1")).toBe(arriba("3"));
+    // Objetivo táctil: ninguna tarjeta por debajo de 44 px.
+    for (const n of ["1", "2", "3", "4", "5"]) {
+      expect(parseFloat(mesaBoton(n).style.width)).toBeGreaterThanOrEqual(44);
+      expect(parseFloat(mesaBoton(n).style.height)).toBeGreaterThanOrEqual(44);
     }
-    expect(contenedor).toHaveClass("overflow-hidden");
-    const numero = within(mesaBoton("13")).getByTestId("numero-mesa");
-    expect(numero).toHaveTextContent(/^13$/);
-    expect(numero).toHaveClass("whitespace-nowrap", "shrink-0");
-    expect(numero.className).not.toMatch(/truncate|text-ellipsis/);
-    // Sin el icono de estado que se comía el número.
-    expect(mesaBoton("13").querySelector("[data-glifo-estado]")).toBeNull();
+  });
+
+  it("«Ordenadas»: por número (el 10 después del 9), y la elección se recuerda", async () => {
+    h.mesas = [mesa("a", "10", "comedor", 4, 0, 0), mesa("b", "9", "comedor", 4, 5, 5), mesa("c", "2", "comedor", 4, 3, 1), mesa("d", "1", "comedor", 4, 9, 9)];
+    const { unmount } = montar({ fijo: true });
+    await screen.findByTestId("mesas-grandes");
+    const selector = screen.getByRole("group", { name: "Cómo ver las mesas" });
+    expect(within(selector).getByRole("radio", { name: "Plano" })).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(within(selector).getByRole("radio", { name: "Ordenadas" }));
+    const contenedor = screen.getByTestId("mesas-grandes");
+    expect(contenedor).toHaveAttribute("data-modo", "ordenadas");
+    const orden = Array.from(contenedor.querySelectorAll("[data-mesa-id]")).map((b) => b.getAttribute("aria-label")!.split(",")[0]);
+    expect(orden).toEqual(["Mesa 1", "Mesa 2", "Mesa 9", "Mesa 10"]);
+    expect(window.localStorage.getItem(CLAVE_MODO_MESAS_HOY)).toBe("ordenadas");
+    unmount();
+    montar({ fijo: true });
+    expect(await screen.findByTestId("mesas-grandes")).toHaveAttribute("data-modo", "ordenadas");
+    // El selector, con objetivos de 44 px.
+    for (const r of within(screen.getByRole("group", { name: "Cómo ver las mesas" })).getAllByRole("radio")) expect(r).toHaveClass("h-11");
+  });
+
+  it("deslizar el dedo a izquierda o derecha sobre las mesas cambia de sala; un toque no", async () => {
+    const onCambiarSala = vi.fn();
+    montar({ fijo: true, onCambiarSala });
+    const zona = await screen.findByTestId("plano-deslizable");
+    fireEvent.pointerDown(zona, { clientX: 300, clientY: 200, pointerType: "touch" });
+    fireEvent.pointerUp(zona, { clientX: 304, clientY: 202, pointerType: "touch" });
+    expect(onCambiarSala).not.toHaveBeenCalled();
+    fireEvent.pointerDown(zona, { clientX: 300, clientY: 200, pointerType: "touch" });
+    fireEvent.pointerUp(zona, { clientX: 220, clientY: 210, pointerType: "touch" });
+    expect(onCambiarSala).toHaveBeenLastCalledWith("salon");
+    fireEvent.pointerDown(zona, { clientX: 200, clientY: 200, pointerType: "touch" });
+    fireEvent.pointerUp(zona, { clientX: 290, clientY: 195, pointerType: "touch" });
+    expect(onCambiarSala).toHaveBeenLastCalledWith("comedor");
+    // Casi vertical: no cuenta.
+    onCambiarSala.mockClear();
+    fireEvent.pointerDown(zona, { clientX: 200, clientY: 100, pointerType: "touch" });
+    fireEvent.pointerUp(zona, { clientX: 260, clientY: 300, pointerType: "touch" });
+    expect(onCambiarSala).not.toHaveBeenCalled();
   });
 
   it("cada tarjeta lleva el estado del plano, su número, plazas y, con reserva, hora, nombre corto y personas", async () => {
@@ -779,17 +841,6 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     expect(mesaBoton("5")).toHaveTextContent("Libre");
   });
 
-  it("conserva la distribución: dos filas (y = 1 m y y = 4 m) de tres y dos mesas, sin solaparse", async () => {
-    montar({ fijo: true });
-    const rejilla = (await screen.findByTestId("mesas-grandes")).firstElementChild as HTMLElement;
-    expect(rejilla).toHaveAttribute("data-filas", "2");
-    expect(rejilla).toHaveAttribute("data-columnas", "3");
-    expect(mesaBoton("1").style.gridRow).toBe("1");
-    expect(mesaBoton("3").style.gridColumn).toBe("3");
-    expect(mesaBoton("4").style.gridRow).toBe("2");
-    expect(mesaBoton("5").style.gridColumn).toBe("2");
-  });
-
   it("tocar una tarjeta abre la mesa con sus acciones (en una hoja)", async () => {
     montar({ fijo: true });
     await screen.findByTestId("mesas-grandes");
@@ -798,11 +849,24 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     expect(within(hoja).getByRole("button", { name: /Liberar mesa/ })).toBeInTheDocument();
   });
 
-  it("la leyenda se parte en líneas en vez de cortarse («Por liberar» entera)", async () => {
+  it("la leyenda va en UNA línea compacta (icono + número, el nombre en el title) y no se corta", async () => {
     montar({ fijo: true });
     const leyenda = await screen.findByTestId("leyenda-plano");
-    expect(within(leyenda).getByRole("list", { name: "Leyenda de estados de mesa" })).toHaveClass("flex-wrap");
+    const lista = within(leyenda).getByRole("list", { name: "Leyenda de estados de mesa" });
+    expect(lista).toHaveClass("flex-nowrap");
+    expect(lista.querySelector('li[title^="Por liberar"]')).not.toBeNull();
     expect(leyenda).toHaveTextContent("Por liberar");
+  });
+
+  it("el nombre de la sala sale ENTERO (sin truncate); «Plano base» va en el menú «⋯» (44 px)", async () => {
+    montar({ fijo: true, salaInicial: "terraza" });
+    const nombre = await screen.findByTestId("plano-fijo-nombre");
+    expect(nombre).toHaveTextContent(/^Terraza$/);
+    expect(nombre.className).not.toMatch(/truncate|text-ellipsis/);
+    expect(nombre).toHaveClass("whitespace-nowrap");
+    expect(screen.getByTestId("plano-fijo-sala").className).not.toMatch(/truncate/);
+    expect(screen.queryByRole("button", { name: /Plano base/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Más opciones de la sala" })).toHaveClass("h-11", "w-11");
   });
 
   it("la reserva señalada en la lista resalta su mesa y, si es de otra sala, el plano salta a ella", async () => {

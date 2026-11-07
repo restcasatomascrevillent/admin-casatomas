@@ -181,6 +181,21 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
     expect(within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveTextContent("Sentar");
   });
 
+  it("con el dedo (sin hover): tocar la fila la señala para el plano (resalta su mesa y salta de sala) y abre la ficha", () => {
+    const onSeñalar = vi.fn();
+    montarEstados(onSeñalar);
+    fireEvent.click(screen.getByRole("button", { name: /^13:00 Ana Espera/ }));
+    expect(onSeñalar).toHaveBeenLastCalledWith("a");
+    expect(document.querySelector('li[data-reserva-id="a"]')).toHaveAttribute("data-señalada", "true");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("objetivos táctiles de 44 px: «Sentar» y la cabecera del grupo plegado", () => {
+    montarEstados();
+    expect(screen.getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveClass("h-11");
+    expect(screen.getByRole("button", { name: /Terminadas \/ No vino \/ Canceladas/ })).toHaveClass("min-h-11");
+  });
+
   it("pasar el ratón por una fila la señala para el plano; al salir, deja de señalarla", () => {
     const onSeñalar = vi.fn();
     montarEstados(onSeñalar);

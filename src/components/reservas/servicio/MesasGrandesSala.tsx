@@ -8,6 +8,11 @@
 // TARJETA grande que ocupa el sitio de la sala, colocada más o menos donde está
 // (filas y columnas derivadas de sus posiciones: `rejillaMesasGrandes`).
 //
+// DOS MODOS (07/11/2026, «respétame un poco más el mapa… y si no, ordenadas»):
+// «Plano» (cada mesa en su sitio real, a escala: `planoFiel`) y «Ordenadas»
+// (rejilla por número: `rejillaOrdenadas`). Táctil: objetivos de 44 px como poco
+// (si en «Plano» no llegan, esa sala va «Ordenadas»), sin zoom ni scroll al tocar.
+//
 // SIN SCROLL (07/11/2026, el dueño en el Salón de la demo, v0.391): todas las
 // mesas caben SIEMPRE en el hueco. El tamaño de cada tarjeta sale del ancho y el
 // alto reales del contenedor (ResizeObserver, `useTamanoElemento`): filas ×
@@ -21,17 +26,27 @@
 // fijar, sentar sin reserva). Las mesas juntas de una reserva son UNA tarjeta.
 // ============================================================================
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useTamanoElemento } from "@/hooks/useAlturaDisponible";
 import { useDroppable } from "@dnd-kit/core";
 import { Link2, Lock, MessageSquareText, Move, Star, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Mesa } from "@/hooks/useMesas";
 import type { ResultadoEstadoMesa } from "@/lib/reservas/servicioSala";
-import { nombreCartelMesa, tiempoCortoMesa } from "@/lib/reservas/vistaHoy";
+import { nombreCartelMesa, tiempoCortoMesa, type ModoMesasHoy } from "@/lib/reservas/vistaHoy";
 import type { UnionDibujo } from "@/lib/reservas/dibujoMesas";
-import { medidasTarjetas, rejillaAjustada, rejillaMesasGrandes, RELLENO_MESAS_GRANDES } from "@/lib/reservas/mesasGrandes";
+import {
+  compararNombreMesa,
+  MINIMO_TACTIL,
+  planoFiel,
+  rejillaOrdenadas,
+  RELLENO_MESAS_GRANDES,
+  unidadesMesas,
+} from "@/lib/reservas/mesasGrandes";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
+
+/** Sin medida (jsdom o antes de medir): se coloca como si el hueco fuera este. */
+const HUECO_POR_DEFECTO = { ancho: 900, alto: 560 };
 
 export interface MesasGrandesSalaProps {
   salaNombre: string;
@@ -44,6 +59,11 @@ export interface MesasGrandesSalaProps {
   onTocarMesa: (mesa: Mesa) => void;
   /** Mesas juntas en este servicio (`dibujarUniones`): una tarjeta por unión. */
   uniones?: readonly UnionDibujo[];
+  /**
+   * «Plano» (cada mesa en su sitio, a escala) u «Ordenadas» (rejilla por número). Si en «Plano» alguna tarjeta
+   * quedaría por debajo de 44 px (objetivo táctil), la sala se pinta «Ordenadas».
+   */
+  modo?: ModoMesasHoy;
 }
 
 export function MesasGrandesSala({
@@ -54,22 +74,28 @@ export function MesasGrandesSala({
   coincidentes,
   onTocarMesa,
   uniones = [],
+  modo = "plano",
 }: MesasGrandesSalaProps) {
   const [caja, setCaja] = useState<HTMLDivElement | null>(null);
-  const tamano = useTamanoElemento(caja);
-  // Con el hueco medido: las filas que den tarjetas más grandes (juntando filas de la sala si hace falta).
-  const ancho = tamano?.ancho ?? 0;
-  const alto = tamano?.alto ?? 0;
-  const rejilla = useMemo(
-    () => (ancho > 0 && alto > 0 ? rejillaAjustada(mesas, uniones, ancho, alto) : rejillaMesasGrandes(mesas, uniones)),
-    [mesas, uniones, ancho, alto],
-  );
+  const tamano = useTamanoElemento(caja) ?? HUECO_POR_DEFECTO;
+  const { ancho, alto } = tamano;
   const porId = useMemo(() => new Map(mesas.map((m) => [m.id, m])), [mesas]);
   const unionDe = useMemo(() => new Map(uniones.map((u) => [u.ids[0], u])), [uniones]);
-  const medidas =
-    tamano && rejilla.filas > 0 ? medidasTarjetas(tamano.ancho, tamano.alto, rejilla.filas, rejilla.columnas) : null;
+  const unidades = useMemo(() => unidadesMesas(mesas, uniones), [mesas, uniones]);
+  const plano = useMemo(
+    () => (modo === "plano" ? planoFiel(unidades, ancho, alto) : null),
+    [modo, unidades, ancho, alto],
+  );
+  const enPlano = !!plano && plano.cajas.length > 0 && plano.minimo >= MINIMO_TACTIL;
+  // «Ordenadas»: por número de la mesa principal (el 10 después del 9).
+  const ordenadas = useMemo(() => {
+    if (enPlano) return null;
+    const nombre = (ids: string[]) => porId.get(ids[0])?.nombre ?? "";
+    const lista = [...unidades].sort((a, b) => compararNombreMesa(nombre(a.ids), nombre(b.ids)));
+    return { lista, rejilla: rejillaOrdenadas(lista.length, ancho, alto) };
+  }, [enPlano, unidades, porId, ancho, alto]);
 
-  if (rejilla.celdas.length === 0) {
+  if (unidades.length === 0) {
     return (
       <div
         ref={setCaja}
@@ -85,57 +111,57 @@ export function MesasGrandesSala({
     );
   }
 
+  const tarjeta = (ids: string[], estilo: CSSProperties, w: number, h: number) => {
+    const suyas = ids.map((id) => porId.get(id)).filter((m): m is Mesa => !!m);
+    if (suyas.length === 0) return null;
+    const union = suyas.length > 1 ? (unionDe.get(suyas[0].id) ?? null) : null;
+    return (
+      <TarjetaMesa
+        key={ids.join("+")}
+        mesas={suyas}
+        plazas={union?.plazas ?? suyas.reduce((s, m) => s + (m.capacidad || 0), 0)}
+        estilo={estilo}
+        ancho={w}
+        alto={h}
+        resultado={estados.get(suyas[0].id) ?? null}
+        seleccionada={suyas.some((m) => m.id === seleccionada)}
+        atenuada={coincidentes !== null && !suyas.some((m) => coincidentes.has(m.id))}
+        resaltada={coincidentes !== null && suyas.some((m) => coincidentes.has(m.id))}
+        onClick={() => onTocarMesa(suyas[0])}
+      />
+    );
+  };
+
   return (
-    // Nunca scroll: `overflow-hidden` y las medidas sacadas del propio hueco.
+    // Nunca scroll (`overflow-hidden`, medidas sacadas del propio hueco). Táctil: sin zoom ni scroll del
+    // navegador al tocar (`touch-none`; los toques siguen llegando como clic) y sin seleccionar texto.
     <div
       ref={setCaja}
-      className="flex h-full w-full items-center justify-center overflow-hidden"
-      style={{ padding: RELLENO_MESAS_GRANDES }}
+      className="relative h-full w-full touch-none select-none overflow-hidden"
       data-testid="mesas-grandes"
+      data-modo={enPlano ? "plano" : "ordenadas"}
+      data-modo-pedido={modo}
     >
-      <div
-        className="grid"
-        data-filas={rejilla.filas}
-        data-columnas={rejilla.columnas}
-        style={
-          medidas
-            ? {
-                gridTemplateColumns: `repeat(${rejilla.columnas}, ${medidas.tarjetaAncho}px)`,
-                gridTemplateRows: `repeat(${rejilla.filas}, ${medidas.tarjetaAlto}px)`,
-                gap: medidas.hueco,
-              }
-            : {
-                // Sin medidas (jsdom o antes de medir): que llene el hueco sin desbordar.
-                width: "100%",
-                height: "100%",
-                gap: 8,
-                gridTemplateColumns: `repeat(${rejilla.columnas}, minmax(0, 1fr))`,
-                gridTemplateRows: `repeat(${rejilla.filas}, minmax(0, 1fr))`,
-              }
-        }
-      >
-        {rejilla.celdas.map((celda) => {
-          const suyas = celda.ids.map((id) => porId.get(id)).filter((m): m is Mesa => !!m);
-          if (suyas.length === 0) return null;
-          const union = suyas.length > 1 ? (unionDe.get(suyas[0].id) ?? null) : null;
-          return (
-            <TarjetaMesa
-              key={celda.ids.join("+")}
-              mesas={suyas}
-              plazas={union?.plazas ?? suyas.reduce((s, m) => s + (m.capacidad || 0), 0)}
-              fila={celda.fila}
-              columna={celda.columna}
-              ancho={medidas?.tarjetaAncho ?? null}
-              alto={medidas?.tarjetaAlto ?? null}
-              resultado={estados.get(suyas[0].id) ?? null}
-              seleccionada={suyas.some((m) => m.id === seleccionada)}
-              atenuada={coincidentes !== null && !suyas.some((m) => coincidentes.has(m.id))}
-              resaltada={coincidentes !== null && suyas.some((m) => coincidentes.has(m.id))}
-              onClick={() => onTocarMesa(suyas[0])}
-            />
-          );
-        })}
-      </div>
+      {enPlano && plano ? (
+        plano.cajas.map((c) =>
+          tarjeta(c.ids, { position: "absolute", left: c.left, top: c.top, width: c.width, height: c.height }, c.width, c.height),
+        )
+      ) : ordenadas ? (
+        <div className="flex h-full w-full items-center justify-center" style={{ padding: RELLENO_MESAS_GRANDES }}>
+          <div
+            className="grid"
+            data-filas={ordenadas.rejilla.filas}
+            data-columnas={ordenadas.rejilla.columnas}
+            style={{
+              gridTemplateColumns: `repeat(${ordenadas.rejilla.columnas}, ${ordenadas.rejilla.tarjetaAncho}px)`,
+              gridTemplateRows: `repeat(${ordenadas.rejilla.filas}, ${ordenadas.rejilla.tarjetaAlto}px)`,
+              gap: ordenadas.rejilla.hueco,
+            }}
+          >
+            {ordenadas.lista.map((u) => tarjeta(u.ids, {}, ordenadas.rejilla.tarjetaAncho, ordenadas.rejilla.tarjetaAlto))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -148,8 +174,7 @@ export function MesasGrandesSala({
 function TarjetaMesa({
   mesas,
   plazas,
-  fila,
-  columna,
+  estilo,
   ancho,
   alto,
   resultado,
@@ -161,11 +186,11 @@ function TarjetaMesa({
   /** Una mesa, o las de una unión (la principal primero). */
   mesas: Mesa[];
   plazas: number;
-  fila: number;
-  columna: number;
-  /** Medidas reales en px (`null` sin medir: tamaño cómodo). */
-  ancho: number | null;
-  alto: number | null;
+  /** Posición (en «Plano», absoluta) y tamaño. */
+  estilo: CSSProperties;
+  /** Medidas en px, para escalar letras y quitar lo que no cabe. */
+  ancho: number;
+  alto: number;
   resultado: ResultadoEstadoMesa | null;
   seleccionada: boolean;
   atenuada: boolean;
@@ -197,8 +222,8 @@ function TarjetaMesa({
   const { setNodeRef, isOver } = useDroppable({ id: `mesa-grande-${principal.id}`, data: { mesaId: principal.id } });
 
   // Escala por tamaño: el número baja de 30 a 14 px (y cabe a lo ancho); el resto se va quitando.
-  const a = ancho ?? 150;
-  const h = alto ?? 120;
+  const a = ancho;
+  const h = alto;
   const tamanoNumero = Math.round(Math.max(14, Math.min(30, h * 0.3, (a - 16) / (Math.max(2, numero.length) * 0.62))));
   const letra = a < 96 || h < 72 ? 11 : 13;
   const conPlazas = h >= 72;
@@ -220,7 +245,9 @@ function TarjetaMesa({
       onClick={onClick}
       title={nota || undefined}
       className={cn(
-        "relative flex min-h-0 min-w-0 touch-manipulation flex-col overflow-hidden rounded-xl text-left text-foreground shadow-sm outline-none transition-[opacity,box-shadow]",
+        "relative flex min-h-11 min-w-11 select-none flex-col overflow-hidden rounded-xl text-left text-foreground shadow-sm outline-none transition-[opacity,box-shadow,transform] duration-75",
+        // Respuesta inmediata al dedo: se hunde al pulsar.
+        "active:scale-[0.97] active:brightness-95",
         h < 72 ? "p-1.5" : "p-2",
         clases,
         "hover:shadow-md",
@@ -230,7 +257,7 @@ function TarjetaMesa({
         isOver && "ring-4 ring-emerald-500 ring-offset-2 ring-offset-background",
         "focus-visible:ring-4 focus-visible:ring-ring",
       )}
-      style={{ gridRow: fila, gridColumn: columna, fontSize: letra }}
+      style={{ ...estilo, fontSize: letra }}
     >
       {/* Mesas juntas: la misma tarjeta, con su rótulo común arriba. */}
       {conJuntas && (
@@ -270,7 +297,7 @@ function TarjetaMesa({
             {conTiempo && tiempo && (
               <span className="flex items-center justify-between gap-1 whitespace-nowrap font-semibold tabular-nums">
                 <span className={cn("shrink-0 rounded px-1 leading-tight", estado !== "reservada" && badge)}>{tiempo}</span>
-                {!conNombre && <span className="shrink-0">{reserva.numero_comensales} p.</span>}
+                {!conNombre && a >= 96 && <span className="shrink-0">{reserva.numero_comensales} p.</span>}
               </span>
             )}
             {conNombre && (

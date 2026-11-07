@@ -116,7 +116,7 @@ export function ListaHoyEscritorio({
       </span>
     </>
   );
-  const claseCabecera = "sticky top-0 z-10 flex min-h-10 w-full items-center justify-between gap-2 border-b bg-muted/95 px-3 py-1.5 text-sm font-semibold backdrop-blur";
+  const claseCabecera = "sticky top-0 z-10 flex min-h-11 w-full items-center justify-between gap-2 border-b bg-muted/95 px-3 py-1.5 text-sm font-semibold backdrop-blur";
 
   return (
     <div data-testid="lista-hoy-escritorio">
@@ -213,7 +213,7 @@ function FilaEscritorio({
         onFocus={() => señalar(true)}
         onBlur={() => señalar(false)}
         aria-label={`${horaCorta(reserva.hora)} ${nombre}, ${reserva.numero_comensales} personas, ${sinMesa ? "sin mesa" : `${sala ? `${sala}, ` : ""}${textoMesas(mesas).toLowerCase()}`}${estado ? `, ${estado.texto}` : ""}`}
-        className="absolute inset-0 h-full w-full hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70"
+        className="absolute inset-0 h-full w-full touch-manipulation select-none hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring active:bg-muted/70"
       />
       <div className="pointer-events-none relative flex min-h-[3.25rem] items-center gap-1.5 px-3 py-1">
         {/* Por debajo de 1536 px no cabe la etiqueta: el estado va en un punto de color junto a la hora. */}
@@ -248,7 +248,7 @@ function FilaEscritorio({
               href={tel}
               aria-label={`Llamar a ${nombre}`}
               title={telefonoLegible(reserva.telefono) ?? undefined}
-              className="pointer-events-auto -my-2 hidden h-11 w-7 items-center justify-center rounded-md text-primary hover:bg-muted xl:inline-flex"
+              className="pointer-events-auto -mx-2 -my-2 hidden h-11 w-11 items-center justify-center rounded-md text-primary hover:bg-muted active:bg-muted xl:inline-flex"
             >
               <Phone className="h-4 w-4" aria-hidden="true" />
             </a>

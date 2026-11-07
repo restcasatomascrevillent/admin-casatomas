@@ -8,6 +8,7 @@ import { REFRESCO_PERIODICO } from "@/lib/realtimeCanal";
 import { AvisoSinConexion } from "@/components/panel/AvisoSinConexion";
 import { esErrorDeRed } from "@/hooks/useEnLinea";
 import { useHoyLocal } from "@/hooks/useHoyLocal";
+import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { admiteReservas } from "@/lib/reservas/negocios";
@@ -99,6 +100,8 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     setSalaPlano(salaId);
     guardarSalaPlanoHoy(salaId);
   }, []);
+  const [bloqueEscritorio, setBloqueEscritorio] = useState<HTMLDivElement | null>(null);
+  const altoEscritorio = useAlturaDisponible(bloqueEscritorio, 420);
   /** Escritorio: la reserva señalada en la lista (ratón, foco o ficha abierta), que el plano resalta. */
   const [señalada, setSeñalada] = useState<string | null>(null);
 
@@ -201,7 +204,14 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     // `ReservasEnVivoContexto`: lo de dentro ya lo refresca `useReservasEnVivo` y no abre su propio canal a
     // `reservas`.
     <ReservasEnVivoContexto.Provider value={true}>
-      <div className="flex min-h-0 flex-col gap-2" data-testid="hoy-escritorio">
+      {/* Nunca más alto que la pantalla (07/11/2026: en la captura del dueño la página hacía scroll y se cortaban
+          «Nueva Reserva» arriba y la leyenda y la última fila abajo): el bloque mide lo que queda y recorta. */}
+      <div
+        ref={setBloqueEscritorio}
+        className="flex min-h-0 flex-col gap-2 overflow-hidden"
+        style={altoEscritorio ? { height: altoEscritorio } : undefined}
+        data-testid="hoy-escritorio"
+      >
         {avisoRed}
         <BarraFiltrosHoy
           busqueda={busqueda}

@@ -43,7 +43,7 @@
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ListChecks, Loader2, Lock, LogOut, MoreHorizontal, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +61,8 @@ import { reservasConMesaEnSala, yaAtendida } from "@/lib/reservas/hoyMovil";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   AlertDialog,
@@ -136,6 +138,9 @@ import {
   ALTURA_MINIMA_PLANO_HOY,
   ALTURA_MINIMA_PLANO_HOY_MOVIL,
   coincideFiltroHoy,
+  guardarModoMesasHoy,
+  leerModoMesasHoy,
+  type ModoMesasHoy,
   turnoDelPlano,
   type FiltroTurnoHoy,
 } from "@/lib/reservas/vistaHoy";
@@ -671,6 +676,45 @@ export function VistaPlanoHoy({
 
   const volverABase = useVolverAPlanoBase(sala?.id ?? "", hoy, turno);
   const [confirmarBase, setConfirmarBase] = useState(false);
+  // «Plano | Ordenadas» (escritorio, 07/11/2026): se recuerda en este navegador; por defecto «Plano».
+  const [modoMesas, setModoMesas] = useState<ModoMesasHoy>(leerModoMesasHoy);
+  const cambiarModoMesas = (m: ModoMesasHoy) => {
+    setModoMesas(m);
+    guardarModoMesasHoy(m);
+  };
+  // Deslizar el dedo (o arrastrar) a izquierda o derecha sobre las mesas cambia de sala: 50 px como poco y
+  // más de lado que de arriba abajo. Un toque quieto en una mesa sigue siendo un toque; tras deslizar, el
+  // clic que llegue después se ignora.
+  const deslizando = useRef<{ x: number; y: number } | null>(null);
+  const ignorarClic = useRef(false);
+  const gestosSala = fijo
+    ? {
+        onPointerDown: (e: React.PointerEvent) => {
+          deslizando.current = { x: e.clientX, y: e.clientY };
+        },
+        onPointerUp: (e: React.PointerEvent) => {
+          const inicio = deslizando.current;
+          deslizando.current = null;
+          if (!inicio) return;
+          const dx = e.clientX - inicio.x;
+          const dy = e.clientY - inicio.y;
+          if (Math.abs(dx) >= 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            ignorarClic.current = true;
+            window.setTimeout(() => (ignorarClic.current = false), 400);
+            irSala(dx < 0 ? 1 : -1);
+          }
+        },
+        onPointerCancel: () => {
+          deslizando.current = null;
+        },
+        onClickCapture: (e: React.MouseEvent) => {
+          if (!ignorarClic.current) return;
+          ignorarClic.current = false;
+          e.preventDefault();
+          e.stopPropagation();
+        },
+      }
+    : {};
   const numAjustes = (ajustesQuery.data ?? []).length;
   const esTerraza = !!sala && /terraza/i.test(sala.title);
   const cierreSala = useSalaCerradaServicio(esTerraza ? (sala?.id ?? null) : null, hoy, turno);
@@ -798,6 +842,28 @@ export function VistaPlanoHoy({
     </ul>
   );
   const leyenda = leyendaEn(false);
+  /**
+   * Leyenda de escritorio (07/11/2026, captura del dueño: «Por liberar» salía cortada por abajo): UNA línea
+   * compacta, icono + número; el nombre va en el `title` (y para el lector de pantalla) y se ve desde 1536 px.
+   */
+  const leyendaCompacta = (
+    <ul aria-label="Leyenda de estados de mesa" className="flex flex-nowrap gap-1" data-testid="leyenda-compacta">
+      {ESTADOS_MESA_SERVICIO.map((estado) => {
+        const { etiqueta, Icono, badge } = CONFIG_ESTADO_MESA[estado];
+        return (
+          <li
+            key={estado}
+            title={`${etiqueta}: ${recuento[estado]}`}
+            className={cn("inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-xs font-medium", badge)}
+          >
+            <Icono className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only 2xl:not-sr-only">{etiqueta}</span>
+            <span className="tabular-nums">{recuento[estado]}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   const filas = (reservasGrupo: ReservaServicio[]) => (
     <ul className="space-y-1">
@@ -1136,26 +1202,32 @@ export function VistaPlanoHoy({
           onValueChange={(valor) => valor && onCambiarSala(valor)}
           className="flex min-h-0 flex-1 flex-col gap-2"
         >
-          <div className="flex min-w-0 items-center gap-2">
+          {/* Fijo (07/11/2026, captura del dueño: «T…» por «Terraza» y «Plano base» cortado): el nombre de la sala
+              va SIEMPRE entero y grande; lo demás encoge o pasa a otra línea, nunca se sale del ancho. */}
+          <div className={cn("flex min-w-0 items-center gap-2", fijo && "flex-wrap gap-y-1")}>
             {fijo && sala ? (
-              <h2 className="flex min-w-0 items-center gap-2 text-2xl font-bold" data-testid="plano-fijo-sala" aria-live="polite">
-                {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
-                <span className="truncate">{sala.title}</span>
-                <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
-                  {indiceSala + 1}/{salas.length}
-                </span>
-                <span className="shrink-0 rounded-md border px-2 py-0.5 text-[13px] font-medium" data-testid="plano-fijo-turno">
-                  {etiquetaTurno}
-                </span>
-                {listo && (
-                  <span className="shrink-0 text-sm font-normal tabular-nums text-muted-foreground">
-                    {(() => {
-                      const c = resumenPorSala.get(sala.id) ?? { total: 0, sinMesa: 0 };
-                      return `· ${c.total} ${c.total === 1 ? "reserva" : "reservas"}${c.sinMesa ? ` · ${c.sinMesa} sin mesa` : ""}`;
-                    })()}
+              <>
+                <h2 className="flex shrink-0 items-center gap-2 text-2xl font-bold" data-testid="plano-fijo-sala" aria-live="polite">
+                  {sala.privada && <Lock className="h-5 w-5 shrink-0" aria-hidden="true" />}
+                  <span className="whitespace-nowrap" data-testid="plano-fijo-nombre">{sala.title}</span>
+                  <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
+                    {indiceSala + 1}/{salas.length}
                   </span>
-                )}
-              </h2>
+                </h2>
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                  <span className="whitespace-nowrap rounded-md border px-2 py-0.5 text-[13px] font-medium text-foreground" data-testid="plano-fijo-turno">
+                    {etiquetaTurno}
+                  </span>
+                  {listo && (
+                    <span className="whitespace-nowrap tabular-nums">
+                      {(() => {
+                        const c = resumenPorSala.get(sala.id) ?? { total: 0, sinMesa: 0 };
+                        return `${c.total} ${c.total === 1 ? "reserva" : "reservas"}${c.sinMesa ? ` · ${c.sinMesa} sin mesa` : ""}`;
+                      })()}
+                    </span>
+                  )}
+                </span>
+              </>
             ) : (
             <TabsList aria-label="Salas" className="h-auto min-h-10 min-w-0 justify-start">
               {salas.map((s) => {
@@ -1195,12 +1267,29 @@ export function VistaPlanoHoy({
             </TabsList>
             )}
             {/* «Reparto de mesas» ya no se ofrece desde Hoy (10/10/2026): lo esencial está aquí. */}
+            {fijo && sala && (
+              <ToggleGroup
+                type="single"
+                value={modoMesas}
+                onValueChange={(v) => (v === "plano" || v === "ordenadas") && cambiarModoMesas(v)}
+                variant="outline"
+                className="ml-auto shrink-0"
+                aria-label="Cómo ver las mesas"
+              >
+                <ToggleGroupItem value="plano" className="h-11 min-w-11 px-3 text-sm">
+                  Plano
+                </ToggleGroupItem>
+                <ToggleGroupItem value="ordenadas" className="h-11 min-w-11 px-3 text-sm">
+                  Ordenadas
+                </ToggleGroupItem>
+              </ToggleGroup>
+            )}
             {!proponiendo && sala && (
-              <div className="ml-auto flex shrink-0 items-center gap-2">
+              <div className={cn("flex shrink-0 items-center gap-2", !fijo && "ml-auto")}>
                 {/* Cerrar la terraza y volver al plano base escriben: solo con «Editar» (06/11/2026). Con
                     solo «Ver», si la terraza está cerrada se dice, sin interruptor. */}
                 {esTerraza && puedeEditar && (
-                  <label className="flex h-10 items-center gap-2 rounded-md border px-2 text-[13px]">
+                  <label className={cn("flex items-center gap-2 rounded-md border px-2 text-[13px]", fijo ? "h-11" : "h-10")}>
                     <Switch checked={cierreSala.cerrada} onCheckedChange={(v) => void cierreSala.cambiar(v)} aria-label={`${sala.title} cerrada en este servicio`} />
                     Cerrada
                   </label>
@@ -1210,7 +1299,22 @@ export function VistaPlanoHoy({
                     Cerrada en este servicio
                   </Badge>
                 )}
-                {puedeEditar && (
+                {puedeEditar && fijo && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="h-11 w-11 p-0" aria-label="Más opciones de la sala">
+                        <MoreHorizontal className="h-5 w-5" aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem className="min-h-11 gap-2" disabled={numAjustes === 0} onSelect={() => setConfirmarBase(true)}>
+                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                        {numAjustes === 0 ? "Plano base (ya está así)" : "Volver al plano base"}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+                {puedeEditar && !fijo && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1246,7 +1350,9 @@ export function VistaPlanoHoy({
               >
               <section
                 aria-label={`Plano de ${sala.title}`}
-                className="relative min-h-0 overflow-hidden rounded-xl border bg-card"
+                className={cn("relative min-h-0 overflow-hidden rounded-xl border bg-card", fijo && "touch-none select-none")}
+                data-testid={fijo ? "plano-deslizable" : undefined}
+                {...gestosSala}
               >
                 {errorDatos ? (
                   avisoError
@@ -1273,6 +1379,7 @@ export function VistaPlanoHoy({
                     coincidentes={coincidentesMapa}
                     onTocarMesa={tocarMesa}
                     uniones={unionesMapa}
+                    modo={modoMesas}
                   />
                 ) : (
                   <MapaSalaServicio
@@ -1320,13 +1427,12 @@ export function VistaPlanoHoy({
               </ConFlechasSala>
 
               {enHojas ? (
-                <div className={cn("flex min-w-0 items-center gap-2", fijo && "flex-wrap")}>
-                  {/* Fijo (escritorio): la leyenda se parte en dos líneas si no cabe, en vez de cortarse
-                      («Por liberar» salía cortado en la captura del dueño, 07/11/2026). */}
-                  {!esMovil && listo && (fijo ? <div className="min-w-0 flex-1" data-testid="leyenda-plano">{leyendaEn(false)}</div> : <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>)}
+                <div className="flex min-w-0 items-center gap-2">
+                  {/* Fijo (escritorio): leyenda compacta en una línea, siempre entera. */}
+                  {!esMovil && listo && (fijo ? <div className="min-w-0 flex-1" data-testid="leyenda-plano">{leyendaCompacta}</div> : <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>)}
                   <Button
                     variant="outline"
-                    className={cn("h-11 justify-between gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
+                    className={cn("h-11 justify-between", fijo ? "gap-2 px-3" : "gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}
                     disabled={!listo}
                     onClick={() => setPendientesAbiertos(true)}
                     aria-label={
@@ -1337,7 +1443,7 @@ export function VistaPlanoHoy({
                   >
                     <span>Por sentar</span>
                     <span className="text-[13px] tabular-nums text-muted-foreground">
-                      {listo ? `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala` : "…"}
+                      {listo ? (fijo ? `${pendientesSala.length} · ${sinSala.length}` : `${pendientesSala.length} sin mesa · ${sinSala.length} sin sala`) : "…"}
                     </span>
                   </Button>
                 </div>

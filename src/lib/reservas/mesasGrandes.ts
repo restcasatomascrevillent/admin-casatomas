@@ -1,21 +1,26 @@
 // ============================================================================
-// MESAS GRANDES — de las posiciones del plano a una rejilla de tarjetas
+// MESAS GRANDES — cómo se colocan las tarjetas de mesa de «Hoy» de escritorio
 // ----------------------------------------------------------------------------
-// «Hoy» de escritorio (07/11/2026, petición del dueño): el plano deja de ser
-// realista (paredes, mesas pequeñas redondas) y pasa a ser como el de un programa
-// de gestión de restaurante: cada mesa es una TARJETA grande, fácil de clicar, y
-// las tarjetas conservan más o menos dónde está cada mesa en la sala.
+// Dos modos (petición del dueño, 07/11/2026: «respétame un poco más el mapa para
+// tenerlo claro en el plano, y si no, déjamelo para el turno simplemente
+// ordenadas normal, sin plano»):
 //
-// Cómo: se toma el centro de cada mesa (posición en METROS, tamaño en CM, como en
-// todo el plano: `pos_x`/`pos_y` es la esquina) y se agrupan los centros cercanos
-// en filas (por la Y) y en columnas (por la X). Dos mesas que caen en la misma
-// casilla se reparten: la segunda pasa a la columna siguiente de esa fila. Las
-// mesas juntas de una misma reserva (`uniones`) son UNA tarjeta, en el centro de
-// su caja común.
+//   · PLANO (`planoFiel`): cada mesa en su sitio REAL, a escala. Se recorta el
+//     rectángulo que ocupan las mesas (sin márgenes vacíos), se escala para
+//     llenar el hueco respetando la proporción (si el hueco tiene otra forma que
+//     la sala, el eje que sobra se estira como mucho ×1,8), se busca el tamaño de tarjeta más
+//     grande con el que ninguna se pisa y, después, cada tarjeta crece todo lo que
+//     le dejan sus vecinas. No se juntan ni se parten filas ni se reordena nada.
+//   · ORDENADAS (`rejillaOrdenadas`): rejilla simple por número (el 10 después del
+//     9), con las columnas que dan las tarjetas más grandes sin scroll.
+//
+// Unidades del plano: posición (esquina) en METROS, tamaño en CM. Las mesas juntas
+// de una reserva (`uniones`) son UNA tarjeta, en la caja común.
 // ============================================================================
 
 export interface MesaPosicion {
   id: string;
+  nombre?: string;
   /** Esquina superior izquierda, en metros. */
   pos_x: number | null;
   pos_y: number | null;
@@ -33,72 +38,41 @@ export interface UnionPosicion {
   alto: number;
 }
 
-export interface CeldaMesas {
-  /** Una mesa, o las de una unión (la principal primero). */
+/** Una tarjeta: una mesa, o las de una unión (la principal primero), con su centro en la sala (metros). */
+export interface UnidadMesas {
   ids: string[];
-  /** Fila y columna de la rejilla, desde 1 (como `grid-row` / `grid-column`). */
-  fila: number;
-  columna: number;
+  cx: number;
+  cy: number;
 }
 
-export interface RejillaMesas {
-  filas: number;
-  columnas: number;
-  celdas: CeldaMesas[];
+/** Caja de una tarjeta en px, dentro del hueco. */
+export interface CajaTarjeta {
+  ids: string[];
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 /** Lado por defecto de una mesa sin tamaño (cm), como el plano (`MapaSalaServicio`). */
 const LADO_POR_DEFECTO_CM = 80;
+/** Relleno alrededor de las tarjetas (px). */
+export const RELLENO_MESAS_GRANDES = 8;
+/** Tamaño máximo de una tarjeta (px), para que con 3 mesas en una sala no salgan de medio metro. */
+const MAX_ANCHO_TARJETA = 260;
+const MAX_ALTO_TARJETA = 180;
+/** Cuánto puede estirarse un eje respecto al otro en «Plano» si el hueco no tiene la forma de la sala. */
+const ESTIRAMIENTO_MAX = 1.8;
+/** Cuánto puede crecer una tarjeta sobre el tamaño común (para que no salgan unas enormes y otras mínimas). */
+const CRECIMIENTO_MAX = 1.5;
+/** Objetivo táctil mínimo (px): en «Plano», una tarjeta más pequeña hace pasar la sala a «Ordenadas». */
+export const MINIMO_TACTIL = 44;
 
-function mediana(valores: number[]): number {
-  if (valores.length === 0) return LADO_POR_DEFECTO_CM / 100;
-  const v = [...valores].sort((a, b) => a - b);
-  const m = Math.floor(v.length / 2);
-  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
-}
-
-/**
- * Agrupa valores cercanos (en metros). Un grupo nuevo empieza cuando el hueco con el anterior pasa de
- * `hueco` o cuando el grupo ya abarca más de `tramo` (para que una hilera de mesas muy juntas no acabe en una
- * sola fila). Devuelve el índice de grupo de cada valor, en el orden original.
- */
-export function agruparCercanos(valores: readonly number[], hueco: number, tramo: number): number[] {
-  const orden = valores.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
-  const grupo = new Array<number>(valores.length).fill(0);
-  let actual = -1;
-  let inicio = 0;
-  let anterior = Number.NEGATIVE_INFINITY;
-  for (const { v, i } of orden) {
-    if (actual < 0 || v - anterior > hueco || v - inicio > tramo) {
-      actual += 1;
-      inicio = v;
-    }
-    grupo[i] = actual;
-    anterior = v;
-  }
-  return grupo;
-}
-
-/**
- * La rejilla de tarjetas de una sala (rehecha el 07/11/2026 tras ver el Salón en la demo: salían columnas
- * vacías, huecos y scroll). Reglas:
- *   · FILAS: los centros cercanos en vertical forman una fila; si hay más filas de las que caben
- *     (`maxFilas`), se juntan las dos más próximas hasta que quepan.
- *   · COLUMNAS: tantas como mesas tiene la fila más larga (ninguna columna vacía). Cada fila conserva su orden
- *     de izquierda a derecha y, si tiene menos mesas, cada una cae en la columna que le toca por su X.
- * Las mesas de `uniones` van juntas en UNA casilla. Sin mesas, rejilla vacía (0 × 0).
- */
-export function rejillaMesasGrandes(
-  mesas: readonly MesaPosicion[],
-  uniones: readonly UnionPosicion[] = [],
-  /** Como mucho estas filas de la sala: se juntan las más próximas. */
-  maxFilas = Number.POSITIVE_INFINITY,
-  /** Como mucho estas columnas: una fila más larga sigue en la fila de debajo (en orden). */
-  maxColumnas = Number.POSITIVE_INFINITY,
-): RejillaMesas {
+/** Las tarjetas de una sala: una por mesa suelta y una por unión. */
+export function unidadesMesas(mesas: readonly MesaPosicion[], uniones: readonly UnionPosicion[] = []): UnidadMesas[] {
   const ids = new Set(mesas.map((m) => m.id));
   const enUnion = new Set<string>();
-  const unidades: Array<{ ids: string[]; cx: number; cy: number }> = [];
+  const unidades: UnidadMesas[] = [];
   for (const u of uniones) {
     const suyas = u.ids.filter((id) => ids.has(id) && !enUnion.has(id));
     if (suyas.length === 0) continue;
@@ -111,59 +85,113 @@ export function rejillaMesasGrandes(
     const alto = (m.alto || LADO_POR_DEFECTO_CM) / 100;
     unidades.push({ ids: [m.id], cx: (m.pos_x || 0) + ancho / 2, cy: (m.pos_y || 0) + alto / 2 });
   }
-  if (unidades.length === 0) return { filas: 0, columnas: 0, celdas: [] };
-
-  // Filas: media mesa de hueco, mesa y media de tramo (a partir del tamaño típico de mesa de la sala).
-  const lado = mediana(mesas.map((m) => Math.min(m.ancho || LADO_POR_DEFECTO_CM, m.alto || LADO_POR_DEFECTO_CM) / 100));
-  const filaDe = agruparCercanos(unidades.map((u) => u.cy), Math.max(0.3, lado * 0.6), Math.max(0.6, lado * 1.5));
-  let filas: number[][] = [];
-  unidades.forEach((_, i) => (filas[filaDe[i]] ??= []).push(i));
-  filas = filas.filter(Boolean);
-  const media = (f: number[]) => f.reduce((s, i) => s + unidades[i].cy, 0) / f.length;
-  const tope = Math.max(1, Math.floor(maxFilas));
-  while (filas.length > tope) {
-    let mejor = 0;
-    for (let k = 1; k < filas.length - 1; k++) {
-      if (media(filas[k + 1]) - media(filas[k]) < media(filas[mejor + 1]) - media(filas[mejor])) mejor = k;
-    }
-    filas.splice(mejor, 2, [...filas[mejor], ...filas[mejor + 1]]);
-  }
-
-  // Filas más largas que `maxColumnas`: se parten en trozos seguidos (de izquierda a derecha).
-  const anchoMax = Math.max(1, Math.floor(maxColumnas));
-  filas = filas.flatMap((f) => {
-    const orden = [...f].sort((a, b) => unidades[a].cx - unidades[b].cx);
-    const trozos: number[][] = [];
-    for (let k = 0; k < orden.length; k += anchoMax) trozos.push(orden.slice(k, k + anchoMax));
-    return trozos;
-  });
-  const columnas = Math.max(...filas.map((f) => f.length));
-  const xs = unidades.map((u) => u.cx);
-  const minX = Math.min(...xs);
-  const rangoX = Math.max(...xs) - minX;
-  const celdas: CeldaMesas[] = [];
-  filas.forEach((indices, f) => {
-    indices.sort((a, b) => unidades[a].cx - unidades[b].cx || unidades[a].ids[0].localeCompare(unidades[b].ids[0]));
-    // Columna por su X; sin pisarse (cada una a la derecha de la anterior) y sin salirse (las del final
-    // empujan hacia la izquierda).
-    const cols: number[] = [];
-    let ultima = -1;
-    for (const i of indices) {
-      const porX = rangoX > 0 ? Math.round(((unidades[i].cx - minX) / rangoX) * (columnas - 1)) : 0;
-      ultima = Math.max(porX, ultima + 1);
-      cols.push(ultima);
-    }
-    for (let k = cols.length - 1, max = columnas - 1; k >= 0; k--, max--) cols[k] = Math.min(cols[k], max);
-    indices.forEach((i, k) => celdas.push({ ids: unidades[i].ids, fila: f + 1, columna: cols[k] + 1 }));
-  });
-  return { filas: filas.length, columnas, celdas };
+  return unidades;
 }
 
-/** Relleno alrededor de la rejilla de tarjetas (px). */
-export const RELLENO_MESAS_GRANDES = 8;
-/** Tamaño máximo de una tarjeta (px), para que con 3 mesas en una sala no salgan de medio metro. */
-const MAX_ANCHO_TARJETA = 260;
-const MAX_ALTO_TARJETA = 180;
+// ─── PLANO: fiel al mapa ─────────────────────────────────────────────────────
+
+/** Centros en px para tarjetas de `w` × `h` en un hueco de `ancho` × `alto` (escala única, centrado). */
+function centrosEscalados(unidades: readonly UnidadMesas[], ancho: number, alto: number, w: number, h: number) {
+  const minX = Math.min(...unidades.map((u) => u.cx));
+  const minY = Math.min(...unidades.map((u) => u.cy));
+  const spanX = Math.max(...unidades.map((u) => u.cx)) - minX;
+  const spanY = Math.max(...unidades.map((u) => u.cy)) - minY;
+  const libreX = ancho - 2 * RELLENO_MESAS_GRANDES - w;
+  const libreY = alto - 2 * RELLENO_MESAS_GRANDES - h;
+  if (libreX < 0 || libreY < 0) return null;
+  const ex = spanX > 0 ? libreX / spanX : Infinity;
+  const ey = spanY > 0 ? libreY / spanY : Infinity;
+  const comun = Number.isFinite(Math.min(ex, ey)) ? Math.min(ex, ey) : 0;
+  // Misma escala en los dos ejes, salvo que el hueco tenga otra forma que la sala: entonces el eje que sobra
+  // se estira como mucho ×1,8 (la sala se sigue reconociendo y las mesas no se quedan diminutas).
+  const sx = Math.min(Number.isFinite(ex) ? ex : 0, comun * ESTIRAMIENTO_MAX);
+  const sy = Math.min(Number.isFinite(ey) ? ey : 0, comun * ESTIRAMIENTO_MAX);
+  const offX = RELLENO_MESAS_GRANDES + w / 2 + (libreX - spanX * sx) / 2;
+  const offY = RELLENO_MESAS_GRANDES + h / 2 + (libreY - spanY * sy) / 2;
+  return unidades.map((u) => ({ x: offX + (u.cx - minX) * sx, y: offY + (u.cy - minY) * sy }));
+}
+
+function sinSolapes(centros: Array<{ x: number; y: number }>, w: number, h: number, hueco: number): boolean {
+  for (let i = 0; i < centros.length; i++) {
+    for (let j = i + 1; j < centros.length; j++) {
+      const dx = Math.abs(centros[i].x - centros[j].x);
+      const dy = Math.abs(centros[i].y - centros[j].y);
+      if (dx < w + hueco && dy < h + hueco) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * «Plano»: cada tarjeta en su sitio real, a escala, lo más grande posible sin pisarse ni salirse del hueco.
+ * `minimo` es el lado más corto de la tarjeta más pequeña (px): por debajo de 44 la sala va «Ordenadas».
+ */
+export function planoFiel(
+  unidades: readonly UnidadMesas[],
+  ancho: number,
+  alto: number,
+  hueco = 8,
+): { cajas: CajaTarjeta[]; minimo: number } {
+  if (unidades.length === 0 || ancho <= 0 || alto <= 0) return { cajas: [], minimo: 0 };
+  // 1) Tamaño común más grande (cuadrado o más ancho que alto) con el que ninguna se pisa.
+  let mejor = { w: 0, h: 0, nota: -1 };
+  for (const proporcion of [1, 1.2, 1.4, 1.6]) {
+    let bajo = 0;
+    let alto_ = Math.min(MAX_ALTO_TARJETA, MAX_ANCHO_TARJETA / proporcion);
+    for (let k = 0; k < 30; k++) {
+      const h = (bajo + alto_) / 2;
+      const c = centrosEscalados(unidades, ancho, alto, h * proporcion, h);
+      if (c && sinSolapes(c, h * proporcion, h, hueco)) bajo = h;
+      else alto_ = h;
+    }
+    const nota = bajo * Math.min(bajo * proporcion, bajo * 1.5);
+    if (nota > mejor.nota) mejor = { w: bajo * proporcion, h: bajo, nota };
+  }
+  const centros = centrosEscalados(unidades, ancho, alto, mejor.w, mejor.h) ?? unidades.map(() => ({ x: ancho / 2, y: alto / 2 }));
+  const tam = unidades.map(() => ({ w: mejor.w, h: mejor.h }));
+
+  // 2) Cada tarjeta crece lo que le dejan sus vecinas y el hueco: primero a lo ancho, luego a lo alto (sin
+  //    pasar de cuadrada). Solo crece: con las demás ya fijadas, no puede pisar a ninguna.
+  const limiteBorde = (c: number, total: number) => 2 * Math.min(c - RELLENO_MESAS_GRANDES, total - RELLENO_MESAS_GRANDES - c);
+  for (let i = 0; i < unidades.length; i++) {
+    let w = Math.min(MAX_ANCHO_TARJETA, mejor.w * CRECIMIENTO_MAX, limiteBorde(centros[i].x, ancho));
+    for (let j = 0; j < unidades.length; j++) {
+      if (j === i) continue;
+      const dy = Math.abs(centros[i].y - centros[j].y);
+      if (dy < (tam[i].h + tam[j].h) / 2 + hueco) {
+        w = Math.min(w, 2 * (Math.abs(centros[i].x - centros[j].x) - tam[j].w / 2 - hueco));
+      }
+    }
+    tam[i].w = Math.max(tam[i].w, w);
+  }
+  for (let i = 0; i < unidades.length; i++) {
+    let h = Math.min(MAX_ALTO_TARJETA, mejor.h * CRECIMIENTO_MAX, tam[i].w, limiteBorde(centros[i].y, alto));
+    for (let j = 0; j < unidades.length; j++) {
+      if (j === i) continue;
+      const dx = Math.abs(centros[i].x - centros[j].x);
+      if (dx < (tam[i].w + tam[j].w) / 2 + hueco) {
+        h = Math.min(h, 2 * (Math.abs(centros[i].y - centros[j].y) - tam[j].h / 2 - hueco));
+      }
+    }
+    tam[i].h = Math.max(tam[i].h, h);
+  }
+
+  const cajas = unidades.map((u, i) => ({
+    ids: u.ids,
+    left: Math.round(centros[i].x - tam[i].w / 2),
+    top: Math.round(centros[i].y - tam[i].h / 2),
+    width: Math.floor(tam[i].w),
+    height: Math.floor(tam[i].h),
+  }));
+  return { cajas, minimo: Math.min(...cajas.map((c) => Math.min(c.width, c.height))) };
+}
+
+// ─── ORDENADAS: rejilla por número ───────────────────────────────────────────
+
+/** Orden natural por número de mesa (el 10 después del 9). */
+export function compararNombreMesa(a: string, b: string): number {
+  return a.localeCompare(b, "es", { numeric: true, sensitivity: "base" });
+}
 
 /**
  * Medidas de cada tarjeta para un hueco de `ancho` × `alto` px con `filas` × `columnas`: entran SIEMPRE
@@ -179,31 +207,19 @@ export function medidasTarjetas(ancho: number, alto: number, filas: number, colu
 }
 
 /**
- * La rejilla que mejor aprovecha un hueco de `ancho` × `alto` px: prueba a juntar filas de la sala y a partir
- * las filas largas, y se queda con la que da tarjetas más grandes (sin contar lo ancho de más: una tarjeta
- * plana no se lee). Cada cambio respecto a la sala tal cual
- * resta un poco (juntar filas un 5 %, cada fila partida un 8 %), para no desordenarla por poca ganancia.
+ * «Ordenadas»: cuántas columnas y filas para `n` tarjetas en un hueco de `ancho` × `alto` px, con las tarjetas
+ * más grandes posible (lo ancho solo cuenta hasta 1,5 veces el alto: una tarjeta plana no se lee).
  */
-export function rejillaAjustada(
-  mesas: readonly MesaPosicion[],
-  uniones: readonly UnionPosicion[],
-  ancho: number,
-  alto: number,
-): RejillaMesas {
-  const base = rejillaMesasGrandes(mesas, uniones);
-  let mejor = base;
+export function rejillaOrdenadas(n: number, ancho: number, alto: number) {
+  let mejor = { columnas: 1, filas: Math.max(1, n), ...medidasTarjetas(ancho, alto, Math.max(1, n), 1) };
   let mejorNota = -1;
-  for (let filas = base.filas; filas >= 1; filas--) {
-    const juntas = filas === base.filas ? base : rejillaMesasGrandes(mesas, uniones, filas);
-    for (let cols = juntas.columnas; cols >= 1; cols--) {
-      const r = cols === juntas.columnas ? juntas : rejillaMesasGrandes(mesas, uniones, filas, cols);
-      const { tarjetaAncho, tarjetaAlto } = medidasTarjetas(ancho, alto, r.filas, r.columnas);
-      // Tamaño útil: lo ancho solo cuenta hasta 1,5 veces el alto (tarjetas planas no se leen).
-      const nota = tarjetaAlto * Math.min(tarjetaAncho, tarjetaAlto * 1.5) * 0.95 ** (base.filas - filas) * 0.92 ** (r.filas - juntas.filas);
-      if (nota > mejorNota) {
-        mejor = r;
-        mejorNota = nota;
-      }
+  for (let columnas = 1; columnas <= Math.max(1, n); columnas++) {
+    const filas = Math.ceil(n / columnas);
+    const m = medidasTarjetas(ancho, alto, filas, columnas);
+    const nota = m.tarjetaAlto * Math.min(m.tarjetaAncho, m.tarjetaAlto * 1.5);
+    if (nota > mejorNota) {
+      mejor = { columnas, filas, ...m };
+      mejorNota = nota;
     }
   }
   return mejor;
