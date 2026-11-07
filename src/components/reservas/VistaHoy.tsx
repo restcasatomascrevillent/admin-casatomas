@@ -187,25 +187,15 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
   }
 
   if (esMovil) {
+    // Móvil (07/11/2026): los controles (Reservas|Mesas, turno, buscador y «Sin reserva») van en UNA fila
+    // dentro de `VistaHoyMovil`, que guarda su propio buscador y turno (por defecto el del reloj).
     return (
       <ReservasEnVivoContexto.Provider value={true}>
-        <div className="space-y-2">
-          <BarraFiltrosHoy
-            busqueda={busqueda}
-            onBusqueda={setBusqueda}
-            filtroTurno={filtroTurno}
-            onFiltroTurno={setFiltroTurno}
-            vista={vista}
-            onVista={cambiarVista}
-            soloFiltros
-            accion={<BotonSentarSinReserva className="shrink-0" />}
-          />
-          {errorReservasHoy ? (
-            <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
-          ) : (
-            <VistaHoyMovil reservas={reservasHoy} fecha={hoy} busqueda={busqueda} filtroTurno={filtroTurno} />
-          )}
-        </div>
+        {errorReservasHoy ? (
+          <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
+        ) : (
+          <VistaHoyMovil reservas={reservasHoy} fecha={hoy} />
+        )}
       </ReservasEnVivoContexto.Provider>
     );
   }

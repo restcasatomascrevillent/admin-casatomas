@@ -109,6 +109,16 @@ export function textoMesas(mesas: string[]): string {
   return mesas.length === 1 ? `Mesa ${mesas[0]}` : `Mesas ${mesas.join(" + ")}`;
 }
 
+/**
+ * La mesa de una reserva con el lenguaje del servicio (07/11/2026): mientras no ha llegado es solo la
+ * PREVISIÓN («Prevista: Mesa 7»); sentada, la confirmada («En mesa 9»).
+ */
+export function textoMesaConfirmada(mesas: string[], sentada: boolean): string {
+  if (mesas.length === 0) return "Sin mesa";
+  const t = textoMesas(mesas);
+  return sentada ? `En ${t.charAt(0).toLowerCase()}${t.slice(1)}` : `Prevista: ${t}`;
+}
+
 export interface MesaOpcion {
   id: string;
   nombre: string;

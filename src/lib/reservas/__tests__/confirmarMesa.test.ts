@@ -7,7 +7,7 @@ import {
   type AsignacionConfirmar,
   type FilaAsignacionLocal,
 } from "../confirmarMesa";
-import { listaHoyMovil, type MesaOpcion, type ReservaHoyMovil } from "../hoyMovil";
+import { listaHoyMovil, textoMesaConfirmada, type MesaOpcion, type ReservaHoyMovil } from "../hoyMovil";
 
 const asig = (mesa: string, reserva: string, hora: string, estado = "confirmada", nombre = reserva, salida: string | null = null): AsignacionConfirmar => ({
   mesa_id: mesa,
@@ -185,5 +185,14 @@ describe("listaHoyMovil", () => {
       ["luego", false],
     ]);
     expect(l.sentadas.map((f) => f.reserva.id)).toEqual(["sentada1", "sentada2"]);
+  });
+});
+
+describe("textoMesaConfirmada", () => {
+  it("prevista mientras no llega, confirmada al sentar", () => {
+    expect(textoMesaConfirmada(["7"], false)).toBe("Prevista: Mesa 7");
+    expect(textoMesaConfirmada(["9"], true)).toBe("En mesa 9");
+    expect(textoMesaConfirmada(["4", "5"], true)).toBe("En mesas 4 + 5");
+    expect(textoMesaConfirmada([], false)).toBe("Sin mesa");
   });
 });

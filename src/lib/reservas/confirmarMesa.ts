@@ -213,7 +213,7 @@ export interface FilaAsignacionLocal {
   reserva_id: string;
   mesa_id: string;
   created_at: string;
-  reservas: Record<string, unknown> & { id: string; nombre: string; hora: string; numero_comensales: number; estado: string };
+  reservas: { id: string; nombre: string; hora: string; numero_comensales: number; estado: string };
   mesas: { id: string; nombre: string; capacidad: number; espacio_id?: string };
 }
 
