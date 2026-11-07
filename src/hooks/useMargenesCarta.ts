@@ -91,6 +91,7 @@ export function useEdicionMargenes() {
         p: {
           coste_max_plato_pct: c.costeMaxPlatoPct,
           multiplicador_min_vino: c.multiplicadorMinVino,
+          multiplicador_min_peso: c.multiplicadorMinPeso,
           subida_coste_pct: c.subidaCostePct,
           iva_pct: c.ivaPct,
           dias_referencia: c.diasReferencia,

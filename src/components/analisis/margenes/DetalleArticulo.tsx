@@ -28,7 +28,8 @@ import {
   precioCompra,
   razon,
   veces,
-  type ArticuloMargen,
+  type PlatoMargen,
+  type VinoMargen,
   type ConfigMargenes,
   type ProductoBuscado,
   type UnidadEscandallo,
@@ -119,7 +120,7 @@ export function DetalleArticulo({
   puedeEditar,
   onCerrar,
 }: {
-  articulo: ArticuloMargen | null;
+  articulo: PlatoMargen | VinoMargen | null;
   config: ConfigMargenes;
   puedeEditar: boolean;
   onCerrar: () => void;
