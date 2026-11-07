@@ -102,42 +102,45 @@ const CONTENIDO_CHIP = {
 type NombreChip = keyof typeof CONTENIDO_CHIP;
 const NOMBRES_CHIP = Object.keys(CONTENIDO_CHIP) as NombreChip[];
 
-/** Solo está el contenido de `activo`: los demás chips no están montados (Radix los desmonta). */
-function soloSeVe(activo: NombreChip) {
+/**
+ * Solo está el contenido de `activo`: los demás chips no están montados (Radix los desmonta). Asíncrono
+ * desde el 07/11/2026: cada chip se carga bajo demanda (`React.lazy` en `Reservas.tsx`).
+ */
+async function soloSeVe(activo: NombreChip) {
   for (const nombre of NOMBRES_CHIP) {
     expect(chip(nombre)).toHaveAttribute("aria-selected", String(nombre === activo));
-    if (nombre === activo) expect(screen.getByTestId(CONTENIDO_CHIP[nombre])).toBeInTheDocument();
+    if (nombre === activo) expect(await screen.findByTestId(CONTENIDO_CHIP[nombre])).toBeInTheDocument();
     else expect(screen.queryByTestId(CONTENIDO_CHIP[nombre])).not.toBeInTheDocument();
   }
 }
 
 describe("Reservas › Configuración · subpestañas", () => {
-  it("Configuración abre en «Reglas» y ofrece los cinco chips, en este orden", () => {
+  it("Configuración abre en «Reglas» y ofrece los cinco chips, en este orden", async () => {
     montar();
     pulsar("Configuración");
 
     const chips = screen.getByTestId("chips-subnivel");
     expect(chips).toBeInTheDocument();
     expect(Array.from(chips.querySelectorAll('[role="tab"]'), (t) => t.textContent)).toEqual(NOMBRES_CHIP);
-    soloSeVe("Reglas");
+    await soloSeVe("Reglas");
   });
 
-  it.each(NOMBRES_CHIP)("el chip «%s» enseña solo lo suyo, sin salir de Configuración", (nombre) => {
+  it.each(NOMBRES_CHIP)("el chip «%s» enseña solo lo suyo, sin salir de Configuración", async (nombre) => {
     montar();
     pulsar("Configuración");
     pulsar(nombre);
 
-    soloSeVe(nombre);
+    await soloSeVe(nombre);
     expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
   });
 
-  it("de «Plantillas email» se vuelve a «Reglas»", () => {
+  it("de «Plantillas email» se vuelve a «Reglas»", async () => {
     montar();
     pulsar("Configuración");
     pulsar("Plantillas email");
     pulsar("Reglas");
 
-    soloSeVe("Reglas");
+    await soloSeVe("Reglas");
   });
 
   it.each([
@@ -146,11 +149,11 @@ describe("Reservas › Configuración · subpestañas", () => {
     ["/reservas?tab=configuracion&sub=servicio", "Servicio"],
     ["/reservas?tab=configuracion&sub=mesas", "Mesas"],
     ["/reservas?tab=configuracion&sub=turnos", "Turnos"],
-  ] as const)("%s abre directo «%s»", (ruta, nombre) => {
+  ] as const)("%s abre directo «%s»", async (ruta, nombre) => {
     montar(ruta);
 
     expect(screen.getByRole("tab", { name: "Configuración" })).toHaveAttribute("aria-selected", "true");
-    soloSeVe(nombre);
+    await soloSeVe(nombre);
   });
 
   it.each([
@@ -158,19 +161,19 @@ describe("Reservas › Configuración · subpestañas", () => {
     // El chip único de antes del reparto: los enlaces guardados siguen llevando a Configuración.
     "/reservas?tab=configuracion&sub=general",
     "/reservas?tab=configuracion&sub=inventada",
-  ])("%s abre «Reglas»", (ruta) => {
+  ])("%s abre «Reglas»", async (ruta) => {
     montar(ruta);
 
-    soloSeVe("Reglas");
+    await soloSeVe("Reglas");
   });
 
-  it("cambiar de chip a mano limpia el enlace de la URL, como al cambiar de pestaña", () => {
+  it("cambiar de chip a mano limpia el enlace de la URL, como al cambiar de pestaña", async () => {
     montar("/reservas?tab=configuracion&sub=plantillas");
     pulsar("Turnos");
 
     expect(screen.getByTestId("ubicacion")).toHaveTextContent(/^\/reservas$/);
     // Y no vuelve a saltar a las plantillas al limpiarse la URL.
-    soloSeVe("Turnos");
+    await soloSeVe("Turnos");
   });
 });
 

@@ -131,6 +131,8 @@ vi.mock("@/components/reservas/PlanoEspacio2D", async () => {
 
 import { toast } from "sonner";
 import { GestorReservasKanban } from "@/components/reservas/GestorReservasKanban";
+// El mapa carga el plano bajo demanda (`React.lazy` en `ElegirMesaDialog`, 07/11/2026): ya cargado aquí.
+import "@/components/reservas/PlanoEspacio2D";
 
 beforeAll(() => {
   window.HTMLElement.prototype.scrollIntoView = vi.fn();
@@ -267,7 +269,7 @@ describe("mover a una sala CON plano: se abre su mapa con la reserva ya señalad
     expect(within(dialogo).getByText("21:00")).toBeInTheDocument();
     expect(within(dialogo).getByText("4 comensales")).toBeInTheDocument();
     // El plano se abre en SU sala, SU día y SU turno (21:00 = cena), con la reserva señalada.
-    expect(within(dialogo).getByTestId("plano")).toHaveAttribute("data-espacio", "reservado");
+    expect(await within(dialogo).findByTestId("plano")).toHaveAttribute("data-espacio", "reservado");
     expect(h.plano).toHaveBeenLastCalledWith(
       expect.objectContaining({ espacioId: "reservado", espacioNombre: "Reservado", reservaId: "r-ana", fecha: HOY, turno: "cena" }),
     );
@@ -505,7 +507,7 @@ describe("el aviso previo de mover no cambia: el mapa se abre DESPUÉS de confir
     fireEvent.click(within(aviso).getByRole("button", { name: "Cambiar de sala" }));
 
     const mapa = await mapaDe("Ana", "Reservado");
-    expect(within(mapa).getByTestId("plano")).toHaveAttribute("data-reserva", "r-ana");
+    expect(await within(mapa).findByTestId("plano")).toHaveAttribute("data-reserva", "r-ana");
     // El trigger de la BD le ha quitado las mesas de Salón: ahora toca elegir la de Reservado.
     expect(h.almacen.asignaciones).toEqual([]);
     expect(within(mapa).getByRole("button", { name: "Ahora no" })).toBeInTheDocument();
