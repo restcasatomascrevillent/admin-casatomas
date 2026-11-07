@@ -92,6 +92,6 @@ describe("prompt ronda 9", () => {
 
   it("tamanos no crecen (prompt <= 5.990, TOOLS <= 10.560 con volumen_comprado y bebidas)", () => {
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.732 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_560); // 9.626 + volumen_comprado (06/11/2026) + bebidas (13/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_630); // 9.626 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026)
   });
 });

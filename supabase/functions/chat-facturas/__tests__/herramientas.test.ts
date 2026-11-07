@@ -117,7 +117,7 @@ describe("TOOLS", () => {
                      "cantidad", "precio_unitario", "total_linea"]) {
       expect(flex.properties.metricas.description).toContain(m);
     }
-    expect(METRICAS_FLEX).toHaveLength(27);
+    expect(METRICAS_FLEX).toHaveLength(29); // + sum_retencion_irpf, count_con_retencion (07/11/2026)
     expect(flex.properties.agrupar.items.enum).toEqual([...AGRUPAR_FLEX]);
     expect(Object.keys(flex.properties.filtros.properties)).toEqual([...FILTROS_FLEX]);
   });
@@ -135,7 +135,7 @@ describe("TOOLS", () => {
     // ~190 tokens por ronda; el prompt no crece: la pista va en la descripcion).
     // 10.550 con bebidas (13/11/2026: formatos, botellas y orden envases en volumen_comprado;
     // +174, ~45 tokens por ronda).
-    expect(tamano).toBeLessThan(10_560);
+    expect(tamano).toBeLessThan(10_630); // + IRPF (07/11/2026)
     for (const t of TOOLS) expect(t.function.description.length, t.function.name).toBeLessThan(330);
   });
 });
@@ -725,7 +725,7 @@ describe("ronda 8 (08/10/2026, migracion 20261008120000)", () => {
     expect(p).toMatch(/con grafico_adjunto di «te dejo la grafica debajo», sin preguntar/);
     expect(p).toMatch(/Con precio_comparable o convertido_desde, usalo y di «convertido desde caja de 10 kg»/);
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_560); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_630); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026)
   });
 });
 
@@ -759,7 +759,7 @@ describe("ronda 9 (10/10/2026, migracion 20261010170000)", () => {
 
   it("tamaños: el prompt y TOOLS no crecen respecto a la ronda 8 (5.728 y 9.620 caracteres)", () => {
     expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.730 + bebidas (13/11) + asociacion (07/11/2026)
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_560); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_630); // 9.620 + volumen_comprado (06/11/2026) + bebidas (13/11/2026) + IRPF (07/11/2026)
   });
 });
 
@@ -888,5 +888,16 @@ describe("bebidas por familia (13/11/2026, migracion 20261113100000)", () => {
     expect(p).toMatch(/- volumen_comprado: familias \(regla 15\)/);
     expect(p).toMatch(/15\. Familias \(cerveza, vino, marisco…\), precio del litro\/kilo y comparativas: volumen_comprado con categoria \(botellas: orden envases\)/);
     expect(p).toMatch(/Nunca buscar_productos ni historial_precios/);
+  });
+});
+
+describe("IRPF (07/11/2026, migracion 20261107610000)", () => {
+  it("las herramientas dicen dónde está la retención", () => {
+    const desc = (n: string) => JSON.stringify(TOOLS.find((t) => t.function.name === n)!.function);
+    expect(desc("resumen_periodo")).toMatch(/IRPF\/retencion: retencion_irpf/);
+    expect(desc("consulta_flexible")).toMatch(/sum_retencion_irpf, count_con_retencion/);
+    expect(METRICAS_FLEX).toContain("sum_retencion_irpf");
+    expect(METRICAS_FLEX).toContain("count_con_retencion");
+    expect(systemPrompt("2026-11-07")).toMatch(/IRPF\/retencion: su retencion_irpf/);
   });
 });
