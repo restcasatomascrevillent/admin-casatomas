@@ -10,6 +10,7 @@ import {
   Settings,
   HelpCircle,
   Instagram,
+  ChartNoAxesCombined,
 } from "lucide-react";
 import { useEffect, type ComponentType, type SVGProps } from "react";
 import { NavLink } from "@/components/NavLink";
@@ -117,6 +118,15 @@ const menuItems: {
     icon: Receipt,
     // Con solo «Facturas · Subida» también sale (entra a la pestaña Cargar, 06/11/2026).
     sectionKey: ["facturas", "facturas_subida"],
+    toggleKey: "facturas",
+  },
+  // «Análisis general» (07/11/2026, petición del dueño): sección propia, fuera de Facturas. Primera
+  // pantalla, Márgenes de carta. Usa el permiso y el interruptor de Facturas (no hay sección «analisis»).
+  {
+    title: "Análisis general",
+    url: "/analisis",
+    icon: ChartNoAxesCombined,
+    sectionKey: "facturas",
     toggleKey: "facturas",
   },
   {
