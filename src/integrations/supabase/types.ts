@@ -4290,6 +4290,8 @@ export type Database = {
           hora: string
           id: string
           importante: boolean
+          /** «Fijar mesa» (20261107120000_reservas_mesa_fijada.sql): los recálculos no la mueven. */
+          mesa_fijada: boolean
           nombre: string | null
           notas_cliente: string | null
           numero_comensales: number
@@ -4315,6 +4317,7 @@ export type Database = {
           hora: string
           id?: string
           importante?: boolean
+          mesa_fijada?: boolean
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales: number
@@ -4338,6 +4341,7 @@ export type Database = {
           hora?: string
           id?: string
           importante?: boolean
+          mesa_fijada?: boolean
           nombre?: string | null
           notas_cliente?: string | null
           numero_comensales?: number

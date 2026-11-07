@@ -68,6 +68,8 @@ export const ESTADOS_MESA_SERVICIO: readonly EstadoMesaServicio[] = [
 export interface ReservaMesaServicio extends ReservaServicio {
   /** Solo existe si la migración 20260926150000_modo_servicio_config_y_salida.sql está aplicada. */
   salida_at?: string | null;
+  /** «Fijar mesa» (20261107120000): los recálculos no la mueven ni se le quita al sentar a otro. */
+  mesa_fijada?: boolean | null;
 }
 
 /** Fila mínima de `asignaciones_mesa` que necesita este módulo. */

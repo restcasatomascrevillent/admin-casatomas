@@ -58,6 +58,8 @@ export interface AsignacionConDetalles extends AsignacionMesa {
     fecha?: string;
     /** «Liberar mesa»: la reserva ya se fue (la mesa queda libre desde esa hora). */
     salida_at?: string | null;
+    /** «Fijar mesa» (20261107120000_reservas_mesa_fijada.sql). */
+    mesa_fijada?: boolean | null;
   };
   mesas: {
     id: string;
@@ -112,7 +114,8 @@ export function useAsignacionesMesa(
             numero_comensales,
             estado,
             fecha,
-            salida_at
+            salida_at,
+            mesa_fijada
           ),
           mesas!inner (
             id,

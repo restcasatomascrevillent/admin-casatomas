@@ -24,7 +24,7 @@ import { turnoDeHora } from "../../../supabase/functions/_shared/disponibilidad"
  * por nombre en `useReservasServicioDia`: las dos migraciones están en todos los proyectos.
  */
 export const COLUMNAS_RESERVAS_HOY =
-  "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at";
+  "id, nombre, telefono, email, fecha, hora, numero_comensales, estado, espacio_id, importante, en_blacklist, notas_cliente, marca, llegada_at, salida_at, mesa_fijada";
 
 /** Las dos vistas de «Hoy». Por defecto, el kanban (la de siempre). */
 export type ModoVistaHoy = "kanban" | "plano";
