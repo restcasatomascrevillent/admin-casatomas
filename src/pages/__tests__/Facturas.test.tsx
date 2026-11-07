@@ -29,10 +29,11 @@ vi.mock("@/components/facturas/compras/TabCompras", () => ({
 // El tablero de Análisis (con sus propios tests) se sustituye por un marcador con
 // un botón que abre un enlace, como hacen sus meses y proveedores.
 vi.mock("@/components/facturas/ChatFacturas", () => ({
-  ChatFacturas: forwardRef(({ onIrA, activa }: { onIrA?: (e: string) => void; activa?: boolean }, _ref) => (
+  ChatFacturas: forwardRef(({ onIrA, activa, ranuraBarra }: { onIrA?: (e: string) => void; activa?: boolean; ranuraBarra?: HTMLElement | null }, _ref) => (
     <div>
       <p>Contenido del chat</p>
       <p data-testid="chat-activa">{activa ? "activa" : "oculta"}</p>
+      <p data-testid="chat-ranura">{ranuraBarra ? "con ranura" : "sin ranura"}</p>
       <button type="button" onClick={() => onIrA?.("?tab=compras&modo=documentos&mes=2026-07")}>
         Julio en Compras
       </button>
@@ -237,7 +238,7 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
       fila({ funcion: "chat-facturas", coste_usd: 0.2, unidades: 20 }),
       fila({ funcion: "clasificar-productos", coste_usd: 0.04, unidades: 2 }),
     ];
-    montar();
+    montar("/facturas?tab=compras");
     const texto = screen.getByTestId("gasto-ia-pestana");
     // Solo lo que cuesta el chatbot (0,2 USD x 0,92); la clasificación es del OCR.
     expect(texto).toHaveTextContent("0,18 € este mes (est.)");
@@ -256,6 +257,21 @@ describe("Facturas · gasto de IA a la derecha de la barra de pestañas", () => 
     expect(screen.queryByText("Clasificación de productos")).not.toBeInTheDocument();
     expect(screen.queryByText("Lectura de facturas (OCR)")).not.toBeInTheDocument();
     expect(screen.getByText(/1 USD ≈ 0,92 EUR/)).toBeInTheDocument();
+  });
+
+  it("en Análisis (barra única, 07/11/2026): los controles de Análisis van en la fila de pestañas y el gasto de IA solo en pantallas muy anchas", () => {
+    montar();
+    const fila = screen.getByTestId("pestanas-pagina");
+    // El hueco para los controles de Análisis está en la misma fila que las pestañas, y se le pasa a ChatFacturas.
+    expect(fila).toContainElement(screen.getByTestId("ranura-analisis"));
+    expect(screen.getByTestId("chat-ranura")).toHaveTextContent("con ranura");
+    expect(screen.getByTestId("gasto-ia-pestana").className).toContain("2xl:flex");
+    // Los iconos de las pestañas, solo en muy ancho (dejan sitio a la barra).
+    const icono = within(screen.getByRole("tab", { name: /^Análisis/ })).getByText((_, el) => el?.tagName === "SPAN" && el.getAttribute("aria-hidden") === "true" && !!el.querySelector("svg"));
+    expect(icono.className).toContain("2xl:inline-flex");
+    // En Compras no hay hueco.
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /^Compras/ }), { button: 0 });
+    expect(screen.queryByTestId("ranura-analisis")).not.toBeInTheDocument();
   });
 
   it("sin datos no inventa cifras", () => {

@@ -2,12 +2,16 @@
 // EXPLORADOR para cambiar la gráfica al instante sin la IA, «Ver documentos»
 // desde cualquier cifra y el copiloto de IA PLEGADO en un panel lateral.
 //
-//   · Barra: periodo [Mes · Trimestre · Año · Todo · Personalizado] y local
-//     [Todos · Casa Tomás · Touza]; los dos van a la URL
-//     (`?tab=chat&desde=…&hasta=…&local=…`) para volver o compartir.
-//   · Tablero (lo único que hace scroll): indicadores, «Explorar», tarjetas de
-//     detalle y gráficas fijadas. Datos: `tablero_compras` (una llamada) y
-//     `explorar_compras` (la gráfica del explorador).
+//   · Barra: periodo [Mes · Trimestre · Año · Todo · 📅 Elegir fechas], local
+//     [Todos · Casa Tomás · Touza], «Personalizar el tablero» y «Pregúntale a
+//     la IA»; periodo y local van a la URL (`?tab=chat&desde=…&hasta=…&local=…`)
+//     para volver o compartir. Desde el 07/11/2026 (barra única) la página
+//     Facturas le deja un hueco en SU barra de pestañas (`ranuraBarra`) y los
+//     controles se pintan allí con un portal: una sola fila arriba.
+//   · Tablero en UNA pantalla (sin scroll de página): cuatro cifras que son
+//     navegación y una vista a la vez (`?vista=`, recordada también en
+//     localStorage; ver TableroCompras). Datos: `tablero_compras`,
+//     `facturas_decision` y `explorar_compras` (el explorador).
 //   · Cualquier cifra → «Ver documentos» (DocumentosDeCifra) → su PDF.
 //   · Copiloto: panel lateral con el historial dentro; sus gráficas se pueden
 //     fijar en el tablero o abrir en el explorador.
@@ -30,6 +34,7 @@
 // IA») no sale (`puedeEditar`, por EdicionFacturasContext). Las dos, por
 // defecto, no: la página Facturas las pasa según el permiso.
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { CalendarSearch, LayoutGrid, Loader2, Sparkles } from "lucide-react";
@@ -63,7 +68,8 @@ import { ErrorTablero, EsqueletoTablero, Segmentado } from "./analisis/piezas";
 import { CopilotoLateral } from "./copiloto/CopilotoLateral";
 import { ChatPantallaCompleta } from "./copiloto/ChatPantallaCompleta";
 import { enlacePantallaCompleta, destinoVolver, type EstadoPantallaCompleta } from "@/lib/facturas/copilotoCompleto";
-import { desplazarDentro, esMovil } from "./analisis/desplazar";
+import { esMovil } from "./analisis/desplazar";
+import { guardarVista, leerVistaGuardada, PARAM_VISTA, vistaInicial, type IdVista } from "@/lib/facturas/vistasAnalisis";
 import { EdicionFacturasContext } from "./analisis/edicionFacturas";
 
 export interface ChatFacturasRef {
@@ -81,6 +87,11 @@ interface ChatFacturasProps {
   conIa?: boolean;
   /** «Editar» en Facturas: enseña los accesos que cambian datos («Clasificar con IA»). Por defecto, no. */
   puedeEditar?: boolean;
+  /**
+   * Hueco en la barra de pestañas de la página para los controles de Análisis
+   * (barra única); `null` mientras no está. Sin él (`undefined`: pruebas, otra página), la barra va encima del tablero.
+   */
+  ranuraBarra?: HTMLElement | null;
 }
 
 const NOMBRE_PERIODO: Record<PeriodoAnalisis, string> = { mes: "este mes", trimestre: "este trimestre", anio: "este año", todo: "el histórico" };
@@ -127,7 +138,7 @@ function textoSeleccion(sel: SeleccionPeriodo, hoy: Date): string {
   return f.desde && f.hasta ? textoRango(f.desde, f.hasta) : NOMBRE_PERIODO[sel.tipo];
 }
 
-export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true, pantallaCompleta: pidePantallaCompleta = false, conIa = false, puedeEditar = false }, ref) => {
+export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ onIrA, activa = true, pantallaCompleta: pidePantallaCompleta = false, conIa = false, puedeEditar = false, ranuraBarra }, ref) => {
   // Sin IA no hay pantalla completa (la página ya lleva a /facturas): se queda el tablero.
   const pantallaCompleta = pidePantallaCompleta && conIa;
   const hoy = useHoy();
@@ -148,6 +159,27 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
   // «Personalizar» el tablero (el diálogo lo monta TableroCompras).
   const [personalizando, setPersonalizando] = useState(false);
   const [tramos, setTramos] = useState<TramoAnterior[]>([]);
+  // La vista del tablero (una a la vez): la de la URL; si no, la última de este navegador.
+  const [vista, setVista] = useState<IdVista>(() => vistaInicial(params, leerVistaGuardada()));
+  const vistaUrl = params.get(PARAM_VISTA);
+  useEffect(() => {
+    // Atrás/Adelante o un enlace con `?vista=`.
+    if (!vistaUrl) return;
+    const v = vistaInicial(new URLSearchParams({ [PARAM_VISTA]: vistaUrl }), null);
+    setVista((actual) => (actual === v ? actual : v));
+  }, [vistaUrl]);
+  const elegirVista = useCallback(
+    (v: IdVista) => {
+      setVista(v);
+      guardarVista(v);
+      const prev = paramsRef.current;
+      if (prev.get(PARAM_VISTA) === v) return;
+      const sig = new URLSearchParams(prev);
+      sig.set(PARAM_VISTA, v);
+      setParams(sig, { replace: true });
+    },
+    [setParams],
+  );
   // Lo último que hay (o se ha escrito) en la URL: solo se escribe lo que CAMBIA aquí.
   const escrito = useRef({ seleccion, local, dia: isoLocal(hoy) });
 
@@ -232,12 +264,14 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     },
   }));
 
-  // Enseña el explorador desplazando SOLO el tablero (scrollIntoView movía también la página).
-  const verExplorador = () => requestAnimationFrame(() => desplazarDentro(document.querySelector<HTMLElement>("[data-testid='explorador']"), "start"));
-  const explorar = useCallback((parcial: Partial<ConfigExplorador>) => {
-    setConfig((c) => ajustarConfig({ ...c, ...parcial }).config);
-    verExplorador();
-  }, []);
+  // Llevar algo al explorador abre la vista «Explorar» (ya no hay que desplazar el tablero).
+  const explorar = useCallback(
+    (parcial: Partial<ConfigExplorador>) => {
+      setConfig((c) => ajustarConfig({ ...c, ...parcial }).config);
+      elegirVista("explorar");
+    },
+    [elegirVista],
+  );
   const explorarGraficaIa = (g: GraficaIa) => {
     // En el móvil el copiloto ocupa toda la pantalla: se cierra para ver el explorador.
     if (esMovil()) setAbierto(false);
@@ -334,6 +368,8 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
         pendiente={tablero.isPlaceholderData}
         personalizando={personalizando}
         onPersonalizando={setPersonalizando}
+        vista={vista}
+        onVista={elegirVista}
         onDocumentos={setPeticionDocs}
         onIrA={irA}
         onExplorar={explorar}
@@ -363,42 +399,35 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
     );
 
   const copilotoVisible = conIa && abierto && activa && !pantallaCompleta;
-  return (
-    // Con el copiloto abierto (360 px, no modal) el contenido deja su hueco a la
-    // derecha (desde lg, 1024 px): si no, el panel tapaba el botón y la franja
-    // derecha (QA 05/11/2026). En la tablet vertical no: quedarían ~440 px y las
-    // tarjetas, a 2 columnas, se aplastaban; ahí el panel va por encima.
-    <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "lg:pr-[360px]")}>
-      <div className={cn("flex shrink-0 flex-wrap items-center gap-2", pantallaCompleta && "hidden")} data-tour="facturas-analisis-barra">
-        <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} />
-        {/* Local, «Actualizando…» y la IA van juntos: si la barra no cabe (tablet en
-            vertical), bajan juntos a la segunda fila y el botón no se queda solo. */}
-        <div className="flex flex-auto flex-wrap items-center gap-2 sm:flex-nowrap">
-          <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} />
-          {tablero.isFetching && !tablero.isLoading && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> Actualizando…
-            </span>
-          )}
+  // Barra única (07/11/2026): periodo, local, «Personalizar» (icono) y la IA, en una
+  // línea con las pestañas de la página. En tablet vertical o móvil puede partir en dos.
+  const barra = (
+    <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 2xl:gap-2" data-tour="facturas-analisis-barra" data-testid="barra-analisis">
+      <SelectorPeriodo valor={seleccion} onCambio={elegirPeriodo} hoy={hoy} compacto />
+      <Segmentado<FiltroLocal> etiqueta="Local" opciones={FILTROS_LOCAL} valor={local} onCambio={setLocal} compacto />
+      {tablero.isFetching && !tablero.isLoading && (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground" role="status">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> <span className="sr-only">Actualizando…</span>
+        </span>
+      )}
+      <div className="ml-auto flex items-center gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11"
+          onClick={() => setPersonalizando(true)}
+          disabled={!datos || datos.sinDatos}
+          aria-haspopup="dialog"
+          aria-label="Personalizar el tablero"
+          title="Personalizar el tablero: qué módulos salen en cada vista"
+        >
+          <LayoutGrid className="h-4 w-4" aria-hidden />
+        </Button>
+        {conIa && (
           <Button
             type="button"
-            variant="outline"
-            // En el móvil no cabe junto al local sin dejar sola a la IA: allí se personaliza
-            // desde el final del tablero («Añadir o quitar módulos»).
-            className="ml-auto hidden h-11 gap-1.5 sm:inline-flex"
-            onClick={() => setPersonalizando(true)}
-            disabled={!datos || datos.sinDatos}
-            aria-haspopup="dialog"
-            aria-label="Personalizar el tablero"
-            title="Elegir qué cifras y módulos se ven, en qué orden y de qué tamaño"
-          >
-            <LayoutGrid className="h-4 w-4" aria-hidden />
-            <span className="hidden xl:inline">Personalizar</span>
-          </Button>
-          {conIa && (
-          <Button
-            type="button"
-            className="ml-auto h-11 gap-1.5 sm:ml-0"
+            className="h-9 gap-1.5 px-2.5 pointer-coarse:h-11 2xl:px-3"
             // Abre y cierra el panel (no es modal: el botón sigue a mano con él abierto).
             onClick={() => {
               setVerHistorial(false);
@@ -410,12 +439,21 @@ export const ChatFacturas = forwardRef<ChatFacturasRef, ChatFacturasProps>(({ on
             aria-label="Pregúntale a la IA"
           >
             <Sparkles className="h-4 w-4" aria-hidden />
-            {/* En tablet vertical la barra no cabe entera: «IA» a secas (el nombre accesible sigue entero). */}
-            <span className="hidden lg:inline">Pregúntale a la</span> IA
+            {/* Con poco sitio, «IA» a secas (el nombre accesible sigue entero). */}
+            <span className="hidden 2xl:inline">Pregúntale a la</span> IA
           </Button>
-          )}
-        </div>
+        )}
       </div>
+    </div>
+  );
+  const barraEnRanura = !!ranuraBarra && activa && !pantallaCompleta;
+  return (
+    // Con el copiloto abierto (360 px, no modal) el contenido deja su hueco a la
+    // derecha (desde lg, 1024 px): si no, el panel tapaba el botón y la franja
+    // derecha (QA 05/11/2026). En la tablet vertical no: quedarían ~440 px y las
+    // tarjetas, a 2 columnas, se aplastaban; ahí el panel va por encima.
+    <div className={cn("flex h-full min-h-0 w-full flex-col gap-2 transition-[padding] motion-reduce:transition-none", copilotoVisible && "lg:pr-[360px]")}>
+      {ranuraBarra === undefined ? !pantallaCompleta && <div className="flex shrink-0">{barra}</div> : barraEnRanura && createPortal(barra, ranuraBarra as HTMLElement)}
 
       {/* `relative`: los `sr-only` (absolute) de dentro se quedan en el tablero y no
           alargan la PÁGINA (scroll de 1063 px a 1180×820, QA 05/11/2026). */}

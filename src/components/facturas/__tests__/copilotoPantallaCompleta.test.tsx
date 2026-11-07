@@ -144,6 +144,8 @@ describe("copiloto: «Pantalla completa» en el panel lateral", () => {
     // El tablero, como estaba (y con la gráfica fijada desde pantalla completa).
     expect(screen.getByTestId("tablero-analisis")).not.toHaveClass("hidden");
     expect(screen.getByTestId("pestanas-pagina")).not.toHaveClass("hidden");
+    // Las gráficas fijadas viven en la vista «Explorar» (Análisis en una pantalla, 07/11/2026).
+    fireEvent.click(within(screen.getByRole("group", { name: "Vista del análisis" })).getByRole("button", { name: "Explorar" }));
     expect(within(screen.getByRole("group", { name: "Gráficas fijadas" })).getByRole("region", { name: "Evolución del precio · Merluza" })).toBeInTheDocument();
   });
 });

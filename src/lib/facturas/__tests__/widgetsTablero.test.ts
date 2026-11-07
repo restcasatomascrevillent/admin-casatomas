@@ -53,7 +53,7 @@ describe("catálogo y configuración por defecto", () => {
     const { v: _v, ...viejo } = D;
     const c = normalizarConfigTablero(viejo);
     expect(c.cifras).toEqual(["gasto", "precios_suben", "ahorro_posible", "familias_fuera", "abonos", "regalado", "por_revisar"]);
-    expect(ids(c)).toEqual(["explorar", "proveedores", "subidas", "ahorro", "familias", "precios_top", "fijos", "abonos", "locales"]);
+    expect(ids(c)).toEqual(["explorar", "proveedores", "subidas", "ahorro", "familias", "precios_top", "fijos", "abonos", "locales", "gasto_mes"]);
     expect(c.modulos.find((m) => m.id === "subidas")?.tamano).toBe("m");
     expect(c.v).toBe(VERSION_TABLERO);
     // Si luego quita una, no vuelve.
@@ -61,6 +61,15 @@ describe("catálogo y configuración por defecto", () => {
     expect(ids(normalizarConfigTablero(JSON.parse(JSON.stringify(sin))))).not.toContain("ahorro");
     expect(ids(deFilaBd(aFilaBd(sin)) as ConfigTablero)).not.toContain("ahorro");
     expect(actualizarVersion(c)).toBe(c);
+  });
+
+  it("un tablero de la versión 2 recibe UNA vez «Gasto por mes» (va junto a «Qué decidir hoy»)", () => {
+    const v2 = { v: 2, cifras: ["gasto"], modulos: [{ id: "explorar", tamano: "l" }, { id: "fijos", tamano: "s" }] };
+    const c = normalizarConfigTablero(v2);
+    expect(ids(c)).toEqual(["explorar", "fijos", "gasto_mes"]);
+    expect(c.v).toBe(3);
+    const sin = activarModulo(c, "gasto_mes", false);
+    expect(ids(normalizarConfigTablero(JSON.parse(JSON.stringify(sin))))).not.toContain("gasto_mes");
   });
 
   it("el catálogo trae más de lo que sale por defecto (cifras y módulos nuevos)", () => {
@@ -79,7 +88,7 @@ describe("normalizarConfigTablero (lo guardado no se fía)", () => {
 
   it("quita lo desconocido y lo repetido; los tamaños raros vuelven al del módulo", () => {
     const c = normalizarConfigTablero({
-      v: 2,
+      v: 3,
       cifras: ["abonos", "abonos", "inventada", "gasto"],
       modulos: [{ id: "familias", tamano: "xl" }, "proveedores", { id: "familias", tamano: "l" }, { id: "nope" }, { id: "explorar", tamano: "s" }],
     });
@@ -92,7 +101,7 @@ describe("normalizarConfigTablero (lo guardado no se fía)", () => {
   });
 
   it("Explorar siempre está (si falta, al principio) y siempre es grande", () => {
-    const c = normalizarConfigTablero({ v: 2, cifras: [], modulos: [{ id: "abonos", tamano: "m" }] });
+    const c = normalizarConfigTablero({ v: 3, cifras: [], modulos: [{ id: "abonos", tamano: "m" }] });
     expect(c.modulos).toEqual([
       { id: "explorar", tamano: "l" },
       { id: "abonos", tamano: "m" },
@@ -101,7 +110,7 @@ describe("normalizarConfigTablero (lo guardado no se fía)", () => {
   });
 
   it("todo quitado es una configuración válida (solo Explorar)", () => {
-    expect(normalizarConfigTablero({ v: 2, cifras: [], modulos: [] })).toEqual({ cifras: [], modulos: [{ id: "explorar", tamano: "l" }], v: 2 });
+    expect(normalizarConfigTablero({ v: 3, cifras: [], modulos: [] })).toEqual({ cifras: [], modulos: [{ id: "explorar", tamano: "l" }], v: 3 });
   });
 });
 
