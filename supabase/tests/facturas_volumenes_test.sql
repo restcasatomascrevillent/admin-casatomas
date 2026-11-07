@@ -32,7 +32,7 @@ begin
   -- T1 ─────────────────────────────────────────────────────────────────────
   foreach f in array array['public.envase_texto(text)',
                            'public.volumen_linea(text,text,numeric,numeric,numeric,text,numeric,text,numeric,numeric)',
-                           'public.volumen_comprado_agente(text,text,date,date,text,text)',
+                           'public.volumen_comprado_agente(text,text,date,date,text,text,integer,text)',
                            'public.productos_envase_recalcular(bigint[])'] loop
     if has_function_privilege('anon', f, 'execute') then
       raise exception 'FALLO T1: anon puede ejecutar %', f;

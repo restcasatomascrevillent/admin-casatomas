@@ -7,6 +7,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { _vaciarDuplicados, sinDuplicar, systemPrompt, TOOLS } from "../herramientas.ts";
 
+/**
+ * Tope del prompt de sistema: 6.400 (antes 5.990). Sube ~370 caracteres el
+ * 07/11/2026 (migracion 20261107100000) por las reglas que el dueño pidio tras
+ * fallos reales en la demo: precio del litro en la 15, no preguntar «¿quieres
+ * que consulte…?» (16), seguimiento con el mismo tema (17) y «ultimo mes» (18).
+ * El prompt va en cache (≈5.600 de 8.200 tokens de entrada, 0,10 $/M en
+ * gpt-4.1-mini): ~+90 tokens ≈ +0,00001 $ por ronda.
+ */
+const LIMITE_PROMPT = 6_400;
+
 /** Simula el handler: una "ejecucion" = bucle de OpenAI (2 llamadas) + 1 registro de uso. */
 function handlerSimulado() {
   const estado = { ejecuciones: 0, llamadasOpenAI: 0, filasUso: 0 };
@@ -80,8 +90,8 @@ describe("prompt ronda 9", () => {
     expect(p).toMatch(/sin ganador si avisos\.unidades_mezcladas o productos_coincidentes > 1/);
   });
 
-  it("tamanos no crecen (prompt <= 5.732, TOOLS <= 10.400 con volumen_comprado)", () => {
-    expect(p.length).toBeLessThanOrEqual(5732);
-    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_400); // 9.626 + volumen_comprado (06/11/2026)
+  it("tamanos no crecen (prompt <= 5.990, TOOLS <= 10.560 con volumen_comprado y bebidas)", () => {
+    expect(p.length).toBeLessThanOrEqual(LIMITE_PROMPT); // 5.732 + bebidas (13/11) + asociacion (07/11/2026)
+    expect(JSON.stringify(TOOLS).length).toBeLessThanOrEqual(10_560); // 9.626 + volumen_comprado (06/11/2026) + bebidas (13/11/2026)
   });
 });
