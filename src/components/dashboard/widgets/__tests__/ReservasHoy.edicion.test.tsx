@@ -29,6 +29,7 @@ vi.mock("@/integrations/supabase/client", () => ({
       const b: Record<string, unknown> = {};
       b.select = () => b;
       b.eq = () => b;
+      b.order = () => b;
       b.then = (ok: (v: unknown) => unknown, ko?: (e: unknown) => unknown) =>
         Promise.resolve({
           data: [{ capacidad_maxima: 60, caracteristicas: { marca: "casa_tomas" } }],
