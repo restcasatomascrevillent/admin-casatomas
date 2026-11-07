@@ -747,6 +747,22 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     expect(screen.queryByRole("button", { name: "Alejar el plano" })).toBeNull();
   });
 
+  it("el plano de mesas NO tiene scroll y el número de mesa sale entero, sin recortar (07/11/2026)", async () => {
+    h.mesas = [...h.mesas, mesa("m13", "13", "comedor", 4, 7, 4)];
+    montar({ fijo: true });
+    const contenedor = await screen.findByTestId("mesas-grandes");
+    for (const nodo of [contenedor, ...Array.from(contenedor.querySelectorAll("*"))] as HTMLElement[]) {
+      expect(nodo.getAttribute("class") ?? "").not.toMatch(/overflow-(auto|scroll|y-auto|x-auto|y-scroll|x-scroll)/);
+    }
+    expect(contenedor).toHaveClass("overflow-hidden");
+    const numero = within(mesaBoton("13")).getByTestId("numero-mesa");
+    expect(numero).toHaveTextContent(/^13$/);
+    expect(numero).toHaveClass("whitespace-nowrap", "shrink-0");
+    expect(numero.className).not.toMatch(/truncate|text-ellipsis/);
+    // Sin el icono de estado que se comía el número.
+    expect(mesaBoton("13").querySelector("[data-glifo-estado]")).toBeNull();
+  });
+
   it("cada tarjeta lleva el estado del plano, su número, plazas y, con reserva, hora, nombre corto y personas", async () => {
     montar({ fijo: true });
     await screen.findByTestId("mesas-grandes");

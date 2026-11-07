@@ -1,6 +1,6 @@
 /** Mesas grandes de «Hoy» de escritorio (07/11/2026): de las posiciones del plano a una rejilla sin solapes. */
 import { describe, it, expect } from "vitest";
-import { agruparCercanos, rejillaMesasGrandes } from "../mesasGrandes";
+import { agruparCercanos, medidasTarjetas, rejillaMesasGrandes } from "../mesasGrandes";
 
 const m = (id: string, pos_x: number, pos_y: number, ancho = 80, alto = 80) => ({ id, pos_x, pos_y, ancho, alto });
 
@@ -51,16 +51,41 @@ describe("rejillaMesasGrandes", () => {
   });
 });
 
-describe("rejillaMesasGrandes · con poco ancho", () => {
-  it("si la sala pide más columnas de las que caben, se comprimen sin solaparse ni perder el orden de cada fila", () => {
-    const mesas = [m("a", 1, 1), m("b", 2.6, 1), m("c", 4.2, 1), m("d", 1.8, 4), m("e", 3.4, 4), m("f", 5, 4)];
-    const libre = rejillaMesasGrandes(mesas);
-    expect(libre.columnas).toBeGreaterThan(3);
-    const r = rejillaMesasGrandes(mesas, [], 3);
-    expect(r.columnas).toBe(3);
-    const casillas = r.celdas.map((c) => `${c.fila}-${c.columna}`);
-    expect(new Set(casillas).size).toBe(6);
-    const fila2 = r.celdas.filter((c) => c.fila === 2).map((c) => c.ids[0]);
-    expect(fila2).toEqual(["d", "e", "f"]);
+describe("rejillaMesasGrandes · sin huecos ni scroll (Salón de la demo, 07/11/2026)", () => {
+  // Posiciones reales del Salón (demo): esquina en metros, tamaño en cm.
+  const SALON = [
+    m("1", 8.21, 6.0, 70, 110), m("10", 15.2, 2.0, 70, 110), m("11", 10.9, 3.3, 150, 150), m("12", 7.25, 2.25, 150, 150),
+    m("13", 11.6, 0.9, 110, 70), m("14", 9.7, 0.9, 110, 70), m("2", 6.39, 6.0, 70, 55), m("3", 4.51, 6.0, 70, 110),
+    m("4", 2.26, 6.0, 70, 110), m("5", 13.89, 5.72, 150, 150), m("7", 9.0, 5.03, 70, 55), m("8", 5.26, 4.3, 70, 110),
+    m("9", 2.26, 4.3, 70, 110),
+  ];
+
+  it("tantas columnas como la fila más larga: ninguna columna vacía", () => {
+    const r = rejillaMesasGrandes(SALON);
+    const usadas = new Set(r.celdas.map((c) => c.columna));
+    expect(usadas.size).toBe(r.columnas);
+    const porFila = new Map<number, number>();
+    r.celdas.forEach((c) => porFila.set(c.fila, (porFila.get(c.fila) ?? 0) + 1));
+    expect(Math.max(...porFila.values())).toBe(r.columnas);
+    expect(new Set(r.celdas.map((c) => c.fila)).size).toBe(r.filas);
+    expect(new Set(r.celdas.map((c) => `${c.fila}-${c.columna}`)).size).toBe(13);
+  });
+
+  it("con poco alto junta filas hasta que quepan, sin perder mesas ni solaparlas", () => {
+    const r = rejillaMesasGrandes(SALON, [], 3);
+    expect(r.filas).toBeLessThanOrEqual(3);
+    expect(new Set(r.celdas.map((c) => `${c.fila}-${c.columna}`)).size).toBe(13);
+    expect(r.celdas.every((c) => c.columna <= r.columnas)).toBe(true);
+  });
+
+  it("medidasTarjetas: filas × columnas entran enteras en el hueco, y nunca más altas que anchas", () => {
+    for (const [ancho, alto] of [[760, 540], [480, 560], [1300, 900], [300, 250]]) {
+      for (const [filas, columnas] of [[5, 5], [2, 8], [6, 3]]) {
+        const { tarjetaAncho, tarjetaAlto, hueco } = medidasTarjetas(ancho, alto, filas, columnas);
+        expect(columnas * tarjetaAncho + (columnas - 1) * hueco + 16).toBeLessThanOrEqual(ancho);
+        expect(filas * tarjetaAlto + (filas - 1) * hueco + 16).toBeLessThanOrEqual(alto);
+        expect(tarjetaAlto).toBeLessThanOrEqual(tarjetaAncho);
+      }
+    }
   });
 });
