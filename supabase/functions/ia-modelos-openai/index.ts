@@ -5,7 +5,11 @@ import { exigirSuperAdmin } from "../_shared/autorizacion.ts";
 import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { AcumuladorUso, registrarUso } from "../_shared/registrar-uso-ia.ts";
 import { compararTiempoConstante } from "../_shared/tiempo-constante.ts";
-import { cuerpoPrueba, esModeloDeChat, modelosDeRespuesta, procesoDeFuncion, textoRespuesta } from "./logica.ts";
+import {
+  costeUsd, cuerpoPrueba, esModeloDeChat, modelosDeRespuesta, peticionEvaluar, type PrecioModelo, procesoDeFuncion, sumarUsage,
+  textoRespuesta,
+} from "./logica.ts";
+import { ejecutarConversacion, type Traza } from "../chat-facturas/bucle.ts";
 const createClient = clienteConAuditoria(createClientBase, "ia-modelos-openai");
 
 // ============================================================================
@@ -20,6 +24,15 @@ const createClient = clienteConAuditoria(createClientBase, "ia-modelos-openai");
 //       Una llamada mínima a chat/completions con ese modelo y la clave del
 //       proyecto de esa función. → { ok, modelo, latencia_ms, respuesta, tokens }
 //       Su gasto queda en ia_uso (función ia-modelos-openai).
+//  POST { accion: "evaluar", modelo, preguntas: [{ id, mensaje, historial? }], presupuesto_usd? }
+//       (07/11/2026, docs/facturas/EVAL-MODELOS.md) Ejecuta el MISMO bucle de
+//       chat-facturas (chat-facturas/bucle.ts: prompt, herramientas y RPC
+//       contra la BD, con el cliente de service role como chat-facturas) con
+//       ese modelo, SIN guardar conversación. Máx. 3 preguntas por llamada.
+//       Se niega si el gasto acumulado de evaluaciones (ia_uso, disparador
+//       «evaluar:…») ya llega a presupuesto_usd (tope 3 $).
+//       → { ok, modelo, resultados: [{ id, respuesta, herramientas, llamadas_chat,
+//            tokens{entrada,cacheados,salida,razonamiento,embedding}, coste_usd, latencia_ms, error? }] }
 //
 //  La llaman: pg_cron «ia-modelos-openai» (diario, x-ocr-secret = Vault
 //  «ocr_trabajos_secret»; también sirve para una prueba desde SQL con
@@ -151,6 +164,78 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
     } finally {
       await registrarUso(uso, { disparador: `prueba:${funcion ?? "-"}:${quien}`.slice(0, 200), duracionMs: Date.now() - t0, cliente: supabase });
     }
+  }
+
+  if (accion === "evaluar") {
+    let pet;
+    try {
+      pet = peticionEvaluar(body);
+    } catch (e) {
+      return json({ ok: false, error: (e as Error).message }, 400);
+    }
+    const { data: disp, error: eDisp } = await supabase.from("ia_modelos_disponibles")
+      .select("id").eq("id", pet.modelo).maybeSingle();
+    if (eDisp) return json({ ok: false, error: eDisp.message }, 500);
+    if (!disp) return json({ ok: false, error: `${pet.modelo} no está en la lista de modelos de la cuenta.` }, 404);
+
+    // Presupuesto: lo ya gastado por TODAS las evaluaciones (fuente de verdad: ia_uso).
+    const { data: gastadas, error: eGasto } = await supabase.from("ia_uso")
+      .select("coste_usd").eq("funcion", "ia-modelos-openai").like("disparador", "evaluar:%");
+    if (eGasto) return json({ ok: false, error: `No se pudo leer el gasto: ${eGasto.message}` }, 500);
+    const gastado = (gastadas ?? []).reduce((s: number, f: { coste_usd: number | null }) => s + Number(f.coste_usd ?? 0), 0);
+    if (gastado >= pet.presupuestoUsd) {
+      return json({ ok: false, error: `Presupuesto de evaluación agotado: ${gastado.toFixed(4)} $ de ${pet.presupuestoUsd} $` }, 402);
+    }
+
+    const { data: precios } = await supabase.from("ia_precios")
+      .select("modelo, usd_por_m_input, usd_por_m_cached, usd_por_m_output").in("modelo", [pet.modelo, "text-embedding-3-small"]);
+    const precio = (m: string) => ((precios ?? []) as (PrecioModelo & { modelo: string })[]).find((p) => p.modelo === m) ?? null;
+
+    const clave = claveOpenAI("chat");
+    if (!clave) return json({ ok: false, error: "Falta la clave de OpenAI en el servidor" }, 500);
+
+    const resultados = [];
+    for (const p of pet.preguntas) {
+      const usoChat = new AcumuladorUso("ia-modelos-openai", pet.modelo, "chat");
+      const usosChat = [usoChat];
+      const usoEmbed = new AcumuladorUso("ia-modelos-openai", "text-embedding-3-small", "embedding");
+      const traza: Traza = { llamadas: [], herramientas: [] };
+      const t0 = Date.now();
+      let respuesta = "";
+      let error: string | null = null;
+      try {
+        // Sin respaldo: se evalúa ESE modelo; si OpenAI lo rechaza, es un resultado.
+        const r = await ejecutarConversacion({
+          supabase, claveOpenAI: clave, mensaje: p.mensaje, historial: p.historial, modelo: pet.modelo, respaldo: null,
+          uso: { usosChat, usoEmbed, nuevoAcumuladorChat: (m) => new AcumuladorUso("ia-modelos-openai", m, "chat") },
+          traza,
+        });
+        respuesta = r.respuesta;
+      } catch (e) {
+        usosChat[usosChat.length - 1].marcarError();
+        error = errorSaneado({ error: { message: (e as Error)?.message ?? String(e) } }, 0);
+      }
+      const latencia = Date.now() - t0;
+      await registrarUso([...usosChat, usoEmbed], {
+        disparador: `evaluar:${pet.modelo}:${p.id}`.slice(0, 200), duracionMs: latencia, cliente: supabase,
+      });
+      const tokens = sumarUsage(traza.llamadas.map((l) => l.usage));
+      const cChat = costeUsd(precio(pet.modelo), tokens);
+      const cEmb = costeUsd(precio("text-embedding-3-small"), { entrada: usoEmbed.prompt, cacheados: 0, salida: 0, razonamiento: 0 });
+      resultados.push({
+        id: p.id,
+        respuesta,
+        error,
+        herramientas: traza.herramientas,
+        llamadas_chat: traza.llamadas.length,
+        llamadas_ms: traza.llamadas.map((l) => l.ms),
+        tokens: { ...tokens, embedding: usoEmbed.prompt },
+        coste_usd: cChat === null ? null : Math.round((cChat + (cEmb ?? 0)) * 1e6) / 1e6,
+        latencia_ms: latencia,
+      });
+    }
+    console.log(`[ia-modelos-openai] ${quien} · evaluar ${pet.modelo} · ${resultados.length} preguntas`);
+    return json({ ok: true, modelo: pet.modelo, resultados });
   }
 
   return json({ ok: false, error: "accion desconocida" }, 400);

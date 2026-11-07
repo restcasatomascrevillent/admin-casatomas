@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { cuerpoPrueba, esDeInteres, esModeloDeChat, modelosDeRespuesta, procesoDeFuncion, textoRespuesta } from "../logica";
+import {
+  costeUsd, cuerpoPrueba, esDeInteres, esModeloDeChat, MAX_PREGUNTAS_EVAL, modelosDeRespuesta, peticionEvaluar, PRESUPUESTO_EVAL_MAX_USD,
+  procesoDeFuncion, sumarUsage, textoRespuesta,
+} from "../logica";
 
 describe("ia-modelos-openai · lógica", () => {
   it("limpia la lista de /v1/models (sin duplicados ni ids raros, ordenada)", () => {
@@ -48,5 +51,40 @@ describe("ia-modelos-openai · lógica", () => {
     expect(textoRespuesta({ choices: [{ message: { content: " funciona " } }] })).toBe("funciona");
     expect(textoRespuesta({ choices: [{ message: { content: null }, finish_reason: "tool_calls" }] })).toContain("tool_calls");
     expect(textoRespuesta(null)).toBe("(sin texto)");
+  });
+});
+
+describe("ia-modelos-openai · evaluar", () => {
+  it("valida la petición: modelo de chat, 1-3 preguntas, historial y tope de 3 $", () => {
+    const p = peticionEvaluar({
+      modelo: "gpt-6-luna",
+      preguntas: [{ id: "q3", mensaje: " hazme la comparativa ", historial: [{ rol: "user", contenido: "litros" }, { rol: "assistant", contenido: "20 l" }] }],
+      presupuesto_usd: 50,
+    });
+    expect(p.modelo).toBe("gpt-6-luna");
+    expect(p.presupuestoUsd).toBe(PRESUPUESTO_EVAL_MAX_USD);
+    expect(p.preguntas[0]).toEqual({ id: "q3", mensaje: "hazme la comparativa", historial: [{ role: "user", content: "litros" }, { role: "assistant", content: "20 l" }] });
+    expect(peticionEvaluar({ modelo: "gpt-4.1-mini", preguntas: [{ mensaje: "x" }], presupuesto_usd: 1 }).presupuestoUsd).toBe(1);
+    expect(() => peticionEvaluar({ modelo: "text-embedding-3-small", preguntas: [{ mensaje: "x" }] })).toThrow();
+    expect(() => peticionEvaluar({ modelo: "gpt-6-sol", preguntas: [] })).toThrow();
+    expect(() => peticionEvaluar({ modelo: "gpt-6-sol", preguntas: Array(MAX_PREGUNTAS_EVAL + 1).fill({ mensaje: "x" }) })).toThrow();
+    expect(() => peticionEvaluar({ modelo: "gpt-6-sol", preguntas: [{ mensaje: "" }] })).toThrow();
+    expect(peticionEvaluar({ modelo: "gpt-6-sol", preguntas: [{ id: "mal id;", mensaje: "x" }] }).preguntas[0].id).toBe("p1");
+  });
+
+  it("suma tokens de varias llamadas (cacheados y razonamiento dentro, sin pasarse)", () => {
+    const t = sumarUsage([
+      { prompt_tokens: 1000, completion_tokens: 50, prompt_tokens_details: { cached_tokens: 800 }, completion_tokens_details: { reasoning_tokens: 10 } },
+      { prompt_tokens: 100, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 999 } },
+      null,
+    ]);
+    expect(t).toEqual({ entrada: 1100, cacheados: 900, salida: 55, razonamiento: 10 });
+  });
+
+  it("coste con la tarifa de ia_precios (cacheada al precio de entrada si no tiene)", () => {
+    const t = { entrada: 1_000_000, cacheados: 500_000, salida: 100_000, razonamiento: 0 };
+    expect(costeUsd({ usd_por_m_input: 2, usd_por_m_cached: 0.2, usd_por_m_output: 10 }, t)).toBeCloseTo(1 + 0.1 + 1, 6);
+    expect(costeUsd({ usd_por_m_input: 2, usd_por_m_cached: null, usd_por_m_output: 10 }, t)).toBeCloseTo(2 + 1, 6);
+    expect(costeUsd(null, t)).toBeNull();
   });
 });
