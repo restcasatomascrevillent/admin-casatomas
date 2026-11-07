@@ -9,7 +9,7 @@ vi.mock("@/integrations/supabase/client", async () => {
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ user: { id: "u1" } }), useUsuarioIdOpcional: () => "u1" }));
 // Con «Editar» en Facturas (todo, como antes del 06/11/2026); los perfiles, en SubidaFacturas.permisos.test.tsx.
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: () => ({ canAccess: true, loading: false }) }));
-const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn() }));
+const toastMock = vi.hoisted(() => Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), warning: vi.fn(), loading: vi.fn() }));
 vi.mock("sonner", () => ({ toast: toastMock }));
 
 import { doble } from "./dobleSupabaseFacturas";
@@ -46,6 +46,7 @@ beforeEach(() => {
   toastMock.success.mockClear();
   toastMock.error.mockClear();
   toastMock.warning.mockClear();
+  toastMock.loading.mockClear();
   window.localStorage.clear();
 });
 
@@ -53,6 +54,26 @@ const elegir = (nombre: string) =>
   fireEvent.change(screen.getByLabelText("Elegir facturas o albaranes (PDF o imágenes)"), {
     target: { files: [new File(["x"], nombre, { type: "application/pdf" })] },
   });
+
+describe("ColaSubidaProvider · tanda de varios documentos: un solo aviso (07/11/2026)", () => {
+  it("3 albaranes: ningún toast por documento ni pop-up; un toast que avanza y un resumen al final", async () => {
+    const sinTotal = (nombre: string): ResultadoProcesamiento => ({
+      nombre, success: true, tipo: "albaran", archivoGuardado: true, duplicado: false,
+      // Lo normal en un albarán: no cuenta como aviso.
+      alertas: [{ codigo: "total_ausente", severidad: "alta", mensaje: "Sin total" }],
+    });
+    montarSubida({ deps: { planificar: async () => ({ camino: "unico" }), iniciarUnico: servidorAntiguo, procesarUnico: async (_f, n) => sinTotal(n) } });
+    fireEvent.change(screen.getByLabelText("Elegir facturas o albaranes (PDF o imágenes)"), {
+      target: { files: ["a1.pdf", "a2.pdf", "a3.pdf"].map((n) => new File(["x"], n, { type: "application/pdf" })) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Enviar 3 documentos/ }));
+    await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Subida terminada: 3 documentos", expect.objectContaining({ id: "subida-tanda-1", description: "3 guardadas" })));
+    expect(toastMock.success).toHaveBeenCalledTimes(1);
+    expect(toastMock.warning).not.toHaveBeenCalled();
+    expect(toastMock.loading.mock.calls.every(([, o]) => o.id === "subida-tanda-1")).toBe(true);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
 
 describe("ColaSubidaProvider · la subida sigue en segundo plano", () => {
   it("sigue al salir de Facturas (SubidaFacturas desmontado), avisa al terminar y apunta la tanda en la campana", async () => {

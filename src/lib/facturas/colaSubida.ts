@@ -191,6 +191,28 @@ export type ClaseResultado =
   | "en_servidor"
   | "fallida";
 
+/**
+ * Avisos que en un ALBARÁN son lo normal y no piden revisar nada (07/11/2026,
+ * queja del equipo: al subir albaranes «se llena de avisos»). Muchos albaranes
+ * vienen sin valorar o sin totales; el importe que cuenta es el de la factura.
+ */
+export const AVISOS_NORMALES_EN_ALBARAN: readonly string[] = [
+  "total_ausente",
+  "subtotal_ausente",
+  "total_deducido",
+  "total_no_deducible",
+  "linea_sin_importe",
+  "numero_ausente",
+];
+
+/** Avisos que de verdad conviene mirar (en un albarán, sin los normales). */
+export function alertasRelevantes(r: ResultadoProcesamiento | undefined): AlertaValidacion[] {
+  const alertas = r?.alertas ?? [];
+  const tipo = r?.tipo ?? (r?.respuesta as { tipo?: unknown } | null | undefined)?.tipo;
+  if (tipo !== "albaran") return alertas;
+  return alertas.filter((a) => !AVISOS_NORMALES_EN_ALBARAN.includes(a.codigo));
+}
+
 /** Cómo se cuenta un resultado (toast, indicador y resumen de la campana). */
 export function clasificarResultado(r: ResultadoProcesamiento | undefined): ClaseResultado {
   if (r && !r.success && (r.sigueEnServidor || r.parado)) return "en_servidor";
@@ -198,7 +220,7 @@ export function clasificarResultado(r: ResultadoProcesamiento | undefined): Clas
   if (r.sustituida || r.paginaAnadida) return "sustituida";
   if (r.duplicado) return r.sustituible || r.anadible ? "pendiente" : "duplicada";
   if (r.archivoGuardado === false) return "sin_original";
-  if ((r.alertas?.length ?? 0) > 0) return "avisos";
+  if (alertasRelevantes(r).length > 0) return "avisos";
   return "guardada";
 }
 
@@ -304,6 +326,8 @@ export const MAX_BYTES_ARCHIVO = 10 * 1024 * 1024;
  * botón «Limpiar terminados» de la pestaña «Cargar» (y los botones del pie en móvil).
  */
 export const POSICION_AVISOS = "top-center" as const;
+/** Id del único toast de una tanda de varios documentos (se actualiza en el sitio). */
+export const idToastTanda = (tanda: number) => `subida-tanda-${tanda}`;
 
 /** Por qué no se admite un fichero al añadirlo (cada causa, su aviso). */
 export type CausaRechazo = "tipo" | "tamano" | "vacio";
