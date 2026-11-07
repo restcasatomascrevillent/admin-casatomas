@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useCanAccessSection } from "@/hooks/useUserRole";
 import { leerTrabajosOcrEnCurso } from "@/hooks/useTrabajoOcr";
 import { ColaSubidaContext, type ContextoColaSubida, RUTA_CARGAR } from "@/hooks/useColaSubida";
 import { invalidarTrasDocumento, type AlertaValidacion } from "@/hooks/useFacturas";
@@ -74,7 +75,12 @@ export function ColaSubidaProvider({ children, deps }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
-  const usuarioId = user?.id ?? null;
+  // Solo quien puede entrar en Facturas (o en su Subida) lee ocr_trabajos al entrar (07/11/2026):
+  // antes se pedía dos veces nada más abrir el panel, aunque no tuviera permiso.
+  const accesoFacturas = useCanAccessSection("facturas");
+  const accesoSubida = useCanAccessSection("facturas_subida");
+  const puedeFacturas = accesoFacturas.canAccess || accesoSubida.canAccess;
+  const usuarioId = user?.id && puedeFacturas ? user.id : null;
 
   // Los callbacks de la cola se crean una vez: leen lo último por referencia.
   const navegarRef = useRef(navigate);
