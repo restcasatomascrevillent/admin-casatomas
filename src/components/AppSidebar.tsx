@@ -37,6 +37,7 @@ import { useAdminFeatureToggles } from "@/hooks/useAdminFeatureToggles";
 import { SECCIONES_GESTOR_WEB } from "@/components/gestion-web/pestanasGestorWeb";
 import { IndicadorSubidasFacturas } from "@/components/facturas/IndicadorSubidasFacturas";
 import { BotonUsuarioMenu } from "@/components/cuenta/BotonUsuarioMenu";
+import { InstalarApp, useModoInstalacion } from "@/components/panel/InstalarApp";
 import { ShoppingBag } from "lucide-react";
 
 // `sectionKey` puede ser una lista: el item se ve si el usuario puede ver
@@ -139,6 +140,7 @@ export function AppSidebar() {
   const { isAdmin, role, permissions, loading } = useUserRole();
   const { isSuperAdmin, loading: superAdminLoading } = useSuperAdmin();
   const { isEnabled, loading: togglesLoading } = useAdminFeatureToggles();
+  const modoInstalacion = useModoInstalacion();
 
   // También en sus subrutas: /facturas/ia (la IA a pantalla completa) sigue marcando «Facturas».
   const isActive = (path: string) => currentPath === path || (path !== "/" && currentPath.startsWith(`${path}/`));
@@ -262,6 +264,12 @@ export function AppSidebar() {
             rol={role ?? null}
             permisos={permissions ?? []}
           />
+          {/* «Instalar app» (07/11/2026): solo si el navegador lo permite y aún no está instalada. */}
+          {(modoInstalacion === "android" || modoInstalacion === "ios") && (
+            <SidebarMenuItem>
+              <InstalarApp colapsado={isCollapsed} />
+            </SidebarMenuItem>
+          )}
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Cerrar sesión"

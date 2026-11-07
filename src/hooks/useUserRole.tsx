@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { useSuperAdmin } from "./useSuperAdmin";
+import { precargarFeatureToggles } from "@/lib/precargaToggles";
 import { alRevalidarSesion } from "@/lib/revalidacion-sesion";
 import { SUPER_ADMIN_EMAILS, isSuperAdmin as checkIsSuperAdmin } from "@/config/permissions";
 
@@ -118,17 +119,20 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     }
 
+    // El menú lateral los necesita en cuanto pase ProtectedRoute: se piden ya, en paralelo.
+    precargarFeatureToggles();
+
     const fetchRoleAndPermissions = async () => {
       // Si no es super admin, mostramos loading
       if (!isSuperAdminUser) setLoading(true);
 
       try {
-        // Obtener rol
-        const { data: roleData } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .single();
+        // Rol y permisos A LA VEZ (07/11/2026): no dependen uno del otro y en serie eran dos
+        // viajes seguidos al entrar (con cobertura de móvil se notaba). Se aplican igual que antes.
+        const [{ data: roleData }, { data: permData }] = await Promise.all([
+          supabase.from("user_roles").select("role").eq("user_id", userId).single(),
+          supabase.from("user_permissions").select("section_key, can_view, can_edit").eq("user_id", userId),
+        ]);
         if (!isMounted) return;
 
         if (roleData) {
@@ -136,13 +140,6 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         } else if (isSuperAdminUser) {
           setRole("admin");
         }
-
-        // Obtener permisos
-        const { data: permData } = await supabase
-          .from("user_permissions")
-          .select("section_key, can_view, can_edit")
-          .eq("user_id", userId);
-        if (!isMounted) return;
 
         if (permData) {
           setPermissions(permData);
@@ -173,19 +170,13 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
       if (enCurso) return;
       enCurso = true;
       try {
-        const { data: roleData, error: roleError } = await supabase
-          .from("user_roles")
-          .select("role")
-          .eq("user_id", userId)
-          .single();
+        const [{ data: roleData, error: roleError }, { data: permData, error: permError }] = await Promise.all([
+          supabase.from("user_roles").select("role").eq("user_id", userId).single(),
+          supabase.from("user_permissions").select("section_key, can_view, can_edit").eq("user_id", userId),
+        ]);
         if (!vivo) return;
         // PGRST116 = sin fila: el rol se ha retirado de verdad.
         const roleOk = !roleError || roleError.code === "PGRST116";
-        const { data: permData, error: permError } = await supabase
-          .from("user_permissions")
-          .select("section_key, can_view, can_edit")
-          .eq("user_id", userId);
-        if (!vivo) return;
         if (roleOk) {
           const nuevo = (roleData?.role as AppRole | undefined) ?? (isSuperAdminUser ? "admin" : null);
           setRole((previo) => (previo === nuevo ? previo : nuevo));

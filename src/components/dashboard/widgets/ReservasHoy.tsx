@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { consultaEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { format } from "date-fns";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
 import { sumarCapacidadPorMarca } from "@/hooks/useDisponibilidad";
@@ -31,25 +31,31 @@ import { estaFueraDeAforo, esSalaPrivada, idsSalasPrivadasActivas } from "@/lib/
  * (`useTodayReservations` las descarta). Antes la tarjeta daba un bloque de
  * ocupación por negocio.
  */
-function useEspaciosCapacidad() {
-  return useQuery({
-    queryKey: ["ocupacion-reservas-hoy-espacios"],
-    queryFn: async () => {
-      const { data: espacios, error } = await supabase
-        .from("espacios_reserva")
-        .select("id, nombre, capacidad_maxima, caracteristicas")
-        .eq("activa", true);
+type SalaLeida = {
+  id?: string;
+  nombre?: string;
+  capacidad_maxima?: unknown;
+  activa?: boolean;
+  caracteristicas?: unknown;
+  marca?: string | null;
+};
 
-      if (error) throw error;
-      return ((espacios ?? []) as any[]).map((e) => ({
-        id: e.id as string | undefined,
-        nombre: e.nombre as string | undefined,
-        capacidad_maxima: Number(e.capacidad_maxima) || 0,
-        marca: marcaDeEspacio(e),
-        // Sala privada (el Reservado): fuera de aforo, no suma su capacidad.
-        privada: esSalaPrivada(e),
-      }));
-    },
+function useEspaciosCapacidad() {
+  // Misma clave y consulta que `useEspaciosReserva` (07/11/2026): el inicio pedía `espacios_reserva`
+  // dos veces a la vez (aquí y en las gráficas, `useIdsSalasPrivadas`). Aquí solo las activas.
+  return useQuery({
+    ...consultaEspaciosReserva,
+    select: (espacios: SalaLeida[]) =>
+      (espacios ?? [])
+        .filter((e) => e?.activa !== false)
+        .map((e) => ({
+          id: e.id,
+          nombre: e.nombre,
+          capacidad_maxima: Number(e.capacidad_maxima) || 0,
+          marca: marcaDeEspacio(e),
+          // Sala privada (el Reservado): fuera de aforo, no suma su capacidad.
+          privada: esSalaPrivada(e),
+        })),
     refetchInterval: 60000,
   });
 }

@@ -1,7 +1,8 @@
 /**
  * Hoy en móvil: la fila de cada reserva, pensada para el camarero (07/11/2026). En grande: hora, nombre y
  * personas; la mesa con el lenguaje del servicio («Prevista: Mesa 3» / «En mesa 3» / «Sin mesa»), el estado
- * y las notas. Botón directo «Sentar · Mesa 3» (no abre la ficha); sin permiso de edición no hay botón.
+ * y las notas. Botón directo con la mesa en grande («Sentar» / «Comedor · Mesa 3», no abre la ficha); sin
+ * permiso de edición no hay botón.
  * El teléfono (15/10/2026, petición del dueño) sigue en la fila como icono «Llamar» de 44 px (desde 375 px).
  */
 import { describe, it, expect, vi } from "vitest";
@@ -25,15 +26,22 @@ const reserva = (extra: Record<string, unknown> = {}) =>
   }) as never;
 
 describe("FilaReservaMovil", () => {
-  it("por llegar con mesa: «Prevista: Mesa 3» y «Sentar · Mesa 3» sin abrir la ficha", () => {
+  it("por llegar con mesa: botón con la MESA de protagonista («Sentar» + «Comedor · Mesa 3» en grande) sin abrir la ficha", () => {
     const onAbrir = vi.fn();
     const onSentar = vi.fn();
     render(
       <ul>
-        <FilaReservaMovil reserva={reserva()} nombresMesa={["3"]} terminada={false} onAbrir={onAbrir} onSentar={onSentar} />
+        <FilaReservaMovil reserva={reserva()} nombresMesa={["3"]} terminada={false} sala="Comedor" onAbrir={onAbrir} onSentar={onSentar} />
       </ul>,
     );
-    expect(screen.getByText("Prevista: Mesa 3")).toBeInTheDocument();
+    const boton = screen.getByRole("button", { name: "Sentar a Ana López en mesa 3" });
+    expect(boton).toHaveTextContent("Sentar");
+    expect(boton).toHaveClass("min-h-14");
+    const mesa = screen.getByTestId("boton-mesa");
+    expect(mesa).toHaveTextContent(/^Comedor · Mesa 3$/);
+    expect(mesa).toHaveClass("text-lg", "font-bold");
+    // La mesa ya va en el botón: no se repite en la fila.
+    expect(screen.queryByText("Prevista: Mesa 3")).toBeNull();
     expect(screen.getByText("21:00")).toHaveClass("text-lg");
     expect(screen.getByText("Ana López")).toHaveClass("text-lg", "font-semibold");
 
@@ -73,7 +81,19 @@ describe("FilaReservaMovil", () => {
         <FilaReservaMovil reserva={reserva()} nombresMesa={["3"]} terminada={false} onAbrir={vi.fn()} onSentar={vi.fn()} mesaPrevistaOcupada />
       </ul>,
     );
-    expect(screen.getByRole("button", { name: "Sentar a Ana López: elegir mesa" })).toHaveTextContent(/^Sentar$/);
+    expect(screen.getByRole("button", { name: "Sentar a Ana López: elegir mesa" })).toHaveTextContent(/^SentarElegir mesa$/);
+    expect(screen.getByText("Prevista: Mesa 3")).toBeInTheDocument();
+  });
+
+  it("sin botón (solo «Ver»): sala y mesa en grande, con el mismo peso", () => {
+    render(
+      <ul>
+        <FilaReservaMovil reserva={reserva()} nombresMesa={["12"]} terminada={false} sala="Terraza" onAbrir={vi.fn()} />
+      </ul>,
+    );
+    const sala = screen.getByText("Terraza");
+    expect(sala.parentElement).toHaveClass("text-lg", "font-semibold");
+    expect(screen.getByText("Prevista: Mesa 12").parentElement).toBe(sala.parentElement);
   });
 
   it("sin mesa: «Sin mesa» y «Sentar» (elige mesa en la ficha)", () => {
@@ -83,7 +103,7 @@ describe("FilaReservaMovil", () => {
       </ul>,
     );
     expect(screen.getByText("Sin mesa")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sentar a Ana López: elegir mesa" })).toHaveTextContent("Sentar");
+    expect(screen.getByRole("button", { name: "Sentar a Ana López: elegir mesa" })).toHaveTextContent("Elegir mesa");
   });
 
   it("sentada: «En mesa 9» y sin botón; las notas se ven con su icono", () => {
