@@ -61,6 +61,7 @@ Datos de la demo a 06/11/2026: unos **1.900 documentos**, **~12.500 líneas**, *
 | `tablero_compras(desde, hasta, local)` | `20261105150500` (+ `191000`, `20261106120000`, `310000`) | Todo el tablero de Análisis en una llamada |
 | `explorar_compras(…)`, `documentos_de_cifra(…)` | `20261105170000` | Explorador y «Ver documentos». Leen la MISMA tabla de hechos: la lista de documentos cuadra con la cifra por construcción |
 | `meses_compras_incompletos(local)` | `20261106310000` | Meses con datos parciales (ver 3.7) |
+| `facturas_alertas_activas(desde, hasta, local)` | `20261107300000` | Alertas vigentes para Análisis («Requiere atención» y marcas en las gráficas). Las genera `facturas_generar_alertas()` (SECURITY DEFINER, solo service_role) con el cron `facturas-alertas` (06:15 UTC) en `notificaciones_dashboard` (`clave` sin duplicar, `caduca_en`, `datos`). Ver 3.13 |
 | `proveedores_listado()` | `20261105130000` | Totales por proveedor sin albaranes ya facturados |
 | `*_agente` (≈40: `resumen_periodo_agente`, `estadisticas_globales_agente`, `buscar_facturas_agente`, `buscar_productos_agente`, `detalle_documento_agente`, `ficha_proveedor_agente`, `variacion_precios_agente`, `serie_precios_agente`, `gasto_categorias_agente`, `albaranes_facturados_agente`…) | varias | Herramientas del chatbot (`chat-facturas/herramientas.ts`). Una RPC precisa por tipo de pregunta, para gastar pocos tokens |
 | `productos_aplicar_clasificacion_ia(items)` | `20261007160000` | Aplica clasificaciones (crea productos y alias, asigna líneas) |
@@ -117,6 +118,17 @@ los mete el dueño en Supabase → Edge Functions → Secrets. Guía de Drive:
     dueño: «no se puede guardar nada en Supabase Storage». Demo y producción comparten la carpeta de
     Drive: no importes el histórico en las dos.
 12. **Nunca inventar ni «arreglar» un importe.** Si algo no cuadra se deja lo impreso y una alerta.
+13. **Alertas diarias** (`20261107300000_facturas_alertas`, umbrales en `configuracion_facturas.alertas`;
+    el % de subida es `umbral_subida_precio_pct`): subida de precio (última compra > 10 % sobre la
+    mediana de los 90 días anteriores, mismo proveedor y texto de línea, €/kg o €/l si se conoce el
+    envase; alta si > 25 % o ≥ 500 € en 90 días), más barato en otro proveedor (mismo producto del
+    catálogo, €/kg o €/l, 15-45 % más barato con ≥ 2 compras), gasto de una familia (mes en curso
+    proyectado desde el día 10 o último mes completo > 25 % sobre la media de los 6 meses completos
+    anteriores), albaranes sin factura > 35 días (no si el mes siguiente está incompleto), proveedor
+    nuevo (45 días), importe > 3× la media del proveedor (sin luz/alquiler/servicios) y revisión
+    (duplicados probables y avisos de lectura sin revisar > 7 días). Nunca cuentan portes, envases,
+    energía ni Servicios/Menaje, ni albaranes ya facturados, ni precios atípicos. Lo que deja de
+    cumplirse caduca (y queda leído) en la pasada siguiente.
 
 ## 4. Reglas de rendimiento
 
@@ -254,6 +266,8 @@ proveedor + número). Coste orientativo: ~11 k tokens de subagente por PDF.
 18. `20261106310000_compras_meses_incompletos`
 19. `20261106510000_permisos_facturas_subida` («Ver» solo consulta y permiso «Facturas · Subida»; a la vez
     que `procesar-factura`, `chat-facturas` y `buscar-precios-mercado` y el panel nuevo)
+19b. `20261107300000_facturas_alertas` (alertas diarias + cron `facturas-alertas`; test
+    `tests/facturas_alertas_test.sql`).
 20. **Otra vez** `20261105200000_rls_permisos_una_vez` (idempotente) para envolver las políticas creadas
     después.
 

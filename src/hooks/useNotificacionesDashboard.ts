@@ -12,6 +12,10 @@ export interface NotificacionDashboard {
   referencia_tipo: string | null;
   leida: boolean;
   created_at: string;
+  /** Alertas de Facturas (20261107300000): prioridad, caducidad y datos (enlace del panel, cifras). */
+  prioridad?: string | null;
+  caduca_en?: string | null;
+  datos?: { enlace?: string | null; [k: string]: unknown } | null;
 }
 
 /**
@@ -56,7 +60,9 @@ export function useNotificacionesDashboard() {
     if (error) {
       console.error("Error cargando notificaciones:", error);
     } else {
-      const leidas = (data || []) as NotificacionDashboard[];
+      // Las alertas de Facturas caducadas (ya no se cumplen) no se enseñan.
+      const ahora = Date.now();
+      const leidas = ((data || []) as NotificacionDashboard[]).filter((n) => !n.caduca_en || Date.parse(n.caduca_en) > ahora);
       const idsLeidas = new Set(leidas.map((n) => n.id));
       const items = [
         ...llegadasDuranteLectura.current.filter((n) => !idsLeidas.has(n.id)),
