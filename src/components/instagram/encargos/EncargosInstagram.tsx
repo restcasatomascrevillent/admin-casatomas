@@ -33,7 +33,7 @@ import {
   type DatosFormulario,
   type Encargo,
 } from "./logica";
-import { useAjustesEncargos, useEncargos, useRolesEncargos } from "./useEncargos";
+import { encargosActivos, useAjustesEncargos, useEncargos, useRolesEncargos } from "./useEncargos";
 
 const ICONO_FORMATO = { reel: Clapperboard, post: ImageIcon, story: Smartphone } as const;
 
@@ -102,7 +102,7 @@ function Tarjeta({ e, onAbrir, roles }: { e: Encargo; onAbrir: () => void; roles
 
 export function EncargosInstagram({ className, onAbrirPieza, encargoInicial = null, marca: marcaPagina, pedir = null }: EncargosInstagramProps) {
   const roles = useRolesEncargos();
-  const { data: encargos = [], isLoading, error } = useEncargos(!roles.cargando && (roles.restaurante || roles.agencia));
+  const { data: encargos = [], isLoading, error } = useEncargos(encargosActivos(roles));
   const { data: ajustes } = useAjustesEncargos();
   const [marcaPropia, setMarca] = useState<"todas" | MarcaId>("todas");
   const marca = marcaPagina ?? marcaPropia;

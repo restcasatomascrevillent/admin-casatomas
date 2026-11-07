@@ -4,6 +4,11 @@
  * próximas publicaciones (sin las ya publicadas), 3 cifras con su tendencia,
  * los encargos abiertos (sin los cerrados) y la sugerencia de la semana; los
  * clics llevan a la pestaña o pieza que toca y la marca de la barra filtra.
+ *
+ * Rendimiento (docs/instagram-rendimiento.md): al abrir, nada llama a una Edge
+ * Function (las cifras salen de instagram_metricas_cuenta, el indicador de la
+ * cuenta no llama a instagram-estado y la IA solo al pedirla), mientras carga
+ * se ven esqueletos y el prefetch deja todo listo para volver al Estudio.
  */
 import type { ReactNode } from "react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -30,8 +35,13 @@ vi.mock("@/integrations/supabase/client", () => {
 vi.mock("@/hooks/useUserRole", () => ({ useCanAccessSection: (k: string) => ({ canAccess: k === "marketing", loading: false }) }));
 
 import { EstudioInstagram, cifrasEstudio, tituloSemana } from "../EstudioInstagram";
+import { prefetchEstudio } from "../consultas";
 import { URL_METRICAS } from "@/components/instagram/metricas/api";
-import { textoIndicador } from "@/components/instagram/BarraInstagram";
+import { IndicadorCuenta, textoIndicador } from "@/components/instagram/BarraInstagram";
+import { calcularResumenEstudio, type FilaCuentaEstudio } from "@/components/instagram/metricas/resumenEstudio";
+import { textoVariacion } from "@/components/instagram/metricas/agregacion";
+import { guardarCuenta } from "@/components/marketing/instagram/cuentaGuardada";
+import type { RespuestaEstado } from "@/components/marketing/instagram/api";
 import type { DatosMetricas } from "@/components/instagram/metricas/tipos";
 
 const AHORA = new Date("2026-11-05T10:00:00Z"); // jueves
@@ -61,6 +71,15 @@ const METRICAS: Partial<DatosMetricas> = {
   ultimaCorrecta: null,
 };
 
+/** 56 días de la cuenta (28 + los 28 anteriores), más recientes primero, como los devuelve la tabla. */
+const FILAS_CUENTA: FilaCuentaEstudio[] = Array.from({ length: 56 }, (_, i) => {
+  const d = new Date(Date.UTC(2026, 10, 4 - i)).toISOString().slice(0, 10);
+  return {
+    fecha: d, ig_user_id: "1", seguidores: 1500 - i * 5, alcance: i < 28 ? 650 : 580, visualizaciones: 900,
+    visitas_perfil: 3, cuentas_interaccion: 20, interacciones: i < 28 ? 44 : 41, toques_enlaces: 1,
+  };
+});
+
 const json = (cuerpo: unknown) => new Response(JSON.stringify(cuerpo), { status: 200, headers: { "content-type": "application/json" } });
 
 beforeAll(() => {
@@ -86,7 +105,9 @@ beforeEach(() => {
       { id: "e1", numero: 1, estado: "para_revisar", modo: "oficiosos", formato: "reel", titulo: "Reel del mar", marca: "casa-tomas", fecha_deseada: "2026-11-09", created_at: "2026-11-01T10:00:00Z", updated_at: "2026-11-04T10:00:00Z" },
       { id: "e2", numero: 2, estado: "publicado", modo: "automatico", formato: "post", titulo: "Ya publicado", marca: "casa-tomas", fecha_deseada: "2026-11-01", created_at: "2026-10-20T10:00:00Z", updated_at: "2026-11-01T10:00:00Z" },
     ],
+    instagram_metricas_cuenta: FILAS_CUENTA,
   };
+  window.localStorage.clear();
   vi.stubGlobal("fetch", vi.fn(async (url: string) => (String(url).startsWith(URL_METRICAS) ? json({ ok: true, ...METRICAS }) : new Response("no", { status: 404 }))));
 });
 
@@ -128,12 +149,12 @@ describe("EstudioInstagram", () => {
     expect(within(filas[2]).getByText("Borrador")).toBeInTheDocument();
     expect(within(proximas).queryByText("Pulpo del martes")).toBeNull();
 
-    // Tres cifras de 28 días con su tendencia.
+    // Tres cifras de 28 días con su tendencia, leídas de la tabla (las mismas cuentas que hace la función).
     const cifras = screen.getByTestId("cifras-estudio");
-    await within(cifras).findByText("Alcance");
-    expect(cifras).toHaveTextContent(/Alcance18\.?420\+12 %/);
-    expect(cifras).toHaveTextContent(/Interacciones1\.?236\+8 %/);
-    expect(cifras).toHaveTextContent(/Seguidores nuevos\+142−4 %/);
+    const esperadas = cifrasEstudio(calcularResumenEstudio(FILAS_CUENTA));
+    await waitFor(() => expect(within(cifras).queryByTestId("esqueleto")).toBeNull());
+    for (const x of esperadas) expect(cifras).toHaveTextContent(`${x.nombre}${x.valor}${typeof x.variacion === "number" ? textoVariacion(x.variacion) : ""}`);
+    expect(esperadas).toHaveLength(3);
 
     // Encargos abiertos: el que espera tu revisión, no el publicado.
     const encargos = screen.getByTestId("encargos-estudio");
@@ -143,6 +164,39 @@ describe("EstudioInstagram", () => {
 
     // Sugerencia de la semana: la IA solo al pedirla.
     expect(within(screen.getByTestId("sugerencia-semana")).getByRole("button", { name: "Pedir ideas a la IA" })).toBeInTheDocument();
+
+    // Ninguna Edge Function al cargar: ni instagram-metricas, ni la IA.
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("mientras carga, esqueletos grises en vez de «Cargando…»", () => {
+    pintar(<EstudioInstagram {...props()} />);
+    expect(screen.getByRole("status", { name: "Cargando cifras" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Cargando las próximas publicaciones" })).toBeInTheDocument();
+    expect(screen.queryByText(/Cargando…|Cargando cifras…/)).toBeNull();
+  });
+
+  it("con el prefetch hecho, volver al Estudio pinta al momento (sin esqueletos)", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await prefetchEstudio(qc, "todas");
+    render(
+      <QueryClientProvider client={qc}>
+        <EstudioInstagram {...props()} />
+      </QueryClientProvider>,
+    );
+    expect(screen.queryAllByTestId("esqueleto")).toHaveLength(0);
+    expect(within(screen.getByTestId("proximas-estudio")).getByText("Cocido del viernes")).toBeInTheDocument();
+    expect(within(screen.getByTestId("encargos-estudio")).getByText("Reel del mar")).toBeInTheDocument();
+    expect(screen.getByTestId("cifras-estudio")).toHaveTextContent("Alcance");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("varias cuentas en la tabla y ninguna guardada: las cifras salen de la Edge Function (respaldo)", async () => {
+    sb.datos.instagram_metricas_cuenta = [...FILAS_CUENTA, ...FILAS_CUENTA.map((f) => ({ ...f, ig_user_id: "2" }))];
+    pintar(<EstudioInstagram {...props()} />);
+    const cifras = screen.getByTestId("cifras-estudio");
+    await waitFor(() => expect(cifras).toHaveTextContent(/Alcance18\.?420\+12 %/));
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining(URL_METRICAS), expect.anything());
   });
 
   it("cada clic lleva a donde toca", async () => {
@@ -173,6 +227,35 @@ describe("EstudioInstagram", () => {
   });
 });
 
+describe("IndicadorCuenta («● @cuenta» de la barra)", () => {
+  const ESTADO = {
+    ok: true, cuentasPorMarca: [], variables: [], comprobaciones: [], cuenta: { id: "1", username: "casatomas" }, cuota: null, avisos: [], comoArreglarlo: [], drive: null,
+  } as RespuestaEstado;
+
+  it("no llama a instagram-estado al cargar: pinta la cuenta guardada", () => {
+    guardarCuenta(ESTADO);
+    pintar(<IndicadorCuenta marca="todas" />);
+    const b = screen.getByTestId("indicador-cuenta");
+    expect(b).toHaveTextContent("@casatomas");
+    expect(b).toHaveAttribute("data-tono", "ok");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("guardada hace más de 45 min: el @usuario en gris, y sigue sin llamar", () => {
+    guardarCuenta(ESTADO, window.localStorage, AHORA.getTime() - 46 * 60_000);
+    pintar(<IndicadorCuenta marca="todas" />);
+    expect(screen.getByTestId("indicador-cuenta")).toHaveAttribute("data-tono", "gris");
+    expect(screen.getByTestId("indicador-cuenta")).toHaveTextContent("@casatomas");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("sin nada guardado: «Sin comprobar», sin llamar a nadie", () => {
+    pintar(<IndicadorCuenta marca="todas" />);
+    expect(screen.getByTestId("indicador-cuenta")).toHaveTextContent("Sin comprobar");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
 describe("piezas puras del Estudio", () => {
   it("indicador «● @cuenta» de la barra: la cuenta de la marca elegida, o la general", () => {
     const estado = { ok: true, cuenta: { username: "oficiososia" }, cuentasPorMarca: [{ marca: "touza", username: "touza_pruebas" }] };
@@ -181,6 +264,7 @@ describe("piezas puras del Estudio", () => {
     expect(textoIndicador({ estado: { ...estado, ok: false }, cargando: false, error: null }, "casa-tomas")).toEqual({ texto: "@oficiososia", tono: "aviso" });
     expect(textoIndicador({ estado: null, cargando: true, error: null }, "todas").texto).toBe("Comprobando…");
     expect(textoIndicador({ estado: null, cargando: false, error: new Error("x") }, "todas")).toEqual({ texto: "Sin comprobar", tono: "mal" });
+    expect(textoIndicador({ estado, cargando: false, error: null, caducada: true }, "todas")).toEqual({ texto: "@oficiososia", tono: "gris" });
   });
 
   it("tituloSemana, también entre dos meses", () => {
