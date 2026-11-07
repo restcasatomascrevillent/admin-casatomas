@@ -110,6 +110,7 @@ import { useAccionesServicioReserva } from "@/hooks/useAccionesServicioReserva";
 import { useAccionesModoServicio } from "@/hooks/useAccionesModoServicio";
 import { useCanAccessSection } from "@/hooks/useUserRole";
 import { useEdicionReserva } from "@/hooks/useEdicionReserva";
+import { useFijarMesa } from "@/hooks/useMesaFijada";
 import { mesasPorReservaDe, useMovimientoReservaServicio } from "@/hooks/useMovimientoReservaServicio";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
 import { useIsBelow, useIsMobile } from "@/hooks/use-mobile";
@@ -236,6 +237,7 @@ export function VistaPlanoHoy({
   const asignarMesas = useAsignarMesasReserva();
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
   const { editarReserva, dialogoEdicion } = useEdicionReserva();
+  const fijarMesa = useFijarMesa();
   const [blacklist, setBlacklist] = useState<ReservaServicio | null>(null);
   const lista = useMemo<ReservaPlanoHoy[]>(() => reservas ?? [], [reservas]);
   const mesasPorReserva = useMemo(() => mesasPorReservaDe(asignacionesDeHoy), [asignacionesDeHoy]);
@@ -714,6 +716,7 @@ export function VistaPlanoHoy({
       sinArrastre={proponiendo}
       telefonoEnlace
       compacta
+      onFijarMesa={proponiendo ? undefined : (x, fijar) => void fijarMesa(x, fijar)}
     />
   );
 

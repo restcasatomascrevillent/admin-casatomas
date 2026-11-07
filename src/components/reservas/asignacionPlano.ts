@@ -224,6 +224,8 @@ export interface ReservaSala {
   espacio_id: string | null;
   notas_cliente?: string | null;
   importante?: boolean | null;
+  /** «Fijar mesa» (20261107120000_reservas_mesa_fijada.sql). */
+  mesa_fijada?: boolean | null;
 }
 
 /**
@@ -247,7 +249,7 @@ export function useReservasDeSala(espacioId?: string, fecha?: string) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("reservas" as any)
-        .select("id, nombre, hora, numero_comensales, estado, telefono, espacio_id, notas_cliente, importante")
+        .select("id, nombre, hora, numero_comensales, estado, telefono, espacio_id, notas_cliente, importante, mesa_fijada")
         .eq("fecha", fecha)
         .eq("espacio_id", espacioId)
         .neq("estado", "cancelada")

@@ -89,6 +89,21 @@ describe("organizarServicio", () => {
     expect(r.resumen).toBe("2 cambios");
   });
 
+  it("mesa fijada (07/11/2026): Pepito no se mueve aunque convenga y su mesa no se da al grupo", () => {
+    const mesas = [pieza("C", "4", 3, { picos_base: 1 }), pieza("S", "5", 2)];
+    const r = organizarServicio(
+      entrada(mesas, [res("Pepito", 4, "21:00:00", ["C4"], { fijada: true }), res("Grupo", 7, "21:00:00")]),
+    );
+    expect(r.movimientos.find((m) => m.reservaId === "Pepito")).toBeUndefined();
+    expect(r.movimientos.flatMap((m) => m.hacia.mesaIds)).not.toContain("C4");
+  });
+
+  it("mesa fijada en la terraza cerrada: se queda", () => {
+    const mesas = [sitio("1", 0, 0), pieza("C", "3", 2)];
+    const r = organizarServicio(entrada(mesas, [res("Luis", 4, "21:00:00", ["T1"], { fijada: true })], { terrazaCerrada: true }));
+    expect(r.movimientos).toHaveLength(0);
+  });
+
   it("terraza cerrada: no asigna nada ahí y recoloca lo que tenía", () => {
     const mesas = [sitio("1", 0, 0), sitio("2", 1.8, 0), pieza("C", "3", 2)];
     const r = organizarServicio(entrada(mesas, [res("Luis", 4, "21:00:00", ["T1"])], { terrazaCerrada: true }));
