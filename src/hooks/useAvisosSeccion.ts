@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
+import { vaALaCampana, type NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 import { tiposDeSeccion, type SeccionAvisos } from "@/lib/avisos";
 import { programarSondeo } from "@/lib/realtimeCanal";
 
@@ -60,6 +60,8 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
   const [hayMas, setHayMas] = useState(false);
   const [error, setError] = useState(false);
   const peticion = useRef(0);
+  /** Filas leídas de la tabla (las que no van a la campana no se enseñan, pero cuentan para paginar). */
+  const crudas = useRef(0);
   const { estado, tipo } = filtros;
 
   const leer = useCallback(
@@ -88,7 +90,8 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
         setHayMas(false);
       } else {
         const filas = (data || []) as NotificacionDashboard[];
-        setAvisos(filas);
+        crudas.current = filas.length;
+        setAvisos(filas.filter(vaALaCampana));
         setHayMas(filas.length === TAMANO_PAGINA_AVISOS_SECCION);
       }
       setLoading(false);
@@ -99,7 +102,7 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
     if (cargandoMas || !hayMas) return;
     const mia = peticion.current;
     setCargandoMas(true);
-    const { data, error: err } = await leer(avisos.length);
+    const { data, error: err } = await leer(crudas.current);
     if (mia !== peticion.current) return;
     setCargandoMas(false);
     if (err) {
@@ -107,9 +110,10 @@ export function useAvisosSeccion(seccion: SeccionAvisos, filtros: FiltrosAvisosS
       return;
     }
     const filas = (data || []) as NotificacionDashboard[];
+    crudas.current += filas.length;
     setAvisos((prev) => {
       const ids = new Set(prev.map((n) => n.id));
-      return [...prev, ...filas.filter((n) => !ids.has(n.id))];
+      return [...prev, ...filas.filter((n) => !ids.has(n.id) && vaALaCampana(n))];
     });
     setHayMas(filas.length === TAMANO_PAGINA_AVISOS_SECCION);
   };

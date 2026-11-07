@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { plural } from "@/components/facturas/shared/formatters";
 import { TIPO_ICON, abrirAvisosSeccion } from "@/lib/avisos";
-import type { AlertaFacturas } from "@/lib/facturas/alertas";
+import { detalleCortoAlerta, resumenCortoAlerta, tituloCortoAlerta, type AlertaFacturas } from "@/lib/facturas/alertas";
 import { FILTROS_VACIOS, type ConfigExplorador } from "@/lib/facturas/explorador";
 import { FilaConMenu, FOCO, Tarjeta, type AccionMenu } from "./piezas";
 
@@ -111,6 +111,7 @@ export function RequiereAtencion({
             <FilaConMenu
               nombre={`${a.prioridad === "alta" ? "Importante: " : ""}${a.titulo}. ${a.mensaje} Opciones`}
               acciones={pendiente ? [] : accionesAlerta(a, onIrA, onExplorar)}
+              cabecera={{ titulo: tituloCortoAlerta(a), detalle: detalleCortoAlerta(a) }}
               title={a.mensaje}
               className={cn(
                 "grid min-h-11 w-full grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 rounded-md px-1.5 py-1.5 text-left hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent",
@@ -119,11 +120,12 @@ export function RequiereAtencion({
             >
               <IconoAlerta a={a} className="mt-0.5" />
               <span className="min-w-0">
-                <span className={cn("block truncate text-sm", !a.leida && "font-medium")}>
+                <span className={cn("block text-sm [overflow-wrap:anywhere]", !a.leida && "font-medium")}>
                   {a.prioridad === "alta" && <span className="mr-1 rounded bg-red-500/10 px-1 text-xs font-semibold text-red-700 dark:text-red-400">Importante</span>}
-                  {a.titulo}
+                  {tituloCortoAlerta(a)}
                 </span>
-                <span className="line-clamp-2 text-xs text-muted-foreground">{a.mensaje}</span>
+                {/* Resumen corto propio, no el mensaje largo recortado (09/11/2026). */}
+                <span className="block text-xs text-muted-foreground tabular-nums [overflow-wrap:anywhere]">{resumenCortoAlerta(a)}</span>
               </span>
             </FilaConMenu>
           </li>
@@ -242,8 +244,8 @@ export function MarcasDeGrafica({
       {con.map((p) => (
         <li key={p.clave} className="inline-flex min-w-0 items-center gap-1.5">
           <MarcaAlerta alertas={p.alertas} etiqueta={p.etiqueta} onIrA={onIrA} />
-          <span className="max-w-[14rem] truncate text-muted-foreground" aria-hidden>
-            {p.etiqueta}: {p.alertas[0].titulo}
+          <span className="min-w-0 text-muted-foreground [overflow-wrap:anywhere]" aria-hidden>
+            {p.etiqueta}: {tituloCortoAlerta(p.alertas[0])}
             {p.alertas.length > 1 ? ` y ${p.alertas.length - 1} más` : ""}
           </span>
         </li>

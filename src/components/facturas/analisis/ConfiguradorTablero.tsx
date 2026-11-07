@@ -266,7 +266,7 @@ function Contenido({ config, onCerrar, onGuardar }: Omit<Props, "abierto">) {
           onClick={() => setBorrador(CONFIG_TABLERO_POR_DEFECTO)}
           disabled={esPorDefecto}
           aria-label="Restablecer el tablero de siempre"
-          title="Vuelve a las 4 cifras, Explorar y las 6 tarjetas de siempre"
+          title="Vuelve al tablero por defecto: las cifras de decisión, las cuatro preguntas y Explorar"
         >
           <RotateCcw className="h-4 w-4" aria-hidden />
           <span className="hidden sm:inline">Restablecer</span>
