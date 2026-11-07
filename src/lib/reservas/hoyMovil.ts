@@ -177,6 +177,46 @@ export function lleganAhora<R extends ReservaHoyMovil>(
     .map(({ r, m }) => ({ reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: (m as number) < minutoAhora }));
 }
 
+// ─── Lista del camarero (07/11/2026) ─────────────────────────────────────────
+
+export interface ListaHoyMovil<R extends ReservaHoyMovil = ReservaHoyMovil> {
+  /** «Llegan ahora»: próximos 15 min y hasta 30 min tarde. */
+  llegan: FilaLlegada<R>[];
+  /** El resto de las que aún no han llegado, por hora (las pasadas de hora, marcadas «Tarde»). */
+  porLlegar: FilaLlegada<R>[];
+  /** Ya sentadas («Llegó»), por hora: van abajo y plegadas. */
+  sentadas: FilaHoyMovil<R>[];
+}
+
+/**
+ * La lista de Hoy en móvil, pensada para sentar rápido: primero las que aún no han llegado («Llegan ahora»
+ * arriba y luego el resto por hora), y abajo las ya sentadas. «No vino» y canceladas no salen. Mismos
+ * filtros (turno y buscador) que la barra.
+ */
+export function listaHoyMovil<R extends ReservaHoyMovil>(
+  reservas: readonly R[],
+  mesasDe: (reservaId: string) => string[],
+  minutoAhora: number,
+  filtros: { busqueda: string; filtroTurno: FiltroTurnoHoy },
+): ListaHoyMovil<R> {
+  const llegan = lleganAhora(reservas, mesasDe, minutoAhora, filtros);
+  const enLlegan = new Set(llegan.map((f) => f.reserva.id));
+  const porHora = (a: R, b: R) => a.hora.localeCompare(b.hora) || (a.nombre ?? "").localeCompare(b.nombre ?? "", "es");
+  const vivas = reservas.filter((r) => coincideFiltroHoy(r, filtros));
+  const porLlegar = vivas
+    .filter((r) => ESTADOS_POR_LLEGAR.has(r.estado) && !enLlegan.has(r.id))
+    .sort(porHora)
+    .map((r) => {
+      const m = minutos(r.hora);
+      return { reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: m != null && m < minutoAhora };
+    });
+  const sentadas = vivas
+    .filter((r) => r.estado === ESTADO_LLEGADA)
+    .sort(porHora)
+    .map((r) => ({ reserva: r, mesas: mesasDe(r.id), terminada: true }));
+  return { llegan, porLlegar, sentadas };
+}
+
 // ─── Estado de cada mesa («Mesas») ───────────────────────────────────────────
 
 export type EstadoMesaHoy =
