@@ -24,13 +24,14 @@ const createClient = clienteConAuditoria(createClientBase, "ia-modelos-openai");
 //       Una llamada mínima a chat/completions con ese modelo y la clave del
 //       proyecto de esa función. → { ok, modelo, latencia_ms, respuesta, tokens }
 //       Su gasto queda en ia_uso (función ia-modelos-openai).
-//  POST { accion: "evaluar", modelo, preguntas: [{ id, mensaje, historial? }], presupuesto_usd? }
+//  POST { accion: "evaluar", modelo, preguntas: [{ id, mensaje, historial? }], presupuesto_usd?, reasoning_effort? }
 //       (07/11/2026, docs/facturas/EVAL-MODELOS.md) Ejecuta el MISMO bucle de
 //       chat-facturas (chat-facturas/bucle.ts: prompt, herramientas y RPC
 //       contra la BD, con el cliente de service role como chat-facturas) con
 //       ese modelo, SIN guardar conversación. Máx. 3 preguntas por llamada.
 //       Se niega si el gasto acumulado de evaluaciones (ia_uso, disparador
-//       «evaluar:…») ya llega a presupuesto_usd (tope 3 $).
+//       «evaluar:…») ya llega a presupuesto_usd (tope 3 $). reasoning_effort
+//       ("low"/"medium") pisa el "none" de GPT-6 SOLO aquí: gpt-6.1-sol no lo admite.
 //       → { ok, modelo, resultados: [{ id, respuesta, herramientas, llamadas_chat,
 //            tokens{entrada,cacheados,salida,razonamiento,embedding}, coste_usd, latencia_ms, error? }] }
 //
@@ -209,6 +210,7 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
           supabase, claveOpenAI: clave, mensaje: p.mensaje, historial: p.historial, modelo: pet.modelo, respaldo: null,
           uso: { usosChat, usoEmbed, nuevoAcumuladorChat: (m) => new AcumuladorUso("ia-modelos-openai", m, "chat") },
           traza,
+          ...(pet.esfuerzo ? { parametrosExtra: { reasoning_effort: pet.esfuerzo } } : {}),
         });
         respuesta = r.respuesta;
       } catch (e) {
@@ -217,7 +219,7 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
       }
       const latencia = Date.now() - t0;
       await registrarUso([...usosChat, usoEmbed], {
-        disparador: `evaluar:${pet.modelo}:${p.id}`.slice(0, 200), duracionMs: latencia, cliente: supabase,
+        disparador: `evaluar:${pet.modelo}${pet.esfuerzo ? "@" + pet.esfuerzo : ""}:${p.id}`.slice(0, 200), duracionMs: latencia, cliente: supabase,
       });
       const tokens = sumarUsage(traza.llamadas.map((l) => l.usage));
       const cChat = costeUsd(precio(pet.modelo), tokens);
@@ -235,7 +237,7 @@ serve(conAuditoriaDePeticion("ia-modelos-openai", createClientBase, async (req) 
       });
     }
     console.log(`[ia-modelos-openai] ${quien} · evaluar ${pet.modelo} · ${resultados.length} preguntas`);
-    return json({ ok: true, modelo: pet.modelo, resultados });
+    return json({ ok: true, modelo: pet.modelo, esfuerzo: pet.esfuerzo, resultados });
   }
 
   return json({ ok: false, error: "accion desconocida" }, 400);

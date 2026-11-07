@@ -70,6 +70,9 @@ describe("ia-modelos-openai · evaluar", () => {
     expect(() => peticionEvaluar({ modelo: "gpt-6-sol", preguntas: Array(MAX_PREGUNTAS_EVAL + 1).fill({ mensaje: "x" }) })).toThrow();
     expect(() => peticionEvaluar({ modelo: "gpt-6-sol", preguntas: [{ mensaje: "" }] })).toThrow();
     expect(peticionEvaluar({ modelo: "gpt-6-sol", preguntas: [{ id: "mal id;", mensaje: "x" }] }).preguntas[0].id).toBe("p1");
+    expect(p.esfuerzo).toBeNull();
+    expect(peticionEvaluar({ modelo: "gpt-6.1-sol", preguntas: [{ mensaje: "x" }], reasoning_effort: "low" }).esfuerzo).toBe("low");
+    expect(() => peticionEvaluar({ modelo: "gpt-6.1-sol", preguntas: [{ mensaje: "x" }], reasoning_effort: "xhigh" })).toThrow();
   });
 
   it("suma tokens de varias llamadas (cacheados y razonamiento dentro, sin pasarse)", () => {

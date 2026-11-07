@@ -97,6 +97,11 @@ export interface PeticionEval {
   preguntas: PreguntaEval[];
   /** Tope de gasto ACUMULADO de todas las evaluaciones (ia_uso), en USD. */
   presupuestoUsd: number;
+  /**
+   * reasoning_effort a forzar SOLO en la evaluación (null = el de chat-facturas,
+   * "none" en GPT-6). Para modelos que no admiten "none" (gpt-6.1-sol).
+   */
+  esfuerzo: "low" | "medium" | null;
 }
 
 /** Máximo de preguntas por llamada: cada una puede tardar hasta 110 s (PRESUPUESTO_MS del bucle). */
@@ -129,7 +134,9 @@ export function peticionEvaluar(body: Record<string, unknown>): PeticionEval {
   });
   const pedido = Number(body.presupuesto_usd);
   const presupuestoUsd = Number.isFinite(pedido) && pedido > 0 ? Math.min(pedido, PRESUPUESTO_EVAL_MAX_USD) : PRESUPUESTO_EVAL_MAX_USD;
-  return { modelo, preguntas, presupuestoUsd };
+  const esfuerzo = body.reasoning_effort === "low" || body.reasoning_effort === "medium" ? body.reasoning_effort : null;
+  if (body.reasoning_effort != null && !esfuerzo) throw new Error("reasoning_effort solo admite low o medium");
+  return { modelo, preguntas, presupuestoUsd, esfuerzo };
 }
 
 export interface PrecioModelo {

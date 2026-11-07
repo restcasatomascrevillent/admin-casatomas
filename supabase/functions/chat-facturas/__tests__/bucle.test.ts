@@ -117,6 +117,26 @@ describe("chat-facturas · bucle compartido (ejecutarConversacion)", () => {
     expect(uso.usosChat.map((a) => a.modelo)).toEqual(["gpt-x", "gpt-4.1-mini"]);
   });
 
+  it("parametrosExtra (solo evaluación) pisa reasoning_effort; la traza guarda el error de la herramienta", async () => {
+    const sb = supabaseFalso();
+    sb.rpc = ((fn: string) => fn === "estadisticas_globales_agente"
+      ? Promise.resolve({ data: null, error: { message: "canceling statement due to statement timeout" } })
+      : Promise.resolve({ data: [], error: null })) as typeof sb.rpc;
+    const ai = openaiFalso([
+      { body: { choices: [{ message: { role: "assistant", content: null, tool_calls: [llamadaTool("estadisticas_globales")] } }], usage: usage(10, 2) } },
+      { body: { choices: [{ message: { role: "assistant", content: "No he podido." } }], usage: usage(10, 2) } },
+    ]);
+    const traza: Traza = { llamadas: [], herramientas: [] };
+    const auditadas: unknown[] = [];
+    await ejecutarConversacion({
+      supabase: sb, claveOpenAI: "x", mensaje: "hola", modelo: "gpt-6.1-sol", uso: estado("gpt-6.1-sol"), traza, fetchImpl: ai.f,
+      parametrosExtra: { reasoning_effort: "low" }, alEjecutarHerramienta: (h) => auditadas.push(h),
+    });
+    expect((ai.cuerpos[0] as { reasoning_effort: string }).reasoning_effort).toBe("low");
+    expect(traza.herramientas[0]).toMatchObject({ resultado: "fallida", error: expect.stringContaining("statement timeout") });
+    expect(auditadas[0]).not.toHaveProperty("error");
+  });
+
   it("sin respaldo, el error de OpenAI se lanza (el llamante lo traduce)", async () => {
     const ai = openaiFalso([{ status: 500, body: "fallo" }]);
     await expect(ejecutarConversacion({ supabase: supabaseFalso(), claveOpenAI: "x", mensaje: "hola", modelo: "gpt-6-sol", uso: estado("gpt-6-sol"), fetchImpl: ai.f }))

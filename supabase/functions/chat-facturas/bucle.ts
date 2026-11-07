@@ -64,10 +64,13 @@ export interface HerramientaEjecutada {
   duracion_ms: number;
 }
 
+/** En la traza de la evaluación, además, el error que vio el modelo (recortado). */
+export type HerramientaTrazada = HerramientaEjecutada & { error?: string };
+
 /** Traza opcional para la evaluación: cada llamada a chat/completions y cada herramienta. */
 export interface Traza {
   llamadas: { modelo: string; usage: UsageBruto | null; ms: number }[];
-  herramientas: HerramientaEjecutada[];
+  herramientas: HerramientaTrazada[];
 }
 
 /**
@@ -96,6 +99,12 @@ export interface OpcionesBucle {
   /** Fecha de hoy del prompt (tests). */
   hoy?: string;
   presupuestoMs?: number;
+  /**
+   * SOLO la evaluación: parámetros que pisan los de parametrosModelo (p. ej.
+   * reasoning_effort "low" para gpt-6.1-sol, que no admite "none"). El
+   * copiloto no lo usa nunca.
+   */
+  parametrosExtra?: Record<string, unknown>;
 }
 
 export interface ResultadoBucle {
@@ -391,9 +400,9 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
   let huboFalloDeHerramienta = false;
   const adjuntos: Adjunto[] = [];
   const referenciasAcum: DocRef[][] = [];
-  const apuntar = (h: HerramientaEjecutada) => {
+  const apuntar = (h: HerramientaEjecutada, error?: string) => {
     o.alEjecutarHerramienta?.(h);
-    o.traza?.herramientas.push(h);
+    o.traza?.herramientas.push(error ? { ...h, error: error.slice(0, 300) } : h);
   };
 
   for (let paso = 0; paso < MAX_PASOS; paso++) {
@@ -411,6 +420,7 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
         model: modelo,
         messages,
         ...parametrosModelo(modelo, MAX_TOKENS_RESPUESTA),
+        ...(o.parametrosExtra ?? {}),
         ...(esUltimo ? {} : { tools: TOOLS }),
       }),
     }, msRestantes(ctx));
@@ -442,8 +452,8 @@ export async function ejecutarConversacion(o: OpcionesBucle): Promise<ResultadoB
         try { args = JSON.parse(tc.function.arguments || "{}"); } catch { /* el modelo mando JSON invalido */ }
         const inicioTool = Date.now();
         const r = await ejecutarTool(tc.function.name, args, supabase, ctx);
-        const resultadoError = (() => { try { return Boolean(JSON.parse(r.contenido).error); } catch { return false; } })();
-        apuntar({ nombre: tc.function.name, argumentos: args, resultado: r.fallo || resultadoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool });
+        const textoError = (() => { try { const e = JSON.parse(r.contenido).error; return e ? String(e) : ""; } catch { return ""; } })();
+        apuntar({ nombre: tc.function.name, argumentos: args, resultado: r.fallo || textoError ? "fallida" : "completada", duracion_ms: Date.now() - inicioTool }, textoError || undefined);
         if (r.fallo) huboFalloDeHerramienta = true;
         if (r.adjunto) adjuntos.push(r.adjunto);
         if (r.referencias?.length) referenciasAcum.push(r.referencias);
