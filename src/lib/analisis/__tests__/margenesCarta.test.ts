@@ -1,0 +1,109 @@
+import { describe, expect, it } from "vitest";
+import {
+  CONFIG_POR_DEFECTO,
+  normalizarCompras,
+  normalizarMargenes,
+  pctDeMultiplicador,
+  problemas,
+  puntosDispersion,
+  razon,
+} from "../margenesCarta";
+
+// Forma del jsonb de margenes_carta (datos reales de la demo, recortados).
+const RPC = {
+  hoy: "2026-11-07",
+  config: { coste_max_plato_pct: 35, multiplicador_min_vino: 2.5, subida_coste_pct: 10, iva_pct: 10, dias_referencia: 90 },
+  resumen: {
+    platos: { total: 3, con_datos: 2, food_cost_medio: 43.2, food_cost_mediana: 43.2, en_rojo: 1, sube_coste: 1, sin_datos: 1, revisados: 0 },
+    vinos: { total: 1, con_datos: 1, multiplicador_medio: 1.37, multiplicador_mediana: 1.37, en_rojo: 1, sube_coste: 0, sin_datos: 0, revisados: 0 },
+  },
+  platos: [
+    {
+      id: "p1", nombre: "Percebes", categoria: "MARISCOS", precio: 19, unidad: "100 g", gramos_venta: 100,
+      venta: 17.2727, coste: 10.95, pct: 63.39, margen: 6.32, variacion_pct: null, principal: "Percebe", principal_coste: 10.95,
+      origen: "estimado", revisado: false, motivo: null, banderas: ["coste_alto"],
+      ingredientes: [{ id: 1, producto_id: 301, producto: "Percebe", cantidad: 100, unidad: "g", origen: "estimado", medida: "kg", eur: 109.5, coste: 10.95 }],
+    },
+    {
+      id: "p2", nombre: "Mejillones al vapor", categoria: "MARISCOS", precio: 9.75, unidad: "Unidad", gramos_venta: null,
+      venta: 8.8636, coste: 2.25, pct: 25.38, margen: 6.61, variacion_pct: 12.5, principal: "Mejillones",
+      origen: "estimado", revisado: false, banderas: ["sube_coste", "otra_desconocida"],
+      ingredientes: [{ id: 2, producto_id: 211, producto: "Mejillones", cantidad: 500, unidad: "g", medida: "kg", eur: 4.5, coste: 2.25 }],
+    },
+    { id: "p3", nombre: "Santiaguiño gallego", categoria: "MARISCOS", precio: 22, unidad: "100 g", motivo: "No hay compras de santiaguiño", banderas: ["sin_mapear"], ingredientes: [] },
+    { nombre: "sin id: se descarta" },
+  ],
+  vinos: [
+    {
+      id: "v1", nombre: "Laurent‑Perrier Millésimé", categoria: "CHAMPAGNE", precio: 110, venta: 100, producto_id: 1785,
+      producto: "Laurent-Perrier Millésimé 75 cl", litros: 0.75, coste: 80.4, multiplicador: 1.37, pct: 80.4, margen: 19.6,
+      banderas: ["multiplicador_bajo"],
+    },
+  ],
+};
+
+describe("normalizarMargenes", () => {
+  it("lee el jsonb y descarta lo que no sirve", () => {
+    const d = normalizarMargenes(RPC);
+    expect(d.platos).toHaveLength(3);
+    expect(d.platos[1].banderas).toEqual(["sube_coste"]);
+    expect(d.platos[0].ingredientes[0]).toMatchObject({ productoId: 301, cantidad: 100, unidad: "g", eur: 109.5 });
+    expect(d.vinos[0]).toMatchObject({ tipo: "vino", multiplicador: 1.37, productoId: 1785 });
+    expect(d.resumen.platos.foodCostMediana).toBe(43.2);
+  });
+
+  it("aguanta una respuesta vacía con los umbrales por defecto", () => {
+    const d = normalizarMargenes(null);
+    expect(d.platos).toEqual([]);
+    expect(d.config).toEqual(CONFIG_POR_DEFECTO);
+  });
+});
+
+describe("razon", () => {
+  const d = normalizarMargenes(RPC);
+  it("plato al peso de un solo ingrediente: €/kg de compra frente a €/kg de venta sin IVA", () => {
+    expect(razon(d.platos[0], d.config)).toBe("Percebes: cuesta 110 €/kg y se vende a 172,73 €/kg sin IVA → 63 % de coste.");
+  });
+  it("sube el coste sin subir la carta", () => {
+    expect(razon(d.platos[1], d.config)).toContain("el coste ha subido un 13 % en 6 meses y la carta sigue igual");
+  });
+  it("sin mapear: el motivo", () => {
+    expect(razon(d.platos[2], d.config)).toBe("Santiaguiño gallego: No hay compras de santiaguiño.");
+  });
+  it("vino: botella y multiplicador", () => {
+    expect(razon(d.vinos[0], d.config)).toBe(
+      "Laurent‑Perrier Millésimé: la botella cuesta 80,40 € y se vende a 110,00 € → 1,37× (mínimo 2,50×).",
+    );
+  });
+});
+
+describe("problemas y gráfica", () => {
+  const d = normalizarMargenes(RPC);
+  it("solo lo que falla, primero lo que más se pasa del umbral", () => {
+    const lista = problemas(d.platos, d.config);
+    expect(lista.map((p) => p.id)).toEqual(["p1", "p2"]);
+  });
+  it("puntos con precio y % (sin los que no tienen datos), en rojo por encima del umbral", () => {
+    const puntos = puntosDispersion(d.platos, 35);
+    expect(puntos).toHaveLength(2);
+    expect(puntos.find((p) => p.id === "p1")?.rojo).toBe(true);
+    expect(puntos.find((p) => p.id === "p2")?.rojo).toBe(false);
+  });
+  it("2,5× sobre el precio con IVA del 10 % = 44 % de coste sin IVA", () => {
+    expect(pctDeMultiplicador(2.5, 10)).toBeCloseTo(44, 5);
+  });
+});
+
+describe("normalizarCompras", () => {
+  it("convierte las filas en documentos para el visor", () => {
+    const filas = normalizarCompras({
+      filas: [
+        { linea_id: 9, id: 33, fecha: "2026-10-03", proveedor: "MARISCOS X", tipo: "factura", local: "casa_tomas", total: 500, drive_url: null,
+          archivo_path: "a/b.pdf", nombre_linea: "PERCEBE", cantidad: 2, unidad: "kg", importe_aportado: 220, medida: "kg", eur_base: 110, eur_ud: 110 },
+        { linea_id: 10 },
+      ],
+    });
+    expect(filas).toHaveLength(1);
+    expect(filas[0]).toMatchObject({ id: 33, aporta: 220, archivoPath: "a/b.pdf", eurBase: 110, tipo: "factura" });
+  });
+});

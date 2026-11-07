@@ -32,6 +32,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const Cheques = lazy(() => import("./pages/Cheques"));
 const Tienda = lazy(() => import("./pages/Tienda"));
 const Facturas = lazy(() => import("./pages/Facturas"));
+const AnalisisGeneral = lazy(() => import("./pages/AnalisisGeneral"));
 const Usuarios = lazy(() => import("./pages/Usuarios"));
 const Ayuda = lazy(() => import("./pages/Ayuda"));
 const Avisos = lazy(() => import("./pages/Avisos"));
@@ -161,6 +162,8 @@ const App = () => (
                       (mismo árbol, no se desmonta al ir y volver). La IA exige «Editar»: sin él, la
                       página vuelve a /facturas (con solo «Facturas · Subida», a Cargar). */}
                   <Route path="/facturas/ia" element={pagina(<Facturas />, ["facturas", "facturas_subida"])} />
+                  {/* «Análisis general» (07/11/2026): sección propia con los permisos de Facturas (solo «Ver», no Subida). */}
+                  <Route path="/analisis" element={pagina(<AnalisisGeneral />, "facturas")} />
                   <Route path="/usuarios" element={pagina(<Usuarios />, "usuarios")} />
                   {/* Centro de Ayuda: para todos los roles (sin sección de permisos). */}
                   {/* Historial de avisos (campana): para todos los roles. */}
