@@ -289,9 +289,10 @@ demo). Compruébalo con `supabase secrets list` (solo nombres, nunca valores).
 
 ## 8. Pendientes y decisiones abiertas
 
-1. **`variacion_precios_agente` tarda ~50 s** en la demo: `precio_referencia_agente` por producto llama a
-   `lineas_precio_agente` → `albaranes_facturados_agente` (~130 ms por llamada). Rediseñar con una sola
-   pasada (o usar `facturado_en_id`, aun así 30 s).
+1. ~~**`variacion_precios_agente` tarda ~50 s**~~ Resuelto el 07/11/2026 con
+   `20261107200000_variacion_precios_rapida` (una pasada por ventanas, mismos resultados: 54 s → 0,3 s con
+   todo 2026; aplicada en la demo). Queda lento aparte `lineas_producto_agente('aceite')` (~3,7 s), que
+   usa `variacion_precios_agente` cuando el chatbot pide un producto concreto.
 2. **Factura 520 de Hermanos Narejos (nº 5419)**: faltan 90 € y probablemente los albaranes 373 y 407; el
    dueño tiene que mirar `IMG_1153.png` en Drive antes de vincular y añadir la línea.
 3. **Factura 2158 de Embajadores**: aviso de CIF (carpeta B75143214 frente a B20691994 impreso).
