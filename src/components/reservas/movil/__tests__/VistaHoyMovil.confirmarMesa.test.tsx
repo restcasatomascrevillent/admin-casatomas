@@ -169,6 +169,44 @@ describe("Selector de mesa al sentar (móvil)", () => {
   });
 });
 
+describe("«Sentar · Mesa 3» de la fila comprueba la prevista (ficha con `inicio`)", () => {
+  const fichaConPrevista = (asignaciones: never[], inicio: "elegir" | "confirmar") =>
+    enHoja(
+      <PanelReservaMovil
+        reserva={ana}
+        fecha="2026-11-07"
+        salas={SALAS}
+        mesas={MESAS}
+        asignaciones={asignaciones}
+        ajustesDia={[]}
+        mesasExcluidas={[]}
+        configOcupacion={configServicioSalaDesde(undefined)}
+        nombresMesa={["3"]}
+        inicio={inicio}
+        onCerrar={vi.fn()}
+      />,
+    );
+
+  it("ocupada por alguien sentado: abre el selector con su mesa marcada ocupada", () => {
+    fichaConPrevista(
+      [asig("m3", "r1", "Ana López", "21:00:00", "confirmada"), asig("m3", "p", "Pérez", "20:30:00", "completada")] as never[],
+      "elegir",
+    );
+    const selector = within(screen.getByTestId("selector-mesa"));
+    expect(selector.getByRole("button", { name: /Mesa 3, .*Ocupada · Pérez/ })).toBeDisabled();
+  });
+
+  it("pisada por otra reserva por llegar: confirmación en la ficha; al aceptar se la quita y sienta en la suya", async () => {
+    fichaConPrevista(
+      [asig("m3", "r1", "Ana López", "21:00:00", "confirmada"), asig("m3", "g", "García", "21:30:00", "confirmada")] as never[],
+      "confirmar",
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("La mesa 3 estaba prevista para García (21:30).");
+    fireEvent.click(screen.getByRole("button", { name: "Sentar igualmente" }));
+    await waitFor(() => expect(h.llamadas).toEqual(["asignar:g:[]", "llegada:r1"]));
+  });
+});
+
 describe("Sin reserva en una mesa prevista para otro (móvil)", () => {
   it("avisa y, al aceptar, le quita la mesa a García antes de sentar", async () => {
     // A las 21:05 una mesa prevista para las 21:30 se pisa con quien entra ahora.

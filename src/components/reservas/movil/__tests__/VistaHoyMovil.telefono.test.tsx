@@ -2,7 +2,7 @@
  * Hoy en móvil: la fila de cada reserva, pensada para el camarero (07/11/2026). En grande: hora, nombre y
  * personas; la mesa con el lenguaje del servicio («Prevista: Mesa 3» / «En mesa 3» / «Sin mesa»), el estado
  * y las notas. Botón directo «Sentar · Mesa 3» (no abre la ficha); sin permiso de edición no hay botón.
- * El teléfono (15/10/2026) pasa a la ficha («Llamar»): en la fila no cabía junto al botón de sentar.
+ * El teléfono (15/10/2026, petición del dueño) sigue en la fila como icono «Llamar» de 44 px (desde 375 px).
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
@@ -43,8 +43,37 @@ describe("FilaReservaMovil", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /^21:00 Ana López, 4 personas/ }));
     expect(onAbrir).toHaveBeenCalledTimes(1);
-    // El teléfono va en la ficha.
+  });
+
+  it("teléfono: icono de 44 px con tel: que no abre la ficha (desde 375 px); sin teléfono, nada", () => {
+    const onAbrir = vi.fn();
+    const { unmount } = render(
+      <ul>
+        <FilaReservaMovil reserva={reserva()} nombresMesa={["3"]} terminada={false} onAbrir={onAbrir} />
+      </ul>,
+    );
+    const enlace = screen.getByRole("link", { name: "Llamar a Ana López" });
+    expect(enlace).toHaveAttribute("href", "tel:+34618190432");
+    expect(enlace).toHaveAttribute("title", "618 19 04 32");
+    expect(enlace).toHaveClass("h-11", "w-11", "pointer-events-auto", "min-[375px]:inline-flex");
+    fireEvent.click(enlace);
+    expect(onAbrir).not.toHaveBeenCalled();
+    unmount();
+    render(
+      <ul>
+        <FilaReservaMovil reserva={reserva({ telefono: "  " })} nombresMesa={["3"]} terminada={false} onAbrir={vi.fn()} />
+      </ul>,
+    );
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("con la mesa prevista ocupada por alguien sentado, el botón dice «Sentar» (elegir mesa)", () => {
+    render(
+      <ul>
+        <FilaReservaMovil reserva={reserva()} nombresMesa={["3"]} terminada={false} onAbrir={vi.fn()} onSentar={vi.fn()} mesaPrevistaOcupada />
+      </ul>,
+    );
+    expect(screen.getByRole("button", { name: "Sentar a Ana López: elegir mesa" })).toHaveTextContent(/^Sentar$/);
   });
 
   it("sin mesa: «Sin mesa» y «Sentar» (elige mesa en la ficha)", () => {

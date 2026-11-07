@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clasificarMesasParaSentar,
+  decidirSentarPrevista,
   estadoParaConfirmar,
   reemplazarMesasEnLista,
   textoDesplazamiento,
@@ -185,6 +186,18 @@ describe("listaHoyMovil", () => {
       ["luego", false],
     ]);
     expect(l.sentadas.map((f) => f.reserva.id)).toEqual(["sentada1", "sentada2"]);
+  });
+});
+
+describe("decidirSentarPrevista (botón «Sentar · Mesa 7» de la fila)", () => {
+  const ana = { id: "ana", hora: "21:00:00" };
+  it("libre: sentar; sin mesa u ocupada por alguien sentado: elegir; pisada por otra por llegar: confirmar", () => {
+    expect(decidirSentarPrevista([asig("m7", "ana", "21:00:00")], ana)).toEqual({ tipo: "sentar" });
+    expect(decidirSentarPrevista([], ana)).toEqual({ tipo: "elegir" });
+    expect(decidirSentarPrevista([asig("m7", "ana", "21:00:00"), asig("m7", "p", "20:30:00", "completada", "Pérez")], ana)).toEqual({ tipo: "elegir" });
+    const d = decidirSentarPrevista([asig("m7", "ana", "21:00:00"), asig("m7", "g", "21:30:00", "confirmada", "García")], ana);
+    expect(d.tipo).toBe("confirmar");
+    expect(d.tipo === "confirmar" && d.desplazadas.map((x) => [x.reservaId, x.mesaIdsQuedan])).toEqual([["g", []]]);
   });
 });
 

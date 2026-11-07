@@ -95,6 +95,8 @@ import {
 import { horaActual, opcionesMesasServicio, opcionesParaSentar, type AjusteDia } from "@/lib/reservas/sentarAhora";
 import {
   clasificarMesasParaSentar,
+  decidirSentarPrevista,
+  type DecisionSentarPrevista,
   estadoParaConfirmar,
   reemplazarMesasEnLista,
   textoDesplazamiento,
@@ -109,6 +111,8 @@ import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 type ReservaMovil = ReservaMesaServicio;
 type Vista = "reservas" | "mesas";
+/** Cómo se abre la ficha: normal, con el selector de mesa abierto o con la confirmación de quitar la prevista a otra. */
+type InicioFicha = "normal" | "elegir" | "confirmar";
 
 const horaCorta = (h: string) => (h ?? "").slice(0, 5);
 const ESTADOS_POR_LLEGAR = new Set(["pendiente", "verificada", "confirmada"]);
@@ -149,6 +153,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
   const [busqueda, setBusqueda] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [abiertaId, setAbiertaId] = useState<string | null>(null);
+  const [inicioFicha, setInicioFicha] = useState<InicioFicha>("normal");
   const [mesaLibre, setMesaLibre] = useState<{ mesa: MesaOpcion; prevista: PrevistaMesa | null } | null>(null);
   const [verSentadas, setVerSentadas] = useState(false);
   const [sentandoId, setSentandoId] = useState<string | null>(null);
@@ -197,12 +202,18 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
 
   const abierta = (reservas ?? []).find((r) => r.id === abiertaId) ?? null;
 
-  /** «Sentar · Mesa 7»: un toque = «Llegó» en su mesa prevista. Sin mesa, la ficha con el selector. */
-  const sentarDesdeFila = async (reserva: ReservaMovil, nombresMesa: string[]) => {
-    if (nombresMesa.length === 0) {
-      setAbiertaId(reserva.id);
-      return;
-    }
+  const abrirFicha = (id: string, inicio: InicioFicha = "normal") => {
+    setInicioFicha(inicio);
+    setAbiertaId(id);
+  };
+
+  /**
+   * «Sentar · Mesa 7»: un toque = «Llegó» en su mesa prevista, SI sigue libre en su franja. Ocupada por alguien
+   * sentado (o sin mesa): la ficha con el selector. Prevista para otra reserva: la ficha con la confirmación.
+   */
+  const sentarDesdeFila = async (reserva: ReservaMovil, decision: DecisionSentarPrevista) => {
+    if (decision.tipo === "elegir") return abrirFicha(reserva.id, "elegir");
+    if (decision.tipo === "confirmar") return abrirFicha(reserva.id, "confirmar");
     setSentandoId(reserva.id);
     try {
       await marcarLlegada(reserva);
@@ -211,19 +222,23 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
     }
   };
 
-  const fila = (reserva: ReservaMovil, nombresMesa: string[], extra: { tarde?: boolean; sentada?: boolean }) => (
-    <FilaReservaMovil
-      key={reserva.id}
-      reserva={reserva}
-      nombresMesa={nombresMesa}
-      terminada={!!extra.sentada}
-      tarde={extra.tarde}
-      sala={reserva.espacio_id ? (salaPorId.get(reserva.espacio_id) ?? "") : undefined}
-      onAbrir={() => setAbiertaId(reserva.id)}
-      onSentar={puedeEditar && !extra.sentada ? () => void sentarDesdeFila(reserva, nombresMesa) : undefined}
-      sentando={sentandoId === reserva.id}
-    />
-  );
+  const fila = (reserva: ReservaMovil, nombresMesa: string[], extra: { tarde?: boolean; sentada?: boolean }) => {
+    const decision = decidirSentarPrevista(asignacionesDia, reserva, configOcupacion);
+    return (
+      <FilaReservaMovil
+        key={reserva.id}
+        reserva={reserva}
+        nombresMesa={nombresMesa}
+        terminada={!!extra.sentada}
+        tarde={extra.tarde}
+        sala={reserva.espacio_id ? (salaPorId.get(reserva.espacio_id) ?? "") : undefined}
+        onAbrir={() => abrirFicha(reserva.id)}
+        onSentar={puedeEditar && !extra.sentada ? () => void sentarDesdeFila(reserva, decision) : undefined}
+        mesaPrevistaOcupada={nombresMesa.length > 0 && decision.tipo === "elegir"}
+        sentando={sentandoId === reserva.id}
+      />
+    );
+  };
 
   const pax = (filas: Array<{ reserva: ReservaMovil }>) => filas.reduce((s, f) => s + (f.reserva.numero_comensales || 0), 0);
 
@@ -309,7 +324,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
             turno={turno}
             terrazaCerradaId={cierre.cerrada ? (terraza?.id ?? null) : null}
             onLibre={(mesa, prevista) => setMesaLibre({ mesa, prevista })}
-            onOcupada={setAbiertaId}
+            onOcupada={(id) => abrirFicha(id)}
           />
         ) : vacia ? (
           <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
@@ -376,6 +391,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
               mesasExcluidas={configAsignacionDesde(config).mesasExcluidas}
               configOcupacion={configOcupacion}
               nombresMesa={mesasDe(abierta.id)}
+              inicio={inicioFicha}
               onCerrar={() => setAbiertaId(null)}
             />
           )}
@@ -398,7 +414,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
               minutoAhora={minutoAhora}
               onVerReserva={(id) => {
                 setMesaLibre(null);
-                setAbiertaId(id);
+                abrirFicha(id);
               }}
               onCerrar={() => setMesaLibre(null)}
             />
@@ -415,7 +431,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
  * Una reserva en la lista móvil de Hoy, en grande para leerla de un vistazo (07/11/2026): hora, nombre y
  * personas arriba; debajo la mesa («Prevista: Mesa 7» / «En mesa 9» / «Sin mesa»), el estado y, si las
  * hay, las notas del cliente. Toda la fila abre su ficha, salvo el botón «Sentar», que es la acción directa.
- * El teléfono vive en la ficha («Llamar»): en la fila no cabía junto al botón.
+ * El teléfono (15/10/2026) es un icono «Llamar» de 44 px en la línea del nombre, desde 375 px de ancho.
  * Un `<button>` no puede ir dentro de otro: el de la fila va por debajo, cubriéndola (`absolute inset-0`), y
  * el contenido por encima sin recibir toques (`pointer-events-none`), salvo el botón «Sentar».
  */
@@ -427,6 +443,7 @@ export function FilaReservaMovil({
   sala,
   onAbrir,
   onSentar,
+  mesaPrevistaOcupada = false,
   sentando = false,
 }: {
   reserva: ReservaMovil;
@@ -439,9 +456,13 @@ export function FilaReservaMovil({
   onAbrir: () => void;
   /** «Sentar · Mesa 7» / «Sentar». Sin él (solo «Ver», o ya sentada) no hay botón. */
   onSentar?: () => void;
+  /** Su mesa prevista la ocupa alguien sentado: el botón dice «Sentar» (abre el selector). */
+  mesaPrevistaOcupada?: boolean;
   sentando?: boolean;
 }) {
   const info = infoEstado(reserva.estado);
+  const tel = enlaceTelefono(reserva.telefono);
+  const directo = nombresMesa.length > 0 && !mesaPrevistaOcupada;
   const sentada = reserva.estado === "completada";
   const textoMesa = textoMesaConfirmada(nombresMesa, sentada);
   const notas = (reserva.notas_cliente ?? "").trim();
@@ -461,6 +482,18 @@ export function FilaReservaMovil({
             <Users className="h-5 w-5 text-muted-foreground" />
             {reserva.numero_comensales}
           </span>
+          {/* Teléfono (15/10/2026, petición del dueño): icono de 44 px con márgenes negativos para no
+              hacer la fila más alta. Desde 375 px: a 320 px dejaba el nombre en ~100 px. */}
+          {tel && (
+            <a
+              href={tel}
+              aria-label={`Llamar a ${reserva.nombre || "la reserva"}`}
+              title={telefonoLegible(reserva.telefono) ?? undefined}
+              className="pointer-events-auto -my-2 hidden h-11 w-11 shrink-0 items-center justify-center rounded-md text-primary active:bg-muted min-[375px]:inline-flex"
+            >
+              <Phone className="h-5 w-5" aria-hidden="true" />
+            </a>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -489,10 +522,10 @@ export function FilaReservaMovil({
               className="pointer-events-auto h-11 shrink-0 gap-1.5 px-3 text-sm font-semibold pointer-coarse:px-3"
               disabled={sentando}
               onClick={onSentar}
-              aria-label={nombresMesa.length ? `Sentar a ${reserva.nombre || "la reserva"} en ${textoMesas(nombresMesa).toLowerCase()}` : `Sentar a ${reserva.nombre || "la reserva"}: elegir mesa`}
+              aria-label={directo ? `Sentar a ${reserva.nombre || "la reserva"} en ${textoMesas(nombresMesa).toLowerCase()}` : `Sentar a ${reserva.nombre || "la reserva"}: elegir mesa`}
             >
               <Armchair className="h-4 w-4" aria-hidden="true" />
-              {nombresMesa.length ? `Sentar · ${textoMesas(nombresMesa)}` : "Sentar"}
+              {directo ? `Sentar · ${textoMesas(nombresMesa)}` : "Sentar"}
             </Button>
           )}
         </div>
@@ -1001,7 +1034,7 @@ export function SelectorMesaMovil({
 }) {
   const casilla = (m: MesaParaConfirmar) => {
     const deshabilitada = ocupado || m.estado.tipo === "ocupada" || (m.propia && sentada);
-    const detalle = m.propia
+    const detalle = m.propia && (sentada || m.estado.tipo !== "ocupada")
       ? sentada
         ? "Aquí está"
         : "Su mesa prevista"
@@ -1068,6 +1101,7 @@ export function PanelReservaMovil({
   mesasExcluidas,
   configOcupacion,
   nombresMesa,
+  inicio = "normal",
   onCerrar,
 }: {
   reserva: ReservaMovil;
@@ -1079,6 +1113,8 @@ export function PanelReservaMovil({
   mesasExcluidas: readonly string[];
   configOcupacion: ReturnType<typeof configServicioSalaDesde>;
   nombresMesa: string[];
+  /** Desde el botón «Sentar» de la fila: con el selector abierto o con la confirmación de quitar la prevista a otra. */
+  inicio?: InicioFicha;
   onCerrar: () => void;
 }) {
   const qc = useQueryClient();
@@ -1089,9 +1125,12 @@ export function PanelReservaMovil({
   const guardarAjustes = useGuardarAjustesMesa(reserva.espacio_id ?? "", fecha, turno);
   // Todo lo de esta ficha que escribe (sentar, cambiar o liberar mesa, deshacer, «No vino») exige «Editar».
   const { canAccess: puedeEditar } = useCanAccessSection("reservas", "edit");
-  const [eligiendo, setEligiendo] = useState(nombresMesa.length === 0 && !estaTerminada(reserva.estado));
+  const [eligiendo, setEligiendo] = useState(
+    (nombresMesa.length === 0 || inicio === "elegir") && !estaTerminada(reserva.estado),
+  );
   const [ocupado, setOcupado] = useState(false);
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
+  const desplazar = useDesplazar(useAsignarConCambioLocal(fecha, mesas));
 
   const salaNombre = (id: string | null) => salas.find((s) => s.id === id)?.nombre ?? "Sin sala";
   const terminada = estaTerminada(reserva.estado);
@@ -1157,9 +1196,36 @@ export function PanelReservaMovil({
       }),
     );
 
+  /** Sentar en SU mesa prevista quitándosela antes a quien la pisa (y devolviéndosela si «Llegó» no se guarda). */
+  const sentarEnPrevista = (desplazadas: readonly Desplazamiento[]) =>
+    ejecutar(async () => {
+      const deshacer = await desplazar(desplazadas);
+      if (!(await marcarLlegada(reserva))) {
+        await deshacer();
+        throw new Error("llegada");
+      }
+    });
+
+  const confirmarPrevista = (desplazadas: readonly Desplazamiento[]) =>
+    setPendiente({
+      texto: textoDesplazamiento(textoMesas(nombresMesa).replace(/^Mesas? /, ""), desplazadas, nombreMesa),
+      ejecutar: () => sentarEnPrevista(desplazadas),
+    });
+
+  // Desde el botón «Sentar · Mesa 7» de la fila con la prevista pisada por otra reserva: la confirmación directamente.
+  useEffect(() => {
+    if (inicio !== "confirmar" || terminada) return;
+    const decision = decidirSentarPrevista(asignaciones, reserva, configOcupacion);
+    if (decision.tipo === "confirmar") confirmarPrevista(decision.desplazadas);
+    // Solo al abrir la ficha.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const elegir = (m: MesaParaConfirmar) => {
     if (m.propia) {
-      if (!terminada) void ejecutar(() => marcarLlegada(reserva));
+      if (terminada || m.estado.tipo === "ocupada") return;
+      if (m.estado.tipo === "prevista") confirmarPrevista(m.estado.desplazadas);
+      else void ejecutar(() => marcarLlegada(reserva));
       return;
     }
     if (m.estado.tipo === "ocupada") return;
@@ -1240,7 +1306,16 @@ export function PanelReservaMovil({
           ) : (
             <div className="grid gap-2">
               {nombresMesa.length > 0 && (
-                <Button className="h-14 text-base" disabled={ocupado} onClick={() => ejecutar(() => marcarLlegada(reserva))}>
+                <Button
+                  className="h-14 text-base"
+                  disabled={ocupado}
+                  onClick={() => {
+                    const decision = decidirSentarPrevista(asignaciones, reserva, configOcupacion);
+                    if (decision.tipo === "confirmar") confirmarPrevista(decision.desplazadas);
+                    else if (decision.tipo === "elegir") setEligiendo(true);
+                    else void ejecutar(() => marcarLlegada(reserva));
+                  }}
+                >
                   <Armchair className="mr-2 h-5 w-5" /> Sentar en {textoMesas(nombresMesa).toLowerCase()}
                 </Button>
               )}

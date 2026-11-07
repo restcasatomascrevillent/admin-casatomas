@@ -126,6 +126,34 @@ export function estadoParaConfirmar(
   return { tipo: "prevista", desplazadas };
 }
 
+export type DecisionSentarPrevista =
+  /** Su(s) mesa(s) prevista(s) libre(s): un toque y a sentarse. */
+  | { tipo: "sentar" }
+  /** Sin mesa, o la prevista la ocupa alguien sentado: hay que elegir otra en el selector. */
+  | { tipo: "elegir" }
+  /** La prevista la pisa otra reserva por llegar: confirmar antes de quitársela. */
+  | { tipo: "confirmar"; desplazadas: Desplazamiento[] };
+
+/**
+ * El botón «Sentar · Mesa 7» de la fila (07/11/2026): antes de sentar en la mesa PREVISTA se comprueba, con la
+ * misma cuenta que el selector, que siga libre en la franja de la reserva.
+ */
+export function decidirSentarPrevista(
+  asignaciones: readonly AsignacionConfirmar[],
+  reserva: { id: string; hora: string },
+  config?: ConfigOcupacionMesa,
+): DecisionSentarPrevista {
+  const propias = [...new Set(asignaciones.filter((a) => a.reserva_id === reserva.id).map((a) => a.mesa_id))];
+  if (propias.length === 0) return { tipo: "elegir" };
+  const desplazadas: Desplazamiento[] = [];
+  for (const mesaId of propias) {
+    const e = estadoParaConfirmar(asignaciones, mesaId, reserva, config);
+    if (e.tipo === "ocupada") return { tipo: "elegir" };
+    if (e.tipo === "prevista") for (const d of e.desplazadas) if (!desplazadas.some((x) => x.reservaId === d.reservaId)) desplazadas.push(d);
+  }
+  return desplazadas.length > 0 ? { tipo: "confirmar", desplazadas } : { tipo: "sentar" };
+}
+
 const RANGO: Record<EstadoConfirmar["tipo"], number> = { libre: 0, prevista: 1, ocupada: 2 };
 
 function numeroMesa(nombre: string): number {
