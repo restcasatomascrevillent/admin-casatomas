@@ -2126,3 +2126,23 @@ describe("ListaReservasAvanzada · más alto para las filas: sin recuento, sin s
     expect([scroller.scrollTop, tarjetas().scrollTop]).toEqual([0, 0]);
   });
 });
+
+describe("ListaReservasAvanzada · filtros en el móvil (07/11/2026)", () => {
+  it("«Filtros» abre una hoja con fecha, estado y canal; los puestos salen como chips que se quitan", async () => {
+    await montar();
+    const boton = screen.getByRole("button", { name: "Filtros" });
+    expect(boton).toHaveClass("md:hidden");
+    fireEvent.click(boton);
+    const hoja = within(await screen.findByRole("dialog"));
+    expect(hoja.getByRole("heading", { name: "Filtros" })).toBeInTheDocument();
+    fireEvent.click(hoja.getByRole("button", { name: "Hoy" }));
+    fireEvent.click(hoja.getByRole("button", { name: /resultado/ }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(screen.getByRole("button", { name: "Filtros (1 activos)" })).toBeInTheDocument();
+    // El chip «Hoy» quita el filtro de fecha.
+    const chips = within(screen.getByLabelText("Filtros activos"));
+    fireEvent.click(chips.getByRole("button", { name: /Hoy/ }));
+    expect(screen.getByRole("button", { name: "Filtros" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Filtros activos")).toBeNull();
+  });
+});

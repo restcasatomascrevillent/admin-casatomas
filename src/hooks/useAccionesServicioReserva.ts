@@ -123,6 +123,14 @@ interface OpcionesEjecucion {
    * quien llama UNA vez al final—, y el correo no avisa por su cuenta si falla.
    */
   enBloque?: boolean;
+  /** Segundo botón del aviso de éxito (p. ej. «Cambiar mesa» tras «Llegó», 07/11/2026). */
+  accionAviso?: AccionAviso;
+}
+
+/** Un botón extra en el aviso de éxito de una acción. */
+export interface AccionAviso {
+  label: string;
+  onClick: () => void;
 }
 
 /** Lo que devuelve una escritura: si se guardó y, si no, por qué. Un solo shape (ver `ResultadoGuarda`). */
@@ -250,9 +258,16 @@ export function useAccionesServicioReserva() {
 
   /** Enseña el aviso de éxito al personal; con «Deshacer» si la acción lo declara. */
   const mostrarAviso = useCallback(
-    (aviso: AvisoPersonal | null, id: string) => {
+    (aviso: AvisoPersonal | null, id: string, extra?: AccionAviso) => {
       if (!aviso) return;
-      const opciones: { description?: string; duration?: number; action?: { label: string; onClick: () => void } } = {};
+      const opciones: {
+        description?: string;
+        duration?: number;
+        action?: { label: string; onClick: () => void };
+        cancel?: { label: string; onClick: () => void };
+      } = {};
+      // Sonner pinta `cancel` como un segundo botón junto a «Deshacer».
+      if (extra) opciones.cancel = extra;
       if (aviso.descripcion) opciones.description = aviso.descripcion;
       if (aviso.duracionMs) opciones.duration = aviso.duracionMs;
       if (aviso.deshacer) {
@@ -276,7 +291,7 @@ export function useAccionesServicioReserva() {
       id: K,
       reserva: ReservaEjecutable,
       entrada?: EntradasAccion[K],
-      { enBloque = false }: OpcionesEjecucion = {},
+      { enBloque = false, accionAviso }: OpcionesEjecucion = {},
     ): Promise<ResultadoAccion> => {
       const def = ACCIONES_EJECUTABLES[id] as unknown as DefinicionAccion<K>;
 
@@ -313,7 +328,7 @@ export function useAccionesServicioReserva() {
       const vista = escrito.estadoReal ? { ...reserva, estado: escrito.estadoReal } : reserva;
       if (def.recuerdaEstadoPrevio) recordarEstadoPrevio(reserva.id, vista.estado);
       if (def.olvidaEstadoPrevio) olvidarEstadoPrevio(reserva.id);
-      if (!enBloque) mostrarAviso(def.aviso(vista, entrada as EntradasAccion[K], cambios), reserva.id);
+      if (!enBloque) mostrarAviso(def.aviso(vista, entrada as EntradasAccion[K], cambios), reserva.id, accionAviso);
 
       const correo = def.avisaCliente
         ? enBloque
@@ -334,7 +349,8 @@ export function useAccionesServicioReserva() {
   );
 
   const marcarLlegada = useCallback(
-    async (reserva: ReservaServicio) => (await ejecutarAccion("haLlegado", reserva)).ok,
+    async (reserva: ReservaServicio, opciones?: { accionAviso?: AccionAviso }) =>
+      (await ejecutarAccion("haLlegado", reserva, undefined, { accionAviso: opciones?.accionAviso })).ok,
     [ejecutarAccion],
   );
 
