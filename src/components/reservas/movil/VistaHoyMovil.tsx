@@ -2,15 +2,16 @@
 // «HOY» EN MÓVIL (< 768 px) — para el camarero que va sentando gente
 // ----------------------------------------------------------------------------
 // Durante el servicio el panel se usa en el MÓVIL (cada camarero el suyo).
-// UNA sola fila de controles (07/11/2026, antes eran cuatro bandas): «Reservas |
-// Mesas», el turno (por defecto el del reloj: antes de las 17:00 comida, después
-// cena), una lupa que despliega el buscador encima y «Sin reserva» (icono).
-//   · RESERVAS: arriba «Llegan ahora» (próximos 15 min y hasta 30 min tarde),
-//     después el resto de las que aún no han llegado, por hora, y abajo las ya
-//     sentadas, plegadas. «No vino» y canceladas no salen. Cada fila, en grande:
-//     hora, nombre, personas, la mesa PREVISTA («Prevista: Mesa 7») o la
-//     confirmada («En mesa 9») y un botón «Sentar · Mesa 7» (un toque = «Llegó»
-//     en su mesa) o «Sentar» (abre la ficha con el selector de mesa).
+// UNA sola fila de controles (07/11/2026, antes eran cuatro bandas): el menú
+// (en Reservas móvil no hay barra superior), «Reservas | Mesas», el turno (por
+// defecto el del reloj: antes de las 17:00 comida, después cena), una lupa que
+// despliega el buscador encima y «Sin reserva» (icono).
+//   · RESERVAS: solo lo que está POR LLEGAR: arriba «Llegan ahora» (próximos
+//     15 min y hasta 30 min tarde) y después el resto, por hora (las pasadas,
+//     «Tarde»). Las ya sentadas no salen (se gestionan en «Mesas»). «No vino» y
+//     canceladas tampoco. Cada fila, en grande: hora, nombre, personas y un botón
+//     con la MESA de protagonista («Sentar» pequeño y «Comedor · Mesa 7» grande;
+//     un toque = «Llegó» en su mesa) o «Elegir mesa» (abre el selector).
 //   · MESAS: cada sala en una cuadrícula de botones grandes con su estado
 //     (libre, sentada, prevista a una hora). Tocar una libre o una prevista:
 //     sentar sin reserva aquí o sentar una reserva. Tocar una ocupada: su ficha.
@@ -34,9 +35,10 @@ import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Armchair,
-  ChevronDown,
   Clock,
   DoorOpen,
+  LayoutGrid,
+  List,
   MapPin,
   Phone,
   Search,
@@ -51,6 +53,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { SidebarTrigger, useSidebarOpcional } from "@/components/ui/sidebar";
 import { useEspaciosReserva } from "@/hooks/useEspaciosReserva";
 import { useMesas, type Mesa } from "@/hooks/useMesas";
 import { useAsignacionesMesa, useAsignarMesasReserva, type AsignacionConDetalles } from "@/hooks/useAsignacionesMesa";
@@ -155,7 +158,6 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
   const [abiertaId, setAbiertaId] = useState<string | null>(null);
   const [inicioFicha, setInicioFicha] = useState<InicioFicha>("normal");
   const [mesaLibre, setMesaLibre] = useState<{ mesa: MesaOpcion; prevista: PrevistaMesa | null } | null>(null);
-  const [verSentadas, setVerSentadas] = useState(false);
   const [sentandoId, setSentandoId] = useState<string | null>(null);
   const minutoAhora = useMinutoAhora();
   useAlDiaMovil();
@@ -198,7 +200,12 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
     () => listaHoyMovil(reservas ?? [], mesasDe, minutoAhora, { busqueda, filtroTurno }),
     [reservas, mesasDe, minutoAhora, busqueda, filtroTurno],
   );
-  const vacia = lista.llegan.length + lista.porLlegar.length + lista.sentadas.length === 0;
+  // Solo lo que está POR LLEGAR (07/11/2026, petición del dueño): las ya sentadas no salen en la lista; liberar o
+  // cambiar su mesa sigue en «Mesas».
+  const vacia = lista.llegan.length + lista.porLlegar.length === 0;
+  // El menú lateral: en Reservas › móvil no hay barra superior (DashboardLayout `sinCabeceraMovil`), así que su
+  // botón va aquí, el primero de la fila. Fuera de un SidebarProvider (tests sueltos) no se pinta.
+  const hayMenu = useSidebarOpcional() !== null;
 
   const abierta = (reservas ?? []).find((r) => r.id === abiertaId) ?? null;
 
@@ -271,7 +278,8 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
         </div>
       )}
 
-      <div className="flex shrink-0 items-center gap-1.5" data-testid="hoy-movil-controles">
+      <div className="flex shrink-0 items-center gap-1" data-testid="hoy-movil-controles">
+        {hayMenu && <SidebarTrigger className="shrink-0" />}
         <ToggleGroup
           type="single"
           value={vista}
@@ -280,15 +288,19 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
           className="grid min-w-0 flex-1 grid-cols-2"
           aria-label="Ver reservas o mesas"
         >
-          <ToggleGroupItem value="reservas" className="h-11 px-2 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11">
-            Reservas
+          {/* Con el botón del menú en la fila, a menos de 390 px el texto no cabe: solo el icono (el nombre
+              sigue para el lector de pantalla). */}
+          <ToggleGroupItem value="reservas" aria-label="Reservas" className="h-11 min-w-0 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
+            <List className="h-5 w-5 min-[390px]:hidden" aria-hidden="true" />
+            <span className="hidden min-[390px]:inline">Reservas</span>
           </ToggleGroupItem>
-          <ToggleGroupItem value="mesas" className="h-11 px-2 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11">
-            Mesas
+          <ToggleGroupItem value="mesas" aria-label="Mesas" className="h-11 min-w-0 px-1 text-sm data-[state=on]:bg-primary data-[state=on]:text-primary-foreground pointer-coarse:h-11 pointer-coarse:px-1">
+            <LayoutGrid className="h-5 w-5 min-[390px]:hidden" aria-hidden="true" />
+            <span className="hidden min-[390px]:inline">Mesas</span>
           </ToggleGroupItem>
         </ToggleGroup>
         <Select value={filtroTurno} onValueChange={(v) => setFiltroTurno(v as FiltroTurnoHoy)}>
-          <SelectTrigger className="h-11 w-[5.75rem] shrink-0 gap-1 px-2 text-sm [&>svg]:shrink-0" aria-label="Turno">
+          <SelectTrigger className="h-11 w-[5.5rem] shrink-0 gap-1 px-2 text-sm [&>svg]:shrink-0" aria-label="Turno">
             <SelectValue>{ETIQUETA_TURNO[filtroTurno]}</SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -332,7 +344,7 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
           <>
             {lista.llegan.length > 0 && (
               <section aria-label="Llegan ahora">
-                <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">
+                <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-primary px-3 py-2 text-base font-semibold text-primary-foreground">
                   <span>Llegan ahora</span>
                   <span className="text-xs font-normal tabular-nums">
                     {lista.llegan.length} · {pax(lista.llegan)} pax
@@ -343,34 +355,13 @@ export function VistaHoyMovil({ reservas, fecha }: { reservas: ReservaMovil[] | 
             )}
             {lista.porLlegar.length > 0 && (
               <section aria-label="Por llegar">
-                <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-muted/95 px-3 py-2 text-sm font-semibold backdrop-blur">
+                <h3 className="sticky top-0 z-10 flex items-center justify-between border-b bg-muted/95 px-3 py-2 text-base font-semibold backdrop-blur">
                   <span>Por llegar</span>
                   <span className="text-xs font-normal text-muted-foreground tabular-nums">
                     {lista.porLlegar.length} {lista.porLlegar.length === 1 ? "reserva" : "reservas"} · {pax(lista.porLlegar)} pax
                   </span>
                 </h3>
                 <ul className="divide-y">{lista.porLlegar.map((f) => fila(f.reserva, f.mesas, { tarde: f.tarde }))}</ul>
-              </section>
-            )}
-            {lista.sentadas.length > 0 && (
-              <section aria-label="Sentadas">
-                <h3 className="sticky top-0 z-10 border-b bg-muted/95 backdrop-blur">
-                  <button
-                    type="button"
-                    className="flex min-h-11 w-full items-center justify-between px-3 text-sm font-semibold"
-                    aria-expanded={verSentadas}
-                    onClick={() => setVerSentadas((v) => !v)}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <ChevronDown className={cn("h-4 w-4 transition-transform", verSentadas && "rotate-180")} aria-hidden="true" />
-                      Ya sentadas
-                    </span>
-                    <span className="text-xs font-normal text-muted-foreground tabular-nums">
-                      {lista.sentadas.length} · {pax(lista.sentadas)} pax
-                    </span>
-                  </button>
-                </h3>
-                {verSentadas && <ul className="divide-y">{lista.sentadas.map((f) => fila(f.reserva, f.mesas, { sentada: true }))}</ul>}
               </section>
             )}
           </>
@@ -463,6 +454,7 @@ export function FilaReservaMovil({
   const info = infoEstado(reserva.estado);
   const tel = enlaceTelefono(reserva.telefono);
   const directo = nombresMesa.length > 0 && !mesaPrevistaOcupada;
+  const botonDirecto = !!onSentar && directo;
   const sentada = reserva.estado === "completada";
   const textoMesa = textoMesaConfirmada(nombresMesa, sentada);
   const notas = (reserva.notas_cliente ?? "").trim();
@@ -497,35 +489,48 @@ export function FilaReservaMovil({
         </div>
         <div className="flex items-center gap-2">
           <span className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
-            <span
-              className={cn(
-                "inline-flex items-center rounded-md px-2 py-0.5 text-sm font-semibold",
-                nombresMesa.length === 0
-                  ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
-                  : sentada
-                    ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
-                    : "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
-              )}
-            >
-              {textoMesa}
-            </span>
-            {sala && <span className="text-xs text-muted-foreground">{sala}</span>}
+            {/* Sala y mesa, en grande y con el mismo peso (07/11/2026). Con el botón directo ya van en él. */}
+            {!botonDirecto && (
+              <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-lg font-semibold leading-tight">
+                {sala && <span>{sala}</span>}
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-md px-2 py-0.5",
+                    nombresMesa.length === 0
+                      ? "bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+                      : sentada
+                        ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-200"
+                        : "bg-sky-100 text-sky-900 dark:bg-sky-950/60 dark:text-sky-200",
+                  )}
+                >
+                  {textoMesa}
+                </span>
+              </span>
+            )}
             {tarde ? (
               <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium text-white">Tarde</span>
             ) : (
               info && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", info.insignia)}>{info.etiqueta}</span>
             )}
           </span>
+          {/* La protagonista es la MESA (07/11/2026, petición del dueño): «Sentar» pequeño encima y debajo, en
+              grande, sala y mesa. Un toque = sentar en ella (con `decidirSentarPrevista`). Sin mesa (o con la
+              prevista ocupada), «Elegir mesa» abre el selector. */}
           {onSentar && (
             <Button
               type="button"
-              className="pointer-events-auto h-11 shrink-0 gap-1.5 px-3 text-sm font-semibold pointer-coarse:px-3"
+              className="pointer-events-auto h-auto min-h-14 max-w-[72%] shrink-0 flex-col items-start justify-center gap-0 px-3 py-1.5 text-left pointer-coarse:px-3"
               disabled={sentando}
               onClick={onSentar}
               aria-label={directo ? `Sentar a ${reserva.nombre || "la reserva"} en ${textoMesas(nombresMesa).toLowerCase()}` : `Sentar a ${reserva.nombre || "la reserva"}: elegir mesa`}
             >
-              <Armchair className="h-4 w-4" aria-hidden="true" />
-              {directo ? `Sentar · ${textoMesas(nombresMesa)}` : "Sentar"}
+              <span className="flex items-center gap-1 text-xs font-medium leading-tight opacity-90">
+                <Armchair className="h-3.5 w-3.5" aria-hidden="true" />
+                Sentar
+              </span>
+              <span className="max-w-full truncate text-lg font-bold leading-tight" data-testid="boton-mesa">
+                {directo ? `${sala ? `${sala} · ` : ""}${textoMesas(nombresMesa)}` : "Elegir mesa"}
+              </span>
             </Button>
           )}
         </div>

@@ -50,3 +50,29 @@ describe.each([
     expect(screen.queryByTestId("version-panel")).toBeNull();
   });
 });
+
+// Reservas › Hoy en móvil (07/11/2026, petición del dueño): sin la barra; el botón de menú lo pone la página.
+describe("DashboardLayout con `sinCabeceraMovil`", () => {
+  const montar = () =>
+    render(
+      <MemoryRouter>
+        <DashboardLayout sinCabeceraMovil>
+          <p>contenido</p>
+        </DashboardLayout>
+      </MemoryRouter>,
+    );
+
+  it("en móvil (375 px) no hay barra y el contenido respeta la zona segura de arriba", () => {
+    ancho(375);
+    montar();
+    expect(screen.queryByRole("banner")).toBeNull();
+    expect(screen.getByRole("main").className).toContain("env(safe-area-inset-top)");
+  });
+
+  it("en tablet (768 px) la barra sigue", () => {
+    ancho(768);
+    montar();
+    expect(screen.getByRole("banner")).toBeInTheDocument();
+    expect(screen.getByRole("main").className).not.toContain("safe-area");
+  });
+});
