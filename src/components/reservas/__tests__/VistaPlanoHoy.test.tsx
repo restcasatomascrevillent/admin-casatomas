@@ -739,12 +739,92 @@ describe("Plano de Hoy · fijo (escritorio): una sala a la vez con flechas", () 
     }
   });
 
-  it("el plano no se acerca ni se mueve: sin botones de zoom", async () => {
+  it("sin plano realista ni zoom: mesas grandes como tarjetas (07/11/2026)", async () => {
     montar({ fijo: true });
-    const mapa = await screen.findByTestId("mapa-sala");
-    expect(mapa).toHaveAttribute("data-fijo", "true");
+    expect(await screen.findByTestId("mesas-grandes")).toBeInTheDocument();
+    expect(screen.queryByTestId("mapa-sala")).toBeNull();
     expect(screen.queryByRole("button", { name: "Acercar el plano" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Alejar el plano" })).toBeNull();
+  });
+
+  it("cada tarjeta lleva el estado del plano, su número, plazas y, con reserva, hora, nombre corto y personas", async () => {
+    montar({ fijo: true });
+    await screen.findByTestId("mesas-grandes");
+    expect(estadoDe("1")).toBe("ocupada");
+    expect(estadoDe("2")).toBe("reservada");
+    expect(estadoDe("3")).toBe("retrasada");
+    expect(estadoDe("4")).toBe("por_liberar");
+    expect(estadoDe("5")).toBe("libre");
+    const rosa = mesaBoton("2");
+    expect(rosa).toHaveTextContent("2");
+    expect(rosa).toHaveTextContent("14:45");
+    expect(rosa).toHaveTextContent("Rosa R.");
+    expect(rosa).toHaveTextContent("3 p.");
+    expect(mesaBoton("5")).toHaveTextContent("Libre");
+  });
+
+  it("conserva la distribución: dos filas (y = 1 m y y = 4 m) de tres y dos mesas, sin solaparse", async () => {
+    montar({ fijo: true });
+    const rejilla = (await screen.findByTestId("mesas-grandes")).firstElementChild as HTMLElement;
+    expect(rejilla).toHaveAttribute("data-filas", "2");
+    expect(rejilla).toHaveAttribute("data-columnas", "3");
+    expect(mesaBoton("1").style.gridRow).toBe("1");
+    expect(mesaBoton("3").style.gridColumn).toBe("3");
+    expect(mesaBoton("4").style.gridRow).toBe("2");
+    expect(mesaBoton("5").style.gridColumn).toBe("2");
+  });
+
+  it("tocar una tarjeta abre la mesa con sus acciones (en una hoja)", async () => {
+    montar({ fijo: true });
+    await screen.findByTestId("mesas-grandes");
+    fireEvent.click(mesaBoton("4"));
+    const hoja = await screen.findByRole("dialog", { name: "Mesa 4" });
+    expect(within(hoja).getByRole("button", { name: /Liberar mesa/ })).toBeInTheDocument();
+  });
+
+  it("la leyenda se parte en líneas en vez de cortarse («Por liberar» entera)", async () => {
+    montar({ fijo: true });
+    const leyenda = await screen.findByTestId("leyenda-plano");
+    expect(within(leyenda).getByRole("list", { name: "Leyenda de estados de mesa" })).toHaveClass("flex-wrap");
+    expect(leyenda).toHaveTextContent("Por liberar");
+  });
+
+  it("la reserva señalada en la lista resalta su mesa y, si es de otra sala, el plano salta a ella", async () => {
+    const onCambiarSala = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const Con = ({ id }: { id: string | null }) => {
+      const [sala, setSala] = useState<string | null>(null);
+      return (
+        <VistaPlanoHoy
+          fijo
+          reservas={RESERVAS}
+          busqueda=""
+          filtroTurno="todo"
+          salaId={sala}
+          onCambiarSala={(x) => {
+            onCambiarSala(x);
+            setSala(x);
+          }}
+          reservaResaltada={id}
+        />
+      );
+    };
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <Con id="r-rosa" />
+      </QueryClientProvider>,
+    );
+    await screen.findByTestId("mesas-grandes");
+    expect(mesaBoton("2")).toHaveAttribute("data-resaltada", "true");
+    expect(mesaBoton("1")).toHaveAttribute("data-atenuada", "true");
+    rerender(
+      <QueryClientProvider client={client}>
+        <Con id="r-fran" />
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(onCambiarSala).toHaveBeenCalledWith("salon"));
+    await waitFor(() => expect(screen.getByTestId("plano-fijo-sala")).toHaveTextContent("Salón"));
+    expect(mesaBoton("10")).toHaveAttribute("data-resaltada", "true");
   });
 
   it("sin «fijo» siguen las pestañas y el zoom (tablet y el resto)", async () => {

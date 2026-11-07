@@ -42,7 +42,7 @@
 // el kanban): sin scroll de página; solo la lista de al lado se desplaza por dentro.
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ListChecks, Loader2, Lock, LogOut, MessageSquareText, RotateCcw, Star, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -143,6 +143,7 @@ import { BlacklistModal } from "../BlacklistModal";
 import { ReservaCard } from "../ReservaCard";
 import { CONFIG_ESTADO_MESA, textoMinutosMesa } from "./estadosMesa";
 import { MapaSalaServicio } from "./MapaSalaServicio";
+import { MesasGrandesSala } from "./MesasGrandesSala";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
 
 /** Reserva de hoy tal como la trae `VistaHoy` (`select("*")`): `salida_at`/`marca` si existen. */
@@ -173,6 +174,11 @@ export interface VistaPlanoHoyProps {
    * mesa tocada y «Por sentar» van en hojas, para dejarle al plano todo el sitio.
    */
   fijo?: boolean;
+  /**
+   * Reserva señalada en la lista de la izquierda («Hoy» de escritorio, 07/11/2026): al pasar el ratón o al
+   * abrirla, sus mesas se resaltan y, si están en otra sala, el plano salta a esa sala (solo `fijo`).
+   */
+  reservaResaltada?: string | null;
 }
 
 /**
@@ -212,6 +218,7 @@ export function VistaPlanoHoy({
   reservasError = false,
   onReintentarReservas,
   fijo = false,
+  reservaResaltada: reservaResaltadaExterna = null,
 }: VistaPlanoHoyProps) {
   // Cambia a medianoche: la tablet se queda en «Hoy» toda la noche.
   const hoy = useHoyLocal();
@@ -618,13 +625,37 @@ export function VistaPlanoHoy({
   /** Tocar una tarjeta del panel resalta su mesa en el plano. */
   const [reservaResaltada, setReservaResaltada] = useState<string | null>(null);
   useEffect(() => setReservaResaltada(null), [sala?.id]);
+  const idResaltada = reservaResaltadaExterna ?? reservaResaltada;
   const mesasResaltadas = useMemo(
     () =>
-      reservaResaltada
-        ? new Set(asignacionesSala.filter((a) => a.reserva_id === reservaResaltada).map((a) => a.mesa_id))
+      idResaltada
+        ? new Set(asignacionesSala.filter((a) => a.reserva_id === idResaltada).map((a) => a.mesa_id))
         : null,
-    [reservaResaltada, asignacionesSala],
+    [idResaltada, asignacionesSala],
   );
+  // La reserva señalada en la lista de la izquierda tiene la mesa en OTRA sala: el plano salta a ella (una
+  // vez por reserva, y tras un momento, para que pasar el ratón por la lista no vaya cambiando de sala).
+  const yaSaltada = useRef<string | null>(null);
+  useEffect(() => {
+    if (!fijo || !reservaResaltadaExterna) {
+      yaSaltada.current = null;
+      return;
+    }
+    if (yaSaltada.current === reservaResaltadaExterna) return;
+    const r = lista.find((x) => x.id === reservaResaltadaExterna);
+    if (!r) return;
+    const suya = (asignacionesDeHoy ?? []).find((a) => a.reserva_id === r.id);
+    const destino = (suya?.mesas as { espacio_id?: string } | undefined)?.espacio_id ?? columnaDeReserva(r, columnas);
+    if (!destino || destino === sala?.id || !salas.some((s) => s.id === destino)) {
+      yaSaltada.current = reservaResaltadaExterna;
+      return;
+    }
+    const t = window.setTimeout(() => {
+      yaSaltada.current = reservaResaltadaExterna;
+      onCambiarSala(destino);
+    }, 350);
+    return () => window.clearTimeout(t);
+  }, [fijo, reservaResaltadaExterna, lista, asignacionesDeHoy, columnas, sala?.id, salas, onCambiarSala]);
   const coincidentesMapa = mesasValidas ?? (mesasResaltadas?.size ? mesasResaltadas : coincidentes);
   const alEmpezarArrastre = (e: DragStartEvent) => {
     setArrastrando((e.active.data.current as ReservaServicio | undefined) ?? null);
@@ -1113,6 +1144,9 @@ export function VistaPlanoHoy({
                 <span className="shrink-0 text-lg font-semibold tabular-nums text-muted-foreground">
                   {indiceSala + 1}/{salas.length}
                 </span>
+                <span className="shrink-0 rounded-md border px-2 py-0.5 text-[13px] font-medium" data-testid="plano-fijo-turno">
+                  {etiquetaTurno}
+                </span>
                 {listo && (
                   <span className="shrink-0 text-sm font-normal tabular-nums text-muted-foreground">
                     {(() => {
@@ -1228,6 +1262,18 @@ export function VistaPlanoHoy({
                       Reintentar
                     </Button>
                   </div>
+                ) : fijo ? (
+                  // Escritorio (07/11/2026): mesas grandes como tarjetas, sin paredes ni decoración.
+                  <MesasGrandesSala
+                    key={sala.id}
+                    salaNombre={sala.title}
+                    mesas={mesas}
+                    estados={estados}
+                    seleccionada={mesaSelId}
+                    coincidentes={coincidentesMapa}
+                    onTocarMesa={tocarMesa}
+                    uniones={unionesMapa}
+                  />
                 ) : (
                   <MapaSalaServicio
                     key={sala.id}
@@ -1265,15 +1311,19 @@ export function VistaPlanoHoy({
                     </Button>
                   </div>
                 )}
-                <p className="pointer-events-none absolute left-2 top-2 rounded-md border bg-background/90 px-2 py-1 text-[13px] font-medium shadow-sm backdrop-blur-sm">
-                  {etiquetaTurno}
-                </p>
+                {!fijo && (
+                  <p className="pointer-events-none absolute left-2 top-2 rounded-md border bg-background/90 px-2 py-1 text-[13px] font-medium shadow-sm backdrop-blur-sm">
+                    {etiquetaTurno}
+                  </p>
+                )}
               </section>
               </ConFlechasSala>
 
               {enHojas ? (
-                <div className="flex min-w-0 items-center gap-2">
-                  {!esMovil && listo && <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>}
+                <div className={cn("flex min-w-0 items-center gap-2", fijo && "flex-wrap")}>
+                  {/* Fijo (escritorio): la leyenda se parte en dos líneas si no cabe, en vez de cortarse
+                      («Por liberar» salía cortado en la captura del dueño, 07/11/2026). */}
+                  {!esMovil && listo && (fijo ? <div className="min-w-0 flex-1" data-testid="leyenda-plano">{leyendaEn(false)}</div> : <div className="no-scrollbar min-w-0 flex-1 overflow-x-auto">{leyendaEn(true)}</div>)}
                   <Button
                     variant="outline"
                     className={cn("h-11 justify-between gap-3", esMovil ? "w-full" : "ml-auto shrink-0")}

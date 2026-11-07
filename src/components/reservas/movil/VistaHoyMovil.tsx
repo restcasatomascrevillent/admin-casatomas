@@ -88,6 +88,7 @@ import { CLAVES_POR_CAMBIO } from "@/lib/reservas/clavesCache";
 import {
   estadoMesasHoy,
   estaTerminada,
+  listaHoyEscritorio,
   listaHoyMovil,
   textoMesaConfirmada,
   textoMesas,
@@ -117,6 +118,7 @@ import {
 import type { ConfigOcupacionMesa } from "@/lib/reservas/ocupacionMesa";
 import { proponerRecalculo, recolocarDesplazadas, textoSinSitio } from "@/lib/reservas/recalcularMesas";
 import { useFijarMesa } from "@/hooks/useMesaFijada";
+import { ListaHoyEscritorio } from "@/components/reservas/servicio/ListaHoyEscritorio";
 import { enlaceTelefono, telefonoLegible } from "@/lib/reservas/telefono";
 import { cn } from "@/lib/utils";
 import { mensajeUsuario } from "@/lib/mensaje-usuario";
@@ -164,6 +166,10 @@ function refrescarTrasError(qc: QueryClient) {
 export interface ColumnaHoy {
   busqueda: string;
   filtroTurno: FiltroTurnoHoy;
+  /** Canceladas de hoy (la lista de escritorio las enseña plegadas al final; el resto de Hoy no las usa). */
+  canceladas?: ReservaMovil[];
+  /** La reserva señalada en la lista (ratón encima, foco o ficha abierta), para resaltarla en el plano. */
+  onSeñalar?: (id: string | null) => void;
 }
 
 export function VistaHoyMovil({
@@ -230,6 +236,15 @@ export function VistaHoyMovil({
     () => listaHoyMovil(reservas ?? [], mesasDe, minutoAhora, { busqueda, filtroTurno }),
     [reservas, mesasDe, minutoAhora, busqueda, filtroTurno],
   );
+  // Escritorio (07/11/2026, «eso era para el móvil»): TODAS las del turno, por estados, en filas de una línea.
+  const canceladas = columna?.canceladas;
+  const listaEscritorio = useMemo(
+    () =>
+      columna ? listaHoyEscritorio([...(reservas ?? []), ...(canceladas ?? [])], mesasDe, minutoAhora, { busqueda, filtroTurno }) : null,
+    [columna, reservas, canceladas, mesasDe, minutoAhora, busqueda, filtroTurno],
+  );
+  const { liberarMesa, estaEnCurso: liberando } = useAccionesModoServicio();
+  const [señaladaRaton, setSeñaladaRaton] = useState<string | null>(null);
   // Solo lo que está POR LLEGAR (07/11/2026, petición del dueño): las ya sentadas no salen en la lista; liberar o
   // cambiar su mesa sigue en «Mesas».
   const vacia = lista.llegan.length + lista.porLlegar.length === 0;
@@ -237,7 +252,13 @@ export function VistaHoyMovil({
   // botón va aquí, el primero de la fila. Fuera de un SidebarProvider (tests sueltos) no se pinta.
   const hayMenu = useSidebarOpcional() !== null;
 
-  const abierta = (reservas ?? []).find((r) => r.id === abiertaId) ?? null;
+  const abierta = [...(reservas ?? []), ...(canceladas ?? [])].find((r) => r.id === abiertaId) ?? null;
+  // La señalada para el plano: la del ratón (o el foco) y, si no, la de la ficha abierta.
+  const señalada = señaladaRaton ?? abiertaId;
+  const onSeñalar = columna?.onSeñalar;
+  useEffect(() => {
+    onSeñalar?.(señalada);
+  }, [onSeñalar, señalada]);
 
   const abrirFicha = (id: string, inicio: InicioFicha = "normal") => {
     setInicioFicha(inicio);
@@ -389,6 +410,18 @@ export function VistaHoyMovil({
             onOcupada={(id) => abrirFicha(id)}
           />
           </>
+        ) : listaEscritorio ? (
+          <ListaHoyEscritorio
+            lista={listaEscritorio}
+            salaDe={(r) => (r.espacio_id ? salaPorId.get(r.espacio_id) : undefined)}
+            onAbrir={(r) => abrirFicha(r.id)}
+            onSentar={puedeEditar ? (r) => void sentarDesdeFila(r, decidirSentarPrevista(asignacionesDia, r, configOcupacion)) : undefined}
+            onLiberar={puedeEditar ? (r) => void liberarMesa(r) : undefined}
+            mesaPrevistaOcupada={(r) => decidirSentarPrevista(asignacionesDia, r, configOcupacion).tipo === "elegir"}
+            ocupadaId={sentandoId ?? (señalada && liberando?.(señalada) ? señalada : null)}
+            señalada={señalada}
+            onSeñalar={setSeñaladaRaton}
+          />
         ) : vacia ? (
           <p className="p-4 text-sm text-muted-foreground">No hay reservas para este filtro.</p>
         ) : (

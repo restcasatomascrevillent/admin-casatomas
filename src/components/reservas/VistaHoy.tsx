@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Info, Search, Wand2 } from "lucide-react";
 import { EstadoErrorCarga } from "@/components/EstadoErrorCarga";
@@ -95,10 +95,12 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
     setFiltroTurno(t);
     if (t !== organizando) setOrganizando(null);
   };
-  const cambiarSala = (salaId: string) => {
+  const cambiarSala = useCallback((salaId: string) => {
     setSalaPlano(salaId);
     guardarSalaPlanoHoy(salaId);
-  };
+  }, []);
+  /** Escritorio: la reserva señalada en la lista (ratón, foco o ficha abierta), que el plano resalta. */
+  const [señalada, setSeñalada] = useState<string | null>(null);
 
   // 07/11/2026: ya no se espera al «resumen de ocupación» (2 consultas cada minuto que bloqueaban toda la
   // pestaña con un esqueleto y cuyas cifras no se pintan desde el 17/10). Cada vista enseña lo suyo según llega.
@@ -143,6 +145,27 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
         .order("hora");
       if (error) throw error;
       // `ReservaPlanoHoy`: con `salida_at` si la columna existe (la vista Plano pinta las mesas con esta lista).
+      return ((data ?? []) as unknown as ReservaPlanoHoy[]).filter((r) => admiteReservas(r.marca));
+    },
+  });
+
+  /**
+   * Canceladas de hoy, solo para la lista de escritorio (plegadas al final, 07/11/2026). Aparte de la de
+   * arriba para no meterlas en el plano ni en el móvil. Clave con el prefijo "reservas-hoy": se refresca igual.
+   */
+  const { data: canceladasHoy } = useQuery({
+    ...REFRESCO_PERIODICO,
+    enabled: !esMovil,
+    queryKey: ["reservas-hoy", "canceladas", hoy],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `espacio_id` no está en los tipos generados (como la de arriba).
+        .from("reservas" as any)
+        .select(COLUMNAS_RESERVAS_HOY)
+        .eq("fecha", hoy)
+        .eq("estado", "cancelada")
+        .order("hora");
+      if (error) throw error;
       return ((data ?? []) as unknown as ReservaPlanoHoy[]).filter((r) => admiteReservas(r.marca));
     },
   });
@@ -199,14 +222,19 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
           }
         />
 
-        {/* 07/11/2026: la lista de lo que falta por llegar (la del móvil) a la izquierda, con su scroll, y el
-            plano fijo, una sala a la vez, en el resto. Cada columna mide lo que queda de pantalla. */}
-        <div className="grid min-h-0 grid-cols-[minmax(0,24rem)_minmax(0,1fr)] items-start gap-3 xl:grid-cols-[26rem_minmax(0,1fr)]">
+        {/* 07/11/2026: a la izquierda la lista completa del turno, por estados, en filas de una línea (con su
+            scroll); a la derecha el plano de mesas grandes, una sala a la vez. Cada columna mide lo que queda de
+            pantalla. Lista de 22 rem (tablet), 26,25 rem (420 px, desde 1280) y 30 rem (480 px, desde 1536). */}
+        <div className="grid min-h-0 grid-cols-[minmax(0,22rem)_minmax(0,1fr)] items-start gap-3 xl:grid-cols-[26.25rem_minmax(0,1fr)] 2xl:grid-cols-[30rem_minmax(0,1fr)]">
           <section aria-label="Reservas por llegar" className="min-w-0">
             {errorReservasHoy ? (
               <EstadoErrorCarga titulo="las reservas de hoy" onReintentar={() => void refetchReservasHoy()} />
             ) : (
-              <VistaHoyMovil reservas={reservasHoy} fecha={hoy} columna={{ busqueda, filtroTurno }} />
+              <VistaHoyMovil
+                reservas={reservasHoy}
+                fecha={hoy}
+                columna={{ busqueda, filtroTurno, canceladas: canceladasHoy, onSeñalar: setSeñalada }}
+              />
             )}
           </section>
           <VistaPlanoHoy
@@ -219,6 +247,7 @@ export function VistaHoy(_props: { onAbrirSala?: (espacioId: string) => void } =
             organizar={organizando && puedeEditar ? { turno: organizando, onSalir: () => setOrganizando(null) } : null}
             reservasError={errorReservasHoy}
             onReintentarReservas={() => void refetchReservasHoy()}
+            reservaResaltada={señalada}
           />
         </div>
       </div>
@@ -253,8 +282,8 @@ function turnoSiguiente(): "comida" | "cena" {
 /** La ayuda (ⓘ) de «Hoy». Con solo «Ver» no hay acciones. */
 function ayudaVistaHoy(soloLectura: boolean): string {
   return soloLectura
-    ? "A la izquierda, las reservas que faltan por llegar; a la derecha, el plano. Toca una mesa para ver su reserva."
-    : "A la izquierda, las que faltan por llegar («Sentar» las sienta en su mesa). A la derecha, el plano: toca una mesa para ver, sentar o fijar. Las flechas (o ← →) cambian de sala.";
+    ? "A la izquierda, las reservas del turno por estado; a la derecha, las mesas de la sala. Pasa el ratón por una reserva para ver su mesa."
+    : "A la izquierda, las reservas del turno por estado («Sentar», «Liberar»; pasa el ratón para ver su mesa). A la derecha, las mesas: tócalas para ver, sentar o fijar. Las flechas (o ← →) cambian de sala.";
 }
 
 /**

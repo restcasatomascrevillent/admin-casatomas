@@ -4,7 +4,7 @@
  * botón de menú va al principio de la fila de controles cuando hay menú lateral (sin barra superior).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -141,5 +141,54 @@ describe("VistaHoyMovil · como columna de escritorio", () => {
   it("cada fila conserva su botón «Sentar»", () => {
     montarColumna("", "todo");
     expect(screen.getAllByRole("button", { name: /Sentar/ }).length).toBeGreaterThan(0);
+  });
+
+  // 07/11/2026 («eso era para el móvil»): en escritorio, TODAS las del turno por estados, en filas de una línea.
+  const montarEstados = (onSeñalar?: (id: string | null) => void) => {
+    const cliente = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const reservas = [
+      res("a", "Ana Espera", "confirmada"),
+      { ...res("b", "Bea Sentada", "completada"), notas_cliente: "Alérgica al marisco" },
+      { ...res("i", "Íñigo Ido", "completada"), salida_at: "2026-11-07T12:50:00Z" },
+      res("n", "Nora Novino", "no_show"),
+    ] as never[];
+    const canceladas = [res("c", "Ciro Cancela", "cancelada")] as never[];
+    return render(
+      <QueryClientProvider client={cliente}>
+        <VistaHoyMovil reservas={reservas} fecha="2026-11-07" columna={{ busqueda: "", filtroTurno: "todo", canceladas, onSeñalar }} />
+      </QueryClientProvider>,
+    );
+  };
+
+  it("agrupa en «Por llegar», «Sentadas» y, plegadas al final, «Terminadas / No vino / Canceladas»", () => {
+    montarEstados();
+    expect(screen.getByRole("region", { name: "Por llegar" })).toHaveTextContent("Ana Espera");
+    const sentadas = screen.getByRole("region", { name: "Sentadas" });
+    expect(sentadas).toHaveTextContent("Bea Sentada");
+    expect(within(sentadas).getByLabelText("Alergia")).toBeInTheDocument();
+    const terminadas = screen.getByRole("region", { name: "Terminadas, no vino y canceladas" });
+    expect(terminadas).not.toHaveTextContent("Nora Novino");
+    fireEvent.click(within(terminadas).getByRole("button", { name: /Terminadas \/ No vino \/ Canceladas/ }));
+    expect(terminadas).toHaveTextContent("Íñigo Ido");
+    expect(terminadas).toHaveTextContent("Nora Novino");
+    expect(terminadas).toHaveTextContent("Ciro Cancela");
+  });
+
+  it("filas de una línea con «Sin mesa» resaltado y acción corta «Sentar»", () => {
+    montarEstados();
+    const porLlegar = screen.getByRole("region", { name: "Por llegar" });
+    expect(within(porLlegar).getByTestId("mesa-fila")).toHaveTextContent("Sin mesa");
+    expect(within(porLlegar).getByRole("button", { name: /^Sentar a Ana Espera/ })).toHaveTextContent("Sentar");
+  });
+
+  it("pasar el ratón por una fila la señala para el plano; al salir, deja de señalarla", () => {
+    const onSeñalar = vi.fn();
+    montarEstados(onSeñalar);
+    const fila = screen.getByText("Ana Espera").closest("li") as HTMLElement;
+    fireEvent.mouseEnter(fila);
+    expect(onSeñalar).toHaveBeenLastCalledWith("a");
+    expect(fila).toHaveAttribute("data-señalada", "true");
+    fireEvent.mouseLeave(fila);
+    expect(onSeñalar).toHaveBeenLastCalledWith(null);
   });
 });
