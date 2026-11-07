@@ -8,7 +8,7 @@
 // parte letra a letra ni se corta una cifra (QA 06/11/2026, con la IA abierta).
 // «Precio de un producto» ya no es tarjeta: es un preset del explorador.
 import { useId, useState } from "react";
-import { ArrowUp, ChevronRight, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowUp, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEntero, formatImporte, plural } from "@/components/facturas/shared/formatters";
 import {
@@ -40,6 +40,7 @@ import {
   type AccionMenu,
 } from "./piezas";
 import { usePuedeEditarFacturas } from "./edicionFacturas";
+import { superaUmbral, type AlertaFacturas } from "@/lib/facturas/alertas";
 
 interface Comunes {
   tamano?: Tamano;
@@ -51,12 +52,31 @@ const LISTA = "space-y-0.5 @[52rem]:grid @[52rem]:grid-cols-2 @[52rem]:gap-x-6 @
 
 // ─── Lo que más ha subido ───────────────────────────────────────────────────
 
-export function LoQueMasHaSubido({ subidas, acciones, tamano = "s", onAmpliar }: { subidas: TableroCompras["subidas"]; acciones: (s: Subida) => AccionMenu[] } & Comunes) {
+export function LoQueMasHaSubido({
+  subidas,
+  acciones,
+  tamano = "s",
+  onAmpliar,
+  umbralPct = 10,
+  alertas = [],
+}: {
+  subidas: TableroCompras["subidas"];
+  acciones: (s: Subida) => AccionMenu[];
+  /** Umbral de alerta de subida (configuracion_facturas): las que lo superan se destacan. */
+  umbralPct?: number;
+  /** Alertas «Sube de precio» vigentes (20261107300000): la fila que tiene una lo dice. */
+  alertas?: AlertaFacturas[];
+} & Comunes) {
   const productos = subidas.productos.slice(0, FILAS_TAMANO[tamano]);
+  const conAlerta = (p: Subida) =>
+    alertas.find(
+      (a) => a.tipo === "facturas_precio_sube" && a.datos.proveedorId === p.proveedor_id && a.datos.nombreNormalizado === p.nombre_normalizado,
+    ) ?? null;
+  const destacadas = productos.filter((p) => superaUmbral(p.variacion_pct, umbralPct)).length;
   return (
     <Tarjeta
       titulo="Lo que más ha subido"
-      subtitulo={`${textoTramos(subidas.tramoInicio, subidas.tramoFin)} · sin IVA`}
+      subtitulo={`${textoTramos(subidas.tramoInicio, subidas.tramoFin)} · sin IVA${destacadas ? ` · en ámbar, más del ${umbralPct} %` : ""}`}
       resumen={
         productos.length
           ? `Sube más: ${productos.slice(0, 3).map((p) => `${p.producto} ${textoPct(p.variacion_pct)}`).join(", ")}.`
@@ -73,18 +93,25 @@ export function LoQueMasHaSubido({ subidas, acciones, tamano = "s", onAmpliar }:
         </SinDatos>
       ) : (
         <ol className={LISTA} aria-label="Productos que más han subido">
-          {productos.map((p) => (
-            <li key={`${p.proveedor_id}-${p.nombre_normalizado}-${p.unidad}`}>
+          {productos.map((p) => {
+            const supera = superaUmbral(p.variacion_pct, umbralPct);
+            const alerta = conAlerta(p);
+            return (
+            <li key={`${p.proveedor_id}-${p.nombre_normalizado}-${p.unidad}`} data-supera-umbral={supera || undefined}>
               <FilaConMenu
                 className={cn(
                   "grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 rounded-md px-1.5 py-1.5 text-left hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent",
+                  supera && "border-l-[3px] border-amber-500 bg-amber-50/60 pl-2 dark:bg-amber-950/20",
                   FOCO,
                 )}
                 acciones={acciones(p)}
                 title={`${p.producto} · ${p.proveedor}`}
-                nombre={`${p.producto} (${p.proveedor}): de ${formatCurrency(p.precio_inicio)} a ${formatCurrency(p.precio_fin)} por ${p.unidad}, ${textoPct(p.variacion_pct)}. Opciones`}
+                nombre={`${p.producto} (${p.proveedor}): de ${formatCurrency(p.precio_inicio)} a ${formatCurrency(p.precio_fin)} por ${p.unidad}, ${textoPct(p.variacion_pct)}${supera ? `; supera el umbral de alerta del ${umbralPct} %` : ""}${alerta ? `; alerta: ${alerta.titulo}` : ""}. Opciones`}
               >
-                <span className="min-w-0 truncate text-sm text-foreground">{p.producto}</span>
+                <span className="flex min-w-0 items-center gap-1 text-sm text-foreground">
+                  {supera && <AlertTriangle className={cn("h-3.5 w-3.5 shrink-0", alerta?.prioridad === "alta" ? "text-red-600" : "text-amber-600")} aria-hidden />}
+                  <span className="truncate">{p.producto}</span>
+                </span>
                 <span className="inline-flex items-center gap-0.5 justify-self-end rounded-full bg-red-500/10 px-1.5 py-px text-sm font-medium tabular-nums text-red-700 dark:text-red-400">
                   <ArrowUp className="h-3.5 w-3.5" aria-hidden />
                   {textoPct(p.variacion_pct, false)}
@@ -92,10 +119,12 @@ export function LoQueMasHaSubido({ subidas, acciones, tamano = "s", onAmpliar }:
                 {/* El detalle, a todo lo ancho (debajo del nombre y del %). */}
                 <span className="col-span-2 min-w-0 truncate text-xs text-muted-foreground">
                   {nombreCorto(p.proveedor)} · <span className="tabular-nums">{formatCurrency(p.precio_inicio)} → {formatCurrency(p.precio_fin)}/{p.unidad}</span>
+                  {alerta && <span className="font-medium text-amber-800 dark:text-amber-400"> · última compra con alerta</span>}
                 </span>
               </FilaConMenu>
             </li>
-          ))}
+            );
+          })}
         </ol>
       )}
     </Tarjeta>

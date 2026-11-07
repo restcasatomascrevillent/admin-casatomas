@@ -31,6 +31,7 @@ vi.mock("@/integrations/supabase/client", () => ({
 }));
 
 import Avisos from "../Avisos";
+import { TIPOS_POR_FILTRO } from "@/lib/avisos";
 
 const ahora = new Date();
 const aviso = (i: number, extra: Record<string, unknown> = {}) => ({
@@ -96,7 +97,11 @@ describe("Avisos", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Facturas" }));
     await waitFor(() =>
-      expect(h.llamadas).toContainEqual({ op: "in", args: ["tipo", ["facturas_subida", "subida_precio", "original_sin_drive"]] }),
+      expect(h.llamadas).toContainEqual({
+        op: "in",
+        // Incluye las alertas automáticas de Facturas (20261107300000).
+        args: ["tipo", TIPOS_POR_FILTRO.facturas],
+      }),
     );
   });
 
