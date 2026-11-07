@@ -3,6 +3,7 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { autenticar, type ConfigAuth, corsHeaders, esDocumentoPropio, jsonResponse, MENSAJE_SOLO_LO_PROPIO } from "./auth.ts";
 import { configModelo } from "./modelo.ts";
+import { modeloDeFuncion } from "../_shared/modelo-funcion.ts";
 import { crearClienteOpenAI } from "./openai.ts";
 import { cargarIndicaciones, conIndicaciones } from "./indicaciones.ts";
 import { crearRegistroUso, type RegistroUsoOcr } from "./registroUso.ts";
@@ -69,8 +70,27 @@ const envModelo = {
   OCR_MODELO_PIEZAS: Deno.env.get("OCR_MODELO_PIEZAS"),
   OCR_DETALLE: Deno.env.get("OCR_DETALLE"),
 };
-const cfgModelo = configModelo(envModelo, "unico");
-const modeloPiezas = configModelo(envModelo, "piezas").modelo;
+let cfgModelo = configModelo(envModelo, "unico");
+let modeloPiezas = configModelo(envModelo, "piezas").modelo;
+
+// Desde el 07/11/2026 manda ia_modelo_funcion (Super Admin › Servicios ›
+// Modelos): «procesar-factura» hace de OCR_MODELO y «ocr-trabajo» de
+// OCR_MODELO_PIEZAS. Sin modelo en la tabla, los secretos de siempre. El resto
+// (detail, techos, esquema) lo sigue decidiendo modelo.ts. Caché de 60 s.
+async function refrescarModelos(): Promise<void> {
+  const cliente = createClient(cfgAuth.supabaseUrl, cfgAuth.serviceKey);
+  const [unico, piezas] = await Promise.all([
+    modeloDeFuncion("procesar-factura", "", { cliente }),
+    modeloDeFuncion("ocr-trabajo", "", { cliente }),
+  ]);
+  const env = {
+    ...envModelo,
+    OCR_MODELO: unico || envModelo.OCR_MODELO,
+    OCR_MODELO_PIEZAS: piezas || envModelo.OCR_MODELO_PIEZAS,
+  };
+  cfgModelo = configModelo(env, "unico");
+  modeloPiezas = configModelo(env, "piezas").modelo;
+}
 
 // Cada llamada a OpenAI deja su fila en ia_uso (registroUso.ts), con el
 // documento en el disparador: `trabajo:<uuid>` al sustituir, `subida:<uuid>`
@@ -92,6 +112,7 @@ function contexto(disparador = `subida:${crypto.randomUUID()}`): ContextoGuardad
 
 serve(conAuditoriaDePeticion("procesar-factura", createClientBase, async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  await refrescarModelos();
 
   // Autenticación ANTES de tocar OpenAI, Drive o la base de datos.
   const auth = await autenticar(req, cfgAuth, "subir");

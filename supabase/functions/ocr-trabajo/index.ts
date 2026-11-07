@@ -3,6 +3,7 @@ import { claveOpenAI } from "../_shared/clave-openai.ts";
 import { createClient as createClientBase } from "https://esm.sh/@supabase/supabase-js@2";
 import { jsonResponse, verificarSecreto } from "../procesar-factura/auth.ts";
 import { configModelo } from "../procesar-factura/modelo.ts";
+import { type ClienteSupabase, modeloDeFuncion } from "../_shared/modelo-funcion.ts";
 import { crearClienteOpenAI } from "../procesar-factura/openai.ts";
 import { cargarIndicaciones, conIndicaciones } from "../procesar-factura/indicaciones.ts";
 import { crearRegistroUso } from "../procesar-factura/registroUso.ts";
@@ -45,10 +46,27 @@ const envModelo = {
   OCR_MODELO_PIEZAS: Deno.env.get("OCR_MODELO_PIEZAS"),
   OCR_DETALLE: Deno.env.get("OCR_DETALLE"),
 };
-const cfgModelo = configModelo(envModelo, "piezas");
+let cfgModelo = configModelo(envModelo, "piezas");
 // Trabajos de UNA pieza (documento de una página): el modelo y la
 // configuración del camino síncrono (OCR_MODELO), no los de las piezas.
-const cfgModeloUnico = configModelo(envModelo, "unico");
+let cfgModeloUnico = configModelo(envModelo, "unico");
+
+// Desde el 07/11/2026 manda ia_modelo_funcion: «ocr-trabajo» = OCR_MODELO_PIEZAS
+// y «procesar-factura» = OCR_MODELO (trabajos de una pieza). Sin modelo en la
+// tabla, los secretos de siempre; el resto lo decide modelo.ts.
+async function refrescarModelos(cliente: ClienteSupabase): Promise<void> {
+  const [unico, piezas] = await Promise.all([
+    modeloDeFuncion("procesar-factura", "", { cliente }),
+    modeloDeFuncion("ocr-trabajo", "", { cliente }),
+  ]);
+  const env = {
+    ...envModelo,
+    OCR_MODELO: unico || envModelo.OCR_MODELO,
+    OCR_MODELO_PIEZAS: piezas || envModelo.OCR_MODELO_PIEZAS,
+  };
+  cfgModelo = configModelo(env, "piezas");
+  cfgModeloUnico = configModelo(env, "unico");
+}
 const drive = {
   clientId: (Deno.env.get("GOOGLE_CLIENT_ID") ?? "").trim(),
   clientSecret: (Deno.env.get("GOOGLE_CLIENT_SECRET") ?? "").trim(),
@@ -82,6 +100,7 @@ serve(conAuditoriaDePeticion("ocr-trabajo", createClientBase, async (req) => {
     return jsonResponse({ ok: false, error: "json_invalido" }, 400);
   }
   const supabase = createClient(URL_SB, SERVICE);
+  await refrescarModelos(supabase);
   // Cada llamada a OpenAI deja su fila en ia_uso (funcion 'ocr-trabajo',
   // disparador `trabajo:<uuid>#<etapa>`). El INSERT no bloquea la lectura; se
   // espera al final de la tarea en segundo plano.
