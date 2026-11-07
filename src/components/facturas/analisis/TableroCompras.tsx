@@ -819,7 +819,7 @@ export function TableroCompras({
       </ul>
 
       {/* 2 · Una vista a la vez */}
-      <div role="group" aria-label="Vista del análisis" className="-mx-1 flex shrink-0 gap-1 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="pastillas-vistas">
+      <div role="group" aria-label="Vista del análisis" className="flex min-w-0 shrink-0 gap-1 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="pastillas-vistas">
         {VISTAS.map((v) => (
           <button
             key={v.id}
