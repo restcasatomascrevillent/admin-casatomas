@@ -92,6 +92,27 @@ export function guardarSalaPlanoHoy(salaId: string): void {
   }
 }
 
+/** Cómo se ven las mesas en «Hoy» de escritorio: en su sitio («plano») o por número («ordenadas»). */
+export type ModoMesasHoy = "plano" | "ordenadas";
+export const CLAVE_MODO_MESAS_HOY = "reservas:hoy:mesas-modo";
+
+/** El modo de mesas elegido en este navegador; por defecto «plano». */
+export function leerModoMesasHoy(): ModoMesasHoy {
+  try {
+    return window.localStorage.getItem(CLAVE_MODO_MESAS_HOY) === "ordenadas" ? "ordenadas" : "plano";
+  } catch {
+    return "plano";
+  }
+}
+
+export function guardarModoMesasHoy(modo: ModoMesasHoy): void {
+  try {
+    window.localStorage.setItem(CLAVE_MODO_MESAS_HOY, modo);
+  } catch {
+    // Sin almacenamiento: la próxima vez, «Plano».
+  }
+}
+
 /** Lo mínimo de una reserva que mira el filtro. */
 export interface ReservaFiltrable {
   hora: string;

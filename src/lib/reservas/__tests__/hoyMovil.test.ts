@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  listaHoyEscritorio,
+  tieneAlergia,
   agruparHoyMovil,
   estadoMesasHoy,
   lleganAhora,
@@ -156,5 +158,56 @@ describe("reservasConMesaEnSala (panel del Plano de Hoy)", () => {
     ];
     const conMesa = new Set(["a", "b", "c", "d", "e", "g", "h"]);
     expect(reservasConMesaEnSala(lista, "c", (id) => conMesa.has(id)).map((x) => x.id)).toEqual(["c", "b", "d", "e", "a"]);
+  });
+});
+
+// «Hoy» de escritorio (07/11/2026): la lista completa del turno, por estados.
+describe("listaHoyEscritorio", () => {
+  const r = (id: string, hora: string, estado: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    nombre: id,
+    hora,
+    numero_comensales: 2,
+    estado,
+    espacio_id: "s1",
+    ...extra,
+  });
+  const sinMesas = () => [] as string[];
+
+  it("agrupa en por llegar, sentadas y terminadas (liberadas, no vino y canceladas), cada grupo por hora", () => {
+    const l = listaHoyEscritorio(
+      [
+        r("conf-14", "14:00", "confirmada"),
+        r("pend-13", "13:00", "pendiente"),
+        r("sent", "13:30", "completada"),
+        r("ida", "13:15", "completada", { salida_at: "2026-11-07T14:00:00Z" }),
+        r("noshow", "13:45", "no_show"),
+        r("canc", "14:15", "cancelada"),
+      ],
+      sinMesas,
+      13 * 60 + 30,
+      { busqueda: "", filtroTurno: "todo" },
+    );
+    expect(l.porLlegar.map((f) => f.reserva.id)).toEqual(["pend-13", "conf-14"]);
+    expect(l.porLlegar.map((f) => f.tarde)).toEqual([true, false]);
+    expect(l.sentadas.map((f) => f.reserva.id)).toEqual(["sent"]);
+    expect(l.terminadas.map((f) => f.reserva.id)).toEqual(["ida", "noshow", "canc"]);
+  });
+
+  it("respeta el turno y el buscador", () => {
+    const l = listaHoyEscritorio(
+      [r("Ana", "14:00", "confirmada"), r("Bea", "21:00", "confirmada"), r("Ana cena", "21:30", "completada")],
+      sinMesas,
+      0,
+      { busqueda: "ana", filtroTurno: "cena" },
+    );
+    expect(l.porLlegar).toEqual([]);
+    expect(l.sentadas.map((f) => f.reserva.id)).toEqual(["Ana cena"]);
+  });
+
+  it("tieneAlergia reconoce la nota de una alergia", () => {
+    expect(tieneAlergia("Alérgico al marisco")).toBe(true);
+    expect(tieneAlergia("celíaca")).toBe(true);
+    expect(tieneAlergia("trona para el niño")).toBe(false);
   });
 });

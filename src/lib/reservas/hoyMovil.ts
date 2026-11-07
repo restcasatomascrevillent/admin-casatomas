@@ -296,3 +296,50 @@ export function reservasConMesaEnSala<R extends { id: string; hora: string; esta
     .filter((r) => r.espacio_id === salaId && r.estado !== "cancelada" && tieneMesa(r.id))
     .sort((a, b) => Number(yaAtendida(a)) - Number(yaAtendida(b)) || a.hora.localeCompare(b.hora) || a.id.localeCompare(b.id));
 }
+
+// ─── «Hoy» de escritorio: la lista completa por estados (07/11/2026) ─────────
+
+export interface ListaHoyEscritorio<R extends ReservaHoyMovil = ReservaHoyMovil> {
+  /** Aún no han llegado (pendiente, verificada, confirmada), por hora; las pasadas de hora, «Tarde». */
+  porLlegar: FilaLlegada<R>[];
+  /** «Llegó» y siguen en la mesa (sin `salida_at`), por hora. */
+  sentadas: FilaHoyMovil<R>[];
+  /** Ya se fueron (mesa liberada), «No vino» y canceladas, por hora: al final y plegadas. */
+  terminadas: FilaHoyMovil<R>[];
+}
+
+/**
+ * La lista de «Hoy» de ESCRITORIO (petición del dueño, 07/11/2026: «eso era para el móvil»): TODAS las reservas
+ * del día del turno elegido, agrupadas por estado. Mismos filtros (turno y buscador) que la barra.
+ */
+export function listaHoyEscritorio<R extends ReservaHoyMovil & { salida_at?: string | null }>(
+  reservas: readonly R[],
+  mesasDe: (reservaId: string) => string[],
+  minutoAhora: number,
+  filtros: { busqueda: string; filtroTurno: FiltroTurnoHoy },
+): ListaHoyEscritorio<R> {
+  const porHora = (a: R, b: R) => a.hora.localeCompare(b.hora) || (a.nombre ?? "").localeCompare(b.nombre ?? "", "es");
+  const vistas = reservas.filter((r) => coincideFiltroHoy(r, filtros)).sort(porHora);
+  const porLlegar: FilaLlegada<R>[] = [];
+  const sentadas: FilaHoyMovil<R>[] = [];
+  const terminadas: FilaHoyMovil<R>[] = [];
+  const vistos = new Set<string>();
+  for (const r of vistas) {
+    if (vistos.has(r.id)) continue;
+    vistos.add(r.id);
+    if (ESTADOS_POR_LLEGAR.has(r.estado)) {
+      const m = minutos(r.hora);
+      porLlegar.push({ reserva: r, mesas: mesasDe(r.id), terminada: false, tarde: m != null && m < minutoAhora });
+    } else if (r.estado === ESTADO_LLEGADA && !r.salida_at) {
+      sentadas.push({ reserva: r, mesas: mesasDe(r.id), terminada: false });
+    } else if (r.estado === ESTADO_LLEGADA || r.estado === ESTADO_NO_SHOW || r.estado === "cancelada") {
+      terminadas.push({ reserva: r, mesas: mesasDe(r.id), terminada: true });
+    }
+  }
+  return { porLlegar, sentadas, terminadas };
+}
+
+/** Palabras que en la nota del cliente avisan de una alergia o intolerancia (icono en la lista de escritorio). */
+const RE_ALERGIA = /alerg|intoleran|cel[ií]ac|gluten|lactosa|frutos secos|marisco/i;
+
+export const tieneAlergia = (notas: string | null | undefined) => RE_ALERGIA.test(notas ?? "");
