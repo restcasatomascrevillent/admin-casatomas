@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock, CloudOff, Info, KanbanSquare, LayoutGrid, Receipt, TrendingUp } from "lucide-react";
+import { AlertTriangle, Bot, Clock, CloudOff, Info, KanbanSquare, LayoutGrid, Receipt, TrendingUp } from "lucide-react";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
 
 /** Adónde lleva un aviso (null = no tiene origen al que ir). Lo comparten la campana y la página «Avisos». */
@@ -11,6 +11,8 @@ export function rutaDeAviso(n: Pick<NotificacionDashboard, "tipo" | "referencia_
   if (n.referencia_tipo === "facturas_productos") return "/facturas?tab=productos";
   // Original de una factura que no se ha podido subir a Drive (20261105193000).
   if (n.referencia_tipo === "facturas_original") return "/facturas?tab=compras";
+  // Modelos de OpenAI nuevos, retirados o sin precio (20261107500000): solo super admin.
+  if (n.referencia_tipo === "ia_modelos") return "/super-admin/servicios?tab=modelos";
   // Encargos de Instagram (20261110100000): la ficha del encargo.
   if (n.referencia_tipo === "instagram_encargo") {
     return n.referencia_id ? `/instagram?tab=encargos&encargo=${encodeURIComponent(n.referencia_id)}` : "/instagram?tab=encargos";
@@ -77,6 +79,10 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   original_sin_drive: CloudOff,
   // Encargos de Instagram: aceptado, entregado, mensaje de Oficiosos…
   instagram_encargo: KanbanSquare,
+  // Centro de modelos de IA (cron diario ia-modelos-openai, 20261107500000).
+  ia_modelo_nuevo: Bot,
+  ia_modelo_retirado: AlertTriangle,
+  ia_modelo_sin_precio: Bot,
   sistema: Info,
 };
 
