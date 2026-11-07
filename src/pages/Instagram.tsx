@@ -1,25 +1,62 @@
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { lazy, Suspense, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { BarChart3, CalendarDays, Clapperboard, Flag, Home, KanbanSquare, PenLine } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardLayout } from "@/components/DashboardLayout";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PestanasPagina } from "@/components/panel/PestanasPagina";
-import { CrearInstagram } from "@/components/instagram/crear";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarioInstagram } from "@/components/instagram/programar";
-import { CampanasInstagram, CLAVE_CAMPANAS, leerPieza, listarCampanas, type IdeaSemanaIA } from "@/components/instagram/campanas";
+// Solo lo ligero va en el paquete de /instagram (los index arrastran las pestañas enteras): ver docs/instagram-rendimiento.md.
+import { CLAVE_CAMPANAS, leerPieza, listarCampanas, type IdeaSemanaIA } from "@/components/instagram/campanas/api";
 import type { PiezaInstagram } from "@/components/marketing/instagram/usePiezasInstagram";
-import { MetricasInstagram } from "@/components/instagram/metricas";
-import { crearReelDesdeBase, type ReelPieza } from "@/components/instagram/reels";
-import { PestanaReels } from "@/components/instagram/video";
+import type { ReelPieza } from "@/lib/instagram/reels";
 import { EstudioInstagram } from "@/components/instagram/estudio/EstudioInstagram";
+import { prefetchEstudio } from "@/components/instagram/estudio/consultas";
 import { IndicadorCuenta, SelectorMarca, type FiltroMarca } from "@/components/instagram/BarraInstagram";
 import { useAlturaDisponible } from "@/hooks/useAlturaDisponible";
-import { EncargosInstagram, usePendientesEncargos, useRolesEncargos, type DatosFormulario } from "@/components/instagram/encargos";
+import { encargosActivos, usePendientesEncargos, useRolesEncargos } from "@/components/instagram/encargos/useEncargos";
+import type { DatosFormulario } from "@/components/instagram/encargos/logica";
+
+// Pestañas pesadas: cada una se descarga la primera vez que se abre (el Estudio, la de por defecto, no).
+const CrearInstagram = lazy(() => import("@/components/instagram/crear/CrearInstagram").then((m) => ({ default: m.CrearInstagram })));
+const CampanasInstagram = lazy(() => import("@/components/instagram/campanas/CampanasInstagram").then((m) => ({ default: m.CampanasInstagram })));
+const CalendarioInstagram = lazy(() => import("@/components/instagram/programar/CalendarioInstagram").then((m) => ({ default: m.CalendarioInstagram })));
+const EncargosInstagram = lazy(() => import("@/components/instagram/encargos/EncargosInstagram").then((m) => ({ default: m.EncargosInstagram })));
+const MetricasInstagram = lazy(() => import("@/components/instagram/metricas/MetricasInstagram").then((m) => ({ default: m.MetricasInstagram })));
 // ── Crear en el móvil (instagram-movil): ver el bloque «Crear en el móvil» más abajo. ──
-import { CrearMovil } from "@/components/instagram/movil";
+const CrearMovil = lazy(() => import("@/components/instagram/movil/CrearMovil").then((m) => ({ default: m.CrearMovil })));
+// Reels: el motor y el reel de partida (crearReelDesdeBase) llegan juntos al abrir la pestaña.
+const PestanaReels = lazy(async () => {
+  const [{ PestanaReels: Pestana }, { crearReelDesdeBase }] = await Promise.all([import("@/components/instagram/video/PestanaReels"), import("@/lib/instagram/reels")]);
+  type Props = ComponentProps<typeof Pestana>;
+  function ConReelInicial({ reel, onChange, ...resto }: Omit<Props, "reel"> & { reel: ReelPieza | null }) {
+    useEffect(() => {
+      if (!reel) onChange(crearReelDesdeBase("del-mar"));
+    }, [reel, onChange]);
+    return reel ? <Pestana reel={reel} onChange={onChange} {...resto} /> : <EsqueletoPestana />;
+  }
+  return { default: ConReelInicial };
+});
+
+/** Lo que se ve mientras se descarga una pestaña: bloques grises con la forma de dos columnas. */
+function EsqueletoPestana() {
+  return (
+    <div role="status" aria-label="Cargando la pestaña" className="grid gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(17.5rem,1fr)]" data-testid="esqueleto-pestana">
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-2/3" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+      <div className="space-y-3">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    </div>
+  );
+}
+
+const Perezosa = ({ children }: { children: ReactNode }) => <Suspense fallback={<EsqueletoPestana />}>{children}</Suspense>;
 
 /**
  * Suelo (px) del alto de la página: por debajo (ventanas muy bajas, teclado
@@ -75,7 +112,8 @@ function marcaInicial(): FiltroMarca {
 export default function Instagram() {
   const [raiz, setRaiz] = useState<HTMLDivElement | null>(null);
   const alto = useAlturaDisponible(raiz, ALTURA_MINIMA_INSTAGRAM);
-  const [reel, setReel] = useState<ReelPieza>(() => crearReelDesdeBase("del-mar"));
+  // null hasta abrir «Reels» (el reel de partida sale del motor, que se carga con la pestaña).
+  const [reel, setReel] = useState<ReelPieza | null>(null);
   const [reelPiezaId, setReelPiezaId] = useState<string | null>(null);
   const [pestana, setPestana] = useState<string>(() => {
     const pedida = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("tab");
@@ -93,6 +131,7 @@ export default function Instagram() {
   const [abrir, setAbrir] = useState<{ pieza: PiezaInstagram; clave: number } | null>(null);
   const [diaCalendario, setDiaCalendario] = useState<string | null>(null);
   const [pedir, setPedir] = useState<{ clave: number; datos?: Partial<DatosFormulario> } | null>(null);
+  const qc = useQueryClient();
   const rolesEncargos = useRolesEncargos();
   const pendientesEncargos = usePendientesEncargos();
   // Agencia sin Marketing: solo «Encargos» (el resto de pestañas es del restaurante).
@@ -116,12 +155,25 @@ export default function Instagram() {
     typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("encargo"),
   );
 
+  // «Crear» se monta la primera vez que se abre y luego se queda montada (no pierde lo que se está editando).
+  const [crearVisitada, setCrearVisitada] = useState(false);
+  useEffect(() => {
+    if (pestanaVisible === "crear") setCrearVisitada(true);
+  }, [pestanaVisible]);
+
+  // Lo del Estudio, pedido ya (y a la vez) desde cualquier pestaña: volver a él pinta al momento.
+  useEffect(() => {
+    if (!soloAgencia) void prefetchEstudio(qc, marca);
+  }, [qc, marca, soloAgencia]);
+
   // Propuestas de campaña nuevas (contador dorado de la pestaña, como la maqueta). Misma consulta que la pestaña.
+  // Sale a la vez que lo demás (sin esperar a los permisos: la RLS filtra); solo se para si ya se sabe que no es del restaurante.
   const campanas = useQuery({
     queryKey: [...CLAVE_CAMPANAS, "lista"],
     queryFn: () => listarCampanas("todas"),
-    enabled: !rolesEncargos.cargando && rolesEncargos.restaurante,
+    enabled: rolesEncargos.cargando || rolesEncargos.restaurante,
     staleTime: 60_000,
+    gcTime: 30 * 60_000,
   });
   const propuestasNuevas = useMemo(
     () => (campanas.data ?? []).filter((c) => c.estado === "propuesta" && (marca === "todas" || c.marca === marca)).length,
@@ -227,64 +279,84 @@ export default function Instagram() {
             data-testid="pagina-instagram"
           >
             {/* La agencia sin Marketing no tiene editor (no puede leer piezas ni Drive). */}
-            {!soloAgencia && !crearEnMovil && <CrearInstagram abrir={abrir} onVerCalendario={() => setPestana("calendario")} />}
+            {!soloAgencia && !crearEnMovil && crearVisitada && (
+              <Perezosa>
+                <CrearInstagram abrir={abrir} onVerCalendario={() => setPestana("calendario")} />
+              </Perezosa>
+            )}
             {/* ── Crear en el móvil (instagram-movil) ── */}
-            {!soloAgencia && crearEnMovil && (
-              <CrearMovil
-                incrustado
-                marcaInicial={marca === "todas" ? undefined : marca}
-                cuenta={<IndicadorCuenta marca={marca} compacto />}
-                onEditorCompleto={() => setEditorCompletoEnMovil(true)}
-                onPantallaCompleta={() => navigate("/instagram/rapido")}
-              />
+            {!soloAgencia && crearEnMovil && crearVisitada && (
+              <Perezosa>
+                <CrearMovil
+                  incrustado
+                  marcaInicial={marca === "todas" ? undefined : marca}
+                  cuenta={<IndicadorCuenta marca={marca} compacto />}
+                  onEditorCompleto={() => setEditorCompletoEnMovil(true)}
+                  onPantallaCompleta={() => navigate("/instagram/rapido")}
+                />
+              </Perezosa>
             )}
           </TabsContent>
 
           {/* Campañas: dos columnas con scroll propio desde `lg`. */}
           <TabsContent value="campanas" className={`${CONTENIDO_PESTANA} lg:overflow-hidden`}>
             {pestana === "campanas" && (
-              <CampanasInstagram
-                className="lg:h-full"
-                marca={marca}
-                onAbrirBorrador={(id) => void abrirEnEditor(id)}
-                onVerCalendario={() => setPestana("calendario")}
-                onAbrirEncargo={abrirEncargo}
-              />
+              <Perezosa>
+                <CampanasInstagram
+                  className="lg:h-full"
+                  marca={marca}
+                  onAbrirBorrador={(id) => void abrirEnEditor(id)}
+                  onVerCalendario={() => setPestana("calendario")}
+                  onAbrirEncargo={abrirEncargo}
+                />
+              </Perezosa>
             )}
           </TabsContent>
 
           {/* Reels: el reel vive en la página para no perderlo al cambiar de pestaña. */}
           <TabsContent value="reels" className={`${CONTENIDO_PESTANA} lg:overflow-hidden`}>
-            {pestana === "reels" && <PestanaReels reel={reel} onChange={setReel} piezaId={reelPiezaId} onPiezaId={setReelPiezaId} marca={marca} />}
+            {pestana === "reels" && (
+              <Perezosa>
+                <PestanaReels reel={reel} onChange={setReel} piezaId={reelPiezaId} onPiezaId={setReelPiezaId} marca={marca} />
+              </Perezosa>
+            )}
           </TabsContent>
 
           {/* Calendario y Métricas solo se montan al abrirlas: así no consultan nada si no se miran. */}
           <TabsContent value="calendario" className={CONTENIDO_PESTANA}>
             {pestana === "calendario" && (
-              <CalendarioInstagram
-                marca={marca}
-                diaInicial={diaCalendario}
-                onAbrirPieza={(id) => void abrirEnEditor(id)}
-                onNuevaPieza={(dia) => nuevaPieza(dia)}
-                onAbrirEncargo={abrirEncargo}
-              />
+              <Perezosa>
+                <CalendarioInstagram
+                  marca={marca}
+                  diaInicial={diaCalendario}
+                  onAbrirPieza={(id) => void abrirEnEditor(id)}
+                  onNuevaPieza={(dia) => nuevaPieza(dia)}
+                  onAbrirEncargo={abrirEncargo}
+                />
+              </Perezosa>
             )}
           </TabsContent>
 
           {/* Encargos: el tablero reparte el alto y cada columna hace scroll. */}
           <TabsContent value="encargos" className={`${CONTENIDO_PESTANA} overflow-hidden`}>
             {pestanaVisible === "encargos" && (
-              <EncargosInstagram
-                encargoInicial={encargoAbierto}
-                onAbrirPieza={(id) => void abrirEnEditor(id)}
-                marca={soloAgencia ? undefined : marca}
-                pedir={pedir}
-              />
+              <Perezosa>
+                <EncargosInstagram
+                  encargoInicial={encargoAbierto}
+                  onAbrirPieza={(id) => void abrirEnEditor(id)}
+                  marca={soloAgencia ? undefined : marca}
+                  pedir={pedir}
+                />
+              </Perezosa>
             )}
           </TabsContent>
 
           <TabsContent value="metricas" className={CONTENIDO_PESTANA}>
-            {pestana === "metricas" && <MetricasInstagram />}
+            {pestana === "metricas" && (
+              <Perezosa>
+                <MetricasInstagram />
+              </Perezosa>
+            )}
           </TabsContent>
         </Tabs>
       </div>

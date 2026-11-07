@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, type ReactNode } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CentroNotificaciones } from "@/components/notificaciones/CentroNotificaciones";
@@ -23,7 +23,49 @@ interface DashboardLayoutProps {
   sinCabeceraMovil?: boolean;
 }
 
+/** Opciones de la página que cambian el marco (las mismas props de `DashboardLayout`). */
+export type OpcionesMarcoPanel = Pick<DashboardLayoutProps, "fixedHeight" | "sinCabeceraMovil">;
+
+/**
+ * Marco montado UNA vez por la ruta de layout (`PanelLayout`, 07/11/2026, «¿por qué al cambiar de sección se
+ * recarga toda la página?»). Dentro de él, el `<DashboardLayout>` de cada página no vuelve a pintar el menú ni la
+ * cabecera: solo pasa sus opciones al marco y devuelve su contenido. Fuera (pruebas, páginas sueltas), igual que
+ * siempre.
+ */
+export const MarcoPanelContext = createContext<((opciones: OpcionesMarcoPanel) => void) | null>(null);
+
 export function DashboardLayout({ children, fixedHeight = false, sinCabeceraMovil = false }: DashboardLayoutProps) {
+  const fijarOpciones = useContext(MarcoPanelContext);
+  if (fijarOpciones) {
+    return (
+      <OpcionesEnMarco fijarOpciones={fijarOpciones} fixedHeight={fixedHeight} sinCabeceraMovil={sinCabeceraMovil}>
+        {children}
+      </OpcionesEnMarco>
+    );
+  }
+  return (
+    <MarcoPanel fixedHeight={fixedHeight} sinCabeceraMovil={sinCabeceraMovil}>
+      {children}
+    </MarcoPanel>
+  );
+}
+
+function OpcionesEnMarco({
+  children,
+  fijarOpciones,
+  fixedHeight,
+  sinCabeceraMovil,
+}: DashboardLayoutProps & { fijarOpciones: (opciones: OpcionesMarcoPanel) => void }) {
+  // Antes de pintar (sin parpadeo de la barra), y al salir de la página el marco vuelve a lo de siempre.
+  useLayoutEffect(() => {
+    fijarOpciones({ fixedHeight, sinCabeceraMovil });
+    return () => fijarOpciones({});
+  }, [fijarOpciones, fixedHeight, sinCabeceraMovil]);
+  return <>{children}</>;
+}
+
+/** Menú lateral + cabecera de tablet/móvil + `<main>`. Lo pinta `DashboardLayout` suelto o `PanelLayout` una vez. */
+export function MarcoPanel({ children, fixedHeight = false, sinCabeceraMovil = false }: DashboardLayoutProps) {
   // Por debajo de 1024px (`useIsCompactNav`: iPad vertical 768/810/820, Android
   // 800, teléfonos) el menú lateral se renderiza como panel deslizante (Sheet)
   // y SOLO se puede abrir desde fuera de él: sin esta barra no habría manera de

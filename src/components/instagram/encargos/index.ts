@@ -5,6 +5,6 @@
 export { EncargosInstagram, type EncargosInstagramProps } from "./EncargosInstagram";
 export { FichaEncargo } from "./FichaEncargo";
 export { FormularioEncargo } from "./FormularioEncargo";
-export { useEncargos, useHuecosEncargo, usePendientesEncargos, useRolesEncargos } from "./useEncargos";
+export { encargosActivos, opcionesEncargos, useEncargos, useHuecosEncargo, usePendientesEncargos, useRolesEncargos } from "./useEncargos";
 export { avisarEncargo, llamarRpc, mensajeErrorEncargo } from "./api";
 export * from "./logica";

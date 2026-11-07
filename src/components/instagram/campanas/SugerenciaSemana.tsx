@@ -6,6 +6,10 @@
  * «Otra idea» pasa a la siguiente y «Crear» se la da a quien lo monte (no
  * crea nada por sí solo).
  *
+ * Al cargar NO se llama a la IA ni a ninguna Edge Function: solo la RPC de
+ * fechas (barata, guardada 1 h). Mientras llega, píldoras grises con la forma
+ * de las fechas (docs/instagram-rendimiento.md).
+ *
  *   <SugerenciaSemana marca="casa-tomas" destacada onCrear={(idea) => …} onVerCampanas={() => …} />
  */
 import { useState } from "react";
@@ -13,6 +17,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { CalendarDays, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { inicioSemana, hoyMadrid, sumarDias } from "@/components/instagram/programar/logica";
 import { MiniaturaFoto } from "@/components/instagram/MiniaturaFoto";
 import { obtenerPlantilla, type MarcaId } from "@/lib/instagram";
@@ -36,6 +41,15 @@ export interface SugerenciaSemanaProps {
   className?: string;
 }
 
+/** Consulta de las fechas señaladas de la semana (compartida con el prefetch del Estudio). */
+export const opcionesFechasSemana = (marca: MarcaId, lunes: string) => ({
+  queryKey: ["marketing_fechas", marca, lunes] as const,
+  queryFn: () => fechasEntre(lunes, sumarDias(lunes, 6), marca),
+  // Las fechas señaladas de una semana casi no cambian.
+  staleTime: 60 * 60_000,
+  gcTime: 2 * 60 * 60_000,
+});
+
 const MOTIVO: Record<string, string> = {
   fecha_senalada: "Fecha señalada",
   temporada: "Temporada",
@@ -49,10 +63,7 @@ export function SugerenciaSemana({ marca, semana, onCrear, onVerCampanas, onPedi
   const domingo = sumarDias(lunes, 6);
   const [indice, setIndice] = useState(0);
 
-  const fechas = useQuery({
-    queryKey: ["marketing_fechas", marca, lunes],
-    queryFn: () => fechasEntre(lunes, domingo, marca),
-  });
+  const fechas = useQuery(opcionesFechasSemana(marca, lunes));
   const ideas = useMutation<RespuestaIdeas, Error>({
     mutationFn: () => pedirIdeasSemana(marca, lunes),
     onSuccess: () => setIndice(0),
@@ -85,7 +96,12 @@ export function SugerenciaSemana({ marca, semana, onCrear, onVerCampanas, onPedi
         </header>
 
         <div className="flex flex-wrap gap-1.5" aria-label="Fechas señaladas de la semana">
-          {fechas.isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-label="Cargando fechas" />}
+          {fechas.isLoading && (
+            <span role="status" aria-label="Cargando fechas" className="flex gap-1.5">
+              <Skeleton className="h-5 w-28 rounded-full" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </span>
+          )}
           {(fechas.data ?? []).map((f) => (
             <span
               key={`${f.titulo}-${f.desde}`}

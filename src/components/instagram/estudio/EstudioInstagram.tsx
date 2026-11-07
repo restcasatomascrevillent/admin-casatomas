@@ -7,34 +7,33 @@
  *    encargos abiertos (los que esperan tu revisión, primero).
  *
  * Solo junta piezas que ya existían (useCalendarioInstagram, useEncargos,
- * useMetricasInstagram, SugerenciaSemana): no crea ni publica nada por sí
+ * las cifras de instagram_metricas_cuenta, SugerenciaSemana): no crea ni publica nada por sí
  * sola. Ocupa el alto que le da la pestaña (sin scroll de página); las listas
  * hacen scroll por dentro desde `lg`.
+ *
+ * Rendimiento (docs/instagram-rendimiento.md): todas las consultas salen a la
+ * vez (sin esperar a los permisos), ninguna llama a Meta ni a la IA, las
+ * cifras se leen de la tabla y no de la Edge Function, y mientras llegan se
+ * ven esqueletos grises con la forma del contenido. Las claves están en
+ * ./consultas.ts, que también usa el prefetch de la página.
  */
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, Clapperboard, Image as ImageIcon, Loader2, Plus, Smartphone, TrendingDown, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, CheckCircle2, Clapperboard, Image as ImageIcon, Plus, Smartphone, TrendingDown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
-import type { MarcaId } from "@/lib/instagram";
-import { SugerenciaSemana, type IdeaSemanaIA } from "@/components/instagram/campanas";
-import {
-  agruparPorDia,
-  construirEventos,
-  DIAS_CORTOS,
-  hoyMadrid,
-  inicioSemana,
-  madridAUtc,
-  sumarDias,
-  textoInstante,
-  type EventoCalendario,
-} from "@/components/instagram/programar/logica";
+// Directo de cada fichero (no de los index): así el Estudio no arrastra Campañas ni el Calendario al paquete de /instagram.
+import { SugerenciaSemana } from "@/components/instagram/campanas/SugerenciaSemana";
+import type { IdeaSemanaIA } from "@/components/instagram/campanas/api";
+import { agruparPorDia, construirEventos, DIAS_CORTOS, hoyMadrid, sumarDias, textoInstante, type EventoCalendario } from "@/components/instagram/programar/logica";
 import { useCalendarioInstagram } from "@/components/instagram/programar/useProgramacionInstagram";
-import { Miniatura, tituloEvento } from "@/components/instagram/programar/CalendarioInstagram";
-import { useEncargos, useRolesEncargos } from "@/components/instagram/encargos/useEncargos";
+import { Miniatura, tituloEvento } from "@/components/instagram/programar/Miniatura";
+import { encargosActivos, useEncargos, useRolesEncargos } from "@/components/instagram/encargos/useEncargos";
 import { esperaA, fechaCorta, NOMBRE_MODO, type DatosFormulario, type Encargo } from "@/components/instagram/encargos/logica";
-import { useMetricasInstagram } from "@/components/instagram/metricas/useMetricasInstagram";
 import { formatearNumero, textoVariacion } from "@/components/instagram/metricas/agregacion";
 import type { DatosMetricas, PuntoSerie } from "@/components/instagram/metricas/tipos";
+import { marcaSugerencia as marcaDeSugerencia, opcionesMetricasEstudio, rangoEstudio } from "./consultas";
 import { ESTADOS_CALENDARIO, ESTILO_TONO } from "@/components/instagram/estados";
 import { InsigniaEstado, MarcaMini } from "@/components/instagram/InsigniaEstado";
 import type { FiltroMarca } from "@/components/instagram/BarraInstagram";
@@ -93,7 +92,7 @@ interface Cifra {
 }
 
 /** Las 3 cifras del Estudio (alcance, interacciones, seguidores nuevos) de los últimos 28 días. */
-export function cifrasEstudio(datos: DatosMetricas | null): Cifra[] {
+export function cifrasEstudio(datos: Pick<DatosMetricas, "resumen" | "serie"> | null): Cifra[] {
   const r = datos?.resumen?.d28;
   if (!r) return [];
   const serie = (datos?.serie ?? []).slice(-28);
@@ -110,6 +109,41 @@ export function cifrasEstudio(datos: DatosMetricas | null): Cifra[] {
       serie: seguidores,
     },
   ];
+}
+
+/** Esqueleto de una lista (miniatura + dos líneas + insignia), mientras carga. */
+function FilasEsqueleto({ filas = 3, miniatura = "h-14 w-12", etiqueta }: { filas?: number; miniatura?: string; etiqueta: string }) {
+  return (
+    <li role="status" aria-label={etiqueta} className="space-y-1" data-testid="esqueleto">
+      {Array.from({ length: filas }, (_, i) => (
+        <span key={i} className="flex items-center gap-3 p-2">
+          <Skeleton className={cn("shrink-0", miniatura)} />
+          <span className="flex-1 space-y-1.5">
+            <Skeleton className="h-4 w-3/5" />
+            <Skeleton className="h-3 w-2/5" />
+          </span>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </span>
+      ))}
+    </li>
+  );
+}
+
+/** Esqueleto de las 3 cifras (nombre, número y minigráfica). */
+function CifrasEsqueleto() {
+  return (
+    <div role="status" aria-label="Cargando cifras" data-testid="esqueleto">
+      {["Alcance", "Interacciones", "Seguidores nuevos"].map((n) => (
+        <div key={n} className="grid grid-cols-[minmax(0,1fr)_6rem] items-center gap-2.5 border-t border-[#efebe8] py-2.5 first:border-t-0">
+          <div className="space-y-1.5">
+            <div className="text-xs text-muted-foreground">{n}</div>
+            <Skeleton className="h-6 w-20" />
+          </div>
+          <Skeleton className="h-[34px] w-24" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function Tarjeta({ titulo, accion, children, className }: { titulo: React.ReactNode; accion?: React.ReactNode; children: React.ReactNode; className?: string }) {
@@ -171,9 +205,9 @@ function MiniDia({ e, onAbrir }: { e: EventoCalendario; onAbrir: (id: string) =>
 
 export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaPieza, onCrearIdea, onAbrirEncargo, onPedirEncargo, className }: EstudioInstagramProps) {
   const hoy = hoyMadrid();
-  const lunes = inicioSemana(hoy);
-  // Una sola consulta: desde el lunes hasta dentro de un mes (semana + próximas).
-  const [rango] = useState(() => ({ desde: madridAUtc(lunes, "00:00") as Date, hasta: madridAUtc(sumarDias(hoy, 31), "00:00") as Date }));
+  // Una sola consulta: desde el lunes hasta dentro de un mes (semana + próximas). Misma clave que el prefetch.
+  const [rango] = useState(() => rangoEstudio(hoy));
+  const lunes = rango.lunes;
   const calendario = useCalendarioInstagram(rango.desde, rango.hasta);
   const eventos = useMemo(
     () =>
@@ -187,7 +221,8 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
   const proximas = eventos.filter((e) => e.tipo !== "publicada" && new Date(e.instante).getTime() >= ahora - 60 * 60_000).slice(0, 20);
 
   const roles = useRolesEncargos();
-  const encargos = useEncargos(!roles.cargando && (roles.restaurante || roles.agencia));
+  // En paralelo con todo lo demás: no espera a los permisos (la RLS ya filtra).
+  const encargos = useEncargos(encargosActivos(roles));
   const abiertos = useMemo(() => {
     const lista = (encargos.data ?? []).filter((e) => ABIERTOS.has(e.estado) && (marca === "todas" || e.marca === marca));
     const espera = (e: Encargo) => (esperaA(e) === "restaurante" ? 0 : 1);
@@ -195,9 +230,10 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
   }, [encargos.data, marca]);
   const esperanRevision = abiertos.filter((e) => esperaA(e) === "restaurante").length;
 
-  const metricas = useMetricasInstagram(undefined, marca === "todas" ? null : marca);
-  const cifras = cifrasEstudio(metricas.datos);
-  const marcaSugerencia: MarcaId = marca === "todas" ? "casa-tomas" : marca;
+  // Las 3 cifras, de la tabla (sin la Edge Function); al cambiar de marca se ven las anteriores hasta que llegan.
+  const metricas = useQuery({ ...opcionesMetricasEstudio(marca), placeholderData: (previo) => previo });
+  const cifras = cifrasEstudio(metricas.data ?? null);
+  const marcaSugerencia = marcaDeSugerencia(marca);
 
   return (
     <div className={cn("grid min-h-0 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.65fr)_minmax(17.5rem,1fr)] lg:grid-rows-[minmax(0,1fr)]", className)} data-testid="estudio-instagram">
@@ -275,11 +311,7 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
           }
         >
           <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pb-1.5" data-testid="proximas-estudio">
-            {calendario.isLoading && (
-              <li className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando…
-              </li>
-            )}
+            {calendario.isLoading && <FilasEsqueleto etiqueta="Cargando las próximas publicaciones" />}
             {calendario.error && <li className="p-3 text-sm text-muted-foreground">No se ha podido cargar el calendario ahora.</li>}
             {!calendario.isLoading && !calendario.error && proximas.length === 0 && (
               <li className="p-3 text-sm text-muted-foreground">
@@ -313,12 +345,8 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
       <div className="flex min-h-0 flex-col gap-4">
         <Tarjeta titulo="Últimos 28 días" accion={<Enlace onClick={() => onIr("metricas")}>Métricas</Enlace>} className="shrink-0">
           <div className="px-3.5 pb-2" data-testid="cifras-estudio">
-            {metricas.cargando && (
-              <p className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando cifras…
-              </p>
-            )}
-            {!metricas.cargando && cifras.length === 0 && (
+            {metricas.isLoading && <CifrasEsqueleto />}
+            {!metricas.isLoading && cifras.length === 0 && (
               <p className="py-3 text-sm text-muted-foreground">Aún no hay cifras de Instagram. Cuando lleguen, verás aquí el alcance, las interacciones y los seguidores.</p>
             )}
             {cifras.map((c) => (
@@ -357,11 +385,7 @@ export function EstudioInstagram({ marca, onIr, onVerDia, onAbrirPieza, onNuevaP
           className="min-h-[12rem] flex-1"
         >
           <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5" data-testid="encargos-estudio">
-            {encargos.isLoading && (
-              <li className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Cargando…
-              </li>
-            )}
+            {encargos.isLoading && <FilasEsqueleto filas={2} miniatura="h-10 w-10" etiqueta="Cargando los encargos" />}
             {!encargos.isLoading && abiertos.length === 0 && <li className="p-3 text-sm text-muted-foreground">No hay encargos abiertos.</li>}
             {abiertos.map((e) => {
               const Icono = ICONO_FORMATO[e.formato] ?? ImageIcon;
