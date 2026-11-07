@@ -17,6 +17,8 @@ import {
   LabelList,
   Line,
   LineChart,
+  ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -38,6 +40,8 @@ import {
 } from "@/lib/facturas/explorador";
 import { FOCO } from "./piezas";
 import { esTactil } from "./desplazar";
+import type { AlertaFacturas } from "@/lib/facturas/alertas";
+import { MarcasDeGrafica } from "./Alertas";
 
 // 12 px como mínimo (texto < 12 px, QA 05/11/2026).
 const EJE = { fontSize: 12, fill: "hsl(var(--muted-foreground))" };
@@ -55,6 +59,26 @@ interface PropsGrafica {
   compacta?: boolean;
   /** Qué se cuenta en el globo («3 documentos»); null, nada. Las de «Al instante» por categoría cuentan líneas. */
   cuenta?: { uno: string; varios: string } | null;
+  /** Alertas de Facturas por clave de punto (20261107300000): marca en el punto y botón debajo. */
+  alertas?: Map<string, AlertaFacturas[]>;
+  /** Línea horizontal discontinua (p. ej. el precio de referencia de un producto). */
+  referencia?: { valor: number; etiqueta: string } | null;
+  onIrA?: (enlace: string) => void;
+}
+
+/** Triángulo de aviso dibujado sobre el punto (ámbar; rojo si alguna alerta es importante). */
+function FormaAviso({ cx, cy, alta }: { cx?: number; cy?: number; alta: boolean }) {
+  if (cx === undefined || cy === undefined || !Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const y = cy - 12;
+  const color = alta ? "#dc2626" : "#d97706";
+  return (
+    <g pointerEvents="none" aria-hidden>
+      <path d={`M ${cx} ${y - 7} L ${cx + 7.5} ${y + 6} L ${cx - 7.5} ${y + 6} Z`} fill={color} stroke="hsl(var(--background))" strokeWidth={1.5} />
+      <text x={cx} y={y + 4.5} textAnchor="middle" fontSize={9} fontWeight={700} fill="#fff">
+        !
+      </text>
+    </g>
+  );
 }
 
 const CUENTA_DOCUMENTOS = { uno: "documento", varios: "documentos" };
@@ -98,6 +122,7 @@ function Globo({
   unidad,
   cuenta,
   elegible,
+  alertas,
 }: TooltipProps<number, string> & {
   series: SerieGrafica[];
   medida: Exploracion["parametros"]["medida"];
@@ -105,6 +130,7 @@ function Globo({
   cuenta: { uno: string; varios: string } | null;
   /** «toca para elegir» solo si tocar hace algo (las gráficas de «Al instante» no eligen). */
   elegible: boolean;
+  alertas?: Map<string, AlertaFacturas[]>;
 }) {
   if (!active || !payload?.length) return null;
   const fila = payload[0]?.payload as FilaGrafica | undefined;
@@ -131,6 +157,11 @@ function Globo({
         <span className="font-semibold tabular-nums">{formatoValor(fila.valor, medida, unidad)}</span>
       </p>
       {fila.incompleto && <p className="font-medium text-amber-800 dark:text-amber-400">Mes incompleto: faltan facturas por subir</p>}
+      {alertas?.get(fila.clave)?.map((a) => (
+        <p key={a.id} className={a.prioridad === "alta" ? "font-medium text-red-700 dark:text-red-400" : "font-medium text-amber-800 dark:text-amber-400"}>
+          ⚠ {a.titulo}
+        </p>
+      ))}
       {(cuenta || elegible) && (
         <p className="text-muted-foreground">
           {cuenta && (fila.documentos === 1 ? `1 ${cuenta.uno}` : `${formatEntero(fila.documentos)} ${cuenta.varios}`)}
@@ -152,6 +183,9 @@ export function GraficaExplorador({
   descripcion,
   compacta,
   cuenta = CUENTA_DOCUMENTOS,
+  alertas,
+  referencia,
+  onIrA,
 }: PropsGrafica) {
   const { filas, series } = useMemo(() => datosGrafica(exploracion, { apartarSinClasificar }), [exploracion, apartarSinClasificar]);
   const { medida, unidad } = exploracion.parametros;
@@ -194,14 +228,47 @@ export function GraficaExplorador({
   const sinGlobo = !!seleccion && esTactil();
   const globo = (
     <Tooltip
-      content={<Globo series={series} medida={medida} unidad={unidad} cuenta={cuenta} elegible={!!onSeleccion} />}
+      content={<Globo series={series} medida={medida} unidad={unidad} cuenta={cuenta} elegible={!!onSeleccion} alertas={alertas} />}
       cursor={{ fill: "hsl(var(--muted))", opacity: 0.5 }}
       {...(sinGlobo ? { active: false } : {})}
     />
   );
   // Abonos con «−» también en la cifra de cada barra.
   const cifraBarra = (v: number) => formatoEje(medida === "abonos" ? -Math.abs(v) : v, medida, unidad);
-  const margen = { top: 8, right: 12, bottom: 0, left: 0 };
+  // Alertas: un triángulo sobre cada punto con alguna (en el precio, a la altura del precio que avisa).
+  const conAlertas = alertas && alertas.size > 0 ? filas.filter((f) => (alertas.get(f.clave)?.length ?? 0) > 0) : [];
+  const yAviso = (f: FilaGrafica): number | null => {
+    if (medida === "precio") {
+      const ps = (alertas?.get(f.clave) ?? []).map((a) => a.datos.precioUd).filter((x): x is number => x !== null);
+      if (ps.length) return Math.max(...ps);
+    }
+    return f.valor;
+  };
+  const avisos = (vertical: boolean) =>
+    conAlertas.map((f) => {
+      const y = yAviso(f);
+      if (y === null) return null;
+      const alta = (alertas?.get(f.clave) ?? []).some((a) => a.prioridad === "alta");
+      const forma = (dx: number, dy: number) => (p: { cx?: number; cy?: number }) => (
+        <FormaAviso cx={p.cx === undefined ? undefined : p.cx + dx} cy={p.cy === undefined ? undefined : p.cy + dy} alta={alta} />
+      );
+      return vertical ? (
+        <ReferenceDot key={`aviso-${f.clave}`} x={f.corta} y={y} r={0} ifOverflow="extendDomain" shape={forma(0, 0)} />
+      ) : (
+        <ReferenceDot key={`aviso-${f.clave}`} x={y} y={f.corta} r={0} ifOverflow="extendDomain" shape={forma(14, 12)} />
+      );
+    });
+  const lineaRef = referencia ? (
+    <ReferenceLine
+      y={referencia.valor}
+      ifOverflow="extendDomain"
+      stroke="#b45309"
+      strokeDasharray="5 4"
+      strokeWidth={1.5}
+      label={{ value: `${referencia.etiqueta}: ${formatoValor(referencia.valor, medida, unidad)}`, position: "insideTopLeft", fontSize: 12, fill: "#92400e" }}
+    />
+  ) : null;
+  const margen = { top: conAlertas.length || referencia ? 22 : 8, right: 12, bottom: 0, left: 0 };
   const anchoEjeY = compacta ? 52 : 64;
 
   let grafica: ReactNode;
@@ -215,6 +282,7 @@ export function GraficaExplorador({
           <XAxis type="number" tickFormatter={ejeY} tick={EJE} axisLine={false} tickLine={false} />
           <YAxis type="category" dataKey="corta" width={compacta ? 110 : 160} tick={EJE} axisLine={false} tickLine={false} interval={0} />
           {globo}
+          {avisos(false)}
           {series.length === 0 ? (
             <Bar dataKey="valor" fill={COLOR_UNICO} radius={[0, 4, 4, 0]} isAnimationActive={false}>
               {filas.map(celdaUnica)}
@@ -239,6 +307,7 @@ export function GraficaExplorador({
           <XAxis dataKey="corta" tick={EJE} axisLine={false} tickLine={false} minTickGap={16} />
           <YAxis tickFormatter={ejeY} tick={EJE} axisLine={false} tickLine={false} width={anchoEjeY} />
           {globo}
+          {lineaRef}
           {(series.length ? series : [{ clave: "valor", dato: "valor" as const, color: COLOR_UNICO, etiqueta: "" }]).map((s) => (
             <Line
               key={s.clave}
@@ -252,6 +321,7 @@ export function GraficaExplorador({
               isAnimationActive={false}
             />
           ))}
+          {avisos(true)}
         </LineChart>
       </ResponsiveContainer>
     );
@@ -276,6 +346,8 @@ export function GraficaExplorador({
               isAnimationActive={false}
             />
           ))}
+          {lineaRef}
+          {avisos(true)}
         </AreaChart>
       </ResponsiveContainer>
     );
@@ -308,6 +380,8 @@ export function GraficaExplorador({
               </Bar>
             ))
           )}
+          {lineaRef}
+          {avisos(true)}
         </BarChart>
       </ResponsiveContainer>
     );
@@ -319,6 +393,9 @@ export function GraficaExplorador({
       <div role="img" aria-label={descripcion} className="min-w-0 select-none [&_.recharts-surface]:outline-none">
         {grafica}
       </div>
+      {conAlertas.length > 0 && (
+        <MarcasDeGrafica puntos={conAlertas.map((f) => ({ clave: f.clave, etiqueta: f.larga, alertas: alertas?.get(f.clave) ?? [] }))} onIrA={onIrA} />
+      )}
     </div>
   );
 }

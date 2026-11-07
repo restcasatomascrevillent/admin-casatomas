@@ -32,6 +32,9 @@ import {
   type AccionMenu,
 } from "./piezas";
 import { GraficaExplorador } from "./GraficaExplorador";
+import { MarcaAlerta } from "./Alertas";
+import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
+import { alertasDelPeriodo, alertasPorClave, marcasDeExploracion, type AlertaFacturas } from "@/lib/facturas/alertas";
 
 const ICONO = "h-4 w-4 text-muted-foreground";
 
@@ -70,9 +73,18 @@ export function GastoPorMesModulo({
   tamano = "m",
   onAmpliar,
   onDocumentos,
+  onIrA,
   pendiente,
-}: Pick<Comunes, "periodo" | "local" | "tamano" | "onAmpliar" | "onDocumentos" | "pendiente"> & { meses: MesGasto[] }) {
+  alertas = [],
+}: Pick<Comunes, "periodo" | "local" | "tamano" | "onAmpliar" | "onDocumentos" | "pendiente"> & {
+  meses: MesGasto[];
+  /** Alertas de Facturas (20261107300000): los meses con alguna llevan su marca encima. */
+  alertas?: AlertaFacturas[];
+  onIrA?: (enlace: string) => void;
+}) {
   const con = meses.filter((m) => m.documentos > 0 || m.total !== 0);
+  const porMes = useMemo(() => alertasPorClave(alertasDelPeriodo(alertas, periodo, local), "mes"), [alertas, periodo, local]);
+  const hayMarcas = con.some((m) => porMes.has(m.mes));
   const max = Math.max(1, ...con.map((m) => Math.max(0, m.casa_tomas) + Math.max(0, m.touza)));
   const variosAnios = new Set(con.map((m) => m.mes.slice(0, 4))).size > 1;
   const conTouza = !local && con.some((m) => m.touza > 0);
@@ -103,8 +115,14 @@ export function GastoPorMesModulo({
               const ct = Math.max(0, m.casa_tomas);
               const tz = conTouza ? Math.max(0, m.touza) : 0;
               const nombre = etiquetaMes(m.mes);
+              const delMes = porMes.get(m.mes) ?? [];
               return (
                 <li key={m.mes} className="flex min-w-0 flex-1 flex-col">
+                  {hayMarcas && (
+                    <span className="flex h-7 shrink-0 items-end justify-center">
+                      <MarcaAlerta alertas={delMes} etiqueta={nombre} onIrA={onIrA} className="h-5 min-w-5 px-0.5" />
+                    </span>
+                  )}
                   <button
                     type="button"
                     disabled={pendiente}
@@ -129,6 +147,7 @@ export function GastoPorMesModulo({
             })}
           </ol>
           {con.some((m) => m.incompleto) && <p className="mt-2 text-xs text-amber-800 dark:text-amber-400">Las barras claras son meses incompletos: faltan facturas por subir.</p>}
+          {hayMarcas && <p className="mt-1 text-xs text-muted-foreground">Toca el aviso de un mes para ver sus alertas.</p>}
         </>
       )}
     </Tarjeta>
@@ -373,6 +392,20 @@ export function EvolucionProducto({
   );
   const q = useExplorarCompras(params, { retraso: 0, activo: !!producto });
   const ex = q.data;
+  const alertasQ = useAlertasFacturas(local);
+  const marcas = useMemo(
+    () =>
+      ex && producto
+        ? marcasDeExploracion(alertasQ.data ?? [], {
+            medida: "precio",
+            agrupar: "mes",
+            filtros: { ...FILTROS_VACIOS, productos: [producto], unidad: ex.parametros.unidad },
+            periodo,
+            local,
+          })
+        : null,
+    [alertasQ.data, ex, producto, periodo, local],
+  );
   const bonito = producto ? producto.charAt(0).toUpperCase() + producto.slice(1).toLowerCase() : "";
   const idBusca = useId();
   return (
@@ -425,7 +458,15 @@ export function EvolucionProducto({
       ) : !ex || ex.sinDatos ? (
         <SinDatos>No se ha comprado {bonito.toLowerCase()} en este periodo.</SinDatos>
       ) : (
-        <GraficaExplorador exploracion={ex} tipo="lineas" alto={tamano === "s" ? 170 : 210} compacta descripcion={`Precio de ${bonito}. ${resumenExploracion(ex)}`} />
+        <GraficaExplorador
+          exploracion={ex}
+          tipo="lineas"
+          alto={tamano === "s" ? 170 : 210}
+          compacta
+          descripcion={`Precio de ${bonito}. ${resumenExploracion(ex)}${marcas?.referencia ? ` ${marcas.referencia.etiqueta}: ${formatImporte(marcas.referencia.valor)}.` : ""}`}
+          alertas={marcas?.porClave}
+          referencia={marcas?.referencia}
+        />
       )}
     </Tarjeta>
   );

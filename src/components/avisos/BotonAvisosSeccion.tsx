@@ -1,11 +1,11 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, CheckCheck, ExternalLink, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAvisosSeccion, useContadorAvisosSeccion, type FiltrosAvisosSeccion } from "@/hooks/useAvisosSeccion";
 import type { NotificacionDashboard } from "@/hooks/useNotificacionesDashboard";
-import { agruparPorDia, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
+import { agruparPorDia, EVENTO_ABRIR_AVISOS, horaAviso, rutaDeAviso, SECCIONES_AVISOS, TIPO_ICON, type SeccionAvisos } from "@/lib/avisos";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,6 +16,14 @@ import { cn } from "@/lib/utils";
  */
 export function BotonAvisosSeccion({ seccion, className }: { seccion: SeccionAvisos; className?: string }) {
   const [abierto, setAbierto] = useState(false);
+  // «Ver todas» de otra parte de la sección (p. ej. «Requiere atención» de Análisis) abre este modal.
+  useEffect(() => {
+    const alAbrir = (e: Event) => {
+      if ((e as CustomEvent<{ seccion?: string }>).detail?.seccion === seccion) setAbierto(true);
+    };
+    window.addEventListener(EVENTO_ABRIR_AVISOS, alAbrir);
+    return () => window.removeEventListener(EVENTO_ABRIR_AVISOS, alAbrir);
+  }, [seccion]);
   const pendientes = useContadorAvisosSeccion(seccion);
   const conPendientes = pendientes > 0;
   const etiqueta = conPendientes
