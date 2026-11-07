@@ -366,6 +366,7 @@ export function FilaConMenu({
   className,
   disabled,
   title,
+  cabecera,
 }: {
   nombre: string;
   acciones: AccionMenu[];
@@ -373,6 +374,11 @@ export function FilaConMenu({
   className?: string;
   disabled?: boolean;
   title?: string;
+  /**
+   * Cabecera corta del menú (título y, debajo, proveedor y fecha). Sin ella sale el
+   * nombre accesible, ENTERO (09/11/2026, dueño: «se cortan con …»).
+   */
+  cabecera?: { titulo: string; detalle?: string };
 }) {
   const [abierto, setAbierto] = useState(false);
   const disparador = useRef<HTMLButtonElement>(null);
@@ -389,7 +395,14 @@ export function FilaConMenu({
       {/* `pointer-events-auto`: dentro del detalle en grande (un Dialog con otra versión de
           Radix) el cuerpo queda con `pointer-events: none` y el menú no se podría tocar. */}
       <PopoverContent align="start" className="pointer-events-auto w-64 p-1" aria-label={nombre} collisionPadding={12}>
-        <p className="line-clamp-2 break-words px-2 py-1.5 text-xs text-muted-foreground">{nombre.replace(/\. ?Opciones$/, "")}</p>
+        {cabecera ? (
+          <div className="px-2 py-1.5">
+            <p className="text-sm font-medium leading-snug text-foreground [overflow-wrap:anywhere]">{cabecera.titulo}</p>
+            {cabecera.detalle && <p className="mt-0.5 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">{cabecera.detalle}</p>}
+          </div>
+        ) : (
+          <p className="px-2 py-1.5 text-xs leading-snug text-muted-foreground [overflow-wrap:anywhere]">{nombre.replace(/\. ?Opciones$/, "")}</p>
+        )}
         {acciones.map((a) => (
           <button
             key={a.etiqueta}

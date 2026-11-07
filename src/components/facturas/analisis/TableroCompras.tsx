@@ -10,8 +10,13 @@
 //   3. EXPLORAR, la gráfica a medida: es un módulo fijo (se mueve, no se quita)
 //      que parte la rejilla en dos.
 //   4. Las gráficas fijadas (del explorador y de la IA).
-//   0. Arriba, «Requiere atención»: las alertas del día (cron facturas-alertas,
-//      20261107300000). Las mismas alertas se marcan en las gráficas.
+//   0. Las alertas del día (cron facturas-alertas) van DENTRO de las tarjetas
+//      (15/11/2026, dueño: un solo tablero de gestión, sin lista suelta): las de
+//      precio en «¿Qué me están subiendo?», las de familia en «¿En qué se va el
+//      dinero?», el resto en la cifra «Por revisar»; y se marcan en las gráficas.
+//   Gráficas de decisión (RPC facturas_decision, 20261115100000): las cifras
+//      «Precios que han subido», «Más barato en otro proveedor» y «Familias
+//      fuera de lo normal» y los módulos subidas, familias, precios_top y ahorro.
 // Qué se ve, en qué orden y de qué tamaño lo elige cada usuario con
 // «Personalizar» (ConfiguradorTablero; se guarda en `dashboard_config`).
 //
@@ -50,7 +55,10 @@ import { consultaTablero } from "@/hooks/useTableroCompras";
 import { useConfigTablero } from "@/hooks/useConfigTablero";
 import { useAlertasFacturas } from "@/hooks/useAlertasFacturas";
 import { alertasDelPeriodo, umbralSubida } from "@/lib/facturas/alertas";
-import { RequiereAtencion } from "./Alertas";
+import { useDecisionFacturas } from "@/hooks/useDecisionFacturas";
+import { irAModulo, resumenDecision } from "@/lib/facturas/decision";
+import { resumenCortoAlerta, tituloCortoAlerta } from "@/lib/facturas/alertas";
+import { CambiosDePrecio, DondeAhorrar, FamiliasFrenteMedia, PreciosLoMasComprado } from "./Decision";
 import { ProveedoresTop } from "./GraficasPrincipales";
 import { AbonosPorProveedor, CasaTomasYTouza, GastoPorFamilia, GastosFijos, LoQueMasHaSubido } from "./TarjetasDetalle";
 import { AlbaranesPorRevisar, EvolucionProducto, GastoPorMesModulo, ProductosMasComprados, RegaladoPorProveedor } from "./ModulosExtra";
@@ -81,6 +89,7 @@ interface Props {
 }
 
 const ICONO = "h-4 w-4 text-muted-foreground";
+const CIFRAS_DECISION = new Set<IdCifra>(["precios_suben", "ahorro_posible", "familias_fuera"]);
 
 export function TableroCompras({
   datos,
@@ -106,6 +115,11 @@ export function TableroCompras({
   const alertas = useMemo(() => alertasQ.data ?? [], [alertasQ.data]);
   const alertasPeriodo = useMemo(() => alertasDelPeriodo(alertas, periodo, local), [alertas, periodo, local]);
   const umbral = umbralSubida(alertas) ?? 10;
+  // Gráficas de decisión (null = migración sin aplicar: se quedan las tarjetas de antes).
+  const decisionQ = useDecisionFacturas(periodo.desde, periodo.hasta, local);
+  const dec = decisionQ.data ?? null;
+  const rd = useMemo(() => (dec ? resumenDecision(dec) : null), [dec]);
+  const otrosAvisos = dec?.cambios.otros ?? [];
   const i = datos.indicadores;
   const variacion = textoVariacion(datos);
   const notaRetencion = notaRetencionGasto(i.gasto, i.retencionIrpf);
@@ -234,13 +248,22 @@ export function TableroCompras({
             etiqueta="Por revisar"
             valor={formasEntero(i.albaranesSinFactura)}
             nota={i.albaranesSinFactura === 1 ? "albarán sin factura" : "albaranes sin factura"}
-            avisos={
-              i.albaranesSinFactura > 0
+            avisos={[
+              ...(i.albaranesSinFactura > 0
                 ? [
                     `${plural(i.albaranesSinFactura, "albarán aún no está", "albaranes aún no están")} en una factura (${formatCurrency(i.albaranesSinFacturaImporte)} con IVA).`,
                   ]
-                : []
-            }
+                : []),
+              // Las alertas que no son de precio ni de familia (proveedor nuevo, importe
+              // inusual, duplicados…): aquí, con su texto corto.
+              ...otrosAvisos
+                .filter((o) => o.alerta.tipo !== "facturas_albaran_sin_factura")
+                .map((o) => (
+                  <span key={o.alerta.id} data-testid="aviso-por-revisar">
+                    <strong className="font-medium">{tituloCortoAlerta(o.alerta)}</strong> · {resumenCortoAlerta(o.alerta)}
+                  </span>
+                )),
+            ]}
             accion="Ver los albaranes sin factura"
             onVer={
               pendiente
@@ -328,6 +351,64 @@ export function TableroCompras({
             onVer={pendiente ? undefined : () => docs("Retención IRPF", "retencion_irpf", { cifra: i.retencionIrpf })}
           />
         );
+      case "precios_suben":
+        return (
+          <Indicador
+            key={id}
+            deshabilitado={pendiente || !rd}
+            etiqueta="Precios que han subido"
+            valor={rd ? formasEntero(rd.subidas) : "…"}
+            nota={
+              rd ? (
+                rd.subidas ? (
+                  <>
+                    Te cuestan unos <b className="tabular-nums">{formatCurrency(Math.round(rd.impactoMes))}</b> más al mes ·{" "}
+                    {plural(rd.subidasCampana, "con aviso", "con aviso")}
+                  </>
+                ) : (
+                  "ninguna subida por encima del umbral"
+                )
+              ) : (
+                "Cargando…"
+              )
+            }
+            accion="Ver los cambios de precio"
+            onVer={!rd || pendiente ? undefined : () => (irAModulo("subidas") ? undefined : setDetalle("subidas"))}
+          />
+        );
+      case "ahorro_posible":
+        return (
+          <Indicador
+            key={id}
+            deshabilitado={pendiente || !rd}
+            etiqueta="Más barato en otro proveedor"
+            valor={rd ? formasEntero(rd.masBarato) : "…"}
+            nota={
+              rd ? (
+                <>
+                  Ahorro de <b className="tabular-nums">{formatCurrency(Math.round(rd.ahorro90))}</b> en 90 días
+                </>
+              ) : (
+                "Cargando…"
+              )
+            }
+            accion="Ver dónde ahorrar"
+            onVer={!rd || pendiente ? undefined : () => void irAModulo("ahorro")}
+          />
+        );
+      case "familias_fuera":
+        return (
+          <Indicador
+            key={id}
+            deshabilitado={pendiente || !rd}
+            etiqueta="Familias fuera de lo normal"
+            valor={rd ? formasEntero(rd.familiasFuera.length) : "…"}
+            nota={rd ? (rd.familiasFuera.length ? rd.familiasFuera.map((f) => f.familia).join(", ") : "todas cerca de su media") : "Cargando…"}
+            avisos={rd ? rd.familiasFuera.map((f) => `${f.familia}: ${formatCurrency(f.importe)} frente a ${formatCurrency(f.referencia)} de media.`) : []}
+            accion="Ver el gasto por familia"
+            onVer={!rd || pendiente ? undefined : () => (irAModulo("familias") ? undefined : setDetalle("familias"))}
+          />
+        );
       default:
         return null;
     }
@@ -362,6 +443,7 @@ export function TableroCompras({
           />
         );
       case "subidas":
+        if (dec) return <CambiosDePrecio decision={dec} tamano={t} onAmpliar={ampliar("subidas")} pendiente={pendiente} onExplorar={onExplorar} onIrA={onIrA} />;
         return (
           <LoQueMasHaSubido
             tamano={t}
@@ -396,6 +478,30 @@ export function TableroCompras({
           />
         );
       case "familias":
+        if (dec)
+          return (
+            <FamiliasFrenteMedia
+              decision={dec}
+              tamano={t}
+              onAmpliar={ampliar("familias")}
+              pendiente={pendiente}
+              sinClasificar={datos.familias.sinClasificar}
+              onClasificar={() => onIrA(ENLACE_PRODUCTOS_COMPRAS)}
+              acciones={siListo((f: { id: number | null; familia: string; importe: number }) =>
+                f.id === null
+                  ? []
+                  : [
+                      verDocs(() => docs(f.familia, "base", { agrupar: "familia", clave: String(f.id), cifra: f.importe, detalle: "Base sin IVA de sus líneas" })),
+                      explorar("Ver por mes en el explorador", {
+                        medida: "base",
+                        agrupar: "mes",
+                        desglose: null,
+                        filtros: { ...FILTROS_VACIOS, familias: [{ id: f.id as number, nombre: f.familia }] },
+                      }),
+                    ],
+              )}
+            />
+          );
         return (
           <GastoPorFamilia
             tamano={t}
@@ -483,6 +589,27 @@ export function TableroCompras({
         return <AlbaranesPorRevisar {...comunesExtra} tamano={t} onAmpliar={ampliar("por_revisar")} />;
       case "regalado":
         return <RegaladoPorProveedor {...comunesExtra} tamano={t} onAmpliar={ampliar("regalado")} />;
+      case "precios_top":
+        if (!dec) return null;
+        return (
+          <PreciosLoMasComprado
+            decision={dec}
+            tamano={t}
+            pendiente={pendiente}
+            onExplorar={onExplorar}
+            onVerDocumentos={(p) =>
+              docs(p.producto, "base", {
+                filtros: { productos: [p.linea ?? p.producto], ...(p.proveedorId !== null ? { proveedores: [p.proveedorId] } : {}) },
+                desde: dec.topDesde,
+                hasta: dec.periodo.hasta || periodo.hasta,
+                detalle: "Base sin IVA de sus líneas",
+              })
+            }
+          />
+        );
+      case "ahorro":
+        if (!dec) return null;
+        return <DondeAhorrar decision={dec} tamano={t} pendiente={pendiente} onIrA={onIrA} />;
       case "precio_producto":
         return (
           <EvolucionProducto
@@ -500,8 +627,11 @@ export function TableroCompras({
     }
   };
 
-  const rejilla = (lista: ModuloActivo[], etiqueta: string) =>
-    lista.length > 0 && (
+  // Sin facturas_decision (migración sin aplicar o error) no hay celdas vacías.
+  const SOLO_DECISION = new Set<string>(["precios_top", "ahorro"]);
+  const rejilla = (todos: ModuloActivo[], etiqueta: string) => {
+    const lista = dec ? todos : todos.filter((m) => !SOLO_DECISION.has(m.id));
+    return lista.length > 0 && (
       <div className={cn(REJILLA_BENTO, atenuar)} aria-busy={pendiente || undefined} role="group" aria-label={etiqueta} data-testid="rejilla-modulos">
         {lista.map((m) => (
           <div key={m.id} className={cn("min-w-0", COLUMNAS_TAMANO[m.tamano])} data-modulo={m.id} data-tamano={m.tamano}>
@@ -510,19 +640,17 @@ export function TableroCompras({
         ))}
       </div>
     );
+  };
 
   const { antes, despues } = tramosModulos(config);
   const vacio = config.cifras.length === 0 && antes.length === 0 && despues.length === 0;
 
   return (
     <div className="@container/tablero space-y-4 pb-4">
-      {/* 0 · Requiere atención (alertas del día) */}
-      <RequiereAtencion alertas={alertas} onIrA={onIrA} onExplorar={onExplorar} pendiente={pendiente} />
-
       {/* 1 · Cifras */}
       {config.cifras.length > 0 && (
         <ul className={cn(rejillaCifras(config.cifras.length), atenuar)} aria-label="Indicadores del periodo" aria-busy={pendiente || undefined} data-tour="facturas-analisis-indicadores">
-          {config.cifras.map(cifra)}
+          {(dec || decisionQ.isPending ? config.cifras : config.cifras.filter((c) => !CIFRAS_DECISION.has(c))).map(cifra)}
         </ul>
       )}
 

@@ -23,6 +23,12 @@ export interface NotificacionDashboard {
  * (`nombreCanalUnico`): en el Dashboard en móvil hay DOS campanas montadas a la vez y con un
  * nombre fijo compartían canal, que se cerraba («mismatch») en cuanto se suscribía la segunda.
  */
+/**
+ * ¿Va a la campana? Las alertas de precio pequeñas (datos.campana = false, < 10 €
+ * al mes: 20261115100000_facturas_decision) solo se ven en Facturas › Análisis.
+ */
+export const vaALaCampana = (n: Pick<NotificacionDashboard, "datos">): boolean => n.datos?.campana !== false;
+
 export const PREFIJO_CANAL_NOTIFICACIONES = "notificaciones_realtime";
 
 const MAX_NOTIFICACIONES = 50;
@@ -62,7 +68,7 @@ export function useNotificacionesDashboard() {
     } else {
       // Las alertas de Facturas caducadas (ya no se cumplen) no se enseñan.
       const ahora = Date.now();
-      const leidas = ((data || []) as NotificacionDashboard[]).filter((n) => !n.caduca_en || Date.parse(n.caduca_en) > ahora);
+      const leidas = ((data || []) as NotificacionDashboard[]).filter((n) => (!n.caduca_en || Date.parse(n.caduca_en) > ahora) && vaALaCampana(n));
       const idsLeidas = new Set(leidas.map((n) => n.id));
       const items = [
         ...llegadasDuranteLectura.current.filter((n) => !idsLeidas.has(n.id)),
@@ -164,6 +170,7 @@ export function useNotificacionesDashboard() {
           const nueva = payload.new as NotificacionDashboard;
           if (nueva?.id) {
             if (idsEnLista.current.has(nueva.id)) return; // ya la trajo la relectura
+            if (!vaALaCampana(nueva)) return; // alerta pequeña: solo en Análisis
             idsEnLista.current.add(nueva.id);
           }
           if (leyendo.current) llegadasDuranteLectura.current.unshift(nueva);

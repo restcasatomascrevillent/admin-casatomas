@@ -163,11 +163,12 @@ afterEach(() => {
 });
 
 describe("rejilla «bento» y tamaños", () => {
-  it("por defecto: Explorar y detrás los 6 módulos pequeños, en una rejilla por el ancho del TABLERO", async () => {
+  it("por defecto: las preguntas antes de Explorar y el resto después, en una rejilla por el ancho del TABLERO", async () => {
     montar();
     await screen.findByText("1.362.491,57 €");
-    expect(ordenModulos()).toEqual(["proveedores", "subidas", "familias", "fijos", "abonos", "locales"]);
-    const rejilla = screen.getByTestId("rejilla-modulos");
+    // Sin facturas_decision (aquí no responde) no salen «precios_top» ni «ahorro»: nada de celdas vacías.
+    expect(ordenModulos()).toEqual(["subidas", "familias", "proveedores", "fijos", "abonos", "locales"]);
+    const [rejilla, despues] = screen.getAllByTestId("rejilla-modulos");
     // Container queries: la rejilla mira el ancho del tablero (que se estrecha con la IA), no el de la pantalla.
     expect(rejilla.className).toMatch(/@\[34rem\]\/tablero:grid-cols-2/);
     expect(rejilla.className).toMatch(/@\[60rem\]\/tablero:grid-cols-3/);
@@ -175,15 +176,16 @@ describe("rejilla «bento» y tamaños", () => {
     expect(rejilla.closest(".\\@container\\/tablero")).not.toBeNull();
     expect(celda("proveedores")).toHaveAttribute("data-tamano", "s");
     expect(celda("proveedores")?.className).toContain("col-span-1");
-    // Explorar va antes de la rejilla.
+    // Explorar va entre las dos rejillas.
     const ex = screen.getByRole("region", { name: "Explorar" });
-    expect(ex.compareDocumentPosition(rejilla) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(rejilla.compareDocumentPosition(ex) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(ex.compareDocumentPosition(despues) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("mediano = 2 columnas, grande = 3 (sin pasarse de las que hay); Explorar puede ir en medio", async () => {
     window.localStorage.setItem(
       "facturas-analisis-tablero",
-      JSON.stringify({ cifras: ["gasto"], modulos: [{ id: "familias", tamano: "l" }, { id: "explorar" }, { id: "proveedores", tamano: "m" }, { id: "abonos", tamano: "s" }] }),
+      JSON.stringify({ v: 2, cifras: ["gasto"], modulos: [{ id: "familias", tamano: "l" }, { id: "explorar" }, { id: "proveedores", tamano: "m" }, { id: "abonos", tamano: "s" }] }),
     );
     montar();
     await screen.findByText("1.362.491,57 €");
@@ -216,19 +218,19 @@ describe("Personalizar el tablero", () => {
     // Añadir «Productos más comprados» y la cifra «Media al mes» desde el catálogo.
     fireEvent.click(within(d).getByRole("switch", { name: "Mostrar «Productos más comprados»" }));
     fireEvent.click(within(d).getByRole("switch", { name: "Mostrar «Media al mes»" }));
-    // Subir «Lo que más ha subido» por encima de proveedores (con botones: también con teclado o dedo).
-    pulsar(within(modulos).getByRole("button", { name: "Subir «Lo que más ha subido»" }), "Enter");
-    // Tamaño mediano a «Gasto por familia».
-    const tam = within(modulos).getByRole("group", { name: "Tamaño de «Gasto por familia»" });
-    fireEvent.click(within(tam).getByRole("button", { name: /^Mediano/ }));
-    expect(within(tam).getByRole("button", { name: /^Mediano/ })).toHaveAttribute("aria-pressed", "true");
+    // Subir «Proveedores con más gasto» por encima de las familias (con botones: también con teclado o dedo).
+    pulsar(within(modulos).getByRole("button", { name: "Subir «Proveedores con más gasto»" }), "Enter");
+    // Tamaño grande a «¿En qué se va el dinero?».
+    const tam = within(modulos).getByRole("group", { name: "Tamaño de «¿En qué se va el dinero?»" });
+    fireEvent.click(within(tam).getByRole("button", { name: /^Grande/ }));
+    expect(within(tam).getByRole("button", { name: /^Grande/ })).toHaveAttribute("aria-pressed", "true");
     // Aún no ha cambiado el tablero.
-    expect(ordenModulos()).toEqual(["proveedores", "subidas", "familias", "fijos", "abonos", "locales"]);
+    expect(ordenModulos()).toEqual(["subidas", "familias", "proveedores", "fijos", "abonos", "locales"]);
 
     fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Personalizar el tablero" })).not.toBeInTheDocument());
     expect(ordenModulos()).toEqual(["subidas", "proveedores", "familias", "fijos", "locales", "productos"]);
-    expect(celda("familias")).toHaveAttribute("data-tamano", "m");
+    expect(celda("familias")).toHaveAttribute("data-tamano", "l");
     expect(within(screen.getByLabelText("Indicadores del periodo")).getByRole("button", { name: /^Media al mes/ })).toBeInTheDocument();
     // El módulo nuevo pide sus datos (productos, base sin IVA).
     await waitFor(() => expect(llamadas("explorar_compras")).toContainEqual(expect.objectContaining({ p_medida: "base", p_agrupar: "producto" })));
@@ -236,11 +238,11 @@ describe("Personalizar el tablero", () => {
     // Sin sesión se guarda en este navegador (y se dice).
     expect(toastMock.info).toHaveBeenCalledWith("Tablero guardado en este navegador", expect.anything());
     const guardada = JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null");
-    expect(guardada.modulos.map((m: { id: string }) => m.id)).toEqual(["explorar", "subidas", "proveedores", "familias", "fijos", "locales", "productos"]);
+    expect(guardada.modulos.map((m: { id: string }) => m.id)).toEqual(["subidas", "ahorro", "proveedores", "familias", "precios_top", "explorar", "fijos", "locales", "productos"]);
   });
 
   it("se recuerda al volver; «Restablecer» deja el de siempre y «Cancelar» no cambia nada", async () => {
-    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ cifras: ["abonos"], modulos: [{ id: "explorar" }, { id: "locales", tamano: "l" }] }));
+    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 2, cifras: ["abonos"], modulos: [{ id: "explorar" }, { id: "locales", tamano: "l" }] }));
     montar();
     await screen.findByText(/14\.376,94/);
     expect(ordenModulos()).toEqual(["locales"]);
@@ -255,8 +257,9 @@ describe("Personalizar el tablero", () => {
     fireEvent.click(within(d).getByRole("button", { name: "Restablecer el tablero de siempre" }));
     expect(within(d).getByRole("button", { name: "Restablecer el tablero de siempre" })).toBeDisabled();
     fireEvent.click(within(d).getByRole("button", { name: "Guardar" }));
-    await waitFor(() => expect(ordenModulos()).toEqual(["proveedores", "subidas", "familias", "fijos", "abonos", "locales"]));
-    expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(4);
+    await waitFor(() => expect(ordenModulos()).toEqual(["subidas", "familias", "proveedores", "fijos", "abonos", "locales"]));
+    // Sin facturas_decision, de las 5 cifras por defecto quedan «Gasto» y «Por revisar».
+    expect(within(screen.getByLabelText("Indicadores del periodo")).getAllByRole("button")).toHaveLength(2);
     expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero") ?? "null")).toEqual(CONFIG_TABLERO_POR_DEFECTO);
   });
 
@@ -277,7 +280,7 @@ describe("Personalizar el tablero", () => {
   it("con sesión: lee y guarda la configuración del usuario en dashboard_config", async () => {
     doble.estado.sesion = { user: { id: "u-1" } };
     doble.estado.filaConfig = {
-      widgets_activos: [{ tipo: "cifra", id: "documentos" }, { tipo: "modulo", id: "explorar", tamano: "l" }, { tipo: "modulo", id: "fijos", tamano: "m" }],
+      widgets_activos: [{ tipo: "cifra", id: "documentos" }, { tipo: "modulo", id: "explorar", tamano: "l" }, { tipo: "modulo", id: "fijos", tamano: "m" }, { tipo: "version", id: "2" }],
       orden_widgets: ["cifra:documentos", "modulo:explorar", "modulo:fijos"],
     };
     montar();
@@ -294,7 +297,7 @@ describe("Personalizar el tablero", () => {
     const { fila, opciones } = doble.estado.upserts[0];
     expect(opciones).toEqual({ onConflict: "user_id,nombre_vista" });
     expect(fila).toMatchObject({ user_id: "u-1", nombre_vista: "facturas_analisis" });
-    expect(fila.orden_widgets).toEqual(["cifra:documentos", "modulo:explorar", "modulo:fijos", "modulo:abonos"]);
+    expect(fila.orden_widgets).toEqual(["cifra:documentos", "modulo:explorar", "modulo:fijos", "modulo:abonos", "version:2"]);
     await waitFor(() => expect(toastMock.success).toHaveBeenCalledWith("Tablero guardado en tu cuenta"));
     expect(JSON.parse(window.localStorage.getItem("facturas-analisis-tablero:u-1") ?? "null").modulos.at(-1)).toEqual({ id: "abonos", tamano: "s" });
   });
@@ -303,7 +306,7 @@ describe("Personalizar el tablero", () => {
 describe("«Evolución de un producto»", () => {
   it("se elige el producto en la propia tarjeta, se guarda y su detalle es el precio por proveedor", async () => {
     doble.rpcs.buscar_productos_texto_agente = () => [{ producto: "MERLUZA" }, { producto: "MERLUZA DE PINCHO" }];
-    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ cifras: ["gasto"], modulos: [{ id: "explorar" }, { id: "precio_producto", tamano: "m" }] }));
+    window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify({ v: 2, cifras: ["gasto"], modulos: [{ id: "explorar" }, { id: "precio_producto", tamano: "m" }] }));
     montar();
     const tarjeta = await screen.findByRole("region", { name: "Evolución de un producto" });
     // Sin producto no hay nada que ampliar.

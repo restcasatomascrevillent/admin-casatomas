@@ -1,4 +1,6 @@
 import {
+  TrendingDown,
+  Handshake,
   AlertTriangle,
   BadgePercent,
   Bot,
@@ -107,6 +109,10 @@ export const TIPO_ICON: Record<string, typeof AlertTriangle> = {
   facturas_proveedor_nuevo: UserPlus,
   facturas_importe_inusual: AlertTriangle,
   facturas_revision: ScanSearch,
+  // 20261115100000_facturas_decision
+  facturas_precio_baja: TrendingDown,
+  facturas_precio_proveedor: TrendingUp,
+  facturas_precio_pactado: Handshake,
   // Centro de modelos de IA (cron diario ia-modelos-openai, 20261107500000).
   ia_modelo_nuevo: Bot,
   ia_modelo_retirado: AlertTriangle,

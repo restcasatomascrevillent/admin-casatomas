@@ -172,9 +172,17 @@ async function preguntar(texto: string) {
   fireEvent.click(within(panel()).getByRole("button", { name: /enviar pregunta/i }));
 }
 
+// El tablero de antes (06/11/2026), ya en la versión actual: lo que prueban estas pruebas.
+const TABLERO_DE_ANTES = {
+  v: 2,
+  cifras: ["gasto", "abonos", "regalado", "por_revisar"],
+  modulos: ["explorar", "proveedores", "subidas", "familias", "fijos", "abonos", "locales"].map((id) => ({ id, tamano: id === "explorar" ? "l" : "s" })),
+};
+
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
   window.localStorage.clear();
+  window.localStorage.setItem("facturas-analisis-tablero", JSON.stringify(TABLERO_DE_ANTES));
   for (const k of Object.keys(doble.rpcs)) delete doble.rpcs[k];
   doble.rpc.mockClear();
   doble.invoke.mockReset();

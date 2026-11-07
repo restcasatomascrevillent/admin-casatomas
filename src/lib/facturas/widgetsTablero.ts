@@ -27,7 +27,11 @@ export type IdCifra =
   | "documentos"
   | "proveedores"
   | "fijos_mes"
-  | "retencion";
+  | "retencion"
+  // Gráficas de decisión (20261115100000_facturas_decision)
+  | "precios_suben"
+  | "ahorro_posible"
+  | "familias_fuera";
 
 export type IdModulo =
   | "explorar"
@@ -41,7 +45,10 @@ export type IdModulo =
   | "productos"
   | "por_revisar"
   | "regalado"
-  | "precio_producto";
+  | "precio_producto"
+  // Gráficas de decisión (20261115100000_facturas_decision)
+  | "precios_top"
+  | "ahorro";
 
 export interface InfoCifra {
   id: IdCifra;
@@ -71,13 +78,16 @@ export const CIFRAS: InfoCifra[] = [
   { id: "proveedores", titulo: "Proveedores", descripcion: "A cuántos proveedores se ha comprado" },
   { id: "fijos_mes", titulo: "Gastos fijos al mes", descripcion: "Lo que se paga casi todos los meses" },
   { id: "retencion", titulo: "Retención IRPF", descripcion: "IRPF retenido (alquileres, gestoría…)" },
+  { id: "precios_suben", titulo: "Precios que han subido", descripcion: "Cuántos y cuánto te cuestan de más al mes" },
+  { id: "ahorro_posible", titulo: "Más barato en otro proveedor", descripcion: "Cuántos y el ahorro posible en 90 días" },
+  { id: "familias_fuera", titulo: "Familias fuera de lo normal", descripcion: "Familias que se salen de su media" },
 ];
 
 export const MODULOS: InfoModulo[] = [
   { id: "explorar", titulo: "Explorar", descripcion: "La gráfica a medida (medida, eje, color y filtros)", tamano: "l", fijo: true, soloTamano: "l" },
   { id: "proveedores", titulo: "Proveedores con más gasto", descripcion: "Ranking con IVA y su % del total", tamano: "s" },
-  { id: "subidas", titulo: "Lo que más ha subido", descripcion: "Productos que han subido de precio, mismo proveedor", tamano: "s" },
-  { id: "familias", titulo: "Gasto por familia", descripcion: "Base sin IVA de las líneas por familia", tamano: "s" },
+  { id: "subidas", titulo: "¿Qué me están subiendo?", descripcion: "Cambios de precio por € al mes: suben, más barato en otro, bajan", tamano: "m" },
+  { id: "familias", titulo: "¿En qué se va el dinero?", descripcion: "Gasto por familia frente a su media, con avisos", tamano: "m" },
   { id: "fijos", titulo: "Gastos fijos al mes", descripcion: "Proveedores que facturan casi todos los meses", tamano: "s" },
   { id: "abonos", titulo: "Abonos por proveedor", descripcion: "Devoluciones y rectificativas", tamano: "s" },
   { id: "locales", titulo: "Casa Tomás y Touza", descripcion: "El gasto de los dos locales, frente a frente", tamano: "s" },
@@ -86,6 +96,8 @@ export const MODULOS: InfoModulo[] = [
   { id: "por_revisar", titulo: "Albaranes por revisar", descripcion: "Los últimos albaranes que aún no tienen factura", tamano: "s" },
   { id: "regalado", titulo: "Regalado por proveedor", descripcion: "Quién regala o descuenta más", tamano: "s" },
   { id: "precio_producto", titulo: "Evolución de un producto", descripcion: "El precio medio de un producto mes a mes, por proveedor", tamano: "m" },
+  { id: "precios_top", titulo: "¿Cómo van los precios de lo que más compro?", descripcion: "Minigráficas del precio de los 6 productos con más gasto", tamano: "l" },
+  { id: "ahorro", titulo: "¿Dónde puedo ahorrar?", descripcion: "Mismo producto más barato en otro proveedor", tamano: "s" },
 ];
 
 export const TAMANOS: { valor: Tamano; etiqueta: string; corta: string; columnas: number }[] = [
@@ -110,21 +122,60 @@ export interface ConfigTablero {
   cifras: IdCifra[];
   /** Módulos en orden, con su tamaño. Siempre lleva «explorar». */
   modulos: ModuloActivo[];
+  /**
+   * Versión del tablero guardado. Sin ella (o < VERSION_TABLERO) es de antes de las
+   * gráficas de decisión: se le añaden una vez (ver `actualizarVersion`).
+   */
+  v?: number;
 }
 
-/** El tablero de siempre: las 4 cifras, Explorar y las 6 tarjetas pequeñas. */
+/** 2 = gráficas de decisión (15/11/2026). */
+export const VERSION_TABLERO = 2;
+
+/**
+ * El tablero de gestión (15/11/2026, maqueta del dueño): arriba el gasto y las
+ * tres cifras de decisión; luego las cuatro preguntas (subidas, ahorro, familias
+ * y precios de lo más comprado) con los proveedores; Explorar; y el resto.
+ */
 export const CONFIG_TABLERO_POR_DEFECTO: ConfigTablero = {
-  cifras: ["gasto", "abonos", "regalado", "por_revisar"],
+  cifras: ["gasto", "precios_suben", "ahorro_posible", "familias_fuera", "por_revisar"],
   modulos: [
-    { id: "explorar", tamano: "l" },
+    { id: "subidas", tamano: "m" },
+    { id: "ahorro", tamano: "s" },
+    { id: "familias", tamano: "m" },
     { id: "proveedores", tamano: "s" },
-    { id: "subidas", tamano: "s" },
-    { id: "familias", tamano: "s" },
+    { id: "precios_top", tamano: "l" },
+    { id: "explorar", tamano: "l" },
     { id: "fijos", tamano: "s" },
     { id: "abonos", tamano: "s" },
     { id: "locales", tamano: "s" },
   ],
+  v: VERSION_TABLERO,
 };
+
+/**
+ * Un tablero guardado antes de las gráficas de decisión: se le añaden UNA vez
+ * (luego cada uno quita lo que no quiera) las tres cifras nuevas tras «Gasto»
+ * (si caben), «¿Dónde puedo ahorrar?» tras las subidas y «¿Cómo van los
+ * precios…?» tras las familias; subidas y familias pasan a medianas.
+ */
+export function actualizarVersion(c: ConfigTablero): ConfigTablero {
+  if ((c.v ?? 1) >= VERSION_TABLERO) return c;
+  const cifras = [...c.cifras];
+  const pos = Math.max(0, cifras.indexOf("gasto") + 1);
+  const nuevas = (["precios_suben", "ahorro_posible", "familias_fuera"] as IdCifra[]).filter((x) => !cifras.includes(x));
+  cifras.splice(pos, 0, ...nuevas.slice(0, Math.max(0, MAX_CIFRAS - cifras.length)));
+  const modulos = c.modulos.map((m) => (m.id === "subidas" || m.id === "familias") && m.tamano === "s" ? { ...m, tamano: "m" as Tamano } : m);
+  const meter = (id: IdModulo, tras: IdModulo, tamano: Tamano) => {
+    if (modulos.some((m) => m.id === id)) return;
+    const i = modulos.findIndex((m) => m.id === tras);
+    const j = i >= 0 ? i + 1 : Math.max(0, modulos.findIndex((m) => m.id === "explorar"));
+    modulos.splice(j, 0, { id, tamano });
+  };
+  meter("ahorro", "subidas", "s");
+  meter("precios_top", "familias", "l");
+  return { cifras, modulos, v: VERSION_TABLERO };
+}
 
 export const NOMBRE_VISTA_TABLERO = "facturas_analisis";
 export const CLAVE_CONFIG_TABLERO = "facturas-analisis-tablero";
@@ -161,7 +212,8 @@ export function normalizarConfigTablero(entrada: unknown): ConfigTablero {
     modulos.push({ id, tamano: tamanoValido(id, o.tamano), ...(producto ? { producto } : {}) });
   }
   if (!modulos.some((m) => m.id === "explorar")) modulos.unshift({ id: "explorar", tamano: "l" });
-  return { cifras: cifras.slice(0, MAX_CIFRAS), modulos };
+  const v = typeof o.v === "number" ? o.v : undefined;
+  return actualizarVersion({ cifras: cifras.slice(0, MAX_CIFRAS), modulos, v });
 }
 
 export const mismaConfig = (a: ConfigTablero, b: ConfigTablero): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -265,6 +317,8 @@ export function aFilaBd(c: ConfigTablero): { widgets_activos: unknown[]; orden_w
   const activos = [
     ...c.cifras.map((id) => ({ tipo: "cifra", id })),
     ...c.modulos.map((m) => ({ tipo: "modulo", id: m.id, tamano: m.tamano, ...(m.producto ? { producto: m.producto } : {}) })),
+    // Al final: la versión del tablero (los de antes no la llevan y se actualizan una vez).
+    { tipo: "version", id: String(c.v ?? VERSION_TABLERO) },
   ];
   return { widgets_activos: activos, orden_widgets: activos.map((a) => `${a.tipo}:${a.id}`) };
 }
@@ -274,11 +328,13 @@ export function deFilaBd(fila: { widgets_activos?: unknown } | null | undefined)
   if (!Array.isArray(w) || w.length === 0) return null;
   const cifras: unknown[] = [];
   const modulos: unknown[] = [];
+  let v: number | undefined;
   for (const x of w) {
     if (!x || typeof x !== "object") continue;
     const o = x as Record<string, unknown>;
-    if (o.tipo === "cifra") cifras.push(o.id);
+    if (o.tipo === "version") v = Number(o.id) || undefined;
+    else if (o.tipo === "cifra") cifras.push(o.id);
     else if (o.tipo === "modulo") modulos.push({ id: o.id, tamano: o.tamano, producto: o.producto });
   }
-  return normalizarConfigTablero({ cifras, modulos });
+  return normalizarConfigTablero({ cifras, modulos, v });
 }

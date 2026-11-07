@@ -10,7 +10,11 @@ export type TipoAlertaFacturas =
   | "facturas_albaran_sin_factura"
   | "facturas_proveedor_nuevo"
   | "facturas_importe_inusual"
-  | "facturas_revision";
+  | "facturas_revision"
+  // 20261115100000_facturas_decision
+  | "facturas_precio_baja"
+  | "facturas_precio_proveedor"
+  | "facturas_precio_pactado";
 
 export const TIPOS_ALERTA_FACTURAS: { tipo: TipoAlertaFacturas; etiqueta: string }[] = [
   { tipo: "facturas_precio_sube", etiqueta: "Suben de precio" },
@@ -20,6 +24,9 @@ export const TIPOS_ALERTA_FACTURAS: { tipo: TipoAlertaFacturas; etiqueta: string
   { tipo: "facturas_proveedor_nuevo", etiqueta: "Proveedores nuevos" },
   { tipo: "facturas_importe_inusual", etiqueta: "Importes inusuales" },
   { tipo: "facturas_revision", etiqueta: "Por revisar" },
+  { tipo: "facturas_precio_baja", etiqueta: "Bajan de precio" },
+  { tipo: "facturas_precio_proveedor", etiqueta: "Un proveedor sube varias cosas" },
+  { tipo: "facturas_precio_pactado", etiqueta: "Precio pactado roto" },
 ];
 
 export const esTipoAlertaFacturas = (t: string): t is TipoAlertaFacturas => TIPOS_ALERTA_FACTURAS.some((x) => x.tipo === t);
@@ -50,6 +57,16 @@ export interface DatosAlerta {
   precioRefUd: number | null;
   variacionPct: number | null;
   umbralPct: number | null;
+  /** € al mes que cuesta (subida) o ahorra (bajada) con lo que se compra (20261115100000). */
+  impactoMes: number | null;
+  /** false = solo en Análisis, no en la campana (20261115100000). */
+  campana: boolean;
+  fecha: string | null;
+  /** Ahorro en 90 días (más barato en otro proveedor). */
+  ahorro: number | null;
+  /** Más barato en otro proveedor: el más barato y su precio. */
+  proveedorOtro: string | null;
+  precioOtro: number | null;
 }
 
 export interface AlertaFacturas {
@@ -112,6 +129,12 @@ export function normalizarAlertas(data: unknown): AlertaFacturas[] {
         precioRefUd: num(d.precio_ref_ud),
         variacionPct: num(d.variacion_pct),
         umbralPct: num(d.umbral_pct),
+        impactoMes: num(d.impacto_mes),
+        campana: d.campana !== false,
+        fecha: txt(d.fecha),
+        ahorro: num(d.ahorro),
+        proveedorOtro: txt(d.proveedor_otro),
+        precioOtro: num(d.precio_otro),
       },
     });
   }
@@ -280,4 +303,53 @@ export function marcasDeExploracion(
 /** El umbral de subida que traen las alertas (el mismo para todas), o null. */
 export function umbralSubida(alertas: AlertaFacturas[]): number | null {
   return alertas.find((a) => a.tipo === "facturas_precio_sube" && a.datos.umbralPct !== null)?.datos.umbralPct ?? null;
+}
+
+// ─── Textos cortos (09/11/2026, dueño: «los avisos se cortan con …») ─────────
+
+const numEs = (n: number, dec: number) => n.toLocaleString("es-ES", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+const precioCorto = (n: number) => numEs(n, n < 10 ? 2 : n < 100 ? 2 : 0);
+const pctCorto = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${numEs(Math.abs(n), Math.abs(n) < 10 && Math.round(Math.abs(n)) !== Math.abs(n) ? 1 : 0)} %`;
+/** «2026-10-02» → «02/10». */
+export const diaMes = (f: string | null | undefined): string | null => (f && /^\d{4}-\d{2}-\d{2}/.test(f) ? `${f.slice(8, 10)}/${f.slice(5, 7)}` : null);
+
+/** Título corto de una alerta para la cabecera de su menú: «Sube Melón piel de sapo +52 %». */
+export function tituloCortoAlerta(a: Pick<AlertaFacturas, "tipo" | "titulo" | "datos">): string {
+  const d = a.datos;
+  const v = d.variacionPct;
+  if ((a.tipo === "facturas_precio_sube" || a.tipo === "facturas_precio_baja") && v !== null) {
+    const nombre = a.titulo.replace(/^(Sube|Baja)\s+/, "").replace(/:\s*[-+−]?[\d.,]+\s*%$/, "");
+    return `${a.tipo === "facturas_precio_sube" ? "Sube" : "Baja"} ${nombre} ${pctCorto(v)}`;
+  }
+  return a.titulo.replace(/:\s*([-+−]?[\d.,]+\s*%)$/, " $1");
+}
+
+/**
+ * Resumen de una línea con las cifras (en vez del mensaje largo recortado):
+ * «0,95 €/kg el 02/10 · antes 0,63 · +52 % · 2 € al mes».
+ */
+export function resumenCortoAlerta(a: Pick<AlertaFacturas, "tipo" | "mensaje" | "datos">): string {
+  const d = a.datos;
+  if ((a.tipo === "facturas_precio_sube" || a.tipo === "facturas_precio_baja" || a.tipo === "facturas_precio_pactado") && d.precio !== null) {
+    const partes = [`${precioCorto(d.precio)} €/${d.medida ?? d.unidad ?? "ud"}${diaMes(d.fecha ?? d.desde) ? ` el ${diaMes(d.fecha ?? d.desde)}` : ""}`];
+    if (d.precioRef !== null) partes.push(`${a.tipo === "facturas_precio_pactado" ? "pactado" : "antes"} ${precioCorto(d.precioRef)}`);
+    if (d.variacionPct !== null) partes.push(pctCorto(d.variacionPct));
+    if (d.impactoMes !== null && a.tipo !== "facturas_precio_pactado")
+      partes.push(`${numEs(Math.abs(d.impactoMes), 0)} € al mes${a.tipo === "facturas_precio_baja" ? " menos" : ""}`);
+    return partes.join(" · ");
+  }
+  if (a.tipo === "facturas_precio_mejor" && d.ahorro !== null) {
+    const precios = d.precio !== null && d.precioOtro !== null ? ` · ${precioCorto(d.precio)} → ${precioCorto(d.precioOtro)} €/${d.medida ?? "ud"}` : "";
+    return `${d.proveedor ?? "?"} → ${d.proveedorOtro ?? "?"}${precios} · ${numEs(d.ahorro, 0)} € menos en 90 días`;
+  }
+  if (a.tipo === "facturas_precio_proveedor" && d.impactoMes !== null) return `unos ${numEs(d.impactoMes, 0)} € más al mes`;
+  // Las demás ya traen un mensaje corto; si no, la primera frase.
+  const primera = a.mensaje.split(/(?<=\.)\s/)[0] ?? a.mensaje;
+  return primera.length <= 110 ? primera : a.mensaje;
+}
+
+/** Detalle bajo el título del menú: proveedor y fecha. */
+export function detalleCortoAlerta(a: Pick<AlertaFacturas, "datos">): string | undefined {
+  const partes = [a.datos.proveedor, diaMes(a.datos.fecha ?? a.datos.hasta)].filter(Boolean);
+  return partes.length ? partes.join(" · ") : undefined;
 }
